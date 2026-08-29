@@ -1,0 +1,1 @@
+CREATE DATABASE goa_test;

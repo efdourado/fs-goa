@@ -1,5 +1,6 @@
 declare namespace Cloudflare {
   interface Env {
-    DB?: D1Database;
+    DATABASE_URL?: string;
+    APP_ORIGIN?: string;
   }
 }

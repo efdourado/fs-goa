@@ -1,0 +1,48 @@
+name: goa
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: goa
+      POSTGRES_USER: goa
+      POSTGRES_PASSWORD: goa_local_only
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U goa -d goa"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - goa_postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+
+  setup:
+    build: .
+    command: ["npm", "run", "db:setup"]
+    environment:
+      DATABASE_URL: postgresql://goa:goa_local_only@postgres:5432/goa
+      ADMIN_USERNAME: admin
+      ADMIN_NAME: Administrador
+      ADMIN_PASSWORD: goa-admin-local
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  app:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://goa:goa_local_only@postgres:5432/goa
+      APP_ORIGIN: http://localhost:3000
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+volumes:
+  goa_postgres_data:

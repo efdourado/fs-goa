@@ -1,68 +1,106 @@
-# Arquitetura da fundação
+# Arquitetura
 
-## Estado da Etapa 1
+## Visão geral
 
-A fundação atual usa React 19, TypeScript, Vinext e Vite, gerando uma aplicação compatível com Cloudflare Workers. Node 22 é ferramenta obrigatória de desenvolvimento e build. O banco permanece desativado nesta etapa (`d1: null`) e não existe autenticação fictícia.
-
-Essa escolha permite validar a interface agora sem fingir que decisões de identidade e persistência já estão resolvidas.
-
-## Fatia entregue
-
-```text
-app/page.tsx        tela “Hoje” do participante
-app/layout.tsx      idioma e metadados sociais
-app/globals.css     sistema visual responsivo
-public/og.png       imagem social do produto
-tests/              smoke tests do HTML renderizado
-docs/               roadmap e decisões
-```
-
-O conteúdo é demonstrativo e deliberadamente isolado. Nenhuma informação de usuário é guardada em memória do navegador como fonte de verdade.
-
-## Limites de domínio
-
-Quando o backend começar, o código será organizado por capacidade do produto, não por telas genéricas:
+Aplicação React 19 + TypeScript com Vinext/Vite. A API REST roda no mesmo runtime
+da interface; o servidor de produção é um processo Node (`vinext start`). O
+PostgreSQL 16+ é a única fonte de verdade. Docker Compose orquestra banco,
+migração/seed e aplicação para desenvolvimento e piloto.
 
 ```text
-features/
-  groups/
-  challenges/
-  entries/
-  metrics/
-lib/
-  auth/
-  validation/
-  ids/
-db/
-  schema/
-drizzle/
+navegador ──JSON + cookie HTTP-only──▶ Vinext / API REST ──SQL parametrizado──▶ PostgreSQL
+                                        ├── autenticação, CSRF e autorização
+                                        ├── grupos, convites e desafios
+                                        ├── registros, métricas e resultados
+                                        └── auditoria e exportação
 ```
 
-Essas pastas só serão criadas quando houver código real para elas.
+## Limites de módulo
 
-## Gate antes da Etapa 2
+| Arquivo | Responsabilidade |
+| --- | --- |
+| `app/GoaApp.tsx` | aplicação cliente responsiva e contrato REST centralizado |
+| `app/api/[...path]/route.ts` | roteamento HTTP fino; nenhuma decisão de autorização na interface |
+| `lib/auth.ts` | contas, sessões, rate limit e papéis |
+| `lib/security.ts` | PBKDF2, tokens, cookies, origem e CSRF |
+| `lib/goa-domain.ts` | grupos, convites e criação dos presets |
+| `lib/goa-challenges.ts` | campos, registros, métricas, resultados e duplicação |
+| `lib/validation.ts` | validação tipada e exportação CSV segura |
+| `db/schema.ts` | 20 tabelas, checks, índices parciais e FKs compostas |
+| `drizzle/` | única fonte de migrações reproduzíveis |
+| `scripts/` | `migrate.mjs` (migrações) e `seed-admin.mjs` (conta de administração) |
 
-Há duas rotas tecnicamente válidas, mas elas não devem ser misturadas:
+## Modelo de domínio
 
-1. **Cloudflare Worker + D1:** aproveita integralmente o runtime atual e um banco SQLite gerenciado de baixo custo.
-2. **Next.js na Vercel + PostgreSQL:** segue a infraestrutura sugerida no briefing e usa um provedor relacional do Marketplace, como Neon ou Supabase.
+Grupos são duradouros e contêm desafios. A associação do usuário ao grupo define o
+papel (`owner`, `admin`, `participant`); uma associação separada ao desafio define
+quem envia registros. Cada desafio tem um ou mais tipos de registro, campos
+semânticos estáveis e itens (por objeto) ou checkpoints (por dia).
 
-A interface já criada é reaproveitável nas duas rotas. Schema, driver, migrações e autenticação só começam depois dessa escolha.
+Números e notas são guardados como inteiros escalados. Campos e opções em uso são
+arquivados, nunca apagados. Métricas referenciam IDs de campos e são recalculadas
+sem modificar os dados de origem. Ao encerrar, blocos de resultado guardam
+snapshots da curadoria; a página pública exige um token aleatório cujo banco
+armazena apenas o hash.
 
-## Regras não negociáveis
+## Segurança
 
-- autorização em toda leitura e escrita no servidor;
-- IDs aleatórios não substituem autorização;
-- senha nunca armazenada diretamente;
-- convites armazenam hash do token e possuem expiração/revogação;
-- duplicação copia estrutura, nunca registros pessoais;
-- campos e métricas usam identificadores estáveis;
-- R2/uploads ficam fora do MVP.
+- senhas nunca são persistidas nem retornadas; PBKDF2-HMAC-SHA256 com 600.000
+  iterações e salt individual via Web Crypto;
+- nome de usuário é NFKC, minúsculo, restrito e único no PostgreSQL;
+- tokens de sessão e convite têm 256 bits; o banco guarda somente SHA-256 base64url;
+- cookie `__Host-goa_session` é `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`;
+- toda mutação autenticada exige `Origin` exata e token CSRF ligado à sessão;
+- toda consulta a recurso privado parte da associação ativa ao grupo — IDs UUID
+  não concedem acesso;
+- participante só altera o próprio registro; a administração é validada no servidor;
+- payload JSON tem limite e campos dinâmicos têm validação estrita;
+- CSV neutraliza células que poderiam virar fórmulas;
+- métricas usam enums, nunca SQL ou fórmulas arbitrárias;
+- duplicação usa allowlist estrutural em transação: desafio, tipos, checkpoints,
+  itens, campos, opções e métricas ganham novos IDs; participantes, registros,
+  valores, resultados, convites e tokens nunca são copiados;
+- auditoria append-only registra correções e transições, sem senha ou token;
+- login tem limite persistente por nome de usuário normalizado.
 
-## Estratégia de testes
+Cobertura automatizada: `tests/security.test.ts`, `tests/validation.test.ts`,
+`tests/metrics.test.ts` e `tests/integration/mvp.test.ts` (contas distintas,
+convite, CSRF negativo, ocultação de rascunho, isolamento entre grupos, registro
+por item e por dia, exportação, encerramento, vitrine e duplicação com
+texto-canário).
 
-- **Etapa 1:** lint, TypeScript, build e smoke test do HTML;
-- **domínio:** testes unitários de regras e métricas;
-- **persistência:** integração contra banco local com migrações reais;
-- **segurança:** matriz negativa de acesso entre usuários e grupos;
-- **fluxos críticos:** navegador apenas para cadastro, convite, registro e encerramento.
+## Operação
+
+O passo `setup` (`npm run db:setup`) só termina após aplicar `drizzle/` e garantir
+a conta de administração; a aplicação depende desse término. O PostgreSQL tem
+healthcheck e volume nomeado. `GET /api/health` verifica processo e banco.
+
+`DATABASE_URL`, `APP_ORIGIN` e `ADMIN_PASSWORD` são segredos do runtime e nunca
+entram na imagem. O banco Docker local não deve ser exposto à internet.
+
+## Decisões
+
+**Runtime.** React/Vinext/Vite com limite compatível com Cloudflare Workers;
+produção roda como processo Node em contêiner. Sem dependência de D1/R2. A
+aplicação não sobe sem `DATABASE_URL`.
+
+**Persistência.** PostgreSQL + Drizzle para schema e migrações. Relações privadas,
+papéis, histórico e auditoria normalizados; JSONB restrito a metadados e snapshots.
+FKs compostas garantem que participante, campo, item e opção pertençam ao mesmo
+escopo. Transações cobrem convite, registro, encerramento e duplicação.
+
+**Identidade.** Contas com nome, usuário e senha; e-mail opcional. Sessões e
+convites por tokens opacos armazenados só por hash. Autorização sempre a partir da
+associação ativa ao grupo; IDs aleatórios reduzem enumeração mas não substituem
+autorização. Identidade de terceiros pode ser adicionada depois sem mudar o domínio.
+
+## Fora do MVP
+
+Recuperação de conta por e-mail verificado; transferência explícita de ownership
+com confirmação; backup/restauração guiados para administradores do ambiente;
+mediana e dispersão nas métricas; reagendamento em lote de itens ao duplicar;
+sequência diária e melhor semana para o piloto de leitura; templates entre grupos
+com consentimento do autor; upload de fotos e vídeos.
+
+Antes de hospedagem ampla: backups, rotação do segredo do banco e TLS do provedor;
+o rate limit por usuário não substitui proteção de borda.

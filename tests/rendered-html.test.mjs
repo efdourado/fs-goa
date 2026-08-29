@@ -29,7 +29,7 @@ async function render(pathname = "/") {
   );
 }
 
-test("renderiza a primeira experiencia do participante", async () => {
+test("renderiza o shell acessível da aplicação", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
@@ -37,11 +37,9 @@ test("renderiza a primeira experiencia do participante", async () => {
   const html = await response.text();
   assert.match(html, /<html[^>]+lang="pt-BR"/i);
   assert.match(html, /<title>Goa — desafios que viram história<\/title>/i);
-  assert.match(html, /Boa noite, Eduardo\./);
-  assert.match(html, /Cine · edição 1/);
-  assert.match(html, /Aftersun/);
-  assert.match(html, /Salvar avaliação/);
-  assert.match(html, /aria-valuenow="18"/);
+  assert.match(html, /Carregando o Goa/);
+  assert.match(html, /role="status"/);
+  assert.match(html, /aria-live="polite"/);
 });
 
 test("publica metadados sociais proprios e absolutos", async () => {

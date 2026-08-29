@@ -1,0 +1,2 @@
+ALTER TABLE "challenge_fields" ADD COLUMN "settings" jsonb DEFAULT '{}'::jsonb NOT NULL;--> statement-breakpoint
+ALTER TABLE "challenge_fields" ADD CONSTRAINT "challenge_fields_settings_object_check" CHECK (jsonb_typeof("challenge_fields"."settings") = 'object');
