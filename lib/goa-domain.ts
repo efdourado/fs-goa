@@ -295,6 +295,36 @@ export async function updateGroup(
   });
 }
 
+export async function softDeleteGroup(session: SessionContext, groupId: string) {
+  return inTransaction(async (client) => {
+    await requireGroupRole(session.user.id, groupId, ["owner"], client);
+    const current = await oneOrNull<{ name: string }>(
+      client,
+      "SELECT name FROM groups WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
+      [groupId],
+    );
+    if (!current) throw new ApiError(404, "not_found", "Grupo não encontrado.");
+    await client.query(
+      `UPDATE groups
+          SET deleted_at = now(), deleted_by_user_id = $2, updated_at = now()
+        WHERE id = $1`,
+      [groupId, session.user.id],
+    );
+    await writeAudit(
+      client,
+      groupId,
+      null,
+      session.user.id,
+      "group.deleted",
+      "group",
+      groupId,
+      current,
+      null,
+    );
+    return { id: groupId, deleted: true };
+  });
+}
+
 export async function createInvite(
   session: SessionContext,
   groupId: string,

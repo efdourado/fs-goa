@@ -899,6 +899,33 @@ export async function transitionChallenge(
   });
 }
 
+export async function softDeleteChallenge(session: SessionContext, challengeId: string) {
+  return inTransaction(async (client) => {
+    const access = await challengeAccess(session.user.id, challengeId, client, true);
+    if (!access.canManage) {
+      throw new ApiError(403, "forbidden", "Somente administradores podem apagar o desafio.");
+    }
+    await client.query(
+      `UPDATE challenges
+          SET deleted_at = now(), deleted_by_user_id = $2, updated_at = now()
+        WHERE id = $1`,
+      [challengeId, session.user.id],
+    );
+    await writeAudit(
+      client,
+      access.challenge.group_id,
+      challengeId,
+      session.user.id,
+      "challenge.deleted",
+      "challenge",
+      challengeId,
+      { title: access.challenge.title, status: access.challenge.status },
+      null,
+    );
+    return { id: challengeId, deleted: true };
+  });
+}
+
 interface StorageField extends FieldRow {
   option_ids: string[];
 }

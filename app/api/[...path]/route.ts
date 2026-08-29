@@ -18,6 +18,7 @@ import {
   saveChallengeFields,
   saveChallengeItems,
   setChallengeParticipants,
+  softDeleteChallenge,
   transitionChallenge,
   updateChallenge,
   updateChallengeItem,
@@ -30,6 +31,7 @@ import {
   createGroup,
   createInvite,
   previewInvite,
+  softDeleteGroup,
   updateGroup,
 } from "@/lib/goa-domain";
 import { getPool } from "@/lib/db";
@@ -156,6 +158,20 @@ export async function PATCH(request: Request): Promise<Response> {
     }
     if (path[0] === "entries" && path.length === 2) {
       return json(await updateEntry(session, path[1], body));
+    }
+    return notFound();
+  });
+}
+
+export async function DELETE(request: Request): Promise<Response> {
+  return handleApi(async () => {
+    const path = segments(request);
+    const session = await requireMutationSession(request);
+    if (path[0] === "groups" && path.length === 2) {
+      return json(await softDeleteGroup(session, path[1]));
+    }
+    if (path[0] === "challenges" && path.length === 2) {
+      return json(await softDeleteChallenge(session, path[1]));
     }
     return notFound();
   });

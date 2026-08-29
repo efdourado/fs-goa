@@ -6,13 +6,13 @@ const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("DATABASE_URL é obrigatória para o teste de integração.");
 process.env.APP_ORIGIN = "http://goa.test";
 
-const { GET, PATCH, POST } = await import("../../app/api/[...path]/route");
+const { DELETE, GET, PATCH, POST } = await import("../../app/api/[...path]/route");
 const adminPool = new pg.Pool({ connectionString: databaseUrl, max: 1 });
 
 type ClientSession = { cookie: string; csrf: string; user: { id: string; name: string; username: string } };
 
 async function call(
-  method: "GET" | "POST" | "PATCH",
+  method: "GET" | "POST" | "PATCH" | "DELETE",
   path: string,
   options: { session?: ClientSession; body?: unknown; csrf?: boolean } = {},
 ) {
@@ -28,7 +28,10 @@ async function call(
     headers,
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
   });
-  const response = method === "GET" ? await GET(request) : method === "POST" ? await POST(request) : await PATCH(request);
+  const response = method === "GET" ? await GET(request)
+    : method === "POST" ? await POST(request)
+    : method === "PATCH" ? await PATCH(request)
+    : await DELETE(request);
   const contentType = response.headers.get("content-type") ?? "";
   const body = contentType.includes("application/json") ? await response.json() : await response.text();
   return { response, body };
@@ -519,4 +522,40 @@ test("aplica limites de criação por dono e por grupo", async () => {
   const bootstrapAfter = await call("GET", "/api/bootstrap", { session: owner });
   const visibleGroups = (bootstrapAfter.body as { groups: Array<{ id: string }> }).groups.map((group) => group.id);
   assert.ok(!visibleGroups.includes(groupIds[5]), "grupo na lixeira não aparece no bootstrap");
+});
+
+test("soft-delete de grupo e desafio pelos endpoints DELETE", async () => {
+  const owner = await register("Dono Lixeira", "dono_lixeira");
+  const stranger = await register("Estranho", "estranho_lixeira");
+
+  const group = await call("POST", "/api/groups", { session: owner, body: { name: "Grupo descartável" } });
+  const groupId = (group.body as { id: string }).id;
+
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: {
+      title: "Desafio descartável", startsOn: "2026-09-01", endsOn: "2026-09-30", submissionMode: "item",
+      participantIds: [owner.user.id], items: [{ title: "Único" }],
+      fields: [{ key: "nota", label: "Nota", type: "rating", required: true }],
+    },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+
+  assert.equal((await call("DELETE", `/api/challenges/${challengeId}`, { session: stranger })).response.status, 404, "estranho não descobre o desafio");
+  const deleteChallenge = await call("DELETE", `/api/challenges/${challengeId}`, { session: owner });
+  assert.equal(deleteChallenge.response.status, 200, JSON.stringify(deleteChallenge.body));
+  assert.equal((await call("GET", `/api/challenges/${challengeId}`, { session: owner })).response.status, 404, "desafio na lixeira responde 404");
+
+  assert.equal((await call("DELETE", `/api/groups/${groupId}`, { session: stranger })).response.status, 404, "estranho não descobre o grupo");
+  const deleteGroup = await call("DELETE", `/api/groups/${groupId}`, { session: owner });
+  assert.equal(deleteGroup.response.status, 200, JSON.stringify(deleteGroup.body));
+  assert.equal((await call("DELETE", `/api/groups/${groupId}`, { session: owner })).response.status, 404, "apagar duas vezes é 404");
+
+  const auditRows = await adminPool.query<{ action: string }>(
+    "SELECT action FROM audit_events WHERE group_id = $1 ORDER BY created_at",
+    [groupId],
+  );
+  const actions = auditRows.rows.map((row) => row.action);
+  assert.ok(actions.includes("challenge.deleted"), "auditoria registra challenge.deleted");
+  assert.ok(actions.includes("group.deleted"), "auditoria registra group.deleted");
 });

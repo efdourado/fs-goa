@@ -241,7 +241,7 @@ class ApiError extends Error {
 async function apiRequest<T>(
   path: string,
   options: {
-    method?: "GET" | "POST" | "PATCH";
+    method?: "GET" | "POST" | "PATCH" | "DELETE";
     body?: unknown;
     csrfToken?: string;
     signal?: AbortSignal;
@@ -809,6 +809,7 @@ function GroupScreen({
   onOpenAdmin,
   onCreateInvite,
   onUpdateGroup,
+  onDeleteGroup,
 }: {
   group: GroupSummary;
   challenges: ChallengeSummary[];
@@ -818,6 +819,7 @@ function GroupScreen({
   onOpenAdmin: (id: Id) => void;
   onCreateInvite: (payload: { expiresInDays: number; maxUses: number }) => Promise<{ token?: string; url?: string }>;
   onUpdateGroup: (payload: { name: string; description: string }) => Promise<void>;
+  onDeleteGroup?: () => Promise<void>;
 }) {
   const [showInvite, setShowInvite] = useState(false);
   const [showGroupEdit, setShowGroupEdit] = useState(false);
@@ -851,6 +853,19 @@ function GroupScreen({
     } catch (cause) {
       setGroupError(errorMessage(cause));
     } finally {
+      setGroupBusy(false);
+    }
+  }
+
+  async function deleteGroup() {
+    if (!onDeleteGroup) return;
+    if (!window.confirm(`Mover "${group.name}" para a lixeira? Os desafios e registros somem do app, mas ficam recuperáveis até você limpar a lixeira na administração.`)) return;
+    setGroupBusy(true);
+    setGroupError(null);
+    try {
+      await onDeleteGroup();
+    } catch (cause) {
+      setGroupError(errorMessage(cause));
       setGroupBusy(false);
     }
   }
@@ -889,6 +904,12 @@ function GroupScreen({
             <div className="sm:col-span-2"><StatusMessage error={groupError} success={groupSuccess} /></div>
             <div className="flex flex-wrap gap-2 sm:col-span-2"><Button type="submit" disabled={groupBusy}>{groupBusy ? "Salvando…" : "Salvar grupo"}</Button><Button variant="ghost" disabled={groupBusy} onClick={toggleGroupEdit}>Cancelar</Button></div>
           </form>
+          {onDeleteGroup ? (
+            <div className="mt-5 border-t border-[var(--line)] pt-4">
+              <Button variant="danger" disabled={groupBusy} onClick={() => void deleteGroup()}>Apagar grupo</Button>
+              <p className="mt-2 text-xs text-[var(--muted)]">Vai para a lixeira. Recuperável até você limpar a lixeira na administração.</p>
+            </div>
+          ) : null}
         </section>
       ) : null}
 
@@ -1504,12 +1525,14 @@ function AdminOverview({
   onSave,
   onTransition,
   onDuplicate,
+  onDelete,
 }: {
   challenge: ChallengeDetail;
   entries: Entry[];
   onSave: (payload: Partial<ChallengeSummary>) => Promise<void>;
   onTransition: (status: "active" | "closed") => Promise<void>;
   onDuplicate: (payload: { title: string }) => Promise<void>;
+  onDelete?: () => Promise<void>;
 }) {
   const [title, setTitle] = useState(challenge.title);
   const [description, setDescription] = useState(challenge.description ?? "");
@@ -1573,6 +1596,14 @@ function AdminOverview({
           <div className="flex items-end"><Button type="submit" variant="secondary" disabled={busy === "duplicate"}>{busy === "duplicate" ? "Duplicando…" : "Criar cópia"}</Button></div>
         </form>
       </section>
+
+      {onDelete ? (
+        <section className={cx(cardClass, "p-5 sm:p-7")}>
+          <h2 className="text-xl font-bold">Apagar desafio</h2>
+          <p className="mt-1 text-sm leading-6 text-[var(--muted)]">Move o desafio e seus registros para a lixeira. Some do app, mas continua recuperável até você limpar a lixeira na administração.</p>
+          <div className="mt-4"><Button variant="danger" disabled={Boolean(busy)} onClick={() => { if (window.confirm(`Mover "${challenge.title}" para a lixeira?`)) void run("delete", onDelete, "Desafio movido para a lixeira."); }}>Apagar desafio</Button></div>
+        </section>
+      ) : null}
       <StatusMessage error={error} success={success} />
     </div>
   );
@@ -1929,6 +1960,7 @@ function AdminScreen({
   onSaveBasics,
   onTransition,
   onDuplicate,
+  onDelete,
   onSaveParticipants,
   onSaveFields,
   onAddItems,
@@ -1948,6 +1980,7 @@ function AdminScreen({
   onSaveBasics: (payload: Partial<ChallengeSummary>) => Promise<void>;
   onTransition: (status: "active" | "closed") => Promise<void>;
   onDuplicate: (payload: { title: string }) => Promise<void>;
+  onDelete?: () => Promise<void>;
   onSaveParticipants: (ids: Id[]) => Promise<void>;
   onSaveFields: (fields: ChallengeField[]) => Promise<void>;
   onAddItems: (payload: Record<string, unknown>) => Promise<void>;
@@ -1971,7 +2004,7 @@ function AdminScreen({
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><button className="min-h-11 text-sm font-bold text-[var(--muted)] hover:text-[var(--ink)]" type="button" onClick={onBack}>← {group?.name ?? "Início"}</button><Button variant="secondary" onClick={onViewParticipant}>Ver como participante</Button></div>
       <PageHeading title={challenge.title} description="Configure, revise e apresente — controles administrativos continuam validados no servidor." action={<ChallengeStatusBadge status={challenge.status} />} />
       <nav className="mb-6 flex gap-1 overflow-x-auto rounded-2xl bg-stone-200/70 p-1" aria-label="Áreas administrativas">{tabs.map((item) => <button className={cx("min-h-11 flex-none rounded-xl px-4 text-sm font-bold", tab === item.id ? "bg-white text-[var(--violet-dark)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]")} type="button" onClick={() => onTab(item.id)} key={item.id}>{item.label}</button>)}</nav>
-      {tab === "overview" ? <AdminOverview challenge={challenge} entries={entries} onSave={onSaveBasics} onTransition={onTransition} onDuplicate={onDuplicate} /> : null}
+      {tab === "overview" ? <AdminOverview challenge={challenge} entries={entries} onSave={onSaveBasics} onTransition={onTransition} onDuplicate={onDuplicate} onDelete={onDelete} /> : null}
       {tab === "participants" ? <AdminParticipants key={`${challenge.id}:${challenge.participants.map((participant) => participant.userId ?? participant.id).join(",")}`} challenge={challenge} group={group} onSave={onSaveParticipants} /> : null}
       {tab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.fields.map((field) => field.id ?? field.key).join(",")}`} challenge={challenge} onSave={onSaveFields} /> : null}
       {tab === "items" ? <AdminItems challenge={challenge} onAdd={onAddItems} onUpdate={onUpdateItem} /> : null}
@@ -2097,6 +2130,20 @@ export default function GoaApp() {
     await refreshBootstrap();
   }
 
+  async function deleteGroup(groupId: Id) {
+    if (!bootstrap) return;
+    await apiRequest(API_PATHS.group(groupId), { method: "DELETE", csrfToken: bootstrap.csrfToken });
+    await refreshBootstrap();
+    setScreen({ kind: "dashboard" });
+  }
+
+  async function deleteChallenge(challengeId: Id, groupId?: Id) {
+    if (!bootstrap) return;
+    await apiRequest(API_PATHS.challenge(challengeId), { method: "DELETE", csrfToken: bootstrap.csrfToken });
+    await refreshBootstrap();
+    setScreen(groupId ? { kind: "group", groupId } : { kind: "dashboard" });
+  }
+
   async function createChallenge(groupId: Id, input: ChallengeCreationInput) {
     if (!bootstrap) return;
     const created = await apiRequest<unknown>(API_PATHS.groupChallenges(groupId), {
@@ -2196,7 +2243,7 @@ export default function GoaApp() {
   if (screen.kind === "invite") {
     content = <InviteScreen key={screen.token} token={screen.token} user={user} csrfToken={bootstrap.csrfToken} onBack={() => setScreen({ kind: "dashboard" })} onNeedAuth={() => undefined} onAccepted={async () => { await refreshBootstrap(); setPendingInviteToken(null); window.history.replaceState({}, "", window.location.pathname); setScreen({ kind: "dashboard" }); }} />;
   } else if (screen.kind === "group" && selectedGroup) {
-    content = <GroupScreen key={selectedGroup.id} group={selectedGroup} challenges={bootstrap.challenges.filter((challenge) => challenge.groupId === selectedGroup.id)} onBack={() => setScreen({ kind: "dashboard" })} onCreateChallenge={() => setScreen({ kind: "create-challenge", groupId: selectedGroup.id })} onOpenChallenge={(id) => void openParticipant(id)} onOpenAdmin={(id) => void openAdmin(id)} onCreateInvite={async (payload) => apiRequest<{ token?: string; url?: string }>(API_PATHS.groupInvites(selectedGroup.id), { method: "POST", body: payload, csrfToken: bootstrap.csrfToken })} onUpdateGroup={(payload) => updateGroup(selectedGroup.id, payload)} />;
+    content = <GroupScreen key={selectedGroup.id} group={selectedGroup} challenges={bootstrap.challenges.filter((challenge) => challenge.groupId === selectedGroup.id)} onBack={() => setScreen({ kind: "dashboard" })} onCreateChallenge={() => setScreen({ kind: "create-challenge", groupId: selectedGroup.id })} onOpenChallenge={(id) => void openParticipant(id)} onOpenAdmin={(id) => void openAdmin(id)} onCreateInvite={async (payload) => apiRequest<{ token?: string; url?: string }>(API_PATHS.groupInvites(selectedGroup.id), { method: "POST", body: payload, csrfToken: bootstrap.csrfToken })} onUpdateGroup={(payload) => updateGroup(selectedGroup.id, payload)} onDeleteGroup={selectedGroup.role === "owner" ? () => deleteGroup(selectedGroup.id) : undefined} />;
   } else if (screen.kind === "create-challenge" && selectedGroup && canManage(selectedGroup.role)) {
     content = <CreateChallengeScreen key={selectedGroup.id} group={selectedGroup} onBack={() => setScreen({ kind: "group", groupId: selectedGroup.id })} onCreate={(input) => createChallenge(selectedGroup.id, input)} />;
   } else if ((screen.kind === "challenge" || screen.kind === "admin") && (detailLoading || !selectedChallenge || selectedChallenge.id !== screen.challengeId)) {
@@ -2204,7 +2251,7 @@ export default function GoaApp() {
   } else if (screen.kind === "challenge" && selectedChallenge) {
     content = <ParticipantChallengeScreen key={selectedChallenge.id} challenge={selectedChallenge} entries={entries} user={user} tab={screen.tab} onTab={(tab) => setScreen({ ...screen, tab })} onBack={() => setScreen({ kind: "dashboard" })} onAdmin={canManage(selectedRole) ? () => void openAdmin(selectedChallenge.id) : undefined} onSaveEntry={saveEntry} />;
   } else if (screen.kind === "admin" && selectedChallenge && canManage(selectedRole)) {
-    content = <AdminScreen key={selectedChallenge.id} challenge={selectedChallenge} entries={entries} group={selectedGroup} tab={screen.tab} onTab={(tab) => setScreen({ ...screen, tab })} onBack={() => selectedGroup ? setScreen({ kind: "group", groupId: selectedGroup.id }) : setScreen({ kind: "dashboard" })} onViewParticipant={() => setScreen({ kind: "challenge", challengeId: selectedChallenge.id, tab: selectedChallenge.status === "closed" ? "results" : "today" })} onSaveBasics={(payload) => mutateChallenge(API_PATHS.challenge(selectedChallenge.id), payload, "PATCH")} onTransition={(status) => mutateChallenge(API_PATHS.transition(selectedChallenge.id), { status })} onDuplicate={duplicateChallenge} onSaveParticipants={(participantIds) => mutateChallenge(API_PATHS.participants(selectedChallenge.id), { replace: true, participantIds })} onSaveFields={(fields) => mutateChallenge(API_PATHS.fields(selectedChallenge.id), { replace: true, archiveMissing: true, fields })} onAddItems={(payload) => mutateChallenge(API_PATHS.items(selectedChallenge.id), payload)} onUpdateItem={(itemId, payload) => mutateChallenge(API_PATHS.item(selectedChallenge.id, itemId), payload, "PATCH")} onPatchEntry={(entryId, values, reason) => mutateChallenge(API_PATHS.entry(entryId), { values, reason }, "PATCH")} onExport={exportCsv} onAddMetric={(payload) => mutateChallenge(API_PATHS.metrics(selectedChallenge.id), payload)} onSaveResult={(payload) => mutateChallenge(API_PATHS.results(selectedChallenge.id), payload)} />;
+    content = <AdminScreen key={selectedChallenge.id} challenge={selectedChallenge} entries={entries} group={selectedGroup} tab={screen.tab} onTab={(tab) => setScreen({ ...screen, tab })} onBack={() => selectedGroup ? setScreen({ kind: "group", groupId: selectedGroup.id }) : setScreen({ kind: "dashboard" })} onViewParticipant={() => setScreen({ kind: "challenge", challengeId: selectedChallenge.id, tab: selectedChallenge.status === "closed" ? "results" : "today" })} onSaveBasics={(payload) => mutateChallenge(API_PATHS.challenge(selectedChallenge.id), payload, "PATCH")} onTransition={(status) => mutateChallenge(API_PATHS.transition(selectedChallenge.id), { status })} onDuplicate={duplicateChallenge} onDelete={canManage(selectedRole) ? () => deleteChallenge(selectedChallenge.id, selectedGroup?.id) : undefined} onSaveParticipants={(participantIds) => mutateChallenge(API_PATHS.participants(selectedChallenge.id), { replace: true, participantIds })} onSaveFields={(fields) => mutateChallenge(API_PATHS.fields(selectedChallenge.id), { replace: true, archiveMissing: true, fields })} onAddItems={(payload) => mutateChallenge(API_PATHS.items(selectedChallenge.id), payload)} onUpdateItem={(itemId, payload) => mutateChallenge(API_PATHS.item(selectedChallenge.id, itemId), payload, "PATCH")} onPatchEntry={(entryId, values, reason) => mutateChallenge(API_PATHS.entry(entryId), { values, reason }, "PATCH")} onExport={exportCsv} onAddMetric={(payload) => mutateChallenge(API_PATHS.metrics(selectedChallenge.id), payload)} onSaveResult={(payload) => mutateChallenge(API_PATHS.results(selectedChallenge.id), payload)} />;
   } else if (screen.kind === "admin" || screen.kind === "create-challenge") {
     content = <main className="mx-auto max-w-2xl px-5 py-16"><EmptyState title="Acesso administrativo indisponível" description="Você não possui papel de responsável ou administrador neste grupo. O servidor também valida cada operação." action={<Button onClick={() => setScreen({ kind: "dashboard" })}>Voltar ao início</Button>} /></main>;
   } else {
