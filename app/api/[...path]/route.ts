@@ -40,6 +40,9 @@ import {
   requireMutationOrigin,
 } from "@/lib/http";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 function segments(request: Request): string[] {
   return new URL(request.url).pathname.split("/").filter(Boolean).slice(1);
 }

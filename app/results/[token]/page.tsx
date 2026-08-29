@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { publicResults } from "@/lib/goa-challenges";
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type PublicMetric = {

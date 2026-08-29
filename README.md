@@ -4,8 +4,9 @@ Plataforma web para desafios privados e personalizáveis. O participante registr
 o sistema organiza e calcula; o administrador revisa e transforma o resultado em
 memória do grupo.
 
-React 19 + TypeScript sobre Vinext/Vite, API REST no mesmo runtime e PostgreSQL
-como fonte de verdade. O MVP está completo e verificado por testes automatizados.
+Next.js 16 (App Router) + React 19 + TypeScript, API REST no mesmo runtime e
+PostgreSQL como fonte de verdade. O MVP está completo e verificado por testes
+automatizados.
 
 ## Rodar localmente
 
@@ -58,19 +59,33 @@ DATABASE_URL=postgresql://goa:goa_local_only@127.0.0.1:5433/goa_test \
 
 O teste de integração se recusa a limpar qualquer banco que não se chame `goa_test`.
 
-## Produção
+## Produção (Vercel + Neon)
 
-Precisa apenas de um PostgreSQL acessível e dos segredos do runtime — nenhum banco
-local é exposto.
+O banco de produção é o PostgreSQL do Neon (`sa-east-1`); nenhum banco local é
+exposto.
 
-1. Configure os segredos: `DATABASE_URL`, `APP_ORIGIN` (origem pública exata),
-   `ADMIN_PASSWORD` (mínimo 10 caracteres).
-2. Build e deploy da imagem (`Dockerfile`) no seu provedor de contêiner.
-3. A cada deploy, rode `npm run db:setup` para aplicar migrações e garantir a conta
-   de administração.
+1. **Vercel → Project Settings**: Framework Preset = **Next.js**, Build Command e
+   Output padrão (não sobrescreva).
+2. **Environment Variables** (Production): `DATABASE_URL` (URL do Neon com
+   `sslmode=require`), `APP_ORIGIN` (origem pública exata, ex.: `https://goa.vercel.app`),
+   `ADMIN_PASSWORD` (mínimo 10 caracteres). Opcional: `ADMIN_USERNAME`, `ADMIN_NAME`.
+3. **`git push`** dispara o build e o deploy.
+4. **Migração + conta de administração** (uma vez, e a cada nova migração) — rode
+   contra o Neon a partir da sua máquina:
 
-O deploy atual usa o PostgreSQL do Neon (`sa-east-1`). A `DATABASE_URL` completa
-vive só nos segredos do provedor e no `.env.local` (fora do Git).
+   ```bash
+   set -a; . ./.env.production.local; set +a
+   npm run db:setup
+   ```
+
+   `.env.production.local` (fora do Git) guarda `DATABASE_URL`/`ADMIN_PASSWORD` de
+   produção; ou exporte as variáveis manualmente.
+
+### Contêiner (alternativa à Vercel)
+
+`Dockerfile` + `compose.yaml` sobem aplicação, migração/seed e um PostgreSQL local.
+Em outro provedor de contêiner, defina os mesmos segredos e rode `npm run db:setup`
+no deploy.
 
 ## Estrutura
 

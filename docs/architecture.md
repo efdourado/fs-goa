@@ -2,13 +2,13 @@
 
 ## Visão geral
 
-Aplicação React 19 + TypeScript com Vinext/Vite. A API REST roda no mesmo runtime
-da interface; o servidor de produção é um processo Node (`vinext start`). O
-PostgreSQL 16+ é a única fonte de verdade. Docker Compose orquestra banco,
-migração/seed e aplicação para desenvolvimento e piloto.
+Aplicação Next.js 16 (App Router) + React 19 + TypeScript. A API REST são route
+handlers no mesmo runtime da interface, todos com runtime Node e renderização
+dinâmica (`force-dynamic`). O PostgreSQL 16+ é a única fonte de verdade. O deploy
+padrão é a Vercel com PostgreSQL do Neon; Docker Compose replica tudo localmente.
 
 ```text
-navegador ──JSON + cookie HTTP-only──▶ Vinext / API REST ──SQL parametrizado──▶ PostgreSQL
+navegador ──JSON + cookie HTTP-only──▶ Next.js / route handlers ──SQL parametrizado──▶ PostgreSQL
                                         ├── autenticação, CSRF e autorização
                                         ├── grupos, convites e desafios
                                         ├── registros, métricas e resultados
@@ -71,18 +71,20 @@ texto-canário).
 
 ## Operação
 
-O passo `setup` (`npm run db:setup`) só termina após aplicar `drizzle/` e garantir
-a conta de administração; a aplicação depende desse término. O PostgreSQL tem
-healthcheck e volume nomeado. `GET /api/health` verifica processo e banco.
+`npm run db:setup` (migração + conta de administração) roda uma vez por schema novo,
+contra o banco de destino. Nenhuma rota acessa o banco em tempo de build, então o
+build da Vercel não precisa de `DATABASE_URL`. No Compose, o serviço `setup` roda
+antes de `app`; o PostgreSQL tem healthcheck e volume nomeado. `GET /api/health`
+verifica processo e banco.
 
-`DATABASE_URL`, `APP_ORIGIN` e `ADMIN_PASSWORD` são segredos do runtime e nunca
-entram na imagem. O banco Docker local não deve ser exposto à internet.
+`DATABASE_URL`, `APP_ORIGIN` e `ADMIN_PASSWORD` são segredos do runtime (variáveis
+de ambiente da Vercel ou do provedor) e nunca entram no repositório nem na imagem.
 
 ## Decisões
 
-**Runtime.** React/Vinext/Vite com limite compatível com Cloudflare Workers;
-produção roda como processo Node em contêiner. Sem dependência de D1/R2. A
-aplicação não sobe sem `DATABASE_URL`.
+**Runtime.** Next.js 16 puro (sem Vite/adapters). API como route handlers Node,
+sempre dinâmicos. Deploy na Vercel por `git push`; a mesma imagem roda em qualquer
+contêiner Node. A aplicação não acessa o banco sem `DATABASE_URL`.
 
 **Persistência.** PostgreSQL + Drizzle para schema e migrações. Relações privadas,
 papéis, histórico e auditoria normalizados; JSONB restrito a metadados e snapshots.
