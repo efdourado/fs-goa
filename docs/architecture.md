@@ -19,14 +19,15 @@ navegador ──JSON + cookie HTTP-only──▶ Next.js / route handlers ──
 
 | Arquivo | Responsabilidade |
 | --- | --- |
-| `app/GoaApp.tsx` | aplicação cliente responsiva e contrato REST centralizado |
+| `app/GoaApp.tsx` | estado global, navegação e orquestração da aplicação cliente |
+| `app/goa/` | contrato REST, tipos, componentes e telas organizados por área |
 | `app/api/[...path]/route.ts` | roteamento HTTP fino; nenhuma decisão de autorização na interface |
 | `lib/auth.ts` | contas, sessões, rate limit e papéis |
 | `lib/security.ts` | PBKDF2, tokens, cookies, origem e CSRF |
-| `lib/goa-domain.ts` | grupos, convites e criação dos presets |
-| `lib/goa-challenges.ts` | campos, registros, métricas, resultados e duplicação |
+| `lib/goa-domain.ts` + `lib/goa/domain/` | fachada e módulos de grupos, convites e criação dos presets |
+| `lib/goa-challenges.ts` + `lib/goa/challenges/` | fachada e módulos de campos, registros, métricas, resultados e duplicação |
 | `lib/validation.ts` | validação tipada e exportação CSV segura |
-| `db/schema.ts` | 20 tabelas, checks, índices parciais e FKs compostas |
+| `db/schema.ts` + `db/schema/` | fachada e 20 tabelas divididas por área do domínio |
 | `drizzle/` | única fonte de migrações reproduzíveis |
 | `scripts/` | `migrate.mjs` (migrações) e `seed-admin.mjs` (conta de administração) |
 
