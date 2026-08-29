@@ -122,3 +122,9 @@ pública de resultados por token rotacionável; duplicação exclusivamente estr
 
 Ver [docs/architecture.md](docs/architecture.md) para o modelo de domínio, o
 desenho de segurança e as decisões, e a lista do que ficou fora do MVP.
+
+## Para onde vai
+
+[ROADMAP.md](ROADMAP.md) reúne as frentes de evolução, as decisões de arquitetura
+em aberto e as fases — de "avaliar a qualquer hora" e viés de indicação ao acervo
+vivo do grupo e ao motor de análise.

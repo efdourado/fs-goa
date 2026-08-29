@@ -93,9 +93,7 @@ nunca o conteúdo dos grupos:
   mudar a própria conta), desativar/reativar conta, revogar sessões, gerar link de
   redefinição de senha.
 
-## Roadmap (não agora)
+## Roadmap
 
-- **Bilíngue** — interface em inglês e português (i18n).
-- **Dark mode**.
-- **Entrega real de e-mail** para redefinição de senha (ex.: Resend) — hoje é
-  mediada pelo administrador.
+A evolução do Goa — frentes, decisões em aberto e fases — está em
+[../ROADMAP.md](../ROADMAP.md).
