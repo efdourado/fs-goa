@@ -613,3 +613,62 @@ test("área de administração: acesso, painel, lixeira e contas", async () => {
   const selfDisable = await call("POST", "/api/admin/users/disable", { session: adminSession, body: { userId: admin.user.id, disabled: true } });
   assert.equal(selfDisable.response.status, 400, "admin não desativa a própria conta");
 });
+
+test("e-mail, login por e-mail, conta e redefinição de senha", async () => {
+  const admin = await register("Suporte", "suporte_admin");
+  await adminPool.query("UPDATE users SET platform_admin = true WHERE id = $1", [admin.user.id]);
+  const adminSession = await login("suporte_admin");
+
+  // register carries the e-mail through
+  const created = await call("POST", "/api/auth/register", {
+    body: { name: "Carla", username: "carla_email", password: "uma senha segura 123", email: "Carla@Example.com" },
+  });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  assert.equal((created.body as { user: { email: string } }).user.email, "Carla@Example.com");
+
+  // a second account cannot claim the same e-mail
+  const dupe = await call("POST", "/api/auth/register", {
+    body: { name: "Outra", username: "outra_email", password: "uma senha segura 123", email: "carla@example.com" },
+  });
+  assert.equal(dupe.response.status, 409, JSON.stringify(dupe.body));
+  assert.equal((dupe.body as { error: string }).error, "email_taken");
+
+  // login works by e-mail (case-insensitive) and by username
+  assert.equal((await call("POST", "/api/auth/login", { body: { username: "CARLA@example.com", password: "uma senha segura 123" } })).response.status, 200, "login por e-mail");
+  assert.equal((await call("POST", "/api/auth/login", { body: { username: "carla_email", password: "uma senha segura 123" } })).response.status, 200, "login por usuário");
+
+  // forgot -> pending flag in admin -> admin mints a link
+  assert.equal((await call("POST", "/api/auth/forgot", { body: { email: "carla@example.com" } })).response.status, 202);
+  const users = await call("GET", "/api/admin/users", { session: adminSession });
+  const carlaRow = (users.body as { users: Array<{ username: string; pendingReset: unknown }> }).users.find((u) => u.username === "carla_email");
+  assert.ok(carlaRow?.pendingReset, "reset pendente aparece no painel");
+  const carlaId = (users.body as { users: Array<{ id: string; username: string }> }).users.find((u) => u.username === "carla_email")!.id;
+
+  const link = await call("POST", "/api/admin/users/reset-link", { session: adminSession, body: { userId: carlaId } });
+  assert.equal(link.response.status, 200, JSON.stringify(link.body));
+  const token = new URL((link.body as { url: string }).url).searchParams.get("reset");
+  assert.ok(token && token.length >= 40);
+
+  // reset sets a new password, kills old sessions, auto-logs-in
+  const reset = await call("POST", "/api/auth/reset", { body: { token, password: "nova senha bem forte 9" } });
+  assert.equal(reset.response.status, 200, JSON.stringify(reset.body));
+  assert.match(reset.response.headers.get("set-cookie") ?? "", /__Host-goa_session=/);
+  assert.equal((await call("POST", "/api/auth/login", { body: { username: "carla_email", password: "uma senha segura 123" } })).response.status, 401, "senha antiga não vale mais");
+  const relog = await call("POST", "/api/auth/login", { body: { username: "carla_email", password: "nova senha bem forte 9" } });
+  assert.equal(relog.response.status, 200);
+  assert.equal((await call("POST", "/api/auth/reset", { body: { token, password: "outra senha qualquer 1" } })).response.status, 400, "token de uso único não repete");
+  const carla: ClientSession = {
+    cookie: (relog.response.headers.get("set-cookie") ?? "").split(";", 1)[0],
+    csrf: (relog.body as { csrfToken: string }).csrfToken,
+    user: (relog.body as { user: ClientSession["user"] }).user,
+  };
+
+  // account screen: change the e-mail, then log in with the new one
+  const updated = await call("PATCH", "/api/account", { session: carla, body: { email: "carla.nova@example.com" } });
+  assert.equal(updated.response.status, 200, JSON.stringify(updated.body));
+  assert.equal((updated.body as { user: { email: string } }).user.email, "carla.nova@example.com");
+  assert.equal((await call("POST", "/api/auth/login", { body: { username: "carla.nova@example.com", password: "nova senha bem forte 9" } })).response.status, 200);
+
+  // password change requires the current password
+  assert.equal((await call("PATCH", "/api/account", { session: carla, body: { currentPassword: "errada", newPassword: "mais uma senha 12345" } })).response.status, 403);
+});

@@ -49,6 +49,21 @@ const DUMMY_PASSWORD_HASH =
 const SESSION_LIFETIME_MS = SESSION_COOKIE_MAX_AGE_SECONDS * 1_000;
 const LOGIN_WINDOW_MS = 15 * 60 * 1_000;
 const LOGIN_MAX_FAILURES = 10;
+const PASSWORD_RESET_TTL_MS = 60 * 60 * 1_000;
+const PASSWORD_RESET_MIN_INTERVAL_MS = 60 * 1_000;
+
+/** Login accepts a username or an e-mail — resolve which, and how to normalize it. */
+function resolveIdentifier(raw: unknown): { column: "username_normalized" | "email_normalized"; value: string } {
+  if (typeof raw === "string" && raw.includes("@")) {
+    const { normalized } = normalizeEmail(raw);
+    if (normalized) return { column: "email_normalized", value: normalized };
+  }
+  try {
+    return { column: "username_normalized", value: normalizeUsername(raw) };
+  } catch {
+    return { column: "username_normalized", value: "invalid_login" };
+  }
+}
 
 function publicUser(row: UserRow): AuthenticatedUser {
   return {
@@ -137,7 +152,11 @@ export async function registerAccount(body: Record<string, unknown>): Promise<{
       };
     });
   } catch (error) {
-    if ((error as { code?: string }).code === "23505") {
+    const violation = error as { code?: string; constraint?: string };
+    if (violation.code === "23505") {
+      if (violation.constraint === "users_email_normalized_uidx") {
+        throw new ApiError(409, "email_taken", "Esse e-mail já está em uso.");
+      }
       throw new ApiError(409, "username_taken", "Esse nome de usuário já está em uso.");
     }
     throw error;
@@ -178,31 +197,26 @@ export async function loginAccount(body: Record<string, unknown>): Promise<{
   csrfToken: string;
   setCookie: string;
 }> {
-  let username: string;
-  try {
-    username = normalizeUsername(body.username);
-  } catch {
-    username = "invalid_login";
-  }
+  const identifier = resolveIdentifier(body.username);
   const password = body.password;
 
   return inTransaction(async (client) => {
-    if (!(await loginAllowed(client, username))) {
+    if (!(await loginAllowed(client, identifier.value))) {
       throw new ApiError(429, "login_limited", "Muitas tentativas. Aguarde 15 minutos.");
     }
     const row = await oneOrNull<UserRow>(
       client,
       `SELECT id, display_name, username, email, password_hash, platform_admin
-         FROM users WHERE username_normalized = $1 AND disabled_at IS NULL`,
-      [username],
+         FROM users WHERE ${identifier.column} = $1 AND disabled_at IS NULL`,
+      [identifier.value],
     );
     const matches = await verifyPassword(password, row?.password_hash ?? DUMMY_PASSWORD_HASH);
     if (!row || !matches) {
-      await recordLoginFailure(client, username);
+      await recordLoginFailure(client, identifier.value);
       throw new ApiError(401, "invalid_credentials", "Usuário ou senha incorretos.");
     }
 
-    await client.query("DELETE FROM login_attempts WHERE username_normalized = $1", [username]);
+    await client.query("DELETE FROM login_attempts WHERE username_normalized = $1", [identifier.value]);
     const session = await createSession(client, row.id);
     return {
       user: publicUser(row),
@@ -210,6 +224,182 @@ export async function loginAccount(body: Record<string, unknown>): Promise<{
       setCookie: serializeSessionCookie(session.rawToken),
     };
   });
+}
+
+/**
+ * Invalidates any pending reset token for the user and mints a fresh one.
+ * Only the hash is stored — the returned raw token lives only in the reset link.
+ */
+export async function mintResetToken(
+  client: PoolClient,
+  userId: string,
+  options: { throttle?: boolean } = {},
+): Promise<{ rawToken: string; expiresAt: Date }> {
+  if (options.throttle !== false) {
+    const recent = await oneOrNull<{ created_at: Date }>(
+      client,
+      `SELECT created_at FROM password_reset_tokens
+        WHERE user_id = $1 AND used_at IS NULL AND expires_at > now()
+        ORDER BY created_at DESC LIMIT 1`,
+      [userId],
+    );
+    if (recent && Date.now() - recent.created_at.getTime() < PASSWORD_RESET_MIN_INTERVAL_MS) {
+      throw new ApiError(429, "reset_throttled", "Aguarde um minuto antes de pedir outro link.");
+    }
+  }
+  await client.query(
+    "UPDATE password_reset_tokens SET used_at = now() WHERE user_id = $1 AND used_at IS NULL",
+    [userId],
+  );
+  const rawToken = generateOpaqueToken();
+  const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MS);
+  await client.query(
+    `INSERT INTO password_reset_tokens (id, user_id, token_hash, created_at, expires_at)
+     VALUES ($1, $2, $3, now(), $4)`,
+    [crypto.randomUUID(), userId, await hashToken(rawToken), expiresAt],
+  );
+  return { rawToken, expiresAt };
+}
+
+/** Records that a user wants to reset. Always resolves — never leaks existence. */
+export async function requestPasswordReset(body: Record<string, unknown>): Promise<{ ok: true }> {
+  const { normalized } = normalizeEmail(body.email);
+  if (normalized) {
+    await inTransaction(async (client) => {
+      const user = await oneOrNull<{ id: string }>(
+        client,
+        "SELECT id FROM users WHERE email_normalized = $1 AND disabled_at IS NULL",
+        [normalized],
+      );
+      if (user) {
+        try {
+          await mintResetToken(client, user.id);
+        } catch (error) {
+          if (!(error instanceof ApiError && error.code === "reset_throttled")) throw error;
+        }
+      }
+    });
+  }
+  return { ok: true };
+}
+
+export async function resetPassword(body: Record<string, unknown>): Promise<{
+  user: AuthenticatedUser;
+  csrfToken: string;
+  setCookie: string;
+}> {
+  const token = typeof body.token === "string" ? body.token : "";
+  let tokenHash: string;
+  try {
+    tokenHash = await hashToken(token);
+  } catch {
+    throw new ApiError(400, "invalid_reset_token", "Link de redefinição inválido ou expirado.");
+  }
+  let passwordHash: string;
+  try {
+    passwordHash = await hashPassword(body.password);
+  } catch {
+    throw new ApiError(400, "invalid_password", "A senha precisa ter ao menos 10 caracteres.");
+  }
+
+  return inTransaction(async (client) => {
+    const row = await oneOrNull<{ id: string; user_id: string }>(
+      client,
+      `SELECT id, user_id FROM password_reset_tokens
+        WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now()
+        FOR UPDATE`,
+      [tokenHash],
+    );
+    if (!row) throw new ApiError(400, "invalid_reset_token", "Link de redefinição inválido ou expirado.");
+
+    await client.query(
+      "UPDATE users SET password_hash = $2, password_changed_at = now(), updated_at = now() WHERE id = $1",
+      [row.user_id, passwordHash],
+    );
+    await client.query("UPDATE password_reset_tokens SET used_at = now() WHERE id = $1", [row.id]);
+    await client.query(
+      "UPDATE sessions SET revoked_at = now(), revoke_reason = 'password_reset' WHERE user_id = $1 AND revoked_at IS NULL",
+      [row.user_id],
+    );
+    const account = await oneOrNull<UserRow>(
+      client,
+      `SELECT id, display_name, username, email, password_hash, platform_admin
+         FROM users WHERE id = $1`,
+      [row.user_id],
+    );
+    if (!account) throw new Error("User row vanished during password reset.");
+    console.warn("auth.reset", { userId: row.user_id });
+    const session = await createSession(client, row.user_id);
+    return {
+      user: publicUser(account),
+      csrfToken: await deriveCsrfToken(session.rawToken),
+      setCookie: serializeSessionCookie(session.rawToken),
+    };
+  });
+}
+
+export async function updateAccount(
+  session: SessionContext,
+  body: Record<string, unknown>,
+): Promise<{ user: AuthenticatedUser }> {
+  const wantsName = body.name !== undefined;
+  const wantsEmail = body.email !== undefined;
+  const wantsPassword = typeof body.newPassword === "string" && body.newPassword !== "";
+  if (!wantsName && !wantsEmail && !wantsPassword) {
+    throw new ApiError(400, "nothing_to_update", "Nada para atualizar.");
+  }
+  const name = wantsName ? displayName(body.name) : null;
+  const email = wantsEmail ? normalizeEmail(body.email) : null;
+  const newPasswordHash = wantsPassword ? await hashPassword(body.newPassword).catch(() => {
+    throw new ApiError(400, "invalid_password", "A nova senha precisa ter ao menos 10 caracteres.");
+  }) : null;
+
+  try {
+    return await inTransaction(async (client) => {
+      if (wantsPassword) {
+        const current = await oneOrNull<{ password_hash: string }>(
+          client,
+          "SELECT password_hash FROM users WHERE id = $1 FOR UPDATE",
+          [session.user.id],
+        );
+        if (!current || !(await verifyPassword(body.currentPassword, current.password_hash))) {
+          throw new ApiError(403, "invalid_current_password", "Senha atual incorreta.");
+        }
+      }
+      if (wantsName) {
+        await client.query("UPDATE users SET display_name = $2, updated_at = now() WHERE id = $1", [session.user.id, name]);
+      }
+      if (wantsEmail) {
+        await client.query(
+          "UPDATE users SET email = $2, email_normalized = $3, updated_at = now() WHERE id = $1",
+          [session.user.id, email!.email, email!.normalized],
+        );
+      }
+      if (wantsPassword) {
+        await client.query(
+          "UPDATE users SET password_hash = $2, password_changed_at = now(), updated_at = now() WHERE id = $1",
+          [session.user.id, newPasswordHash],
+        );
+        await client.query(
+          "UPDATE sessions SET revoked_at = now(), revoke_reason = 'password_change' WHERE user_id = $1 AND id <> $2 AND revoked_at IS NULL",
+          [session.user.id, session.id],
+        );
+      }
+      const account = await oneOrNull<UserRow>(
+        client,
+        `SELECT id, display_name, username, email, password_hash, platform_admin FROM users WHERE id = $1`,
+        [session.user.id],
+      );
+      if (!account) throw new Error("User row vanished during account update.");
+      return { user: publicUser(account) };
+    });
+  } catch (error) {
+    const violation = error as { code?: string; constraint?: string };
+    if (violation.code === "23505" && violation.constraint === "users_email_normalized_uidx") {
+      throw new ApiError(409, "email_taken", "Esse e-mail já está em uso.");
+    }
+    throw error;
+  }
 }
 
 export async function sessionFromToken(rawToken: string | null): Promise<SessionContext | null> {

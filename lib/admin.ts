@@ -1,5 +1,5 @@
 import type { PoolClient } from "pg";
-import type { SessionContext } from "./auth";
+import { mintResetToken, type SessionContext } from "./auth";
 import { inTransaction, withClient } from "./db";
 import { ApiError, stringValue } from "./http";
 
@@ -72,13 +72,17 @@ export async function adminUsers() {
       last_seen_at: Date | null;
       groups_owned: number;
       active_sessions: number;
+      pending_reset_expires_at: Date | null;
     }>(
       `SELECT u.id, u.display_name, u.username, u.email, u.created_at, u.disabled_at, u.platform_admin,
               (SELECT max(s.last_seen_at) FROM sessions s WHERE s.user_id = u.id) AS last_seen_at,
               (SELECT count(*)::int FROM groups g
                 WHERE g.owner_user_id = u.id AND g.deleted_at IS NULL) AS groups_owned,
               (SELECT count(*)::int FROM sessions s
-                WHERE s.user_id = u.id AND s.revoked_at IS NULL AND s.expires_at > now()) AS active_sessions
+                WHERE s.user_id = u.id AND s.revoked_at IS NULL AND s.expires_at > now()) AS active_sessions,
+              (SELECT max(prt.expires_at) FROM password_reset_tokens prt
+                WHERE prt.user_id = u.id AND prt.used_at IS NULL AND prt.expires_at > now())
+                AS pending_reset_expires_at
          FROM users u
         ORDER BY u.created_at DESC
         LIMIT 200`,
@@ -95,7 +99,31 @@ export async function adminUsers() {
         lastSeenAt: user.last_seen_at ? user.last_seen_at.toISOString() : null,
         groupsOwned: user.groups_owned,
         activeSessions: user.active_sessions,
+        pendingReset: user.pending_reset_expires_at
+          ? { expiresAt: user.pending_reset_expires_at.toISOString() }
+          : null,
       })),
+    };
+  });
+}
+
+export async function adminResetLink(
+  session: SessionContext,
+  body: Record<string, unknown>,
+  origin: string,
+): Promise<{ url: string; expiresAt: string }> {
+  const userId = stringValue(body, "userId", { min: 1, max: 100 })!;
+  return inTransaction(async (client) => {
+    const target = await client.query<{ email: string | null }>(
+      "SELECT email FROM users WHERE id = $1 AND disabled_at IS NULL FOR UPDATE",
+      [userId],
+    );
+    if (!target.rowCount) throw new ApiError(404, "not_found", "Conta não encontrada ou desativada.");
+    const { rawToken, expiresAt } = await mintResetToken(client, userId, { throttle: false });
+    console.warn("admin.resetLink", { actor: session.user.username, userId });
+    return {
+      url: `${origin}/?reset=${encodeURIComponent(rawToken)}`,
+      expiresAt: expiresAt.toISOString(),
     };
   });
 }

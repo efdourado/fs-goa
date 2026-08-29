@@ -1,4 +1,4 @@
-export { users, sessions, loginAttempts } from "./schema/accounts";
+export { users, sessions, loginAttempts, passwordResetTokens } from "./schema/accounts";
 export {
   groups,
   groupMembers,

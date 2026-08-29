@@ -83,8 +83,10 @@ export const sessions = pgTable(
   ],
 );
 
-// This table deliberately does not reference users: unknown usernames must be
+// This table deliberately does not reference users: unknown identifiers must be
 // rate-limited exactly like existing ones, without leaking account existence.
+// The key is a normalized username OR e-mail (login accepts either), so the
+// check only bounds length rather than matching the username grammar.
 export const loginAttempts = pgTable(
   "login_attempts",
   {
@@ -96,13 +98,46 @@ export const loginAttempts = pgTable(
   (table) => [
     index("login_attempts_locked_until_idx").on(table.lockedUntil),
     check(
-      "login_attempts_username_check",
-      sql`${table.usernameNormalized} ~ '^[a-z0-9][a-z0-9._-]{2,31}$'`,
+      "login_attempts_identifier_check",
+      sql`char_length(btrim(${table.usernameNormalized})) between 1 and 254`,
     ),
     check("login_attempts_failure_count_check", sql`${table.failureCount} >= 0`),
     check(
       "login_attempts_lock_window_check",
       sql`${table.lockedUntil} is null or ${table.lockedUntil} >= ${table.windowStartedAt}`,
+    ),
+  ],
+);
+
+// Single-use password-reset tokens. Only the SHA-256 (base64url) of the token is
+// stored; the raw token lives only in the reset link. Delivery is admin-mediated
+// today (see /admin), so nothing here changes when e-mail sending is added.
+export const passwordResetTokens = pgTable(
+  "password_reset_tokens",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull(),
+    createdAt: timestamptz("created_at").defaultNow().notNull(),
+    expiresAt: timestamptz("expires_at").notNull(),
+    usedAt: timestamptz("used_at"),
+  },
+  (table) => [
+    unique("password_reset_tokens_token_hash_unique").on(table.tokenHash),
+    index("password_reset_tokens_user_active_idx").on(table.userId, table.usedAt),
+    check(
+      "password_reset_tokens_token_hash_check",
+      sql`${table.tokenHash} ~ '^[A-Za-z0-9_-]{43}$'`,
+    ),
+    check(
+      "password_reset_tokens_expiry_check",
+      sql`${table.expiresAt} > ${table.createdAt}`,
+    ),
+    check(
+      "password_reset_tokens_used_at_check",
+      sql`${table.usedAt} is null or ${table.usedAt} >= ${table.createdAt}`,
     ),
   ],
 );

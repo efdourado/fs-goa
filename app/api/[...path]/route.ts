@@ -2,15 +2,19 @@ import {
   loginAccount,
   logoutSession,
   registerAccount,
+  requestPasswordReset,
   requireMutationSession,
   requirePlatformAdminMutation,
   requirePlatformAdminSession,
   requireSession,
+  resetPassword,
   sessionFromRequest,
+  updateAccount,
 } from "@/lib/auth";
 import {
   adminAudit,
   adminOverview,
+  adminResetLink,
   adminTrash,
   adminUsers,
   purgeTrashItem,
@@ -114,6 +118,15 @@ export async function POST(request: Request): Promise<Response> {
       const session = await requireMutationSession(request);
       return json({ ok: true }, 200, { "set-cookie": await logoutSession(session) });
     }
+    if (isPath(path, "auth", "forgot")) {
+      requireMutationOrigin(request);
+      return json(await requestPasswordReset(await readJsonObject(request)), 202);
+    }
+    if (isPath(path, "auth", "reset")) {
+      requireMutationOrigin(request);
+      const result = await resetPassword(await readJsonObject(request));
+      return json({ user: result.user, csrfToken: result.csrfToken }, 200, { "set-cookie": result.setCookie });
+    }
 
     if (path[0] === "admin") {
       const adminSession = await requirePlatformAdminMutation(request);
@@ -122,6 +135,9 @@ export async function POST(request: Request): Promise<Response> {
       if (isPath(path, "admin", "users", "disable")) return json(await setUserDisabled(adminSession, adminBody));
       if (isPath(path, "admin", "users", "revoke-sessions")) {
         return json(await revokeUserSessions(adminSession, adminBody));
+      }
+      if (isPath(path, "admin", "users", "reset-link")) {
+        return json(await adminResetLink(adminSession, adminBody, new URL(request.url).origin));
       }
       return notFound();
     }
@@ -177,6 +193,9 @@ export async function PATCH(request: Request): Promise<Response> {
     const path = segments(request);
     const session = await requireMutationSession(request);
     const body = await readJsonObject(request);
+    if (isPath(path, "account")) {
+      return json(await updateAccount(session, body));
+    }
     if (path[0] === "groups" && path.length === 2) {
       return json(await updateGroup(session, path[1], body));
     }
