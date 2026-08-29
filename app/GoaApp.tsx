@@ -160,12 +160,20 @@ interface ChallengeDetail extends ChallengeSummary {
   result?: ChallengeResult | null;
 }
 
+interface Limits {
+  groupsPerOwner: number;
+  challengesPerGroup: number;
+}
+
 interface BootstrapData {
   csrfToken: string;
   user: User | null;
+  limits: Limits;
   groups: GroupSummary[];
   challenges: ChallengeSummary[];
 }
+
+const DEFAULT_LIMITS: Limits = { groupsPerOwner: 6, challengesPerGroup: 6 };
 
 interface InvitePreview {
   token?: string;
@@ -289,6 +297,7 @@ function normalizeBootstrap(raw: BootstrapData | { bootstrap: BootstrapData }): 
   return {
     csrfToken: data.csrfToken ?? "",
     user: data.user ?? null,
+    limits: { ...DEFAULT_LIMITS, ...data.limits },
     groups: data.groups ?? [],
     challenges: data.challenges ?? [],
   };
@@ -670,6 +679,7 @@ function DashboardScreen({
   user,
   groups,
   challenges,
+  limits,
   onOpenGroup,
   onOpenChallenge,
   onOpenAdmin,
@@ -679,6 +689,7 @@ function DashboardScreen({
   user: User;
   groups: GroupSummary[];
   challenges: ChallengeSummary[];
+  limits: Limits;
   onOpenGroup: (id: Id) => void;
   onOpenChallenge: (id: Id) => void;
   onOpenAdmin: (id: Id) => void;
@@ -690,6 +701,8 @@ function DashboardScreen({
   const [error, setError] = useState<string | null>(null);
   const active = challenges.filter((challenge) => challenge.status === "active");
   const other = challenges.filter((challenge) => challenge.status !== "active");
+  const ownedGroups = groups.filter((group) => group.role === "owner").length;
+  const atGroupLimit = ownedGroups >= limits.groupsPerOwner;
 
   async function createGroup(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -715,7 +728,7 @@ function DashboardScreen({
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
-      <PageHeading title={`Olá, ${user.name.split(" ")[0]}.`} description="Veja o que pede sua atenção hoje ou comece uma nova experiência com seu grupo." action={<Button onClick={() => setShowGroupForm(true)}><span>+</span>Criar grupo</Button>} />
+      <PageHeading title={`Olá, ${user.name.split(" ")[0]}.`} description="Veja o que pede sua atenção hoje ou comece uma nova experiência com seu grupo." action={<div className="flex flex-col items-end gap-1"><Button disabled={atGroupLimit} onClick={() => setShowGroupForm(true)}><span>+</span>Criar grupo</Button><span className="text-xs text-[var(--muted)]">{ownedGroups}/{limits.groupsPerOwner} grupos{atGroupLimit ? " · limite atingido" : ""}</span></div>} />
 
       {showGroupForm ? (
         <form className={cx(cardClass, "mb-7 grid gap-4 p-5 sm:grid-cols-[1fr_auto]")} onSubmit={createGroup}>
@@ -811,9 +824,11 @@ function GroupScreen({
   onCreateInvite,
   onUpdateGroup,
   onDeleteGroup,
+  challengeLimit,
 }: {
   group: GroupSummary;
   challenges: ChallengeSummary[];
+  challengeLimit: number;
   onBack: () => void;
   onCreateChallenge: () => void;
   onOpenChallenge: (id: Id) => void;
@@ -893,7 +908,7 @@ function GroupScreen({
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
       <button className="mb-6 min-h-11 text-sm font-bold text-[var(--muted)] hover:text-[var(--ink)]" type="button" onClick={onBack}>← Voltar ao início</button>
-      <PageHeading title={group.name} description={`${group.description ? `${group.description} · ` : ""}${group.memberCount ?? group.members?.length ?? 0} pessoas · você é ${group.role === "owner" ? "responsável" : group.role === "admin" ? "admin" : "participante"}`} action={canManage(group.role) ? <div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={toggleGroupEdit}>{showGroupEdit ? "Fechar edição" : "Editar grupo"}</Button><Button variant="secondary" onClick={() => setShowInvite(!showInvite)}>Convidar</Button><Button onClick={onCreateChallenge}>+ Novo desafio</Button></div> : undefined} />
+      <PageHeading title={group.name} description={`${group.description ? `${group.description} · ` : ""}${group.memberCount ?? group.members?.length ?? 0} pessoas · você é ${group.role === "owner" ? "responsável" : group.role === "admin" ? "admin" : "participante"}`} action={canManage(group.role) ? <div className="flex flex-col items-end gap-1"><div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={toggleGroupEdit}>{showGroupEdit ? "Fechar edição" : "Editar grupo"}</Button><Button variant="secondary" onClick={() => setShowInvite(!showInvite)}>Convidar</Button><Button disabled={challenges.length >= challengeLimit} onClick={onCreateChallenge}>+ Novo desafio</Button></div><span className="text-xs text-[var(--muted)]">{challenges.length}/{challengeLimit} desafios{challenges.length >= challengeLimit ? " · limite atingido" : ""}</span></div> : undefined} />
 
       {showGroupEdit ? (
         <section className={cx(cardClass, "mb-7 p-5")} aria-labelledby="group-edit-title">
@@ -2244,7 +2259,7 @@ export default function GoaApp() {
   if (screen.kind === "invite") {
     content = <InviteScreen key={screen.token} token={screen.token} user={user} csrfToken={bootstrap.csrfToken} onBack={() => setScreen({ kind: "dashboard" })} onNeedAuth={() => undefined} onAccepted={async () => { await refreshBootstrap(); setPendingInviteToken(null); window.history.replaceState({}, "", window.location.pathname); setScreen({ kind: "dashboard" }); }} />;
   } else if (screen.kind === "group" && selectedGroup) {
-    content = <GroupScreen key={selectedGroup.id} group={selectedGroup} challenges={bootstrap.challenges.filter((challenge) => challenge.groupId === selectedGroup.id)} onBack={() => setScreen({ kind: "dashboard" })} onCreateChallenge={() => setScreen({ kind: "create-challenge", groupId: selectedGroup.id })} onOpenChallenge={(id) => void openParticipant(id)} onOpenAdmin={(id) => void openAdmin(id)} onCreateInvite={async (payload) => apiRequest<{ token?: string; url?: string }>(API_PATHS.groupInvites(selectedGroup.id), { method: "POST", body: payload, csrfToken: bootstrap.csrfToken })} onUpdateGroup={(payload) => updateGroup(selectedGroup.id, payload)} onDeleteGroup={selectedGroup.role === "owner" ? () => deleteGroup(selectedGroup.id) : undefined} />;
+    content = <GroupScreen key={selectedGroup.id} group={selectedGroup} challenges={bootstrap.challenges.filter((challenge) => challenge.groupId === selectedGroup.id)} challengeLimit={bootstrap.limits.challengesPerGroup} onBack={() => setScreen({ kind: "dashboard" })} onCreateChallenge={() => setScreen({ kind: "create-challenge", groupId: selectedGroup.id })} onOpenChallenge={(id) => void openParticipant(id)} onOpenAdmin={(id) => void openAdmin(id)} onCreateInvite={async (payload) => apiRequest<{ token?: string; url?: string }>(API_PATHS.groupInvites(selectedGroup.id), { method: "POST", body: payload, csrfToken: bootstrap.csrfToken })} onUpdateGroup={(payload) => updateGroup(selectedGroup.id, payload)} onDeleteGroup={selectedGroup.role === "owner" ? () => deleteGroup(selectedGroup.id) : undefined} />;
   } else if (screen.kind === "create-challenge" && selectedGroup && canManage(selectedGroup.role)) {
     content = <CreateChallengeScreen key={selectedGroup.id} group={selectedGroup} onBack={() => setScreen({ kind: "group", groupId: selectedGroup.id })} onCreate={(input) => createChallenge(selectedGroup.id, input)} />;
   } else if ((screen.kind === "challenge" || screen.kind === "admin") && (detailLoading || !selectedChallenge || selectedChallenge.id !== screen.challengeId)) {
@@ -2256,7 +2271,7 @@ export default function GoaApp() {
   } else if (screen.kind === "admin" || screen.kind === "create-challenge") {
     content = <main className="mx-auto max-w-2xl px-5 py-16"><EmptyState title="Acesso administrativo indisponível" description="Você não possui papel de responsável ou administrador neste grupo. O servidor também valida cada operação." action={<Button onClick={() => setScreen({ kind: "dashboard" })}>Voltar ao início</Button>} /></main>;
   } else {
-    content = <DashboardScreen user={user} groups={bootstrap.groups} challenges={bootstrap.challenges} onOpenGroup={(groupId) => setScreen({ kind: "group", groupId })} onOpenChallenge={(id) => void openParticipant(id)} onOpenAdmin={(id) => void openAdmin(id)} onCreateGroup={createGroup} onOpenInvite={(token) => { setPendingInviteToken(token); setScreen({ kind: "invite", token }); }} />;
+    content = <DashboardScreen user={user} groups={bootstrap.groups} challenges={bootstrap.challenges} limits={bootstrap.limits} onOpenGroup={(groupId) => setScreen({ kind: "group", groupId })} onOpenChallenge={(id) => void openParticipant(id)} onOpenAdmin={(id) => void openAdmin(id)} onCreateGroup={createGroup} onOpenInvite={(token) => { setPendingInviteToken(token); setScreen({ kind: "invite", token }); }} />;
   }
 
   return (

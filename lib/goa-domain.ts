@@ -107,7 +107,15 @@ export async function challengeAccess(
 }
 
 export async function bootstrap(session: SessionContext | null): Promise<Record<string, unknown>> {
-  if (!session) return { csrfToken: "", user: null, groups: [], challenges: [] };
+  if (!session) {
+    return {
+      csrfToken: "",
+      user: null,
+      limits: { groupsPerOwner: LIMITS.groupsPerOwner, challengesPerGroup: LIMITS.challengesPerGroup },
+      groups: [],
+      challenges: [],
+    };
+  }
 
   return withClient(async (client) => {
     const groupsResult = await client.query<{
@@ -194,6 +202,10 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
     return {
       csrfToken: await csrfForSession(session),
       user: session.user,
+      limits: {
+        groupsPerOwner: LIMITS.groupsPerOwner,
+        challengesPerGroup: LIMITS.challengesPerGroup,
+      },
       groups: groupsResult.rows.map((group) => ({
         id: group.id,
         name: group.name,
