@@ -23,9 +23,11 @@ Encerrar sem apagar dados: `docker compose down`.
 
 ## Conta de administração
 
-O Goa não tem "superadmin" global: os papéis (`owner` > `admin` > `participant`)
-valem por grupo, e quem cria um grupo vira `owner` dele. O `db:seed` cria/atualiza
-uma conta comum para o primeiro acesso.
+Os papéis do produto (`owner` > `admin` > `participant`) valem por grupo, e quem
+cria um grupo vira `owner` dele. Além disso, a conta criada pelo `db:seed` recebe
+`platform_admin` e enxerga `/admin` — um painel privado do desenvolvedor com uso,
+armazenamento, lixeira do banco (purga definitiva), auditoria e moderação de
+contas. Nenhuma outra conta vê essa área (respostas `404`).
 
 | Ambiente   | Usuário | Senha                                    |
 | ---------- | ------- | ---------------------------------------- |
@@ -34,6 +36,12 @@ uma conta comum para o primeiro acesso.
 
 Depois de entrar, use a interface para criar um grupo e convidar as demais pessoas.
 Rode `npm run db:seed` de novo a qualquer momento para redefinir a senha.
+
+As contas fazem login por **nome de usuário ou e-mail** + senha. O e-mail é
+opcional no cadastro, mas é o que permite recuperar o acesso: quem esquece a senha
+pede em "Esqueci a senha" e o administrador gera um link de uso único na aba
+*Contas* do `/admin`. Ver [docs/product.md](docs/product.md) para o funcionamento
+completo e [docs/api.md](docs/api.md) para a lista de endpoints.
 
 ## Desenvolvimento sem Docker
 
@@ -68,7 +76,8 @@ exposto.
    Output padrão (não sobrescreva).
 2. **Environment Variables** (Production): `DATABASE_URL` (URL do Neon com
    `sslmode=require`), `APP_ORIGIN` (origem pública exata, ex.: `https://goa.vercel.app`),
-   `ADMIN_PASSWORD` (mínimo 10 caracteres). Opcional: `ADMIN_USERNAME`, `ADMIN_NAME`.
+   `ADMIN_PASSWORD` (mínimo 10 caracteres). Opcional: `ADMIN_USERNAME`, `ADMIN_NAME`,
+   `MAX_GROUPS_PER_OWNER` / `MAX_CHALLENGES_PER_GROUP` (padrão 6).
 3. **`git push`** dispara o build e o deploy.
 4. **Migração + conta de administração** (uma vez, e a cada nova migração) — rode
    contra o Neon a partir da sua máquina:
@@ -97,13 +106,14 @@ lib/        autenticação, domínio, validação e métricas
 scripts/    migração e seed da conta de administração
 tests/      unidade, smoke e integração
 compose.yaml   PostgreSQL + setup + aplicação
-docs/       arquitetura e decisões
+docs/       arquitetura, produto (docs/product.md) e endpoints (docs/api.md)
 ```
 
 ## O que o MVP entrega
 
-Cadastro e login por usuário com sessão HTTP-only e CSRF; grupos privados com
-papéis e convites expiráveis; desafios em `draft`/`active`/`closed`; presets
+Cadastro e login por usuário ou e-mail com sessão HTTP-only e CSRF, mais
+redefinição de senha por link de uso único; grupos privados com papéis e convites
+expiráveis; desafios em `draft`/`active`/`closed`; presets
 **Cine** e **90 dias de leitura**; campos de texto, número, nota, opção, booleano e
 data; itens e checkpoints diários; registros persistentes com edição autorizada e
 histórico; revisão administrativa, auditoria append-only e exportação CSV segura;

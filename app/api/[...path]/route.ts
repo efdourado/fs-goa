@@ -2,10 +2,25 @@ import {
   loginAccount,
   logoutSession,
   registerAccount,
+  requestPasswordReset,
   requireMutationSession,
+  requirePlatformAdminMutation,
+  requirePlatformAdminSession,
   requireSession,
+  resetPassword,
   sessionFromRequest,
+  updateAccount,
 } from "@/lib/auth";
+import {
+  adminAudit,
+  adminOverview,
+  adminResetLink,
+  adminTrash,
+  adminUsers,
+  purgeTrashItem,
+  revokeUserSessions,
+  setUserDisabled,
+} from "@/lib/admin";
 import {
   addMetric,
   curateResults,
@@ -18,8 +33,10 @@ import {
   saveChallengeFields,
   saveChallengeItems,
   setChallengeParticipants,
+  softDeleteChallenge,
   transitionChallenge,
   updateChallenge,
+  updateChallengeItem,
   updateEntry,
 } from "@/lib/goa-challenges";
 import {
@@ -29,6 +46,8 @@ import {
   createGroup,
   createInvite,
   previewInvite,
+  softDeleteGroup,
+  updateGroup,
 } from "@/lib/goa-domain";
 import { getPool } from "@/lib/db";
 import {
@@ -59,6 +78,14 @@ export async function GET(request: Request): Promise<Response> {
       return json({ ok: true, database: database.rows[0]?.now?.toISOString() ?? null });
     }
     if (isPath(path, "bootstrap")) return json(await bootstrap(await sessionFromRequest(request)));
+    if (path[0] === "admin") {
+      await requirePlatformAdminSession(request);
+      if (isPath(path, "admin", "overview")) return json(await adminOverview());
+      if (isPath(path, "admin", "users")) return json(await adminUsers());
+      if (isPath(path, "admin", "trash")) return json(await adminTrash());
+      if (isPath(path, "admin", "audit")) return json(await adminAudit(new URL(request.url).searchParams));
+      return notFound();
+    }
     if (path[0] === "invites" && path.length === 2) return json(await previewInvite(path[1]));
     if (path[0] === "results" && path.length === 2) return json(await publicResults(path[1]));
     if (path[0] === "challenges" && path.length === 2) {
@@ -90,6 +117,29 @@ export async function POST(request: Request): Promise<Response> {
     if (isPath(path, "auth", "logout")) {
       const session = await requireMutationSession(request);
       return json({ ok: true }, 200, { "set-cookie": await logoutSession(session) });
+    }
+    if (isPath(path, "auth", "forgot")) {
+      requireMutationOrigin(request);
+      return json(await requestPasswordReset(await readJsonObject(request)), 202);
+    }
+    if (isPath(path, "auth", "reset")) {
+      requireMutationOrigin(request);
+      const result = await resetPassword(await readJsonObject(request));
+      return json({ user: result.user, csrfToken: result.csrfToken }, 200, { "set-cookie": result.setCookie });
+    }
+
+    if (path[0] === "admin") {
+      const adminSession = await requirePlatformAdminMutation(request);
+      const adminBody = await readJsonObject(request);
+      if (isPath(path, "admin", "trash", "purge")) return json(await purgeTrashItem(adminSession, adminBody));
+      if (isPath(path, "admin", "users", "disable")) return json(await setUserDisabled(adminSession, adminBody));
+      if (isPath(path, "admin", "users", "revoke-sessions")) {
+        return json(await revokeUserSessions(adminSession, adminBody));
+      }
+      if (isPath(path, "admin", "users", "reset-link")) {
+        return json(await adminResetLink(adminSession, adminBody, new URL(request.url).origin));
+      }
+      return notFound();
     }
 
     const session = await requireMutationSession(request);
@@ -143,11 +193,34 @@ export async function PATCH(request: Request): Promise<Response> {
     const path = segments(request);
     const session = await requireMutationSession(request);
     const body = await readJsonObject(request);
+    if (isPath(path, "account")) {
+      return json(await updateAccount(session, body));
+    }
+    if (path[0] === "groups" && path.length === 2) {
+      return json(await updateGroup(session, path[1], body));
+    }
+    if (path[0] === "challenges" && path[2] === "items" && path.length === 4) {
+      return json(await updateChallengeItem(session, path[1], path[3], body));
+    }
     if (path[0] === "challenges" && path.length === 2) {
       return json(await updateChallenge(session, path[1], body));
     }
     if (path[0] === "entries" && path.length === 2) {
       return json(await updateEntry(session, path[1], body));
+    }
+    return notFound();
+  });
+}
+
+export async function DELETE(request: Request): Promise<Response> {
+  return handleApi(async () => {
+    const path = segments(request);
+    const session = await requireMutationSession(request);
+    if (path[0] === "groups" && path.length === 2) {
+      return json(await softDeleteGroup(session, path[1]));
+    }
+    if (path[0] === "challenges" && path.length === 2) {
+      return json(await softDeleteChallenge(session, path[1]));
     }
     return notFound();
   });
