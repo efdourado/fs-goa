@@ -23,9 +23,11 @@ Encerrar sem apagar dados: `docker compose down`.
 
 ## Conta de administração
 
-O Goa não tem "superadmin" global: os papéis (`owner` > `admin` > `participant`)
-valem por grupo, e quem cria um grupo vira `owner` dele. O `db:seed` cria/atualiza
-uma conta comum para o primeiro acesso.
+Os papéis do produto (`owner` > `admin` > `participant`) valem por grupo, e quem
+cria um grupo vira `owner` dele. Além disso, a conta criada pelo `db:seed` recebe
+`platform_admin` e enxerga `/admin` — um painel privado do desenvolvedor com uso,
+armazenamento, lixeira do banco (purga definitiva), auditoria e moderação de
+contas. Nenhuma outra conta vê essa área (respostas `404`).
 
 | Ambiente   | Usuário | Senha                                    |
 | ---------- | ------- | ---------------------------------------- |
@@ -68,7 +70,8 @@ exposto.
    Output padrão (não sobrescreva).
 2. **Environment Variables** (Production): `DATABASE_URL` (URL do Neon com
    `sslmode=require`), `APP_ORIGIN` (origem pública exata, ex.: `https://goa.vercel.app`),
-   `ADMIN_PASSWORD` (mínimo 10 caracteres). Opcional: `ADMIN_USERNAME`, `ADMIN_NAME`.
+   `ADMIN_PASSWORD` (mínimo 10 caracteres). Opcional: `ADMIN_USERNAME`, `ADMIN_NAME`,
+   `MAX_GROUPS_PER_OWNER` / `MAX_CHALLENGES_PER_GROUP` (padrão 6).
 3. **`git push`** dispara o build e o deploy.
 4. **Migração + conta de administração** (uma vez, e a cada nova migração) — rode
    contra o Neon a partir da sua máquina:

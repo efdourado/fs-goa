@@ -22,6 +22,7 @@ export interface AuthenticatedUser {
   name: string;
   username: string;
   email: string | null;
+  platformAdmin: boolean;
 }
 
 export interface SessionContext {
@@ -36,6 +37,7 @@ interface UserRow {
   username: string;
   email: string | null;
   password_hash: string;
+  platform_admin: boolean;
 }
 
 interface SessionRow extends UserRow {
@@ -49,7 +51,13 @@ const LOGIN_WINDOW_MS = 15 * 60 * 1_000;
 const LOGIN_MAX_FAILURES = 10;
 
 function publicUser(row: UserRow): AuthenticatedUser {
-  return { id: row.id, name: row.display_name, username: row.username, email: row.email };
+  return {
+    id: row.id,
+    name: row.display_name,
+    username: row.username,
+    email: row.email,
+    platformAdmin: row.platform_admin === true,
+  };
 }
 
 function normalizeEmail(value: unknown): { email: string | null; normalized: string | null } {
@@ -117,7 +125,7 @@ export async function registerAccount(body: Record<string, unknown>): Promise<{
           (id, display_name, username, username_normalized, email, email_normalized, password_hash,
            password_changed_at, created_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, now(), now(), now())
-         RETURNING id, display_name, username, email, password_hash`,
+         RETURNING id, display_name, username, email, password_hash, platform_admin`,
         [userId, name, username, usernameNormalized, email.email, email.normalized, passwordHash],
       );
       if (!inserted) throw new Error("User insert did not return a row.");
@@ -184,7 +192,7 @@ export async function loginAccount(body: Record<string, unknown>): Promise<{
     }
     const row = await oneOrNull<UserRow>(
       client,
-      `SELECT id, display_name, username, email, password_hash
+      `SELECT id, display_name, username, email, password_hash, platform_admin
          FROM users WHERE username_normalized = $1 AND disabled_at IS NULL`,
       [username],
     );
@@ -204,8 +212,7 @@ export async function loginAccount(body: Record<string, unknown>): Promise<{
   });
 }
 
-export async function sessionFromRequest(request: Request): Promise<SessionContext | null> {
-  const rawToken = cookieValue(request, SESSION_COOKIE_NAME);
+export async function sessionFromToken(rawToken: string | null): Promise<SessionContext | null> {
   if (!rawToken) return null;
 
   let tokenHash: string;
@@ -218,7 +225,8 @@ export async function sessionFromRequest(request: Request): Promise<SessionConte
   return withClient(async (client) => {
     const row = await oneOrNull<SessionRow>(
       client,
-      `SELECT s.id AS session_id, u.id, u.display_name, u.username, u.email, u.password_hash
+      `SELECT s.id AS session_id, u.id, u.display_name, u.username, u.email, u.password_hash,
+              u.platform_admin
          FROM sessions s
          JOIN users u ON u.id = s.user_id
         WHERE s.token_hash = $1 AND s.revoked_at IS NULL AND s.expires_at > now()
@@ -235,6 +243,10 @@ export async function sessionFromRequest(request: Request): Promise<SessionConte
   });
 }
 
+export async function sessionFromRequest(request: Request): Promise<SessionContext | null> {
+  return sessionFromToken(cookieValue(request, SESSION_COOKIE_NAME));
+}
+
 export async function requireSession(request: Request): Promise<SessionContext> {
   const session = await sessionFromRequest(request);
   if (!session) throw new ApiError(401, "unauthenticated", "Entre na sua conta para continuar.");
@@ -246,6 +258,24 @@ export async function requireMutationSession(request: Request): Promise<SessionC
   const session = await requireSession(request);
   if (!(await verifyCsrfToken(session.rawToken, request.headers.get("x-csrf-token")))) {
     throw new ApiError(403, "invalid_csrf", "Token de segurança inválido.");
+  }
+  return session;
+}
+
+/** Read-only platform-admin gate: 404 (not 403) so the console stays invisible. */
+export async function requirePlatformAdminSession(request: Request): Promise<SessionContext> {
+  const session = await sessionFromRequest(request);
+  if (!session?.user.platformAdmin) {
+    throw new ApiError(404, "not_found", "Recurso não encontrado.");
+  }
+  return session;
+}
+
+/** Mutating platform-admin gate: origin + CSRF + the flag. */
+export async function requirePlatformAdminMutation(request: Request): Promise<SessionContext> {
+  const session = await requireMutationSession(request);
+  if (!session.user.platformAdmin) {
+    throw new ApiError(404, "not_found", "Recurso não encontrado.");
   }
   return session;
 }

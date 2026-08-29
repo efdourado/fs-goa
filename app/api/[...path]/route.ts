@@ -3,9 +3,20 @@ import {
   logoutSession,
   registerAccount,
   requireMutationSession,
+  requirePlatformAdminMutation,
+  requirePlatformAdminSession,
   requireSession,
   sessionFromRequest,
 } from "@/lib/auth";
+import {
+  adminAudit,
+  adminOverview,
+  adminTrash,
+  adminUsers,
+  purgeTrashItem,
+  revokeUserSessions,
+  setUserDisabled,
+} from "@/lib/admin";
 import {
   addMetric,
   curateResults,
@@ -63,6 +74,14 @@ export async function GET(request: Request): Promise<Response> {
       return json({ ok: true, database: database.rows[0]?.now?.toISOString() ?? null });
     }
     if (isPath(path, "bootstrap")) return json(await bootstrap(await sessionFromRequest(request)));
+    if (path[0] === "admin") {
+      await requirePlatformAdminSession(request);
+      if (isPath(path, "admin", "overview")) return json(await adminOverview());
+      if (isPath(path, "admin", "users")) return json(await adminUsers());
+      if (isPath(path, "admin", "trash")) return json(await adminTrash());
+      if (isPath(path, "admin", "audit")) return json(await adminAudit(new URL(request.url).searchParams));
+      return notFound();
+    }
     if (path[0] === "invites" && path.length === 2) return json(await previewInvite(path[1]));
     if (path[0] === "results" && path.length === 2) return json(await publicResults(path[1]));
     if (path[0] === "challenges" && path.length === 2) {
@@ -94,6 +113,17 @@ export async function POST(request: Request): Promise<Response> {
     if (isPath(path, "auth", "logout")) {
       const session = await requireMutationSession(request);
       return json({ ok: true }, 200, { "set-cookie": await logoutSession(session) });
+    }
+
+    if (path[0] === "admin") {
+      const adminSession = await requirePlatformAdminMutation(request);
+      const adminBody = await readJsonObject(request);
+      if (isPath(path, "admin", "trash", "purge")) return json(await purgeTrashItem(adminSession, adminBody));
+      if (isPath(path, "admin", "users", "disable")) return json(await setUserDisabled(adminSession, adminBody));
+      if (isPath(path, "admin", "users", "revoke-sessions")) {
+        return json(await revokeUserSessions(adminSession, adminBody));
+      }
+      return notFound();
     }
 
     const session = await requireMutationSession(request);

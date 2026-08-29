@@ -28,6 +28,7 @@ interface User {
   id: Id;
   name: string;
   username: string;
+  platformAdmin?: boolean;
 }
 
 interface Member extends User {

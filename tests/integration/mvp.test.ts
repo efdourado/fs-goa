@@ -52,6 +52,17 @@ async function register(name: string, username: string): Promise<ClientSession> 
   return { cookie: setCookie.split(";", 1)[0], csrf: payload.csrfToken, user: payload.user };
 }
 
+async function login(username: string): Promise<ClientSession> {
+  const result = await call("POST", "/api/auth/login", {
+    body: { username, password: "uma senha segura 123" },
+  });
+  assert.equal(result.response.status, 200, JSON.stringify(result.body));
+  const payload = result.body as { user: ClientSession["user"]; csrfToken: string };
+  const setCookie = result.response.headers.get("set-cookie");
+  if (!setCookie) throw new Error("Cookie de sessão ausente.");
+  return { cookie: setCookie.split(";", 1)[0], csrf: payload.csrfToken, user: payload.user };
+}
+
 before(async () => {
   const database = await adminPool.query<{ current_database: string }>("SELECT current_database()");
   if (database.rows[0]?.current_database !== "goa_test") {
@@ -558,4 +569,47 @@ test("soft-delete de grupo e desafio pelos endpoints DELETE", async () => {
   const actions = auditRows.rows.map((row) => row.action);
   assert.ok(actions.includes("challenge.deleted"), "auditoria registra challenge.deleted");
   assert.ok(actions.includes("group.deleted"), "auditoria registra group.deleted");
+});
+
+test("área de administração: acesso, painel, lixeira e contas", async () => {
+  const admin = await register("Plataforma", "plataforma_admin");
+  const member = await register("Membro Comum", "membro_comum_admin");
+  await adminPool.query("UPDATE users SET platform_admin = true WHERE id = $1", [admin.user.id]);
+  // re-login so the session row reflects platform_admin
+  const adminSession = await login("plataforma_admin");
+
+  assert.equal((await call("GET", "/api/admin/overview", { session: member })).response.status, 404, "não-admin recebe 404");
+  assert.equal((await call("GET", "/api/admin/overview")).response.status, 404, "anônimo recebe 404");
+
+  const overview = await call("GET", "/api/admin/overview", { session: adminSession });
+  assert.equal(overview.response.status, 200, JSON.stringify(overview.body));
+  const overviewBody = overview.body as { users: { total: number }; storage: { tables: unknown[] } };
+  assert.ok(overviewBody.users.total >= 2);
+  assert.ok(Array.isArray(overviewBody.storage.tables) && overviewBody.storage.tables.length > 0);
+
+  assert.equal((await call("GET", "/api/admin/users", { session: adminSession })).response.status, 200);
+  assert.equal((await call("GET", "/api/admin/audit", { session: adminSession })).response.status, 200);
+
+  // trash + purge round-trip
+  const group = await call("POST", "/api/groups", { session: member, body: { name: "Para purgar" } });
+  const groupId = (group.body as { id: string }).id;
+  await call("DELETE", `/api/groups/${groupId}`, { session: member });
+  const trash = await call("GET", "/api/admin/trash", { session: adminSession });
+  const trashed = (trash.body as { items: Array<{ kind: string; id: string }> }).items;
+  assert.ok(trashed.some((item) => item.kind === "group" && item.id === groupId), "grupo aparece na lixeira");
+
+  const purge = await call("POST", "/api/admin/trash/purge", { session: adminSession, body: { kind: "group", id: groupId } });
+  assert.equal(purge.response.status, 200, JSON.stringify(purge.body));
+  const stillThere = await adminPool.query("SELECT 1 FROM groups WHERE id = $1", [groupId]);
+  assert.equal(stillThere.rowCount, 0, "purge remove a linha do grupo de vez");
+
+  // disable a member -> its sessions die and it cannot log back in
+  const disable = await call("POST", "/api/admin/users/disable", { session: adminSession, body: { userId: member.user.id, disabled: true } });
+  assert.equal(disable.response.status, 200, JSON.stringify(disable.body));
+  assert.ok((disable.body as { sessionsRevoked: number }).sessionsRevoked >= 1, "desativar revoga as sessões");
+  const blockedLogin = await call("POST", "/api/auth/login", { body: { username: "membro_comum_admin", password: "uma senha segura 123" } });
+  assert.equal(blockedLogin.response.status, 401, "conta desativada não faz login");
+
+  const selfDisable = await call("POST", "/api/admin/users/disable", { session: adminSession, body: { userId: admin.user.id, disabled: true } });
+  assert.equal(selfDisable.response.status, 400, "admin não desativa a própria conta");
 });
