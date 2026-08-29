@@ -53,12 +53,13 @@ try {
   const result = await pool.query(
     `INSERT INTO users
        (id, display_name, username, username_normalized, password_hash,
-        password_changed_at, created_at, updated_at)
-     VALUES ($1, $2, $3, $3, $4, now(), now(), now())
+        password_changed_at, platform_admin, created_at, updated_at)
+     VALUES ($1, $2, $3, $3, $4, now(), true, now(), now())
      ON CONFLICT (username_normalized) DO UPDATE SET
        display_name = EXCLUDED.display_name,
        password_hash = EXCLUDED.password_hash,
        password_changed_at = now(),
+       platform_admin = true,
        updated_at = now(),
        disabled_at = NULL
      RETURNING id, (xmax = 0) AS created`,

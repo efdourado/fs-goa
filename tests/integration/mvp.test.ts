@@ -478,3 +478,45 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
   const sessionDb = await adminPool.query<{ token_hash: string }>("SELECT token_hash FROM sessions LIMIT 1");
   assert.ok(!owner.cookie.includes(sessionDb.rows[0]?.token_hash ?? "impossivel"), "token bruto da sessão não pode estar no banco");
 });
+
+test("aplica limites de criação por dono e por grupo", async () => {
+  const owner = await register("Limite", "limite_dono");
+
+  const groupIds: string[] = [];
+  for (let index = 0; index < 6; index += 1) {
+    const created = await call("POST", "/api/groups", { session: owner, body: { name: `Grupo ${index + 1}` } });
+    assert.equal(created.response.status, 201, JSON.stringify(created.body));
+    groupIds.push((created.body as { id: string }).id);
+  }
+
+  const overflowGroup = await call("POST", "/api/groups", { session: owner, body: { name: "Grupo 7" } });
+  assert.equal(overflowGroup.response.status, 403, "o 7º grupo do mesmo dono deve ser recusado");
+  assert.equal((overflowGroup.body as { error: string }).error, "group_limit");
+
+  const groupId = groupIds[0];
+  const challengeBody = (title: string) => ({
+    title, startsOn: "2026-09-01", endsOn: "2026-09-30", submissionMode: "item",
+    participantIds: [owner.user.id], items: [{ title: "Item único" }],
+    fields: [{ key: "nota", label: "Nota", type: "rating", required: true }],
+  });
+  for (let index = 0; index < 6; index += 1) {
+    const created = await call("POST", `/api/groups/${groupId}/challenges`, {
+      session: owner, body: challengeBody(`Desafio ${index + 1}`),
+    });
+    assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  }
+
+  const overflowChallenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner, body: challengeBody("Desafio 7"),
+  });
+  assert.equal(overflowChallenge.response.status, 403, "o 7º desafio do mesmo grupo deve ser recusado");
+  assert.equal((overflowChallenge.body as { error: string }).error, "challenge_limit");
+
+  await adminPool.query("UPDATE groups SET deleted_at = now(), deleted_by_user_id = $1 WHERE id = $2", [owner.user.id, groupIds[5]]);
+  const afterTrash = await call("POST", "/api/groups", { session: owner, body: { name: "Grupo pós-lixeira" } });
+  assert.equal(afterTrash.response.status, 201, "apagar um grupo deve liberar espaço no limite");
+
+  const bootstrapAfter = await call("GET", "/api/bootstrap", { session: owner });
+  const visibleGroups = (bootstrapAfter.body as { groups: Array<{ id: string }> }).groups.map((group) => group.id);
+  assert.ok(!visibleGroups.includes(groupIds[5]), "grupo na lixeira não aparece no bootstrap");
+});

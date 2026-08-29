@@ -182,7 +182,7 @@ async function calculateMetricRow(client: PoolClient, metric: MetricRow): Promis
               (SELECT count(*)::int FROM challenge_items ci
                 WHERE ci.challenge_id = c.id AND ci.entry_type_id = et.id AND ci.archived_at IS NULL) AS item_count
          FROM entry_types et JOIN challenges c ON c.id = et.challenge_id
-        WHERE et.id = $1 AND c.id = $2`,
+        WHERE et.id = $1 AND c.id = $2 AND c.deleted_at IS NULL`,
       [metric.entry_type_id, metric.challenge_id],
     );
     const expected = !context
@@ -1153,7 +1153,7 @@ export async function updateEntry(
     }>(client,
       `SELECT e.id,e.challenge_id,e.entry_type_id,e.participant_user_id,c.group_id,c.status
          FROM entries e JOIN challenges c ON c.id=e.challenge_id
-        WHERE e.id=$1 AND e.deleted_at IS NULL FOR UPDATE`, [entryId]);
+        WHERE e.id=$1 AND e.deleted_at IS NULL AND c.deleted_at IS NULL FOR UPDATE`, [entryId]);
     if (!entry) throw new ApiError(404, "not_found", "Registro não encontrado.");
     const role = await requireGroupRole(session.user.id, entry.group_id, ["owner", "admin", "participant"], client);
     const canManage = role === "owner" || role === "admin";
@@ -1309,7 +1309,8 @@ export async function publicResults(token: string) {
       id: string; title: string; description: string | null; start_date: string; end_date: string;
     }>(client,
       `SELECT id,title,description,start_date::text AS start_date,end_date::text AS end_date FROM challenges
-        WHERE result_share_token_hash=$1 AND results_published_at IS NOT NULL AND status='closed'`, [hash]);
+        WHERE result_share_token_hash=$1 AND results_published_at IS NOT NULL AND status='closed'
+          AND deleted_at IS NULL`, [hash]);
     if (!challenge) throw new ApiError(404, "not_found", "Resultados não encontrados.");
     const participants = await client.query<{ display_name: string }>(
       `SELECT u.display_name FROM challenge_participants cp JOIN users u ON u.id=cp.user_id

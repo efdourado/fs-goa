@@ -7,6 +7,7 @@ import {
 } from "./auth";
 import { inTransaction, oneOrNull, withClient } from "./db";
 import { ApiError, stringValue } from "./http";
+import { assertUnder, LIMITS } from "./limits";
 import { generateOpaqueToken, hashToken } from "./security";
 import { validateDateValue } from "./validation";
 
@@ -89,9 +90,10 @@ export async function challengeAccess(
               ) AS is_participant,
               c.results_published_at
          FROM challenges c
+         JOIN groups g ON g.id = c.group_id AND g.deleted_at IS NULL AND g.archived_at IS NULL
          JOIN group_members gm ON gm.group_id = c.group_id
           AND gm.user_id = $2 AND gm.removed_at IS NULL
-        WHERE c.id = $1
+        WHERE c.id = $1 AND c.deleted_at IS NULL
           AND (c.status <> 'draft' OR gm.role IN ('owner','admin'))${lock ? " FOR UPDATE OF c" : ""}`,
       [challengeId, userId],
     );
@@ -122,7 +124,7 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
           AND gm.user_id = $1 AND gm.removed_at IS NULL
          LEFT JOIN group_members active_members ON active_members.group_id = g.id
           AND active_members.removed_at IS NULL
-        WHERE g.archived_at IS NULL
+        WHERE g.archived_at IS NULL AND g.deleted_at IS NULL
         GROUP BY g.id, gm.role
         ORDER BY g.created_at`,
       [session.user.id],
@@ -180,9 +182,11 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
                 ELSE 1
               END AS total_count
          FROM challenges c
+         JOIN groups g ON g.id = c.group_id AND g.deleted_at IS NULL AND g.archived_at IS NULL
          JOIN group_members gm ON gm.group_id = c.group_id
           AND gm.user_id = $1 AND gm.removed_at IS NULL
-        WHERE c.status <> 'draft' OR gm.role IN ('owner','admin')
+        WHERE c.deleted_at IS NULL
+          AND (c.status <> 'draft' OR gm.role IN ('owner','admin'))
         ORDER BY CASE c.status WHEN 'active' THEN 0 WHEN 'draft' THEN 1 ELSE 2 END, c.created_at DESC`,
       [session.user.id],
     );
@@ -219,6 +223,19 @@ export async function createGroup(session: SessionContext, body: Record<string, 
   const name = stringValue(body, "name", { min: 1, max: 120 })!;
   const description = stringValue(body, "description", { max: 1_000, optional: true }) ?? null;
   return inTransaction(async (client) => {
+    const owned = await oneOrNull<{ count: number }>(
+      client,
+      `SELECT count(*)::int AS count FROM groups
+        WHERE owner_user_id = $1 AND deleted_at IS NULL AND archived_at IS NULL`,
+      [session.user.id],
+    );
+    assertUnder(
+      owned?.count ?? 0,
+      LIMITS.groupsPerOwner,
+      "group_limit",
+      `Você atingiu o limite de ${LIMITS.groupsPerOwner} grupos. Apague um grupo para criar outro.`,
+    );
+
     const id = publicId();
     await client.query(
       `INSERT INTO groups (id, name, description, owner_user_id, created_at, updated_at)
@@ -246,7 +263,7 @@ export async function updateGroup(
       client,
       `SELECT name, description
          FROM groups
-        WHERE id = $1 AND archived_at IS NULL
+        WHERE id = $1 AND archived_at IS NULL AND deleted_at IS NULL
         FOR UPDATE`,
       [groupId],
     );
@@ -329,7 +346,7 @@ async function inviteByToken(token: string, client: PoolClient, lock = false): P
     `SELECT gi.id, gi.group_id, g.name AS group_name, u.display_name AS invited_by,
             gi.role, gi.max_uses, gi.use_count, gi.expires_at, gi.revoked_at
        FROM group_invites gi
-       JOIN groups g ON g.id = gi.group_id
+       JOIN groups g ON g.id = gi.group_id AND g.deleted_at IS NULL AND g.archived_at IS NULL
        JOIN users u ON u.id = gi.created_by_user_id
       WHERE gi.token_hash = $1${lock ? " FOR UPDATE OF gi" : ""}`,
     [tokenHash],
@@ -509,6 +526,18 @@ export async function createChallenge(
 
   return inTransaction(async (client) => {
     await requireGroupRole(session.user.id, groupId, ["owner", "admin"], client);
+    const existing = await oneOrNull<{ count: number }>(
+      client,
+      "SELECT count(*)::int AS count FROM challenges WHERE group_id = $1 AND deleted_at IS NULL",
+      [groupId],
+    );
+    assertUnder(
+      existing?.count ?? 0,
+      LIMITS.challengesPerGroup,
+      "challenge_limit",
+      `Este grupo atingiu o limite de ${LIMITS.challengesPerGroup} desafios. Apague um desafio para criar outro.`,
+    );
+
     const id = publicId();
     await client.query(
       `INSERT INTO challenges

@@ -31,6 +31,7 @@ export const users = pgTable(
     emailNormalized: text("email_normalized"),
     passwordHash: text("password_hash").notNull(),
     passwordChangedAt: timestamptz("password_changed_at").defaultNow().notNull(),
+    platformAdmin: boolean("platform_admin").notNull().default(false),
     disabledAt: timestamptz("disabled_at"),
     createdAt: timestamptz("created_at").defaultNow().notNull(),
     updatedAt: timestamptz("updated_at").defaultNow().notNull(),
@@ -123,11 +124,22 @@ export const groups = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
     archivedAt: timestamptz("archived_at"),
+    deletedAt: timestamptz("deleted_at"),
+    deletedByUserId: text("deleted_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamptz("created_at").defaultNow().notNull(),
     updatedAt: timestamptz("updated_at").defaultNow().notNull(),
   },
   (table) => [
+    index("groups_owner_active_idx")
+      .on(table.ownerUserId)
+      .where(sql`${table.deletedAt} is null and ${table.archivedAt} is null`),
     check("groups_name_check", sql`char_length(btrim(${table.name})) between 1 and 120`),
+    check(
+      "groups_deleted_at_check",
+      sql`${table.deletedAt} is null or ${table.deletedAt} >= ${table.createdAt}`,
+    ),
   ],
 );
 
@@ -247,6 +259,10 @@ export const challenges = pgTable(
     closedAt: timestamptz("closed_at"),
     resultsPublishedAt: timestamptz("results_published_at"),
     resultShareTokenHash: text("result_share_token_hash"),
+    deletedAt: timestamptz("deleted_at"),
+    deletedByUserId: text("deleted_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamptz("created_at").defaultNow().notNull(),
     updatedAt: timestamptz("updated_at").defaultNow().notNull(),
   },
@@ -259,8 +275,15 @@ export const challenges = pgTable(
       table.startDate,
       table.endDate,
     ),
+    index("challenges_group_active_idx")
+      .on(table.groupId)
+      .where(sql`${table.deletedAt} is null`),
     check("challenges_title_check", sql`char_length(btrim(${table.title})) between 1 and 160`),
     check("challenges_date_range_check", sql`${table.endDate} >= ${table.startDate}`),
+    check(
+      "challenges_deleted_at_check",
+      sql`${table.deletedAt} is null or ${table.deletedAt} >= ${table.createdAt}`,
+    ),
     check("challenges_time_zone_check", sql`char_length(btrim(${table.timeZone})) between 1 and 100`),
     check("challenges_status_check", sql`${table.status} in ('draft', 'active', 'closed')`),
     check(
