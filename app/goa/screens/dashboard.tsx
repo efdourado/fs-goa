@@ -52,7 +52,7 @@ export function DashboardScreen({
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
-      <PageHeading title={`Olá, ${user.name.split(" ")[0]}.`} description="Veja o que pede sua atenção hoje ou comece uma nova experiência com seu grupo." action={atGroupLimit ? <span className="text-sm text-[var(--muted)]">Você atingiu o limite de {limits.groupsPerOwner} grupos</span> : <button type="button" className={cx(linkClass, "text-sm")} onClick={() => setShowGroupForm((open) => !open)}>{showGroupForm ? "Fechar" : `Crie um grupo (limite ${limits.groupsPerOwner})`}</button>} />
+      <PageHeading title={`Olá, ${user.name.split(" ")[0]}.`} description="Veja o que pede sua atenção hoje ou comece uma nova experiência com seu grupo." action={atGroupLimit ? <span className="text-sm text-[var(--muted)]">Você atingiu o limite de {limits.groupsPerOwner} grupos</span> : <button type="button" className={cx(linkClass, "text-sm")} onClick={() => setShowGroupForm((open) => !open)}>{showGroupForm ? "Fechar" : `+ Crie um grupo (limite ${limits.groupsPerOwner})`}</button>} />
 
       {showGroupForm ? (
         <form className={cx(cardClass, "mb-7 grid gap-4 p-5 sm:grid-cols-[1fr_auto]")} onSubmit={createGroup}>
@@ -70,7 +70,7 @@ export function DashboardScreen({
 
       <section aria-labelledby="active-title">
         <div className="mb-4 flex items-center justify-between">
-          <h2 id="active-title" className="text-xl font-bold tracking-[-0.03em]">Ativos e agendados</h2>
+          <h2 id="active-title" className="text-xl font-bold tracking-[-0.03em]">Desafios criados</h2>
           <span className="text-xs font-semibold text-[var(--muted)]">{active.length} {active.length === 1 ? "desafio" : "desafios"}</span>
         </div>
         {active.length ? (
@@ -80,10 +80,10 @@ export function DashboardScreen({
               const total = challenge.totalCount ?? 0;
               const done = challenge.completedCount ?? 0;
               return (
-                <article className={cx("flex flex-col overflow-hidden rounded-[20px] border bg-[var(--paper)] shadow-[0_1px_2px_rgba(32,36,31,0.04)]", tone.border)} key={challenge.id}>
+                <article className={cx("relative flex flex-col overflow-hidden rounded-[20px] border bg-[var(--paper)] shadow-[0_1px_2px_rgba(32,36,31,0.04)] transition hover:-translate-y-0.5 has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-[var(--main)]/25", tone.border)} key={challenge.id}>
                   <div className="flex flex-1 flex-col p-5">
                     <div className="flex items-center justify-between gap-3"><ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} /><span className="text-xs text-[var(--muted)]">{isChallengeScheduled(challenge.status, challenge.startsOn) ? `começa em ${formatDate(challenge.startsOn)}` : challenge.endsOn ? `até ${formatDate(challenge.endsOn)}` : "sem prazo"}</span></div>
-                    <h3 className="mt-5 text-2xl font-bold tracking-[-0.04em]">{challenge.title}</h3>
+                    <h3 className="mt-5 text-2xl font-bold tracking-[-0.04em]"><button type="button" onClick={() => onOpenChallenge(challenge.id)} className="cursor-pointer text-left after:absolute after:inset-0 after:content-[''] focus-visible:outline-none">{challenge.title}</button></h3>
                     {challenge.description ? <p className="mt-2 line-clamp-2 text-sm leading-6 text-[var(--muted)]">{challenge.description}</p> : null}
                     {total > 0 ? (
                       <div className="mt-5">
@@ -92,7 +92,7 @@ export function DashboardScreen({
                       </div>
                     ) : null}
                   </div>
-                  <button type="button" onClick={() => onOpenChallenge(challenge.id)} className={cx("w-full px-5 py-3.5 text-sm font-bold text-white transition hover:opacity-90 cursor-pointer", tone.solid)}>Abrir desafio</button>
+                  <span className={cx("block w-full px-5 py-3.5", tone.solid)} />
                 </article>
               );
             })}

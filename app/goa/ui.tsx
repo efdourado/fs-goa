@@ -12,7 +12,7 @@ export const inputClass =
   "mb-1 min-h-12 w-full rounded-xl border border-[var(--line)] bg-[var(--paper)] px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--main)] focus:ring-4 focus:ring-[var(--main)]/15 disabled:cursor-not-allowed disabled:bg-[var(--canvas)]";
 export const labelClass = "mb-1.5 block text-sm font-semibold text-[var(--ink)]";
 export const linkClass =
-  "font-bold text-[var(--main-strong)] underline-offset-4 hover:underline cursor-pointer disabled:cursor-not-allowed disabled:opacity-50";
+  "font-medium underline-offset-4 hover:underline cursor-pointer disabled:cursor-not-allowed disabled:opacity-50";
 
 export function cx(...classes: Array<string | false | null | undefined>): string {
   return classes.filter(Boolean).join(" ");
@@ -193,10 +193,10 @@ const CHALLENGE_STATUS_META: Record<
   "draft" | "scheduled" | "active" | "closed",
   { label: string; dot: string; border: string; solid: string }
 > = {
-  draft: { label: "Rascunho", dot: "bg-[var(--warn)]", border: "border-[var(--warn)]", solid: "bg-[var(--warn)]" },
-  scheduled: { label: "Agendado", dot: "bg-[var(--main)]", border: "border-[var(--main)]", solid: "bg-[var(--main)]" },
-  active: { label: "Ativo", dot: "bg-[var(--ok)]", border: "border-[var(--ok)]", solid: "bg-[var(--ok)]" },
-  closed: { label: "Encerrado", dot: "bg-[var(--muted)]", border: "border-[var(--muted)]", solid: "bg-[var(--muted)]" },
+  draft: { label: "Rascunho", dot: "bg-[var(--warn-line)]", border: "border-[var(--warn-line)]", solid: "bg-[var(--warn-line)]" },
+  scheduled: { label: "Agendado", dot: "bg-[var(--main-line)]", border: "border-[var(--main-line)]", solid: "bg-[var(--main-line)]" },
+  active: { label: "Ativo", dot: "bg-[var(--ok-line)]", border: "border-[var(--ok-line)]", solid: "bg-[var(--ok-line)]" },
+  closed: { label: "Encerrado", dot: "bg-[var(--line)]", border: "border-[var(--line)]", solid: "bg-[var(--line)]" },
 };
 
 export function challengeStatusTone(status: ChallengeStatus, startsOn?: string | null) {

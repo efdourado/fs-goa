@@ -187,7 +187,7 @@ export function ParticipantChallengeScreen({
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-6 pb-28 sm:px-6 sm:py-10">
-      <div className="mb-5 flex items-center justify-between gap-3"><button className="min-h-11 text-sm font-bold text-[var(--muted)] hover:text-[var(--ink)]" type="button" onClick={onBack}>← Início</button>{onAdmin ? <Button variant="secondary" onClick={onAdmin}>Administrar</Button> : null}</div>
+      <div className="mb-5 flex items-center justify-between gap-3"><button className="min-h-11 text-sm font-bold text-[var(--muted)] hover:text-[var(--ink)]" type="button" onClick={onBack}>← Início</button>{onAdmin ? <Button variant="secondary" onClick={onAdmin}>Gerenciar</Button> : null}</div>
       <section className="relative overflow-hidden rounded-[28px] bg-[var(--ink)] p-6 text-white sm:p-9">
         <div className="relative z-10">
           <div className="flex flex-wrap items-center justify-between gap-3"><ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} /><span className="text-xs text-white/65">{formatDate(challenge.startsOn)} — {formatDate(challenge.endsOn)}</span></div>
