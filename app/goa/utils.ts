@@ -1,4 +1,4 @@
-import type { Entry, Id, Role } from "./types";
+import type { ChallengeItem, ChallengeStatus, Entry, Id, Role } from "./types";
 
 export function canManage(role?: Role): boolean {
   return role === "owner" || role === "admin";
@@ -29,6 +29,56 @@ export function formatDateTime(value?: string | null): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function dateKeyInSaoPaulo(now: Date): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
+export function isChallengeScheduled(
+  status: ChallengeStatus,
+  startsOn?: string | null,
+  now = new Date(),
+): boolean {
+  return status === "active" && Boolean(startsOn && startsOn > dateKeyInSaoPaulo(now));
+}
+
+export function entryUnavailableMessage({
+  challengeStatus,
+  isParticipant,
+  itemStatus,
+  opensAt,
+}: {
+  challengeStatus: ChallengeStatus;
+  isParticipant?: boolean;
+  itemStatus?: ChallengeItem["status"];
+  opensAt?: string | null;
+}): string | null {
+  if (challengeStatus === "closed") return "Este desafio foi encerrado. O registro está disponível somente para leitura.";
+  if (challengeStatus === "draft") return "Este desafio ainda é um rascunho. Ative-o para liberar os registros.";
+  if (isParticipant === false) return "Você pode acompanhar este desafio, mas não está entre as pessoas selecionadas para registrar.";
+  if (itemStatus === "scheduled") {
+    return opensAt
+      ? `Este checkpoint ainda não começou. O registro será liberado em ${formatDateTime(opensAt)}.`
+      : "Este checkpoint ainda não começou. O registro será liberado na data programada.";
+  }
+  if (itemStatus === "closed") return "Este checkpoint foi encerrado. O registro está disponível somente para leitura.";
+  return null;
+}
+
+export function itemStatusLabel(status?: ChallengeItem["status"]): string {
+  return status === "scheduled" ? "Programado"
+    : status === "open" ? "Disponível"
+      : status === "past_due" ? "Prazo encerrado"
+        : status === "closed" ? "Encerrado"
+          : "Planejado";
 }
 
 export function valuesAsRecord(values: Entry["values"]): Record<Id, unknown> {

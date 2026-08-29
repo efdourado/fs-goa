@@ -154,6 +154,9 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
   const outsiderGroup = await call("POST", "/api/groups", { session: outsider, body: { name: "Outro grupo" } });
   assert.equal(outsiderGroup.response.status, 201);
   const outsiderGroupId = (outsiderGroup.body as { id: string }).id;
+  const targetGroup = await call("POST", "/api/groups", { session: owner, body: { name: "Clube de modelos" } });
+  assert.equal(targetGroup.response.status, 201, JSON.stringify(targetGroup.body));
+  const targetGroupId = (targetGroup.body as { id: string }).id;
 
   const challengeResponse = await call("POST", `/api/groups/${groupId}/challenges`, {
     session: owner,
@@ -161,7 +164,10 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
       template: "cine",
       title: "Cine — 2 filmes",
       description: "Piloto de cinema",
-      rules: "Assistir e avaliar.",
+      ruleSections: [
+        { title: "Assistir por inteiro", description: "Veja o filme até o fim antes de avaliar." },
+        { title: "Registrar a impressão", description: "Dê uma nota e conte o que ficou com você." },
+      ],
       startsOn: "2026-08-01",
       endsOn: "2026-09-30",
       submissionMode: "item",
@@ -181,6 +187,10 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
   const originalDraftItems = (originalDraftDetail.body as {
     items: Array<{ id: string; title: string; description: string | null }>;
   }).items;
+  assert.deepEqual((originalDraftDetail.body as { ruleSections: unknown }).ruleSections, [
+    { title: "Assistir por inteiro", description: "Veja o filme até o fim antes de avaliar." },
+    { title: "Registrar a impressão", description: "Dê uma nota e conte o que ficou com você." },
+  ]);
   const originalItemIds = originalDraftItems.map((item) => item.id);
   assert.equal(originalItemIds.length, 2);
 
@@ -198,6 +208,16 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
     title: "Aftersun — seleção do clube",
     description: "Primeiro filme da rodada.",
   });
+  const updatedRules = [
+    { title: "Assistir por inteiro", description: "Veja o filme até o fim antes de avaliar." },
+    { title: "Compartilhar com cuidado", description: "Dê uma nota e respeite a experiência das outras pessoas." },
+  ];
+  const rulesEdit = await call("PATCH", `/api/challenges/${challengeId}`, {
+    session: owner,
+    body: { ruleSections: updatedRules },
+  });
+  assert.equal(rulesEdit.response.status, 200, JSON.stringify(rulesEdit.body));
+  assert.deepEqual((rulesEdit.body as { ruleSections: unknown }).ruleSections, updatedRules);
 
   const draftAfterOwnerEdit = await call("GET", `/api/challenges/${challengeId}`, { session: owner });
   assert.equal(draftAfterOwnerEdit.response.status, 200, JSON.stringify(draftAfterOwnerEdit.body));
@@ -326,17 +346,22 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
   const crossGroupDuplicate = await call("POST", `/api/challenges/${challengeId}/duplicate`, {
     session: owner, body: { title: "Cópia fora do grupo", targetGroupId: outsiderGroupId },
   });
-  assert.equal(crossGroupDuplicate.response.status, 400);
+  assert.equal(crossGroupDuplicate.response.status, 404, "grupo alheio não pode ser descoberto como destino");
+
+  const sameGroupDuplicate = await call("POST", `/api/challenges/${challengeId}/duplicate`, {
+    session: owner, body: { title: "Cópia no mesmo grupo", targetGroupId: groupId },
+  });
+  assert.equal(sameGroupDuplicate.response.status, 400, "a cópia precisa reutilizar o modelo em outro grupo");
 
   const duplicate = await call("POST", `/api/challenges/${challengeId}/duplicate`, {
-    session: owner, body: { title: "Cine — edição 2" },
+    session: owner, body: { title: "Cine — edição 2", targetGroupId },
   });
   assert.equal(duplicate.response.status, 201, JSON.stringify(duplicate.body));
   const duplicateId = (duplicate.body as { id: string }).id;
   const destination = await adminPool.query<{
-    status: string; participants: number; entries: number; values: number; results: number; fields: number; items: number;
+    group_id: string; status: string; rule_sections: unknown; participants: number; entries: number; values: number; results: number; fields: number; items: number;
   }>(
-    `SELECT c.status,
+    `SELECT c.group_id, c.status, c.rule_sections,
       (SELECT count(*)::int FROM challenge_participants WHERE challenge_id=c.id) participants,
       (SELECT count(*)::int FROM entries WHERE challenge_id=c.id) entries,
       (SELECT count(*)::int FROM entry_values WHERE challenge_id=c.id) values,
@@ -347,8 +372,14 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
     [duplicateId],
   );
   assert.deepEqual(destination.rows[0], {
-    status: "draft", participants: 0, entries: 0, values: 0, results: 0, fields: 2, items: 2,
+    group_id: targetGroupId, status: "draft", rule_sections: updatedRules,
+    participants: 0, entries: 0, values: 0, results: 0, fields: 2, items: 2,
   });
+  const duplicationLedger = await adminPool.query<{ source_group_id: string; target_group_id: string }>(
+    "SELECT source_group_id,target_group_id FROM challenge_duplications WHERE target_challenge_id=$1",
+    [duplicateId],
+  );
+  assert.deepEqual(duplicationLedger.rows[0], { source_group_id: groupId, target_group_id: targetGroupId });
   const leaked = await adminPool.query<{ leaked: boolean }>(
     `SELECT EXISTS(
       SELECT 1 FROM entry_values ev WHERE ev.challenge_id=$1 AND ev.text_value LIKE '%canario-pessoal%'
@@ -466,6 +497,29 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
   const curatedDaily = await call("GET", `/api/challenges/${dailyId}`, { session: owner });
   assert.match(JSON.stringify(curatedDaily.body), /Abertura concluída/, "curadoria diária deve preservar o título do checkpoint");
 
+  const readingCopy = await call("POST", `/api/challenges/${dailyId}/duplicate`, {
+    session: owner,
+    body: { title: "Leitura diária — outro grupo", targetGroupId },
+  });
+  assert.equal(readingCopy.response.status, 201, JSON.stringify(readingCopy.body));
+  const readingCopyId = (readingCopy.body as { id: string }).id;
+  const copiedReading = await adminPool.query<{ group_id: string; mode: string; checkpoints: number; participants: number; entries: number }>(
+    `SELECT c.group_id,
+            (SELECT submission_mode FROM entry_types WHERE challenge_id=c.id AND archived_at IS NULL LIMIT 1) AS mode,
+            (SELECT count(*)::int FROM challenge_checkpoints WHERE challenge_id=c.id AND archived_at IS NULL) AS checkpoints,
+            (SELECT count(*)::int FROM challenge_participants WHERE challenge_id=c.id) AS participants,
+            (SELECT count(*)::int FROM entries WHERE challenge_id=c.id) AS entries
+       FROM challenges c WHERE c.id=$1`,
+    [readingCopyId],
+  );
+  assert.deepEqual(copiedReading.rows[0], {
+    group_id: targetGroupId,
+    mode: "daily",
+    checkpoints: 2,
+    participants: 0,
+    entries: 0,
+  }, "um desafio de leitura pode ser reutilizado estruturalmente em outro grupo");
+
   const futureDaily = await call("POST", `/api/groups/${groupId}/challenges`, {
     session: owner,
     body: {
@@ -525,6 +579,23 @@ test("aplica limites de criação por dono e por grupo", async () => {
   });
   assert.equal(overflowChallenge.response.status, 403, "o 7º desafio do mesmo grupo deve ser recusado");
   assert.equal((overflowChallenge.body as { error: string }).error, "challenge_limit");
+
+  const copySource = await call("POST", `/api/groups/${groupIds[1]}/challenges`, {
+    session: owner,
+    body: challengeBody("Modelo para copiar"),
+  });
+  assert.equal(copySource.response.status, 201, JSON.stringify(copySource.body));
+  const overflowCopy = await call("POST", `/api/challenges/${(copySource.body as { id: string }).id}/duplicate`, {
+    session: owner,
+    body: { title: "Não cabe no destino", targetGroupId: groupId },
+  });
+  assert.equal(overflowCopy.response.status, 403, "a cópia também respeita o limite do grupo de destino");
+  assert.equal((overflowCopy.body as { error: string }).error, "challenge_limit");
+  const fullGroupCount = await adminPool.query<{ count: number }>(
+    "SELECT count(*)::int AS count FROM challenges WHERE group_id=$1 AND deleted_at IS NULL",
+    [groupId],
+  );
+  assert.equal(fullGroupCount.rows[0]?.count, 6, "falha de limite não deixa cópia parcial");
 
   await adminPool.query("UPDATE groups SET deleted_at = now(), deleted_by_user_id = $1 WHERE id = $2", [owner.user.id, groupIds[5]]);
   const afterTrash = await call("POST", "/api/groups", { session: owner, body: { name: "Grupo pós-lixeira" } });

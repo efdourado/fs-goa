@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
 /*
  * Every colour in the app resolves to one of these tokens — components never
  * name a hue. Swap a value here and the whole UI follows. `--main*` is the brand

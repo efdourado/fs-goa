@@ -4,7 +4,8 @@ import { useMemo, useState } from "react";
 
 import { errorMessage } from "../api";
 import { cleanFields, FieldBuilder, presetFields } from "../fields";
-import type { ChallengeCreationInput, ChallengeField, GroupSummary, Id, Template } from "../types";
+import { RuleSectionsEditor } from "../rules";
+import type { ChallengeCreationInput, ChallengeField, ChallengeRule, GroupSummary, Id, Template } from "../types";
 import { Button, cardClass, cx, EmptyState, inputClass, labelClass, PageHeading, StatusMessage } from "../ui";
 import { formatDate } from "../utils";
 
@@ -21,7 +22,7 @@ export function CreateChallengeScreen({
   const [template, setTemplate] = useState<Template | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [rules, setRules] = useState("");
+  const [ruleSections, setRuleSections] = useState<ChallengeRule[]>([]);
   const [startsOn, setStartsOn] = useState("");
   const [endsOn, setEndsOn] = useState("");
   const [fields, setFields] = useState<ChallengeField[]>([]);
@@ -44,6 +45,10 @@ export function CreateChallengeScreen({
       setError("Escolha um modelo e preencha título e datas.");
       return;
     }
+    if (step === 1 && ruleSections.some((rule) => !rule.title.trim() || !rule.description.trim())) {
+      setError("Preencha o título e a descrição de cada regra ou remova a regra vazia.");
+      return;
+    }
     if (step === 2 && !fields.length) {
       setError("Adicione pelo menos um campo.");
       return;
@@ -64,7 +69,7 @@ export function CreateChallengeScreen({
         template,
         title: title.trim(),
         description: description.trim(),
-        rules: rules.trim(),
+        ruleSections: ruleSections.map((rule) => ({ title: rule.title.trim(), description: rule.description.trim() })),
         startsOn,
         endsOn,
         submissionMode: template === "reading" ? "daily" : "item",
@@ -107,7 +112,7 @@ export function CreateChallengeScreen({
               <label><span className={labelClass}>Início</span><input className={inputClass} type="date" value={startsOn} onChange={(event) => setStartsOn(event.target.value)} required /></label>
               <label><span className={labelClass}>Término</span><input className={inputClass} type="date" min={startsOn} value={endsOn} onChange={(event) => setEndsOn(event.target.value)} required /></label>
               <label className="sm:col-span-2"><span className={labelClass}>Descrição <small className="font-normal text-[var(--muted)]">opcional</small></span><textarea className={inputClass} rows={3} value={description} onChange={(event) => setDescription(event.target.value)} maxLength={1000} /></label>
-              <label className="sm:col-span-2"><span className={labelClass}>Regras <small className="font-normal text-[var(--muted)]">opcional</small></span><textarea className={inputClass} rows={4} value={rules} onChange={(event) => setRules(event.target.value)} maxLength={5000} /></label>
+              <div className="sm:col-span-2"><div className="mb-3"><span className={labelClass}>Regras com título <small className="font-normal text-[var(--muted)]">opcional</small></span><p className="text-xs leading-5 text-[var(--muted)]">Dê destaque a cada acordo importante do desafio.</p></div><RuleSectionsEditor value={ruleSections} onChange={setRuleSections} /></div>
             </div>
           </div>
         ) : null}

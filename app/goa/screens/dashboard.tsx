@@ -5,7 +5,7 @@ import { type FormEvent, useState } from "react";
 import { errorMessage } from "../api";
 import type { ChallengeSummary, GroupSummary, Id, Limits, User } from "../types";
 import { Button, cardClass, ChallengeStatusBadge, cx, EmptyState, inputClass, labelClass, PageHeading, StatusMessage } from "../ui";
-import { canManage, formatDate, inviteTokenFromText } from "../utils";
+import { canManage, formatDate, inviteTokenFromText, isChallengeScheduled } from "../utils";
 
 export function DashboardScreen({
   user,
@@ -78,14 +78,14 @@ export function DashboardScreen({
 
       <section aria-labelledby="active-title">
         <div className="mb-4 flex items-center justify-between">
-          <h2 id="active-title" className="text-xl font-bold tracking-[-0.03em]">Para acompanhar agora</h2>
+          <h2 id="active-title" className="text-xl font-bold tracking-[-0.03em]">Ativos e agendados</h2>
           <span className="text-xs font-semibold text-[var(--muted)]">{active.length} {active.length === 1 ? "desafio" : "desafios"}</span>
         </div>
         {active.length ? (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {active.map((challenge) => (
               <article className={cx(cardClass, "overflow-hidden p-5")} key={challenge.id}>
-                <div className="flex items-start justify-between gap-3"><ChallengeStatusBadge status={challenge.status} /><span className="text-xs text-[var(--muted)]">{challenge.endsOn ? `até ${formatDate(challenge.endsOn)}` : "sem prazo"}</span></div>
+                <div className="flex items-center justify-between gap-3"><ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} /><span className="text-xs text-[var(--muted)]">{isChallengeScheduled(challenge.status, challenge.startsOn) ? `começa em ${formatDate(challenge.startsOn)}` : challenge.endsOn ? `até ${formatDate(challenge.endsOn)}` : "sem prazo"}</span></div>
                 <h3 className="mt-5 text-2xl font-bold tracking-[-0.04em]">{challenge.title}</h3>
                 {challenge.description ? <p className="mt-2 line-clamp-2 text-sm leading-6 text-[var(--muted)]">{challenge.description}</p> : null}
                 {typeof challenge.totalCount === "number" && challenge.totalCount > 0 ? (
@@ -102,32 +102,33 @@ export function DashboardScreen({
             ))}
           </div>
         ) : (
-          <EmptyState title="Nada pendente por aqui" description="Quando um desafio do seu grupo estiver ativo, ele aparecerá aqui com o próximo registro." />
+          <EmptyState title="Nada pendente por aqui" description="Quando um desafio estiver ativo ou agendado, ele aparecerá aqui com a data do próximo registro." />
         )}
       </section>
 
-      <section className="mt-10 grid gap-6 lg:grid-cols-[1.25fr_0.75fr]">
-        <div>
-          <div className="mb-4 flex items-center justify-between"><h2 className="text-xl font-bold tracking-[-0.03em]">Seus grupos</h2><span className="text-xs text-[var(--muted)]">{groups.length}</span></div>
-          {groups.length ? (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {groups.map((group) => (
-                <button className={cx(cardClass, "flex min-h-24 items-center justify-between gap-4 p-4 text-left transition hover:-translate-y-0.5 hover:border-[var(--main-line)]")} type="button" onClick={() => onOpenGroup(group.id)} key={group.id}>
-                  <span><strong className="block text-base">{group.name}</strong><small className="mt-1 block text-[var(--muted)]">{group.memberCount ?? group.members?.length ?? 0} pessoas · {group.role === "owner" ? "responsável" : group.role === "admin" ? "admin" : "participante"}</small></span>
-                  <span className="text-lg text-[var(--main-strong)]" aria-hidden="true">→</span>
-                </button>
-              ))}
-            </div>
-          ) : <EmptyState title="Crie seu primeiro grupo" description="Um grupo reúne pessoas e continua existindo entre diferentes edições de desafios." action={<Button onClick={() => setShowGroupForm(true)}><span>+</span>Criar grupo</Button>} />}
+      <section className="mt-10" aria-labelledby="groups-title">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 id="groups-title" className="text-xl font-bold tracking-[-0.03em]">Seus grupos</h2>
+          <span className="text-xs font-semibold text-[var(--muted)]">{groups.length} {groups.length === 1 ? "grupo" : "grupos"}</span>
         </div>
-        <aside className={cx(cardClass, "p-5")}>
-          <h2 className="mt-2 text-xl font-bold tracking-[-0.03em]">Recebeu um convite?</h2>
-          <p className="mt-2 text-sm leading-6 text-[var(--muted)]">Cole o link ou o código enviado pelo administrador.</p>
-          <form className="mt-5 space-y-3" onSubmit={submitInvite}>
-            <label><span className="sr-only">Link ou código do convite</span><input className={inputClass} name="invite" placeholder="Link ou código do convite" required /></label>
-            <Button type="submit" variant="secondary" className="w-full">Ir</Button>
-          </form>
-        </aside>
+        {groups.length ? (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {groups.map((group) => (
+              <button className={cx(cardClass, "flex min-h-24 items-center justify-between gap-4 p-4 text-left transition hover:-translate-y-0.5 hover:border-[var(--main-line)]")} type="button" onClick={() => onOpenGroup(group.id)} key={group.id}>
+                <span><strong className="block text-base">{group.name}</strong><small className="mt-1 block text-[var(--muted)]">{group.memberCount ?? group.members?.length ?? 0} pessoas · {group.role === "owner" ? "responsável" : group.role === "admin" ? "admin" : "participante"}</small></span>
+                <span className="text-lg text-[var(--main-strong)]" aria-hidden="true">→</span>
+              </button>
+            ))}
+          </div>
+        ) : <EmptyState title="Crie seu primeiro grupo" description="Um grupo reúne pessoas e continua existindo entre diferentes edições de desafios." action={<Button onClick={() => setShowGroupForm(true)}><span>+</span>Criar grupo</Button>} />}
+        <form className={cx(cardClass, "mt-3 flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:gap-4")} onSubmit={submitInvite}>
+          <div className="sm:flex-1">
+            <strong className="block text-sm">Recebeu um convite?</strong>
+            <span className="mt-0.5 block text-xs leading-5 text-[var(--muted)]">Cole o link ou o código enviado pelo administrador.</span>
+          </div>
+          <label className="sm:w-80"><span className="sr-only">Link ou código do convite</span><input className={inputClass} name="invite" placeholder="Link ou código do convite" required /></label>
+          <Button type="submit" variant="secondary">Entrar</Button>
+        </form>
       </section>
 
       {other.length ? (
@@ -136,7 +137,7 @@ export function DashboardScreen({
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {other.map((challenge) => (
               <button className={cx(cardClass, "flex items-center justify-between gap-3 p-4 text-left hover:border-[var(--main-line)]")} type="button" onClick={() => challenge.status === "draft" && canManage(challenge.viewerRole) ? onOpenAdmin(challenge.id) : onOpenChallenge(challenge.id)} key={challenge.id}>
-                <span><ChallengeStatusBadge status={challenge.status} /><strong className="mt-2 block">{challenge.title}</strong></span><span aria-hidden="true">→</span>
+                <span className="flex items-center gap-2"><ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} /><strong>{challenge.title}</strong></span><span aria-hidden="true">→</span>
               </button>
             ))}
           </div>

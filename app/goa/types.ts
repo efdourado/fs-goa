@@ -126,12 +126,18 @@ export interface ChallengeResult {
   publishedAt?: string | null;
 }
 
+export interface ChallengeRule {
+  title: string;
+  description: string;
+}
+
 export interface ChallengeSummary {
   id: Id;
   groupId: Id;
   title: string;
   description?: string | null;
   rules?: string | null;
+  ruleSections?: ChallengeRule[];
   startsOn?: string | null;
   endsOn?: string | null;
   status: ChallengeStatus;
@@ -197,7 +203,7 @@ export interface ChallengeCreationInput {
   template: Template;
   title: string;
   description: string;
-  rules: string;
+  ruleSections: ChallengeRule[];
   startsOn: string;
   endsOn: string;
   submissionMode: SubmissionMode;

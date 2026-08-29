@@ -152,7 +152,8 @@ export const resultBlocks = pgTable(
 export const challengeDuplications = pgTable(
   "challenge_duplications",
   {
-    groupId: text("group_id").notNull(),
+    sourceGroupId: text("source_group_id").notNull(),
+    targetGroupId: text("target_group_id").notNull(),
     sourceChallengeId: text("source_challenge_id").notNull(),
     targetChallengeId: text("target_challenge_id").primaryKey(),
     copiedByUserId: text("copied_by_user_id")
@@ -163,12 +164,12 @@ export const challengeDuplications = pgTable(
   (table) => [
     foreignKey({
       name: "challenge_duplications_source_group_fk",
-      columns: [table.sourceChallengeId, table.groupId],
+      columns: [table.sourceChallengeId, table.sourceGroupId],
       foreignColumns: [challenges.id, challenges.groupId],
     }).onDelete("restrict"),
     foreignKey({
       name: "challenge_duplications_target_group_fk",
-      columns: [table.targetChallengeId, table.groupId],
+      columns: [table.targetChallengeId, table.targetGroupId],
       foreignColumns: [challenges.id, challenges.groupId],
     }).onDelete("cascade"),
     index("challenge_duplications_source_idx").on(table.sourceChallengeId, table.createdAt),
@@ -176,6 +177,9 @@ export const challengeDuplications = pgTable(
       "challenge_duplications_distinct_check",
       sql`${table.sourceChallengeId} <> ${table.targetChallengeId}`,
     ),
+    check(
+      "challenge_duplications_group_distinct_check",
+      sql`${table.sourceGroupId} <> ${table.targetGroupId}`,
+    ),
   ],
 );
-

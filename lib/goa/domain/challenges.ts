@@ -4,6 +4,7 @@ import { ApiError, stringValue } from "../../http";
 import { assertUnder, LIMITS } from "../../limits";
 import { writeAudit } from "./audit";
 import { defaultFields, insertField, type ClientField } from "./fields";
+import { parseRuleSections, rulesCompatibilityText } from "./rules";
 import { asRecord, dateString, publicId, semanticKey } from "./shared";
 
 const SUBMISSION_MODES = new Set(["item", "daily", "free"]);
@@ -27,7 +28,8 @@ export async function createChallenge(
 ) {
   const title = stringValue(body, "title", { min: 1, max: 160 })!;
   const description = stringValue(body, "description", { max: 2_000, optional: true }) ?? null;
-  const rules = stringValue(body, "rules", { max: 10_000, optional: true }) ?? null;
+  const ruleSections = parseRuleSections(body.ruleSections, body.rules);
+  const rules = rulesCompatibilityText(ruleSections);
   const startDate = dateString(body.startsOn ?? body.startDate, "Data inicial");
   const endDate = dateString(body.endsOn ?? body.endDate, "Data final");
   if (endDate < startDate) throw new ApiError(400, "date_range", "A data final deve ser posterior ao início.");
@@ -42,6 +44,14 @@ export async function createChallenge(
 
   return inTransaction(async (client) => {
     await requireGroupRole(session.user.id, groupId, ["owner", "admin"], client);
+    const activeGroup = await oneOrNull<{ id: string }>(
+      client,
+      `SELECT id FROM groups
+        WHERE id=$1 AND archived_at IS NULL AND deleted_at IS NULL
+        FOR UPDATE`,
+      [groupId],
+    );
+    if (!activeGroup) throw new ApiError(404, "not_found", "Grupo não encontrado.");
     const existing = await oneOrNull<{ count: number }>(
       client,
       "SELECT count(*)::int AS count FROM challenges WHERE group_id = $1 AND deleted_at IS NULL",
@@ -57,10 +67,10 @@ export async function createChallenge(
     const id = publicId();
     await client.query(
       `INSERT INTO challenges
-        (id, group_id, created_by_user_id, title, description, rules, start_date, end_date,
+        (id, group_id, created_by_user_id, title, description, rules, rule_sections, start_date, end_date,
          time_zone, status, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'draft',now(),now())`,
-      [id, groupId, session.user.id, title, description, rules, startDate, endDate, "America/Sao_Paulo"],
+       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,'draft',now(),now())`,
+      [id, groupId, session.user.id, title, description, rules, JSON.stringify(ruleSections), startDate, endDate, "America/Sao_Paulo"],
     );
     const entryTypeId = publicId();
     await client.query(

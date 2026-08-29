@@ -4,6 +4,7 @@ import Link from "next/link";
 import { type ReactNode, useState } from "react";
 
 import type { ChallengeStatus, User } from "./types";
+import { isChallengeScheduled } from "./utils";
 
 export const cardClass =
   "rounded-[20px] border border-[var(--line)] bg-[var(--paper)] shadow-[0_1px_2px_rgba(32,36,31,0.04)]";
@@ -149,17 +150,17 @@ export function AppHeader({
   onLogout: () => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false);
-  const navLink = "min-h-11 rounded-xl px-2 text-xs font-bold text-[var(--muted)] hover:bg-[var(--wash)] hover:text-[var(--ink)] sm:px-3";
+  const navLink = "min-h-11 cursor-pointer rounded-xl px-2 text-xs font-bold text-[var(--muted)] hover:bg-[var(--wash)] hover:text-[var(--ink)] disabled:cursor-not-allowed sm:px-3";
   return (
     <header className="sticky top-0 z-30 border-b border-black/10 bg-[var(--canvas)]/92 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:h-[76px] sm:px-6">
-        <button className="rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25" type="button" onClick={onHome}><Brand /></button>
+        <button className="cursor-pointer rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25" type="button" onClick={onHome}><Brand /></button>
         <div className="flex items-center gap-1 sm:gap-2">
           {user.platformAdmin ? (
             <Link className={cx(navLink, "inline-flex items-center")} href="/admin">Admin</Link>
           ) : null}
           <button
-            className="flex items-center gap-2.5 rounded-xl p-1 pr-2 text-left hover:bg-[var(--wash)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
+            className="flex cursor-pointer items-center gap-2.5 rounded-xl p-1 pr-2 text-left hover:bg-[var(--wash)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
             type="button"
             onClick={onAccount}
             aria-label="Sua conta"
@@ -186,14 +187,24 @@ export function AppHeader({
   );
 }
 
-export function ChallengeStatusBadge({ status }: { status: ChallengeStatus }) {
-  const labels = { draft: "Rascunho", active: "Ativo", closed: "Encerrado" };
+const CHALLENGE_STATUS_META: Record<
+  "draft" | "scheduled" | "active" | "closed",
+  { label: string; dot: string }
+> = {
+  draft: { label: "Rascunho", dot: "bg-[var(--warn)]" },
+  scheduled: { label: "Agendado", dot: "bg-[var(--main)]" },
+  active: { label: "Ativo", dot: "bg-[var(--ok)]" },
+  closed: { label: "Encerrado", dot: "bg-[var(--muted)]" },
+};
+
+export function ChallengeStatusBadge({ status, startsOn }: { status: ChallengeStatus; startsOn?: string | null }) {
+  const meta = CHALLENGE_STATUS_META[isChallengeScheduled(status, startsOn) ? "scheduled" : status];
   return (
-    <span className={cx(
-      "inline-flex rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.1em]",
-      status === "active" && "bg-[var(--ok-soft)] text-[var(--ok)]",
-      status === "draft" && "bg-[var(--warn-soft)] text-[var(--warn)]",
-      status === "closed" && "bg-[var(--wash-strong)] text-[var(--muted)]",
-    )}>{labels[status]}</span>
+    <span
+      className={cx("inline-block h-2.5 w-2.5 flex-none rounded-full ring-1 ring-inset ring-black/10", meta.dot)}
+      role="img"
+      aria-label={`Situação: ${meta.label}`}
+      title={meta.label}
+    />
   );
 }
