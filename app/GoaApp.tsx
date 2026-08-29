@@ -515,13 +515,11 @@ function PageHeading({
 function AuthScreen({
   initialMode,
   invitePending,
-  csrfToken,
   onAuthenticated,
   onShowInvite,
 }: {
   initialMode: "login" | "register";
   invitePending: boolean;
-  csrfToken: string;
   onAuthenticated: (mode: "login" | "register", payload: Record<string, string>) => Promise<void>;
   onShowInvite?: () => void;
 }) {
@@ -602,7 +600,7 @@ function AuthScreen({
               </label>
             ) : null}
             <StatusMessage error={error} />
-            <Button type="submit" disabled={busy || !csrfToken} className="w-full">
+            <Button type="submit" disabled={busy} className="w-full">
               {busy ? "Aguarde…" : mode === "login" ? "Entrar" : "Criar conta"}
               {!busy ? <span aria-hidden="true">→</span> : null}
             </Button>
@@ -2068,7 +2066,7 @@ export default function GoaApp() {
     if (screen.kind === "invite") {
       return <InviteScreen token={screen.token} user={null} csrfToken={bootstrap.csrfToken} onBack={() => setScreen({ kind: "auth", mode: "login" })} onNeedAuth={() => setScreen({ kind: "auth", mode: "login" })} onAccepted={async () => undefined} />;
     }
-    return <AuthScreen initialMode={screen.kind === "auth" ? screen.mode : "login"} invitePending={Boolean(pendingInviteToken)} csrfToken={bootstrap.csrfToken} onAuthenticated={authenticate} onShowInvite={pendingInviteToken ? () => setScreen({ kind: "invite", token: pendingInviteToken }) : undefined} />;
+    return <AuthScreen initialMode={screen.kind === "auth" ? screen.mode : "login"} invitePending={Boolean(pendingInviteToken)} onAuthenticated={authenticate} onShowInvite={pendingInviteToken ? () => setScreen({ kind: "invite", token: pendingInviteToken }) : undefined} />;
   }
 
   const user = bootstrap.user;
