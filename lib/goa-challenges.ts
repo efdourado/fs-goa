@@ -98,7 +98,7 @@ async function generateDailyCheckpoints(
        VALUES ($1,$2,$3,$4,$5,$6::date::timestamp AT TIME ZONE 'America/Sao_Paulo',
                ($6::date + interval '1 day')::timestamp AT TIME ZONE 'America/Sao_Paulo',now(),now())
        ON CONFLICT (challenge_id,semantic_key) DO UPDATE SET
-         title=excluded.title,position=excluded.position,starts_at=excluded.starts_at,
+         position=excluded.position,starts_at=excluded.starts_at,
          due_at=excluded.due_at,archived_at=NULL,updated_at=now()
        RETURNING id`,
       [publicId(), challengeId, `dia_${position + 1}`, `Dia ${position + 1}`, position, day]);
@@ -679,6 +679,107 @@ export async function saveChallengeItems(
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
       "items.created", "challenge", challengeId, null, { itemIds: ids });
     return { itemIds: ids };
+  });
+}
+
+export async function updateChallengeItem(
+  session: SessionContext,
+  challengeId: string,
+  itemId: string,
+  body: Record<string, unknown>,
+) {
+  return inTransaction(async (client) => {
+    const access = await challengeAccess(session.user.id, challengeId, client, true);
+    if (!access.canManage) {
+      throw new ApiError(403, "forbidden", "Somente administradores podem editar itens e checkpoints.");
+    }
+    if (access.challenge.status === "closed") {
+      throw new ApiError(409, "challenge_locked", "Desafios encerrados preservam sua leitura histórica.");
+    }
+
+    const type = await oneOrNull<{ submission_mode: "item" | "daily" | "free" }>(
+      client,
+      `SELECT submission_mode
+         FROM entry_types
+        WHERE challenge_id = $1 AND archived_at IS NULL
+        ORDER BY created_at
+        LIMIT 1`,
+      [challengeId],
+    );
+
+    if (type?.submission_mode === "daily") {
+      const current = await oneOrNull<{ title: string; description: string | null }>(
+        client,
+        `SELECT title, description
+           FROM challenge_checkpoints
+          WHERE id = $1 AND challenge_id = $2 AND archived_at IS NULL
+          FOR UPDATE`,
+        [itemId, challengeId],
+      );
+      if (!current) throw new ApiError(404, "not_found", "Checkpoint não encontrado.");
+      const title = body.title === undefined
+        ? current.title
+        : stringValue(body, "title", { min: 1, max: 160 })!;
+      const description = body.description === undefined
+        ? current.description
+        : stringValue(body, "description", { max: 2_000, optional: true }) ?? null;
+      await client.query(
+        `UPDATE challenge_checkpoints
+            SET title = $3, description = $4, updated_at = now()
+          WHERE id = $1 AND challenge_id = $2`,
+        [itemId, challengeId, title, description],
+      );
+      await writeAudit(
+        client,
+        access.challenge.group_id,
+        challengeId,
+        session.user.id,
+        "checkpoint.updated",
+        "challenge_checkpoint",
+        itemId,
+        current,
+        { title, description },
+      );
+      return { id: itemId, title, description };
+    }
+
+    if (type?.submission_mode === "item") {
+      const current = await oneOrNull<{ title: string; description: string | null }>(
+        client,
+        `SELECT title, description
+           FROM challenge_items
+          WHERE id = $1 AND challenge_id = $2 AND archived_at IS NULL
+          FOR UPDATE`,
+        [itemId, challengeId],
+      );
+      if (!current) throw new ApiError(404, "not_found", "Item não encontrado.");
+      const title = body.title === undefined
+        ? current.title
+        : stringValue(body, "title", { min: 1, max: 200 })!;
+      const description = body.description === undefined
+        ? current.description
+        : stringValue(body, "description", { max: 2_000, optional: true }) ?? null;
+      await client.query(
+        `UPDATE challenge_items
+            SET title = $3, description = $4, updated_at = now()
+          WHERE id = $1 AND challenge_id = $2`,
+        [itemId, challengeId, title, description],
+      );
+      await writeAudit(
+        client,
+        access.challenge.group_id,
+        challengeId,
+        session.user.id,
+        "item.updated",
+        "challenge_item",
+        itemId,
+        current,
+        { title, description },
+      );
+      return { id: itemId, title, description };
+    }
+
+    throw new ApiError(409, "invalid_mode", "Este desafio não usa itens ou checkpoints.");
   });
 }
 

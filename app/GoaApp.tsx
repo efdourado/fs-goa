@@ -37,6 +37,7 @@ interface Member extends User {
 interface GroupSummary {
   id: Id;
   name: string;
+  description?: string | null;
   role: Role;
   memberCount?: number;
   members?: Member[];
@@ -202,6 +203,7 @@ const API_PATHS = {
     logout: "/api/auth/logout",
   },
   groups: "/api/groups",
+  group: (groupId: Id) => `/api/groups/${encodeURIComponent(groupId)}`,
   groupInvites: (groupId: Id) => `/api/groups/${encodeURIComponent(groupId)}/invites`,
   invite: (token: string) => `/api/invites/${encodeURIComponent(token)}`,
   groupChallenges: (groupId: Id) => `/api/groups/${encodeURIComponent(groupId)}/challenges`,
@@ -210,6 +212,8 @@ const API_PATHS = {
     `/api/challenges/${encodeURIComponent(challengeId)}/participants`,
   fields: (challengeId: Id) => `/api/challenges/${encodeURIComponent(challengeId)}/fields`,
   items: (challengeId: Id) => `/api/challenges/${encodeURIComponent(challengeId)}/items`,
+  item: (challengeId: Id, itemId: Id) =>
+    `/api/challenges/${encodeURIComponent(challengeId)}/items/${encodeURIComponent(itemId)}`,
   metrics: (challengeId: Id) => `/api/challenges/${encodeURIComponent(challengeId)}/metrics`,
   results: (challengeId: Id) => `/api/challenges/${encodeURIComponent(challengeId)}/results`,
   entries: (challengeId: Id) => `/api/challenges/${encodeURIComponent(challengeId)}/entries`,
@@ -380,7 +384,7 @@ function inviteTokenFromText(value: string): string {
 const cardClass =
   "rounded-[24px] border border-[var(--line)] bg-[var(--paper)] shadow-[0_12px_40px_rgba(32,36,31,0.04)]";
 const inputClass =
-  "min-h-12 w-full rounded-xl border border-[var(--line)] bg-white px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--violet)] focus:ring-4 focus:ring-[rgba(103,88,216,0.12)] disabled:cursor-not-allowed disabled:bg-stone-100";
+  "mb-1 min-h-12 w-full rounded-xl border border-[var(--line)] bg-white px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--violet)] focus:ring-4 focus:ring-[rgba(103,88,216,0.12)] disabled:cursor-not-allowed disabled:bg-stone-100";
 const labelClass = "mb-1.5 block text-sm font-semibold text-[var(--ink)]";
 
 function cx(...classes: Array<string | false | null | undefined>): string {
@@ -403,7 +407,7 @@ function Button({
   className?: string;
 }) {
   const tones = {
-    primary: "border-transparent bg-[var(--violet)] text-white hover:bg-[var(--violet-dark)]",
+    primary: "border-transparent bg-[var(--violet)] text-white hover:opacity-90",
     secondary: "border-[var(--line)] bg-[var(--paper)] text-[var(--ink)] hover:bg-stone-100",
     ghost: "border-transparent bg-transparent text-[var(--violet-dark)] hover:bg-violet-50",
     danger: "border-red-200 bg-red-50 text-red-800 hover:bg-red-100",
@@ -411,7 +415,7 @@ function Button({
   return (
     <button
       className={cx(
-        "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-200 disabled:cursor-not-allowed disabled:opacity-55",
+        "cursor-pointer inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-200 disabled:cursor-not-allowed disabled:opacity-55",
         tones[variant],
         className,
       )}
@@ -458,7 +462,7 @@ function EmptyState({
   return (
     <div className="rounded-2xl border border-dashed border-[var(--line)] bg-stone-50/70 px-5 py-10 text-center">
       <span className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-violet-100 text-xl text-[var(--violet-dark)]" aria-hidden="true">
-        ✦
+        ᥫ᭡
       </span>
       <h3 className="text-lg font-bold tracking-[-0.02em]">{title}</h3>
       <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[var(--muted)]">{description}</p>
@@ -481,7 +485,7 @@ function LoadingView({ label = "Carregando o Goa…" }: { label?: string }) {
 function Brand() {
   return (
     <span className="inline-flex items-center gap-2.5" aria-label="Goa">
-      <span className="grid h-9 w-9 -rotate-3 place-items-center rounded-[50%_50%_50%_16%] bg-[var(--ink)] text-lg font-black text-[var(--canvas)]" aria-hidden="true">
+      <span className="grid h-9 w-9 -rotate-3 place-items-center rounded-[50%_50%_50%_16%] bg-[var(--ink)] text-lg font-black text-[var(--canvas)] border-1 border-white" aria-hidden="true">
         g
       </span>
       <strong className="text-xl tracking-[-0.06em]">goa</strong>
@@ -573,11 +577,10 @@ function AuthScreen({
               <strong>Você tem um convite pendente.</strong> Entre ou crie sua conta para aceitar.
             </button>
           ) : null}
-          <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-[var(--muted)]">{mode === "login" ? "Boas-vindas de volta" : "Comece seu primeiro desafio"}</p>
           <h2 className="mt-2 text-3xl font-bold tracking-[-0.045em]">{mode === "login" ? "Entre no Goa" : "Crie sua conta"}</h2>
           <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{mode === "login" ? "Use seu nome de usuário e senha." : "Só pedimos o essencial. E-mail não é obrigatório."}</p>
 
-          <form className="mt-7 space-y-4" onSubmit={submit}>
+          <form className="mt-6 space-y-4" onSubmit={submit}>
             {mode === "register" ? (
               <label>
                 <span className={labelClass}>Seu nome</span>
@@ -587,7 +590,7 @@ function AuthScreen({
             <label>
               <span className={labelClass}>Usuário</span>
               <input className={inputClass} name="username" autoComplete="username" required minLength={3} maxLength={40} disabled={busy} spellCheck={false} />
-              {mode === "register" ? <span className="mt-1 block text-xs text-[var(--muted)]">Use letras, números, ponto, hífen ou sublinhado.</span> : null}
+              {mode === "register" ? <span className="mt-1 block text-xs text-[var(--muted)] mb-3">Use letras, números, ponto, hífen ou sublinhado.</span> : null}
             </label>
             <label>
               <span className={labelClass}>Senha</span>
@@ -600,14 +603,14 @@ function AuthScreen({
               </label>
             ) : null}
             <StatusMessage error={error} />
-            <Button type="submit" disabled={busy} className="w-full">
+            <Button type="submit" disabled={busy} className="w-full mt-6">
               {busy ? "Aguarde…" : mode === "login" ? "Entrar" : "Criar conta"}
               {!busy ? <span aria-hidden="true">→</span> : null}
             </Button>
           </form>
-          <p className="mt-6 text-center text-sm text-[var(--muted)]">
+          <p className="mt-3 text-center text-sm text-[var(--muted)]">
             {mode === "login" ? "Sem conta?" : "Já tem uma conta?"}{" "}
-            <button className="min-h-11 font-bold text-[var(--violet-dark)] underline-offset-4 hover:underline" type="button" onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(null); }}>
+            <button className="min-h-11 font-bold underline-offset-4 hover:underline cursor-pointer" type="button" onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(null); }}>
               {mode === "login" ? "Cadastre-se" : "Entrar"}
             </button>
           </p>
@@ -714,7 +717,7 @@ function DashboardScreen({
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
-      <PageHeading eyebrow="Seu espaço" title={`Olá, ${user.name.split(" ")[0]}.`} description="Veja o que pede sua atenção hoje ou comece uma nova experiência com seu grupo." action={<Button onClick={() => setShowGroupForm(true)}>+ Criar grupo</Button>} />
+      <PageHeading title={`Olá, ${user.name.split(" ")[0]}.`} description="Veja o que pede sua atenção hoje ou comece uma nova experiência com seu grupo." action={<Button onClick={() => setShowGroupForm(true)}><span>+</span>Criar grupo</Button>} />
 
       {showGroupForm ? (
         <form className={cx(cardClass, "mb-7 grid gap-4 p-5 sm:grid-cols-[1fr_auto]")} onSubmit={createGroup}>
@@ -772,15 +775,14 @@ function DashboardScreen({
                 </button>
               ))}
             </div>
-          ) : <EmptyState title="Crie seu primeiro grupo" description="Um grupo reúne pessoas e continua existindo entre diferentes edições de desafios." action={<Button onClick={() => setShowGroupForm(true)}>Criar grupo</Button>} />}
+          ) : <EmptyState title="Crie seu primeiro grupo" description="Um grupo reúne pessoas e continua existindo entre diferentes edições de desafios." action={<Button onClick={() => setShowGroupForm(true)}><span>+</span>Criar grupo</Button>} />}
         </div>
         <aside className={cx(cardClass, "p-5")}>
-          <p className="text-xs font-extrabold uppercase tracking-[0.12em] text-[var(--muted)]">Entrar em um grupo</p>
           <h2 className="mt-2 text-xl font-bold tracking-[-0.03em]">Recebeu um convite?</h2>
           <p className="mt-2 text-sm leading-6 text-[var(--muted)]">Cole o link ou o código enviado pelo administrador.</p>
           <form className="mt-5 space-y-3" onSubmit={submitInvite}>
             <label><span className="sr-only">Link ou código do convite</span><input className={inputClass} name="invite" placeholder="Link ou código do convite" required /></label>
-            <Button type="submit" variant="secondary" className="w-full">Ver convite</Button>
+            <Button type="submit" variant="secondary" className="w-full">Ir</Button>
           </form>
         </aside>
       </section>
@@ -809,6 +811,7 @@ function GroupScreen({
   onOpenChallenge,
   onOpenAdmin,
   onCreateInvite,
+  onUpdateGroup,
 }: {
   group: GroupSummary;
   challenges: ChallengeSummary[];
@@ -817,11 +820,43 @@ function GroupScreen({
   onOpenChallenge: (id: Id) => void;
   onOpenAdmin: (id: Id) => void;
   onCreateInvite: (payload: { expiresInDays: number; maxUses: number }) => Promise<{ token?: string; url?: string }>;
+  onUpdateGroup: (payload: { name: string; description: string }) => Promise<void>;
 }) {
   const [showInvite, setShowInvite] = useState(false);
+  const [showGroupEdit, setShowGroupEdit] = useState(false);
+  const [groupName, setGroupName] = useState(group.name);
+  const [groupDescription, setGroupDescription] = useState(group.description ?? "");
   const [inviteUrl, setInviteUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [groupBusy, setGroupBusy] = useState(false);
+  const [groupError, setGroupError] = useState<string | null>(null);
+  const [groupSuccess, setGroupSuccess] = useState<string | null>(null);
+
+  function toggleGroupEdit() {
+    if (!showGroupEdit) {
+      setGroupName(group.name);
+      setGroupDescription(group.description ?? "");
+      setGroupError(null);
+      setGroupSuccess(null);
+    }
+    setShowGroupEdit(!showGroupEdit);
+  }
+
+  async function updateGroup(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setGroupBusy(true);
+    setGroupError(null);
+    setGroupSuccess(null);
+    try {
+      await onUpdateGroup({ name: groupName.trim(), description: groupDescription.trim() });
+      setGroupSuccess("Grupo atualizado.");
+    } catch (cause) {
+      setGroupError(errorMessage(cause));
+    } finally {
+      setGroupBusy(false);
+    }
+  }
 
   async function createInvite(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -845,7 +880,20 @@ function GroupScreen({
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
       <button className="mb-6 min-h-11 text-sm font-bold text-[var(--muted)] hover:text-[var(--ink)]" type="button" onClick={onBack}>← Voltar ao início</button>
-      <PageHeading eyebrow="Grupo privado" title={group.name} description={`${group.memberCount ?? group.members?.length ?? 0} pessoas · você é ${group.role === "owner" ? "responsável" : group.role === "admin" ? "admin" : "participante"}`} action={canManage(group.role) ? <div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={() => setShowInvite(!showInvite)}>Convidar</Button><Button onClick={onCreateChallenge}>+ Novo desafio</Button></div> : undefined} />
+      <PageHeading eyebrow="Grupo privado" title={group.name} description={`${group.description ? `${group.description} · ` : ""}${group.memberCount ?? group.members?.length ?? 0} pessoas · você é ${group.role === "owner" ? "responsável" : group.role === "admin" ? "admin" : "participante"}`} action={canManage(group.role) ? <div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={toggleGroupEdit}>{showGroupEdit ? "Fechar edição" : "Editar grupo"}</Button><Button variant="secondary" onClick={() => setShowInvite(!showInvite)}>Convidar</Button><Button onClick={onCreateChallenge}>+ Novo desafio</Button></div> : undefined} />
+
+      {showGroupEdit ? (
+        <section className={cx(cardClass, "mb-7 p-5")} aria-labelledby="group-edit-title">
+          <h2 id="group-edit-title" className="text-lg font-bold">Editar grupo</h2>
+          <p className="mt-1 text-sm text-[var(--muted)]">O nome atualizado aparece para todas as pessoas do grupo.</p>
+          <form className="mt-4 grid gap-4 sm:grid-cols-2" onSubmit={updateGroup}>
+            <label className="sm:col-span-2"><span className={labelClass}>Nome</span><input className={inputClass} value={groupName} onChange={(event) => setGroupName(event.target.value)} required maxLength={120} /></label>
+            <label className="sm:col-span-2"><span className={labelClass}>Descrição</span><textarea className={inputClass} rows={3} value={groupDescription} onChange={(event) => setGroupDescription(event.target.value)} maxLength={1000} placeholder="O que reúne este grupo?" /></label>
+            <div className="sm:col-span-2"><StatusMessage error={groupError} success={groupSuccess} /></div>
+            <div className="flex flex-wrap gap-2 sm:col-span-2"><Button type="submit" disabled={groupBusy}>{groupBusy ? "Salvando…" : "Salvar grupo"}</Button><Button variant="ghost" disabled={groupBusy} onClick={toggleGroupEdit}>Cancelar</Button></div>
+          </form>
+        </section>
+      ) : null}
 
       {showInvite ? (
         <section className={cx(cardClass, "mb-7 p-5")} aria-labelledby="invite-create-title">
@@ -1584,9 +1632,11 @@ function AdminFields({
 function AdminItems({
   challenge,
   onAdd,
+  onUpdate,
 }: {
   challenge: ChallengeDetail;
   onAdd: (payload: Record<string, unknown>) => Promise<void>;
+  onUpdate: (itemId: Id, payload: { title: string; description: string }) => Promise<void>;
 }) {
   const [itemsText, setItemsText] = useState("");
   const startsOn = challenge.startsOn ?? "";
@@ -1594,6 +1644,36 @@ function AdminItems({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<Id | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editBusy, setEditBusy] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editSuccess, setEditSuccess] = useState<string | null>(null);
+
+  function startEditing(item: ChallengeItem) {
+    setEditingId(item.id);
+    setEditTitle(item.title);
+    setEditDescription(item.description ?? "");
+    setEditError(null);
+    setEditSuccess(null);
+  }
+
+  async function submitEdit(event: FormEvent<HTMLFormElement>, itemId: Id) {
+    event.preventDefault();
+    setEditBusy(true);
+    setEditError(null);
+    setEditSuccess(null);
+    try {
+      await onUpdate(itemId, { title: editTitle.trim(), description: editDescription.trim() });
+      setEditingId(null);
+      setEditSuccess(challenge.submissionMode === "daily" ? "Checkpoint atualizado." : "Item atualizado.");
+    } catch (cause) {
+      setEditError(errorMessage(cause));
+    } finally {
+      setEditBusy(false);
+    }
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1612,12 +1692,40 @@ function AdminItems({
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
       <section className={cx(cardClass, "p-5 sm:p-7")}>
-        <PageHeading title="Itens e checkpoints" description="Cada checkpoint define uma oportunidade de registro sem misturar os valores dos participantes." />
-        {challenge.items.length ? <ol className="divide-y divide-[var(--line)]">{[...challenge.items].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)).map((item, index) => <li className="flex items-start justify-between gap-4 py-4" key={item.id}><div className="flex gap-3"><span className="grid h-8 w-8 flex-none place-items-center rounded-lg bg-stone-100 text-xs font-bold text-[var(--muted)]">{index + 1}</span><span><strong className="block text-sm">{item.title}</strong><small className="mt-1 block text-[var(--muted)]">{item.date ? formatDate(item.date) : item.opensAt || item.dueAt ? `${formatDate(item.opensAt)} — ${formatDate(item.dueAt)}` : "sem janela definida"}</small></span></div><span className="rounded-full bg-stone-100 px-2 py-1 text-[10px] font-bold uppercase text-[var(--muted)]">{item.status ?? "planejado"}</span></li>)}</ol> : <EmptyState title="Nenhum checkpoint" description="Adicione itens ou gere checkpoints diários antes de ativar o desafio." />}
+        <PageHeading title="Itens e checkpoints" description="Edite títulos e descrições sem trocar os identificadores usados nos registros. Depois do encerramento, o histórico fica bloqueado." />
+        {editSuccess ? <div className="mb-3"><StatusMessage success={editSuccess} /></div> : null}
+        {challenge.items.length ? (
+          <ol className="divide-y divide-[var(--line)]">
+            {[...challenge.items].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)).map((item, index) => (
+              <li className="py-4" key={item.id}>
+                {editingId === item.id ? (
+                  <form className="grid gap-3" onSubmit={(event) => void submitEdit(event, item.id)}>
+                    <div className="flex items-center gap-3">
+                      <span className="grid h-8 w-8 flex-none place-items-center rounded-lg bg-stone-100 text-xs font-bold text-[var(--muted)]">{index + 1}</span>
+                      <strong className="text-sm">Editar {challenge.submissionMode === "daily" ? "checkpoint" : "item"}</strong>
+                    </div>
+                    <label><span className={labelClass}>Título</span><input className={inputClass} value={editTitle} onChange={(event) => setEditTitle(event.target.value)} required maxLength={challenge.submissionMode === "daily" ? 160 : 200} /></label>
+                    <label><span className={labelClass}>Descrição</span><textarea className={inputClass} rows={3} value={editDescription} onChange={(event) => setEditDescription(event.target.value)} maxLength={2000} placeholder="Contexto opcional" /></label>
+                    <StatusMessage error={editError} />
+                    <div className="flex flex-wrap gap-2"><Button type="submit" disabled={editBusy}>{editBusy ? "Salvando…" : "Salvar"}</Button><Button variant="ghost" disabled={editBusy} onClick={() => { setEditingId(null); setEditError(null); }}>Cancelar</Button></div>
+                  </form>
+                ) : (
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex min-w-0 gap-3">
+                      <span className="grid h-8 w-8 flex-none place-items-center rounded-lg bg-stone-100 text-xs font-bold text-[var(--muted)]">{index + 1}</span>
+                      <span className="min-w-0"><strong className="block text-sm">{item.title}</strong>{item.description ? <span className="mt-1 block text-sm leading-6 text-[var(--muted)]">{item.description}</span> : null}<small className="mt-1 block text-[var(--muted)]">{item.date ? formatDate(item.date) : item.opensAt || item.dueAt ? `${formatDate(item.opensAt)} — ${formatDate(item.dueAt)}` : "sem janela definida"}</small></span>
+                    </div>
+                    <div className="flex flex-none flex-col items-end gap-2"><span className="rounded-full bg-stone-100 px-2 py-1 text-[10px] font-bold uppercase text-[var(--muted)]">{item.status ?? "planejado"}</span>{challenge.status !== "closed" ? <Button variant="secondary" className="min-h-9 px-3 py-1 text-xs" onClick={() => startEditing(item)}>Editar</Button> : null}</div>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ol>
+        ) : <EmptyState title="Nenhum checkpoint" description="Adicione itens ou gere checkpoints diários antes de ativar o desafio." />}
       </section>
       <aside className={cx(cardClass, "h-fit p-5")}>
         <h2 className="text-lg font-bold">{challenge.submissionMode === "daily" ? "Gerar dias" : "Adicionar itens"}</h2>
-        {challenge.status !== "draft" ? <p className="mt-4 text-sm leading-6 text-[var(--muted)]">A estrutura de itens e checkpoints fica bloqueada depois da ativação.</p> : <form className="mt-4 space-y-4" onSubmit={submit}>
+        {challenge.status !== "draft" ? <p className="mt-4 text-sm leading-6 text-[var(--muted)]">Novos itens e datas ficam bloqueados depois da ativação. Títulos e descrições ainda podem ser corrigidos até o encerramento.</p> : <form className="mt-4 space-y-4" onSubmit={submit}>
           {challenge.submissionMode === "daily" ? <><p className="text-xs leading-5 text-[var(--muted)]">A geração usa exatamente as datas definidas nas informações básicas.</p><label><span className={labelClass}>Primeiro dia</span><input className={inputClass} type="date" value={startsOn} readOnly required /></label><label><span className={labelClass}>Último dia</span><input className={inputClass} type="date" min={startsOn} value={endsOn} readOnly required /></label></> : <label><span className={labelClass}>Um título por linha</span><textarea className={inputClass} rows={10} value={itemsText} onChange={(event) => setItemsText(event.target.value)} placeholder={"Item 1\nItem 2"} /></label>}
           <StatusMessage error={error} success={success} />
           <Button type="submit" className="w-full" disabled={busy || challenge.status !== "draft"}>{busy ? "Salvando…" : challenge.submissionMode === "daily" ? "Gerar checkpoints" : "Adicionar"}</Button>
@@ -1827,6 +1935,7 @@ function AdminScreen({
   onSaveParticipants,
   onSaveFields,
   onAddItems,
+  onUpdateItem,
   onPatchEntry,
   onExport,
   onAddMetric,
@@ -1845,6 +1954,7 @@ function AdminScreen({
   onSaveParticipants: (ids: Id[]) => Promise<void>;
   onSaveFields: (fields: ChallengeField[]) => Promise<void>;
   onAddItems: (payload: Record<string, unknown>) => Promise<void>;
+  onUpdateItem: (itemId: Id, payload: { title: string; description: string }) => Promise<void>;
   onPatchEntry: (entryId: Id, values: Record<Id, unknown>, reason: string) => Promise<void>;
   onExport: () => Promise<void>;
   onAddMetric: (payload: Record<string, unknown>) => Promise<void>;
@@ -1867,7 +1977,7 @@ function AdminScreen({
       {tab === "overview" ? <AdminOverview challenge={challenge} entries={entries} onSave={onSaveBasics} onTransition={onTransition} onDuplicate={onDuplicate} /> : null}
       {tab === "participants" ? <AdminParticipants key={`${challenge.id}:${challenge.participants.map((participant) => participant.userId ?? participant.id).join(",")}`} challenge={challenge} group={group} onSave={onSaveParticipants} /> : null}
       {tab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.fields.map((field) => field.id ?? field.key).join(",")}`} challenge={challenge} onSave={onSaveFields} /> : null}
-      {tab === "items" ? <AdminItems challenge={challenge} onAdd={onAddItems} /> : null}
+      {tab === "items" ? <AdminItems challenge={challenge} onAdd={onAddItems} onUpdate={onUpdateItem} /> : null}
       {tab === "review" ? <AdminReview challenge={challenge} entries={entries} onPatch={onPatchEntry} onExport={onExport} /> : null}
       {tab === "metrics" ? <AdminMetrics challenge={challenge} onAdd={onAddMetric} /> : null}
       {tab === "results" ? <AdminResults challenge={challenge} entries={entries} onSave={onSaveResult} /> : null}
@@ -1980,6 +2090,16 @@ export default function GoaApp() {
     if (resolvedId) setScreen({ kind: "group", groupId: resolvedId });
   }
 
+  async function updateGroup(groupId: Id, payload: { name: string; description: string }) {
+    if (!bootstrap) return;
+    await apiRequest(API_PATHS.group(groupId), {
+      method: "PATCH",
+      body: payload,
+      csrfToken: bootstrap.csrfToken,
+    });
+    await refreshBootstrap();
+  }
+
   async function createChallenge(groupId: Id, input: ChallengeCreationInput) {
     if (!bootstrap) return;
     const created = await apiRequest<unknown>(API_PATHS.groupChallenges(groupId), {
@@ -2079,7 +2199,7 @@ export default function GoaApp() {
   if (screen.kind === "invite") {
     content = <InviteScreen key={screen.token} token={screen.token} user={user} csrfToken={bootstrap.csrfToken} onBack={() => setScreen({ kind: "dashboard" })} onNeedAuth={() => undefined} onAccepted={async () => { await refreshBootstrap(); setPendingInviteToken(null); window.history.replaceState({}, "", window.location.pathname); setScreen({ kind: "dashboard" }); }} />;
   } else if (screen.kind === "group" && selectedGroup) {
-    content = <GroupScreen key={selectedGroup.id} group={selectedGroup} challenges={bootstrap.challenges.filter((challenge) => challenge.groupId === selectedGroup.id)} onBack={() => setScreen({ kind: "dashboard" })} onCreateChallenge={() => setScreen({ kind: "create-challenge", groupId: selectedGroup.id })} onOpenChallenge={(id) => void openParticipant(id)} onOpenAdmin={(id) => void openAdmin(id)} onCreateInvite={async (payload) => apiRequest<{ token?: string; url?: string }>(API_PATHS.groupInvites(selectedGroup.id), { method: "POST", body: payload, csrfToken: bootstrap.csrfToken })} />;
+    content = <GroupScreen key={selectedGroup.id} group={selectedGroup} challenges={bootstrap.challenges.filter((challenge) => challenge.groupId === selectedGroup.id)} onBack={() => setScreen({ kind: "dashboard" })} onCreateChallenge={() => setScreen({ kind: "create-challenge", groupId: selectedGroup.id })} onOpenChallenge={(id) => void openParticipant(id)} onOpenAdmin={(id) => void openAdmin(id)} onCreateInvite={async (payload) => apiRequest<{ token?: string; url?: string }>(API_PATHS.groupInvites(selectedGroup.id), { method: "POST", body: payload, csrfToken: bootstrap.csrfToken })} onUpdateGroup={(payload) => updateGroup(selectedGroup.id, payload)} />;
   } else if (screen.kind === "create-challenge" && selectedGroup && canManage(selectedGroup.role)) {
     content = <CreateChallengeScreen key={selectedGroup.id} group={selectedGroup} onBack={() => setScreen({ kind: "group", groupId: selectedGroup.id })} onCreate={(input) => createChallenge(selectedGroup.id, input)} />;
   } else if ((screen.kind === "challenge" || screen.kind === "admin") && (detailLoading || !selectedChallenge || selectedChallenge.id !== screen.challengeId)) {
@@ -2087,7 +2207,7 @@ export default function GoaApp() {
   } else if (screen.kind === "challenge" && selectedChallenge) {
     content = <ParticipantChallengeScreen key={selectedChallenge.id} challenge={selectedChallenge} entries={entries} user={user} tab={screen.tab} onTab={(tab) => setScreen({ ...screen, tab })} onBack={() => setScreen({ kind: "dashboard" })} onAdmin={canManage(selectedRole) ? () => void openAdmin(selectedChallenge.id) : undefined} onSaveEntry={saveEntry} />;
   } else if (screen.kind === "admin" && selectedChallenge && canManage(selectedRole)) {
-    content = <AdminScreen key={selectedChallenge.id} challenge={selectedChallenge} entries={entries} group={selectedGroup} tab={screen.tab} onTab={(tab) => setScreen({ ...screen, tab })} onBack={() => selectedGroup ? setScreen({ kind: "group", groupId: selectedGroup.id }) : setScreen({ kind: "dashboard" })} onViewParticipant={() => setScreen({ kind: "challenge", challengeId: selectedChallenge.id, tab: selectedChallenge.status === "closed" ? "results" : "today" })} onSaveBasics={(payload) => mutateChallenge(API_PATHS.challenge(selectedChallenge.id), payload, "PATCH")} onTransition={(status) => mutateChallenge(API_PATHS.transition(selectedChallenge.id), { status })} onDuplicate={duplicateChallenge} onSaveParticipants={(participantIds) => mutateChallenge(API_PATHS.participants(selectedChallenge.id), { replace: true, participantIds })} onSaveFields={(fields) => mutateChallenge(API_PATHS.fields(selectedChallenge.id), { replace: true, archiveMissing: true, fields })} onAddItems={(payload) => mutateChallenge(API_PATHS.items(selectedChallenge.id), payload)} onPatchEntry={(entryId, values, reason) => mutateChallenge(API_PATHS.entry(entryId), { values, reason }, "PATCH")} onExport={exportCsv} onAddMetric={(payload) => mutateChallenge(API_PATHS.metrics(selectedChallenge.id), payload)} onSaveResult={(payload) => mutateChallenge(API_PATHS.results(selectedChallenge.id), payload)} />;
+    content = <AdminScreen key={selectedChallenge.id} challenge={selectedChallenge} entries={entries} group={selectedGroup} tab={screen.tab} onTab={(tab) => setScreen({ ...screen, tab })} onBack={() => selectedGroup ? setScreen({ kind: "group", groupId: selectedGroup.id }) : setScreen({ kind: "dashboard" })} onViewParticipant={() => setScreen({ kind: "challenge", challengeId: selectedChallenge.id, tab: selectedChallenge.status === "closed" ? "results" : "today" })} onSaveBasics={(payload) => mutateChallenge(API_PATHS.challenge(selectedChallenge.id), payload, "PATCH")} onTransition={(status) => mutateChallenge(API_PATHS.transition(selectedChallenge.id), { status })} onDuplicate={duplicateChallenge} onSaveParticipants={(participantIds) => mutateChallenge(API_PATHS.participants(selectedChallenge.id), { replace: true, participantIds })} onSaveFields={(fields) => mutateChallenge(API_PATHS.fields(selectedChallenge.id), { replace: true, archiveMissing: true, fields })} onAddItems={(payload) => mutateChallenge(API_PATHS.items(selectedChallenge.id), payload)} onUpdateItem={(itemId, payload) => mutateChallenge(API_PATHS.item(selectedChallenge.id, itemId), payload, "PATCH")} onPatchEntry={(entryId, values, reason) => mutateChallenge(API_PATHS.entry(entryId), { values, reason }, "PATCH")} onExport={exportCsv} onAddMetric={(payload) => mutateChallenge(API_PATHS.metrics(selectedChallenge.id), payload)} onSaveResult={(payload) => mutateChallenge(API_PATHS.results(selectedChallenge.id), payload)} />;
   } else if (screen.kind === "admin" || screen.kind === "create-challenge") {
     content = <main className="mx-auto max-w-2xl px-5 py-16"><EmptyState title="Acesso administrativo indisponível" description="Você não possui papel de responsável ou administrador neste grupo. O servidor também valida cada operação." action={<Button onClick={() => setScreen({ kind: "dashboard" })}>Voltar ao início</Button>} /></main>;
   } else {

@@ -235,6 +235,49 @@ export async function createGroup(session: SessionContext, body: Record<string, 
   });
 }
 
+export async function updateGroup(
+  session: SessionContext,
+  groupId: string,
+  body: Record<string, unknown>,
+) {
+  return inTransaction(async (client) => {
+    await requireGroupRole(session.user.id, groupId, ["owner", "admin"], client);
+    const current = await oneOrNull<{ name: string; description: string | null }>(
+      client,
+      `SELECT name, description
+         FROM groups
+        WHERE id = $1 AND archived_at IS NULL
+        FOR UPDATE`,
+      [groupId],
+    );
+    if (!current) throw new ApiError(404, "not_found", "Grupo não encontrado.");
+
+    const name = body.name === undefined
+      ? current.name
+      : stringValue(body, "name", { min: 1, max: 120 })!;
+    const description = body.description === undefined
+      ? current.description
+      : stringValue(body, "description", { max: 1_000, optional: true }) ?? null;
+
+    await client.query(
+      "UPDATE groups SET name = $2, description = $3, updated_at = now() WHERE id = $1",
+      [groupId, name, description],
+    );
+    await writeAudit(
+      client,
+      groupId,
+      null,
+      session.user.id,
+      "group.updated",
+      "group",
+      groupId,
+      current,
+      { name, description },
+    );
+    return { id: groupId, name, description };
+  });
+}
+
 export async function createInvite(
   session: SessionContext,
   groupId: string,

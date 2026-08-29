@@ -20,6 +20,7 @@ import {
   setChallengeParticipants,
   transitionChallenge,
   updateChallenge,
+  updateChallengeItem,
   updateEntry,
 } from "@/lib/goa-challenges";
 import {
@@ -29,6 +30,7 @@ import {
   createGroup,
   createInvite,
   previewInvite,
+  updateGroup,
 } from "@/lib/goa-domain";
 import { getPool } from "@/lib/db";
 import {
@@ -143,6 +145,12 @@ export async function PATCH(request: Request): Promise<Response> {
     const path = segments(request);
     const session = await requireMutationSession(request);
     const body = await readJsonObject(request);
+    if (path[0] === "groups" && path.length === 2) {
+      return json(await updateGroup(session, path[1], body));
+    }
+    if (path[0] === "challenges" && path[2] === "items" && path.length === 4) {
+      return json(await updateChallengeItem(session, path[1], path[3], body));
+    }
     if (path[0] === "challenges" && path.length === 2) {
       return json(await updateChallenge(session, path[1], body));
     }

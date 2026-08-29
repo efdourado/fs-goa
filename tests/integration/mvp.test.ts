@@ -89,6 +89,54 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
   const replay = await call("POST", `/api/invites/${inviteToken}`, { session: participant, body: {} });
   assert.equal(replay.response.status, 200, "aceite repetido pela mesma conta deve ser idempotente");
 
+  const participantGroupEdit = await call("PATCH", `/api/groups/${groupId}`, {
+    session: participant,
+    body: { name: "Clube invadido", description: "Participantes não podem editar o grupo." },
+  });
+  assert.equal(participantGroupEdit.response.status, 403, "participante não pode editar os dados do grupo");
+
+  const outsiderGroupEdit = await call("PATCH", `/api/groups/${groupId}`, {
+    session: outsider,
+    body: { name: "Grupo alheio", description: "Não deve revelar a existência do grupo." },
+  });
+  assert.equal(outsiderGroupEdit.response.status, 404, "usuário externo não pode descobrir o grupo pela edição");
+
+  const ownerGroupEdit = await call("PATCH", `/api/groups/${groupId}`, {
+    session: owner,
+    body: { name: "Clube do Sofá Editado", description: "Cinema, conversa e bons hábitos." },
+  });
+  assert.equal(ownerGroupEdit.response.status, 200, JSON.stringify(ownerGroupEdit.body));
+  assert.deepEqual(ownerGroupEdit.body, {
+    id: groupId,
+    name: "Clube do Sofá Editado",
+    description: "Cinema, conversa e bons hábitos.",
+  });
+
+  await adminPool.query(
+    "UPDATE group_members SET role='admin' WHERE group_id=$1 AND user_id=$2",
+    [groupId, participant.user.id],
+  );
+  const adminGroupEdit = await call("PATCH", `/api/groups/${groupId}`, {
+    session: participant,
+    body: { name: "Clube do Sofá Editado", description: "Descrição revisada por uma administradora." },
+  });
+  await adminPool.query(
+    "UPDATE group_members SET role='participant' WHERE group_id=$1 AND user_id=$2",
+    [groupId, participant.user.id],
+  );
+  assert.equal(adminGroupEdit.response.status, 200, JSON.stringify(adminGroupEdit.body));
+  assert.equal((adminGroupEdit.body as { id: string }).id, groupId, "editar o grupo deve preservar seu ID");
+
+  const editedGroupBootstrap = await call("GET", "/api/bootstrap", { session: owner });
+  assert.equal(editedGroupBootstrap.response.status, 200, JSON.stringify(editedGroupBootstrap.body));
+  const editedGroup = (editedGroupBootstrap.body as {
+    groups: Array<{ id: string; name: string; description: string | null }>;
+  }).groups.find((group) => group.id === groupId);
+  assert.ok(editedGroup);
+  assert.equal(editedGroup.id, groupId);
+  assert.equal(editedGroup.name, "Clube do Sofá Editado");
+  assert.equal(editedGroup.description, "Descrição revisada por uma administradora.");
+
   const outsiderGroup = await call("POST", "/api/groups", { session: outsider, body: { name: "Outro grupo" } });
   assert.equal(outsiderGroup.response.status, 201);
   const outsiderGroupId = (outsiderGroup.body as { id: string }).id;
@@ -114,10 +162,62 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
   assert.equal(challengeResponse.response.status, 201, JSON.stringify(challengeResponse.body));
   const challengeId = (challengeResponse.body as { id: string }).id;
 
+  const originalDraftDetail = await call("GET", `/api/challenges/${challengeId}`, { session: owner });
+  assert.equal(originalDraftDetail.response.status, 200, JSON.stringify(originalDraftDetail.body));
+  const originalDraftItems = (originalDraftDetail.body as {
+    items: Array<{ id: string; title: string; description: string | null }>;
+  }).items;
+  const originalItemIds = originalDraftItems.map((item) => item.id);
+  assert.equal(originalItemIds.length, 2);
+
+  const ownerDraftItemEdit = await call(
+    "PATCH",
+    `/api/challenges/${challengeId}/items/${originalItemIds[0]}`,
+    {
+      session: owner,
+      body: { title: "Aftersun — seleção do clube", description: "Primeiro filme da rodada." },
+    },
+  );
+  assert.equal(ownerDraftItemEdit.response.status, 200, JSON.stringify(ownerDraftItemEdit.body));
+  assert.deepEqual(ownerDraftItemEdit.body, {
+    id: originalItemIds[0],
+    title: "Aftersun — seleção do clube",
+    description: "Primeiro filme da rodada.",
+  });
+
+  const draftAfterOwnerEdit = await call("GET", `/api/challenges/${challengeId}`, { session: owner });
+  assert.equal(draftAfterOwnerEdit.response.status, 200, JSON.stringify(draftAfterOwnerEdit.body));
+  const draftAfterOwnerItems = (draftAfterOwnerEdit.body as {
+    items: Array<{ id: string; title: string; description: string | null }>;
+  }).items;
+  assert.deepEqual(draftAfterOwnerItems.map((item) => item.id), originalItemIds, "editar não deve recriar os itens");
+  assert.equal(draftAfterOwnerItems[0].title, "Aftersun — seleção do clube");
+  assert.equal(draftAfterOwnerItems[0].description, "Primeiro filme da rodada.");
+
   const hiddenDraft = await call("GET", `/api/challenges/${challengeId}`, { session: participant });
   assert.equal(hiddenDraft.response.status, 404, "participante não pode descobrir rascunho antes da ativação");
   const crossTenant = await call("GET", `/api/challenges/${challengeId}`, { session: outsider });
   assert.equal(crossTenant.response.status, 404, "membro de outro grupo não pode descobrir o desafio");
+
+  await adminPool.query(
+    "UPDATE group_members SET role='admin' WHERE group_id=$1 AND user_id=$2",
+    [groupId, participant.user.id],
+  );
+  const adminDraftItemEdit = await call(
+    "PATCH",
+    `/api/challenges/${challengeId}/items/${originalItemIds[1]}`,
+    {
+      session: participant,
+      body: { title: "Perfect Days — edição do clube", description: "Segundo filme da rodada." },
+    },
+  );
+  await adminPool.query(
+    "UPDATE group_members SET role='participant' WHERE group_id=$1 AND user_id=$2",
+    [groupId, participant.user.id],
+  );
+  assert.equal(adminDraftItemEdit.response.status, 200, JSON.stringify(adminDraftItemEdit.body));
+  assert.equal((adminDraftItemEdit.body as { id: string }).id, originalItemIds[1]);
+
   const missingCsrf = await call("POST", `/api/challenges/${challengeId}/transition`, {
     session: { ...owner, csrf: "" }, body: { status: "active" }, csrf: false,
   });
@@ -128,6 +228,17 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
   });
   assert.equal(activated.response.status, 200, JSON.stringify(activated.body));
 
+  const activeItemEdit = await call(
+    "PATCH",
+    `/api/challenges/${challengeId}/items/${originalItemIds[0]}`,
+    {
+      session: owner,
+      body: { title: "Aftersun (2022)", description: "Título corrigido durante o desafio." },
+    },
+  );
+  assert.equal(activeItemEdit.response.status, 200, JSON.stringify(activeItemEdit.body));
+  assert.equal((activeItemEdit.body as { id: string }).id, originalItemIds[0]);
+
   const detail = await call("GET", `/api/challenges/${challengeId}`, { session: participant });
   assert.equal(detail.response.status, 200, JSON.stringify(detail.body));
   const challenge = detail.body as {
@@ -135,6 +246,8 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
     items: Array<{ id: string; title: string }>;
     metrics: Array<{ id: string }>;
   };
+  assert.deepEqual(challenge.items.map((item) => item.id), originalItemIds, "edições em draft e active devem preservar IDs");
+  assert.deepEqual(challenge.items.map((item) => item.title), ["Aftersun (2022)", "Perfect Days — edição do clube"]);
   const ratingId = challenge.fields.find((field) => field.key === "nota")?.id;
   const commentId = challenge.fields.find((field) => field.key === "comentario")?.id;
   assert.ok(ratingId && commentId);
@@ -166,11 +279,18 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
   const csv = await call("GET", `/api/challenges/${challengeId}/export.csv`, { session: owner });
   assert.equal(csv.response.status, 200);
   assert.match(csv.body as string, /canario-pessoal/);
+  assert.match(csv.body as string, /Aftersun \(2022\)/, "a exportação deve usar o título corrigido");
 
   const closed = await call("POST", `/api/challenges/${challengeId}/transition`, {
     session: owner, body: { status: "closed" },
   });
   assert.equal(closed.response.status, 200, JSON.stringify(closed.body));
+  const closedItemEdit = await call(
+    "PATCH",
+    `/api/challenges/${challengeId}/items/${originalItemIds[0]}`,
+    { session: owner, body: { title: "Não pode mudar depois do encerramento" } },
+  );
+  assert.equal(closedItemEdit.response.status, 409, "item de desafio encerrado deve permanecer bloqueado");
   const finalDetail = await call("GET", `/api/challenges/${challengeId}`, { session: owner });
   const finalMetrics = (finalDetail.body as { metrics: Array<{ id: string }> }).metrics;
   const results = await call("POST", `/api/challenges/${challengeId}/results`, {
@@ -257,7 +377,23 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
     body: { generate: { frequency: "daily", startsOn: "2026-07-01", endsOn: "2026-07-03" } },
   });
   assert.equal(generated.response.status, 201, JSON.stringify(generated.body));
-  assert.equal((generated.body as { checkpointIds: string[] }).checkpointIds.length, 3);
+  const generatedCheckpointIds = (generated.body as { checkpointIds: string[] }).checkpointIds;
+  assert.equal(generatedCheckpointIds.length, 3);
+
+  const checkpointEdit = await call(
+    "PATCH",
+    `/api/challenges/${dailyId}/items/${generatedCheckpointIds[0]}`,
+    {
+      session: owner,
+      body: { title: "Abertura da leitura", description: "Primeiro encontro do diário." },
+    },
+  );
+  assert.equal(checkpointEdit.response.status, 200, JSON.stringify(checkpointEdit.body));
+  assert.deepEqual(checkpointEdit.body, {
+    id: generatedCheckpointIds[0],
+    title: "Abertura da leitura",
+    description: "Primeiro encontro do diário.",
+  });
 
   const rescheduled = await call("PATCH", `/api/challenges/${dailyId}`, {
     session: owner, body: { startsOn: "2026-07-01", endsOn: "2026-07-02" },
@@ -270,12 +406,24 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
     items: Array<{ id: string; title: string; status: string }>;
   };
   assert.equal(dailyChallenge.items.length, 2, "regeneração deve arquivar checkpoints excedentes");
+  assert.equal(dailyChallenge.items[0].id, generatedCheckpointIds[0], "reagendar deve preservar o ID do checkpoint");
+  assert.equal(dailyChallenge.items[0].title, "Abertura da leitura", "reagendar deve preservar o título personalizado");
   assert.equal(dailyChallenge.fields[0].config.multiline, true, "texto longo deve sobreviver ao round-trip");
 
   const activateDaily = await call("POST", `/api/challenges/${dailyId}/transition`, {
     session: owner, body: { status: "active" },
   });
   assert.equal(activateDaily.response.status, 200, JSON.stringify(activateDaily.body));
+  const activeCheckpointEdit = await call(
+    "PATCH",
+    `/api/challenges/${dailyId}/items/${dailyChallenge.items[0].id}`,
+    {
+      session: owner,
+      body: { title: "Abertura concluída", description: "Título corrigido com o desafio ativo." },
+    },
+  );
+  assert.equal(activeCheckpointEdit.response.status, 200, JSON.stringify(activeCheckpointEdit.body));
+  assert.equal((activeCheckpointEdit.body as { id: string }).id, dailyChallenge.items[0].id);
   const dailyEntry = await call("POST", `/api/challenges/${dailyId}/entries`, {
     session: owner,
     body: { checkpointId: dailyChallenge.items[0].id, values: { [dailyChallenge.fields[0].id]: "canario-diario" } },
@@ -284,19 +432,25 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
   const dailyEntryId = (dailyEntry.body as { id: string }).id;
   const dailyCsv = await call("GET", `/api/challenges/${dailyId}/export.csv`, { session: owner });
   assert.equal(dailyCsv.response.status, 200);
-  assert.match(dailyCsv.body as string, /Dia 1/);
+  assert.match(dailyCsv.body as string, /Abertura concluída/);
 
   const closeDaily = await call("POST", `/api/challenges/${dailyId}/transition`, {
     session: owner, body: { status: "closed" },
   });
   assert.equal(closeDaily.response.status, 200, JSON.stringify(closeDaily.body));
+  const closedCheckpointEdit = await call(
+    "PATCH",
+    `/api/challenges/${dailyId}/items/${dailyChallenge.items[0].id}`,
+    { session: owner, body: { title: "Não pode mudar depois do encerramento" } },
+  );
+  assert.equal(closedCheckpointEdit.response.status, 409, "checkpoint encerrado deve preservar sua leitura histórica");
   const dailyResult = await call("POST", `/api/challenges/${dailyId}/results`, {
     session: owner,
     body: { headline: "Diário concluído", comments: [{ entryId: dailyEntryId, fieldId: dailyChallenge.fields[0].id }] },
   });
   assert.equal(dailyResult.response.status, 200, JSON.stringify(dailyResult.body));
   const curatedDaily = await call("GET", `/api/challenges/${dailyId}`, { session: owner });
-  assert.match(JSON.stringify(curatedDaily.body), /Dia 1/, "curadoria diária deve preservar o título do checkpoint");
+  assert.match(JSON.stringify(curatedDaily.body), /Abertura concluída/, "curadoria diária deve preservar o título do checkpoint");
 
   const futureDaily = await call("POST", `/api/groups/${groupId}/challenges`, {
     session: owner,
