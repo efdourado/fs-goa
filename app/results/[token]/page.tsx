@@ -39,13 +39,13 @@ export default async function SharedResultsPage({ params }: { params: Promise<{ 
           goa
         </Link>
         <section className="overflow-hidden rounded-[30px] bg-[var(--ink)] px-6 py-12 text-white sm:px-12 sm:py-16">
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-stone-400">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-white/50">
             {challenge.startsOn} — {challenge.endsOn}
           </p>
           <h1 className="mt-5 max-w-4xl text-4xl font-semibold leading-none tracking-[-0.055em] sm:text-7xl">
             {result.headline || challenge.title}
           </h1>
-          {result.summary ? <p className="mt-7 max-w-2xl text-base leading-7 text-stone-300">{result.summary}</p> : null}
+          {result.summary ? <p className="mt-7 max-w-2xl text-base leading-7 text-white/65">{result.summary}</p> : null}
           <div className="mt-8 flex flex-wrap gap-2">
             {challenge.participants.map((participant) => (
               <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs" key={participant}>{participant}</span>

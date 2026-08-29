@@ -15,6 +15,20 @@
       "when": 1787964586073,
       "tag": "0001_windy_chat",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788009348953,
+      "tag": "0002_perpetual_gressill",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788015326834,
+      "tag": "0003_robust_deathstrike",
+      "breakpoints": true
     }
   ]
 }

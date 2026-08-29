@@ -19,14 +19,18 @@ navegador ──JSON + cookie HTTP-only──▶ Next.js / route handlers ──
 
 | Arquivo | Responsabilidade |
 | --- | --- |
-| `app/GoaApp.tsx` | aplicação cliente responsiva e contrato REST centralizado |
+| `app/GoaApp.tsx` | estado global, navegação e orquestração da aplicação cliente |
+| `app/goa/` | contrato REST, tipos, componentes e telas organizados por área |
 | `app/api/[...path]/route.ts` | roteamento HTTP fino; nenhuma decisão de autorização na interface |
-| `lib/auth.ts` | contas, sessões, rate limit e papéis |
+| `app/admin/` | página `/admin` (componente de servidor com guarda) + console cliente |
+| `lib/auth.ts` | contas, sessões, rate limit, papéis, redefinição de senha e atualização de conta |
+| `lib/admin.ts` | serviços do painel `/admin` — só metadados (contadores, tamanho, lixeira, auditoria, moderação) |
 | `lib/security.ts` | PBKDF2, tokens, cookies, origem e CSRF |
-| `lib/goa-domain.ts` | grupos, convites e criação dos presets |
-| `lib/goa-challenges.ts` | campos, registros, métricas, resultados e duplicação |
+| `lib/limits.ts` | limites de criação por dono/grupo (env) |
+| `lib/goa-domain.ts` + `lib/goa/domain/` | fachada e módulos de grupos, convites e criação dos presets |
+| `lib/goa-challenges.ts` + `lib/goa/challenges/` | fachada e módulos de campos, registros, métricas, resultados e duplicação |
 | `lib/validation.ts` | validação tipada e exportação CSV segura |
-| `db/schema.ts` | 20 tabelas, checks, índices parciais e FKs compostas |
+| `db/schema.ts` + `db/schema/` | fachada e 21 tabelas divididas por área do domínio |
 | `drizzle/` | única fonte de migrações reproduzíveis |
 | `scripts/` | `migrate.mjs` (migrações) e `seed-admin.mjs` (conta de administração) |
 
@@ -91,18 +95,26 @@ papéis, histórico e auditoria normalizados; JSONB restrito a metadados e snaps
 FKs compostas garantem que participante, campo, item e opção pertençam ao mesmo
 escopo. Transações cobrem convite, registro, encerramento e duplicação.
 
-**Identidade.** Contas com nome, usuário e senha; e-mail opcional. Sessões e
-convites por tokens opacos armazenados só por hash. Autorização sempre a partir da
-associação ativa ao grupo; IDs aleatórios reduzem enumeração mas não substituem
-autorização. Identidade de terceiros pode ser adicionada depois sem mudar o domínio.
+**Identidade.** Contas com nome, usuário e senha; e-mail opcional. O login aceita
+usuário **ou** e-mail; o e-mail também habilita a redefinição de senha por token de
+uso único (`password_reset_tokens`, só o hash é guardado; entrega mediada pelo
+administrador hoje). Sessões e convites por tokens opacos armazenados só por hash.
+Autorização sempre a partir da associação ativa ao grupo; IDs aleatórios reduzem
+enumeração mas não substituem autorização. `platform_admin` é um flag separado, sem
+poder sobre grupos — só abre o painel de operação `/admin`. Identidade de terceiros
+pode ser adicionada depois sem mudar o domínio.
 
-## Fora do MVP
+## Roadmap e fora do MVP
 
-Recuperação de conta por e-mail verificado; transferência explícita de ownership
-com confirmação; backup/restauração guiados para administradores do ambiente;
-mediana e dispersão nas métricas; reagendamento em lote de itens ao duplicar;
-sequência diária e melhor semana para o piloto de leitura; templates entre grupos
-com consentimento do autor; upload de fotos e vídeos.
+Próximos caminhos: **interface bilíngue** (inglês + português, i18n); **dark mode**;
+**entrega automática de e-mail** para a redefinição de senha (hoje é mediada pelo
+administrador via `/admin`).
+
+Ainda fora: transferência explícita de ownership com confirmação;
+backup/restauração guiados para administradores do ambiente; mediana e dispersão
+nas métricas; reagendamento em lote de itens ao duplicar; sequência diária e melhor
+semana para o piloto de leitura; templates entre grupos com consentimento do autor;
+upload de fotos e vídeos.
 
 Antes de hospedagem ampla: backups, rotação do segredo do banco e TLS do provedor;
 o rate limit por usuário não substitui proteção de borda.
