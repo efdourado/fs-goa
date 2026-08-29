@@ -108,7 +108,7 @@ async function apiGet<T>(path: string): Promise<T> {
   return body as T;
 }
 
-export default function AdminConsole({ viewerName, csrfToken }: { viewerName: string; csrfToken: string }) {
+export default function AdminConsole({ viewerId, viewerName, csrfToken }: { viewerId: string; viewerName: string; csrfToken: string }) {
   const [tab, setTab] = useState<Tab>("usage");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -234,9 +234,13 @@ export default function AdminConsole({ viewerName, csrfToken }: { viewerName: st
       {tab === "accounts" ? (
         <AccountsTab
           users={users}
+          viewerId={viewerId}
           busy={busy}
           onDisable={(user, disabled) =>
             run(() => post("/api/admin/users/disable", { userId: user.id, disabled }), loadUsers)
+          }
+          onSetAdmin={(user, platformAdmin) =>
+            run(() => post("/api/admin/users/set-admin", { userId: user.id, platformAdmin }), loadUsers)
           }
           onRevoke={(user) =>
             run(() => post("/api/admin/users/revoke-sessions", { userId: user.id }), loadUsers)
@@ -390,14 +394,18 @@ function AuditTab({
 
 function AccountsTab({
   users,
+  viewerId,
   busy,
   onDisable,
+  onSetAdmin,
   onRevoke,
   onResetLink,
 }: {
   users: AdminUser[] | null;
+  viewerId: string;
   busy: boolean;
   onDisable: (user: AdminUser, disabled: boolean) => void;
+  onSetAdmin: (user: AdminUser, platformAdmin: boolean) => void;
   onRevoke: (user: AdminUser) => void;
   onResetLink: (user: AdminUser) => Promise<{ url: string; expiresAt: string }>;
 }) {
@@ -439,17 +447,29 @@ function AccountsTab({
                   @{user.username}{user.email ? ` · ${user.email}` : " · sem e-mail"} · criada {formatDateTime(user.createdAt)} · última sessão {formatDateTime(user.lastSeenAt)} · {user.groupsOwned} grupos · {user.activeSessions} sessões
                 </p>
               </div>
-              {user.platformAdmin ? (
-                <span className={cx("text-xs", muted)}>protegida</span>
+              {user.id === viewerId ? (
+                <span className={cx("text-xs", muted)}>você</span>
               ) : (
                 <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="secondary"
+                    disabled={busy}
+                    onClick={() => {
+                      const to = !user.platformAdmin;
+                      if (window.confirm(to ? `Dar acesso de administração a ${user.name}?` : `Remover o acesso de administração de ${user.name}?`)) onSetAdmin(user, to);
+                    }}
+                  >
+                    {user.platformAdmin ? "Remover admin" : "Tornar admin"}
+                  </Button>
                   <Button variant="ghost" disabled={!!linkBusy || !user.email} onClick={() => generate(user)}>
                     {linkBusy === user.id ? "Gerando…" : "Gerar link de senha"}
                   </Button>
                   <Button variant="ghost" disabled={busy || !user.activeSessions} onClick={() => onRevoke(user)}>Revogar sessões</Button>
-                  <Button variant={user.disabledAt ? "secondary" : "danger"} disabled={busy} onClick={() => onDisable(user, !user.disabledAt)}>
-                    {user.disabledAt ? "Reativar" : "Desativar"}
-                  </Button>
+                  {user.platformAdmin ? null : (
+                    <Button variant={user.disabledAt ? "secondary" : "danger"} disabled={busy} onClick={() => onDisable(user, !user.disabledAt)}>
+                      {user.disabledAt ? "Reativar" : "Desativar"}
+                    </Button>
+                  )}
                 </div>
               )}
             </div>

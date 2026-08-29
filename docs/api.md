@@ -40,7 +40,7 @@ Toda resposta é JSON `no-store` com `x-content-type-options: nosniff` e
 | `POST /api/auth/logout` | sessão+csrf | — | `200 { ok }` + cookie limpo; revoga a sessão atual |
 | `POST /api/auth/forgot` | origem | `{ email }` | `202 { ok }` **sempre** (não revela se a conta existe). Registra o pedido; o admin gera o link em `/admin` |
 | `POST /api/auth/reset` | origem | `{ token, password }` | `200 { user, csrfToken }` + `Set-Cookie` (login automático). Marca o token usado e revoga todas as sessões antigas da conta. `400 invalid_reset_token` |
-| `PATCH /api/account` | sessão+csrf | `{ name?, email?, currentPassword?, newPassword? }` | `200 { user }`. Trocar a senha exige `currentPassword` e revoga as outras sessões. `403 invalid_current_password`, `409 email_taken` |
+| `PATCH /api/account` | sessão+csrf | `{ name?, currentPassword?, newPassword? }` | `200 { user }`. Só o nome e a senha são editáveis; passar `email` ou `username` dá `403 email_locked` / `403 username_locked`. Trocar a senha exige `currentPassword` e revoga as outras sessões |
 
 ## Grupos
 
@@ -106,5 +106,6 @@ Só expõem metadados — nunca o conteúdo de grupos ou desafios.
 | `GET /api/admin/audit?groupId=&entityId=&limit=` | — | eventos de `audit_events` com autor, antes/depois; filtro por grupo/entidade |
 | `POST /api/admin/trash/purge` | `{ kind: "group"\|"challenge"\|"entry", id }` | apaga de vez, em ordem de dependência (o schema é cheio de `RESTRICT`) |
 | `POST /api/admin/users/disable` | `{ userId, disabled }` | liga/desliga `disabled_at`; ao desativar revoga as sessões. Admins e a própria conta são protegidos |
+| `POST /api/admin/users/set-admin` | `{ userId, platformAdmin }` | liga/desliga `platform_admin`. Não permite mudar a própria conta (`400 self_target`) |
 | `POST /api/admin/users/revoke-sessions` | `{ userId }` | revoga todas as sessões ativas da conta |
 | `POST /api/admin/users/reset-link` | `{ userId }` | `{ url, expiresAt }` — link de uso único (`/?reset=<token>`) para o admin repassar |
