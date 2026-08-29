@@ -302,7 +302,7 @@ export default function GoaApp() {
   } else if (screen.kind === "admin" || screen.kind === "create-challenge") {
     content = <main className="mx-auto max-w-2xl px-5 py-16"><EmptyState title="Acesso administrativo indisponível" description="Você não possui papel de responsável ou administrador neste grupo. O servidor também valida cada operação." action={<Button onClick={() => setScreen({ kind: "dashboard" })}>Voltar ao início</Button>} /></main>;
   } else {
-    content = <DashboardScreen user={user} groups={bootstrap.groups} challenges={bootstrap.challenges} limits={bootstrap.limits} onOpenGroup={(groupId) => setScreen({ kind: "group", groupId })} onOpenChallenge={(id) => void openParticipant(id)} onOpenAdmin={(id) => void openAdmin(id)} onCreateGroup={createGroup} onOpenInvite={(token) => { setPendingInviteToken(token); setScreen({ kind: "invite", token }); }} />;
+    content = <DashboardScreen user={user} groups={bootstrap.groups} challenges={bootstrap.challenges} limits={bootstrap.limits} onOpenGroup={(groupId) => setScreen({ kind: "group", groupId })} onOpenChallenge={(id) => void openParticipant(id)} onOpenAdmin={(id) => void openAdmin(id)} onCreateGroup={createGroup} />;
   }
 
   return (

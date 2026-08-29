@@ -11,6 +11,8 @@ export const cardClass =
 export const inputClass =
   "mb-1 min-h-12 w-full rounded-xl border border-[var(--line)] bg-[var(--paper)] px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--main)] focus:ring-4 focus:ring-[var(--main)]/15 disabled:cursor-not-allowed disabled:bg-[var(--canvas)]";
 export const labelClass = "mb-1.5 block text-sm font-semibold text-[var(--ink)]";
+export const linkClass =
+  "font-bold text-[var(--main-strong)] underline-offset-4 hover:underline cursor-pointer disabled:cursor-not-allowed disabled:opacity-50";
 
 export function cx(...classes: Array<string | false | null | undefined>): string {
   return classes.filter(Boolean).join(" ");
@@ -189,16 +191,20 @@ export function AppHeader({
 
 const CHALLENGE_STATUS_META: Record<
   "draft" | "scheduled" | "active" | "closed",
-  { label: string; dot: string }
+  { label: string; dot: string; border: string; solid: string }
 > = {
-  draft: { label: "Rascunho", dot: "bg-[var(--warn)]" },
-  scheduled: { label: "Agendado", dot: "bg-[var(--main)]" },
-  active: { label: "Ativo", dot: "bg-[var(--ok)]" },
-  closed: { label: "Encerrado", dot: "bg-[var(--muted)]" },
+  draft: { label: "Rascunho", dot: "bg-[var(--warn)]", border: "border-[var(--warn)]", solid: "bg-[var(--warn)]" },
+  scheduled: { label: "Agendado", dot: "bg-[var(--main)]", border: "border-[var(--main)]", solid: "bg-[var(--main)]" },
+  active: { label: "Ativo", dot: "bg-[var(--ok)]", border: "border-[var(--ok)]", solid: "bg-[var(--ok)]" },
+  closed: { label: "Encerrado", dot: "bg-[var(--muted)]", border: "border-[var(--muted)]", solid: "bg-[var(--muted)]" },
 };
 
+export function challengeStatusTone(status: ChallengeStatus, startsOn?: string | null) {
+  return CHALLENGE_STATUS_META[isChallengeScheduled(status, startsOn) ? "scheduled" : status];
+}
+
 export function ChallengeStatusBadge({ status, startsOn }: { status: ChallengeStatus; startsOn?: string | null }) {
-  const meta = CHALLENGE_STATUS_META[isChallengeScheduled(status, startsOn) ? "scheduled" : status];
+  const meta = challengeStatusTone(status, startsOn);
   return (
     <span
       className={cx("inline-block h-2.5 w-2.5 flex-none rounded-full ring-1 ring-inset ring-black/10", meta.dot)}
