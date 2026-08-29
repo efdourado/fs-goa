@@ -52,7 +52,7 @@ Toda resposta é JSON `no-store` com `x-content-type-options: nosniff` e
 | `POST /api/groups/:id/invites` | sessão+csrf (owner/admin) | `{ expiresInDays?, maxUses? }` | `201 { id, token, url, expiresAt, maxUses }` |
 | `POST /api/groups/:id/challenges` | sessão+csrf (owner/admin) | ver "criar desafio" abaixo | `201 { id, challengeId, status: "draft" }`. `403 challenge_limit` ao passar de `MAX_CHALLENGES_PER_GROUP` (6) |
 
-Criar desafio: `{ title, description?, rules?, startsOn, endsOn, submissionMode:
+Criar desafio: `{ title, description?, ruleSections?: [{ title, description }], startsOn, endsOn, submissionMode:
 "item"|"daily"|"free", template?, fields[], items[], generateDaily?, participantIds[] }`.
 
 ## Convites
@@ -67,7 +67,7 @@ Criar desafio: `{ title, description?, rules?, startsOn, endsOn, submissionMode:
 | Método · rota | Acesso | Corpo | Retorna / efeito |
 | --- | --- | --- | --- |
 | `GET /api/challenges/:id` | sessão (membro do grupo) | — | Detalhe completo: campos, itens, participantes, métricas, resultado. Rascunho só para owner/admin |
-| `PATCH /api/challenges/:id` | sessão+csrf (owner/admin) | `{ title?, description?, rules?, startsOn?, endsOn? }` | desafio atualizado |
+| `PATCH /api/challenges/:id` | sessão+csrf (owner/admin) | `{ title?, description?, ruleSections?: [{ title, description }], startsOn?, endsOn? }` | desafio atualizado |
 | `DELETE /api/challenges/:id` | sessão+csrf (owner/admin) | — | `200 { id, deleted: true }` — lixeira |
 | `POST /api/challenges/:id/participants` | sessão+csrf (owner/admin) | `{ replace: true, participantIds[] }` | participantes ativos |
 | `POST /api/challenges/:id/fields` | sessão+csrf (owner/admin) | `{ replace, archiveMissing, fields[] }` | `201` — campos em uso são arquivados, nunca apagados |
@@ -76,7 +76,7 @@ Criar desafio: `{ title, description?, rules?, startsOn, endsOn, submissionMode:
 | `POST /api/challenges/:id/metrics` | sessão+csrf (owner/admin) | `{ operation, fieldKey?, label, ... }` | `201` — só enums (`sum`, `average`, `count`, `min`, `max`, `completion_rate`) |
 | `POST /api/challenges/:id/entries` | sessão+csrf (participante) | `{ itemId?/checkpointId?, values }` | `201` — um registro ativo por item/dia |
 | `POST /api/challenges/:id/transition` | sessão+csrf (owner/admin) | `{ status: "active" \| "closed" }` | `draft→active→closed`; encerrar congela os dados e gera blocos de resultado |
-| `POST /api/challenges/:id/duplicate` | sessão+csrf (owner/admin) | `{ title?, targetGroupId? }` | `201` — clona só a estrutura (nunca participantes, registros, convites, tokens) |
+| `POST /api/challenges/:id/duplicate` | sessão+csrf (owner/admin nos dois grupos) | `{ title?, targetGroupId }` | `201` — cria um rascunho estrutural em outro grupo; nunca copia participantes, registros, resultados, convites ou tokens |
 | `POST /api/challenges/:id/results` | sessão+csrf (owner/admin) | `{ headline?, summary?, metricIds[], commentKeys[], publish? }` | curadoria da vitrine; ao publicar retorna `url` pública |
 | `GET /api/challenges/:id/entries` | sessão (owner/admin) | — | `{ entries: [...] }` para a revisão |
 | `GET /api/challenges/:id/export.csv` | sessão (owner/admin) | — | `text/csv`; células que virariam fórmula são neutralizadas |

@@ -4,6 +4,7 @@ import { type FormEvent, useMemo, useState } from "react";
 
 import { errorMessage } from "../api";
 import { cleanFields, FieldBuilder } from "../fields";
+import { RuleSectionsEditor, visibleRuleSections } from "../rules";
 import type {
   AdminTab,
   ChallengeDetail,
@@ -26,8 +27,15 @@ import {
   PageHeading,
   StatusMessage,
 } from "../ui";
-import { formatDate, formatDateTime, itemIdForEntry, valuesAsRecord } from "../utils";
+import { formatDate, formatDateTime, isChallengeScheduled, itemIdForEntry, itemStatusLabel, valuesAsRecord } from "../utils";
 import { DynamicEntryForm, ResultView } from "./participant-challenge";
+
+export interface DuplicateTargetGroup {
+  id: Id;
+  name: string;
+  challengeCount: number;
+  challengeLimit: number;
+}
 
 function AdminOverview({
   challenge,
@@ -35,26 +43,31 @@ function AdminOverview({
   onSave,
   onTransition,
   onDuplicate,
+  duplicateTargets,
   onDelete,
 }: {
   challenge: ChallengeDetail;
   entries: Entry[];
   onSave: (payload: Partial<ChallengeSummary>) => Promise<void>;
   onTransition: (status: "active" | "closed") => Promise<void>;
-  onDuplicate: (payload: { title: string }) => Promise<void>;
+  onDuplicate: (payload: { title: string; targetGroupId: Id }) => Promise<void>;
+  duplicateTargets: DuplicateTargetGroup[];
   onDelete?: () => Promise<void>;
 }) {
   const [title, setTitle] = useState(challenge.title);
   const [description, setDescription] = useState(challenge.description ?? "");
-  const [rules, setRules] = useState(challenge.rules ?? "");
+  const [ruleSections, setRuleSections] = useState(() => visibleRuleSections(challenge.ruleSections, challenge.rules));
   const [startsOn, setStartsOn] = useState(challenge.startsOn ?? "");
   const [endsOn, setEndsOn] = useState(challenge.endsOn ?? "");
-  const [duplicateTitle, setDuplicateTitle] = useState(`${challenge.title} — cópia`);
+  const [duplicateTitle, setDuplicateTitle] = useState(challenge.title);
+  const availableTargets = duplicateTargets.filter((target) => target.challengeCount < target.challengeLimit);
+  const [duplicateTargetGroupId, setDuplicateTargetGroupId] = useState<Id>(availableTargets[0]?.id ?? "");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const expected = challenge.items.length * challenge.participants.length;
   const missing = Math.max(0, expected - entries.length);
+  const scheduled = isChallengeScheduled(challenge.status, challenge.startsOn);
 
   async function run(label: string, action: () => Promise<void>, successText: string) {
     setBusy(label);
@@ -79,12 +92,12 @@ function AdminOverview({
       <section className={cx(cardClass, "p-5 sm:p-7")}>
         <h2 className="text-xl font-bold">Informações básicas</h2>
         <p className="mt-1 text-sm text-[var(--muted)]">Registros históricos nunca dependem da posição visual destes campos.</p>
-        <form className="mt-5 grid gap-4 sm:grid-cols-2" onSubmit={(event) => { event.preventDefault(); void run("save", () => onSave({ title: title.trim(), description: description.trim(), rules: rules.trim(), startsOn, endsOn }), "Informações atualizadas."); }}>
+        <form className="mt-5 grid gap-4 sm:grid-cols-2" onSubmit={(event) => { event.preventDefault(); void run("save", () => onSave({ title: title.trim(), description: description.trim(), ruleSections: ruleSections.map((rule) => ({ title: rule.title.trim(), description: rule.description.trim() })), startsOn, endsOn }), "Informações atualizadas."); }}>
           <label className="sm:col-span-2"><span className={labelClass}>Título</span><input className={inputClass} value={title} onChange={(event) => setTitle(event.target.value)} required maxLength={140} disabled={challenge.status === "closed"} /></label>
           <label><span className={labelClass}>Início</span><input className={inputClass} type="date" value={startsOn} onChange={(event) => setStartsOn(event.target.value)} disabled={challenge.status !== "draft"} /></label>
           <label><span className={labelClass}>Término</span><input className={inputClass} type="date" min={startsOn} value={endsOn} onChange={(event) => setEndsOn(event.target.value)} disabled={challenge.status !== "draft"} /></label>
           <label className="sm:col-span-2"><span className={labelClass}>Descrição</span><textarea className={inputClass} rows={3} value={description} onChange={(event) => setDescription(event.target.value)} maxLength={1000} disabled={challenge.status === "closed"} /></label>
-          <label className="sm:col-span-2"><span className={labelClass}>Regras</span><textarea className={inputClass} rows={5} value={rules} onChange={(event) => setRules(event.target.value)} maxLength={5000} disabled={challenge.status === "closed"} /></label>
+          <div className="sm:col-span-2"><div className="mb-3"><span className={labelClass}>Regras com título</span><p className="text-xs leading-5 text-[var(--muted)]">Cada regra ganha destaque próprio para ninguém precisar procurar o combinado.</p></div><RuleSectionsEditor value={ruleSections} onChange={setRuleSections} disabled={challenge.status === "closed"} /></div>
           {challenge.status !== "closed" ? <div className="sm:col-span-2"><Button type="submit" disabled={busy === "save"}>{busy === "save" ? "Salvando…" : "Salvar informações"}</Button></div> : null}
         </form>
       </section>
@@ -92,19 +105,20 @@ function AdminOverview({
       <section className={cx(cardClass, "p-5 sm:p-7")}>
         <h2 className="text-xl font-bold">Estado do desafio</h2>
         <div className="mt-4 flex flex-col gap-4 rounded-2xl bg-[var(--wash)] p-5 sm:flex-row sm:items-center sm:justify-between">
-          <div><ChallengeStatusBadge status={challenge.status} /><p className="mt-2 max-w-xl text-sm leading-6 text-[var(--muted)]">{challenge.status === "draft" ? "Somente administradores veem este rascunho. Confira campos, checkpoints e participantes antes de ativar." : challenge.status === "active" ? "Participantes podem enviar e editar seus registros. Encerrar bloqueia os dados de origem." : "Registros e estrutura estão congelados; a curadoria da vitrine ainda pode ser atualizada."}</p></div>
+          <div><ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} /><p className="mt-2 max-w-xl text-sm leading-6 text-[var(--muted)]">{challenge.status === "draft" ? "Somente administradores veem este rascunho. Confira campos, checkpoints e participantes antes de ativar." : scheduled ? `O desafio já está ativado, mas está agendado para ${formatDate(challenge.startsOn, { day: "2-digit", month: "long", year: "numeric" })}. Os registros serão liberados quando os checkpoints começarem.` : challenge.status === "active" ? "Participantes podem enviar e editar seus registros. Encerrar bloqueia os dados de origem." : "Registros e estrutura estão congelados; a curadoria da vitrine ainda pode ser atualizada."}</p></div>
           {challenge.status === "draft" ? <Button disabled={Boolean(busy)} onClick={() => { if (window.confirm("Ativar este desafio? Participantes selecionados poderão registrar.")) void run("transition", () => onTransition("active"), "Desafio ativado."); }}>Ativar desafio</Button> : null}
           {challenge.status === "active" ? <Button variant="danger" disabled={Boolean(busy)} onClick={() => { if (window.confirm("Encerrar o desafio? Os registros serão bloqueados e esta ação não poderá ser desfeita no MVP.")) void run("transition", () => onTransition("closed"), "Desafio encerrado."); }}>Encerrar desafio</Button> : null}
         </div>
       </section>
 
       <section className={cx(cardClass, "p-5 sm:p-7")}>
-        <h2 className="text-xl font-bold">Duplicar com segurança</h2>
-        <p className="mt-1 text-sm leading-6 text-[var(--muted)]">Cria um novo rascunho neste grupo com regras, campos, métricas e checkpoints. Não copia participantes, registros, comentários selecionados nem auditoria.</p>
-        <form className="mt-5 grid gap-4 sm:grid-cols-[1fr_auto]" onSubmit={(event) => { event.preventDefault(); void run("duplicate", () => onDuplicate({ title: duplicateTitle.trim() }), "Cópia criada como rascunho."); }}>
-          <label><span className={labelClass}>Novo título</span><input className={inputClass} value={duplicateTitle} onChange={(event) => setDuplicateTitle(event.target.value)} required maxLength={140} /></label>
-          <div className="flex items-end"><Button type="submit" variant="secondary" disabled={busy === "duplicate"}>{busy === "duplicate" ? "Duplicando…" : "Criar cópia"}</Button></div>
-        </form>
+        <h2 className="text-xl font-bold">Reutilizar em outro grupo</h2>
+        <p className="mt-1 text-sm leading-6 text-[var(--muted)]">Cria um rascunho estrutural em outro grupo com regras, campos, métricas e checkpoints. Participantes, registros, resultados e convites nunca são copiados. Revise as datas antes de ativar.</p>
+        {duplicateTargets.length ? <form className="mt-5 grid gap-4 lg:grid-cols-[1fr_1fr_auto]" onSubmit={(event) => { event.preventDefault(); if (!duplicateTargetGroupId) { setError("Escolha um grupo de destino disponível."); return; } void run("duplicate", () => onDuplicate({ title: duplicateTitle.trim(), targetGroupId: duplicateTargetGroupId }), "Modelo reutilizado como rascunho."); }}>
+          <label><span className={labelClass}>Título no novo grupo</span><input className={inputClass} value={duplicateTitle} onChange={(event) => setDuplicateTitle(event.target.value)} required maxLength={160} /></label>
+          <label><span className={labelClass}>Grupo de destino</span><select className={inputClass} value={duplicateTargetGroupId} onChange={(event) => setDuplicateTargetGroupId(event.target.value)} required><option value="">Selecione outro grupo</option>{duplicateTargets.map((target) => { const full = target.challengeCount >= target.challengeLimit; return <option value={target.id} disabled={full} key={target.id}>{target.name} · {target.challengeCount}/{target.challengeLimit}{full ? " (limite atingido)" : ""}</option>; })}</select></label>
+          <div className="flex items-end"><Button type="submit" variant="secondary" disabled={busy === "duplicate" || !duplicateTargetGroupId || !availableTargets.length}>{busy === "duplicate" ? "Criando…" : "Usar neste grupo"}</Button></div>
+        </form> : <div className="mt-5 rounded-2xl border border-dashed border-[var(--line)] bg-[var(--wash)]/60 p-5"><strong className="text-sm">Nenhum outro grupo disponível</strong><p className="mt-1 text-sm leading-6 text-[var(--muted)]">Crie outro grupo ou torne-se responsável/admin de um grupo para reutilizar este modelo.</p></div>}
       </section>
 
       {onDelete ? (
@@ -253,7 +267,7 @@ function AdminItems({
                       <span className="grid h-8 w-8 flex-none place-items-center rounded-lg bg-[var(--wash)] text-xs font-bold text-[var(--muted)]">{index + 1}</span>
                       <span className="min-w-0"><strong className="block text-sm">{item.title}</strong>{item.description ? <span className="mt-1 block text-sm leading-6 text-[var(--muted)]">{item.description}</span> : null}<small className="mt-1 block text-[var(--muted)]">{item.date ? formatDate(item.date) : item.opensAt || item.dueAt ? `${formatDate(item.opensAt)} — ${formatDate(item.dueAt)}` : "sem janela definida"}</small></span>
                     </div>
-                    <div className="flex flex-none flex-col items-end gap-2"><span className="rounded-full bg-[var(--wash)] px-2 py-1 text-[10px] font-bold uppercase text-[var(--muted)]">{item.status ?? "planejado"}</span>{challenge.status !== "closed" ? <Button variant="secondary" className="min-h-9 px-3 py-1 text-xs" onClick={() => startEditing(item)}>Editar</Button> : null}</div>
+                    <div className="flex flex-none flex-col items-end gap-2"><span className="rounded-full bg-[var(--wash)] px-2 py-1 text-[10px] font-bold uppercase text-[var(--muted)]">{itemStatusLabel(item.status)}</span>{challenge.status !== "closed" ? <Button variant="secondary" className="min-h-9 px-3 py-1 text-xs" onClick={() => startEditing(item)}>Editar</Button> : null}</div>
                   </div>
                 )}
               </li>
@@ -329,7 +343,7 @@ function AdminReview({
         <section className={cx(cardClass, "p-5 sm:p-7")} aria-labelledby="correction-title">
           <div className="mb-5 flex items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.1em] text-[var(--muted)]">Correção administrativa</p><h2 id="correction-title" className="mt-1 text-xl font-bold">{selected.participantName ?? "Participante"} · {selectedItem?.title ?? "Registro"}</h2></div><Button variant="ghost" onClick={() => setSelectedId(null)}>Fechar</Button></div>
           <label className="mb-5 block"><span className={labelClass}>Motivo da alteração <span className="text-[var(--main-2)]">*</span></span><textarea className={inputClass} rows={3} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Explique por que o registro está sendo corrigido. Isto ficará na auditoria." maxLength={500} disabled={challenge.status === "closed"} /></label>
-          <DynamicEntryForm key={`${selected.id}-${selected.updatedAt ?? ""}`} fields={challenge.fields} item={selectedItem} entry={selected} canEdit={challenge.status !== "closed"} onSave={async (values) => { if (!reason.trim()) throw new Error("Informe o motivo da correção administrativa."); await onPatch(selected.id, values, reason.trim()); setReason(""); }} />
+          <DynamicEntryForm key={`${selected.id}-${selected.updatedAt ?? ""}`} fields={challenge.fields} item={selectedItem} entry={selected} canEdit={challenge.status !== "closed"} unavailableMessage={challenge.status === "closed" ? "Este desafio foi encerrado. O registro está disponível somente para leitura." : null} onSave={async (values) => { if (!reason.trim()) throw new Error("Informe o motivo da correção administrativa."); await onPatch(selected.id, values, reason.trim()); setReason(""); }} />
         </section>
       ) : null}
     </div>
@@ -470,6 +484,7 @@ export function AdminScreen({
   onSaveBasics,
   onTransition,
   onDuplicate,
+  duplicateTargets,
   onDelete,
   onSaveParticipants,
   onSaveFields,
@@ -489,7 +504,8 @@ export function AdminScreen({
   onViewParticipant: () => void;
   onSaveBasics: (payload: Partial<ChallengeSummary>) => Promise<void>;
   onTransition: (status: "active" | "closed") => Promise<void>;
-  onDuplicate: (payload: { title: string }) => Promise<void>;
+  onDuplicate: (payload: { title: string; targetGroupId: Id }) => Promise<void>;
+  duplicateTargets: DuplicateTargetGroup[];
   onDelete?: () => Promise<void>;
   onSaveParticipants: (ids: Id[]) => Promise<void>;
   onSaveFields: (fields: ChallengeField[]) => Promise<void>;
@@ -512,9 +528,9 @@ export function AdminScreen({
   return (
     <main className="mx-auto max-w-7xl px-4 py-6 pb-24 sm:px-6 sm:py-10">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><button className="min-h-11 text-sm font-bold text-[var(--muted)] hover:text-[var(--ink)]" type="button" onClick={onBack}>← {group?.name ?? "Início"}</button><Button variant="secondary" onClick={onViewParticipant}>Ver como participante</Button></div>
-      <PageHeading title={challenge.title} description="Configure, revise e apresente — controles administrativos continuam validados no servidor." action={<ChallengeStatusBadge status={challenge.status} />} />
+      <PageHeading title={challenge.title} description="Configure, revise e apresente — controles administrativos continuam validados no servidor." action={<ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} />} />
       <nav className="mb-6 flex gap-1 overflow-x-auto rounded-2xl bg-[var(--wash-strong)]/70 p-1" aria-label="Áreas administrativas">{tabs.map((item) => <button className={cx("min-h-11 flex-none rounded-xl px-4 text-sm font-bold", tab === item.id ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]")} type="button" onClick={() => onTab(item.id)} key={item.id}>{item.label}</button>)}</nav>
-      {tab === "overview" ? <AdminOverview challenge={challenge} entries={entries} onSave={onSaveBasics} onTransition={onTransition} onDuplicate={onDuplicate} onDelete={onDelete} /> : null}
+      {tab === "overview" ? <AdminOverview challenge={challenge} entries={entries} onSave={onSaveBasics} onTransition={onTransition} onDuplicate={onDuplicate} duplicateTargets={duplicateTargets} onDelete={onDelete} /> : null}
       {tab === "participants" ? <AdminParticipants key={`${challenge.id}:${challenge.participants.map((participant) => participant.userId ?? participant.id).join(",")}`} challenge={challenge} group={group} onSave={onSaveParticipants} /> : null}
       {tab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.fields.map((field) => field.id ?? field.key).join(",")}`} challenge={challenge} onSave={onSaveFields} /> : null}
       {tab === "items" ? <AdminItems challenge={challenge} onAdd={onAddItems} onUpdate={onUpdateItem} /> : null}

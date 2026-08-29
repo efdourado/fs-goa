@@ -5,6 +5,7 @@ import {
   foreignKey,
   index,
   integer,
+  jsonb,
   pgTable,
   primaryKey,
   text,
@@ -28,6 +29,10 @@ export const challenges = pgTable(
     title: text("title").notNull(),
     description: text("description"),
     rules: text("rules"),
+    ruleSections: jsonb("rule_sections")
+      .$type<Array<{ title: string; description: string }>>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
     startDate: date("start_date", { mode: "string" }).notNull(),
     endDate: date("end_date", { mode: "string" }).notNull(),
     timeZone: text("time_zone").notNull().default("UTC"),
@@ -56,6 +61,10 @@ export const challenges = pgTable(
       .on(table.groupId)
       .where(sql`${table.deletedAt} is null`),
     check("challenges_title_check", sql`char_length(btrim(${table.title})) between 1 and 160`),
+    check(
+      "challenges_rule_sections_check",
+      sql`jsonb_typeof(${table.ruleSections}) = 'array' and jsonb_array_length(${table.ruleSections}) <= 20`,
+    ),
     check("challenges_date_range_check", sql`${table.endDate} >= ${table.startDate}`),
     check(
       "challenges_deleted_at_check",
@@ -158,4 +167,3 @@ export const challengeCheckpoints = pgTable(
     ),
   ],
 );
-

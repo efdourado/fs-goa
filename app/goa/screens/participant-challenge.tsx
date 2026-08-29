@@ -3,6 +3,7 @@
 import { type FormEvent, useMemo, useState } from "react";
 
 import { errorMessage } from "../api";
+import { RuleSectionsView, visibleRuleSections } from "../rules";
 import type {
   ChallengeDetail,
   ChallengeField,
@@ -24,7 +25,7 @@ import {
   PageHeading,
   StatusMessage,
 } from "../ui";
-import { formatDate, formatDateTime, itemIdForEntry, valuesAsRecord } from "../utils";
+import { entryUnavailableMessage, formatDate, formatDateTime, isChallengeScheduled, itemIdForEntry, valuesAsRecord } from "../utils";
 
 function ratingChoices(config?: FieldConfig): number[] {
   const min = config?.min ?? 0;
@@ -39,12 +40,14 @@ export function DynamicEntryForm({
   item,
   entry,
   canEdit,
+  unavailableMessage,
   onSave,
 }: {
   fields: ChallengeField[];
   item: ChallengeItem | null;
   entry?: Entry;
   canEdit: boolean;
+  unavailableMessage?: string | null;
   onSave: (values: Record<Id, unknown>, entry?: Entry) => Promise<void>;
 }) {
   const [values, setValues] = useState<Record<Id, unknown>>(() => entry ? valuesAsRecord(entry.values) : {});
@@ -107,7 +110,7 @@ export function DynamicEntryForm({
         );
       })}
       <StatusMessage error={error} success={success} />
-      {canEdit ? <Button type="submit" className="w-full" disabled={busy}>{busy ? "Salvando…" : entry ? "Salvar alterações" : "Salvar registro"}<span aria-hidden="true">→</span></Button> : <p className="rounded-xl bg-[var(--wash)] px-4 py-3 text-sm text-[var(--muted)]">Este desafio está encerrado. O registro está disponível somente para leitura.</p>}
+      {canEdit ? <Button type="submit" className="w-full" disabled={busy}>{busy ? "Salvando…" : entry ? "Salvar alterações" : "Salvar registro"}<span aria-hidden="true">→</span></Button> : <p className="rounded-xl border border-[var(--line)] bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{unavailableMessage ?? "Este registro está disponível somente para leitura."}</p>}
       {item?.dueAt ? <p className="text-center text-xs text-[var(--muted)]">Prazo: {formatDateTime(item.dueAt)}</p> : null}
     </form>
   );
@@ -167,6 +170,14 @@ export function ParticipantChallengeScreen({
   const selectedItem = sortedItems.find((item) => item.id === selectedItemId) ?? defaultItem;
   const currentEntry = selectedItem ? entriesByItem.get(selectedItem.id) : ownEntries.find((entry) => !itemIdForEntry(entry));
   const completion = sortedItems.length ? Math.round((ownEntries.length / sortedItems.length) * 100) : 0;
+  const scheduled = isChallengeScheduled(challenge.status, challenge.startsOn);
+  const ruleSections = useMemo(() => visibleRuleSections(challenge.ruleSections, challenge.rules), [challenge.ruleSections, challenge.rules]);
+  const unavailableMessage = entryUnavailableMessage({
+    challengeStatus: challenge.status,
+    isParticipant: challenge.isParticipant,
+    itemStatus: selectedItem?.status,
+    opensAt: selectedItem?.opensAt,
+  });
   const tabs: Array<{ id: ParticipantTab; label: string }> = [
     { id: "today", label: "Hoje" },
     { id: "history", label: "Histórico" },
@@ -179,13 +190,16 @@ export function ParticipantChallengeScreen({
       <div className="mb-5 flex items-center justify-between gap-3"><button className="min-h-11 text-sm font-bold text-[var(--muted)] hover:text-[var(--ink)]" type="button" onClick={onBack}>← Início</button>{onAdmin ? <Button variant="secondary" onClick={onAdmin}>Administrar</Button> : null}</div>
       <section className="relative overflow-hidden rounded-[28px] bg-[var(--ink)] p-6 text-white sm:p-9">
         <div className="relative z-10">
-          <div className="flex flex-wrap items-center justify-between gap-3"><ChallengeStatusBadge status={challenge.status} /><span className="text-xs text-white/65">{formatDate(challenge.startsOn)} — {formatDate(challenge.endsOn)}</span></div>
+          <div className="flex flex-wrap items-center justify-between gap-3"><ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} /><span className="text-xs text-white/65">{formatDate(challenge.startsOn)} — {formatDate(challenge.endsOn)}</span></div>
           <h1 className="mt-10 max-w-3xl text-4xl font-semibold leading-none tracking-[-0.055em] sm:text-6xl">{challenge.title}</h1>
           {challenge.description ? <p className="mt-4 max-w-2xl text-sm leading-6 text-white/70">{challenge.description}</p> : null}
           {sortedItems.length ? <div className="mt-8 max-w-2xl"><div className="mb-2 flex justify-between text-xs text-white/70"><span><strong className="text-white">{ownEntries.length}</strong> de {sortedItems.length} registros</span><span>{completion}%</span></div><div className="h-2 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-[var(--main-2)]" style={{ width: `${Math.min(100, completion)}%` }} /></div></div> : null}
         </div>
         <span className="absolute -right-28 -top-36 h-96 w-96 rounded-full border border-white/10" aria-hidden="true" />
       </section>
+
+      {scheduled ? <section className="mt-5 rounded-2xl border border-[var(--main-line)] bg-[var(--paper)] px-5 py-4"><strong className="text-[var(--main-strong)]">Desafio agendado para {formatDate(challenge.startsOn, { day: "2-digit", month: "long", year: "numeric" })}</strong><p className="mt-1 text-sm leading-6 text-[var(--muted)]">Ele já foi ativado e pode ser consultado, mas os registros só serão liberados quando o primeiro checkpoint começar.</p></section> : null}
+      <RuleSectionsView rules={ruleSections} />
 
       <nav className="mt-5 hidden gap-1 rounded-2xl bg-[var(--wash-strong)]/70 p-1 sm:flex" aria-label="Navegação do desafio">
         {tabs.map((item) => <button className={cx("min-h-11 flex-1 rounded-xl px-3 text-sm font-bold", tab === item.id ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]")} type="button" onClick={() => onTab(item.id)} key={item.id}>{item.label}</button>)}
@@ -198,13 +212,12 @@ export function ParticipantChallengeScreen({
               {challenge.status === "closed" ? <EmptyState title="Este desafio foi encerrado" description="Os registros foram preservados. Abra o resultado para rever a história do grupo." action={<Button onClick={() => onTab("results")}>Ver resultado</Button>} /> : challenge.submissionMode !== "free" && !selectedItem ? <EmptyState title="Nenhum checkpoint disponível" description="O próximo item aparecerá aqui quando for liberado pelo administrador." /> : (
                 <>
                   <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-xs font-extrabold uppercase tracking-[0.12em] text-[var(--muted)]">{currentEntry ? "Seu registro" : "Próximo registro"}</p><h2 className="mt-2 text-2xl font-bold tracking-[-0.04em]">{selectedItem?.title ?? "Novo registro"}</h2>{selectedItem?.description ? <p className="mt-1 text-sm text-[var(--muted)]">{selectedItem.description}</p> : null}</div>{selectedItem?.dueAt ? <span className="rounded-full bg-[var(--wash)] px-3 py-2 text-xs font-semibold text-[var(--muted)]">até {formatDateTime(selectedItem.dueAt)}</span> : null}</div>
-                  <DynamicEntryForm key={`${selectedItem?.id ?? "free"}-${currentEntry?.id ?? "new"}`} fields={challenge.fields} item={selectedItem ?? null} entry={currentEntry} canEdit={challenge.status === "active" && challenge.isParticipant !== false && selectedItem?.status !== "scheduled" && selectedItem?.status !== "closed"} onSave={(values, entry) => onSaveEntry(selectedItem?.id ?? null, values, entry)} />
+                  <DynamicEntryForm key={`${selectedItem?.id ?? "free"}-${currentEntry?.id ?? "new"}`} fields={challenge.fields} item={selectedItem ?? null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry(selectedItem?.id ?? null, values, entry)} />
                 </>
               )}
             </section>
             <aside className="space-y-5">
               {sortedItems.length > 1 ? <section className={cx(cardClass, "p-5")}><h2 className="text-base font-bold">Checkpoints</h2><label className="mt-3 block"><span className="sr-only">Escolher checkpoint</span><select className={inputClass} value={selectedItem?.id ?? ""} onChange={(event) => setSelectedItemId(event.target.value)}>{sortedItems.map((item, index) => <option value={item.id} key={item.id} disabled={item.status === "scheduled" && !entriesByItem.has(item.id)}>{entriesByItem.has(item.id) ? "✓ " : ""}{index + 1}. {item.title}{item.status === "scheduled" ? " (em breve)" : ""}</option>)}</select></label><ul className="mt-3 space-y-2 text-xs text-[var(--muted)]"><li>{ownEntries.length} concluídos</li><li>{Math.max(0, sortedItems.length - ownEntries.length)} pendentes</li></ul></section> : null}
-              {challenge.rules ? <details className={cx(cardClass, "p-5")}><summary className="cursor-pointer text-sm font-bold">Regras do desafio</summary><p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-[var(--muted)]">{challenge.rules}</p></details> : null}
             </aside>
           </div>
         ) : null}
@@ -220,7 +233,7 @@ export function ParticipantChallengeScreen({
         {tab === "results" ? challenge.status === "closed" || challenge.result ? <ResultView challenge={challenge} /> : <EmptyState title="A história ainda está acontecendo" description="O resultado final será liberado quando o desafio for encerrado." action={<Button onClick={() => onTab("today")}>Voltar ao registro</Button>} /> : null}
       </div>
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 grid h-[72px] grid-cols-4 border-t border-[var(--line)] bg-[var(--paper)]/95 px-2 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl sm:hidden" aria-label="Navegação mobile do desafio">
+      <nav className="safe-area-bottom fixed inset-x-0 bottom-0 z-40 grid h-[72px] grid-cols-4 border-t border-[var(--line)] bg-[var(--paper)]/95 px-2 backdrop-blur-xl sm:hidden" aria-label="Navegação mobile do desafio">
         {tabs.map((item) => <button className={cx("flex min-h-12 flex-col items-center justify-center gap-1 text-[10px] font-bold", tab === item.id ? "text-[var(--main-strong)]" : "text-[var(--muted)]")} type="button" onClick={() => onTab(item.id)} key={item.id}><span className="text-base" aria-hidden="true">{item.id === "today" ? "●" : item.id === "history" ? "◷" : item.id === "progress" ? "↗" : "✦"}</span>{item.label}</button>)}
       </nav>
     </main>

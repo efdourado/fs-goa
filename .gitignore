@@ -10,8 +10,12 @@
 
 # next.js
 /.next/
+/.next-verify/
 /out/
 /build/
+
+# local scratch (spreadsheets, calculations, notes — never versioned)
+/.tmp/
 
 # debug
 npm-debug.log*

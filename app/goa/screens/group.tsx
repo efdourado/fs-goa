@@ -148,8 +148,7 @@ export function GroupScreen({
             <div className="grid gap-4 sm:grid-cols-2">
               {challenges.map((challenge) => (
                 <article className={cx(cardClass, "p-5")} key={challenge.id}>
-                  <ChallengeStatusBadge status={challenge.status} />
-                  <h3 className="mt-4 text-xl font-bold">{challenge.title}</h3>
+                  <div className="flex items-center gap-2"><ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} /><h3 className="text-xl font-bold">{challenge.title}</h3></div>
                   <p className="mt-2 text-sm text-[var(--muted)]">{challenge.startsOn || challenge.endsOn ? `${formatDate(challenge.startsOn)} — ${formatDate(challenge.endsOn)}` : "Datas ainda não definidas"}</p>
                   <div className="mt-5 flex gap-2"><Button onClick={() => onOpenChallenge(challenge.id)} className="flex-1">Abrir</Button>{canManage(group.role) ? <Button variant="secondary" onClick={() => onOpenAdmin(challenge.id)}>Admin</Button> : null}</div>
                 </article>

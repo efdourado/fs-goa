@@ -5,6 +5,7 @@ import { ApiError, stringValue } from "../../http";
 import { fieldsForChallenge } from "./fields";
 import { generateDailyCheckpoints } from "./items";
 import { metricsForChallenge, resultForChallenge } from "./results";
+import { parseRuleSections, rulesCompatibilityText } from "../domain/rules";
 
 function windowStatus(
   challengeStatus: "draft" | "active" | "closed",
@@ -71,6 +72,7 @@ export async function getChallengeDetail(session: SessionContext, challengeId: s
       title: access.challenge.title,
       description: access.challenge.description,
       rules: access.challenge.rules,
+      ruleSections: parseRuleSections(access.challenge.rule_sections, access.challenge.rules),
       startsOn: access.challenge.start_date,
       endsOn: access.challenge.end_date,
       status: access.challenge.status,
@@ -103,9 +105,10 @@ export async function updateChallenge(
     const description = body.description === undefined
       ? access.challenge.description
       : stringValue(body, "description", { max: 2_000, optional: true }) ?? null;
-    const rules = body.rules === undefined
-      ? access.challenge.rules
-      : stringValue(body, "rules", { max: 10_000, optional: true }) ?? null;
+    const ruleSections = body.ruleSections === undefined && body.rules === undefined
+      ? parseRuleSections(access.challenge.rule_sections, access.challenge.rules)
+      : parseRuleSections(body.ruleSections, body.rules);
+    const rules = rulesCompatibilityText(ruleSections);
     const startDate = body.startsOn === undefined && body.startDate === undefined
       ? access.challenge.start_date
       : dateString(body.startsOn ?? body.startDate, "Data inicial");
@@ -118,9 +121,9 @@ export async function updateChallenge(
       throw new ApiError(409, "dates_locked", "As datas não podem mudar depois da ativação.");
     }
     await client.query(
-      `UPDATE challenges SET title=$2, description=$3, rules=$4, start_date=$5,
-              end_date=$6, updated_at=now() WHERE id=$1`,
-      [challengeId, title, description, rules, startDate, endDate],
+      `UPDATE challenges SET title=$2, description=$3, rules=$4, rule_sections=$5::jsonb, start_date=$6,
+              end_date=$7, updated_at=now() WHERE id=$1`,
+      [challengeId, title, description, rules, JSON.stringify(ruleSections), startDate, endDate],
     );
     if (access.challenge.status === "draft") {
       const entryType = await oneOrNull<{ submission_mode: string }>(client,
@@ -132,9 +135,10 @@ export async function updateChallenge(
     }
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
       "challenge.updated", "challenge", challengeId,
-      { title: access.challenge.title, description: access.challenge.description, rules: access.challenge.rules,
+      { title: access.challenge.title, description: access.challenge.description,
+        ruleSections: parseRuleSections(access.challenge.rule_sections, access.challenge.rules),
         startsOn: access.challenge.start_date, endsOn: access.challenge.end_date },
-      { title, description, rules, startsOn: startDate, endsOn: endDate });
-    return { id: challengeId, title, description, rules, startsOn: startDate, endsOn: endDate };
+      { title, description, ruleSections, startsOn: startDate, endsOn: endDate });
+    return { id: challengeId, title, description, rules, ruleSections, startsOn: startDate, endsOn: endDate };
   });
 }
