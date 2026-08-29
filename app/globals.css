@@ -1,16 +1,36 @@
 @import "tailwindcss";
 
+/*
+ * Every colour in the app resolves to one of these tokens — components never
+ * name a hue. Swap a value here and the whole UI follows. `--main*` is the brand
+ * accent (violet today, could be anything); `--wash*` are warm neutral fills;
+ * `--ok/--warn/--danger` are status colours with matching soft + line variants.
+ */
 :root {
   --ink: #20241f;
   --muted: #6f7169;
   --canvas: #f5f1e8;
   --paper: #fffdf8;
   --line: #e4ded1;
-  --violet: #6758d8;
-  --violet-dark: #5344bd;
-  --coral: #f16e50;
-  --mint: #a7d6bd;
-  --sand: #e7c48f;
+  --wash: #f0ebe0;
+  --wash-strong: #e6dfce;
+
+  --main: #6758d8;
+  --main-strong: #5344bd;
+  --main-soft: #ece9fb;
+  --main-line: #cfc7f0;
+  --main-2: #f16e50;
+
+  --ok: #0f7a52;
+  --ok-soft: #d9f2e5;
+  --ok-line: #a9ddc4;
+  --warn: #92500e;
+  --warn-soft: #fbeecb;
+  --warn-line: #eecf92;
+  --danger: #b3261e;
+  --danger-strong: #7f1d1d;
+  --danger-soft: #fdeceb;
+  --danger-line: #f3c9c5;
 }
 
 * { box-sizing: border-box; }
@@ -19,7 +39,7 @@ html { scroll-behavior: smooth; }
 body {
   margin: 0;
   background:
-    radial-gradient(circle at 8% -5%, rgb(103 88 216 / 8%), transparent 25rem),
+    radial-gradient(circle at 8% -5%, color-mix(in srgb, var(--main) 8%, transparent), transparent 25rem),
     var(--canvas);
   color: var(--ink);
   font-family: var(--font-geist-sans), Arial, sans-serif;
@@ -38,7 +58,7 @@ a { color: inherit; text-decoration: none; }
 button, a, textarea { -webkit-tap-highlight-color: transparent; }
 
 button:focus-visible, a:focus-visible, textarea:focus-visible {
-  outline: 3px solid rgb(103 88 216 / 38%);
+  outline: 3px solid color-mix(in srgb, var(--main) 38%, transparent);
   outline-offset: 3px;
 }
 

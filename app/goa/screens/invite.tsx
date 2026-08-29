@@ -53,7 +53,7 @@ export function InviteScreen({
   return (
     <main className="mx-auto flex min-h-[calc(100vh-76px)] max-w-2xl items-center px-4 py-10 sm:px-6">
       <section className={cx(cardClass, "w-full p-6 text-center sm:p-10")}>
-        <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[var(--coral)] text-2xl" aria-hidden="true">◎</span>
+        <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[var(--main-2)] text-2xl" aria-hidden="true">◎</span>
         {loading ? <p className="mt-5 text-sm text-[var(--muted)]" role="status">Verificando convite…</p> : preview ? (
           <>
             <p className="mt-6 text-xs font-extrabold uppercase tracking-[0.14em] text-[var(--muted)]">Convite para um grupo privado</p>

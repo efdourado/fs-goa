@@ -85,8 +85,8 @@ export function CreateChallengeScreen({
     <main className="mx-auto max-w-5xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
       <button className="mb-6 min-h-11 text-sm font-bold text-[var(--muted)] hover:text-[var(--ink)]" type="button" onClick={onBack}>← Voltar para {group.name}</button>
       <PageHeading title="Monte a próxima experiência" description="Comece com um preset e ajuste somente o que seu grupo precisa." />
-      <nav className="mb-6 grid grid-cols-4 gap-1 rounded-2xl bg-stone-200/70 p-1" aria-label="Etapas de criação">
-        {stepLabels.map((label, index) => <button className={cx("min-h-11 rounded-xl px-2 text-xs font-bold sm:text-sm", step === index + 1 ? "bg-white text-[var(--violet-dark)] shadow-sm" : index + 1 < step ? "text-[var(--ink)]" : "text-[var(--muted)]")} type="button" onClick={() => index + 1 < step && setStep(index + 1)} disabled={index + 1 > step} key={label}><span className="hidden sm:inline">{index + 1}. </span>{label}</button>)}
+      <nav className="mb-6 grid grid-cols-4 gap-1 rounded-2xl bg-[var(--wash-strong)]/70 p-1" aria-label="Etapas de criação">
+        {stepLabels.map((label, index) => <button className={cx("min-h-11 rounded-xl px-2 text-xs font-bold sm:text-sm", step === index + 1 ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : index + 1 < step ? "text-[var(--ink)]" : "text-[var(--muted)]")} type="button" onClick={() => index + 1 < step && setStep(index + 1)} disabled={index + 1 > step} key={label}><span className="hidden sm:inline">{index + 1}. </span>{label}</button>)}
       </nav>
 
       <section className={cx(cardClass, "p-5 sm:p-7")}>
@@ -95,7 +95,7 @@ export function CreateChallengeScreen({
             <h2 className="text-xl font-bold">Escolha um ponto de partida</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               {(["cine", "reading"] as const).map((value) => (
-                <button className={cx("rounded-2xl border p-5 text-left transition", template === value ? "border-[var(--violet)] bg-violet-50 ring-2 ring-violet-200" : "border-[var(--line)] bg-white hover:border-violet-300")} type="button" aria-pressed={template === value} onClick={() => chooseTemplate(value)} key={value}>
+                <button className={cx("rounded-2xl border p-5 text-left transition", template === value ? "border-[var(--main)] bg-[var(--main-soft)] ring-2 ring-[var(--main)]/25" : "border-[var(--line)] bg-[var(--paper)] hover:border-[var(--main-line)]")} type="button" aria-pressed={template === value} onClick={() => chooseTemplate(value)} key={value}>
                   <span className="text-2xl" aria-hidden="true">{value === "cine" ? "◉" : "▤"}</span>
                   <strong className="mt-3 block text-lg">{value === "cine" ? "Cine" : "Leitura"}</strong>
                   <span className="mt-1 block text-sm leading-6 text-[var(--muted)]">{value === "cine" ? "Uma lista de títulos, nota e comentário por item." : "Check-in diário com páginas, livro e conclusão."}</span>
@@ -120,7 +120,7 @@ export function CreateChallengeScreen({
             {template === "cine" ? (
               <><p className="mt-1 text-sm leading-6 text-[var(--muted)]">Cole um título por linha. Cada item vira uma oportunidade de registro para cada participante.</p><label className="mt-5 block"><span className={labelClass}>Lista de itens</span><textarea className={inputClass} rows={12} value={itemsText} onChange={(event) => setItemsText(event.target.value)} placeholder={"Primeiro título\nSegundo título\nTerceiro título"} /></label><p className="mt-2 text-xs font-semibold text-[var(--muted)]">{items.length} {items.length === 1 ? "item" : "itens"}</p></>
             ) : (
-              <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-5"><strong className="text-emerald-950">Check-ins diários</strong><p className="mt-2 text-sm leading-6 text-emerald-900">O servidor criará um checkpoint por dia entre {formatDate(startsOn)} e {formatDate(endsOn)}. Datas e limites são validados novamente no servidor.</p></div>
+              <div className="mt-5 rounded-2xl border border-[var(--ok-line)] bg-[var(--ok-soft)] p-5"><strong className="text-[var(--ok)]">Check-ins diários</strong><p className="mt-2 text-sm leading-6 text-[var(--ok)]">O servidor criará um checkpoint por dia entre {formatDate(startsOn)} e {formatDate(endsOn)}. Datas e limites são validados novamente no servidor.</p></div>
             )}
           </div>
         ) : null}
@@ -132,10 +132,10 @@ export function CreateChallengeScreen({
             {group.members?.length ? (
               <fieldset className="mt-5 grid gap-3 sm:grid-cols-2">
                 <legend className="sr-only">Participantes</legend>
-                {group.members.map((member) => <label className="flex min-h-14 items-center gap-3 rounded-xl border border-[var(--line)] bg-white px-4" key={member.id}><input type="checkbox" aria-label={`Selecionar ${member.name}`} checked={participantIds.includes(member.id)} onChange={(event) => setParticipantIds((current) => event.target.checked ? [...current, member.id] : current.filter((id) => id !== member.id))} /><span><strong className="block text-sm">{member.name}</strong><small className="text-[var(--muted)]">@{member.username}</small></span></label>)}
+                {group.members.map((member) => <label className="flex min-h-14 items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4" key={member.id}><input type="checkbox" aria-label={`Selecionar ${member.name}`} checked={participantIds.includes(member.id)} onChange={(event) => setParticipantIds((current) => event.target.checked ? [...current, member.id] : current.filter((id) => id !== member.id))} /><span><strong className="block text-sm">{member.name}</strong><small className="text-[var(--muted)]">@{member.username}</small></span></label>)}
               </fieldset>
             ) : <EmptyState title="Membros ainda não carregados" description="Você pode salvar o desafio como rascunho e adicionar participantes na área administrativa." />}
-            <div className="mt-6 rounded-2xl bg-stone-100 p-5 text-sm leading-6"><strong className="block text-base">Resumo do rascunho</strong><span className="mt-2 block text-[var(--muted)]">{fields.length} campos · {template === "reading" ? "checkpoints diários" : `${items.length} itens`} · {participantIds.length} participantes</span><p className="mt-2 text-[var(--muted)]">O desafio será criado como rascunho. Revise tudo na administração antes de ativar.</p></div>
+            <div className="mt-6 rounded-2xl bg-[var(--wash)] p-5 text-sm leading-6"><strong className="block text-base">Resumo do rascunho</strong><span className="mt-2 block text-[var(--muted)]">{fields.length} campos · {template === "reading" ? "checkpoints diários" : `${items.length} itens`} · {participantIds.length} participantes</span><p className="mt-2 text-[var(--muted)]">O desafio será criado como rascunho. Revise tudo na administração antes de ativar.</p></div>
           </div>
         ) : null}
 

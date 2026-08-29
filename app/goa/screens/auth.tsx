@@ -49,20 +49,20 @@ export function AuthScreen({
       <section className="relative hidden overflow-hidden bg-[var(--ink)] p-12 text-white lg:flex lg:flex-col lg:justify-between">
         <Brand />
         <div className="relative z-10 max-w-xl">
-          <p className="mb-5 text-xs font-bold uppercase tracking-[0.18em] text-[#aaa9a0]">Desafios privados, histórias duradouras</p>
+          <p className="mb-5 text-xs font-bold uppercase tracking-[0.18em] text-white/55">Desafios privados, histórias duradouras</p>
           <h1 className="text-6xl font-semibold leading-[0.96] tracking-[-0.06em]">Você registra.<br />O Goa organiza.</h1>
-          <p className="mt-6 max-w-lg text-base leading-7 text-[#c8c9c2]">Crie desafios com seu grupo, acompanhe o que importa e transforme o resultado em uma memória bonita.</p>
+          <p className="mt-6 max-w-lg text-base leading-7 text-white/70">Crie desafios com seu grupo, acompanhe o que importa e transforme o resultado em uma memória bonita.</p>
         </div>
-        <p className="text-xs text-[#8f918b]">Privado por padrão · sem planilhas frágeis</p>
+        <p className="text-xs text-white/45">Privado por padrão · sem planilhas frágeis</p>
         <span className="absolute -right-24 top-20 h-96 w-96 rounded-full border border-white/10" aria-hidden="true" />
-        <span className="absolute -bottom-32 right-24 h-80 w-80 rounded-full bg-[var(--coral)] opacity-90" aria-hidden="true" />
+        <span className="absolute -bottom-32 right-24 h-80 w-80 rounded-full bg-[var(--main-2)] opacity-90" aria-hidden="true" />
       </section>
 
       <section className="flex min-h-screen items-center justify-center px-5 py-10 sm:px-10">
         <div className="w-full max-w-md">
           <div className="mb-10 lg:hidden"><Brand /></div>
           {invitePending ? (
-            <button className="mb-5 w-full rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-left text-sm text-violet-900" type="button" onClick={onShowInvite}>
+            <button className="mb-5 w-full rounded-xl border border-[var(--main-line)] bg-[var(--main-soft)] px-4 py-3 text-left text-sm text-[var(--main-strong)]" type="button" onClick={onShowInvite}>
               <strong>Você tem um convite pendente.</strong> Entre ou crie sua conta para aceitar.
             </button>
           ) : null}

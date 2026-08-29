@@ -101,7 +101,7 @@ export function FieldBuilder({
       {fields.length ? (
         <ol className="space-y-3">
           {fields.map((field, index) => (
-            <li className="rounded-2xl border border-[var(--line)] bg-white p-4" key={field.id ?? field.key}>
+            <li className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-4" key={field.id ?? field.key}>
               <div className="grid gap-3 md:grid-cols-[1.4fr_0.8fr_auto]">
                 <label><span className={labelClass}>Rótulo</span><input className={inputClass} value={field.label} maxLength={100} onChange={(event) => update(index, { label: event.target.value })} /></label>
                 <label><span className={labelClass}>Tipo</span><select className={inputClass} value={field.type} disabled={lockPersistedTypes && Boolean(field.id)} onChange={(event) => update(index, { type: event.target.value as FieldType })}>{Object.entries(fieldTypeLabels).map(([value, text]) => <option value={value} key={value}>{text}</option>)}</select></label>
@@ -122,7 +122,7 @@ export function FieldBuilder({
                 <div className="mt-3 grid gap-3 sm:grid-cols-2"><label className="flex min-h-12 items-center gap-2 rounded-xl border border-[var(--line)] px-3 text-sm font-semibold"><input type="checkbox" checked={field.config?.multiline ?? false} onChange={(event) => updateConfig(index, { multiline: event.target.checked })} />Texto longo</label><label><span className={labelClass}>Limite de caracteres</span><input className={inputClass} type="number" min={1} max={5000} value={field.config?.maxLength ?? 280} onChange={(event) => updateConfig(index, { maxLength: Number(event.target.value) || 280 })} /></label></div>
               ) : null}
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                <code className="rounded bg-stone-100 px-2 py-1 text-[11px] text-[var(--muted)]">{field.key}</code>
+                <code className="rounded bg-[var(--wash)] px-2 py-1 text-[11px] text-[var(--muted)]">{field.key}</code>
                 <div className="flex gap-1"><Button variant="ghost" onClick={() => move(index, -1)} disabled={index === 0} className="px-3" >↑<span className="sr-only">Mover para cima</span></Button><Button variant="ghost" onClick={() => move(index, 1)} disabled={index === fields.length - 1} className="px-3">↓<span className="sr-only">Mover para baixo</span></Button><Button variant="danger" onClick={() => onChange(fields.filter((_, fieldIndex) => fieldIndex !== index))}>Remover</Button></div>
               </div>
             </li>
@@ -130,12 +130,12 @@ export function FieldBuilder({
         </ol>
       ) : <EmptyState title="Nenhum campo configurado" description="Adicione pelo menos um campo para que os participantes possam registrar algo." />}
 
-      <form className="rounded-2xl border border-dashed border-violet-300 bg-violet-50/60 p-4" onSubmit={addField}>
-        <p className="mb-3 text-sm font-bold text-violet-950">Adicionar campo</p>
+      <form className="rounded-2xl border border-dashed border-[var(--main-line)] bg-[var(--main-soft)]/60 p-4" onSubmit={addField}>
+        <p className="mb-3 text-sm font-bold text-[var(--main-strong)]">Adicionar campo</p>
         <div className="grid gap-3 sm:grid-cols-[1fr_180px_auto_auto]">
           <label><span className="sr-only">Nome do campo</span><input className={inputClass} value={label} onChange={(event) => setLabel(event.target.value)} placeholder="Ex.: Páginas lidas" maxLength={100} required /></label>
           <label><span className="sr-only">Tipo do campo</span><select className={inputClass} value={type} onChange={(event) => setType(event.target.value as FieldType)}>{Object.entries(fieldTypeLabels).map(([value, text]) => <option value={value} key={value}>{text}</option>)}</select></label>
-          <label className="flex min-h-12 items-center gap-2 rounded-xl bg-white px-3 text-sm font-semibold"><input type="checkbox" checked={required} onChange={(event) => setRequired(event.target.checked)} />Obrigatório</label>
+          <label className="flex min-h-12 items-center gap-2 rounded-xl bg-[var(--paper)] px-3 text-sm font-semibold"><input type="checkbox" checked={required} onChange={(event) => setRequired(event.target.checked)} />Obrigatório</label>
           <Button type="submit">Adicionar</Button>
         </div>
       </form>

@@ -63,9 +63,9 @@ function Button({
   disabled?: boolean;
 }) {
   const tones = {
-    primary: "border-transparent bg-[var(--violet)] text-white hover:opacity-90",
+    primary: "border-transparent bg-[var(--main)] text-white hover:opacity-90",
     secondary: "border-[var(--line)] bg-transparent text-[var(--ink)] hover:bg-black/[0.04]",
-    danger: "border-red-200 bg-transparent text-red-700 hover:bg-red-50",
+    danger: "border-[var(--danger-line)] bg-transparent text-[var(--danger)] hover:bg-[var(--danger-soft)]",
     ghost: "border-transparent bg-transparent text-[var(--muted)] hover:bg-black/[0.04] hover:text-[var(--ink)]",
   };
   return (
@@ -200,7 +200,7 @@ export default function AdminConsole({ viewerName, csrfToken }: { viewerName: st
             onClick={() => setTab(item.id)}
             className={cx(
               "min-h-10 flex-none rounded-xl px-4 text-sm font-bold transition",
-              tab === item.id ? "bg-[var(--paper)] text-[var(--violet-dark)] shadow-sm" : cx(muted, "hover:text-[var(--ink)]"),
+              tab === item.id ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : cx(muted, "hover:text-[var(--ink)]"),
             )}
           >
             {item.label}
@@ -209,7 +209,7 @@ export default function AdminConsole({ viewerName, csrfToken }: { viewerName: st
       </nav>
 
       {error ? (
-        <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900" role="alert">{error}</div>
+        <div className="mb-5 rounded-xl border border-[var(--danger-line)] bg-[var(--danger-soft)] px-4 py-3 text-sm text-[var(--danger-strong)]" role="alert">{error}</div>
       ) : null}
 
       {tab === "usage" ? <UsageTab overview={overview} /> : null}
@@ -281,7 +281,7 @@ function UsageTab({ overview }: { overview: Overview | null }) {
                   <span className={muted}>{formatBytes(table.bytes)}</span>
                 </div>
                 <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-black/[0.06]">
-                  <span className="block h-full rounded-full bg-[var(--violet)]" style={{ width: `${(table.bytes / maxBytes) * 100}%` }} />
+                  <span className="block h-full rounded-full bg-[var(--main)]" style={{ width: `${(table.bytes / maxBytes) * 100}%` }} />
                 </div>
               </div>
             </li>
@@ -349,7 +349,7 @@ function AuditTab({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <input
-          className="min-h-9 w-full max-w-sm rounded-lg border border-[var(--line)] bg-[var(--paper)] px-3 text-sm outline-none focus:border-[var(--violet)]"
+          className="min-h-9 w-full max-w-sm rounded-lg border border-[var(--line)] bg-[var(--paper)] px-3 text-sm outline-none focus:border-[var(--main)]"
           placeholder="Filtrar por ID de entidade"
           value={entity}
           onChange={(event) => onEntity(event.target.value.trim())}
@@ -416,7 +416,7 @@ function AccountsTab({
                 <div className="flex flex-wrap items-center gap-2">
                   <strong>{user.name}</strong>
                   {user.platformAdmin ? <span className="rounded-full bg-black/[0.06] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide">admin</span> : null}
-                  {user.disabledAt ? <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-800">desativada</span> : null}
+                  {user.disabledAt ? <span className="rounded-full bg-[var(--danger-soft)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--danger)]">desativada</span> : null}
                 </div>
                 <span className={cx("text-xs", muted)}>@{user.username}{user.email ? ` · ${user.email}` : ""}</span>
               </td>

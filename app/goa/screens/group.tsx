@@ -133,7 +133,7 @@ export function GroupScreen({
           </form>
           <div className="mt-4"><StatusMessage error={error} /></div>
           {inviteUrl ? (
-            <div className="mt-4 flex flex-col gap-2 rounded-xl bg-violet-50 p-3 sm:flex-row sm:items-center">
+            <div className="mt-4 flex flex-col gap-2 rounded-xl bg-[var(--main-soft)] p-3 sm:flex-row sm:items-center">
               <input className={cx(inputClass, "font-mono text-xs")} value={inviteUrl} readOnly aria-label="Link do convite" />
               <Button variant="secondary" onClick={() => void navigator.clipboard.writeText(inviteUrl)}>Copiar</Button>
             </div>
@@ -161,7 +161,7 @@ export function GroupScreen({
           <h2 className="text-lg font-bold">Pessoas</h2>
           {group.members?.length ? (
             <ul className="mt-3 divide-y divide-[var(--line)]">
-              {group.members.map((member) => <li className="flex items-center justify-between gap-3 py-3" key={member.id}><span><strong className="block text-sm">{member.name}</strong><small className="text-[var(--muted)]">@{member.username}</small></span><span className="rounded-full bg-stone-100 px-2 py-1 text-[10px] font-bold uppercase">{member.role}</span></li>)}
+              {group.members.map((member) => <li className="flex items-center justify-between gap-3 py-3" key={member.id}><span><strong className="block text-sm">{member.name}</strong><small className="text-[var(--muted)]">@{member.username}</small></span><span className="rounded-full bg-[var(--wash)] px-2 py-1 text-[10px] font-bold uppercase">{member.role}</span></li>)}
             </ul>
           ) : <p className="mt-3 text-sm leading-6 text-[var(--muted)]">A lista de membros aparecerá quando o bootstrap a disponibilizar.</p>}
         </aside>

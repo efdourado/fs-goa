@@ -7,7 +7,7 @@ import type { ChallengeStatus, User } from "./types";
 export const cardClass =
   "rounded-[20px] border border-[var(--line)] bg-[var(--paper)] shadow-[0_1px_2px_rgba(32,36,31,0.04)]";
 export const inputClass =
-  "mb-1 min-h-12 w-full rounded-xl border border-[var(--line)] bg-[var(--paper)] px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--violet)] focus:ring-4 focus:ring-[rgba(103,88,216,0.12)] disabled:cursor-not-allowed disabled:bg-[var(--canvas)]";
+  "mb-1 min-h-12 w-full rounded-xl border border-[var(--line)] bg-[var(--paper)] px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--main)] focus:ring-4 focus:ring-[var(--main)]/15 disabled:cursor-not-allowed disabled:bg-[var(--canvas)]";
 export const labelClass = "mb-1.5 block text-sm font-semibold text-[var(--ink)]";
 
 export function cx(...classes: Array<string | false | null | undefined>): string {
@@ -30,15 +30,15 @@ export function Button({
   className?: string;
 }) {
   const tones = {
-    primary: "border-transparent bg-[var(--violet)] text-white hover:opacity-90",
+    primary: "border-transparent bg-[var(--main)] text-white hover:opacity-90",
     secondary: "border-[var(--line)] bg-transparent text-[var(--ink)] hover:bg-black/[0.04]",
     ghost: "border-transparent bg-transparent text-[var(--muted)] hover:bg-black/[0.04] hover:text-[var(--ink)]",
-    danger: "border-red-200 bg-transparent text-red-700 hover:bg-red-50",
+    danger: "border-[var(--danger-line)] bg-transparent text-[var(--danger)] hover:bg-[var(--danger-soft)]",
   };
   return (
     <button
       className={cx(
-        "cursor-pointer inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-200 disabled:cursor-not-allowed disabled:opacity-55",
+        "cursor-pointer inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 disabled:cursor-not-allowed disabled:opacity-55",
         tones[variant],
         className,
       )}
@@ -63,7 +63,7 @@ export function StatusMessage({
     <div
       className={cx(
         "rounded-xl border px-4 py-3 text-sm",
-        error ? "border-red-200 bg-red-50 text-red-900" : "border-emerald-200 bg-emerald-50 text-emerald-900",
+        error ? "border-[var(--danger-line)] bg-[var(--danger-soft)] text-[var(--danger-strong)]" : "border-[var(--ok-line)] bg-[var(--ok-soft)] text-[var(--ok)]",
       )}
       role={error ? "alert" : "status"}
       aria-live="polite"
@@ -83,8 +83,8 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-dashed border-[var(--line)] bg-stone-50/70 px-5 py-10 text-center">
-      <span className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-violet-100 text-xl text-[var(--violet-dark)]" aria-hidden="true">
+    <div className="rounded-2xl border border-dashed border-[var(--line)] bg-[var(--wash)]/70 px-5 py-10 text-center">
+      <span className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-[var(--main-soft)] text-xl text-[var(--main-strong)]" aria-hidden="true">
         ᥫ᭡
       </span>
       <h3 className="text-lg font-bold tracking-[-0.02em]">{title}</h3>
@@ -98,7 +98,7 @@ export function LoadingView({ label = "Carregando o Goa…" }: { label?: string 
   return (
     <div className="grid min-h-screen place-items-center px-6" role="status" aria-live="polite">
       <div className="text-center">
-        <span className="mx-auto mb-4 block h-10 w-10 animate-spin rounded-full border-4 border-violet-200 border-t-[var(--violet)]" aria-hidden="true" />
+        <span className="mx-auto mb-4 block h-10 w-10 animate-spin rounded-full border-4 border-[var(--main-line)] border-t-[var(--main)]" aria-hidden="true" />
         <p className="text-sm font-semibold text-[var(--muted)]">{label}</p>
       </div>
     </div>
@@ -147,19 +147,19 @@ export function AppHeader({
 }) {
   const [busy, setBusy] = useState(false);
   return (
-    <header className="sticky top-0 z-30 border-b border-black/10 bg-[rgba(245,241,232,0.92)] backdrop-blur-xl">
+    <header className="sticky top-0 z-30 border-b border-black/10 bg-[var(--canvas)]/92 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:h-[76px] sm:px-6">
-        <button className="rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-200" type="button" onClick={onHome}><Brand /></button>
+        <button className="rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25" type="button" onClick={onHome}><Brand /></button>
         <div className="flex items-center gap-3">
           <div className="hidden text-right sm:block">
             <strong className="block text-sm">{user.name}</strong>
             <span className="block text-xs text-[var(--muted)]">@{user.username}</span>
           </div>
-          <span className="grid h-10 w-10 place-items-center rounded-full border-2 border-white bg-violet-200 text-xs font-black" aria-hidden="true">
+          <span className="grid h-10 w-10 place-items-center rounded-full border-2 border-white bg-[var(--main-line)] text-xs font-black" aria-hidden="true">
             {user.name.split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("")}
           </span>
           <button
-            className="min-h-11 rounded-xl px-2 text-xs font-bold text-[var(--muted)] hover:bg-white hover:text-[var(--ink)] disabled:opacity-50 sm:px-3"
+            className="min-h-11 rounded-xl px-2 text-xs font-bold text-[var(--muted)] hover:bg-[var(--wash)] hover:text-[var(--ink)] disabled:opacity-50 sm:px-3"
             type="button"
             disabled={busy}
             onClick={async () => { setBusy(true); try { await onLogout(); } finally { setBusy(false); } }}
@@ -177,9 +177,9 @@ export function ChallengeStatusBadge({ status }: { status: ChallengeStatus }) {
   return (
     <span className={cx(
       "inline-flex rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.1em]",
-      status === "active" && "bg-emerald-100 text-emerald-800",
-      status === "draft" && "bg-amber-100 text-amber-900",
-      status === "closed" && "bg-stone-200 text-stone-700",
+      status === "active" && "bg-[var(--ok-soft)] text-[var(--ok)]",
+      status === "draft" && "bg-[var(--warn-soft)] text-[var(--warn)]",
+      status === "closed" && "bg-[var(--wash-strong)] text-[var(--muted)]",
     )}>{labels[status]}</span>
   );
 }
