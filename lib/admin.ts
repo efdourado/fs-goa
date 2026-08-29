@@ -344,3 +344,27 @@ export async function revokeUserSessions(session: SessionContext, body: Record<s
     return { userId, sessionsRevoked: result.rowCount ?? 0 };
   });
 }
+
+export async function setUserPlatformAdmin(session: SessionContext, body: Record<string, unknown>) {
+  const userId = stringValue(body, "userId", { min: 1, max: 100 })!;
+  const platformAdmin = body.platformAdmin === true;
+  if (userId === session.user.id) {
+    throw new ApiError(400, "self_target", "Você não pode mudar o próprio acesso de administração.");
+  }
+  return inTransaction(async (client) => {
+    const target = await client.query<{ disabled_at: Date | null }>(
+      "SELECT disabled_at FROM users WHERE id = $1 FOR UPDATE",
+      [userId],
+    );
+    if (!target.rowCount) throw new ApiError(404, "not_found", "Conta não encontrada.");
+    if (platformAdmin && target.rows[0].disabled_at) {
+      throw new ApiError(400, "disabled_target", "Reative a conta antes de torná-la administradora.");
+    }
+    await client.query(
+      "UPDATE users SET platform_admin = $2, updated_at = now() WHERE id = $1",
+      [userId, platformAdmin],
+    );
+    console.warn("admin.setPlatformAdmin", { actor: session.user.username, userId, platformAdmin });
+    return { userId, platformAdmin };
+  });
+}

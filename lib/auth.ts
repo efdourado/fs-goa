@@ -342,64 +342,55 @@ export async function updateAccount(
   session: SessionContext,
   body: Record<string, unknown>,
 ): Promise<{ user: AuthenticatedUser }> {
+  // Username and e-mail are not self-editable yet — only the display name and password.
+  if (body.username !== undefined) {
+    throw new ApiError(403, "username_locked", "O nome de usuário não pode ser alterado.");
+  }
+  if (body.email !== undefined) {
+    throw new ApiError(403, "email_locked", "A edição de e-mail está desativada por enquanto.");
+  }
   const wantsName = body.name !== undefined;
-  const wantsEmail = body.email !== undefined;
   const wantsPassword = typeof body.newPassword === "string" && body.newPassword !== "";
-  if (!wantsName && !wantsEmail && !wantsPassword) {
+  if (!wantsName && !wantsPassword) {
     throw new ApiError(400, "nothing_to_update", "Nada para atualizar.");
   }
   const name = wantsName ? displayName(body.name) : null;
-  const email = wantsEmail ? normalizeEmail(body.email) : null;
   const newPasswordHash = wantsPassword ? await hashPassword(body.newPassword).catch(() => {
     throw new ApiError(400, "invalid_password", "A nova senha precisa ter ao menos 10 caracteres.");
   }) : null;
 
-  try {
-    return await inTransaction(async (client) => {
-      if (wantsPassword) {
-        const current = await oneOrNull<{ password_hash: string }>(
-          client,
-          "SELECT password_hash FROM users WHERE id = $1 FOR UPDATE",
-          [session.user.id],
-        );
-        if (!current || !(await verifyPassword(body.currentPassword, current.password_hash))) {
-          throw new ApiError(403, "invalid_current_password", "Senha atual incorreta.");
-        }
-      }
-      if (wantsName) {
-        await client.query("UPDATE users SET display_name = $2, updated_at = now() WHERE id = $1", [session.user.id, name]);
-      }
-      if (wantsEmail) {
-        await client.query(
-          "UPDATE users SET email = $2, email_normalized = $3, updated_at = now() WHERE id = $1",
-          [session.user.id, email!.email, email!.normalized],
-        );
-      }
-      if (wantsPassword) {
-        await client.query(
-          "UPDATE users SET password_hash = $2, password_changed_at = now(), updated_at = now() WHERE id = $1",
-          [session.user.id, newPasswordHash],
-        );
-        await client.query(
-          "UPDATE sessions SET revoked_at = now(), revoke_reason = 'password_change' WHERE user_id = $1 AND id <> $2 AND revoked_at IS NULL",
-          [session.user.id, session.id],
-        );
-      }
-      const account = await oneOrNull<UserRow>(
+  return inTransaction(async (client) => {
+    if (wantsPassword) {
+      const current = await oneOrNull<{ password_hash: string }>(
         client,
-        `SELECT id, display_name, username, email, password_hash, platform_admin FROM users WHERE id = $1`,
+        "SELECT password_hash FROM users WHERE id = $1 FOR UPDATE",
         [session.user.id],
       );
-      if (!account) throw new Error("User row vanished during account update.");
-      return { user: publicUser(account) };
-    });
-  } catch (error) {
-    const violation = error as { code?: string; constraint?: string };
-    if (violation.code === "23505" && violation.constraint === "users_email_normalized_uidx") {
-      throw new ApiError(409, "email_taken", "Esse e-mail já está em uso.");
+      if (!current || !(await verifyPassword(body.currentPassword, current.password_hash))) {
+        throw new ApiError(403, "invalid_current_password", "Senha atual incorreta.");
+      }
     }
-    throw error;
-  }
+    if (wantsName) {
+      await client.query("UPDATE users SET display_name = $2, updated_at = now() WHERE id = $1", [session.user.id, name]);
+    }
+    if (wantsPassword) {
+      await client.query(
+        "UPDATE users SET password_hash = $2, password_changed_at = now(), updated_at = now() WHERE id = $1",
+        [session.user.id, newPasswordHash],
+      );
+      await client.query(
+        "UPDATE sessions SET revoked_at = now(), revoke_reason = 'password_change' WHERE user_id = $1 AND id <> $2 AND revoked_at IS NULL",
+        [session.user.id, session.id],
+      );
+    }
+    const account = await oneOrNull<UserRow>(
+      client,
+      `SELECT id, display_name, username, email, password_hash, platform_admin FROM users WHERE id = $1`,
+      [session.user.id],
+    );
+    if (!account) throw new Error("User row vanished during account update.");
+    return { user: publicUser(account) };
+  });
 }
 
 export async function sessionFromToken(rawToken: string | null): Promise<SessionContext | null> {

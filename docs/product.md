@@ -20,8 +20,9 @@ saber o link ou o ID de um desafio não dá acesso a nada.
   entrega é **mediada pelo administrador** — o pedido aparece no painel `/admin`,
   aba *Contas*, e o administrador gera um link de uso único (válido por 1 hora) e
   repassa. Ao usar o link, todas as outras sessões da conta são encerradas.
-- **Sua conta** (ícone no topo): trocar nome, e-mail e senha. Trocar a senha
-  encerra as outras sessões.
+- **Seu perfil** (ícone no topo): por enquanto só o **nome de exibição** e a
+  **senha** são editáveis; nome de usuário e e-mail ficam bloqueados. Trocar a
+  senha encerra as outras sessões.
 
 ## Grupos e papéis
 
@@ -88,8 +89,9 @@ nunca o conteúdo dos grupos:
 - **Uso**: contagem de contas, grupos, desafios, registros; tamanho do banco por tabela.
 - **Lixeira**: grupos/desafios/registros apagados; excluir definitivo para liberar espaço.
 - **Auditoria**: quem fez o quê, antes/depois, quando; filtro por grupo/entidade.
-- **Contas**: cadastro e atividade; desativar/reativar conta, revogar sessões,
-  gerar link de redefinição de senha.
+- **Contas**: cadastro e atividade; **tornar/remover administrador** (não dá para
+  mudar a própria conta), desativar/reativar conta, revogar sessões, gerar link de
+  redefinição de senha.
 
 ## Roadmap (não agora)
 

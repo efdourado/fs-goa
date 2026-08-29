@@ -14,11 +14,10 @@ export function AccountScreen({
 }: {
   user: User;
   onBack: () => void;
-  onSaveProfile: (payload: { name: string; email: string }) => Promise<void>;
+  onSaveProfile: (payload: { name: string }) => Promise<void>;
   onChangePassword: (payload: { currentPassword: string; newPassword: string }) => Promise<void>;
 }) {
   const [name, setName] = useState(user.name);
-  const [email, setEmail] = useState(user.email ?? "");
   const [profileBusy, setProfileBusy] = useState(false);
   const [profileMsg, setProfileMsg] = useState<{ error?: string; success?: string }>({});
 
@@ -30,7 +29,7 @@ export function AccountScreen({
     setProfileBusy(true);
     setProfileMsg({});
     try {
-      await onSaveProfile({ name: name.trim(), email: email.trim() });
+      await onSaveProfile({ name: name.trim() });
       setProfileMsg({ success: "Perfil atualizado." });
     } catch (cause) {
       setProfileMsg({ error: errorMessage(cause) });
@@ -63,13 +62,14 @@ export function AccountScreen({
   return (
     <main className="mx-auto max-w-3xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
       <button className="mb-6 min-h-11 text-sm font-bold text-[var(--muted)] hover:text-[var(--ink)]" type="button" onClick={onBack}>← Voltar ao início</button>
-      <PageHeading title="Sua conta" description={`Entrou como @${user.username}. O e-mail permite login e recuperação de senha.`} />
+      <PageHeading title="Seu perfil" description="Por enquanto só o nome de exibição é editável." />
 
       <section className={cx(cardClass, "p-5 sm:p-7")}>
         <h2 className="text-xl font-bold">Perfil</h2>
         <form className="mt-4 grid gap-4 sm:grid-cols-2" onSubmit={saveProfile}>
           <label className="sm:col-span-2"><span className={labelClass}>Nome</span><input className={inputClass} value={name} onChange={(event) => setName(event.target.value)} required maxLength={80} disabled={profileBusy} /></label>
-          <label className="sm:col-span-2"><span className={labelClass}>E-mail</span><input className={inputClass} type="email" value={email} onChange={(event) => setEmail(event.target.value)} maxLength={254} placeholder="voce@exemplo.com" disabled={profileBusy} spellCheck={false} /><span className="mt-1 block text-xs text-[var(--muted)]">Deixe em branco para remover.</span></label>
+          <label><span className={labelClass}>Nome de usuário</span><input className={cx(inputClass, "opacity-60")} value={`@${user.username}`} readOnly disabled /></label>
+          <label><span className={labelClass}>E-mail</span><input className={cx(inputClass, "opacity-60")} value={user.email ?? "não informado"} readOnly disabled /></label>
           <div className="sm:col-span-2"><StatusMessage error={profileMsg.error} success={profileMsg.success} /></div>
           <div className="sm:col-span-2"><Button type="submit" disabled={profileBusy}>{profileBusy ? "Salvando…" : "Salvar perfil"}</Button></div>
         </form>

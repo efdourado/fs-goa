@@ -663,12 +663,28 @@ test("e-mail, login por e-mail, conta e redefinição de senha", async () => {
     user: (relog.body as { user: ClientSession["user"] }).user,
   };
 
-  // account screen: change the e-mail, then log in with the new one
-  const updated = await call("PATCH", "/api/account", { session: carla, body: { email: "carla.nova@example.com" } });
-  assert.equal(updated.response.status, 200, JSON.stringify(updated.body));
-  assert.equal((updated.body as { user: { email: string } }).user.email, "carla.nova@example.com");
-  assert.equal((await call("POST", "/api/auth/login", { body: { username: "carla.nova@example.com", password: "nova senha bem forte 9" } })).response.status, 200);
+  // perfil: só o nome é editável; e-mail e usuário ficam bloqueados por enquanto
+  const nameOnly = await call("PATCH", "/api/account", { session: carla, body: { name: "Carla Editada" } });
+  assert.equal(nameOnly.response.status, 200, JSON.stringify(nameOnly.body));
+  assert.equal((nameOnly.body as { user: { name: string } }).user.name, "Carla Editada");
+  assert.equal((await call("PATCH", "/api/account", { session: carla, body: { email: "x@example.com" } })).response.status, 403, "e-mail bloqueado");
+  assert.equal((await call("PATCH", "/api/account", { session: carla, body: { username: "carla2" } })).response.status, 403, "usuário bloqueado");
 
   // password change requires the current password
   assert.equal((await call("PATCH", "/api/account", { session: carla, body: { currentPassword: "errada", newPassword: "mais uma senha 12345" } })).response.status, 403);
+
+  // admin promove e rebaixa outra conta pela API
+  async function carlaSession(): Promise<ClientSession> {
+    const r = await call("POST", "/api/auth/login", { body: { username: "carla_email", password: "nova senha bem forte 9" } });
+    assert.equal(r.response.status, 200, JSON.stringify(r.body));
+    return { cookie: (r.response.headers.get("set-cookie") ?? "").split(";", 1)[0], csrf: (r.body as { csrfToken: string }).csrfToken, user: (r.body as { user: ClientSession["user"] }).user };
+  }
+  assert.equal((await call("GET", "/api/admin/overview", { session: await carlaSession() })).response.status, 404, "sem promoção: 404");
+  const promote = await call("POST", "/api/admin/users/set-admin", { session: adminSession, body: { userId: carla.user.id, platformAdmin: true } });
+  assert.equal(promote.response.status, 200, JSON.stringify(promote.body));
+  assert.equal((await call("GET", "/api/admin/overview", { session: await carlaSession() })).response.status, 200, "conta promovida enxerga o painel");
+  assert.equal((await call("POST", "/api/admin/users/set-admin", { session: adminSession, body: { userId: admin.user.id, platformAdmin: false } })).response.status, 400, "admin não muda o próprio acesso");
+  const demote = await call("POST", "/api/admin/users/set-admin", { session: adminSession, body: { userId: carla.user.id, platformAdmin: false } });
+  assert.equal(demote.response.status, 200, JSON.stringify(demote.body));
+  assert.equal((await call("GET", "/api/admin/overview", { session: await carlaSession() })).response.status, 404, "após rebaixar, volta a 404");
 });

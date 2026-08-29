@@ -109,7 +109,12 @@ export async function handleApi(work: () => Promise<Response>): Promise<Response
       return json({ error: "invalid_relation", message: "A operação viola uma regra do domínio." }, 400);
     }
 
-    console.error("Unhandled Goa API error", { name: error instanceof Error ? error.name : "unknown" });
+    console.error("Unhandled Goa API error", {
+      name: error instanceof Error ? error.name : "unknown",
+      message: error instanceof Error ? error.message : String(error),
+      pgCode: databaseError?.code,
+      constraint: databaseError?.constraint,
+    });
     return json({ error: "internal_error", message: "Não foi possível concluir a operação." }, 500);
   }
 }

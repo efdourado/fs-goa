@@ -12,5 +12,5 @@ export default async function AdminPage() {
   const store = await cookies();
   const session = await sessionFromToken(store.get(SESSION_COOKIE_NAME)?.value ?? null);
   if (!session?.user.platformAdmin) notFound();
-  return <AdminConsole viewerName={session.user.name} csrfToken={await csrfForSession(session)} />;
+  return <AdminConsole viewerId={session.user.id} viewerName={session.user.name} csrfToken={await csrfForSession(session)} />;
 }

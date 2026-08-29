@@ -20,6 +20,7 @@ import {
   purgeTrashItem,
   revokeUserSessions,
   setUserDisabled,
+  setUserPlatformAdmin,
 } from "@/lib/admin";
 import {
   addMetric,
@@ -133,6 +134,7 @@ export async function POST(request: Request): Promise<Response> {
       const adminBody = await readJsonObject(request);
       if (isPath(path, "admin", "trash", "purge")) return json(await purgeTrashItem(adminSession, adminBody));
       if (isPath(path, "admin", "users", "disable")) return json(await setUserDisabled(adminSession, adminBody));
+      if (isPath(path, "admin", "users", "set-admin")) return json(await setUserPlatformAdmin(adminSession, adminBody));
       if (isPath(path, "admin", "users", "revoke-sessions")) {
         return json(await revokeUserSessions(adminSession, adminBody));
       }
