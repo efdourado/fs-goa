@@ -382,9 +382,9 @@ function inviteTokenFromText(value: string): string {
 }
 
 const cardClass =
-  "rounded-[24px] border border-[var(--line)] bg-[var(--paper)] shadow-[0_12px_40px_rgba(32,36,31,0.04)]";
+  "rounded-[20px] border border-[var(--line)] bg-[var(--paper)] shadow-[0_1px_2px_rgba(32,36,31,0.04)]";
 const inputClass =
-  "mb-1 min-h-12 w-full rounded-xl border border-[var(--line)] bg-white px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--violet)] focus:ring-4 focus:ring-[rgba(103,88,216,0.12)] disabled:cursor-not-allowed disabled:bg-stone-100";
+  "mb-1 min-h-12 w-full rounded-xl border border-[var(--line)] bg-[var(--paper)] px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--violet)] focus:ring-4 focus:ring-[rgba(103,88,216,0.12)] disabled:cursor-not-allowed disabled:bg-[var(--canvas)]";
 const labelClass = "mb-1.5 block text-sm font-semibold text-[var(--ink)]";
 
 function cx(...classes: Array<string | false | null | undefined>): string {
@@ -408,9 +408,9 @@ function Button({
 }) {
   const tones = {
     primary: "border-transparent bg-[var(--violet)] text-white hover:opacity-90",
-    secondary: "border-[var(--line)] bg-[var(--paper)] text-[var(--ink)] hover:bg-stone-100",
-    ghost: "border-transparent bg-transparent text-[var(--violet-dark)] hover:bg-violet-50",
-    danger: "border-red-200 bg-red-50 text-red-800 hover:bg-red-100",
+    secondary: "border-[var(--line)] bg-transparent text-[var(--ink)] hover:bg-black/[0.04]",
+    ghost: "border-transparent bg-transparent text-[var(--muted)] hover:bg-black/[0.04] hover:text-[var(--ink)]",
+    danger: "border-red-200 bg-transparent text-red-700 hover:bg-red-50",
   };
   return (
     <button
@@ -494,12 +494,10 @@ function Brand() {
 }
 
 function PageHeading({
-  eyebrow,
   title,
   description,
   action,
 }: {
-  eyebrow?: string;
   title: string;
   description?: string;
   action?: ReactNode;
@@ -507,7 +505,6 @@ function PageHeading({
   return (
     <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        {eyebrow ? <p className="mb-2 text-[11px] font-extrabold uppercase tracking-[0.14em] text-[var(--muted)]">{eyebrow}</p> : null}
         <h1 className="text-3xl font-bold tracking-[-0.045em] sm:text-4xl">{title}</h1>
         {description ? <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">{description}</p> : null}
       </div>
@@ -880,7 +877,7 @@ function GroupScreen({
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
       <button className="mb-6 min-h-11 text-sm font-bold text-[var(--muted)] hover:text-[var(--ink)]" type="button" onClick={onBack}>← Voltar ao início</button>
-      <PageHeading eyebrow="Grupo privado" title={group.name} description={`${group.description ? `${group.description} · ` : ""}${group.memberCount ?? group.members?.length ?? 0} pessoas · você é ${group.role === "owner" ? "responsável" : group.role === "admin" ? "admin" : "participante"}`} action={canManage(group.role) ? <div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={toggleGroupEdit}>{showGroupEdit ? "Fechar edição" : "Editar grupo"}</Button><Button variant="secondary" onClick={() => setShowInvite(!showInvite)}>Convidar</Button><Button onClick={onCreateChallenge}>+ Novo desafio</Button></div> : undefined} />
+      <PageHeading title={group.name} description={`${group.description ? `${group.description} · ` : ""}${group.memberCount ?? group.members?.length ?? 0} pessoas · você é ${group.role === "owner" ? "responsável" : group.role === "admin" ? "admin" : "participante"}`} action={canManage(group.role) ? <div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={toggleGroupEdit}>{showGroupEdit ? "Fechar edição" : "Editar grupo"}</Button><Button variant="secondary" onClick={() => setShowInvite(!showInvite)}>Convidar</Button><Button onClick={onCreateChallenge}>+ Novo desafio</Button></div> : undefined} />
 
       {showGroupEdit ? (
         <section className={cx(cardClass, "mb-7 p-5")} aria-labelledby="group-edit-title">
@@ -1235,7 +1232,7 @@ function CreateChallengeScreen({
   return (
     <main className="mx-auto max-w-5xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
       <button className="mb-6 min-h-11 text-sm font-bold text-[var(--muted)] hover:text-[var(--ink)]" type="button" onClick={onBack}>← Voltar para {group.name}</button>
-      <PageHeading eyebrow="Novo desafio" title="Monte a próxima experiência" description="Comece com um preset e ajuste somente o que seu grupo precisa." />
+      <PageHeading title="Monte a próxima experiência" description="Comece com um preset e ajuste somente o que seu grupo precisa." />
       <nav className="mb-6 grid grid-cols-4 gap-1 rounded-2xl bg-stone-200/70 p-1" aria-label="Etapas de criação">
         {stepLabels.map((label, index) => <button className={cx("min-h-11 rounded-xl px-2 text-xs font-bold sm:text-sm", step === index + 1 ? "bg-white text-[var(--violet-dark)] shadow-sm" : index + 1 < step ? "text-[var(--ink)]" : "text-[var(--muted)]")} type="button" onClick={() => index + 1 < step && setStep(index + 1)} disabled={index + 1 > step} key={label}><span className="hidden sm:inline">{index + 1}. </span>{label}</button>)}
       </nav>
@@ -1767,7 +1764,7 @@ function AdminReview({
         <PageHeading title="Revisão dos registros" description={`${entries.length} enviados · ${Math.max(0, expected - entries.length)} pendentes · ${entries.filter((entry) => entry.isLate).length} após o prazo`} action={<Button variant="secondary" disabled={exporting} onClick={() => { setExporting(true); setError(null); onExport().catch((cause: unknown) => setError(errorMessage(cause))).finally(() => setExporting(false)); }}>{exporting ? "Preparando…" : "Exportar CSV"}</Button>} />
         <div className="mb-5 grid gap-3 sm:grid-cols-[1fr_auto]">
           <label><span className="sr-only">Buscar registros</span><input className={inputClass} type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar pessoa ou checkpoint" /></label>
-          <label className="flex min-h-12 items-center gap-2 rounded-xl border border-[var(--line)] bg-white px-4 text-sm font-semibold"><input type="checkbox" checked={lateOnly} onChange={(event) => setLateOnly(event.target.checked)} />Somente atrasados</label>
+          <label className="flex min-h-12 items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4 text-sm font-semibold"><input type="checkbox" checked={lateOnly} onChange={(event) => setLateOnly(event.target.checked)} />Somente atrasados</label>
         </div>
         <StatusMessage error={error} />
         {filtered.length ? (
@@ -1916,7 +1913,7 @@ function AdminResults({
         <div className="mt-5"><StatusMessage error={error} success={success} /></div>
         <Button className="mt-5" disabled={busy} onClick={() => void save()}>{busy ? "Salvando…" : "Salvar vitrine"}</Button>
       </section>
-      {challenge.result || challenge.status === "closed" ? <section><PageHeading eyebrow="Prévia" title="Como o grupo verá" /><ResultView challenge={challenge} /></section> : <EmptyState title="Prévia disponível após salvar" description="Você pode preparar a curadoria durante o desafio e publicar o resultado ao encerrá-lo." />}
+      {challenge.result || challenge.status === "closed" ? <section><PageHeading title="Como o grupo verá" description="Prévia da vitrine com a curadoria atual." /><ResultView challenge={challenge} /></section> : <EmptyState title="Prévia disponível após salvar" description="Você pode preparar a curadoria durante o desafio e publicar o resultado ao encerrá-lo." />}
     </div>
   );
 }
@@ -1972,7 +1969,7 @@ function AdminScreen({
   return (
     <main className="mx-auto max-w-7xl px-4 py-6 pb-24 sm:px-6 sm:py-10">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><button className="min-h-11 text-sm font-bold text-[var(--muted)] hover:text-[var(--ink)]" type="button" onClick={onBack}>← {group?.name ?? "Início"}</button><Button variant="secondary" onClick={onViewParticipant}>Ver como participante</Button></div>
-      <PageHeading eyebrow="Administração" title={challenge.title} description="Configure, revise e apresente — controles administrativos continuam validados no servidor." action={<ChallengeStatusBadge status={challenge.status} />} />
+      <PageHeading title={challenge.title} description="Configure, revise e apresente — controles administrativos continuam validados no servidor." action={<ChallengeStatusBadge status={challenge.status} />} />
       <nav className="mb-6 flex gap-1 overflow-x-auto rounded-2xl bg-stone-200/70 p-1" aria-label="Áreas administrativas">{tabs.map((item) => <button className={cx("min-h-11 flex-none rounded-xl px-4 text-sm font-bold", tab === item.id ? "bg-white text-[var(--violet-dark)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]")} type="button" onClick={() => onTab(item.id)} key={item.id}>{item.label}</button>)}</nav>
       {tab === "overview" ? <AdminOverview challenge={challenge} entries={entries} onSave={onSaveBasics} onTransition={onTransition} onDuplicate={onDuplicate} /> : null}
       {tab === "participants" ? <AdminParticipants key={`${challenge.id}:${challenge.participants.map((participant) => participant.userId ?? participant.id).join(",")}`} challenge={challenge} group={group} onSave={onSaveParticipants} /> : null}
