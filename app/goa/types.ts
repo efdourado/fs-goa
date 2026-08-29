@@ -18,6 +18,7 @@ export interface User {
   id: Id;
   name: string;
   username: string;
+  email?: string | null;
   platformAdmin?: boolean;
 }
 
@@ -183,7 +184,9 @@ export interface ApiErrorBody {
 export type Screen =
   | { kind: "loading" }
   | { kind: "auth"; mode: "login" | "register" }
+  | { kind: "reset"; token: string }
   | { kind: "dashboard" }
+  | { kind: "account" }
   | { kind: "group"; groupId: Id }
   | { kind: "invite"; token: string }
   | { kind: "create-challenge"; groupId: Id }

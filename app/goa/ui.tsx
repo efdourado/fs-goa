@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { type ReactNode, useState } from "react";
 
 import type { ChallengeStatus, User } from "./types";
@@ -139,27 +140,40 @@ export function PageHeading({
 export function AppHeader({
   user,
   onHome,
+  onAccount,
   onLogout,
 }: {
   user: User;
   onHome: () => void;
+  onAccount: () => void;
   onLogout: () => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false);
+  const navLink = "min-h-11 rounded-xl px-2 text-xs font-bold text-[var(--muted)] hover:bg-[var(--wash)] hover:text-[var(--ink)] sm:px-3";
   return (
     <header className="sticky top-0 z-30 border-b border-black/10 bg-[var(--canvas)]/92 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:h-[76px] sm:px-6">
         <button className="rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25" type="button" onClick={onHome}><Brand /></button>
-        <div className="flex items-center gap-3">
-          <div className="hidden text-right sm:block">
-            <strong className="block text-sm">{user.name}</strong>
-            <span className="block text-xs text-[var(--muted)]">@{user.username}</span>
-          </div>
-          <span className="grid h-10 w-10 place-items-center rounded-full border-2 border-white bg-[var(--main-line)] text-xs font-black" aria-hidden="true">
-            {user.name.split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("")}
-          </span>
+        <div className="flex items-center gap-1 sm:gap-2">
+          {user.platformAdmin ? (
+            <Link className={cx(navLink, "inline-flex items-center")} href="/admin">Admin</Link>
+          ) : null}
           <button
-            className="min-h-11 rounded-xl px-2 text-xs font-bold text-[var(--muted)] hover:bg-[var(--wash)] hover:text-[var(--ink)] disabled:opacity-50 sm:px-3"
+            className="flex items-center gap-2.5 rounded-xl p-1 pr-2 text-left hover:bg-[var(--wash)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
+            type="button"
+            onClick={onAccount}
+            aria-label="Sua conta"
+          >
+            <span className="grid h-9 w-9 place-items-center rounded-full border-2 border-white bg-[var(--main-line)] text-xs font-black" aria-hidden="true">
+              {user.name.split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("")}
+            </span>
+            <span className="hidden leading-tight sm:block">
+              <strong className="block text-sm">{user.name}</strong>
+              <span className="block text-xs text-[var(--muted)]">@{user.username}</span>
+            </span>
+          </button>
+          <button
+            className={cx(navLink, "disabled:opacity-50")}
             type="button"
             disabled={busy}
             onClick={async () => { setBusy(true); try { await onLogout(); } finally { setBusy(false); } }}

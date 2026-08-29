@@ -42,6 +42,7 @@ interface AdminUser {
   lastSeenAt: string | null;
   groupsOwned: number;
   activeSessions: number;
+  pendingReset: { expiresAt: string } | null;
 }
 
 const card = "rounded-[20px] border border-[var(--line)] bg-[var(--paper)] shadow-[0_1px_2px_rgba(32,36,31,0.04)]";
@@ -240,6 +241,9 @@ export default function AdminConsole({ viewerName, csrfToken }: { viewerName: st
           onRevoke={(user) =>
             run(() => post("/api/admin/users/revoke-sessions", { userId: user.id }), loadUsers)
           }
+          onResetLink={(user) =>
+            post("/api/admin/users/reset-link", { userId: user.id }) as Promise<{ url: string; expiresAt: string }>
+          }
         />
       ) : null}
     </main>
@@ -389,61 +393,78 @@ function AccountsTab({
   busy,
   onDisable,
   onRevoke,
+  onResetLink,
 }: {
   users: AdminUser[] | null;
   busy: boolean;
   onDisable: (user: AdminUser, disabled: boolean) => void;
   onRevoke: (user: AdminUser) => void;
+  onResetLink: (user: AdminUser) => Promise<{ url: string; expiresAt: string }>;
 }) {
+  const [links, setLinks] = useState<Record<string, { url: string; expiresAt: string }>>({});
+  const [linkBusy, setLinkBusy] = useState<string | null>(null);
+  const [linkError, setLinkError] = useState<string | null>(null);
+
   if (!users) return <p className={cx("text-sm", muted)}>Carregando…</p>;
+
+  async function generate(user: AdminUser) {
+    setLinkBusy(user.id);
+    setLinkError(null);
+    try {
+      const generated = await onResetLink(user);
+      setLinks((current) => ({ ...current, [user.id]: generated }));
+    } catch (cause) {
+      setLinkError(cause instanceof Error ? cause.message : "Falha ao gerar o link.");
+    } finally {
+      setLinkBusy(null);
+    }
+  }
+
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[720px] border-separate border-spacing-y-2 text-sm">
-        <thead>
-          <tr className={cx("text-left text-xs uppercase tracking-wide", muted)}>
-            <th className="px-3 py-1 font-bold">Conta</th>
-            <th className="px-3 py-1 font-bold">Criada</th>
-            <th className="px-3 py-1 font-bold">Última sessão</th>
-            <th className="px-3 py-1 font-bold">Grupos</th>
-            <th className="px-3 py-1 font-bold">Sessões</th>
-            <th className="px-3 py-1 font-bold">Ações</th>
-          </tr>
-        </thead>
-        <tbody>
-          {users.map((user) => (
-            <tr key={user.id} className={cx(card, user.disabledAt && "opacity-60")}>
-              <td className="rounded-l-[20px] px-3 py-3">
+    <div className="space-y-2">
+      {linkError ? <div className="rounded-xl border border-[var(--danger-line)] bg-[var(--danger-soft)] px-4 py-3 text-sm text-[var(--danger-strong)]">{linkError}</div> : null}
+      {users.map((user) => {
+        const link = links[user.id];
+        return (
+          <article key={user.id} className={cx(card, "p-4", user.disabledAt && "opacity-60")}>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <strong>{user.name}</strong>
                   {user.platformAdmin ? <span className="rounded-full bg-black/[0.06] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide">admin</span> : null}
                   {user.disabledAt ? <span className="rounded-full bg-[var(--danger-soft)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--danger)]">desativada</span> : null}
+                  {user.pendingReset ? <span className="rounded-full bg-[var(--warn-soft)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--warn)]">reset pedido</span> : null}
                 </div>
-                <span className={cx("text-xs", muted)}>@{user.username}{user.email ? ` · ${user.email}` : ""}</span>
-              </td>
-              <td className={cx("px-3 py-3 text-xs", muted)}>{formatDateTime(user.createdAt)}</td>
-              <td className={cx("px-3 py-3 text-xs", muted)}>{formatDateTime(user.lastSeenAt)}</td>
-              <td className="px-3 py-3">{user.groupsOwned}</td>
-              <td className="px-3 py-3">{user.activeSessions}</td>
-              <td className="rounded-r-[20px] px-3 py-3">
-                {user.platformAdmin ? (
-                  <span className={cx("text-xs", muted)}>protegida</span>
-                ) : (
-                  <div className="flex gap-2">
-                    <Button variant="ghost" disabled={busy || !user.activeSessions} onClick={() => onRevoke(user)}>Revogar sessões</Button>
-                    <Button
-                      variant={user.disabledAt ? "secondary" : "danger"}
-                      disabled={busy}
-                      onClick={() => onDisable(user, !user.disabledAt)}
-                    >
-                      {user.disabledAt ? "Reativar" : "Desativar"}
-                    </Button>
-                  </div>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                <p className={cx("mt-1 text-xs", muted)}>
+                  @{user.username}{user.email ? ` · ${user.email}` : " · sem e-mail"} · criada {formatDateTime(user.createdAt)} · última sessão {formatDateTime(user.lastSeenAt)} · {user.groupsOwned} grupos · {user.activeSessions} sessões
+                </p>
+              </div>
+              {user.platformAdmin ? (
+                <span className={cx("text-xs", muted)}>protegida</span>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="ghost" disabled={!!linkBusy || !user.email} onClick={() => generate(user)}>
+                    {linkBusy === user.id ? "Gerando…" : "Gerar link de senha"}
+                  </Button>
+                  <Button variant="ghost" disabled={busy || !user.activeSessions} onClick={() => onRevoke(user)}>Revogar sessões</Button>
+                  <Button variant={user.disabledAt ? "secondary" : "danger"} disabled={busy} onClick={() => onDisable(user, !user.disabledAt)}>
+                    {user.disabledAt ? "Reativar" : "Desativar"}
+                  </Button>
+                </div>
+              )}
+            </div>
+            {link ? (
+              <div className="mt-3 rounded-xl bg-black/[0.04] p-3">
+                <p className={cx("text-[11px] font-bold uppercase tracking-wide", muted)}>Link de uso único · expira {formatDateTime(link.expiresAt)}</p>
+                <div className="mt-1 flex items-center gap-2">
+                  <input readOnly value={link.url} className="min-w-0 flex-1 rounded-lg border border-[var(--line)] bg-[var(--paper)] px-2 py-1 text-xs" onFocus={(event) => event.currentTarget.select()} />
+                  <Button variant="secondary" onClick={() => navigator.clipboard?.writeText(link.url)}>Copiar</Button>
+                </div>
+              </div>
+            ) : null}
+          </article>
+        );
+      })}
     </div>
   );
 }

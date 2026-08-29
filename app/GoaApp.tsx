@@ -11,6 +11,7 @@ import {
   normalizeCreatedId,
   normalizeEntries,
 } from "./goa/api";
+import { AccountScreen } from "./goa/screens/account";
 import { AdminScreen } from "./goa/screens/admin";
 import { AuthScreen } from "./goa/screens/auth";
 import { CreateChallengeScreen } from "./goa/screens/create-challenge";
@@ -18,6 +19,7 @@ import { DashboardScreen } from "./goa/screens/dashboard";
 import { GroupScreen } from "./goa/screens/group";
 import { InviteScreen } from "./goa/screens/invite";
 import { ParticipantChallengeScreen } from "./goa/screens/participant-challenge";
+import { ResetPasswordScreen } from "./goa/screens/reset-password";
 import type {
   AdminTab,
   BootstrapData,
@@ -44,7 +46,9 @@ export default function GoaApp() {
   useEffect(() => {
     const controller = new AbortController();
     let active = true;
-    const queryToken = new URLSearchParams(window.location.search).get("invite");
+    const params = new URLSearchParams(window.location.search);
+    const resetToken = params.get("reset");
+    const queryToken = params.get("invite");
     const pathMatch = window.location.pathname.match(/\/invites?\/([^/]+)/);
     const inviteToken = queryToken || (pathMatch ? decodeURIComponent(pathMatch[1]) : null);
     apiRequest<BootstrapData | { bootstrap: BootstrapData }>(API_PATHS.bootstrap, { signal: controller.signal })
@@ -53,7 +57,12 @@ export default function GoaApp() {
         const data = normalizeBootstrap(raw);
         if (inviteToken) setPendingInviteToken(inviteToken);
         setBootstrap(data);
-        setScreen(inviteToken ? { kind: "invite", token: inviteToken } : data.user ? { kind: "dashboard" } : { kind: "auth", mode: "login" });
+        setScreen(
+          resetToken ? { kind: "reset", token: resetToken }
+          : inviteToken ? { kind: "invite", token: inviteToken }
+          : data.user ? { kind: "dashboard" }
+          : { kind: "auth", mode: "login" },
+        );
       })
       .catch((cause: unknown) => {
         if (!active || (cause instanceof DOMException && cause.name === "AbortError")) return;
@@ -113,6 +122,22 @@ export default function GoaApp() {
     setEntries([]);
     setScreen({ kind: "auth", mode: "login" });
     if (data.user) throw new Error("Não foi possível encerrar a sessão.");
+  }
+
+  async function forgotPassword(email: string) {
+    await apiRequest(API_PATHS.auth.forgot, { method: "POST", body: { email }, csrfToken: bootstrap?.csrfToken });
+  }
+
+  async function completeReset() {
+    window.history.replaceState({}, "", window.location.pathname);
+    const data = await refreshBootstrap();
+    setScreen(data.user ? { kind: "dashboard" } : { kind: "auth", mode: "login" });
+  }
+
+  async function saveAccount(payload: Record<string, unknown>) {
+    if (!bootstrap) return;
+    await apiRequest(API_PATHS.account, { method: "PATCH", body: payload, csrfToken: bootstrap.csrfToken });
+    await refreshBootstrap();
   }
 
   async function openParticipant(challengeId: Id, requestedTab?: ParticipantTab) {
@@ -242,11 +267,15 @@ export default function GoaApp() {
   }
   if (!bootstrap || screen.kind === "loading") return <LoadingView />;
 
+  if (screen.kind === "reset") {
+    return <ResetPasswordScreen token={screen.token} onDone={completeReset} onCancel={() => { window.history.replaceState({}, "", window.location.pathname); setScreen({ kind: "auth", mode: "login" }); }} />;
+  }
+
   if (!bootstrap.user) {
     if (screen.kind === "invite") {
       return <InviteScreen token={screen.token} user={null} csrfToken={bootstrap.csrfToken} onBack={() => setScreen({ kind: "auth", mode: "login" })} onNeedAuth={() => setScreen({ kind: "auth", mode: "login" })} onAccepted={async () => undefined} />;
     }
-    return <AuthScreen initialMode={screen.kind === "auth" ? screen.mode : "login"} invitePending={Boolean(pendingInviteToken)} onAuthenticated={authenticate} onShowInvite={pendingInviteToken ? () => setScreen({ kind: "invite", token: pendingInviteToken }) : undefined} />;
+    return <AuthScreen initialMode={screen.kind === "auth" ? screen.mode : "login"} invitePending={Boolean(pendingInviteToken)} onAuthenticated={authenticate} onForgot={forgotPassword} onShowInvite={pendingInviteToken ? () => setScreen({ kind: "invite", token: pendingInviteToken }) : undefined} />;
   }
 
   const user = bootstrap.user;
@@ -256,7 +285,9 @@ export default function GoaApp() {
   const selectedRole = selectedChallenge?.viewerRole ?? selectedGroup?.role;
 
   let content: ReactNode;
-  if (screen.kind === "invite") {
+  if (screen.kind === "account") {
+    content = <AccountScreen user={user} onBack={() => setScreen({ kind: "dashboard" })} onSaveProfile={saveAccount} onChangePassword={saveAccount} />;
+  } else if (screen.kind === "invite") {
     content = <InviteScreen key={screen.token} token={screen.token} user={user} csrfToken={bootstrap.csrfToken} onBack={() => setScreen({ kind: "dashboard" })} onNeedAuth={() => undefined} onAccepted={async () => { await refreshBootstrap(); setPendingInviteToken(null); window.history.replaceState({}, "", window.location.pathname); setScreen({ kind: "dashboard" }); }} />;
   } else if (screen.kind === "group" && selectedGroup) {
     content = <GroupScreen key={selectedGroup.id} group={selectedGroup} challenges={bootstrap.challenges.filter((challenge) => challenge.groupId === selectedGroup.id)} challengeLimit={bootstrap.limits.challengesPerGroup} onBack={() => setScreen({ kind: "dashboard" })} onCreateChallenge={() => setScreen({ kind: "create-challenge", groupId: selectedGroup.id })} onOpenChallenge={(id) => void openParticipant(id)} onOpenAdmin={(id) => void openAdmin(id)} onCreateInvite={async (payload) => apiRequest<{ token?: string; url?: string }>(API_PATHS.groupInvites(selectedGroup.id), { method: "POST", body: payload, csrfToken: bootstrap.csrfToken })} onUpdateGroup={(payload) => updateGroup(selectedGroup.id, payload)} onDeleteGroup={selectedGroup.role === "owner" ? () => deleteGroup(selectedGroup.id) : undefined} />;
@@ -276,7 +307,7 @@ export default function GoaApp() {
 
   return (
     <div className="min-h-screen bg-[var(--canvas)] text-[var(--ink)]">
-      <AppHeader user={user} onHome={() => setScreen({ kind: "dashboard" })} onLogout={logout} />
+      <AppHeader user={user} onHome={() => setScreen({ kind: "dashboard" })} onAccount={() => setScreen({ kind: "account" })} onLogout={logout} />
       {content}
     </div>
   );
