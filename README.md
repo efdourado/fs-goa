@@ -37,6 +37,12 @@ contas. Nenhuma outra conta vê essa área (respostas `404`).
 Depois de entrar, use a interface para criar um grupo e convidar as demais pessoas.
 Rode `npm run db:seed` de novo a qualquer momento para redefinir a senha.
 
+As contas fazem login por **nome de usuário ou e-mail** + senha. O e-mail é
+opcional no cadastro, mas é o que permite recuperar o acesso: quem esquece a senha
+pede em "Esqueci a senha" e o administrador gera um link de uso único na aba
+*Contas* do `/admin`. Ver [docs/product.md](docs/product.md) para o funcionamento
+completo e [docs/api.md](docs/api.md) para a lista de endpoints.
+
 ## Desenvolvimento sem Docker
 
 Node.js `22.20.0` (ver `.nvmrc`).
@@ -100,13 +106,14 @@ lib/        autenticação, domínio, validação e métricas
 scripts/    migração e seed da conta de administração
 tests/      unidade, smoke e integração
 compose.yaml   PostgreSQL + setup + aplicação
-docs/       arquitetura e decisões
+docs/       arquitetura, produto (docs/product.md) e endpoints (docs/api.md)
 ```
 
 ## O que o MVP entrega
 
-Cadastro e login por usuário com sessão HTTP-only e CSRF; grupos privados com
-papéis e convites expiráveis; desafios em `draft`/`active`/`closed`; presets
+Cadastro e login por usuário ou e-mail com sessão HTTP-only e CSRF, mais
+redefinição de senha por link de uso único; grupos privados com papéis e convites
+expiráveis; desafios em `draft`/`active`/`closed`; presets
 **Cine** e **90 dias de leitura**; campos de texto, número, nota, opção, booleano e
 data; itens e checkpoints diários; registros persistentes com edição autorizada e
 histórico; revisão administrativa, auditoria append-only e exportação CSV segura;
