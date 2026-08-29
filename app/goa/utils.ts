@@ -91,17 +91,3 @@ export function valuesAsRecord(values: Entry["values"]): Record<Id, unknown> {
 export function itemIdForEntry(entry: Entry): Id | null {
   return entry.itemId ?? entry.checkpointId ?? null;
 }
-
-export function inviteTokenFromText(value: string): string {
-  const trimmed = value.trim();
-  if (!trimmed) return "";
-  try {
-    const url = new URL(trimmed, window.location.origin);
-    const queryToken = url.searchParams.get("invite");
-    if (queryToken) return queryToken;
-    const parts = url.pathname.split("/").filter(Boolean);
-    return parts.at(-1) ?? trimmed;
-  } catch {
-    return trimmed.split("/").filter(Boolean).at(-1) ?? trimmed;
-  }
-}

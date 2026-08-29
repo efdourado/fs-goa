@@ -4,8 +4,8 @@ import { type FormEvent, useState } from "react";
 
 import { errorMessage } from "../api";
 import type { ChallengeSummary, GroupSummary, Id, Limits, User } from "../types";
-import { Button, cardClass, ChallengeStatusBadge, cx, EmptyState, inputClass, labelClass, PageHeading, StatusMessage } from "../ui";
-import { canManage, formatDate, inviteTokenFromText, isChallengeScheduled } from "../utils";
+import { Button, cardClass, challengeStatusTone, ChallengeStatusBadge, cx, EmptyState, inputClass, labelClass, linkClass, PageHeading, StatusMessage } from "../ui";
+import { canManage, formatDate, isChallengeScheduled } from "../utils";
 
 export function DashboardScreen({
   user,
@@ -16,7 +16,6 @@ export function DashboardScreen({
   onOpenChallenge,
   onOpenAdmin,
   onCreateGroup,
-  onOpenInvite,
 }: {
   user: User;
   groups: GroupSummary[];
@@ -26,7 +25,6 @@ export function DashboardScreen({
   onOpenChallenge: (id: Id) => void;
   onOpenAdmin: (id: Id) => void;
   onCreateGroup: (name: string) => Promise<void>;
-  onOpenInvite: (token: string) => void;
 }) {
   const [showGroupForm, setShowGroupForm] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -52,15 +50,9 @@ export function DashboardScreen({
     }
   }
 
-  function submitInvite(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const token = inviteTokenFromText(String(new FormData(event.currentTarget).get("invite") ?? ""));
-    if (token) onOpenInvite(token);
-  }
-
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
-      <PageHeading title={`Olá, ${user.name.split(" ")[0]}.`} description="Veja o que pede sua atenção hoje ou comece uma nova experiência com seu grupo." action={<div className="flex flex-col items-end gap-1"><Button disabled={atGroupLimit} onClick={() => setShowGroupForm(true)}><span>+</span>Criar grupo</Button><span className="text-xs text-[var(--muted)]">{ownedGroups}/{limits.groupsPerOwner} grupos{atGroupLimit ? " · limite atingido" : ""}</span></div>} />
+      <PageHeading title={`Olá, ${user.name.split(" ")[0]}.`} description="Veja o que pede sua atenção hoje ou comece uma nova experiência com seu grupo." action={atGroupLimit ? <span className="text-sm text-[var(--muted)]">Você atingiu o limite de {limits.groupsPerOwner} grupos</span> : <button type="button" className={cx(linkClass, "text-sm")} onClick={() => setShowGroupForm((open) => !open)}>{showGroupForm ? "Fechar" : `Crie um grupo (limite ${limits.groupsPerOwner})`}</button>} />
 
       {showGroupForm ? (
         <form className={cx(cardClass, "mb-7 grid gap-4 p-5 sm:grid-cols-[1fr_auto]")} onSubmit={createGroup}>
@@ -83,23 +75,27 @@ export function DashboardScreen({
         </div>
         {active.length ? (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {active.map((challenge) => (
-              <article className={cx(cardClass, "overflow-hidden p-5")} key={challenge.id}>
-                <div className="flex items-center justify-between gap-3"><ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} /><span className="text-xs text-[var(--muted)]">{isChallengeScheduled(challenge.status, challenge.startsOn) ? `começa em ${formatDate(challenge.startsOn)}` : challenge.endsOn ? `até ${formatDate(challenge.endsOn)}` : "sem prazo"}</span></div>
-                <h3 className="mt-5 text-2xl font-bold tracking-[-0.04em]">{challenge.title}</h3>
-                {challenge.description ? <p className="mt-2 line-clamp-2 text-sm leading-6 text-[var(--muted)]">{challenge.description}</p> : null}
-                {typeof challenge.totalCount === "number" && challenge.totalCount > 0 ? (
-                  <div className="mt-5">
-                    <div className="mb-2 flex justify-between text-xs text-[var(--muted)]"><span>{challenge.completedCount ?? 0} de {challenge.totalCount}</span><span>{Math.round(((challenge.completedCount ?? 0) / challenge.totalCount) * 100)}%</span></div>
-                    <div className="h-2 overflow-hidden rounded-full bg-[var(--wash-strong)]"><span className="block h-full rounded-full bg-[var(--main-2)]" style={{ width: `${Math.min(100, ((challenge.completedCount ?? 0) / challenge.totalCount) * 100)}%` }} /></div>
+            {active.map((challenge) => {
+              const tone = challengeStatusTone(challenge.status, challenge.startsOn);
+              const total = challenge.totalCount ?? 0;
+              const done = challenge.completedCount ?? 0;
+              return (
+                <article className={cx("flex flex-col overflow-hidden rounded-[20px] border bg-[var(--paper)] shadow-[0_1px_2px_rgba(32,36,31,0.04)]", tone.border)} key={challenge.id}>
+                  <div className="flex flex-1 flex-col p-5">
+                    <div className="flex items-center justify-between gap-3"><ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} /><span className="text-xs text-[var(--muted)]">{isChallengeScheduled(challenge.status, challenge.startsOn) ? `começa em ${formatDate(challenge.startsOn)}` : challenge.endsOn ? `até ${formatDate(challenge.endsOn)}` : "sem prazo"}</span></div>
+                    <h3 className="mt-5 text-2xl font-bold tracking-[-0.04em]">{challenge.title}</h3>
+                    {challenge.description ? <p className="mt-2 line-clamp-2 text-sm leading-6 text-[var(--muted)]">{challenge.description}</p> : null}
+                    {total > 0 ? (
+                      <div className="mt-5">
+                        <div className="mb-2 flex justify-between text-xs text-[var(--muted)]"><span>{done} de {total}</span><span>{Math.round((done / total) * 100)}%</span></div>
+                        <div className="h-2 overflow-hidden rounded-full bg-[var(--wash-strong)]"><span className="block h-full rounded-full bg-[var(--main-2)]" style={{ width: `${Math.min(100, (done / total) * 100)}%` }} /></div>
+                      </div>
+                    ) : null}
                   </div>
-                ) : null}
-                <div className="mt-6 flex flex-wrap gap-2">
-                  <Button onClick={() => onOpenChallenge(challenge.id)} className="flex-1">Abrir desafio</Button>
-                  {canManage(challenge.viewerRole) ? <Button variant="secondary" onClick={() => onOpenAdmin(challenge.id)}>Administrar</Button> : null}
-                </div>
-              </article>
-            ))}
+                  <button type="button" onClick={() => onOpenChallenge(challenge.id)} className={cx("w-full px-5 py-3.5 text-sm font-bold text-white transition hover:opacity-90 cursor-pointer", tone.solid)}>Abrir desafio</button>
+                </article>
+              );
+            })}
           </div>
         ) : (
           <EmptyState title="Nada pendente por aqui" description="Quando um desafio estiver ativo ou agendado, ele aparecerá aqui com a data do próximo registro." />
@@ -120,15 +116,7 @@ export function DashboardScreen({
               </button>
             ))}
           </div>
-        ) : <EmptyState title="Crie seu primeiro grupo" description="Um grupo reúne pessoas e continua existindo entre diferentes edições de desafios." action={<Button onClick={() => setShowGroupForm(true)}><span>+</span>Criar grupo</Button>} />}
-        <form className={cx(cardClass, "mt-3 flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:gap-4")} onSubmit={submitInvite}>
-          <div className="sm:flex-1">
-            <strong className="block text-sm">Recebeu um convite?</strong>
-            <span className="mt-0.5 block text-xs leading-5 text-[var(--muted)]">Cole o link ou o código enviado pelo administrador.</span>
-          </div>
-          <label className="sm:w-80"><span className="sr-only">Link ou código do convite</span><input className={inputClass} name="invite" placeholder="Link ou código do convite" required /></label>
-          <Button type="submit" variant="secondary">Entrar</Button>
-        </form>
+        ) : <EmptyState title="Crie seu primeiro grupo" description="Um grupo reúne pessoas e continua existindo entre diferentes edições de desafios." action={<Button onClick={() => setShowGroupForm(true)}>Criar grupo</Button>} />}
       </section>
 
       {other.length ? (
