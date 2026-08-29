@@ -4,8 +4,8 @@ import { type FormEvent, useState } from "react";
 
 import { errorMessage } from "../api";
 import type { ChallengeSummary, GroupSummary, Id } from "../types";
-import { Button, cardClass, ChallengeStatusBadge, cx, EmptyState, inputClass, labelClass, linkClass, PageHeading, StatusMessage } from "../ui";
-import { canManage, formatDate } from "../utils";
+import { Button, cardClass, challengeStatusTone, ChallengeStatusBadge, cx, EmptyState, inputClass, labelClass, linkClass, PageHeading, StatusMessage } from "../ui";
+import { canManage, formatDate, isChallengeScheduled } from "../utils";
 
 export function GroupScreen({
   group,
@@ -101,7 +101,7 @@ export function GroupScreen({
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
       <button className="mb-6 min-h-11 text-sm font-bold text-[var(--muted)] hover:text-[var(--ink)]" type="button" onClick={onBack}>← Voltar ao início</button>
-      <PageHeading title={group.name} description={`${group.description ? `${group.description} · ` : ""}${group.memberCount ?? group.members?.length ?? 0} pessoas · você é ${group.role === "owner" ? "responsável" : group.role === "admin" ? "admin" : "participante"}`} action={canManage(group.role) ? <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm sm:justify-end"><button type="button" className={linkClass} onClick={toggleGroupEdit}>{showGroupEdit ? "Fechar edição" : "Editar grupo"}</button><button type="button" className={linkClass} onClick={() => setShowInvite((open) => !open)}>{showInvite ? "Fechar convite" : "Convidar"}</button>{challenges.length >= challengeLimit ? <span className="text-[var(--muted)]">Limite de {challengeLimit} desafios atingido</span> : <button type="button" className={linkClass} onClick={onCreateChallenge}>Novo desafio (limite {challengeLimit})</button>}</div> : undefined} />
+      <PageHeading title={group.name} description={`${group.description ? `${group.description} · ` : ""}${group.memberCount ?? group.members?.length ?? 0} pessoas · você é ${group.role === "owner" ? "responsável" : group.role === "admin" ? "admin" : "participante"}`} action={canManage(group.role) ? <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm sm:justify-end"><button type="button" className={linkClass} onClick={toggleGroupEdit}>{showGroupEdit ? "Fechar edição" : "Editar grupo"}</button><button type="button" className={linkClass} onClick={() => setShowInvite((open) => !open)}>{showInvite ? "Fechar convite" : "Convidar"}</button>{challenges.length >= challengeLimit ? <span className="text-[var(--muted)]">Limite de {challengeLimit} desafios atingido</span> : <button type="button" className={linkClass} onClick={onCreateChallenge}>+ Criar desafio (limite {challengeLimit})</button>}</div> : undefined} />
 
       {showGroupEdit ? (
         <section className={cx(cardClass, "mb-7 p-5")} aria-labelledby="group-edit-title">
@@ -146,13 +146,27 @@ export function GroupScreen({
           <h2 className="mb-4 text-xl font-bold tracking-[-0.03em]">Desafios do grupo</h2>
           {challenges.length ? (
             <div className="grid gap-4 sm:grid-cols-2">
-              {challenges.map((challenge) => (
-                <article className={cx(cardClass, "p-5")} key={challenge.id}>
-                  <div className="flex items-center gap-2"><ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} /><h3 className="text-xl font-bold">{challenge.title}</h3></div>
-                  <p className="mt-2 text-sm text-[var(--muted)]">{challenge.startsOn || challenge.endsOn ? `${formatDate(challenge.startsOn)} — ${formatDate(challenge.endsOn)}` : "Datas ainda não definidas"}</p>
-                  <div className="mt-5 flex gap-2"><Button onClick={() => onOpenChallenge(challenge.id)} className="flex-1">Abrir</Button>{canManage(group.role) ? <Button variant="secondary" onClick={() => onOpenAdmin(challenge.id)}>Admin</Button> : null}</div>
-                </article>
-              ))}
+              {challenges.map((challenge) => {
+                const tone = challengeStatusTone(challenge.status, challenge.startsOn);
+                const total = challenge.totalCount ?? 0;
+                const done = challenge.completedCount ?? 0;
+                return (
+                  <article className={cx("relative flex flex-col overflow-hidden rounded-[20px] border bg-[var(--paper)] shadow-[0_1px_2px_rgba(32,36,31,0.04)] transition hover:-translate-y-0.5 has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-[var(--main)]/25", tone.border)} key={challenge.id}>
+                    <div className="flex flex-1 flex-col p-5">
+                      <div className="flex items-center justify-between gap-3"><ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} /><span className="text-xs text-[var(--muted)]">{isChallengeScheduled(challenge.status, challenge.startsOn) ? `começa em ${formatDate(challenge.startsOn)}` : challenge.endsOn ? `até ${formatDate(challenge.endsOn)}` : "sem prazo"}</span></div>
+                      <h3 className="mt-5 text-2xl font-bold tracking-[-0.04em]"><button type="button" onClick={() => onOpenChallenge(challenge.id)} className="cursor-pointer text-left after:absolute after:inset-0 after:content-[''] focus-visible:outline-none">{challenge.title}</button></h3>
+                      {challenge.description ? <p className="mt-2 line-clamp-2 text-sm leading-6 text-[var(--muted)]">{challenge.description}</p> : null}
+                      {total > 0 ? (
+                        <div className="mt-5">
+                          <div className="mb-2 flex justify-between text-xs text-[var(--muted)]"><span>{done} de {total}</span><span>{Math.round((done / total) * 100)}%</span></div>
+                          <div className="h-2 overflow-hidden rounded-full bg-[var(--wash-strong)]"><span className="block h-full rounded-full bg-[var(--main-2)]" style={{ width: `${Math.min(100, (done / total) * 100)}%` }} /></div>
+                        </div>
+                      ) : null}
+                    </div>
+                    <span className={cx("block w-full px-5 py-3.5", tone.solid)} />
+                  </article>
+                );
+              })}
             </div>
           ) : <EmptyState title="Este grupo ainda não tem desafios" description={canManage(group.role) ? "Escolha um preset e configure a primeira edição." : "Quando um administrador criar um desafio, ele aparecerá aqui."} action={canManage(group.role) ? <Button onClick={onCreateChallenge}>Criar desafio</Button> : undefined} />}
         </section>
