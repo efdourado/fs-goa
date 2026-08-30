@@ -70,9 +70,18 @@ export async function syncDailyCheckpoints(
   );
   const ids = upserted.rows.map((row) => row.id);
 
+  // Reagendar nunca descarta um dia que já recebeu check-in: arquivar só os
+  // checkpoints fora da nova janela que continuam vazios. Encurtar um período
+  // por cima de registros é barrado antes, em updateChallenge; esta cláusula é a
+  // rede de segurança para os demais caminhos (ex.: regeneração manual).
   await client.query(
-    `UPDATE challenge_checkpoints SET archived_at=now(),updated_at=now()
-      WHERE challenge_id=$1 AND archived_at IS NULL AND NOT (id=ANY($2::text[]))`,
+    `UPDATE challenge_checkpoints cc SET archived_at=now(),updated_at=now()
+      WHERE cc.challenge_id=$1 AND cc.archived_at IS NULL AND NOT (cc.id=ANY($2::text[]))
+        AND NOT EXISTS (
+          SELECT 1 FROM entries e
+           WHERE e.challenge_id=cc.challenge_id AND e.deleted_at IS NULL
+             AND e.occurred_on=(cc.starts_at AT TIME ZONE 'America/Sao_Paulo')::date
+        )`,
     [challengeId, ids],
   );
   return ids;

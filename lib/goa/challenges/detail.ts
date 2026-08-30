@@ -123,22 +123,59 @@ export async function updateChallenge(
         ? body.endDate
         : access.challenge.end_date;
     const { startDate, endDate } = dateRange(rawStartDate, rawEndDate);
-    if (access.challenge.status === "active" &&
-      (startDate !== access.challenge.start_date || endDate !== access.challenge.end_date)) {
-      throw new ApiError(409, "dates_locked", "As datas não podem mudar depois da ativação.");
+    const scheduleChanged =
+      startDate !== access.challenge.start_date || endDate !== access.challenge.end_date;
+    const entryType = await oneOrNull<{ submission_mode: string }>(client,
+      "SELECT submission_mode FROM entry_types WHERE challenge_id=$1 AND archived_at IS NULL ORDER BY created_at LIMIT 1",
+      [challengeId]);
+
+    if (access.challenge.status === "active" && scheduleChanged) {
+      // A agenda de um desafio ativo pode ser estendida ou remarcada à vontade,
+      // mas nunca de um jeito que deixe um registro já enviado fora do período.
+      if (startDate !== null && endDate !== null) {
+        const stranded = await oneOrNull<{ count: number }>(
+          client,
+          `SELECT count(*)::int AS count FROM entries
+            WHERE challenge_id=$1 AND deleted_at IS NULL
+              AND (occurred_on < $2::date OR occurred_on > $3::date)`,
+          [challengeId, startDate, endDate],
+        );
+        if (stranded && stranded.count > 0) {
+          throw new ApiError(
+            409,
+            "schedule_would_strand_entries",
+            `Este período deixaria ${stranded.count} registro(s) fora do desafio. Ajuste ou remova esses registros antes de encurtar as datas.`,
+          );
+        }
+      } else if (entryType?.submission_mode === "daily") {
+        const anyEntry = await oneOrNull<{ count: number }>(
+          client,
+          "SELECT count(*)::int AS count FROM entries WHERE challenge_id=$1 AND deleted_at IS NULL",
+          [challengeId],
+        );
+        if (anyEntry && anyEntry.count > 0) {
+          throw new ApiError(
+            409,
+            "schedule_would_strand_entries",
+            `Este desafio diário já tem ${anyEntry.count} registro(s) presos ao calendário. Defina um período em vez de retirá-lo.`,
+          );
+        }
+      }
     }
+
     await client.query(
       `UPDATE challenges SET title=$2, description=$3, rules=$4, rule_sections=$5::jsonb, start_date=$6,
               end_date=$7, updated_at=now() WHERE id=$1`,
       [challengeId, title, description, rules, JSON.stringify(ruleSections), startDate, endDate],
     );
-    if (access.challenge.status === "draft") {
-      const entryType = await oneOrNull<{ submission_mode: string }>(client,
-        "SELECT submission_mode FROM entry_types WHERE challenge_id=$1 AND archived_at IS NULL ORDER BY created_at LIMIT 1",
-        [challengeId]);
-      if (entryType?.submission_mode === "daily" && startDate !== null && endDate !== null) {
+    if (
+      entryType?.submission_mode === "daily"
+      && (access.challenge.status === "draft"
+        || (access.challenge.status === "active" && scheduleChanged))
+    ) {
+      if (startDate !== null && endDate !== null) {
         await generateDailyCheckpoints(client, challengeId, startDate, endDate);
-      } else if (entryType?.submission_mode === "daily") {
+      } else {
         await client.query(
           `UPDATE challenge_checkpoints
               SET archived_at = now(), updated_at = now()

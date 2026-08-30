@@ -277,6 +277,18 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
   assert.equal(activeItemEdit.response.status, 200, JSON.stringify(activeItemEdit.body));
   assert.equal((activeItemEdit.body as { id: string }).id, originalItemIds[0]);
 
+  const activeFieldAdd = await call("POST", `/api/challenges/${challengeId}/fields`, {
+    session: owner,
+    body: { label: "Onde assistiu", type: "text", required: false },
+  });
+  assert.equal(activeFieldAdd.response.status, 201, JSON.stringify(activeFieldAdd.body));
+
+  const activeExtend = await call("PATCH", `/api/challenges/${challengeId}`, {
+    session: owner, body: { startsOn: "2026-08-01", endsOn: "2026-12-31" },
+  });
+  assert.equal(activeExtend.response.status, 200, JSON.stringify(activeExtend.body));
+  assert.equal((activeExtend.body as { endsOn: string }).endsOn, "2026-12-31", "o prazo de um desafio ativo pode ser estendido");
+
   const detail = await call("GET", `/api/challenges/${challengeId}`, { session: participant });
   assert.equal(detail.response.status, 200, JSON.stringify(detail.body));
   const challenge = detail.body as {
@@ -289,6 +301,10 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
   const ratingId = challenge.fields.find((field) => field.key === "nota")?.id;
   const commentId = challenge.fields.find((field) => field.key === "comentario")?.id;
   assert.ok(ratingId && commentId);
+  assert.ok(
+    challenge.fields.some((field) => field.key === "onde_assistiu"),
+    "campo adicionado com o desafio ativo aparece no detalhe",
+  );
 
   const saved = await call("POST", `/api/challenges/${challengeId}/entries`, {
     session: participant,
@@ -318,6 +334,34 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
   assert.equal(csv.response.status, 200);
   assert.match(csv.body as string, /canario-pessoal/);
   assert.match(csv.body as string, /Aftersun \(2022\)/, "a exportação deve usar o título corrigido");
+
+  const strandingShrink = await call("PATCH", `/api/challenges/${challengeId}`, {
+    session: owner, body: { startsOn: "2026-08-01", endsOn: "2026-08-02" },
+  });
+  assert.equal(strandingShrink.response.status, 409, "encurtar o prazo por cima de um registro é barrado");
+  assert.equal((strandingShrink.body as { error: string }).error, "schedule_would_strand_entries");
+
+  const archiveUsedItem = await call("DELETE", `/api/challenges/${challengeId}/items/${originalItemIds[0]}`, {
+    session: owner,
+  });
+  assert.equal(archiveUsedItem.response.status, 409, "item com registro não pode ser removido");
+  assert.equal((archiveUsedItem.body as { error: string }).error, "item_has_data");
+
+  const extraItem = await call("POST", `/api/challenges/${challengeId}/items`, {
+    session: owner, body: { items: [{ title: "Item adicionado no meio da rodada" }] },
+  });
+  assert.equal(extraItem.response.status, 201, JSON.stringify(extraItem.body));
+  const extraItemId = (extraItem.body as { itemIds: string[] }).itemIds[0];
+  const archiveExtra = await call("DELETE", `/api/challenges/${challengeId}/items/${extraItemId}`, {
+    session: owner,
+  });
+  assert.equal(archiveExtra.response.status, 200, JSON.stringify(archiveExtra.body));
+  const afterArchive = await call("GET", `/api/challenges/${challengeId}`, { session: owner });
+  assert.deepEqual(
+    (afterArchive.body as { items: Array<{ id: string }> }).items.map((item) => item.id),
+    originalItemIds,
+    "o item recém-arquivado some e os originais continuam",
+  );
 
   const closed = await call("POST", `/api/challenges/${challengeId}/transition`, {
     session: owner, body: { status: "closed" },
@@ -377,7 +421,8 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
   );
   assert.deepEqual(destination.rows[0], {
     group_id: targetGroupId, status: "draft", rule_sections: updatedRules,
-    participants: 0, entries: 0, values: 0, results: 0, fields: 2, items: 2,
+    // três campos: os dois do template + "Onde assistiu", adicionado com o desafio ativo.
+    participants: 0, entries: 0, values: 0, results: 0, fields: 3, items: 2,
   });
   const duplicationLedger = await adminPool.query<{ source_group_id: string; target_group_id: string }>(
     "SELECT source_group_id,target_group_id FROM challenge_duplications WHERE target_challenge_id=$1",
@@ -482,6 +527,39 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
   const dailyCsv = await call("GET", `/api/challenges/${dailyId}/export.csv`, { session: owner });
   assert.equal(dailyCsv.response.status, 200);
   assert.match(dailyCsv.body as string, /Abertura concluída/);
+
+  const dailyExtend = await call("PATCH", `/api/challenges/${dailyId}`, {
+    session: owner, body: { startsOn: "2026-07-01", endsOn: "2026-07-05" },
+  });
+  assert.equal(dailyExtend.response.status, 200, JSON.stringify(dailyExtend.body));
+  const dailyAfterExtend = await call("GET", `/api/challenges/${dailyId}`, { session: owner });
+  const extendedItems = (dailyAfterExtend.body as { items: Array<{ id: string; title: string }> }).items;
+  assert.equal(extendedItems.length, 5, "estender o período de um diário ativo materializa os novos dias");
+  assert.equal(extendedItems[0].id, dailyChallenge.items[0].id, "estender preserva o ID do checkpoint com check-in");
+  assert.equal(extendedItems[0].title, "Abertura concluída", "estender preserva o título personalizado");
+
+  const dailyShiftAwayFromEntry = await call("PATCH", `/api/challenges/${dailyId}`, {
+    session: owner, body: { startsOn: "2026-07-02", endsOn: "2026-07-05" },
+  });
+  assert.equal(dailyShiftAwayFromEntry.response.status, 409, "remarcar por cima de um check-in é barrado");
+  assert.equal((dailyShiftAwayFromEntry.body as { error: string }).error, "schedule_would_strand_entries");
+
+  const dailyDropSchedule = await call("PATCH", `/api/challenges/${dailyId}`, {
+    session: owner, body: { startsOn: null, endsOn: null },
+  });
+  assert.equal(dailyDropSchedule.response.status, 409, "tirar o período de um diário com check-ins é barrado");
+  assert.equal((dailyDropSchedule.body as { error: string }).error, "schedule_would_strand_entries");
+
+  const dailyShrinkBack = await call("PATCH", `/api/challenges/${dailyId}`, {
+    session: owner, body: { startsOn: "2026-07-01", endsOn: "2026-07-02" },
+  });
+  assert.equal(dailyShrinkBack.response.status, 200, "encurtar é permitido quando os dias removidos estão vazios");
+  const dailyAfterShrink = await call("GET", `/api/challenges/${dailyId}`, { session: owner });
+  assert.equal(
+    (dailyAfterShrink.body as { items: unknown[] }).items.length,
+    2,
+    "os dias vazios fora do novo período são arquivados",
+  );
 
   const closeDaily = await call("POST", `/api/challenges/${dailyId}/transition`, {
     session: owner, body: { status: "closed" },

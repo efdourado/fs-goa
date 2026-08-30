@@ -17,6 +17,34 @@ function unscale(value: number | null, scale: number | null): number | undefined
   return value === null || scale === null ? undefined : value / 10 ** scale;
 }
 
+/**
+ * A `(challenge_id, semantic_key)` unique index covers archived rows too, so a
+ * field created after activation can collide with one that was removed earlier
+ * in the draft. Resolve the clash here instead of letting Postgres 500.
+ */
+async function uniqueFieldKey(
+  client: PoolClient,
+  challengeId: string,
+  desired: unknown,
+  position: number,
+): Promise<string> {
+  const base = semanticKey(desired, `campo_${position + 1}`);
+  const taken = new Set(
+    (
+      await client.query<{ semantic_key: string }>(
+        "SELECT semantic_key FROM challenge_fields WHERE challenge_id=$1",
+        [challengeId],
+      )
+    ).rows.map((row) => row.semantic_key),
+  );
+  if (!taken.has(base)) return base;
+  for (let suffix = 2; suffix < 100; suffix += 1) {
+    const candidate = `${base}_${suffix}`.slice(0, 64);
+    if (!taken.has(candidate)) return candidate;
+  }
+  return `${base}_${publicId().slice(0, 8)}`.slice(0, 64);
+}
+
 function scaledConfigValue(value: unknown, scale: number): number | null {
   if (value === undefined || value === null || value === "") return null;
   const parsed = Number(value);
@@ -86,13 +114,15 @@ export async function addChallengeField(
   return inTransaction(async (client) => {
     const access = await challengeAccess(session.user.id, challengeId, client, true);
     if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores podem criar campos.");
-    if (access.challenge.status !== "draft") throw new ApiError(409, "challenge_locked", "Campos só podem ser criados no rascunho.");
+    if (access.challenge.status === "closed") throw new ApiError(409, "challenge_locked", "Campos não podem ser criados depois do encerramento.");
     const entryType = await oneOrNull<{ id: string }>(client,
       "SELECT id FROM entry_types WHERE challenge_id=$1 AND archived_at IS NULL ORDER BY created_at LIMIT 1", [challengeId]);
     if (!entryType) throw new ApiError(409, "missing_entry_type", "O desafio não possui tipo de registro.");
     const positionRow = await oneOrNull<{ position: number }>(client,
       "SELECT coalesce(max(position),-1)::int + 1 AS position FROM challenge_fields WHERE challenge_id=$1", [challengeId]);
-    const inserted = await insertField(client, challengeId, entryType.id, body, positionRow?.position ?? 0);
+    const position = positionRow?.position ?? 0;
+    const key = await uniqueFieldKey(client, challengeId, body.key ?? body.label, position);
+    const inserted = await insertField(client, challengeId, entryType.id, { ...body, key }, position);
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
       "field.created", "challenge_field", inserted.id, null, { key: inserted.semanticKey, kind: inserted.kind });
     return { id: inserted.id };
@@ -110,7 +140,7 @@ export async function saveChallengeFields(
   return inTransaction(async (client) => {
     const access = await challengeAccess(session.user.id, challengeId, client, true);
     if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores podem editar campos.");
-    if (access.challenge.status !== "draft") throw new ApiError(409, "challenge_locked", "Campos só podem ser editados no rascunho.");
+    if (access.challenge.status === "closed") throw new ApiError(409, "challenge_locked", "Campos não podem ser editados depois do encerramento.");
     const entryType = await oneOrNull<{ id: string }>(client,
       "SELECT id FROM entry_types WHERE challenge_id=$1 AND archived_at IS NULL ORDER BY created_at LIMIT 1", [challengeId]);
     if (!entryType) throw new ApiError(409, "missing_entry_type", "Tipo de registro ausente.");
@@ -118,7 +148,8 @@ export async function saveChallengeFields(
     for (let position = 0; position < requestedFields.length; position += 1) {
       const field = asRecord(requestedFields[position]);
       if (typeof field.id !== "string") {
-        const inserted = await insertField(client, challengeId, entryType.id, field, position);
+        const key = await uniqueFieldKey(client, challengeId, field.key ?? field.label, position);
+        const inserted = await insertField(client, challengeId, entryType.id, { ...field, key }, position);
         keptIds.push(inserted.id);
         continue;
       }
@@ -199,6 +230,21 @@ export async function saveChallengeFields(
       }
     }
     if (body.archiveMissing === true || body.replace === true) {
+      if (access.challenge.status !== "draft") {
+        const withData = await client.query<{ label: string }>(
+          `SELECT f.label FROM challenge_fields f
+            WHERE f.challenge_id=$1 AND f.archived_at IS NULL AND NOT (f.id=ANY($2::text[]))
+              AND EXISTS (SELECT 1 FROM entry_values ev WHERE ev.field_id=f.id)`,
+          [challengeId, keptIds],
+        );
+        if (withData.rows.length) {
+          throw new ApiError(
+            409,
+            "field_has_data",
+            `Estes campos já têm respostas e não podem ser removidos: ${withData.rows.map((row) => row.label).join(", ")}. Registros históricos ficam intactos.`,
+          );
+        }
+      }
       await client.query(
         `UPDATE challenge_fields SET archived_at=now(),updated_at=now()
           WHERE challenge_id=$1 AND archived_at IS NULL AND NOT (id=ANY($2::text[]))`,
