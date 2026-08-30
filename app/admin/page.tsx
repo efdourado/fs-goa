@@ -6,7 +6,7 @@ import AdminConsole from "./AdminConsole";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Goa · administração", robots: { index: false, follow: false } };
+export const metadata = { title: "Goa · gestão", robots: { index: false, follow: false } };
 
 export default async function AdminPage() {
   const store = await cookies();
