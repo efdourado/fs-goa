@@ -34,6 +34,9 @@ export const API_PATHS = {
   group: (groupId: Id) => `/api/groups/${encodeURIComponent(groupId)}`,
   groupMembers: (groupId: Id) => `/api/groups/${encodeURIComponent(groupId)}/members`,
   groupInvites: (groupId: Id) => `/api/groups/${encodeURIComponent(groupId)}/invites`,
+  memberRequestAccept: (id: Id) => `/api/member-requests/${encodeURIComponent(id)}/accept`,
+  memberRequestDecline: (id: Id) => `/api/member-requests/${encodeURIComponent(id)}/decline`,
+  memberRequestCancel: (id: Id) => `/api/member-requests/${encodeURIComponent(id)}/cancel`,
   invite: (token: string) => `/api/invites/${encodeURIComponent(token)}`,
   groupChallenges: (groupId: Id) => `/api/groups/${encodeURIComponent(groupId)}/challenges`,
   challenge: (challengeId: Id) => `/api/challenges/${encodeURIComponent(challengeId)}`,
@@ -120,6 +123,7 @@ export function normalizeBootstrap(raw: BootstrapData | { bootstrap: BootstrapDa
     limits: { ...DEFAULT_LIMITS, ...data.limits },
     groups: data.groups ?? [],
     challenges: data.challenges ?? [],
+    memberRequests: data.memberRequests ?? [],
   };
 }
 

@@ -209,7 +209,11 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
     description: "Primeiro filme da rodada.",
   });
   const updatedRules = [
-    { title: "Assistir por inteiro", description: "Veja o filme até o fim antes de avaliar." },
+    {
+      title: "Assistir por inteiro",
+      description: "Veja o filme até o fim antes de avaliar.",
+      topics: [{ title: "sem trailer", description: "spoilers atrapalham a nota" }],
+    },
     { title: "Compartilhar com cuidado", description: "Dê uma nota e respeite a experiência das outras pessoas." },
   ];
   const rulesEdit = await call("PATCH", `/api/challenges/${challengeId}`, {
@@ -547,7 +551,7 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
   assert.ok(!owner.cookie.includes(sessionDb.rows[0]?.token_hash ?? "impossivel"), "token bruto da sessão não pode estar no banco");
 });
 
-test("convites distinguem grupo e desafio, e inclusão por username é idempotente", async () => {
+test("convites distinguem grupo e desafio, e convite por username exige aceite", async () => {
   const owner = await register("Dona Convites", "dona_convites");
   const directMember = await register("Membro Direto", "membro_direto_convites");
   const groupGuest = await register("Convidada do Grupo", "convidada_grupo_convites");
@@ -565,14 +569,23 @@ test("convites distinguem grupo e desafio, e inclusão por username é idempoten
     session: directMember,
     body: { username: revokedGuest.user.username },
   });
-  assert.equal(outsiderAdd.response.status, 404, "quem não pertence ao grupo não pode adicionar por username");
+  assert.equal(outsiderAdd.response.status, 404, "quem não pertence ao grupo não pode convidar por username");
 
-  const addedByUsername = await call("POST", `/api/groups/${groupId}/members`, {
+  async function pendingRequestId(userId: string): Promise<string> {
+    const row = await adminPool.query<{ id: string }>(
+      "SELECT id FROM group_member_requests WHERE group_id = $1 AND user_id = $2 AND status = 'pending'",
+      [groupId, userId],
+    );
+    if (!row.rows[0]) throw new Error("solicitação pendente ausente");
+    return row.rows[0].id;
+  }
+
+  const invitedByUsername = await call("POST", `/api/groups/${groupId}/members`, {
     session: owner,
     body: { username: "  MEMBRO_DIRETO_CONVITES  " },
   });
-  assert.equal(addedByUsername.response.status, 200, JSON.stringify(addedByUsername.body));
-  assert.deepEqual(addedByUsername.body, {
+  assert.equal(invitedByUsername.response.status, 200, JSON.stringify(invitedByUsername.body));
+  assert.deepEqual(invitedByUsername.body, {
     groupId,
     member: {
       id: directMember.user.id,
@@ -580,35 +593,92 @@ test("convites distinguem grupo e desafio, e inclusão por username é idempoten
       username: "membro_direto_convites",
       role: "participant",
     },
-    added: true,
-    restored: false,
-    idempotent: false,
+    status: "requested",
   });
+  const notYetMember = await adminPool.query<{ count: number }>(
+    "SELECT count(*)::int AS count FROM group_members WHERE group_id = $1 AND user_id = $2 AND removed_at IS NULL",
+    [groupId, directMember.user.id],
+  );
+  assert.equal(notYetMember.rows[0]?.count, 0, "convite por username não adiciona ninguém direto");
 
-  const participantCannotAdd = await call("POST", `/api/groups/${groupId}/members`, {
-    session: directMember,
-    body: { username: revokedGuest.user.username },
-  });
-  assert.equal(participantCannotAdd.response.status, 403, "participante não pode adicionar outra conta");
-
-  const usernameReplay = await call("POST", `/api/groups/${groupId}/members`, {
+  const pendingReplay = await call("POST", `/api/groups/${groupId}/members`, {
     session: owner,
     body: { username: directMember.user.username },
   });
-  assert.equal(usernameReplay.response.status, 200, JSON.stringify(usernameReplay.body));
-  assert.equal((usernameReplay.body as { added: boolean }).added, false);
-  assert.equal((usernameReplay.body as { idempotent: boolean }).idempotent, true);
+  assert.equal(pendingReplay.response.status, 200, JSON.stringify(pendingReplay.body));
+  assert.equal((pendingReplay.body as { status: string }).status, "already_pending");
+
+  const inviteeBootstrap = await call("GET", "/api/bootstrap", { session: directMember });
+  const inboxRequests = (inviteeBootstrap.body as {
+    memberRequests: Array<{ id: string; groupId: string; groupName: string; invitedBy: string | null; role: string }>;
+  }).memberRequests;
+  assert.equal(inboxRequests.length, 1);
+  assert.deepEqual(
+    { groupId: inboxRequests[0].groupId, groupName: inboxRequests[0].groupName, invitedBy: inboxRequests[0].invitedBy, role: inboxRequests[0].role },
+    { groupId, groupName: "Grupo dos convites", invitedBy: "Dona Convites", role: "participant" },
+  );
+  assert.ok(
+    !(inviteeBootstrap.body as { groups: Array<{ id: string }> }).groups.some((group) => group.id === groupId),
+    "grupo só aparece para o convidado depois do aceite",
+  );
+
+  const wrongAccepter = await call("POST", `/api/member-requests/${inboxRequests[0].id}/accept`, {
+    session: challengeGuest,
+    body: {},
+  });
+  assert.equal(wrongAccepter.response.status, 404, "só o convidado responde à própria solicitação");
+
+  const declined = await call("POST", `/api/member-requests/${inboxRequests[0].id}/decline`, {
+    session: directMember,
+    body: {},
+  });
+  assert.equal(declined.response.status, 200, JSON.stringify(declined.body));
+  assert.equal((declined.body as { status: string }).status, "declined");
+
+  await call("POST", `/api/groups/${groupId}/members`, { session: owner, body: { username: directMember.user.username } });
+  const accepted = await call("POST", `/api/member-requests/${await pendingRequestId(directMember.user.id)}/accept`, {
+    session: directMember,
+    body: {},
+  });
+  assert.equal(accepted.response.status, 200, JSON.stringify(accepted.body));
+  assert.equal((accepted.body as { status: string }).status, "accepted");
+  const nowMember = await adminPool.query<{ count: number }>(
+    "SELECT count(*)::int AS count FROM group_members WHERE group_id = $1 AND user_id = $2 AND removed_at IS NULL",
+    [groupId, directMember.user.id],
+  );
+  assert.equal(nowMember.rows[0]?.count, 1, "aceite entra no grupo");
+  const acceptedBootstrap = await call("GET", "/api/bootstrap", { session: directMember });
+  assert.ok(
+    (acceptedBootstrap.body as { groups: Array<{ id: string }> }).groups.some((group) => group.id === groupId),
+    "grupo aceito aparece no bootstrap do convidado",
+  );
+  const acceptedRequestId = await adminPool.query<{ id: string }>(
+    "SELECT id FROM group_member_requests WHERE group_id = $1 AND user_id = $2 AND status = 'accepted'",
+    [groupId, directMember.user.id],
+  );
+  const acceptReplay = await call("POST", `/api/member-requests/${acceptedRequestId.rows[0]?.id}/accept`, {
+    session: directMember,
+    body: {},
+  });
+  assert.equal(acceptReplay.response.status, 200, JSON.stringify(acceptReplay.body));
+  assert.equal((acceptReplay.body as { idempotent: boolean }).idempotent, true, "reenviar aceite é idempotente");
+
+  const participantCannotInvite = await call("POST", `/api/groups/${groupId}/members`, {
+    session: directMember,
+    body: { username: revokedGuest.user.username },
+  });
+  assert.equal(participantCannotInvite.response.status, 403, "participante não pode convidar outra conta");
 
   await adminPool.query(
     "UPDATE group_members SET removed_at = now() WHERE group_id = $1 AND user_id = $2",
     [groupId, directMember.user.id],
   );
-  const restoredByUsername = await call("POST", `/api/groups/${groupId}/members`, {
-    session: owner,
-    body: { username: directMember.user.username },
+  await call("POST", `/api/groups/${groupId}/members`, { session: owner, body: { username: directMember.user.username } });
+  const restored = await call("POST", `/api/member-requests/${await pendingRequestId(directMember.user.id)}/accept`, {
+    session: directMember,
+    body: {},
   });
-  assert.equal(restoredByUsername.response.status, 200, JSON.stringify(restoredByUsername.body));
-  assert.equal((restoredByUsername.body as { restored: boolean }).restored, true);
+  assert.equal(restored.response.status, 200, JSON.stringify(restored.body));
   const memberAudit = await adminPool.query<{ action: string }>(
     "SELECT action FROM audit_events WHERE group_id = $1 AND entity_type = 'group_member' AND entity_id = $2",
     [groupId, directMember.user.id],
@@ -616,8 +686,13 @@ test("convites distinguem grupo e desafio, e inclusão por username é idempoten
   assert.deepEqual(
     new Set(memberAudit.rows.map((row) => row.action)),
     new Set(["group.member_added", "group.member_restored"]),
-    "adição e restauração por username ficam auditadas sem evento para replay",
+    "aceite e restauração ficam auditados",
   );
+  const requestAudit = await adminPool.query<{ count: number }>(
+    "SELECT count(*)::int AS count FROM audit_events WHERE group_id = $1 AND action = 'group.member_requested'",
+    [groupId],
+  );
+  assert.ok((requestAudit.rows[0]?.count ?? 0) >= 3, "cada convite por username gera auditoria própria");
 
   const challengeResponse = await call("POST", `/api/groups/${groupId}/challenges`, {
     session: owner,
@@ -785,11 +860,20 @@ test("recusa entrar no grupo além do limite de pessoas, por username e por conv
     const groupId = (groupResponse.body as { id: string }).id;
 
     for (const guest of [second, third]) {
-      const added = await call("POST", `/api/groups/${groupId}/members`, {
+      const invited = await call("POST", `/api/groups/${groupId}/members`, {
         session: owner,
         body: { username: guest.user.username },
       });
-      assert.equal(added.response.status, 200, JSON.stringify(added.body));
+      assert.equal(invited.response.status, 200, JSON.stringify(invited.body));
+      const request = await adminPool.query<{ id: string }>(
+        "SELECT id FROM group_member_requests WHERE group_id = $1 AND user_id = $2 AND status = 'pending'",
+        [groupId, guest.user.id],
+      );
+      const acceptedGuest = await call("POST", `/api/member-requests/${request.rows[0]?.id}/accept`, {
+        session: guest,
+        body: {},
+      });
+      assert.equal(acceptedGuest.response.status, 200, JSON.stringify(acceptedGuest.body));
     }
 
     const overflowUsername = await call("POST", `/api/groups/${groupId}/members`, {
@@ -823,6 +907,44 @@ test("recusa entrar no grupo além do limite de pessoas, por username e por conv
   } finally {
     if (previousCap === undefined) delete process.env.MAX_MEMBERS_PER_GROUP;
     else process.env.MAX_MEMBERS_PER_GROUP = previousCap;
+  }
+});
+
+test("limita quantos grupos uma conta pode participar, por aceite e por link", async () => {
+  const previousCap = process.env.MAX_GROUPS_PER_MEMBER;
+  process.env.MAX_GROUPS_PER_MEMBER = "1";
+  try {
+    const joiner = await register("Colecionador de Grupos", "colecionador_grupos");
+    const hostA = await register("Anfitriã A", "anfitria_a_limite");
+    const hostB = await register("Anfitrião B", "anfitriao_b_limite");
+
+    const ownGroup = await call("POST", "/api/groups", { session: joiner, body: { name: "Meu único grupo" } });
+    assert.equal(ownGroup.response.status, 201, JSON.stringify(ownGroup.body));
+
+    const groupA = (await call("POST", "/api/groups", { session: hostA, body: { name: "Grupo A" } })).body as { id: string };
+    await call("POST", `/api/groups/${groupA.id}/members`, { session: hostA, body: { username: joiner.user.username } });
+    const requestA = await adminPool.query<{ id: string }>(
+      "SELECT id FROM group_member_requests WHERE group_id = $1 AND user_id = $2 AND status = 'pending'",
+      [groupA.id, joiner.user.id],
+    );
+    const acceptOverLimit = await call("POST", `/api/member-requests/${requestA.rows[0]?.id}/accept`, {
+      session: joiner,
+      body: {},
+    });
+    assert.equal(acceptOverLimit.response.status, 403, JSON.stringify(acceptOverLimit.body));
+    assert.equal((acceptOverLimit.body as { error: string }).error, "group_membership_limit");
+
+    const groupB = (await call("POST", "/api/groups", { session: hostB, body: { name: "Grupo B" } })).body as { id: string };
+    const linkB = await call("POST", `/api/groups/${groupB.id}/invites`, { session: hostB, body: { expiresInDays: 7, maxUses: 1 } });
+    const linkOverLimit = await call("POST", `/api/invites/${(linkB.body as { token: string }).token}`, {
+      session: joiner,
+      body: {},
+    });
+    assert.equal(linkOverLimit.response.status, 403, JSON.stringify(linkOverLimit.body));
+    assert.equal((linkOverLimit.body as { error: string }).error, "group_membership_limit");
+  } finally {
+    if (previousCap === undefined) delete process.env.MAX_GROUPS_PER_MEMBER;
+    else process.env.MAX_GROUPS_PER_MEMBER = previousCap;
   }
 });
 

@@ -50,6 +50,13 @@
       "when": 1788096426032,
       "tag": "0006_lazy_true_believers",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1788106403391,
+      "tag": "0007_fresh_invaders",
+      "breakpoints": true
     }
   ]
 }

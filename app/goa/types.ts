@@ -26,6 +26,13 @@ export interface Member extends User {
   role: Role;
 }
 
+export interface PendingGroupRequest {
+  id: Id;
+  name: string;
+  username: string;
+  createdAt: string;
+}
+
 export interface GroupSummary {
   id: Id;
   name: string;
@@ -33,6 +40,8 @@ export interface GroupSummary {
   role: Role;
   memberCount?: number;
   members?: Member[];
+  /** Outgoing @-invites still awaiting the invitee's approval (only for owners/admins). */
+  pendingRequests?: PendingGroupRequest[];
 }
 
 interface FieldOption {
@@ -126,9 +135,16 @@ export interface ChallengeResult {
   publishedAt?: string | null;
 }
 
+export interface RuleTopic {
+  title: string;
+  description: string;
+}
+
 export interface ChallengeRule {
   title: string;
   description: string;
+  /** Nested sub-points, auto-numbered as `<ruleNumber>.<n>` in the rule's card. */
+  topics?: RuleTopic[];
 }
 
 export interface ChallengeSummary {
@@ -160,6 +176,17 @@ export interface ChallengeDetail extends ChallengeSummary {
 export interface Limits {
   groupsPerOwner: number;
   challengesPerGroup: number;
+  groupsPerMember: number;
+  pendingInvitesPerUser: number;
+}
+
+export interface MemberRequest {
+  id: Id;
+  groupId: Id;
+  groupName: string;
+  role: Role;
+  invitedBy?: string | null;
+  createdAt: string;
 }
 
 export interface BootstrapData {
@@ -168,9 +195,15 @@ export interface BootstrapData {
   limits: Limits;
   groups: GroupSummary[];
   challenges: ChallengeSummary[];
+  memberRequests: MemberRequest[];
 }
 
-export const DEFAULT_LIMITS: Limits = { groupsPerOwner: 6, challengesPerGroup: 6 };
+export const DEFAULT_LIMITS: Limits = {
+  groupsPerOwner: 6,
+  challengesPerGroup: 6,
+  groupsPerMember: 186,
+  pendingInvitesPerUser: 31,
+};
 
 export interface InvitePreview {
   token?: string;
@@ -190,10 +223,10 @@ export interface InviteAcceptance extends InvitePreview {
   idempotent: boolean;
 }
 
-export interface GroupMemberResult {
-  added: boolean;
-  restored?: boolean;
+export interface GroupInviteResult {
+  status: "requested" | "already_member" | "already_pending";
   member: Member;
+  groupId: Id;
 }
 
 export interface TemplateSummary {

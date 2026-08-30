@@ -53,24 +53,49 @@ test("renderiza estado agendado e regras tituladas em destaque", () => {
   const rules = renderToStaticMarkup(createElement(RuleSectionsView, {
     rules: [
       { title: "Meta diária", description: "Ler vinte páginas." },
-      { title: "Registro", description: "Preencher até 23h59." },
+      {
+        title: "Registro",
+        description: "Preencher até 23h59.",
+        topics: [{ title: "qualquer coisa", description: "vale tudo" }],
+      },
     ],
   }));
   assert.match(rules, /Regras a serem seguidas/);
   assert.match(rules, /Meta diária/);
   assert.match(rules, /Registro/);
+  assert.match(rules, /2\.1/, "tópico da regra 2 é numerado 2.1");
+  assert.match(rules, /qualquer coisa/, "título do tópico é renderizado");
   assert.doesNotMatch(rules, /<details/);
 });
 
 test("header sinaliza logo, perfil e sair como clicáveis", () => {
   const header = renderToStaticMarkup(createElement(AppHeader, {
     user: { id: "user-1", name: "Pessoa Teste", username: "pessoa" },
+    notifications: [],
     onHome: () => undefined,
     onAccount: () => undefined,
     onLogout: async () => undefined,
+    onAcceptRequest: async () => undefined,
+    onDeclineRequest: async () => undefined,
   }));
   const pointerCount = header.match(/cursor-pointer/g)?.length ?? 0;
   assert.ok(pointerCount >= 3, `esperava cursor clicável nos três controles; recebeu ${pointerCount}`);
   assert.match(header, /aria-label="Sua conta"/);
+  assert.match(header, /aria-label="Novidades"/);
   assert.match(header, />Sair<\/button>/);
+});
+
+test("header lista convites de grupo pendentes no menu de novidades", () => {
+  const header = renderToStaticMarkup(createElement(AppHeader, {
+    user: { id: "user-1", name: "Pessoa Teste", username: "pessoa" },
+    notifications: [
+      { id: "req-1", groupId: "g1", groupName: "Clube do Sofá", role: "participant", invitedBy: "Ana", createdAt: "2026-08-30T12:00:00.000Z" },
+    ],
+    onHome: () => undefined,
+    onAccount: () => undefined,
+    onLogout: async () => undefined,
+    onAcceptRequest: async () => undefined,
+    onDeclineRequest: async () => undefined,
+  }));
+  assert.match(header, /aria-label="Novidades \(1\)"/);
 });

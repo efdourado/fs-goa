@@ -45,8 +45,11 @@ export function CreateChallengeScreen({
       setError("Escolha um modelo e preencha título e datas.");
       return;
     }
-    if (step === 1 && ruleSections.some((rule) => !rule.title.trim() || !rule.description.trim())) {
-      setError("Preencha o título e a descrição de cada regra ou remova a regra vazia.");
+    if (step === 1 && ruleSections.some((rule) =>
+      !rule.title.trim() || !rule.description.trim()
+      || (rule.topics ?? []).some((topic) => !topic.title.trim() || !topic.description.trim())
+    )) {
+      setError("Preencha o título e a descrição de cada regra e tópico, ou remova os vazios.");
       return;
     }
     if (step === 2 && !fields.length) {
@@ -69,7 +72,13 @@ export function CreateChallengeScreen({
         template,
         title: title.trim(),
         description: description.trim(),
-        ruleSections: ruleSections.map((rule) => ({ title: rule.title.trim(), description: rule.description.trim() })),
+        ruleSections: ruleSections.map((rule) => ({
+          title: rule.title.trim(),
+          description: rule.description.trim(),
+          ...(rule.topics?.length
+            ? { topics: rule.topics.map((topic) => ({ title: topic.title.trim(), description: topic.description.trim() })) }
+            : {}),
+        })),
         startsOn,
         endsOn,
         submissionMode: template === "reading" ? "daily" : "item",

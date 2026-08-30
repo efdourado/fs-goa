@@ -47,12 +47,14 @@ import {
 } from "@/lib/goa-challenges";
 import {
   acceptInvite,
-  addGroupMemberByUsername,
   bootstrap,
+  cancelMemberRequest,
   createChallenge,
   createGroup,
   createInvite,
   previewInvite,
+  requestGroupMember,
+  respondToMemberRequest,
   softDeleteGroup,
   updateGroup,
 } from "@/lib/goa-domain";
@@ -158,7 +160,16 @@ export async function POST(request: Request): Promise<Response> {
     const body = await readJsonObject(request);
     if (isPath(path, "groups")) return json(await createGroup(session, body), 201);
     if (path[0] === "groups" && path[2] === "members" && path.length === 3) {
-      return json(await addGroupMemberByUsername(session, path[1], body));
+      return json(await requestGroupMember(session, path[1], body));
+    }
+    if (path[0] === "member-requests" && path.length === 3 && path[2] === "accept") {
+      return json(await respondToMemberRequest(session, path[1], "accept"));
+    }
+    if (path[0] === "member-requests" && path.length === 3 && path[2] === "decline") {
+      return json(await respondToMemberRequest(session, path[1], "decline"));
+    }
+    if (path[0] === "member-requests" && path.length === 3 && path[2] === "cancel") {
+      return json(await cancelMemberRequest(session, path[1]));
     }
     if (path[0] === "groups" && path[2] === "invites" && path.length === 3) {
       const result = await createInvite(session, path[1], body);

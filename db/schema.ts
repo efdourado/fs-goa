@@ -2,6 +2,7 @@ export { users, sessions, loginAttempts, passwordResetTokens } from "./schema/ac
 export {
   groups,
   groupMembers,
+  groupMemberRequests,
   groupInvites,
   inviteRedemptions,
 } from "./schema/groups";
