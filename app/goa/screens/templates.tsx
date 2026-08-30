@@ -12,7 +12,7 @@ import type {
   TemplateSummary,
   User,
 } from "../types";
-import { Brand, Button, cardClass, cx, EmptyState, inputClass, labelClass, PageHeading, StatusMessage } from "../ui";
+import { backLinkClass, Brand, Button, cardClass, cx, EmptyState, inputClass, labelClass, PageHeading, StatusMessage } from "../ui";
 
 const MODE_LABEL: Record<string, string> = {
   item: "por item",
@@ -136,7 +136,7 @@ export function TemplatesScreen({
 
   const body = (
     <main className="mx-auto max-w-7xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
-      <button className="mb-6 min-h-11 text-sm font-light text-[var(--muted)] hover:text-[var(--ink)]" type="button" onClick={onBack}>← Voltar</button>
+      <button className={cx(backLinkClass, "mb-6")} type="button" onClick={onBack}>← Voltar</button>
       <PageHeading
         title="Modelos prontos"
         description="Desafios de exemplo para ver como o Goa funciona. Abra um para conhecer as regras, o formulário e as métricas — e duplique para um grupo seu quando quiser começar."
@@ -275,7 +275,7 @@ export function TemplateDetailScreen({
 
   const body = (
     <main className="mx-auto max-w-3xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
-      <button className="mb-6 min-h-11 text-sm font-light text-[var(--muted)] hover:text-[var(--ink)]" type="button" onClick={onBack}>← Todos os modelos</button>
+      <button className={cx(backLinkClass, "mb-6")} type="button" onClick={onBack}>← Todos os modelos</button>
       {error ? <StatusMessage error={error} /> : !template ? (
         <p className="text-sm text-[var(--muted)]" role="status">Carregando modelo…</p>
       ) : (

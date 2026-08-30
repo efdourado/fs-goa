@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 import { API_PATHS, apiRequest, errorMessage } from "../api";
 import type { InviteAcceptance, InvitePreview, User } from "../types";
-import { Button, cardClass, cx, StatusMessage } from "../ui";
+import { backLinkClass, Button, cardClass, cx, StatusMessage } from "../ui";
 import { formatDateTime } from "../utils";
 
 export function InviteScreen({
@@ -70,7 +70,7 @@ export function InviteScreen({
           </>
         ) : null}
         <div className="mt-5"><StatusMessage error={error} /></div>
-        <button className="mt-6 min-h-11 text-sm font-light text-[var(--muted)] hover:text-[var(--ink)]" type="button" onClick={onBack}>← Voltar</button>
+        <button className={cx(backLinkClass, "mt-6")} type="button" onClick={onBack}>← Voltar</button>
       </section>
     </main>
   );

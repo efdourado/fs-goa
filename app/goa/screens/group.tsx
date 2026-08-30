@@ -5,7 +5,7 @@ import { type FormEvent, useRef, useState } from "react";
 import { errorMessage } from "../api";
 import { copyText } from "../clipboard";
 import type { ChallengeSummary, GroupInviteResult, GroupSummary, Id, PendingGroupRequest } from "../types";
-import { Button, cardClass, challengeStatusTone, ChallengeStatusBadge, cx, EmptyState, inputClass, labelClass, linkClass, PageHeading, StatusMessage } from "../ui";
+import { backLinkClass, Button, cardClass, challengeStatusTone, ChallengeStatusBadge, cx, EmptyState, inputClass, labelClass, linkClass, PageHeading, StatusMessage } from "../ui";
 import { canManage, formatDate, isChallengeScheduled } from "../utils";
 
 export function GroupScreen({
@@ -164,7 +164,7 @@ export function GroupScreen({
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
-      <button className="mb-6 min-h-11 text-sm font-light text-[var(--muted)] hover:text-[var(--ink)]" type="button" onClick={onBack}>← Voltar ao início</button>
+      <button className={cx(backLinkClass, "mb-6")} type="button" onClick={onBack}>← Voltar ao início</button>
       <PageHeading title={group.name} description={`${group.description ? `${group.description} · ` : ""}${group.memberCount ?? group.members?.length ?? 0} pessoas · ${group.role === "owner" ? "responsável" : group.role === "admin" ? "admin" : "participante"}`} action={canManage(group.role) ? <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm sm:justify-end"><button type="button" className={linkClass} onClick={toggleGroupEdit}>{showGroupEdit ? "Fechar edição" : "Editar grupo"}</button><button type="button" className={linkClass} onClick={() => setShowInvite((open) => !open)}>{showInvite ? "Fechar convite" : "+ Convidar"}</button>{challenges.length >= challengeLimit ? <span className="text-[var(--muted)]">Limite de {challengeLimit} desafios atingido</span> : <button type="button" className={linkClass} onClick={onCreateChallenge}>+ Criar desafio (limite {challengeLimit})</button>}</div> : undefined} />
 
       {showGroupEdit ? (

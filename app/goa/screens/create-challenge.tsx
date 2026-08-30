@@ -6,7 +6,7 @@ import { errorMessage } from "../api";
 import { cleanFields, FieldBuilder, presetFields } from "../fields";
 import { RuleSectionsEditor } from "../rules";
 import type { ChallengeCreationInput, ChallengeField, ChallengeRule, GroupSummary, Id, Template } from "../types";
-import { Button, cardClass, cx, EmptyState, inputClass, labelClass, PageHeading, StatusMessage } from "../ui";
+import { backLinkClass, Button, cardClass, cx, EmptyState, inputClass, labelClass, PageHeading, StatusMessage } from "../ui";
 import { formatDate } from "../utils";
 
 export function CreateChallengeScreen({
@@ -97,7 +97,7 @@ export function CreateChallengeScreen({
   const stepLabels = ["Base", "Campos", "Checkpoints", "Pessoas"];
   return (
     <main className="mx-auto max-w-5xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
-      <button className="mb-6 min-h-11 text-sm font-light text-[var(--muted)] hover:text-[var(--ink)]" type="button" onClick={onBack}>← Voltar para {group.name}</button>
+      <button className={cx(backLinkClass, "mb-6")} type="button" onClick={onBack}>← Voltar para {group.name}</button>
       <PageHeading title="Monte a próxima experiência" description="Comece com um preset e ajuste somente o que seu grupo precisa." />
       <nav className="mb-6 grid grid-cols-4 gap-1 rounded-2xl bg-[var(--wash-strong)]/70 p-1" aria-label="Etapas de criação">
         {stepLabels.map((label, index) => <button className={cx("min-h-11 rounded-xl px-2 text-xs font-light sm:text-sm", step === index + 1 ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : index + 1 < step ? "text-[var(--ink)]" : "text-[var(--muted)]")} type="button" onClick={() => index + 1 < step && setStep(index + 1)} disabled={index + 1 > step} key={label}><span className="hidden sm:inline">{index + 1}. </span>{label}</button>)}
