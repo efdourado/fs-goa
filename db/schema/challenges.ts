@@ -41,6 +41,8 @@ export const challenges = pgTable(
     closedAt: timestamptz("closed_at"),
     resultsPublishedAt: timestamptz("results_published_at"),
     resultShareTokenHash: text("result_share_token_hash"),
+    publishedAsTemplateAt: timestamptz("published_as_template_at"),
+    templateSummary: text("template_summary"),
     deletedAt: timestamptz("deleted_at"),
     deletedByUserId: text("deleted_by_user_id").references(() => users.id, {
       onDelete: "set null",
@@ -60,7 +62,14 @@ export const challenges = pgTable(
     index("challenges_group_active_idx")
       .on(table.groupId)
       .where(sql`${table.deletedAt} is null`),
+    index("challenges_template_idx")
+      .on(table.publishedAsTemplateAt)
+      .where(sql`${table.publishedAsTemplateAt} is not null and ${table.deletedAt} is null`),
     check("challenges_title_check", sql`char_length(btrim(${table.title})) between 1 and 160`),
+    check(
+      "challenges_template_summary_check",
+      sql`${table.templateSummary} is null or char_length(btrim(${table.templateSummary})) between 1 and 280`,
+    ),
     check(
       "challenges_rule_sections_check",
       sql`jsonb_typeof(${table.ruleSections}) = 'array' and jsonb_array_length(${table.ruleSections}) <= 20`,

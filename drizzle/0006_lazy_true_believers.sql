@@ -1,0 +1,4 @@
+ALTER TABLE "challenges" ADD COLUMN "published_as_template_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "challenges" ADD COLUMN "template_summary" text;--> statement-breakpoint
+CREATE INDEX "challenges_template_idx" ON "challenges" USING btree ("published_as_template_at") WHERE "challenges"."published_as_template_at" is not null and "challenges"."deleted_at" is null;--> statement-breakpoint
+ALTER TABLE "challenges" ADD CONSTRAINT "challenges_template_summary_check" CHECK ("challenges"."template_summary" is null or char_length(btrim("challenges"."template_summary")) between 1 and 280);

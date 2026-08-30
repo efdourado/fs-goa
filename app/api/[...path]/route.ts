@@ -26,16 +26,21 @@ import {
   addMetric,
   curateResults,
   duplicateChallenge,
+  duplicateTemplate,
   exportEntriesCsv,
   getChallengeDetail,
+  getTemplateDetail,
   listEntries,
+  listTemplates,
   publicResults,
   saveEntry,
   saveChallengeFields,
   saveChallengeItems,
   setChallengeParticipants,
+  setChallengeTemplate,
   softDeleteChallenge,
   transitionChallenge,
+  unpublishChallengeTemplate,
   updateChallenge,
   updateChallengeItem,
   updateEntry,
@@ -91,6 +96,8 @@ export async function GET(request: Request): Promise<Response> {
     if (path[0] === "invites" && path.length === 2) {
       return json(await previewInvite(path[1], await sessionFromRequest(request)));
     }
+    if (isPath(path, "templates")) return json(await listTemplates());
+    if (path[0] === "templates" && path.length === 2) return json(await getTemplateDetail(path[1]));
     if (path[0] === "results" && path.length === 2) return json(await publicResults(path[1]));
     if (path[0] === "challenges" && path.length === 2) {
       return json(await getChallengeDetail(await requireSession(request), path[1]));
@@ -183,6 +190,12 @@ export async function POST(request: Request): Promise<Response> {
     if (path[0] === "challenges" && path[2] === "duplicate" && path.length === 3) {
       return json(await duplicateChallenge(session, path[1], body), 201);
     }
+    if (path[0] === "challenges" && path[2] === "template" && path.length === 3) {
+      return json(await setChallengeTemplate(session, path[1], body));
+    }
+    if (path[0] === "templates" && path[2] === "duplicate" && path.length === 3) {
+      return json(await duplicateTemplate(session, path[1], body), 201);
+    }
     if (path[0] === "challenges" && path[2] === "results" && path.length === 3) {
       const result = await curateResults(session, path[1], body);
       return json({
@@ -226,6 +239,9 @@ export async function DELETE(request: Request): Promise<Response> {
     const session = await requireMutationSession(request);
     if (path[0] === "groups" && path.length === 2) {
       return json(await softDeleteGroup(session, path[1]));
+    }
+    if (path[0] === "challenges" && path[2] === "template" && path.length === 3) {
+      return json(await unpublishChallengeTemplate(session, path[1]));
     }
     if (path[0] === "challenges" && path.length === 2) {
       return json(await softDeleteChallenge(session, path[1]));

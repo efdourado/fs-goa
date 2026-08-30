@@ -196,6 +196,38 @@ export interface GroupMemberResult {
   member: Member;
 }
 
+export interface TemplateSummary {
+  id: Id;
+  title: string;
+  summary?: string | null;
+  submissionMode: SubmissionMode;
+  ruleCount: number;
+  fieldCount: number;
+  itemCount: number;
+  metricCount: number;
+  publishedAt: string;
+}
+
+export interface TemplateFieldPreview {
+  label: string;
+  type: FieldType;
+  required: boolean;
+  options: string[];
+}
+
+export interface TemplateDetail {
+  id: Id;
+  title: string;
+  description?: string | null;
+  summary?: string | null;
+  ruleSections: ChallengeRule[];
+  submissionMode: SubmissionMode;
+  durationDays: number;
+  fields: TemplateFieldPreview[];
+  items: Array<{ title: string; description?: string | null }>;
+  metrics: Array<{ label: string; operation: Metric["operation"]; groupBy: string }>;
+}
+
 export interface ApiErrorBody {
   message?: string;
   error?: string;
@@ -213,7 +245,9 @@ export type Screen =
   | { kind: "invite-success"; invitation: InviteAcceptance }
   | { kind: "create-challenge"; groupId: Id }
   | { kind: "challenge"; challengeId: Id; tab: ParticipantTab }
-  | { kind: "admin"; challengeId: Id; tab: AdminTab };
+  | { kind: "admin"; challengeId: Id; tab: AdminTab }
+  | { kind: "templates" }
+  | { kind: "template"; challengeId: Id };
 
 export interface ChallengeCreationInput {
   template: Template;

@@ -43,6 +43,13 @@
       "when": 1788094258278,
       "tag": "0005_long_puma",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788096426032,
+      "tag": "0006_lazy_true_believers",
+      "breakpoints": true
     }
   ]
 }

@@ -13,12 +13,14 @@ export function AuthScreen({
   onAuthenticated,
   onForgot,
   onShowInvite,
+  onShowTemplates,
 }: {
   initialMode: "login" | "register";
   invitePending: boolean;
   onAuthenticated: (mode: "login" | "register", payload: Record<string, string>) => Promise<void>;
   onForgot: (email: string) => Promise<void>;
   onShowInvite?: () => void;
+  onShowTemplates?: () => void;
 }) {
   const [mode, setMode] = useState<Mode>(initialMode);
   const [busy, setBusy] = useState(false);
@@ -170,6 +172,11 @@ export function AuthScreen({
               </>
             )}
           </p>
+          {onShowTemplates ? (
+            <p className="mt-2 text-center text-sm text-[var(--muted)]">
+              <button className="min-h-11 font-light underline-offset-4 hover:underline cursor-pointer" type="button" onClick={onShowTemplates}>Ver modelos prontos</button>
+            </p>
+          ) : null}
         </div>
       </section>
     </main>
