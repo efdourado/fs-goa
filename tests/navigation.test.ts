@@ -38,3 +38,11 @@ test("gera URLs compartilháveis sem expor estado transitório", () => {
     "/challenges/c-1/manage?tab=metrics",
   );
 });
+
+test("resolve a vitrine pública de modelos e mantém compatibilidade com /templates", () => {
+  assert.deepEqual(screenFromUrl("/modelos"), { kind: "templates" });
+  assert.deepEqual(screenFromUrl("/modelos/ch-1"), { kind: "template", challengeId: "ch-1" });
+  assert.deepEqual(screenFromUrl("/templates/ch-1"), { kind: "template", challengeId: "ch-1" });
+  assert.equal(urlForScreen({ kind: "templates" }), "/modelos");
+  assert.equal(urlForScreen({ kind: "template", challengeId: "ch 1" }), "/modelos/ch%201");
+});

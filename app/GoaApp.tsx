@@ -20,6 +20,7 @@ import { GroupScreen } from "./goa/screens/group";
 import { InviteAcceptedScreen, InviteScreen } from "./goa/screens/invite";
 import { ParticipantChallengeScreen } from "./goa/screens/participant-challenge";
 import { ResetPasswordScreen } from "./goa/screens/reset-password";
+import { TemplateDetailScreen, TemplatesScreen } from "./goa/screens/templates";
 import { screenFromUrl, urlForScreen } from "./goa/navigation";
 import type {
   AdminTab,
@@ -42,6 +43,7 @@ export default function GoaApp() {
   const [screen, setScreen] = useState<Screen>({ kind: "loading" });
   const [pendingInviteToken, setPendingInviteToken] = useState<string | null>(null);
   const [pendingRoute, setPendingRoute] = useState<Screen | null>(null);
+  const [resumeTemplateCopy, setResumeTemplateCopy] = useState<Id | null>(null);
   const [selectedChallenge, setSelectedChallenge] = useState<ChallengeDetail | null>(null);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -240,6 +242,12 @@ export default function GoaApp() {
     void loadChallenge(challengeId).catch(() => undefined);
   }
 
+  function goToAuthFrom(next: Screen) {
+    setPendingRoute(next);
+    if (next.kind === "template") setResumeTemplateCopy(next.challengeId);
+    setScreen({ kind: "auth", mode: "login" });
+  }
+
   async function createGroup(name: string) {
     if (!bootstrap) return;
     const response = await apiRequest<unknown>(API_PATHS.groups, { method: "POST", body: { name }, csrfToken: bootstrap.csrfToken });
@@ -366,7 +374,13 @@ export default function GoaApp() {
     if (screen.kind === "invite") {
       return <InviteScreen token={screen.token} user={null} csrfToken={bootstrap.csrfToken} onBack={() => setScreen({ kind: "auth", mode: "login" })} onNeedAuth={() => setScreen({ kind: "auth", mode: "login" })} onAccepted={async () => undefined} />;
     }
-    return <AuthScreen initialMode={screen.kind === "auth" ? screen.mode : "login"} invitePending={Boolean(pendingInviteToken)} onAuthenticated={authenticate} onForgot={forgotPassword} onShowInvite={pendingInviteToken ? () => setScreen({ kind: "invite", token: pendingInviteToken }) : undefined} />;
+    if (screen.kind === "templates") {
+      return <TemplatesScreen user={null} manageableChallenges={[]} csrfToken={bootstrap.csrfToken} onOpen={(id) => setScreen({ kind: "template", challengeId: id })} onBack={() => setScreen({ kind: "auth", mode: "login" })} onSignIn={() => goToAuthFrom(screen)} onChanged={() => undefined} />;
+    }
+    if (screen.kind === "template") {
+      return <TemplateDetailScreen user={null} challengeId={screen.challengeId} groups={[]} csrfToken={bootstrap.csrfToken} onBack={() => setScreen({ kind: "templates" })} onSignIn={() => goToAuthFrom(screen)} onDuplicated={() => undefined} />;
+    }
+    return <AuthScreen initialMode={screen.kind === "auth" ? screen.mode : "login"} invitePending={Boolean(pendingInviteToken)} onAuthenticated={authenticate} onForgot={forgotPassword} onShowInvite={pendingInviteToken ? () => setScreen({ kind: "invite", token: pendingInviteToken }) : undefined} onShowTemplates={() => setScreen({ kind: "templates" })} />;
   }
 
   const user = bootstrap.user;
@@ -383,6 +397,10 @@ export default function GoaApp() {
   } else if (screen.kind === "invite-success") {
     const invitation = screen.invitation;
     content = <InviteAcceptedScreen invitation={invitation} onContinue={() => { if (invitation.challengeId) openParticipant(invitation.challengeId); else setScreen({ kind: "group", groupId: invitation.groupId }); }} />;
+  } else if (screen.kind === "templates") {
+    content = <TemplatesScreen user={user} manageableChallenges={bootstrap.challenges.filter((challenge) => canManage(challenge.viewerRole))} csrfToken={bootstrap.csrfToken} onOpen={(id) => setScreen({ kind: "template", challengeId: id })} onBack={() => setScreen({ kind: "dashboard" })} onSignIn={() => undefined} onChanged={() => { void refreshBootstrap(); }} />;
+  } else if (screen.kind === "template") {
+    content = <TemplateDetailScreen key={screen.challengeId} user={user} challengeId={screen.challengeId} groups={bootstrap.groups} csrfToken={bootstrap.csrfToken} autoCopy={resumeTemplateCopy === screen.challengeId} onBack={() => { setResumeTemplateCopy(null); setScreen({ kind: "templates" }); }} onSignIn={() => undefined} onDuplicated={async (result) => { setResumeTemplateCopy(null); await refreshBootstrap(); openAdmin(result.challengeId); }} />;
   } else if (screen.kind === "group" && selectedGroup) {
     content = <GroupScreen key={selectedGroup.id} group={selectedGroup} challenges={bootstrap.challenges.filter((challenge) => challenge.groupId === selectedGroup.id)} challengeLimit={bootstrap.limits.challengesPerGroup} onBack={() => setScreen({ kind: "dashboard" })} onCreateChallenge={() => setScreen({ kind: "create-challenge", groupId: selectedGroup.id })} onOpenChallenge={(id) => openParticipant(id)} onCreateInvite={async (payload) => apiRequest<{ token?: string; url?: string }>(API_PATHS.groupInvites(selectedGroup.id), { method: "POST", body: payload, csrfToken: bootstrap.csrfToken })} onAddMemberByUsername={(username) => apiRequest<GroupMemberResult>(API_PATHS.groupMembers(selectedGroup.id), { method: "POST", body: { username }, csrfToken: bootstrap.csrfToken })} onUpdateGroup={(payload) => updateGroup(selectedGroup.id, payload)} onDeleteGroup={selectedGroup.role === "owner" ? () => deleteGroup(selectedGroup.id) : undefined} />;
   } else if (screen.kind === "create-challenge" && selectedGroup && canManage(selectedGroup.role)) {

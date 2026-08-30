@@ -103,7 +103,8 @@ no deploy.
 ## Estrutura
 
 ```text
-app/        interface, API REST (app/api) e vitrine pública (app/results)
+app/        interface, API REST (app/api), vitrine de resultados (app/results)
+            e galeria pública de modelos (app/modelos)
 db/         schema Drizzle do PostgreSQL
 drizzle/    migrações versionadas
 lib/        autenticação, domínio, validação e métricas

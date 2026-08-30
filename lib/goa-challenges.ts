@@ -15,6 +15,13 @@ export {
 export { softDeleteChallenge, transitionChallenge } from "./goa/challenges/lifecycle";
 export { setChallengeParticipants } from "./goa/challenges/participants";
 export {
+  duplicateTemplate,
+  getTemplateDetail,
+  listTemplates,
+  setChallengeTemplate,
+  unpublishChallengeTemplate,
+} from "./goa/challenges/templates";
+export {
   addMetric,
   curateResults,
   metricsForChallenge,

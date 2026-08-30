@@ -29,6 +29,13 @@ export function screenFromUrl(pathname: string, search = ""): Screen | null {
   if (queryInvite) return { kind: "invite", token: queryInvite };
 
   const parts = pathname.split("/").filter(Boolean);
+  if (parts[0] === "modelos" || parts[0] === "templates") {
+    if (parts.length === 1) return { kind: "templates" };
+    if (parts.length === 2) {
+      const challengeId = decoded(parts[1]);
+      return challengeId ? { kind: "template", challengeId } : null;
+    }
+  }
   if ((parts[0] === "invite" || parts[0] === "invites") && parts.length === 2) {
     const token = decoded(parts[1]);
     return token ? { kind: "invite", token } : null;
@@ -74,6 +81,10 @@ export function urlForScreen(screen: Screen): string | null {
       return `/challenges/${encodeURIComponent(screen.challengeId)}${screen.tab === "today" ? "" : `?tab=${screen.tab}`}`;
     case "admin":
       return `/challenges/${encodeURIComponent(screen.challengeId)}/manage${screen.tab === "overview" ? "" : `?tab=${screen.tab}`}`;
+    case "templates":
+      return "/modelos";
+    case "template":
+      return `/modelos/${encodeURIComponent(screen.challengeId)}`;
     case "invite":
       return `/invites/${encodeURIComponent(screen.token)}`;
     case "invite-success":

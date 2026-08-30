@@ -158,6 +158,7 @@ export function AppHeader({
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:h-[76px] sm:px-6">
         <button className="cursor-pointer rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25" type="button" onClick={onHome}><Brand /></button>
         <div className="flex items-center gap-1 sm:gap-2">
+          <Link className={cx(navLink, "inline-flex items-center")} href="/modelos">Modelos</Link>
           {user.platformAdmin ? (
             <Link className={cx(navLink, "inline-flex items-center")} href="/admin">Gestão</Link>
           ) : null}

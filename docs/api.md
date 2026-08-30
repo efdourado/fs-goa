@@ -78,6 +78,8 @@ Criar desafio: `{ title, description?, ruleSections?: [{ title, description }], 
 | `POST /api/challenges/:id/entries` | sessão+csrf (participante) | `{ itemId?/checkpointId?, values }` | `201` — um registro ativo por item/dia |
 | `POST /api/challenges/:id/transition` | sessão+csrf (owner/admin) | `{ status: "active" \| "closed" }` | `draft→active→closed`; encerrar congela os dados e gera blocos de resultado |
 | `POST /api/challenges/:id/duplicate` | sessão+csrf (owner/admin nos dois grupos) | `{ title?, targetGroupId }` | `201` — cria um rascunho estrutural em outro grupo; nunca copia participantes, registros, resultados, convites ou tokens |
+| `POST /api/challenges/:id/template` | sessão+csrf (platform_admin + owner/admin do desafio) | `{ summary? }` | `200 { id, publishedAsTemplate: true, summary }` — publica o desafio na vitrine pública de modelos |
+| `DELETE /api/challenges/:id/template` | sessão+csrf (platform_admin + owner/admin do desafio) | — | `200 { id, publishedAsTemplate: false }` |
 | `POST /api/challenges/:id/results` | sessão+csrf (owner/admin) | `{ headline?, summary?, metricIds[], commentKeys[], publish? }` | curadoria da vitrine; ao publicar retorna `url` pública |
 | `GET /api/challenges/:id/entries` | sessão (owner/admin) | — | `{ entries: [...] }` para a revisão |
 | `GET /api/challenges/:id/export.csv` | sessão (owner/admin) | — | `text/csv`; células que virariam fórmula são neutralizadas |
@@ -93,6 +95,17 @@ Criar desafio: `{ title, description?, ruleSections?: [{ title, description }], 
 | Método · rota | Acesso | Retorna |
 | --- | --- | --- |
 | `GET /api/results/:token` | público (por token) | `{ challenge: { title, participants, result } }` — só desafios encerrados e publicados |
+
+## Modelos
+
+Projeções só-leitura de desafios que um `platform_admin` publicou. Nunca expõem
+participantes, registros, resultados nem o grupo de origem.
+
+| Método · rota | Acesso | Retorna |
+| --- | --- | --- |
+| `GET /api/templates` | público | `{ templates: [{ id, title, summary, submissionMode, ruleCount, fieldCount, itemCount, metricCount, publishedAt }] }` |
+| `GET /api/templates/:id` | público | `{ id, title, description, summary, ruleSections, submissionMode, durationDays, fields, items, metrics }` — `404` se não for um modelo publicado |
+| `POST /api/templates/:id/duplicate` | sessão+csrf (owner/admin do grupo de destino) | `{ targetGroupId, title? }` → `201` com um rascunho estrutural no grupo escolhido |
 
 ## Administração (`/api/admin/*`)
 

@@ -809,6 +809,93 @@ test("recusa entrar no grupo além do limite de pessoas, por username e por conv
   }
 });
 
+test("modelos públicos: publica, lista, detalha sem sessão e duplica para um grupo", async () => {
+  const admin = await register("Curadora", "curadora_modelos");
+  await adminPool.query("UPDATE users SET platform_admin = true WHERE id = $1", [admin.user.id]);
+  const adminSession = await login("curadora_modelos");
+  const stranger = await register("Estranho", "estranho_modelos");
+
+  const group = await call("POST", "/api/groups", { session: adminSession, body: { name: "Vitrine" } });
+  const groupId = (group.body as { id: string }).id;
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: adminSession,
+    body: {
+      title: "Cine clube do mês", startsOn: "2026-09-01", endsOn: "2026-09-30", submissionMode: "item",
+      participantIds: [admin.user.id], items: [{ title: "Filme 1" }, { title: "Filme 2" }],
+      fields: [{ key: "nota", label: "Nota", type: "rating", required: true }],
+    },
+  });
+  assert.equal(challenge.response.status, 201, JSON.stringify(challenge.body));
+  const challengeId = (challenge.body as { id: string }).id;
+
+  const refusedPublish = await call("POST", `/api/challenges/${challengeId}/template`, {
+    session: stranger,
+    body: {},
+  });
+  assert.equal(refusedPublish.response.status, 403, "quem não é platform admin não publica modelos");
+
+  const published = await call("POST", `/api/challenges/${challengeId}/template`, {
+    session: adminSession,
+    body: { summary: "Um cine clube pronto para começar." },
+  });
+  assert.equal(published.response.status, 200, JSON.stringify(published.body));
+  assert.equal((published.body as { publishedAsTemplate: boolean }).publishedAsTemplate, true);
+
+  const gallery = await call("GET", "/api/templates");
+  assert.equal(gallery.response.status, 200);
+  const listed = (gallery.body as { templates: Array<{ id: string; summary: string; itemCount: number }> }).templates;
+  const mine = listed.find((entry) => entry.id === challengeId);
+  assert.ok(mine, "o modelo publicado aparece na galeria pública");
+  assert.equal(mine?.summary, "Um cine clube pronto para começar.");
+  assert.equal(mine?.itemCount, 2);
+
+  const detail = await call("GET", `/api/templates/${challengeId}`);
+  assert.equal(detail.response.status, 200, JSON.stringify(detail.body));
+  const detailBody = detail.body as Record<string, unknown>;
+  assert.equal(detailBody.title, "Cine clube do mês");
+  assert.ok(Array.isArray(detailBody.fields) && (detailBody.fields as unknown[]).length === 1);
+  assert.ok(!("participants" in detailBody), "o detalhe público não expõe participantes");
+  assert.ok(!("result" in detailBody), "o detalhe público não expõe resultados");
+
+  const strangerGroup = await call("POST", "/api/groups", { session: stranger, body: { name: "Meu grupo" } });
+  const strangerGroupId = (strangerGroup.body as { id: string }).id;
+  const copied = await call("POST", `/api/templates/${challengeId}/duplicate`, {
+    session: stranger,
+    body: { targetGroupId: strangerGroupId },
+  });
+  assert.equal(copied.response.status, 201, JSON.stringify(copied.body));
+  const copyId = (copied.body as { challengeId: string }).challengeId;
+  assert.notEqual(copyId, challengeId);
+  const copyRow = await adminPool.query<{ group_id: string; status: string; published_as_template_at: Date | null }>(
+    "SELECT group_id, status, published_as_template_at FROM challenges WHERE id = $1",
+    [copyId],
+  );
+  assert.equal(copyRow.rows[0]?.group_id, strangerGroupId);
+  assert.equal(copyRow.rows[0]?.status, "draft");
+  assert.equal(copyRow.rows[0]?.published_as_template_at, null, "a cópia não herda a flag de modelo");
+
+  const copyItems = await adminPool.query<{ count: number }>(
+    "SELECT count(*)::int AS count FROM challenge_items WHERE challenge_id = $1 AND archived_at IS NULL",
+    [copyId],
+  );
+  assert.equal(copyItems.rows[0]?.count, 2, "a estrutura foi copiada");
+
+  const notMyGroup = await call("POST", `/api/templates/${challengeId}/duplicate`, {
+    session: stranger,
+    body: { targetGroupId: groupId },
+  });
+  assert.equal(notMyGroup.response.status, 404, "não dá para duplicar num grupo que você não administra");
+
+  const unpublished = await call("DELETE", `/api/challenges/${challengeId}/template`, { session: adminSession });
+  assert.equal(unpublished.response.status, 200, JSON.stringify(unpublished.body));
+  const galleryAfter = await call("GET", "/api/templates");
+  assert.ok(
+    !(galleryAfter.body as { templates: Array<{ id: string }> }).templates.some((entry) => entry.id === challengeId),
+    "modelo despublicado sai da galeria",
+  );
+  assert.equal((await call("GET", `/api/templates/${challengeId}`)).response.status, 404);
+});
+
 test("aplica limites de criação por dono e por grupo", async () => {
   const owner = await register("Limite", "limite_dono");
 
