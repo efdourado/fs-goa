@@ -634,6 +634,19 @@ test("convites distinguem grupo e desafio, e inclusão por username é idempoten
   assert.equal(challengeResponse.response.status, 201, JSON.stringify(challengeResponse.body));
   const challengeId = (challengeResponse.body as { id: string }).id;
 
+  const draftInviteAttempt = await call("POST", `/api/groups/${groupId}/invites`, {
+    session: owner,
+    body: { expiresInDays: 7, maxUses: 1, challengeId },
+  });
+  assert.equal(draftInviteAttempt.response.status, 409, "não se convida para um desafio ainda em rascunho");
+  assert.equal((draftInviteAttempt.body as { error: string }).error, "challenge_not_active");
+
+  const activation = await call("POST", `/api/challenges/${challengeId}/transition`, {
+    session: owner,
+    body: { status: "active" },
+  });
+  assert.equal(activation.response.status, 200, JSON.stringify(activation.body));
+
   const groupInvite = await call("POST", `/api/groups/${groupId}/invites`, {
     session: owner,
     body: { expiresInDays: 7, maxUses: 1 },
@@ -710,6 +723,10 @@ test("convites distinguem grupo e desafio, e inclusão por username é idempoten
     [groupId, challengeGuest.user.id, challengeId],
   );
   assert.deepEqual(challengeMembership.rows[0], { group_member: true, challenge_participant: true });
+
+  const guestOpensChallenge = await call("GET", `/api/challenges/${challengeId}`, { session: challengeGuest });
+  assert.equal(guestOpensChallenge.response.status, 200, "quem aceitou o convite abre o desafio sem erro");
+  assert.equal((guestOpensChallenge.body as { isParticipant: boolean }).isParticipant, true);
 
   const acceptedChallengePreview = await call("GET", `/api/invites/${challengeToken}`, { session: challengeGuest });
   assert.equal((acceptedChallengePreview.body as { accepted: boolean }).accepted, true);

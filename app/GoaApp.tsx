@@ -208,6 +208,7 @@ export default function GoaApp() {
     setSelectedChallenge(null);
     setEntries([]);
     setPendingRoute(null);
+    setResumeTemplateCopy(null);
     setScreen({ kind: "auth", mode: "login" });
     if (data.user) throw new Error("Não foi possível encerrar a sessão.");
   }
