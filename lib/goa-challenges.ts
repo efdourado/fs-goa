@@ -9,6 +9,7 @@ export {
 export { addChallengeField, saveChallengeFields } from "./goa/challenges/fields";
 export {
   addChallengeItem,
+  archiveChallengeItem,
   saveChallengeItems,
   updateChallengeItem,
 } from "./goa/challenges/items";

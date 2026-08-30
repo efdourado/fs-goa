@@ -59,8 +59,14 @@ Destrava quase todo o resto.
 
 - [x] **Desafio sem data** — entregue: início/fim opcionais em par, datas passadas
   aceitas, listas por item sem prazo, check-in diário sob demanda e encerramento
-  manual. A agenda só pode ser alterada no rascunho. Atalhos de duração (30/60/90
-  dias, 6 meses, 1 ano ou dias avulsos) calculam o término a partir do início.
+  manual. Atalhos de duração (30/60/90 dias, 6 meses, 1 ano ou dias avulsos)
+  calculam o término a partir do início.
+- [x] **Estrutura editável com o desafio ativo** — entregue: prazo, campos e itens
+  podem ser ajustados enquanto a rodada roda (a planilha era editável, aqui também).
+  O servidor barra só o que estragaria os dados: encurtar o período por cima de um
+  registro, remover um campo ou item que já tem resposta, trocar o tipo de um campo
+  persistido. Estender o prazo de um diário materializa os novos dias e preserva os
+  que já têm check-in. Só o encerramento congela tudo.
 - **Semanas de pausa** — a agenda passa a ter exceções; é o mecanismo oficial de
   recuperação de quem ficou pra trás.
 - **Trilho paralelo** — um item de longa duração (uma série, ex.: Attack on

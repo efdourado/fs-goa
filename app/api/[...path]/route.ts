@@ -24,6 +24,7 @@ import {
 } from "@/lib/admin";
 import {
   addMetric,
+  archiveChallengeItem,
   curateResults,
   duplicateChallenge,
   duplicateTemplate,
@@ -250,6 +251,9 @@ export async function DELETE(request: Request): Promise<Response> {
     const session = await requireMutationSession(request);
     if (path[0] === "groups" && path.length === 2) {
       return json(await softDeleteGroup(session, path[1]));
+    }
+    if (path[0] === "challenges" && path[2] === "items" && path.length === 4) {
+      return json(await archiveChallengeItem(session, path[1], path[3]));
     }
     if (path[0] === "challenges" && path[2] === "template" && path.length === 3) {
       return json(await unpublishChallengeTemplate(session, path[1]));

@@ -121,18 +121,19 @@ function AdminOverview({
 
       <section className={cx(cardClass, "p-5 sm:p-7")}>
         <h2 className="text-xl font-light">Informações básicas</h2>
-        <p className="mt-1 text-sm text-[var(--muted)]">Registros históricos nunca dependem da posição visual destes campos.</p>
+        <p className="mt-1 text-sm text-[var(--muted)]">{challenge.status === "closed" ? "Registros históricos nunca dependem da posição visual destes campos." : "Tudo aqui pode ser ajustado enquanto o desafio existe. Registros históricos nunca dependem da posição visual destes campos."}</p>
         <form className="mt-5 grid gap-4 sm:grid-cols-2" onSubmit={saveBasics}>
           <label className="sm:col-span-2"><span className={labelClass}>Título</span><input className={inputClass} value={title} onChange={(event) => setTitle(event.target.value)} required maxLength={140} disabled={challenge.status === "closed"} /></label>
-          <fieldset className="sm:col-span-2" disabled={challenge.status !== "draft"}>
+          <fieldset className="sm:col-span-2" disabled={challenge.status === "closed"}>
             <legend className={labelClass}>Agenda</legend>
             <div className="grid gap-2 sm:grid-cols-2">
               <button className={cx("min-h-14 rounded-xl border px-4 py-3 text-left disabled:cursor-not-allowed disabled:opacity-60", scheduleMode === "period" ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)]")} type="button" aria-pressed={scheduleMode === "period"} onClick={() => setScheduleMode("period")}><strong className="block text-sm">Com período</strong><span className="text-xs font-normal text-[var(--muted)]">Datas futuras ou históricas.</span></button>
               <button className={cx("min-h-14 rounded-xl border px-4 py-3 text-left disabled:cursor-not-allowed disabled:opacity-60", scheduleMode === "none" ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)]")} type="button" aria-pressed={scheduleMode === "none"} onClick={() => setScheduleMode("none")}><strong className="block text-sm">Sem prazo</strong><span className="text-xs font-normal text-[var(--muted)]">Encerramento manual.</span></button>
             </div>
+            {challenge.status === "active" ? <p className="mt-2 text-xs leading-5 text-[var(--muted)]">Dá para estender ou remarcar o prazo. Encurtar não é permitido se já houver registros nas datas removidas; num desafio diário, mudar o início reposiciona a numeração dos dias.</p> : null}
           </fieldset>
           {scheduleMode === "period" ? (
-            <SchedulePeriodFields startsOn={startsOn} endsOn={endsOn} onStartsOn={setStartsOn} onEndsOn={setEndsOn} disabled={challenge.status !== "draft"} />
+            <SchedulePeriodFields startsOn={startsOn} endsOn={endsOn} onStartsOn={setStartsOn} onEndsOn={setEndsOn} disabled={challenge.status === "closed"} />
           ) : <p className="sm:col-span-2 rounded-xl bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">Este desafio fica aberto até ser encerrado manualmente.</p>}
           <label className="sm:col-span-2"><span className={labelClass}>Descrição</span><textarea className={inputClass} rows={3} value={description} onChange={(event) => setDescription(event.target.value)} maxLength={1000} disabled={challenge.status === "closed"} /></label>
           <div className="sm:col-span-2"><div className="mb-3"><span className={labelClass}>Regras com título</span><p className="text-xs leading-5 text-[var(--muted)]">Cada regra ganha destaque próprio para ninguém precisar procurar o combinado.</p></div><RuleSectionsEditor value={ruleSections} onChange={setRuleSections} disabled={challenge.status === "closed"} /></div>
@@ -211,10 +212,10 @@ function AdminFields({
   const [success, setSuccess] = useState<string | null>(null);
   return (
     <section className={cx(cardClass, "p-5 sm:p-7")}>
-      <PageHeading title="Campos do registro" description={challenge.status === "draft" ? "Tipos e ordem podem ser ajustados antes da ativação." : "Campos persistidos mantêm seu identificador; remoções são tratadas como arquivamento pelo servidor."} />
+      <PageHeading title="Campos do registro" description={challenge.status === "draft" ? "Tipos e ordem podem ser ajustados livremente antes da ativação." : challenge.status === "active" ? "Adicione, renomeie ou reordene campos a qualquer momento. O tipo de um campo já salvo é fixo, e um campo com respostas não pode ser removido — o histórico fica intacto." : "Os campos foram congelados no encerramento para preservar o resultado."} />
       <FieldBuilder fields={fields} onChange={setFields} lockPersistedTypes={challenge.status !== "draft"} />
       <div className="mt-5"><StatusMessage error={error} success={success} /></div>
-      <Button className="mt-5" disabled={busy || challenge.status !== "draft"} onClick={() => { setBusy(true); setError(null); setSuccess(null); onSave(cleanFields(fields)).then(() => setSuccess("Campos salvos.")).catch((cause: unknown) => setError(errorMessage(cause))).finally(() => setBusy(false)); }}>{busy ? "Salvando…" : "Salvar campos"}</Button>
+      <Button className="mt-5" disabled={busy || challenge.status === "closed"} onClick={() => { setBusy(true); setError(null); setSuccess(null); onSave(cleanFields(fields)).then(() => setSuccess("Campos salvos.")).catch((cause: unknown) => setError(errorMessage(cause))).finally(() => setBusy(false)); }}>{busy ? "Salvando…" : "Salvar campos"}</Button>
     </section>
   );
 }
@@ -223,24 +224,45 @@ function AdminItems({
   challenge,
   onAdd,
   onUpdate,
+  onArchive,
 }: {
   challenge: ChallengeDetail;
   onAdd: (payload: Record<string, unknown>) => Promise<void>;
   onUpdate: (itemId: Id, payload: { title: string; description: string }) => Promise<void>;
+  onArchive: (itemId: Id) => Promise<void>;
 }) {
   const [itemsText, setItemsText] = useState("");
   const startsOn = challenge.startsOn ?? "";
   const endsOn = challenge.endsOn ?? "";
   const undatedDaily = challenge.submissionMode === "daily" && !challenge.startsOn && !challenge.endsOn;
+  const datedDaily = challenge.submissionMode === "daily" && !undatedDaily;
+  const canAddItems = challenge.submissionMode === "item" && challenge.status !== "closed";
+  const canArchiveItems = challenge.submissionMode === "item" && challenge.status !== "closed";
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [archivingId, setArchivingId] = useState<Id | null>(null);
   const [editingId, setEditingId] = useState<Id | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editBusy, setEditBusy] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [editSuccess, setEditSuccess] = useState<string | null>(null);
+
+  async function archive(item: ChallengeItem) {
+    if (!window.confirm(`Remover "${item.title}" do desafio? Ele sai da lista; registros já enviados continuam no histórico.`)) return;
+    setArchivingId(item.id);
+    setError(null);
+    setSuccess(null);
+    try {
+      await onArchive(item.id);
+      setSuccess("Item removido.");
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setArchivingId(null);
+    }
+  }
 
   function startEditing(item: ChallengeItem) {
     setEditingId(item.id);
@@ -274,7 +296,7 @@ function AdminItems({
     try {
       await onAdd(challenge.submissionMode === "daily"
         ? { generate: { frequency: "daily", startsOn, endsOn } }
-        : { items: titles.map((title, index) => ({ title, position: challenge.items.length + index })) });
+        : { items: titles.map((title) => ({ title })) });
       setItemsText("");
       setSuccess(challenge.submissionMode === "daily" ? "Checkpoints diários gerados." : "Itens adicionados.");
     } catch (cause) { setError(errorMessage(cause)); } finally { setBusy(false); }
@@ -283,7 +305,7 @@ function AdminItems({
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
       <section className={cx(cardClass, "p-5 sm:p-7")}>
-        <PageHeading title="Itens e checkpoints" description={undatedDaily ? "Este hábito não precisa de checkpoints antecipados: cada data ganha um check-in quando alguém registra." : "Edite títulos e descrições sem trocar os identificadores usados nos registros. Depois do encerramento, o histórico fica bloqueado."} />
+        <PageHeading title="Itens e checkpoints" description={undatedDaily ? "Este hábito não precisa de checkpoints antecipados: cada data ganha um check-in quando alguém registra." : datedDaily ? "Os títulos e descrições dos dias podem ser corrigidos a qualquer momento. Para adicionar ou tirar dias, ajuste o período na aba Geral." : challenge.status === "closed" ? "Edite apenas para leitura: o histórico deste desafio está bloqueado." : "Adicione, renomeie e remova itens enquanto o desafio existe. Um item com registro não pode ser removido — apague os registros antes."} />
         {editSuccess ? <div className="mb-3"><StatusMessage success={editSuccess} /></div> : null}
         {challenge.items.length ? (
           <ol className="divide-y divide-[var(--line)]">
@@ -306,7 +328,7 @@ function AdminItems({
                       <span className="grid h-8 w-8 flex-none place-items-center rounded-lg bg-[var(--wash)] text-xs font-light text-[var(--muted)]">{index + 1}</span>
                       <span className="min-w-0"><strong className="block text-sm">{item.title}</strong>{item.description ? <span className="mt-1 block text-sm leading-6 text-[var(--muted)]">{item.description}</span> : null}<small className="mt-1 block text-[var(--muted)]">{item.date ? formatDate(item.date) : item.opensAt || item.dueAt ? `${formatDate(item.opensAt)} — ${formatDate(item.dueAt)}` : "sem janela definida"}</small></span>
                     </div>
-                    <div className="flex flex-none flex-col items-end gap-2"><span className="rounded-full bg-[var(--wash)] px-2 py-1 text-[10px] font-light uppercase text-[var(--muted)]">{itemStatusLabel(item.status)}</span>{challenge.status !== "closed" ? <Button variant="secondary" className="min-h-9 px-3 py-1 text-xs" onClick={() => startEditing(item)}>Editar</Button> : null}</div>
+                    <div className="flex flex-none flex-col items-end gap-2"><span className="rounded-full bg-[var(--wash)] px-2 py-1 text-[10px] font-light uppercase text-[var(--muted)]">{itemStatusLabel(item.status)}</span>{challenge.status !== "closed" ? <div className="flex gap-2"><Button variant="secondary" className="min-h-9 px-3 py-1 text-xs" onClick={() => startEditing(item)}>Editar</Button>{canArchiveItems ? <Button variant="danger" className="min-h-9 px-3 py-1 text-xs" disabled={archivingId === item.id} onClick={() => void archive(item)}>{archivingId === item.id ? "Removendo…" : "Remover"}</Button> : null}</div> : null}</div>
                   </div>
                 )}
               </li>
@@ -317,11 +339,15 @@ function AdminItems({
           : <EmptyState title="Nenhum checkpoint" description="Adicione itens ou gere checkpoints diários antes de ativar o desafio." />}
       </section>
       <aside className={cx(cardClass, "h-fit p-5")}>
-        <h2 className="text-lg font-light">{undatedDaily ? "Sem calendário fixo" : challenge.submissionMode === "daily" ? "Gerar dias" : "Adicionar itens"}</h2>
-        {undatedDaily ? <p className="mt-4 text-sm leading-6 text-[var(--muted)]">Para transformar o hábito em uma edição com começo e fim, volte à aba Geral enquanto ele ainda for rascunho e escolha “Com período”.</p> : challenge.status !== "draft" ? <p className="mt-4 text-sm leading-6 text-[var(--muted)]">Novos itens e datas ficam bloqueados depois da ativação. Títulos e descrições ainda podem ser corrigidos até o encerramento.</p> : <form className="mt-4 space-y-4" onSubmit={submit}>
-          {challenge.submissionMode === "daily" ? <><p className="text-xs leading-5 text-[var(--muted)]">A geração usa exatamente as datas definidas nas informações básicas.</p><label><span className={labelClass}>Primeiro dia</span><input className={inputClass} type="date" value={startsOn} readOnly required /></label><label><span className={labelClass}>Último dia</span><input className={inputClass} type="date" min={startsOn} value={endsOn} readOnly required /></label></> : <label><span className={labelClass}>Um título por linha</span><textarea className={inputClass} rows={10} value={itemsText} onChange={(event) => setItemsText(event.target.value)} placeholder={"Item 1\nItem 2"} /></label>}
+        <h2 className="text-lg font-light">{undatedDaily ? "Sem calendário fixo" : datedDaily ? "Dias do desafio" : "Adicionar itens"}</h2>
+        {challenge.submissionMode === "free" ? <p className="mt-4 text-sm leading-6 text-[var(--muted)]">Este desafio usa registro livre, sem itens nem checkpoints.</p>
+          : undatedDaily ? <p className="mt-4 text-sm leading-6 text-[var(--muted)]">Para dar começo e fim a este hábito, abra a aba Geral e escolha “Com período”. Os check-ins já feitos são mantidos.</p>
+          : datedDaily && challenge.status === "active" ? <p className="mt-4 text-sm leading-6 text-[var(--muted)]">Os dias seguem o período do desafio. Ajuste as datas na aba Geral para incluir ou remover dias — os dias que já têm check-in são preservados.</p>
+          : challenge.submissionMode === "item" && challenge.status === "closed" ? <p className="mt-4 text-sm leading-6 text-[var(--muted)]">O desafio foi encerrado; a lista de itens está congelada para preservar o resultado.</p>
+          : <form className="mt-4 space-y-4" onSubmit={submit}>
+          {challenge.submissionMode === "daily" ? <><p className="text-xs leading-5 text-[var(--muted)]">A geração usa exatamente as datas definidas nas informações básicas.</p><label><span className={labelClass}>Primeiro dia</span><input className={inputClass} type="date" value={startsOn} readOnly required /></label><label><span className={labelClass}>Último dia</span><input className={inputClass} type="date" min={startsOn} value={endsOn} readOnly required /></label></> : <><label><span className={labelClass}>Um título por linha</span><textarea className={inputClass} rows={10} value={itemsText} onChange={(event) => setItemsText(event.target.value)} placeholder={"Item 1\nItem 2"} /></label>{challenge.status === "active" ? <p className="text-xs leading-5 text-[var(--muted)]">Os itens novos entram no fim da lista e ficam abertos para registro na hora.</p> : null}</>}
           <StatusMessage error={error} success={success} />
-          <Button type="submit" className="w-full" disabled={busy || challenge.status !== "draft"}>{busy ? "Salvando…" : challenge.submissionMode === "daily" ? "Gerar checkpoints" : "Adicionar"}</Button>
+          <Button type="submit" className="w-full" disabled={busy || (challenge.submissionMode === "daily" ? challenge.status !== "draft" : !canAddItems)}>{busy ? "Salvando…" : challenge.submissionMode === "daily" ? "Gerar checkpoints" : "Adicionar"}</Button>
         </form>}
       </aside>
     </div>
@@ -531,6 +557,7 @@ export function AdminScreen({
   onSaveFields,
   onAddItems,
   onUpdateItem,
+  onArchiveItem,
   onPatchEntry,
   onExport,
   onAddMetric,
@@ -552,6 +579,7 @@ export function AdminScreen({
   onSaveFields: (fields: ChallengeField[]) => Promise<void>;
   onAddItems: (payload: Record<string, unknown>) => Promise<void>;
   onUpdateItem: (itemId: Id, payload: { title: string; description: string }) => Promise<void>;
+  onArchiveItem: (itemId: Id) => Promise<void>;
   onPatchEntry: (entryId: Id, values: Record<Id, unknown>, reason: string) => Promise<void>;
   onExport: () => Promise<void>;
   onAddMetric: (payload: Record<string, unknown>) => Promise<void>;
@@ -574,7 +602,7 @@ export function AdminScreen({
       {tab === "overview" ? <AdminOverview challenge={challenge} entries={entries} onSave={onSaveBasics} onTransition={onTransition} onDuplicate={onDuplicate} duplicateTargets={duplicateTargets} onDelete={onDelete} /> : null}
       {tab === "participants" ? <AdminParticipants key={`${challenge.id}:${challenge.participants.map((participant) => participant.userId ?? participant.id).join(",")}`} challenge={challenge} group={group} onSave={onSaveParticipants} /> : null}
       {tab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.fields.map((field) => field.id ?? field.key).join(",")}`} challenge={challenge} onSave={onSaveFields} /> : null}
-      {tab === "items" ? <AdminItems challenge={challenge} onAdd={onAddItems} onUpdate={onUpdateItem} /> : null}
+      {tab === "items" ? <AdminItems challenge={challenge} onAdd={onAddItems} onUpdate={onUpdateItem} onArchive={onArchiveItem} /> : null}
       {tab === "review" ? <AdminReview challenge={challenge} entries={entries} onPatch={onPatchEntry} onExport={onExport} /> : null}
       {tab === "metrics" ? <AdminMetrics challenge={challenge} onAdd={onAddMetric} /> : null}
       {tab === "results" ? <AdminResults challenge={challenge} entries={entries} onSave={onSaveResult} /> : null}
