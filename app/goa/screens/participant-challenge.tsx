@@ -15,6 +15,7 @@ import type {
   User,
 } from "../types";
 import {
+  backLinkClass,
   Button,
   cardClass,
   ChallengeStatusBadge,
@@ -55,6 +56,13 @@ export function DynamicEntryForm({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  const optionalFields = fields.filter((field) => field.id && !field.required);
+  const isBlank = (value: unknown) => value === undefined || value === null || value === "";
+  const hasFilledOptional = optionalFields.some((field) => field.id && !isBlank(values[field.id]));
+  // Optional fields (e.g. "Nota do livro") stay tucked away so nobody feels
+  // nudged to rate a book they have not finished. Auto-open once one is filled.
+  const [showOptional, setShowOptional] = useState(hasFilledOptional || !canEdit);
+
   function setValue(field: ChallengeField, value: unknown) {
     if (!field.id) return;
     setValues((current) => ({ ...current, [field.id as Id]: value }));
@@ -94,6 +102,7 @@ export function DynamicEntryForm({
     <form className="space-y-5" onSubmit={submit} noValidate>
       {fields.map((field) => {
         if (!field.id) return null;
+        if (!field.required && !showOptional) return null;
         const id = `entry-field-${field.id}`;
         const value = values[field.id];
         return (
@@ -109,6 +118,15 @@ export function DynamicEntryForm({
           </div>
         );
       })}
+      {optionalFields.length && canEdit ? (
+        <button
+          type="button"
+          className="min-h-11 cursor-pointer text-sm font-light text-[var(--main-strong)] hover:underline"
+          onClick={() => setShowOptional((open) => !open)}
+        >
+          {showOptional ? "Ocultar campos opcionais" : `Mostrar campos opcionais (${optionalFields.length})`}
+        </button>
+      ) : null}
       <StatusMessage error={error} success={success} />
       {canEdit ? <Button type="submit" className="w-full" disabled={busy}>{busy ? "Salvando…" : entry ? "Salvar alterações" : "Salvar registro"}<span aria-hidden="true">→</span></Button> : <p className="rounded-xl border border-[var(--line)] bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{unavailableMessage ?? "Este registro está disponível somente para leitura."}</p>}
       {item?.dueAt ? <p className="text-center text-xs text-[var(--muted)]">Prazo: {formatDateTime(item.dueAt)}</p> : null}
@@ -187,7 +205,7 @@ export function ParticipantChallengeScreen({
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-6 pb-28 sm:px-6 sm:py-10">
-      <div className="mb-5 flex items-center justify-between gap-3"><button className="min-h-11 text-sm font-light text-[var(--muted)] hover:text-[var(--ink)]" type="button" onClick={onBack}>← Início</button>{onAdmin ? <Button variant="secondary" onClick={onAdmin}>Gerenciar</Button> : null}</div>
+      <div className="mb-5 flex items-center justify-between gap-3"><button className={backLinkClass} type="button" onClick={onBack}>← Início</button>{onAdmin ? <Button variant="secondary" onClick={onAdmin}>Gerenciar</Button> : null}</div>
       <section className="relative overflow-hidden rounded-[28px] bg-[var(--ink)] p-6 text-white sm:p-9">
         <div className="relative z-10">
           <div className="flex flex-wrap items-center justify-between gap-3"><ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} /><span className="text-xs text-white/65">{formatDate(challenge.startsOn)} — {formatDate(challenge.endsOn)}</span></div>
