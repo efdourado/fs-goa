@@ -31,6 +31,29 @@ export function formatDateTime(value?: string | null): string {
   });
 }
 
+export function inviteTokenFromText(value: string, baseUrl = "https://goa.invalid"): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+
+  try {
+    const url = new URL(trimmed, baseUrl);
+    const queryToken = url.searchParams.get("invite")?.trim();
+    if (queryToken) return queryToken;
+    const pathToken = url.pathname.split("/").filter(Boolean).at(-1);
+    if (pathToken) {
+      try {
+        return decodeURIComponent(pathToken);
+      } catch {
+        return pathToken;
+      }
+    }
+  } catch {
+    // Mantém compatibilidade com um código bruto ou texto parcialmente colado.
+  }
+
+  return trimmed.split("/").filter(Boolean).at(-1) ?? trimmed;
+}
+
 function dateKeyInSaoPaulo(now: Date): string {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Sao_Paulo",

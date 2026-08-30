@@ -86,11 +86,11 @@ function AdminOverview({
   return (
     <div className="space-y-6">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {[{ label: "Participantes", value: challenge.participants.length }, { label: "Checkpoints", value: challenge.items.length }, { label: "Registros", value: entries.length }, { label: "Pendências", value: missing }].map((stat) => <article className={cx(cardClass, "p-5")} key={stat.label}><p className="text-xs font-bold uppercase tracking-[0.1em] text-[var(--muted)]">{stat.label}</p><strong className="mt-2 block text-4xl tracking-[-0.05em]">{stat.value}</strong></article>)}
+        {[{ label: "Participantes", value: challenge.participants.length }, { label: "Checkpoints", value: challenge.items.length }, { label: "Registros", value: entries.length }, { label: "Pendências", value: missing }].map((stat) => <article className={cx(cardClass, "p-5")} key={stat.label}><p className="text-xs font-light uppercase tracking-[0.1em] text-[var(--muted)]">{stat.label}</p><strong className="mt-2 block text-4xl tracking-[-0.05em]">{stat.value}</strong></article>)}
       </div>
 
       <section className={cx(cardClass, "p-5 sm:p-7")}>
-        <h2 className="text-xl font-bold">Informações básicas</h2>
+        <h2 className="text-xl font-light">Informações básicas</h2>
         <p className="mt-1 text-sm text-[var(--muted)]">Registros históricos nunca dependem da posição visual destes campos.</p>
         <form className="mt-5 grid gap-4 sm:grid-cols-2" onSubmit={(event) => { event.preventDefault(); void run("save", () => onSave({ title: title.trim(), description: description.trim(), ruleSections: ruleSections.map((rule) => ({ title: rule.title.trim(), description: rule.description.trim() })), startsOn, endsOn }), "Informações atualizadas."); }}>
           <label className="sm:col-span-2"><span className={labelClass}>Título</span><input className={inputClass} value={title} onChange={(event) => setTitle(event.target.value)} required maxLength={140} disabled={challenge.status === "closed"} /></label>
@@ -103,7 +103,7 @@ function AdminOverview({
       </section>
 
       <section className={cx(cardClass, "p-5 sm:p-7")}>
-        <h2 className="text-xl font-bold">Estado do desafio</h2>
+        <h2 className="text-xl font-light">Estado do desafio</h2>
         <div className="mt-4 flex flex-col gap-4 rounded-2xl bg-[var(--wash)] p-5 sm:flex-row sm:items-center sm:justify-between">
           <div><ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} /><p className="mt-2 max-w-xl text-sm leading-6 text-[var(--muted)]">{challenge.status === "draft" ? "Somente administradores veem este rascunho. Confira campos, checkpoints e participantes antes de ativar." : scheduled ? `O desafio já está ativado, mas está agendado para ${formatDate(challenge.startsOn, { day: "2-digit", month: "long", year: "numeric" })}. Os registros serão liberados quando os checkpoints começarem.` : challenge.status === "active" ? "Participantes podem enviar e editar seus registros. Encerrar bloqueia os dados de origem." : "Registros e estrutura estão congelados; a curadoria da vitrine ainda pode ser atualizada."}</p></div>
           {challenge.status === "draft" ? <Button disabled={Boolean(busy)} onClick={() => { if (window.confirm("Ativar este desafio? Participantes selecionados poderão registrar.")) void run("transition", () => onTransition("active"), "Desafio ativado."); }}>Ativar desafio</Button> : null}
@@ -112,7 +112,7 @@ function AdminOverview({
       </section>
 
       <section className={cx(cardClass, "p-5 sm:p-7")}>
-        <h2 className="text-xl font-bold">Reutilizar em outro grupo</h2>
+        <h2 className="text-xl font-light">Reutilizar em outro grupo</h2>
         <p className="mt-1 text-sm leading-6 text-[var(--muted)]">Cria um rascunho estrutural em outro grupo com regras, campos, métricas e checkpoints. Participantes, registros, resultados e convites nunca são copiados. Revise as datas antes de ativar.</p>
         {duplicateTargets.length ? <form className="mt-5 grid gap-4 lg:grid-cols-[1fr_1fr_auto]" onSubmit={(event) => { event.preventDefault(); if (!duplicateTargetGroupId) { setError("Escolha um grupo de destino disponível."); return; } void run("duplicate", () => onDuplicate({ title: duplicateTitle.trim(), targetGroupId: duplicateTargetGroupId }), "Modelo reutilizado como rascunho."); }}>
           <label><span className={labelClass}>Título no novo grupo</span><input className={inputClass} value={duplicateTitle} onChange={(event) => setDuplicateTitle(event.target.value)} required maxLength={160} /></label>
@@ -123,7 +123,7 @@ function AdminOverview({
 
       {onDelete ? (
         <section className={cx(cardClass, "p-5 sm:p-7")}>
-          <h2 className="text-xl font-bold">Apagar desafio</h2>
+          <h2 className="text-xl font-light">Apagar desafio</h2>
           <p className="mt-1 text-sm leading-6 text-[var(--muted)]">Move o desafio e seus registros para a lixeira. Some do app, mas continua recuperável até você limpar a lixeira na administração.</p>
           <div className="mt-4"><Button variant="danger" disabled={Boolean(busy)} onClick={() => { if (window.confirm(`Mover "${challenge.title}" para a lixeira?`)) void run("delete", onDelete, "Desafio movido para a lixeira."); }}>Apagar desafio</Button></div>
         </section>
@@ -253,7 +253,7 @@ function AdminItems({
                 {editingId === item.id ? (
                   <form className="grid gap-3" onSubmit={(event) => void submitEdit(event, item.id)}>
                     <div className="flex items-center gap-3">
-                      <span className="grid h-8 w-8 flex-none place-items-center rounded-lg bg-[var(--wash)] text-xs font-bold text-[var(--muted)]">{index + 1}</span>
+                      <span className="grid h-8 w-8 flex-none place-items-center rounded-lg bg-[var(--wash)] text-xs font-light text-[var(--muted)]">{index + 1}</span>
                       <strong className="text-sm">Editar {challenge.submissionMode === "daily" ? "checkpoint" : "item"}</strong>
                     </div>
                     <label><span className={labelClass}>Título</span><input className={inputClass} value={editTitle} onChange={(event) => setEditTitle(event.target.value)} required maxLength={challenge.submissionMode === "daily" ? 160 : 200} /></label>
@@ -264,10 +264,10 @@ function AdminItems({
                 ) : (
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex min-w-0 gap-3">
-                      <span className="grid h-8 w-8 flex-none place-items-center rounded-lg bg-[var(--wash)] text-xs font-bold text-[var(--muted)]">{index + 1}</span>
+                      <span className="grid h-8 w-8 flex-none place-items-center rounded-lg bg-[var(--wash)] text-xs font-light text-[var(--muted)]">{index + 1}</span>
                       <span className="min-w-0"><strong className="block text-sm">{item.title}</strong>{item.description ? <span className="mt-1 block text-sm leading-6 text-[var(--muted)]">{item.description}</span> : null}<small className="mt-1 block text-[var(--muted)]">{item.date ? formatDate(item.date) : item.opensAt || item.dueAt ? `${formatDate(item.opensAt)} — ${formatDate(item.dueAt)}` : "sem janela definida"}</small></span>
                     </div>
-                    <div className="flex flex-none flex-col items-end gap-2"><span className="rounded-full bg-[var(--wash)] px-2 py-1 text-[10px] font-bold uppercase text-[var(--muted)]">{itemStatusLabel(item.status)}</span>{challenge.status !== "closed" ? <Button variant="secondary" className="min-h-9 px-3 py-1 text-xs" onClick={() => startEditing(item)}>Editar</Button> : null}</div>
+                    <div className="flex flex-none flex-col items-end gap-2"><span className="rounded-full bg-[var(--wash)] px-2 py-1 text-[10px] font-light uppercase text-[var(--muted)]">{itemStatusLabel(item.status)}</span>{challenge.status !== "closed" ? <Button variant="secondary" className="min-h-9 px-3 py-1 text-xs" onClick={() => startEditing(item)}>Editar</Button> : null}</div>
                   </div>
                 )}
               </li>
@@ -276,7 +276,7 @@ function AdminItems({
         ) : <EmptyState title="Nenhum checkpoint" description="Adicione itens ou gere checkpoints diários antes de ativar o desafio." />}
       </section>
       <aside className={cx(cardClass, "h-fit p-5")}>
-        <h2 className="text-lg font-bold">{challenge.submissionMode === "daily" ? "Gerar dias" : "Adicionar itens"}</h2>
+        <h2 className="text-lg font-light">{challenge.submissionMode === "daily" ? "Gerar dias" : "Adicionar itens"}</h2>
         {challenge.status !== "draft" ? <p className="mt-4 text-sm leading-6 text-[var(--muted)]">Novos itens e datas ficam bloqueados depois da ativação. Títulos e descrições ainda podem ser corrigidos até o encerramento.</p> : <form className="mt-4 space-y-4" onSubmit={submit}>
           {challenge.submissionMode === "daily" ? <><p className="text-xs leading-5 text-[var(--muted)]">A geração usa exatamente as datas definidas nas informações básicas.</p><label><span className={labelClass}>Primeiro dia</span><input className={inputClass} type="date" value={startsOn} readOnly required /></label><label><span className={labelClass}>Último dia</span><input className={inputClass} type="date" min={startsOn} value={endsOn} readOnly required /></label></> : <label><span className={labelClass}>Um título por linha</span><textarea className={inputClass} rows={10} value={itemsText} onChange={(event) => setItemsText(event.target.value)} placeholder={"Item 1\nItem 2"} /></label>}
           <StatusMessage error={error} success={success} />
@@ -329,8 +329,8 @@ function AdminReview({
               const values = valuesAsRecord(entry.values);
               return (
                 <article className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-4" key={entry.id}>
-                  <div className="flex items-start justify-between gap-3"><div><strong className="block">{entry.participantName ?? entry.participantUsername ?? "Participante"}</strong><span className="mt-1 block text-xs text-[var(--muted)]">{item?.title ?? "Registro livre"} · {formatDateTime(entry.submittedAt ?? entry.updatedAt)}</span></div>{entry.isLate ? <span className="rounded-full bg-[var(--warn-soft)] px-2 py-1 text-[10px] font-bold uppercase text-[var(--warn)]">atrasado</span> : null}</div>
-                  <dl className="mt-4 grid gap-2 sm:grid-cols-2">{challenge.fields.slice(0, 4).map((field) => field.id && values[field.id] !== undefined ? <div className="rounded-lg bg-[var(--wash)] px-3 py-2" key={field.id}><dt className="text-[10px] font-bold uppercase text-[var(--muted)]">{field.label}</dt><dd className="mt-1 truncate text-sm font-semibold">{typeof values[field.id] === "boolean" ? values[field.id] ? "Sim" : "Não" : String(values[field.id])}</dd></div> : null)}</dl>
+                  <div className="flex items-start justify-between gap-3"><div><strong className="block">{entry.participantName ?? entry.participantUsername ?? "Participante"}</strong><span className="mt-1 block text-xs text-[var(--muted)]">{item?.title ?? "Registro livre"} · {formatDateTime(entry.submittedAt ?? entry.updatedAt)}</span></div>{entry.isLate ? <span className="rounded-full bg-[var(--warn-soft)] px-2 py-1 text-[10px] font-light uppercase text-[var(--warn)]">atrasado</span> : null}</div>
+                  <dl className="mt-4 grid gap-2 sm:grid-cols-2">{challenge.fields.slice(0, 4).map((field) => field.id && values[field.id] !== undefined ? <div className="rounded-lg bg-[var(--wash)] px-3 py-2" key={field.id}><dt className="text-[10px] font-light uppercase text-[var(--muted)]">{field.label}</dt><dd className="mt-1 truncate text-sm font-semibold">{typeof values[field.id] === "boolean" ? values[field.id] ? "Sim" : "Não" : String(values[field.id])}</dd></div> : null)}</dl>
                   <Button className="mt-4 w-full" variant="secondary" onClick={() => { setSelectedId(entry.id); setReason(""); }}>Inspecionar e corrigir</Button>
                 </article>
               );
@@ -341,7 +341,7 @@ function AdminReview({
 
       {selected ? (
         <section className={cx(cardClass, "p-5 sm:p-7")} aria-labelledby="correction-title">
-          <div className="mb-5 flex items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.1em] text-[var(--muted)]">Correção administrativa</p><h2 id="correction-title" className="mt-1 text-xl font-bold">{selected.participantName ?? "Participante"} · {selectedItem?.title ?? "Registro"}</h2></div><Button variant="ghost" onClick={() => setSelectedId(null)}>Fechar</Button></div>
+          <div className="mb-5 flex items-start justify-between gap-3"><div><p className="text-xs font-light uppercase tracking-[0.1em] text-[var(--muted)]">Correção administrativa</p><h2 id="correction-title" className="mt-1 text-xl font-light">{selected.participantName ?? "Participante"} · {selectedItem?.title ?? "Registro"}</h2></div><Button variant="ghost" onClick={() => setSelectedId(null)}>Fechar</Button></div>
           <label className="mb-5 block"><span className={labelClass}>Motivo da alteração <span className="text-[var(--main-2)]">*</span></span><textarea className={inputClass} rows={3} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Explique por que o registro está sendo corrigido. Isto ficará na auditoria." maxLength={500} disabled={challenge.status === "closed"} /></label>
           <DynamicEntryForm key={`${selected.id}-${selected.updatedAt ?? ""}`} fields={challenge.fields} item={selectedItem} entry={selected} canEdit={challenge.status !== "closed"} unavailableMessage={challenge.status === "closed" ? "Este desafio foi encerrado. O registro está disponível somente para leitura." : null} onSave={async (values) => { if (!reason.trim()) throw new Error("Informe o motivo da correção administrativa."); await onPatch(selected.id, values, reason.trim()); setReason(""); }} />
         </section>
@@ -385,10 +385,10 @@ function AdminMetrics({
     <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
       <section>
         <PageHeading title="Métricas" description="Operações conhecidas referenciam IDs estáveis de campos, nunca sua posição na tela." />
-        {challenge.metrics.length ? <div className="grid gap-3 sm:grid-cols-2">{challenge.metrics.map((metric) => <article className={cx(cardClass, "p-5")} key={metric.id}><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.1em] text-[var(--muted)]">{metric.operation.replace("_", " ")}</p><h3 className="mt-1 font-bold">{metric.label}</h3></div><strong className="text-2xl tracking-[-0.04em]">{metric.formattedValue ?? metric.value ?? "—"}</strong></div><div className="mt-4 flex flex-wrap gap-2 text-[10px] font-bold uppercase text-[var(--muted)]">{metric.visibleDuring ? <span className="rounded-full bg-[var(--ok-soft)] px-2 py-1">durante</span> : null}{metric.visibleInResults ? <span className="rounded-full bg-[var(--main-soft)] px-2 py-1">resultado</span> : null}{metric.groupBy && metric.groupBy !== "none" ? <span className="rounded-full bg-[var(--wash)] px-2 py-1">por {metric.groupBy}</span> : null}</div></article>)}</div> : <EmptyState title="Nenhuma métrica configurada" description="Comece com contagem, média ou taxa de conclusão. Fórmulas arbitrárias ficam fora do MVP." />}
+        {challenge.metrics.length ? <div className="grid gap-3 sm:grid-cols-2">{challenge.metrics.map((metric) => <article className={cx(cardClass, "p-5")} key={metric.id}><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-light uppercase tracking-[0.1em] text-[var(--muted)]">{metric.operation.replace("_", " ")}</p><h3 className="mt-1 font-light">{metric.label}</h3></div><strong className="text-2xl tracking-[-0.04em]">{metric.formattedValue ?? metric.value ?? "—"}</strong></div><div className="mt-4 flex flex-wrap gap-2 text-[10px] font-light uppercase text-[var(--muted)]">{metric.visibleDuring ? <span className="rounded-full bg-[var(--ok-soft)] px-2 py-1">durante</span> : null}{metric.visibleInResults ? <span className="rounded-full bg-[var(--main-soft)] px-2 py-1">resultado</span> : null}{metric.groupBy && metric.groupBy !== "none" ? <span className="rounded-full bg-[var(--wash)] px-2 py-1">por {metric.groupBy}</span> : null}</div></article>)}</div> : <EmptyState title="Nenhuma métrica configurada" description="Comece com contagem, média ou taxa de conclusão. Fórmulas arbitrárias ficam fora do MVP." />}
       </section>
       <aside className={cx(cardClass, "h-fit p-5")}>
-        <h2 className="text-lg font-bold">Adicionar métrica</h2>
+        <h2 className="text-lg font-light">Adicionar métrica</h2>
         {challenge.status === "closed" ? <p className="mt-4 text-sm leading-6 text-[var(--muted)]">As métricas foram congeladas no encerramento para preservar o resultado histórico.</p> : <form className="mt-4 space-y-4" onSubmit={submit}>
           <label><span className={labelClass}>Nome</span><input className={inputClass} value={label} onChange={(event) => setLabel(event.target.value)} placeholder="Ex.: Média do grupo" required maxLength={100} /></label>
           <label><span className={labelClass}>Operação</span><select className={inputClass} value={operation} onChange={(event) => { const next = event.target.value as Metric["operation"]; setOperation(next); setFieldId(""); }}><option value="sum">Soma</option><option value="average">Média</option><option value="count">Contagem</option><option value="min">Mínimo</option><option value="max">Máximo</option><option value="completion_rate">Taxa de conclusão</option></select></label>
@@ -463,8 +463,8 @@ function AdminResults({
       <section className={cx(cardClass, "p-5 sm:p-7")}>
         <PageHeading title="Curadoria da vitrine" description="Os cálculos são automáticos; você escolhe o que ajuda a contar a história." />
         <div className="grid gap-4 sm:grid-cols-2"><label className="sm:col-span-2"><span className={labelClass}>Manchete</span><input className={inputClass} value={headline} onChange={(event) => setHeadline(event.target.value)} maxLength={180} /></label><label className="sm:col-span-2"><span className={labelClass}>Resumo</span><textarea className={inputClass} rows={4} value={summary} onChange={(event) => setSummary(event.target.value)} maxLength={1500} /></label></div>
-        <fieldset className="mt-6"><legend className="text-base font-bold">Métricas em destaque</legend>{challenge.metrics.length ? <div className="mt-3 grid gap-2 sm:grid-cols-2">{challenge.metrics.map((metric) => <label className="flex min-h-12 items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4 text-sm" key={metric.id}><input type="checkbox" aria-label={`Destacar métrica ${metric.label}`} checked={metricIds.includes(metric.id)} onChange={(event) => setMetricIds((current) => event.target.checked ? [...current, metric.id] : current.filter((id) => id !== metric.id))} /><span><strong className="block">{metric.label}</strong><small className="text-[var(--muted)]">{metric.formattedValue ?? metric.value ?? "sem valor"}</small></span></label>)}</div> : <p className="mt-2 text-sm text-[var(--muted)]">Crie métricas antes de selecioná-las.</p>}</fieldset>
-        <fieldset className="mt-6"><legend className="text-base font-bold">Comentários selecionados</legend>{candidates.length ? <div className="mt-3 grid gap-2 sm:grid-cols-2">{candidates.map((candidate) => <label className="flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4 text-sm" key={candidate.key}><input className="mt-1" type="checkbox" aria-label={`Selecionar comentário de ${candidate.authorName}`} checked={commentKeys.includes(candidate.key)} onChange={(event) => setCommentKeys((current) => event.target.checked ? [...current, candidate.key] : current.filter((key) => key !== candidate.key))} /><span><span className="line-clamp-3 leading-6">“{candidate.text}”</span><small className="mt-2 block font-bold text-[var(--muted)]">{candidate.authorName} · {candidate.itemTitle}</small></span></label>)}</div> : <p className="mt-2 text-sm text-[var(--muted)]">Nenhum campo de texto preenchido está disponível para curadoria.</p>}</fieldset>
+        <fieldset className="mt-6"><legend className="text-base font-light">Métricas em destaque</legend>{challenge.metrics.length ? <div className="mt-3 grid gap-2 sm:grid-cols-2">{challenge.metrics.map((metric) => <label className="flex min-h-12 items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4 text-sm" key={metric.id}><input type="checkbox" aria-label={`Destacar métrica ${metric.label}`} checked={metricIds.includes(metric.id)} onChange={(event) => setMetricIds((current) => event.target.checked ? [...current, metric.id] : current.filter((id) => id !== metric.id))} /><span><strong className="block">{metric.label}</strong><small className="text-[var(--muted)]">{metric.formattedValue ?? metric.value ?? "sem valor"}</small></span></label>)}</div> : <p className="mt-2 text-sm text-[var(--muted)]">Crie métricas antes de selecioná-las.</p>}</fieldset>
+        <fieldset className="mt-6"><legend className="text-base font-light">Comentários selecionados</legend>{candidates.length ? <div className="mt-3 grid gap-2 sm:grid-cols-2">{candidates.map((candidate) => <label className="flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4 text-sm" key={candidate.key}><input className="mt-1" type="checkbox" aria-label={`Selecionar comentário de ${candidate.authorName}`} checked={commentKeys.includes(candidate.key)} onChange={(event) => setCommentKeys((current) => event.target.checked ? [...current, candidate.key] : current.filter((key) => key !== candidate.key))} /><span><span className="line-clamp-3 leading-6">“{candidate.text}”</span><small className="mt-2 block font-light text-[var(--muted)]">{candidate.authorName} · {candidate.itemTitle}</small></span></label>)}</div> : <p className="mt-2 text-sm text-[var(--muted)]">Nenhum campo de texto preenchido está disponível para curadoria.</p>}</fieldset>
         <div className="mt-5"><StatusMessage error={error} success={success} /></div>
         <Button className="mt-5" disabled={busy} onClick={() => void save()}>{busy ? "Salvando…" : "Salvar vitrine"}</Button>
       </section>
@@ -527,9 +527,9 @@ export function AdminScreen({
   ];
   return (
     <main className="mx-auto max-w-7xl px-4 py-6 pb-24 sm:px-6 sm:py-10">
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><button className="min-h-11 text-sm font-bold text-[var(--muted)] hover:text-[var(--ink)]" type="button" onClick={onBack}>← {group?.name ?? "Início"}</button><Button variant="secondary" onClick={onViewParticipant}>Ver como participante</Button></div>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><button className="min-h-11 text-sm font-light text-[var(--muted)] hover:text-[var(--ink)]" type="button" onClick={onBack}>← {group?.name ?? "Início"}</button><Button variant="secondary" onClick={onViewParticipant}>Ver como participante</Button></div>
       <PageHeading title={challenge.title} description="Configure, revise e apresente — controles administrativos continuam validados no servidor." action={<ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} />} />
-      <nav className="mb-6 flex gap-1 overflow-x-auto rounded-2xl bg-[var(--wash-strong)]/70 p-1" aria-label="Áreas administrativas">{tabs.map((item) => <button className={cx("min-h-11 flex-none rounded-xl px-4 text-sm font-bold", tab === item.id ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]")} type="button" onClick={() => onTab(item.id)} key={item.id}>{item.label}</button>)}</nav>
+      <nav className="mb-6 flex gap-1 overflow-x-auto rounded-2xl bg-[var(--wash-strong)]/70 p-1" aria-label="Áreas administrativas">{tabs.map((item) => <button className={cx("min-h-11 flex-none rounded-xl px-4 text-sm font-light", tab === item.id ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]")} type="button" onClick={() => onTab(item.id)} key={item.id}>{item.label}</button>)}</nav>
       {tab === "overview" ? <AdminOverview challenge={challenge} entries={entries} onSave={onSaveBasics} onTransition={onTransition} onDuplicate={onDuplicate} duplicateTargets={duplicateTargets} onDelete={onDelete} /> : null}
       {tab === "participants" ? <AdminParticipants key={`${challenge.id}:${challenge.participants.map((participant) => participant.userId ?? participant.id).join(",")}`} challenge={challenge} group={group} onSave={onSaveParticipants} /> : null}
       {tab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.fields.map((field) => field.id ?? field.key).join(",")}`} challenge={challenge} onSave={onSaveFields} /> : null}

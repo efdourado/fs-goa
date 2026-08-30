@@ -61,11 +61,11 @@ export function AccountScreen({
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
-      <button className="mb-6 min-h-11 text-sm font-bold text-[var(--muted)] hover:text-[var(--ink)]" type="button" onClick={onBack}>← Voltar ao início</button>
+      <button className="mb-6 min-h-11 text-sm font-light text-[var(--muted)] hover:text-[var(--ink)]" type="button" onClick={onBack}>← Voltar ao início</button>
       <PageHeading title="Seu perfil" description="Por enquanto só o nome de exibição é editável." />
 
       <section className={cx(cardClass, "p-5 sm:p-7")}>
-        <h2 className="text-xl font-bold">Perfil</h2>
+        <h2 className="text-xl font-light">Perfil</h2>
         <form className="mt-4 grid gap-4 sm:grid-cols-2" onSubmit={saveProfile}>
           <label className="sm:col-span-2"><span className={labelClass}>Nome</span><input className={inputClass} value={name} onChange={(event) => setName(event.target.value)} required maxLength={80} disabled={profileBusy} /></label>
           <label><span className={labelClass}>Nome de usuário</span><input className={cx(inputClass, "opacity-60")} value={`@${user.username}`} readOnly disabled /></label>
@@ -76,7 +76,7 @@ export function AccountScreen({
       </section>
 
       <section className={cx(cardClass, "mt-6 p-5 sm:p-7")}>
-        <h2 className="text-xl font-bold">Senha</h2>
+        <h2 className="text-xl font-light">Senha</h2>
         <p className="mt-1 text-sm text-[var(--muted)]">Trocar a senha encerra suas outras sessões.</p>
         <form className="mt-4 grid gap-4 sm:grid-cols-2" onSubmit={changePassword}>
           <label className="sm:col-span-2"><span className={labelClass}>Senha atual</span><input className={inputClass} name="currentPassword" type="password" autoComplete="current-password" required disabled={pwBusy} /></label>

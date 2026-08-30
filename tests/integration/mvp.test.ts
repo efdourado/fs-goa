@@ -547,6 +547,213 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
   assert.ok(!owner.cookie.includes(sessionDb.rows[0]?.token_hash ?? "impossivel"), "token bruto da sessão não pode estar no banco");
 });
 
+test("convites distinguem grupo e desafio, e inclusão por username é idempotente", async () => {
+  const owner = await register("Dona Convites", "dona_convites");
+  const directMember = await register("Membro Direto", "membro_direto_convites");
+  const groupGuest = await register("Convidada do Grupo", "convidada_grupo_convites");
+  const challengeGuest = await register("Convidada do Desafio", "convidada_desafio_convites");
+  const revokedGuest = await register("Convidado Revogado", "convidado_revogado_convites");
+
+  const groupResponse = await call("POST", "/api/groups", {
+    session: owner,
+    body: { name: "Grupo dos convites" },
+  });
+  assert.equal(groupResponse.response.status, 201, JSON.stringify(groupResponse.body));
+  const groupId = (groupResponse.body as { id: string }).id;
+
+  const outsiderAdd = await call("POST", `/api/groups/${groupId}/members`, {
+    session: directMember,
+    body: { username: revokedGuest.user.username },
+  });
+  assert.equal(outsiderAdd.response.status, 404, "quem não pertence ao grupo não pode adicionar por username");
+
+  const addedByUsername = await call("POST", `/api/groups/${groupId}/members`, {
+    session: owner,
+    body: { username: "  MEMBRO_DIRETO_CONVITES  " },
+  });
+  assert.equal(addedByUsername.response.status, 200, JSON.stringify(addedByUsername.body));
+  assert.deepEqual(addedByUsername.body, {
+    groupId,
+    member: {
+      id: directMember.user.id,
+      name: "Membro Direto",
+      username: "membro_direto_convites",
+      role: "participant",
+    },
+    added: true,
+    restored: false,
+    idempotent: false,
+  });
+
+  const participantCannotAdd = await call("POST", `/api/groups/${groupId}/members`, {
+    session: directMember,
+    body: { username: revokedGuest.user.username },
+  });
+  assert.equal(participantCannotAdd.response.status, 403, "participante não pode adicionar outra conta");
+
+  const usernameReplay = await call("POST", `/api/groups/${groupId}/members`, {
+    session: owner,
+    body: { username: directMember.user.username },
+  });
+  assert.equal(usernameReplay.response.status, 200, JSON.stringify(usernameReplay.body));
+  assert.equal((usernameReplay.body as { added: boolean }).added, false);
+  assert.equal((usernameReplay.body as { idempotent: boolean }).idempotent, true);
+
+  await adminPool.query(
+    "UPDATE group_members SET removed_at = now() WHERE group_id = $1 AND user_id = $2",
+    [groupId, directMember.user.id],
+  );
+  const restoredByUsername = await call("POST", `/api/groups/${groupId}/members`, {
+    session: owner,
+    body: { username: directMember.user.username },
+  });
+  assert.equal(restoredByUsername.response.status, 200, JSON.stringify(restoredByUsername.body));
+  assert.equal((restoredByUsername.body as { restored: boolean }).restored, true);
+  const memberAudit = await adminPool.query<{ action: string }>(
+    "SELECT action FROM audit_events WHERE group_id = $1 AND entity_type = 'group_member' AND entity_id = $2",
+    [groupId, directMember.user.id],
+  );
+  assert.deepEqual(
+    new Set(memberAudit.rows.map((row) => row.action)),
+    new Set(["group.member_added", "group.member_restored"]),
+    "adição e restauração por username ficam auditadas sem evento para replay",
+  );
+
+  const challengeResponse = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: {
+      title: "Desafio com convite próprio",
+      startsOn: "2026-09-01",
+      endsOn: "2026-09-30",
+      submissionMode: "item",
+      participantIds: [owner.user.id],
+      items: [{ title: "Item único" }],
+      fields: [{ key: "nota", label: "Nota", type: "rating", required: true }],
+    },
+  });
+  assert.equal(challengeResponse.response.status, 201, JSON.stringify(challengeResponse.body));
+  const challengeId = (challengeResponse.body as { id: string }).id;
+
+  const groupInvite = await call("POST", `/api/groups/${groupId}/invites`, {
+    session: owner,
+    body: { expiresInDays: 7, maxUses: 1 },
+  });
+  assert.equal(groupInvite.response.status, 201, JSON.stringify(groupInvite.body));
+  assert.equal((groupInvite.body as { kind: string }).kind, "group");
+  assert.equal((groupInvite.body as { groupName: string }).groupName, "Grupo dos convites");
+  assert.equal((groupInvite.body as { challengeId: string | null }).challengeId, null);
+  const groupToken = (groupInvite.body as { token: string }).token;
+
+  const anonymousGroupPreview = await call("GET", `/api/invites/${groupToken}`);
+  assert.equal(anonymousGroupPreview.response.status, 200, JSON.stringify(anonymousGroupPreview.body));
+  assert.equal((anonymousGroupPreview.body as { accepted: boolean }).accepted, false);
+  assert.equal((anonymousGroupPreview.body as { status: string }).status, "valid");
+
+  const acceptedGroup = await call("POST", `/api/invites/${groupToken}`, {
+    session: groupGuest,
+    body: {},
+  });
+  assert.equal(acceptedGroup.response.status, 200, JSON.stringify(acceptedGroup.body));
+  assert.equal((acceptedGroup.body as { kind: string }).kind, "group");
+  const groupOnlyMembership = await adminPool.query<{ group_member: boolean; challenge_participant: boolean }>(
+    `SELECT
+       EXISTS (SELECT 1 FROM group_members WHERE group_id = $1 AND user_id = $2 AND removed_at IS NULL) AS group_member,
+       EXISTS (SELECT 1 FROM challenge_participants WHERE challenge_id = $3 AND user_id = $2 AND removed_at IS NULL) AS challenge_participant`,
+    [groupId, groupGuest.user.id, challengeId],
+  );
+  assert.deepEqual(groupOnlyMembership.rows[0], { group_member: true, challenge_participant: false });
+  const acceptedGroupPreview = await call("GET", `/api/invites/${groupToken}`, { session: groupGuest });
+  assert.equal((acceptedGroupPreview.body as { accepted: boolean }).accepted, true);
+  assert.equal((acceptedGroupPreview.body as { status: string }).status, "accepted", "aceite pessoal prevalece sobre esgotamento global");
+
+  const challengeInvite = await call("POST", `/api/groups/${groupId}/invites`, {
+    session: owner,
+    body: { expiresInDays: 7, maxUses: 1, challengeId },
+  });
+  assert.equal(challengeInvite.response.status, 201, JSON.stringify(challengeInvite.body));
+  assert.equal((challengeInvite.body as { kind: string }).kind, "challenge");
+  assert.equal((challengeInvite.body as { groupId: string }).groupId, groupId);
+  assert.equal((challengeInvite.body as { challengeId: string }).challengeId, challengeId);
+  assert.equal((challengeInvite.body as { challengeTitle: string }).challengeTitle, "Desafio com convite próprio");
+  const challengeToken = (challengeInvite.body as { token: string }).token;
+  const challengeInviteId = (challengeInvite.body as { id: string }).id;
+  const targetRow = await adminPool.query<{ group_id: string; challenge_id: string }>(
+    "SELECT group_id, challenge_id FROM invite_challenge_targets WHERE invite_id = $1",
+    [challengeInviteId],
+  );
+  assert.deepEqual(targetRow.rows[0], { group_id: groupId, challenge_id: challengeId });
+
+  const beforeChallengePreview = await call("GET", `/api/invites/${challengeToken}`, { session: challengeGuest });
+  assert.equal(beforeChallengePreview.response.status, 200, JSON.stringify(beforeChallengePreview.body));
+  assert.equal((beforeChallengePreview.body as { kind: string }).kind, "challenge");
+  assert.equal((beforeChallengePreview.body as { accepted: boolean }).accepted, false);
+  assert.equal((beforeChallengePreview.body as { status: string }).status, "valid");
+
+  const acceptedChallenge = await call("POST", `/api/invites/${challengeToken}`, {
+    session: challengeGuest,
+    body: {},
+  });
+  assert.equal(acceptedChallenge.response.status, 200, JSON.stringify(acceptedChallenge.body));
+  assert.deepEqual(acceptedChallenge.body, {
+    kind: "challenge",
+    groupId,
+    groupName: "Grupo dos convites",
+    challengeId,
+    challengeTitle: "Desafio com convite próprio",
+    accepted: true,
+    idempotent: false,
+  });
+  const challengeMembership = await adminPool.query<{ group_member: boolean; challenge_participant: boolean }>(
+    `SELECT
+       EXISTS (SELECT 1 FROM group_members WHERE group_id = $1 AND user_id = $2 AND removed_at IS NULL) AS group_member,
+       EXISTS (SELECT 1 FROM challenge_participants WHERE challenge_id = $3 AND user_id = $2 AND removed_at IS NULL) AS challenge_participant`,
+    [groupId, challengeGuest.user.id, challengeId],
+  );
+  assert.deepEqual(challengeMembership.rows[0], { group_member: true, challenge_participant: true });
+
+  const acceptedChallengePreview = await call("GET", `/api/invites/${challengeToken}`, { session: challengeGuest });
+  assert.equal((acceptedChallengePreview.body as { accepted: boolean }).accepted, true);
+  assert.equal((acceptedChallengePreview.body as { status: string }).status, "accepted");
+  const challengeReplay = await call("POST", `/api/invites/${challengeToken}`, {
+    session: challengeGuest,
+    body: {},
+  });
+  assert.equal(challengeReplay.response.status, 200, JSON.stringify(challengeReplay.body));
+  assert.equal((challengeReplay.body as { idempotent: boolean }).idempotent, true);
+  const challengeUses = await adminPool.query<{ use_count: number }>(
+    "SELECT use_count FROM group_invites WHERE id = $1",
+    [challengeInviteId],
+  );
+  assert.equal(challengeUses.rows[0]?.use_count, 1, "replay não consome outro uso");
+
+  const revokedInvite = await call("POST", `/api/groups/${groupId}/invites`, {
+    session: owner,
+    body: { expiresInDays: 7, maxUses: 1, challengeId },
+  });
+  assert.equal(revokedInvite.response.status, 201, JSON.stringify(revokedInvite.body));
+  await adminPool.query("UPDATE group_invites SET revoked_at = now() WHERE id = $1", [
+    (revokedInvite.body as { id: string }).id,
+  ]);
+  const rejected = await call("POST", `/api/invites/${(revokedInvite.body as { token: string }).token}`, {
+    session: revokedGuest,
+    body: {},
+  });
+  assert.equal(rejected.response.status, 410, JSON.stringify(rejected.body));
+  const partialRows = await adminPool.query<{ group_members: number; challenge_participants: number }>(
+    `SELECT
+       (SELECT count(*)::int FROM group_members WHERE group_id = $1 AND user_id = $2 AND removed_at IS NULL) AS group_members,
+       (SELECT count(*)::int FROM challenge_participants WHERE challenge_id = $3 AND user_id = $2 AND removed_at IS NULL) AS challenge_participants`,
+    [groupId, revokedGuest.user.id, challengeId],
+  );
+  assert.deepEqual(partialRows.rows[0], { group_members: 0, challenge_participants: 0 }, "convite inválido não deixa aceite parcial");
+
+  const missingTarget = await call("POST", `/api/groups/${groupId}/invites`, {
+    session: owner,
+    body: { challengeId: "desafio-inexistente" },
+  });
+  assert.equal(missingTarget.response.status, 404, "alvo ausente não cria convite genérico por engano");
+});
+
 test("aplica limites de criação por dono e por grupo", async () => {
   const owner = await register("Limite", "limite_dono");
 

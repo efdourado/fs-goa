@@ -1,9 +1,10 @@
 "use client";
 
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useRef, useState } from "react";
 
 import { errorMessage } from "../api";
-import type { ChallengeSummary, GroupSummary, Id } from "../types";
+import { copyText } from "../clipboard";
+import type { ChallengeSummary, GroupMemberResult, GroupSummary, Id } from "../types";
 import { Button, cardClass, challengeStatusTone, ChallengeStatusBadge, cx, EmptyState, inputClass, labelClass, linkClass, PageHeading, StatusMessage } from "../ui";
 import { canManage, formatDate, isChallengeScheduled } from "../utils";
 
@@ -13,8 +14,8 @@ export function GroupScreen({
   onBack,
   onCreateChallenge,
   onOpenChallenge,
-  onOpenAdmin,
   onCreateInvite,
+  onAddMemberByUsername,
   onUpdateGroup,
   onDeleteGroup,
   challengeLimit,
@@ -25,8 +26,8 @@ export function GroupScreen({
   onBack: () => void;
   onCreateChallenge: () => void;
   onOpenChallenge: (id: Id) => void;
-  onOpenAdmin: (id: Id) => void;
-  onCreateInvite: (payload: { expiresInDays: number; maxUses: number }) => Promise<{ token?: string; url?: string }>;
+  onCreateInvite: (payload: { expiresInDays: number; maxUses: number; challengeId?: Id }) => Promise<{ token?: string; url?: string }>;
+  onAddMemberByUsername: (username: string) => Promise<GroupMemberResult>;
   onUpdateGroup: (payload: { name: string; description: string }) => Promise<void>;
   onDeleteGroup?: () => Promise<void>;
 }) {
@@ -35,8 +36,15 @@ export function GroupScreen({
   const [groupName, setGroupName] = useState(group.name);
   const [groupDescription, setGroupDescription] = useState(group.description ?? "");
   const [inviteUrl, setInviteUrl] = useState("");
+  const inviteInputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copyBusy, setCopyBusy] = useState(false);
+  const [copySuccess, setCopySuccess] = useState<string | null>(null);
+  const [copyError, setCopyError] = useState<string | null>(null);
+  const [memberBusy, setMemberBusy] = useState(false);
+  const [memberError, setMemberError] = useState<string | null>(null);
+  const [memberSuccess, setMemberSuccess] = useState<string | null>(null);
   const [groupBusy, setGroupBusy] = useState(false);
   const [groupError, setGroupError] = useState<string | null>(null);
   const [groupSuccess, setGroupSuccess] = useState<string | null>(null);
@@ -88,9 +96,12 @@ export function GroupScreen({
       const created = await onCreateInvite({
         expiresInDays: Number(form.get("expiresInDays") ?? 7),
         maxUses: Number(form.get("maxUses") ?? 1),
+        challengeId: String(form.get("challengeId") ?? "") || undefined,
       });
       const token = created.token ?? "";
-      setInviteUrl(created.url ?? (token ? `${window.location.origin}/?invite=${encodeURIComponent(token)}` : ""));
+      setInviteUrl(created.url ?? (token ? `${window.location.origin}/invites/${encodeURIComponent(token)}` : ""));
+      setCopySuccess(null);
+      setCopyError(null);
     } catch (cause) {
       setError(errorMessage(cause));
     } finally {
@@ -98,14 +109,47 @@ export function GroupScreen({
     }
   }
 
+  async function copyInvite() {
+    setCopyBusy(true);
+    setCopySuccess(null);
+    setCopyError(null);
+    try {
+      await copyText(inviteUrl, inviteInputRef.current);
+      setCopySuccess("Link copiado.");
+    } catch (cause) {
+      setCopyError(errorMessage(cause));
+    } finally {
+      setCopyBusy(false);
+    }
+  }
+
+  async function addMember(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const username = String(new FormData(form).get("username") ?? "").trim();
+    if (!username) return;
+    setMemberBusy(true);
+    setMemberError(null);
+    setMemberSuccess(null);
+    try {
+      const result = await onAddMemberByUsername(username);
+      setMemberSuccess(result.added ? `@${result.member.username} foi adicionado ao grupo.` : `@${result.member.username} já participa deste grupo.`);
+      if (result.added) form.reset();
+    } catch (cause) {
+      setMemberError(errorMessage(cause));
+    } finally {
+      setMemberBusy(false);
+    }
+  }
+
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
-      <button className="mb-6 min-h-11 text-sm font-bold text-[var(--muted)] hover:text-[var(--ink)]" type="button" onClick={onBack}>← Voltar ao início</button>
-      <PageHeading title={group.name} description={`${group.description ? `${group.description} · ` : ""}${group.memberCount ?? group.members?.length ?? 0} pessoas · você é ${group.role === "owner" ? "responsável" : group.role === "admin" ? "admin" : "participante"}`} action={canManage(group.role) ? <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm sm:justify-end"><button type="button" className={linkClass} onClick={toggleGroupEdit}>{showGroupEdit ? "Fechar edição" : "Editar grupo"}</button><button type="button" className={linkClass} onClick={() => setShowInvite((open) => !open)}>{showInvite ? "Fechar convite" : "Convidar"}</button>{challenges.length >= challengeLimit ? <span className="text-[var(--muted)]">Limite de {challengeLimit} desafios atingido</span> : <button type="button" className={linkClass} onClick={onCreateChallenge}>+ Criar desafio (limite {challengeLimit})</button>}</div> : undefined} />
+      <button className="mb-6 min-h-11 text-sm font-light text-[var(--muted)] hover:text-[var(--ink)]" type="button" onClick={onBack}>← Voltar ao início</button>
+      <PageHeading title={group.name} description={`${group.description ? `${group.description} · ` : ""}${group.memberCount ?? group.members?.length ?? 0} pessoas · você é ${group.role === "owner" ? "responsável" : group.role === "admin" ? "admin" : "participante"}`} action={canManage(group.role) ? <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm sm:justify-end"><button type="button" className={linkClass} onClick={toggleGroupEdit}>{showGroupEdit ? "Fechar edição" : "Editar grupo"}</button><button type="button" className={linkClass} onClick={() => setShowInvite((open) => !open)}>{showInvite ? "Fechar convite" : "+ Convidar"}</button>{challenges.length >= challengeLimit ? <span className="text-[var(--muted)]">Limite de {challengeLimit} desafios atingido</span> : <button type="button" className={linkClass} onClick={onCreateChallenge}>+ Criar desafio (limite {challengeLimit})</button>}</div> : undefined} />
 
       {showGroupEdit ? (
         <section className={cx(cardClass, "mb-7 p-5")} aria-labelledby="group-edit-title">
-          <h2 id="group-edit-title" className="text-lg font-bold">Editar grupo</h2>
+          <h2 id="group-edit-title" className="text-lg font-light">Editar grupo</h2>
           <p className="mt-1 text-sm text-[var(--muted)]">O nome atualizado aparece para todas as pessoas do grupo.</p>
           <form className="mt-4 grid gap-4 sm:grid-cols-2" onSubmit={updateGroup}>
             <label className="sm:col-span-2"><span className={labelClass}>Nome</span><input className={inputClass} value={groupName} onChange={(event) => setGroupName(event.target.value)} required maxLength={120} /></label>
@@ -124,9 +168,10 @@ export function GroupScreen({
 
       {showInvite ? (
         <section className={cx(cardClass, "mb-7 p-5")} aria-labelledby="invite-create-title">
-          <h2 id="invite-create-title" className="text-lg font-bold">Criar convite seguro</h2>
+          <h2 id="invite-create-title" className="text-lg font-light">Criar convite seguro</h2>
           <p className="mt-1 text-sm text-[var(--muted)]">O link expira e pode ter uso limitado. Gere um novo quando precisar.</p>
-          <form className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_auto]" onSubmit={createInvite}>
+          <form className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-[1.2fr_1fr_1fr_auto]" onSubmit={createInvite}>
+            <label><span className={labelClass}>Destino</span><select className={inputClass} name="challengeId" defaultValue=""><option value="">Somente o grupo</option>{challenges.filter((challenge) => challenge.status !== "closed").map((challenge) => <option value={challenge.id} key={challenge.id}>Desafio: {challenge.title}</option>)}</select></label>
             <label><span className={labelClass}>Expira em</span><select className={inputClass} name="expiresInDays" defaultValue="7"><option value="1">1 dia</option><option value="7">7 dias</option><option value="30">30 dias</option></select></label>
             <label><span className={labelClass}>Quantidade de usos</span><input className={inputClass} name="maxUses" type="number" min={1} max={100} defaultValue={1} /></label>
             <div className="flex items-end"><Button type="submit" disabled={busy}>{busy ? "Gerando…" : "Gerar link"}</Button></div>
@@ -134,16 +179,17 @@ export function GroupScreen({
           <div className="mt-4"><StatusMessage error={error} /></div>
           {inviteUrl ? (
             <div className="mt-4 flex flex-col gap-2 rounded-xl bg-[var(--main-soft)] p-3 sm:flex-row sm:items-center">
-              <input className={cx(inputClass, "font-mono text-xs")} value={inviteUrl} readOnly aria-label="Link do convite" />
-              <Button variant="secondary" onClick={() => void navigator.clipboard.writeText(inviteUrl)}>Copiar</Button>
+              <input ref={inviteInputRef} className={cx(inputClass, "font-mono text-xs")} value={inviteUrl} readOnly aria-label="Link do convite" onFocus={(event) => event.currentTarget.select()} />
+              <Button variant="secondary" disabled={copyBusy} onClick={() => void copyInvite()}>{copyBusy ? "Copiando…" : copySuccess ? "Copiado" : "Copiar"}</Button>
             </div>
           ) : null}
+          <div className="mt-3"><StatusMessage error={copyError} success={copySuccess} /></div>
         </section>
       ) : null}
 
       <div className="grid gap-7 lg:grid-cols-[1fr_320px]">
         <section>
-          <h2 className="mb-4 text-xl font-bold tracking-[-0.03em]">Desafios do grupo</h2>
+          <h2 className="mb-4 text-xl font-light tracking-[-0.03em]">Desafios do grupo</h2>
           {challenges.length ? (
             <div className="grid gap-4 sm:grid-cols-2">
               {challenges.map((challenge) => {
@@ -154,7 +200,7 @@ export function GroupScreen({
                   <article className={cx("relative flex flex-col overflow-hidden rounded-[20px] border bg-[var(--paper)] shadow-[0_1px_2px_rgba(32,36,31,0.04)] transition hover:-translate-y-0.5 has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-[var(--main)]/25", tone.border)} key={challenge.id}>
                     <div className="flex flex-1 flex-col p-5">
                       <div className="flex items-center justify-between gap-3"><ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} /><span className="text-xs text-[var(--muted)]">{isChallengeScheduled(challenge.status, challenge.startsOn) ? `começa em ${formatDate(challenge.startsOn)}` : challenge.endsOn ? `até ${formatDate(challenge.endsOn)}` : "sem prazo"}</span></div>
-                      <h3 className="mt-5 text-2xl font-bold tracking-[-0.04em]"><button type="button" onClick={() => onOpenChallenge(challenge.id)} className="cursor-pointer text-left after:absolute after:inset-0 after:content-[''] focus-visible:outline-none">{challenge.title}</button></h3>
+                      <h3 className="mt-5 text-2xl font-light tracking-[-0.04em]"><button type="button" onClick={() => onOpenChallenge(challenge.id)} className="cursor-pointer text-left after:absolute after:inset-0 after:content-[''] focus-visible:outline-none">{challenge.title}</button></h3>
                       {challenge.description ? <p className="mt-2 line-clamp-2 text-sm leading-6 text-[var(--muted)]">{challenge.description}</p> : null}
                       {total > 0 ? (
                         <div className="mt-5">
@@ -171,10 +217,17 @@ export function GroupScreen({
           ) : <EmptyState title="Este grupo ainda não tem desafios" description={canManage(group.role) ? "Escolha um preset e configure a primeira edição." : "Quando um administrador criar um desafio, ele aparecerá aqui."} action={canManage(group.role) ? <Button onClick={onCreateChallenge}>Criar desafio</Button> : undefined} />}
         </section>
         <aside className={cx(cardClass, "h-fit p-5")}>
-          <h2 className="text-lg font-bold">Pessoas</h2>
+          <h2 className="text-lg font-light">Pessoas</h2>
+          {canManage(group.role) ? (
+            <form className="mt-4 border-b border-[var(--line)] pb-4" onSubmit={addMember}>
+              <label><span className={labelClass}>Adicionar por @usuário</span><input className={inputClass} name="username" placeholder="@nome_de_usuario" required maxLength={33} disabled={memberBusy} spellCheck={false} /></label>
+              <Button className="w-full" type="submit" variant="secondary" disabled={memberBusy}>{memberBusy ? "Adicionando…" : "Adicionar ao grupo"}</Button>
+              <div className="mt-3"><StatusMessage error={memberError} success={memberSuccess} /></div>
+            </form>
+          ) : null}
           {group.members?.length ? (
             <ul className="mt-3 divide-y divide-[var(--line)]">
-              {group.members.map((member) => <li className="flex items-center justify-between gap-3 py-3" key={member.id}><span><strong className="block text-sm">{member.name}</strong><small className="text-[var(--muted)]">@{member.username}</small></span><span className="rounded-full bg-[var(--wash)] px-2 py-1 text-[10px] font-bold uppercase">{member.role}</span></li>)}
+              {group.members.map((member) => <li className="flex items-center justify-between gap-3 py-3" key={member.id}><span><strong className="block text-sm">{member.name}</strong><small className="text-[var(--muted)]">@{member.username}</small></span><span className="rounded-full bg-[var(--wash)] px-2 py-1 text-[10px] font-light uppercase">{member.role}</span></li>)}
             </ul>
           ) : <p className="mt-3 text-sm leading-6 text-[var(--muted)]">A lista de membros aparecerá quando o bootstrap a disponibilizar.</p>}
         </aside>

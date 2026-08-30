@@ -49,7 +49,8 @@ Toda resposta é JSON `no-store` com `x-content-type-options: nosniff` e
 | `POST /api/groups` | sessão+csrf | `{ name, description? }` | `201 { id, name, role: "owner", memberCount }`. `403 group_limit` ao passar de `MAX_GROUPS_PER_OWNER` (6) |
 | `PATCH /api/groups/:id` | sessão+csrf (owner/admin) | `{ name?, description? }` | `200 { id, name, description }` |
 | `DELETE /api/groups/:id` | sessão+csrf (owner) | — | `200 { id, deleted: true }` — vai para a lixeira (`deleted_at`), some do app até ser purgado no `/admin` |
-| `POST /api/groups/:id/invites` | sessão+csrf (owner/admin) | `{ expiresInDays?, maxUses? }` | `201 { id, token, url, expiresAt, maxUses }` |
+| `POST /api/groups/:id/members` | sessão+csrf (owner/admin) | `{ username }` | `200 { groupId, member, added, restored, idempotent }` — busca exata e normalizada; adiciona ou restaura como participante e preserva admin restaurado |
+| `POST /api/groups/:id/invites` | sessão+csrf (owner/admin) | `{ expiresInDays?, maxUses?, challengeId? }` | `201 { id, token, url, kind, groupId, groupName, challengeId, challengeTitle, expiresAt, maxUses }`. Com `challengeId`, o alvo deve pertencer ao grupo e não pode estar encerrado |
 | `POST /api/groups/:id/challenges` | sessão+csrf (owner/admin) | ver "criar desafio" abaixo | `201 { id, challengeId, status: "draft" }`. `403 challenge_limit` ao passar de `MAX_CHALLENGES_PER_GROUP` (6) |
 
 Criar desafio: `{ title, description?, ruleSections?: [{ title, description }], startsOn, endsOn, submissionMode:
@@ -59,8 +60,8 @@ Criar desafio: `{ title, description?, ruleSections?: [{ title, description }], 
 
 | Método · rota | Acesso | Corpo | Retorna |
 | --- | --- | --- | --- |
-| `GET /api/invites/:token` | público | — | `{ groupId, groupName, invitedBy, expiresAt, status }` |
-| `POST /api/invites/:token` | sessão+csrf | `{}` | `{ groupId, accepted, idempotent }` — adiciona quem chamou como `participant` |
+| `GET /api/invites/:token` | público (sensível à sessão) | — | `{ kind, groupId, groupName, challengeId, challengeTitle, invitedBy, expiresAt, accepted, status }`. Com sessão, `accepted/status` reconhecem o aceite anterior da conta |
+| `POST /api/invites/:token` | sessão+csrf | `{}` | `{ kind, groupId, groupName, challengeId, challengeTitle, accepted, idempotent }` — sempre associa ao grupo; convite de desafio também cria `challenge_participants`, na mesma transação |
 
 ## Desafios
 

@@ -81,7 +81,7 @@ export function AuthScreen({
       <section className="relative hidden overflow-hidden bg-[var(--ink)] p-12 text-white lg:flex lg:flex-col lg:justify-between">
         <Brand />
         <div className="relative z-10 max-w-xl">
-          <p className="mb-5 text-xs font-bold uppercase tracking-[0.18em] text-white/55">Desafios privados, histórias duradouras</p>
+          <p className="mb-5 text-xs font-light uppercase tracking-[0.18em] text-white/55">Desafios privados, histórias duradouras</p>
           <h1 className="text-6xl font-semibold leading-[0.96] tracking-[-0.06em]">Você registra.<br />O Goa organiza.</h1>
           <p className="mt-6 max-w-lg text-base leading-7 text-white/70">Crie desafios com seu grupo, acompanhe o que importa e transforme o resultado em uma memória bonita.</p>
         </div>
@@ -95,10 +95,10 @@ export function AuthScreen({
           <div className="mb-10 lg:hidden"><Brand /></div>
           {invitePending ? (
             <button className="mb-5 w-full rounded-xl border border-[var(--main-line)] bg-[var(--main-soft)] px-4 py-3 text-left text-sm text-[var(--main-strong)]" type="button" onClick={onShowInvite}>
-              <strong>Você tem um convite pendente.</strong> Entre ou crie sua conta para aceitar.
+              <strong>Você tem um convite pendente.</strong> Entre ou crie sua conta; o aceite será concluído automaticamente.
             </button>
           ) : null}
-          <h2 className="mt-2 text-3xl font-bold tracking-[-0.045em]">{heading}</h2>
+          <h2 className="mt-2 text-3xl font-light tracking-[-0.045em]">{heading}</h2>
           <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{subheading}</p>
 
           {mode === "forgot" && forgotSent ? (
@@ -145,7 +145,7 @@ export function AuthScreen({
               ) : null}
 
               {mode === "login" ? (
-                <button className="text-xs font-bold text-[var(--muted)] underline-offset-4 hover:text-[var(--ink)] hover:underline" type="button" onClick={() => goTo("forgot")}>
+                <button className="text-xs font-light text-[var(--muted)] underline-offset-4 hover:text-[var(--ink)] hover:underline" type="button" onClick={() => goTo("forgot")}>
                   Esqueci a senha
                 </button>
               ) : null}
@@ -160,11 +160,11 @@ export function AuthScreen({
 
           <p className="mt-3 text-center text-sm text-[var(--muted)]">
             {mode === "forgot" ? (
-              <button className="min-h-11 font-bold underline-offset-4 hover:underline cursor-pointer" type="button" onClick={() => goTo("login")}>Voltar</button>
+              <button className="min-h-11 font-light underline-offset-4 hover:underline cursor-pointer" type="button" onClick={() => goTo("login")}>Voltar</button>
             ) : (
               <>
                 {mode === "login" ? "Sem conta? " : "Já tem uma conta? "}
-                <button className="min-h-11 font-bold underline-offset-4 hover:underline cursor-pointer" type="button" onClick={() => goTo(mode === "login" ? "register" : "login")}>
+                <button className="min-h-11 font-light underline-offset-4 hover:underline cursor-pointer" type="button" onClick={() => goTo(mode === "login" ? "register" : "login")}>
                   {mode === "login" ? "Cadastre-se" : "Entrar"}
                 </button>
               </>

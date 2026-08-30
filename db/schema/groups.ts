@@ -96,6 +96,7 @@ export const groupInvites = pgTable(
     createdAt: timestamptz("created_at").defaultNow().notNull(),
   },
   (table) => [
+    unique("group_invites_id_group_unique").on(table.id, table.groupId),
     unique("group_invites_token_hash_unique").on(table.tokenHash),
     index("group_invites_group_active_idx").on(
       table.groupId,
@@ -136,4 +137,3 @@ export const inviteRedemptions = pgTable(
     index("invite_redemptions_user_idx").on(table.userId, table.redeemedAt),
   ],
 );
-
