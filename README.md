@@ -70,12 +70,14 @@ O teste de integração se recusa a limpar qualquer banco que não se chame `goa
 ## Produção (Vercel + Neon)
 
 O banco de produção é o PostgreSQL do Neon (`sa-east-1`); nenhum banco local é
-exposto.
+exposto. `vercel.json` fixa as funções na região `gru1`, colada ao Neon, para
+cortar a latência de cada consulta.
 
 1. **Vercel → Project Settings**: Framework Preset = **Next.js**, Build Command e
    Output padrão (não sobrescreva).
-2. **Environment Variables** (Production): `DATABASE_URL` (URL do Neon com
-   `sslmode=require`), `APP_ORIGIN` (origem pública exata, ex.: `https://goa.vercel.app`),
+2. **Environment Variables** (Production): `DATABASE_URL` (use a URL **pooled** do
+   Neon — host com `-pooler` — com `sslmode=require`, para reaproveitar conexões
+   entre invocações), `APP_ORIGIN` (origem pública exata, ex.: `https://goa.vercel.app`),
    `ADMIN_PASSWORD` (mínimo 10 caracteres). Opcional: `ADMIN_USERNAME`, `ADMIN_NAME`,
    `MAX_GROUPS_PER_OWNER` / `MAX_CHALLENGES_PER_GROUP` (padrão 6),
    `MAX_MEMBERS_PER_GROUP` (padrão 62).
@@ -89,7 +91,8 @@ exposto.
    ```
 
    `.env.production.local` (fora do Git) guarda `DATABASE_URL`/`ADMIN_PASSWORD` de
-   produção; ou exporte as variáveis manualmente.
+   produção; ou exporte as variáveis manualmente. Para a migração, use a URL
+   **direta** do Neon (sem `-pooler`); o pooled fica só para a aplicação.
 
 ### Contêiner (alternativa à Vercel)
 

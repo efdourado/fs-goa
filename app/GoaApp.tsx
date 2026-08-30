@@ -33,6 +33,7 @@ import type {
   ParticipantTab,
   Screen,
 } from "./goa/types";
+import { CACHE_KEYS, clearCache, readCache, writeCache } from "./goa/cache";
 import { AppHeader, Brand, Button, cardClass, cx, EmptyState, LoadingView } from "./goa/ui";
 import { canManage, slugify } from "./goa/utils";
 
@@ -56,24 +57,43 @@ export default function GoaApp() {
     const pathMatch = window.location.pathname.match(/\/invites?\/([^/]+)/);
     const inviteToken = queryToken || (pathMatch ? decodeURIComponent(pathMatch[1]) : null);
     const routed = screenFromUrl(window.location.pathname, window.location.search);
+
+    const resolveScreen = (data: BootstrapData): Screen => {
+      if (resetToken) return { kind: "reset", token: resetToken };
+      if (inviteToken) return { kind: "invite", token: inviteToken };
+      if (!data.user) return { kind: "auth", mode: "login" };
+      return routed && routed.kind !== "invite" && routed.kind !== "reset" ? routed : { kind: "dashboard" };
+    };
+
+    // Paint from the last known bootstrap so the first screen is instant, then
+    // revalidate against the database in the background.
+    const cached = readCache<BootstrapData>(CACHE_KEYS.bootstrap);
+    let revalidated = false;
+    if (cached) {
+      void Promise.resolve().then(() => {
+        if (!active || revalidated) return;
+        if (inviteToken) setPendingInviteToken(inviteToken);
+        setBootstrap(cached);
+        setScreen(resolveScreen(cached));
+      });
+    }
+
     apiRequest<BootstrapData | { bootstrap: BootstrapData }>(API_PATHS.bootstrap, { signal: controller.signal })
       .then((raw) => {
         if (!active) return;
+        revalidated = true;
         const data = normalizeBootstrap(raw);
+        writeCache(CACHE_KEYS.bootstrap, data);
         if (inviteToken) setPendingInviteToken(inviteToken);
         setBootstrap(data);
-        if (resetToken) { setScreen({ kind: "reset", token: resetToken }); return; }
-        if (inviteToken) { setScreen({ kind: "invite", token: inviteToken }); return; }
-        if (!data.user) {
-          if (routed && routed.kind !== "dashboard") setPendingRoute(routed);
-          setScreen({ kind: "auth", mode: "login" });
-          return;
+        if (!data.user && !resetToken && !inviteToken && routed && routed.kind !== "dashboard") {
+          setPendingRoute(routed);
         }
-        setScreen(routed && routed.kind !== "invite" && routed.kind !== "reset" ? routed : { kind: "dashboard" });
+        setScreen(resolveScreen(data));
       })
       .catch((cause: unknown) => {
         if (!active || (cause instanceof DOMException && cause.name === "AbortError")) return;
-        setBootError(errorMessage(cause));
+        if (!cached) setBootError(errorMessage(cause));
       });
     return () => { active = false; controller.abort(); };
   }, []);
@@ -110,24 +130,34 @@ export default function GoaApp() {
   async function refreshBootstrap(): Promise<BootstrapData> {
     const raw = await apiRequest<BootstrapData | { bootstrap: BootstrapData }>(API_PATHS.bootstrap);
     const data = normalizeBootstrap(raw);
+    writeCache(CACHE_KEYS.bootstrap, data);
     setBootstrap(data);
     return data;
   }
 
   async function loadChallenge(challengeId: Id): Promise<ChallengeDetail> {
-    setDetailLoading(true);
-    setDetailError(null);
+    const cached = readCache<{ challenge: ChallengeDetail; entries: Entry[] }>(CACHE_KEYS.challenge(challengeId));
+    if (cached) {
+      setSelectedChallenge(cached.challenge);
+      setEntries(cached.entries);
+      setDetailError(null);
+    } else {
+      setDetailLoading(true);
+      setDetailError(null);
+    }
     try {
       const [rawChallenge, rawEntries] = await Promise.all([
         apiRequest<ChallengeDetail | { challenge: ChallengeDetail }>(API_PATHS.challenge(challengeId)),
         apiRequest<Entry[] | { entries: Entry[] }>(API_PATHS.entries(challengeId)),
       ]);
       const challenge = normalizeChallenge(rawChallenge);
+      const nextEntries = normalizeEntries(rawEntries);
       setSelectedChallenge(challenge);
-      setEntries(normalizeEntries(rawEntries));
+      setEntries(nextEntries);
+      writeCache(CACHE_KEYS.challenge(challengeId), { challenge, entries: nextEntries });
       return challenge;
     } catch (cause) {
-      setDetailError(errorMessage(cause));
+      if (!cached) setDetailError(errorMessage(cause));
       throw cause;
     } finally {
       setDetailLoading(false);
@@ -171,9 +201,11 @@ export default function GoaApp() {
   async function logout() {
     if (!bootstrap) return;
     await apiRequest(API_PATHS.auth.logout, { method: "POST", body: {}, csrfToken: bootstrap.csrfToken });
+    clearCache();
     const data = await refreshBootstrap();
     setSelectedChallenge(null);
     setEntries([]);
+    setPendingRoute(null);
     setScreen({ kind: "auth", mode: "login" });
     if (data.user) throw new Error("Não foi possível encerrar a sessão.");
   }
@@ -270,7 +302,10 @@ export default function GoaApp() {
   async function mutateChallenge(path: string, body: unknown, method: "POST" | "PATCH" = "POST") {
     if (!bootstrap) return;
     await apiRequest(path, { method, body, csrfToken: bootstrap.csrfToken });
-    await Promise.all([reloadSelected(), refreshBootstrap()]);
+    // The open challenge is what the user is looking at; refresh it before
+    // releasing the caller. Dashboard counts can catch up in the background.
+    await reloadSelected();
+    void refreshBootstrap().catch(() => undefined);
   }
 
   async function duplicateChallenge(payload: { title: string; targetGroupId: Id }) {
