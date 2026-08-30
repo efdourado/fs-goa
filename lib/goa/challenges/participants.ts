@@ -2,12 +2,14 @@ import type { SessionContext } from "../../auth";
 import { inTransaction } from "../../db";
 import { challengeAccess, writeAudit } from "../../goa-domain";
 import { ApiError } from "../../http";
+import { assertArrayWithin, LIMITS } from "../../limits";
 
 export async function setChallengeParticipants(
   session: SessionContext,
   challengeId: string,
   body: Record<string, unknown>,
 ) {
+  assertArrayWithin(body.participantIds, LIMITS.membersPerGroup, "Participantes demais para um único desafio.");
   const requestedIds = Array.isArray(body.participantIds)
     ? [...new Set(body.participantIds.filter((id): id is string => typeof id === "string"))]
     : typeof body.userId === "string" ? [body.userId] : [];

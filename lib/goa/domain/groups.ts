@@ -1,3 +1,5 @@
+import type { PoolClient } from "pg";
+
 import { requireGroupRole, type GroupRole, type SessionContext } from "../../auth";
 import { inTransaction, oneOrNull } from "../../db";
 import { ApiError, stringValue } from "../../http";
@@ -5,6 +7,40 @@ import { assertUnder, LIMITS } from "../../limits";
 import { normalizeUsername } from "../../security";
 import { writeAudit } from "./audit";
 import { publicId } from "./shared";
+
+/**
+ * Serializes member additions for a group and refuses the join once it is at
+ * capacity. Someone already active does not count against the cap, so a role
+ * change or a re-accept never gets stuck. The `groups` row lock makes the
+ * count-then-insert safe under concurrent invites.
+ */
+export async function assertGroupHasCapacity(
+  client: PoolClient,
+  groupId: string,
+  joiningUserId: string,
+): Promise<void> {
+  await client.query("SELECT id FROM groups WHERE id = $1 FOR UPDATE", [groupId]);
+  const active = await oneOrNull<{ is_member: boolean }>(
+    client,
+    `SELECT EXISTS (
+       SELECT 1 FROM group_members
+        WHERE group_id = $1 AND user_id = $2 AND removed_at IS NULL
+     ) AS is_member`,
+    [groupId, joiningUserId],
+  );
+  if (active?.is_member) return;
+  const counted = await oneOrNull<{ count: number }>(
+    client,
+    "SELECT count(*)::int AS count FROM group_members WHERE group_id = $1 AND removed_at IS NULL",
+    [groupId],
+  );
+  assertUnder(
+    counted?.count ?? 0,
+    LIMITS.membersPerGroup,
+    "group_full",
+    `Este grupo atingiu o limite de ${LIMITS.membersPerGroup} pessoas.`,
+  );
+}
 
 export async function createGroup(session: SessionContext, body: Record<string, unknown>) {
   const name = stringValue(body, "name", { min: 1, max: 120 })!;
@@ -91,6 +127,7 @@ export async function addGroupMemberByUsername(
       };
     }
 
+    await assertGroupHasCapacity(client, groupId, target.id);
     const role: GroupRole = existing?.role === "admin" ? "admin" : "participant";
     await client.query(
       `INSERT INTO group_members
