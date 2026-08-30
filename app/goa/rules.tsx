@@ -62,16 +62,15 @@ export function RuleSectionsEditor({
 export function RuleSectionsView({ rules }: { rules: ChallengeRule[] }) {
   if (!rules.length) return null;
   return (
-    <section className="mt-5 overflow-hidden rounded-[24px] border border-[var(--main-line)] bg-[var(--main-soft)] px-5 py-6 sm:px-7 sm:py-7" aria-labelledby="challenge-rules-title">
-      <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-[var(--main-strong)]">Antes de começar</p>
-      <h2 className="mt-2 text-2xl font-bold tracking-[-0.035em]" id="challenge-rules-title">Regras do desafio</h2>
+    <section className="mt-5 overflow-hidden rounded-[24px]" aria-labelledby="challenge-rules-title">
+      <h2 className="mt-2 text-2xl font-light tracking-[-0.035em]" id="challenge-rules-title">Regras a serem seguidas:</h2>
       <div className={cx("mt-5 grid gap-3", rules.length > 1 && "md:grid-cols-2")}>
         {rules.map((rule, index) => (
           <article className="rounded-2xl border border-[var(--main-line)]/70 bg-[var(--paper)] p-5" key={`${rule.title}-${index}`}>
             <div className="flex items-start gap-3">
               <span className="grid h-8 w-8 flex-none place-items-center rounded-full bg-[var(--main)] text-xs font-black text-white" aria-hidden="true">{index + 1}</span>
               <div>
-                <h3 className="text-lg font-bold tracking-[-0.02em]">{rule.title}</h3>
+                <h3 className="text-lg font-light tracking-[-0.02em]">{rule.title}</h3>
                 <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--muted)]">{rule.description}</p>
               </div>
             </div>

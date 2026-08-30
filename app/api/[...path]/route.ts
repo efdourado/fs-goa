@@ -42,6 +42,7 @@ import {
 } from "@/lib/goa-challenges";
 import {
   acceptInvite,
+  addGroupMemberByUsername,
   bootstrap,
   createChallenge,
   createGroup,
@@ -87,7 +88,9 @@ export async function GET(request: Request): Promise<Response> {
       if (isPath(path, "admin", "audit")) return json(await adminAudit(new URL(request.url).searchParams));
       return notFound();
     }
-    if (path[0] === "invites" && path.length === 2) return json(await previewInvite(path[1]));
+    if (path[0] === "invites" && path.length === 2) {
+      return json(await previewInvite(path[1], await sessionFromRequest(request)));
+    }
     if (path[0] === "results" && path.length === 2) return json(await publicResults(path[1]));
     if (path[0] === "challenges" && path.length === 2) {
       return json(await getChallengeDetail(await requireSession(request), path[1]));
@@ -147,10 +150,13 @@ export async function POST(request: Request): Promise<Response> {
     const session = await requireMutationSession(request);
     const body = await readJsonObject(request);
     if (isPath(path, "groups")) return json(await createGroup(session, body), 201);
+    if (path[0] === "groups" && path[2] === "members" && path.length === 3) {
+      return json(await addGroupMemberByUsername(session, path[1], body));
+    }
     if (path[0] === "groups" && path[2] === "invites" && path.length === 3) {
       const result = await createInvite(session, path[1], body);
       const origin = new URL(request.url).origin;
-      return json({ ...result, url: `${origin}/?invite=${encodeURIComponent(result.token)}` }, 201);
+      return json({ ...result, url: `${origin}/invites/${encodeURIComponent(result.token)}` }, 201);
     }
     if (path[0] === "invites" && path.length === 2) return json(await acceptInvite(session, path[1]));
     if (path[0] === "groups" && path[2] === "challenges" && path.length === 3) {

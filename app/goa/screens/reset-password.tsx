@@ -40,7 +40,7 @@ export function ResetPasswordScreen({
     <main className="mx-auto flex min-h-screen max-w-md items-center px-4 py-10 sm:px-6">
       <section className={cx(cardClass, "w-full p-6 sm:p-8")}>
         <Brand />
-        <h1 className="mt-6 text-2xl font-bold tracking-[-0.04em]">Criar uma nova senha</h1>
+        <h1 className="mt-6 text-2xl font-light tracking-[-0.04em]">Criar uma nova senha</h1>
         <p className="mt-2 text-sm leading-6 text-[var(--muted)]">Escolha uma senha nova. Suas outras sessões serão encerradas por segurança.</p>
         <form className="mt-6 space-y-4" onSubmit={submit}>
           <label>
@@ -54,7 +54,7 @@ export function ResetPasswordScreen({
           <StatusMessage error={error} />
           <Button type="submit" className="w-full" disabled={busy}>{busy ? "Salvando…" : "Salvar e entrar"}</Button>
         </form>
-        <button className="mt-5 min-h-11 text-sm font-bold text-[var(--muted)] hover:text-[var(--ink)]" type="button" onClick={onCancel}>← Voltar ao login</button>
+        <button className="mt-5 min-h-11 text-sm font-light text-[var(--muted)] hover:text-[var(--ink)]" type="button" onClick={onCancel}>← Voltar ao login</button>
       </section>
     </main>
   );

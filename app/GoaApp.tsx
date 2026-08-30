@@ -17,16 +17,19 @@ import { AuthScreen } from "./goa/screens/auth";
 import { CreateChallengeScreen } from "./goa/screens/create-challenge";
 import { DashboardScreen } from "./goa/screens/dashboard";
 import { GroupScreen } from "./goa/screens/group";
-import { InviteScreen } from "./goa/screens/invite";
+import { InviteAcceptedScreen, InviteScreen } from "./goa/screens/invite";
 import { ParticipantChallengeScreen } from "./goa/screens/participant-challenge";
 import { ResetPasswordScreen } from "./goa/screens/reset-password";
+import { screenFromUrl, urlForScreen } from "./goa/navigation";
 import type {
   AdminTab,
   BootstrapData,
   ChallengeCreationInput,
   ChallengeDetail,
   Entry,
+  GroupMemberResult,
   Id,
+  InviteAcceptance,
   ParticipantTab,
   Screen,
 } from "./goa/types";
@@ -37,6 +40,7 @@ export default function GoaApp() {
   const [bootstrap, setBootstrap] = useState<BootstrapData | null>(null);
   const [screen, setScreen] = useState<Screen>({ kind: "loading" });
   const [pendingInviteToken, setPendingInviteToken] = useState<string | null>(null);
+  const [pendingRoute, setPendingRoute] = useState<Screen | null>(null);
   const [selectedChallenge, setSelectedChallenge] = useState<ChallengeDetail | null>(null);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -51,18 +55,21 @@ export default function GoaApp() {
     const queryToken = params.get("invite");
     const pathMatch = window.location.pathname.match(/\/invites?\/([^/]+)/);
     const inviteToken = queryToken || (pathMatch ? decodeURIComponent(pathMatch[1]) : null);
+    const routed = screenFromUrl(window.location.pathname, window.location.search);
     apiRequest<BootstrapData | { bootstrap: BootstrapData }>(API_PATHS.bootstrap, { signal: controller.signal })
       .then((raw) => {
         if (!active) return;
         const data = normalizeBootstrap(raw);
         if (inviteToken) setPendingInviteToken(inviteToken);
         setBootstrap(data);
-        setScreen(
-          resetToken ? { kind: "reset", token: resetToken }
-          : inviteToken ? { kind: "invite", token: inviteToken }
-          : data.user ? { kind: "dashboard" }
-          : { kind: "auth", mode: "login" },
-        );
+        if (resetToken) { setScreen({ kind: "reset", token: resetToken }); return; }
+        if (inviteToken) { setScreen({ kind: "invite", token: inviteToken }); return; }
+        if (!data.user) {
+          if (routed && routed.kind !== "dashboard") setPendingRoute(routed);
+          setScreen({ kind: "auth", mode: "login" });
+          return;
+        }
+        setScreen(routed && routed.kind !== "invite" && routed.kind !== "reset" ? routed : { kind: "dashboard" });
       })
       .catch((cause: unknown) => {
         if (!active || (cause instanceof DOMException && cause.name === "AbortError")) return;
@@ -70,6 +77,35 @@ export default function GoaApp() {
       });
     return () => { active = false; controller.abort(); };
   }, []);
+
+  // Keep the address bar in step with the current screen so every view is
+  // shareable and the browser's back button lands where the user expects.
+  useEffect(() => {
+    if (screen.kind === "loading") return;
+    const url = urlForScreen(screen);
+    if (!url || url === window.location.pathname + window.location.search) return;
+    window.history.pushState(null, "", url);
+  }, [screen]);
+
+  useEffect(() => {
+    function onPopState() {
+      const routed = screenFromUrl(window.location.pathname, window.location.search);
+      setScreen(routed ?? { kind: "dashboard" });
+    }
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  // Deep links and history navigation set a challenge/admin screen without going
+  // through openParticipant/openAdmin; load the detail once when that happens.
+  const routedChallengeId =
+    screen.kind === "challenge" || screen.kind === "admin" ? screen.challengeId : null;
+  useEffect(() => {
+    if (!routedChallengeId || !bootstrap?.user || detailLoading) return;
+    if (selectedChallenge?.id === routedChallengeId) return;
+    void loadChallenge(routedChallengeId).catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routedChallengeId, bootstrap?.user]);
 
   async function refreshBootstrap(): Promise<BootstrapData> {
     const raw = await apiRequest<BootstrapData | { bootstrap: BootstrapData }>(API_PATHS.bootstrap);
@@ -111,7 +147,25 @@ export default function GoaApp() {
     });
     const data = await refreshBootstrap();
     if (!data.user) throw new Error("A sessão não foi criada. Tente novamente.");
-    setScreen(pendingInviteToken ? { kind: "invite", token: pendingInviteToken } : { kind: "dashboard" });
+    if (pendingInviteToken) {
+      try {
+        const invitation = await apiRequest<InviteAcceptance>(API_PATHS.invite(pendingInviteToken), {
+          method: "POST",
+          body: {},
+          csrfToken: data.csrfToken,
+        });
+        setPendingInviteToken(null);
+        await refreshBootstrap();
+        setScreen({ kind: "invite-success", invitation });
+      } catch {
+        // Surface the reason (expired, revoked, exhausted) on the invite screen.
+        setScreen({ kind: "invite", token: pendingInviteToken });
+      }
+      return;
+    }
+    const next = pendingRoute ?? { kind: "dashboard" as const };
+    setPendingRoute(null);
+    setScreen(next);
   }
 
   async function logout() {
@@ -140,16 +194,18 @@ export default function GoaApp() {
     await refreshBootstrap();
   }
 
-  async function openParticipant(challengeId: Id, requestedTab?: ParticipantTab) {
+  function openParticipant(challengeId: Id, requestedTab?: ParticipantTab) {
     const summary = bootstrap?.challenges.find((challenge) => challenge.id === challengeId);
     const tab = requestedTab ?? (summary?.status === "closed" ? "results" : "today");
     setScreen({ kind: "challenge", challengeId, tab });
-    try { await loadChallenge(challengeId); } catch { /* O erro detalhado é renderizado no estado da tela. */ }
   }
 
-  async function openAdmin(challengeId: Id, tab: AdminTab = "overview") {
+  function openAdmin(challengeId: Id, tab: AdminTab = "overview") {
     setScreen({ kind: "admin", challengeId, tab });
-    try { await loadChallenge(challengeId); } catch { /* O erro detalhado é renderizado no estado da tela. */ }
+  }
+
+  function retryDetail(challengeId: Id) {
+    void loadChallenge(challengeId).catch(() => undefined);
   }
 
   async function createGroup(name: string) {
@@ -208,7 +264,7 @@ export default function GoaApp() {
     if (!challengeId) throw new Error("O servidor criou o rascunho sem retornar seu identificador.");
 
     await refreshBootstrap();
-    await openAdmin(challengeId);
+    openAdmin(challengeId);
   }
 
   async function mutateChallenge(path: string, body: unknown, method: "POST" | "PATCH" = "POST") {
@@ -222,7 +278,7 @@ export default function GoaApp() {
     const response = await apiRequest<unknown>(API_PATHS.duplicate(selectedChallenge.id), { method: "POST", body: payload, csrfToken: bootstrap.csrfToken });
     const challengeId = normalizeCreatedId(response);
     await refreshBootstrap();
-    if (challengeId) await openAdmin(challengeId);
+    if (challengeId) openAdmin(challengeId);
   }
 
   async function saveEntry(itemId: Id | null, values: Record<Id, unknown>, entry?: Entry) {
@@ -258,7 +314,7 @@ export default function GoaApp() {
       <main className="grid min-h-screen place-items-center px-5">
         <section className={cx(cardClass, "max-w-lg p-7 text-center")}>
           <Brand />
-          <h1 className="mt-6 text-2xl font-bold">Não foi possível abrir o Goa</h1>
+          <h1 className="mt-6 text-2xl font-light">Não foi possível abrir o Goa</h1>
           <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{bootError}</p>
           <Button className="mt-6" onClick={() => window.location.reload()}>Tentar novamente</Button>
         </section>
@@ -288,21 +344,24 @@ export default function GoaApp() {
   if (screen.kind === "account") {
     content = <AccountScreen user={user} onBack={() => setScreen({ kind: "dashboard" })} onSaveProfile={saveAccount} onChangePassword={saveAccount} />;
   } else if (screen.kind === "invite") {
-    content = <InviteScreen key={screen.token} token={screen.token} user={user} csrfToken={bootstrap.csrfToken} onBack={() => setScreen({ kind: "dashboard" })} onNeedAuth={() => undefined} onAccepted={async () => { await refreshBootstrap(); setPendingInviteToken(null); window.history.replaceState({}, "", window.location.pathname); setScreen({ kind: "dashboard" }); }} />;
+    content = <InviteScreen key={screen.token} token={screen.token} user={user} csrfToken={bootstrap.csrfToken} onBack={() => setScreen({ kind: "dashboard" })} onNeedAuth={() => undefined} onAccepted={async (invitation) => { setPendingInviteToken(null); await refreshBootstrap(); setScreen({ kind: "invite-success", invitation }); }} />;
+  } else if (screen.kind === "invite-success") {
+    const invitation = screen.invitation;
+    content = <InviteAcceptedScreen invitation={invitation} onContinue={() => { if (invitation.challengeId) openParticipant(invitation.challengeId); else setScreen({ kind: "group", groupId: invitation.groupId }); }} />;
   } else if (screen.kind === "group" && selectedGroup) {
-    content = <GroupScreen key={selectedGroup.id} group={selectedGroup} challenges={bootstrap.challenges.filter((challenge) => challenge.groupId === selectedGroup.id)} challengeLimit={bootstrap.limits.challengesPerGroup} onBack={() => setScreen({ kind: "dashboard" })} onCreateChallenge={() => setScreen({ kind: "create-challenge", groupId: selectedGroup.id })} onOpenChallenge={(id) => void openParticipant(id)} onOpenAdmin={(id) => void openAdmin(id)} onCreateInvite={async (payload) => apiRequest<{ token?: string; url?: string }>(API_PATHS.groupInvites(selectedGroup.id), { method: "POST", body: payload, csrfToken: bootstrap.csrfToken })} onUpdateGroup={(payload) => updateGroup(selectedGroup.id, payload)} onDeleteGroup={selectedGroup.role === "owner" ? () => deleteGroup(selectedGroup.id) : undefined} />;
+    content = <GroupScreen key={selectedGroup.id} group={selectedGroup} challenges={bootstrap.challenges.filter((challenge) => challenge.groupId === selectedGroup.id)} challengeLimit={bootstrap.limits.challengesPerGroup} onBack={() => setScreen({ kind: "dashboard" })} onCreateChallenge={() => setScreen({ kind: "create-challenge", groupId: selectedGroup.id })} onOpenChallenge={(id) => openParticipant(id)} onCreateInvite={async (payload) => apiRequest<{ token?: string; url?: string }>(API_PATHS.groupInvites(selectedGroup.id), { method: "POST", body: payload, csrfToken: bootstrap.csrfToken })} onAddMemberByUsername={(username) => apiRequest<GroupMemberResult>(API_PATHS.groupMembers(selectedGroup.id), { method: "POST", body: { username }, csrfToken: bootstrap.csrfToken })} onUpdateGroup={(payload) => updateGroup(selectedGroup.id, payload)} onDeleteGroup={selectedGroup.role === "owner" ? () => deleteGroup(selectedGroup.id) : undefined} />;
   } else if (screen.kind === "create-challenge" && selectedGroup && canManage(selectedGroup.role)) {
     content = <CreateChallengeScreen key={selectedGroup.id} group={selectedGroup} onBack={() => setScreen({ kind: "group", groupId: selectedGroup.id })} onCreate={(input) => createChallenge(selectedGroup.id, input)} />;
   } else if ((screen.kind === "challenge" || screen.kind === "admin") && (detailLoading || !selectedChallenge || selectedChallenge.id !== screen.challengeId)) {
-    content = detailError ? <main className="mx-auto max-w-2xl px-5 py-16"><EmptyState title="Não foi possível abrir este desafio" description={detailError} action={<Button onClick={() => screen.kind === "admin" ? void openAdmin(screen.challengeId, screen.tab) : void openParticipant(screen.challengeId, screen.tab)}>Tentar novamente</Button>} /></main> : <LoadingView label="Carregando o desafio…" />;
+    content = detailError ? <main className="mx-auto max-w-2xl px-5 py-16"><EmptyState title="Não foi possível abrir este desafio" description={detailError} action={<Button onClick={() => retryDetail(screen.challengeId)}>Tentar novamente</Button>} /></main> : <LoadingView label="Carregando o desafio…" />;
   } else if (screen.kind === "challenge" && selectedChallenge) {
-    content = <ParticipantChallengeScreen key={selectedChallenge.id} challenge={selectedChallenge} entries={entries} user={user} tab={screen.tab} onTab={(tab) => setScreen({ ...screen, tab })} onBack={() => setScreen({ kind: "dashboard" })} onAdmin={canManage(selectedRole) ? () => void openAdmin(selectedChallenge.id) : undefined} onSaveEntry={saveEntry} />;
+    content = <ParticipantChallengeScreen key={selectedChallenge.id} challenge={selectedChallenge} entries={entries} user={user} tab={screen.tab} onTab={(tab) => setScreen({ ...screen, tab })} onBack={() => setScreen({ kind: "dashboard" })} onAdmin={canManage(selectedRole) ? () => openAdmin(selectedChallenge.id) : undefined} onSaveEntry={saveEntry} />;
   } else if (screen.kind === "admin" && selectedChallenge && canManage(selectedRole)) {
     content = <AdminScreen key={selectedChallenge.id} challenge={selectedChallenge} entries={entries} group={selectedGroup} duplicateTargets={bootstrap.groups.filter((candidate) => candidate.id !== selectedChallenge.groupId && canManage(candidate.role)).map((candidate) => ({ id: candidate.id, name: candidate.name, challengeCount: bootstrap.challenges.filter((item) => item.groupId === candidate.id).length, challengeLimit: bootstrap.limits.challengesPerGroup }))} tab={screen.tab} onTab={(tab) => setScreen({ ...screen, tab })} onBack={() => selectedGroup ? setScreen({ kind: "group", groupId: selectedGroup.id }) : setScreen({ kind: "dashboard" })} onViewParticipant={() => setScreen({ kind: "challenge", challengeId: selectedChallenge.id, tab: selectedChallenge.status === "closed" ? "results" : "today" })} onSaveBasics={(payload) => mutateChallenge(API_PATHS.challenge(selectedChallenge.id), payload, "PATCH")} onTransition={(status) => mutateChallenge(API_PATHS.transition(selectedChallenge.id), { status })} onDuplicate={duplicateChallenge} onDelete={canManage(selectedRole) ? () => deleteChallenge(selectedChallenge.id, selectedGroup?.id) : undefined} onSaveParticipants={(participantIds) => mutateChallenge(API_PATHS.participants(selectedChallenge.id), { replace: true, participantIds })} onSaveFields={(fields) => mutateChallenge(API_PATHS.fields(selectedChallenge.id), { replace: true, archiveMissing: true, fields })} onAddItems={(payload) => mutateChallenge(API_PATHS.items(selectedChallenge.id), payload)} onUpdateItem={(itemId, payload) => mutateChallenge(API_PATHS.item(selectedChallenge.id, itemId), payload, "PATCH")} onPatchEntry={(entryId, values, reason) => mutateChallenge(API_PATHS.entry(entryId), { values, reason }, "PATCH")} onExport={exportCsv} onAddMetric={(payload) => mutateChallenge(API_PATHS.metrics(selectedChallenge.id), payload)} onSaveResult={(payload) => mutateChallenge(API_PATHS.results(selectedChallenge.id), payload)} />;
   } else if (screen.kind === "admin" || screen.kind === "create-challenge") {
     content = <main className="mx-auto max-w-2xl px-5 py-16"><EmptyState title="Acesso administrativo indisponível" description="Você não possui papel de responsável ou administrador neste grupo. O servidor também valida cada operação." action={<Button onClick={() => setScreen({ kind: "dashboard" })}>Voltar ao início</Button>} /></main>;
   } else {
-    content = <DashboardScreen user={user} groups={bootstrap.groups} challenges={bootstrap.challenges} limits={bootstrap.limits} onOpenGroup={(groupId) => setScreen({ kind: "group", groupId })} onOpenChallenge={(id) => void openParticipant(id)} onOpenAdmin={(id) => void openAdmin(id)} onCreateGroup={createGroup} />;
+    content = <DashboardScreen user={user} groups={bootstrap.groups} challenges={bootstrap.challenges} limits={bootstrap.limits} onOpenGroup={(groupId) => setScreen({ kind: "group", groupId })} onOpenChallenge={(id) => openParticipant(id)} onOpenAdmin={(id) => openAdmin(id)} onCreateGroup={createGroup} />;
   }
 
   return (

@@ -56,7 +56,7 @@ test("renderiza estado agendado e regras tituladas em destaque", () => {
       { title: "Registro", description: "Preencher até 23h59." },
     ],
   }));
-  assert.match(rules, /Regras do desafio/);
+  assert.match(rules, /Regras a serem seguidas/);
   assert.match(rules, /Meta diária/);
   assert.match(rules, /Registro/);
   assert.doesNotMatch(rules, /<details/);

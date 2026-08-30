@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { type ReactNode, useCallback, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+
+import { copyText } from "../goa/clipboard";
 
 type Tab = "usage" | "trash" | "audit" | "accounts";
 
@@ -72,7 +74,7 @@ function Button({
   return (
     <button
       className={cx(
-        "inline-flex min-h-9 cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-55",
+        "inline-flex min-h-9 cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition disabled:cursor-not-allowed disabled:opacity-55",
         tones[variant],
       )}
       type="button"
@@ -187,10 +189,10 @@ export default function AdminConsole({ viewerId, viewerName, csrfToken }: { view
     <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
       <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-[-0.045em]">Administração</h1>
+          <h1 className="text-3xl font-light tracking-[-0.045em]">Administração</h1>
           <p className={cx("mt-1 text-sm", muted)}>Área privada · {viewerName}. Somente metadados — nunca o conteúdo dos grupos.</p>
         </div>
-        <Link className={cx("text-sm font-bold", muted, "hover:text-[var(--ink)]")} href="/">← Voltar ao app</Link>
+        <Link className={cx("text-sm font-light", muted, "hover:text-[var(--ink)]")} href="/">← Voltar ao app</Link>
       </header>
 
       <nav className="mb-6 flex gap-1 overflow-x-auto rounded-2xl bg-black/[0.04] p-1" aria-label="Seções da administração">
@@ -200,7 +202,7 @@ export default function AdminConsole({ viewerId, viewerName, csrfToken }: { view
             type="button"
             onClick={() => setTab(item.id)}
             className={cx(
-              "min-h-10 flex-none rounded-xl px-4 text-sm font-bold transition",
+              "min-h-10 flex-none rounded-xl px-4 text-sm font-light transition",
               tab === item.id ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : cx(muted, "hover:text-[var(--ink)]"),
             )}
           >
@@ -257,7 +259,7 @@ export default function AdminConsole({ viewerId, viewerName, csrfToken }: { view
 function Stat({ label, value, hint }: { label: string; value: ReactNode; hint?: string }) {
   return (
     <article className={cx(card, "p-5")}>
-      <p className={cx("text-xs font-bold uppercase tracking-[0.1em]", muted)}>{label}</p>
+      <p className={cx("text-xs font-light uppercase tracking-[0.1em]", muted)}>{label}</p>
       <strong className="mt-2 block text-3xl tracking-[-0.04em]">{value}</strong>
       {hint ? <p className={cx("mt-1 text-xs", muted)}>{hint}</p> : null}
     </article>
@@ -277,8 +279,8 @@ function UsageTab({ overview }: { overview: Overview | null }) {
       </div>
       <section className={cx(card, "p-5 sm:p-6")}>
         <div className="flex items-baseline justify-between">
-          <h2 className="text-lg font-bold">Armazenamento</h2>
-          <span className="text-sm font-bold">{formatBytes(overview.storage.databaseBytes)}</span>
+          <h2 className="text-lg font-light">Armazenamento</h2>
+          <span className="text-sm font-light">{formatBytes(overview.storage.databaseBytes)}</span>
         </div>
         <ul className="mt-4 space-y-2">
           {overview.storage.tables.map((table) => (
@@ -320,7 +322,7 @@ function TrashTab({
         <li key={`${item.kind}:${item.id}`} className={cx(card, "flex flex-wrap items-center justify-between gap-3 p-4")}>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className="rounded-full bg-black/[0.06] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">{kindLabel[item.kind]}</span>
+              <span className="rounded-full bg-black/[0.06] px-2 py-0.5 text-[10px] font-light uppercase tracking-wide">{kindLabel[item.kind]}</span>
               <strong className="truncate">{item.label}</strong>
             </div>
             <p className={cx("mt-1 text-xs", muted)}>
@@ -374,7 +376,7 @@ function AuditTab({
             <li key={event.id} className={cx(card, "p-4 text-sm")}>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <code className="rounded bg-black/[0.06] px-1.5 py-0.5 text-xs font-bold">{event.action}</code>
+                  <code className="rounded bg-black/[0.06] px-1.5 py-0.5 text-xs font-light">{event.action}</code>
                   <span className={cx("text-xs", muted)}>{event.entityType} · {event.entityId}</span>
                 </div>
                 <span className={cx("text-xs", muted)}>{event.actor ? `@${event.actor}` : "sistema"} · {formatDateTime(event.createdAt)}</span>
@@ -412,12 +414,20 @@ function AccountsTab({
   const [links, setLinks] = useState<Record<string, { url: string; expiresAt: string }>>({});
   const [linkBusy, setLinkBusy] = useState<string | null>(null);
   const [linkError, setLinkError] = useState<string | null>(null);
+  const [copyBusy, setCopyBusy] = useState<string | null>(null);
+  const [copyFeedback, setCopyFeedback] = useState<{
+    userId: string;
+    kind: "success" | "error";
+    message: string;
+  } | null>(null);
+  const linkInputs = useRef<Record<string, HTMLInputElement | null>>({});
 
   if (!users) return <p className={cx("text-sm", muted)}>Carregando…</p>;
 
   async function generate(user: AdminUser) {
     setLinkBusy(user.id);
     setLinkError(null);
+    setCopyFeedback(null);
     try {
       const generated = await onResetLink(user);
       setLinks((current) => ({ ...current, [user.id]: generated }));
@@ -425,6 +435,23 @@ function AccountsTab({
       setLinkError(cause instanceof Error ? cause.message : "Falha ao gerar o link.");
     } finally {
       setLinkBusy(null);
+    }
+  }
+
+  async function copyResetLink(userId: string, url: string) {
+    setCopyBusy(userId);
+    setCopyFeedback(null);
+    try {
+      await copyText(url, linkInputs.current[userId]);
+      setCopyFeedback({ userId, kind: "success", message: "Link copiado." });
+    } catch (cause) {
+      setCopyFeedback({
+        userId,
+        kind: "error",
+        message: cause instanceof Error ? cause.message : "Não foi possível copiar o link.",
+      });
+    } finally {
+      setCopyBusy(null);
     }
   }
 
@@ -439,9 +466,9 @@ function AccountsTab({
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <strong>{user.name}</strong>
-                  {user.platformAdmin ? <span className="rounded-full bg-black/[0.06] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide">admin</span> : null}
-                  {user.disabledAt ? <span className="rounded-full bg-[var(--danger-soft)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--danger)]">desativada</span> : null}
-                  {user.pendingReset ? <span className="rounded-full bg-[var(--warn-soft)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--warn)]">reset pedido</span> : null}
+                  {user.platformAdmin ? <span className="rounded-full bg-black/[0.06] px-1.5 py-0.5 text-[10px] font-light uppercase tracking-wide">admin</span> : null}
+                  {user.disabledAt ? <span className="rounded-full bg-[var(--danger-soft)] px-1.5 py-0.5 text-[10px] font-light text-[var(--danger)]">desativada</span> : null}
+                  {user.pendingReset ? <span className="rounded-full bg-[var(--warn-soft)] px-1.5 py-0.5 text-[10px] font-light text-[var(--warn)]">reset pedido</span> : null}
                 </div>
                 <p className={cx("mt-1 text-xs", muted)}>
                   @{user.username}{user.email ? ` · ${user.email}` : " · sem e-mail"} · criada {formatDateTime(user.createdAt)} · última sessão {formatDateTime(user.lastSeenAt)} · {user.groupsOwned} grupos · {user.activeSessions} sessões
@@ -475,11 +502,28 @@ function AccountsTab({
             </div>
             {link ? (
               <div className="mt-3 rounded-xl bg-black/[0.04] p-3">
-                <p className={cx("text-[11px] font-bold uppercase tracking-wide", muted)}>Link de uso único · expira {formatDateTime(link.expiresAt)}</p>
+                <p className={cx("text-[11px] font-light uppercase tracking-wide", muted)}>Link de uso único · expira {formatDateTime(link.expiresAt)}</p>
                 <div className="mt-1 flex items-center gap-2">
-                  <input readOnly value={link.url} className="min-w-0 flex-1 rounded-lg border border-[var(--line)] bg-[var(--paper)] px-2 py-1 text-xs" onFocus={(event) => event.currentTarget.select()} />
-                  <Button variant="secondary" onClick={() => navigator.clipboard?.writeText(link.url)}>Copiar</Button>
+                  <input
+                    ref={(element) => { linkInputs.current[user.id] = element; }}
+                    readOnly
+                    value={link.url}
+                    className="min-w-0 flex-1 rounded-lg border border-[var(--line)] bg-[var(--paper)] px-2 py-1 text-xs"
+                    onFocus={(event) => event.currentTarget.select()}
+                  />
+                  <Button variant="secondary" disabled={copyBusy === user.id} onClick={() => void copyResetLink(user.id, link.url)}>
+                    {copyBusy === user.id ? "Copiando…" : copyFeedback?.userId === user.id && copyFeedback.kind === "success" ? "Copiado" : "Copiar"}
+                  </Button>
                 </div>
+                {copyFeedback?.userId === user.id ? (
+                  <p
+                    className={cx("mt-2 text-xs", copyFeedback.kind === "error" ? "text-[var(--danger)]" : "text-[var(--ok)]")}
+                    role={copyFeedback.kind === "error" ? "alert" : "status"}
+                    aria-live="polite"
+                  >
+                    {copyFeedback.message}
+                  </p>
+                ) : null}
               </div>
             ) : null}
           </article>

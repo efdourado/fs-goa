@@ -52,7 +52,7 @@ export function DashboardScreen({
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
-      <PageHeading title={`Olá, ${user.name.split(" ")[0]}.`} description="Veja o que pede sua atenção hoje ou comece uma nova experiência com seu grupo." action={atGroupLimit ? <span className="text-sm text-[var(--muted)]">Você atingiu o limite de {limits.groupsPerOwner} grupos</span> : <button type="button" className={cx(linkClass, "text-sm")} onClick={() => setShowGroupForm((open) => !open)}>{showGroupForm ? "Fechar" : `+ Crie um grupo (limite ${limits.groupsPerOwner})`}</button>} />
+      <PageHeading title={`Olá, ${user.name.split(" ")[0]}.`} description="O que pede sua atenção hoje e seus grupos." action={atGroupLimit ? <span className="text-sm text-[var(--muted)]">Você atingiu o limite de {limits.groupsPerOwner} grupos</span> : <button type="button" className={cx(linkClass, "text-sm")} onClick={() => setShowGroupForm((open) => !open)}>{showGroupForm ? "Fechar" : `+ Crie um grupo (limite: ${limits.groupsPerOwner})`}</button>} />
 
       {showGroupForm ? (
         <form className={cx(cardClass, "mb-7 grid gap-4 p-5 sm:grid-cols-[1fr_auto]")} onSubmit={createGroup}>
@@ -70,7 +70,7 @@ export function DashboardScreen({
 
       <section aria-labelledby="active-title">
         <div className="mb-4 flex items-center justify-between">
-          <h2 id="active-title" className="text-xl font-bold tracking-[-0.03em]">Desafios criados</h2>
+          <h2 id="active-title" className="text-xl font-semibold tracking-[-0.03em]">Desafios criados</h2>
           <span className="text-xs font-semibold text-[var(--muted)]">{active.length} {active.length === 1 ? "desafio" : "desafios"}</span>
         </div>
         {active.length ? (
@@ -83,8 +83,8 @@ export function DashboardScreen({
                 <article className={cx("relative flex flex-col overflow-hidden rounded-[20px] border bg-[var(--paper)] shadow-[0_1px_2px_rgba(32,36,31,0.04)] transition hover:-translate-y-0.5 has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-[var(--main)]/25", tone.border)} key={challenge.id}>
                   <div className="flex flex-1 flex-col p-5">
                     <div className="flex items-center justify-between gap-3"><ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} /><span className="text-xs text-[var(--muted)]">{isChallengeScheduled(challenge.status, challenge.startsOn) ? `começa em ${formatDate(challenge.startsOn)}` : challenge.endsOn ? `até ${formatDate(challenge.endsOn)}` : "sem prazo"}</span></div>
-                    <h3 className="mt-5 text-2xl font-bold tracking-[-0.04em]"><button type="button" onClick={() => onOpenChallenge(challenge.id)} className="cursor-pointer text-left after:absolute after:inset-0 after:content-[''] focus-visible:outline-none">{challenge.title}</button></h3>
-                    {challenge.description ? <p className="mt-2 line-clamp-2 text-sm leading-6 text-[var(--muted)]">{challenge.description}</p> : null}
+                    <h3 className="mt-5 text-2xl font-light tracking-[-0.04em]"><button type="button" onClick={() => onOpenChallenge(challenge.id)} className="cursor-pointer text-left after:absolute after:inset-0 after:content-[''] focus-visible:outline-none">{challenge.title}</button></h3>
+                    {challenge.description ? <p className="mt-2 line-clamp-1 text-sm leading-6 text-[var(--muted)]">{challenge.description}</p> : null}
                     {total > 0 ? (
                       <div className="mt-5">
                         <div className="mb-2 flex justify-between text-xs text-[var(--muted)]"><span>{done} de {total}</span><span>{Math.round((done / total) * 100)}%</span></div>
@@ -104,14 +104,14 @@ export function DashboardScreen({
 
       <section className="mt-10" aria-labelledby="groups-title">
         <div className="mb-4 flex items-center justify-between">
-          <h2 id="groups-title" className="text-xl font-bold tracking-[-0.03em]">Seus grupos</h2>
+          <h2 id="groups-title" className="text-xl font-semibold tracking-[-0.03em]">Seus grupos</h2>
           <span className="text-xs font-semibold text-[var(--muted)]">{groups.length} {groups.length === 1 ? "grupo" : "grupos"}</span>
         </div>
         {groups.length ? (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {groups.map((group) => (
-              <button className={cx(cardClass, "flex min-h-24 items-center justify-between gap-4 p-4 text-left transition hover:-translate-y-0.5 hover:border-[var(--main-line)]")} type="button" onClick={() => onOpenGroup(group.id)} key={group.id}>
-                <span><strong className="block text-base">{group.name}</strong><small className="mt-1 block text-[var(--muted)]">{group.memberCount ?? group.members?.length ?? 0} pessoas · {group.role === "owner" ? "responsável" : group.role === "admin" ? "admin" : "participante"}</small></span>
+              <button className={cx(cardClass, "cursor-pointer flex min-h-24 items-center justify-between gap-4 p-4 text-left transition hover:-translate-y-0.5 hover:border-[var(--main-line)]")} type="button" onClick={() => onOpenGroup(group.id)} key={group.id}>
+                <span>{group.name}<small className="mt-1 block text-[var(--muted)]">{group.memberCount ?? group.members?.length ?? 0} pessoas · {group.role === "owner" ? "responsável" : group.role === "admin" ? "admin" : "participante"}</small></span>
                 <span className="text-lg text-[var(--main-strong)]" aria-hidden="true">→</span>
               </button>
             ))}
@@ -121,11 +121,11 @@ export function DashboardScreen({
 
       {other.length ? (
         <section className="mt-10">
-          <h2 className="mb-4 text-xl font-bold tracking-[-0.03em]">Rascunhos e memórias</h2>
+          <h2 className="mb-4 text-xl font-semibold tracking-[-0.03em]">Rascunhos e memórias</h2>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {other.map((challenge) => (
-              <button className={cx(cardClass, "flex items-center justify-between gap-3 p-4 text-left hover:border-[var(--main-line)]")} type="button" onClick={() => challenge.status === "draft" && canManage(challenge.viewerRole) ? onOpenAdmin(challenge.id) : onOpenChallenge(challenge.id)} key={challenge.id}>
-                <span className="flex items-center gap-2"><ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} /><strong>{challenge.title}</strong></span><span aria-hidden="true">→</span>
+              <button className={cx(cardClass, "cursor-pointer flex items-center justify-between gap-3 p-4 text-left hover:border-[var(--main-line)]")} type="button" onClick={() => challenge.status === "draft" && canManage(challenge.viewerRole) ? onOpenAdmin(challenge.id) : onOpenChallenge(challenge.id)} key={challenge.id}>
+                <span className="flex items-center gap-2"><ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} />{challenge.title}</span><span aria-hidden="true">→</span>
               </button>
             ))}
           </div>

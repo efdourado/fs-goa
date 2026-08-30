@@ -22,7 +22,7 @@ export interface User {
   platformAdmin?: boolean;
 }
 
-interface Member extends User {
+export interface Member extends User {
   role: Role;
 }
 
@@ -174,11 +174,26 @@ export const DEFAULT_LIMITS: Limits = { groupsPerOwner: 6, challengesPerGroup: 6
 
 export interface InvitePreview {
   token?: string;
+  kind?: "group" | "challenge";
   groupId: Id;
   groupName: string;
+  challengeId?: Id | null;
+  challengeTitle?: string | null;
   invitedBy?: string;
   expiresAt?: string | null;
   status?: "valid" | "expired" | "revoked" | "exhausted" | "accepted";
+  accepted?: boolean;
+}
+
+export interface InviteAcceptance extends InvitePreview {
+  accepted: true;
+  idempotent: boolean;
+}
+
+export interface GroupMemberResult {
+  added: boolean;
+  restored?: boolean;
+  member: Member;
 }
 
 export interface ApiErrorBody {
@@ -195,6 +210,7 @@ export type Screen =
   | { kind: "account" }
   | { kind: "group"; groupId: Id }
   | { kind: "invite"; token: string }
+  | { kind: "invite-success"; invitation: InviteAcceptance }
   | { kind: "create-challenge"; groupId: Id }
   | { kind: "challenge"; challengeId: Id; tab: ParticipantTab }
   | { kind: "admin"; challengeId: Id; tab: AdminTab };

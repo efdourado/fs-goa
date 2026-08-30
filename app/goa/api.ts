@@ -28,6 +28,7 @@ export const API_PATHS = {
   account: "/api/account",
   groups: "/api/groups",
   group: (groupId: Id) => `/api/groups/${encodeURIComponent(groupId)}`,
+  groupMembers: (groupId: Id) => `/api/groups/${encodeURIComponent(groupId)}/members`,
   groupInvites: (groupId: Id) => `/api/groups/${encodeURIComponent(groupId)}/invites`,
   invite: (token: string) => `/api/invites/${encodeURIComponent(token)}`,
   groupChallenges: (groupId: Id) => `/api/groups/${encodeURIComponent(groupId)}/challenges`,
@@ -50,7 +51,7 @@ export const API_PATHS = {
     `/api/challenges/${encodeURIComponent(challengeId)}/export.csv`,
 } as const;
 
-class ApiError extends Error {
+export class ApiError extends Error {
   status: number;
   fieldErrors?: Record<string, string[]>;
 

@@ -12,7 +12,7 @@ export const inputClass =
   "mb-1 min-h-12 w-full rounded-xl border border-[var(--line)] bg-[var(--paper)] px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--main)] focus:ring-4 focus:ring-[var(--main)]/15 disabled:cursor-not-allowed disabled:bg-[var(--canvas)]";
 export const labelClass = "mb-1.5 block text-sm font-semibold text-[var(--ink)]";
 export const linkClass =
-  "font-medium underline-offset-4 hover:underline cursor-pointer disabled:cursor-not-allowed disabled:opacity-50";
+  "px-4 py-2 border-l-1 rounded-xl border-[var(--muted)] underline-offset-4 hover:opacity-90 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50";
 
 export function cx(...classes: Array<string | false | null | undefined>): string {
   return classes.filter(Boolean).join(" ");
@@ -42,7 +42,7 @@ export function Button({
   return (
     <button
       className={cx(
-        "cursor-pointer inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 disabled:cursor-not-allowed disabled:opacity-55",
+        "cursor-pointer inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-light transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 disabled:cursor-not-allowed disabled:opacity-55",
         tones[variant],
         className,
       )}
@@ -91,7 +91,7 @@ export function EmptyState({
       <span className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-[var(--main-soft)] text-xl text-[var(--main-strong)]" aria-hidden="true">
         ᥫ᭡
       </span>
-      <h3 className="text-lg font-bold tracking-[-0.02em]">{title}</h3>
+      <h3 className="text-lg font-light tracking-[-0.02em]">{title}</h3>
       <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[var(--muted)]">{description}</p>
       {action ? <div className="mt-5">{action}</div> : null}
     </div>
@@ -132,7 +132,7 @@ export function PageHeading({
   return (
     <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <h1 className="text-3xl font-bold tracking-[-0.045em] sm:text-4xl">{title}</h1>
+        <h1 className="text-3xl font-semibold tracking-[-0.045em] sm:text-4xl">{title}</h1>
         {description ? <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">{description}</p> : null}
       </div>
       {action}
@@ -152,14 +152,14 @@ export function AppHeader({
   onLogout: () => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false);
-  const navLink = "min-h-11 cursor-pointer rounded-xl px-2 text-xs font-bold text-[var(--muted)] hover:bg-[var(--wash)] hover:text-[var(--ink)] disabled:cursor-not-allowed sm:px-3";
+  const navLink = "min-h-11 cursor-pointer rounded-xl px-2 text-xs text-[var(--muted)] hover:bg-[var(--wash)] hover:text-[var(--ink)] disabled:cursor-not-allowed sm:px-3";
   return (
     <header className="sticky top-0 z-30 border-b border-black/10 bg-[var(--canvas)]/92 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:h-[76px] sm:px-6">
         <button className="cursor-pointer rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25" type="button" onClick={onHome}><Brand /></button>
         <div className="flex items-center gap-1 sm:gap-2">
           {user.platformAdmin ? (
-            <Link className={cx(navLink, "inline-flex items-center")} href="/admin">Admin</Link>
+            <Link className={cx(navLink, "inline-flex items-center")} href="/admin">Gestão</Link>
           ) : null}
           <button
             className="flex cursor-pointer items-center gap-2.5 rounded-xl p-1 pr-2 text-left hover:bg-[var(--wash)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"

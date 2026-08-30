@@ -88,16 +88,16 @@ export function CreateChallengeScreen({
   const stepLabels = ["Base", "Campos", "Checkpoints", "Pessoas"];
   return (
     <main className="mx-auto max-w-5xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
-      <button className="mb-6 min-h-11 text-sm font-bold text-[var(--muted)] hover:text-[var(--ink)]" type="button" onClick={onBack}>← Voltar para {group.name}</button>
+      <button className="mb-6 min-h-11 text-sm font-light text-[var(--muted)] hover:text-[var(--ink)]" type="button" onClick={onBack}>← Voltar para {group.name}</button>
       <PageHeading title="Monte a próxima experiência" description="Comece com um preset e ajuste somente o que seu grupo precisa." />
       <nav className="mb-6 grid grid-cols-4 gap-1 rounded-2xl bg-[var(--wash-strong)]/70 p-1" aria-label="Etapas de criação">
-        {stepLabels.map((label, index) => <button className={cx("min-h-11 rounded-xl px-2 text-xs font-bold sm:text-sm", step === index + 1 ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : index + 1 < step ? "text-[var(--ink)]" : "text-[var(--muted)]")} type="button" onClick={() => index + 1 < step && setStep(index + 1)} disabled={index + 1 > step} key={label}><span className="hidden sm:inline">{index + 1}. </span>{label}</button>)}
+        {stepLabels.map((label, index) => <button className={cx("min-h-11 rounded-xl px-2 text-xs font-light sm:text-sm", step === index + 1 ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : index + 1 < step ? "text-[var(--ink)]" : "text-[var(--muted)]")} type="button" onClick={() => index + 1 < step && setStep(index + 1)} disabled={index + 1 > step} key={label}><span className="hidden sm:inline">{index + 1}. </span>{label}</button>)}
       </nav>
 
       <section className={cx(cardClass, "p-5 sm:p-7")}>
         {step === 1 ? (
           <div>
-            <h2 className="text-xl font-bold">Escolha um ponto de partida</h2>
+            <h2 className="text-xl font-light">Escolha um ponto de partida</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               {(["cine", "reading"] as const).map((value) => (
                 <button className={cx("rounded-2xl border p-5 text-left transition", template === value ? "border-[var(--main)] bg-[var(--main-soft)] ring-2 ring-[var(--main)]/25" : "border-[var(--line)] bg-[var(--paper)] hover:border-[var(--main-line)]")} type="button" aria-pressed={template === value} onClick={() => chooseTemplate(value)} key={value}>
@@ -111,17 +111,17 @@ export function CreateChallengeScreen({
               <label className="sm:col-span-2"><span className={labelClass}>Título</span><input className={inputClass} value={title} onChange={(event) => setTitle(event.target.value)} maxLength={140} required /></label>
               <label><span className={labelClass}>Início</span><input className={inputClass} type="date" value={startsOn} onChange={(event) => setStartsOn(event.target.value)} required /></label>
               <label><span className={labelClass}>Término</span><input className={inputClass} type="date" min={startsOn} value={endsOn} onChange={(event) => setEndsOn(event.target.value)} required /></label>
-              <label className="sm:col-span-2"><span className={labelClass}>Descrição <small className="font-normal text-[var(--muted)]">opcional</small></span><textarea className={inputClass} rows={3} value={description} onChange={(event) => setDescription(event.target.value)} maxLength={1000} /></label>
-              <div className="sm:col-span-2"><div className="mb-3"><span className={labelClass}>Regras com título <small className="font-normal text-[var(--muted)]">opcional</small></span><p className="text-xs leading-5 text-[var(--muted)]">Dê destaque a cada acordo importante do desafio.</p></div><RuleSectionsEditor value={ruleSections} onChange={setRuleSections} /></div>
+              <label className="sm:col-span-2"><span className={labelClass}>Descrição <small className="font-light text-[var(--muted)]">opcional</small></span><textarea className={inputClass} rows={3} value={description} onChange={(event) => setDescription(event.target.value)} maxLength={1000} /></label>
+              <div className="sm:col-span-2"><div className="mb-3"><span className={labelClass}>Regras com título <small className="font-light text-[var(--muted)]">opcional</small></span><p className="text-xs leading-5 text-[var(--muted)]">Dê destaque a cada acordo importante do desafio.</p></div><RuleSectionsEditor value={ruleSections} onChange={setRuleSections} /></div>
             </div>
           </div>
         ) : null}
 
-        {step === 2 ? <div><h2 className="text-xl font-bold">O que cada pessoa registra?</h2><p className="mb-5 mt-1 text-sm text-[var(--muted)]">O identificador de cada campo permanece estável mesmo se o rótulo mudar.</p><FieldBuilder fields={fields} onChange={setFields} /></div> : null}
+        {step === 2 ? <div><h2 className="text-xl font-light">O que cada pessoa registra?</h2><p className="mb-5 mt-1 text-sm text-[var(--muted)]">O identificador de cada campo permanece estável mesmo se o rótulo mudar.</p><FieldBuilder fields={fields} onChange={setFields} /></div> : null}
 
         {step === 3 ? (
           <div>
-            <h2 className="text-xl font-bold">Defina os checkpoints</h2>
+            <h2 className="text-xl font-light">Defina os checkpoints</h2>
             {template === "cine" ? (
               <><p className="mt-1 text-sm leading-6 text-[var(--muted)]">Cole um título por linha. Cada item vira uma oportunidade de registro para cada participante.</p><label className="mt-5 block"><span className={labelClass}>Lista de itens</span><textarea className={inputClass} rows={12} value={itemsText} onChange={(event) => setItemsText(event.target.value)} placeholder={"Primeiro título\nSegundo título\nTerceiro título"} /></label><p className="mt-2 text-xs font-semibold text-[var(--muted)]">{items.length} {items.length === 1 ? "item" : "itens"}</p></>
             ) : (
@@ -132,7 +132,7 @@ export function CreateChallengeScreen({
 
         {step === 4 ? (
           <div>
-            <h2 className="text-xl font-bold">Quem vai participar?</h2>
+            <h2 className="text-xl font-light">Quem vai participar?</h2>
             <p className="mt-1 text-sm text-[var(--muted)]">Somente membros selecionados poderão enviar registros. Administradores continuam com acesso à revisão.</p>
             {group.members?.length ? (
               <fieldset className="mt-5 grid gap-3 sm:grid-cols-2">

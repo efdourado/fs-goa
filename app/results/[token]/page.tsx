@@ -34,12 +34,12 @@ export default async function SharedResultsPage({ params }: { params: Promise<{ 
   return (
     <main className="min-h-screen bg-[var(--canvas)] px-4 py-8 text-[var(--ink)] sm:px-6 sm:py-14">
       <div className="mx-auto max-w-5xl">
-        <Link className="mb-7 inline-flex min-h-11 items-center gap-2 font-bold" href="/">
+        <Link className="mb-7 inline-flex min-h-11 items-center gap-2 font-light" href="/">
           <span className="grid h-9 w-9 place-items-center rounded-[50%_50%_50%_16%] bg-[var(--ink)] text-white">g</span>
           goa
         </Link>
         <section className="overflow-hidden rounded-[30px] bg-[var(--ink)] px-6 py-12 text-white sm:px-12 sm:py-16">
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-white/50">
+          <p className="text-xs font-light uppercase tracking-[0.16em] text-white/50">
             {challenge.startsOn} — {challenge.endsOn}
           </p>
           <h1 className="mt-5 max-w-4xl text-4xl font-semibold leading-none tracking-[-0.055em] sm:text-7xl">
@@ -56,7 +56,7 @@ export default async function SharedResultsPage({ params }: { params: Promise<{ 
           <section className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-label="Resultados em números">
             {result.metrics.map((metric) => (
               <article className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-6" key={metric.id}>
-                <p className="text-xs font-bold uppercase tracking-[0.1em] text-[var(--muted)]">{metric.label}</p>
+                <p className="text-xs font-light uppercase tracking-[0.1em] text-[var(--muted)]">{metric.label}</p>
                 <strong className="mt-3 block text-4xl tracking-[-0.05em]">{metric.formattedValue ?? metric.value ?? "—"}</strong>
               </article>
             ))}
@@ -67,7 +67,7 @@ export default async function SharedResultsPage({ params }: { params: Promise<{ 
             {result.comments.map((comment) => (
               <blockquote className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-6" key={comment.id}>
                 <p className="text-lg leading-8">“{comment.text}”</p>
-                {comment.itemTitle ? <footer className="mt-4 text-sm font-bold text-[var(--muted)]">{comment.itemTitle}</footer> : null}
+                {comment.itemTitle ? <footer className="mt-4 text-sm font-light text-[var(--muted)]">{comment.itemTitle}</footer> : null}
               </blockquote>
             ))}
           </section>

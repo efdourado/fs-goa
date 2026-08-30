@@ -220,6 +220,15 @@ export async function adminAudit(query: URLSearchParams) {
  * The schema uses RESTRICT liberally, so we cannot rely on ON DELETE CASCADE.
  */
 async function purgeChallengeRows(client: PoolClient, challengeId: string): Promise<void> {
+  // A challenge-targeted invitation must disappear with its target. Deleting the
+  // parent invitation cascades both its target row and any redemption history.
+  await client.query(
+    `DELETE FROM group_invites
+      WHERE id IN (
+        SELECT invite_id FROM invite_challenge_targets WHERE challenge_id = $1
+      )`,
+    [challengeId],
+  );
   await client.query("DELETE FROM result_blocks WHERE challenge_id = $1", [challengeId]);
   await client.query("DELETE FROM entry_values WHERE challenge_id = $1", [challengeId]);
   await client.query("DELETE FROM entries WHERE challenge_id = $1", [challengeId]);

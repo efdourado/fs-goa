@@ -131,7 +131,7 @@ export function FieldBuilder({
       ) : <EmptyState title="Nenhum campo configurado" description="Adicione pelo menos um campo para que os participantes possam registrar algo." />}
 
       <form className="rounded-2xl border border-dashed border-[var(--main-line)] bg-[var(--main-soft)]/60 p-4" onSubmit={addField}>
-        <p className="mb-3 text-sm font-bold text-[var(--main-strong)]">Adicionar campo</p>
+        <p className="mb-3 text-sm font-light text-[var(--main-strong)]">Adicionar campo</p>
         <div className="grid gap-3 sm:grid-cols-[1fr_180px_auto_auto]">
           <label><span className="sr-only">Nome do campo</span><input className={inputClass} value={label} onChange={(event) => setLabel(event.target.value)} placeholder="Ex.: Páginas lidas" maxLength={100} required /></label>
           <label><span className="sr-only">Tipo do campo</span><select className={inputClass} value={type} onChange={(event) => setType(event.target.value as FieldType)}>{Object.entries(fieldTypeLabels).map(([value, text]) => <option value={value} key={value}>{text}</option>)}</select></label>
