@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import test from "node:test";
 
 import { RuleSectionsView } from "../app/goa/rules";
+import { DynamicEntryForm } from "../app/goa/screens/participant-challenge";
 import { AppHeader, ChallengeStatusBadge } from "../app/goa/ui";
 import { entryUnavailableMessage, isChallengeScheduled, itemStatusLabel } from "../app/goa/utils";
 
@@ -66,6 +67,21 @@ test("renderiza estado agendado e regras tituladas em destaque", () => {
   assert.match(rules, /2\.1/, "tópico da regra 2 é numerado 2.1");
   assert.match(rules, /qualquer coisa/, "título do tópico é renderizado");
   assert.doesNotMatch(rules, /<details/);
+});
+
+test("formulário de registro esconde campos opcionais até a pessoa pedir", () => {
+  const form = renderToStaticMarkup(createElement(DynamicEntryForm, {
+    fields: [
+      { id: "f1", key: "paginas", label: "Páginas lidas", type: "number", required: true },
+      { id: "f2", key: "nota", label: "Nota do livro", type: "rating", required: false, config: { min: 0, max: 5, step: 0.5 } },
+    ],
+    item: null,
+    canEdit: true,
+    onSave: async () => undefined,
+  }));
+  assert.match(form, /Páginas lidas/);
+  assert.doesNotMatch(form, /Nota do livro/, "campo opcional fica oculto por padrão");
+  assert.match(form, /Mostrar campos opcionais \(1\)/);
 });
 
 test("header sinaliza logo, perfil e sair como clicáveis", () => {
