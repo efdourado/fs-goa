@@ -50,7 +50,7 @@ export async function getChallengeDetail(session: SessionContext, challengeId: s
         [challengeId],
       );
     const metrics = await metricsForChallenge(client, challengeId);
-    const result = await resultForChallenge(client, challengeId);
+    const result = await resultForChallenge(client, challengeId, metrics);
     const items = itemsResult.rows.length
       ? itemsResult.rows.map((item) => ({
           id: item.id, entryTypeId: item.entry_type_id, title: item.title,

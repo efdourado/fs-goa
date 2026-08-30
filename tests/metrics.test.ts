@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { PoolClient } from "pg";
+
+import { resultForChallenge } from "../lib/goa/challenges/results";
 import { calculateMetric } from "../lib/metrics";
 
 test("calcula as seis métricas básicas com semântica determinística", () => {
@@ -33,3 +36,35 @@ test("rejeita números não finitos", () => {
   assert.throws(() => calculateMetric({ operation: "max", values: [Number.POSITIVE_INFINITY] }), /finitos/);
 });
 
+test("reaproveita métricas calculadas no detalhe sem consultá-las novamente", async () => {
+  const queries: string[] = [];
+  const client = {
+    query: async (sql: string) => {
+      queries.push(sql);
+      if (sql.includes("SELECT results_published_at")) {
+        return { rows: [{ results_published_at: null }] };
+      }
+      if (sql.includes("FROM result_blocks")) {
+        return {
+          rows: [{
+            id: "block-1",
+            kind: "metric",
+            metric_id: "metric-1",
+            heading: "Média",
+            body_snapshot: null,
+            value_snapshot: null,
+            position: 0,
+          }],
+        };
+      }
+      throw new Error(`Consulta inesperada: ${sql}`);
+    },
+  } as unknown as PoolClient;
+  const metric = { id: "metric-1", label: "Média", value: 4.5 };
+
+  const result = await resultForChallenge(client, "challenge-1", [metric]);
+
+  assert.deepEqual(result.metrics, [metric]);
+  assert.equal(queries.length, 2);
+  assert.ok(queries.every((sql) => !sql.includes("FROM challenge_metrics")));
+});

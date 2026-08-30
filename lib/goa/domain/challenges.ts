@@ -2,24 +2,13 @@ import { requireGroupRole, type SessionContext } from "../../auth";
 import { inTransaction, oneOrNull } from "../../db";
 import { ApiError, stringValue } from "../../http";
 import { assertUnder, LIMITS } from "../../limits";
+import { syncDailyCheckpoints } from "../daily-checkpoints";
 import { writeAudit } from "./audit";
 import { defaultFields, insertField, type ClientField } from "./fields";
 import { parseRuleSections, rulesCompatibilityText } from "./rules";
 import { asRecord, dateString, publicId, semanticKey } from "./shared";
 
 const SUBMISSION_MODES = new Set(["item", "daily", "free"]);
-
-function eachDate(start: string, end: string): string[] {
-  const current = new Date(`${start}T00:00:00Z`);
-  const last = new Date(`${end}T00:00:00Z`);
-  const dates: string[] = [];
-  while (current <= last) {
-    dates.push(current.toISOString().slice(0, 10));
-    if (dates.length > 366) throw new ApiError(400, "date_range", "Desafios diários podem ter no máximo 366 dias.");
-    current.setUTCDate(current.getUTCDate() + 1);
-  }
-  return dates;
-}
 
 export async function createChallenge(
   session: SessionContext,
@@ -99,17 +88,13 @@ export async function createChallenge(
         );
       }
     } else if (submissionMode === "daily" && body.generateDaily !== false) {
-      const dates = eachDate(startDate, endDate);
-      for (let index = 0; index < dates.length; index += 1) {
-        const date = dates[index];
-        await client.query(
-          `INSERT INTO challenge_checkpoints
-            (id, challenge_id, semantic_key, title, position, starts_at, due_at, created_at, updated_at)
-           VALUES ($1,$2,$3,$4,$5,$6::date::timestamp AT TIME ZONE 'America/Sao_Paulo',
-                   ($6::date + interval '1 day')::timestamp AT TIME ZONE 'America/Sao_Paulo',now(),now())`,
-          [publicId(), id, `dia_${index + 1}`, `Dia ${index + 1}`, index, date],
-        );
-      }
+      await syncDailyCheckpoints(
+        client,
+        id,
+        startDate,
+        endDate,
+        "Desafios diários podem ter no máximo 366 dias.",
+      );
     }
 
     const requestedParticipants = participantIds.length ? participantIds : [session.user.id];

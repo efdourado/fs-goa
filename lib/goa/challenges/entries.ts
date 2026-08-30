@@ -21,6 +21,15 @@ interface StorageField extends FieldRow {
   option_ids: string[];
 }
 
+interface EntryValueInsert {
+  field_id: string;
+  text_value: string | null;
+  number_scaled: number | null;
+  boolean_value: boolean | null;
+  date_value: string | null;
+  option_id: string | null;
+}
+
 async function storageFields(client: PoolClient, challengeId: string, entryTypeId: string): Promise<StorageField[]> {
   const fields = await client.query<FieldRow>(
     `SELECT id,challenge_id,entry_type_id,semantic_key,label,help_text,kind,required,position,
@@ -69,6 +78,7 @@ async function writeEntryValues(
   const unknown = Object.keys(values).filter((key) => !knownKeys.has(key));
   if (unknown.length) throw new ApiError(400, "unknown_field", "O registro contém campos desconhecidos.", unknown);
   const normalized: Record<string, unknown> = {};
+  const inserts: EntryValueInsert[] = [];
   for (const field of fields) {
     const candidate = Object.hasOwn(values, field.id) ? values[field.id] : values[field.semantic_key];
     const validation = validateFieldValue(fieldDefinition(field), candidate);
@@ -83,13 +93,28 @@ async function writeEntryValues(
     } else if (field.kind === "boolean") columns[2] = validation.value as boolean;
     else if (field.kind === "date") columns[3] = validation.value as string;
     else if (field.kind === "choice") columns[4] = validation.value as string;
+    inserts.push({
+      field_id: field.id,
+      text_value: columns[0],
+      number_scaled: columns[1],
+      boolean_value: columns[2],
+      date_value: columns[3],
+      option_id: columns[4],
+    });
+    normalized[field.id] = validation.value;
+  }
+  if (inserts.length) {
     await client.query(
       `INSERT INTO entry_values
         (entry_id,challenge_id,entry_type_id,field_id,text_value,number_scaled,boolean_value,date_value,option_id,created_at,updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,now(),now())`,
-      [entryId, challengeId, entryTypeId, field.id, ...columns],
+       SELECT $1,$2,$3,value.field_id,value.text_value,value.number_scaled,value.boolean_value,
+              value.date_value,value.option_id,now(),now()
+         FROM jsonb_to_recordset($4::jsonb) AS value(
+           field_id text,text_value text,number_scaled bigint,boolean_value boolean,
+           date_value date,option_id text
+         )`,
+      [entryId, challengeId, entryTypeId, JSON.stringify(inserts)],
     );
-    normalized[field.id] = validation.value;
   }
   return normalized;
 }
