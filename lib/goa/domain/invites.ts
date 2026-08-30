@@ -4,6 +4,7 @@ import { inTransaction, oneOrNull, withClient } from "../../db";
 import { ApiError, stringValue } from "../../http";
 import { generateOpaqueToken, hashToken } from "../../security";
 import { writeAudit } from "./audit";
+import { assertGroupHasCapacity } from "./groups";
 import { integerValue, publicId } from "./shared";
 
 type InviteKind = "group" | "challenge";
@@ -192,6 +193,7 @@ export async function acceptInvite(session: SessionContext, token: string) {
     const status = inviteStatus(invite);
     if (status !== "valid") throw new ApiError(410, `invite_${status}`, "Este convite não está mais disponível.");
 
+    await assertGroupHasCapacity(client, invite.group_id, session.user.id);
     await client.query(
       `INSERT INTO group_members (group_id, user_id, role, added_by_user_id, joined_at)
        VALUES ($1, $2, $3, $4, now())

@@ -77,7 +77,8 @@ exposto.
 2. **Environment Variables** (Production): `DATABASE_URL` (URL do Neon com
    `sslmode=require`), `APP_ORIGIN` (origem pública exata, ex.: `https://goa.vercel.app`),
    `ADMIN_PASSWORD` (mínimo 10 caracteres). Opcional: `ADMIN_USERNAME`, `ADMIN_NAME`,
-   `MAX_GROUPS_PER_OWNER` / `MAX_CHALLENGES_PER_GROUP` (padrão 6).
+   `MAX_GROUPS_PER_OWNER` / `MAX_CHALLENGES_PER_GROUP` (padrão 6),
+   `MAX_MEMBERS_PER_GROUP` (padrão 62).
 3. **`git push`** dispara o build e o deploy.
 4. **Migração + conta de administração** (uma vez, e a cada nova migração) — rode
    contra o Neon a partir da sua máquina:

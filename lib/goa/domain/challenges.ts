@@ -1,7 +1,7 @@
 import { requireGroupRole, type SessionContext } from "../../auth";
 import { inTransaction, oneOrNull } from "../../db";
 import { ApiError, stringValue } from "../../http";
-import { assertUnder, LIMITS } from "../../limits";
+import { assertArrayWithin, assertUnder, LIMITS } from "../../limits";
 import { syncDailyCheckpoints } from "../daily-checkpoints";
 import { writeAudit } from "./audit";
 import { defaultFields, insertField, type ClientField } from "./fields";
@@ -27,6 +27,8 @@ export async function createChallenge(
   const fields = Array.isArray(body.fields) && body.fields.length ? (body.fields as ClientField[]) : defaultFields(body.template);
   if (fields.length > 30) throw new ApiError(400, "field_limit", "Use no máximo 30 campos.");
   const items = Array.isArray(body.items) ? body.items : [];
+  assertArrayWithin(body.items, 200, "Adicione no máximo 200 itens.");
+  assertArrayWithin(body.participantIds, LIMITS.membersPerGroup, "Participantes demais para um único desafio.");
   const participantIds = Array.isArray(body.participantIds)
     ? [...new Set(body.participantIds.filter((id): id is string => typeof id === "string"))]
     : [session.user.id];

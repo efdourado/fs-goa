@@ -754,6 +754,61 @@ test("convites distinguem grupo e desafio, e inclusão por username é idempoten
   assert.equal(missingTarget.response.status, 404, "alvo ausente não cria convite genérico por engano");
 });
 
+test("recusa entrar no grupo além do limite de pessoas, por username e por convite", async () => {
+  const previousCap = process.env.MAX_MEMBERS_PER_GROUP;
+  process.env.MAX_MEMBERS_PER_GROUP = "3";
+  try {
+    const owner = await register("Dona Lotada", "dona_lotada");
+    const second = await register("Segunda Pessoa", "segunda_lotada");
+    const third = await register("Terceira Pessoa", "terceira_lotada");
+    const byUsername = await register("Quarta por Username", "quarta_lotada");
+    const byInvite = await register("Quinta por Convite", "quinta_lotada");
+
+    const groupResponse = await call("POST", "/api/groups", { session: owner, body: { name: "Grupo lotado" } });
+    const groupId = (groupResponse.body as { id: string }).id;
+
+    for (const guest of [second, third]) {
+      const added = await call("POST", `/api/groups/${groupId}/members`, {
+        session: owner,
+        body: { username: guest.user.username },
+      });
+      assert.equal(added.response.status, 200, JSON.stringify(added.body));
+    }
+
+    const overflowUsername = await call("POST", `/api/groups/${groupId}/members`, {
+      session: owner,
+      body: { username: byUsername.user.username },
+    });
+    assert.equal(overflowUsername.response.status, 403, JSON.stringify(overflowUsername.body));
+    assert.equal((overflowUsername.body as { error: string }).error, "group_full");
+
+    const invite = await call("POST", `/api/groups/${groupId}/invites`, {
+      session: owner,
+      body: { expiresInDays: 7, maxUses: 5 },
+    });
+    const overflowInvite = await call("POST", `/api/invites/${(invite.body as { token: string }).token}`, {
+      session: byInvite,
+      body: {},
+    });
+    assert.equal(overflowInvite.response.status, 403, JSON.stringify(overflowInvite.body));
+    assert.equal((overflowInvite.body as { error: string }).error, "group_full");
+
+    const settled = await adminPool.query<{ count: number }>(
+      "SELECT count(*)::int AS count FROM group_members WHERE group_id = $1 AND removed_at IS NULL",
+      [groupId],
+    );
+    assert.equal(settled.rows[0]?.count, 3, "o grupo para exatamente no limite");
+    const inviteUse = await adminPool.query<{ use_count: number }>(
+      "SELECT use_count FROM group_invites WHERE id = $1",
+      [(invite.body as { id: string }).id],
+    );
+    assert.equal(inviteUse.rows[0]?.use_count, 0, "aceite recusado não consome o convite");
+  } finally {
+    if (previousCap === undefined) delete process.env.MAX_MEMBERS_PER_GROUP;
+    else process.env.MAX_MEMBERS_PER_GROUP = previousCap;
+  }
+});
+
 test("aplica limites de criação por dono e por grupo", async () => {
   const owner = await register("Limite", "limite_dono");
 
