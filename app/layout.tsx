@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const title = "Goa — desafios que viram história";
+const title = "Goa";
 const description =
   "Desafios privados e personalizáveis para grupos registrarem progresso e guardarem suas histórias.";
 

@@ -164,8 +164,46 @@ export function GroupScreen({
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
-      <button className={cx(backLinkClass, "mb-6")} type="button" onClick={onBack}>← Voltar ao início</button>
-      <PageHeading title={group.name} description={`${group.description ? `${group.description} · ` : ""}${group.memberCount ?? group.members?.length ?? 0} pessoas · ${group.role === "owner" ? "responsável" : group.role === "admin" ? "admin" : "participante"}`} action={canManage(group.role) ? <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm sm:justify-end"><button type="button" className={linkClass} onClick={toggleGroupEdit}>{showGroupEdit ? "Fechar edição" : "Editar grupo"}</button><button type="button" className={linkClass} onClick={() => setShowInvite((open) => !open)}>{showInvite ? "Fechar convite" : "+ Convidar"}</button>{challenges.length >= challengeLimit ? <span className="text-[var(--muted)]">Limite de {challengeLimit} desafios atingido</span> : <button type="button" className={linkClass} onClick={onCreateChallenge}>+ Criar desafio (limite {challengeLimit})</button>}</div> : undefined} />
+      <button className={cx(backLinkClass, "mb-6")} type="button" onClick={onBack}>← Início</button>
+      <PageHeading
+        title={group.name}
+        description={`${group.description ? `${group.description} · ` : ""}${group.memberCount ?? group.members?.length ?? 0} ${
+          (group.memberCount ?? group.members?.length ?? 0) === 1 ? "pessoa" : "pessoas"
+        } · ${
+          group.role === "owner"
+            ? "Responsável"
+            : group.role === "admin"
+              ? "admin"
+              : "Participante"
+        }`}
+        action={
+          canManage(group.role) ? (
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm sm:justify-end">
+              <button type="button" className={linkClass} onClick={toggleGroupEdit}>
+                {showGroupEdit ? "Fechar edição" : "Editar grupo"}
+              </button>
+
+              <button
+                type="button"
+                className={linkClass}
+                onClick={() => setShowInvite((open) => !open)}
+              >
+                {showInvite ? "Fechar convite" : "+ Convidar"}
+              </button>
+
+              {challenges.length >= challengeLimit ? (
+                <span className="text-[var(--muted)]">
+                  Limite de {challengeLimit} desafios atingido
+                </span>
+              ) : (
+                <button type="button" className={linkClass} onClick={onCreateChallenge}>
+                  + Criar desafio (limite {challengeLimit})
+                </button>
+              )}
+            </div>
+          ) : undefined
+        }
+      />
 
       {showGroupEdit ? (
         <section className={cx(cardClass, "mb-7 p-5")} aria-labelledby="group-edit-title">

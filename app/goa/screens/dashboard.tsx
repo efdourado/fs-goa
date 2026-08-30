@@ -111,7 +111,12 @@ export function DashboardScreen({
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {groups.map((group) => (
               <button className={cx(cardClass, "cursor-pointer flex min-h-24 items-center justify-between gap-4 p-4 text-left transition hover:-translate-y-0.5 hover:border-[var(--main-line)]")} type="button" onClick={() => onOpenGroup(group.id)} key={group.id}>
-                <span>{group.name}<small className="mt-1 block text-[var(--muted)]">{group.memberCount ?? group.members?.length ?? 0} pessoas · {group.role === "owner" ? "responsável" : group.role === "admin" ? "admin" : "participante"}</small></span>
+                <span>
+                  {group.name}
+                  <small className="mt-1 block text-[var(--muted)]">
+                    {group.memberCount ?? group.members?.length ?? 0} {(group.memberCount ?? group.members?.length ?? 0) === 1 ? "pessoa" : "pessoas"} · {group.role === "owner" ? "Responsável" : group.role === "admin" ? "admin" : "Participante"}
+                  </small>
+                </span>
                 <span className="text-lg text-[var(--main-strong)]" aria-hidden="true">→</span>
               </button>
             ))}

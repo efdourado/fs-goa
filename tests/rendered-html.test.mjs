@@ -60,11 +60,11 @@ test("o servidor de produção renderiza o shell acessível com metadados sociai
 
     const html = await response.text();
     assert.match(html, /<html[^>]+lang="pt-BR"/i);
-    assert.match(html, /<title>Goa — desafios que viram história<\/title>/i);
+    assert.match(html, /<title>Goa<\/title>/i);
     assert.match(html, /Carregando o Goa/);
     assert.match(html, /role="status"/);
     assert.match(html, /aria-live="polite"/);
-    assert.match(html, /property="og:title" content="Goa — desafios que viram história"/i);
+    assert.match(html, /property="og:title" content="Goa"/i);
     assert.match(html, new RegExp(`property="og:image" content="${BASE}/og\\.png"`, "i"));
     assert.match(html, /name="twitter:card" content="summary_large_image"/i);
   });
