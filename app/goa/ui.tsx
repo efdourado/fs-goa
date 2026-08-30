@@ -13,6 +13,9 @@ export const inputClass =
 export const labelClass = "mb-1.5 block text-sm font-medium text-[var(--ink)]";
 export const linkClass =
   "px-4 py-2 border-l-1 rounded-xl border-[var(--muted)] underline-offset-4 hover:opacity-90 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50";
+/** The "← Voltar" links that sit at the top of most screens. */
+export const backLinkClass =
+  "min-h-11 cursor-pointer text-sm font-light text-[var(--muted)] hover:text-[var(--ink)]";
 
 export function cx(...classes: Array<string | false | null | undefined>): string {
   return classes.filter(Boolean).join(" ");

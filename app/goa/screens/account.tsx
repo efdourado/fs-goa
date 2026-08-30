@@ -4,7 +4,7 @@ import { type FormEvent, useState } from "react";
 
 import { errorMessage } from "../api";
 import type { User } from "../types";
-import { Button, cardClass, cx, inputClass, labelClass, PageHeading, StatusMessage } from "../ui";
+import { backLinkClass, Button, cardClass, cx, inputClass, labelClass, PageHeading, StatusMessage } from "../ui";
 
 export function AccountScreen({
   user,
@@ -61,7 +61,7 @@ export function AccountScreen({
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
-      <button className="mb-6 min-h-11 text-sm font-light text-[var(--muted)] hover:text-[var(--ink)]" type="button" onClick={onBack}>← Voltar ao início</button>
+      <button className={cx(backLinkClass, "mb-6")} type="button" onClick={onBack}>← Voltar ao início</button>
       <PageHeading title="Seu perfil" description="Por enquanto só o nome de exibição é editável." />
 
       <section className={cx(cardClass, "p-5 sm:p-7")}>

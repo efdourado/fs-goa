@@ -3,7 +3,7 @@
 import { type FormEvent, useState } from "react";
 
 import { API_PATHS, apiRequest, errorMessage } from "../api";
-import { Brand, Button, cardClass, cx, inputClass, labelClass, StatusMessage } from "../ui";
+import { backLinkClass, Brand, Button, cardClass, cx, inputClass, labelClass, StatusMessage } from "../ui";
 
 export function ResetPasswordScreen({
   token,
@@ -54,7 +54,7 @@ export function ResetPasswordScreen({
           <StatusMessage error={error} />
           <Button type="submit" className="w-full" disabled={busy}>{busy ? "Salvando…" : "Salvar e entrar"}</Button>
         </form>
-        <button className="mt-5 min-h-11 text-sm font-light text-[var(--muted)] hover:text-[var(--ink)]" type="button" onClick={onCancel}>← Voltar ao login</button>
+        <button className={cx(backLinkClass, "mt-5")} type="button" onClick={onCancel}>← Voltar ao login</button>
       </section>
     </main>
   );
