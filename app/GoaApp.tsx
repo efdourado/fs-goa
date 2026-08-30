@@ -122,12 +122,13 @@ export default function GoaApp() {
   // through openParticipant/openAdmin; load the detail once when that happens.
   const routedChallengeId =
     screen.kind === "challenge" || screen.kind === "admin" ? screen.challengeId : null;
+  const viewerId = bootstrap?.user?.id ?? null;
   useEffect(() => {
-    if (!routedChallengeId || !bootstrap?.user || detailLoading) return;
+    if (!routedChallengeId || !viewerId || detailLoading) return;
     if (selectedChallenge?.id === routedChallengeId) return;
     void loadChallenge(routedChallengeId).catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routedChallengeId, bootstrap?.user]);
+  }, [routedChallengeId, viewerId]);
 
   async function refreshBootstrap(): Promise<BootstrapData> {
     const raw = await apiRequest<BootstrapData | { bootstrap: BootstrapData }>(API_PATHS.bootstrap);
