@@ -342,12 +342,21 @@ export default function GoaApp() {
     if (challengeId) openAdmin(challengeId);
   }
 
-  async function saveEntry(itemId: Id | null, values: Record<Id, unknown>, entry?: Entry) {
+  async function saveEntry(
+    itemId: Id | null,
+    values: Record<Id, unknown>,
+    entry?: Entry,
+    occurredOn?: string,
+  ) {
     if (!bootstrap || !selectedChallenge) return;
     if (entry) {
       await apiRequest(API_PATHS.entry(entry.id), { method: "PATCH", body: { values }, csrfToken: bootstrap.csrfToken });
     } else {
-      await apiRequest(API_PATHS.entries(selectedChallenge.id), { method: "POST", body: { itemId, values }, csrfToken: bootstrap.csrfToken });
+      await apiRequest(API_PATHS.entries(selectedChallenge.id), {
+        method: "POST",
+        body: { itemId, values, ...(occurredOn ? { occurredOn } : {}) },
+        csrfToken: bootstrap.csrfToken,
+      });
     }
     await reloadSelected();
   }

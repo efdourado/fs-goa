@@ -21,11 +21,13 @@ export async function calculateMetricRow(
   if (metric.operation === "completion_rate") {
     const context = await oneOrNull<{
       submission_mode: "item" | "daily" | "free";
-      start_date: string;
-      end_date: string;
+      start_date: string | null;
+      end_date: string | null;
       participants: number;
       completed: number;
       item_count: number;
+      checkpoint_count: number;
+      active_days: number;
     }>(
       client,
       `SELECT et.submission_mode, c.start_date::text AS start_date, c.end_date::text AS end_date,
@@ -34,7 +36,15 @@ export async function calculateMetricRow(
               (SELECT count(*)::int FROM entries e
                 WHERE e.challenge_id = c.id AND e.entry_type_id = et.id AND e.deleted_at IS NULL) AS completed,
               (SELECT count(*)::int FROM challenge_items ci
-                WHERE ci.challenge_id = c.id AND ci.entry_type_id = et.id AND ci.archived_at IS NULL) AS item_count
+                WHERE ci.challenge_id = c.id AND ci.entry_type_id = et.id AND ci.archived_at IS NULL) AS item_count,
+              (SELECT count(*)::int FROM challenge_checkpoints cc
+                WHERE cc.challenge_id = c.id AND cc.archived_at IS NULL) AS checkpoint_count,
+              CASE WHEN c.activated_at IS NULL THEN 0
+                ELSE greatest(1,
+                  (coalesce(c.closed_at, now()) AT TIME ZONE c.time_zone)::date
+                  - (c.activated_at AT TIME ZONE c.time_zone)::date + 1
+                )::int
+              END AS active_days
          FROM entry_types et JOIN challenges c ON c.id = et.challenge_id
         WHERE et.id = $1 AND c.id = $2 AND c.deleted_at IS NULL`,
       [metric.entry_type_id, metric.challenge_id],
@@ -45,7 +55,9 @@ export async function calculateMetricRow(
         (context.submission_mode === "item"
           ? context.item_count
           : context.submission_mode === "daily"
-            ? Math.max(0, Math.round((new Date(`${context.end_date}T00:00:00Z`).getTime() - new Date(`${context.start_date}T00:00:00Z`).getTime()) / 86_400_000) + 1)
+            ? context.start_date === null
+              ? context.active_days
+              : context.checkpoint_count
             : 1);
     result = calculateMetric({
       operation: "completion_rate",
@@ -299,7 +311,8 @@ export async function publicResults(token: string) {
   try { hash = await hashToken(token); } catch { throw new ApiError(404, "not_found", "Resultados não encontrados."); }
   return withClient(async (client) => {
     const challenge = await oneOrNull<{
-      id: string; title: string; description: string | null; start_date: string; end_date: string;
+      id: string; title: string; description: string | null;
+      start_date: string | null; end_date: string | null;
     }>(client,
       `SELECT id,title,description,start_date::text AS start_date,end_date::text AS end_date FROM challenges
         WHERE result_share_token_hash=$1 AND results_published_at IS NOT NULL AND status='closed'

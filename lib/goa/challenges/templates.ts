@@ -23,8 +23,8 @@ interface TemplateRow {
   summary: string | null;
   rules: string | null;
   rule_sections: unknown;
-  start_date: string;
-  end_date: string;
+  start_date: string | null;
+  end_date: string | null;
   published_as_template_at: Date;
   submission_mode: "item" | "daily" | "free" | null;
   field_count: number;
@@ -75,7 +75,8 @@ export async function listTemplates() {
 async function templateRowById(client: PoolClient, challengeId: string) {
   return oneOrNull<{
     id: string; title: string; description: string | null; summary: string | null;
-    rules: string | null; rule_sections: unknown; start_date: string; end_date: string;
+    rules: string | null; rule_sections: unknown;
+    start_date: string | null; end_date: string | null;
     submission_mode: "item" | "daily" | "free" | null;
   }>(
     client,
@@ -125,11 +126,12 @@ export async function getTemplateDetail(challengeId: string) {
       summary: template.summary,
       ruleSections: parseRuleSections(template.rule_sections, template.rules),
       submissionMode: template.submission_mode ?? "free",
-      durationDays:
-        Math.round(
-          (Date.parse(`${template.end_date}T00:00:00Z`) - Date.parse(`${template.start_date}T00:00:00Z`))
-            / 86_400_000,
-        ) + 1,
+      durationDays: template.start_date && template.end_date
+        ? Math.round(
+            (Date.parse(`${template.end_date}T00:00:00Z`) - Date.parse(`${template.start_date}T00:00:00Z`))
+              / 86_400_000,
+          ) + 1
+        : null,
       fields: fields.map((field) => ({
         label: field.label,
         type: field.kind === "choice" ? "select" : field.kind,

@@ -100,6 +100,7 @@ export interface Entry {
   userId?: Id;
   participantName?: string;
   participantUsername?: string;
+  occurredOn?: string;
   submittedAt?: string;
   updatedAt?: string;
   isLate?: boolean;
@@ -162,7 +163,7 @@ export interface ChallengeSummary {
   viewerRole?: Role;
   isParticipant?: boolean;
   completedCount?: number;
-  totalCount?: number;
+  totalCount?: number | null;
 }
 
 export interface ChallengeDetail extends ChallengeSummary {
@@ -255,7 +256,7 @@ export interface TemplateDetail {
   summary?: string | null;
   ruleSections: ChallengeRule[];
   submissionMode: SubmissionMode;
-  durationDays: number;
+  durationDays: number | null;
   fields: TemplateFieldPreview[];
   items: Array<{ title: string; description?: string | null }>;
   metrics: Array<{ label: string; operation: Metric["operation"]; groupBy: string }>;
@@ -287,8 +288,8 @@ export interface ChallengeCreationInput {
   title: string;
   description: string;
   ruleSections: ChallengeRule[];
-  startsOn: string;
-  endsOn: string;
+  startsOn: string | null;
+  endsOn: string | null;
   submissionMode: SubmissionMode;
   fields: ChallengeField[];
   items: Array<{ title: string; position: number }>;

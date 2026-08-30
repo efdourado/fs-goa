@@ -4,7 +4,14 @@ import Link from "next/link";
 import { type ReactNode, useEffect, useState } from "react";
 
 import type { ChallengeStatus, Id, MemberRequest, User } from "./types";
-import { formatDateTime, isChallengeScheduled } from "./utils";
+import {
+  dateKeyInSaoPaulo,
+  formatDateRange,
+  formatDateTime,
+  inclusiveDayCount,
+  isChallengeScheduled,
+  shiftDateKey,
+} from "./utils";
 
 export const cardClass =
   "rounded-[20px] border border-[var(--line)] bg-[var(--paper)] shadow-[0_1px_2px_rgba(32,36,31,0.04)]";
@@ -143,6 +150,97 @@ export function PageHeading({
   );
 }
 
+const DURATION_PRESETS: Array<{ label: string; shift: { days?: number; months?: number } }> = [
+  { label: "30 dias", shift: { days: 29 } },
+  { label: "60 dias", shift: { days: 59 } },
+  { label: "90 dias", shift: { days: 89 } },
+  { label: "6 meses", shift: { months: 6, days: -1 } },
+  { label: "1 ano", shift: { months: 12, days: -1 } },
+];
+
+/**
+ * Início/término pair with duration shortcuts: pick "90 dias" (or type the day
+ * count) and the end date is derived from the start — no calendar counting. The
+ * start can sit in the past, so a challenge run before the app can be rebuilt.
+ */
+export function SchedulePeriodFields({
+  startsOn,
+  endsOn,
+  onStartsOn,
+  onEndsOn,
+  disabled = false,
+}: {
+  startsOn: string;
+  endsOn: string;
+  onStartsOn: (value: string) => void;
+  onEndsOn: (value: string) => void;
+  disabled?: boolean;
+}) {
+  const today = dateKeyInSaoPaulo(new Date());
+  const anchor = startsOn || today;
+  const duration = inclusiveDayCount(startsOn, endsOn);
+
+  function applyShift(shift: { days?: number; months?: number }) {
+    if (!startsOn) onStartsOn(anchor);
+    onEndsOn(shiftDateKey(anchor, shift));
+  }
+
+  return (
+    <>
+      <label>
+        <span className={labelClass}>Início</span>
+        <input className={inputClass} type="date" value={startsOn} onChange={(event) => onStartsOn(event.target.value)} required disabled={disabled} />
+      </label>
+      <label>
+        <span className={labelClass}>Término</span>
+        <input className={inputClass} type="date" min={startsOn || undefined} value={endsOn} onChange={(event) => onEndsOn(event.target.value)} required disabled={disabled} />
+      </label>
+      <div className="sm:col-span-2">
+        <span className={labelClass}>Duração</span>
+        <p className="text-xs leading-5 text-[var(--muted)]">Escolha um atalho ou digite os dias — o término se ajusta a partir do início{startsOn ? "" : " (hoje, até você escolher outra data)"}.</p>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {DURATION_PRESETS.map((preset) => {
+            const active = Boolean(startsOn && endsOn) && shiftDateKey(anchor, preset.shift) === endsOn;
+            return (
+              <button
+                key={preset.label}
+                type="button"
+                disabled={disabled}
+                aria-pressed={active}
+                onClick={() => applyShift(preset.shift)}
+                className={cx(
+                  "min-h-9 rounded-full border px-3 text-xs transition disabled:cursor-not-allowed disabled:opacity-60",
+                  active ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] text-[var(--muted)] hover:border-[var(--main-line)]",
+                )}
+              >
+                {preset.label}
+              </button>
+            );
+          })}
+          <label className="flex items-center gap-1.5 text-xs text-[var(--muted)]">
+            <input
+              type="number"
+              min={1}
+              max={3660}
+              inputMode="numeric"
+              disabled={disabled}
+              value={duration ?? ""}
+              onChange={(event) => {
+                const days = Number(event.target.value);
+                if (Number.isInteger(days) && days >= 1 && days <= 3660) applyShift({ days: days - 1 });
+              }}
+              className="w-16 rounded-lg border border-[var(--line)] bg-[var(--paper)] px-2 py-1.5 text-center text-sm text-[var(--ink)] outline-none focus:border-[var(--main)] disabled:cursor-not-allowed disabled:bg-[var(--canvas)]"
+              aria-label="Duração em dias"
+            />
+            dias
+          </label>
+        </div>
+        {duration ? <p className="mt-2 text-xs text-[var(--muted)]">{duration} {duration === 1 ? "dia" : "dias"} · {formatDateRange(startsOn, endsOn)}</p> : null}
+      </div>
+    </>
+  );
+}
+
 export function AppHeader({
   user,
   notifications,
@@ -178,7 +276,7 @@ export function AppHeader({
             aria-label="Sua conta"
           >
             <span className="grid h-9 w-9 place-items-center rounded-full border-2 border-white bg-[var(--main-line)] text-xs font-black" aria-hidden="true">
-              {user.name.split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("")}
+              {user.name.split(/\s+/).slice(0, 1).map((part) => part[0]).join("")}
             </span>
             <span className="hidden leading-tight sm:block">
               <strong className="block text-sm">{user.name}</strong>

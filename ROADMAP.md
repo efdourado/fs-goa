@@ -57,8 +57,10 @@ Destrava quase todo o resto.
 
 ### 2. Formatos e agenda
 
-- **Desafio sem data** — início/fim opcionais, encerramento manual. Mexe em
-  geração de checkpoints, `isChallengeScheduled` e no fechamento/vitrine.
+- [x] **Desafio sem data** — entregue: início/fim opcionais em par, datas passadas
+  aceitas, listas por item sem prazo, check-in diário sob demanda e encerramento
+  manual. A agenda só pode ser alterada no rascunho. Atalhos de duração (30/60/90
+  dias, 6 meses, 1 ano ou dias avulsos) calculam o término a partir do início.
 - **Semanas de pausa** — a agenda passa a ter exceções; é o mecanismo oficial de
   recuperação de quem ficou pra trás.
 - **Trilho paralelo** — um item de longa duração (uma série, ex.: Attack on
@@ -124,7 +126,7 @@ agrupar itens. **Entrega o caso do PDF Cine Dupla inteiro.**
 
 ### Fase 2 — Agenda flexível
 
-Desafio sem data · semanas de pausa · trilho paralelo.
+~~Desafio sem data~~ *(entregue)* · semanas de pausa · trilho paralelo.
 
 ### Fase 3 — Templates
 

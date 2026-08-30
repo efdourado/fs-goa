@@ -26,7 +26,16 @@ import {
   PageHeading,
   StatusMessage,
 } from "../ui";
-import { entryUnavailableMessage, formatDate, formatDateTime, isChallengeScheduled, itemIdForEntry, valuesAsRecord } from "../utils";
+import {
+  dateKeyInSaoPaulo,
+  entryUnavailableMessage,
+  formatDate,
+  formatDateRange,
+  formatDateTime,
+  isChallengeScheduled,
+  itemIdForEntry,
+  valuesAsRecord,
+} from "../utils";
 
 function ratingChoices(config?: FieldConfig): number[] {
   const min = config?.min ?? 0;
@@ -140,7 +149,7 @@ export function ResultView({ challenge }: { challenge: ChallengeDetail }) {
   return (
     <div className="space-y-5">
       <section className="overflow-hidden rounded-[28px] bg-[var(--ink)] px-6 py-10 text-white sm:px-10 sm:py-14">
-        <p className="text-xs font-light uppercase tracking-[0.16em] text-white/55">{challenge.startsOn || challenge.endsOn ? `${formatDate(challenge.startsOn)} — ${formatDate(challenge.endsOn)}` : "Uma história do grupo"}</p>
+        <p className="text-xs font-light uppercase tracking-[0.16em] text-white/55">{challenge.startsOn || challenge.endsOn ? formatDateRange(challenge.startsOn, challenge.endsOn) : "Uma história sem prazo"}</p>
         <h2 className="mt-4 max-w-3xl text-4xl font-semibold leading-none tracking-[-0.055em] sm:text-6xl">{result?.headline || challenge.title}</h2>
         {result?.summary ? <p className="mt-6 max-w-2xl text-base leading-7 text-white/70">{result.summary}</p> : null}
         <div className="mt-8 flex flex-wrap gap-2">{challenge.participants.map((participant) => <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs" key={participant.id}>{participant.name}</span>)}</div>
@@ -174,11 +183,14 @@ export function ParticipantChallengeScreen({
   onTab: (tab: ParticipantTab) => void;
   onBack: () => void;
   onAdmin?: () => void;
-  onSaveEntry: (itemId: Id | null, values: Record<Id, unknown>, entry?: Entry) => Promise<void>;
+  onSaveEntry: (itemId: Id | null, values: Record<Id, unknown>, entry?: Entry, occurredOn?: string) => Promise<void>;
 }) {
   const ownEntries = entries.filter((entry) => !entry.userId || entry.userId === user.id);
   const entriesByItem = useMemo(() => new Map(ownEntries.map((entry) => [itemIdForEntry(entry), entry])), [ownEntries]);
   const sortedItems = useMemo(() => [...challenge.items].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)), [challenge.items]);
+  const undatedDaily = challenge.submissionMode === "daily" && !challenge.startsOn && !challenge.endsOn;
+  const today = dateKeyInSaoPaulo(new Date());
+  const [occurredOn, setOccurredOn] = useState(today);
   const defaultItem = sortedItems.find((item) => item.status === "open" && !entriesByItem.has(item.id))
     ?? sortedItems.find((item) => !entriesByItem.has(item.id) && item.status !== "scheduled" && item.status !== "closed")
     ?? [...sortedItems].reverse().find((item) => entriesByItem.has(item.id))
@@ -186,7 +198,11 @@ export function ParticipantChallengeScreen({
     ?? null;
   const [selectedItemId, setSelectedItemId] = useState<Id | null>(defaultItem?.id ?? null);
   const selectedItem = sortedItems.find((item) => item.id === selectedItemId) ?? defaultItem;
-  const currentEntry = selectedItem ? entriesByItem.get(selectedItem.id) : ownEntries.find((entry) => !itemIdForEntry(entry));
+  const currentEntry = undatedDaily
+    ? ownEntries.find((entry) => entry.occurredOn === occurredOn)
+    : selectedItem
+      ? entriesByItem.get(selectedItem.id)
+      : ownEntries.find((entry) => !itemIdForEntry(entry));
   const completion = sortedItems.length ? Math.round((ownEntries.length / sortedItems.length) * 100) : 0;
   const scheduled = isChallengeScheduled(challenge.status, challenge.startsOn);
   const ruleSections = useMemo(() => visibleRuleSections(challenge.ruleSections, challenge.rules), [challenge.ruleSections, challenge.rules]);
@@ -208,7 +224,7 @@ export function ParticipantChallengeScreen({
       <div className="mb-5 flex items-center justify-between gap-3"><button className={backLinkClass} type="button" onClick={onBack}>← Início</button>{onAdmin ? <Button variant="secondary" onClick={onAdmin}>Gerenciar</Button> : null}</div>
       <section className="relative overflow-hidden rounded-[28px] bg-[var(--ink)] p-6 text-white sm:p-9">
         <div className="relative z-10">
-          <div className="flex flex-wrap items-center justify-between gap-3"><ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} /><span className="text-xs text-white/65">{formatDate(challenge.startsOn)} — {formatDate(challenge.endsOn)}</span></div>
+          <div className="flex flex-wrap items-center justify-between gap-3"><ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} /><span className="text-xs text-white/65">{formatDateRange(challenge.startsOn, challenge.endsOn)}</span></div>
           <h1 className="mt-10 max-w-3xl text-4xl font-semibold leading-none tracking-[-0.055em] sm:text-6xl">{challenge.title}</h1>
           {challenge.description ? <p className="mt-4 max-w-2xl text-sm leading-6 text-white/70">{challenge.description}</p> : null}
           {sortedItems.length ? <div className="mt-8 max-w-2xl"><div className="mb-2 flex justify-between text-xs text-white/70"><span><strong className="text-white">{ownEntries.length}</strong> de {sortedItems.length} registros</span><span>{completion}%</span></div><div className="h-2 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-[var(--main-2)]" style={{ width: `${Math.min(100, completion)}%` }} /></div></div> : null}
@@ -227,15 +243,16 @@ export function ParticipantChallengeScreen({
         {tab === "today" ? (
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1.45fr)_minmax(290px,0.65fr)]">
             <section className={cx(cardClass, "p-5 sm:p-7")}>
-              {challenge.status === "closed" ? <EmptyState title="Este desafio foi encerrado" description="Os registros foram preservados. Abra o resultado para rever a história do grupo." action={<Button onClick={() => onTab("results")}>Ver resultado</Button>} /> : challenge.submissionMode !== "free" && !selectedItem ? <EmptyState title="Nenhum checkpoint disponível" description="O próximo item aparecerá aqui quando for liberado pelo administrador." /> : (
+              {challenge.status === "closed" ? <EmptyState title="Este desafio foi encerrado" description="Os registros foram preservados. Abra o resultado para rever a história do grupo." action={<Button onClick={() => onTab("results")}>Ver resultado</Button>} /> : challenge.submissionMode !== "free" && !selectedItem && !undatedDaily ? <EmptyState title="Nenhum checkpoint disponível" description="O próximo item aparecerá aqui quando for liberado pelo administrador." /> : (
                 <>
                   <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <h2 className="mt-2 text-2xl font-light tracking-[-0.04em]">
-                        {selectedItem?.title ?? "Novo registro"}
+                        {selectedItem?.title ?? (undatedDaily ? `Check-in de ${formatDate(occurredOn, { day: "2-digit", month: "long", year: "numeric" })}` : "Novo registro")}
                       </h2>
                       {selectedItem?.description ? <p className="mt-1 text-sm text-[var(--muted)]">{selectedItem.description}</p> : null}</div>{selectedItem?.dueAt ? <span className="rounded-full bg-[var(--wash)] px-3 py-2 text-xs font-semibold text-[var(--muted)]">até {formatDateTime(selectedItem.dueAt)}</span> : null}</div>
-                  <DynamicEntryForm key={`${selectedItem?.id ?? "free"}-${currentEntry?.id ?? "new"}`} fields={challenge.fields} item={selectedItem ?? null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry(selectedItem?.id ?? null, values, entry)} />
+                  {undatedDaily || (challenge.submissionMode === "item" && !currentEntry) ? <label className="mb-5 block"><span className={labelClass}>Data em que aconteceu</span><input className={inputClass} type="date" max={today} value={occurredOn} disabled={Boolean(unavailableMessage)} onChange={(event) => setOccurredOn(event.target.value || today)} /><small className="mt-1 block text-[var(--muted)]">Use hoje ou recupere um registro do passado.</small></label> : currentEntry?.occurredOn ? <p className="mb-5 text-xs text-[var(--muted)]">Aconteceu em {formatDate(currentEntry.occurredOn, { day: "2-digit", month: "long", year: "numeric" })}.</p> : null}
+                  <DynamicEntryForm key={`${selectedItem?.id ?? "free"}-${undatedDaily ? occurredOn : "fixed"}-${currentEntry?.id ?? "new"}`} fields={challenge.fields} item={selectedItem ?? null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry(selectedItem?.id ?? null, values, entry, undatedDaily || (challenge.submissionMode === "item" && !entry) ? occurredOn : undefined)} />
                 </>
               )}
             </section>
@@ -246,7 +263,7 @@ export function ParticipantChallengeScreen({
         ) : null}
 
         {tab === "history" ? (
-          <section className={cx(cardClass, "p-5 sm:p-7")}><PageHeading title="Seus registros" description="Somente o que você enviou neste desafio." />{ownEntries.length ? <ul className="divide-y divide-[var(--line)]">{[...ownEntries].sort((a, b) => String(b.submittedAt).localeCompare(String(a.submittedAt))).map((entry) => { const item = sortedItems.find((candidate) => candidate.id === itemIdForEntry(entry)); const values = valuesAsRecord(entry.values); return <li className="py-5" key={entry.id}><div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div><strong>{item?.title ?? "Registro livre"}</strong><p className="mt-1 text-xs text-[var(--muted)]">{formatDateTime(entry.submittedAt ?? entry.updatedAt)}{entry.isLate ? " · enviado após o prazo" : ""}</p></div><dl className="grid gap-2 text-sm sm:grid-cols-2">{challenge.fields.map((field) => field.id && values[field.id] !== undefined ? <div className="rounded-lg bg-[var(--wash)] px-3 py-2" key={field.id}><dt className="text-[10px] font-light uppercase text-[var(--muted)]">{field.label}</dt><dd className="mt-1 font-semibold">{typeof values[field.id] === "boolean" ? values[field.id] ? "Sim" : "Não" : String(values[field.id])}</dd></div> : null)}</dl></div></li>; })}</ul> : <EmptyState title="Você ainda não registrou nada" description="Quando salvar o primeiro checkpoint, ele ficará guardado aqui." />}</section>
+          <section className={cx(cardClass, "p-5 sm:p-7")}><PageHeading title="Seus registros" description="Somente o que você enviou neste desafio." />{ownEntries.length ? <ul className="divide-y divide-[var(--line)]">{[...ownEntries].sort((a, b) => String(b.occurredOn ?? b.submittedAt).localeCompare(String(a.occurredOn ?? a.submittedAt))).map((entry) => { const item = sortedItems.find((candidate) => candidate.id === itemIdForEntry(entry)); const values = valuesAsRecord(entry.values); return <li className="py-5" key={entry.id}><div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div><strong>{item?.title ?? (challenge.submissionMode === "daily" ? "Check-in diário" : "Registro livre")}</strong><p className="mt-1 text-xs text-[var(--muted)]">{entry.occurredOn ? `Aconteceu em ${formatDate(entry.occurredOn, { day: "2-digit", month: "long", year: "numeric" })} · ` : ""}salvo em {formatDateTime(entry.submittedAt ?? entry.updatedAt)}{entry.isLate ? " · enviado após o prazo" : ""}</p></div><dl className="grid gap-2 text-sm sm:grid-cols-2">{challenge.fields.map((field) => field.id && values[field.id] !== undefined ? <div className="rounded-lg bg-[var(--wash)] px-3 py-2" key={field.id}><dt className="text-[10px] font-light uppercase text-[var(--muted)]">{field.label}</dt><dd className="mt-1 font-semibold">{typeof values[field.id] === "boolean" ? values[field.id] ? "Sim" : "Não" : String(values[field.id])}</dd></div> : null)}</dl></div></li>; })}</ul> : <EmptyState title="Você ainda não registrou nada" description="Quando salvar o primeiro checkpoint, ele ficará guardado aqui." />}</section>
         ) : null}
 
         {tab === "progress" ? (

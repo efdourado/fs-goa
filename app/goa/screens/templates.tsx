@@ -280,7 +280,7 @@ export function TemplateDetailScreen({
         <p className="text-sm text-[var(--muted)]" role="status">Carregando modelo…</p>
       ) : (
         <>
-          <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-[var(--muted)]">Modelo · {MODE_LABEL[template.submissionMode] ?? template.submissionMode} · {template.durationDays} dia{template.durationDays === 1 ? "" : "s"}</p>
+          <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-[var(--muted)]">Modelo · {MODE_LABEL[template.submissionMode] ?? template.submissionMode} · {template.durationDays === null ? "sem prazo" : `${template.durationDays} dia${template.durationDays === 1 ? "" : "s"}`}</p>
           <h1 className="mt-2 text-3xl font-light tracking-[-0.04em] sm:text-4xl">{template.title}</h1>
           {template.description ? <p className="mt-3 text-sm leading-6 text-[var(--muted)]">{template.description}</p> : null}
 

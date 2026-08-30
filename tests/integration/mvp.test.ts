@@ -547,6 +547,128 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
   });
   assert.equal(futureSubmission.response.status, 409, "checkpoint futuro não pode receber registro");
 
+  const undatedItem = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: {
+      template: "cine",
+      title: "Lista contínua sem prazo",
+      startsOn: null,
+      endsOn: null,
+      submissionMode: "item",
+      participantIds: [owner.user.id],
+      items: [{ title: "Tarefa sem vencimento" }],
+      fields: [{ key: "concluida", label: "Concluída", type: "boolean", required: true }],
+    },
+  });
+  assert.equal(undatedItem.response.status, 201, JSON.stringify(undatedItem.body));
+  const undatedItemId = (undatedItem.body as { id: string }).id;
+  const undatedItemDetail = await call("GET", `/api/challenges/${undatedItemId}`, { session: owner });
+  assert.equal(undatedItemDetail.response.status, 200, JSON.stringify(undatedItemDetail.body));
+  assert.equal((undatedItemDetail.body as { startsOn: string | null }).startsOn, null);
+  assert.equal((undatedItemDetail.body as { endsOn: string | null }).endsOn, null);
+
+  const undatedDaily = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: {
+      template: "reading",
+      title: "Hábito diário sem prazo",
+      startsOn: null,
+      endsOn: null,
+      submissionMode: "daily",
+      participantIds: [owner.user.id],
+      fields: [{ key: "nota", label: "Nota do dia", type: "text", required: true }],
+    },
+  });
+  assert.equal(undatedDaily.response.status, 201, JSON.stringify(undatedDaily.body));
+  const undatedDailyId = (undatedDaily.body as { id: string }).id;
+  const undatedDailyDetail = await call("GET", `/api/challenges/${undatedDailyId}`, { session: owner });
+  assert.equal(undatedDailyDetail.response.status, 200, JSON.stringify(undatedDailyDetail.body));
+  const undatedDailyChallenge = undatedDailyDetail.body as {
+    startsOn: string | null;
+    endsOn: string | null;
+    fields: Array<{ id: string }>;
+    items: unknown[];
+  };
+  assert.equal(undatedDailyChallenge.startsOn, null);
+  assert.equal(undatedDailyChallenge.endsOn, null);
+  assert.deepEqual(undatedDailyChallenge.items, [], "daily sem prazo não materializa checkpoints futuros");
+  assert.ok(undatedDailyChallenge.fields[0]?.id);
+
+  const activateUndatedDaily = await call("POST", `/api/challenges/${undatedDailyId}/transition`, {
+    session: owner,
+    body: { status: "active" },
+  });
+  assert.equal(activateUndatedDaily.response.status, 200, JSON.stringify(activateUndatedDaily.body));
+
+  const historicalDay = "2020-01-02";
+  const firstUndatedCheckIn = await call("POST", `/api/challenges/${undatedDailyId}/entries`, {
+    session: owner,
+    body: {
+      occurredOn: historicalDay,
+      values: { [undatedDailyChallenge.fields[0].id]: "registro original" },
+    },
+  });
+  assert.equal(firstUndatedCheckIn.response.status, 201, JSON.stringify(firstUndatedCheckIn.body));
+  const firstUndatedEntry = firstUndatedCheckIn.body as {
+    id: string;
+    occurredOn: string;
+    updated: boolean;
+  };
+  assert.equal(firstUndatedEntry.occurredOn, historicalDay);
+  assert.equal(firstUndatedEntry.updated, false);
+
+  const repeatedUndatedCheckIn = await call("POST", `/api/challenges/${undatedDailyId}/entries`, {
+    session: owner,
+    body: {
+      occurredOn: historicalDay,
+      values: { [undatedDailyChallenge.fields[0].id]: "registro corrigido" },
+    },
+  });
+  assert.equal(repeatedUndatedCheckIn.response.status, 201, JSON.stringify(repeatedUndatedCheckIn.body));
+  const repeatedUndatedEntry = repeatedUndatedCheckIn.body as {
+    id: string;
+    occurredOn: string;
+    updated: boolean;
+  };
+  assert.equal(repeatedUndatedEntry.id, firstUndatedEntry.id, "o mesmo dia deve atualizar o registro existente");
+  assert.equal(repeatedUndatedEntry.occurredOn, historicalDay);
+  assert.equal(repeatedUndatedEntry.updated, true);
+
+  const undatedEntries = await call("GET", `/api/challenges/${undatedDailyId}/entries`, { session: owner });
+  assert.equal(undatedEntries.response.status, 200, JSON.stringify(undatedEntries.body));
+  const entriesForUndatedDaily = (undatedEntries.body as {
+    entries: Array<{ id: string; occurredOn: string; values: Record<string, unknown> }>;
+  }).entries;
+  assert.equal(entriesForUndatedDaily.length, 1, "repetir a data não deve duplicar o check-in");
+  assert.equal(entriesForUndatedDaily[0]?.id, firstUndatedEntry.id);
+  assert.equal(entriesForUndatedDaily[0]?.occurredOn, historicalDay);
+  assert.equal(entriesForUndatedDaily[0]?.values[undatedDailyChallenge.fields[0].id], "registro corrigido");
+
+  const futureUndatedCheckIn = await call("POST", `/api/challenges/${undatedDailyId}/entries`, {
+    session: owner,
+    body: {
+      occurredOn: "2099-01-01",
+      values: { [undatedDailyChallenge.fields[0].id]: "não deve entrar" },
+    },
+  });
+  assert.equal(futureUndatedCheckIn.response.status, 409, "daily sem prazo não aceita check-in futuro");
+  assert.equal((futureUndatedCheckIn.body as { error: string }).error, "checkin_in_future");
+
+  const incompleteDatePair = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: {
+      title: "Período incompleto",
+      startsOn: "2026-08-01",
+      endsOn: null,
+      submissionMode: "item",
+      participantIds: [owner.user.id],
+      items: [{ title: "Não deve ser criado" }],
+      fields: [{ key: "nota", label: "Nota", type: "rating", required: true }],
+    },
+  });
+  assert.equal(incompleteDatePair.response.status, 400, "início e término devem ser informados juntos");
+  assert.equal((incompleteDatePair.body as { error: string }).error, "date_pair_required");
+
   const sessionDb = await adminPool.query<{ token_hash: string }>("SELECT token_hash FROM sessions LIMIT 1");
   assert.ok(!owner.cookie.includes(sessionDb.rows[0]?.token_hash ?? "impossivel"), "token bruto da sessão não pode estar no banco");
 });

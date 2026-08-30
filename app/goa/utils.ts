@@ -31,6 +31,38 @@ export function formatDateTime(value?: string | null): string {
   });
 }
 
+export function formatDateRange(startsOn?: string | null, endsOn?: string | null): string {
+  if (startsOn && endsOn) return `${formatDate(startsOn)} — ${formatDate(endsOn)}`;
+  if (startsOn) return `Desde ${formatDate(startsOn)}`;
+  if (endsOn) return `Até ${formatDate(endsOn)}`;
+  return "Sem prazo";
+}
+
+/**
+ * Shifts a `YYYY-MM-DD` key by a number of days and/or whole months. Month steps
+ * clamp overflow, so "31/01 + 1 mês" lands on the last day of February instead of
+ * spilling into March. Used to turn "começa aqui, dura 90 dias" into an end date.
+ */
+export function shiftDateKey(dateKey: string, shift: { days?: number; months?: number }): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateKey);
+  if (!match) return dateKey;
+  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  const months = shift.months ?? 0;
+  const target = new Date(Date.UTC(year, month - 1 + months, day));
+  if (months && target.getUTCDate() !== day) target.setUTCDate(0);
+  target.setUTCDate(target.getUTCDate() + (shift.days ?? 0));
+  return target.toISOString().slice(0, 10);
+}
+
+/** Inclusive day span of a period, matching how daily checkpoints are counted. */
+export function inclusiveDayCount(startsOn?: string | null, endsOn?: string | null): number | null {
+  if (!startsOn || !endsOn) return null;
+  const start = Date.parse(`${startsOn}T00:00:00Z`);
+  const end = Date.parse(`${endsOn}T00:00:00Z`);
+  if (Number.isNaN(start) || Number.isNaN(end) || end < start) return null;
+  return Math.round((end - start) / 86_400_000) + 1;
+}
+
 export function inviteTokenFromText(value: string, baseUrl = "https://goa.invalid"): string {
   const trimmed = value.trim();
   if (!trimmed) return "";
@@ -54,7 +86,7 @@ export function inviteTokenFromText(value: string, baseUrl = "https://goa.invali
   return trimmed.split("/").filter(Boolean).at(-1) ?? trimmed;
 }
 
-function dateKeyInSaoPaulo(now: Date): string {
+export function dateKeyInSaoPaulo(now: Date): string {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Sao_Paulo",
     year: "numeric",

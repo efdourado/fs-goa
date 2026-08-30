@@ -5,8 +5,15 @@ import test from "node:test";
 
 import { RuleSectionsView } from "../app/goa/rules";
 import { DynamicEntryForm } from "../app/goa/screens/participant-challenge";
-import { AppHeader, ChallengeStatusBadge } from "../app/goa/ui";
-import { entryUnavailableMessage, isChallengeScheduled, itemStatusLabel } from "../app/goa/utils";
+import { AppHeader, ChallengeStatusBadge, SchedulePeriodFields } from "../app/goa/ui";
+import {
+  entryUnavailableMessage,
+  formatDateRange,
+  inclusiveDayCount,
+  isChallengeScheduled,
+  itemStatusLabel,
+  shiftDateKey,
+} from "../app/goa/utils";
 
 test("distingue desafio agendado do ciclo persistido ativo", () => {
   const now = new Date("2026-08-29T15:00:00Z");
@@ -14,6 +21,45 @@ test("distingue desafio agendado do ciclo persistido ativo", () => {
   assert.equal(isChallengeScheduled("active", "2026-08-29", now), false);
   assert.equal(isChallengeScheduled("draft", "2026-08-30", now), false);
   assert.equal(isChallengeScheduled("closed", "2026-08-30", now), false);
+  assert.equal(isChallengeScheduled("active", null, now), false);
+});
+
+test("apresenta período ou ausência de prazo sem datas fictícias", () => {
+  assert.equal(formatDateRange(null, null), "Sem prazo");
+  assert.match(formatDateRange("2026-08-01", "2026-08-31"), /01.*ago.*31.*ago/i);
+});
+
+test("deriva o término a partir do início e da duração", () => {
+  // "Começa hoje, dura 90 dias" => 90 checkpoints, do dia 0 ao dia 89.
+  assert.equal(shiftDateKey("2026-08-30", { days: 89 }), "2026-11-27");
+  assert.equal(inclusiveDayCount("2026-08-30", "2026-11-27"), 90);
+  // Passos em mês fecham o vão ("6 meses" = último dia antes do mesmo dia do mês).
+  assert.equal(shiftDateKey("2026-01-15", { months: 6, days: -1 }), "2026-07-14");
+  // Overflow de mês é aparado para o último dia real.
+  assert.equal(shiftDateKey("2026-01-31", { months: 1 }), "2026-02-28");
+  assert.equal(shiftDateKey("nao-e-data", { days: 5 }), "nao-e-data");
+  assert.equal(inclusiveDayCount("2026-08-30", "2026-08-29"), null);
+  assert.equal(inclusiveDayCount(null, "2026-08-30"), null);
+});
+
+test("campos de período oferecem atalhos de duração e refletem o span atual", () => {
+  const withPeriod = renderToStaticMarkup(createElement(SchedulePeriodFields, {
+    startsOn: "2026-08-30",
+    endsOn: "2026-11-27",
+    onStartsOn: () => undefined,
+    onEndsOn: () => undefined,
+  }));
+  assert.match(withPeriod, /6 meses/);
+  assert.match(withPeriod, /aria-pressed="true"[\s\S]*?>90 dias<\/button>/);
+  assert.match(withPeriod, /90 dias · /);
+
+  const empty = renderToStaticMarkup(createElement(SchedulePeriodFields, {
+    startsOn: "",
+    endsOn: "",
+    onStartsOn: () => undefined,
+    onEndsOn: () => undefined,
+  }));
+  assert.match(empty, /hoje, até você escolher/);
 });
 
 test("explica por que um registro está indisponível sem chamar futuro de encerrado", () => {

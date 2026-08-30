@@ -113,7 +113,7 @@ export function RuleSectionsView({ rules }: { rules: ChallengeRule[] }) {
                   <div className="mt-4 space-y-3 border-l-2 border-[var(--main-line)] pl-4">
                     {rule.topics.map((topic, topicIndex) => (
                       <div key={`${topic.title}-${topicIndex}`}>
-                        <h4 className="text-sm font-semibold text-[var(--ink)]">
+                        <h4 className="text-sm font-light text-[var(--ink)]">
                           <span className="text-[var(--muted)]">{index + 1}.{topicIndex + 1}</span> {topic.title}
                         </h4>
                         <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-[var(--muted)]">{topic.description}</p>

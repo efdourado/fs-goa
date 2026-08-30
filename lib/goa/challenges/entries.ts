@@ -4,6 +4,7 @@ import { inTransaction, oneOrNull, withClient } from "../../db";
 import {
   asRecord,
   challengeAccess,
+  dateKeyInTimeZone,
   dateString,
   publicId,
   writeAudit,
@@ -207,6 +208,7 @@ export async function saveEntry(
     if (!entryType) throw new ApiError(400, "invalid_entry_type", "Tipo de registro inválido.");
     let itemId: string | null = null;
     let occurredOn: string;
+    const today = dateKeyInTimeZone(new Date(), access.challenge.time_zone);
     if (entryType.submission_mode === "item") {
       if (typeof body.itemId !== "string") throw new ApiError(400, "missing_item", "Selecione um item.");
       const item = await oneOrNull<{ id: string }>(client,
@@ -214,39 +216,49 @@ export async function saveEntry(
         [body.itemId, challengeId, entryType.id]);
       if (!item) throw new ApiError(400, "invalid_item", "Item não pertence ao desafio.");
       itemId = item.id;
-      occurredOn = typeof body.occurredOn === "string" ? dateString(body.occurredOn, "Data") : new Date().toISOString().slice(0, 10);
+      occurredOn = typeof body.occurredOn === "string" ? dateString(body.occurredOn, "Data") : today;
     } else if (entryType.submission_mode === "daily") {
       const requestedDay = typeof body.occurredOn === "string" ? dateString(body.occurredOn, "Data") : null;
       const requestedCheckpointId = typeof body.itemId === "string" || typeof body.checkpointId === "string"
         ? String(body.itemId ?? body.checkpointId) : null;
-      const checkpoint = requestedCheckpointId
-        ? await oneOrNull<{ day: string; starts_at: Date }>(client,
-            `SELECT (starts_at AT TIME ZONE 'America/Sao_Paulo')::date::text AS day,starts_at
-               FROM challenge_checkpoints WHERE id=$1 AND challenge_id=$2 AND archived_at IS NULL`,
-            [requestedCheckpointId, challengeId])
-        : requestedDay
+      if (access.challenge.start_date === null || access.challenge.end_date === null) {
+        if (requestedCheckpointId) {
+          throw new ApiError(400, "invalid_checkpoint", "Desafios sem prazo não usam checkpoints fixos.");
+        }
+        occurredOn = requestedDay ?? today;
+        if (occurredOn > today) {
+          throw new ApiError(409, "checkin_in_future", "O check-in pode ser de hoje ou de uma data passada.");
+        }
+      } else {
+        const checkpoint = requestedCheckpointId
           ? await oneOrNull<{ day: string; starts_at: Date }>(client,
               `SELECT (starts_at AT TIME ZONE 'America/Sao_Paulo')::date::text AS day,starts_at
-                 FROM challenge_checkpoints
-                WHERE challenge_id=$1 AND archived_at IS NULL
-                  AND (starts_at AT TIME ZONE 'America/Sao_Paulo')::date=$2::date`,
-              [challengeId, requestedDay])
-          : await oneOrNull<{ day: string; starts_at: Date }>(client,
-              `SELECT (starts_at AT TIME ZONE 'America/Sao_Paulo')::date::text AS day,starts_at
-                 FROM challenge_checkpoints
-                WHERE challenge_id=$1 AND archived_at IS NULL AND starts_at<=now()
-                  AND (due_at IS NULL OR due_at>now()) ORDER BY starts_at DESC LIMIT 1`,
-              [challengeId]);
-      if (!checkpoint) throw new ApiError(400, "invalid_checkpoint", "Checkpoint diário inexistente ou indisponível.");
-      if (checkpoint.starts_at.getTime() > Date.now()) {
-        throw new ApiError(409, "checkpoint_scheduled", "Este checkpoint ainda não foi liberado.");
-      }
-      occurredOn = checkpoint.day;
-      if (occurredOn < access.challenge.start_date || occurredOn > access.challenge.end_date) {
-        throw new ApiError(400, "date_range", "A data está fora do período do desafio.");
+                 FROM challenge_checkpoints WHERE id=$1 AND challenge_id=$2 AND archived_at IS NULL`,
+              [requestedCheckpointId, challengeId])
+          : requestedDay
+            ? await oneOrNull<{ day: string; starts_at: Date }>(client,
+                `SELECT (starts_at AT TIME ZONE 'America/Sao_Paulo')::date::text AS day,starts_at
+                   FROM challenge_checkpoints
+                  WHERE challenge_id=$1 AND archived_at IS NULL
+                    AND (starts_at AT TIME ZONE 'America/Sao_Paulo')::date=$2::date`,
+                [challengeId, requestedDay])
+            : await oneOrNull<{ day: string; starts_at: Date }>(client,
+                `SELECT (starts_at AT TIME ZONE 'America/Sao_Paulo')::date::text AS day,starts_at
+                   FROM challenge_checkpoints
+                  WHERE challenge_id=$1 AND archived_at IS NULL AND starts_at<=now()
+                    AND (due_at IS NULL OR due_at>now()) ORDER BY starts_at DESC LIMIT 1`,
+                [challengeId]);
+        if (!checkpoint) throw new ApiError(400, "invalid_checkpoint", "Checkpoint diário inexistente ou indisponível.");
+        if (checkpoint.starts_at.getTime() > Date.now()) {
+          throw new ApiError(409, "checkpoint_scheduled", "Este checkpoint ainda não foi liberado.");
+        }
+        occurredOn = checkpoint.day;
+        if (occurredOn < access.challenge.start_date || occurredOn > access.challenge.end_date) {
+          throw new ApiError(400, "date_range", "A data está fora do período do desafio.");
+        }
       }
     } else {
-      occurredOn = typeof body.occurredOn === "string" ? dateString(body.occurredOn, "Data") : new Date().toISOString().slice(0, 10);
+      occurredOn = typeof body.occurredOn === "string" ? dateString(body.occurredOn, "Data") : today;
     }
     const fields = await storageFields(client, challengeId, entryType.id);
     const existing = entryType.submission_mode === "item"
