@@ -8,9 +8,15 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
     return {
       csrfToken: "",
       user: null,
-      limits: { groupsPerOwner: LIMITS.groupsPerOwner, challengesPerGroup: LIMITS.challengesPerGroup },
+      limits: {
+        groupsPerOwner: LIMITS.groupsPerOwner,
+        challengesPerGroup: LIMITS.challengesPerGroup,
+        groupsPerMember: LIMITS.groupsPerMember,
+        pendingInvitesPerUser: LIMITS.pendingInvitesPerUser,
+      },
       groups: [],
       challenges: [],
+      memberRequests: [],
     };
   }
 
@@ -57,6 +63,51 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
       }
     }
 
+    // Pending outgoing invites, shown on the group screen so admins can track or
+    // withdraw them. Only groups the viewer manages.
+    const manageableGroupIds = groupsResult.rows
+      .filter((group) => group.role === "owner" || group.role === "admin")
+      .map((group) => group.id);
+    const pendingByGroup = new Map<string, Array<Record<string, unknown>>>();
+    if (manageableGroupIds.length) {
+      const pending = await client.query<{
+        group_id: string;
+        id: string;
+        display_name: string;
+        username: string;
+        created_at: Date;
+      }>(
+        `SELECT r.group_id, r.id, u.display_name, u.username, r.created_at
+           FROM group_member_requests r JOIN users u ON u.id = r.user_id
+          WHERE r.group_id = ANY($1::text[]) AND r.status = 'pending'
+          ORDER BY r.created_at`,
+        [manageableGroupIds],
+      );
+      for (const row of pending.rows) {
+        const list = pendingByGroup.get(row.group_id) ?? [];
+        list.push({ id: row.id, name: row.display_name, username: row.username, createdAt: row.created_at.toISOString() });
+        pendingByGroup.set(row.group_id, list);
+      }
+    }
+
+    const memberRequestsResult = await client.query<{
+      id: string;
+      group_id: string;
+      group_name: string;
+      role: GroupRole;
+      created_at: Date;
+      invited_by: string | null;
+    }>(
+      `SELECT r.id, r.group_id, g.name AS group_name, r.role, r.created_at,
+              inviter.display_name AS invited_by
+         FROM group_member_requests r
+         JOIN groups g ON g.id = r.group_id AND g.deleted_at IS NULL AND g.archived_at IS NULL
+         LEFT JOIN users inviter ON inviter.id = r.invited_by_user_id
+        WHERE r.user_id = $1 AND r.status = 'pending'
+        ORDER BY r.created_at DESC`,
+      [session.user.id],
+    );
+
     const challengesResult = await client.query<{
       id: string;
       group_id: string;
@@ -102,6 +153,8 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
       limits: {
         groupsPerOwner: LIMITS.groupsPerOwner,
         challengesPerGroup: LIMITS.challengesPerGroup,
+        groupsPerMember: LIMITS.groupsPerMember,
+        pendingInvitesPerUser: LIMITS.pendingInvitesPerUser,
       },
       groups: groupsResult.rows.map((group) => ({
         id: group.id,
@@ -110,6 +163,7 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
         role: group.role,
         memberCount: group.member_count,
         members: membersByGroup.get(group.id) ?? [],
+        pendingRequests: pendingByGroup.get(group.id) ?? [],
       })),
       challenges: challengesResult.rows.map((challenge) => ({
         id: challenge.id,
@@ -123,6 +177,14 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
         isParticipant: challenge.is_participant,
         completedCount: challenge.completed_count,
         totalCount: challenge.total_count,
+      })),
+      memberRequests: memberRequestsResult.rows.map((request) => ({
+        id: request.id,
+        groupId: request.group_id,
+        groupName: request.group_name,
+        role: request.role,
+        invitedBy: request.invited_by,
+        createdAt: request.created_at.toISOString(),
       })),
     };
   });

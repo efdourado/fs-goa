@@ -92,7 +92,7 @@ function AdminOverview({
       <section className={cx(cardClass, "p-5 sm:p-7")}>
         <h2 className="text-xl font-light">Informações básicas</h2>
         <p className="mt-1 text-sm text-[var(--muted)]">Registros históricos nunca dependem da posição visual destes campos.</p>
-        <form className="mt-5 grid gap-4 sm:grid-cols-2" onSubmit={(event) => { event.preventDefault(); void run("save", () => onSave({ title: title.trim(), description: description.trim(), ruleSections: ruleSections.map((rule) => ({ title: rule.title.trim(), description: rule.description.trim() })), startsOn, endsOn }), "Informações atualizadas."); }}>
+        <form className="mt-5 grid gap-4 sm:grid-cols-2" onSubmit={(event) => { event.preventDefault(); void run("save", () => onSave({ title: title.trim(), description: description.trim(), ruleSections: ruleSections.map((rule) => ({ title: rule.title.trim(), description: rule.description.trim(), ...(rule.topics?.length ? { topics: rule.topics.map((topic) => ({ title: topic.title.trim(), description: topic.description.trim() })) } : {}) })), startsOn, endsOn }), "Informações atualizadas."); }}>
           <label className="sm:col-span-2"><span className={labelClass}>Título</span><input className={inputClass} value={title} onChange={(event) => setTitle(event.target.value)} required maxLength={140} disabled={challenge.status === "closed"} /></label>
           <label><span className={labelClass}>Início</span><input className={inputClass} type="date" value={startsOn} onChange={(event) => setStartsOn(event.target.value)} disabled={challenge.status !== "draft"} /></label>
           <label><span className={labelClass}>Término</span><input className={inputClass} type="date" min={startsOn} value={endsOn} onChange={(event) => setEndsOn(event.target.value)} disabled={challenge.status !== "draft"} /></label>
@@ -517,7 +517,7 @@ export function AdminScreen({
   onSaveResult: (payload: Record<string, unknown>) => Promise<void>;
 }) {
   const tabs: Array<{ id: AdminTab; label: string }> = [
-    { id: "overview", label: "Visão geral" },
+    { id: "overview", label: "Geral" },
     { id: "participants", label: "Pessoas" },
     { id: "fields", label: "Campos" },
     { id: "items", label: "Checkpoints" },

@@ -77,6 +77,52 @@ export const groupMembers = pgTable(
   ],
 );
 
+/**
+ * A directed invitation from a group's admins to a specific account. Unlike the
+ * token-based `group_invites`, joining here needs the invitee's consent: the row
+ * sits `pending` until they accept (which creates the `group_members` row) or
+ * decline. The partial unique index keeps a single open request per person per
+ * group while leaving answered rows behind as history.
+ */
+export const groupMemberRequests = pgTable(
+  "group_member_requests",
+  {
+    id: text("id").primaryKey(),
+    groupId: text("group_id")
+      .notNull()
+      .references(() => groups.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    invitedByUserId: text("invited_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    role: text("role").notNull().default("participant"),
+    status: text("status").notNull().default("pending"),
+    createdAt: timestamptz("created_at").defaultNow().notNull(),
+    respondedAt: timestamptz("responded_at"),
+  },
+  (table) => [
+    uniqueIndex("group_member_requests_one_pending_uidx")
+      .on(table.groupId, table.userId)
+      .where(sql`${table.status} = 'pending'`),
+    index("group_member_requests_user_status_idx").on(table.userId, table.status),
+    index("group_member_requests_group_status_idx").on(table.groupId, table.status),
+    check(
+      "group_member_requests_role_check",
+      sql`${table.role} in ('admin', 'participant')`,
+    ),
+    check(
+      "group_member_requests_status_check",
+      sql`${table.status} in ('pending', 'accepted', 'declined', 'cancelled')`,
+    ),
+    check(
+      "group_member_requests_responded_check",
+      sql`${table.status} = 'pending' or ${table.respondedAt} is not null`,
+    ),
+  ],
+);
+
 export const groupInvites = pgTable(
   "group_invites",
   {

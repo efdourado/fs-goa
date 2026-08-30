@@ -28,7 +28,7 @@ import type {
   ChallengeCreationInput,
   ChallengeDetail,
   Entry,
-  GroupMemberResult,
+  GroupInviteResult,
   Id,
   InviteAcceptance,
   ParticipantTab,
@@ -69,7 +69,8 @@ export default function GoaApp() {
 
     // Paint from the last known bootstrap so the first screen is instant, then
     // revalidate against the database in the background.
-    const cached = readCache<BootstrapData>(CACHE_KEYS.bootstrap);
+    const cachedRaw = readCache<BootstrapData>(CACHE_KEYS.bootstrap);
+    const cached = cachedRaw ? normalizeBootstrap(cachedRaw) : null;
     let revalidated = false;
     if (cached) {
       void Promise.resolve().then(() => {
@@ -276,6 +277,21 @@ export default function GoaApp() {
     setScreen({ kind: "dashboard" });
   }
 
+  async function respondToMemberRequest(requestId: Id, action: "accept" | "decline") {
+    if (!bootstrap) return;
+    await apiRequest(
+      action === "accept" ? API_PATHS.memberRequestAccept(requestId) : API_PATHS.memberRequestDecline(requestId),
+      { method: "POST", body: {}, csrfToken: bootstrap.csrfToken },
+    );
+    await refreshBootstrap();
+  }
+
+  async function cancelMemberRequest(requestId: Id) {
+    if (!bootstrap) return;
+    await apiRequest(API_PATHS.memberRequestCancel(requestId), { method: "POST", body: {}, csrfToken: bootstrap.csrfToken });
+    await refreshBootstrap();
+  }
+
   async function deleteChallenge(challengeId: Id, groupId?: Id) {
     if (!bootstrap) return;
     await apiRequest(API_PATHS.challenge(challengeId), { method: "DELETE", csrfToken: bootstrap.csrfToken });
@@ -404,7 +420,7 @@ export default function GoaApp() {
   } else if (screen.kind === "template") {
     content = <TemplateDetailScreen key={screen.challengeId} user={user} challengeId={screen.challengeId} groups={bootstrap.groups} csrfToken={bootstrap.csrfToken} autoCopy={resumeTemplateCopy === screen.challengeId} onBack={() => { setResumeTemplateCopy(null); setScreen({ kind: "templates" }); }} onSignIn={() => undefined} onDuplicated={async (result) => { setResumeTemplateCopy(null); await refreshBootstrap(); openAdmin(result.challengeId); }} />;
   } else if (screen.kind === "group" && selectedGroup) {
-    content = <GroupScreen key={selectedGroup.id} group={selectedGroup} challenges={bootstrap.challenges.filter((challenge) => challenge.groupId === selectedGroup.id)} challengeLimit={bootstrap.limits.challengesPerGroup} onBack={() => setScreen({ kind: "dashboard" })} onCreateChallenge={() => setScreen({ kind: "create-challenge", groupId: selectedGroup.id })} onOpenChallenge={(id) => openParticipant(id)} onCreateInvite={async (payload) => apiRequest<{ token?: string; url?: string }>(API_PATHS.groupInvites(selectedGroup.id), { method: "POST", body: payload, csrfToken: bootstrap.csrfToken })} onAddMemberByUsername={(username) => apiRequest<GroupMemberResult>(API_PATHS.groupMembers(selectedGroup.id), { method: "POST", body: { username }, csrfToken: bootstrap.csrfToken })} onUpdateGroup={(payload) => updateGroup(selectedGroup.id, payload)} onDeleteGroup={selectedGroup.role === "owner" ? () => deleteGroup(selectedGroup.id) : undefined} />;
+    content = <GroupScreen key={selectedGroup.id} group={selectedGroup} challenges={bootstrap.challenges.filter((challenge) => challenge.groupId === selectedGroup.id)} challengeLimit={bootstrap.limits.challengesPerGroup} pendingRequests={selectedGroup.pendingRequests ?? []} onBack={() => setScreen({ kind: "dashboard" })} onCreateChallenge={() => setScreen({ kind: "create-challenge", groupId: selectedGroup.id })} onOpenChallenge={(id) => openParticipant(id)} onCreateInvite={async (payload) => apiRequest<{ token?: string; url?: string }>(API_PATHS.groupInvites(selectedGroup.id), { method: "POST", body: payload, csrfToken: bootstrap.csrfToken })} onInviteByUsername={(username) => apiRequest<GroupInviteResult>(API_PATHS.groupMembers(selectedGroup.id), { method: "POST", body: { username }, csrfToken: bootstrap.csrfToken })} onCancelRequest={cancelMemberRequest} onUpdateGroup={(payload) => updateGroup(selectedGroup.id, payload)} onDeleteGroup={selectedGroup.role === "owner" ? () => deleteGroup(selectedGroup.id) : undefined} />;
   } else if (screen.kind === "create-challenge" && selectedGroup && canManage(selectedGroup.role)) {
     content = <CreateChallengeScreen key={selectedGroup.id} group={selectedGroup} onBack={() => setScreen({ kind: "group", groupId: selectedGroup.id })} onCreate={(input) => createChallenge(selectedGroup.id, input)} />;
   } else if ((screen.kind === "challenge" || screen.kind === "admin") && (detailLoading || !selectedChallenge || selectedChallenge.id !== screen.challengeId)) {
@@ -421,7 +437,7 @@ export default function GoaApp() {
 
   return (
     <div className="min-h-screen bg-[var(--canvas)] text-[var(--ink)]">
-      <AppHeader user={user} onHome={() => setScreen({ kind: "dashboard" })} onAccount={() => setScreen({ kind: "account" })} onLogout={logout} />
+      <AppHeader user={user} notifications={bootstrap.memberRequests} onHome={() => setScreen({ kind: "dashboard" })} onAccount={() => setScreen({ kind: "account" })} onLogout={logout} onAcceptRequest={(id) => respondToMemberRequest(id, "accept")} onDeclineRequest={(id) => respondToMemberRequest(id, "decline")} />
       {content}
     </div>
   );

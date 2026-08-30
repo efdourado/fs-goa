@@ -9,7 +9,7 @@ function positiveIntEnv(name: string, fallback: number): number {
 
 /**
  * Creation caps kept deliberately low while Goa is effectively single-tenant.
- * All are per owner / per group (not global) and can be raised via env.
+ * All are per owner / per group / per member (not global) and can be raised via env.
  */
 export const LIMITS = {
   get groupsPerOwner(): number {
@@ -20,6 +20,18 @@ export const LIMITS = {
   },
   get membersPerGroup(): number {
     return positiveIntEnv("MAX_MEMBERS_PER_GROUP", 62);
+  },
+  /**
+   * How many groups a single account may belong to (any role, owned included).
+   * Generous — years of revisitable challenge groups — but bounds the blast
+   * radius of a hostile flow adding someone everywhere and keeps bootstrap cheap.
+   */
+  get groupsPerMember(): number {
+    return positiveIntEnv("MAX_GROUPS_PER_MEMBER", 186);
+  },
+  /** Open incoming member requests one account can accumulate before new ones are refused. */
+  get pendingInvitesPerUser(): number {
+    return positiveIntEnv("MAX_PENDING_INVITES_PER_USER", 31);
   },
 };
 
