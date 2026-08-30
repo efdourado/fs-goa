@@ -189,8 +189,8 @@ export default function AdminConsole({ viewerId, viewerName, csrfToken }: { view
     <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
       <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-light tracking-[-0.045em]">Administração</h1>
-          <p className={cx("mt-1 text-sm", muted)}>Área privada · {viewerName}. Somente metadados — nunca o conteúdo dos grupos.</p>
+          <h1 className="text-3xl font-light tracking-[-0.045em]">Gestão</h1>
+          <p className={cx("mt-1 text-sm", muted)}>Gestão interna · {viewerName}. Somente metadados — nunca o conteúdo dos grupos.</p>
         </div>
         <Link className={cx("text-sm font-light", muted, "hover:text-[var(--ink)]")} href="/">← Voltar ao app</Link>
       </header>

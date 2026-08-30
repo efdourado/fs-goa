@@ -174,7 +174,7 @@ export function AuthScreen({
           </p>
           {onShowTemplates ? (
             <p className="mt-2 text-center text-sm text-[var(--muted)]">
-              <button className="min-h-11 font-light underline-offset-4 hover:underline cursor-pointer" type="button" onClick={onShowTemplates}>Ver modelos prontos</button>
+              <button className="min-h-11 font-light underline-offset-4 hover:underline cursor-pointer" type="button" onClick={onShowTemplates}>Modelos prontos</button>
             </p>
           ) : null}
         </div>
