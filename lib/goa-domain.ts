@@ -13,4 +13,12 @@ export {
   updateGroup,
 } from "./goa/domain/groups";
 export { acceptInvite, createInvite, previewInvite } from "./goa/domain/invites";
-export { asRecord, dateString, integerValue, publicId, semanticKey } from "./goa/domain/shared";
+export {
+  asRecord,
+  dateKeyInTimeZone,
+  dateRange,
+  dateString,
+  integerValue,
+  publicId,
+  semanticKey,
+} from "./goa/domain/shared";

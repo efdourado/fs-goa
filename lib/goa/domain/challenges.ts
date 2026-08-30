@@ -6,7 +6,7 @@ import { syncDailyCheckpoints } from "../daily-checkpoints";
 import { writeAudit } from "./audit";
 import { defaultFields, insertField, type ClientField } from "./fields";
 import { parseRuleSections, rulesCompatibilityText } from "./rules";
-import { asRecord, dateString, publicId, semanticKey } from "./shared";
+import { asRecord, dateRange, publicId, semanticKey } from "./shared";
 
 const SUBMISSION_MODES = new Set(["item", "daily", "free"]);
 
@@ -19,9 +19,10 @@ export async function createChallenge(
   const description = stringValue(body, "description", { max: 2_000, optional: true }) ?? null;
   const ruleSections = parseRuleSections(body.ruleSections, body.rules);
   const rules = rulesCompatibilityText(ruleSections);
-  const startDate = dateString(body.startsOn ?? body.startDate, "Data inicial");
-  const endDate = dateString(body.endsOn ?? body.endDate, "Data final");
-  if (endDate < startDate) throw new ApiError(400, "date_range", "A data final deve ser posterior ao início.");
+  const { startDate, endDate } = dateRange(
+    Object.hasOwn(body, "startsOn") ? body.startsOn : body.startDate,
+    Object.hasOwn(body, "endsOn") ? body.endsOn : body.endDate,
+  );
   const submissionMode = typeof body.submissionMode === "string" ? body.submissionMode : body.template === "reading" ? "daily" : "item";
   if (!SUBMISSION_MODES.has(submissionMode)) throw new ApiError(400, "submission_mode", "Modo de registro inválido.");
   const fields = Array.isArray(body.fields) && body.fields.length ? (body.fields as ClientField[]) : defaultFields(body.template);
@@ -89,7 +90,12 @@ export async function createChallenge(
           [publicId(), id, entryTypeId, semanticKey(itemTitle, `item_${index + 1}`), itemTitle, index],
         );
       }
-    } else if (submissionMode === "daily" && body.generateDaily !== false) {
+    } else if (
+      submissionMode === "daily"
+      && startDate !== null
+      && endDate !== null
+      && body.generateDaily !== false
+    ) {
       await syncDailyCheckpoints(
         client,
         id,

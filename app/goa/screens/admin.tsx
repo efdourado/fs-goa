@@ -26,6 +26,7 @@ import {
   inputClass,
   labelClass,
   PageHeading,
+  SchedulePeriodFields,
   StatusMessage,
 } from "../ui";
 import { formatDate, formatDateTime, isChallengeScheduled, itemIdForEntry, itemStatusLabel, valuesAsRecord } from "../utils";
@@ -58,6 +59,9 @@ function AdminOverview({
   const [title, setTitle] = useState(challenge.title);
   const [description, setDescription] = useState(challenge.description ?? "");
   const [ruleSections, setRuleSections] = useState(() => visibleRuleSections(challenge.ruleSections, challenge.rules));
+  const [scheduleMode, setScheduleMode] = useState<"period" | "none">(
+    challenge.startsOn && challenge.endsOn ? "period" : "none",
+  );
   const [startsOn, setStartsOn] = useState(challenge.startsOn ?? "");
   const [endsOn, setEndsOn] = useState(challenge.endsOn ?? "");
   const [duplicateTitle, setDuplicateTitle] = useState(challenge.title);
@@ -84,6 +88,31 @@ function AdminOverview({
     }
   }
 
+  function saveBasics(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (scheduleMode === "period" && (!startsOn || !endsOn)) {
+      setError("Preencha início e término, ou escolha um desafio sem prazo.");
+      return;
+    }
+    if (scheduleMode === "period" && endsOn < startsOn) {
+      setError("A data final deve ser igual ou posterior ao início.");
+      return;
+    }
+    void run("save", () => onSave({
+      title: title.trim(),
+      description: description.trim(),
+      ruleSections: ruleSections.map((rule) => ({
+        title: rule.title.trim(),
+        description: rule.description.trim(),
+        ...(rule.topics?.length
+          ? { topics: rule.topics.map((topic) => ({ title: topic.title.trim(), description: topic.description.trim() })) }
+          : {}),
+      })),
+      startsOn: scheduleMode === "period" ? startsOn : null,
+      endsOn: scheduleMode === "period" ? endsOn : null,
+    }), "Informações atualizadas.");
+  }
+
   return (
     <div className="space-y-6">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -93,10 +122,18 @@ function AdminOverview({
       <section className={cx(cardClass, "p-5 sm:p-7")}>
         <h2 className="text-xl font-light">Informações básicas</h2>
         <p className="mt-1 text-sm text-[var(--muted)]">Registros históricos nunca dependem da posição visual destes campos.</p>
-        <form className="mt-5 grid gap-4 sm:grid-cols-2" onSubmit={(event) => { event.preventDefault(); void run("save", () => onSave({ title: title.trim(), description: description.trim(), ruleSections: ruleSections.map((rule) => ({ title: rule.title.trim(), description: rule.description.trim(), ...(rule.topics?.length ? { topics: rule.topics.map((topic) => ({ title: topic.title.trim(), description: topic.description.trim() })) } : {}) })), startsOn, endsOn }), "Informações atualizadas."); }}>
+        <form className="mt-5 grid gap-4 sm:grid-cols-2" onSubmit={saveBasics}>
           <label className="sm:col-span-2"><span className={labelClass}>Título</span><input className={inputClass} value={title} onChange={(event) => setTitle(event.target.value)} required maxLength={140} disabled={challenge.status === "closed"} /></label>
-          <label><span className={labelClass}>Início</span><input className={inputClass} type="date" value={startsOn} onChange={(event) => setStartsOn(event.target.value)} disabled={challenge.status !== "draft"} /></label>
-          <label><span className={labelClass}>Término</span><input className={inputClass} type="date" min={startsOn} value={endsOn} onChange={(event) => setEndsOn(event.target.value)} disabled={challenge.status !== "draft"} /></label>
+          <fieldset className="sm:col-span-2" disabled={challenge.status !== "draft"}>
+            <legend className={labelClass}>Agenda</legend>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <button className={cx("min-h-14 rounded-xl border px-4 py-3 text-left disabled:cursor-not-allowed disabled:opacity-60", scheduleMode === "period" ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)]")} type="button" aria-pressed={scheduleMode === "period"} onClick={() => setScheduleMode("period")}><strong className="block text-sm">Com período</strong><span className="text-xs font-normal text-[var(--muted)]">Datas futuras ou históricas.</span></button>
+              <button className={cx("min-h-14 rounded-xl border px-4 py-3 text-left disabled:cursor-not-allowed disabled:opacity-60", scheduleMode === "none" ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)]")} type="button" aria-pressed={scheduleMode === "none"} onClick={() => setScheduleMode("none")}><strong className="block text-sm">Sem prazo</strong><span className="text-xs font-normal text-[var(--muted)]">Encerramento manual.</span></button>
+            </div>
+          </fieldset>
+          {scheduleMode === "period" ? (
+            <SchedulePeriodFields startsOn={startsOn} endsOn={endsOn} onStartsOn={setStartsOn} onEndsOn={setEndsOn} disabled={challenge.status !== "draft"} />
+          ) : <p className="sm:col-span-2 rounded-xl bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">Este desafio fica aberto até ser encerrado manualmente.</p>}
           <label className="sm:col-span-2"><span className={labelClass}>Descrição</span><textarea className={inputClass} rows={3} value={description} onChange={(event) => setDescription(event.target.value)} maxLength={1000} disabled={challenge.status === "closed"} /></label>
           <div className="sm:col-span-2"><div className="mb-3"><span className={labelClass}>Regras com título</span><p className="text-xs leading-5 text-[var(--muted)]">Cada regra ganha destaque próprio para ninguém precisar procurar o combinado.</p></div><RuleSectionsEditor value={ruleSections} onChange={setRuleSections} disabled={challenge.status === "closed"} /></div>
           {challenge.status !== "closed" ? <div className="sm:col-span-2"><Button type="submit" disabled={busy === "save"}>{busy === "save" ? "Salvando…" : "Salvar informações"}</Button></div> : null}
@@ -194,6 +231,7 @@ function AdminItems({
   const [itemsText, setItemsText] = useState("");
   const startsOn = challenge.startsOn ?? "";
   const endsOn = challenge.endsOn ?? "";
+  const undatedDaily = challenge.submissionMode === "daily" && !challenge.startsOn && !challenge.endsOn;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -245,7 +283,7 @@ function AdminItems({
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
       <section className={cx(cardClass, "p-5 sm:p-7")}>
-        <PageHeading title="Itens e checkpoints" description="Edite títulos e descrições sem trocar os identificadores usados nos registros. Depois do encerramento, o histórico fica bloqueado." />
+        <PageHeading title="Itens e checkpoints" description={undatedDaily ? "Este hábito não precisa de checkpoints antecipados: cada data ganha um check-in quando alguém registra." : "Edite títulos e descrições sem trocar os identificadores usados nos registros. Depois do encerramento, o histórico fica bloqueado."} />
         {editSuccess ? <div className="mb-3"><StatusMessage success={editSuccess} /></div> : null}
         {challenge.items.length ? (
           <ol className="divide-y divide-[var(--line)]">
@@ -274,11 +312,13 @@ function AdminItems({
               </li>
             ))}
           </ol>
-        ) : <EmptyState title="Nenhum checkpoint" description="Adicione itens ou gere checkpoints diários antes de ativar o desafio." />}
+        ) : undatedDaily
+          ? <EmptyState title="Check-ins sob demanda" description="Nada para gerar aqui. Participantes podem registrar hoje ou recuperar uma data passada enquanto o desafio estiver ativo." />
+          : <EmptyState title="Nenhum checkpoint" description="Adicione itens ou gere checkpoints diários antes de ativar o desafio." />}
       </section>
       <aside className={cx(cardClass, "h-fit p-5")}>
-        <h2 className="text-lg font-light">{challenge.submissionMode === "daily" ? "Gerar dias" : "Adicionar itens"}</h2>
-        {challenge.status !== "draft" ? <p className="mt-4 text-sm leading-6 text-[var(--muted)]">Novos itens e datas ficam bloqueados depois da ativação. Títulos e descrições ainda podem ser corrigidos até o encerramento.</p> : <form className="mt-4 space-y-4" onSubmit={submit}>
+        <h2 className="text-lg font-light">{undatedDaily ? "Sem calendário fixo" : challenge.submissionMode === "daily" ? "Gerar dias" : "Adicionar itens"}</h2>
+        {undatedDaily ? <p className="mt-4 text-sm leading-6 text-[var(--muted)]">Para transformar o hábito em uma edição com começo e fim, volte à aba Geral enquanto ele ainda for rascunho e escolha “Com período”.</p> : challenge.status !== "draft" ? <p className="mt-4 text-sm leading-6 text-[var(--muted)]">Novos itens e datas ficam bloqueados depois da ativação. Títulos e descrições ainda podem ser corrigidos até o encerramento.</p> : <form className="mt-4 space-y-4" onSubmit={submit}>
           {challenge.submissionMode === "daily" ? <><p className="text-xs leading-5 text-[var(--muted)]">A geração usa exatamente as datas definidas nas informações básicas.</p><label><span className={labelClass}>Primeiro dia</span><input className={inputClass} type="date" value={startsOn} readOnly required /></label><label><span className={labelClass}>Último dia</span><input className={inputClass} type="date" min={startsOn} value={endsOn} readOnly required /></label></> : <label><span className={labelClass}>Um título por linha</span><textarea className={inputClass} rows={10} value={itemsText} onChange={(event) => setItemsText(event.target.value)} placeholder={"Item 1\nItem 2"} /></label>}
           <StatusMessage error={error} success={success} />
           <Button type="submit" className="w-full" disabled={busy || challenge.status !== "draft"}>{busy ? "Salvando…" : challenge.submissionMode === "daily" ? "Gerar checkpoints" : "Adicionar"}</Button>

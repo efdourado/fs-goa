@@ -57,6 +57,13 @@
       "when": 1788106403391,
       "tag": "0007_fresh_invaders",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788113752372,
+      "tag": "0008_easy_mercury",
+      "breakpoints": true
     }
   ]
 }

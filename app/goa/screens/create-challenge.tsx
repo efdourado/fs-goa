@@ -6,7 +6,7 @@ import { errorMessage } from "../api";
 import { cleanFields, FieldBuilder, presetFields } from "../fields";
 import { RuleSectionsEditor } from "../rules";
 import type { ChallengeCreationInput, ChallengeField, ChallengeRule, GroupSummary, Id, Template } from "../types";
-import { backLinkClass, Button, cardClass, cx, EmptyState, inputClass, labelClass, PageHeading, StatusMessage } from "../ui";
+import { backLinkClass, Button, cardClass, cx, EmptyState, inputClass, labelClass, PageHeading, SchedulePeriodFields, StatusMessage } from "../ui";
 import { formatDate } from "../utils";
 
 export function CreateChallengeScreen({
@@ -23,6 +23,7 @@ export function CreateChallengeScreen({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [ruleSections, setRuleSections] = useState<ChallengeRule[]>([]);
+  const [scheduleMode, setScheduleMode] = useState<"period" | "none">("period");
   const [startsOn, setStartsOn] = useState("");
   const [endsOn, setEndsOn] = useState("");
   const [fields, setFields] = useState<ChallengeField[]>([]);
@@ -41,8 +42,16 @@ export function CreateChallengeScreen({
 
   function nextStep() {
     setError(null);
-    if (step === 1 && (!template || !title.trim() || !startsOn || !endsOn)) {
-      setError("Escolha um modelo e preencha título e datas.");
+    if (step === 1 && (!template || !title.trim())) {
+      setError("Escolha um modelo e preencha o título.");
+      return;
+    }
+    if (step === 1 && scheduleMode === "period" && (!startsOn || !endsOn)) {
+      setError("Preencha início e término, ou escolha um desafio sem prazo.");
+      return;
+    }
+    if (step === 1 && scheduleMode === "period" && endsOn < startsOn) {
+      setError("A data final deve ser igual ou posterior ao início.");
       return;
     }
     if (step === 1 && ruleSections.some((rule) =>
@@ -79,12 +88,12 @@ export function CreateChallengeScreen({
             ? { topics: rule.topics.map((topic) => ({ title: topic.title.trim(), description: topic.description.trim() })) }
             : {}),
         })),
-        startsOn,
-        endsOn,
+        startsOn: scheduleMode === "period" ? startsOn : null,
+        endsOn: scheduleMode === "period" ? endsOn : null,
         submissionMode: template === "reading" ? "daily" : "item",
         fields: cleanFields(fields),
         items: items.map((item, position) => ({ title: item, position })),
-        generateDaily: template === "reading",
+        generateDaily: template === "reading" && scheduleMode === "period",
         participantIds,
       });
     } catch (cause) {
@@ -118,8 +127,17 @@ export function CreateChallengeScreen({
             </div>
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
               <label className="sm:col-span-2"><span className={labelClass}>Título</span><input className={inputClass} value={title} onChange={(event) => setTitle(event.target.value)} maxLength={140} required /></label>
-              <label><span className={labelClass}>Início</span><input className={inputClass} type="date" value={startsOn} onChange={(event) => setStartsOn(event.target.value)} required /></label>
-              <label><span className={labelClass}>Término</span><input className={inputClass} type="date" min={startsOn} value={endsOn} onChange={(event) => setEndsOn(event.target.value)} required /></label>
+              <fieldset className="sm:col-span-2">
+                <legend className={labelClass}>Agenda</legend>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <button className={cx("min-h-16 rounded-xl border px-4 py-3 text-left", scheduleMode === "period" ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] bg-[var(--paper)]")} type="button" aria-pressed={scheduleMode === "period"} onClick={() => setScheduleMode("period")}><strong className="block text-sm">Com período</strong><span className="mt-1 block text-xs font-normal text-[var(--muted)]">Use datas futuras ou passadas.</span></button>
+                  <button className={cx("min-h-16 rounded-xl border px-4 py-3 text-left", scheduleMode === "none" ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] bg-[var(--paper)]")} type="button" aria-pressed={scheduleMode === "none"} onClick={() => setScheduleMode("none")}><strong className="block text-sm">Sem prazo</strong><span className="mt-1 block text-xs font-normal text-[var(--muted)]">O grupo encerra quando quiser.</span></button>
+                </div>
+              </fieldset>
+              {scheduleMode === "period" ? <>
+                <SchedulePeriodFields startsOn={startsOn} endsOn={endsOn} onStartsOn={setStartsOn} onEndsOn={setEndsOn} />
+                <p className="sm:col-span-2 text-xs leading-5 text-[var(--muted)]">Pode ser uma edição futura, atual ou já realizada. Para reconstruir uma história antiga, escolha o período original.</p>
+              </> : <p className="sm:col-span-2 rounded-xl bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">Sem datas fixas: listas ficam abertas no ritmo do grupo e hábitos recebem um check-in por dia, inclusive em datas passadas.</p>}
               <label className="sm:col-span-2"><span className={labelClass}>Descrição <small className="font-light text-[var(--muted)]">opcional</small></span><textarea className={inputClass} rows={3} value={description} onChange={(event) => setDescription(event.target.value)} maxLength={1000} /></label>
               <div className="sm:col-span-2"><div className="mb-3"><span className={labelClass}>Regras com título <small className="font-light text-[var(--muted)]">opcional</small></span><p className="text-xs leading-5 text-[var(--muted)]">Dê destaque a cada acordo importante do desafio.</p></div><RuleSectionsEditor value={ruleSections} onChange={setRuleSections} /></div>
             </div>
@@ -133,8 +151,10 @@ export function CreateChallengeScreen({
             <h2 className="text-xl font-light">Defina os checkpoints</h2>
             {template === "cine" ? (
               <><p className="mt-1 text-sm leading-6 text-[var(--muted)]">Cole um título por linha. Cada item vira uma oportunidade de registro para cada participante.</p><label className="mt-5 block"><span className={labelClass}>Lista de itens</span><textarea className={inputClass} rows={12} value={itemsText} onChange={(event) => setItemsText(event.target.value)} placeholder={"Primeiro título\nSegundo título\nTerceiro título"} /></label><p className="mt-2 text-xs font-semibold text-[var(--muted)]">{items.length} {items.length === 1 ? "item" : "itens"}</p></>
-            ) : (
+            ) : scheduleMode === "period" ? (
               <div className="mt-5 rounded-2xl border border-[var(--ok-line)] bg-[var(--ok-soft)] p-5"><strong className="text-[var(--ok)]">Check-ins diários</strong><p className="mt-2 text-sm leading-6 text-[var(--ok)]">O servidor criará um checkpoint por dia entre {formatDate(startsOn)} e {formatDate(endsOn)}. Datas e limites são validados novamente no servidor.</p></div>
+            ) : (
+              <div className="mt-5 rounded-2xl border border-[var(--ok-line)] bg-[var(--ok-soft)] p-5"><strong className="text-[var(--ok)]">Hábito sem prazo</strong><p className="mt-2 text-sm leading-6 text-[var(--ok)]">Não há calendário para gerar antecipadamente. Cada pessoa registra um check-in por dia e pode recuperar uma data passada.</p></div>
             )}
           </div>
         ) : null}
@@ -149,7 +169,7 @@ export function CreateChallengeScreen({
                 {group.members.map((member) => <label className="flex min-h-14 items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4" key={member.id}><input type="checkbox" aria-label={`Selecionar ${member.name}`} checked={participantIds.includes(member.id)} onChange={(event) => setParticipantIds((current) => event.target.checked ? [...current, member.id] : current.filter((id) => id !== member.id))} /><span><strong className="block text-sm">{member.name}</strong><small className="text-[var(--muted)]">@{member.username}</small></span></label>)}
               </fieldset>
             ) : <EmptyState title="Membros ainda não carregados" description="Você pode salvar o desafio como rascunho e adicionar participantes na área administrativa." />}
-            <div className="mt-6 rounded-2xl bg-[var(--wash)] p-5 text-sm leading-6"><strong className="block text-base">Resumo do rascunho</strong><span className="mt-2 block text-[var(--muted)]">{fields.length} campos · {template === "reading" ? "checkpoints diários" : `${items.length} itens`} · {participantIds.length} participantes</span><p className="mt-2 text-[var(--muted)]">O desafio será criado como rascunho. Revise tudo na administração antes de ativar.</p></div>
+            <div className="mt-6 rounded-2xl bg-[var(--wash)] p-5 text-sm leading-6"><strong className="block text-base">Resumo do rascunho</strong><span className="mt-2 block text-[var(--muted)]">{fields.length} campos · {template === "reading" ? scheduleMode === "period" ? "checkpoints diários" : "check-ins diários sem prazo" : `${items.length} itens`} · {participantIds.length} participantes</span><p className="mt-2 text-[var(--muted)]">O desafio será criado como rascunho. Revise tudo na administração antes de ativar.</p></div>
           </div>
         ) : null}
 

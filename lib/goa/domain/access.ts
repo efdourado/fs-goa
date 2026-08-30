@@ -12,8 +12,8 @@ interface ChallengeAccessRow {
   description: string | null;
   rules: string | null;
   rule_sections: unknown;
-  start_date: string;
-  end_date: string;
+  start_date: string | null;
+  end_date: string | null;
   time_zone: string;
   status: ChallengeStatus;
   role: GroupRole;

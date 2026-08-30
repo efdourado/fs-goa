@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { publicResults } from "@/lib/goa-challenges";
+import { formatDateRange } from "@/app/goa/utils";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,7 +41,7 @@ export default async function SharedResultsPage({ params }: { params: Promise<{ 
         </Link>
         <section className="overflow-hidden rounded-[30px] bg-[var(--ink)] px-6 py-12 text-white sm:px-12 sm:py-16">
           <p className="text-xs font-light uppercase tracking-[0.16em] text-white/50">
-            {challenge.startsOn} — {challenge.endsOn}
+            {formatDateRange(challenge.startsOn, challenge.endsOn)}
           </p>
           <h1 className="mt-5 max-w-4xl text-4xl font-semibold leading-none tracking-[-0.055em] sm:text-7xl">
             {result.headline || challenge.title}

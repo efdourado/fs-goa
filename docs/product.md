@@ -56,12 +56,26 @@ Um desafio vive em três estados: **`draft` → `active` → `closed`**.
 - **Ativo**: os participantes selecionados enviam e editam os próprios registros.
 - **Encerrado**: os dados de origem congelam; só a curadoria da vitrine continua editável.
 
+O **período é opcional**, sempre em par: início e término são informados juntos ou
+ambos ficam vazios. Datas passadas são aceitas de propósito, inclusive para
+reconstruir no Goa uma experiência realizada antes do app. A agenda só pode ser
+alterada enquanto o desafio está em rascunho. Sem período, o desafio fica **sem
+prazo** e permanece ativo até owner/admin encerrá-lo manualmente.
+
+Para não contar dias no calendário, a edição com período traz **atalhos de
+duração** (30/60/90 dias, 6 meses, 1 ano ou um número de dias avulso): o término é
+calculado a partir do início — ou de hoje, se o início ainda estiver vazio.
+
 **Presets** para começar rápido: *Cine* (um registro por filme) e *90 dias de
 leitura* (um checkpoint por dia). Dá para ajustar tudo depois.
 
 **Modo de registro**:
-- *por item* — uma lista de objetos (filmes, livros, etapas); um registro ativo por item.
-- *por dia* — um checkpoint por data entre início e fim; um registro ativo por dia.
+- *por item* — uma lista de objetos (filmes, livros, etapas); um registro ativo por
+  item. Sem prazo, funciona como uma lista contínua, disponível até o encerramento
+  manual.
+- *por dia* — com período, um checkpoint por data entre início e fim; sem prazo,
+  cada participante faz um check-in diário sob demanda para hoje ou uma data
+  passada, com no máximo um registro por dia.
 - *livre* — sem itens; registros soltos.
 
 **Campos** são semânticos e estáveis: texto, número, nota, opção, booleano, data.

@@ -33,8 +33,8 @@ export const challenges = pgTable(
       .$type<Array<{ title: string; description: string }>>()
       .notNull()
       .default(sql`'[]'::jsonb`),
-    startDate: date("start_date", { mode: "string" }).notNull(),
-    endDate: date("end_date", { mode: "string" }).notNull(),
+    startDate: date("start_date", { mode: "string" }),
+    endDate: date("end_date", { mode: "string" }),
     timeZone: text("time_zone").notNull().default("UTC"),
     status: text("status").notNull().default("draft"),
     activatedAt: timestamptz("activated_at"),
@@ -74,7 +74,11 @@ export const challenges = pgTable(
       "challenges_rule_sections_check",
       sql`jsonb_typeof(${table.ruleSections}) = 'array' and jsonb_array_length(${table.ruleSections}) <= 20`,
     ),
-    check("challenges_date_range_check", sql`${table.endDate} >= ${table.startDate}`),
+    check(
+      "challenges_date_range_check",
+      sql`(${table.startDate} is null and ${table.endDate} is null)
+        or (${table.startDate} is not null and ${table.endDate} is not null and ${table.endDate} >= ${table.startDate})`,
+    ),
     check(
       "challenges_deleted_at_check",
       sql`${table.deletedAt} is null or ${table.deletedAt} >= ${table.createdAt}`,

@@ -35,7 +35,9 @@ export async function transitionChallenge(
         throw new ApiError(409, "challenge_incomplete", "Adicione campos e participantes antes de ativar.");
       }
       if ((readiness.submission_mode === "item" && !readiness.items) ||
-          (readiness.submission_mode === "daily" && !readiness.checkpoints)) {
+          (readiness.submission_mode === "daily"
+            && access.challenge.start_date !== null
+            && !readiness.checkpoints)) {
         throw new ApiError(409, "challenge_incomplete", "Adicione os itens ou checkpoints antes de ativar.");
       }
       await client.query("UPDATE challenges SET status='active', activated_at=now(), updated_at=now() WHERE id=$1", [challengeId]);

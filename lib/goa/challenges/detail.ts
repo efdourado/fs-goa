@@ -1,6 +1,6 @@
 import type { SessionContext } from "../../auth";
 import { inTransaction, oneOrNull, withClient } from "../../db";
-import { challengeAccess, dateString, writeAudit } from "../../goa-domain";
+import { challengeAccess, dateRange, writeAudit } from "../../goa-domain";
 import { ApiError, stringValue } from "../../http";
 import { fieldsForChallenge } from "./fields";
 import { generateDailyCheckpoints } from "./items";
@@ -51,7 +51,10 @@ export async function getChallengeDetail(session: SessionContext, challengeId: s
       );
     const metrics = await metricsForChallenge(client, challengeId);
     const result = await resultForChallenge(client, challengeId, metrics);
-    const items = itemsResult.rows.length
+    const submissionMode = typeResult.rows[0]?.submission_mode ?? "free";
+    const items = submissionMode === "daily" && access.challenge.start_date === null
+      ? []
+      : itemsResult.rows.length
       ? itemsResult.rows.map((item) => ({
           id: item.id, entryTypeId: item.entry_type_id, title: item.title,
           description: item.description, position: item.position,
@@ -76,7 +79,7 @@ export async function getChallengeDetail(session: SessionContext, challengeId: s
       startsOn: access.challenge.start_date,
       endsOn: access.challenge.end_date,
       status: access.challenge.status,
-      submissionMode: typeResult.rows[0]?.submission_mode ?? "free",
+      submissionMode,
       viewerRole: access.challenge.role,
       isParticipant: access.challenge.is_participant,
       fields,
@@ -109,13 +112,17 @@ export async function updateChallenge(
       ? parseRuleSections(access.challenge.rule_sections, access.challenge.rules)
       : parseRuleSections(body.ruleSections, body.rules);
     const rules = rulesCompatibilityText(ruleSections);
-    const startDate = body.startsOn === undefined && body.startDate === undefined
-      ? access.challenge.start_date
-      : dateString(body.startsOn ?? body.startDate, "Data inicial");
-    const endDate = body.endsOn === undefined && body.endDate === undefined
-      ? access.challenge.end_date
-      : dateString(body.endsOn ?? body.endDate, "Data final");
-    if (endDate < startDate) throw new ApiError(400, "date_range", "A data final deve ser posterior ao início.");
+    const rawStartDate = Object.hasOwn(body, "startsOn")
+      ? body.startsOn
+      : Object.hasOwn(body, "startDate")
+        ? body.startDate
+        : access.challenge.start_date;
+    const rawEndDate = Object.hasOwn(body, "endsOn")
+      ? body.endsOn
+      : Object.hasOwn(body, "endDate")
+        ? body.endDate
+        : access.challenge.end_date;
+    const { startDate, endDate } = dateRange(rawStartDate, rawEndDate);
     if (access.challenge.status === "active" &&
       (startDate !== access.challenge.start_date || endDate !== access.challenge.end_date)) {
       throw new ApiError(409, "dates_locked", "As datas não podem mudar depois da ativação.");
@@ -129,8 +136,15 @@ export async function updateChallenge(
       const entryType = await oneOrNull<{ submission_mode: string }>(client,
         "SELECT submission_mode FROM entry_types WHERE challenge_id=$1 AND archived_at IS NULL ORDER BY created_at LIMIT 1",
         [challengeId]);
-      if (entryType?.submission_mode === "daily") {
+      if (entryType?.submission_mode === "daily" && startDate !== null && endDate !== null) {
         await generateDailyCheckpoints(client, challengeId, startDate, endDate);
+      } else if (entryType?.submission_mode === "daily") {
+        await client.query(
+          `UPDATE challenge_checkpoints
+              SET archived_at = now(), updated_at = now()
+            WHERE challenge_id = $1 AND archived_at IS NULL`,
+          [challengeId],
+        );
       }
     }
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,

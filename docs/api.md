@@ -53,8 +53,13 @@ Toda resposta é JSON `no-store` com `x-content-type-options: nosniff` e
 | `POST /api/groups/:id/invites` | sessão+csrf (owner/admin) | `{ expiresInDays?, maxUses?, challengeId? }` | `201 { id, token, url, kind, groupId, groupName, challengeId, challengeTitle, expiresAt, maxUses }`. Com `challengeId`, o alvo deve pertencer ao grupo e não pode estar encerrado |
 | `POST /api/groups/:id/challenges` | sessão+csrf (owner/admin) | ver "criar desafio" abaixo | `201 { id, challengeId, status: "draft" }`. `403 challenge_limit` ao passar de `MAX_CHALLENGES_PER_GROUP` (6) |
 
-Criar desafio: `{ title, description?, ruleSections?: [{ title, description }], startsOn, endsOn, submissionMode:
+Criar desafio: `{ title, description?, ruleSections?: [{ title, description }], startsOn?, endsOn?, submissionMode:
 "item"|"daily"|"free", template?, fields[], items[], generateDaily?, participantIds[] }`.
+
+`startsOn` e `endsOn` formam um período opcional: devem ser enviados juntos ou
+omitidos juntos (`null` também remove ambos durante o rascunho). O período aceita
+datas passadas; a única relação temporal obrigatória é `endsOn >= startsOn`.
+Desafios sem período não expiram automaticamente e são encerrados manualmente.
 
 ## Convites
 
@@ -68,15 +73,15 @@ Criar desafio: `{ title, description?, ruleSections?: [{ title, description }], 
 | Método · rota | Acesso | Corpo | Retorna / efeito |
 | --- | --- | --- | --- |
 | `GET /api/challenges/:id` | sessão (membro do grupo) | — | Detalhe completo: campos, itens, participantes, métricas, resultado. Rascunho só para owner/admin |
-| `PATCH /api/challenges/:id` | sessão+csrf (owner/admin) | `{ title?, description?, ruleSections?: [{ title, description }], startsOn?, endsOn? }` | desafio atualizado |
+| `PATCH /api/challenges/:id` | sessão+csrf (owner/admin) | `{ title?, description?, ruleSections?: [{ title, description }], startsOn?: string\|null, endsOn?: string\|null }` | desafio atualizado; a agenda só muda no rascunho e início/término devem ser enviados ou removidos em par |
 | `DELETE /api/challenges/:id` | sessão+csrf (owner/admin) | — | `200 { id, deleted: true }` — lixeira |
 | `POST /api/challenges/:id/participants` | sessão+csrf (owner/admin) | `{ replace: true, participantIds[] }` | participantes ativos |
 | `POST /api/challenges/:id/fields` | sessão+csrf (owner/admin) | `{ replace, archiveMissing, fields[] }` | `201` — campos em uso são arquivados, nunca apagados |
-| `POST /api/challenges/:id/items` | sessão+csrf (owner/admin) | itens (por objeto) ou `{ generate: { frequency, startsOn, endsOn } }` (por dia) | `201` |
+| `POST /api/challenges/:id/items` | sessão+csrf (owner/admin) | itens (por objeto) ou `{ generate: { frequency, startsOn, endsOn } }` (diário com período) | `201`; no diário sem prazo os check-ins são criados sob demanda pelo endpoint de registros |
 | `PATCH /api/challenges/:id/items/:itemId` | sessão+csrf (owner/admin) | `{ title?, description? }` | item/checkpoint atualizado sem trocar o identificador; bloqueado após o encerramento |
 | `POST /api/challenges/:id/metrics` | sessão+csrf (owner/admin) | `{ operation, fieldKey?, label, ... }` | `201` — só enums (`sum`, `average`, `count`, `min`, `max`, `completion_rate`) |
-| `POST /api/challenges/:id/entries` | sessão+csrf (participante) | `{ itemId?/checkpointId?, values }` | `201` — um registro ativo por item/dia |
-| `POST /api/challenges/:id/transition` | sessão+csrf (owner/admin) | `{ status: "active" \| "closed" }` | `draft→active→closed`; encerrar congela os dados e gera blocos de resultado |
+| `POST /api/challenges/:id/entries` | sessão+csrf (participante) | `{ itemId?/checkpointId?, occurredOn?, values }` | `201` — um registro ativo por item/dia; no diário sem prazo, `occurredOn` usa hoje por padrão, aceita hoje ou uma data passada e cria ou atualiza diretamente o check-in do participante naquele dia, sem persistir um checkpoint |
+| `POST /api/challenges/:id/transition` | sessão+csrf (owner/admin) | `{ status: "active" \| "closed" }` | `draft→active→closed`; encerrar congela os dados e gera blocos de resultado; desafios sem prazo só terminam por este encerramento manual |
 | `POST /api/challenges/:id/duplicate` | sessão+csrf (owner/admin nos dois grupos) | `{ title?, targetGroupId }` | `201` — cria um rascunho estrutural em outro grupo; nunca copia participantes, registros, resultados, convites ou tokens |
 | `POST /api/challenges/:id/template` | sessão+csrf (platform_admin + owner/admin do desafio) | `{ summary? }` | `200 { id, publishedAsTemplate: true, summary }` — publica o desafio na vitrine pública de modelos |
 | `DELETE /api/challenges/:id/template` | sessão+csrf (platform_admin + owner/admin do desafio) | — | `200 { id, publishedAsTemplate: false }` |

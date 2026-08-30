@@ -114,12 +114,12 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
       title: string;
       description: string | null;
       status: ChallengeStatus;
-      start_date: string;
-      end_date: string;
+      start_date: string | null;
+      end_date: string | null;
       role: GroupRole;
       is_participant: boolean;
       completed_count: number;
-      total_count: number;
+      total_count: number | null;
     }>(
       `SELECT c.id, c.group_id, c.title, c.description, c.status,
               c.start_date::text AS start_date, c.end_date::text AS end_date,
@@ -134,7 +134,11 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
                 WHEN EXISTS (SELECT 1 FROM entry_types et WHERE et.challenge_id = c.id AND et.submission_mode = 'item')
                 THEN (SELECT count(*)::int FROM challenge_items ci WHERE ci.challenge_id = c.id AND ci.archived_at IS NULL)
                 WHEN EXISTS (SELECT 1 FROM entry_types et WHERE et.challenge_id = c.id AND et.submission_mode = 'daily')
-                THEN (c.end_date - c.start_date + 1)::int
+                  AND c.start_date IS NOT NULL
+                THEN (SELECT count(*)::int FROM challenge_checkpoints cc
+                       WHERE cc.challenge_id = c.id AND cc.archived_at IS NULL)
+                WHEN EXISTS (SELECT 1 FROM entry_types et WHERE et.challenge_id = c.id AND et.submission_mode = 'daily')
+                THEN NULL
                 ELSE 1
               END AS total_count
          FROM challenges c
