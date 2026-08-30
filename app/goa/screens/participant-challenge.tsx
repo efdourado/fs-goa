@@ -130,7 +130,7 @@ export function DynamicEntryForm({
       {optionalFields.length && canEdit ? (
         <button
           type="button"
-          className="min-h-11 cursor-pointer text-sm font-light text-[var(--main-strong)] hover:underline"
+          className="min-h-11 cursor-pointer text-sm font-light hover:underline"
           onClick={() => setShowOptional((open) => !open)}
         >
           {showOptional ? "Ocultar campos opcionais" : `Mostrar campos opcionais (${optionalFields.length})`}
