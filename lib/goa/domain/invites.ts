@@ -47,8 +47,14 @@ export async function createInvite(
         )
       : null;
     if (challengeId && !challenge) throw new ApiError(404, "not_found", "Desafio não encontrado.");
-    if (challenge?.status === "closed") {
-      throw new ApiError(409, "challenge_closed", "Não é possível convidar participantes para um desafio encerrado.");
+    if (challenge && challenge.status !== "active") {
+      throw new ApiError(
+        409,
+        "challenge_not_active",
+        challenge.status === "closed"
+          ? "Não é possível convidar participantes para um desafio encerrado."
+          : "Ative o desafio antes de convidar participantes para ele.",
+      );
     }
 
     const rawToken = generateOpaqueToken();
@@ -130,7 +136,9 @@ async function inviteByToken(token: string, client: PoolClient, lock = false): P
 
 function inviteStatus(invite: InviteRow): InviteStatus {
   if (invite.revoked_at) return "revoked";
-  if (invite.challenge_id && (!invite.challenge_title || invite.challenge_status === "closed")) return "revoked";
+  // A challenge invite is only good while its target is live: a deleted or
+  // closed challenge (or one somehow back in draft) retires the invite.
+  if (invite.challenge_id && (!invite.challenge_title || invite.challenge_status !== "active")) return "revoked";
   if (invite.expires_at.getTime() <= Date.now()) return "expired";
   if (invite.use_count >= invite.max_uses) return "exhausted";
   return "valid";

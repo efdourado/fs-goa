@@ -171,7 +171,7 @@ export function GroupScreen({
           <h2 id="invite-create-title" className="text-lg font-light">Criar convite seguro</h2>
           <p className="mt-1 text-sm text-[var(--muted)]">O link expira e pode ter uso limitado. Gere um novo quando precisar.</p>
           <form className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-[1.2fr_1fr_1fr_auto]" onSubmit={createInvite}>
-            <label><span className={labelClass}>Destino</span><select className={inputClass} name="challengeId" defaultValue=""><option value="">Somente o grupo</option>{challenges.filter((challenge) => challenge.status !== "closed").map((challenge) => <option value={challenge.id} key={challenge.id}>Desafio: {challenge.title}</option>)}</select></label>
+            <label><span className={labelClass}>Destino</span><select className={inputClass} name="challengeId" defaultValue=""><option value="">Somente o grupo</option>{challenges.filter((challenge) => challenge.status === "active").map((challenge) => <option value={challenge.id} key={challenge.id}>Desafio: {challenge.title}</option>)}</select></label>
             <label><span className={labelClass}>Expira em</span><select className={inputClass} name="expiresInDays" defaultValue="7"><option value="1">1 dia</option><option value="7">7 dias</option><option value="30">30 dias</option></select></label>
             <label><span className={labelClass}>Quantidade de usos</span><input className={inputClass} name="maxUses" type="number" min={1} max={100} defaultValue={1} /></label>
             <div className="flex items-end"><Button type="submit" disabled={busy}>{busy ? "Gerando…" : "Gerar link"}</Button></div>
