@@ -11,6 +11,7 @@ import {
   writeAudit,
 } from "../../goa-domain";
 import { ApiError, stringValue } from "../../http";
+import { syncDailyCheckpoints } from "../daily-checkpoints";
 
 export async function generateDailyCheckpoints(
   client: PoolClient,
@@ -18,33 +19,7 @@ export async function generateDailyCheckpoints(
   startsOn: string,
   endsOn: string,
 ): Promise<string[]> {
-  const current = new Date(`${startsOn}T00:00:00Z`);
-  const last = new Date(`${endsOn}T00:00:00Z`);
-  const ids: string[] = [];
-  let position = 0;
-  while (current <= last) {
-    if (position >= 366) throw new ApiError(400, "date_range", "Use no máximo 366 checkpoints.");
-    const day = current.toISOString().slice(0, 10);
-    const inserted = await oneOrNull<{ id: string }>(client,
-      `INSERT INTO challenge_checkpoints
-        (id,challenge_id,semantic_key,title,position,starts_at,due_at,created_at,updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6::date::timestamp AT TIME ZONE 'America/Sao_Paulo',
-               ($6::date + interval '1 day')::timestamp AT TIME ZONE 'America/Sao_Paulo',now(),now())
-       ON CONFLICT (challenge_id,semantic_key) DO UPDATE SET
-         position=excluded.position,starts_at=excluded.starts_at,
-         due_at=excluded.due_at,archived_at=NULL,updated_at=now()
-       RETURNING id`,
-      [publicId(), challengeId, `dia_${position + 1}`, `Dia ${position + 1}`, position, day]);
-    if (inserted) ids.push(inserted.id);
-    position += 1;
-    current.setUTCDate(current.getUTCDate() + 1);
-  }
-  await client.query(
-    `UPDATE challenge_checkpoints SET archived_at=now(),updated_at=now()
-      WHERE challenge_id=$1 AND archived_at IS NULL AND NOT (id=ANY($2::text[]))`,
-    [challengeId, ids],
-  );
-  return ids;
+  return syncDailyCheckpoints(client, challengeId, startsOn, endsOn);
 }
 
 export async function addChallengeItem(

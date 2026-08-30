@@ -114,7 +114,11 @@ export async function metricsForChallenge(client: PoolClient, challengeId: strin
   return calculated;
 }
 
-export async function resultForChallenge(client: PoolClient, challengeId: string) {
+export async function resultForChallenge(
+  client: PoolClient,
+  challengeId: string,
+  calculatedMetrics?: Array<Record<string, unknown>>,
+) {
   const challenge = await oneOrNull<{ results_published_at: Date | null }>(
     client,
     "SELECT results_published_at FROM challenges WHERE id = $1",
@@ -133,7 +137,12 @@ export async function resultForChallenge(client: PoolClient, challengeId: string
        FROM result_blocks WHERE challenge_id = $1 AND visible = true ORDER BY position`,
     [challengeId],
   );
-  const currentMetrics = await metricsForChallenge(client, challengeId);
+  const needsMetricFallback = blocks.rows.some(
+    (block) => block.kind === "metric" && block.value_snapshot === null && block.metric_id !== null,
+  );
+  const currentMetrics = needsMetricFallback
+    ? calculatedMetrics ?? await metricsForChallenge(client, challengeId)
+    : [];
   const metricById = new Map(currentMetrics.map((metric) => [metric.id, metric]));
   const textBlocks = blocks.rows.filter((block) => block.kind === "text");
   return {
