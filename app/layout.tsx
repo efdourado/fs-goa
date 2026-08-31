@@ -46,10 +46,11 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-// Runs before first paint: the stored preference (or the cookie the server just
-// inlined) wins, "system" is resolved against the OS, and `data-theme` lands on
-// <html> so there is never a light flash before hydration.
-const themeBoot = `(function(){try{var c=document.cookie.match(/(?:^|; )goa-theme=([^;]+)/);var p=localStorage.getItem('goa-theme')||(c&&c[1])||'system';var d=p==='dark'||(p!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}})();`;
+// Runs before first paint. Only an explicit "light"/"dark" choice is written to
+// <html> (localStorage is the source of truth, the cookie is the fallback the
+// server already read); "system" writes nothing and lets the CSS
+// prefers-color-scheme block decide, so dark mode still works with no JS.
+const themeBoot = `(function(){try{var p=localStorage.getItem('goa-theme');if(!p){var m=document.cookie.match(/(?:^|; )goa-theme=([^;]+)/);p=m&&m[1];}if(p==='light'||p==='dark')document.documentElement.setAttribute('data-theme',p);}catch(e){}})();`;
 
 export default async function RootLayout({
   children,
