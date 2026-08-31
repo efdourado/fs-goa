@@ -6,7 +6,7 @@ import { syncDailyCheckpoints } from "../daily-checkpoints";
 import { writeAudit } from "./audit";
 import { defaultFields, insertField, type ClientField } from "./fields";
 import { parseRuleSections, rulesCompatibilityText } from "./rules";
-import { asRecord, dateRange, publicId, semanticKey } from "./shared";
+import { asRecord, dateRange, meetingUrlValue, publicId, semanticKey } from "./shared";
 
 const SUBMISSION_MODES = new Set(["item", "daily", "free"]);
 
@@ -17,6 +17,7 @@ export async function createChallenge(
 ) {
   const title = stringValue(body, "title", { min: 1, max: 160 })!;
   const description = stringValue(body, "description", { max: 2_000, optional: true }) ?? null;
+  const meetingUrl = meetingUrlValue(body.meetingUrl);
   const ruleSections = parseRuleSections(body.ruleSections, body.rules);
   const rules = rulesCompatibilityText(ruleSections);
   const { startDate, endDate } = dateRange(
@@ -59,10 +60,10 @@ export async function createChallenge(
     const id = publicId();
     await client.query(
       `INSERT INTO challenges
-        (id, group_id, created_by_user_id, title, description, rules, rule_sections, start_date, end_date,
+        (id, group_id, created_by_user_id, title, description, meeting_url, rules, rule_sections, start_date, end_date,
          time_zone, status, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,'draft',now(),now())`,
-      [id, groupId, session.user.id, title, description, rules, JSON.stringify(ruleSections), startDate, endDate, "America/Sao_Paulo"],
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,'draft',now(),now())`,
+      [id, groupId, session.user.id, title, description, meetingUrl, rules, JSON.stringify(ruleSections), startDate, endDate, "America/Sao_Paulo"],
     );
     const entryTypeId = publicId();
     await client.query(

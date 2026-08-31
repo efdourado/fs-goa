@@ -153,6 +153,7 @@ export interface ChallengeSummary {
   groupId: Id;
   title: string;
   description?: string | null;
+  meetingUrl?: string | null;
   rules?: string | null;
   ruleSections?: ChallengeRule[];
   startsOn?: string | null;
@@ -287,6 +288,7 @@ export interface ChallengeCreationInput {
   template: Template;
   title: string;
   description: string;
+  meetingUrl: string | null;
   ruleSections: ChallengeRule[];
   startsOn: string | null;
   endsOn: string | null;
