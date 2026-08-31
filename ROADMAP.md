@@ -1,165 +1,244 @@
 # Roadmap do Goa
 
 O MVP está no ar: desafios privados com campos configuráveis, etapas datadas,
-métricas e uma vitrine final. Este documento organiza a evolução para o que o Goa
-quer ser:
+métricas e uma vitrine final. Já entraram também **modo escuro** e **interface
+bilíngue (pt-BR/en)**. Este documento organiza a evolução para o que o Goa quer
+ser:
 
 > **O registro vivo de um grupo — clube de cinema, de leitura, de hábitos —
-> organizado em rodadas, com análise de verdade das avaliações e de quem
-> indicou o quê.**
+> organizado em rodadas, com análise de verdade das avaliações e de quem indicou
+> o quê.** O app também pode servir como uma _to-do list_ de hábitos, não só como
+> desafio fechado.
 
-A visão-alvo vem de duas planilhas que o grupo manteve na mão antes do app
-(`/.tmp/*.xlsx`, não versionadas):
+A visão-alvo vem das planilhas que o grupo manteve na mão antes do app
+(`.tmp/*.xlsx`, não versionadas; fonte em `docs/archives/cine/`). A planilha é uma
+excelente **especificação do domínio e dos relatórios** — o app deve gerar os
+mesmos resultados com muito menos trabalho, **não** virar uma planilha no
+navegador.
 
-- **Projeto Cine** — 6 pessoas, 30 filmes, 8 semanas de discussão com 2 pausas.
-  Cada filme tem um _indicado por_. A planilha calcula nota ajustada (bayesiana),
-  consenso, polarização, surpresa vs. expectativa, **viés do indicador**, nota de
-  curador, compatibilidade de gosto par a par e a mesma bateria fatiada por
-  gênero / década / duração / carga / semana / rodada de indicação.
-- **Cine Dupla** — 2 pessoas, **sem semanas nem prazos**: "anda no ritmo de
-  vocês dois". Mesma análise, mais simples.
+## A mudança central: separar o que hoje está misturado
 
-## Princípios
+Hoje o sistema mistura três coisas diferentes — **o que aconteceu**, **com qual
+objeto** e **em qual dia/checkpoint**. O modo `item | daily | free` amarra num
+único eixo três propriedades que são independentes. O caminho é separar:
 
-1. Nada público por padrão. Acesso vem sempre da associação ativa a um grupo.
-2. O servidor valida cada operação. A posição visual de um campo nunca é regra.
-3. Registros históricos são imutáveis; curadoria e apresentação são editáveis.
-4. Uma rodada termina virando memória — nunca uma planilha abandonada.
-5. O admin não deve precisar cobrar ninguém na unha.
+| Conceito | Hoje | Alvo |
+|---|---|---|
+| Livro, filme, hábito | texto solto (`"Livro atual"`) ou `challenge_item` sem identidade entre rodadas | **`CatalogItem`** — identidade estável no grupo, atributos tipados, taxonomias |
+| Gênero, década, carga | não existe / vira texto | **taxonomia** referenciável e multivalorada |
+| Duração, ano, páginas | não existe | **atributo tipado** (número + unidade), analisável |
+| Filme indicado por alguém nesta edição | `challenge_item` (título + agenda + `metadata` sempre `{}`) | **`RoundItem`** → `CatalogItem` + indicação + posição + bloco/semana |
+| Dia / semana / encontro | modo `daily` colapsa o checkpoint numa data, sem FK | **checkpoint explícito** com FK persistida; bloco/semana como camada de agenda |
+| 30 páginas lidas / assistiu / concluiu | um registro por participante/dia (`daily`) ou um por item (`item`) | **evento** com `purpose`, alvo opcional, cardinalidade própria |
+| Nota, expectativa, comentário | nota presa ao dia (leitura) ou ao item (cine); comentário usado pra "explicar" a relação | **avaliação** ligada ao item, editável/versionada; comentário nunca é obrigatório pro sistema saber o objeto |
+| Ranking, painel, compatibilidade | `groupBy` salvo mas ignorado no cálculo; sempre um escalar | **projeção calculada** — nunca fonte de verdade |
 
-## Decisões de arquitetura em aberto
+### Tipos de registro = 4 propriedades ortogonais
 
-Nenhuma frente grande avança antes de resolver estas:
+Em vez de `item | daily | free`:
 
-| # | Decisão | Impacto |
-|---|---------|---------|
-| D1 | Uma **rodada** é filha de um acervo do grupo, ou continua sendo o objeto de topo com o acervo como visão agregada? | Schema inteiro |
-| D2 | "Avaliar a qualquer hora" vira o **padrão**, com checkpoints datados como opção (leitura)? | Fluxo do participante, geração de etapas |
-| D3 | Notificação: **só in-app** primeiro, ou e-mail/push é obrigatório? | Precisa (ou não) contratar provedor agora |
-| D4 | Métricas de análise: calcular **no fechamento** ou **ao vivo**? | Complexidade, engajamento |
-| D5 | Galeria de templates v1: **2 modelos no código** ou CRUD de template? | Tamanho da Fase 3 |
+- **`purpose`** — progresso · conclusão · expectativa · avaliação · check-in
+- **`targetPolicy`** — alvo obrigatório · opcional · ausente
+- **`cardinality`** — uma vez por item · uma por item/dia · repetível
+- **`schedulePolicy`** — livre · dentro da rodada · preso a checkpoint
+- campos semânticos do formulário
 
-## Frentes
+Um registro precisa poder apontar **ao mesmo tempo** para livro + dia + checkpoint.
+A escolha não pode continuar sendo "item ou data".
 
-### 1. Fundação de dados
+### Teste de aceitação da fundação
 
-Destrava quase todo o resto.
+> Uma pessoa registra progresso em **dois livros no mesmo dia**, conclui um deles
+> e dá uma nota. O sistema produz dois progressos e uma avaliação
+> inequivocamente ligada ao livro concluído, **sem exigir comentário
+> explicativo**.
 
-- **Atribuição de indicação** — `challenge_items.recommended_by_user_id`.
-  Peça-chave: sem ela não há viés de indicação, nota de curador nem análise por
-  curador.
-- **Distribuição manual** — o admin arruma os N itens em posições / **blocos**
-  (temáticos) / **semanas** (temporais). Hoje só existe `position` e nenhuma UI
-  de reordenar de verdade nem camada de agrupamento.
-- **Notas desacopladas de "checkpoint datado"** — no modo cine, avaliar qualquer
-  item já consumido, a qualquer momento, sem reassistir; o único prazo é o fim da
-  rodada. Ver D2.
+## Onde o Goa falha hoje (âncoras)
 
-### 2. Formatos e agenda
+- Preset de leitura grava "Livro atual" como texto e joga páginas, conclusão, nota
+  e comentário no mesmo formulário diário — [lib/goa/domain/fields.ts](lib/goa/domain/fields.ts).
+- O banco proíbe `item_id` no modo diário e permite só um registro por
+  participante/dia — [db/schema/entries.ts](db/schema/entries.ts).
+- O checkpoint recebido pela API vira uma data e a listagem tenta reconstruí-lo por
+  coincidência de data, sem FK — [lib/goa/challenges/entries.ts](lib/goa/challenges/entries.ts).
+- `challenge_items.metadata` é sempre `{}` na criação e o detalhe nem o retorna —
+  [db/schema/challenge-definition.ts](db/schema/challenge-definition.ts),
+  [lib/goa/challenges/items.ts](lib/goa/challenges/items.ts),
+  [lib/goa/challenges/detail.ts](lib/goa/challenges/detail.ts).
+- `groupBy` é salvo e exibido, mas o cálculo o ignora e retorna um único escalar —
+  [lib/goa/challenges/results.ts](lib/goa/challenges/results.ts).
+- Taxa de conclusão pressupõe "todos os participantes × todos os itens" — erra em
+  hábitos pessoais e trilhos opcionais.
+- Duplicar um desafio dá novos IDs aos filmes/livros — não há identidade entre
+  rodadas — [lib/goa/challenges/copy.ts](lib/goa/challenges/copy.ts).
+- Showcase só entende texto, métrica escalar e comentário —
+  [db/schema/results.ts](db/schema/results.ts),
+  [app/results/[token]/page.tsx](app/results/[token]/page.tsx).
 
-- [x] **Desafio sem data** — entregue: início/fim opcionais em par, datas passadas
-  aceitas, listas por item sem prazo, check-in diário sob demanda e encerramento
-  manual. Atalhos de duração (30/60/90 dias, 6 meses, 1 ano ou dias avulsos)
-  calculam o término a partir do início.
-- [x] **Estrutura editável com o desafio ativo** — entregue: prazo, campos e itens
-  podem ser ajustados enquanto a rodada roda (a planilha era editável, aqui também).
-  O servidor barra só o que estragaria os dados: encurtar o período por cima de um
-  registro, remover um campo ou item que já tem resposta, trocar o tipo de um campo
-  persistido. Estender o prazo de um diário materializa os novos dias e preserva os
-  que já têm check-in. Só o encerramento congela tudo.
-- **Semanas de pausa** — a agenda passa a ter exceções; é o mecanismo oficial de
-  recuperação de quem ficou pra trás.
-- **Trilho paralelo** — um item de longa duração (uma série, ex.: Attack on
-  Titan) que **não é etapa**, não ocupa posição na ordem e é acompanhado de leve
-  (progresso por episódio). `challenge_items.kind = 'parallel'`.
+## Modelo recomendado
 
-### 3. Templates
+Mantém `Group` e `Challenge`. Não é reescrever tudo nem renomear o banco.
 
-- **Template = desafio serializado** — campos + itens + regras + métricas +
-  formato de agenda, sem participantes nem datas. Leitura e clube de cinema para
-  começar; espaço para mais.
-- **Galeria de templates** na navegação do header — ver exemplos preenchidos,
-  "usar este modelo" abre o fluxo de criação pré-preenchido. Ver D5.
+```
+Grupo
+├── Acervo
+│   └── CatalogItem: filme, livro, hábito…
+│       ├── atributos tipados (duração, ano, páginas…)
+│       └── taxonomias / tags (gênero, carga…)
+└── Rodada (Challenge)
+    ├── RoundItem ───────────── CatalogItem
+    │   ├── indicado por
+    │   ├── posição
+    │   ├── bloco / semana
+    │   └── atribuições
+    ├── Checkpoints / agenda (com exceções: semanas de pausa)
+    └── Registros
+        ├── participante
+        ├── RoundItem (quando aplicável)
+        ├── checkpoint (opcional)
+        ├── data/hora
+        ├── purpose
+        └── valores
+        └── Avaliação: nota, expectativa, comentário — ligada ao item
+```
 
-### 4. Acervo vivo
+`challenge_items` evolui para `RoundItem` ganhando referência ao `CatalogItem`. O
+mesmo filme reaparece em outra rodada com outra posição/semana/indicador sem
+perder identidade. Duração é número+unidade, não entidade. Gênero é referenciável
+porque é categoria multivalorada.
 
-- **Catálogo permanente por grupo** — todo item + nota de toda rodada rola para
-  um acervo do grupo, com ranking, compatibilidade e histórico acumulados entre
-  rodadas. É a maior mudança conceitual (ver D1): reposiciona o Goa de "desafios"
-  para "a vida do clube, organizada em rodadas".
+## Motor de análise v2
 
-### 5. Motor de análise
+Formatos de saída além de escalar: **série · ranking · distribuição · matriz ·
+perfil**.
 
-Classe nova de métrica além de `sum / average / count / min / max /
-completion_rate`:
+Cada definição de métrica declara: conjunto de dados · medida semântica ·
+agregação · dimensão · filtros · **mínimo de amostra** · versão do algoritmo ·
+audiência (pessoal / grupo / pública).
 
-- Nota ajustada (bayesiana, puxada para a média global quando há poucas notas).
-- Consenso, polarização, desvio.
-- Surpresa e decepção (exigem **Expectativas**: nota pré-consumo opcional).
-- **Viés do indicador** — nota da própria indicação menos a média dos outros.
-- Nota e ranking de curador; perfil por pessoa ("curador equilibrado/leve").
-- Compatibilidade de gosto par a par (correlação das notas em itens comuns).
-- Análise fatiada (gênero, década, duração, carga, atenção, semana, rodada).
-- Painel de destaques e "prêmios" (mais generoso, mais rigoroso, melhor
-  previsão, maior viés próprio, dupla mais compatível...).
+Parâmetros no template e na metodologia do showcase, **nunca enterrados em
+código** (a planilha usa, p.ex., mínimo de 4 notas para ranking e peso 4 na média
+bayesiana).
 
-Ver D4 para o momento do cálculo.
+Bateria: nota ajustada (bayesiana) · consenso, polarização, desvio · surpresa e
+decepção (exigem Expectativas) · **viés do indicador** · nota/ranking de curador e
+perfil por pessoa · análise fatiada (gênero, década, duração, carga, atenção,
+semana, rodada de indicação) · painel de destaques e "prêmios".
 
-### 6. Logística e básico do site
+Métricas básicas ao vivo; análises pesadas cacheadas; ao encerrar/publicar tudo
+vira **snapshot imutável**.
 
-- **Link de reunião** — `meeting_url` no desafio (ou por checkpoint, para a
-  discussão semanal) + botão "entrar agora".
-- **Digest do admin** — resumo semanal/diário configurável: quem está em dia,
-  quem está atrasado, notas pendentes, próximo prazo. Maior investimento de
-  infra (ver D3): hoje não há e-mail nem push. Começa in-app.
-- **Deletar conta** — soft-delete + purga; tratar grupos em que a pessoa é dona
-  (transferir ou bloquear).
-- **Página "Sobre"** — a ideia do app e a trajetória do desenvolvedor.
-- **Footer** — Instagram [@efdourado](https://instagram.com/efdourado) e links.
+### Afinidade entre pessoas
+
+- Cinema/leitura: similaridade de notas em itens comuns. Hábitos: similaridade de
+  rotina/aderência, não "gosto".
+- **Sempre exibir quantos itens foram comparados**; "dados insuficientes" abaixo
+  de um limite.
+- Não criar pontuação universal de afinidade. Começar com distância média
+  explicável entre notas; Pearson/Spearman e normalização de viés depois.
+- Resultado nominal fica no grupo por padrão; publicar exige consentimento ou
+  anonimização.
+
+## Showcase v2
+
+Opinativo: o sistema gera uma história pronta; o admin só oculta, reordena e
+destaca blocos.
+
+Vocabulário de `result_blocks` ampliado: `leaderboard` · `chart` · `matrix` ·
+`profile` · `item_grid` · `timeline`, além de hero/resumo/KPIs/comentários/
+metodologia. Cada bloco guarda dataset versionado, config visual, privacidade e
+snapshot.
+
+Blocos: hero + resumo · KPIs · ranking dos itens · gênero/década/duração ·
+consenso e polarização · expectativa × resultado · matriz de afinidade · perfil
+dos curadores · linha do tempo · cards e comentários · metodologia e tamanho das
+amostras.
+
+## Criação simples (sem reproduzir as 9 abas)
+
+1. Escolher modelo: Cine · Leitura · Hábitos · Customizado.
+2. Nome, período opcional, participantes.
+3. Colar lista/tabela de itens **ou** escolher itens já no acervo.
+4. Completar só os metadados necessários (gênero, duração, autor…).
+5. Organizar por drag-and-drop em blocos/semanas; confirmar indicadores.
+6. Prévia dos registros, análises e showcase que serão gerados.
+
+Colagem tabular + import CSV resolvem a maior parte. Import direto de `.xlsx` fica
+para depois. O template traz a receita completa: tipo de item + atributos,
+formulários (expectativa/progresso/avaliação), agenda **relativa**, métricas +
+limites de amostra, layout do showcase, regras de privacidade.
+
+Para o participante: "Li hoje" → páginas/minutos; "Terminei" → nota + comentário
+opcional; "Assistido" → avaliação. Comentário sempre disponível, nunca necessário.
+
+## Página "Como podemos melhorar?"
+
+Recurso transversal da Fase 0. Acessível pelo footer, configurações e depois de
+criar/publicar — sem modal agressivo.
+
+1. Em que parte do Goa você estava?
+2. O que estava tentando fazer?
+3. Conseguiu? Facilidade de 1 a 5.
+4. O que atrapalhou ou está faltando?
+5. Impacto: bloqueou / deu trabalho / incômodo pequeno / ideia futura.
+6. Como resolve isso hoje: planilha / WhatsApp / Notion / outro app / não resolve.
+7. Que mudança faria você voltar mais ou indicar o Goa?
+8. Podemos entrar em contato? E-mail opcional, consentimento não pré-marcado.
+
+Pergunta condicional e opcional sobre disposição a pagar **só** depois de uma
+experiência de sucesso — nunca obrigatória.
+
+O sistema anexa rota, versão, idioma, tipo de template e papel do usuário —
+**nunca** conteúdo de notas, comentários ou registros. Guarda versão do
+formulário, categoria e consentimento.
 
 ## Fases
 
-Ordem proposta — cada fase entrega algo utilizável de ponta a ponta.
+| Fase | Entrega | Critério de saída |
+|---|---|---|
+| **0 — Alinhamento e escuta** | Vocabulário fechado (item, rodada, evento, avaliação, privacidade); página "Como podemos melhorar?"; plano de migração; deletar conta · Sobre · footer · link de reunião | Equipe concorda sobre a abstração central |
+| **1 — Fundação relacional** | Acervo por grupo · `RoundItem` + indicação + atribuições · checkpoint explícito com FK · `purpose/targetPolicy/cardinality/schedulePolicy` separados · múltiplos tipos de registro ponta a ponta · UI de reordenar/agrupar | **Cenário dos dois livros no mesmo dia funciona** |
+| **2 — Criação rápida e verticais** | Cine, Leitura e Hábitos completos · atributos tipados + taxonomias · colagem em lote · templates versionados · semanas de pausa · trilho paralelo | Gênero/duração cadastrados uma vez e usados nas análises |
+| **3 — Motor de análise v2** | Agrupamento real · Bayes, mediana, dispersão, consenso, surpresa, viés · Expectativas · cortes dimensionais | Paridade automatizada com os resultados da planilha de referência |
+| **4 — Showcase v2** | Receitas de blocos · rankings, gráficos, matriz · preview privado · curadoria · snapshot | Showcase útil gerado sem configurar métrica na mão |
+| **5 — Memória do grupo** | Histórico entre rodadas · rankings acumulados · perfis e afinidade com privacidade | O mesmo item é reconhecido em rodadas diferentes |
+| **6 — Automação** | Enriquecimento por catálogos externos · importadores assistidos · **sorteios automatizados** · organização sugerida por IA (tema, expectativa, duração dos filmes…) · digests e notificações | Automação reduz trabalho comprovado nos feedbacks |
 
-### Fase 0 — Básico, risco baixo, ship rápido
+A fundação do acervo vem **antes** do motor de análise: gênero, duração,
+indicador e histórico dependem dela.
 
-Deletar conta · página Sobre · footer · campo de link de reunião.
+## Decisões a fechar agora
 
-### Fase 1 — Indicador + notas soltas
+- Acervo e rodadas são filhos irmãos do grupo; `RoundItem` liga os dois.
+- Avaliação ligada ao item e disponível durante a rodada; checkpoint é opcional.
+- Notificações in-app primeiro (D3 mantida).
+- Métricas básicas ao vivo; snapshot definitivo na publicação.
+- Poucos templates first-party e versionados antes de abrir um construtor geral.
 
-`recommended_by_user_id` · modo "avaliar a qualquer hora" · UI de reordenar e
-agrupar itens. **Entrega o caso do PDF Cine Dupla inteiro.**
+## O que evitar
 
-### Fase 2 — Agenda flexível
+- Transformar tudo em campo genérico ou JSON.
+- Usar dia/checkpoint como objeto avaliado.
+- Gravar gênero e duração em cada avaliação.
+- Exigir comentário para descobrir qual livro foi concluído.
+- Duplicar livro/filme em toda rodada sem identidade.
+- Publicar afinidade nominal por padrão.
+- Construir um editor no-code genérico antes de validar Cine, Leitura e Hábitos.
+- Recalcular retroativamente um showcase já publicado.
 
-~~Desafio sem data~~ *(entregue)* · semanas de pausa · trilho paralelo.
+## Entregue
 
-### Fase 3 — Templates
-
-Serializar desafio → template · galeria + navegação no header.
-
-### Fase 4 — Motor de análise
-
-Bateria de métricas de análise · Expectativas · resultado v2 da rodada.
-
-### Fase 5 — Acervo vivo
-
-Rollup do catálogo por grupo · histórico e rankings entre rodadas.
-
-### Fase 6 — Notificações
-
-Digest do admin (in-app primeiro, e-mail depois). Puxa junto a **entrega real de
-e-mail** (ex.: Resend), que hoje falta também para a redefinição de senha —
-mediada pelo administrador no MVP.
-
-## Melhorias transversais (encaixam em qualquer fase)
-
-- **Bilíngue** — interface em inglês e português (i18n).
-- **Modo escuro**.
+- **Modo escuro** — tokens claro/escuro, `prefers-color-scheme` + escolha
+  explícita por cookie, toggle System/Claro/Escuro.
+- **Bilíngue pt-BR/en** — `next-intl`, locale por cookie, sem prefixo de URL.
+- **Desafio sem data** — início/fim opcionais, datas passadas, check-in diário sob
+  demanda, encerramento manual, atalhos de duração.
+- **Estrutura editável com o desafio ativo** — prazo, campos e itens ajustáveis;
+  o servidor barra só o que estraga dados; o encerramento congela.
 
 ## Fora de escopo por enquanto
 
 - App mobile nativo.
 - Descoberta pública / feed social entre grupos.
-- Integração automática com catálogos de streaming (JustWatch etc.).
-- Import direto das planilhas `.xlsx` (a migração é manual e pontual).
+- Import direto das planilhas `.xlsx` (migração manual e pontual).
+- Editor no-code genérico de domínio.
