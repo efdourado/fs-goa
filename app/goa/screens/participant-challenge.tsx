@@ -237,6 +237,7 @@ export function ParticipantChallengeScreen({
           <div className="flex flex-wrap items-center justify-between gap-3"><ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} /><span className="text-xs text-white/65">{f.dateRange(challenge.startsOn, challenge.endsOn)}</span></div>
           <h1 className="mt-10 max-w-3xl text-4xl font-semibold leading-none tracking-[-0.055em] sm:text-6xl">{challenge.title}</h1>
           {challenge.description ? <p className="mt-4 max-w-2xl text-sm leading-6 text-white/70">{challenge.description}</p> : null}
+          {challenge.meetingUrl ? <a className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl bg-white/15 px-4 text-sm font-light text-white hover:bg-white/25" href={challenge.meetingUrl} target="_blank" rel="noreferrer"><span aria-hidden="true">↗</span>{t("joinMeeting")}</a> : null}
           {sortedItems.length ? <div className="mt-8 max-w-2xl"><div className="mb-2 flex justify-between text-xs text-white/70"><span>{t.rich("entriesProgress", { done: ownEntries.length, total: sortedItems.length, b: (chunks) => <strong className="text-white">{chunks}</strong> })}</span><span>{completion}%</span></div><div className="h-2 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-[var(--main-2)]" style={{ width: `${Math.min(100, completion)}%` }} /></div></div> : null}
         </div>
         <span className="absolute -right-28 -top-36 h-96 w-96 rounded-full border border-white/10" aria-hidden="true" />

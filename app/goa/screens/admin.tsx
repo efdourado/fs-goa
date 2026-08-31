@@ -67,6 +67,7 @@ function AdminOverview({
   const longDate: Intl.DateTimeFormatOptions = { day: "2-digit", month: "long", year: "numeric" };
   const [title, setTitle] = useState(challenge.title);
   const [description, setDescription] = useState(challenge.description ?? "");
+  const [meetingUrl, setMeetingUrl] = useState(challenge.meetingUrl ?? "");
   const [ruleSections, setRuleSections] = useState(() => visibleRuleSections(challenge.ruleSections, challenge.rules, trules("legacyTitle")));
   const [scheduleMode, setScheduleMode] = useState<"period" | "none">(
     challenge.startsOn && challenge.endsOn ? "period" : "none",
@@ -107,9 +108,14 @@ function AdminOverview({
       setError(t("errEndBeforeStart"));
       return;
     }
+    if (meetingUrl.trim() && !/^https:\/\/\S+$/u.test(meetingUrl.trim())) {
+      setError(t("errMeetingUrl"));
+      return;
+    }
     void run("save", () => onSave({
       title: title.trim(),
       description: description.trim(),
+      meetingUrl: meetingUrl.trim() || null,
       ruleSections: ruleSections.map((rule) => ({
         title: rule.title.trim(),
         description: rule.description.trim(),
@@ -152,6 +158,7 @@ function AdminOverview({
             <SchedulePeriodFields startsOn={startsOn} endsOn={endsOn} onStartsOn={setStartsOn} onEndsOn={setEndsOn} disabled={challenge.status === "closed"} />
           ) : <p className="sm:col-span-2 rounded-xl bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{t("noPeriodNote")}</p>}
           <label className="sm:col-span-2"><span className={labelClass}>{t("descriptionLabel")}</span><textarea className={inputClass} rows={3} value={description} onChange={(event) => setDescription(event.target.value)} maxLength={1000} disabled={challenge.status === "closed"} /></label>
+          <label className="sm:col-span-2"><span className={labelClass}>{t("meetingLabel")}</span><input className={inputClass} type="url" inputMode="url" value={meetingUrl} onChange={(event) => setMeetingUrl(event.target.value)} maxLength={2000} placeholder="https://meet.example.com/…" disabled={challenge.status === "closed"} /><small className="mt-1 block text-xs text-[var(--muted)]">{t("meetingHint")}</small></label>
           <div className="sm:col-span-2"><div className="mb-3"><span className={labelClass}>{t("rulesLabel")}</span><p className="text-xs leading-5 text-[var(--muted)]">{t("rulesHint")}</p></div><RuleSectionsEditor value={ruleSections} onChange={setRuleSections} disabled={challenge.status === "closed"} /></div>
           {challenge.status !== "closed" ? <div className="sm:col-span-2"><Button type="submit" disabled={busy === "save"}>{busy === "save" ? tc("saving") : t("saveBasics")}</Button></div> : null}
         </form>
@@ -627,7 +634,7 @@ export function AdminScreen({
   const tabs: AdminTab[] = ["overview", "participants", "fields", "items", "review", "metrics", "results"];
   return (
     <main className="mx-auto max-w-7xl px-4 py-6 pb-24 sm:px-6 sm:py-10">
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><button className={backLinkClass} type="button" onClick={onBack}>{t("back", { group: group?.name ?? tc("home") })}</button><Button variant="secondary" onClick={onViewParticipant}>{t("viewAsParticipant")}</Button></div>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><button className={backLinkClass} type="button" onClick={onBack}>{t("back", { group: group?.name ?? tc("home") })}</button><div className="flex flex-wrap gap-2">{challenge.meetingUrl ? <a className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--main-line)] bg-[var(--main-soft)] px-4 text-sm font-light text-[var(--main-strong)] hover:opacity-90" href={challenge.meetingUrl} target="_blank" rel="noreferrer">{t("joinMeeting")}</a> : null}<Button variant="secondary" onClick={onViewParticipant}>{t("viewAsParticipant")}</Button></div></div>
       <PageHeading title={challenge.title} description={t("subtitle")} action={<ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} />} />
       <nav className="mb-6 flex gap-1 overflow-x-auto rounded-2xl bg-[var(--wash-strong)]/70 p-1" aria-label={t("tabsAria")}>{tabs.map((id) => <button className={cx("min-h-11 flex-none rounded-xl px-4 text-sm font-light", tab === id ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]")} type="button" onClick={() => onTab(id)} key={id}>{t(`tabs.${id}`)}</button>)}</nav>
       {tab === "overview" ? <AdminOverview challenge={challenge} entries={entries} onSave={onSaveBasics} onTransition={onTransition} onDuplicate={onDuplicate} duplicateTargets={duplicateTargets} onDelete={onDelete} /> : null}

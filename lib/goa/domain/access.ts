@@ -10,6 +10,7 @@ interface ChallengeAccessRow {
   group_id: string;
   title: string;
   description: string | null;
+  meeting_url: string | null;
   rules: string | null;
   rule_sections: unknown;
   start_date: string | null;
@@ -35,7 +36,7 @@ export async function challengeAccess(
   const work = async (activeClient: PoolClient) => {
     const challenge = await oneOrNull<ChallengeAccessRow>(
       activeClient,
-      `SELECT c.id, c.group_id, c.title, c.description, c.rules, c.rule_sections,
+      `SELECT c.id, c.group_id, c.title, c.description, c.meeting_url, c.rules, c.rule_sections,
               c.start_date::text AS start_date, c.end_date::text AS end_date,
               c.time_zone, c.status, gm.role,
               EXISTS (

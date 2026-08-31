@@ -26,6 +26,7 @@ export function CreateChallengeScreen({
   const [template, setTemplate] = useState<Template | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [meetingUrl, setMeetingUrl] = useState("");
   const [ruleSections, setRuleSections] = useState<ChallengeRule[]>([]);
   const [scheduleMode, setScheduleMode] = useState<"period" | "none">("period");
   const [startsOn, setStartsOn] = useState("");
@@ -58,6 +59,10 @@ export function CreateChallengeScreen({
       setError(t("errEndBeforeStart"));
       return;
     }
+    if (step === 1 && meetingUrl.trim() && !/^https:\/\/\S+$/u.test(meetingUrl.trim())) {
+      setError(t("errMeetingUrl"));
+      return;
+    }
     if (step === 1 && ruleSections.some((rule) =>
       !rule.title.trim() || !rule.description.trim()
       || (rule.topics ?? []).some((topic) => !topic.title.trim() || !topic.description.trim())
@@ -85,6 +90,7 @@ export function CreateChallengeScreen({
         template,
         title: title.trim(),
         description: description.trim(),
+        meetingUrl: meetingUrl.trim() || null,
         ruleSections: ruleSections.map((rule) => ({
           title: rule.title.trim(),
           description: rule.description.trim(),
@@ -143,6 +149,7 @@ export function CreateChallengeScreen({
                 <p className="sm:col-span-2 text-xs leading-5 text-[var(--muted)]">{t("periodNote")}</p>
               </> : <p className="sm:col-span-2 rounded-xl bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{t("noneNote")}</p>}
               <label className="sm:col-span-2"><span className={labelClass}>{t("descriptionLabel")} <small className="font-light text-[var(--muted)]">{t("optional")}</small></span><textarea className={inputClass} rows={3} value={description} onChange={(event) => setDescription(event.target.value)} maxLength={1000} /></label>
+              <label className="sm:col-span-2"><span className={labelClass}>{t("meetingLabel")} <small className="font-light text-[var(--muted)]">{t("optional")}</small></span><input className={inputClass} type="url" inputMode="url" value={meetingUrl} onChange={(event) => setMeetingUrl(event.target.value)} maxLength={2000} placeholder="https://meet.example.com/…" /><small className="mt-1 block text-xs text-[var(--muted)]">{t("meetingHint")}</small></label>
               <div className="sm:col-span-2"><div className="mb-3"><span className={labelClass}>{t("rulesLabel")} <small className="font-light text-[var(--muted)]">{t("optional")}</small></span><p className="text-xs leading-5 text-[var(--muted)]">{t("rulesHint")}</p></div><RuleSectionsEditor value={ruleSections} onChange={setRuleSections} /></div>
             </div>
           </div>
