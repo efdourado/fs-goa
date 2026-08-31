@@ -1447,3 +1447,70 @@ test("e-mail, login por e-mail, conta e redefinição de senha", async () => {
   assert.equal(demote.response.status, 200, JSON.stringify(demote.body));
   assert.equal((await call("GET", "/api/admin/overview", { session: await carlaSession() })).response.status, 404, "após rebaixar, volta a 404");
 });
+
+test("fase 0: feedback, link de reunião e remoção da própria conta", async () => {
+  const host = await register("Marina", "marina_f0");
+  const guest = await register("Bruno", "bruno_f0");
+
+  // feedback: logado, deslogado e validação
+  assert.equal(
+    (await call("POST", "/api/feedback", { session: host, body: { area: "dashboard", goal: "ver meus desafios", impact: "minor", ease: 4 } })).response.status,
+    201,
+  );
+  assert.equal(
+    (await call("POST", "/api/feedback", { body: { area: "modelos", goal: "conhecer o app", impact: "idea" } })).response.status,
+    201,
+    "feedback aceita remetente deslogado",
+  );
+  assert.equal(
+    (await call("POST", "/api/feedback", { session: host, body: { area: "x", goal: "y", impact: "explodiu" } })).response.status,
+    400,
+  );
+
+  const soloGroup = await call("POST", "/api/groups", { session: host, body: { name: "Clube solo" } });
+  const soloGroupId = (soloGroup.body as { id: string }).id;
+  const sharedGroup = await call("POST", "/api/groups", { session: host, body: { name: "Clube com gente" } });
+  const sharedGroupId = (sharedGroup.body as { id: string }).id;
+  const inv = await call("POST", `/api/groups/${sharedGroupId}/invites`, { session: host, body: { expiresInDays: 7, maxUses: 1 } });
+  await call("POST", `/api/invites/${(inv.body as { token: string }).token}`, { session: guest, body: {} });
+
+  // link de reunião: não-https recusado, https aceito e visível no detalhe
+  const badMeeting = await call("POST", `/api/groups/${soloGroupId}/challenges`, {
+    session: host,
+    body: { template: "cine", title: "Sem link", submissionMode: "item", meetingUrl: "meet.example.com", items: [{ title: "A" }], fields: [{ key: "nota", label: "Nota", type: "rating", required: true }] },
+  });
+  assert.equal(badMeeting.response.status, 400, "link de reunião precisa ser https://");
+
+  const withMeeting = await call("POST", `/api/groups/${soloGroupId}/challenges`, {
+    session: host,
+    body: { template: "cine", title: "Com link", submissionMode: "item", meetingUrl: "https://meet.example.com/goa", items: [{ title: "A" }], fields: [{ key: "nota", label: "Nota", type: "rating", required: true }] },
+  });
+  assert.equal(withMeeting.response.status, 201, JSON.stringify(withMeeting.body));
+  const meetingChallengeId = (withMeeting.body as { id: string }).id;
+  const detail = await call("GET", `/api/challenges/${meetingChallengeId}`, { session: host });
+  assert.equal((detail.body as { meetingUrl: string }).meetingUrl, "https://meet.example.com/goa");
+
+  const cleared = await call("PATCH", `/api/challenges/${meetingChallengeId}`, { session: host, body: { meetingUrl: "" } });
+  assert.equal(cleared.response.status, 200, JSON.stringify(cleared.body));
+  const afterClear = await call("GET", `/api/challenges/${meetingChallengeId}`, { session: host });
+  assert.equal((afterClear.body as { meetingUrl: string | null }).meetingUrl, null, "link de reunião pode ser removido");
+
+  // remoção da conta: bloqueada enquanto há grupo com outra pessoa
+  const blocked = await call("DELETE", "/api/account", { session: host });
+  assert.equal(blocked.response.status, 409, "não apaga a conta com um grupo compartilhado");
+  assert.equal((blocked.body as { error: string }).error, "owns_groups");
+
+  // depois de apagar o grupo compartilhado, a remoção passa
+  assert.equal((await call("DELETE", `/api/groups/${sharedGroupId}`, { session: host })).response.status, 200);
+  const removed = await call("DELETE", "/api/account", { session: host });
+  assert.equal(removed.response.status, 200, JSON.stringify(removed.body));
+  assert.match(removed.response.headers.get("set-cookie") ?? "", /__Host-goa_session=;|Max-Age=0/i);
+  assert.equal((await call("GET", "/api/bootstrap", { session: host })).response.status, 200);
+  assert.equal(
+    (await call("POST", "/api/feedback", { session: host, body: { area: "a", goal: "b", impact: "minor" } })).response.status,
+    201,
+    "a sessão foi revogada, mas o feedback anônimo ainda funciona",
+  );
+  const soloGone = await adminPool.query<{ deleted_at: Date | null }>("SELECT deleted_at FROM groups WHERE id=$1", [soloGroupId]);
+  assert.ok(soloGone.rows[0]?.deleted_at, "grupos solo vão para a lixeira ao apagar a conta");
+});

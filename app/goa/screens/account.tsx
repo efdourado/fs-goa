@@ -12,11 +12,13 @@ export function AccountScreen({
   onBack,
   onSaveProfile,
   onChangePassword,
+  onDeleteAccount,
 }: {
   user: User;
   onBack: () => void;
   onSaveProfile: (payload: { name: string }) => Promise<void>;
   onChangePassword: (payload: { currentPassword: string; newPassword: string }) => Promise<void>;
+  onDeleteAccount: () => Promise<void>;
 }) {
   const t = useTranslations("account");
   const tc = useTranslations("common");
@@ -27,6 +29,21 @@ export function AccountScreen({
 
   const [pwBusy, setPwBusy] = useState(false);
   const [pwMsg, setPwMsg] = useState<{ error?: string; success?: string }>({});
+
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  async function deleteAccount() {
+    if (!window.confirm(t("deleteConfirm"))) return;
+    setDeleteBusy(true);
+    setDeleteError(null);
+    try {
+      await onDeleteAccount();
+    } catch (cause) {
+      setDeleteError(f.error(cause));
+      setDeleteBusy(false);
+    }
+  }
 
   async function saveProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -89,6 +106,15 @@ export function AccountScreen({
           <div className="sm:col-span-2"><StatusMessage error={pwMsg.error} success={pwMsg.success} /></div>
           <div className="sm:col-span-2"><Button type="submit" disabled={pwBusy}>{pwBusy ? t("changingPassword") : t("changePassword")}</Button></div>
         </form>
+      </section>
+
+      <section className={cx(cardClass, "mt-6 border-[var(--danger-line)] p-5 sm:p-7")}>
+        <h2 className="text-xl font-light text-[var(--danger)]">{t("dangerTitle")}</h2>
+        <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{t("deleteBody")}</p>
+        <div className="mt-4"><StatusMessage error={deleteError} /></div>
+        <Button variant="danger" className="mt-4" disabled={deleteBusy} onClick={() => void deleteAccount()}>
+          {deleteBusy ? t("deleting") : t("deleteAccount")}
+        </Button>
       </section>
     </main>
   );

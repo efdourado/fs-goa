@@ -68,13 +68,14 @@ export async function adminUsers() {
       email: string | null;
       created_at: Date;
       disabled_at: Date | null;
+      deleted_at: Date | null;
       platform_admin: boolean;
       last_seen_at: Date | null;
       groups_owned: number;
       active_sessions: number;
       pending_reset_expires_at: Date | null;
     }>(
-      `SELECT u.id, u.display_name, u.username, u.email, u.created_at, u.disabled_at, u.platform_admin,
+      `SELECT u.id, u.display_name, u.username, u.email, u.created_at, u.disabled_at, u.deleted_at, u.platform_admin,
               (SELECT max(s.last_seen_at) FROM sessions s WHERE s.user_id = u.id) AS last_seen_at,
               (SELECT count(*)::int FROM groups g
                 WHERE g.owner_user_id = u.id AND g.deleted_at IS NULL) AS groups_owned,
@@ -95,6 +96,7 @@ export async function adminUsers() {
         email: user.email,
         createdAt: user.created_at.toISOString(),
         disabledAt: user.disabled_at ? user.disabled_at.toISOString() : null,
+        deletedAt: user.deleted_at ? user.deleted_at.toISOString() : null,
         platformAdmin: user.platform_admin,
         lastSeenAt: user.last_seen_at ? user.last_seen_at.toISOString() : null,
         groupsOwned: user.groups_owned,

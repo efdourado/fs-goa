@@ -36,6 +36,7 @@ import type {
   Screen,
 } from "./goa/types";
 import { CACHE_KEYS, clearCache, readCache, writeCache } from "./goa/cache";
+import { Footer } from "./goa/Footer";
 import { AppHeader, Brand, Button, cardClass, cx, EmptyState, LoadingView } from "./goa/ui";
 import { canManage, slugify } from "./goa/utils";
 
@@ -237,6 +238,18 @@ export default function GoaApp() {
     await refreshBootstrap();
   }
 
+  async function deleteAccount() {
+    if (!bootstrap) return;
+    await apiRequest(API_PATHS.account, { method: "DELETE", csrfToken: bootstrap.csrfToken });
+    clearCache();
+    setSelectedChallenge(null);
+    setEntries([]);
+    setPendingRoute(null);
+    setResumeTemplateCopy(null);
+    await refreshBootstrap();
+    setScreen({ kind: "auth", mode: "login" });
+  }
+
   function openParticipant(challengeId: Id, requestedTab?: ParticipantTab) {
     const summary = bootstrap?.challenges.find((challenge) => challenge.id === challengeId);
     const tab = requestedTab ?? (summary?.status === "closed" ? "results" : "today");
@@ -424,7 +437,7 @@ export default function GoaApp() {
 
   let content: ReactNode;
   if (screen.kind === "account") {
-    content = <AccountScreen user={user} onBack={() => setScreen({ kind: "dashboard" })} onSaveProfile={saveAccount} onChangePassword={saveAccount} />;
+    content = <AccountScreen user={user} onBack={() => setScreen({ kind: "dashboard" })} onSaveProfile={saveAccount} onChangePassword={saveAccount} onDeleteAccount={deleteAccount} />;
   } else if (screen.kind === "invite") {
     content = <InviteScreen key={screen.token} token={screen.token} user={user} csrfToken={bootstrap.csrfToken} onBack={() => setScreen({ kind: "dashboard" })} onNeedAuth={() => undefined} onAccepted={async (invitation) => { setPendingInviteToken(null); await refreshBootstrap(); setScreen({ kind: "invite-success", invitation }); }} />;
   } else if (screen.kind === "invite-success") {
@@ -451,9 +464,10 @@ export default function GoaApp() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--canvas)] text-[var(--ink)]">
+    <div className="flex min-h-screen flex-col bg-[var(--canvas)] text-[var(--ink)]">
       <AppHeader user={user} notifications={bootstrap.memberRequests} onHome={() => setScreen({ kind: "dashboard" })} onAccount={() => setScreen({ kind: "account" })} onLogout={logout} onAcceptRequest={(id) => respondToMemberRequest(id, "accept")} onDeclineRequest={(id) => respondToMemberRequest(id, "decline")} />
-      {content}
+      <div className="flex-1">{content}</div>
+      {screen.kind === "challenge" || screen.kind === "admin" ? null : <Footer />}
     </div>
   );
 }

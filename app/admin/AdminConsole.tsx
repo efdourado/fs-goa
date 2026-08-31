@@ -5,7 +5,7 @@ import { type ReactNode, useCallback, useEffect, useRef, useState } from "react"
 
 import { copyText } from "../goa/clipboard";
 
-type Tab = "usage" | "trash" | "audit" | "accounts";
+type Tab = "usage" | "trash" | "audit" | "accounts" | "feedback";
 
 interface Overview {
   users: { total: number; newThisWeek: number; disabled: number };
@@ -40,11 +40,29 @@ interface AdminUser {
   email: string | null;
   createdAt: string;
   disabledAt: string | null;
+  deletedAt: string | null;
   platformAdmin: boolean;
   lastSeenAt: string | null;
   groupsOwned: number;
   activeSessions: number;
   pendingReset: { expiresAt: string } | null;
+}
+interface FeedbackItem {
+  id: string;
+  createdAt: string;
+  area: string;
+  goal: string;
+  impact: string;
+  succeeded: boolean | null;
+  ease: number | null;
+  friction: string | null;
+  wish: string | null;
+  workaround: string | null;
+  route: string | null;
+  locale: string | null;
+  appVersion: string | null;
+  contact: string | null;
+  username: string | null;
 }
 
 const card = "rounded-[20px] border border-[var(--line)] bg-[var(--paper)] shadow-[0_1px_2px_rgba(32,36,31,0.04)]";
@@ -119,6 +137,7 @@ export default function AdminConsole({ viewerId, viewerName, csrfToken }: { view
   const [trash, setTrash] = useState<TrashItem[] | null>(null);
   const [audit, setAudit] = useState<AuditEvent[] | null>(null);
   const [users, setUsers] = useState<AdminUser[] | null>(null);
+  const [feedback, setFeedback] = useState<FeedbackItem[] | null>(null);
   const [auditEntity, setAuditEntity] = useState("");
 
   const post = useCallback(
@@ -145,6 +164,10 @@ export default function AdminConsole({ viewerId, viewerName, csrfToken }: { view
     () => apiGet<{ users: AdminUser[] }>("/api/admin/users").then((data) => setUsers(data.users)),
     [],
   );
+  const loadFeedback = useCallback(
+    () => apiGet<{ items: FeedbackItem[] }>("/api/admin/feedback").then((data) => setFeedback(data.items)),
+    [],
+  );
   const loadAudit = useCallback(
     (entityId?: string) =>
       apiGet<{ events: AuditEvent[] }>(`/api/admin/audit?limit=150${entityId ? `&entityId=${encodeURIComponent(entityId)}` : ""}`)
@@ -158,12 +181,13 @@ export default function AdminConsole({ viewerId, viewerName, csrfToken }: { view
       tab === "usage" ? loadOverview
       : tab === "trash" ? loadTrash
       : tab === "audit" ? () => loadAudit()
+      : tab === "feedback" ? loadFeedback
       : loadUsers;
     loader()
       .then(() => { if (!cancelled) setError(null); })
       .catch((cause: unknown) => { if (!cancelled) setError(cause instanceof Error ? cause.message : "Falha ao carregar."); });
     return () => { cancelled = true; };
-  }, [tab, loadOverview, loadTrash, loadAudit, loadUsers]);
+  }, [tab, loadOverview, loadTrash, loadAudit, loadUsers, loadFeedback]);
 
   async function run(action: () => Promise<unknown>, reload: () => Promise<unknown>) {
     setBusy(true);
@@ -183,6 +207,7 @@ export default function AdminConsole({ viewerId, viewerName, csrfToken }: { view
     { id: "trash", label: "Lixeira" },
     { id: "audit", label: "Auditoria" },
     { id: "accounts", label: "Contas" },
+    { id: "feedback", label: "Feedback" },
   ];
 
   return (
@@ -233,6 +258,7 @@ export default function AdminConsole({ viewerId, viewerName, csrfToken }: { view
           onEntity={(value) => { setAuditEntity(value); loadAudit(value || undefined); }}
         />
       ) : null}
+      {tab === "feedback" ? <FeedbackTab items={feedback} /> : null}
       {tab === "accounts" ? (
         <AccountsTab
           users={users}
@@ -394,6 +420,41 @@ function AuditTab({
   );
 }
 
+const IMPACT_LABEL: Record<string, string> = {
+  blocked: "bloqueou",
+  effort: "deu trabalho",
+  minor: "incômodo pequeno",
+  idea: "ideia futura",
+};
+
+function FeedbackTab({ items }: { items: FeedbackItem[] | null }) {
+  if (!items) return <p className={cx("text-sm", muted)}>Carregando…</p>;
+  if (!items.length) return <div className={cx(card, "p-8 text-center text-sm", muted)}>Nenhum feedback ainda.</div>;
+  return (
+    <ul className="space-y-2">
+      {items.map((item) => (
+        <li key={item.id} className={cx(card, "p-4 text-sm")}>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-black/[0.06] px-2 py-0.5 text-[10px] font-light uppercase tracking-wide">{IMPACT_LABEL[item.impact] ?? item.impact}</span>
+            <strong>{item.area}</strong>
+            {item.succeeded === false ? <span className="rounded-full bg-[var(--danger-soft)] px-1.5 py-0.5 text-[10px] font-light text-[var(--danger)]">não conseguiu</span> : null}
+            {item.ease != null ? <span className={cx("text-xs", muted)}>facilidade {item.ease}/5</span> : null}
+          </div>
+          <p className="mt-2 leading-6">{item.goal}</p>
+          {item.friction ? <p className={cx("mt-1 leading-6", muted)}><span className="font-semibold">Atrapalhou:</span> {item.friction}</p> : null}
+          {item.wish ? <p className={cx("mt-1 leading-6", muted)}><span className="font-semibold">Pediu:</span> {item.wish}</p> : null}
+          {item.workaround ? <p className={cx("mt-1", muted)}>Hoje resolve com: {item.workaround}</p> : null}
+          <p className={cx("mt-2 text-xs", muted)}>
+            {item.username ? `@${item.username}` : "anônimo"} · {formatDateTime(item.createdAt)}
+            {item.route ? ` · ${item.route}` : ""}{item.locale ? ` · ${item.locale}` : ""}
+            {item.contact ? ` · contato: ${item.contact}` : ""}
+          </p>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function AccountsTab({
   users,
   viewerId,
@@ -467,7 +528,7 @@ function AccountsTab({
                 <div className="flex flex-wrap items-center gap-2">
                   <strong>{user.name}</strong>
                   {user.platformAdmin ? <span className="rounded-full bg-black/[0.06] px-1.5 py-0.5 text-[10px] font-light uppercase tracking-wide">admin</span> : null}
-                  {user.disabledAt ? <span className="rounded-full bg-[var(--danger-soft)] px-1.5 py-0.5 text-[10px] font-light text-[var(--danger)]">desativada</span> : null}
+                  {user.deletedAt ? <span className="rounded-full bg-[var(--danger-soft)] px-1.5 py-0.5 text-[10px] font-light text-[var(--danger)]">removida</span> : user.disabledAt ? <span className="rounded-full bg-[var(--danger-soft)] px-1.5 py-0.5 text-[10px] font-light text-[var(--danger)]">desativada</span> : null}
                   {user.pendingReset ? <span className="rounded-full bg-[var(--warn-soft)] px-1.5 py-0.5 text-[10px] font-light text-[var(--warn)]">reset pedido</span> : null}
                 </div>
                 <p className={cx("mt-1 text-xs", muted)}>

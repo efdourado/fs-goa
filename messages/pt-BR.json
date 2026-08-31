@@ -38,11 +38,18 @@
   },
   "nav": {
     "templates": "Modelos",
+    "about": "Sobre",
     "admin": "Gestão",
     "account": "Sua conta",
     "signOut": "Sair",
     "signingOut": "Saindo…",
     "signIn": "Entrar"
+  },
+  "footer": {
+    "tagline": "Goa — desafios privados, histórias duradouras.",
+    "about": "Sobre",
+    "templates": "Modelos",
+    "feedback": "Como podemos melhorar?"
   },
   "roles": {
     "owner": "Responsável",
@@ -296,6 +303,7 @@
     "errPickTemplate": "Escolha um modelo e preencha o título.",
     "errPeriod": "Preencha início e término, ou escolha um desafio sem prazo.",
     "errEndBeforeStart": "A data final deve ser igual ou posterior ao início.",
+    "errMeetingUrl": "Use um link https:// válido para a reunião.",
     "errRules": "Preencha o título e a descrição de cada regra e tópico, ou remova os vazios.",
     "errNoFields": "Adicione pelo menos um campo.",
     "errNoItems": "Adicione ao menos um item para o desafio de filmes.",
@@ -326,6 +334,8 @@
     "noneNote": "Sem datas fixas: listas ficam abertas no ritmo do grupo e hábitos recebem um check-in por dia, inclusive em datas passadas.",
     "descriptionLabel": "Descrição",
     "optional": "opcional",
+    "meetingLabel": "Link da reunião",
+    "meetingHint": "Onde o grupo se encontra para discutir. Cola um https:// e vira um botão “Entrar na reunião”.",
     "rulesLabel": "Regras com título",
     "rulesHint": "Dê destaque a cada acordo importante do desafio.",
     "fieldsTitle": "O que cada pessoa registra?",
@@ -373,6 +383,10 @@
     },
     "errPeriod": "Preencha início e término, ou escolha um desafio sem prazo.",
     "errEndBeforeStart": "A data final deve ser igual ou posterior ao início.",
+    "errMeetingUrl": "Use um link https:// válido para a reunião.",
+    "joinMeeting": "Entrar na reunião",
+    "meetingLabel": "Link da reunião",
+    "meetingHint": "https:// onde o grupo se encontra. Vira um botão para participantes e administradores.",
     "basicsSaved": "Informações atualizadas.",
     "stat": {
       "participants": "Participantes",
@@ -546,6 +560,7 @@
     },
     "backHome": "← Início",
     "manage": "Gerenciar",
+    "joinMeeting": "Entrar na reunião",
     "navAria": "Navegação do desafio",
     "navMobileAria": "Navegação mobile do desafio",
     "entriesProgress": "<b>{done}</b> de {total} registros",
@@ -774,7 +789,12 @@
     "newPassword": "Nova senha",
     "confirmNewPassword": "Confirme a nova senha",
     "changingPassword": "Alterando…",
-    "changePassword": "Alterar senha"
+    "changePassword": "Alterar senha",
+    "dangerTitle": "Zona de perigo",
+    "deleteBody": "Apagar a conta desativa o acesso e remove seus dados pessoais. Grupos onde você é a única pessoa vão para a lixeira. Se você é responsável por um grupo com outras pessoas, transfira ou apague esse grupo antes.",
+    "deleteConfirm": "Apagar sua conta? O acesso é encerrado e os dados pessoais são removidos.",
+    "deleteAccount": "Apagar minha conta",
+    "deleting": "Apagando…"
   },
   "resetPassword": {
     "passwordsDontMatch": "As senhas não coincidem.",
@@ -788,5 +808,54 @@
   "publicResults": {
     "numbersAria": "Resultados em números",
     "footer": "Memória publicada pelo grupo no Goa."
+  },
+  "about": {
+    "title": "Sobre o Goa",
+    "lede": "O Goa nasceu de planilhas — as que um grupo de amigos mantinha para organizar um clube de cinema e um de leitura. Ele automatiza esse trabalho: o participante registra, o sistema calcula e o resultado vira memória.",
+    "body": [
+      "A ideia é simples. Um grupo escolhe um desafio — assistir a uma lista de filmes, ler por 90 dias, manter um hábito — e cada pessoa registra seu progresso. O Goa cuida do resto: acompanha quem está em dia, calcula médias e rankings, e no fim monta uma vitrine que conta a história daquela rodada.",
+      "Nada é público por padrão. Cada grupo é privado, o acesso vem sempre da associação a ele, e registros já enviados são preservados — só a curadoria e a apresentação continuam editáveis.",
+      "O Goa é um projeto pessoal em evolução, feito por Eduardo Dourado. As planilhas originais viraram a especificação do domínio; o app está aos poucos alcançando tudo o que elas faziam, com muito menos trabalho manual."
+    ],
+    "feedbackNudge": "Tem uma ideia ou algo te incomodou?",
+    "feedbackLink": "Conte pra gente."
+  },
+  "feedbackPage": {
+    "title": "Como podemos melhorar?",
+    "lede": "Leva um minuto. Suas respostas ajudam a decidir o que construir primeiro — não guardamos nada dos seus registros, notas ou comentários.",
+    "q1": "Em que parte do Goa você estava?",
+    "q1Placeholder": "Ex.: criando um desafio, registrando o dia, vendo o resultado…",
+    "q2": "O que você estava tentando fazer?",
+    "q3a": "Conseguiu?",
+    "yes": "Sim",
+    "no": "Não",
+    "partly": "Mais ou menos",
+    "q3b": "Quão fácil foi?",
+    "q3bScale": "1 = muito difícil · 5 = muito fácil",
+    "q4": "O que te atrapalhou ou está faltando?",
+    "q5": "Qual foi o impacto?",
+    "impact": {
+      "blocked": "Me bloqueou de vez",
+      "effort": "Deu bastante trabalho",
+      "minor": "Incômodo pequeno",
+      "idea": "Só uma ideia pro futuro"
+    },
+    "impactRequired": "Escolha o impacto.",
+    "q6": "Como você resolve isso hoje?",
+    "q6None": "Não resolvo / não se aplica",
+    "workaround": {
+      "spreadsheet": "Planilha",
+      "whatsapp": "WhatsApp",
+      "notion": "Notion",
+      "other_app": "Outro app",
+      "none": "Não resolvo"
+    },
+    "q7": "Que mudança faria você voltar mais vezes ou indicar o Goa?",
+    "q8": "Podemos entrar em contato sobre isso?",
+    "q8Placeholder": "Seu e-mail (opcional)",
+    "sending": "Enviando…",
+    "send": "Enviar",
+    "thanksTitle": "Recebido. Obrigado!",
+    "thanksBody": "Cada resposta é lida. Se você deixou um e-mail, talvez a gente escreva pra entender melhor."
   }
 }

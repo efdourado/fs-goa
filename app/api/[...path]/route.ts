@@ -6,6 +6,7 @@ import {
   requireMutationSession,
   requirePlatformAdminMutation,
   requirePlatformAdminSession,
+  deleteOwnAccount,
   requireSession,
   resetPassword,
   sessionFromRequest,
@@ -22,6 +23,7 @@ import {
   setUserDisabled,
   setUserPlatformAdmin,
 } from "@/lib/admin";
+import { adminFeedback, submitFeedback } from "@/lib/feedback";
 import {
   addMetric,
   archiveChallengeItem,
@@ -93,6 +95,7 @@ export async function GET(request: Request): Promise<Response> {
       if (isPath(path, "admin", "overview")) return json(await adminOverview());
       if (isPath(path, "admin", "users")) return json(await adminUsers());
       if (isPath(path, "admin", "trash")) return json(await adminTrash());
+      if (isPath(path, "admin", "feedback")) return json(await adminFeedback());
       if (isPath(path, "admin", "audit")) return json(await adminAudit(new URL(request.url).searchParams));
       return notFound();
     }
@@ -140,6 +143,16 @@ export async function POST(request: Request): Promise<Response> {
       requireMutationOrigin(request);
       const result = await resetPassword(await readJsonObject(request));
       return json({ user: result.user, csrfToken: result.csrfToken }, 200, { "set-cookie": result.setCookie });
+    }
+
+    if (isPath(path, "feedback")) {
+      requireMutationOrigin(request);
+      const result = await submitFeedback(
+        await sessionFromRequest(request),
+        await readJsonObject(request),
+        { appVersion: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) ?? null },
+      );
+      return json(result, 201);
     }
 
     if (path[0] === "admin") {
@@ -249,6 +262,10 @@ export async function DELETE(request: Request): Promise<Response> {
   return handleApi(async () => {
     const path = segments(request);
     const session = await requireMutationSession(request);
+    if (isPath(path, "account")) {
+      const result = await deleteOwnAccount(session);
+      return json({ ok: true }, 200, { "set-cookie": result.setCookie });
+    }
     if (path[0] === "groups" && path.length === 2) {
       return json(await softDeleteGroup(session, path[1]));
     }

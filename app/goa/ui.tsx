@@ -271,6 +271,7 @@ export function AppHeader({
         <button className="cursor-pointer rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25" type="button" onClick={onHome}><Brand /></button>
         <div className="flex items-center gap-1 sm:gap-2">
           <Link className={cx(navLink, "inline-flex items-center")} href="/modelos">{t("templates")}</Link>
+          <Link className={cx(navLink, "hidden items-center sm:inline-flex")} href="/sobre">{t("about")}</Link>
           {user.platformAdmin ? (
             <Link className={cx(navLink, "inline-flex items-center")} href="/admin">{t("admin")}</Link>
           ) : null}
