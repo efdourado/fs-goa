@@ -94,6 +94,9 @@ cortar a latência de cada consulta.
    produção; ou exporte as variáveis manualmente. Para a migração, use a URL
    **direta** do Neon (sem `-pooler`); o pooled fica só para a aplicação.
 
+   Algumas migrações vêm com um _backfill_ pontual e idempotente. Depois da
+   `0010` (acervo do grupo), rode uma vez: `node scripts/backfill-catalog.mjs`.
+
 ### Contêiner (alternativa à Vercel)
 
 `Dockerfile` + `compose.yaml` sobem aplicação, migração/seed e um PostgreSQL local.
