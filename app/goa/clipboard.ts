@@ -1,12 +1,20 @@
 type CopySource = Pick<HTMLInputElement | HTMLTextAreaElement, "focus" | "select" | "setSelectionRange" | "value">;
 
+/** Carries a stable `code` so the UI layer can localise the failure. */
+export class ClipboardError extends Error {
+  constructor(public readonly code: "clipboard_empty" | "clipboard_failed") {
+    super(code);
+    this.name = "ClipboardError";
+  }
+}
+
 /**
  * Copies sensitive, user-visible text without logging it. The legacy command is
  * kept only as a fallback for browsers and embedded contexts where the modern
  * Clipboard API is unavailable or denied.
  */
 export async function copyText(text: string, source?: CopySource | null): Promise<void> {
-  if (!text) throw new Error("Não há texto para copiar.");
+  if (!text) throw new ClipboardError("clipboard_empty");
 
   if (
     typeof window !== "undefined"
@@ -50,5 +58,5 @@ export async function copyText(text: string, source?: CopySource | null): Promis
     }
   }
 
-  throw new Error("Não foi possível copiar automaticamente. Selecione o link e copie manualmente.");
+  throw new ClipboardError("clipboard_failed");
 }

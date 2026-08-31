@@ -1,20 +1,21 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { type ReactNode, useEffect, useState } from "react";
 
+import { useGoaFormat } from "./format";
+import { SettingsMenu } from "./SettingsMenu";
 import type { ChallengeStatus, Id, MemberRequest, User } from "./types";
 import {
   dateKeyInSaoPaulo,
-  formatDateRange,
-  formatDateTime,
   inclusiveDayCount,
   isChallengeScheduled,
   shiftDateKey,
 } from "./utils";
 
 export const cardClass =
-  "rounded-[20px] border border-[var(--line)] bg-[var(--paper)] shadow-[0_1px_2px_rgba(32,36,31,0.04)]";
+  "rounded-[20px] border border-[var(--line)] bg-[var(--paper)] shadow-[var(--elevate-1)]";
 export const inputClass =
   "mb-1 min-h-12 w-full rounded-xl border border-[var(--line)] bg-[var(--paper)] px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--main)] focus:ring-4 focus:ring-[var(--main)]/15 disabled:cursor-not-allowed disabled:bg-[var(--canvas)]";
 export const labelClass = "mb-1.5 block text-sm font-medium text-[var(--ink)]";
@@ -45,8 +46,8 @@ export function Button({
 }) {
   const tones = {
     primary: "border-transparent bg-[var(--main)] text-white hover:opacity-90",
-    secondary: "border-[var(--line)] bg-transparent text-[var(--ink)] hover:bg-black/[0.04]",
-    ghost: "border-transparent bg-transparent text-[var(--muted)] hover:bg-black/[0.04] hover:text-[var(--ink)]",
+    secondary: "border-[var(--line)] bg-transparent text-[var(--ink)] hover:bg-[var(--hover)]",
+    ghost: "border-transparent bg-transparent text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--ink)]",
     danger: "border-[var(--danger-line)] bg-transparent text-[var(--danger)] hover:bg-[var(--danger-soft)]",
   };
   return (
@@ -108,12 +109,13 @@ export function EmptyState({
   );
 }
 
-export function LoadingView({ label = "Carregando o Goa…" }: { label?: string }) {
+export function LoadingView({ label }: { label?: string }) {
+  const t = useTranslations("common");
   return (
     <div className="grid min-h-screen place-items-center px-6" role="status" aria-live="polite">
       <div className="text-center">
         <span className="mx-auto mb-4 block h-10 w-10 animate-spin rounded-full border-4 border-[var(--main-line)] border-t-[var(--main)]" aria-hidden="true" />
-        <p className="text-sm font-semibold text-[var(--muted)]">{label}</p>
+        <p className="text-sm font-semibold text-[var(--muted)]">{label ?? t("loadingApp")}</p>
       </div>
     </div>
   );
@@ -122,7 +124,7 @@ export function LoadingView({ label = "Carregando o Goa…" }: { label?: string 
 export function Brand() {
   return (
     <span className="inline-flex items-center gap-2.5" aria-label="Goa">
-      <span className="grid h-9 w-9 -rotate-3 place-items-center rounded-[50%_50%_50%_16%] bg-[var(--ink)] text-lg font-black text-[var(--canvas)] border-1 border-white" aria-hidden="true">
+      <span className="grid h-9 w-9 -rotate-3 place-items-center rounded-[50%_50%_50%_16%] bg-[var(--ink)] text-lg font-black text-[var(--canvas)] border-1 border-[var(--paper)]" aria-hidden="true">
         g
       </span>
       <strong className="text-xl tracking-[-0.06em]">goa</strong>
@@ -150,12 +152,12 @@ export function PageHeading({
   );
 }
 
-const DURATION_PRESETS: Array<{ label: string; shift: { days?: number; months?: number } }> = [
-  { label: "30 dias", shift: { days: 29 } },
-  { label: "60 dias", shift: { days: 59 } },
-  { label: "90 dias", shift: { days: 89 } },
-  { label: "6 meses", shift: { months: 6, days: -1 } },
-  { label: "1 ano", shift: { months: 12, days: -1 } },
+const DURATION_PRESETS: Array<{ key: "d30" | "d60" | "d90" | "m6" | "y1"; shift: { days?: number; months?: number } }> = [
+  { key: "d30", shift: { days: 29 } },
+  { key: "d60", shift: { days: 59 } },
+  { key: "d90", shift: { days: 89 } },
+  { key: "m6", shift: { months: 6, days: -1 } },
+  { key: "y1", shift: { months: 12, days: -1 } },
 ];
 
 /**
@@ -176,6 +178,8 @@ export function SchedulePeriodFields({
   onEndsOn: (value: string) => void;
   disabled?: boolean;
 }) {
+  const t = useTranslations("schedule");
+  const f = useGoaFormat();
   const today = dateKeyInSaoPaulo(new Date());
   const anchor = startsOn || today;
   const duration = inclusiveDayCount(startsOn, endsOn);
@@ -188,22 +192,22 @@ export function SchedulePeriodFields({
   return (
     <>
       <label>
-        <span className={labelClass}>Início</span>
+        <span className={labelClass}>{t("start")}</span>
         <input className={inputClass} type="date" value={startsOn} onChange={(event) => onStartsOn(event.target.value)} required disabled={disabled} />
       </label>
       <label>
-        <span className={labelClass}>Término</span>
+        <span className={labelClass}>{t("end")}</span>
         <input className={inputClass} type="date" min={startsOn || undefined} value={endsOn} onChange={(event) => onEndsOn(event.target.value)} required disabled={disabled} />
       </label>
       <div className="sm:col-span-2">
-        <span className={labelClass}>Duração</span>
-        <p className="text-xs leading-5 text-[var(--muted)]">Escolha um atalho ou digite os dias — o término se ajusta a partir do início{startsOn ? "" : " (hoje, até você escolher outra data)"}.</p>
+        <span className={labelClass}>{t("duration")}</span>
+        <p className="text-xs leading-5 text-[var(--muted)]">{t("durationHint", { today: startsOn ? "" : t("durationHintToday") })}</p>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           {DURATION_PRESETS.map((preset) => {
             const active = Boolean(startsOn && endsOn) && shiftDateKey(anchor, preset.shift) === endsOn;
             return (
               <button
-                key={preset.label}
+                key={preset.key}
                 type="button"
                 disabled={disabled}
                 aria-pressed={active}
@@ -213,7 +217,7 @@ export function SchedulePeriodFields({
                   active ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] text-[var(--muted)] hover:border-[var(--main-line)]",
                 )}
               >
-                {preset.label}
+                {t(`preset.${preset.key}`)}
               </button>
             );
           })}
@@ -230,12 +234,12 @@ export function SchedulePeriodFields({
                 if (Number.isInteger(days) && days >= 1 && days <= 3660) applyShift({ days: days - 1 });
               }}
               className="w-16 rounded-lg border border-[var(--line)] bg-[var(--paper)] px-2 py-1.5 text-center text-sm text-[var(--ink)] outline-none focus:border-[var(--main)] disabled:cursor-not-allowed disabled:bg-[var(--canvas)]"
-              aria-label="Duração em dias"
+              aria-label={t("durationDaysAria")}
             />
-            dias
+            {t("days")}
           </label>
         </div>
-        {duration ? <p className="mt-2 text-xs text-[var(--muted)]">{duration} {duration === 1 ? "dia" : "dias"} · {formatDateRange(startsOn, endsOn)}</p> : null}
+        {duration ? <p className="mt-2 text-xs text-[var(--muted)]">{t("span", { count: duration, range: f.dateRange(startsOn, endsOn) })}</p> : null}
       </div>
     </>
   );
@@ -258,24 +262,25 @@ export function AppHeader({
   onAcceptRequest: (id: Id) => Promise<void>;
   onDeclineRequest: (id: Id) => Promise<void>;
 }) {
+  const t = useTranslations("nav");
   const [busy, setBusy] = useState(false);
   const navLink = "min-h-11 cursor-pointer rounded-xl px-2 text-xs text-[var(--muted)] hover:bg-[var(--wash)] hover:text-[var(--ink)] disabled:cursor-not-allowed sm:px-3";
   return (
-    <header className="sticky top-0 z-30 border-b border-black/10 bg-[var(--canvas)]/92 backdrop-blur-xl">
+    <header className="sticky top-0 z-30 border-b border-[var(--edge)] bg-[var(--canvas)]/92 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:h-[76px] sm:px-6">
         <button className="cursor-pointer rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25" type="button" onClick={onHome}><Brand /></button>
         <div className="flex items-center gap-1 sm:gap-2">
-          <Link className={cx(navLink, "inline-flex items-center")} href="/modelos">Modelos</Link>
+          <Link className={cx(navLink, "inline-flex items-center")} href="/modelos">{t("templates")}</Link>
           {user.platformAdmin ? (
-            <Link className={cx(navLink, "inline-flex items-center")} href="/admin">Gestão</Link>
+            <Link className={cx(navLink, "inline-flex items-center")} href="/admin">{t("admin")}</Link>
           ) : null}
           <button
             className="flex cursor-pointer items-center gap-2.5 rounded-xl p-1 pr-2 text-left hover:bg-[var(--wash)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
             type="button"
             onClick={onAccount}
-            aria-label="Sua conta"
+            aria-label={t("account")}
           >
-            <span className="grid h-9 w-9 place-items-center rounded-full border-2 border-white bg-[var(--main-line)] text-xs font-black" aria-hidden="true">
+            <span className="grid h-9 w-9 place-items-center rounded-full border-2 border-[var(--paper)] bg-[var(--main-line)] text-xs font-black" aria-hidden="true">
               {user.name.split(/\s+/).slice(0, 1).map((part) => part[0]).join("")}
             </span>
             <span className="hidden leading-tight sm:block">
@@ -288,13 +293,14 @@ export function AppHeader({
             onAcceptRequest={onAcceptRequest}
             onDeclineRequest={onDeclineRequest}
           />
+          <SettingsMenu />
           <button
             className={cx(navLink, "disabled:opacity-50")}
             type="button"
             disabled={busy}
             onClick={async () => { setBusy(true); try { await onLogout(); } finally { setBusy(false); } }}
           >
-            {busy ? "Saindo…" : "Sair"}
+            {busy ? t("signingOut") : t("signOut")}
           </button>
         </div>
       </div>
@@ -311,6 +317,8 @@ function NotificationsMenu({
   onAcceptRequest: (id: Id) => Promise<void>;
   onDeclineRequest: (id: Id) => Promise<void>;
 }) {
+  const t = useTranslations("notifications");
+  const f = useGoaFormat();
   const [open, setOpen] = useState(false);
   const [pendingId, setPendingId] = useState<Id | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -330,7 +338,7 @@ function NotificationsMenu({
     try {
       await (action === "accept" ? onAcceptRequest(id) : onDeclineRequest(id));
     } catch {
-      setError("Não foi possível concluir. Tente de novo.");
+      setError(t("error"));
     } finally {
       setPendingId(null);
     }
@@ -342,7 +350,7 @@ function NotificationsMenu({
         className="relative grid h-9 w-9 cursor-pointer place-items-center rounded-xl text-[var(--muted)] hover:bg-[var(--wash)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
         type="button"
         onClick={() => setOpen((value) => !value)}
-        aria-label={count ? `Novidades (${count})` : "Novidades"}
+        aria-label={count ? t("labelCount", { count }) : t("label")}
         aria-expanded={open}
       >
         <svg viewBox="0 0 16 16" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
@@ -358,10 +366,10 @@ function NotificationsMenu({
       {open ? (
         <>
           <button type="button" aria-hidden="true" tabIndex={-1} className="fixed inset-0 z-40 cursor-default" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-50 mt-2 w-[min(92vw,22rem)] overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--paper)] shadow-[0_12px_40px_rgba(32,36,31,0.16)]" role="dialog" aria-label="Novidades">
+          <div className="absolute right-0 z-50 mt-2 w-[min(92vw,22rem)] overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--paper)] shadow-[var(--elevate-2)]" role="dialog" aria-label={t("title")}>
             <div className="flex items-center justify-between border-b border-[var(--line)] px-4 py-3">
-              <strong className="text-sm">Novidades</strong>
-              {count ? <span className="text-xs text-[var(--muted)]">{count} pendente{count === 1 ? "" : "s"}</span> : null}
+              <strong className="text-sm">{t("title")}</strong>
+              {count ? <span className="text-xs text-[var(--muted)]">{t("pending", { count })}</span> : null}
             </div>
             {error ? <p className="border-b border-[var(--line)] bg-[var(--danger-soft)] px-4 py-2 text-xs text-[var(--danger)]">{error}</p> : null}
             {count ? (
@@ -369,22 +377,26 @@ function NotificationsMenu({
                 {inbox.map((request) => (
                   <li className="px-4 py-3" key={request.id}>
                     <p className="text-sm leading-5">
-                      <strong>{request.invitedBy ?? "Alguém"}</strong> convidou você para o grupo <strong>{request.groupName}</strong>.
+                      {t.rich("invited", {
+                        invitedBy: request.invitedBy ?? t("someone"),
+                        groupName: request.groupName,
+                        b: (chunks) => <strong>{chunks}</strong>,
+                      })}
                     </p>
-                    <p className="mt-0.5 text-xs text-[var(--muted)]">{formatDateTime(request.createdAt)}</p>
+                    <p className="mt-0.5 text-xs text-[var(--muted)]">{f.dateTime(request.createdAt)}</p>
                     <div className="mt-2 flex gap-2">
                       <Button className="min-h-9 px-3 py-1 text-xs" disabled={pendingId === request.id} onClick={() => void respond(request.id, "accept")}>
-                        {pendingId === request.id ? "…" : "Aceitar"}
+                        {pendingId === request.id ? "…" : t("accept")}
                       </Button>
                       <Button className="min-h-9 px-3 py-1 text-xs" variant="ghost" disabled={pendingId === request.id} onClick={() => void respond(request.id, "decline")}>
-                        Recusar
+                        {t("decline")}
                       </Button>
                     </div>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="px-4 py-6 text-center text-sm text-[var(--muted)]">Nenhuma novidade.</p>
+              <p className="px-4 py-6 text-center text-sm text-[var(--muted)]">{t("empty")}</p>
             )}
           </div>
         </>
@@ -393,28 +405,31 @@ function NotificationsMenu({
   );
 }
 
-const CHALLENGE_STATUS_META: Record<
+const CHALLENGE_STATUS_TONE: Record<
   "draft" | "scheduled" | "active" | "closed",
-  { label: string; dot: string; border: string; solid: string }
+  { dot: string; border: string; solid: string }
 > = {
-  draft: { label: "Rascunho", dot: "bg-[var(--warn-line)]", border: "border-[var(--warn-line)]", solid: "bg-[var(--warn-line)]" },
-  scheduled: { label: "Agendado", dot: "bg-[var(--main-line)]", border: "border-[var(--main-line)]", solid: "bg-[var(--main-line)]" },
-  active: { label: "Ativo", dot: "bg-[var(--ok-line)]", border: "border-[var(--ok-line)]", solid: "bg-[var(--ok-line)]" },
-  closed: { label: "Encerrado", dot: "bg-[var(--line)]", border: "border-[var(--line)]", solid: "bg-[var(--line)]" },
+  draft: { dot: "bg-[var(--warn-line)]", border: "border-[var(--warn-line)]", solid: "bg-[var(--warn-line)]" },
+  scheduled: { dot: "bg-[var(--main-line)]", border: "border-[var(--main-line)]", solid: "bg-[var(--main-line)]" },
+  active: { dot: "bg-[var(--ok-line)]", border: "border-[var(--ok-line)]", solid: "bg-[var(--ok-line)]" },
+  closed: { dot: "bg-[var(--line)]", border: "border-[var(--line)]", solid: "bg-[var(--line)]" },
 };
 
 export function challengeStatusTone(status: ChallengeStatus, startsOn?: string | null) {
-  return CHALLENGE_STATUS_META[isChallengeScheduled(status, startsOn) ? "scheduled" : status];
+  return CHALLENGE_STATUS_TONE[isChallengeScheduled(status, startsOn) ? "scheduled" : status];
 }
 
 export function ChallengeStatusBadge({ status, startsOn }: { status: ChallengeStatus; startsOn?: string | null }) {
-  const meta = challengeStatusTone(status, startsOn);
+  const t = useTranslations("challengeStatus");
+  const f = useGoaFormat();
+  const tone = challengeStatusTone(status, startsOn);
+  const label = f.challengeStatusLabel(status, startsOn);
   return (
     <span
-      className={cx("inline-block h-2.5 w-2.5 flex-none rounded-full ring-1 ring-inset ring-black/10", meta.dot)}
+      className={cx("inline-block h-2.5 w-2.5 flex-none rounded-full ring-1 ring-inset ring-[var(--edge)]", tone.dot)}
       role="img"
-      aria-label={`Situação: ${meta.label}`}
-      title={meta.label}
+      aria-label={t("srLabel", { label })}
+      title={label}
     />
   );
 }

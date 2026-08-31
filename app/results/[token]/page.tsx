@@ -1,7 +1,10 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { getFormatter, getTranslations } from "next-intl/server";
+
 import { publicResults } from "@/lib/goa-challenges";
-import { formatDateRange } from "@/app/goa/utils";
+import { type Formatter, makeGoaFormat, type Translator } from "@/app/goa/format";
+import { SettingsMenu } from "@/app/goa/SettingsMenu";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,6 +26,11 @@ export default async function SharedResultsPage({ params }: { params: Promise<{ 
   } catch {
     notFound();
   }
+  const t = await getTranslations("publicResults");
+  const tRoot = await getTranslations();
+  const formatter = await getFormatter();
+  const f = makeGoaFormat(tRoot as unknown as Translator, formatter as unknown as Formatter);
+
   const challenge = payload.challenge;
   const result = challenge.result as {
     headline?: string | null;
@@ -35,13 +43,16 @@ export default async function SharedResultsPage({ params }: { params: Promise<{ 
   return (
     <main className="min-h-screen bg-[var(--canvas)] px-4 py-8 text-[var(--ink)] sm:px-6 sm:py-14">
       <div className="mx-auto max-w-5xl">
-        <Link className="mb-7 inline-flex min-h-11 items-center gap-2 font-light" href="/">
-          <span className="grid h-9 w-9 place-items-center rounded-[50%_50%_50%_16%] bg-[var(--ink)] text-white">g</span>
-          goa
-        </Link>
-        <section className="overflow-hidden rounded-[30px] bg-[var(--ink)] px-6 py-12 text-white sm:px-12 sm:py-16">
+        <div className="mb-7 flex items-center justify-between gap-3">
+          <Link className="inline-flex min-h-11 items-center gap-2 font-light" href="/">
+            <span className="grid h-9 w-9 place-items-center rounded-[50%_50%_50%_16%] bg-[var(--ink)] text-[var(--canvas)]">g</span>
+            goa
+          </Link>
+          <SettingsMenu />
+        </div>
+        <section className="overflow-hidden rounded-[30px] bg-[var(--spotlight)] px-6 py-12 text-[var(--spotlight-ink)] sm:px-12 sm:py-16">
           <p className="text-xs font-light uppercase tracking-[0.16em] text-white/50">
-            {formatDateRange(challenge.startsOn, challenge.endsOn)}
+            {f.dateRange(challenge.startsOn, challenge.endsOn)}
           </p>
           <h1 className="mt-5 max-w-4xl text-4xl font-semibold leading-none tracking-[-0.055em] sm:text-7xl">
             {result.headline || challenge.title}
@@ -54,7 +65,7 @@ export default async function SharedResultsPage({ params }: { params: Promise<{ 
           </div>
         </section>
         {result.metrics?.length ? (
-          <section className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-label="Resultados em números">
+          <section className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-label={t("numbersAria")}>
             {result.metrics.map((metric) => (
               <article className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-6" key={metric.id}>
                 <p className="text-xs font-light uppercase tracking-[0.1em] text-[var(--muted)]">{metric.label}</p>
@@ -73,7 +84,7 @@ export default async function SharedResultsPage({ params }: { params: Promise<{ 
             ))}
           </section>
         ) : null}
-        <p className="mt-8 text-center text-xs text-[var(--muted)]">Memória publicada pelo grupo no Goa.</p>
+        <p className="mt-8 text-center text-xs text-[var(--muted)]">{t("footer")}</p>
       </div>
     </main>
   );
