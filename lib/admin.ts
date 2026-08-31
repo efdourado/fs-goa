@@ -299,6 +299,12 @@ export async function purgeTrashItem(session: SessionContext, body: Record<strin
       [id],
     );
     await client.query("DELETE FROM group_invites WHERE group_id = $1", [id]);
+    await client.query(
+      "DELETE FROM catalog_item_tags WHERE catalog_item_id IN (SELECT id FROM catalog_items WHERE group_id = $1)",
+      [id],
+    );
+    await client.query("DELETE FROM catalog_items WHERE group_id = $1", [id]);
+    await client.query("DELETE FROM catalog_tags WHERE group_id = $1", [id]);
     await client.query("DELETE FROM audit_events WHERE group_id = $1", [id]);
     await client.query("DELETE FROM group_members WHERE group_id = $1", [id]);
     await client.query("DELETE FROM groups WHERE id = $1", [id]);

@@ -27,11 +27,35 @@ export async function getChallengeDetail(session: SessionContext, challengeId: s
     const itemsResult = await client.query<{
         id: string; entry_type_id: string; title: string; description: string | null;
         position: number; opens_at: Date | null; due_at: Date | null;
+        catalog_item_id: string | null; catalog_title: string | null; catalog_year: number | null;
+        catalog_runtime: number | null; recommended_by_id: string | null; recommended_by_name: string | null;
       }>(
-        `SELECT id, entry_type_id, title, description, position, opens_at, due_at
-           FROM challenge_items WHERE challenge_id = $1 AND archived_at IS NULL ORDER BY position`,
+        `SELECT i.id, i.entry_type_id, i.title, i.description, i.position, i.opens_at, i.due_at,
+                i.catalog_item_id, ci.title AS catalog_title, ci.year AS catalog_year,
+                ci.runtime_minutes AS catalog_runtime,
+                i.recommended_by_user_id AS recommended_by_id, ru.display_name AS recommended_by_name
+           FROM challenge_items i
+           LEFT JOIN catalog_items ci ON ci.id = i.catalog_item_id
+           LEFT JOIN users ru ON ru.id = i.recommended_by_user_id
+          WHERE i.challenge_id = $1 AND i.archived_at IS NULL ORDER BY i.position`,
         [challengeId],
       );
+    const catalogIds = itemsResult.rows.map((item) => item.catalog_item_id).filter((value): value is string => Boolean(value));
+    const genresByCatalog = new Map<string, string[]>();
+    if (catalogIds.length) {
+      const genreRows = await client.query<{ catalog_item_id: string; label: string }>(
+        `SELECT cit.catalog_item_id, ct.label
+           FROM catalog_item_tags cit JOIN catalog_tags ct ON ct.id = cit.tag_id
+          WHERE cit.catalog_item_id = ANY($1::text[]) AND ct.kind = 'genre'
+          ORDER BY ct.label`,
+        [catalogIds],
+      );
+      for (const row of genreRows.rows) {
+        const list = genresByCatalog.get(row.catalog_item_id) ?? [];
+        list.push(row.label);
+        genresByCatalog.set(row.catalog_item_id, list);
+      }
+    }
     const checkpointsResult = await client.query<{
         id: string; title: string; description: string | null; position: number;
         starts_at: Date | null; due_at: Date | null;
@@ -61,6 +85,18 @@ export async function getChallengeDetail(session: SessionContext, challengeId: s
           description: item.description, position: item.position,
           opensAt: item.opens_at?.toISOString() ?? null, dueAt: item.due_at?.toISOString() ?? null,
           status: windowStatus(access.challenge.status, item.opens_at, item.due_at),
+          catalogItem: item.catalog_item_id
+            ? {
+                id: item.catalog_item_id,
+                title: item.catalog_title ?? item.title,
+                year: item.catalog_year,
+                runtimeMinutes: item.catalog_runtime,
+                genres: genresByCatalog.get(item.catalog_item_id) ?? [],
+              }
+            : null,
+          recommendedBy: item.recommended_by_id
+            ? { id: item.recommended_by_id, name: item.recommended_by_name ?? "" }
+            : null,
         }))
       : checkpointsResult.rows.map((checkpoint) => ({
           id: checkpoint.id, checkpointId: checkpoint.id, title: checkpoint.title,

@@ -11,6 +11,12 @@ import {
   writeAudit,
 } from "../../goa-domain";
 import { ApiError, stringValue } from "../../http";
+import {
+  assertCatalogItemInGroup,
+  resolveTags,
+  setCatalogItemTags,
+  upsertCatalogItem,
+} from "../catalog";
 import { syncDailyCheckpoints } from "../daily-checkpoints";
 
 export async function generateDailyCheckpoints(
@@ -65,11 +71,18 @@ export async function addChallengeItem(
     if (!entryType || entryType.submission_mode !== "item") throw new ApiError(409, "invalid_mode", "Este desafio não usa itens.");
     const position = integerValue(body.position, 0, 0, 10_000);
     const id = publicId();
+    let catalogItemId: string;
+    if (typeof body.catalogItemId === "string" && body.catalogItemId) {
+      await assertCatalogItemInGroup(client, body.catalogItemId, access.challenge.group_id, "film");
+      catalogItemId = body.catalogItemId;
+    } else {
+      catalogItemId = await upsertCatalogItem(client, access.challenge.group_id, session.user.id, { kind: "film", title });
+    }
     await client.query(
       `INSERT INTO challenge_items
-        (id, challenge_id, entry_type_id, semantic_key, title, description, position, metadata, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,'{}'::jsonb,now(),now())`,
-      [id, challengeId, entryType.id, await uniqueItemKey(client, challengeId, body.key ?? title, position), title, description, position],
+        (id, challenge_id, entry_type_id, catalog_item_id, semantic_key, title, description, position, metadata, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'{}'::jsonb,now(),now())`,
+      [id, challengeId, entryType.id, catalogItemId, await uniqueItemKey(client, challengeId, body.key ?? title, position), title, description, position],
     );
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
       "item.created", "challenge_item", id, null, { title });
@@ -121,6 +134,11 @@ export async function saveChallengeItems(
     const base = await oneOrNull<{ position: number }>(client,
       "SELECT coalesce(max(position),-1)::int + 1 AS position FROM challenge_items WHERE challenge_id=$1 AND archived_at IS NULL",
       [challengeId]);
+    const memberIds = new Set(
+      (await client.query<{ user_id: string }>(
+        "SELECT user_id FROM group_members WHERE group_id=$1 AND removed_at IS NULL", [access.challenge.group_id])
+      ).rows.map((row) => row.user_id),
+    );
     const ids: string[] = [];
     for (let index = 0; index < requestedItems.length; index += 1) {
       const item = asRecord(requestedItems[index]);
@@ -128,11 +146,33 @@ export async function saveChallengeItems(
       if (!title) throw new ApiError(400, "invalid_item", "Item sem título.");
       const id = publicId();
       const position = (base?.position ?? 0) + index;
+
+      let catalogItemId: string;
+      if (typeof item.catalogItemId === "string" && item.catalogItemId) {
+        await assertCatalogItemInGroup(client, item.catalogItemId, access.challenge.group_id, "film");
+        catalogItemId = item.catalogItemId;
+      } else {
+        catalogItemId = await upsertCatalogItem(client, access.challenge.group_id, session.user.id, {
+          kind: "film", title, year: item.year, runtimeMinutes: item.runtimeMinutes,
+        });
+      }
+      if (Array.isArray(item.genres) && item.genres.length) {
+        await setCatalogItemTags(client, catalogItemId, await resolveTags(client, access.challenge.group_id, "genre", item.genres));
+      }
+      let recommendedBy: string | null = null;
+      if (typeof item.recommendedByUserId === "string" && item.recommendedByUserId) {
+        if (!memberIds.has(item.recommendedByUserId)) {
+          throw new ApiError(400, "invalid_recommender", "Quem indicou precisa ser um membro do grupo.");
+        }
+        recommendedBy = item.recommendedByUserId;
+      }
+
       await client.query(
         `INSERT INTO challenge_items
-          (id,challenge_id,entry_type_id,semantic_key,title,description,position,metadata,created_at,updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,'{}'::jsonb,now(),now())`,
-        [id, challengeId, type.id, await uniqueItemKey(client, challengeId, item.key ?? title, position), title,
+          (id,challenge_id,entry_type_id,catalog_item_id,recommended_by_user_id,semantic_key,title,description,position,metadata,created_at,updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'{}'::jsonb,now(),now())`,
+        [id, challengeId, type.id, catalogItemId, recommendedBy,
+          await uniqueItemKey(client, challengeId, item.key ?? title, position), title,
           typeof item.description === "string" ? item.description.trim() || null : null, position],
       );
       ids.push(id);
@@ -205,9 +245,9 @@ export async function updateChallengeItem(
     }
 
     if (type?.submission_mode === "item") {
-      const current = await oneOrNull<{ title: string; description: string | null }>(
+      const current = await oneOrNull<{ title: string; description: string | null; recommended_by_user_id: string | null }>(
         client,
-        `SELECT title, description
+        `SELECT title, description, recommended_by_user_id
            FROM challenge_items
           WHERE id = $1 AND challenge_id = $2 AND archived_at IS NULL
           FOR UPDATE`,
@@ -220,11 +260,25 @@ export async function updateChallengeItem(
       const description = body.description === undefined
         ? current.description
         : stringValue(body, "description", { max: 2_000, optional: true }) ?? null;
+      const touchesRecommender = Object.hasOwn(body, "recommendedByUserId");
+      let recommendedBy = current.recommended_by_user_id;
+      if (touchesRecommender) {
+        const wanted = typeof body.recommendedByUserId === "string" ? body.recommendedByUserId : "";
+        if (!wanted) {
+          recommendedBy = null;
+        } else {
+          const member = await oneOrNull<{ user_id: string }>(client,
+            "SELECT user_id FROM group_members WHERE group_id=$1 AND user_id=$2 AND removed_at IS NULL",
+            [access.challenge.group_id, wanted]);
+          if (!member) throw new ApiError(400, "invalid_recommender", "Quem indicou precisa ser um membro do grupo.");
+          recommendedBy = wanted;
+        }
+      }
       await client.query(
         `UPDATE challenge_items
-            SET title = $3, description = $4, updated_at = now()
+            SET title = $3, description = $4, recommended_by_user_id = $5, updated_at = now()
           WHERE id = $1 AND challenge_id = $2`,
-        [itemId, challengeId, title, description],
+        [itemId, challengeId, title, description, recommendedBy],
       );
       await writeAudit(
         client,
@@ -234,10 +288,10 @@ export async function updateChallengeItem(
         "item.updated",
         "challenge_item",
         itemId,
-        current,
-        { title, description },
+        { title: current.title, description: current.description },
+        { title, description, ...(touchesRecommender ? { recommendedByUserId: recommendedBy } : {}) },
       );
-      return { id: itemId, title, description };
+      return { id: itemId, title, description, ...(touchesRecommender ? { recommendedByUserId: recommendedBy } : {}) };
     }
 
     throw new ApiError(409, "invalid_mode", "Este desafio não usa itens ou checkpoints.");
