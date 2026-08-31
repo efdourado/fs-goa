@@ -228,6 +228,11 @@ indicador e histórico dependem dela.
 
 ## Entregue
 
+- **Fase 0** — página "Como podemos melhorar?", página Sobre, footer, link de
+  reunião no desafio, remoção da própria conta.
+- **Fase 1a** — acervo de filmes por grupo (`catalog_items`), identidade do filme
+  entre rodadas (`challenge_items.catalog_item_id`), tags de gênero, e
+  `recommended_by_user_id` no item — a peça que destrava o viés do indicador.
 - **Modo escuro** — tokens claro/escuro, `prefers-color-scheme` + escolha
   explícita por cookie, toggle System/Claro/Escuro.
 - **Bilíngue pt-BR/en** — `next-intl`, locale por cookie, sem prefixo de URL.

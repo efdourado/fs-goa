@@ -1,8 +1,11 @@
 # Arquitetura v2 — fundação relacional (Fase 1 da roadmap)
 
-> **Status:** proposta. Nada disto está implementado. É o contrato que precisa da
-> sua aprovação antes de qualquer migração no schema central. Contexto e
-> motivação em [../ROADMAP.md](../ROADMAP.md).
+> **Status:** parcialmente implementado. **D1 resolvida** (acervo e rodada são
+> irmãos do grupo) e a **Fase 1a** já está em `main` — `catalog_items`,
+> `catalog_tags`, `challenge_items.catalog_item_id` + `recommended_by_user_id`
+> (migração 0010). O que segue abaixo (`round_items`, `entries.checkpoint_id`,
+> as 4 colunas ortogonais de `entry_types`, relaxar os CHECK) é o **Marco 3** e
+> ainda precisa de decisão em D2. Contexto em [../ROADMAP.md](../ROADMAP.md).
 
 ## O problema em uma frase
 
@@ -107,9 +110,7 @@ Vira um teste de integração novo em `tests/integration/`.
 
 ## Decisões ainda abertas (precisam de você)
 
-- **D1** — Acervo e rodada são filhos irmãos do grupo (proposta acima), ou a
-  rodada continua no topo com o acervo como visão agregada? A proposta assume
-  irmãos.
+- ~~**D1**~~ — **resolvida:** acervo e rodada são filhos irmãos do grupo.
 - **D2** — "Avaliar a qualquer hora" (`schedule_policy = within_round`) vira o
   **padrão** para cine, com checkpoint datado como opção só para leitura/hábitos?
 - Ordem de UI: a organização por blocos/semanas (drag-and-drop) entra **junto**
