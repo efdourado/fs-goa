@@ -33,9 +33,10 @@ export function SettingsMenu({ align = "right" }: { align?: "left" | "right" }) 
         aria-label={t("settings.legend")}
         aria-expanded={open}
       >
-        <svg viewBox="0 0 16 16" className="h-[17px] w-[17px]" aria-hidden="true">
-          <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="1.4" />
-          <path d="M8 2a6 6 0 0 0 0 12Z" fill="currentColor" />
+        <svg viewBox="0 0 16 16" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true">
+          <path d="M2 4.5h8M13 4.5h1M2 11.5h1M6 11.5h8" />
+          <circle cx="11.5" cy="4.5" r="1.7" fill="currentColor" stroke="none" />
+          <circle cx="4.5" cy="11.5" r="1.7" fill="currentColor" stroke="none" />
         </svg>
       </button>
       {open ? (
