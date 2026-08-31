@@ -1,10 +1,11 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import { useGoaFormat } from "../format";
 import { cleanFields, FieldBuilder, presetFields } from "../fields";
+import { CineItemsEditor, type CineRow, cineRowsToInput } from "../cine-items";
 import { RuleSectionsEditor } from "../rules";
 import type { ChallengeCreationInput, ChallengeField, ChallengeRule, GroupSummary, Id, Template } from "../types";
 import { backLinkClass, Button, cardClass, cx, EmptyState, inputClass, labelClass, PageHeading, SchedulePeriodFields, StatusMessage } from "../ui";
@@ -32,17 +33,17 @@ export function CreateChallengeScreen({
   const [startsOn, setStartsOn] = useState("");
   const [endsOn, setEndsOn] = useState("");
   const [fields, setFields] = useState<ChallengeField[]>([]);
-  const [itemsText, setItemsText] = useState("");
+  const [cineItems, setCineItems] = useState<CineRow[]>([]);
   const [participantIds, setParticipantIds] = useState<Id[]>(group.members?.map((member) => member.id) ?? []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const items = useMemo(() => itemsText.split("\n").map((item) => item.trim()).filter(Boolean), [itemsText]);
+  const itemInputs = cineRowsToInput(cineItems);
 
   function chooseTemplate(next: Template) {
     setTemplate(next);
     setFields(presetFields(next, (key) => tp(key)));
     setTitle(next === "cine" ? t("templateCineTitle") : t("templateReadingTitle"));
-    setItemsText("");
+    setCineItems([]);
   }
 
   function nextStep() {
@@ -74,7 +75,7 @@ export function CreateChallengeScreen({
       setError(t("errNoFields"));
       return;
     }
-    if (step === 3 && template === "cine" && !items.length) {
+    if (step === 3 && template === "cine" && !itemInputs.length) {
       setError(t("errNoItems"));
       return;
     }
@@ -102,7 +103,7 @@ export function CreateChallengeScreen({
         endsOn: scheduleMode === "period" ? endsOn : null,
         submissionMode: template === "reading" ? "daily" : "item",
         fields: cleanFields(fields),
-        items: items.map((item, position) => ({ title: item, position })),
+        items: template === "cine" ? itemInputs : [],
         generateDaily: template === "reading" && scheduleMode === "period",
         participantIds,
       });
@@ -161,7 +162,7 @@ export function CreateChallengeScreen({
           <div>
             <h2 className="text-xl font-light">{t("checkpointsTitle")}</h2>
             {template === "cine" ? (
-              <><p className="mt-1 text-sm leading-6 text-[var(--muted)]">{t("cineItemsHint")}</p><label className="mt-5 block"><span className={labelClass}>{t("itemsLabel")}</span><textarea className={inputClass} rows={12} value={itemsText} onChange={(event) => setItemsText(event.target.value)} placeholder={t("itemsPlaceholder")} /></label><p className="mt-2 text-xs font-semibold text-[var(--muted)]">{t("itemsCount", { count: items.length })}</p></>
+              <><p className="mt-1 mb-4 text-sm leading-6 text-[var(--muted)]">{t("cineItemsHint")}</p><CineItemsEditor value={cineItems} onChange={setCineItems} members={group.members ?? []} groupId={group.id} /><p className="mt-3 text-xs font-semibold text-[var(--muted)]">{t("itemsCount", { count: itemInputs.length })}</p></>
             ) : scheduleMode === "period" ? (
               <div className="mt-5 rounded-2xl border border-[var(--ok-line)] bg-[var(--ok-soft)] p-5"><strong className="text-[var(--ok)]">{t("dailyTitle")}</strong><p className="mt-2 text-sm leading-6 text-[var(--ok)]">{t("dailyBody", { start: f.date(startsOn), end: f.date(endsOn) })}</p></div>
             ) : (
@@ -180,7 +181,7 @@ export function CreateChallengeScreen({
                 {group.members.map((member) => <label className="flex min-h-14 items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4" key={member.id}><input type="checkbox" aria-label={t("selectMember", { name: member.name })} checked={participantIds.includes(member.id)} onChange={(event) => setParticipantIds((current) => event.target.checked ? [...current, member.id] : current.filter((id) => id !== member.id))} /><span><strong className="block text-sm">{member.name}</strong><small className="text-[var(--muted)]">@{member.username}</small></span></label>)}
               </fieldset>
             ) : <EmptyState title={t("noMembersTitle")} description={t("noMembersBody")} />}
-            <div className="mt-6 rounded-2xl bg-[var(--wash)] p-5 text-sm leading-6"><strong className="block text-base">{t("summaryTitle")}</strong><span className="mt-2 block text-[var(--muted)]">{t("summaryFields", { count: fields.length })} · {template === "reading" ? scheduleMode === "period" ? t("summaryDaily") : t("summaryHabit") : t("summaryItems", { count: items.length })} · {t("summaryParticipants", { count: participantIds.length })}</span><p className="mt-2 text-[var(--muted)]">{t("summaryNote")}</p></div>
+            <div className="mt-6 rounded-2xl bg-[var(--wash)] p-5 text-sm leading-6"><strong className="block text-base">{t("summaryTitle")}</strong><span className="mt-2 block text-[var(--muted)]">{t("summaryFields", { count: fields.length })} · {template === "reading" ? scheduleMode === "period" ? t("summaryDaily") : t("summaryHabit") : t("summaryItems", { count: itemInputs.length })} · {t("summaryParticipants", { count: participantIds.length })}</span><p className="mt-2 text-[var(--muted)]">{t("summaryNote")}</p></div>
           </div>
         ) : null}
 

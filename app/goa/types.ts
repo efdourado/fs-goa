@@ -69,6 +69,17 @@ export interface ChallengeField {
   config?: FieldConfig;
 }
 
+export interface CatalogItem {
+  id: Id;
+  kind: "film" | "book" | "other";
+  title: string;
+  year?: number | null;
+  runtimeMinutes?: number | null;
+  pageCount?: number | null;
+  genres: string[];
+  roundCount?: number;
+}
+
 export interface ChallengeItem {
   id: Id;
   title: string;
@@ -78,6 +89,8 @@ export interface ChallengeItem {
   dueAt?: string | null;
   date?: string | null;
   status?: "scheduled" | "open" | "past_due" | "closed";
+  catalogItem?: Pick<CatalogItem, "id" | "title" | "year" | "runtimeMinutes" | "genres"> | null;
+  recommendedBy?: { id: Id; name: string } | null;
 }
 
 export interface Participant {
@@ -294,7 +307,17 @@ export interface ChallengeCreationInput {
   endsOn: string | null;
   submissionMode: SubmissionMode;
   fields: ChallengeField[];
-  items: Array<{ title: string; position: number }>;
+  items: ChallengeItemInput[];
   generateDaily: boolean;
   participantIds: Id[];
+}
+
+export interface ChallengeItemInput {
+  title: string;
+  position: number;
+  catalogItemId?: Id;
+  recommendedByUserId?: Id;
+  year?: number;
+  runtimeMinutes?: number;
+  genres?: string[];
 }
