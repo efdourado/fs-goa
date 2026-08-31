@@ -1,16 +1,17 @@
 "use client";
 
-import { type ReactNode, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import {
   API_PATHS,
   apiRequest,
-  errorMessage,
   normalizeBootstrap,
   normalizeChallenge,
   normalizeCreatedId,
   normalizeEntries,
 } from "./goa/api";
+import { useGoaFormat } from "./goa/format";
 import { AccountScreen } from "./goa/screens/account";
 import { AdminScreen } from "./goa/screens/admin";
 import { AuthScreen } from "./goa/screens/auth";
@@ -39,6 +40,11 @@ import { AppHeader, Brand, Button, cardClass, cx, EmptyState, LoadingView } from
 import { canManage, slugify } from "./goa/utils";
 
 export default function GoaApp() {
+  const t = useTranslations("app");
+  const tc = useTranslations("common");
+  const f = useGoaFormat();
+  const fRef = useRef(f);
+  fRef.current = f;
   const [bootstrap, setBootstrap] = useState<BootstrapData | null>(null);
   const [screen, setScreen] = useState<Screen>({ kind: "loading" });
   const [pendingInviteToken, setPendingInviteToken] = useState<string | null>(null);
@@ -96,7 +102,7 @@ export default function GoaApp() {
       })
       .catch((cause: unknown) => {
         if (!active || (cause instanceof DOMException && cause.name === "AbortError")) return;
-        if (!cached) setBootError(errorMessage(cause));
+        if (!cached) setBootError(fRef.current.error(cause));
       });
     return () => { active = false; controller.abort(); };
   }, []);
@@ -161,7 +167,7 @@ export default function GoaApp() {
       writeCache(CACHE_KEYS.challenge(challengeId), { challenge, entries: nextEntries });
       return challenge;
     } catch (cause) {
-      if (!cached) setDetailError(errorMessage(cause));
+      if (!cached) setDetailError(f.error(cause));
       throw cause;
     } finally {
       setDetailLoading(false);
@@ -173,14 +179,14 @@ export default function GoaApp() {
   }
 
   async function authenticate(mode: "login" | "register", payload: Record<string, string>) {
-    if (!bootstrap) throw new Error("O bootstrap de segurança ainda não foi carregado.");
+    if (!bootstrap) throw new Error(t("bootstrapNotLoaded"));
     await apiRequest(API_PATHS.auth[mode], {
       method: "POST",
       body: payload,
       csrfToken: bootstrap.csrfToken,
     });
     const data = await refreshBootstrap();
-    if (!data.user) throw new Error("A sessão não foi criada. Tente novamente.");
+    if (!data.user) throw new Error(t("sessionNotCreated"));
     if (pendingInviteToken) {
       try {
         const invitation = await apiRequest<InviteAcceptance>(API_PATHS.invite(pendingInviteToken), {
@@ -212,7 +218,7 @@ export default function GoaApp() {
     setPendingRoute(null);
     setResumeTemplateCopy(null);
     setScreen({ kind: "auth", mode: "login" });
-    if (data.user) throw new Error("Não foi possível encerrar a sessão.");
+    if (data.user) throw new Error(t("sessionNotEnded"));
   }
 
   async function forgotPassword(email: string) {
@@ -319,7 +325,7 @@ export default function GoaApp() {
       },
     });
     const challengeId = normalizeCreatedId(created);
-    if (!challengeId) throw new Error("O servidor criou o rascunho sem retornar seu identificador.");
+    if (!challengeId) throw new Error(t("draftWithoutId"));
 
     await refreshBootstrap();
     openAdmin(challengeId);
@@ -366,13 +372,13 @@ export default function GoaApp() {
     const response = await fetch(API_PATHS.exportEntries(selectedChallenge.id), { credentials: "same-origin", headers: { Accept: "text/csv" } });
     if (!response.ok) {
       const body = await response.text();
-      throw new Error(body || "Não foi possível exportar os registros.");
+      throw new Error(body || t("exportFailed"));
     }
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `${slugify(selectedChallenge.title)}-registros.csv`;
+    anchor.download = `${slugify(selectedChallenge.title)}-${t("exportFilename")}.csv`;
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
@@ -384,9 +390,9 @@ export default function GoaApp() {
       <main className="grid min-h-screen place-items-center px-5">
         <section className={cx(cardClass, "max-w-lg p-7 text-center")}>
           <Brand />
-          <h1 className="mt-6 text-2xl font-light">Não foi possível abrir o Goa</h1>
+          <h1 className="mt-6 text-2xl font-light">{t("bootTitle")}</h1>
           <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{bootError}</p>
-          <Button className="mt-6" onClick={() => window.location.reload()}>Tentar novamente</Button>
+          <Button className="mt-6" onClick={() => window.location.reload()}>{t("retry")}</Button>
         </section>
       </main>
     );
@@ -433,13 +439,13 @@ export default function GoaApp() {
   } else if (screen.kind === "create-challenge" && selectedGroup && canManage(selectedGroup.role)) {
     content = <CreateChallengeScreen key={selectedGroup.id} group={selectedGroup} onBack={() => setScreen({ kind: "group", groupId: selectedGroup.id })} onCreate={(input) => createChallenge(selectedGroup.id, input)} />;
   } else if ((screen.kind === "challenge" || screen.kind === "admin") && (detailLoading || !selectedChallenge || selectedChallenge.id !== screen.challengeId)) {
-    content = detailError ? <main className="mx-auto max-w-2xl px-5 py-16"><EmptyState title="Não foi possível abrir este desafio" description={detailError} action={<Button onClick={() => retryDetail(screen.challengeId)}>Tentar novamente</Button>} /></main> : <LoadingView label="Carregando o desafio…" />;
+    content = detailError ? <main className="mx-auto max-w-2xl px-5 py-16"><EmptyState title={t("detailError")} description={detailError} action={<Button onClick={() => retryDetail(screen.challengeId)}>{t("retry")}</Button>} /></main> : <LoadingView label={tc("loadingChallenge")} />;
   } else if (screen.kind === "challenge" && selectedChallenge) {
     content = <ParticipantChallengeScreen key={selectedChallenge.id} challenge={selectedChallenge} entries={entries} user={user} tab={screen.tab} onTab={(tab) => setScreen({ ...screen, tab })} onBack={() => setScreen({ kind: "dashboard" })} onAdmin={canManage(selectedRole) ? () => openAdmin(selectedChallenge.id) : undefined} onSaveEntry={saveEntry} />;
   } else if (screen.kind === "admin" && selectedChallenge && canManage(selectedRole)) {
     content = <AdminScreen key={selectedChallenge.id} challenge={selectedChallenge} entries={entries} group={selectedGroup} duplicateTargets={bootstrap.groups.filter((candidate) => candidate.id !== selectedChallenge.groupId && canManage(candidate.role)).map((candidate) => ({ id: candidate.id, name: candidate.name, challengeCount: bootstrap.challenges.filter((item) => item.groupId === candidate.id).length, challengeLimit: bootstrap.limits.challengesPerGroup }))} tab={screen.tab} onTab={(tab) => setScreen({ ...screen, tab })} onBack={() => selectedGroup ? setScreen({ kind: "group", groupId: selectedGroup.id }) : setScreen({ kind: "dashboard" })} onViewParticipant={() => setScreen({ kind: "challenge", challengeId: selectedChallenge.id, tab: selectedChallenge.status === "closed" ? "results" : "today" })} onSaveBasics={(payload) => mutateChallenge(API_PATHS.challenge(selectedChallenge.id), payload, "PATCH")} onTransition={(status) => mutateChallenge(API_PATHS.transition(selectedChallenge.id), { status })} onDuplicate={duplicateChallenge} onDelete={canManage(selectedRole) ? () => deleteChallenge(selectedChallenge.id, selectedGroup?.id) : undefined} onSaveParticipants={(participantIds) => mutateChallenge(API_PATHS.participants(selectedChallenge.id), { replace: true, participantIds })} onSaveFields={(fields) => mutateChallenge(API_PATHS.fields(selectedChallenge.id), { replace: true, archiveMissing: true, fields })} onAddItems={(payload) => mutateChallenge(API_PATHS.items(selectedChallenge.id), payload)} onUpdateItem={(itemId, payload) => mutateChallenge(API_PATHS.item(selectedChallenge.id, itemId), payload, "PATCH")} onArchiveItem={(itemId) => mutateChallenge(API_PATHS.item(selectedChallenge.id, itemId), undefined, "DELETE")} onPatchEntry={(entryId, values, reason) => mutateChallenge(API_PATHS.entry(entryId), { values, reason }, "PATCH")} onExport={exportCsv} onAddMetric={(payload) => mutateChallenge(API_PATHS.metrics(selectedChallenge.id), payload)} onSaveResult={(payload) => mutateChallenge(API_PATHS.results(selectedChallenge.id), payload)} />;
   } else if (screen.kind === "admin" || screen.kind === "create-challenge") {
-    content = <main className="mx-auto max-w-2xl px-5 py-16"><EmptyState title="Acesso administrativo indisponível" description="Você não possui papel de responsável ou administrador neste grupo. O servidor também valida cada operação." action={<Button onClick={() => setScreen({ kind: "dashboard" })}>Voltar ao início</Button>} /></main>;
+    content = <main className="mx-auto max-w-2xl px-5 py-16"><EmptyState title={t("adminUnavailableTitle")} description={t("adminUnavailableBody")} action={<Button onClick={() => setScreen({ kind: "dashboard" })}>{t("backToStart")}</Button>} /></main>;
   } else {
     content = <DashboardScreen user={user} groups={bootstrap.groups} challenges={bootstrap.challenges} limits={bootstrap.limits} onOpenGroup={(groupId) => setScreen({ kind: "group", groupId })} onOpenChallenge={(id) => openParticipant(id)} onOpenAdmin={(id) => openAdmin(id)} onCreateGroup={createGroup} />;
   }

@@ -60,12 +60,14 @@ export const API_PATHS = {
 
 export class ApiError extends Error {
   status: number;
+  code?: string;
   fieldErrors?: Record<string, string[]>;
 
-  constructor(message: string, status: number, fieldErrors?: Record<string, string[]>) {
+  constructor(message: string, status: number, code?: string, fieldErrors?: Record<string, string[]>) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.code = code;
     this.fieldErrors = fieldErrors;
   }
 }
@@ -99,8 +101,9 @@ export async function apiRequest<T>(
   if (!response.ok) {
     const errorBody = body as ApiErrorBody | null;
     throw new ApiError(
-      errorBody?.message ?? errorBody?.error ?? "Não foi possível concluir a operação.",
+      errorBody?.message ?? errorBody?.error ?? "",
       response.status,
+      errorBody?.error,
       errorBody?.errors,
     );
   }
@@ -109,10 +112,6 @@ export async function apiRequest<T>(
     return body.data;
   }
   return body as T;
-}
-
-export function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Algo deu errado. Tente novamente.";
 }
 
 export function normalizeBootstrap(raw: BootstrapData | { bootstrap: BootstrapData }): BootstrapData {

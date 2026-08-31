@@ -1,19 +1,12 @@
 import assert from "node:assert/strict";
 import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
 import test from "node:test";
 
 import { RuleSectionsView } from "../app/goa/rules";
 import { DynamicEntryForm } from "../app/goa/screens/participant-challenge";
 import { AppHeader, ChallengeStatusBadge, SchedulePeriodFields } from "../app/goa/ui";
-import {
-  entryUnavailableMessage,
-  formatDateRange,
-  inclusiveDayCount,
-  isChallengeScheduled,
-  itemStatusLabel,
-  shiftDateKey,
-} from "../app/goa/utils";
+import { inclusiveDayCount, isChallengeScheduled, shiftDateKey } from "../app/goa/utils";
+import { ptFormat, renderWithIntl } from "./helpers/intl";
 
 test("distingue desafio agendado do ciclo persistido ativo", () => {
   const now = new Date("2026-08-29T15:00:00Z");
@@ -25,8 +18,8 @@ test("distingue desafio agendado do ciclo persistido ativo", () => {
 });
 
 test("apresenta período ou ausência de prazo sem datas fictícias", () => {
-  assert.equal(formatDateRange(null, null), "Sem prazo");
-  assert.match(formatDateRange("2026-08-01", "2026-08-31"), /01.*ago.*31.*ago/i);
+  assert.equal(ptFormat.dateRange(null, null), "Sem prazo");
+  assert.match(ptFormat.dateRange("2026-08-01", "2026-08-31"), /01.*ago.*31.*ago/i);
 });
 
 test("deriva o término a partir do início e da duração", () => {
@@ -43,7 +36,7 @@ test("deriva o término a partir do início e da duração", () => {
 });
 
 test("campos de período oferecem atalhos de duração e refletem o span atual", () => {
-  const withPeriod = renderToStaticMarkup(createElement(SchedulePeriodFields, {
+  const withPeriod = renderWithIntl(createElement(SchedulePeriodFields, {
     startsOn: "2026-08-30",
     endsOn: "2026-11-27",
     onStartsOn: () => undefined,
@@ -53,7 +46,7 @@ test("campos de período oferecem atalhos de duração e refletem o span atual",
   assert.match(withPeriod, /aria-pressed="true"[\s\S]*?>90 dias<\/button>/);
   assert.match(withPeriod, /90 dias · /);
 
-  const empty = renderToStaticMarkup(createElement(SchedulePeriodFields, {
+  const empty = renderWithIntl(createElement(SchedulePeriodFields, {
     startsOn: "",
     endsOn: "",
     onStartsOn: () => undefined,
@@ -63,7 +56,7 @@ test("campos de período oferecem atalhos de duração e refletem o span atual",
 });
 
 test("explica por que um registro está indisponível sem chamar futuro de encerrado", () => {
-  const scheduled = entryUnavailableMessage({
+  const scheduled = ptFormat.entryUnavailableMessage({
     challengeStatus: "active",
     isParticipant: true,
     itemStatus: "scheduled",
@@ -71,21 +64,21 @@ test("explica por que um registro está indisponível sem chamar futuro de encer
   });
   assert.match(scheduled ?? "", /ainda não começou/i);
   assert.doesNotMatch(scheduled ?? "", /desafio.*encerrado/i);
-  assert.match(entryUnavailableMessage({ challengeStatus: "draft", isParticipant: true }) ?? "", /rascunho/i);
-  assert.match(entryUnavailableMessage({ challengeStatus: "active", isParticipant: false }) ?? "", /não está entre/i);
-  assert.match(entryUnavailableMessage({ challengeStatus: "closed", isParticipant: true }) ?? "", /encerrado/i);
-  assert.equal(entryUnavailableMessage({ challengeStatus: "active", isParticipant: true, itemStatus: "open" }), null);
+  assert.match(ptFormat.entryUnavailableMessage({ challengeStatus: "draft", isParticipant: true }) ?? "", /rascunho/i);
+  assert.match(ptFormat.entryUnavailableMessage({ challengeStatus: "active", isParticipant: false }) ?? "", /não está entre/i);
+  assert.match(ptFormat.entryUnavailableMessage({ challengeStatus: "closed", isParticipant: true }) ?? "", /encerrado/i);
+  assert.equal(ptFormat.entryUnavailableMessage({ challengeStatus: "active", isParticipant: true, itemStatus: "open" }), null);
 });
 
 test("traduz os estados dos checkpoints", () => {
-  assert.equal(itemStatusLabel("scheduled"), "Programado");
-  assert.equal(itemStatusLabel("open"), "Disponível");
-  assert.equal(itemStatusLabel("past_due"), "Prazo encerrado");
-  assert.equal(itemStatusLabel("closed"), "Encerrado");
+  assert.equal(ptFormat.itemStatusLabel("scheduled"), "Programado");
+  assert.equal(ptFormat.itemStatusLabel("open"), "Disponível");
+  assert.equal(ptFormat.itemStatusLabel("past_due"), "Prazo encerrado");
+  assert.equal(ptFormat.itemStatusLabel("closed"), "Encerrado");
 });
 
 test("renderiza estado agendado e regras tituladas em destaque", () => {
-  const badge = renderToStaticMarkup(createElement(ChallengeStatusBadge, {
+  const badge = renderWithIntl(createElement(ChallengeStatusBadge, {
     status: "active",
     startsOn: "2099-01-01",
   }));
@@ -94,10 +87,10 @@ test("renderiza estado agendado e regras tituladas em destaque", () => {
   assert.match(badge, /title="Agendado"/);
   assert.match(badge, /rounded-full/);
 
-  const activeBadge = renderToStaticMarkup(createElement(ChallengeStatusBadge, { status: "active" }));
+  const activeBadge = renderWithIntl(createElement(ChallengeStatusBadge, { status: "active" }));
   assert.match(activeBadge, /aria-label="Situação: Ativo"/);
 
-  const rules = renderToStaticMarkup(createElement(RuleSectionsView, {
+  const rules = renderWithIntl(createElement(RuleSectionsView, {
     rules: [
       { title: "Meta diária", description: "Ler vinte páginas." },
       {
@@ -116,7 +109,7 @@ test("renderiza estado agendado e regras tituladas em destaque", () => {
 });
 
 test("formulário de registro esconde campos opcionais até a pessoa pedir", () => {
-  const form = renderToStaticMarkup(createElement(DynamicEntryForm, {
+  const form = renderWithIntl(createElement(DynamicEntryForm, {
     fields: [
       { id: "f1", key: "paginas", label: "Páginas lidas", type: "number", required: true },
       { id: "f2", key: "nota", label: "Nota do livro", type: "rating", required: false, config: { min: 0, max: 5, step: 0.5 } },
@@ -131,7 +124,7 @@ test("formulário de registro esconde campos opcionais até a pessoa pedir", () 
 });
 
 test("header sinaliza logo, perfil e sair como clicáveis", () => {
-  const header = renderToStaticMarkup(createElement(AppHeader, {
+  const header = renderWithIntl(createElement(AppHeader, {
     user: { id: "user-1", name: "Pessoa Teste", username: "pessoa" },
     notifications: [],
     onHome: () => undefined,
@@ -148,7 +141,7 @@ test("header sinaliza logo, perfil e sair como clicáveis", () => {
 });
 
 test("header lista convites de grupo pendentes no menu de novidades", () => {
-  const header = renderToStaticMarkup(createElement(AppHeader, {
+  const header = renderWithIntl(createElement(AppHeader, {
     user: { id: "user-1", name: "Pessoa Teste", username: "pessoa" },
     notifications: [
       { id: "req-1", groupId: "g1", groupName: "Clube do Sofá", role: "participant", invitedBy: "Ana", createdAt: "2026-08-30T12:00:00.000Z" },
