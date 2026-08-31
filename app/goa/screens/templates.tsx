@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
 
 import { API_PATHS, apiRequest } from "../api";
+import { Footer } from "../Footer";
 import { useGoaFormat } from "../format";
 import { RuleSectionsView } from "../rules";
 import { SettingsMenu } from "../SettingsMenu";
@@ -21,7 +22,7 @@ function PublicChrome({ user, onSignIn, children }: { user: User | null; onSignI
   const t = useTranslations("templates");
   if (user) return <>{children}</>;
   return (
-    <div className="min-h-screen bg-[var(--canvas)] text-[var(--ink)]">
+    <div className="flex min-h-screen flex-col bg-[var(--canvas)] text-[var(--ink)]">
       <header className="sticky top-0 z-30 border-b border-[var(--edge)] bg-[var(--canvas)]/92 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:h-[76px] sm:px-6">
           <Brand />
@@ -31,7 +32,8 @@ function PublicChrome({ user, onSignIn, children }: { user: User | null; onSignI
           </div>
         </div>
       </header>
-      {children}
+      <div className="flex-1">{children}</div>
+      <Footer />
     </div>
   );
 }

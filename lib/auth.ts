@@ -393,6 +393,74 @@ export async function updateAccount(
   });
 }
 
+/**
+ * Self-service account removal. Blocked while the person still owns a group that
+ * has other active members (ownership transfer isn't a feature yet — they must
+ * hand off or delete those groups first). Solo-owned groups are soft-deleted.
+ * The account row is kept but scrubbed of PII and disabled; a hard purge is an
+ * `/admin` follow-up.
+ */
+export async function deleteOwnAccount(session: SessionContext): Promise<{ setCookie: string }> {
+  await inTransaction(async (client) => {
+    await client.query("SELECT id FROM users WHERE id = $1 FOR UPDATE", [session.user.id]);
+
+    const ownedGroups = await client.query<{ id: string; name: string; other_members: number }>(
+      `SELECT g.id, g.name,
+              (SELECT count(*)::int FROM group_members m
+                WHERE m.group_id = g.id AND m.removed_at IS NULL AND m.user_id <> $1) AS other_members
+         FROM groups g
+         JOIN group_members gm ON gm.group_id = g.id AND gm.user_id = $1
+          AND gm.role = 'owner' AND gm.removed_at IS NULL
+        WHERE g.deleted_at IS NULL`,
+      [session.user.id],
+    );
+
+    const shared = ownedGroups.rows.filter((group) => group.other_members > 0);
+    if (shared.length) {
+      throw new ApiError(
+        409,
+        "owns_groups",
+        `Transfira ou apague os grupos onde você é responsável antes de apagar a conta: ${shared
+          .map((group) => group.name)
+          .join(", ")}.`,
+      );
+    }
+
+    for (const group of ownedGroups.rows) {
+      await client.query(
+        `UPDATE groups SET deleted_at = now(), deleted_by_user_id = $2, updated_at = now() WHERE id = $1`,
+        [group.id, session.user.id],
+      );
+      await client.query(
+        `INSERT INTO audit_events
+          (id, group_id, challenge_id, actor_user_id, action, entity_type, entity_id, before, after, metadata, created_at)
+         VALUES ($1,$2,NULL,$3,'group.deleted','group',$2,$4::jsonb,NULL,'{"reason":"account_deleted"}'::jsonb,now())`,
+        [crypto.randomUUID(), group.id, session.user.id, JSON.stringify({ name: group.name })],
+      );
+    }
+
+    await client.query(
+      "UPDATE group_members SET removed_at = now() WHERE user_id = $1 AND removed_at IS NULL",
+      [session.user.id],
+    );
+    await client.query(
+      `UPDATE users
+          SET deleted_at = now(), disabled_at = now(),
+              display_name = 'Conta removida', email = NULL, email_normalized = NULL,
+              updated_at = now()
+        WHERE id = $1`,
+      [session.user.id],
+    );
+    await client.query(
+      "UPDATE sessions SET revoked_at = now(), revoke_reason = 'account_deleted' WHERE user_id = $1 AND revoked_at IS NULL",
+      [session.user.id],
+    );
+    console.warn("auth.deleteAccount", { userId: session.user.id });
+  });
+
+  return { setCookie: clearSessionCookie() };
+}
+
 export async function sessionFromToken(rawToken: string | null): Promise<SessionContext | null> {
   if (!rawToken) return null;
 

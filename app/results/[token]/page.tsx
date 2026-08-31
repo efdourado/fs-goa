@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getFormatter, getTranslations } from "next-intl/server";
 
 import { publicResults } from "@/lib/goa-challenges";
+import { Footer } from "@/app/goa/Footer";
 import { type Formatter, makeGoaFormat, type Translator } from "@/app/goa/format";
 import { SettingsMenu } from "@/app/goa/SettingsMenu";
 
@@ -86,6 +87,7 @@ export default async function SharedResultsPage({ params }: { params: Promise<{ 
         ) : null}
         <p className="mt-8 text-center text-xs text-[var(--muted)]">{t("footer")}</p>
       </div>
+      <Footer />
     </main>
   );
 }

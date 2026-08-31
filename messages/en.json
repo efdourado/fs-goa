@@ -38,11 +38,18 @@
   },
   "nav": {
     "templates": "Templates",
+    "about": "About",
     "admin": "Console",
     "account": "Your account",
     "signOut": "Sign out",
     "signingOut": "Signing out…",
     "signIn": "Sign in"
+  },
+  "footer": {
+    "tagline": "Goa — private challenges, lasting stories.",
+    "about": "About",
+    "templates": "Templates",
+    "feedback": "How can we improve?"
   },
   "roles": {
     "owner": "Owner",
@@ -296,6 +303,7 @@
     "errPickTemplate": "Pick a template and fill in the title.",
     "errPeriod": "Fill in the start and end, or choose a challenge with no deadline.",
     "errEndBeforeStart": "The end date must be the same as or after the start.",
+    "errMeetingUrl": "Use a valid https:// link for the meeting.",
     "errRules": "Fill in the title and description of every rule and topic, or remove the empty ones.",
     "errNoFields": "Add at least one field.",
     "errNoItems": "Add at least one item for the movie challenge.",
@@ -326,6 +334,8 @@
     "noneNote": "No fixed dates: lists stay open at the group's pace, and habits get one check-in per day, including on past dates.",
     "descriptionLabel": "Description",
     "optional": "optional",
+    "meetingLabel": "Meeting link",
+    "meetingHint": "Where the group meets to discuss. Paste an https:// link and it becomes a “Join meeting” button.",
     "rulesLabel": "Titled rules",
     "rulesHint": "Give every important agreement its own spotlight.",
     "fieldsTitle": "What does each person log?",
@@ -373,6 +383,10 @@
     },
     "errPeriod": "Fill in the start and end, or choose a challenge with no deadline.",
     "errEndBeforeStart": "The end date must be the same as or after the start.",
+    "errMeetingUrl": "Use a valid https:// link for the meeting.",
+    "joinMeeting": "Join meeting",
+    "meetingLabel": "Meeting link",
+    "meetingHint": "https:// where the group meets. Becomes a button for participants and admins.",
     "basicsSaved": "Details updated.",
     "stat": {
       "participants": "Participants",
@@ -546,6 +560,7 @@
     },
     "backHome": "← Home",
     "manage": "Manage",
+    "joinMeeting": "Join meeting",
     "navAria": "Challenge navigation",
     "navMobileAria": "Mobile challenge navigation",
     "entriesProgress": "<b>{done}</b> of {total} entries",
@@ -774,7 +789,12 @@
     "newPassword": "New password",
     "confirmNewPassword": "Confirm new password",
     "changingPassword": "Changing…",
-    "changePassword": "Change password"
+    "changePassword": "Change password",
+    "dangerTitle": "Danger zone",
+    "deleteBody": "Deleting your account disables access and removes your personal data. Groups where you're the only person go to the trash. If you own a group with other people, transfer or delete that group first.",
+    "deleteConfirm": "Delete your account? Access ends and your personal data is removed.",
+    "deleteAccount": "Delete my account",
+    "deleting": "Deleting…"
   },
   "resetPassword": {
     "passwordsDontMatch": "The passwords don't match.",
@@ -788,5 +808,54 @@
   "publicResults": {
     "numbersAria": "Results in numbers",
     "footer": "A memory published by the group on Goa."
+  },
+  "about": {
+    "title": "About Goa",
+    "lede": "Goa grew out of spreadsheets — the ones a group of friends kept to run a film club and a reading club. It automates that work: people log their progress, the system does the math, and the result becomes a memory.",
+    "body": [
+      "The idea is simple. A group picks a challenge — watch a list of films, read for 90 days, keep a habit — and each person logs their progress. Goa handles the rest: it tracks who's on schedule, computes averages and rankings, and at the end builds a showcase that tells the story of that round.",
+      "Nothing is public by default. Every group is private, access always comes from belonging to it, and submitted entries are preserved — only the curation and presentation stay editable.",
+      "Goa is a personal project in progress, built by Eduardo Dourado. The original spreadsheets became the domain spec; the app is gradually catching up to everything they did, with far less manual work."
+    ],
+    "feedbackNudge": "Have an idea, or did something bug you?",
+    "feedbackLink": "Tell us."
+  },
+  "feedbackPage": {
+    "title": "How can we improve?",
+    "lede": "Takes a minute. Your answers help decide what to build first — we keep nothing from your entries, ratings, or comments.",
+    "q1": "Which part of Goa were you in?",
+    "q1Placeholder": "e.g. creating a challenge, logging the day, viewing the result…",
+    "q2": "What were you trying to do?",
+    "q3a": "Did it work?",
+    "yes": "Yes",
+    "no": "No",
+    "partly": "Sort of",
+    "q3b": "How easy was it?",
+    "q3bScale": "1 = very hard · 5 = very easy",
+    "q4": "What got in your way or is missing?",
+    "q5": "What was the impact?",
+    "impact": {
+      "blocked": "Blocked me outright",
+      "effort": "Took real effort",
+      "minor": "Minor annoyance",
+      "idea": "Just an idea for later"
+    },
+    "impactRequired": "Choose the impact.",
+    "q6": "How do you handle this today?",
+    "q6None": "I don't / not applicable",
+    "workaround": {
+      "spreadsheet": "Spreadsheet",
+      "whatsapp": "WhatsApp",
+      "notion": "Notion",
+      "other_app": "Another app",
+      "none": "I don't"
+    },
+    "q7": "What change would bring you back more often or make you recommend Goa?",
+    "q8": "Can we contact you about this?",
+    "q8Placeholder": "Your email (optional)",
+    "sending": "Sending…",
+    "send": "Send",
+    "thanksTitle": "Got it. Thank you!",
+    "thanksBody": "Every response is read. If you left an email, we might write to understand it better."
   }
 }
