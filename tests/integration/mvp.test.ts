@@ -1514,3 +1514,77 @@ test("fase 0: feedback, link de reunião e remoção da própria conta", async (
   const soloGone = await adminPool.query<{ deleted_at: Date | null }>("SELECT deleted_at FROM groups WHERE id=$1", [soloGroupId]);
   assert.ok(soloGone.rows[0]?.deleted_at, "grupos solo vão para a lixeira ao apagar a conta");
 });
+
+test("fase 1a: acervo do grupo, identidade do filme entre rodadas e indicador", async () => {
+  const owner = await register("Clara", "clara_cat");
+  const friend = await register("Dan", "dan_cat");
+  const groupId = (await call("POST", "/api/groups", { session: owner, body: { name: "Cineclube" } })).body as { id: string };
+  const gid = groupId.id;
+  const invite = await call("POST", `/api/groups/${gid}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } });
+  await call("POST", `/api/invites/${(invite.body as { token: string }).token}`, { session: friend, body: {} });
+
+  const first = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: {
+      template: "cine", title: "Rodada 1", submissionMode: "item",
+      participantIds: [owner.user.id, friend.user.id],
+      fields: [{ key: "nota", label: "Nota", type: "rating", required: true }],
+      items: [
+        { title: "Aftersun", recommendedByUserId: friend.user.id, year: 2022, genres: ["drama"] },
+        { title: "  perfect days ", year: 2023 },
+      ],
+    },
+  });
+  assert.equal(first.response.status, 201, JSON.stringify(first.body));
+  const firstId = (first.body as { id: string }).id;
+
+  const catalog = await call("GET", `/api/groups/${gid}/catalog`, { session: friend });
+  assert.equal(catalog.response.status, 200);
+  const catalogItems = (catalog.body as { items: Array<{ id: string; title: string; year: number | null; genres: string[]; roundCount: number }> }).items;
+  assert.equal(catalogItems.length, 2, "dois filmes no acervo");
+  const aftersun = catalogItems.find((item) => item.title === "Aftersun");
+  assert.ok(aftersun);
+  assert.equal(aftersun.year, 2022);
+  assert.deepEqual(aftersun.genres, ["drama"]);
+
+  const detail = await call("GET", `/api/challenges/${firstId}`, { session: owner });
+  const items = (detail.body as { items: Array<{ title: string; catalogItem: { id: string; year: number | null } | null; recommendedBy: { name: string } | null }> }).items;
+  assert.equal(items[0].recommendedBy?.name, "Dan");
+  assert.equal(items[0].catalogItem?.id, aftersun.id);
+
+  // segunda rodada reusa o mesmo filme por título → mesma identidade no acervo
+  const second = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: {
+      template: "cine", title: "Rodada 2", submissionMode: "item",
+      participantIds: [owner.user.id],
+      fields: [{ key: "nota", label: "Nota", type: "rating", required: true }],
+      items: [{ title: "AFTERSUN" }],
+    },
+  });
+  assert.equal(second.response.status, 201, JSON.stringify(second.body));
+  const secondDetail = await call("GET", `/api/challenges/${(second.body as { id: string }).id}`, { session: owner });
+  assert.equal((secondDetail.body as { items: Array<{ catalogItem: { id: string } | null }> }).items[0].catalogItem?.id, aftersun.id, "mesmo filme, mesma linha do acervo");
+
+  const catalog2 = await call("GET", `/api/groups/${gid}/catalog`, { session: owner });
+  assert.equal((catalog2.body as { items: unknown[] }).items.length, 2, "reuso não cria filme novo");
+  assert.equal((catalog2.body as { items: Array<{ id: string; roundCount: number }> }).items.find((i) => i.id === aftersun.id)?.roundCount, 2);
+
+  // editar atributos no acervo
+  const patched = await call("PATCH", `/api/catalog/${aftersun.id}`, { session: owner, body: { runtimeMinutes: 96, genres: ["drama", "coming of age"] } });
+  assert.equal(patched.response.status, 200, JSON.stringify(patched.body));
+  const afterPatch = await call("GET", `/api/challenges/${firstId}`, { session: owner });
+  assert.deepEqual((afterPatch.body as { items: Array<{ catalogItem: { genres: string[]; runtimeMinutes: number | null } | null }> }).items[0].catalogItem?.genres, ["coming of age", "drama"]);
+
+  // indicador precisa ser membro do grupo
+  const badRecommender = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: {
+      template: "cine", title: "Rodada ruim", submissionMode: "item",
+      participantIds: [owner.user.id],
+      fields: [{ key: "nota", label: "Nota", type: "rating", required: true }],
+      items: [{ title: "Qualquer", recommendedByUserId: "user-que-nao-existe" }],
+    },
+  });
+  assert.equal(badRecommender.response.status, 400);
+});

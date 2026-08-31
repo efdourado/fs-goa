@@ -2,6 +2,12 @@ import { requireGroupRole, type SessionContext } from "../../auth";
 import { inTransaction, oneOrNull } from "../../db";
 import { ApiError, stringValue } from "../../http";
 import { assertArrayWithin, assertUnder, LIMITS } from "../../limits";
+import {
+  assertCatalogItemInGroup,
+  resolveTags,
+  setCatalogItemTags,
+  upsertCatalogItem,
+} from "../catalog";
 import { syncDailyCheckpoints } from "../daily-checkpoints";
 import { writeAudit } from "./audit";
 import { defaultFields, insertField, type ClientField } from "./fields";
@@ -80,15 +86,50 @@ export async function createChallenge(
 
     if (submissionMode === "item") {
       if (!items.length || items.length > 200) throw new ApiError(400, "item_limit", "Adicione de 1 a 200 itens.");
+      const memberIds = new Set(
+        (
+          await client.query<{ user_id: string }>(
+            "SELECT user_id FROM group_members WHERE group_id = $1 AND removed_at IS NULL",
+            [groupId],
+          )
+        ).rows.map((row) => row.user_id),
+      );
+      const catalogKind = body.template === "reading" ? "book" : "film";
       for (let index = 0; index < items.length; index += 1) {
         const item = asRecord(items[index]);
         const itemTitle = typeof item.title === "string" ? item.title.trim() : "";
         if (!itemTitle) throw new ApiError(400, "invalid_item", "Item sem título.");
+
+        let catalogItemId: string | null = null;
+        if (typeof item.catalogItemId === "string" && item.catalogItemId) {
+          await assertCatalogItemInGroup(client, item.catalogItemId, groupId, catalogKind);
+          catalogItemId = item.catalogItemId;
+        } else {
+          catalogItemId = await upsertCatalogItem(client, groupId, session.user.id, {
+            kind: catalogKind,
+            title: itemTitle,
+            year: item.year,
+            runtimeMinutes: item.runtimeMinutes,
+            pageCount: item.pageCount,
+          });
+        }
+        if (Array.isArray(item.genres) && item.genres.length) {
+          await setCatalogItemTags(client, catalogItemId, await resolveTags(client, groupId, "genre", item.genres));
+        }
+
+        let recommendedBy: string | null = null;
+        if (typeof item.recommendedByUserId === "string" && item.recommendedByUserId) {
+          if (!memberIds.has(item.recommendedByUserId)) {
+            throw new ApiError(400, "invalid_recommender", "Quem indicou precisa ser um membro do grupo.");
+          }
+          recommendedBy = item.recommendedByUserId;
+        }
+
         await client.query(
           `INSERT INTO challenge_items
-            (id, challenge_id, entry_type_id, semantic_key, title, position, metadata, created_at, updated_at)
-           VALUES ($1,$2,$3,$4,$5,$6,'{}'::jsonb,now(),now())`,
-          [publicId(), id, entryTypeId, semanticKey(itemTitle, `item_${index + 1}`), itemTitle, index],
+            (id, challenge_id, entry_type_id, catalog_item_id, recommended_by_user_id, semantic_key, title, position, metadata, created_at, updated_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'{}'::jsonb,now(),now())`,
+          [publicId(), id, entryTypeId, catalogItemId, recommendedBy, semanticKey(itemTitle, `item_${index + 1}`), itemTitle, index],
         );
       }
     } else if (

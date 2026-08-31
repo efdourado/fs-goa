@@ -24,6 +24,7 @@ import {
   setUserPlatformAdmin,
 } from "@/lib/admin";
 import { adminFeedback, submitFeedback } from "@/lib/feedback";
+import { listGroupCatalog, updateCatalogItem } from "@/lib/goa/catalog";
 import {
   addMetric,
   archiveChallengeItem,
@@ -105,6 +106,9 @@ export async function GET(request: Request): Promise<Response> {
     if (isPath(path, "templates")) return json(await listTemplates());
     if (path[0] === "templates" && path.length === 2) return json(await getTemplateDetail(path[1]));
     if (path[0] === "results" && path.length === 2) return json(await publicResults(path[1]));
+    if (path[0] === "groups" && path[2] === "catalog" && path.length === 3) {
+      return json(await listGroupCatalog(await requireSession(request), path[1]));
+    }
     if (path[0] === "challenges" && path.length === 2) {
       return json(await getChallengeDetail(await requireSession(request), path[1]));
     }
@@ -241,6 +245,9 @@ export async function PATCH(request: Request): Promise<Response> {
     const body = await readJsonObject(request);
     if (isPath(path, "account")) {
       return json(await updateAccount(session, body));
+    }
+    if (path[0] === "catalog" && path.length === 2) {
+      return json(await updateCatalogItem(session, path[1], body));
     }
     if (path[0] === "groups" && path.length === 2) {
       return json(await updateGroup(session, path[1], body));
