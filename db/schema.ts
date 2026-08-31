@@ -25,3 +25,4 @@ export {
   challengeDuplications,
 } from "./schema/results";
 export { auditEvents } from "./schema/audit";
+export { feedback } from "./schema/feedback";
