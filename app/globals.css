@@ -6,11 +6,21 @@
 
 /*
  * Every colour in the app resolves to one of these tokens — components never
- * name a hue. Swap a value here and the whole UI follows. `--main*` is the brand
- * accent (violet today, could be anything); `--wash*` are warm neutral fills;
+ * name a hue. `:root` is the light theme; `:root[data-theme="dark"]` swaps every
+ * value for the warm-charcoal dark theme. The no-flash boot script in the root
+ * layout always writes an explicit `data-theme="light" | "dark"` (it resolves the
+ * "system" preference itself), so a single `[data-theme="dark"]` selector is
+ * enough — no `prefers-color-scheme` media query to keep in sync.
+ *
+ * `--main*` is the brand accent (violet); `--wash*` are neutral fills;
  * `--ok/--warn/--danger` are status colours with matching soft + line variants.
+ * `--spotlight*` is the always-dark hero surface (auth aside, results banner).
+ * `--edge/--hover*` replace the old raw black/white overlays; `--shadow-*` hold
+ * full shadow values so cards keep depth in both themes.
  */
 :root {
+  color-scheme: light;
+
   --ink: #20241f;
   --muted: #6f7169;
   --canvas: #f5f1e8;
@@ -35,6 +45,51 @@
   --danger-strong: #7f1d1d;
   --danger-soft: #fdeceb;
   --danger-line: #f3c9c5;
+
+  --spotlight: #20241f;
+  --spotlight-ink: #f5f1e8;
+  --edge: rgba(20, 24, 20, 0.1);
+  --hover: rgba(20, 24, 20, 0.04);
+  --hover-strong: rgba(20, 24, 20, 0.06);
+  --elevate-1: 0 1px 2px rgba(32, 36, 31, 0.06);
+  --elevate-2: 0 12px 40px rgba(32, 36, 31, 0.16);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --ink: #ece6d8;
+  --muted: #9c978a;
+  --canvas: #16150f;
+  --paper: #201e17;
+  --line: #37342a;
+  --wash: #262319;
+  --wash-strong: #302c20;
+
+  --main: #6d5ce0;
+  --main-strong: #ac9ff8;
+  --main-soft: #241f42;
+  --main-line: #443b70;
+  --main-2: #f47c5e;
+
+  --ok: #3fb98a;
+  --ok-soft: #173a2e;
+  --ok-line: #2e5f4b;
+  --warn: #d9a054;
+  --warn-soft: #3a2e15;
+  --warn-line: #5e4a24;
+  --danger: #f06a62;
+  --danger-strong: #f5a39d;
+  --danger-soft: #3a1d1c;
+  --danger-line: #5e2e2b;
+
+  --spotlight: #211d15;
+  --spotlight-ink: #f5f1e8;
+  --edge: rgba(255, 255, 255, 0.12);
+  --hover: rgba(255, 255, 255, 0.06);
+  --hover-strong: rgba(255, 255, 255, 0.09);
+  --elevate-1: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --elevate-2: 0 16px 48px rgba(0, 0, 0, 0.6);
 }
 
 * { box-sizing: border-box; }
@@ -43,11 +98,15 @@ html { scroll-behavior: smooth; }
 body {
   margin: 0;
   background:
-    radial-gradient(circle at 8% -5%, color-mix(in srgb, var(--main) 8%, transparent), transparent 25rem),
+    radial-gradient(circle at 8% -5%, color-mix(in srgb, var(--main) 9%, transparent), transparent 25rem),
     var(--canvas);
   color: var(--ink);
   font-family: var(--font-geist-sans), Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--main) 30%, transparent);
 }
 
 @layer base {
