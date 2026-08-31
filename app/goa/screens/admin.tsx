@@ -252,18 +252,21 @@ function AdminFields({
 
 function AdminItems({
   challenge,
+  group,
   onAdd,
   onUpdate,
   onArchive,
 }: {
   challenge: ChallengeDetail;
+  group?: GroupSummary;
   onAdd: (payload: Record<string, unknown>) => Promise<void>;
-  onUpdate: (itemId: Id, payload: { title: string; description: string }) => Promise<void>;
+  onUpdate: (itemId: Id, payload: { title: string; description: string; recommendedByUserId?: string | null }) => Promise<void>;
   onArchive: (itemId: Id) => Promise<void>;
 }) {
   const t = useTranslations("adminChallenge");
   const tc = useTranslations("common");
   const f = useGoaFormat();
+  const members = group?.members ?? [];
   const [itemsText, setItemsText] = useState("");
   const startsOn = challenge.startsOn ?? "";
   const endsOn = challenge.endsOn ?? "";
@@ -278,6 +281,7 @@ function AdminItems({
   const [editingId, setEditingId] = useState<Id | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [editRecommendedBy, setEditRecommendedBy] = useState("");
   const [editBusy, setEditBusy] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [editSuccess, setEditSuccess] = useState<string | null>(null);
@@ -302,6 +306,7 @@ function AdminItems({
     setEditingId(item.id);
     setEditTitle(item.title);
     setEditDescription(item.description ?? "");
+    setEditRecommendedBy(item.recommendedBy?.id ?? "");
     setEditError(null);
     setEditSuccess(null);
   }
@@ -312,7 +317,11 @@ function AdminItems({
     setEditError(null);
     setEditSuccess(null);
     try {
-      await onUpdate(itemId, { title: editTitle.trim(), description: editDescription.trim() });
+      await onUpdate(itemId, {
+        title: editTitle.trim(),
+        description: editDescription.trim(),
+        ...(challenge.submissionMode === "item" ? { recommendedByUserId: editRecommendedBy || null } : {}),
+      });
       setEditingId(null);
       setEditSuccess(challenge.submissionMode === "daily" ? t("checkpointUpdated") : t("itemUpdated"));
     } catch (cause) {
@@ -353,6 +362,7 @@ function AdminItems({
                     </div>
                     <label><span className={labelClass}>{t("itemTitleLabel")}</span><input className={inputClass} value={editTitle} onChange={(event) => setEditTitle(event.target.value)} required maxLength={challenge.submissionMode === "daily" ? 160 : 200} /></label>
                     <label><span className={labelClass}>{t("itemDescriptionLabel")}</span><textarea className={inputClass} rows={3} value={editDescription} onChange={(event) => setEditDescription(event.target.value)} maxLength={2000} placeholder={t("itemDescriptionPlaceholder")} /></label>
+                    {challenge.submissionMode === "item" && members.length ? <label><span className={labelClass}>{t("itemRecommendedBy")}</span><select className={inputClass} value={editRecommendedBy} onChange={(event) => setEditRecommendedBy(event.target.value)}><option value="">{t("itemRecommendedByNone")}</option>{members.map((member) => <option value={member.id} key={member.id}>{member.name}</option>)}</select></label> : null}
                     <StatusMessage error={editError} />
                     <div className="flex flex-wrap gap-2"><Button type="submit" disabled={editBusy}>{editBusy ? tc("saving") : tc("save")}</Button><Button variant="ghost" disabled={editBusy} onClick={() => { setEditingId(null); setEditError(null); }}>{tc("cancel")}</Button></div>
                   </form>
@@ -360,7 +370,7 @@ function AdminItems({
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex min-w-0 gap-3">
                       <span className="grid h-8 w-8 flex-none place-items-center rounded-lg bg-[var(--wash)] text-xs font-light text-[var(--muted)]">{index + 1}</span>
-                      <span className="min-w-0"><strong className="block text-sm">{item.title}</strong>{item.description ? <span className="mt-1 block text-sm leading-6 text-[var(--muted)]">{item.description}</span> : null}<small className="mt-1 block text-[var(--muted)]">{item.date ? f.date(item.date) : item.opensAt || item.dueAt ? t("itemWindow", { opens: f.date(item.opensAt), due: f.date(item.dueAt) }) : t("itemNoWindow")}</small></span>
+                      <span className="min-w-0"><strong className="block text-sm">{item.title}</strong>{item.description ? <span className="mt-1 block text-sm leading-6 text-[var(--muted)]">{item.description}</span> : null}{item.recommendedBy || item.catalogItem?.year || item.catalogItem?.genres.length ? <small className="mt-1 block text-[var(--muted)]">{[item.recommendedBy ? t("itemRecommendedByLine", { name: item.recommendedBy.name }) : null, item.catalogItem?.year ? String(item.catalogItem.year) : null, item.catalogItem?.genres.length ? item.catalogItem.genres.join(", ") : null].filter(Boolean).join(" · ")}</small> : null}<small className="mt-1 block text-[var(--muted)]">{item.date ? f.date(item.date) : item.opensAt || item.dueAt ? t("itemWindow", { opens: f.date(item.opensAt), due: f.date(item.dueAt) }) : t("itemNoWindow")}</small></span>
                     </div>
                     <div className="flex flex-none flex-col items-end gap-2"><span className="rounded-full bg-[var(--wash)] px-2 py-1 text-[10px] font-light uppercase text-[var(--muted)]">{f.itemStatusLabel(item.status)}</span>{challenge.status !== "closed" ? <div className="flex gap-2"><Button variant="secondary" className="min-h-9 px-3 py-1 text-xs" onClick={() => startEditing(item)}>{t("edit")}</Button>{canArchiveItems ? <Button variant="danger" className="min-h-9 px-3 py-1 text-xs" disabled={archivingId === item.id} onClick={() => void archive(item)}>{archivingId === item.id ? t("removing") : t("remove")}</Button> : null}</div> : null}</div>
                   </div>
@@ -622,7 +632,7 @@ export function AdminScreen({
   onSaveParticipants: (ids: Id[]) => Promise<void>;
   onSaveFields: (fields: ChallengeField[]) => Promise<void>;
   onAddItems: (payload: Record<string, unknown>) => Promise<void>;
-  onUpdateItem: (itemId: Id, payload: { title: string; description: string }) => Promise<void>;
+  onUpdateItem: (itemId: Id, payload: { title: string; description: string; recommendedByUserId?: string | null }) => Promise<void>;
   onArchiveItem: (itemId: Id) => Promise<void>;
   onPatchEntry: (entryId: Id, values: Record<Id, unknown>, reason: string) => Promise<void>;
   onExport: () => Promise<void>;
@@ -640,7 +650,7 @@ export function AdminScreen({
       {tab === "overview" ? <AdminOverview challenge={challenge} entries={entries} onSave={onSaveBasics} onTransition={onTransition} onDuplicate={onDuplicate} duplicateTargets={duplicateTargets} onDelete={onDelete} /> : null}
       {tab === "participants" ? <AdminParticipants key={`${challenge.id}:${challenge.participants.map((participant) => participant.userId ?? participant.id).join(",")}`} challenge={challenge} group={group} onSave={onSaveParticipants} /> : null}
       {tab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.fields.map((field) => field.id ?? field.key).join(",")}`} challenge={challenge} onSave={onSaveFields} /> : null}
-      {tab === "items" ? <AdminItems challenge={challenge} onAdd={onAddItems} onUpdate={onUpdateItem} onArchive={onArchiveItem} /> : null}
+      {tab === "items" ? <AdminItems challenge={challenge} group={group} onAdd={onAddItems} onUpdate={onUpdateItem} onArchive={onArchiveItem} /> : null}
       {tab === "review" ? <AdminReview challenge={challenge} entries={entries} onPatch={onPatchEntry} onExport={onExport} /> : null}
       {tab === "metrics" ? <AdminMetrics challenge={challenge} onAdd={onAddMetric} /> : null}
       {tab === "results" ? <AdminResults challenge={challenge} entries={entries} onSave={onSaveResult} /> : null}
