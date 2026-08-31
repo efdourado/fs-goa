@@ -71,6 +71,13 @@
       "when": 1788207963732,
       "tag": "0009_damp_shard",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1788219335690,
+      "tag": "0010_ambitious_mister_sinister",
+      "breakpoints": true
     }
   ]
 }

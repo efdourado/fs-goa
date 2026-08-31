@@ -13,6 +13,8 @@ import {
   unique,
 } from "drizzle-orm/pg-core";
 
+import { users } from "./accounts";
+import { catalogItems } from "./catalog";
 import { challengeCheckpoints, challenges } from "./challenges";
 import { timestamptz } from "./columns";
 
@@ -55,6 +57,8 @@ export const challengeItems = pgTable(
     challengeId: text("challenge_id").notNull(),
     checkpointId: text("checkpoint_id"),
     entryTypeId: text("entry_type_id").notNull(),
+    catalogItemId: text("catalog_item_id").references(() => catalogItems.id, { onDelete: "restrict" }),
+    recommendedByUserId: text("recommended_by_user_id").references(() => users.id, { onDelete: "set null" }),
     semanticKey: text("semantic_key").notNull(),
     title: text("title").notNull(),
     description: text("description"),
@@ -89,6 +93,7 @@ export const challengeItems = pgTable(
       table.position,
     ),
     index("challenge_items_due_idx").on(table.challengeId, table.dueAt),
+    index("challenge_items_catalog_idx").on(table.catalogItemId),
     check("challenge_items_key_check", sql`${table.semanticKey} ~ '^[a-z][a-z0-9_]{0,63}$'`),
     check("challenge_items_title_check", sql`char_length(btrim(${table.title})) between 1 and 200`),
     check("challenge_items_position_check", sql`${table.position} >= 0`),
