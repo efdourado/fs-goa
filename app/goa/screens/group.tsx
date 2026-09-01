@@ -1,11 +1,12 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { type FormEvent, useRef, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 
+import { API_PATHS, apiRequest } from "../api";
 import { copyText } from "../clipboard";
 import { useGoaFormat } from "../format";
-import type { ChallengeSummary, GroupInviteResult, GroupSummary, Id, PendingGroupRequest } from "../types";
+import type { CatalogItem, ChallengeSummary, GroupInviteResult, GroupSummary, Id, PendingGroupRequest } from "../types";
 import { backLinkClass, Button, cardClass, challengeStatusTone, ChallengeStatusBadge, cx, EmptyState, inputClass, labelClass, linkClass, PageHeading, StatusMessage } from "../ui";
 import { canManage, isChallengeScheduled } from "../utils";
 
@@ -16,6 +17,7 @@ export function GroupScreen({
   onBack,
   onCreateChallenge,
   onOpenChallenge,
+  onOpenCatalogItem,
   onCreateInvite,
   onInviteByUsername,
   onCancelRequest,
@@ -30,6 +32,7 @@ export function GroupScreen({
   onBack: () => void;
   onCreateChallenge: () => void;
   onOpenChallenge: (id: Id) => void;
+  onOpenCatalogItem: (itemId: Id) => void;
   onCreateInvite: (payload: { expiresInDays: number; maxUses: number; challengeId?: Id }) => Promise<{ token?: string; url?: string }>;
   onInviteByUsername: (username: string) => Promise<GroupInviteResult>;
   onCancelRequest: (id: Id) => Promise<void>;
@@ -54,6 +57,22 @@ export function GroupScreen({
   const [memberBusy, setMemberBusy] = useState(false);
   const [memberError, setMemberError] = useState<string | null>(null);
   const [memberSuccess, setMemberSuccess] = useState<string | null>(null);
+  const [catalog, setCatalog] = useState<CatalogItem[] | null>(null);
+  const [catalogSort, setCatalogSort] = useState<"title" | "rating">("title");
+
+  useEffect(() => {
+    const controller = new AbortController();
+    apiRequest<{ items: CatalogItem[] }>(API_PATHS.groupCatalog(group.id), { signal: controller.signal })
+      .then((response) => setCatalog(response.items))
+      .catch(() => setCatalog([]));
+    return () => controller.abort();
+  }, [group.id]);
+
+  const sortedCatalog = [...(catalog ?? [])].sort((a, b) =>
+    catalogSort === "rating"
+      ? (b.ratingAvg ?? -1) - (a.ratingAvg ?? -1)
+      : a.title.localeCompare(b.title),
+  );
   const [groupBusy, setGroupBusy] = useState(false);
   const [groupError, setGroupError] = useState<string | null>(null);
   const [groupSuccess, setGroupSuccess] = useState<string | null>(null);
@@ -283,6 +302,41 @@ export function GroupScreen({
             </div>
           ) : <EmptyState title={t("noChallengesTitle")} description={canManage(group.role) ? t("noChallengesManage") : t("noChallengesMember")} action={canManage(group.role) ? <Button onClick={onCreateChallenge}>{t("createChallengeCta")}</Button> : undefined} />}
         </section>
+        {sortedCatalog.length ? (
+          <section>
+            <div className="mb-4 flex items-baseline justify-between gap-3">
+              <h2 className="text-xl font-light tracking-[-0.03em]">{t("catalogTitle")}</h2>
+              <label className="text-xs text-[var(--muted)]">
+                <span className="sr-only">{t("catalogSortLabel")}</span>
+                <select className="bg-transparent" value={catalogSort} onChange={(event) => setCatalogSort(event.target.value as "title" | "rating")}>
+                  <option value="title">{t("catalogSortTitle")}</option>
+                  <option value="rating">{t("catalogSortRating")}</option>
+                </select>
+              </label>
+            </div>
+            <ul className="divide-y divide-[var(--line)] rounded-2xl border border-[var(--line)] bg-[var(--paper)]">
+              {sortedCatalog.map((item) => (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    onClick={() => onOpenCatalogItem(item.id)}
+                    className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-[var(--wash)]"
+                  >
+                    <span className="min-w-0">
+                      <strong className="block truncate text-sm font-light">{item.title}{item.year ? ` (${item.year})` : ""}</strong>
+                      <span className="text-xs text-[var(--muted)]">{[item.genres.join(", ") || null, t("catalogRounds", { count: item.roundCount ?? 0 })].filter(Boolean).join(" · ")}</span>
+                    </span>
+                    <span className="flex-none text-sm tabular-nums">
+                      {item.ratingAvg === null || item.ratingAvg === undefined
+                        ? <span className="text-[var(--muted)]">—</span>
+                        : <>{item.ratingAvg}<span className="ml-1.5 text-[10px] font-light text-[var(--muted)]">n={item.ratingCount ?? 0}</span></>}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
         <section>
           <div className="flex items-baseline justify-between gap-3">
             <h2 className="text-lg font-light">{t("peopleTitle")}</h2>

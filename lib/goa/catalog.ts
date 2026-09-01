@@ -183,10 +183,24 @@ export async function listGroupCatalog(session: SessionContext, groupId: string)
       runtime_minutes: number | null;
       page_count: number | null;
       round_count: number;
+      rating_avg: number | null;
+      rating_count: number;
     }>(
       `SELECT ci.id, ci.kind, ci.title, ci.year, ci.runtime_minutes, ci.page_count,
-              (SELECT count(DISTINCT it.challenge_id)::int FROM challenge_items it WHERE it.catalog_item_id = ci.id) AS round_count
+              (SELECT count(DISTINCT it.challenge_id)::int FROM challenge_items it WHERE it.catalog_item_id = ci.id) AS round_count,
+              agg.rating_avg, coalesce(agg.rating_count, 0)::int AS rating_count
          FROM catalog_items ci
+         LEFT JOIN LATERAL (
+           SELECT avg(ev.number_scaled::float8 / (10 ^ f.number_scale)) AS rating_avg,
+                  count(ev.entry_id) AS rating_count
+             FROM challenge_items it
+             JOIN challenges c ON c.id = it.challenge_id AND c.deleted_at IS NULL AND c.status <> 'draft'
+             JOIN entries e ON e.item_id = it.id AND e.deleted_at IS NULL
+              AND e.entry_type_id IN (SELECT id FROM entry_types WHERE challenge_id = c.id AND purpose = 'rating')
+             JOIN entry_values ev ON ev.entry_id = e.id AND ev.number_scaled IS NOT NULL
+             JOIN challenge_fields f ON f.id = ev.field_id AND f.kind = 'rating'
+            WHERE it.catalog_item_id = ci.id AND it.archived_at IS NULL
+         ) agg ON true
         WHERE ci.group_id = $1 AND ci.archived_at IS NULL
         ORDER BY ci.title`,
       [groupId],
@@ -216,6 +230,78 @@ export async function listGroupCatalog(session: SessionContext, groupId: string)
         pageCount: item.page_count,
         genres: genresByItem.get(item.id) ?? [],
         roundCount: item.round_count,
+        ratingAvg: item.rating_avg === null ? null : Number(item.rating_avg.toFixed(2)),
+        ratingCount: item.rating_count,
+      })),
+    };
+  });
+}
+
+/**
+ * One catalog item plus its history: the rounds it appeared in (with each
+ * round's average rating and who recommended it), so the group can see how a
+ * film or book has done across editions.
+ */
+export async function catalogItemDetail(session: SessionContext, groupId: string, catalogItemId: string) {
+  return withClient(async (client) => {
+    await requireGroupRole(session.user.id, groupId, ["owner", "admin", "participant"], client);
+    const item = await oneOrNull<{
+      id: string; kind: string; title: string;
+      year: number | null; runtime_minutes: number | null; page_count: number | null;
+    }>(
+      client,
+      `SELECT id, kind, title, year, runtime_minutes, page_count
+         FROM catalog_items WHERE id = $1 AND group_id = $2 AND archived_at IS NULL`,
+      [catalogItemId, groupId],
+    );
+    if (!item) throw new ApiError(404, "not_found", "Item do acervo não encontrado.");
+
+    const tags = await client.query<{ kind: string; label: string }>(
+      `SELECT ct.kind, ct.label FROM catalog_item_tags cit
+         JOIN catalog_tags ct ON ct.id = cit.tag_id
+        WHERE cit.catalog_item_id = $1 ORDER BY ct.label`,
+      [catalogItemId],
+    );
+    const rounds = await client.query<{
+      challenge_id: string; title: string; status: string;
+      start_date: string | null; end_date: string | null;
+      recommended_by: string | null; rating_avg: number | null; rating_count: number;
+    }>(
+      `SELECT c.id AS challenge_id, c.title, c.status,
+              c.start_date::text AS start_date, c.end_date::text AS end_date,
+              ru.display_name AS recommended_by,
+              avg(ev.number_scaled::float8 / (10 ^ f.number_scale)) AS rating_avg,
+              count(ev.entry_id)::int AS rating_count
+         FROM challenge_items it
+         JOIN challenges c ON c.id = it.challenge_id AND c.deleted_at IS NULL AND c.status <> 'draft'
+         LEFT JOIN users ru ON ru.id = it.recommended_by_user_id
+         LEFT JOIN entries e ON e.item_id = it.id AND e.deleted_at IS NULL
+          AND e.entry_type_id IN (SELECT id FROM entry_types WHERE challenge_id = c.id AND purpose = 'rating')
+         LEFT JOIN entry_values ev ON ev.entry_id = e.id AND ev.number_scaled IS NOT NULL
+         LEFT JOIN challenge_fields f ON f.id = ev.field_id AND f.kind = 'rating'
+        WHERE it.catalog_item_id = $1 AND it.archived_at IS NULL
+        GROUP BY c.id, c.title, c.status, c.start_date, c.end_date, ru.display_name, c.created_at
+        ORDER BY c.start_date NULLS LAST, c.created_at`,
+      [catalogItemId],
+    );
+
+    return {
+      id: item.id,
+      kind: item.kind,
+      title: item.title,
+      year: item.year,
+      runtimeMinutes: item.runtime_minutes,
+      pageCount: item.page_count,
+      genres: tags.rows.filter((tag) => tag.kind === "genre").map((tag) => tag.label),
+      rounds: rounds.rows.map((round) => ({
+        challengeId: round.challenge_id,
+        title: round.title,
+        status: round.status,
+        startsOn: round.start_date,
+        endsOn: round.end_date,
+        recommendedBy: round.recommended_by,
+        ratingAvg: round.rating_avg === null ? null : Number(round.rating_avg.toFixed(2)),
+        ratingCount: round.rating_count,
       })),
     };
   });
