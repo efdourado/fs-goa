@@ -55,22 +55,19 @@ A escolha não pode continuar sendo "item ou data".
 
 ## Onde o Goa falha hoje (âncoras)
 
-- Preset de leitura grava "Livro atual" como texto e joga páginas, conclusão, nota
-  e comentário no mesmo formulário diário — [lib/goa/domain/fields.ts](lib/goa/domain/fields.ts).
-- O banco proíbe `item_id` no modo diário e permite só um registro por
-  participante/dia — [db/schema/entries.ts](db/schema/entries.ts).
-- O checkpoint recebido pela API vira uma data e a listagem tenta reconstruí-lo por
-  coincidência de data, sem FK — [lib/goa/challenges/entries.ts](lib/goa/challenges/entries.ts).
-- `challenge_items.metadata` é sempre `{}` na criação e o detalhe nem o retorna —
-  [db/schema/challenge-definition.ts](db/schema/challenge-definition.ts),
-  [lib/goa/challenges/items.ts](lib/goa/challenges/items.ts),
-  [lib/goa/challenges/detail.ts](lib/goa/challenges/detail.ts).
+Resolvidos na Fase 1 (Marcos 1–4): `item_id` no modo diário + mais de um registro
+por participante/dia, checkpoint com FK persistida (`entries.checkpoint_id`),
+identidade do filme/livro entre rodadas e no remapeamento da cópia.
+
+Ainda abertos:
+
+- Preset de leitura clássico (`reading_daily`) ainda grava "Livro atual" como
+  texto — o `reading_club` (livros no acervo) é a alternativa —
+  [lib/goa/domain/fields.ts](lib/goa/domain/fields.ts).
 - `groupBy` é salvo e exibido, mas o cálculo o ignora e retorna um único escalar —
   [lib/goa/challenges/results.ts](lib/goa/challenges/results.ts).
 - Taxa de conclusão pressupõe "todos os participantes × todos os itens" — erra em
   hábitos pessoais e trilhos opcionais.
-- Duplicar um desafio dá novos IDs aos filmes/livros — não há identidade entre
-  rodadas — [lib/goa/challenges/copy.ts](lib/goa/challenges/copy.ts).
 - Showcase só entende texto, métrica escalar e comentário —
   [db/schema/results.ts](db/schema/results.ts),
   [app/results/[token]/page.tsx](app/results/[token]/page.tsx).
@@ -197,7 +194,7 @@ formulário, categoria e consentimento.
 | Fase | Entrega | Critério de saída |
 |---|---|---|
 | **0 — Alinhamento e escuta** | Vocabulário fechado (item, rodada, evento, avaliação, privacidade); página "Como podemos melhorar?"; plano de migração; deletar conta · Sobre · footer · link de reunião | Equipe concorda sobre a abstração central |
-| **1 — Fundação relacional** | Acervo por grupo · `RoundItem` + indicação + atribuições · checkpoint explícito com FK · `purpose/targetPolicy/cardinality/schedulePolicy` separados · múltiplos tipos de registro ponta a ponta · UI de reordenar/agrupar | **Cenário dos dois livros no mesmo dia funciona** |
+| **1 — Fundação relacional** ✅ | Acervo por grupo · `RoundItem` + indicação · checkpoint explícito com FK · `purpose/targetPolicy/cardinality/schedulePolicy` separados · múltiplos tipos de registro ponta a ponta · receitas versionadas | **Cenário dos dois livros no mesmo dia funciona** — teste de integração verde |
 | **2 — Criação rápida e verticais** | Cine, Leitura e Hábitos completos · atributos tipados + taxonomias · colagem em lote · templates versionados · semanas de pausa · trilho paralelo | Gênero/duração cadastrados uma vez e usados nas análises |
 | **3 — Motor de análise v2** | Agrupamento real · Bayes, mediana, dispersão, consenso, surpresa, viés · Expectativas · cortes dimensionais | Paridade automatizada com os resultados da planilha de referência |
 | **4 — Showcase v2** | Receitas de blocos · rankings, gráficos, matriz · preview privado · curadoria · snapshot | Showcase útil gerado sem configurar métrica na mão |
@@ -239,6 +236,15 @@ indicador e histórico dependem dela.
   o wizard começa sem prazo, uma rodada de cine com início futuro é só `active`
   (não "agendada"), "assistido no futuro" é recusado. Catálogo desambigua por ano.
   Duração no editor de filmes.
+- **Marco 4 — Fase 1 fechada** (migração 0012): `entry_types` ganhou as 4 colunas
+  ortogonais (`purpose/target_policy/cardinality/schedule_policy`), `entries`
+  ganhou `checkpoint_id` + índices únicos por cardinalidade
+  (`once_per_item_day` destrava "dois livros no mesmo dia"), `challenges` ganhou
+  `recipe_key`/`recipe_version`. **Receitas versionadas** (`cine_free`,
+  `cine_curated`, `reading_club`, `reading_daily`); **Cine Curadoria** ponta a
+  ponta com expectativa que trava ao avaliar; a aba Campos edita cada tipo de
+  registro; a duplicação carrega a receita, zera a agenda e remapeia o acervo do
+  grupo de destino.
 - **Modo escuro** — tokens claro/escuro, `prefers-color-scheme` + escolha
   explícita por cookie, toggle System/Claro/Escuro.
 - **Bilíngue pt-BR/en** — `next-intl`, locale por cookie, sem prefixo de URL.

@@ -1,22 +1,28 @@
 # Arquitetura v2 — fundação relacional (Fase 1 da roadmap)
 
-> **Status:** parcialmente implementado.
-> - **D1 resolvida** — acervo e rodada são irmãos do grupo. **Fase 1a** em `main`
->   (migração 0010: `catalog_items`, `catalog_tags`,
->   `challenge_items.catalog_item_id` + `recommended_by_user_id`).
+> **Status:** implementada. A Fase 1 fechou no **Marco 4** (migração 0012).
+> - **D1 resolvida** — acervo e rodada são irmãos do grupo (migração 0010:
+>   `catalog_items`, `catalog_tags`, `challenge_items.catalog_item_id` +
+>   `recommended_by_user_id`).
 > - **D2 resolvida** — **Cine Livre é o padrão**: filmes disponíveis enquanto a
 >   rodada está `active`; início/fim são contexto, não bloqueio; uma avaliação
 >   atual por (filme, tipo, pessoa); o encerramento congela. O `within_round` do
 >   design abaixo passou a se chamar **`while_active`**.
-> - **Marco 3** em `main` (migração 0011): `challenge_items.entry_type_id` virou
->   nullable (o item é type-agnostic; o tipo vive no `entry`), a unicidade de
->   `entries` inclui `entry_type_id`, e o catálogo desambigua por ano. Um filme
->   já aceita expectativa **e** avaliação da mesma pessoa.
-> - **Falta** (Marco 4): `entries.checkpoint_id`, as 4 colunas ortogonais de
->   `entry_types` (`purpose/target_policy/cardinality/schedule_policy`), receitas
->   versionadas, Cine Curadoria (fluxo de expectativa que congela ao marcar
->   "assistido"). O `entry_types.submission_mode` + os CHECK de `entries` seguem
->   como estão até lá.
+> - **Marco 3** (migração 0011): `challenge_items.entry_type_id` virou nullable
+>   (o item é type-agnostic; o tipo vive no `entry`), a unicidade de `entries`
+>   inclui `entry_type_id`, e o catálogo desambigua por ano.
+> - **Marco 4** (migração 0012) — **`entry_types` ganhou as 4 colunas ortogonais**
+>   (`purpose/target_policy/cardinality/schedule_policy`, com fallback do
+>   `submission_mode`), `entries` ganhou `checkpoint_id` + `cardinality`
+>   denormalizada e índices únicos por cardinalidade (`once_per_item_day`
+>   destrava "dois livros no mesmo dia"), e `challenges` ganhou
+>   `recipe_key`/`recipe_version`. Receitas versionadas em
+>   `lib/goa/challenges/recipes.ts` (`cine_free`, `cine_curated`, `reading_club`,
+>   `reading_daily`); **Cine Curadoria** ponta a ponta (expectativa + avaliação,
+>   a expectativa trava ao avaliar); a cópia carrega a receita, zera a agenda e
+>   remapeia o acervo do grupo de destino. O `submission_mode` **fica**, derivado.
+> - **O teste de aceitação abaixo passa** (`tests/integration/mvp.test.ts` →
+>   "fundação: dois livros no mesmo dia…").
 >
 > Contexto em [../ROADMAP.md](../ROADMAP.md).
 
@@ -126,9 +132,9 @@ Vira um teste de integração novo em `tests/integration/`.
 - ~~**D1**~~ — **resolvida:** acervo e rodada são filhos irmãos do grupo.
 - ~~**D2**~~ — **resolvida:** Cine Livre (`schedule_policy = while_active`) é o
   **padrão** do cine; checkpoint datado fica como opção para leitura/hábitos.
-- **Aberta** — a organização por blocos/semanas entra junto com `round_items`
-  (Marco 4) ou fica para o Marco 5 como visão? Proposta: Marco 5 (visão), sem
-  contaminar a relação pessoa × filme × avaliação.
+- **Blocos/semanas** — decidido: **Marco 5, como visão** (semana planejada ×
+  real via `occurred_on`/`checkpoint_id`), sem contaminar a relação
+  pessoa × item × avaliação.
 
 ## O que NÃO muda na Fase 1
 
