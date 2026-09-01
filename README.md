@@ -44,19 +44,39 @@ pede em "Esqueci a senha" e o administrador gera um link de uso único na aba
 
 ## Desenvolvimento sem Docker
 
-Node.js `22.20.0` (ver `.nvmrc`).
+Node.js `22.20.0` (ver `.nvmrc`). PostgreSQL local (o `postgres` do compose serve).
+
+**Primeira vez:**
 
 ```bash
-cp .env.example .env.local          # ajuste DATABASE_URL / ADMIN_PASSWORD
-docker compose up -d postgres       # ou aponte para outro PostgreSQL
+cp .env.example .env.local          # ajuste DATABASE_URL / ADMIN_PASSWORD uma vez
+docker compose up -d postgres
 npm ci
 npm run db:setup                    # migração + conta de administração
 npm run dev
 ```
 
-Verificações:
+**No dia a dia** (o `.env.local` já existe):
 
 ```bash
+docker compose up -d postgres
+npm run dev
+```
+
+## Comandos
+
+```bash
+# migração — local
+npm run db:migrate
+
+# migração — produção (Neon), da sua máquina
+node --env-file=.env.production.local scripts/migrate.mjs
+
+# migração + conta de administração de uma vez
+npm run db:setup                                        # local
+node --env-file=.env.production.local scripts/seed-admin.mjs   # depois do migrate, em prod
+
+# verificações
 npm run lint
 npm run typecheck
 npm test                            # unidade + build + smoke
@@ -64,7 +84,10 @@ DATABASE_URL=postgresql://goa:goa_local_only@127.0.0.1:5433/goa_test \
   npm run db:migrate && npm run test:integration
 ```
 
-O teste de integração se recusa a limpar qualquer banco que não se chame `goa_test`.
+`.env.production.local` (fora do Git) guarda `DATABASE_URL`/`ADMIN_PASSWORD` de
+produção. Para a **migração** use a URL **direta** do Neon (sem `-pooler`); o
+pooled fica só para a aplicação. O teste de integração se recusa a limpar
+qualquer banco que não se chame `goa_test`.
 
 ## Produção (Vercel + Neon)
 
@@ -81,20 +104,16 @@ cortar a latência de cada consulta.
    `MAX_GROUPS_PER_OWNER` / `MAX_CHALLENGES_PER_GROUP` (padrão 6),
    `MAX_MEMBERS_PER_GROUP` (padrão 62).
 3. **`git push`** dispara o build e o deploy.
-4. **Migração + conta de administração** (uma vez, e a cada nova migração) — rode
-   contra o Neon a partir da sua máquina:
+4. **Migração** (a cada nova migração), da sua máquina contra o Neon:
 
    ```bash
-   set -a; . ./.env.production.local; set +a
-   npm run db:setup
+   node --env-file=.env.production.local scripts/migrate.mjs
    ```
 
-   `.env.production.local` (fora do Git) guarda `DATABASE_URL`/`ADMIN_PASSWORD` de
-   produção; ou exporte as variáveis manualmente. Para a migração, use a URL
-   **direta** do Neon (sem `-pooler`); o pooled fica só para a aplicação.
-
-   Algumas migrações vêm com um _backfill_ pontual e idempotente. Depois da
-   `0010` (acervo do grupo), rode uma vez: `node scripts/backfill-catalog.mjs`.
+   A conta de administração já existe — só rode `scripts/seed-admin.mjs` do mesmo
+   jeito se precisar redefinir a senha. Algumas migrações vêm com um _backfill_
+   pontual e idempotente: depois da `0010` (acervo do grupo), rode uma vez
+   `node --env-file=.env.production.local scripts/backfill-catalog.mjs`.
 
 ### Contêiner (alternativa à Vercel)
 
