@@ -1576,6 +1576,20 @@ test("fase 1a: acervo do grupo, identidade do filme entre rodadas e indicador", 
   const afterPatch = await call("GET", `/api/challenges/${firstId}`, { session: owner });
   assert.deepEqual((afterPatch.body as { items: Array<{ catalogItem: { genres: string[]; runtimeMinutes: number | null } | null }> }).items[0].catalogItem?.genres, ["coming of age", "drama"]);
 
+  // ano desambigua: "Dune" (1984) e "Dune" (2021) são dois itens
+  const dune = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: {
+      template: "cine", title: "Duna", submissionMode: "item",
+      participantIds: [owner.user.id],
+      fields: [{ key: "nota", label: "Nota", type: "rating", required: true }],
+      items: [{ title: "Dune", year: 1984 }, { title: "Dune", year: 2021 }],
+    },
+  });
+  assert.equal(dune.response.status, 201, JSON.stringify(dune.body));
+  const duneCatalog = (await call("GET", `/api/groups/${gid}/catalog`, { session: owner })).body as { items: Array<{ title: string; year: number | null }> };
+  assert.equal(duneCatalog.items.filter((item) => item.title === "Dune").length, 2, "Dune 1984 e Dune 2021 não fundem");
+
   // indicador precisa ser membro do grupo
   const badRecommender = await call("POST", `/api/groups/${gid}/challenges`, {
     session: owner,
@@ -1587,4 +1601,64 @@ test("fase 1a: acervo do grupo, identidade do filme entre rodadas e indicador", 
     },
   });
   assert.equal(badRecommender.response.status, 400);
+});
+
+test("modelo de registros: um filme aceita mais de um tipo de registro por pessoa", async () => {
+  const owner = await register("Íris", "iris_rec");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube do modelo" } })).body as { id: string }).id;
+
+  const challenge = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: {
+      template: "cine", title: "Curadoria", submissionMode: "item",
+      participantIds: [owner.user.id],
+      fields: [{ key: "nota", label: "Nota", type: "rating", required: true }],
+      items: [{ title: "Aftersun" }, { title: "Petite Maman" }],
+    },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+
+  // um 2º entry_type ("expectativa") com seu próprio campo, direto no banco
+  const expTypeId = "exp-type-iris";
+  await adminPool.query(
+    `INSERT INTO entry_types (id, challenge_id, semantic_key, name, submission_mode, created_at, updated_at)
+     VALUES ($1, $2, 'expectativa', 'Expectativa', 'item', now(), now())`,
+    [expTypeId, challengeId],
+  );
+  await adminPool.query(
+    `INSERT INTO challenge_fields
+       (id, challenge_id, entry_type_id, semantic_key, label, kind, required, position,
+        number_scale, min_scaled, max_scaled, step_scaled, settings, created_at, updated_at)
+     VALUES ($1, $2, $3, 'hype', 'Expectativa', 'rating', true, 0, 1, 0, 50, 5, '{}'::jsonb, now(), now())`,
+    ["exp-field-iris", challengeId, expTypeId],
+  );
+
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } })).response.status, 200);
+
+  const detail = await call("GET", `/api/challenges/${challengeId}`, { session: owner });
+  const items = (detail.body as { items: Array<{ id: string; title: string }> }).items;
+  const aftersun = items.find((item) => item.title === "Aftersun")!;
+
+  // avaliação e expectativa do MESMO filme, pela MESMA pessoa, coexistem
+  const rating = await call("POST", `/api/challenges/${challengeId}/entries`, { session: owner, body: { itemId: aftersun.id, values: { nota: 4 } } });
+  assert.equal(rating.response.status, 201, JSON.stringify(rating.body));
+  const expectation = await call("POST", `/api/challenges/${challengeId}/entries`, { session: owner, body: { itemId: aftersun.id, entryTypeId: expTypeId, values: { hype: 5 } } });
+  assert.equal(expectation.response.status, 201, JSON.stringify(expectation.body));
+
+  const rows = await adminPool.query<{ entry_type_id: string }>(
+    "SELECT entry_type_id FROM entries WHERE item_id=$1 AND participant_user_id=$2 AND deleted_at IS NULL",
+    [aftersun.id, owner.user.id],
+  );
+  assert.equal(rows.rows.length, 2, "dois registros de tipos diferentes no mesmo filme");
+
+  // qualquer filme pode ser avaliado primeiro; nenhum checkpoint envolvido
+  const petite = items.find((item) => item.title === "Petite Maman")!;
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/entries`, { session: owner, body: { itemId: petite.id, values: { nota: 3 } } })).response.status, 201);
+  const checkpoints = await adminPool.query("SELECT id FROM challenge_checkpoints WHERE challenge_id=$1", [challengeId]);
+  assert.equal(checkpoints.rows.length, 0, "cine não usa checkpoints");
+
+  // "assistido no futuro" é recusado
+  const future = await call("POST", `/api/challenges/${challengeId}/entries`, { session: owner, body: { itemId: petite.id, occurredOn: "2099-01-01", values: { nota: 2 } } });
+  assert.equal(future.response.status, 409);
+  assert.equal((future.body as { error: string }).error, "watch_in_future");
 });

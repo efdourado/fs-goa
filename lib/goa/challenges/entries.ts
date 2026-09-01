@@ -211,12 +211,17 @@ export async function saveEntry(
     const today = dateKeyInTimeZone(new Date(), access.challenge.time_zone);
     if (entryType.submission_mode === "item") {
       if (typeof body.itemId !== "string") throw new ApiError(400, "missing_item", "Selecione um item.");
+      // The item is type-agnostic now — any of the challenge's entry types can
+      // record against the same film (an expectation and a rating coexist).
       const item = await oneOrNull<{ id: string }>(client,
-        "SELECT id FROM challenge_items WHERE id=$1 AND challenge_id=$2 AND entry_type_id=$3 AND archived_at IS NULL",
-        [body.itemId, challengeId, entryType.id]);
+        "SELECT id FROM challenge_items WHERE id=$1 AND challenge_id=$2 AND archived_at IS NULL",
+        [body.itemId, challengeId]);
       if (!item) throw new ApiError(400, "invalid_item", "Item não pertence ao desafio.");
       itemId = item.id;
       occurredOn = typeof body.occurredOn === "string" ? dateString(body.occurredOn, "Data") : today;
+      if (occurredOn > today) {
+        throw new ApiError(409, "watch_in_future", "A data assistida pode ser hoje ou uma data passada.");
+      }
     } else if (entryType.submission_mode === "daily") {
       const requestedDay = typeof body.occurredOn === "string" ? dateString(body.occurredOn, "Data") : null;
       const requestedCheckpointId = typeof body.itemId === "string" || typeof body.checkpointId === "string"
@@ -263,8 +268,8 @@ export async function saveEntry(
     const fields = await storageFields(client, challengeId, entryType.id);
     const existing = entryType.submission_mode === "item"
       ? await oneOrNull<{ id: string }>(client,
-          "SELECT id FROM entries WHERE item_id=$1 AND participant_user_id=$2 AND deleted_at IS NULL FOR UPDATE",
-          [itemId, participantId])
+          "SELECT id FROM entries WHERE item_id=$1 AND entry_type_id=$2 AND participant_user_id=$3 AND deleted_at IS NULL FOR UPDATE",
+          [itemId, entryType.id, participantId])
       : entryType.submission_mode === "daily"
         ? await oneOrNull<{ id: string }>(client,
             `SELECT id FROM entries WHERE challenge_id=$1 AND entry_type_id=$2

@@ -81,8 +81,8 @@ export async function addChallengeItem(
     await client.query(
       `INSERT INTO challenge_items
         (id, challenge_id, entry_type_id, catalog_item_id, semantic_key, title, description, position, metadata, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'{}'::jsonb,now(),now())`,
-      [id, challengeId, entryType.id, catalogItemId, await uniqueItemKey(client, challengeId, body.key ?? title, position), title, description, position],
+       VALUES ($1,$2,NULL,$3,$4,$5,$6,$7,'{}'::jsonb,now(),now())`,
+      [id, challengeId, catalogItemId, await uniqueItemKey(client, challengeId, body.key ?? title, position), title, description, position],
     );
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
       "item.created", "challenge_item", id, null, { title });
@@ -170,8 +170,8 @@ export async function saveChallengeItems(
       await client.query(
         `INSERT INTO challenge_items
           (id,challenge_id,entry_type_id,catalog_item_id,recommended_by_user_id,semantic_key,title,description,position,metadata,created_at,updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'{}'::jsonb,now(),now())`,
-        [id, challengeId, type.id, catalogItemId, recommendedBy,
+         VALUES ($1,$2,NULL,$3,$4,$5,$6,$7,$8,'{}'::jsonb,now(),now())`,
+        [id, challengeId, catalogItemId, recommendedBy,
           await uniqueItemKey(client, challengeId, item.key ?? title, position), title,
           typeof item.description === "string" ? item.description.trim() || null : null, position],
       );
