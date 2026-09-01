@@ -301,6 +301,7 @@
   },
   "cineItems": {
     "titleLabel": "Film title",
+    "runtime": "Runtime (min)",
     "titlePlaceholder": "e.g. Aftersun",
     "recommendedBy": "Recommended by",
     "recommendedByNone": "No recommender",
