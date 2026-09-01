@@ -9,10 +9,72 @@ import {
   writeAudit,
 } from "../../goa-domain";
 import { ApiError, stringValue } from "../../http";
+import { bayesianAverage, indicatorBias, mean, meanDelta, spread } from "../analysis";
 import { calculateMetric } from "../../metrics";
 import { generateOpaqueToken, hashToken } from "../../security";
 import { primaryEntryType } from "./entry-types";
 import type { MetricRow } from "./types";
+
+interface SeriesEntry {
+  key: string;
+  label: string;
+  value: number | null;
+  sampleSize: number;
+  formattedValue: string;
+}
+
+function metricSettings(metric: MetricRow): { minSample: number; bayesPriorWeight: number } {
+  const settings = (metric.settings ?? {}) as Record<string, unknown>;
+  const minSample = Number(settings.minSample);
+  const bayesPriorWeight = Number(settings.bayesPriorWeight);
+  return {
+    minSample: Number.isFinite(minSample) && minSample > 0 ? Math.floor(minSample) : 1,
+    bayesPriorWeight: Number.isFinite(bayesPriorWeight) && bayesPriorWeight >= 0 ? bayesPriorWeight : 4,
+  };
+}
+
+function formatValue(value: number | null, decimalPlaces: number, suffix = ""): string {
+  if (value === null) return "—";
+  return `${value.toLocaleString("pt-BR", { maximumFractionDigits: decimalPlaces })}${suffix}`;
+}
+
+interface RatingRow {
+  value: number;
+  item_id: string | null;
+  item_title: string | null;
+  participant_id: string;
+  participant_name: string | null;
+}
+
+/** Numeric field values for a metric, tagged with their item and participant. */
+async function ratingRows(client: PoolClient, metric: MetricRow): Promise<RatingRow[]> {
+  const result = await client.query<RatingRow>(
+    `SELECT (ev.number_scaled::float8 / (10 ^ f.number_scale)) AS value,
+            e.item_id, ci.title AS item_title,
+            e.participant_user_id AS participant_id, u.display_name AS participant_name
+       FROM entry_values ev
+       JOIN entries e ON e.id = ev.entry_id
+       JOIN challenge_fields f ON f.id = ev.field_id
+       LEFT JOIN challenge_items ci ON ci.id = e.item_id
+       LEFT JOIN users u ON u.id = e.participant_user_id
+      WHERE e.challenge_id = $1 AND ev.field_id = $2
+        AND e.deleted_at IS NULL AND ev.number_scaled IS NOT NULL`,
+    [metric.challenge_id, metric.field_id],
+  );
+  return result.rows;
+}
+
+function groupBy<T>(rows: T[], key: (row: T) => { id: string; label: string } | null) {
+  const groups = new Map<string, { label: string; rows: T[] }>();
+  for (const row of rows) {
+    const g = key(row);
+    if (!g) continue;
+    const bucket = groups.get(g.id) ?? { label: g.label, rows: [] };
+    bucket.rows.push(row);
+    groups.set(g.id, bucket);
+  }
+  return groups;
+}
 
 export async function calculateMetricRow(
   client: PoolClient,
@@ -81,20 +143,7 @@ export async function calculateMetricRow(
         );
     result = { value: count?.count ?? 0, sampleSize: count?.count ?? 0 };
   } else {
-    const values = await client.query<{ number_scaled: number; number_scale: number }>(
-      `SELECT ev.number_scaled, f.number_scale
-         FROM entry_values ev
-         JOIN entries e ON e.id = ev.entry_id
-         JOIN challenge_fields f ON f.id = ev.field_id
-        WHERE e.challenge_id = $1 AND ev.field_id = $2
-          AND e.deleted_at IS NULL AND ev.number_scaled IS NOT NULL`,
-      [metric.challenge_id, metric.field_id],
-    );
-    result = calculateMetric({
-      operation: metric.operation,
-      values: values.rows.map((value) => value.number_scaled / 10 ** value.number_scale),
-      decimalPlaces: metric.decimal_places,
-    });
+    result = await computeValueMetric(client, metric);
   }
   const suffix = metric.operation === "completion_rate" && result.value !== null ? "%" : "";
   return {
@@ -106,9 +155,171 @@ export async function calculateMetricRow(
     groupBy: metric.group_by,
     visibleDuring: metric.visible_during_challenge,
     visibleInResults: metric.settings?.visibleInResults !== false,
+    minSample: metricSettings(metric).minSample,
     value: result.value,
     sampleSize: result.sampleSize,
-    formattedValue: result.value === null ? "—" : `${result.value.toLocaleString("pt-BR")}${suffix}`,
+    series: "series" in result ? result.series : undefined,
+    formattedValue: formatValue(result.value, metric.decimal_places, suffix),
+  };
+}
+
+type ValueResult = { value: number | null; sampleSize: number; series?: SeriesEntry[] };
+
+/** Basic numeric ops + the analysis ops, with `group_by` expanded into a ranked series. */
+async function computeValueMetric(client: PoolClient, metric: MetricRow): Promise<ValueResult> {
+  const { minSample, bayesPriorWeight } = metricSettings(metric);
+  const dp = metric.decimal_places;
+
+  if (metric.operation === "surprise") return computeSurprise(client, metric, minSample, dp);
+  if (metric.operation === "indicator_bias") return computeIndicatorBias(client, metric, minSample, dp);
+
+  const rows = await ratingRows(client, metric);
+  const all = rows.map((row) => row.value);
+  const globalMean = mean(all) ?? 0;
+  const overall = aggregateValues(metric.operation, all, globalMean, bayesPriorWeight, minSample, dp);
+
+  const keyFn =
+    metric.group_by === "item"
+      ? (row: RatingRow) => (row.item_id ? { id: row.item_id, label: row.item_title ?? "—" } : null)
+      : metric.group_by === "participant"
+        ? (row: RatingRow) => ({ id: row.participant_id, label: row.participant_name ?? "—" })
+        : null;
+  if (!keyFn) return overall;
+
+  const series: SeriesEntry[] = [];
+  for (const [id, bucket] of groupBy(rows, keyFn)) {
+    const grouped = aggregateValues(
+      metric.operation,
+      bucket.rows.map((row) => row.value),
+      globalMean,
+      bayesPriorWeight,
+      minSample,
+      dp,
+    );
+    series.push({
+      key: id,
+      label: bucket.label,
+      value: grouped.value,
+      sampleSize: grouped.sampleSize,
+      formattedValue: formatValue(grouped.value, dp),
+    });
+  }
+  series.sort((a, b) => (b.value ?? Number.NEGATIVE_INFINITY) - (a.value ?? Number.NEGATIVE_INFINITY));
+  return { value: overall.value, sampleSize: overall.sampleSize, series };
+}
+
+function aggregateValues(
+  operation: MetricRow["operation"],
+  values: number[],
+  priorMean: number,
+  priorWeight: number,
+  minSample: number,
+  decimalPlaces: number,
+): { value: number | null; sampleSize: number } {
+  if (operation === "bayesian_average") {
+    return bayesianAverage(values, priorMean, priorWeight, { decimalPlaces, minSample });
+  }
+  if (operation === "spread") return spread(values, { decimalPlaces, minSample });
+  const basic = calculateMetric({
+    operation: operation as "sum" | "average" | "count" | "min" | "max",
+    values,
+    decimalPlaces,
+  });
+  const thin = minSample > 1 && basic.sampleSize < minSample;
+  return { value: thin ? null : basic.value, sampleSize: basic.sampleSize };
+}
+
+async function computeSurprise(
+  client: PoolClient,
+  metric: MetricRow,
+  minSample: number,
+  decimalPlaces: number,
+): Promise<ValueResult> {
+  const rows = await client.query<{ item_id: string; item_title: string | null; rating: number; expectation: number }>(
+    `SELECT re.item_id, ci.title AS item_title,
+            (rv.number_scaled::float8 / (10 ^ rf.number_scale)) AS rating,
+            (xv.number_scaled::float8 / (10 ^ xf.number_scale)) AS expectation
+       FROM entries re
+       JOIN entry_types rt ON rt.id = re.entry_type_id AND rt.purpose = 'rating'
+       JOIN entry_values rv ON rv.entry_id = re.id AND rv.field_id = $2
+       JOIN challenge_fields rf ON rf.id = rv.field_id
+       JOIN entries xe ON xe.challenge_id = re.challenge_id AND xe.item_id = re.item_id
+        AND xe.participant_user_id = re.participant_user_id AND xe.deleted_at IS NULL
+       JOIN entry_types xt ON xt.id = xe.entry_type_id AND xt.purpose = 'expectation'
+       JOIN entry_values xv ON xv.entry_id = xe.id
+       JOIN challenge_fields xf ON xf.id = xv.field_id AND xf.kind = 'rating'
+       LEFT JOIN challenge_items ci ON ci.id = re.item_id
+      WHERE re.challenge_id = $1 AND re.deleted_at IS NULL AND re.item_id IS NOT NULL
+        AND rv.number_scaled IS NOT NULL AND xv.number_scaled IS NOT NULL`,
+    [metric.challenge_id, metric.field_id],
+  );
+  const overall = meanDelta(
+    rows.rows.map((row) => [row.rating, row.expectation] as const),
+    { decimalPlaces, minSample },
+  );
+  if (metric.group_by !== "item") return overall;
+  const byItem = new Map<string, { label: string; pairs: Array<readonly [number, number]> }>();
+  for (const row of rows.rows) {
+    const bucket = byItem.get(row.item_id) ?? { label: row.item_title ?? "—", pairs: [] };
+    bucket.pairs.push([row.rating, row.expectation]);
+    byItem.set(row.item_id, bucket);
+  }
+  const series: SeriesEntry[] = [...byItem].map(([id, bucket]) => {
+    const delta = meanDelta(bucket.pairs, { decimalPlaces, minSample });
+    return {
+      key: id,
+      label: bucket.label,
+      value: delta.value,
+      sampleSize: delta.sampleSize,
+      formattedValue: formatValue(delta.value, decimalPlaces),
+    };
+  });
+  series.sort((a, b) => (b.value ?? Number.NEGATIVE_INFINITY) - (a.value ?? Number.NEGATIVE_INFINITY));
+  return { value: overall.value, sampleSize: overall.sampleSize, series };
+}
+
+async function computeIndicatorBias(
+  client: PoolClient,
+  metric: MetricRow,
+  minSample: number,
+  decimalPlaces: number,
+): Promise<ValueResult> {
+  const all = await ratingRows(client, metric);
+  const groupMean = mean(all.map((row) => row.value)) ?? 0;
+  const picks = await client.query<{ person: string; person_name: string | null; value: number }>(
+    `SELECT ci.recommended_by_user_id AS person, u.display_name AS person_name,
+            (ev.number_scaled::float8 / (10 ^ f.number_scale)) AS value
+       FROM entry_values ev
+       JOIN entries e ON e.id = ev.entry_id
+       JOIN challenge_fields f ON f.id = ev.field_id
+       JOIN challenge_items ci ON ci.id = e.item_id AND ci.recommended_by_user_id IS NOT NULL
+       JOIN users u ON u.id = ci.recommended_by_user_id
+      WHERE e.challenge_id = $1 AND ev.field_id = $2
+        AND e.deleted_at IS NULL AND ev.number_scaled IS NOT NULL`,
+    [metric.challenge_id, metric.field_id],
+  );
+  const byPerson = new Map<string, { label: string; values: number[] }>();
+  for (const row of picks.rows) {
+    const bucket = byPerson.get(row.person) ?? { label: row.person_name ?? "—", values: [] };
+    bucket.values.push(row.value);
+    byPerson.set(row.person, bucket);
+  }
+  const series: SeriesEntry[] = [...byPerson].map(([id, bucket]) => {
+    const bias = indicatorBias(bucket.values, groupMean, { decimalPlaces, minSample });
+    return {
+      key: id,
+      label: bucket.label,
+      value: bias.value,
+      sampleSize: bias.sampleSize,
+      formattedValue: formatValue(bias.value, decimalPlaces),
+    };
+  });
+  series.sort((a, b) => (b.value ?? Number.NEGATIVE_INFINITY) - (a.value ?? Number.NEGATIVE_INFINITY));
+  const values = series.map((entry) => entry.value).filter((value): value is number => value !== null);
+  return {
+    value: values.length ? mean(values.map(Math.abs)) ?? null : null,
+    sampleSize: picks.rows.length,
+    series: metric.group_by === "participant" ? series : undefined,
   };
 }
 
@@ -177,10 +388,16 @@ export async function addMetric(
   challengeId: string,
   body: Record<string, unknown>,
 ) {
-  const operations = new Set(["sum", "average", "count", "min", "max", "completion_rate"]);
+  const operations = new Set([
+    "sum", "average", "count", "min", "max", "completion_rate",
+    "bayesian_average", "spread", "surprise", "indicator_bias",
+  ]);
+  const numericFieldOps = ["sum", "average", "min", "max", "bayesian_average", "spread", "surprise", "indicator_bias"];
   const operation = typeof body.operation === "string" ? body.operation : "count";
   if (!operations.has(operation)) throw new ApiError(400, "invalid_metric", "Operação de métrica inválida.");
   const label = stringValue(body, "label", { max: 120 })!;
+  const minSample = Number(body.minSample);
+  const bayesPriorWeight = Number(body.bayesPriorWeight);
   const groupBy = typeof body.groupBy === "string" && ["none", "participant", "item", "day", "week"].includes(body.groupBy)
     ? body.groupBy : "none";
   const visibleDuring = body.visibleDuring !== false;
@@ -196,12 +413,12 @@ export async function addMetric(
         "SELECT entry_type_id, kind FROM challenge_fields WHERE id=$1 AND challenge_id=$2 AND archived_at IS NULL",
         [fieldId, challengeId]);
       if (!field) throw new ApiError(400, "invalid_field", "Campo não pertence ao desafio.");
-      if (["sum", "average", "min", "max"].includes(operation) && !["number", "rating"].includes(field.kind)) {
+      if (numericFieldOps.includes(operation) && !["number", "rating"].includes(field.kind)) {
         throw new ApiError(400, "invalid_metric", "Essa operação exige campo numérico ou nota.");
       }
       entryTypeId = field.entry_type_id;
     } else {
-      if (["sum", "average", "min", "max"].includes(operation)) {
+      if (numericFieldOps.includes(operation)) {
         throw new ApiError(400, "invalid_metric", "Selecione um campo numérico.");
       }
       const type = await primaryEntryType(client, challengeId);
@@ -219,7 +436,12 @@ export async function addMetric(
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,2,$9,$10,$11::jsonb,$12,now(),now())`,
       [id, challengeId, entryTypeId, fieldId, semanticKey(body.key ?? label, `metrica_${positionRow?.position ?? 0}`),
         label, operation, groupBy, visibleDuring, positionRow?.position ?? 0,
-        JSON.stringify({ visibleInResults }), session.user.id],
+        JSON.stringify({
+          visibleInResults,
+          ...(Number.isFinite(minSample) && minSample > 0 ? { minSample: Math.floor(minSample) } : {}),
+          ...(Number.isFinite(bayesPriorWeight) && bayesPriorWeight >= 0 ? { bayesPriorWeight } : {}),
+        }),
+        session.user.id],
     );
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
       "metric.created", "challenge_metric", id, null, { label, operation, fieldId });
@@ -254,7 +476,7 @@ export async function curateResults(
     }
     const availableMetrics = await client.query<MetricRow>(
       `SELECT id,challenge_id,entry_type_id,field_id,semantic_key,label,operation,group_by,
-              decimal_places,visible_during_challenge,position
+              decimal_places,visible_during_challenge,position,settings
          FROM challenge_metrics WHERE challenge_id=$1 AND archived_at IS NULL
           AND ($2::text[] = '{}'::text[] OR id=ANY($2::text[])) ORDER BY position`,
       [challengeId, metricIds],
