@@ -56,7 +56,10 @@ export const challengeItems = pgTable(
     id: text("id").primaryKey(),
     challengeId: text("challenge_id").notNull(),
     checkpointId: text("checkpoint_id"),
-    entryTypeId: text("entry_type_id").notNull(),
+    // A round item is now type-agnostic: it names the film in this round; the
+    // entry carries the entry type ("registro", "expectativa"…). Legacy rows keep
+    // their value, new cine items are inserted NULL.
+    entryTypeId: text("entry_type_id"),
     catalogItemId: text("catalog_item_id").references(() => catalogItems.id, { onDelete: "restrict" }),
     recommendedByUserId: text("recommended_by_user_id").references(() => users.id, { onDelete: "set null" }),
     semanticKey: text("semantic_key").notNull(),
@@ -72,11 +75,7 @@ export const challengeItems = pgTable(
   },
   (table) => [
     unique("challenge_items_challenge_key_unique").on(table.challengeId, table.semanticKey),
-    unique("challenge_items_id_challenge_type_unique").on(
-      table.id,
-      table.challengeId,
-      table.entryTypeId,
-    ),
+    unique("challenge_items_id_challenge_unique").on(table.id, table.challengeId),
     foreignKey({
       name: "challenge_items_checkpoint_challenge_fk",
       columns: [table.checkpointId, table.challengeId],

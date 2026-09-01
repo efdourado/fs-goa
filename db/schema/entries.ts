@@ -61,12 +61,12 @@ export const entries = pgTable(
       foreignColumns: [entryTypes.id, entryTypes.challengeId, entryTypes.submissionMode],
     }).onDelete("restrict"),
     foreignKey({
-      name: "entries_item_challenge_type_fk",
-      columns: [table.itemId, table.challengeId, table.entryTypeId],
-      foreignColumns: [challengeItems.id, challengeItems.challengeId, challengeItems.entryTypeId],
+      name: "entries_item_challenge_fk",
+      columns: [table.itemId, table.challengeId],
+      foreignColumns: [challengeItems.id, challengeItems.challengeId],
     }).onDelete("restrict"),
     uniqueIndex("entries_one_active_item_response_uidx")
-      .on(table.itemId, table.participantUserId)
+      .on(table.itemId, table.entryTypeId, table.participantUserId)
       .where(sql`${table.itemId} is not null and ${table.deletedAt} is null`),
     uniqueIndex("entries_one_active_daily_response_uidx")
       .on(
