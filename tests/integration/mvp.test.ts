@@ -585,8 +585,11 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
   });
   assert.equal(readingCopy.response.status, 201, JSON.stringify(readingCopy.body));
   const readingCopyId = (readingCopy.body as { id: string }).id;
-  const copiedReading = await adminPool.query<{ group_id: string; mode: string; checkpoints: number; participants: number; entries: number }>(
-    `SELECT c.group_id,
+  const copiedReading = await adminPool.query<{
+    group_id: string; mode: string; recipe_key: string | null; start_date: string | null;
+    checkpoints: number; participants: number; entries: number;
+  }>(
+    `SELECT c.group_id, c.recipe_key, c.start_date::text AS start_date,
             (SELECT submission_mode FROM entry_types WHERE challenge_id=c.id AND archived_at IS NULL LIMIT 1) AS mode,
             (SELECT count(*)::int FROM challenge_checkpoints WHERE challenge_id=c.id AND archived_at IS NULL) AS checkpoints,
             (SELECT count(*)::int FROM challenge_participants WHERE challenge_id=c.id) AS participants,
@@ -597,7 +600,11 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
   assert.deepEqual(copiedReading.rows[0], {
     group_id: targetGroupId,
     mode: "daily",
-    checkpoints: 2,
+    recipe_key: "reading_daily",
+    // The copy starts undated: the schedule is relative, so checkpoints regenerate
+    // when the admin picks new dates.
+    start_date: null,
+    checkpoints: 0,
     participants: 0,
     entries: 0,
   }, "um desafio de leitura pode ser reutilizado estruturalmente em outro grupo");
