@@ -14,9 +14,6 @@ export function Footer() {
           <Link className={linkClass} href="/sobre">{t("about")}</Link>
           <Link className={linkClass} href="/modelos">{t("templates")}</Link>
           <Link className={linkClass} href="/feedback">{t("feedback")}</Link>
-          <a className={linkClass} href="https://instagram.com/efdourado" target="_blank" rel="noreferrer">
-            @efdourado
-          </a>
         </nav>
       </div>
     </footer>
