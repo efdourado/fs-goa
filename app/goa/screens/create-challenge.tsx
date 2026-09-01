@@ -172,7 +172,7 @@ export function CreateChallengeScreen({
           <div>
             <h2 className="text-xl font-light">{t("checkpointsTitle")}</h2>
             {tracksCatalog ? (
-              <><p className="mt-1 mb-4 text-sm leading-6 text-[var(--muted)]">{tracksCatalog === "book" ? t("bookItemsHint") : t("cineItemsHint")}</p><CineItemsEditor value={cineItems} onChange={setCineItems} members={group.members ?? []} groupId={group.id} /><p className="mt-3 text-xs font-semibold text-[var(--muted)]">{t("itemsCount", { count: itemInputs.length })}</p></>
+              <><p className="mt-1 mb-4 text-sm leading-6 text-[var(--muted)]">{tracksCatalog === "book" ? t("bookItemsHint") : t("cineItemsHint")}</p><CineItemsEditor value={cineItems} onChange={setCineItems} members={group.members ?? []} groupId={group.id} kind={tracksCatalog === "book" ? "book" : "film"} /><p className="mt-3 text-xs font-semibold text-[var(--muted)]">{t("itemsCount", { count: itemInputs.length })}</p></>
             ) : scheduleMode === "period" ? (
               <div className="mt-5 rounded-2xl border border-[var(--ok-line)] bg-[var(--ok-soft)] p-5"><strong className="text-[var(--ok)]">{t("dailyTitle")}</strong><p className="mt-2 text-sm leading-6 text-[var(--ok)]">{t("dailyBody", { start: f.date(startsOn), end: f.date(endsOn) })}</p></div>
             ) : (

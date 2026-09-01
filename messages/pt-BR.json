@@ -346,7 +346,8 @@
     "loadingCatalog": "Carregando o acervo…",
     "emptyCatalog": "O acervo do grupo ainda está vazio. Os filmes que você adicionar aqui passam a fazer parte dele.",
     "alreadyAdded": "já na lista",
-    "roundsCount": "{count, plural, =0 {novo} one {# rodada} other {# rodadas}}"
+    "roundsCount": "{count, plural, =0 {novo} one {# rodada} other {# rodadas}}",
+    "pages": "Páginas"
   },
   "createChallenge": {
     "errPickTemplate": "Escolha um modelo e preencha o título.",
