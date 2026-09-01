@@ -15,6 +15,14 @@ import {
   type FieldDefinition,
   validateFieldValue,
 } from "../../validation";
+import {
+  cardinalityOf,
+  entryTypeById,
+  primaryEntryType,
+  purposeOf,
+  schedulePolicyOf,
+  targetPolicyOf,
+} from "./entry-types";
 import { fieldsForChallenge } from "./fields";
 import type { FieldRow } from "./types";
 
@@ -151,11 +159,12 @@ export async function listEntries(session: SessionContext, challengeId: string) 
       throw new ApiError(403, "forbidden", "Você não participa deste desafio.");
     }
     const result = await client.query<{
-      id: string; item_id: string | null; participant_user_id: string; display_name: string;
+      id: string; item_id: string | null; checkpoint_id: string | null; entry_type_id: string;
+      participant_user_id: string; display_name: string;
       username: string; occurred_on: string; submitted_at: Date; updated_at: Date;
     }>(
-      `SELECT e.id,e.item_id,e.participant_user_id,u.display_name,u.username,e.occurred_on::text AS occurred_on,
-              e.submitted_at,e.updated_at
+      `SELECT e.id,e.item_id,e.checkpoint_id,e.entry_type_id,e.participant_user_id,u.display_name,u.username,
+              e.occurred_on::text AS occurred_on,e.submitted_at,e.updated_at
          FROM entries e JOIN users u ON u.id=e.participant_user_id
         WHERE e.challenge_id=$1 AND e.deleted_at IS NULL
           AND ($2::boolean OR e.participant_user_id=$3)
@@ -171,8 +180,9 @@ export async function listEntries(session: SessionContext, challengeId: string) 
     const checkpointByDay = new Map(checkpoints.rows.map((checkpoint) => [checkpoint.day, checkpoint.id]));
     return result.rows.map((entry) => ({
       id: entry.id,
-      itemId: entry.item_id ?? checkpointByDay.get(entry.occurred_on) ?? null,
-      checkpointId: checkpointByDay.get(entry.occurred_on) ?? null,
+      itemId: entry.item_id ?? entry.checkpoint_id ?? checkpointByDay.get(entry.occurred_on) ?? null,
+      checkpointId: entry.checkpoint_id ?? checkpointByDay.get(entry.occurred_on) ?? null,
+      entryTypeId: entry.entry_type_id,
       participantId: entry.participant_user_id,
       userId: entry.participant_user_id,
       participantName: entry.display_name,
@@ -199,96 +209,119 @@ export async function saveEntry(
       [challengeId, participantId]);
     if (!participant) throw new ApiError(403, "forbidden", "Usuário não participa deste desafio.");
     const entryType = typeof body.entryTypeId === "string"
-      ? await oneOrNull<{ id: string; submission_mode: "item" | "daily" | "free" }>(client,
-          "SELECT id,submission_mode FROM entry_types WHERE id=$1 AND challenge_id=$2 AND archived_at IS NULL",
-          [body.entryTypeId, challengeId])
-      : await oneOrNull<{ id: string; submission_mode: "item" | "daily" | "free" }>(client,
-          "SELECT id,submission_mode FROM entry_types WHERE challenge_id=$1 AND archived_at IS NULL ORDER BY created_at LIMIT 1",
-          [challengeId]);
+      ? await entryTypeById(client, challengeId, body.entryTypeId)
+      : await primaryEntryType(client, challengeId);
     if (!entryType) throw new ApiError(400, "invalid_entry_type", "Tipo de registro inválido.");
+    const challengeHasPeriod =
+      access.challenge.start_date !== null && access.challenge.end_date !== null;
+    const targetPolicy = targetPolicyOf(entryType);
+    const cardinality = cardinalityOf(entryType);
+    const schedulePolicy = schedulePolicyOf(entryType, challengeHasPeriod);
+    // A recipe can ask for checkpoints, but an undated round has none — those
+    // entries just carry a free date, like Cine Livre.
+    const effectiveSchedule =
+      schedulePolicy === "checkpoint" && !challengeHasPeriod ? "while_active" : schedulePolicy;
+
     let itemId: string | null = null;
+    let checkpointId: string | null = null;
     let occurredOn: string;
     const today = dateKeyInTimeZone(new Date(), access.challenge.time_zone);
-    if (entryType.submission_mode === "item") {
-      if (typeof body.itemId !== "string") throw new ApiError(400, "missing_item", "Selecione um item.");
-      // The item is type-agnostic now — any of the challenge's entry types can
-      // record against the same film (an expectation and a rating coexist).
-      const item = await oneOrNull<{ id: string }>(client,
-        "SELECT id FROM challenge_items WHERE id=$1 AND challenge_id=$2 AND archived_at IS NULL",
-        [body.itemId, challengeId]);
-      if (!item) throw new ApiError(400, "invalid_item", "Item não pertence ao desafio.");
-      itemId = item.id;
+
+    if (effectiveSchedule !== "checkpoint") {
+      const requestedItemId =
+        typeof body.itemId === "string" && body.itemId ? body.itemId : null;
+      if (targetPolicy === "required" && !requestedItemId) {
+        throw new ApiError(400, "missing_item", "Selecione um item.");
+      }
+      // The round item is type-agnostic: expectation and rating both point at it.
+      if (targetPolicy !== "none" && requestedItemId) {
+        const item = await oneOrNull<{ id: string }>(client,
+          "SELECT id FROM challenge_items WHERE id=$1 AND challenge_id=$2 AND archived_at IS NULL",
+          [requestedItemId, challengeId]);
+        if (!item) throw new ApiError(400, "invalid_item", "Item não pertence ao desafio.");
+        itemId = item.id;
+      }
       occurredOn = typeof body.occurredOn === "string" ? dateString(body.occurredOn, "Data") : today;
       if (occurredOn > today) {
-        throw new ApiError(409, "watch_in_future", "A data assistida pode ser hoje ou uma data passada.");
+        throw itemId
+          ? new ApiError(409, "watch_in_future", "A data assistida pode ser hoje ou uma data passada.")
+          : new ApiError(409, "checkin_in_future", "O check-in pode ser de hoje ou de uma data passada.");
       }
-    } else if (entryType.submission_mode === "daily") {
+    } else {
       const requestedDay = typeof body.occurredOn === "string" ? dateString(body.occurredOn, "Data") : null;
       const requestedCheckpointId = typeof body.itemId === "string" || typeof body.checkpointId === "string"
         ? String(body.itemId ?? body.checkpointId) : null;
-      if (access.challenge.start_date === null || access.challenge.end_date === null) {
-        if (requestedCheckpointId) {
-          throw new ApiError(400, "invalid_checkpoint", "Desafios sem prazo não usam checkpoints fixos.");
-        }
-        occurredOn = requestedDay ?? today;
-        if (occurredOn > today) {
-          throw new ApiError(409, "checkin_in_future", "O check-in pode ser de hoje ou de uma data passada.");
-        }
-      } else {
-        const checkpoint = requestedCheckpointId
-          ? await oneOrNull<{ day: string; starts_at: Date }>(client,
-              `SELECT (starts_at AT TIME ZONE 'America/Sao_Paulo')::date::text AS day,starts_at
-                 FROM challenge_checkpoints WHERE id=$1 AND challenge_id=$2 AND archived_at IS NULL`,
-              [requestedCheckpointId, challengeId])
-          : requestedDay
-            ? await oneOrNull<{ day: string; starts_at: Date }>(client,
-                `SELECT (starts_at AT TIME ZONE 'America/Sao_Paulo')::date::text AS day,starts_at
-                   FROM challenge_checkpoints
-                  WHERE challenge_id=$1 AND archived_at IS NULL
-                    AND (starts_at AT TIME ZONE 'America/Sao_Paulo')::date=$2::date`,
-                [challengeId, requestedDay])
-            : await oneOrNull<{ day: string; starts_at: Date }>(client,
-                `SELECT (starts_at AT TIME ZONE 'America/Sao_Paulo')::date::text AS day,starts_at
-                   FROM challenge_checkpoints
-                  WHERE challenge_id=$1 AND archived_at IS NULL AND starts_at<=now()
-                    AND (due_at IS NULL OR due_at>now()) ORDER BY starts_at DESC LIMIT 1`,
-                [challengeId]);
-        if (!checkpoint) throw new ApiError(400, "invalid_checkpoint", "Checkpoint diário inexistente ou indisponível.");
-        if (checkpoint.starts_at.getTime() > Date.now()) {
-          throw new ApiError(409, "checkpoint_scheduled", "Este checkpoint ainda não foi liberado.");
-        }
-        occurredOn = checkpoint.day;
-        if (occurredOn < access.challenge.start_date || occurredOn > access.challenge.end_date) {
-          throw new ApiError(400, "date_range", "A data está fora do período do desafio.");
-        }
+      const checkpoint = requestedCheckpointId
+        ? await oneOrNull<{ id: string; day: string; starts_at: Date }>(client,
+            `SELECT id,(starts_at AT TIME ZONE 'America/Sao_Paulo')::date::text AS day,starts_at
+               FROM challenge_checkpoints WHERE id=$1 AND challenge_id=$2 AND archived_at IS NULL`,
+            [requestedCheckpointId, challengeId])
+        : requestedDay
+          ? await oneOrNull<{ id: string; day: string; starts_at: Date }>(client,
+              `SELECT id,(starts_at AT TIME ZONE 'America/Sao_Paulo')::date::text AS day,starts_at
+                 FROM challenge_checkpoints
+                WHERE challenge_id=$1 AND archived_at IS NULL
+                  AND (starts_at AT TIME ZONE 'America/Sao_Paulo')::date=$2::date`,
+              [challengeId, requestedDay])
+          : await oneOrNull<{ id: string; day: string; starts_at: Date }>(client,
+              `SELECT id,(starts_at AT TIME ZONE 'America/Sao_Paulo')::date::text AS day,starts_at
+                 FROM challenge_checkpoints
+                WHERE challenge_id=$1 AND archived_at IS NULL AND starts_at<=now()
+                  AND (due_at IS NULL OR due_at>now()) ORDER BY starts_at DESC LIMIT 1`,
+              [challengeId]);
+      if (!checkpoint) throw new ApiError(400, "invalid_checkpoint", "Checkpoint diário inexistente ou indisponível.");
+      if (checkpoint.starts_at.getTime() > Date.now()) {
+        throw new ApiError(409, "checkpoint_scheduled", "Este checkpoint ainda não foi liberado.");
       }
-    } else {
-      occurredOn = typeof body.occurredOn === "string" ? dateString(body.occurredOn, "Data") : today;
+      occurredOn = checkpoint.day;
+      checkpointId = checkpoint.id;
+      if (occurredOn < access.challenge.start_date! || occurredOn > access.challenge.end_date!) {
+        throw new ApiError(400, "date_range", "A data está fora do período do desafio.");
+      }
     }
+
+    // Expectation is a pre-watch note; once the film is rated it stops moving.
+    if (purposeOf(entryType) === "expectation" && itemId) {
+      const rated = await oneOrNull<{ id: string }>(client,
+        `SELECT e.id FROM entries e JOIN entry_types t ON t.id = e.entry_type_id
+          WHERE e.item_id=$1 AND e.participant_user_id=$2 AND e.deleted_at IS NULL
+            AND t.purpose = 'rating' LIMIT 1`,
+        [itemId, participantId]);
+      if (rated) {
+        throw new ApiError(409, "expectation_locked", "A expectativa trava depois que você avalia o filme.");
+      }
+    }
+
     const fields = await storageFields(client, challengeId, entryType.id);
-    const existing = entryType.submission_mode === "item"
+    const existing = cardinality === "once_per_item" && itemId
       ? await oneOrNull<{ id: string }>(client,
           "SELECT id FROM entries WHERE item_id=$1 AND entry_type_id=$2 AND participant_user_id=$3 AND deleted_at IS NULL FOR UPDATE",
           [itemId, entryType.id, participantId])
-      : entryType.submission_mode === "daily"
+      : cardinality === "once_per_item_day" && itemId
         ? await oneOrNull<{ id: string }>(client,
-            `SELECT id FROM entries WHERE challenge_id=$1 AND entry_type_id=$2
+            `SELECT id FROM entries WHERE item_id=$1 AND entry_type_id=$2
               AND participant_user_id=$3 AND occurred_on=$4 AND deleted_at IS NULL FOR UPDATE`,
-            [challengeId, entryType.id, participantId, occurredOn])
-        : null;
+            [itemId, entryType.id, participantId, occurredOn])
+        : cardinality === "once_per_day"
+          ? await oneOrNull<{ id: string }>(client,
+              `SELECT id FROM entries WHERE challenge_id=$1 AND entry_type_id=$2
+                AND participant_user_id=$3 AND occurred_on=$4 AND deleted_at IS NULL FOR UPDATE`,
+              [challengeId, entryType.id, participantId, occurredOn])
+          : null;
     const entryId = existing?.id ?? publicId();
     if (existing) {
       await client.query(
-        "UPDATE entries SET occurred_on=$2,last_edited_by_user_id=$3,updated_at=now(),submitted_at=now() WHERE id=$1",
-        [entryId, occurredOn, session.user.id]);
+        "UPDATE entries SET occurred_on=$2,item_id=$3,checkpoint_id=$4,last_edited_by_user_id=$5,updated_at=now(),submitted_at=now() WHERE id=$1",
+        [entryId, occurredOn, itemId, checkpointId, session.user.id]);
       await client.query("DELETE FROM entry_values WHERE entry_id=$1", [entryId]);
     } else {
       await client.query(
         `INSERT INTO entries
-          (id,challenge_id,entry_type_id,submission_mode,item_id,participant_user_id,occurred_on,
+          (id,challenge_id,entry_type_id,submission_mode,cardinality,item_id,checkpoint_id,participant_user_id,occurred_on,
            submitted_at,created_by_user_id,last_edited_by_user_id,created_at,updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,now(),$8,$8,now(),now())`,
-        [entryId, challengeId, entryType.id, entryType.submission_mode, itemId, participantId, occurredOn, session.user.id],
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,now(),$10,$10,now(),now())`,
+        [entryId, challengeId, entryType.id, entryType.submission_mode, cardinality, itemId, checkpointId,
+          participantId, occurredOn, session.user.id],
       );
     }
     const normalized = await writeEntryValues(client, entryId, challengeId, entryType.id, fields, body.values);
@@ -309,16 +342,28 @@ export async function updateEntry(
   return inTransaction(async (client) => {
     const entry = await oneOrNull<{
       id: string; challenge_id: string; entry_type_id: string; participant_user_id: string;
+      item_id: string | null; purpose: string | null;
       group_id: string; status: "draft" | "active" | "closed";
     }>(client,
-      `SELECT e.id,e.challenge_id,e.entry_type_id,e.participant_user_id,c.group_id,c.status
+      `SELECT e.id,e.challenge_id,e.entry_type_id,e.participant_user_id,e.item_id,t.purpose,c.group_id,c.status
          FROM entries e JOIN challenges c ON c.id=e.challenge_id
+         JOIN entry_types t ON t.id=e.entry_type_id
         WHERE e.id=$1 AND e.deleted_at IS NULL AND c.deleted_at IS NULL FOR UPDATE`, [entryId]);
     if (!entry) throw new ApiError(404, "not_found", "Registro não encontrado.");
     const role = await requireGroupRole(session.user.id, entry.group_id, ["owner", "admin", "participant"], client);
     const canManage = role === "owner" || role === "admin";
     if (!canManage && entry.participant_user_id !== session.user.id) throw new ApiError(404, "not_found", "Registro não encontrado.");
     if (entry.status !== "active") throw new ApiError(409, "challenge_not_active", "O desafio não aceita correções agora.");
+    if (entry.purpose === "expectation" && entry.item_id) {
+      const rated = await oneOrNull<{ id: string }>(client,
+        `SELECT e.id FROM entries e JOIN entry_types t ON t.id = e.entry_type_id
+          WHERE e.item_id=$1 AND e.participant_user_id=$2 AND e.deleted_at IS NULL
+            AND t.purpose = 'rating' LIMIT 1`,
+        [entry.item_id, entry.participant_user_id]);
+      if (rated) {
+        throw new ApiError(409, "expectation_locked", "A expectativa trava depois que você avalia o filme.");
+      }
+    }
     const fields = await storageFields(client, entry.challenge_id, entry.entry_type_id);
     const before = (await entryValues(client, [entryId])).get(entryId) ?? {};
     await client.query("DELETE FROM entry_values WHERE entry_id=$1", [entryId]);
