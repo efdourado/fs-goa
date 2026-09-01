@@ -240,7 +240,6 @@ export function GroupScreen({
           {onDeleteGroup ? (
             <div className="mt-5 border-t border-[var(--line)] pt-4">
               <Button variant="danger" disabled={groupBusy} onClick={() => void deleteGroup()}>{t("deleteGroup")}</Button>
-              <p className="mt-2 text-xs text-[var(--muted)]">{t("deleteHint")}</p>
             </div>
           ) : null}
         </section>
