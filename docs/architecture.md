@@ -2,119 +2,121 @@
 
 ## Visão geral
 
-Aplicação Next.js 16 (App Router) + React 19 + TypeScript. A API REST são route
-handlers no mesmo runtime da interface, todos com runtime Node e renderização
-dinâmica (`force-dynamic`). O PostgreSQL 16+ é a única fonte de verdade. O deploy
-padrão é a Vercel com PostgreSQL do Neon; Docker Compose replica tudo localmente.
+Next.js 16 (App Router) + React 19 + TypeScript. A API REST são route handlers no
+mesmo runtime da interface, todos Node e dinâmicos (`force-dynamic`). PostgreSQL
+16+ é a única fonte de verdade. Deploy padrão: Vercel + Neon; Docker Compose
+replica tudo localmente.
 
 ```text
 navegador ──JSON + cookie HTTP-only──▶ Next.js / route handlers ──SQL parametrizado──▶ PostgreSQL
                                         ├── autenticação, CSRF e autorização
-                                        ├── grupos, convites e desafios
-                                        ├── registros, métricas e resultados
-                                        └── auditoria e exportação
+                                        ├── grupos, convites, acervo
+                                        ├── rodadas: receitas, tipos de registro, registros
+                                        ├── análise, vitrine e auditoria
 ```
 
 ## Limites de módulo
 
 | Arquivo | Responsabilidade |
 | --- | --- |
-| `app/GoaApp.tsx` | estado global, navegação e orquestração da aplicação cliente |
-| `app/goa/` | contrato REST, tipos, componentes e telas organizados por área |
-| `app/api/[...path]/route.ts` | roteamento HTTP fino; nenhuma decisão de autorização na interface |
-| `app/admin/` | página `/admin` (componente de servidor com guarda) + console cliente |
-| `lib/auth.ts` | contas, sessões, rate limit, papéis, redefinição de senha e atualização de conta |
-| `lib/admin.ts` | serviços do painel `/admin` — só metadados (contadores, tamanho, lixeira, auditoria, moderação) |
+| `app/GoaApp.tsx` | estado global, navegação e orquestração da SPA cliente |
+| `app/goa/` | contrato REST (`api.ts`), tipos, telas e componentes |
+| `app/api/[...path]/route.ts` | roteamento HTTP fino; nenhuma decisão de autorização |
+| `app/admin/` | página `/admin` (server component com guarda) + console |
+| `lib/auth.ts` | contas, sessões, rate limit, papéis, redefinição de senha |
+| `lib/admin.ts` | serviços do `/admin` — só metadados |
 | `lib/security.ts` | PBKDF2, tokens, cookies, origem e CSRF |
-| `lib/limits.ts` | limites de criação por dono/grupo (env) |
-| `lib/goa-domain.ts` + `lib/goa/domain/` | fachada e módulos de grupos, convites e criação dos presets |
-| `lib/goa-challenges.ts` + `lib/goa/challenges/` | fachada e módulos de campos, registros, métricas, resultados e duplicação |
+| `lib/goa/domain/` | criação de grupos, convites e desafios |
+| `lib/goa/challenges/` | receitas, tipos de registro, campos, registros, análise, vitrine, duplicação |
+| `lib/goa/catalog.ts` | acervo do grupo e histórico de um item entre rodadas |
+| `lib/goa/analysis.ts` · `lib/metrics.ts` | matemática pura das métricas (bayes, desvio, delta) |
 | `lib/validation.ts` | validação tipada e exportação CSV segura |
-| `db/schema.ts` + `db/schema/` | fachada e 21 tabelas divididas por área do domínio |
+| `db/schema/` | schema Drizzle, dividido por área |
 | `drizzle/` | única fonte de migrações reproduzíveis |
-| `scripts/` | `migrate.mjs` (migrações) e `seed-admin.mjs` (conta de administração) |
 
 ## Modelo de domínio
 
-Grupos são duradouros e contêm desafios. A associação do usuário ao grupo define o
-papel (`owner`, `admin`, `participant`); uma associação separada ao desafio define
-quem envia registros. Cada desafio tem um ou mais tipos de registro, campos
-semânticos estáveis e itens (por objeto) ou checkpoints (por dia).
+```
+Grupo
+├── Acervo — catalog_items (filme/livro), atributos tipados, tags (gênero)
+│              identidade estável entre rodadas
+└── Rodada (challenges) — recipe_key + recipe_version
+    ├── entry_types — 4 eixos ortogonais (o submission_mode fica, derivado):
+    │     purpose (progress·completion·expectation·rating·checkin)
+    │     target_policy (required·optional·none)  — precisa de um round item?
+    │     cardinality (once_per_item·once_per_item_day·once_per_day·repeatable)
+    │     schedule_policy (free·while_active·checkpoint)
+    ├── challenge_items — o filme/livro nesta rodada + catalog_item_id + recommended_by
+    ├── challenge_checkpoints — dias, quando a receita usa checkpoints
+    ├── challenge_fields — campos semânticos por tipo de registro
+    └── entries — participante + tipo + item/checkpoint + occurred_on + entry_values
+```
 
-Números e notas são guardados como inteiros escalados. Campos e opções em uso são
-arquivados, nunca apagados. Métricas referenciam IDs de campos e são recalculadas
-sem modificar os dados de origem. Ao encerrar, blocos de resultado guardam
-snapshots da curadoria; a página pública exige um token aleatório cujo banco
-armazena apenas o hash.
+- **Receitas** (`lib/goa/challenges/recipes.ts`): `cine_free`, `cine_curated`
+  (2 tipos: expectativa + avaliação), `reading_club` (3 tipos: progresso/dia,
+  conclusão, nota), `reading_daily` (check-in). Cada receita abre os tipos de
+  registro, os campos e as métricas de análise — um round novo já gera vitrine
+  completa sem configuração.
+- Um mesmo item aceita **mais de um tipo** de registro por pessoa (unicidade por
+  item × tipo × pessoa; `once_per_item_day` inclui `occurred_on`). A expectativa
+  **trava** assim que existe uma avaliação daquela pessoa para o item.
+- Números e notas são inteiros escalados. Campos e opções em uso são arquivados,
+  nunca apagados.
+- **Métricas** referenciam IDs de campos e são recalculadas sem tocar nos dados.
+  `group_by` produz uma série (ranking por item, recorte por pessoa). Ao encerrar,
+  `result_blocks` guarda snapshots congelados; a página pública exige um token
+  aleatório cujo banco guarda só o hash (rotacionável).
+- **Duplicação** é só estrutural, em transação: desafio, tipos, campos, opções,
+  itens e métricas ganham novos IDs; a receita carrega, a agenda zera, os itens
+  re-resolvem contra o acervo do grupo de destino. Participantes, registros,
+  valores, checkpoints, blocos, tokens e indicadores **nunca** são copiados.
 
 ## Segurança
 
-- senhas nunca são persistidas nem retornadas; PBKDF2-HMAC-SHA256 com 600.000
-  iterações e salt individual via Web Crypto;
-- nome de usuário é NFKC, minúsculo, restrito e único no PostgreSQL;
-- tokens de sessão e convite têm 256 bits; o banco guarda somente SHA-256 base64url;
-- cookie `__Host-goa_session` é `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`;
-- toda mutação autenticada exige `Origin` exata e token CSRF ligado à sessão;
-- toda consulta a recurso privado parte da associação ativa ao grupo — IDs UUID
-  não concedem acesso;
-- participante só altera o próprio registro; a administração é validada no servidor;
-- payload JSON tem limite e campos dinâmicos têm validação estrita;
-- CSV neutraliza células que poderiam virar fórmulas;
-- métricas usam enums, nunca SQL ou fórmulas arbitrárias;
-- duplicação usa allowlist estrutural em transação: desafio, tipos, checkpoints,
-  itens, campos, opções e métricas ganham novos IDs; participantes, registros,
-  valores, resultados, convites e tokens nunca são copiados;
-- auditoria append-only registra correções e transições, sem senha ou token;
-- login tem limite persistente por nome de usuário normalizado.
+- senhas nunca persistidas nem retornadas; PBKDF2-HMAC-SHA256, 600.000 iterações,
+  salt individual via Web Crypto;
+- nome de usuário NFKC, minúsculo, restrito, único no PostgreSQL;
+- tokens de sessão e convite de 256 bits; o banco guarda só SHA-256 base64url;
+- cookie `__Host-goa_session` — `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`;
+- toda mutação autenticada exige `Origin` exata + token CSRF ligado à sessão;
+- toda consulta a recurso privado parte da associação ativa ao grupo — IDs não
+  concedem acesso; participante só altera o próprio registro;
+- payload JSON limitado, campos dinâmicos com validação estrita, CSV neutraliza
+  células-fórmula, métricas usam enums (nunca SQL nem fórmula arbitrária);
+- auditoria append-only registra correções e transições, sem senha nem token;
+- `platform_admin` é um flag separado, sem poder sobre grupos — só abre `/admin`.
 
-Cobertura automatizada: `tests/security.test.ts`, `tests/validation.test.ts`,
-`tests/metrics.test.ts` e `tests/integration/mvp.test.ts` (contas distintas,
-convite, CSRF negativo, ocultação de rascunho, isolamento entre grupos, registro
-por item e por dia, exportação, encerramento, vitrine e duplicação com
-texto-canário).
+Cobertura: `tests/{security,validation,metrics,analysis}.test.ts` e
+`tests/integration/mvp.test.ts` (contas distintas, convite, CSRF negativo,
+isolamento entre grupos, o cenário dos dois livros no mesmo dia, Cine Curadoria,
+motor de análise, vitrine gerada, memória do acervo, duplicação com texto-canário).
 
 ## Operação
 
-`npm run db:setup` (migração + conta de administração) roda uma vez por schema novo,
-contra o banco de destino. Nenhuma rota acessa o banco em tempo de build, então o
-build da Vercel não precisa de `DATABASE_URL`. No Compose, o serviço `setup` roda
-antes de `app`; o PostgreSQL tem healthcheck e volume nomeado. `GET /api/health`
-verifica processo e banco.
+`npm run db:setup` (migração + conta de administração) roda uma vez por schema
+novo, contra o banco de destino. Nenhuma rota acessa o banco em build. No Compose,
+o serviço `setup` roda antes de `app`. `GET /api/health` verifica processo e banco.
 
-`DATABASE_URL`, `APP_ORIGIN` e `ADMIN_PASSWORD` são segredos do runtime (variáveis
-de ambiente da Vercel ou do provedor) e nunca entram no repositório nem na imagem.
+`DATABASE_URL`, `APP_ORIGIN` e `ADMIN_PASSWORD` são segredos do runtime — nunca no
+repositório nem na imagem. A migração usa a URL **direta** do Neon; a aplicação, a
+**pooled**.
 
 ## Decisões
 
-**Runtime.** Next.js 16 puro (sem Vite/adapters). API como route handlers Node,
-sempre dinâmicos. Deploy na Vercel por `git push`; a mesma imagem roda em qualquer
-contêiner Node. A aplicação não acessa o banco sem `DATABASE_URL`.
+- **Runtime** — Next.js 16 puro, sem Vite/adapters. Deploy por `git push`; a
+  mesma imagem roda em qualquer contêiner Node.
+- **Persistência** — Postgres + Drizzle; JSONB restrito a metadados e snapshots;
+  FKs compostas garantem que participante, campo, item e opção pertençam ao mesmo
+  escopo; transações cobrem convite, registro, encerramento e duplicação.
+- **Identidade** — contas com usuário e senha, e-mail opcional (login por ambos;
+  habilita a redefinição por token de uso único). Autorização sempre a partir da
+  associação ativa ao grupo. Identidade de terceiros cabe depois sem mudar o
+  domínio.
+- **`submission_mode`** — mantido como coluna derivada por compatibilidade com o
+  FK e os CHECKs de `entries`; os 4 eixos ortogonais é que mandam.
 
-**Persistência.** PostgreSQL + Drizzle para schema e migrações. Relações privadas,
-papéis, histórico e auditoria normalizados; JSONB restrito a metadados e snapshots.
-FKs compostas garantem que participante, campo, item e opção pertençam ao mesmo
-escopo. Transações cobrem convite, registro, encerramento e duplicação.
+## Fora de escopo por enquanto
 
-**Identidade.** Contas com nome, usuário e senha; e-mail opcional. O login aceita
-usuário **ou** e-mail; o e-mail também habilita a redefinição de senha por token de
-uso único (`password_reset_tokens`, só o hash é guardado; entrega mediada pelo
-administrador hoje). Sessões e convites por tokens opacos armazenados só por hash.
-Autorização sempre a partir da associação ativa ao grupo; IDs aleatórios reduzem
-enumeração mas não substituem autorização. `platform_admin` é um flag separado, sem
-poder sobre grupos — só abre o painel de operação `/admin`. Identidade de terceiros
-pode ser adicionada depois sem mudar o domínio.
-
-## Roadmap e fora do MVP
-
-Próximos caminhos: **interface bilíngue** (inglês + português, i18n); **dark mode**;
-**entrega automática de e-mail** para a redefinição de senha (hoje é mediada pelo
-administrador via `/admin`).
-
-Ainda fora: transferência explícita de ownership com confirmação;
-backup/restauração guiados para administradores do ambiente; mediana e dispersão
-nas métricas; reagendamento em lote de itens ao duplicar; sequência diária e melhor
-semana para o piloto de leitura; templates entre grupos com consentimento do autor;
-upload de fotos e vídeos.
-
-Antes de hospedagem ampla: backups, rotação do segredo do banco e TLS do provedor;
-o rate limit por usuário não substitui proteção de borda.
+App mobile nativo; feed social entre grupos; import direto de `.xlsx`; editor
+no-code genérico; afinidade nominal publicada sem consentimento; recalcular
+retroativamente uma vitrine publicada.

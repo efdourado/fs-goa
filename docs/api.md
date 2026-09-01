@@ -29,7 +29,7 @@ Toda resposta é JSON `no-store` com `x-content-type-options: nosniff` e
 | Método · rota | Acesso | Corpo | Retorna |
 | --- | --- | --- | --- |
 | `GET /api/health` | público | — | `{ ok, database }` (ping no PostgreSQL) |
-| `GET /api/bootstrap` | público | — | `{ csrfToken, user, limits, groups, challenges }`. `user` é `null` quando deslogado |
+| `GET /api/bootstrap` | público | — | `{ csrfToken, user, limits, groups, challenges, memberRequests }`. `user` é `null` quando deslogado |
 
 ## Autenticação e conta
 
@@ -53,13 +53,17 @@ Toda resposta é JSON `no-store` com `x-content-type-options: nosniff` e
 | `POST /api/groups/:id/invites` | sessão+csrf (owner/admin) | `{ expiresInDays?, maxUses?, challengeId? }` | `201 { id, token, url, kind, groupId, groupName, challengeId, challengeTitle, expiresAt, maxUses }`. Com `challengeId`, o alvo deve pertencer ao grupo e não pode estar encerrado |
 | `POST /api/groups/:id/challenges` | sessão+csrf (owner/admin) | ver "criar desafio" abaixo | `201 { id, challengeId, status: "draft" }`. `403 challenge_limit` ao passar de `MAX_CHALLENGES_PER_GROUP` (6) |
 
-Criar desafio: `{ title, description?, ruleSections?: [{ title, description }], startsOn?, endsOn?, submissionMode:
-"item"|"daily"|"free", template?, fields[], items[], generateDaily?, participantIds[] }`.
+Criar desafio: `{ recipe: "cine_free"|"cine_curated"|"reading_club"|"reading_daily",
+title, description?, meetingUrl?, ruleSections?: [{ title, description }], startsOn?,
+endsOn?, fields[], items[], generateDaily?, participantIds[] }`. A receita abre os
+tipos de registro, os campos e as métricas de análise; `fields` sobrescreve os
+campos do tipo primário. Clientes antigos ainda podem enviar
+`template: "cine"|"reading"` ou `submissionMode` cru.
 
-`startsOn` e `endsOn` formam um período opcional: devem ser enviados juntos ou
-omitidos juntos (`null` também remove ambos durante o rascunho). O período aceita
-datas passadas; a única relação temporal obrigatória é `endsOn >= startsOn`.
-Desafios sem período não expiram automaticamente e são encerrados manualmente.
+`startsOn` e `endsOn` formam um período opcional: enviados juntos ou omitidos
+juntos (`null` também remove ambos no rascunho). Aceita datas passadas; a única
+relação obrigatória é `endsOn >= startsOn`. Sem período o desafio não expira e é
+encerrado manualmente.
 
 ## Convites
 
@@ -72,20 +76,21 @@ Desafios sem período não expiram automaticamente e são encerrados manualmente
 
 | Método · rota | Acesso | Corpo | Retorna / efeito |
 | --- | --- | --- | --- |
-| `GET /api/challenges/:id` | sessão (membro do grupo) | — | Detalhe completo: campos, itens, participantes, métricas, resultado. Rascunho só para owner/admin |
+| `GET /api/challenges/:id` | sessão (membro do grupo) | — | Detalhe: `recipeKey`, `entryTypes[]` (cada um com `purpose`/`fields`), `fields` (do tipo primário), `items`, `participants`, `metrics` (com `series` quando `groupBy != none`), `result`. Rascunho só para owner/admin |
 | `PATCH /api/challenges/:id` | sessão+csrf (owner/admin) | `{ title?, description?, ruleSections?: [{ title, description }], startsOn?: string\|null, endsOn?: string\|null }` | desafio atualizado; a agenda só muda no rascunho e início/término devem ser enviados ou removidos em par |
 | `DELETE /api/challenges/:id` | sessão+csrf (owner/admin) | — | `200 { id, deleted: true }` — lixeira |
 | `POST /api/challenges/:id/participants` | sessão+csrf (owner/admin) | `{ replace: true, participantIds[] }` | participantes ativos |
-| `POST /api/challenges/:id/fields` | sessão+csrf (owner/admin) | `{ replace, archiveMissing, fields[] }` | `201` — campos em uso são arquivados, nunca apagados |
+| `POST /api/challenges/:id/fields` | sessão+csrf (owner/admin) | `{ entryTypeId?, replace, archiveMissing, fields[] }` | `201` — `entryTypeId` escolhe o tipo de registro (default: o primário); campos em uso são arquivados, nunca apagados |
 | `POST /api/challenges/:id/items` | sessão+csrf (owner/admin) | itens (por objeto) ou `{ generate: { frequency, startsOn, endsOn } }` (diário com período) | `201`; no diário sem prazo os check-ins são criados sob demanda pelo endpoint de registros |
-| `PATCH /api/challenges/:id/items/:itemId` | sessão+csrf (owner/admin) | `{ title?, description? }` | item/checkpoint atualizado sem trocar o identificador; bloqueado após o encerramento |
-| `POST /api/challenges/:id/metrics` | sessão+csrf (owner/admin) | `{ operation, fieldKey?, label, ... }` | `201` — só enums (`sum`, `average`, `count`, `min`, `max`, `completion_rate`) |
-| `POST /api/challenges/:id/entries` | sessão+csrf (participante) | `{ itemId?/checkpointId?, occurredOn?, values }` | `201` — um registro ativo por item/dia; no diário sem prazo, `occurredOn` usa hoje por padrão, aceita hoje ou uma data passada e cria ou atualiza diretamente o check-in do participante naquele dia, sem persistir um checkpoint |
-| `POST /api/challenges/:id/transition` | sessão+csrf (owner/admin) | `{ status: "active" \| "closed" }` | `draft→active→closed`; encerrar congela os dados e gera blocos de resultado; desafios sem prazo só terminam por este encerramento manual |
+| `PATCH /api/challenges/:id/items/:itemId` | sessão+csrf (owner/admin) | `{ title?, description?, recommendedByUserId? }` | item/checkpoint atualizado sem trocar o identificador; bloqueado após o encerramento |
+| `DELETE /api/challenges/:id/items/:itemId` | sessão+csrf (owner/admin) | — | arquiva um item sem registros; `409 item_has_data` se já houver registros |
+| `POST /api/challenges/:id/metrics` | sessão+csrf (owner/admin) | `{ operation, fieldId?, groupBy?, label, minSample?, bayesPriorWeight?, ... }` | `201` — só enums: `sum` `average` `count` `min` `max` `completion_rate` `bayesian_average` `spread` `surprise` `indicator_bias` |
+| `POST /api/challenges/:id/entries` | sessão+csrf (participante) | `{ itemId?/checkpointId?, entryTypeId?, occurredOn?, values }` | `201` — cardinalidade e alvo vêm do tipo de registro; `entryTypeId` escolhe o tipo (default: o primário). `409 expectation_locked` ao editar a expectativa depois de avaliar; `409 watch_in_future` para data futura |
+| `POST /api/challenges/:id/transition` | sessão+csrf (owner/admin) | `{ status: "active" \| "closed" }` | `draft→active→closed`; encerrar congela os dados e **gera a vitrine** (hero, KPIs, ranking, perfis, comentários) |
 | `POST /api/challenges/:id/duplicate` | sessão+csrf (owner/admin nos dois grupos) | `{ title?, targetGroupId }` | `201` — cria um rascunho estrutural em outro grupo; nunca copia participantes, registros, resultados, convites ou tokens |
 | `POST /api/challenges/:id/template` | sessão+csrf (platform_admin + owner/admin do desafio) | `{ summary? }` | `200 { id, publishedAsTemplate: true, summary }` — publica o desafio na vitrine pública de modelos |
 | `DELETE /api/challenges/:id/template` | sessão+csrf (platform_admin + owner/admin do desafio) | — | `200 { id, publishedAsTemplate: false }` |
-| `POST /api/challenges/:id/results` | sessão+csrf (owner/admin) | `{ headline?, summary?, metricIds[], commentKeys[], publish? }` | curadoria da vitrine; ao publicar retorna `url` pública |
+| `POST /api/challenges/:id/results` | sessão+csrf (owner/admin) | `{ headline?, summary?, metricIds[], comments[], publish? }` **ou** `{ regenerate: true }` | curadoria manual da vitrine ou regeneração a partir dos dados atuais; ao publicar retorna `url` pública |
 | `GET /api/challenges/:id/entries` | sessão (owner/admin) | — | `{ entries: [...] }` para a revisão |
 | `GET /api/challenges/:id/export.csv` | sessão (owner/admin) | — | `text/csv`; células que virariam fórmula são neutralizadas |
 
@@ -93,7 +98,15 @@ Desafios sem período não expiram automaticamente e são encerrados manualmente
 
 | Método · rota | Acesso | Corpo | Efeito |
 | --- | --- | --- | --- |
-| `PATCH /api/entries/:id` | sessão+csrf | `{ values, reason? }` | Correção. Participante só altera o próprio; owner/admin corrigem com `reason` que vai para a auditoria |
+| `PATCH /api/entries/:id` | sessão+csrf | `{ values, reason? }` | Correção. Participante só altera o próprio; owner/admin corrigem com `reason` que vai para a auditoria. `409 expectation_locked` se a expectativa já foi travada por uma avaliação |
+
+## Acervo
+
+| Método · rota | Acesso | Retorna / efeito |
+| --- | --- | --- |
+| `GET /api/groups/:id/catalog` | sessão (membro) | `{ items: [{ id, kind, title, year, genres, roundCount, ratingAvg, ratingCount }] }` — a média histórica cobre as rodadas visíveis do grupo |
+| `GET /api/groups/:id/catalog/:itemId` | sessão (membro) | o item + `rounds: [{ challengeId, title, status, startsOn, endsOn, recommendedBy, ratingAvg, ratingCount }]` |
+| `PATCH /api/catalog/:itemId` | sessão+csrf (owner/admin) | `{ title?, year?, runtimeMinutes?, pageCount?, genres? }` — atributos e tags do item; afeta todas as rodadas |
 
 ## Resultados
 
