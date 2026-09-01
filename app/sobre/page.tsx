@@ -25,7 +25,7 @@ export default async function AboutPage() {
         </div>
       </header>
       <main className="mx-auto max-w-3xl px-4 py-12 sm:px-6 sm:py-16">
-        <h1 className="text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">{t("title")}</h1>
+        <h1 className="text-4xl font-medium tracking-[-0.045em] sm:text-5xl">{t("title")}</h1>
         <p className="mt-4 text-lg leading-8 text-[var(--muted)]">{t("lede")}</p>
         <div className="mt-8 space-y-5 text-base leading-8">
           {paragraphs.map((paragraph, index) => (

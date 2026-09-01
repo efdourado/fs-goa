@@ -42,6 +42,8 @@ export interface GroupSummary {
   id: Id;
   name: string;
   description?: string | null;
+  /** `personal` is the hidden solo workspace — never shown as a group in the UI. */
+  kind?: "standard" | "personal";
   role: Role;
   memberCount?: number;
   members?: Member[];
@@ -78,6 +80,7 @@ export interface CatalogItem {
   id: Id;
   kind: "film" | "book" | "other";
   title: string;
+  author?: string | null;
   year?: number | null;
   runtimeMinutes?: number | null;
   pageCount?: number | null;
@@ -113,7 +116,7 @@ export interface ChallengeItem {
   dueAt?: string | null;
   date?: string | null;
   status?: "scheduled" | "open" | "past_due" | "closed";
-  catalogItem?: Pick<CatalogItem, "id" | "title" | "year" | "runtimeMinutes" | "pageCount" | "genres"> | null;
+  catalogItem?: Pick<CatalogItem, "id" | "title" | "author" | "year" | "runtimeMinutes" | "pageCount" | "genres"> | null;
   recommendedBy?: { id: Id; name: string } | null;
 }
 
@@ -223,7 +226,6 @@ export interface ChallengeSummary {
   groupId: Id;
   title: string;
   description?: string | null;
-  meetingUrl?: string | null;
   rules?: string | null;
   ruleSections?: ChallengeRule[];
   startsOn?: string | null;
@@ -271,6 +273,8 @@ export interface BootstrapData {
   csrfToken: string;
   user: User | null;
   limits: Limits;
+  /** The caller's personal-workspace group id, or null until they create one. */
+  personalWorkspaceId: Id | null;
   groups: GroupSummary[];
   challenges: ChallengeSummary[];
   memberRequests: MemberRequest[];
@@ -356,6 +360,7 @@ export type Screen =
   | { kind: "invite"; token: string }
   | { kind: "invite-success"; invitation: InviteAcceptance }
   | { kind: "create-challenge"; groupId: Id }
+  | { kind: "create-personal-challenge" }
   | { kind: "challenge"; challengeId: Id; tab: ParticipantTab }
   | { kind: "admin"; challengeId: Id; tab: AdminTab }
   | { kind: "templates" }
@@ -365,7 +370,6 @@ export interface ChallengeCreationInput {
   recipe: RecipeKey;
   title: string;
   description: string;
-  meetingUrl: string | null;
   ruleSections: ChallengeRule[];
   startsOn: string | null;
   endsOn: string | null;
@@ -380,7 +384,9 @@ export interface ChallengeItemInput {
   position: number;
   catalogItemId?: Id;
   recommendedByUserId?: Id;
+  author?: string;
   year?: number;
   runtimeMinutes?: number;
+  pageCount?: number;
   genres?: string[];
 }

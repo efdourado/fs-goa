@@ -115,7 +115,7 @@ export function LoadingView({ label }: { label?: string }) {
     <div className="grid min-h-screen place-items-center px-6" role="status" aria-live="polite">
       <div className="text-center">
         <span className="mx-auto mb-4 block h-10 w-10 animate-spin rounded-full border-4 border-[var(--main-line)] border-t-[var(--main)]" aria-hidden="true" />
-        <p className="text-sm font-semibold text-[var(--muted)]">{label ?? t("loadingApp")}</p>
+        <p className="text-sm font-medium text-[var(--muted)]">{label ?? t("loadingApp")}</p>
       </div>
     </div>
   );
@@ -144,7 +144,7 @@ export function PageHeading({
   return (
     <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <h1 className="text-3xl font-semibold tracking-[-0.045em] sm:text-4xl">{title}</h1>
+        <h1 className="text-3xl font-medium tracking-[-0.045em] sm:text-4xl">{title}</h1>
         {description ? <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">{description}</p> : null}
       </div>
       {action}

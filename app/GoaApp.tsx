@@ -318,25 +318,24 @@ export default function GoaApp() {
     setScreen(groupId ? { kind: "group", groupId } : { kind: "dashboard" });
   }
 
-  async function createChallenge(groupId: Id, input: ChallengeCreationInput) {
+  async function createChallenge(target: { groupId: Id } | { personal: true }, input: ChallengeCreationInput) {
     if (!bootstrap) return;
-    const created = await apiRequest<unknown>(API_PATHS.groupChallenges(groupId), {
-      method: "POST",
-      csrfToken: bootstrap.csrfToken,
-      body: {
-        recipe: input.recipe,
-        title: input.title,
-        description: input.description,
-        meetingUrl: input.meetingUrl,
-        ruleSections: input.ruleSections,
-        startsOn: input.startsOn,
-        endsOn: input.endsOn,
-        fields: input.fields,
-        items: input.items,
-        generateDaily: input.generateDaily,
-        participantIds: input.participantIds,
-      },
-    });
+    const body = {
+      recipe: input.recipe,
+      title: input.title,
+      description: input.description,
+      ruleSections: input.ruleSections,
+      startsOn: input.startsOn,
+      endsOn: input.endsOn,
+      fields: input.fields,
+      items: input.items,
+      generateDaily: input.generateDaily,
+      participantIds: input.participantIds,
+    };
+    const created = await apiRequest<unknown>(
+      "personal" in target ? API_PATHS.personalChallenges : API_PATHS.groupChallenges(target.groupId),
+      { method: "POST", csrfToken: bootstrap.csrfToken, body },
+    );
     const challengeId = normalizeCreatedId(created);
     if (!challengeId) throw new Error(t("draftWithoutId"));
 
@@ -466,23 +465,26 @@ export default function GoaApp() {
   } else if (screen.kind === "templates") {
     content = <TemplatesScreen user={user} manageableChallenges={bootstrap.challenges.filter((challenge) => canManage(challenge.viewerRole))} csrfToken={bootstrap.csrfToken} onOpen={(id) => setScreen({ kind: "template", challengeId: id })} onBack={() => setScreen({ kind: "dashboard" })} onSignIn={() => undefined} onChanged={() => { void refreshBootstrap(); }} />;
   } else if (screen.kind === "template") {
-    content = <TemplateDetailScreen key={screen.challengeId} user={user} challengeId={screen.challengeId} groups={bootstrap.groups} csrfToken={bootstrap.csrfToken} autoCopy={resumeTemplateCopy === screen.challengeId} onBack={() => { setResumeTemplateCopy(null); setScreen({ kind: "templates" }); }} onSignIn={() => undefined} onDuplicated={async (result) => { setResumeTemplateCopy(null); await refreshBootstrap(); openAdmin(result.challengeId); }} />;
+    content = <TemplateDetailScreen key={screen.challengeId} user={user} challengeId={screen.challengeId} groups={bootstrap.groups.filter((candidate) => candidate.kind !== "personal")} csrfToken={bootstrap.csrfToken} autoCopy={resumeTemplateCopy === screen.challengeId} onBack={() => { setResumeTemplateCopy(null); setScreen({ kind: "templates" }); }} onSignIn={() => undefined} onDuplicated={async (result) => { setResumeTemplateCopy(null); await refreshBootstrap(); openAdmin(result.challengeId); }} />;
   } else if (screen.kind === "group" && selectedGroup) {
     content = <GroupScreen key={selectedGroup.id} group={selectedGroup} challenges={bootstrap.challenges.filter((challenge) => challenge.groupId === selectedGroup.id)} challengeLimit={bootstrap.limits.challengesPerGroup} pendingRequests={selectedGroup.pendingRequests ?? []} onBack={() => setScreen({ kind: "dashboard" })} onCreateChallenge={() => setScreen({ kind: "create-challenge", groupId: selectedGroup.id })} onOpenChallenge={(id) => openParticipant(id)} onOpenCatalogItem={(itemId) => setScreen({ kind: "catalog-item", groupId: selectedGroup.id, itemId })} onCreateInvite={async (payload) => apiRequest<{ token?: string; url?: string }>(API_PATHS.groupInvites(selectedGroup.id), { method: "POST", body: payload, csrfToken: bootstrap.csrfToken })} onInviteByUsername={(username) => apiRequest<GroupInviteResult>(API_PATHS.groupMembers(selectedGroup.id), { method: "POST", body: { username }, csrfToken: bootstrap.csrfToken })} onCancelRequest={cancelMemberRequest} onUpdateGroup={(payload) => updateGroup(selectedGroup.id, payload)} onDeleteGroup={selectedGroup.role === "owner" ? () => deleteGroup(selectedGroup.id) : undefined} />;
   } else if (screen.kind === "catalog-item" && selectedGroup) {
     content = <CatalogItemScreen key={screen.itemId} groupId={screen.groupId} itemId={screen.itemId} onBack={() => setScreen({ kind: "group", groupId: screen.groupId })} onOpenChallenge={(id) => openParticipant(id)} />;
   } else if (screen.kind === "create-challenge" && selectedGroup && canManage(selectedGroup.role)) {
-    content = <CreateChallengeScreen key={selectedGroup.id} group={selectedGroup} onBack={() => setScreen({ kind: "group", groupId: selectedGroup.id })} onCreate={(input) => createChallenge(selectedGroup.id, input)} />;
+    content = <CreateChallengeScreen key={selectedGroup.id} group={selectedGroup} onBack={() => setScreen({ kind: "group", groupId: selectedGroup.id })} onCreate={(input) => createChallenge({ groupId: selectedGroup.id }, input)} />;
+  } else if (screen.kind === "create-personal-challenge") {
+    const soloGroup = { id: bootstrap.personalWorkspaceId ?? "", name: user.name, kind: "personal" as const, role: "owner" as const, members: [{ ...user, role: "owner" as const }] };
+    content = <CreateChallengeScreen key="personal" personal group={soloGroup} onBack={() => setScreen({ kind: "dashboard" })} onCreate={(input) => createChallenge({ personal: true }, input)} />;
   } else if ((screen.kind === "challenge" || screen.kind === "admin") && (detailLoading || !selectedChallenge || selectedChallenge.id !== screen.challengeId)) {
     content = detailError ? <main className="mx-auto max-w-2xl px-5 py-16"><EmptyState title={t("detailError")} description={detailError} action={<Button onClick={() => retryDetail(screen.challengeId)}>{t("retry")}</Button>} /></main> : <LoadingView label={tc("loadingChallenge")} />;
   } else if (screen.kind === "challenge" && selectedChallenge) {
     content = <ParticipantChallengeScreen key={selectedChallenge.id} challenge={selectedChallenge} entries={entries} user={user} tab={screen.tab} onTab={(tab) => setScreen({ ...screen, tab })} onBack={() => setScreen({ kind: "dashboard" })} onAdmin={canManage(selectedRole) ? () => openAdmin(selectedChallenge.id) : undefined} onSaveEntry={saveEntry} />;
   } else if (screen.kind === "admin" && selectedChallenge && canManage(selectedRole)) {
-    content = <AdminScreen key={selectedChallenge.id} challenge={selectedChallenge} entries={entries} group={selectedGroup} duplicateTargets={bootstrap.groups.filter((candidate) => candidate.id !== selectedChallenge.groupId && canManage(candidate.role)).map((candidate) => ({ id: candidate.id, name: candidate.name, challengeCount: bootstrap.challenges.filter((item) => item.groupId === candidate.id).length, challengeLimit: bootstrap.limits.challengesPerGroup }))} tab={screen.tab} onTab={(tab) => setScreen({ ...screen, tab })} onBack={() => selectedGroup ? setScreen({ kind: "group", groupId: selectedGroup.id }) : setScreen({ kind: "dashboard" })} onViewParticipant={() => setScreen({ kind: "challenge", challengeId: selectedChallenge.id, tab: selectedChallenge.status === "closed" ? "results" : "today" })} onSaveBasics={(payload) => mutateChallenge(API_PATHS.challenge(selectedChallenge.id), payload, "PATCH")} onTransition={(status) => mutateChallenge(API_PATHS.transition(selectedChallenge.id), { status })} onDuplicate={duplicateChallenge} onDelete={canManage(selectedRole) ? () => deleteChallenge(selectedChallenge.id, selectedGroup?.id) : undefined} onSaveParticipants={(participantIds) => mutateChallenge(API_PATHS.participants(selectedChallenge.id), { replace: true, participantIds })} onSaveFields={(entryTypeId, fields) => mutateChallenge(API_PATHS.fields(selectedChallenge.id), { ...(entryTypeId ? { entryTypeId } : {}), replace: true, archiveMissing: true, fields })} onAddItems={(payload) => mutateChallenge(API_PATHS.items(selectedChallenge.id), payload)} onUpdateItem={(itemId, payload) => mutateChallenge(API_PATHS.item(selectedChallenge.id, itemId), payload, "PATCH")} onArchiveItem={(itemId) => mutateChallenge(API_PATHS.item(selectedChallenge.id, itemId), undefined, "DELETE")} onPatchEntry={(entryId, values, reason) => mutateChallenge(API_PATHS.entry(entryId), { values, reason }, "PATCH")} onExport={exportCsv} onAddMetric={(payload) => mutateChallenge(API_PATHS.metrics(selectedChallenge.id), payload)} onSaveResult={(payload) => mutateChallenge(API_PATHS.results(selectedChallenge.id), payload)} onPublishResult={(payload) => mutateChallengeReturning<{ url?: string | null; publishedAt?: string; anonymized?: boolean }>(API_PATHS.resultsPublish(selectedChallenge.id), payload)} onUnpublishResult={() => mutateChallenge(API_PATHS.results(selectedChallenge.id), undefined, "DELETE")} />;
+    content = <AdminScreen key={selectedChallenge.id} challenge={selectedChallenge} entries={entries} group={selectedGroup} duplicateTargets={bootstrap.groups.filter((candidate) => candidate.id !== selectedChallenge.groupId && candidate.kind !== "personal" && canManage(candidate.role)).map((candidate) => ({ id: candidate.id, name: candidate.name, challengeCount: bootstrap.challenges.filter((item) => item.groupId === candidate.id).length, challengeLimit: bootstrap.limits.challengesPerGroup }))} tab={screen.tab} onTab={(tab) => setScreen({ ...screen, tab })} onBack={() => selectedGroup ? setScreen({ kind: "group", groupId: selectedGroup.id }) : setScreen({ kind: "dashboard" })} onViewParticipant={() => setScreen({ kind: "challenge", challengeId: selectedChallenge.id, tab: selectedChallenge.status === "closed" ? "results" : "today" })} onSaveBasics={(payload) => mutateChallenge(API_PATHS.challenge(selectedChallenge.id), payload, "PATCH")} onTransition={(status) => mutateChallenge(API_PATHS.transition(selectedChallenge.id), { status })} onDuplicate={duplicateChallenge} onDelete={canManage(selectedRole) ? () => deleteChallenge(selectedChallenge.id, selectedGroup?.id) : undefined} onSaveParticipants={(participantIds) => mutateChallenge(API_PATHS.participants(selectedChallenge.id), { replace: true, participantIds })} onSaveFields={(entryTypeId, fields) => mutateChallenge(API_PATHS.fields(selectedChallenge.id), { ...(entryTypeId ? { entryTypeId } : {}), replace: true, archiveMissing: true, fields })} onAddItems={(payload) => mutateChallenge(API_PATHS.items(selectedChallenge.id), payload)} onUpdateItem={(itemId, payload) => mutateChallenge(API_PATHS.item(selectedChallenge.id, itemId), payload, "PATCH")} onArchiveItem={(itemId) => mutateChallenge(API_PATHS.item(selectedChallenge.id, itemId), undefined, "DELETE")} onPatchEntry={(entryId, values, reason) => mutateChallenge(API_PATHS.entry(entryId), { values, reason }, "PATCH")} onExport={exportCsv} onAddMetric={(payload) => mutateChallenge(API_PATHS.metrics(selectedChallenge.id), payload)} onSaveResult={(payload) => mutateChallenge(API_PATHS.results(selectedChallenge.id), payload)} onPublishResult={(payload) => mutateChallengeReturning<{ url?: string | null; publishedAt?: string; anonymized?: boolean }>(API_PATHS.resultsPublish(selectedChallenge.id), payload)} onUnpublishResult={() => mutateChallenge(API_PATHS.results(selectedChallenge.id), undefined, "DELETE")} />;
   } else if (screen.kind === "admin" || screen.kind === "create-challenge") {
     content = <main className="mx-auto max-w-2xl px-5 py-16"><EmptyState title={t("adminUnavailableTitle")} description={t("adminUnavailableBody")} action={<Button onClick={() => setScreen({ kind: "dashboard" })}>{t("backToStart")}</Button>} /></main>;
   } else {
-    content = <DashboardScreen user={user} groups={bootstrap.groups} challenges={bootstrap.challenges} limits={bootstrap.limits} onOpenGroup={(groupId) => setScreen({ kind: "group", groupId })} onOpenChallenge={(id) => openParticipant(id)} onOpenAdmin={(id) => openAdmin(id)} onCreateGroup={createGroup} />;
+    content = <DashboardScreen user={user} groups={bootstrap.groups} challenges={bootstrap.challenges} personalWorkspaceId={bootstrap.personalWorkspaceId} limits={bootstrap.limits} onOpenGroup={(groupId) => setScreen({ kind: "group", groupId })} onOpenChallenge={(id) => openParticipant(id)} onOpenAdmin={(id) => openAdmin(id)} onCreateGroup={createGroup} onCreatePersonalChallenge={() => setScreen({ kind: "create-personal-challenge" })} />;
   }
 
   return (

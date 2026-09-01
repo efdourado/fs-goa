@@ -8,24 +8,72 @@ import type { ChallengeSummary, GroupSummary, Id, Limits, User } from "../types"
 import { Button, cardClass, challengeStatusTone, ChallengeStatusBadge, cx, EmptyState, inputClass, labelClass, linkClass, PageHeading, StatusMessage } from "../ui";
 import { canManage, isChallengeScheduled } from "../utils";
 
+function ActiveChallengeCard({
+  challenge,
+  onOpen,
+}: {
+  challenge: ChallengeSummary;
+  onOpen: (id: Id) => void;
+}) {
+  const t = useTranslations("dashboard");
+  const f = useGoaFormat();
+  const tone = challengeStatusTone(challenge.status, challenge.startsOn, challenge.submissionMode);
+  const total = challenge.totalCount ?? 0;
+  const done = challenge.completedCount ?? 0;
+  return (
+    <article className={cx("relative flex flex-col overflow-hidden rounded-[20px] border bg-[var(--paper)] shadow-[var(--elevate-1)] transition hover:-translate-y-0.5 has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-[var(--main)]/25", tone.border)}>
+      <div className="flex flex-1 flex-col p-5">
+        <div className="flex items-center justify-between gap-3"><ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} /><span className="text-xs text-[var(--muted)]">{isChallengeScheduled(challenge.status, challenge.startsOn, challenge.submissionMode) ? t("startsOn", { date: f.date(challenge.startsOn) }) : challenge.endsOn ? t("endsOn", { date: f.date(challenge.endsOn) }) : t("noDeadline")}</span></div>
+        <h3 className="mt-5 text-2xl font-light tracking-[-0.04em]"><button type="button" onClick={() => onOpen(challenge.id)} className="cursor-pointer text-left after:absolute after:inset-0 after:content-[''] focus-visible:outline-none">{challenge.title}</button></h3>
+        {challenge.description ? <p className="mt-2 line-clamp-1 text-sm leading-6 text-[var(--muted)]">{challenge.description}</p> : null}
+        {total > 0 ? (
+          <div className="mt-5">
+            <div className="mb-2 flex justify-between text-xs text-[var(--muted)]"><span>{t("progress", { done, total })}</span><span>{Math.round((done / total) * 100)}%</span></div>
+            <div className="h-2 overflow-hidden rounded-full bg-[var(--wash-strong)]"><span className="block h-full rounded-full bg-[var(--main-2)]" style={{ width: `${Math.min(100, (done / total) * 100)}%` }} /></div>
+          </div>
+        ) : null}
+      </div>
+      <span className={cx("block w-full px-5 py-3.5", tone.solid)} />
+    </article>
+  );
+}
+
+function ArchiveChallengeRow({
+  challenge,
+  onOpen,
+}: {
+  challenge: ChallengeSummary;
+  onOpen: () => void;
+}) {
+  return (
+    <button className={cx(cardClass, "cursor-pointer flex items-center justify-between gap-3 p-4 text-left hover:border-[var(--main-line)]")} type="button" onClick={onOpen}>
+      <span className="flex items-center gap-2"><ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />{challenge.title}</span><span aria-hidden="true">→</span>
+    </button>
+  );
+}
+
 export function DashboardScreen({
   user,
   groups,
   challenges,
+  personalWorkspaceId,
   limits,
   onOpenGroup,
   onOpenChallenge,
   onOpenAdmin,
   onCreateGroup,
+  onCreatePersonalChallenge,
 }: {
   user: User;
   groups: GroupSummary[];
   challenges: ChallengeSummary[];
+  personalWorkspaceId: Id | null;
   limits: Limits;
   onOpenGroup: (id: Id) => void;
   onOpenChallenge: (id: Id) => void;
   onOpenAdmin: (id: Id) => void;
   onCreateGroup: (name: string) => Promise<void>;
+  onCreatePersonalChallenge: () => void;
 }) {
   const t = useTranslations("dashboard");
   const tc = useTranslations("common");
@@ -34,10 +82,25 @@ export function DashboardScreen({
   const [showGroupForm, setShowGroupForm] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const active = challenges.filter((challenge) => challenge.status === "active");
-  const other = challenges.filter((challenge) => challenge.status !== "active");
-  const ownedGroups = groups.filter((group) => group.role === "owner").length;
+
+  const isPersonal = (challenge: ChallengeSummary) =>
+    personalWorkspaceId !== null && challenge.groupId === personalWorkspaceId;
+  const personalChallenges = challenges.filter(isPersonal);
+  const personalActive = personalChallenges.filter((challenge) => challenge.status === "active");
+  const personalOther = personalChallenges.filter((challenge) => challenge.status !== "active");
+
+  const groupChallenges = challenges.filter((challenge) => !isPersonal(challenge));
+  const active = groupChallenges.filter((challenge) => challenge.status === "active");
+  const other = groupChallenges.filter((challenge) => challenge.status !== "active");
+
+  const standardGroups = groups.filter((group) => group.kind !== "personal");
+  const ownedGroups = standardGroups.filter((group) => group.role === "owner").length;
   const atGroupLimit = ownedGroups >= limits.groupsPerOwner;
+
+  function openChallenge(challenge: ChallengeSummary) {
+    if (challenge.status === "draft" && canManage(challenge.viewerRole)) onOpenAdmin(challenge.id);
+    else onOpenChallenge(challenge.id);
+  }
 
   async function createGroup(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -73,14 +136,37 @@ export function DashboardScreen({
         </form>
       ) : null}
 
-      <section aria-labelledby="groups-title">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 id="groups-title" className="text-xl font-semibold tracking-[-0.03em]">{t("groupsTitle")}</h2>
-          <span className="text-xs font-semibold text-[var(--muted)]">{t("groupsCount", { count: groups.length })}</span>
+      <section aria-labelledby="personal-title">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 id="personal-title" className="text-xl font-medium tracking-[-0.03em]">{t("personalTitle")}</h2>
+          <button type="button" className={cx(linkClass, "text-sm")} onClick={onCreatePersonalChallenge}>{t("personalCreate")}</button>
         </div>
-        {groups.length ? (
+        {personalChallenges.length ? (
+          <div className="space-y-6">
+            {personalActive.length ? (
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {personalActive.map((challenge) => <ActiveChallengeCard key={challenge.id} challenge={challenge} onOpen={onOpenChallenge} />)}
+              </div>
+            ) : null}
+            {personalOther.length ? (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {personalOther.map((challenge) => <ArchiveChallengeRow key={challenge.id} challenge={challenge} onOpen={() => openChallenge(challenge)} />)}
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <EmptyState title={t("personalEmptyTitle")} description={t("personalEmptyBody")} action={<Button onClick={onCreatePersonalChallenge}>{t("personalCreate")}</Button>} />
+        )}
+      </section>
+
+      <section className="mt-10" aria-labelledby="groups-title">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 id="groups-title" className="text-xl font-medium tracking-[-0.03em]">{t("groupsTitle")}</h2>
+          <span className="text-xs font-medium text-[var(--muted)]">{t("groupsCount", { count: standardGroups.length })}</span>
+        </div>
+        {standardGroups.length ? (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {groups.map((group) => {
+            {standardGroups.map((group) => {
               const count = group.memberCount ?? group.members?.length ?? 0;
               return (
                 <button className={cx(cardClass, "cursor-pointer flex min-h-24 items-center justify-between gap-4 p-4 text-left transition hover:-translate-y-0.5 hover:border-[var(--main-line)]")} type="button" onClick={() => onOpenGroup(group.id)} key={group.id}>
@@ -100,32 +186,12 @@ export function DashboardScreen({
 
       <section className="mt-10" aria-labelledby="active-title">
         <div className="mb-4 flex items-center justify-between">
-          <h2 id="active-title" className="text-xl font-semibold tracking-[-0.03em]">{t("challengesTitle")}</h2>
-          <span className="text-xs font-semibold text-[var(--muted)]">{t("challengesCount", { count: active.length })}</span>
+          <h2 id="active-title" className="text-xl font-medium tracking-[-0.03em]">{t("challengesTitle")}</h2>
+          <span className="text-xs font-medium text-[var(--muted)]">{t("challengesCount", { count: active.length })}</span>
         </div>
         {active.length ? (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {active.map((challenge) => {
-              const tone = challengeStatusTone(challenge.status, challenge.startsOn, challenge.submissionMode);
-              const total = challenge.totalCount ?? 0;
-              const done = challenge.completedCount ?? 0;
-              return (
-                <article className={cx("relative flex flex-col overflow-hidden rounded-[20px] border bg-[var(--paper)] shadow-[var(--elevate-1)] transition hover:-translate-y-0.5 has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-[var(--main)]/25", tone.border)} key={challenge.id}>
-                  <div className="flex flex-1 flex-col p-5">
-                    <div className="flex items-center justify-between gap-3"><ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} /><span className="text-xs text-[var(--muted)]">{isChallengeScheduled(challenge.status, challenge.startsOn, challenge.submissionMode) ? t("startsOn", { date: f.date(challenge.startsOn) }) : challenge.endsOn ? t("endsOn", { date: f.date(challenge.endsOn) }) : t("noDeadline")}</span></div>
-                    <h3 className="mt-5 text-2xl font-light tracking-[-0.04em]"><button type="button" onClick={() => onOpenChallenge(challenge.id)} className="cursor-pointer text-left after:absolute after:inset-0 after:content-[''] focus-visible:outline-none">{challenge.title}</button></h3>
-                    {challenge.description ? <p className="mt-2 line-clamp-1 text-sm leading-6 text-[var(--muted)]">{challenge.description}</p> : null}
-                    {total > 0 ? (
-                      <div className="mt-5">
-                        <div className="mb-2 flex justify-between text-xs text-[var(--muted)]"><span>{t("progress", { done, total })}</span><span>{Math.round((done / total) * 100)}%</span></div>
-                        <div className="h-2 overflow-hidden rounded-full bg-[var(--wash-strong)]"><span className="block h-full rounded-full bg-[var(--main-2)]" style={{ width: `${Math.min(100, (done / total) * 100)}%` }} /></div>
-                      </div>
-                    ) : null}
-                  </div>
-                  <span className={cx("block w-full px-5 py-3.5", tone.solid)} />
-                </article>
-              );
-            })}
+            {active.map((challenge) => <ActiveChallengeCard key={challenge.id} challenge={challenge} onOpen={onOpenChallenge} />)}
           </div>
         ) : (
           <EmptyState title={t("noChallengesTitle")} description={t("noChallengesBody")} />
@@ -134,13 +200,9 @@ export function DashboardScreen({
 
       {other.length ? (
         <section className="mt-10">
-          <h2 className="mb-4 text-xl font-semibold tracking-[-0.03em]">{t("archiveTitle")}</h2>
+          <h2 className="mb-4 text-xl font-medium tracking-[-0.03em]">{t("archiveTitle")}</h2>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {other.map((challenge) => (
-              <button className={cx(cardClass, "cursor-pointer flex items-center justify-between gap-3 p-4 text-left hover:border-[var(--main-line)]")} type="button" onClick={() => challenge.status === "draft" && canManage(challenge.viewerRole) ? onOpenAdmin(challenge.id) : onOpenChallenge(challenge.id)} key={challenge.id}>
-                <span className="flex items-center gap-2"><ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />{challenge.title}</span><span aria-hidden="true">→</span>
-              </button>
-            ))}
+            {other.map((challenge) => <ArchiveChallengeRow key={challenge.id} challenge={challenge} onOpen={() => openChallenge(challenge)} />)}
           </div>
         </section>
       ) : null}

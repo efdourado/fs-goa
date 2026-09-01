@@ -37,6 +37,7 @@ export function CatalogItemScreen({
   if (!item) return <LoadingView />;
 
   const attrs = [
+    item.author ? t("byAuthor", { name: item.author }) : null,
     item.year ? String(item.year) : null,
     item.runtimeMinutes ? t("runtime", { minutes: item.runtimeMinutes }) : null,
     item.pageCount ? t("pages", { count: item.pageCount }) : null,

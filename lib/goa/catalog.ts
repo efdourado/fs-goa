@@ -33,13 +33,28 @@ function optionalInt(value: unknown, min: number, max: number, name: string): nu
 }
 
 export interface CatalogAttributes {
+  author?: unknown;
   year?: unknown;
   runtimeMinutes?: unknown;
   pageCount?: unknown;
 }
 
+function optionalText(value: unknown, max: number, name: string): string | null {
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value !== "string") {
+    throw new ApiError(400, "invalid_text", `${name} precisa ser texto.`);
+  }
+  const clean = value.trim();
+  if (!clean) return null;
+  if (clean.length > max) {
+    throw new ApiError(400, "invalid_text", `${name} pode ter no máximo ${max} caracteres.`);
+  }
+  return clean;
+}
+
 function readAttributes(input: CatalogAttributes) {
   return {
+    author: optionalText(input.author, 200, "Autor"),
     year: optionalInt(input.year, 1870, 2200, "Ano"),
     runtimeMinutes: optionalInt(input.runtimeMinutes, 1, 100_000, "Duração"),
     pageCount: optionalInt(input.pageCount, 1, 1_000_000, "Páginas"),
@@ -68,9 +83,12 @@ export async function upsertCatalogItem(
   // apart. But when there's a single row of the same title and either side lacks
   // a year, it's the same work: "Aftersun" folds into "Aftersun (2022)", and
   // adding a year to a lone yearless "Dune" enriches it instead of forking.
-  type Row = { id: string; year: number | null; runtime_minutes: number | null; page_count: number | null };
+  type Row = {
+    id: string; author: string | null; year: number | null;
+    runtime_minutes: number | null; page_count: number | null;
+  };
   const sameTitle = await client.query<Row>(
-    `SELECT id, year, runtime_minutes, page_count FROM catalog_items
+    `SELECT id, author, year, runtime_minutes, page_count FROM catalog_items
       WHERE group_id = $1 AND kind = $2 AND normalized_title = $3 AND archived_at IS NULL
       ORDER BY created_at`,
     [groupId, input.kind, normalized],
@@ -84,12 +102,13 @@ export async function upsertCatalogItem(
   if (existing) {
     const sets: string[] = [];
     const params: unknown[] = [existing.id];
-    const enrich = (column: string, current: number | null, next: number | null) => {
+    const enrich = (column: string, current: string | number | null, next: string | number | null) => {
       if (next !== null && current === null) {
         params.push(next);
         sets.push(`${column} = $${params.length}`);
       }
     };
+    enrich("author", existing.author, attributes.author);
     enrich("year", existing.year, attributes.year);
     enrich("runtime_minutes", existing.runtime_minutes, attributes.runtimeMinutes);
     enrich("page_count", existing.page_count, attributes.pageCount);
@@ -102,9 +121,9 @@ export async function upsertCatalogItem(
   const id = publicId();
   await client.query(
     `INSERT INTO catalog_items
-      (id, group_id, kind, title, normalized_title, year, runtime_minutes, page_count, created_by_user_id, created_at, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,now(),now())`,
-    [id, groupId, input.kind, title, normalized, attributes.year, attributes.runtimeMinutes, attributes.pageCount, userId],
+      (id, group_id, kind, title, normalized_title, author, year, runtime_minutes, page_count, created_by_user_id, created_at, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now(),now())`,
+    [id, groupId, input.kind, title, normalized, attributes.author, attributes.year, attributes.runtimeMinutes, attributes.pageCount, userId],
   );
   return id;
 }
@@ -183,6 +202,7 @@ export async function listGroupCatalog(session: SessionContext, groupId: string)
       id: string;
       kind: string;
       title: string;
+      author: string | null;
       year: number | null;
       runtime_minutes: number | null;
       page_count: number | null;
@@ -190,7 +210,7 @@ export async function listGroupCatalog(session: SessionContext, groupId: string)
       rating_avg: number | null;
       rating_count: number;
     }>(
-      `SELECT ci.id, ci.kind, ci.title, ci.year, ci.runtime_minutes, ci.page_count,
+      `SELECT ci.id, ci.kind, ci.title, ci.author, ci.year, ci.runtime_minutes, ci.page_count,
               (SELECT count(DISTINCT it.challenge_id)::int FROM challenge_items it WHERE it.catalog_item_id = ci.id) AS round_count,
               agg.rating_avg, coalesce(agg.rating_count, 0)::int AS rating_count
          FROM catalog_items ci
@@ -229,6 +249,7 @@ export async function listGroupCatalog(session: SessionContext, groupId: string)
         id: item.id,
         kind: item.kind,
         title: item.title,
+        author: item.author,
         year: item.year,
         runtimeMinutes: item.runtime_minutes,
         pageCount: item.page_count,
@@ -250,11 +271,11 @@ export async function catalogItemDetail(session: SessionContext, groupId: string
   return withClient(async (client) => {
     await requireGroupRole(session.user.id, groupId, ["owner", "admin", "participant"], client);
     const item = await oneOrNull<{
-      id: string; kind: string; title: string;
+      id: string; kind: string; title: string; author: string | null;
       year: number | null; runtime_minutes: number | null; page_count: number | null;
     }>(
       client,
-      `SELECT id, kind, title, year, runtime_minutes, page_count
+      `SELECT id, kind, title, author, year, runtime_minutes, page_count
          FROM catalog_items WHERE id = $1 AND group_id = $2 AND archived_at IS NULL`,
       [catalogItemId, groupId],
     );
@@ -293,6 +314,7 @@ export async function catalogItemDetail(session: SessionContext, groupId: string
       id: item.id,
       kind: item.kind,
       title: item.title,
+      author: item.author,
       year: item.year,
       runtimeMinutes: item.runtime_minutes,
       pageCount: item.page_count,
@@ -331,6 +353,7 @@ export async function applyCatalogItemUpdate(
     sets.push(`title = $${params.length - 1}`, `normalized_title = $${params.length}`);
   }
   for (const [column, value, key] of [
+    ["author", attributes.author, "author"],
     ["year", attributes.year, "year"],
     ["runtime_minutes", attributes.runtimeMinutes, "runtimeMinutes"],
     ["page_count", attributes.pageCount, "pageCount"],

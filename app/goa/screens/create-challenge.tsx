@@ -19,10 +19,13 @@ const RECIPES: Array<{ key: RecipeKey; catalogKind: "film" | "book" | null; sche
 
 export function CreateChallengeScreen({
   group,
+  personal = false,
   onBack,
   onCreate,
 }: {
   group: GroupSummary;
+  /** Solo mode: no "people" step, no group chrome, submits to the personal workspace. */
+  personal?: boolean;
   onBack: () => void;
   onCreate: (input: ChallengeCreationInput) => Promise<void>;
 }) {
@@ -34,8 +37,8 @@ export function CreateChallengeScreen({
   const [recipe, setRecipe] = useState<RecipeKey | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [meetingUrl, setMeetingUrl] = useState("");
   const [ruleSections, setRuleSections] = useState<ChallengeRule[]>([]);
+  const [showOptional, setShowOptional] = useState(false);
   const [scheduleMode, setScheduleMode] = useState<"period" | "none">("none");
   const [startsOn, setStartsOn] = useState("");
   const [endsOn, setEndsOn] = useState("");
@@ -47,6 +50,11 @@ export function CreateChallengeScreen({
   const itemInputs = cineRowsToInput(cineItems);
   const recipeMeta = RECIPES.find((entry) => entry.key === recipe) ?? null;
   const tracksCatalog = recipeMeta?.catalogKind ?? null;
+  const stepKeys = personal
+    ? (["base", "fields", "checkpoints"] as const)
+    : (["base", "fields", "checkpoints", "people"] as const);
+  const lastStep = stepKeys.length;
+  const optionalOpen = showOptional || Boolean(description.trim()) || ruleSections.length > 0;
 
   function chooseRecipe(next: RecipeKey) {
     const meta = RECIPES.find((entry) => entry.key === next)!;
@@ -71,10 +79,6 @@ export function CreateChallengeScreen({
       setError(t("errEndBeforeStart"));
       return;
     }
-    if (step === 1 && meetingUrl.trim() && !/^https:\/\/\S+$/u.test(meetingUrl.trim())) {
-      setError(t("errMeetingUrl"));
-      return;
-    }
     if (step === 1 && ruleSections.some((rule) =>
       !rule.title.trim() || !rule.description.trim()
       || (rule.topics ?? []).some((topic) => !topic.title.trim() || !topic.description.trim())
@@ -90,11 +94,24 @@ export function CreateChallengeScreen({
       setError(tracksCatalog === "book" ? t("errNoBooks") : t("errNoItems"));
       return;
     }
-    setStep((current) => Math.min(4, current + 1));
+    if (step === 3 && tracksCatalog === "book"
+      && cineItems.some((row) => row.title.trim() && !row.author.trim())) {
+      setError(t("errNoAuthor"));
+      return;
+    }
+    setStep((current) => Math.min(lastStep, current + 1));
   }
 
   async function submit() {
     if (!recipe) return;
+    if (tracksCatalog && !itemInputs.length) {
+      setError(tracksCatalog === "book" ? t("errNoBooks") : t("errNoItems"));
+      return;
+    }
+    if (tracksCatalog === "book" && cineItems.some((row) => row.title.trim() && !row.author.trim())) {
+      setError(t("errNoAuthor"));
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -102,7 +119,6 @@ export function CreateChallengeScreen({
         recipe,
         title: title.trim(),
         description: description.trim(),
-        meetingUrl: meetingUrl.trim() || null,
         ruleSections: ruleSections.map((rule) => ({
           title: rule.title.trim(),
           description: rule.description.trim(),
@@ -124,12 +140,11 @@ export function CreateChallengeScreen({
     }
   }
 
-  const stepKeys = ["base", "fields", "checkpoints", "people"] as const;
   return (
     <main className="mx-auto max-w-5xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
-      <button className={cx(backLinkClass, "mb-6")} type="button" onClick={onBack}>{t("back", { group: group.name })}</button>
-      <PageHeading title={t("title")} description={t("subtitle")} />
-      <nav className="mb-6 grid grid-cols-2 gap-1 rounded-2xl bg-[var(--wash-strong)]/70 p-1 sm:grid-cols-4" aria-label={t("stepsNav")}>
+      <button className={cx(backLinkClass, "mb-6")} type="button" onClick={onBack}>{personal ? tc("backHome") : t("back", { group: group.name })}</button>
+      <PageHeading title={personal ? t("personalTitle") : t("title")} description={personal ? t("personalSubtitle") : t("subtitle")} />
+      <nav className={cx("mb-6 grid gap-1 rounded-2xl bg-[var(--wash-strong)]/70 p-1", personal ? "grid-cols-3" : "grid-cols-2 sm:grid-cols-4")} aria-label={t("stepsNav")}>
         {stepKeys.map((key, index) => <button className={cx("min-h-11 truncate rounded-xl px-2 text-xs font-light sm:text-sm", step === index + 1 ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : index + 1 < step ? "text-[var(--ink)]" : "text-[var(--muted)]")} type="button" onClick={() => index + 1 < step && setStep(index + 1)} disabled={index + 1 > step} key={key}><span className="hidden sm:inline">{index + 1}. </span>{t(`steps.${key}`)}</button>)}
       </nav>
 
@@ -159,9 +174,18 @@ export function CreateChallengeScreen({
                 <SchedulePeriodFields startsOn={startsOn} endsOn={endsOn} onStartsOn={setStartsOn} onEndsOn={setEndsOn} />
                 <p className="sm:col-span-2 text-xs leading-5 text-[var(--muted)]">{t("periodNote")}</p>
               </> : <p className="sm:col-span-2 rounded-xl bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{t("noneNote")}</p>}
-              <label className="sm:col-span-2"><span className={labelClass}>{t("descriptionLabel")} <small className="font-light text-[var(--muted)]">{t("optional")}</small></span><textarea className={inputClass} rows={3} value={description} onChange={(event) => setDescription(event.target.value)} maxLength={1000} /></label>
-              <label className="sm:col-span-2"><span className={labelClass}>{t("meetingLabel")} <small className="font-light text-[var(--muted)]">{t("optional")}</small></span><input className={inputClass} type="url" inputMode="url" value={meetingUrl} onChange={(event) => setMeetingUrl(event.target.value)} maxLength={2000} placeholder="https://meet.example.com/…" /><small className="mt-1 block text-xs text-[var(--muted)]">{t("meetingHint")}</small></label>
-              <div className="sm:col-span-2"><div className="mb-3"><span className={labelClass}>{t("rulesLabel")} <small className="font-light text-[var(--muted)]">{t("optional")}</small></span><p className="text-xs leading-5 text-[var(--muted)]">{t("rulesHint")}</p></div><RuleSectionsEditor value={ruleSections} onChange={setRuleSections} /></div>
+
+              <div className="sm:col-span-2">
+                {optionalOpen ? (
+                  <div className="grid gap-4">
+                    <button type="button" className={cx(backLinkClass, "justify-self-start")} onClick={() => setShowOptional(false)} hidden={Boolean(description.trim()) || ruleSections.length > 0}>{t("hideOptional")}</button>
+                    <label><span className={labelClass}>{t("descriptionLabel")} <small className="font-light text-[var(--muted)]">{t("optional")}</small></span><textarea className={inputClass} rows={3} value={description} onChange={(event) => setDescription(event.target.value)} maxLength={1000} /></label>
+                    <div><div className="mb-3"><span className={labelClass}>{t("rulesLabel")} <small className="font-light text-[var(--muted)]">{t("optional")}</small></span><p className="text-xs leading-5 text-[var(--muted)]">{t("rulesHint")}</p></div><RuleSectionsEditor value={ruleSections} onChange={setRuleSections} /></div>
+                  </div>
+                ) : (
+                  <button type="button" className={cx("min-h-11 rounded-xl border border-dashed border-[var(--line)] px-4 text-sm font-light text-[var(--muted)] hover:border-[var(--main-line)] hover:text-[var(--ink)]")} onClick={() => setShowOptional(true)}>{t("showOptional", { count: 2 })}</button>
+                )}
+              </div>
             </div>
           </div>
         ) : null}
@@ -172,7 +196,7 @@ export function CreateChallengeScreen({
           <div>
             <h2 className="text-xl font-light">{t("checkpointsTitle")}</h2>
             {tracksCatalog ? (
-              <><p className="mt-1 mb-4 text-sm leading-6 text-[var(--muted)]">{tracksCatalog === "book" ? t("bookItemsHint") : t("cineItemsHint")}</p><CineItemsEditor value={cineItems} onChange={setCineItems} members={group.members ?? []} groupId={group.id} kind={tracksCatalog === "book" ? "book" : "film"} /><p className="mt-3 text-xs font-semibold text-[var(--muted)]">{t("itemsCount", { count: itemInputs.length })}</p></>
+              <><p className="mt-1 mb-4 text-sm leading-6 text-[var(--muted)]">{tracksCatalog === "book" ? t("bookItemsHint") : t("cineItemsHint")}</p><CineItemsEditor value={cineItems} onChange={setCineItems} members={personal ? [] : group.members ?? []} groupId={group.id} kind={tracksCatalog === "book" ? "book" : "film"} /><p className="mt-3 text-xs font-medium text-[var(--muted)]">{t("itemsCount", { count: itemInputs.length })}</p></>
             ) : scheduleMode === "period" ? (
               <div className="mt-5 rounded-2xl border border-[var(--ok-line)] bg-[var(--ok-soft)] p-5"><strong className="text-[var(--ok)]">{t("dailyTitle")}</strong><p className="mt-2 text-sm leading-6 text-[var(--ok)]">{t("dailyBody", { start: f.date(startsOn), end: f.date(endsOn) })}</p></div>
             ) : (
@@ -181,7 +205,7 @@ export function CreateChallengeScreen({
           </div>
         ) : null}
 
-        {step === 4 ? (
+        {step === 4 && !personal ? (
           <div>
             <h2 className="text-xl font-light">{t("peopleTitle")}</h2>
             <p className="mt-1 text-sm text-[var(--muted)]">{t("peopleSubtitle")}</p>
@@ -198,7 +222,7 @@ export function CreateChallengeScreen({
         <div className="mt-6"><StatusMessage error={error} /></div>
         <div className="mt-7 flex flex-col-reverse gap-2 border-t border-[var(--line)] pt-5 sm:flex-row sm:justify-between">
           <Button variant="secondary" onClick={() => step === 1 ? onBack() : setStep((current) => current - 1)}>{step === 1 ? tc("cancel") : t("backStep")}</Button>
-          {step < 4 ? <Button onClick={nextStep}>{t("next")}</Button> : <Button disabled={busy} onClick={() => void submit()}>{busy ? t("creatingDraft") : t("createDraft")}</Button>}
+          {step < lastStep ? <Button onClick={nextStep}>{t("next")}</Button> : <Button disabled={busy} onClick={() => void submit()}>{busy ? t("creatingDraft") : t("createDraft")}</Button>}
         </div>
       </section>
     </main>

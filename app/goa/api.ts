@@ -43,6 +43,7 @@ export const API_PATHS = {
   memberRequestCancel: (id: Id) => `/api/member-requests/${encodeURIComponent(id)}/cancel`,
   invite: (token: string) => `/api/invites/${encodeURIComponent(token)}`,
   groupChallenges: (groupId: Id) => `/api/groups/${encodeURIComponent(groupId)}/challenges`,
+  personalChallenges: "/api/personal/challenges",
   challenge: (challengeId: Id) => `/api/challenges/${encodeURIComponent(challengeId)}`,
   participants: (challengeId: Id) =>
     `/api/challenges/${encodeURIComponent(challengeId)}/participants`,
@@ -126,6 +127,7 @@ export function normalizeBootstrap(raw: BootstrapData | { bootstrap: BootstrapDa
     csrfToken: data.csrfToken ?? "",
     user: data.user ?? null,
     limits: { ...DEFAULT_LIMITS, ...data.limits },
+    personalWorkspaceId: data.personalWorkspaceId ?? null,
     groups: data.groups ?? [],
     challenges: data.challenges ?? [],
     memberRequests: data.memberRequests ?? [],

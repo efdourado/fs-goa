@@ -127,6 +127,13 @@
       "when": 1788296279913,
       "tag": "0017_strong_unus",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1788304989481,
+      "tag": "0018_confused_liz_osborn",
+      "breakpoints": true
     }
   ]
 }

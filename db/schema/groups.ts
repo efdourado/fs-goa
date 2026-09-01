@@ -19,6 +19,9 @@ export const groups = pgTable(
     id: text("id").primaryKey(),
     name: text("name").notNull(),
     description: text("description"),
+    // `personal` is the hidden solo workspace one per account gets on demand — it
+    // never shows in the groups UI and does not count against ownership limits.
+    kind: text("kind").notNull().default("standard"),
     ownerUserId: text("owner_user_id")
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
@@ -34,6 +37,10 @@ export const groups = pgTable(
     index("groups_owner_active_idx")
       .on(table.ownerUserId)
       .where(sql`${table.deletedAt} is null and ${table.archivedAt} is null`),
+    uniqueIndex("groups_one_personal_per_owner_uidx")
+      .on(table.ownerUserId)
+      .where(sql`${table.kind} = 'personal' and ${table.deletedAt} is null`),
+    check("groups_kind_check", sql`${table.kind} in ('standard', 'personal')`),
     check("groups_name_check", sql`char_length(btrim(${table.name})) between 1 and 120`),
     check(
       "groups_deleted_at_check",

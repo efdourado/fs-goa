@@ -79,18 +79,6 @@ export function integerValue(value: unknown, fallback: number, min: number, max:
   return number;
 }
 
-/** Optional `https://` meeting link on a challenge. Returns null when cleared. */
-export function meetingUrlValue(value: unknown): string | null {
-  if (value === undefined || value === null || value === "") return null;
-  if (typeof value !== "string") throw new ApiError(400, "invalid_meeting_url", "O link da reunião precisa ser texto.");
-  const clean = value.trim();
-  if (!clean) return null;
-  if (clean.length > 2_000 || !/^https:\/\/\S+$/u.test(clean)) {
-    throw new ApiError(400, "invalid_meeting_url", "Use um link https:// válido para a reunião.");
-  }
-  return clean;
-}
-
 export function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)

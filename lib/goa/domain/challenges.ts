@@ -3,6 +3,7 @@ import { inTransaction, oneOrNull } from "../../db";
 import { ApiError, stringValue } from "../../http";
 import { assertArrayWithin, assertUnder, LIMITS } from "../../limits";
 import {
+  applyCatalogItemUpdate,
   assertCatalogItemInGroup,
   resolveTags,
   setCatalogItemTags,
@@ -13,7 +14,7 @@ import { resolveRecipe } from "../challenges/recipes";
 import { writeAudit } from "./audit";
 import { insertField, type ClientField } from "./fields";
 import { parseRuleSections, rulesCompatibilityText } from "./rules";
-import { asRecord, dateRange, meetingUrlValue, publicId, semanticKey } from "./shared";
+import { asRecord, dateRange, publicId, semanticKey } from "./shared";
 
 export async function createChallenge(
   session: SessionContext,
@@ -22,7 +23,6 @@ export async function createChallenge(
 ) {
   const title = stringValue(body, "title", { min: 1, max: 160 })!;
   const description = stringValue(body, "description", { max: 2_000, optional: true }) ?? null;
-  const meetingUrl = meetingUrlValue(body.meetingUrl);
   const ruleSections = parseRuleSections(body.ruleSections, body.rules);
   const rules = rulesCompatibilityText(ruleSections);
   const { startDate, endDate } = dateRange(
@@ -66,10 +66,10 @@ export async function createChallenge(
     const id = publicId();
     await client.query(
       `INSERT INTO challenges
-        (id, group_id, created_by_user_id, title, description, meeting_url, rules, rule_sections, recipe_key, recipe_version,
+        (id, group_id, created_by_user_id, title, description, rules, rule_sections, recipe_key, recipe_version,
          start_date, end_date, time_zone, status, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12,$13,'draft',now(),now())`,
-      [id, groupId, session.user.id, title, description, meetingUrl, rules, JSON.stringify(ruleSections),
+       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11,$12,'draft',now(),now())`,
+      [id, groupId, session.user.id, title, description, rules, JSON.stringify(ruleSections),
         recipe.key, recipe.version, startDate, endDate, "America/Sao_Paulo"],
     );
 
@@ -124,15 +124,23 @@ export async function createChallenge(
         const item = asRecord(items[index]);
         const itemTitle = typeof item.title === "string" ? item.title.trim() : "";
         if (!itemTitle) throw new ApiError(400, "invalid_item", "Item sem título.");
+        const itemAuthor = typeof item.author === "string" ? item.author.trim() : "";
+        if (catalogKind === "book" && !itemAuthor) {
+          throw new ApiError(400, "invalid_item", "Informe o autor de cada livro.");
+        }
 
         let catalogItemId: string | null = null;
         if (typeof item.catalogItemId === "string" && item.catalogItemId) {
           await assertCatalogItemInGroup(client, item.catalogItemId, groupId, catalogKind);
           catalogItemId = item.catalogItemId;
+          if (itemAuthor) {
+            await applyCatalogItemUpdate(client, catalogItemId, groupId, { author: itemAuthor });
+          }
         } else {
           catalogItemId = await upsertCatalogItem(client, groupId, session.user.id, {
             kind: catalogKind,
             title: itemTitle,
+            author: item.author,
             year: item.year,
             runtimeMinutes: item.runtimeMinutes,
             pageCount: item.pageCount,
@@ -243,4 +251,48 @@ export async function createChallenge(
     });
     return { id, challengeId: id, status: "draft" };
   });
+}
+
+/**
+ * Find-or-create the caller's hidden personal workspace: a `kind='personal'`
+ * group they solely own, the backing store for challenges run on their own. It
+ * is idempotent and sits outside the `groupsPerOwner` cap.
+ */
+export async function ensurePersonalWorkspace(userId: string): Promise<string> {
+  return inTransaction(async (client) => {
+    const readId = () =>
+      oneOrNull<{ id: string }>(
+        client,
+        "SELECT id FROM groups WHERE owner_user_id = $1 AND kind = 'personal' AND deleted_at IS NULL",
+        [userId],
+      );
+    const existing = await readId();
+    if (existing) return existing.id;
+    // The partial unique index makes this a no-op under a concurrent request;
+    // re-read to pick up whichever row won.
+    await client.query(
+      `INSERT INTO groups (id, name, kind, owner_user_id, created_at, updated_at)
+       VALUES ($1, 'Pessoal', 'personal', $2, now(), now())
+       ON CONFLICT DO NOTHING`,
+      [publicId(), userId],
+    );
+    const workspaceId = (await readId())?.id;
+    if (!workspaceId) throw new ApiError(500, "workspace_unavailable", "Não foi possível preparar seu espaço pessoal.");
+    await client.query(
+      `INSERT INTO group_members (group_id, user_id, role, added_by_user_id, joined_at)
+       VALUES ($1, $2, 'owner', $2, now())
+       ON CONFLICT (group_id, user_id) DO NOTHING`,
+      [workspaceId, userId],
+    );
+    return workspaceId;
+  });
+}
+
+/** Creates a challenge in the caller's personal workspace, making it on demand. */
+export async function createPersonalChallenge(
+  session: SessionContext,
+  body: Record<string, unknown>,
+) {
+  const workspaceId = await ensurePersonalWorkspace(session.user.id);
+  return createChallenge(session, workspaceId, body);
 }

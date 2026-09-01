@@ -58,6 +58,7 @@ import {
   createChallenge,
   createGroup,
   createInvite,
+  createPersonalChallenge,
   previewInvite,
   requestGroupMember,
   respondToMemberRequest,
@@ -202,6 +203,9 @@ export async function POST(request: Request): Promise<Response> {
     if (path[0] === "invites" && path.length === 2) return json(await acceptInvite(session, path[1]));
     if (path[0] === "groups" && path[2] === "challenges" && path.length === 3) {
       return json(await createChallenge(session, path[1], body), 201);
+    }
+    if (isPath(path, "personal", "challenges")) {
+      return json(await createPersonalChallenge(session, body), 201);
     }
     if (path[0] === "challenges" && path[2] === "participants" && path.length === 3) {
       return json(await setChallengeParticipants(session, path[1], body));

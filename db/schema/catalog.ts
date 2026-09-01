@@ -31,6 +31,9 @@ export const catalogItems = pgTable(
     kind: text("kind").notNull(),
     title: text("title").notNull(),
     normalizedTitle: text("normalized_title").notNull(),
+    // Enrichable attribute, not part of the identity (title + year). Books treat
+    // it as required at the app layer; films leave it null.
+    author: text("author"),
     year: smallint("year"),
     runtimeMinutes: integer("runtime_minutes"),
     pageCount: integer("page_count"),
@@ -54,6 +57,10 @@ export const catalogItems = pgTable(
     index("catalog_items_group_kind_idx").on(table.groupId, table.kind),
     check("catalog_items_kind_check", sql`${table.kind} in ('film', 'book', 'other')`),
     check("catalog_items_title_check", sql`char_length(btrim(${table.title})) between 1 and 300`),
+    check(
+      "catalog_items_author_check",
+      sql`${table.author} is null or char_length(btrim(${table.author})) between 1 and 200`,
+    ),
     check("catalog_items_normalized_title_check", sql`char_length(${table.normalizedTitle}) between 1 and 300`),
     check("catalog_items_year_check", sql`${table.year} is null or ${table.year} between 1870 and 2200`),
     check("catalog_items_runtime_check", sql`${table.runtimeMinutes} is null or ${table.runtimeMinutes} between 1 and 100000`),
