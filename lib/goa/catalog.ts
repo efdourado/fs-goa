@@ -65,8 +65,9 @@ export async function upsertCatalogItem(
   const attributes = readAttributes(input);
 
   // Year participates in the identity so "Dune (1984)" and "Dune (2021)" stay
-  // apart. But a bare title still matches a single dated row of the same name
-  // (and adopts its year), so "Aftersun" folds into "Aftersun (2022)".
+  // apart. But when there's a single row of the same title and either side lacks
+  // a year, it's the same work: "Aftersun" folds into "Aftersun (2022)", and
+  // adding a year to a lone yearless "Dune" enriches it instead of forking.
   type Row = { id: string; year: number | null; runtime_minutes: number | null; page_count: number | null };
   const sameTitle = await client.query<Row>(
     `SELECT id, year, runtime_minutes, page_count FROM catalog_items
@@ -76,7 +77,10 @@ export async function upsertCatalogItem(
   );
   const existing: Row | null =
     sameTitle.rows.find((row) => (row.year ?? -1) === (attributes.year ?? -1))
-    ?? (attributes.year === null && sameTitle.rows.length === 1 ? sameTitle.rows[0] : null);
+    ?? (sameTitle.rows.length === 1
+      && (attributes.year === null || sameTitle.rows[0].year === null)
+        ? sameTitle.rows[0]
+        : null);
   if (existing) {
     const sets: string[] = [];
     const params: unknown[] = [existing.id];

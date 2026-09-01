@@ -150,5 +150,8 @@ pessoas, cortes por gênero/década, automação).
 ## Licença
 
 [Functional Source License 1.1](LICENSE.md) com licença futura Apache 2.0
-(`FSL-1.1-ALv2`): uso livre para qualquer fim que não seja oferecer um produto ou
-serviço concorrente; cada versão passa a Apache 2.0 dois anos depois de publicada.
+(`FSL-1.1-ALv2`). O código é **fonte disponível** (não open source durante a
+janela): você pode ler, usar, modificar e redistribuir para qualquer fim que
+**não** seja oferecer a terceiros um produto ou serviço comercial concorrente. A
+licença protege este código, não a ideia nem uma reimplementação independente.
+Cada versão passa a Apache 2.0 dois anos depois de publicada.
