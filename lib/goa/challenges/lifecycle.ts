@@ -15,10 +15,16 @@ export async function transitionChallenge(
   return inTransaction(async (client) => {
     const access = await challengeAccess(session.user.id, challengeId, client, true);
     if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores podem mudar o estado.");
+    const reopening = access.challenge.status === "closed" && target === "active";
     const valid = (access.challenge.status === "draft" && target === "active") ||
-      (access.challenge.status === "active" && target === "closed");
+      (access.challenge.status === "active" && target === "closed") ||
+      reopening;
     if (!valid) throw new ApiError(409, "invalid_transition", "A transição de estado não é permitida.");
-    if (target === "active") {
+    if (reopening) {
+      // Reabrir não repete a checagem de prontidão (já passou por ela uma vez) —
+      // apenas libera os registros de novo e limpa a marca de encerramento.
+      await client.query("UPDATE challenges SET status='active', closed_at=NULL, updated_at=now() WHERE id=$1", [challengeId]);
+    } else if (target === "active") {
       const types = await entryTypesForChallenge(client, challengeId);
       const challengeHasPeriod =
         access.challenge.start_date !== null && access.challenge.end_date !== null;
@@ -41,11 +47,9 @@ export async function transitionChallenge(
       await client.query("UPDATE challenges SET status='active', activated_at=now(), updated_at=now() WHERE id=$1", [challengeId]);
     } else {
       await client.query("UPDATE challenges SET status='closed', closed_at=now(), updated_at=now() WHERE id=$1", [challengeId]);
-      const existingBlocks = await oneOrNull<{ count: number }>(client,
-        "SELECT count(*)::int AS count FROM result_blocks WHERE challenge_id=$1", [challengeId]);
-      if (!existingBlocks?.count) {
-        await generateShowcase(client, challengeId, session.user.id);
-      }
+      // Rebuilds the showcase every time — cheap (delete + re-insert) and it's the
+      // only way a re-close after `reopening` picks up whatever changed meanwhile.
+      await generateShowcase(client, challengeId, session.user.id);
     }
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
       `challenge.${target}`, "challenge", challengeId, { status: access.challenge.status }, { status: target });

@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { type FormEvent, useMemo, useState } from "react";
 
 import { useGoaFormat } from "../format";
+import { CineItemsEditor, type CineRow, cineRowsToInput } from "../cine-items";
 import { cleanFields, FieldBuilder } from "../fields";
 import { RuleSectionsEditor, visibleRuleSections } from "../rules";
 import type {
@@ -30,7 +31,7 @@ import {
   SchedulePeriodFields,
   StatusMessage,
 } from "../ui";
-import { isChallengeScheduled, itemIdForEntry, valuesAsRecord } from "../utils";
+import { isChallengeScheduled, itemIdForEntry, recipeCatalogKind, valuesAsRecord } from "../utils";
 import { DynamicEntryForm, ResultView } from "./participant-challenge";
 
 const METRIC_OPERATIONS: Metric["operation"][] = [
@@ -176,6 +177,7 @@ function AdminOverview({
           <div><ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} /><p className="mt-2 max-w-xl text-sm leading-6 text-[var(--muted)]">{challenge.status === "draft" ? t("stateDraft") : scheduled ? t("stateScheduled", { date: f.date(challenge.startsOn, longDate) }) : challenge.status === "active" ? t("stateActive") : t("stateClosed")}</p></div>
           {challenge.status === "draft" ? <Button disabled={Boolean(busy)} onClick={() => { if (window.confirm(t("activateConfirm"))) void run("transition", () => onTransition("active"), t("activated")); }}>{t("activate")}</Button> : null}
           {challenge.status === "active" ? <Button variant="danger" disabled={Boolean(busy)} onClick={() => { if (window.confirm(t("closeConfirm"))) void run("transition", () => onTransition("closed"), t("closedDone")); }}>{t("close")}</Button> : null}
+          {challenge.status === "closed" ? <Button variant="secondary" disabled={Boolean(busy)} onClick={() => { if (window.confirm(t("reopenConfirm"))) void run("transition", () => onTransition("active"), t("reopenedDone")); }}>{t("reopen")}</Button> : null}
         </div>
       </section>
 
@@ -297,14 +299,19 @@ function AdminItems({
   challenge: ChallengeDetail;
   group?: GroupSummary;
   onAdd: (payload: Record<string, unknown>) => Promise<void>;
-  onUpdate: (itemId: Id, payload: { title: string; description: string; recommendedByUserId?: string | null }) => Promise<void>;
+  onUpdate: (itemId: Id, payload: {
+    title: string; description: string; recommendedByUserId?: string | null;
+    year?: number | null; runtimeMinutes?: number | null; pageCount?: number | null; genres?: string[];
+  }) => Promise<void>;
   onArchive: (itemId: Id) => Promise<void>;
 }) {
   const t = useTranslations("adminChallenge");
+  const tCine = useTranslations("cineItems");
   const tc = useTranslations("common");
   const f = useGoaFormat();
   const members = group?.members ?? [];
-  const [itemsText, setItemsText] = useState("");
+  const catalogKind = recipeCatalogKind(challenge.recipeKey) === "book" ? "book" : "film";
+  const [newItemRows, setNewItemRows] = useState<CineRow[]>([]);
   const startsOn = challenge.startsOn ?? "";
   const endsOn = challenge.endsOn ?? "";
   const undatedDaily = challenge.submissionMode === "daily" && !challenge.startsOn && !challenge.endsOn;
@@ -319,6 +326,10 @@ function AdminItems({
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editRecommendedBy, setEditRecommendedBy] = useState("");
+  const [editYear, setEditYear] = useState("");
+  const [editRuntime, setEditRuntime] = useState("");
+  const [editPages, setEditPages] = useState("");
+  const [editGenres, setEditGenres] = useState("");
   const [editBusy, setEditBusy] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [editSuccess, setEditSuccess] = useState<string | null>(null);
@@ -344,20 +355,34 @@ function AdminItems({
     setEditTitle(item.title);
     setEditDescription(item.description ?? "");
     setEditRecommendedBy(item.recommendedBy?.id ?? "");
+    setEditYear(item.catalogItem?.year ? String(item.catalogItem.year) : "");
+    setEditRuntime(item.catalogItem?.runtimeMinutes ? String(item.catalogItem.runtimeMinutes) : "");
+    setEditPages(item.catalogItem?.pageCount ? String(item.catalogItem.pageCount) : "");
+    setEditGenres(item.catalogItem?.genres.join(", ") ?? "");
     setEditError(null);
     setEditSuccess(null);
   }
 
-  async function submitEdit(event: FormEvent<HTMLFormElement>, itemId: Id) {
+  async function submitEdit(event: FormEvent<HTMLFormElement>, itemId: Id, hasCatalogItem: boolean) {
     event.preventDefault();
     setEditBusy(true);
     setEditError(null);
     setEditSuccess(null);
     try {
+      const year = Number(editYear);
+      const runtime = Number(editRuntime);
+      const pages = Number(editPages);
       await onUpdate(itemId, {
         title: editTitle.trim(),
         description: editDescription.trim(),
         ...(challenge.submissionMode === "item" ? { recommendedByUserId: editRecommendedBy || null } : {}),
+        ...(hasCatalogItem ? {
+          year: Number.isInteger(year) && year > 0 ? year : null,
+          ...(catalogKind === "book"
+            ? { pageCount: Number.isInteger(pages) && pages > 0 ? pages : null }
+            : { runtimeMinutes: Number.isInteger(runtime) && runtime > 0 ? runtime : null }),
+          genres: editGenres.split(",").map((genre) => genre.trim()).filter(Boolean),
+        } : {}),
       });
       setEditingId(null);
       setEditSuccess(challenge.submissionMode === "daily" ? t("checkpointUpdated") : t("itemUpdated"));
@@ -370,15 +395,18 @@ function AdminItems({
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const titles = itemsText.split("\n").map((item) => item.trim()).filter(Boolean);
-    if (challenge.submissionMode !== "daily" && !titles.length) { setError(t("errNoItem")); return; }
     setBusy(true); setError(null); setSuccess(null);
     try {
-      await onAdd(challenge.submissionMode === "daily"
-        ? { generate: { frequency: "daily", startsOn, endsOn } }
-        : { items: titles.map((title) => ({ title })) });
-      setItemsText("");
-      setSuccess(challenge.submissionMode === "daily" ? t("dailyGenerated") : t("itemsAdded"));
+      if (challenge.submissionMode === "daily") {
+        await onAdd({ generate: { frequency: "daily", startsOn, endsOn } });
+        setSuccess(t("dailyGenerated"));
+      } else {
+        const items = cineRowsToInput(newItemRows);
+        if (!items.length) { setError(t("errNoItem")); setBusy(false); return; }
+        await onAdd({ items });
+        setNewItemRows([]);
+        setSuccess(t("itemsAdded"));
+      }
     } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
   }
 
@@ -392,7 +420,7 @@ function AdminItems({
             {[...challenge.items].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)).map((item, index) => (
               <li className="py-4" key={item.id}>
                 {editingId === item.id ? (
-                  <form className="grid gap-3" onSubmit={(event) => void submitEdit(event, item.id)}>
+                  <form className="grid gap-3" onSubmit={(event) => void submitEdit(event, item.id, Boolean(item.catalogItem))}>
                     <div className="flex items-center gap-3">
                       <span className="grid h-8 w-8 flex-none place-items-center rounded-lg bg-[var(--wash)] text-xs font-light text-[var(--muted)]">{index + 1}</span>
                       <strong className="text-sm">{editLabel}</strong>
@@ -400,6 +428,15 @@ function AdminItems({
                     <label><span className={labelClass}>{t("itemTitleLabel")}</span><input className={inputClass} value={editTitle} onChange={(event) => setEditTitle(event.target.value)} required maxLength={challenge.submissionMode === "daily" ? 160 : 200} /></label>
                     <label><span className={labelClass}>{t("itemDescriptionLabel")}</span><textarea className={inputClass} rows={3} value={editDescription} onChange={(event) => setEditDescription(event.target.value)} maxLength={2000} placeholder={t("itemDescriptionPlaceholder")} /></label>
                     {challenge.submissionMode === "item" && members.length ? <label><span className={labelClass}>{t("itemRecommendedBy")}</span><select className={inputClass} value={editRecommendedBy} onChange={(event) => setEditRecommendedBy(event.target.value)}><option value="">{t("itemRecommendedByNone")}</option>{members.map((member) => <option value={member.id} key={member.id}>{member.name}</option>)}</select></label> : null}
+                    {item.catalogItem ? (
+                      <div className="grid gap-2 sm:grid-cols-[110px_110px_1fr]">
+                        <label><span className={labelClass}>{tCine("year")}</span><input className={inputClass} type="number" inputMode="numeric" min={1870} max={2200} value={editYear} onChange={(event) => setEditYear(event.target.value)} /></label>
+                        {catalogKind === "book"
+                          ? <label><span className={labelClass}>{tCine("pages")}</span><input className={inputClass} type="number" inputMode="numeric" min={1} max={100000} value={editPages} onChange={(event) => setEditPages(event.target.value)} /></label>
+                          : <label><span className={labelClass}>{tCine("runtime")}</span><input className={inputClass} type="number" inputMode="numeric" min={1} max={100000} value={editRuntime} onChange={(event) => setEditRuntime(event.target.value)} /></label>}
+                        <label><span className={labelClass}>{tCine("genres")}</span><input className={inputClass} value={editGenres} placeholder={tCine("genresPlaceholder")} onChange={(event) => setEditGenres(event.target.value)} /></label>
+                      </div>
+                    ) : null}
                     <StatusMessage error={editError} />
                     <div className="flex flex-wrap gap-2"><Button type="submit" disabled={editBusy}>{editBusy ? tc("saving") : tc("save")}</Button><Button variant="ghost" disabled={editBusy} onClick={() => { setEditingId(null); setEditError(null); }}>{tc("cancel")}</Button></div>
                   </form>
@@ -426,9 +463,9 @@ function AdminItems({
           : datedDaily && challenge.status === "active" ? <p className="mt-4 text-sm leading-6 text-[var(--muted)]">{t("datedDailyActiveNote")}</p>
           : challenge.submissionMode === "item" && challenge.status === "closed" ? <p className="mt-4 text-sm leading-6 text-[var(--muted)]">{t("itemClosedNote")}</p>
           : <form className="mt-4 space-y-4" onSubmit={submit}>
-          {challenge.submissionMode === "daily" ? <><p className="text-xs leading-5 text-[var(--muted)]">{t("dailyGenNote")}</p><label><span className={labelClass}>{t("firstDay")}</span><input className={inputClass} type="date" value={startsOn} readOnly required /></label><label><span className={labelClass}>{t("lastDay")}</span><input className={inputClass} type="date" min={startsOn} value={endsOn} readOnly required /></label></> : <><label><span className={labelClass}>{t("oneTitlePerLine")}</span><textarea className={inputClass} rows={10} value={itemsText} onChange={(event) => setItemsText(event.target.value)} placeholder={t("itemsTextPlaceholder")} /></label>{challenge.status === "active" ? <p className="text-xs leading-5 text-[var(--muted)]">{t("activeItemsNote")}</p> : null}</>}
+          {challenge.submissionMode === "daily" ? <><p className="text-xs leading-5 text-[var(--muted)]">{t("dailyGenNote")}</p><label><span className={labelClass}>{t("firstDay")}</span><input className={inputClass} type="date" value={startsOn} readOnly required /></label><label><span className={labelClass}>{t("lastDay")}</span><input className={inputClass} type="date" min={startsOn} value={endsOn} readOnly required /></label></> : <><CineItemsEditor value={newItemRows} onChange={setNewItemRows} members={members} groupId={group?.id ?? challenge.groupId} kind={catalogKind} />{challenge.status === "active" ? <p className="text-xs leading-5 text-[var(--muted)]">{t("activeItemsNote")}</p> : null}</>}
           <StatusMessage error={error} success={success} />
-          <Button type="submit" className="w-full" disabled={busy || (challenge.submissionMode === "daily" ? challenge.status !== "draft" : !canAddItems)}>{busy ? tc("saving") : challenge.submissionMode === "daily" ? t("generateCheckpoints") : t("add")}</Button>
+          <Button type="submit" className="w-full" disabled={busy || (challenge.submissionMode === "daily" ? challenge.status !== "draft" : !canAddItems || !newItemRows.length)}>{busy ? tc("saving") : challenge.submissionMode === "daily" ? t("generateCheckpoints") : t("add")}</Button>
         </form>}
       </aside>
     </div>
@@ -689,7 +726,10 @@ export function AdminScreen({
   onSaveParticipants: (ids: Id[]) => Promise<void>;
   onSaveFields: (entryTypeId: Id, fields: ChallengeField[]) => Promise<void>;
   onAddItems: (payload: Record<string, unknown>) => Promise<void>;
-  onUpdateItem: (itemId: Id, payload: { title: string; description: string; recommendedByUserId?: string | null }) => Promise<void>;
+  onUpdateItem: (itemId: Id, payload: {
+    title: string; description: string; recommendedByUserId?: string | null;
+    year?: number | null; runtimeMinutes?: number | null; pageCount?: number | null; genres?: string[];
+  }) => Promise<void>;
   onArchiveItem: (itemId: Id) => Promise<void>;
   onPatchEntry: (entryId: Id, values: Record<Id, unknown>, reason: string) => Promise<void>;
   onExport: () => Promise<void>;

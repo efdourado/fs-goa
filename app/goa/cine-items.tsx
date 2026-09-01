@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { API_PATHS, apiRequest } from "./api";
 import type { CatalogItem, ChallengeItemInput, Id, Member } from "./types";
-import { Button, cx, inputClass, labelClass } from "./ui";
+import { Button, cx, inputClass, labelClass, StatusMessage } from "./ui";
 
 export interface CineRow {
   key: string;
@@ -20,6 +20,52 @@ export interface CineRow {
 
 export function newCineRow(title = "", extra: Partial<CineRow> = {}): CineRow {
   return { key: crypto.randomUUID(), title, recommendedByUserId: "", year: "", runtime: "", pages: "", genres: "", ...extra };
+}
+
+/** Reads any of a small set of aliases off a pasted JSON object, first match wins. */
+function pick(raw: Record<string, unknown>, ...keys: string[]): unknown {
+  for (const key of keys) if (raw[key] !== undefined && raw[key] !== null) return raw[key];
+  return undefined;
+}
+
+function asFieldString(value: unknown): string {
+  return value === undefined || value === null ? "" : String(value);
+}
+
+/**
+ * Parses a pasted JSON array of `{title, year, runtimeMinutes|pageCount, genres}`
+ * objects into rows — the "already have the list ready" fast path, as an
+ * alternative to typing titles one by one. Throws a translation key on failure.
+ */
+export function parseJsonItemsPaste(text: string, existingTitles: Set<string>): CineRow[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error("jsonInvalid");
+  }
+  if (!Array.isArray(parsed)) throw new Error("jsonMustBeArray");
+  const known = new Set(existingTitles);
+  const rows: CineRow[] = [];
+  for (const entry of parsed) {
+    if (!entry || typeof entry !== "object") continue;
+    const raw = entry as Record<string, unknown>;
+    const title = typeof raw.title === "string" ? raw.title.trim() : "";
+    if (!title || known.has(title.toLowerCase())) continue;
+    known.add(title.toLowerCase());
+    const genresValue = pick(raw, "genres", "genre");
+    const genres = Array.isArray(genresValue)
+      ? genresValue.filter((value): value is string => typeof value === "string").join(", ")
+      : typeof genresValue === "string" ? genresValue : "";
+    rows.push(newCineRow(title, {
+      year: asFieldString(pick(raw, "year")),
+      runtime: asFieldString(pick(raw, "runtimeMinutes", "runtime", "duration", "durationMinutes")),
+      pages: asFieldString(pick(raw, "pageCount", "pages")),
+      genres,
+    }));
+  }
+  if (!rows.length) throw new Error("jsonNoItems");
+  return rows;
 }
 
 export function cineRowsToInput(rows: CineRow[]): ChallengeItemInput[] {
@@ -60,6 +106,8 @@ export function CineItemsEditor({
 }) {
   const t = useTranslations("cineItems");
   const [paste, setPaste] = useState("");
+  const [pasteMode, setPasteMode] = useState<"simple" | "json">("simple");
+  const [pasteError, setPasteError] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<CatalogItem[] | null>(null);
   const [showCatalog, setShowCatalog] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -85,6 +133,18 @@ export function CineItemsEditor({
     onChange(value.filter((row) => row.key !== key));
   }
   function appendPaste() {
+    setPasteError(null);
+    if (pasteMode === "json") {
+      const known = new Set(value.map((row) => row.title.trim().toLowerCase()));
+      try {
+        const rows = parseJsonItemsPaste(paste, known);
+        onChange([...value, ...rows]);
+        setPaste("");
+      } catch (cause) {
+        setPasteError(t(cause instanceof Error ? cause.message : "jsonInvalid"));
+      }
+      return;
+    }
     const titles = paste.split("\n").map((line) => line.trim()).filter(Boolean);
     if (!titles.length) return;
     const known = new Set(value.map((row) => row.title.trim().toLowerCase()));
@@ -137,9 +197,25 @@ export function CineItemsEditor({
       ) : null}
 
       <div className="rounded-2xl border border-dashed border-[var(--main-line)] bg-[var(--main-soft)]/50 p-3">
-        <label className="block"><span className={labelClass}>{t("pasteLabel")}</span>
-          <textarea className={inputClass} rows={4} value={paste} onChange={(event) => setPaste(event.target.value)} placeholder={t("pastePlaceholder")} />
+        <div className="mb-2 flex gap-1 rounded-full bg-[var(--paper)] p-1 text-xs" role="tablist" aria-label={t("pasteModeAria")}>
+          {(["simple", "json"] as const).map((mode) => (
+            <button
+              type="button"
+              key={mode}
+              role="tab"
+              aria-selected={pasteMode === mode}
+              className={cx("min-h-9 flex-1 rounded-full px-3 font-light", pasteMode === mode ? "bg-[var(--main-soft)] text-[var(--main-strong)]" : "text-[var(--muted)] hover:text-[var(--ink)]")}
+              onClick={() => { setPasteMode(mode); setPasteError(null); }}
+            >
+              {mode === "simple" ? t("pasteModeSimple") : t("pasteModeJson")}
+            </button>
+          ))}
+        </div>
+        <label className="block"><span className={labelClass}>{pasteMode === "json" ? t("pasteJsonLabel") : t("pasteLabel")}</span>
+          <textarea className={cx(inputClass, pasteMode === "json" ? "font-mono text-xs" : "")} rows={pasteMode === "json" ? 8 : 4} value={paste} onChange={(event) => setPaste(event.target.value)} placeholder={pasteMode === "json" ? t(kind === "book" ? "pasteJsonPlaceholderBook" : "pasteJsonPlaceholderFilm") : t("pastePlaceholder")} />
         </label>
+        {pasteMode === "json" ? <p className="mb-2 text-xs leading-5 text-[var(--muted)]">{t("pasteJsonHint")}</p> : null}
+        <StatusMessage error={pasteError} />
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={appendPaste} disabled={!paste.trim()}>{t("addPasted")}</Button>
           <Button variant="ghost" onClick={() => setShowCatalog((open) => !open)}>{showCatalog ? t("hideCatalog") : t("fromCatalog")}</Button>

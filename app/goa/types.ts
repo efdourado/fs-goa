@@ -111,7 +111,7 @@ export interface ChallengeItem {
   dueAt?: string | null;
   date?: string | null;
   status?: "scheduled" | "open" | "past_due" | "closed";
-  catalogItem?: Pick<CatalogItem, "id" | "title" | "year" | "runtimeMinutes" | "genres"> | null;
+  catalogItem?: Pick<CatalogItem, "id" | "title" | "year" | "runtimeMinutes" | "pageCount" | "genres"> | null;
   recommendedBy?: { id: Id; name: string } | null;
 }
 
