@@ -69,6 +69,7 @@ export async function addChallengeItem(
 ) {
   const title = stringValue(body, "title", { max: 200 })!;
   const description = stringValue(body, "description", { max: 2_000, optional: true }) ?? null;
+  const author = stringValue(body, "author", { max: 200, optional: true }) ?? null;
   return inTransaction(async (client) => {
     const access = await challengeAccess(session.user.id, challengeId, client, true);
     if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores podem criar itens.");
@@ -76,14 +77,20 @@ export async function addChallengeItem(
     const types = await entryTypesForChallenge(client, challengeId);
     if (!usesRoundItems(types)) throw new ApiError(409, "invalid_mode", "Este desafio não usa itens.");
     const catalogKind = recipeCatalogKind(access.challenge.recipe_key) ?? "film";
+    if (catalogKind === "book" && !author) {
+      throw new ApiError(400, "invalid_item", "Informe o autor de cada livro.");
+    }
     const position = integerValue(body.position, 0, 0, 10_000);
     const id = publicId();
     let catalogItemId: string;
     if (typeof body.catalogItemId === "string" && body.catalogItemId) {
       await assertCatalogItemInGroup(client, body.catalogItemId, access.challenge.group_id, catalogKind);
       catalogItemId = body.catalogItemId;
+      if (author) {
+        await applyCatalogItemUpdate(client, catalogItemId, access.challenge.group_id, { author });
+      }
     } else {
-      catalogItemId = await upsertCatalogItem(client, access.challenge.group_id, session.user.id, { kind: catalogKind, title });
+      catalogItemId = await upsertCatalogItem(client, access.challenge.group_id, session.user.id, { kind: catalogKind, title, author });
     }
     await client.query(
       `INSERT INTO challenge_items
@@ -149,6 +156,10 @@ export async function saveChallengeItems(
       const item = asRecord(requestedItems[index]);
       const title = typeof item.title === "string" ? item.title.trim() : "";
       if (!title) throw new ApiError(400, "invalid_item", "Item sem título.");
+      const author = typeof item.author === "string" ? item.author.trim() : "";
+      if (catalogKind === "book" && !author) {
+        throw new ApiError(400, "invalid_item", "Informe o autor de cada livro.");
+      }
       const id = publicId();
       const position = (base?.position ?? 0) + index;
 
@@ -156,9 +167,12 @@ export async function saveChallengeItems(
       if (typeof item.catalogItemId === "string" && item.catalogItemId) {
         await assertCatalogItemInGroup(client, item.catalogItemId, access.challenge.group_id, catalogKind);
         catalogItemId = item.catalogItemId;
+        if (author) {
+          await applyCatalogItemUpdate(client, catalogItemId, access.challenge.group_id, { author });
+        }
       } else {
         catalogItemId = await upsertCatalogItem(client, access.challenge.group_id, session.user.id, {
-          kind: catalogKind, title, year: item.year, runtimeMinutes: item.runtimeMinutes,
+          kind: catalogKind, title, author: item.author, year: item.year, runtimeMinutes: item.runtimeMinutes,
           pageCount: item.pageCount,
         });
       }
@@ -258,6 +272,11 @@ export async function updateChallengeItem(
       const description = body.description === undefined
         ? current.description
         : stringValue(body, "description", { max: 2_000, optional: true }) ?? null;
+      if (recipeCatalogKind(access.challenge.recipe_key) === "book"
+        && Object.hasOwn(body, "author")
+        && !(typeof body.author === "string" && body.author.trim())) {
+        throw new ApiError(400, "invalid_item", "Informe o autor de cada livro.");
+      }
       const touchesRecommender = Object.hasOwn(body, "recommendedByUserId");
       let recommendedBy = current.recommended_by_user_id;
       if (touchesRecommender) {
@@ -282,7 +301,7 @@ export async function updateChallengeItem(
       // no item do desafio — atualizá-los aqui é o que deixa "esqueci de preencher
       // na criação" corrigível depois, sem duplicar a lógica de `updateCatalogItem`.
       if (current.catalog_item_id
-        && (Object.hasOwn(body, "year") || Object.hasOwn(body, "runtimeMinutes")
+        && (Object.hasOwn(body, "author") || Object.hasOwn(body, "year") || Object.hasOwn(body, "runtimeMinutes")
           || Object.hasOwn(body, "pageCount") || Object.hasOwn(body, "genres"))) {
         await applyCatalogItemUpdate(client, current.catalog_item_id, access.challenge.group_id, body);
       }

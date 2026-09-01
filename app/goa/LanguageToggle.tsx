@@ -43,7 +43,7 @@ export function LanguageToggle({ className }: { className?: string }) {
             aria-pressed={isActive}
             title={t(value)}
             className={cx(
-              "h-7 cursor-pointer rounded-md px-2.5 text-xs font-semibold transition disabled:cursor-progress",
+              "h-7 cursor-pointer rounded-md px-2.5 text-xs font-medium transition disabled:cursor-progress",
               isActive
                 ? "bg-[var(--paper)] text-[var(--ink)] shadow-[var(--elevate-1)]"
                 : "text-[var(--muted)] hover:text-[var(--ink)]",

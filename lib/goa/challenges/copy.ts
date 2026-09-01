@@ -87,12 +87,12 @@ export async function copyChallengeStructure(
   const sourceItems = await client.query<{
     entry_type_id: string | null; semantic_key: string; title: string;
     description: string | null; position: number; metadata: unknown;
-    catalog_kind: string | null; catalog_title: string | null;
+    catalog_kind: string | null; catalog_title: string | null; catalog_author: string | null;
     catalog_year: number | null; catalog_runtime: number | null; catalog_pages: number | null;
     catalog_item_id: string | null;
   }>(
     `SELECT i.entry_type_id,i.semantic_key,i.title,i.description,i.position,i.metadata,i.catalog_item_id,
-            ci.kind AS catalog_kind, ci.title AS catalog_title, ci.year AS catalog_year,
+            ci.kind AS catalog_kind, ci.title AS catalog_title, ci.author AS catalog_author, ci.year AS catalog_year,
             ci.runtime_minutes AS catalog_runtime, ci.page_count AS catalog_pages
        FROM challenge_items i
        LEFT JOIN catalog_items ci ON ci.id = i.catalog_item_id
@@ -105,6 +105,7 @@ export async function copyChallengeStructure(
       catalogItemId = await upsertCatalogItem(client, targetGroupId, createdByUserId, {
         kind: source.catalog_kind as "film" | "book" | "other",
         title: source.catalog_title ?? source.title,
+        author: source.catalog_author,
         year: source.catalog_year,
         runtimeMinutes: source.catalog_runtime,
         pageCount: source.catalog_pages,

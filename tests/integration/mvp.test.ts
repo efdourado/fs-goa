@@ -1543,27 +1543,6 @@ test("fase 0: feedback, link de reunião e remoção da própria conta", async (
   const inv = await call("POST", `/api/groups/${sharedGroupId}/invites`, { session: host, body: { expiresInDays: 7, maxUses: 1 } });
   await call("POST", `/api/invites/${(inv.body as { token: string }).token}`, { session: guest, body: {} });
 
-  // link de reunião: não-https recusado, https aceito e visível no detalhe
-  const badMeeting = await call("POST", `/api/groups/${soloGroupId}/challenges`, {
-    session: host,
-    body: { template: "cine", title: "Sem link", submissionMode: "item", meetingUrl: "meet.example.com", items: [{ title: "A" }], fields: [{ key: "nota", label: "Nota", type: "rating", required: true }] },
-  });
-  assert.equal(badMeeting.response.status, 400, "link de reunião precisa ser https://");
-
-  const withMeeting = await call("POST", `/api/groups/${soloGroupId}/challenges`, {
-    session: host,
-    body: { template: "cine", title: "Com link", submissionMode: "item", meetingUrl: "https://meet.example.com/goa", items: [{ title: "A" }], fields: [{ key: "nota", label: "Nota", type: "rating", required: true }] },
-  });
-  assert.equal(withMeeting.response.status, 201, JSON.stringify(withMeeting.body));
-  const meetingChallengeId = (withMeeting.body as { id: string }).id;
-  const detail = await call("GET", `/api/challenges/${meetingChallengeId}`, { session: host });
-  assert.equal((detail.body as { meetingUrl: string }).meetingUrl, "https://meet.example.com/goa");
-
-  const cleared = await call("PATCH", `/api/challenges/${meetingChallengeId}`, { session: host, body: { meetingUrl: "" } });
-  assert.equal(cleared.response.status, 200, JSON.stringify(cleared.body));
-  const afterClear = await call("GET", `/api/challenges/${meetingChallengeId}`, { session: host });
-  assert.equal((afterClear.body as { meetingUrl: string | null }).meetingUrl, null, "link de reunião pode ser removido");
-
   // remoção da conta: bloqueada enquanto há grupo com outra pessoa
   const blocked = await call("DELETE", "/api/account", { session: host });
   assert.equal(blocked.response.status, 409, "não apaga a conta com um grupo compartilhado");
@@ -1808,11 +1787,24 @@ test("fundação: dois livros no mesmo dia, conclusão e nota sem comentário", 
   const owner = await register("Lúcia", "lucia_found");
   const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube de leitura" } })).body as { id: string }).id;
 
+  // livro sem autor é recusado — autor é obrigatório para o clube de leitura
+  const noAuthor = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "reading_club", title: "Sem autor", participantIds: [owner.user.id],
+      items: [{ title: "Norwegian Wood" }],
+    },
+  });
+  assert.equal(noAuthor.response.status, 400, "livro precisa de autor");
+
   const created = await call("POST", `/api/groups/${gid}/challenges`, {
     session: owner,
     body: {
       recipe: "reading_club", title: "Temporada 1", participantIds: [owner.user.id],
-      items: [{ title: "Norwegian Wood" }, { title: "Kafka à Beira-Mar" }],
+      items: [
+        { title: "Norwegian Wood", author: "Haruki Murakami" },
+        { title: "Kafka à Beira-Mar", author: "Haruki Murakami" },
+      ],
     },
   });
   assert.equal(created.response.status, 201, JSON.stringify(created.body));
@@ -1871,11 +1863,18 @@ test("fundação: dois livros no mesmo dia, conclusão e nota sem comentário", 
 
   // #9c: a nota do livro fica no tipo `completion`; a memória do acervo enxerga.
   const bookCatalog = (await call("GET", `/api/groups/${gid}/catalog`, { session: owner })).body as {
-    items: Array<{ title: string; ratingAvg: number | null; ratingCount: number }>;
+    items: Array<{ title: string; author: string | null; ratingAvg: number | null; ratingCount: number }>;
   };
   const norwegianCatalog = bookCatalog.items.find((entry) => entry.title === "Norwegian Wood");
   assert.equal(norwegianCatalog?.ratingCount, 1, "avaliação de livro no tipo completion conta no acervo");
   assert.equal(norwegianCatalog?.ratingAvg, 5);
+  assert.equal(norwegianCatalog?.author, "Haruki Murakami", "autor do livro fica no acervo");
+  assert.equal(
+    (detail.body as { items: Array<{ title: string; catalogItem: { author: string | null } | null }> })
+      .items.find((item) => item.title === "Norwegian Wood")?.catalogItem?.author,
+    "Haruki Murakami",
+    "autor aparece no item do desafio",
+  );
 });
 
 test("Cine Curadoria: expectativa e avaliação coexistem, e a expectativa trava ao avaliar", async () => {
@@ -2186,4 +2185,44 @@ test("auditoria de correção de registro guarda só metadados", async () => {
   assert.deepEqual([...(audit.rows[0].metadata.fields ?? [])].sort(), [commentField, ratingField].sort());
   assert.equal(audit.rows[0].metadata.reason, "ajuste combinado");
   assert.doesNotMatch(JSON.stringify(audit.rows[0]), /texto secreto/, "nenhum conteúdo do participante na auditoria");
+});
+
+test("desafio pessoal: workspace criado sob demanda, invisível como grupo e reusado", async () => {
+  const owner = await register("Solange", "sol_personal");
+
+  const before = await call("GET", "/api/bootstrap", { session: owner });
+  assert.equal((before.body as { personalWorkspaceId: string | null }).personalWorkspaceId, null);
+  const groupsBefore = (before.body as { groups: Array<{ id: string }> }).groups.length;
+
+  const first = await call("POST", "/api/personal/challenges", {
+    session: owner,
+    body: { recipe: "cine_free", title: "Minha maratona", items: [{ title: "Stalker", year: 1979 }] },
+  });
+  assert.equal(first.response.status, 201, JSON.stringify(first.body));
+  const firstId = (first.body as { id: string }).id;
+
+  const after = await call("GET", "/api/bootstrap", { session: owner });
+  const workspaceId = (after.body as { personalWorkspaceId: string | null }).personalWorkspaceId;
+  assert.ok(workspaceId, "workspace pessoal existe depois do primeiro desafio");
+  const groups = (after.body as { groups: Array<{ id: string; kind?: string }> }).groups;
+  assert.equal(groups.length, groupsBefore + 1);
+  assert.equal(groups.find((group) => group.id === workspaceId)?.kind, "personal");
+  const challenges = (after.body as { challenges: Array<{ id: string; groupId: string }> }).challenges;
+  assert.equal(challenges.find((challenge) => challenge.id === firstId)?.groupId, workspaceId);
+
+  // segundo desafio pessoal reusa o mesmo workspace
+  const second = await call("POST", "/api/personal/challenges", {
+    session: owner,
+    body: { recipe: "reading_daily", title: "90 dias", startsOn: "2024-01-01", endsOn: "2024-01-30" },
+  });
+  assert.equal(second.response.status, 201, JSON.stringify(second.body));
+  const afterSecond = await call("GET", "/api/bootstrap", { session: owner });
+  assert.equal((afterSecond.body as { personalWorkspaceId: string }).personalWorkspaceId, workspaceId);
+  assert.equal((afterSecond.body as { groups: unknown[] }).groups.length, groupsBefore + 1, "sem grupo novo");
+
+  // o workspace pessoal não conta contra o limite de grupos do dono
+  for (let index = 0; index < 6; index += 1) {
+    const group = await call("POST", "/api/groups", { session: owner, body: { name: `Grupo ${index}` } });
+    assert.equal(group.response.status, 201, `grupo ${index}: ${JSON.stringify(group.body)}`);
+  }
 });

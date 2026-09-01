@@ -14,6 +14,7 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
         groupsPerMember: LIMITS.groupsPerMember,
         pendingInvitesPerUser: LIMITS.pendingInvitesPerUser,
       },
+      personalWorkspaceId: null,
       groups: [],
       challenges: [],
       memberRequests: [],
@@ -25,10 +26,11 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
       id: string;
       name: string;
       description: string | null;
+      kind: "standard" | "personal";
       role: GroupRole;
       member_count: number;
     }>(
-      `SELECT g.id, g.name, g.description, gm.role,
+      `SELECT g.id, g.name, g.description, g.kind, gm.role,
               count(active_members.user_id)::int AS member_count
          FROM groups g
          JOIN group_members gm ON gm.group_id = g.id
@@ -40,6 +42,8 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
         ORDER BY g.created_at`,
       [session.user.id],
     );
+    const personalWorkspaceId =
+      groupsResult.rows.find((group) => group.kind === "personal")?.id ?? null;
     const groupIds = groupsResult.rows.map((group) => group.id);
     const membersByGroup = new Map<string, Array<Record<string, unknown>>>();
     if (groupIds.length) {
@@ -179,10 +183,12 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
         groupsPerMember: LIMITS.groupsPerMember,
         pendingInvitesPerUser: LIMITS.pendingInvitesPerUser,
       },
+      personalWorkspaceId,
       groups: groupsResult.rows.map((group) => ({
         id: group.id,
         name: group.name,
         description: group.description,
+        kind: group.kind,
         role: group.role,
         memberCount: group.member_count,
         members: membersByGroup.get(group.id) ?? [],

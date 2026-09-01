@@ -313,7 +313,7 @@ function UsageTab({ overview }: { overview: Overview | null }) {
             <li key={table.name} className="grid grid-cols-[1fr_auto] items-center gap-3">
               <div>
                 <div className="flex justify-between text-xs">
-                  <span className="font-semibold">{table.name}</span>
+                  <span className="font-medium">{table.name}</span>
                   <span className={muted}>{formatBytes(table.bytes)}</span>
                 </div>
                 <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-black/[0.06]">
@@ -441,8 +441,8 @@ function FeedbackTab({ items }: { items: FeedbackItem[] | null }) {
             {item.ease != null ? <span className={cx("text-xs", muted)}>facilidade {item.ease}/5</span> : null}
           </div>
           <p className="mt-2 leading-6">{item.goal}</p>
-          {item.friction ? <p className={cx("mt-1 leading-6", muted)}><span className="font-semibold">Atrapalhou:</span> {item.friction}</p> : null}
-          {item.wish ? <p className={cx("mt-1 leading-6", muted)}><span className="font-semibold">Pediu:</span> {item.wish}</p> : null}
+          {item.friction ? <p className={cx("mt-1 leading-6", muted)}><span className="font-medium">Atrapalhou:</span> {item.friction}</p> : null}
+          {item.wish ? <p className={cx("mt-1 leading-6", muted)}><span className="font-medium">Pediu:</span> {item.wish}</p> : null}
           {item.workaround ? <p className={cx("mt-1", muted)}>Hoje resolve com: {item.workaround}</p> : null}
           <p className={cx("mt-2 text-xs", muted)}>
             {item.username ? `@${item.username}` : "anônimo"} · {formatDateTime(item.createdAt)}

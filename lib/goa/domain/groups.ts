@@ -63,7 +63,9 @@ export async function assertUnderMembershipCap(
 ): Promise<void> {
   const counted = await oneOrNull<{ count: number }>(
     client,
-    "SELECT count(*)::int AS count FROM group_members WHERE user_id = $1 AND removed_at IS NULL",
+    `SELECT count(*)::int AS count FROM group_members gm
+       JOIN groups g ON g.id = gm.group_id AND g.kind = 'standard'
+      WHERE gm.user_id = $1 AND gm.removed_at IS NULL`,
     [userId],
   );
   assertUnder(
@@ -99,7 +101,8 @@ export async function createGroup(session: SessionContext, body: Record<string, 
     const owned = await oneOrNull<{ count: number }>(
       client,
       `SELECT count(*)::int AS count FROM groups
-        WHERE owner_user_id = $1 AND deleted_at IS NULL AND archived_at IS NULL`,
+        WHERE owner_user_id = $1 AND kind = 'standard'
+          AND deleted_at IS NULL AND archived_at IS NULL`,
       [session.user.id],
     );
     assertUnder(

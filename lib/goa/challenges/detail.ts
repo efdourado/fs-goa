@@ -16,7 +16,6 @@ import { fieldsForChallenge } from "./fields";
 import { generateDailyCheckpoints } from "./items";
 import { metricsForChallenge, resultForChallenge } from "./results";
 import { parseRuleSections, rulesCompatibilityText } from "../domain/rules";
-import { meetingUrlValue } from "../domain/shared";
 
 function windowStatus(
   challengeStatus: "draft" | "active" | "closed",
@@ -38,12 +37,13 @@ export async function getChallengeDetail(session: SessionContext, challengeId: s
         id: string; title: string; description: string | null;
         position: number; opens_at: Date | null; due_at: Date | null;
         checkpoint_id: string | null;
-        catalog_item_id: string | null; catalog_title: string | null; catalog_year: number | null;
+        catalog_item_id: string | null; catalog_title: string | null;
+        catalog_author: string | null; catalog_year: number | null;
         catalog_runtime: number | null; catalog_pages: number | null;
         recommended_by_id: string | null; recommended_by_name: string | null;
       }>(
         `SELECT i.id, i.title, i.description, i.position, i.opens_at, i.due_at, i.checkpoint_id,
-                i.catalog_item_id, ci.title AS catalog_title, ci.year AS catalog_year,
+                i.catalog_item_id, ci.title AS catalog_title, ci.author AS catalog_author, ci.year AS catalog_year,
                 ci.runtime_minutes AS catalog_runtime, ci.page_count AS catalog_pages,
                 i.recommended_by_user_id AS recommended_by_id, ru.display_name AS recommended_by_name
            FROM challenge_items i
@@ -140,6 +140,7 @@ export async function getChallengeDetail(session: SessionContext, challengeId: s
         ? {
             id: item.catalog_item_id,
             title: item.catalog_title ?? item.title,
+            author: item.catalog_author,
             year: item.catalog_year,
             runtimeMinutes: item.catalog_runtime,
             pageCount: item.catalog_pages,
@@ -165,7 +166,6 @@ export async function getChallengeDetail(session: SessionContext, challengeId: s
       startsOn: access.challenge.start_date,
       endsOn: access.challenge.end_date,
       status: access.challenge.status,
-      meetingUrl: access.challenge.meeting_url,
       recipeKey: access.challenge.recipe_key ?? null,
       resultsAnon: access.challenge.results_anon,
       submissionMode,
@@ -200,9 +200,6 @@ export async function updateChallenge(
     const description = body.description === undefined
       ? access.challenge.description
       : stringValue(body, "description", { max: 2_000, optional: true }) ?? null;
-    const meetingUrl = Object.hasOwn(body, "meetingUrl")
-      ? meetingUrlValue(body.meetingUrl)
-      : access.challenge.meeting_url;
     const ruleSections = body.ruleSections === undefined && body.rules === undefined
       ? parseRuleSections(access.challenge.rule_sections, access.challenge.rules)
       : parseRuleSections(body.ruleSections, body.rules);
@@ -260,9 +257,9 @@ export async function updateChallenge(
     }
 
     await client.query(
-      `UPDATE challenges SET title=$2, description=$3, meeting_url=$4, rules=$5, rule_sections=$6::jsonb,
-              start_date=$7, end_date=$8, updated_at=now() WHERE id=$1`,
-      [challengeId, title, description, meetingUrl, rules, JSON.stringify(ruleSections), startDate, endDate],
+      `UPDATE challenges SET title=$2, description=$3, rules=$4, rule_sections=$5::jsonb,
+              start_date=$6, end_date=$7, updated_at=now() WHERE id=$1`,
+      [challengeId, title, description, rules, JSON.stringify(ruleSections), startDate, endDate],
     );
     if (
       checkpointDriven
@@ -283,10 +280,9 @@ export async function updateChallenge(
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
       "challenge.updated", "challenge", challengeId,
       { title: access.challenge.title, description: access.challenge.description,
-        meetingUrl: access.challenge.meeting_url,
         ruleSections: parseRuleSections(access.challenge.rule_sections, access.challenge.rules),
         startsOn: access.challenge.start_date, endsOn: access.challenge.end_date },
-      { title, description, meetingUrl, ruleSections, startsOn: startDate, endsOn: endDate });
-    return { id: challengeId, title, description, meetingUrl, rules, ruleSections, startsOn: startDate, endsOn: endDate };
+      { title, description, ruleSections, startsOn: startDate, endsOn: endDate });
+    return { id: challengeId, title, description, rules, ruleSections, startsOn: startDate, endsOn: endDate };
   });
 }

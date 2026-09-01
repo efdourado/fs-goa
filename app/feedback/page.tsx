@@ -24,7 +24,7 @@ export default async function FeedbackPage() {
         </div>
       </header>
       <main className="mx-auto max-w-2xl px-4 py-10 sm:px-6 sm:py-14">
-        <h1 className="text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">{t("title")}</h1>
+        <h1 className="text-3xl font-medium tracking-[-0.04em] sm:text-4xl">{t("title")}</h1>
         <p className="mt-3 text-base leading-7 text-[var(--muted)]">{t("lede")}</p>
         <div className="mt-8">
           <FeedbackForm />

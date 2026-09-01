@@ -72,7 +72,6 @@ function AdminOverview({
   const longDate: Intl.DateTimeFormatOptions = { day: "2-digit", month: "long", year: "numeric" };
   const [title, setTitle] = useState(challenge.title);
   const [description, setDescription] = useState(challenge.description ?? "");
-  const [meetingUrl, setMeetingUrl] = useState(challenge.meetingUrl ?? "");
   const [ruleSections, setRuleSections] = useState(() => visibleRuleSections(challenge.ruleSections, challenge.rules, trules("legacyTitle")));
   const [scheduleMode, setScheduleMode] = useState<"period" | "none">(
     challenge.startsOn && challenge.endsOn ? "period" : "none",
@@ -116,14 +115,9 @@ function AdminOverview({
       setError(t("errEndBeforeStart"));
       return;
     }
-    if (meetingUrl.trim() && !/^https:\/\/\S+$/u.test(meetingUrl.trim())) {
-      setError(t("errMeetingUrl"));
-      return;
-    }
     void run("save", () => onSave({
       title: title.trim(),
       description: description.trim(),
-      meetingUrl: meetingUrl.trim() || null,
       ruleSections: ruleSections.map((rule) => ({
         title: rule.title.trim(),
         description: rule.description.trim(),
@@ -166,7 +160,6 @@ function AdminOverview({
             <SchedulePeriodFields startsOn={startsOn} endsOn={endsOn} onStartsOn={setStartsOn} onEndsOn={setEndsOn} disabled={challenge.status === "closed"} />
           ) : <p className="sm:col-span-2 rounded-xl bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{t("noPeriodNote")}</p>}
           <label className="sm:col-span-2"><span className={labelClass}>{t("descriptionLabel")}</span><textarea className={inputClass} rows={3} value={description} onChange={(event) => setDescription(event.target.value)} maxLength={1000} disabled={challenge.status === "closed"} /></label>
-          <label className="sm:col-span-2"><span className={labelClass}>{t("meetingLabel")}</span><input className={inputClass} type="url" inputMode="url" value={meetingUrl} onChange={(event) => setMeetingUrl(event.target.value)} maxLength={2000} placeholder="https://meet.example.com/…" disabled={challenge.status === "closed"} /><small className="mt-1 block text-xs text-[var(--muted)]">{t("meetingHint")}</small></label>
           <div className="sm:col-span-2"><div className="mb-3"><span className={labelClass}>{t("rulesLabel")}</span><p className="text-xs leading-5 text-[var(--muted)]">{t("rulesHint")}</p></div><RuleSectionsEditor value={ruleSections} onChange={setRuleSections} disabled={challenge.status === "closed"} /></div>
           {challenge.status !== "closed" ? <div className="sm:col-span-2"><Button type="submit" disabled={busy === "save"}>{busy === "save" ? tc("saving") : t("saveBasics")}</Button></div> : null}
         </form>
@@ -302,7 +295,7 @@ function AdminItems({
   onAdd: (payload: Record<string, unknown>) => Promise<void>;
   onUpdate: (itemId: Id, payload: {
     title: string; description: string; recommendedByUserId?: string | null;
-    year?: number | null; runtimeMinutes?: number | null; pageCount?: number | null; genres?: string[];
+    author?: string; year?: number | null; runtimeMinutes?: number | null; pageCount?: number | null; genres?: string[];
   }) => Promise<void>;
   onArchive: (itemId: Id) => Promise<void>;
 }) {
@@ -327,6 +320,7 @@ function AdminItems({
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editRecommendedBy, setEditRecommendedBy] = useState("");
+  const [editAuthor, setEditAuthor] = useState("");
   const [editYear, setEditYear] = useState("");
   const [editRuntime, setEditRuntime] = useState("");
   const [editPages, setEditPages] = useState("");
@@ -356,6 +350,7 @@ function AdminItems({
     setEditTitle(item.title);
     setEditDescription(item.description ?? "");
     setEditRecommendedBy(item.recommendedBy?.id ?? "");
+    setEditAuthor(item.catalogItem?.author ?? "");
     setEditYear(item.catalogItem?.year ? String(item.catalogItem.year) : "");
     setEditRuntime(item.catalogItem?.runtimeMinutes ? String(item.catalogItem.runtimeMinutes) : "");
     setEditPages(item.catalogItem?.pageCount ? String(item.catalogItem.pageCount) : "");
@@ -366,6 +361,10 @@ function AdminItems({
 
   async function submitEdit(event: FormEvent<HTMLFormElement>, itemId: Id, hasCatalogItem: boolean) {
     event.preventDefault();
+    if (hasCatalogItem && catalogKind === "book" && !editAuthor.trim()) {
+      setEditError(tCine("authorRequired"));
+      return;
+    }
     setEditBusy(true);
     setEditError(null);
     setEditSuccess(null);
@@ -380,7 +379,7 @@ function AdminItems({
         ...(hasCatalogItem ? {
           year: Number.isInteger(year) && year > 0 ? year : null,
           ...(catalogKind === "book"
-            ? { pageCount: Number.isInteger(pages) && pages > 0 ? pages : null }
+            ? { author: editAuthor.trim(), pageCount: Number.isInteger(pages) && pages > 0 ? pages : null }
             : { runtimeMinutes: Number.isInteger(runtime) && runtime > 0 ? runtime : null }),
           genres: editGenres.split(",").map((genre) => genre.trim()).filter(Boolean),
         } : {}),
@@ -404,6 +403,9 @@ function AdminItems({
       } else {
         const items = cineRowsToInput(newItemRows);
         if (!items.length) { setError(t("errNoItem")); setBusy(false); return; }
+        if (catalogKind === "book" && newItemRows.some((row) => row.title.trim() && !row.author.trim())) {
+          setError(tCine("authorRequired")); setBusy(false); return;
+        }
         await onAdd({ items });
         setNewItemRows([]);
         setSuccess(t("itemsAdded"));
@@ -429,6 +431,9 @@ function AdminItems({
                     <label><span className={labelClass}>{t("itemTitleLabel")}</span><input className={inputClass} value={editTitle} onChange={(event) => setEditTitle(event.target.value)} required maxLength={challenge.submissionMode === "daily" ? 160 : 200} /></label>
                     <label><span className={labelClass}>{t("itemDescriptionLabel")}</span><textarea className={inputClass} rows={3} value={editDescription} onChange={(event) => setEditDescription(event.target.value)} maxLength={2000} placeholder={t("itemDescriptionPlaceholder")} /></label>
                     {challenge.submissionMode === "item" && members.length ? <label><span className={labelClass}>{t("itemRecommendedBy")}</span><select className={inputClass} value={editRecommendedBy} onChange={(event) => setEditRecommendedBy(event.target.value)}><option value="">{t("itemRecommendedByNone")}</option>{members.map((member) => <option value={member.id} key={member.id}>{member.name}</option>)}</select></label> : null}
+                    {item.catalogItem && catalogKind === "book" ? (
+                      <label><span className={labelClass}>{tCine("author")}</span><input className={cx(inputClass, editAuthor.trim() ? "" : "border-[var(--danger)]")} value={editAuthor} maxLength={200} placeholder={tCine("authorPlaceholder")} onChange={(event) => setEditAuthor(event.target.value)} /></label>
+                    ) : null}
                     {item.catalogItem ? (
                       <div className="grid gap-2 sm:grid-cols-[110px_110px_1fr]">
                         <label><span className={labelClass}>{tCine("year")}</span><input className={inputClass} type="number" inputMode="numeric" min={1870} max={2200} value={editYear} onChange={(event) => setEditYear(event.target.value)} /></label>
@@ -445,7 +450,7 @@ function AdminItems({
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex min-w-0 gap-3">
                       <span className="grid h-8 w-8 flex-none place-items-center rounded-lg bg-[var(--wash)] text-xs font-light text-[var(--muted)]">{index + 1}</span>
-                      <span className="min-w-0"><strong className="block text-sm">{item.title}</strong>{item.description ? <span className="mt-1 block text-sm leading-6 text-[var(--muted)]">{item.description}</span> : null}{item.recommendedBy || item.catalogItem?.year || item.catalogItem?.genres.length ? <small className="mt-1 block text-[var(--muted)]">{[item.recommendedBy ? t("itemRecommendedByLine", { name: item.recommendedBy.name }) : null, item.catalogItem?.year ? String(item.catalogItem.year) : null, item.catalogItem?.genres.length ? item.catalogItem.genres.join(", ") : null].filter(Boolean).join(" · ")}</small> : null}<small className="mt-1 block text-[var(--muted)]">{item.date ? f.date(item.date) : item.opensAt || item.dueAt ? t("itemWindow", { opens: f.date(item.opensAt), due: f.date(item.dueAt) }) : t("itemNoWindow")}</small></span>
+                      <span className="min-w-0"><strong className="block text-sm">{item.title}</strong>{item.description ? <span className="mt-1 block text-sm leading-6 text-[var(--muted)]">{item.description}</span> : null}{item.recommendedBy || item.catalogItem?.author || item.catalogItem?.year || item.catalogItem?.genres.length ? <small className="mt-1 block text-[var(--muted)]">{[item.catalogItem?.author ? tCine("byAuthor", { name: item.catalogItem.author }) : null, item.recommendedBy ? t("itemRecommendedByLine", { name: item.recommendedBy.name }) : null, item.catalogItem?.year ? String(item.catalogItem.year) : null, item.catalogItem?.genres.length ? item.catalogItem.genres.join(", ") : null].filter(Boolean).join(" · ")}</small> : null}<small className="mt-1 block text-[var(--muted)]">{item.date ? f.date(item.date) : item.opensAt || item.dueAt ? t("itemWindow", { opens: f.date(item.opensAt), due: f.date(item.dueAt) }) : t("itemNoWindow")}</small></span>
                     </div>
                     <div className="flex flex-none flex-col items-end gap-2"><span className="rounded-full bg-[var(--wash)] px-2 py-1 text-[10px] font-light uppercase text-[var(--muted)]">{f.itemStatusLabel(item.status)}</span>{challenge.status !== "closed" ? <div className="flex gap-2"><Button variant="secondary" className="min-h-9 px-3 py-1 text-xs" onClick={() => startEditing(item)}>{t("edit")}</Button>{canArchiveItems ? <Button variant="danger" className="min-h-9 px-3 py-1 text-xs" disabled={archivingId === item.id} onClick={() => void archive(item)}>{archivingId === item.id ? t("removing") : t("remove")}</Button> : null}</div> : null}</div>
                   </div>
@@ -514,7 +519,7 @@ function AdminReview({
         <PageHeading title={t("reviewTitle")} description={t("reviewSummary", { sent: entries.length, pending: Math.max(0, expected - doneCount), late: entries.filter((entry) => entry.isLate).length })} action={<Button variant="secondary" disabled={exporting} onClick={() => { setExporting(true); setError(null); onExport().catch((cause: unknown) => setError(f.error(cause))).finally(() => setExporting(false)); }}>{exporting ? t("preparing") : t("exportCsv")}</Button>} />
         <div className="mb-5 grid gap-3 sm:grid-cols-[1fr_auto]">
           <label><span className="sr-only">{t("searchEntries")}</span><input className={inputClass} type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("searchPlaceholder")} /></label>
-          <label className="flex min-h-12 items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4 text-sm font-semibold"><input type="checkbox" checked={lateOnly} onChange={(event) => setLateOnly(event.target.checked)} />{t("lateOnly")}</label>
+          <label className="flex min-h-12 items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4 text-sm font-medium"><input type="checkbox" checked={lateOnly} onChange={(event) => setLateOnly(event.target.checked)} />{t("lateOnly")}</label>
         </div>
         <StatusMessage error={error} />
         {filtered.length ? (
@@ -527,7 +532,7 @@ function AdminReview({
               return (
                 <article className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-4" key={entry.id}>
                   <div className="flex items-start justify-between gap-3"><div><strong className="block">{entry.participantName ?? entry.participantUsername ?? t("participantFallback")}</strong><span className="mt-1 block text-xs text-[var(--muted)]">{[item?.title ?? t("freeEntry"), type && challenge.entryTypes.length > 1 ? type.name : null, f.dateTime(entry.submittedAt ?? entry.updatedAt)].filter(Boolean).join(" · ")}</span></div>{entry.isLate ? <span className="rounded-full bg-[var(--warn-soft)] px-2 py-1 text-[10px] font-light uppercase text-[var(--warn)]">{t("late")}</span> : null}</div>
-                  <dl className="mt-4 grid gap-2 sm:grid-cols-2">{entryFields.slice(0, 4).map((field) => field.id && values[field.id] !== undefined ? <div className="rounded-lg bg-[var(--wash)] px-3 py-2" key={field.id}><dt className="text-[10px] font-light uppercase text-[var(--muted)]">{field.label}</dt><dd className="mt-1 truncate text-sm font-semibold">{typeof values[field.id] === "boolean" ? values[field.id] ? tc("yes") : tc("no") : String(values[field.id])}</dd></div> : null)}</dl>
+                  <dl className="mt-4 grid gap-2 sm:grid-cols-2">{entryFields.slice(0, 4).map((field) => field.id && values[field.id] !== undefined ? <div className="rounded-lg bg-[var(--wash)] px-3 py-2" key={field.id}><dt className="text-[10px] font-light uppercase text-[var(--muted)]">{field.label}</dt><dd className="mt-1 truncate text-sm font-medium">{typeof values[field.id] === "boolean" ? values[field.id] ? tc("yes") : tc("no") : String(values[field.id])}</dd></div> : null)}</dl>
                   <Button className="mt-4 w-full" variant="secondary" onClick={() => { setSelectedId(entry.id); setReason(""); }}>{t("inspect")}</Button>
                 </article>
               );
@@ -585,7 +590,7 @@ function AdminMetrics({
     <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
       <section>
         <PageHeading title={t("metricsTitle")} description={t("metricsSubtitle")} />
-        {challenge.metrics.length ? <div className="grid gap-3 sm:grid-cols-2">{challenge.metrics.map((metric) => <article className={cx(cardClass, "p-5")} key={metric.id}><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-light uppercase tracking-[0.1em] text-[var(--muted)]">{tm(`operationName.${metric.operation}`)}</p><h3 className="mt-1 font-light">{metric.label}</h3></div><strong className="text-2xl tracking-[-0.04em]">{metric.series?.length ? "" : metric.formattedValue ?? metric.value ?? "—"}</strong></div>{metric.series?.length ? <ol className="mt-3 space-y-1 text-sm">{metric.series.slice(0, 8).map((row, index) => <li key={row.key} className={cx("flex items-center justify-between gap-2", row.value === null && "opacity-45")}><span className="truncate"><span className="mr-2 tabular-nums text-[var(--muted)]">{index + 1}</span>{row.label}</span><span className="flex-none tabular-nums font-semibold">{row.value === null ? tm("smallSample") : row.formattedValue ?? row.value}<span className="ml-1.5 text-[10px] font-light text-[var(--muted)]">n={row.sampleSize}</span></span></li>)}</ol> : null}<div className="mt-4 flex flex-wrap gap-2 text-[10px] font-light uppercase text-[var(--muted)]">{metric.visibleDuring ? <span className="rounded-full bg-[var(--ok-soft)] px-2 py-1">{t("metricDuring")}</span> : null}{metric.visibleInResults ? <span className="rounded-full bg-[var(--main-soft)] px-2 py-1">{t("metricInResults")}</span> : null}{metric.groupBy && metric.groupBy !== "none" ? <span className="rounded-full bg-[var(--wash)] px-2 py-1">{t("metricGroupedBy", { groupBy: tm(`groupByShort.${metric.groupBy}`) })}</span> : null}</div></article>)}</div> : <EmptyState title={t("noMetricsTitle")} description={t("noMetricsBody")} />}
+        {challenge.metrics.length ? <div className="grid gap-3 sm:grid-cols-2">{challenge.metrics.map((metric) => <article className={cx(cardClass, "p-5")} key={metric.id}><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-light uppercase tracking-[0.1em] text-[var(--muted)]">{tm(`operationName.${metric.operation}`)}</p><h3 className="mt-1 font-light">{metric.label}</h3></div><strong className="text-2xl tracking-[-0.04em]">{metric.series?.length ? "" : metric.formattedValue ?? metric.value ?? "—"}</strong></div>{metric.series?.length ? <ol className="mt-3 space-y-1 text-sm">{metric.series.slice(0, 8).map((row, index) => <li key={row.key} className={cx("flex items-center justify-between gap-2", row.value === null && "opacity-45")}><span className="truncate"><span className="mr-2 tabular-nums text-[var(--muted)]">{index + 1}</span>{row.label}</span><span className="flex-none tabular-nums font-medium">{row.value === null ? tm("smallSample") : row.formattedValue ?? row.value}<span className="ml-1.5 text-[10px] font-light text-[var(--muted)]">n={row.sampleSize}</span></span></li>)}</ol> : null}<div className="mt-4 flex flex-wrap gap-2 text-[10px] font-light uppercase text-[var(--muted)]">{metric.visibleDuring ? <span className="rounded-full bg-[var(--ok-soft)] px-2 py-1">{t("metricDuring")}</span> : null}{metric.visibleInResults ? <span className="rounded-full bg-[var(--main-soft)] px-2 py-1">{t("metricInResults")}</span> : null}{metric.groupBy && metric.groupBy !== "none" ? <span className="rounded-full bg-[var(--wash)] px-2 py-1">{t("metricGroupedBy", { groupBy: tm(`groupByShort.${metric.groupBy}`) })}</span> : null}</div></article>)}</div> : <EmptyState title={t("noMetricsTitle")} description={t("noMetricsBody")} />}
       </section>
       <aside className={cx(cardClass, "h-fit p-5")}>
         <h2 className="text-lg font-light">{t("addMetric")}</h2>
@@ -594,8 +599,8 @@ function AdminMetrics({
           <label><span className={labelClass}>{t("metricOperationLabel")}</span><select className={inputClass} value={operation} onChange={(event) => { const next = event.target.value as Metric["operation"]; setOperation(next); setFieldId(""); }}>{METRIC_OPERATIONS.map((op) => <option value={op} key={op}>{tm(`operationName.${op}`)}</option>)}</select></label>
           {needsField ? <label><span className={labelClass}>{t("metricFieldLabel")}</span><select className={inputClass} value={fieldId} onChange={(event) => setFieldId(event.target.value)} required><option value="">{t("metricFieldPlaceholder")}</option>{selectableFields.filter((field) => field.id).map((field) => <option value={field.id} key={field.id}>{field.label}</option>)}</select></label> : null}
           <label><span className={labelClass}>{t("metricGroupByLabel")}</span><select className={inputClass} value={groupBy} onChange={(event) => setGroupBy(event.target.value as Metric["groupBy"])}>{METRIC_GROUP_BY.map((value) => <option value={value} key={value}>{tm(`groupBy.${value}`)}</option>)}</select></label>
-          <label className="flex min-h-11 items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={visibleDuring} onChange={(event) => setVisibleDuring(event.target.checked)} />{t("metricVisibleDuring")}</label>
-          <label className="flex min-h-11 items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={visibleInResults} onChange={(event) => setVisibleInResults(event.target.checked)} />{t("metricVisibleResults")}</label>
+          <label className="flex min-h-11 items-center gap-2 text-sm font-medium"><input type="checkbox" checked={visibleDuring} onChange={(event) => setVisibleDuring(event.target.checked)} />{t("metricVisibleDuring")}</label>
+          <label className="flex min-h-11 items-center gap-2 text-sm font-medium"><input type="checkbox" checked={visibleInResults} onChange={(event) => setVisibleInResults(event.target.checked)} />{t("metricVisibleResults")}</label>
           <StatusMessage error={error} success={success} />
           <Button type="submit" className="w-full" disabled={busy}>{busy ? t("calculating") : t("addMetric")}</Button>
         </form>}
@@ -824,7 +829,7 @@ export function AdminScreen({
   const tabs: AdminTab[] = ["overview", "participants", "fields", "items", "review", "metrics", "results"];
   return (
     <main className="mx-auto max-w-7xl px-4 py-6 pb-24 sm:px-6 sm:py-10">
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><button className={backLinkClass} type="button" onClick={onBack}>{t("back", { group: group?.name ?? tc("home") })}</button><div className="flex flex-wrap gap-2">{challenge.meetingUrl ? <a className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--main-line)] bg-[var(--main-soft)] px-4 text-sm font-light text-[var(--main-strong)] hover:opacity-90" href={challenge.meetingUrl} target="_blank" rel="noreferrer">{t("joinMeeting")}</a> : null}<Button variant="secondary" onClick={onViewParticipant}>{t("viewAsParticipant")}</Button></div></div>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><button className={backLinkClass} type="button" onClick={onBack}>{t("back", { group: group?.name ?? tc("home") })}</button><div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={onViewParticipant}>{t("viewAsParticipant")}</Button></div></div>
       <PageHeading title={challenge.title} description={t("subtitle")} action={<ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />} />
       <nav className="mb-6 flex gap-1 overflow-x-auto rounded-2xl bg-[var(--wash-strong)]/70 p-1" aria-label={t("tabsAria")}>{tabs.map((id) => <button className={cx("min-h-11 flex-none rounded-xl px-4 text-sm font-light", tab === id ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]")} type="button" onClick={() => onTab(id)} key={id}>{t(`tabs.${id}`)}</button>)}</nav>
       {tab === "overview" ? <AdminOverview challenge={challenge} entries={entries} onSave={onSaveBasics} onTransition={onTransition} onDuplicate={onDuplicate} duplicateTargets={duplicateTargets} onDelete={onDelete} /> : null}

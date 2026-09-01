@@ -77,7 +77,7 @@ export function InviteScreen({
             <p className="mt-6 text-xs font-extrabold uppercase tracking-[0.14em] text-[var(--muted)]">{preview.challengeId ? t("kickerChallenge") : t("kickerGroup")}</p>
             <h1 className="mt-2 text-3xl font-light tracking-[-0.04em]">{preview.challengeTitle ?? preview.groupName}</h1>
             <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-[var(--muted)]">{previewBody}</p>
-            {preview.expiresAt ? <p className="mt-3 text-xs font-semibold text-[var(--muted)]">{t("validUntil", { date: f.dateTime(preview.expiresAt) })}</p> : null}
+            {preview.expiresAt ? <p className="mt-3 text-xs font-medium text-[var(--muted)]">{t("validUntil", { date: f.dateTime(preview.expiresAt) })}</p> : null}
             {preview.status === "accepted" ? <div className="mt-5 space-y-4"><StatusMessage success={t("alreadyAccepted")} /><Button onClick={() => void onAccepted({ ...preview, accepted: true, idempotent: true })}>{t("continue")}</Button></div> : preview.status && preview.status !== "valid" ? <div className="mt-5"><StatusMessage error={preview.status === "expired" ? t("expired") : preview.status === "revoked" ? t("revoked") : t("exhausted")} /></div> : (
               <Button className="mt-7 w-full sm:w-auto" disabled={busy} onClick={() => void accept()}>{busy ? t("accepting") : user ? t("acceptAs", { name: user.name }) : t("signInToAccept")}</Button>
             )}

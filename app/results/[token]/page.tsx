@@ -50,7 +50,7 @@ export default async function SharedResultsPage({ params }: { params: Promise<{ 
           <p className="text-xs font-light uppercase tracking-[0.16em] text-white/50">
             {f.dateRange(challenge.startsOn, challenge.endsOn)}
           </p>
-          <h1 className="mt-5 max-w-4xl text-4xl font-semibold leading-none tracking-[-0.055em] sm:text-7xl">
+          <h1 className="mt-5 max-w-4xl text-4xl font-medium leading-none tracking-[-0.055em] sm:text-7xl">
             {result.headline || challenge.title}
           </h1>
           {result.summary ? <p className="mt-7 max-w-2xl text-base leading-7 text-white/65">{result.summary}</p> : null}

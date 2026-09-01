@@ -29,7 +29,6 @@ export const challenges = pgTable(
       .references(() => users.id, { onDelete: "restrict" }),
     title: text("title").notNull(),
     description: text("description"),
-    meetingUrl: text("meeting_url"),
     rules: text("rules"),
     ruleSections: jsonb("rule_sections")
       .$type<Array<{ title: string; description: string }>>()
@@ -80,10 +79,6 @@ export const challenges = pgTable(
       .on(table.publishedAsTemplateAt)
       .where(sql`${table.publishedAsTemplateAt} is not null and ${table.deletedAt} is null`),
     check("challenges_title_check", sql`char_length(btrim(${table.title})) between 1 and 160`),
-    check(
-      "challenges_meeting_url_check",
-      sql`${table.meetingUrl} is null or (char_length(btrim(${table.meetingUrl})) between 1 and 2000 and ${table.meetingUrl} ~ '^https://')`,
-    ),
     check(
       "challenges_template_summary_check",
       sql`${table.templateSummary} is null or char_length(btrim(${table.templateSummary})) between 1 and 280`,

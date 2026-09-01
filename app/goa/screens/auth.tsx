@@ -86,7 +86,7 @@ export function AuthScreen({
         <Brand />
         <div className="relative z-10 max-w-xl">
           <p className="mb-5 text-xs font-light uppercase tracking-[0.18em] text-white/55">{t("heroKicker")}</p>
-          <h1 className="text-6xl font-semibold leading-[0.96] tracking-[-0.06em]">{t("heroTitleLine1")}<br />{t("heroTitleLine2")}</h1>
+          <h1 className="text-6xl font-medium leading-[0.96] tracking-[-0.06em]">{t("heroTitleLine1")}<br />{t("heroTitleLine2")}</h1>
           <p className="mt-6 max-w-lg text-base leading-7 text-white/70">{t("heroBody")}</p>
         </div>
         <p className="text-xs text-white/45">{t("heroFootnote")}</p>
