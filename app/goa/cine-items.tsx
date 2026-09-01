@@ -14,11 +14,12 @@ export interface CineRow {
   recommendedByUserId: string;
   year: string;
   runtime: string;
+  pages: string;
   genres: string;
 }
 
 export function newCineRow(title = "", extra: Partial<CineRow> = {}): CineRow {
-  return { key: crypto.randomUUID(), title, recommendedByUserId: "", year: "", runtime: "", genres: "", ...extra };
+  return { key: crypto.randomUUID(), title, recommendedByUserId: "", year: "", runtime: "", pages: "", genres: "", ...extra };
 }
 
 export function cineRowsToInput(rows: CineRow[]): ChallengeItemInput[] {
@@ -28,6 +29,7 @@ export function cineRowsToInput(rows: CineRow[]): ChallengeItemInput[] {
     .map(({ row, index }) => {
       const year = Number(row.year);
       const runtime = Number(row.runtime);
+      const pages = Number(row.pages);
       const genres = row.genres.split(",").map((genre) => genre.trim()).filter(Boolean);
       return {
         title: row.title.trim(),
@@ -36,6 +38,7 @@ export function cineRowsToInput(rows: CineRow[]): ChallengeItemInput[] {
         ...(row.recommendedByUserId ? { recommendedByUserId: row.recommendedByUserId } : {}),
         ...(Number.isInteger(year) && year > 1800 ? { year } : {}),
         ...(Number.isInteger(runtime) && runtime > 0 ? { runtimeMinutes: runtime } : {}),
+        ...(Number.isInteger(pages) && pages > 0 ? { pageCount: pages } : {}),
         ...(genres.length ? { genres } : {}),
       };
     });
@@ -46,11 +49,14 @@ export function CineItemsEditor({
   onChange,
   members,
   groupId,
+  kind = "film",
 }: {
   value: CineRow[];
   onChange: (rows: CineRow[]) => void;
   members: Member[];
   groupId: Id;
+  /** Filters the "from catalog" picker and swaps the runtime field for pages. */
+  kind?: "film" | "book";
 }) {
   const t = useTranslations("cineItems");
   const [paste, setPaste] = useState("");
@@ -62,10 +68,10 @@ export function CineItemsEditor({
     if (!showCatalog || catalog) return;
     const controller = new AbortController();
     apiRequest<{ items: CatalogItem[] }>(API_PATHS.groupCatalog(groupId), { signal: controller.signal })
-      .then((response) => setCatalog(response.items.filter((item) => item.kind === "film")))
+      .then((response) => setCatalog(response.items.filter((item) => item.kind === kind)))
       .catch(() => setCatalog([]));
     return () => controller.abort();
-  }, [showCatalog, catalog, groupId]);
+  }, [showCatalog, catalog, groupId, kind]);
 
   const usedCatalogIds = useMemo(
     () => new Set(value.map((row) => row.catalogItemId).filter(Boolean)),
@@ -117,7 +123,9 @@ export function CineItemsEditor({
                 {open ? (
                   <div className="mt-2 grid gap-2 sm:grid-cols-[110px_110px_1fr]">
                     <label><span className={labelClass}>{t("year")}</span><input className={inputClass} type="number" inputMode="numeric" min={1870} max={2200} value={row.year} onChange={(event) => update(row.key, { year: event.target.value })} /></label>
-                    <label><span className={labelClass}>{t("runtime")}</span><input className={inputClass} type="number" inputMode="numeric" min={1} max={100000} value={row.runtime} onChange={(event) => update(row.key, { runtime: event.target.value })} /></label>
+                    {kind === "book"
+                      ? <label><span className={labelClass}>{t("pages")}</span><input className={inputClass} type="number" inputMode="numeric" min={1} max={100000} value={row.pages} onChange={(event) => update(row.key, { pages: event.target.value })} /></label>
+                      : <label><span className={labelClass}>{t("runtime")}</span><input className={inputClass} type="number" inputMode="numeric" min={1} max={100000} value={row.runtime} onChange={(event) => update(row.key, { runtime: event.target.value })} /></label>}
                     <label><span className={labelClass}>{t("genres")}</span><input className={inputClass} value={row.genres} placeholder={t("genresPlaceholder")} onChange={(event) => update(row.key, { genres: event.target.value })} /></label>
                   </div>
                 ) : null}
@@ -145,7 +153,7 @@ export function CineItemsEditor({
                   key={item.id}
                   type="button"
                   disabled={usedCatalogIds.has(item.id)}
-                  onClick={() => onChange([...value, newCineRow(item.title, { catalogItemId: item.id, year: item.year ? String(item.year) : "", runtime: item.runtimeMinutes ? String(item.runtimeMinutes) : "", genres: item.genres.join(", ") })])}
+                  onClick={() => onChange([...value, newCineRow(item.title, { catalogItemId: item.id, year: item.year ? String(item.year) : "", runtime: item.runtimeMinutes ? String(item.runtimeMinutes) : "", pages: item.pageCount ? String(item.pageCount) : "", genres: item.genres.join(", ") })])}
                   className={cx("flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-[var(--wash)] disabled:opacity-40", "")}
                 >
                   <span>{item.title}{item.year ? <span className="text-[var(--muted)]"> · {item.year}</span> : null}{item.genres.length ? <span className="text-[var(--muted)]"> · {item.genres.join(", ")}</span> : null}</span>

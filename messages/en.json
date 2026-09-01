@@ -346,7 +346,8 @@
     "loadingCatalog": "Loading the catalog…",
     "emptyCatalog": "The group catalog is still empty. Films you add here become part of it.",
     "alreadyAdded": "already in the list",
-    "roundsCount": "{count, plural, =0 {new} one {# round} other {# rounds}}"
+    "roundsCount": "{count, plural, =0 {new} one {# round} other {# rounds}}",
+    "pages": "Pages"
   },
   "createChallenge": {
     "errPickTemplate": "Pick a template and fill in the title.",
