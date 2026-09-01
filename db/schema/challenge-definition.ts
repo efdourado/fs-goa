@@ -29,6 +29,12 @@ export const entryTypes = pgTable(
     name: text("name").notNull(),
     description: text("description"),
     submissionMode: text("submission_mode").notNull(),
+    // Four orthogonal axes that `submission_mode` used to collapse. Nullable while
+    // legacy rows catch up; the app falls back to the `submission_mode` default.
+    purpose: text("purpose"),
+    targetPolicy: text("target_policy"),
+    cardinality: text("cardinality"),
+    schedulePolicy: text("schedule_policy"),
     archivedAt: timestamptz("archived_at"),
     createdAt: timestamptz("created_at").defaultNow().notNull(),
     updatedAt: timestamptz("updated_at").defaultNow().notNull(),
@@ -46,6 +52,22 @@ export const entryTypes = pgTable(
     check(
       "entry_types_submission_mode_check",
       sql`${table.submissionMode} in ('item', 'daily', 'free')`,
+    ),
+    check(
+      "entry_types_purpose_check",
+      sql`${table.purpose} is null or ${table.purpose} in ('progress', 'completion', 'expectation', 'rating', 'checkin')`,
+    ),
+    check(
+      "entry_types_target_policy_check",
+      sql`${table.targetPolicy} is null or ${table.targetPolicy} in ('required', 'optional', 'none')`,
+    ),
+    check(
+      "entry_types_cardinality_check",
+      sql`${table.cardinality} is null or ${table.cardinality} in ('once_per_item', 'once_per_item_day', 'repeatable', 'once_per_day')`,
+    ),
+    check(
+      "entry_types_schedule_policy_check",
+      sql`${table.schedulePolicy} is null or ${table.schedulePolicy} in ('free', 'while_active', 'checkpoint')`,
     ),
   ],
 );
