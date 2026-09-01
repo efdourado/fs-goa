@@ -3,7 +3,6 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 
 import { FeedbackForm } from "@/app/goa/FeedbackForm";
-import { Footer } from "@/app/goa/Footer";
 import { SettingsMenu } from "@/app/goa/SettingsMenu";
 import { Brand } from "@/app/goa/ui";
 
@@ -31,7 +30,6 @@ export default async function FeedbackPage() {
           <FeedbackForm />
         </div>
       </main>
-      <Footer />
     </div>
   );
 }
