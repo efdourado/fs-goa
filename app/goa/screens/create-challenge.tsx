@@ -12,9 +12,9 @@ import { backLinkClass, Button, cardClass, cx, EmptyState, inputClass, labelClas
 
 const RECIPES: Array<{ key: RecipeKey; catalogKind: "film" | "book" | null; scheduleMode: "period" | "none"; glyph: string }> = [
   { key: "cine_free", catalogKind: "film", scheduleMode: "none", glyph: "◉" },
-  { key: "cine_curated", catalogKind: "film", scheduleMode: "none", glyph: "✦" },
-  { key: "reading_club", catalogKind: "book", scheduleMode: "period", glyph: "▤" },
-  { key: "reading_daily", catalogKind: null, scheduleMode: "period", glyph: "◷" },
+  { key: "cine_curated", catalogKind: "film", scheduleMode: "none", glyph: "〇" },
+  { key: "reading_club", catalogKind: "book", scheduleMode: "period", glyph: "◎" },
+  { key: "reading_daily", catalogKind: null, scheduleMode: "period", glyph: "⟳" },
 ];
 
 export function CreateChallengeScreen({
