@@ -1840,3 +1840,125 @@ test("cópia: carrega a receita, zera a agenda e remapeia o acervo do destino", 
   assert.equal(row.rows[0].catalog_title, "Stalker");
   assert.equal(row.rows[0].recommender, null, "o indicador do grupo de origem não é copiado");
 });
+
+type SeriesRow = { key: string; label: string; value: number | null; sampleSize: number };
+type ApiMetric = { id: string; label: string; operation: string; groupBy: string; value: number | null; series?: SeriesRow[] };
+
+test("motor de análise: ranking ajustado, surpresa, viés e vitrine automática", async () => {
+  const owner = await register("Ana", "ana_an");
+  const bob = await register("Bruno", "bruno_an");
+  const carol = await register("Carla", "carla_an");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Cineclube" } })).body as { id: string }).id;
+  for (const person of [bob, carol]) {
+    await adminPool.query(
+      "INSERT INTO group_members (group_id, user_id, role, added_by_user_id, joined_at) VALUES ($1,$2,'participant',$3,now()) ON CONFLICT DO NOTHING",
+      [gid, person.user.id, owner.user.id],
+    );
+  }
+
+  const created = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "cine_curated", title: "Ciclo 1",
+      participantIds: [owner.user.id, bob.user.id, carol.user.id],
+      items: [
+        { title: "Solaris", recommendedByUserId: owner.user.id },
+        { title: "Persona" },
+      ],
+    },
+  });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const challengeId = (created.body as { id: string }).id;
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } })).response.status, 200);
+
+  const detail0 = await call("GET", `/api/challenges/${challengeId}`, { session: owner });
+  const types = (detail0.body as { entryTypes: Array<{ id: string; purpose: string }> }).entryTypes;
+  const items = (detail0.body as { items: Array<{ id: string; title: string }> }).items;
+  const expType = types.find((t) => t.purpose === "expectation")!.id;
+  const ratingType = types.find((t) => t.purpose === "rating")!.id;
+  const solaris = items.find((i) => i.title === "Solaris")!.id;
+  const persona = items.find((i) => i.title === "Persona")!.id;
+
+  const log = (session: ClientSession, itemId: string, typeId: string, values: Record<string, number>) =>
+    call("POST", `/api/challenges/${challengeId}/entries`, { session, body: { itemId, entryTypeId: typeId, values } });
+
+  // Solaris: high expectations, delivered. Persona: only Ana rates it (thin sample).
+  await log(owner, solaris, expType, { expectativa: 3 });
+  await log(bob, solaris, expType, { expectativa: 3 });
+  await log(carol, solaris, expType, { expectativa: 3 });
+  await log(owner, solaris, ratingType, { nota: 5 });
+  await log(bob, solaris, ratingType, { nota: 5 });
+  await log(carol, solaris, ratingType, { nota: 4 });
+  await log(owner, persona, ratingType, { nota: 2 });
+
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "closed" } })).response.status, 200);
+
+  const detail = await call("GET", `/api/challenges/${challengeId}`, { session: owner });
+  const metrics = (detail.body as { metrics: ApiMetric[] }).metrics;
+
+  const ranking = metrics.find((m) => m.operation === "bayesian_average")!;
+  assert.ok(Array.isArray(ranking.series), "ranking traz série");
+  assert.equal(ranking.series![0].label, "Solaris", "Solaris no topo do ranking ajustado");
+  const personaRow = ranking.series!.find((s) => s.label === "Persona")!;
+  assert.equal(personaRow.value, null, "Persona abaixo do mínimo de amostra (minSample 3) fica sem valor");
+  assert.equal(personaRow.sampleSize, 1);
+
+  const surprise = metrics.find((m) => m.operation === "surprise")!;
+  const solarisSurprise = surprise.series!.find((s) => s.label === "Solaris")!;
+  assert.ok(solarisSurprise.value !== null && solarisSurprise.value > 0, "Solaris superou a expectativa");
+
+  const bias = metrics.find((m) => m.operation === "indicator_bias")!;
+  const anaBias = bias.series!.find((s) => s.label === "Ana");
+  assert.ok(anaBias && anaBias.value !== null, "viés do indicador calculado para quem indicou");
+
+  // a vitrine foi gerada sozinha ao encerrar
+  const blocks = await adminPool.query<{ kind: string; heading: string | null }>(
+    "SELECT kind, heading FROM result_blocks WHERE challenge_id=$1 ORDER BY position",
+    [challengeId],
+  );
+  assert.equal(blocks.rows[0].kind, "text");
+  assert.equal(blocks.rows[0].heading, "headline");
+  assert.ok(blocks.rows.some((b) => b.kind === "metric"), "vitrine automática tem blocos de métrica");
+
+  // regenerar substitui os blocos
+  const regen = await call("POST", `/api/challenges/${challengeId}/results`, { session: owner, body: { regenerate: true } });
+  assert.equal(regen.response.status, 200, JSON.stringify(regen.body));
+});
+
+test("memória do acervo: um filme reconhecido em duas rodadas encerradas", async () => {
+  const owner = await register("Dora", "dora_mem");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Memória" } })).body as { id: string }).id;
+
+  async function runRound(title: string, notas: number[]) {
+    const res = await call("POST", `/api/groups/${gid}/challenges`, {
+      session: owner,
+      body: { recipe: "cine_free", title, participantIds: [owner.user.id], items: [{ title: "Stalker", year: 1979 }] },
+    });
+    const cid = (res.body as { id: string }).id;
+    assert.equal((await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } })).response.status, 200);
+    const item = ((await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { items: Array<{ id: string }> }).items[0].id;
+    for (const nota of notas) {
+      // one participant, so update the same entry — use distinct rounds instead
+      await call("POST", `/api/challenges/${cid}/entries`, { session: owner, body: { itemId: item, values: { nota } } });
+    }
+    await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "closed" } });
+    return cid;
+  }
+
+  await runRound("Ciclo A", [4]);
+  await runRound("Ciclo B", [2]);
+
+  const list = (await call("GET", `/api/groups/${gid}/catalog`, { session: owner })).body as {
+    items: Array<{ id: string; title: string; roundCount: number; ratingAvg: number | null; ratingCount: number }>;
+  };
+  const stalker = list.items.find((i) => i.title === "Stalker")!;
+  assert.equal(stalker.roundCount, 2, "o mesmo filme aparece em 2 rodadas");
+  assert.equal(stalker.ratingCount, 2);
+  assert.equal(stalker.ratingAvg, 3, "média histórica das duas notas");
+
+  const detail = (await call("GET", `/api/groups/${gid}/catalog/${stalker.id}`, { session: owner })).body as {
+    rounds: Array<{ title: string; ratingAvg: number | null; ratingCount: number }>;
+  };
+  assert.deepEqual(detail.rounds.map((r) => r.title), ["Ciclo A", "Ciclo B"]);
+  assert.deepEqual(detail.rounds.map((r) => r.ratingAvg), [4, 2]);
+});
