@@ -40,8 +40,7 @@ Rode `npm run db:seed` de novo a qualquer momento para redefinir a senha.
 As contas fazem login por **nome de usuário ou e-mail** + senha. O e-mail é
 opcional no cadastro, mas é o que permite recuperar o acesso: quem esquece a senha
 pede em "Esqueci a senha" e o administrador gera um link de uso único na aba
-*Contas* do `/admin`. Ver [docs/product.md](docs/product.md) para o funcionamento
-completo e [docs/api.md](docs/api.md) para a lista de endpoints.
+*Contas* do `/admin`.
 
 ## Desenvolvimento sem Docker
 
@@ -106,36 +105,47 @@ no deploy.
 ## Estrutura
 
 ```text
-app/        interface, API REST (app/api), vitrine de resultados (app/results)
-            e galeria pública de modelos (app/modelos)
+app/        interface, API REST (app/api), vitrine (app/results), galeria de modelos (app/modelos)
 db/         schema Drizzle do PostgreSQL
 drizzle/    migrações versionadas
-lib/        autenticação, domínio, validação e métricas
+lib/        autenticação, domínio, receitas, análise e validação
 scripts/    migração e seed da conta de administração
 tests/      unidade, smoke e integração
-compose.yaml   PostgreSQL + setup + aplicação
-docs/       arquitetura, produto (docs/product.md) e endpoints (docs/api.md)
+docs/       arquitetura (docs/architecture.md) e endpoints (docs/api.md)
 ```
 
-## O que o MVP entrega
+## O que o Goa faz
 
-Cadastro e login por usuário ou e-mail com sessão HTTP-only e CSRF, mais
-redefinição de senha por link de uso único; grupos privados com papéis e convites
-expiráveis; desafios em `draft`/`active`/`closed`; presets
-**Cine** e **90 dias de leitura**; campos de texto, número, nota, opção, booleano e
-data; itens e checkpoints diários; registros persistentes com edição autorizada e
-histórico; revisão administrativa, auditoria append-only e exportação CSV segura;
-soma, média, contagem, mínimo, máximo e taxa de conclusão; curadoria e página
-pública de resultados por token rotacionável; duplicação exclusivamente estrutural.
+- **Contas** — cadastro e login por usuário **ou** e-mail, sessão HTTP-only + CSRF;
+  redefinição de senha por link de uso único (hoje mediada pelo `/admin`). O
+  e-mail é opcional mas é o que recupera o acesso.
+- **Grupos e papéis** — o grupo é duradouro e reúne pessoas entre rodadas. `owner`
+  > `admin` > `participant`. Convites por link expirável / código curto.
+- **Rodadas por receita** — `cine_free`, `cine_curated` (expectativa + avaliação;
+  a expectativa trava ao avaliar), `reading_club` (livros no acervo, progresso por
+  dia + conclusão + nota) e `reading_daily` (check-in diário). Estados
+  `draft → active → closed`; período opcional; campos semânticos estáveis.
+- **Acervo** — filme/livro tem identidade estável no grupo (`catalog_items`), com
+  atributos e gêneros; reaparece em outra rodada sem perder o histórico.
+- **Registros** — cada pessoa edita o próprio; owner/admin corrigem com motivo
+  (auditado). Um registro aponta item + dia + checkpoint conforme a receita.
+- **Análise** — `group_by` calculado: ranking com nota ajustada (bayesiana, com
+  mínimo de amostra), polarização (desvio), surpresa × decepção (avaliação −
+  expectativa), viés do indicador. As receitas já semeiam as métricas certas.
+- **Vitrine** — ao encerrar, o Goa gera a história (hero, KPIs, ranking, perfis,
+  melhores comentários) e congela um snapshot; owner/admin ajustam manchete/
+  resumo, regeneram e publicam em `/results/<token>` (o banco guarda só o hash).
+- **`/admin`** — painel só de metadados para a conta `platform_admin`: uso,
+  tamanho do banco, lixeira (purga definitiva), auditoria, moderação de contas.
+  Qualquer outra conta recebe `404`.
 
-Ver [docs/architecture.md](docs/architecture.md) para o modelo de domínio, o
-desenho de segurança e as decisões, e a lista do que ficou fora do MVP.
+Ver [docs/architecture.md](docs/architecture.md) para o modelo de domínio, a
+segurança e as decisões; [docs/api.md](docs/api.md) para os endpoints.
 
 ## Para onde vai
 
-[ROADMAP.md](ROADMAP.md) reúne as frentes de evolução, as decisões de arquitetura
-em aberto e as fases — de "avaliar a qualquer hora" e viés de indicação ao acervo
-vivo do grupo e ao motor de análise.
+[ROADMAP.md](ROADMAP.md) — o que já entrou e o que vem a seguir (afinidade entre
+pessoas, cortes por gênero/década, automação).
 
 ## Licença
 
