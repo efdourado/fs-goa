@@ -41,14 +41,13 @@
     "about": "About",
     "admin": "Console",
     "account": "Your account",
+    "menu": "Menu",
     "signOut": "Sign out",
     "signingOut": "Signing out…",
     "signIn": "Sign in"
   },
   "footer": {
     "tagline": "Goa — private challenges, lasting stories.",
-    "about": "About",
-    "templates": "Templates",
     "feedback": "How can we improve?"
   },
   "roles": {

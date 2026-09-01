@@ -269,14 +269,14 @@ export function AppHeader({
     <header className="sticky top-0 z-30 border-b border-[var(--edge)] bg-[var(--canvas)]/92 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:h-[76px] sm:px-6">
         <button className="cursor-pointer rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25" type="button" onClick={onHome}><Brand /></button>
-        <div className="flex items-center gap-1 sm:gap-2">
-          <Link className={cx(navLink, "inline-flex items-center")} href="/modelos">{t("templates")}</Link>
+        <div className="flex min-w-0 items-center gap-0.5 sm:gap-2">
+          <Link className={cx(navLink, "hidden items-center sm:inline-flex")} href="/modelos">{t("templates")}</Link>
           <Link className={cx(navLink, "hidden items-center sm:inline-flex")} href="/sobre">{t("about")}</Link>
           {user.platformAdmin ? (
-            <Link className={cx(navLink, "inline-flex items-center")} href="/admin">{t("admin")}</Link>
+            <Link className={cx(navLink, "hidden items-center sm:inline-flex")} href="/admin">{t("admin")}</Link>
           ) : null}
           <button
-            className="flex cursor-pointer items-center gap-2.5 rounded-xl p-1 pr-2 text-left hover:bg-[var(--wash)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
+            className="flex shrink-0 cursor-pointer items-center gap-2.5 rounded-xl p-1 pr-1 text-left hover:bg-[var(--wash)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 sm:pr-2"
             type="button"
             onClick={onAccount}
             aria-label={t("account")}
@@ -296,16 +296,80 @@ export function AppHeader({
           />
           <SettingsMenu />
           <button
-            className={cx(navLink, "disabled:opacity-50")}
+            className={cx(navLink, "hidden shrink-0 disabled:opacity-50 sm:inline-flex sm:items-center")}
             type="button"
             disabled={busy}
             onClick={async () => { setBusy(true); try { await onLogout(); } finally { setBusy(false); } }}
           >
             {busy ? t("signingOut") : t("signOut")}
           </button>
+          <HeaderOverflowMenu isPlatformAdmin={Boolean(user.platformAdmin)} busy={busy} onLogout={async () => { setBusy(true); try { await onLogout(); } finally { setBusy(false); } }} />
         </div>
       </div>
     </header>
+  );
+}
+
+/**
+ * Phone-only overflow for the header's secondary links + sign out. On `sm:` and
+ * up those live inline and this collapses away, so the small-screen header stays
+ * down to the account, notifications and settings glyphs.
+ */
+function HeaderOverflowMenu({
+  isPlatformAdmin,
+  busy,
+  onLogout,
+}: {
+  isPlatformAdmin: boolean;
+  busy: boolean;
+  onLogout: () => Promise<void>;
+}) {
+  const t = useTranslations("nav");
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  const itemClass = "block min-h-11 rounded-xl px-3 py-2.5 text-sm text-[var(--ink)] hover:bg-[var(--wash)]";
+  return (
+    <div className="relative sm:hidden">
+      <button
+        className="grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-xl text-[var(--muted)] hover:bg-[var(--wash)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-label={t("menu")}
+        aria-expanded={open}
+      >
+        <svg viewBox="0 0 16 16" className="h-[18px] w-[18px]" fill="currentColor" aria-hidden="true">
+          <circle cx="8" cy="3" r="1.5" />
+          <circle cx="8" cy="8" r="1.5" />
+          <circle cx="8" cy="13" r="1.5" />
+        </svg>
+      </button>
+      {open ? (
+        <>
+          <button type="button" aria-hidden="true" tabIndex={-1} className="fixed inset-0 z-40 cursor-default" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 z-50 mt-2 w-52 rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-1.5 shadow-[var(--elevate-2)]" role="dialog" aria-label={t("menu")}>
+            <Link className={itemClass} href="/modelos" onClick={() => setOpen(false)}>{t("templates")}</Link>
+            <Link className={itemClass} href="/sobre" onClick={() => setOpen(false)}>{t("about")}</Link>
+            {isPlatformAdmin ? <Link className={itemClass} href="/admin" onClick={() => setOpen(false)}>{t("admin")}</Link> : null}
+            <div className="my-1 border-t border-[var(--line)]" />
+            <button
+              className={cx(itemClass, "w-full text-left disabled:opacity-50")}
+              type="button"
+              disabled={busy}
+              onClick={async () => { await onLogout(); setOpen(false); }}
+            >
+              {busy ? t("signingOut") : t("signOut")}
+            </button>
+          </div>
+        </>
+      ) : null}
+    </div>
   );
 }
 
