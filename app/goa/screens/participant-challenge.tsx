@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { type FormEvent, useMemo, useState } from "react";
 
 import { useGoaFormat } from "../format";
+import { MetricBlock } from "../metrics-view";
 import { RuleSectionsView, visibleRuleSections } from "../rules";
 import type {
   ChallengeDetail,
@@ -146,6 +147,7 @@ export function DynamicEntryForm({
 
 export function ResultView({ challenge }: { challenge: ChallengeDetail }) {
   const t = useTranslations("resultView");
+  const tm = useTranslations("metrics");
   const f = useGoaFormat();
   const result = challenge.result;
   const metrics = result?.metrics?.length ? result.metrics : challenge.metrics.filter((metric) => metric.visibleInResults);
@@ -158,9 +160,16 @@ export function ResultView({ challenge }: { challenge: ChallengeDetail }) {
         <div className="mt-8 flex flex-wrap gap-2">{challenge.participants.map((participant) => <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs" key={participant.id}>{participant.name}</span>)}</div>
       </section>
       {metrics.length ? (
-        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-label={t("numbersAria")}>
-          {metrics.map((metric) => <article className={cx(cardClass, "p-5")} key={metric.id}><p className="text-xs font-light uppercase tracking-[0.1em] text-[var(--muted)]">{metric.label}</p><strong className="mt-3 block text-4xl tracking-[-0.05em]">{metric.formattedValue ?? metric.value ?? "—"}</strong></article>)}
-        </section>
+        <div className="space-y-3" aria-label={t("numbersAria")}>
+          <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {metrics.filter((metric) => !metric.series?.length).map((metric) => (
+              <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} />
+            ))}
+          </section>
+          {metrics.filter((metric) => metric.series?.length).map((metric) => (
+            <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} />
+          ))}
+        </div>
       ) : <EmptyState title={t("emptyTitle")} description={t("emptyBody")} />}
       {result?.comments?.length ? (
         <section className={cx(cardClass, "p-6 sm:p-8")}><h2 className="text-xl font-light">{t("momentsTitle")}</h2><div className="mt-5 grid gap-4 sm:grid-cols-2">{result.comments.map((comment) => <blockquote className="rounded-2xl bg-[var(--wash)] p-5" key={comment.id}><p className="text-sm leading-6">“{comment.text}”</p><footer className="mt-3 text-xs font-light text-[var(--muted)]">{comment.authorName ?? t("participantFallback")}{comment.itemTitle ? ` · ${comment.itemTitle}` : ""}</footer></blockquote>)}</div></section>
@@ -275,6 +284,7 @@ export function ParticipantChallengeScreen({
 }) {
   const t = useTranslations("participant");
   const tc = useTranslations("common");
+  const tm = useTranslations("metrics");
   const trules = useTranslations("rules");
   const f = useGoaFormat();
   const longDate: Intl.DateTimeFormatOptions = { day: "2-digit", month: "long", year: "numeric" };
@@ -372,7 +382,7 @@ export function ParticipantChallengeScreen({
         ) : null}
 
         {tab === "progress" ? (
-          <section><PageHeading title={t("progressTitle")} description={t("progressSubtitle")} />{challenge.metrics.filter((metric) => metric.visibleDuring).length ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{challenge.metrics.filter((metric) => metric.visibleDuring).map((metric) => <article className={cx(cardClass, "p-6")} key={metric.id}><p className="text-xs font-light uppercase tracking-[0.1em] text-[var(--muted)]">{metric.label}</p><strong className="mt-3 block text-4xl tracking-[-0.05em]">{metric.formattedValue ?? metric.value ?? "—"}</strong></article>)}</div> : <EmptyState title={t("noProgressTitle")} description={t("noProgressBody")} />}</section>
+          <section><PageHeading title={t("progressTitle")} description={t("progressSubtitle")} />{challenge.metrics.filter((metric) => metric.visibleDuring).length ? <div className="space-y-3"><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{challenge.metrics.filter((metric) => metric.visibleDuring && !metric.series?.length).map((metric) => <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} />)}</div>{challenge.metrics.filter((metric) => metric.visibleDuring && metric.series?.length).map((metric) => <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} />)}</div> : <EmptyState title={t("noProgressTitle")} description={t("noProgressBody")} />}</section>
         ) : null}
 
         {tab === "results" ? challenge.status === "closed" || challenge.result ? <ResultView challenge={challenge} /> : <EmptyState title={t("storyOngoingTitle")} description={t("storyOngoingBody")} action={<Button onClick={() => onTab("today")}>{t("backToEntry")}</Button>} /> : null}

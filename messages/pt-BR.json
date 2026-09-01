@@ -96,7 +96,11 @@
       "count": "Contagem",
       "min": "Mínimo",
       "max": "Máximo",
-      "completion_rate": "Taxa de conclusão"
+      "completion_rate": "Taxa de conclusão",
+      "bayesian_average": "Nota ajustada",
+      "spread": "Polarização",
+      "surprise": "Surpresa × decepção",
+      "indicator_bias": "Viés do indicador"
     },
     "groupBy": {
       "none": "Sem agrupamento",
@@ -106,7 +110,8 @@
     "groupByShort": {
       "participant": "participante",
       "item": "item"
-    }
+    },
+    "smallSample": "amostra pequena"
   },
   "errors": {
     "generic": "Algo deu errado. Tente novamente.",
@@ -596,6 +601,9 @@
     "selectCommentAria": "Selecionar comentário de {author}",
     "noTextFields": "Nenhum campo de texto preenchido está disponível para curadoria.",
     "saveResults": "Salvar vitrine",
+    "regenerateShowcase": "Regenerar vitrine",
+    "regenerateHint": "Recria os blocos a partir dos dados atuais (manchete, métricas e melhores comentários). Sua curadoria manual é substituída.",
+    "showcaseRegenerated": "Vitrine regenerada.",
     "previewTitle": "Como o grupo verá",
     "previewSubtitle": "Prévia da vitrine com a curadoria atual.",
     "previewEmptyTitle": "Prévia disponível após salvar",
