@@ -16,6 +16,7 @@ interface ChallengeAccessRow {
   start_date: string | null;
   end_date: string | null;
   recipe_key: string | null;
+  results_anon: boolean;
   time_zone: string;
   status: ChallengeStatus;
   role: GroupRole;
@@ -38,7 +39,7 @@ export async function challengeAccess(
     const challenge = await oneOrNull<ChallengeAccessRow>(
       activeClient,
       `SELECT c.id, c.group_id, c.title, c.description, c.meeting_url, c.rules, c.rule_sections,
-              c.start_date::text AS start_date, c.end_date::text AS end_date, c.recipe_key,
+              c.start_date::text AS start_date, c.end_date::text AS end_date, c.recipe_key, c.results_anon,
               c.time_zone, c.status, gm.role,
               EXISTS (
                 SELECT 1 FROM challenge_participants cp

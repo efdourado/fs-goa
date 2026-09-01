@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   check,
   date,
   foreignKey,
@@ -44,6 +45,9 @@ export const challenges = pgTable(
     closedAt: timestamptz("closed_at"),
     resultsPublishedAt: timestamptz("results_published_at"),
     resultShareTokenHash: text("result_share_token_hash"),
+    // When true, the public /results page replaces participant names with
+    // "Participante 1, 2…". In-group views keep real names.
+    resultsAnon: boolean("results_anon").notNull().default(false),
     publishedAsTemplateAt: timestamptz("published_as_template_at"),
     templateSummary: text("template_summary"),
     deletedAt: timestamptz("deleted_at"),

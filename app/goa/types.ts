@@ -227,6 +227,7 @@ export interface ChallengeSummary {
   status: ChallengeStatus;
   template?: Template | null;
   recipeKey?: RecipeKey | null;
+  resultsAnon?: boolean;
   submissionMode?: SubmissionMode;
   completionEntryTypeId?: Id | null;
   viewerRole?: Role;

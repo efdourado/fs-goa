@@ -464,6 +464,10 @@ export async function curateResults(
   return inTransaction(async (client) => {
     const access = await challengeAccess(session.user.id, challengeId, client, true);
     if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores podem publicar resultados.");
+    if (Object.hasOwn(body, "anonymizeParticipants")) {
+      await client.query("UPDATE challenges SET results_anon = $2, updated_at = now() WHERE id = $1",
+        [challengeId, body.anonymizeParticipants === true]);
+    }
     if (body.regenerate === true) {
       await generateShowcase(client, challengeId, session.user.id);
       await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
@@ -541,9 +545,9 @@ export async function publicResults(token: string) {
   return withClient(async (client) => {
     const challenge = await oneOrNull<{
       id: string; title: string; description: string | null;
-      start_date: string | null; end_date: string | null;
+      start_date: string | null; end_date: string | null; results_anon: boolean;
     }>(client,
-      `SELECT id,title,description,start_date::text AS start_date,end_date::text AS end_date FROM challenges
+      `SELECT id,title,description,start_date::text AS start_date,end_date::text AS end_date,results_anon FROM challenges
         WHERE result_share_token_hash=$1 AND results_published_at IS NOT NULL AND status='closed'
           AND deleted_at IS NULL`, [hash]);
     if (!challenge) throw new ApiError(404, "not_found", "Resultados não encontrados.");
@@ -554,7 +558,9 @@ export async function publicResults(token: string) {
       challenge: {
         id: challenge.id, title: challenge.title, description: challenge.description,
         startsOn: challenge.start_date, endsOn: challenge.end_date,
-        participants: participants.rows.map((participant) => participant.display_name),
+        participants: challenge.results_anon
+          ? participants.rows.map((_, index) => `Participante ${index + 1}`)
+          : participants.rows.map((participant) => participant.display_name),
         result: await resultForChallenge(client, challenge.id),
       },
     };

@@ -90,7 +90,7 @@ encerrado manualmente.
 | `POST /api/challenges/:id/duplicate` | sessão+csrf (owner/admin nos dois grupos) | `{ title?, targetGroupId }` | `201` — cria um rascunho estrutural em outro grupo; nunca copia participantes, registros, resultados, convites ou tokens |
 | `POST /api/challenges/:id/template` | sessão+csrf (platform_admin + owner/admin do desafio) | `{ summary? }` | `200 { id, publishedAsTemplate: true, summary }` — publica o desafio na vitrine pública de modelos |
 | `DELETE /api/challenges/:id/template` | sessão+csrf (platform_admin + owner/admin do desafio) | — | `200 { id, publishedAsTemplate: false }` |
-| `POST /api/challenges/:id/results` | sessão+csrf (owner/admin) | `{ headline?, summary?, metricIds[], comments[], publish? }` **ou** `{ regenerate: true }` | curadoria manual da vitrine ou regeneração a partir dos dados atuais; ao publicar retorna `url` pública |
+| `POST /api/challenges/:id/results` | sessão+csrf (owner/admin) | `{ headline?, summary?, metricIds[], comments[], anonymizeParticipants?, publish? }` **ou** `{ regenerate: true }` | curadoria manual da vitrine ou regeneração; `anonymizeParticipants` troca os nomes por "Participante N" só na página pública; ao publicar retorna `url` |
 | `GET /api/challenges/:id/entries` | sessão (owner/admin) | — | `{ entries: [...] }` para a revisão |
 | `GET /api/challenges/:id/export.csv` | sessão (owner/admin) | — | `text/csv`; células que virariam fórmula são neutralizadas |
 

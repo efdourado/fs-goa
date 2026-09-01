@@ -1,0 +1,1 @@
+ALTER TABLE "challenges" ADD COLUMN "results_anon" boolean DEFAULT false NOT NULL;

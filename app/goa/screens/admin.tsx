@@ -593,6 +593,7 @@ function AdminResults({
   const [commentKeys, setCommentKeys] = useState<string[]>(
     challenge.result?.comments?.flatMap((comment) => comment.entryId && comment.fieldId ? [`${comment.entryId}:${comment.fieldId}`] : []) ?? [],
   );
+  const [anonymize, setAnonymize] = useState(challenge.resultsAnon === true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -619,6 +620,7 @@ function AdminResults({
         summary: summary.trim(),
         metricIds,
         comments: candidates.filter((candidate) => commentKeys.includes(candidate.key)).map(({ entryId, fieldId }) => ({ entryId, fieldId })),
+        anonymizeParticipants: anonymize,
       });
       setSuccess(t("resultsSaved"));
     } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
@@ -627,7 +629,7 @@ function AdminResults({
   async function regenerate() {
     setBusy(true); setError(null); setSuccess(null);
     try {
-      await onSave({ regenerate: true });
+      await onSave({ regenerate: true, anonymizeParticipants: anonymize });
       setSuccess(t("showcaseRegenerated"));
     } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
   }
@@ -639,6 +641,7 @@ function AdminResults({
         <div className="grid gap-4 sm:grid-cols-2"><label className="sm:col-span-2"><span className={labelClass}>{t("headlineLabel")}</span><input className={inputClass} value={headline} onChange={(event) => setHeadline(event.target.value)} maxLength={180} /></label><label className="sm:col-span-2"><span className={labelClass}>{t("summaryLabel")}</span><textarea className={inputClass} rows={4} value={summary} onChange={(event) => setSummary(event.target.value)} maxLength={1500} /></label></div>
         <fieldset className="mt-6"><legend className="text-base font-light">{t("highlightMetrics")}</legend>{challenge.metrics.length ? <div className="mt-3 grid gap-2 sm:grid-cols-2">{challenge.metrics.map((metric) => <label className="flex min-h-12 items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4 text-sm" key={metric.id}><input type="checkbox" aria-label={t("highlightMetricAria", { label: metric.label })} checked={metricIds.includes(metric.id)} onChange={(event) => setMetricIds((current) => event.target.checked ? [...current, metric.id] : current.filter((id) => id !== metric.id))} /><span><strong className="block">{metric.label}</strong><small className="text-[var(--muted)]">{metric.formattedValue ?? metric.value ?? t("metricNoValue")}</small></span></label>)}</div> : <p className="mt-2 text-sm text-[var(--muted)]">{t("createMetricsFirst")}</p>}</fieldset>
         <fieldset className="mt-6"><legend className="text-base font-light">{t("selectedComments")}</legend>{candidates.length ? <div className="mt-3 grid gap-2 sm:grid-cols-2">{candidates.map((candidate) => <label className="flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4 text-sm" key={candidate.key}><input className="mt-1" type="checkbox" aria-label={t("selectCommentAria", { author: candidate.authorName })} checked={commentKeys.includes(candidate.key)} onChange={(event) => setCommentKeys((current) => event.target.checked ? [...current, candidate.key] : current.filter((key) => key !== candidate.key))} /><span><span className="line-clamp-3 leading-6">“{candidate.text}”</span><small className="mt-2 block font-light text-[var(--muted)]">{candidate.authorName} · {candidate.itemTitle}</small></span></label>)}</div> : <p className="mt-2 text-sm text-[var(--muted)]">{t("noTextFields")}</p>}</fieldset>
+        <label className="mt-6 flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4 text-sm"><input className="mt-0.5" type="checkbox" aria-label={t("anonymizeParticipants")} checked={anonymize} onChange={(event) => setAnonymize(event.target.checked)} /><span><strong className="block">{t("anonymizeParticipants")}</strong><small className="text-[var(--muted)]">{t("anonymizeHint")}</small></span></label>
         <div className="mt-5"><StatusMessage error={error} success={success} /></div>
         <div className="mt-5 flex flex-col gap-2 sm:flex-row"><Button disabled={busy} onClick={() => void save()}>{busy ? tc("saving") : t("saveResults")}</Button><Button variant="secondary" disabled={busy} onClick={() => void regenerate()}>{t("regenerateShowcase")}</Button></div>
         <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{t("regenerateHint")}</p>
