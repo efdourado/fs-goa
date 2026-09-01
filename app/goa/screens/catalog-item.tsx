@@ -64,7 +64,7 @@ export function CatalogItemScreen({
             {item.rounds.map((round) => (
               <li key={round.challengeId} className="flex items-center justify-between gap-3 py-3">
                 <span className="min-w-0">
-                  <button type="button" onClick={() => onOpenChallenge(round.challengeId)} className="block truncate text-sm font-light hover:underline">{round.title}</button>
+                  <button type="button" onClick={() => onOpenChallenge(round.challengeId)} className="block cursor-pointer truncate text-sm font-light hover:underline">{round.title}</button>
                   <span className="text-xs text-[var(--muted)]">
                     {[round.startsOn || round.endsOn ? f.dateRange(round.startsOn, round.endsOn) : t(`status.${round.status}`),
                       round.recommendedBy ? t("recommendedBy", { name: round.recommendedBy }) : null].filter(Boolean).join(" · ")}
