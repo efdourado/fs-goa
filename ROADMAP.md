@@ -233,6 +233,12 @@ indicador e histórico dependem dela.
 - **Fase 1a** — acervo de filmes por grupo (`catalog_items`), identidade do filme
   entre rodadas (`challenge_items.catalog_item_id`), tags de gênero, e
   `recommended_by_user_id` no item — a peça que destrava o viés do indicador.
+- **Marco 3** — modelo de registros: o item da rodada ficou independente do
+  `entry_type` (o tipo vive no `entry`, unicidade por filme × tipo × pessoa), então
+  um mesmo filme já aceita expectativa **e** avaliação. **Cine Livre é o padrão**:
+  o wizard começa sem prazo, uma rodada de cine com início futuro é só `active`
+  (não "agendada"), "assistido no futuro" é recusado. Catálogo desambigua por ano.
+  Duração no editor de filmes.
 - **Modo escuro** — tokens claro/escuro, `prefers-color-scheme` + escolha
   explícita por cookie, toggle System/Claro/Escuro.
 - **Bilíngue pt-BR/en** — `next-intl`, locale por cookie, sem prefixo de URL.

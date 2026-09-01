@@ -1,11 +1,24 @@
 # Arquitetura v2 — fundação relacional (Fase 1 da roadmap)
 
-> **Status:** parcialmente implementado. **D1 resolvida** (acervo e rodada são
-> irmãos do grupo) e a **Fase 1a** já está em `main` — `catalog_items`,
-> `catalog_tags`, `challenge_items.catalog_item_id` + `recommended_by_user_id`
-> (migração 0010). O que segue abaixo (`round_items`, `entries.checkpoint_id`,
-> as 4 colunas ortogonais de `entry_types`, relaxar os CHECK) é o **Marco 3** e
-> ainda precisa de decisão em D2. Contexto em [../ROADMAP.md](../ROADMAP.md).
+> **Status:** parcialmente implementado.
+> - **D1 resolvida** — acervo e rodada são irmãos do grupo. **Fase 1a** em `main`
+>   (migração 0010: `catalog_items`, `catalog_tags`,
+>   `challenge_items.catalog_item_id` + `recommended_by_user_id`).
+> - **D2 resolvida** — **Cine Livre é o padrão**: filmes disponíveis enquanto a
+>   rodada está `active`; início/fim são contexto, não bloqueio; uma avaliação
+>   atual por (filme, tipo, pessoa); o encerramento congela. O `within_round` do
+>   design abaixo passou a se chamar **`while_active`**.
+> - **Marco 3** em `main` (migração 0011): `challenge_items.entry_type_id` virou
+>   nullable (o item é type-agnostic; o tipo vive no `entry`), a unicidade de
+>   `entries` inclui `entry_type_id`, e o catálogo desambigua por ano. Um filme
+>   já aceita expectativa **e** avaliação da mesma pessoa.
+> - **Falta** (Marco 4): `entries.checkpoint_id`, as 4 colunas ortogonais de
+>   `entry_types` (`purpose/target_policy/cardinality/schedule_policy`), receitas
+>   versionadas, Cine Curadoria (fluxo de expectativa que congela ao marcar
+>   "assistido"). O `entry_types.submission_mode` + os CHECK de `entries` seguem
+>   como estão até lá.
+>
+> Contexto em [../ROADMAP.md](../ROADMAP.md).
 
 ## O problema em uma frase
 
@@ -47,17 +60,17 @@ grupo
 | `purpose` | `progress · completion · expectation · rating · checkin` | o que o registro é |
 | `target_policy` | `required · optional · none` | precisa apontar um `round_item`? |
 | `cardinality` | `once_per_item · once_per_item_day · repeatable · once_per_day` | quantos por participante |
-| `schedule_policy` | `free · within_round · checkpoint` | quando pode registrar |
+| `schedule_policy` | `free · while_active · checkpoint` | quando pode registrar |
 
 Exemplos:
 
 | Fluxo | purpose | target_policy | cardinality | schedule_policy |
 |---|---|---|---|---|
-| Expectativa de filme | expectation | required | once_per_item | within_round |
-| Avaliação de filme | rating | required | once_per_item | within_round |
-| Progresso de leitura | progress | required | once_per_item_day | within_round |
-| Conclusão de livro | completion | required | once_per_item | within_round |
-| Hábito diário | checkin | required | once_per_item_day | within_round |
+| Expectativa de filme | expectation | required | once_per_item | while_active |
+| Avaliação de filme | rating | required | once_per_item | while_active |
+| Progresso de leitura | progress | required | once_per_item_day | while_active |
+| Conclusão de livro | completion | required | once_per_item | while_active |
+| Hábito diário | checkin | required | once_per_item_day | while_active |
 | Reflexão do encontro | checkin | none | repeatable | checkpoint |
 
 ### `round_items` (era `challenge_items`)
@@ -108,13 +121,14 @@ Então há dois registros de `progress` (um por livro/dia),
 
 Vira um teste de integração novo em `tests/integration/`.
 
-## Decisões ainda abertas (precisam de você)
+## Decisões
 
 - ~~**D1**~~ — **resolvida:** acervo e rodada são filhos irmãos do grupo.
-- **D2** — "Avaliar a qualquer hora" (`schedule_policy = within_round`) vira o
-  **padrão** para cine, com checkpoint datado como opção só para leitura/hábitos?
-- Ordem de UI: a organização por blocos/semanas (drag-and-drop) entra **junto**
-  com `round_items`, ou fica para a Fase 2?
+- ~~**D2**~~ — **resolvida:** Cine Livre (`schedule_policy = while_active`) é o
+  **padrão** do cine; checkpoint datado fica como opção para leitura/hábitos.
+- **Aberta** — a organização por blocos/semanas entra junto com `round_items`
+  (Marco 4) ou fica para o Marco 5 como visão? Proposta: Marco 5 (visão), sem
+  contaminar a relação pessoa × filme × avaliação.
 
 ## O que NÃO muda na Fase 1
 
