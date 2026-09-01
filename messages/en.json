@@ -660,6 +660,7 @@
     "dueBy": "by {date}",
     "occurredOnLabel": "Date it happened",
     "occurredOnHint": "Use today or backfill an entry from the past.",
+    "occurredOnOptionalHint": "Leave it blank to save the entry without a date.",
     "occurredOn": "Happened on {date}.",
     "expectationLocked": "Expectation locks once you rate the film. This entry is read-only.",
     "checkpointsTitle": "Checkpoints",

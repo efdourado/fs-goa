@@ -1,0 +1,1 @@
+ALTER TABLE "entries" ALTER COLUMN "occurred_on" DROP NOT NULL;

@@ -660,6 +660,7 @@
     "dueBy": "até {date}",
     "occurredOnLabel": "Data em que aconteceu",
     "occurredOnHint": "Use hoje ou recupere um registro do passado.",
+    "occurredOnOptionalHint": "Deixe em branco para salvar o registro sem data.",
     "occurredOn": "Aconteceu em {date}.",
     "expectationLocked": "A expectativa trava depois que você avalia. O registro fica só para leitura.",
     "checkpointsTitle": "Checkpoints",

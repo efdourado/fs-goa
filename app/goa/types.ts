@@ -151,7 +151,7 @@ export interface Entry {
   userId?: Id;
   participantName?: string;
   participantUsername?: string;
-  occurredOn?: string;
+  occurredOn?: string | null;
   submittedAt?: string;
   updatedAt?: string;
   isLate?: boolean;

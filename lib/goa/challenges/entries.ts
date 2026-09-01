@@ -161,14 +161,14 @@ export async function listEntries(session: SessionContext, challengeId: string) 
     const result = await client.query<{
       id: string; item_id: string | null; checkpoint_id: string | null; entry_type_id: string;
       participant_user_id: string; display_name: string;
-      username: string; occurred_on: string; submitted_at: Date; updated_at: Date;
+      username: string; occurred_on: string | null; submitted_at: Date; updated_at: Date;
     }>(
       `SELECT e.id,e.item_id,e.checkpoint_id,e.entry_type_id,e.participant_user_id,u.display_name,u.username,
               e.occurred_on::text AS occurred_on,e.submitted_at,e.updated_at
          FROM entries e JOIN users u ON u.id=e.participant_user_id
         WHERE e.challenge_id=$1 AND e.deleted_at IS NULL
           AND ($2::boolean OR e.participant_user_id=$3)
-        ORDER BY e.occurred_on DESC,e.created_at DESC`,
+        ORDER BY e.occurred_on DESC NULLS LAST,e.created_at DESC`,
       [challengeId, access.canManage, session.user.id],
     );
     const values = await entryValues(client, result.rows.map((entry) => entry.id));
@@ -180,8 +180,8 @@ export async function listEntries(session: SessionContext, challengeId: string) 
     const checkpointByDay = new Map(checkpoints.rows.map((checkpoint) => [checkpoint.day, checkpoint.id]));
     return result.rows.map((entry) => ({
       id: entry.id,
-      itemId: entry.item_id ?? entry.checkpoint_id ?? checkpointByDay.get(entry.occurred_on) ?? null,
-      checkpointId: entry.checkpoint_id ?? checkpointByDay.get(entry.occurred_on) ?? null,
+      itemId: entry.item_id ?? entry.checkpoint_id ?? checkpointByDay.get(entry.occurred_on ?? "") ?? null,
+      checkpointId: entry.checkpoint_id ?? checkpointByDay.get(entry.occurred_on ?? "") ?? null,
       entryTypeId: entry.entry_type_id,
       participantId: entry.participant_user_id,
       userId: entry.participant_user_id,
@@ -224,8 +224,10 @@ export async function saveEntry(
 
     let itemId: string | null = null;
     let checkpointId: string | null = null;
-    let occurredOn: string;
+    let occurredOn: string | null;
     const today = dateKeyInTimeZone(new Date(), access.challenge.time_zone);
+    // Day-keyed entries always need a date; a plain round entry may go without one.
+    const dateOptional = cardinality !== "once_per_day" && cardinality !== "once_per_item_day";
 
     if (effectiveSchedule !== "checkpoint") {
       const requestedItemId =
@@ -241,8 +243,12 @@ export async function saveEntry(
         if (!item) throw new ApiError(400, "invalid_item", "Item não pertence ao desafio.");
         itemId = item.id;
       }
-      occurredOn = typeof body.occurredOn === "string" ? dateString(body.occurredOn, "Data") : today;
-      if (occurredOn > today) {
+      occurredOn = dateOptional && (body.occurredOn === null || body.occurredOn === "")
+        ? null
+        : typeof body.occurredOn === "string" && body.occurredOn
+          ? dateString(body.occurredOn, "Data")
+          : today;
+      if (occurredOn !== null && occurredOn > today) {
         throw itemId
           ? new ApiError(409, "watch_in_future", "A data assistida pode ser hoje ou uma data passada.")
           : new ApiError(409, "checkin_in_future", "O check-in pode ser de hoje ou de uma data passada.");
@@ -385,7 +391,7 @@ export async function exportEntriesCsv(session: SessionContext, challengeId: str
     const lines = [header.map((value) => escapeCsvCell(value)).join(",")];
     for (const entry of entries) {
       const values = entry.values as Record<string, unknown>;
-      const row = [entry.id, entry.participantName, entry.participantUsername, entry.occurredOn, entry.itemTitle ?? "",
+      const row = [entry.id, entry.participantName, entry.participantUsername, entry.occurredOn ?? "", entry.itemTitle ?? "",
         ...fields.map((field) => {
           const value = values[String(field.id)];
           return value === null || value === undefined ? "" : String(value);
@@ -407,7 +413,7 @@ export async function exportEntriesCsv(session: SessionContext, challengeId: str
 async function listEntriesWithClient(client: PoolClient, challengeId: string): Promise<Array<Record<string, unknown>>> {
   const result = await client.query<{
     id: string; item_id: string | null; item_title: string | null; participant_user_id: string;
-    display_name: string; username: string; occurred_on: string; submitted_at: Date; updated_at: Date;
+    display_name: string; username: string; occurred_on: string | null; submitted_at: Date; updated_at: Date;
   }>(
     `SELECT e.id,e.item_id,coalesce(ci.title,cc.title) AS item_title,e.participant_user_id,u.display_name,u.username,
             e.occurred_on::text AS occurred_on,e.submitted_at,e.updated_at
@@ -416,7 +422,7 @@ async function listEntriesWithClient(client: PoolClient, challengeId: string): P
        LEFT JOIN challenge_checkpoints cc ON cc.challenge_id=e.challenge_id
         AND (cc.starts_at AT TIME ZONE 'America/Sao_Paulo')::date=e.occurred_on
         AND cc.archived_at IS NULL
-      WHERE e.challenge_id=$1 AND e.deleted_at IS NULL ORDER BY e.occurred_on,e.created_at`, [challengeId]);
+      WHERE e.challenge_id=$1 AND e.deleted_at IS NULL ORDER BY e.occurred_on NULLS LAST,e.created_at`, [challengeId]);
   const values = await entryValues(client, result.rows.map((entry) => entry.id));
   return result.rows.map((entry) => ({
     id: entry.id, itemId: entry.item_id, itemTitle: entry.item_title,

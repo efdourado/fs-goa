@@ -7,6 +7,7 @@ if (!databaseUrl) throw new Error("DATABASE_URL é obrigatória para o teste de 
 process.env.APP_ORIGIN = "http://goa.test";
 
 const { DELETE, GET, PATCH, POST } = await import("../../app/api/[...path]/route");
+const { dateKeyInTimeZone } = await import("../../lib/goa/domain/shared");
 const adminPool = new pg.Pool({ connectionString: databaseUrl, max: 1 });
 
 type ClientSession = { cookie: string; csrf: string; user: { id: string; name: string; username: string } };
@@ -1684,6 +1685,75 @@ test("modelo de registros: um filme aceita mais de um tipo de registro por pesso
 
 type DetailType = { id: string; purpose: string; semanticKey: string; cardinality: string; countsCompletion?: boolean };
 type DetailItem = { id: string; title: string };
+
+test("data do registro é opcional: uma rodada aceita registro sem data, mas o diário não", async () => {
+  const owner = await register("Nina", "nina_semdata");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Sem data" } })).body as { id: string }).id;
+  const today = dateKeyInTimeZone(new Date(), "America/Sao_Paulo");
+
+  const challenge = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: {
+      template: "cine", title: "Cine livre", submissionMode: "item",
+      participantIds: [owner.user.id],
+      fields: [{ key: "nota", label: "Nota", type: "rating", required: true }],
+      items: [{ title: "Sem data" }, { title: "Vazio" }, { title: "Padrão hoje" }],
+    },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } })).response.status, 200);
+  const items = ((await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { items: DetailItem[] }).items;
+  const byTitle = (title: string) => items.find((item) => item.title === title)!;
+
+  // `occurredOn: null` e `""` salvam o registro sem data
+  const nullDate = await call("POST", `/api/challenges/${challengeId}/entries`, {
+    session: owner, body: { itemId: byTitle("Sem data").id, occurredOn: null, values: { nota: 4 } },
+  });
+  assert.equal(nullDate.response.status, 201, JSON.stringify(nullDate.body));
+  assert.equal((nullDate.body as { occurredOn: string | null }).occurredOn, null);
+  const emptyDate = await call("POST", `/api/challenges/${challengeId}/entries`, {
+    session: owner, body: { itemId: byTitle("Vazio").id, occurredOn: "", values: { nota: 3 } },
+  });
+  assert.equal(emptyDate.response.status, 201, JSON.stringify(emptyDate.body));
+  assert.equal((emptyDate.body as { occurredOn: string | null }).occurredOn, null);
+
+  // omitir a chave mantém o padrão "hoje"
+  const omitted = await call("POST", `/api/challenges/${challengeId}/entries`, {
+    session: owner, body: { itemId: byTitle("Padrão hoje").id, values: { nota: 5 } },
+  });
+  assert.equal(omitted.response.status, 201, JSON.stringify(omitted.body));
+  assert.equal((omitted.body as { occurredOn: string }).occurredOn, today);
+
+  const rows = await adminPool.query<{ occurred_on: string | null }>(
+    "SELECT occurred_on::text AS occurred_on FROM entries WHERE challenge_id=$1 AND deleted_at IS NULL",
+    [challengeId],
+  );
+  assert.equal(rows.rows.filter((row) => row.occurred_on === null).length, 2);
+
+  // o histórico devolve o registro sem data sem quebrar
+  const listed = ((await call("GET", `/api/challenges/${challengeId}/entries`, { session: owner })).body as {
+    entries: Array<{ itemId: string | null; occurredOn: string | null }>;
+  }).entries;
+  assert.equal(listed.find((entry) => entry.itemId === byTitle("Sem data").id)?.occurredOn, null);
+
+  // um tipo diário (once_per_day) ignora o "sem data" e cai no hoje
+  const daily = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: {
+      template: "reading", title: "Hábito", startsOn: null, endsOn: null,
+      submissionMode: "daily", participantIds: [owner.user.id],
+      fields: [{ key: "linha", label: "Linha do dia", type: "text", required: true }],
+    },
+  });
+  const dailyId = (daily.body as { id: string }).id;
+  assert.equal((await call("POST", `/api/challenges/${dailyId}/transition`, { session: owner, body: { status: "active" } })).response.status, 200);
+  const dailyField = ((await call("GET", `/api/challenges/${dailyId}`, { session: owner })).body as { fields: Array<{ id: string }> }).fields[0].id;
+  const dailyEntry = await call("POST", `/api/challenges/${dailyId}/entries`, {
+    session: owner, body: { occurredOn: null, values: { [dailyField]: "oi" } },
+  });
+  assert.equal(dailyEntry.response.status, 201, JSON.stringify(dailyEntry.body));
+  assert.equal((dailyEntry.body as { occurredOn: string }).occurredOn, today);
+});
 
 test("fundação: dois livros no mesmo dia, conclusão e nota sem comentário", async () => {
   const owner = await register("Lúcia", "lucia_found");

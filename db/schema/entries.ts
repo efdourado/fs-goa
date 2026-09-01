@@ -36,7 +36,10 @@ export const entries = pgTable(
     itemId: text("item_id"),
     checkpointId: text("checkpoint_id"),
     participantUserId: text("participant_user_id").notNull(),
-    occurredOn: date("occurred_on", { mode: "string" }).notNull(),
+    // Nullable: a plain round entry ("I watched it, no date in mind") can skip
+    // the date. Day-keyed cardinalities (`once_per_day`, `once_per_item_day`)
+    // still always carry one — the entry API fills today when it's omitted.
+    occurredOn: date("occurred_on", { mode: "string" }),
     submittedAt: timestamptz("submitted_at").defaultNow().notNull(),
     createdByUserId: text("created_by_user_id")
       .notNull()
