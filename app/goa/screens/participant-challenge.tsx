@@ -50,6 +50,7 @@ export function DynamicEntryForm({
   entry,
   canEdit,
   unavailableMessage,
+  dateField,
   onSave,
 }: {
   fields: ChallengeField[];
@@ -57,6 +58,9 @@ export function DynamicEntryForm({
   entry?: Entry;
   canEdit: boolean;
   unavailableMessage?: string | null;
+  // An "when did it happen" date that rides with the optional fields — blank
+  // means the entry is saved without a date. Owned by the caller.
+  dateField?: { label: string; hint: string; value: string; max: string; onChange: (value: string) => void };
   onSave: (values: Record<Id, unknown>, entry?: Entry) => Promise<void>;
 }) {
   const t = useTranslations("entryForm");
@@ -69,7 +73,9 @@ export function DynamicEntryForm({
 
   const optionalFields = fields.filter((field) => field.id && !field.required);
   const isBlank = (value: unknown) => value === undefined || value === null || value === "";
-  const hasFilledOptional = optionalFields.some((field) => field.id && !isBlank(values[field.id]));
+  const optionalCount = optionalFields.length + (dateField ? 1 : 0);
+  const hasFilledOptional = optionalFields.some((field) => field.id && !isBlank(values[field.id]))
+    || Boolean(dateField?.value);
   // Optional fields (e.g. "Nota do livro") stay tucked away so nobody feels
   // nudged to rate a book they have not finished. Auto-open once one is filled.
   const [showOptional, setShowOptional] = useState(hasFilledOptional || !canEdit);
@@ -129,13 +135,20 @@ export function DynamicEntryForm({
           </div>
         );
       })}
-      {optionalFields.length && canEdit ? (
+      {dateField && showOptional ? (
+        <div>
+          <label className={labelClass} htmlFor="entry-occurred-on">{dateField.label}<small className="ml-2 font-light text-[var(--muted)]">{t("optional")}</small></label>
+          <input id="entry-occurred-on" className={inputClass} type="date" max={dateField.max} value={dateField.value} disabled={!canEdit || busy} onChange={(event) => dateField.onChange(event.target.value)} />
+          <small className="mt-1 block text-[var(--muted)]">{dateField.hint}</small>
+        </div>
+      ) : null}
+      {optionalCount && canEdit ? (
         <button
           type="button"
           className="min-h-11 cursor-pointer text-sm font-light hover:underline"
           onClick={() => setShowOptional((open) => !open)}
         >
-          {showOptional ? t("hideOptional") : t("showOptional", { count: optionalFields.length })}
+          {showOptional ? t("hideOptional") : t("showOptional", { count: optionalCount })}
         </button>
       ) : null}
       <StatusMessage error={error} success={success} />
@@ -210,6 +223,9 @@ function ItemEntryPanel({
   item,
   ownEntries,
   occurredOn,
+  onOccurredOnChange,
+  offerOptionalDate,
+  today,
   unavailableMessage,
   canEdit,
   onSaveEntry,
@@ -217,10 +233,17 @@ function ItemEntryPanel({
   challenge: ChallengeDetail;
   item: ChallengeItem;
   ownEntries: Entry[];
+  // "" when the participant left the (optional) date blank; `today` is the
+  // fallback for the day-keyed forms that still require one.
   occurredOn: string;
+  onOccurredOnChange: (value: string) => void;
+  // When a prominent date picker is already on screen (a per-day round), the
+  // per-form optional date is skipped so there is only one control.
+  offerOptionalDate: boolean;
+  today: string;
   unavailableMessage: string | null;
   canEdit: boolean;
-  onSaveEntry: (itemId: Id | null, values: Record<Id, unknown>, entry?: Entry, occurredOn?: string, entryTypeId?: Id) => Promise<void>;
+  onSaveEntry: (itemId: Id | null, values: Record<Id, unknown>, entry?: Entry, occurredOn?: string | null, entryTypeId?: Id) => Promise<void>;
 }) {
   const t = useTranslations("participant");
   const types = itemEntryTypes(challenge);
@@ -233,26 +256,31 @@ function ItemEntryPanel({
         const entry = ownEntries.find((candidate) =>
           itemIdForEntry(candidate) === item.id
           && (candidate.entryTypeId ?? "") === type.id
-          && (!perDay || candidate.occurredOn === occurredOn));
+          && (!perDay || candidate.occurredOn === (occurredOn || today)));
         const rated = ratingTypeId
           ? ownEntries.some((candidate) => itemIdForEntry(candidate) === item.id && candidate.entryTypeId === ratingTypeId)
           : false;
         const locked = type.purpose === "expectation" && rated;
+        // A first plain-round entry may carry a date; day-keyed forms take it
+        // from the picker above, an expectation is pre-watch, and once an entry
+        // exists the date is fixed.
+        const offersDate = offerOptionalDate && !perDay && !entry && canEdit && !locked && type.purpose !== "expectation";
         return (
           <div key={type.id || "registro"}>
             {stacked ? <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">{type.name}</h3> : null}
             <DynamicEntryForm
-              key={`${type.id}-${perDay ? occurredOn : "fixed"}-${entry?.id ?? "new"}`}
+              key={`${type.id}-${perDay ? occurredOn || today : "fixed"}-${entry?.id ?? "new"}`}
               fields={type.fields}
               item={item}
               entry={entry}
               canEdit={canEdit && !locked}
               unavailableMessage={locked ? t("expectationLocked") : unavailableMessage}
+              dateField={offersDate ? { label: t("occurredOnLabel"), hint: t("occurredOnOptionalHint"), value: occurredOn, max: today, onChange: onOccurredOnChange } : undefined}
               onSave={(values, saved) => onSaveEntry(
                 item.id,
                 values,
                 saved,
-                perDay || !saved ? occurredOn : undefined,
+                saved ? undefined : perDay ? occurredOn || today : offersDate ? occurredOn || null : undefined,
                 type.id || undefined,
               )}
             />
@@ -280,7 +308,7 @@ export function ParticipantChallengeScreen({
   onTab: (tab: ParticipantTab) => void;
   onBack: () => void;
   onAdmin?: () => void;
-  onSaveEntry: (itemId: Id | null, values: Record<Id, unknown>, entry?: Entry, occurredOn?: string, entryTypeId?: Id) => Promise<void>;
+  onSaveEntry: (itemId: Id | null, values: Record<Id, unknown>, entry?: Entry, occurredOn?: string | null, entryTypeId?: Id) => Promise<void>;
 }) {
   const t = useTranslations("participant");
   const tc = useTranslations("common");
@@ -298,7 +326,10 @@ export function ParticipantChallengeScreen({
   const sortedItems = useMemo(() => [...challenge.items].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)), [challenge.items]);
   const undatedDaily = challenge.submissionMode === "daily" && !challenge.startsOn && !challenge.endsOn;
   const today = dateKeyInSaoPaulo(new Date());
-  const [occurredOn, setOccurredOn] = useState(today);
+  // "" means the participant hasn't picked a date. The plain round form saves it
+  // as-is (no date); the daily / per-day forms fall back to `today`.
+  const [occurredOn, setOccurredOn] = useState("");
+  const effectiveOccurredOn = occurredOn || today;
   const defaultItem = sortedItems.find((item) => item.status === "open" && !entriesByItem.has(item.id))
     ?? sortedItems.find((item) => !entriesByItem.has(item.id) && item.status !== "scheduled" && item.status !== "closed")
     ?? [...sortedItems].reverse().find((item) => entriesByItem.has(item.id))
@@ -307,7 +338,7 @@ export function ParticipantChallengeScreen({
   const [selectedItemId, setSelectedItemId] = useState<Id | null>(defaultItem?.id ?? null);
   const selectedItem = sortedItems.find((item) => item.id === selectedItemId) ?? defaultItem;
   const currentEntry = undatedDaily
-    ? ownEntries.find((entry) => entry.occurredOn === occurredOn)
+    ? ownEntries.find((entry) => entry.occurredOn === effectiveOccurredOn)
     : selectedItem
       ? entriesByItem.get(selectedItem.id)
       : ownEntries.find((entry) => !itemIdForEntry(entry));
@@ -326,6 +357,9 @@ export function ParticipantChallengeScreen({
   const itemForms = itemEntryTypes(challenge);
   const useItemPanel = itemForms.length > 0 && !undatedDaily && Boolean(selectedItem);
   const perDayItem = itemForms.some((type) => type.cardinality === "once_per_item_day");
+  // A daily / per-day round needs a concrete date, so it gets a prominent picker.
+  // A plain round instead offers the date among the entry form's optional fields.
+  const dateRequired = undatedDaily || (useItemPanel && perDayItem);
   const tabs: Array<{ id: ParticipantTab }> = [
     { id: "today" },
     { id: "history" },
@@ -363,15 +397,15 @@ export function ParticipantChallengeScreen({
                   <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <h2 className="mt-2 text-2xl font-light tracking-[-0.04em]">
-                        {selectedItem?.title ?? (undatedDaily ? t("checkInOf", { date: f.date(occurredOn, longDate) }) : t("newEntry"))}
+                        {selectedItem?.title ?? (undatedDaily ? t("checkInOf", { date: f.date(effectiveOccurredOn, longDate) }) : t("newEntry"))}
                       </h2>
                       {selectedItem?.description ? <p className="mt-1 text-sm text-[var(--muted)]">{selectedItem.description}</p> : null}
                       {selectedItem?.recommendedBy || selectedItem?.catalogItem?.year ? <p className="mt-1 text-xs text-[var(--muted)]">{[selectedItem.recommendedBy ? t("recommendedBy", { name: selectedItem.recommendedBy.name }) : null, selectedItem.catalogItem?.year ? String(selectedItem.catalogItem.year) : null, selectedItem.catalogItem?.genres.length ? selectedItem.catalogItem.genres.join(", ") : null].filter(Boolean).join(" · ")}</p> : null}</div>{selectedItem?.dueAt ? <span className="rounded-full bg-[var(--wash)] px-3 py-2 text-xs font-semibold text-[var(--muted)]">{t("dueBy", { date: f.dateTime(selectedItem.dueAt) })}</span> : null}</div>
-                  {undatedDaily || (useItemPanel && (perDayItem || !currentEntry)) ? <label className="mb-5 block"><span className={labelClass}>{t("occurredOnLabel")}</span><input className={inputClass} type="date" max={today} value={occurredOn} disabled={Boolean(unavailableMessage)} onChange={(event) => setOccurredOn(event.target.value || today)} /><small className="mt-1 block text-[var(--muted)]">{t("occurredOnHint")}</small></label> : !useItemPanel && currentEntry?.occurredOn ? <p className="mb-5 text-xs text-[var(--muted)]">{t("occurredOn", { date: f.date(currentEntry.occurredOn, longDate) })}</p> : null}
+                  {dateRequired ? <label className="mb-5 block"><span className={labelClass}>{t("occurredOnLabel")}</span><input className={inputClass} type="date" max={today} value={effectiveOccurredOn} disabled={Boolean(unavailableMessage)} onChange={(event) => setOccurredOn(event.target.value || today)} /><small className="mt-1 block text-[var(--muted)]">{t("occurredOnHint")}</small></label> : !useItemPanel && currentEntry?.occurredOn ? <p className="mb-5 text-xs text-[var(--muted)]">{t("occurredOn", { date: f.date(currentEntry.occurredOn, longDate) })}</p> : null}
                   {useItemPanel && selectedItem ? (
-                    <ItemEntryPanel challenge={challenge} item={selectedItem} ownEntries={ownEntries} occurredOn={occurredOn} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} onSaveEntry={onSaveEntry} />
+                    <ItemEntryPanel challenge={challenge} item={selectedItem} ownEntries={ownEntries} occurredOn={occurredOn} onOccurredOnChange={setOccurredOn} offerOptionalDate={!perDayItem} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} onSaveEntry={onSaveEntry} />
                   ) : (
-                    <DynamicEntryForm key={`${selectedItem?.id ?? "free"}-${undatedDaily ? occurredOn : "fixed"}-${currentEntry?.id ?? "new"}`} fields={challenge.fields} item={selectedItem ?? null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry(selectedItem?.id ?? null, values, entry, undatedDaily ? occurredOn : undefined)} />
+                    <DynamicEntryForm key={`${selectedItem?.id ?? "free"}-${undatedDaily ? effectiveOccurredOn : "fixed"}-${currentEntry?.id ?? "new"}`} fields={challenge.fields} item={selectedItem ?? null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry(selectedItem?.id ?? null, values, entry, undatedDaily ? effectiveOccurredOn : undefined)} />
                   )}
                 </>
               )}

@@ -365,7 +365,7 @@ export default function GoaApp() {
     itemId: Id | null,
     values: Record<Id, unknown>,
     entry?: Entry,
-    occurredOn?: string,
+    occurredOn?: string | null,
     entryTypeId?: Id,
   ) {
     if (!bootstrap || !selectedChallenge) return;
@@ -374,7 +374,9 @@ export default function GoaApp() {
     } else {
       await apiRequest(API_PATHS.entries(selectedChallenge.id), {
         method: "POST",
-        body: { itemId, values, ...(occurredOn ? { occurredOn } : {}), ...(entryTypeId ? { entryTypeId } : {}) },
+        // `null` is meaningful — an entry saved with no date — so only an
+        // `undefined` argument drops the key and lets the server assume today.
+        body: { itemId, values, ...(occurredOn !== undefined ? { occurredOn } : {}), ...(entryTypeId ? { entryTypeId } : {}) },
         csrfToken: bootstrap.csrfToken,
       });
     }
