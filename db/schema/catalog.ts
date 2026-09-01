@@ -8,6 +8,7 @@ import {
   smallint,
   text,
   unique,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 import { users } from "./accounts";
@@ -41,7 +42,14 @@ export const catalogItems = pgTable(
     updatedAt: timestamptz("updated_at").defaultNow().notNull(),
   },
   (table) => [
-    unique("catalog_items_group_kind_title_unique").on(table.groupId, table.kind, table.normalizedTitle),
+    // Year is part of the identity: "Dune" and "Dune (2021)" are different films.
+    // A title with no year is its own bucket.
+    uniqueIndex("catalog_items_group_kind_title_year_uidx").on(
+      table.groupId,
+      table.kind,
+      table.normalizedTitle,
+      sql`coalesce(${table.year}, -1)`,
+    ),
     unique("catalog_items_id_group_unique").on(table.id, table.groupId),
     index("catalog_items_group_kind_idx").on(table.groupId, table.kind),
     check("catalog_items_kind_check", sql`${table.kind} in ('film', 'book', 'other')`),
