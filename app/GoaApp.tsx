@@ -37,7 +37,6 @@ import type {
   Screen,
 } from "./goa/types";
 import { CACHE_KEYS, clearCache, readCache, writeCache } from "./goa/cache";
-import { Footer } from "./goa/Footer";
 import { AppHeader, Brand, Button, cardClass, cx, EmptyState, LoadingView } from "./goa/ui";
 import { canManage, slugify } from "./goa/utils";
 
@@ -472,7 +471,6 @@ export default function GoaApp() {
     <div className="flex min-h-screen flex-col bg-[var(--canvas)] text-[var(--ink)]">
       <AppHeader user={user} notifications={bootstrap.memberRequests} onHome={() => setScreen({ kind: "dashboard" })} onAccount={() => setScreen({ kind: "account" })} onLogout={logout} onAcceptRequest={(id) => respondToMemberRequest(id, "accept")} onDeclineRequest={(id) => respondToMemberRequest(id, "decline")} />
       <div className="flex-1">{content}</div>
-      {screen.kind === "challenge" || screen.kind === "admin" ? null : <Footer />}
     </div>
   );
 }

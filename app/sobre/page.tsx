@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 
-import { Footer } from "@/app/goa/Footer";
 import { SettingsMenu } from "@/app/goa/SettingsMenu";
 import { Brand } from "@/app/goa/ui";
 
@@ -40,7 +39,6 @@ export default async function AboutPage() {
           </Link>
         </p>
       </main>
-      <Footer />
     </div>
   );
 }

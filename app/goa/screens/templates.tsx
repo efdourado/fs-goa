@@ -4,7 +4,6 @@ import { useTranslations } from "next-intl";
 import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
 
 import { API_PATHS, apiRequest } from "../api";
-import { Footer } from "../Footer";
 import { useGoaFormat } from "../format";
 import { RuleSectionsView } from "../rules";
 import { SettingsMenu } from "../SettingsMenu";
@@ -33,7 +32,6 @@ function PublicChrome({ user, onSignIn, children }: { user: User | null; onSignI
         </div>
       </header>
       <div className="flex-1">{children}</div>
-      <Footer />
     </div>
   );
 }
