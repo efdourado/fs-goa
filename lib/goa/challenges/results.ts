@@ -13,6 +13,7 @@ import { bayesianAverage, indicatorBias, mean, meanDelta, spread } from "../anal
 import { calculateMetric } from "../../metrics";
 import { generateOpaqueToken, hashToken } from "../../security";
 import { primaryEntryType } from "./entry-types";
+import { generateShowcase } from "./showcase";
 import type { MetricRow } from "./types";
 
 interface SeriesEntry {
@@ -463,6 +464,12 @@ export async function curateResults(
   return inTransaction(async (client) => {
     const access = await challengeAccess(session.user.id, challengeId, client, true);
     if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores podem publicar resultados.");
+    if (body.regenerate === true) {
+      await generateShowcase(client, challengeId, session.user.id);
+      await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
+        "results.regenerated", "challenge", challengeId, null, null);
+      return { challengeId, shareToken: null, published: false };
+    }
     await client.query("DELETE FROM result_blocks WHERE challenge_id=$1", [challengeId]);
     let position = 0;
     for (const [heading, text] of [["headline", headline], ["summary", summary]] as const) {

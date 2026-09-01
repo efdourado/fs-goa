@@ -1,10 +1,9 @@
 import type { SessionContext } from "../../auth";
 import { inTransaction, oneOrNull } from "../../db";
-import { challengeAccess, publicId, writeAudit } from "../../goa-domain";
+import { challengeAccess, writeAudit } from "../../goa-domain";
 import { ApiError } from "../../http";
 import { entryTypesForChallenge, usesCheckpoints, usesRoundItems } from "./entry-types";
-import { calculateMetricRow } from "./results";
-import type { MetricRow } from "./types";
+import { generateShowcase } from "./showcase";
 
 export async function transitionChallenge(
   session: SessionContext,
@@ -41,23 +40,11 @@ export async function transitionChallenge(
       }
       await client.query("UPDATE challenges SET status='active', activated_at=now(), updated_at=now() WHERE id=$1", [challengeId]);
     } else {
-      const metricRows = await client.query<MetricRow>(
-        `SELECT id,challenge_id,entry_type_id,field_id,semantic_key,label,operation,group_by,
-                decimal_places,visible_during_challenge,position,settings
-           FROM challenge_metrics WHERE challenge_id=$1 AND archived_at IS NULL ORDER BY position`, [challengeId]);
       await client.query("UPDATE challenges SET status='closed', closed_at=now(), updated_at=now() WHERE id=$1", [challengeId]);
       const existingBlocks = await oneOrNull<{ count: number }>(client,
         "SELECT count(*)::int AS count FROM result_blocks WHERE challenge_id=$1", [challengeId]);
       if (!existingBlocks?.count) {
-        for (const metric of metricRows.rows) {
-          const value = await calculateMetricRow(client, metric);
-          await client.query(
-            `INSERT INTO result_blocks
-              (id,challenge_id,kind,metric_id,heading,value_snapshot,position,visible,created_by_user_id,created_at,updated_at)
-             VALUES ($1,$2,'metric',$3,$4,$5::jsonb,$6,true,$7,now(),now())`,
-            [publicId(), challengeId, metric.id, metric.label, JSON.stringify(value), metric.position, session.user.id],
-          );
-        }
+        await generateShowcase(client, challengeId, session.user.id);
       }
     }
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
