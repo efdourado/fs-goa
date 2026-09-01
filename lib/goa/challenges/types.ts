@@ -1,4 +1,14 @@
-import type { MetricOperation } from "../../metrics";
+export type MetricOperation =
+  | "sum"
+  | "average"
+  | "count"
+  | "min"
+  | "max"
+  | "completion_rate"
+  | "bayesian_average"
+  | "spread"
+  | "surprise"
+  | "indicator_bias";
 
 export interface MetricRow {
   id: string;
