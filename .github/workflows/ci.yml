@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: package.json
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test:unit
+      - run: npm run build
+        env:
+          # `next build` reads env files if present; none exist in CI, and every
+          # route is `force-dynamic`, so no database is needed here.
+          NEXT_TELEMETRY_DISABLED: "1"
+
+  integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: goa
+          POSTGRES_PASSWORD: goa_ci_only
+          POSTGRES_DB: goa_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U goa -d goa_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://goa:goa_ci_only@localhost:5432/goa_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: package.json
+          cache: npm
+      - run: npm ci
+      - run: node scripts/migrate.mjs
+      - run: npm run test:integration
