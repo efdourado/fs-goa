@@ -102,3 +102,23 @@ export async function entryTypeById(
     [entryTypeId, challengeId],
   );
 }
+
+/** Any of the challenge's types point at a round item (film / book). */
+export function usesRoundItems(types: EntryTypeRow[]): boolean {
+  return types.some((type) => targetPolicyOf(type) !== "none");
+}
+
+/** Any type is bound to dated checkpoints — only meaningful with a fixed period. */
+export function usesCheckpoints(types: EntryTypeRow[], challengeHasPeriod: boolean): boolean {
+  return (
+    challengeHasPeriod
+    && types.some((type) => schedulePolicyOf(type, challengeHasPeriod) === "checkpoint")
+  );
+}
+
+/** The catalog kind a recipe tracks; null when it has no round items. */
+export function recipeCatalogKind(recipeKey: string | null): "film" | "book" | null {
+  if (recipeKey === "cine_free" || recipeKey === "cine_curated") return "film";
+  if (recipeKey === "reading_club") return "book";
+  return null;
+}

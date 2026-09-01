@@ -231,21 +231,52 @@ function AdminFields({
   onSave,
 }: {
   challenge: ChallengeDetail;
-  onSave: (fields: ChallengeField[]) => Promise<void>;
+  onSave: (entryTypeId: Id, fields: ChallengeField[]) => Promise<void>;
 }) {
   const t = useTranslations("adminChallenge");
   const tc = useTranslations("common");
   const f = useGoaFormat();
-  const [fields, setFields] = useState(challenge.fields);
+  const types = challenge.entryTypes.length
+    ? challenge.entryTypes
+    : [{ id: "", name: "", fields: challenge.fields } as ChallengeDetail["entryTypes"][number]];
+  const [selectedTypeId, setSelectedTypeId] = useState(
+    types.find((type) => type.isPrimary)?.id ?? types[0]?.id ?? "",
+  );
+  const activeType = types.find((type) => type.id === selectedTypeId) ?? types[0];
+  const [fields, setFields] = useState(activeType?.fields ?? []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  function pickType(id: Id) {
+    setSelectedTypeId(id);
+    setFields(types.find((type) => type.id === id)?.fields ?? []);
+    setError(null);
+    setSuccess(null);
+  }
+
   return (
     <section className={cx(cardClass, "p-5 sm:p-7")}>
       <PageHeading title={t("fieldsTitle")} description={challenge.status === "draft" ? t("fieldsHintDraft") : challenge.status === "active" ? t("fieldsHintActive") : t("fieldsHintClosed")} />
-      <FieldBuilder fields={fields} onChange={setFields} lockPersistedTypes={challenge.status !== "draft"} />
+      {types.length > 1 ? (
+        <div className="mb-5 flex flex-wrap gap-1 rounded-2xl bg-[var(--wash-strong)]/70 p-1" role="tablist" aria-label={t("fieldsTypeLegend")}>
+          {types.map((type) => (
+            <button
+              key={type.id}
+              type="button"
+              role="tab"
+              aria-selected={type.id === selectedTypeId}
+              className={cx("min-h-10 rounded-xl px-4 text-sm font-light", type.id === selectedTypeId ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]")}
+              onClick={() => pickType(type.id)}
+            >
+              {type.name}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      <FieldBuilder key={selectedTypeId} fields={fields} onChange={setFields} lockPersistedTypes={challenge.status !== "draft"} />
       <div className="mt-5"><StatusMessage error={error} success={success} /></div>
-      <Button className="mt-5" disabled={busy || challenge.status === "closed"} onClick={() => { setBusy(true); setError(null); setSuccess(null); onSave(cleanFields(fields)).then(() => setSuccess(t("fieldsSaved"))).catch((cause: unknown) => setError(f.error(cause))).finally(() => setBusy(false)); }}>{busy ? tc("saving") : t("saveFields")}</Button>
+      <Button className="mt-5" disabled={busy || challenge.status === "closed"} onClick={() => { setBusy(true); setError(null); setSuccess(null); onSave(selectedTypeId, cleanFields(fields)).then(() => setSuccess(t("fieldsSaved"))).catch((cause: unknown) => setError(f.error(cause))).finally(() => setBusy(false)); }}>{busy ? tc("saving") : t("saveFields")}</Button>
     </section>
   );
 }
@@ -630,7 +661,7 @@ export function AdminScreen({
   duplicateTargets: DuplicateTargetGroup[];
   onDelete?: () => Promise<void>;
   onSaveParticipants: (ids: Id[]) => Promise<void>;
-  onSaveFields: (fields: ChallengeField[]) => Promise<void>;
+  onSaveFields: (entryTypeId: Id, fields: ChallengeField[]) => Promise<void>;
   onAddItems: (payload: Record<string, unknown>) => Promise<void>;
   onUpdateItem: (itemId: Id, payload: { title: string; description: string; recommendedByUserId?: string | null }) => Promise<void>;
   onArchiveItem: (itemId: Id) => Promise<void>;
@@ -649,7 +680,7 @@ export function AdminScreen({
       <nav className="mb-6 flex gap-1 overflow-x-auto rounded-2xl bg-[var(--wash-strong)]/70 p-1" aria-label={t("tabsAria")}>{tabs.map((id) => <button className={cx("min-h-11 flex-none rounded-xl px-4 text-sm font-light", tab === id ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]")} type="button" onClick={() => onTab(id)} key={id}>{t(`tabs.${id}`)}</button>)}</nav>
       {tab === "overview" ? <AdminOverview challenge={challenge} entries={entries} onSave={onSaveBasics} onTransition={onTransition} onDuplicate={onDuplicate} duplicateTargets={duplicateTargets} onDelete={onDelete} /> : null}
       {tab === "participants" ? <AdminParticipants key={`${challenge.id}:${challenge.participants.map((participant) => participant.userId ?? participant.id).join(",")}`} challenge={challenge} group={group} onSave={onSaveParticipants} /> : null}
-      {tab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.fields.map((field) => field.id ?? field.key).join(",")}`} challenge={challenge} onSave={onSaveFields} /> : null}
+      {tab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} /> : null}
       {tab === "items" ? <AdminItems challenge={challenge} group={group} onAdd={onAddItems} onUpdate={onUpdateItem} onArchive={onArchiveItem} /> : null}
       {tab === "review" ? <AdminReview challenge={challenge} entries={entries} onPatch={onPatchEntry} onExport={onExport} /> : null}
       {tab === "metrics" ? <AdminMetrics challenge={challenge} onAdd={onAddMetric} /> : null}

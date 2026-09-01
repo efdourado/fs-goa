@@ -496,6 +496,7 @@
     "fieldsHintDraft": "Types and order can be adjusted freely before activation.",
     "fieldsHintActive": "Add, rename, or reorder fields at any time. The type of a saved field is fixed, and a field with answers can't be removed — history stays intact.",
     "fieldsHintClosed": "The fields were frozen at closing to preserve the result.",
+    "fieldsTypeLegend": "Entry type",
     "fieldsSaved": "Fields saved.",
     "saveFields": "Save fields",
     "itemRemoveConfirm": "Remove \"{title}\" from the challenge? It leaves the list; entries already submitted stay in the history.",
