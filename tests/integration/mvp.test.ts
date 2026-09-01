@@ -1669,3 +1669,174 @@ test("modelo de registros: um filme aceita mais de um tipo de registro por pesso
   assert.equal(future.response.status, 409);
   assert.equal((future.body as { error: string }).error, "watch_in_future");
 });
+
+type DetailType = { id: string; purpose: string; semanticKey: string; cardinality: string };
+type DetailItem = { id: string; title: string };
+
+test("fundação: dois livros no mesmo dia, conclusão e nota sem comentário", async () => {
+  const owner = await register("Lúcia", "lucia_found");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube de leitura" } })).body as { id: string }).id;
+
+  const created = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "reading_club", title: "Temporada 1", participantIds: [owner.user.id],
+      items: [{ title: "Norwegian Wood" }, { title: "Kafka à Beira-Mar" }],
+    },
+  });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const challengeId = (created.body as { id: string }).id;
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } })).response.status, 200);
+
+  const detail = await call("GET", `/api/challenges/${challengeId}`, { session: owner });
+  const types = (detail.body as { entryTypes: DetailType[] }).entryTypes;
+  const items = (detail.body as { items: DetailItem[] }).items;
+  const progress = types.find((type) => type.purpose === "progress")!;
+  const completion = types.find((type) => type.purpose === "completion")!;
+  const rating = types.find((type) => type.purpose === "rating")!;
+  assert.equal(progress.cardinality, "once_per_item_day");
+  const norwegian = items.find((item) => item.title === "Norwegian Wood")!;
+  const kafka = items.find((item) => item.title === "Kafka à Beira-Mar")!;
+
+  const day = "2024-05-10";
+  for (const book of [norwegian, kafka]) {
+    const res = await call("POST", `/api/challenges/${challengeId}/entries`, {
+      session: owner,
+      body: { itemId: book.id, entryTypeId: progress.id, occurredOn: day, values: { paginas: 40 } },
+    });
+    assert.equal(res.response.status, 201, JSON.stringify(res.body));
+  }
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/entries`, {
+    session: owner, body: { itemId: norwegian.id, entryTypeId: completion.id, values: { concluido: true } },
+  })).response.status, 201);
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/entries`, {
+    session: owner, body: { itemId: norwegian.id, entryTypeId: rating.id, values: { nota: 5 } },
+  })).response.status, 201);
+
+  const rows = await adminPool.query<{ purpose: string; item_id: string; occurred_on: string }>(
+    `SELECT t.purpose, e.item_id, e.occurred_on::text AS occurred_on
+       FROM entries e JOIN entry_types t ON t.id = e.entry_type_id
+      WHERE e.challenge_id = $1 AND e.deleted_at IS NULL
+      ORDER BY t.purpose, e.item_id`,
+    [challengeId],
+  );
+  const byPurpose = (name: string) => rows.rows.filter((row) => row.purpose === name);
+  assert.equal(byPurpose("progress").length, 2, "um progresso por livro no mesmo dia");
+  assert.deepEqual(byPurpose("progress").map((row) => row.occurred_on), [day, day]);
+  assert.equal(byPurpose("completion").length, 1);
+  assert.equal(byPurpose("completion")[0].item_id, norwegian.id);
+  assert.equal(byPurpose("rating").length, 1);
+  assert.equal(byPurpose("rating")[0].item_id, norwegian.id);
+
+  const commentValues = await adminPool.query<{ count: number }>(
+    `SELECT count(*)::int AS count FROM entry_values ev
+       JOIN challenge_fields f ON f.id = ev.field_id
+      WHERE ev.challenge_id = $1 AND f.kind = 'text'`,
+    [challengeId],
+  );
+  assert.equal(commentValues.rows[0].count, 0, "o sistema soube de qual livro sem exigir comentário");
+
+  // progresso no mesmo livro e dia atualiza em vez de duplicar
+  const again = await call("POST", `/api/challenges/${challengeId}/entries`, {
+    session: owner, body: { itemId: norwegian.id, entryTypeId: progress.id, occurredOn: day, values: { paginas: 55 } },
+  });
+  assert.equal((again.body as { updated?: boolean }).updated, true);
+});
+
+test("Cine Curadoria: expectativa e avaliação coexistem, e a expectativa trava ao avaliar", async () => {
+  const owner = await register("Théo", "theo_cur");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Curadoria" } })).body as { id: string }).id;
+
+  const created = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "cine_curated", title: "Ciclo Lynch", participantIds: [owner.user.id],
+      items: [{ title: "Mulholland Drive" }],
+    },
+  });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const challengeId = (created.body as { id: string }).id;
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } })).response.status, 200);
+
+  const detail = await call("GET", `/api/challenges/${challengeId}`, { session: owner });
+  const types = (detail.body as { entryTypes: DetailType[] }).entryTypes;
+  const items = (detail.body as { items: DetailItem[] }).items;
+  const expectation = types.find((type) => type.purpose === "expectation")!;
+  const rating = types.find((type) => type.purpose === "rating")!;
+  const film = items[0];
+
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/entries`, {
+    session: owner, body: { itemId: film.id, entryTypeId: expectation.id, values: { expectativa: 5 } },
+  })).response.status, 201);
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/entries`, {
+    session: owner, body: { itemId: film.id, entryTypeId: rating.id, values: { nota: 3 } },
+  })).response.status, 201);
+
+  const coexist = await adminPool.query<{ purpose: string }>(
+    `SELECT t.purpose FROM entries e JOIN entry_types t ON t.id = e.entry_type_id
+      WHERE e.item_id = $1 AND e.deleted_at IS NULL ORDER BY t.purpose`,
+    [film.id],
+  );
+  assert.deepEqual(coexist.rows.map((row) => row.purpose), ["expectation", "rating"]);
+
+  // a expectativa não pode mais mudar depois da avaliação
+  const locked = await call("POST", `/api/challenges/${challengeId}/entries`, {
+    session: owner, body: { itemId: film.id, entryTypeId: expectation.id, values: { expectativa: 1 } },
+  });
+  assert.equal(locked.response.status, 409);
+  assert.equal((locked.body as { error: string }).error, "expectation_locked");
+
+  const expEntry = await adminPool.query<{ id: string }>(
+    `SELECT e.id FROM entries e JOIN entry_types t ON t.id = e.entry_type_id
+      WHERE e.item_id = $1 AND t.purpose = 'expectation' AND e.deleted_at IS NULL`,
+    [film.id],
+  );
+  const patchLocked = await call("PATCH", `/api/entries/${expEntry.rows[0].id}`, {
+    session: owner, body: { values: { expectativa: 2 } },
+  });
+  assert.equal(patchLocked.response.status, 409);
+});
+
+test("cópia: carrega a receita, zera a agenda e remapeia o acervo do destino", async () => {
+  const owner = await register("Ravi", "ravi_copy");
+  const source = ((await call("POST", "/api/groups", { session: owner, body: { name: "Origem" } })).body as { id: string }).id;
+  const target = ((await call("POST", "/api/groups", { session: owner, body: { name: "Destino" } })).body as { id: string }).id;
+
+  const created = await call("POST", `/api/groups/${source}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "cine_curated", title: "Sessão", participantIds: [owner.user.id],
+      items: [{ title: "Stalker", year: 1979, genres: ["ficção científica"] }],
+    },
+  });
+  const sourceId = (created.body as { id: string }).id;
+
+  const copy = await call("POST", `/api/challenges/${sourceId}/duplicate`, {
+    session: owner, body: { title: "Sessão — bis", targetGroupId: target },
+  });
+  assert.equal(copy.response.status, 201, JSON.stringify(copy.body));
+  const copyId = (copy.body as { id: string }).id;
+
+  const row = await adminPool.query<{
+    recipe_key: string; start_date: string | null; checkpoints: number;
+    purposes: string[]; catalog_group: string | null; recommender: string | null; catalog_title: string | null;
+  }>(
+    `SELECT c.recipe_key, c.start_date::text AS start_date,
+            (SELECT count(*)::int FROM challenge_checkpoints WHERE challenge_id = c.id) AS checkpoints,
+            (SELECT array_agg(t.purpose ORDER BY t.purpose) FROM entry_types t WHERE t.challenge_id = c.id) AS purposes,
+            (SELECT ci.group_id FROM challenge_items i JOIN catalog_items ci ON ci.id = i.catalog_item_id
+              WHERE i.challenge_id = c.id LIMIT 1) AS catalog_group,
+            (SELECT ci.title FROM challenge_items i JOIN catalog_items ci ON ci.id = i.catalog_item_id
+              WHERE i.challenge_id = c.id LIMIT 1) AS catalog_title,
+            (SELECT i.recommended_by_user_id FROM challenge_items i WHERE i.challenge_id = c.id LIMIT 1) AS recommender
+       FROM challenges c WHERE c.id = $1`,
+    [copyId],
+  );
+  assert.equal(row.rows[0].recipe_key, "cine_curated");
+  assert.equal(row.rows[0].start_date, null);
+  assert.equal(row.rows[0].checkpoints, 0);
+  assert.deepEqual(row.rows[0].purposes, ["expectation", "rating"]);
+  assert.equal(row.rows[0].catalog_group, target, "o item aponta para o acervo do grupo de destino");
+  assert.equal(row.rows[0].catalog_title, "Stalker");
+  assert.equal(row.rows[0].recommender, null, "o indicador do grupo de origem não é copiado");
+});
