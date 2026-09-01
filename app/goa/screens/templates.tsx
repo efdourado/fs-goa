@@ -181,7 +181,7 @@ export function TemplatesScreen({
               {canPublish ? (
                 <button
                   type="button"
-                  className="relative z-10 mt-4 self-start text-xs font-semibold text-[var(--danger)] hover:underline disabled:opacity-50"
+                  className="relative z-10 mt-4 cursor-pointer self-start text-xs font-semibold text-[var(--danger)] hover:underline disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={adminBusy}
                   onClick={() => void unpublish(template.id)}
                 >

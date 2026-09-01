@@ -152,7 +152,7 @@ export function AuthScreen({
               ) : null}
 
               {mode === "login" ? (
-                <button className="text-xs font-light text-[var(--muted)] underline-offset-4 hover:text-[var(--ink)] hover:underline" type="button" onClick={() => goTo("forgot")}>
+                <button className="cursor-pointer text-xs font-light text-[var(--muted)] underline-offset-4 hover:text-[var(--ink)] hover:underline" type="button" onClick={() => goTo("forgot")}>
                   {t("forgot.link")}
                 </button>
               ) : null}
