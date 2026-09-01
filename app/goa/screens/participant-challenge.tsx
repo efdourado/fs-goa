@@ -428,7 +428,7 @@ export function ParticipantChallengeScreen({
       </div>
 
       <nav className="safe-area-bottom fixed inset-x-0 bottom-0 z-40 grid h-[72px] grid-cols-4 border-t border-[var(--line)] bg-[var(--paper)]/95 px-2 backdrop-blur-xl sm:hidden" aria-label={t("navMobileAria")}>
-        {tabs.map((item) => <button className={cx("flex min-h-12 flex-col items-center justify-center gap-1 text-[10px] font-light", tab === item.id ? "text-[var(--main-strong)]" : "text-[var(--muted)]")} type="button" onClick={() => onTab(item.id)} key={item.id}><span className="text-base" aria-hidden="true">{item.id === "today" ? "●" : item.id === "history" ? "◷" : item.id === "progress" ? "↗" : "✦"}</span>{t(`tabs.${item.id}`)}</button>)}
+        {tabs.map((item) => <button className={cx("flex min-h-12 flex-col items-center justify-center gap-1 text-[10px] font-light", tab === item.id ? "text-[var(--main-strong)]" : "text-[var(--muted)]")} type="button" onClick={() => onTab(item.id)} key={item.id}><span className="text-base" aria-hidden="true">{item.id === "today" ? "◉" : item.id === "history" ? "⟳" : item.id === "progress" ? "◎" : "〇"}</span>{t(`tabs.${item.id}`)}</button>)}
       </nav>
     </main>
   );
