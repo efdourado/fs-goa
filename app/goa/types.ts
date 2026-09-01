@@ -139,16 +139,31 @@ export interface Entry {
   values: Record<Id, unknown> | EntryValueItem[];
 }
 
+export type MetricOperation =
+  | "sum" | "average" | "count" | "min" | "max" | "completion_rate"
+  | "bayesian_average" | "spread" | "surprise" | "indicator_bias";
+
+export interface MetricSeriesEntry {
+  key: string;
+  label: string;
+  value: number | null;
+  formattedValue?: string;
+  sampleSize: number;
+}
+
 export interface Metric {
   id: Id;
   label: string;
-  operation: "sum" | "average" | "count" | "min" | "max" | "completion_rate";
+  operation: MetricOperation;
   fieldId?: Id | null;
-  groupBy?: "none" | "participant" | "item";
+  groupBy?: "none" | "participant" | "item" | "day" | "week";
   visibleDuring?: boolean;
   visibleInResults?: boolean;
+  minSample?: number;
   value?: string | number | null;
   formattedValue?: string | null;
+  /** Present when `groupBy !== "none"` — a ranking or per-person breakdown. */
+  series?: MetricSeriesEntry[];
 }
 
 interface ResultComment {

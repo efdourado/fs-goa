@@ -5,17 +5,12 @@ import { getFormatter, getTranslations } from "next-intl/server";
 import { publicResults } from "@/lib/goa-challenges";
 import { Footer } from "@/app/goa/Footer";
 import { type Formatter, makeGoaFormat, type Translator } from "@/app/goa/format";
+import { MetricBlock } from "@/app/goa/metrics-view";
 import { SettingsMenu } from "@/app/goa/SettingsMenu";
+import type { Metric } from "@/app/goa/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-type PublicMetric = {
-  id: string;
-  label: string;
-  formattedValue?: string | null;
-  value?: string | number | null;
-};
 
 type PublicComment = { id: string; text: string; itemTitle?: string | null };
 
@@ -33,10 +28,11 @@ export default async function SharedResultsPage({ params }: { params: Promise<{ 
   const f = makeGoaFormat(tRoot as unknown as Translator, formatter as unknown as Formatter);
 
   const challenge = payload.challenge;
+  const tm = await getTranslations("metrics");
   const result = challenge.result as {
     headline?: string | null;
     summary?: string | null;
-    metrics?: PublicMetric[];
+    metrics?: Metric[];
     comments?: PublicComment[];
     publishedAt?: string | null;
   };
@@ -66,14 +62,16 @@ export default async function SharedResultsPage({ params }: { params: Promise<{ 
           </div>
         </section>
         {result.metrics?.length ? (
-          <section className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-label={t("numbersAria")}>
-            {result.metrics.map((metric) => (
-              <article className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-6" key={metric.id}>
-                <p className="text-xs font-light uppercase tracking-[0.1em] text-[var(--muted)]">{metric.label}</p>
-                <strong className="mt-3 block text-4xl tracking-[-0.05em]">{metric.formattedValue ?? metric.value ?? "—"}</strong>
-              </article>
+          <div className="mt-6 space-y-4" aria-label={t("numbersAria")}>
+            <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {result.metrics.filter((metric) => !metric.series?.length).map((metric) => (
+                <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} />
+              ))}
+            </section>
+            {result.metrics.filter((metric) => metric.series?.length).map((metric) => (
+              <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} />
             ))}
-          </section>
+          </div>
         ) : null}
         {result.comments?.length ? (
           <section className="mt-6 grid gap-4 sm:grid-cols-2">

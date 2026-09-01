@@ -96,7 +96,11 @@
       "count": "Count",
       "min": "Minimum",
       "max": "Maximum",
-      "completion_rate": "Completion rate"
+      "completion_rate": "Completion rate",
+      "bayesian_average": "Adjusted rating",
+      "spread": "Polarization",
+      "surprise": "Surprise vs. letdown",
+      "indicator_bias": "Curator bias"
     },
     "groupBy": {
       "none": "No grouping",
@@ -106,7 +110,8 @@
     "groupByShort": {
       "participant": "participant",
       "item": "item"
-    }
+    },
+    "smallSample": "small sample"
   },
   "errors": {
     "generic": "Something went wrong. Try again.",
@@ -596,6 +601,9 @@
     "selectCommentAria": "Select comment from {author}",
     "noTextFields": "No filled-in text field is available for curation.",
     "saveResults": "Save showcase",
+    "regenerateShowcase": "Regenerate showcase",
+    "regenerateHint": "Rebuilds the blocks from the current data (headline, metrics, best comments). Your manual curation is replaced.",
+    "showcaseRegenerated": "Showcase regenerated.",
     "previewTitle": "How the group will see it",
     "previewSubtitle": "Preview of the showcase with the current curation.",
     "previewEmptyTitle": "Preview available after saving",
