@@ -9,6 +9,7 @@ import {
   purposeOf,
   schedulePolicyOf,
   targetPolicyOf,
+  usesRoundItems,
 } from "./entry-types";
 import { fieldsForChallenge } from "./fields";
 import { generateDailyCheckpoints } from "./items";
@@ -103,7 +104,12 @@ export async function getChallengeDetail(session: SessionContext, challengeId: s
     const primaryEntryTypeId = primaryType?.id ?? null;
     const metrics = await metricsForChallenge(client, challengeId);
     const result = await resultForChallenge(client, challengeId, metrics);
-    const submissionMode = primaryType?.submission_mode ?? "free";
+    // The client's `submissionMode` answers "how does a participant pick what to
+    // log". A round with catalog items is "item" even when its primary type
+    // (a reading club's daily progress) is `daily`.
+    const submissionMode = usesRoundItems(allTypes)
+      ? "item"
+      : primaryType?.submission_mode ?? "free";
     const primaryFields = primaryEntryTypeId
       ? fieldsByType.get(primaryEntryTypeId) ?? []
       : fields;

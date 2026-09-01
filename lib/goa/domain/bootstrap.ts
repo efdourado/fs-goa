@@ -125,9 +125,15 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
       `SELECT c.id, c.group_id, c.title, c.description, c.status,
               c.start_date::text AS start_date, c.end_date::text AS end_date,
               gm.role,
-              (SELECT et.submission_mode FROM entry_types et
-                WHERE et.challenge_id = c.id AND et.archived_at IS NULL
-                ORDER BY (et.purpose = 'expectation'), et.created_at LIMIT 1) AS submission_mode,
+              (CASE
+                WHEN EXISTS (SELECT 1 FROM entry_types et WHERE et.challenge_id = c.id
+                              AND et.archived_at IS NULL
+                              AND (et.submission_mode = 'item' OR et.target_policy IN ('required','optional')))
+                THEN 'item'
+                ELSE (SELECT et.submission_mode FROM entry_types et
+                       WHERE et.challenge_id = c.id AND et.archived_at IS NULL
+                       ORDER BY (et.purpose = 'expectation'), et.created_at LIMIT 1)
+              END) AS submission_mode,
               EXISTS (SELECT 1 FROM challenge_participants cp
                        WHERE cp.challenge_id = c.id AND cp.user_id = $1 AND cp.removed_at IS NULL)
                 AS is_participant,
