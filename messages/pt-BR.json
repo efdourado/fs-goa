@@ -41,14 +41,13 @@
     "about": "Sobre",
     "admin": "Gestão",
     "account": "Sua conta",
+    "menu": "Menu",
     "signOut": "Sair",
     "signingOut": "Saindo…",
     "signIn": "Entrar"
   },
   "footer": {
     "tagline": "Goa — desafios privados, histórias duradouras.",
-    "about": "Sobre",
-    "templates": "Modelos",
     "feedback": "Como podemos melhorar?"
   },
   "roles": {
