@@ -4,6 +4,11 @@ export type ChallengeStatus = "draft" | "active" | "closed";
 export type FieldType = "text" | "number" | "rating" | "select" | "boolean" | "date";
 export type SubmissionMode = "item" | "daily" | "free";
 export type Template = "cine" | "reading";
+export type RecipeKey = "cine_free" | "cine_curated" | "reading_club" | "reading_daily";
+export type EntryPurpose = "progress" | "completion" | "expectation" | "rating" | "checkin";
+export type TargetPolicy = "required" | "optional" | "none";
+export type Cardinality = "once_per_item" | "once_per_item_day" | "repeatable" | "once_per_day";
+export type SchedulePolicy = "free" | "while_active" | "checkpoint";
 export type AdminTab =
   | "overview"
   | "participants"
@@ -100,6 +105,19 @@ export interface Participant {
   username?: string;
 }
 
+export interface EntryTypeView {
+  id: Id;
+  name: string;
+  semanticKey: string;
+  purpose: EntryPurpose;
+  submissionMode: SubmissionMode;
+  targetPolicy: TargetPolicy;
+  cardinality: Cardinality;
+  schedulePolicy: SchedulePolicy;
+  isPrimary: boolean;
+  fields: ChallengeField[];
+}
+
 interface EntryValueItem {
   fieldId: Id;
   value: unknown;
@@ -109,6 +127,7 @@ export interface Entry {
   id: Id;
   itemId?: Id | null;
   checkpointId?: Id | null;
+  entryTypeId?: Id;
   participantId?: Id;
   userId?: Id;
   participantName?: string;
@@ -173,6 +192,7 @@ export interface ChallengeSummary {
   endsOn?: string | null;
   status: ChallengeStatus;
   template?: Template | null;
+  recipeKey?: RecipeKey | null;
   submissionMode?: SubmissionMode;
   viewerRole?: Role;
   isParticipant?: boolean;
@@ -182,6 +202,7 @@ export interface ChallengeSummary {
 
 export interface ChallengeDetail extends ChallengeSummary {
   fields: ChallengeField[];
+  entryTypes: EntryTypeView[];
   items: ChallengeItem[];
   participants: Participant[];
   metrics: Metric[];
@@ -298,14 +319,13 @@ export type Screen =
   | { kind: "template"; challengeId: Id };
 
 export interface ChallengeCreationInput {
-  template: Template;
+  recipe: RecipeKey;
   title: string;
   description: string;
   meetingUrl: string | null;
   ruleSections: ChallengeRule[];
   startsOn: string | null;
   endsOn: string | null;
-  submissionMode: SubmissionMode;
   fields: ChallengeField[];
   items: ChallengeItemInput[];
   generateDaily: boolean;

@@ -7,8 +7,15 @@ import { useGoaFormat } from "../format";
 import { cleanFields, FieldBuilder, presetFields } from "../fields";
 import { CineItemsEditor, type CineRow, cineRowsToInput } from "../cine-items";
 import { RuleSectionsEditor } from "../rules";
-import type { ChallengeCreationInput, ChallengeField, ChallengeRule, GroupSummary, Id, Template } from "../types";
+import type { ChallengeCreationInput, ChallengeField, ChallengeRule, GroupSummary, Id, RecipeKey } from "../types";
 import { backLinkClass, Button, cardClass, cx, EmptyState, inputClass, labelClass, PageHeading, SchedulePeriodFields, StatusMessage } from "../ui";
+
+const RECIPES: Array<{ key: RecipeKey; catalogKind: "film" | "book" | null; scheduleMode: "period" | "none"; glyph: string }> = [
+  { key: "cine_free", catalogKind: "film", scheduleMode: "none", glyph: "◉" },
+  { key: "cine_curated", catalogKind: "film", scheduleMode: "none", glyph: "✦" },
+  { key: "reading_club", catalogKind: "book", scheduleMode: "period", glyph: "▤" },
+  { key: "reading_daily", catalogKind: null, scheduleMode: "period", glyph: "◷" },
+];
 
 export function CreateChallengeScreen({
   group,
@@ -24,7 +31,7 @@ export function CreateChallengeScreen({
   const tp = useTranslations("fields.preset");
   const f = useGoaFormat();
   const [step, setStep] = useState(1);
-  const [template, setTemplate] = useState<Template | null>(null);
+  const [recipe, setRecipe] = useState<RecipeKey | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [meetingUrl, setMeetingUrl] = useState("");
@@ -38,19 +45,21 @@ export function CreateChallengeScreen({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const itemInputs = cineRowsToInput(cineItems);
+  const recipeMeta = RECIPES.find((entry) => entry.key === recipe) ?? null;
+  const tracksCatalog = recipeMeta?.catalogKind ?? null;
 
-  function chooseTemplate(next: Template) {
-    setTemplate(next);
+  function chooseRecipe(next: RecipeKey) {
+    const meta = RECIPES.find((entry) => entry.key === next)!;
+    setRecipe(next);
     setFields(presetFields(next, (key) => tp(key)));
-    setTitle(next === "cine" ? t("templateCineTitle") : t("templateReadingTitle"));
-    // Cine Livre é o padrão: sem prazo. Leitura (diário) começa com período.
-    setScheduleMode(next === "reading" ? "period" : "none");
+    setTitle(t(`recipes.${next}.title`));
+    setScheduleMode(meta.scheduleMode);
     setCineItems([]);
   }
 
   function nextStep() {
     setError(null);
-    if (step === 1 && (!template || !title.trim())) {
+    if (step === 1 && (!recipe || !title.trim())) {
       setError(t("errPickTemplate"));
       return;
     }
@@ -77,20 +86,20 @@ export function CreateChallengeScreen({
       setError(t("errNoFields"));
       return;
     }
-    if (step === 3 && template === "cine" && !itemInputs.length) {
-      setError(t("errNoItems"));
+    if (step === 3 && tracksCatalog && !itemInputs.length) {
+      setError(tracksCatalog === "book" ? t("errNoBooks") : t("errNoItems"));
       return;
     }
     setStep((current) => Math.min(4, current + 1));
   }
 
   async function submit() {
-    if (!template) return;
+    if (!recipe) return;
     setBusy(true);
     setError(null);
     try {
       await onCreate({
-        template,
+        recipe,
         title: title.trim(),
         description: description.trim(),
         meetingUrl: meetingUrl.trim() || null,
@@ -103,10 +112,9 @@ export function CreateChallengeScreen({
         })),
         startsOn: scheduleMode === "period" ? startsOn : null,
         endsOn: scheduleMode === "period" ? endsOn : null,
-        submissionMode: template === "reading" ? "daily" : "item",
         fields: cleanFields(fields),
-        items: template === "cine" ? itemInputs : [],
-        generateDaily: template === "reading" && scheduleMode === "period",
+        items: tracksCatalog ? itemInputs : [],
+        generateDaily: scheduleMode === "period",
         participantIds,
       });
     } catch (cause) {
@@ -130,11 +138,11 @@ export function CreateChallengeScreen({
           <div>
             <h2 className="text-xl font-light">{t("startTitle")}</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              {(["cine", "reading"] as const).map((value) => (
-                <button className={cx("rounded-2xl border p-5 text-left transition", template === value ? "border-[var(--main)] bg-[var(--main-soft)] ring-2 ring-[var(--main)]/25" : "border-[var(--line)] bg-[var(--paper)] hover:border-[var(--main-line)]")} type="button" aria-pressed={template === value} onClick={() => chooseTemplate(value)} key={value}>
-                  <span className="text-2xl" aria-hidden="true">{value === "cine" ? "◉" : "▤"}</span>
-                  <strong className="mt-3 block text-lg">{value === "cine" ? t("templateCine") : t("templateReading")}</strong>
-                  <span className="mt-1 block text-sm leading-6 text-[var(--muted)]">{value === "cine" ? t("templateCineBody") : t("templateReadingBody")}</span>
+              {RECIPES.map((entry) => (
+                <button className={cx("rounded-2xl border p-5 text-left transition", recipe === entry.key ? "border-[var(--main)] bg-[var(--main-soft)] ring-2 ring-[var(--main)]/25" : "border-[var(--line)] bg-[var(--paper)] hover:border-[var(--main-line)]")} type="button" aria-pressed={recipe === entry.key} onClick={() => chooseRecipe(entry.key)} key={entry.key}>
+                  <span className="text-2xl" aria-hidden="true">{entry.glyph}</span>
+                  <strong className="mt-3 block text-lg">{t(`recipes.${entry.key}.name`)}</strong>
+                  <span className="mt-1 block text-sm leading-6 text-[var(--muted)]">{t(`recipes.${entry.key}.body`)}</span>
                 </button>
               ))}
             </div>
@@ -163,8 +171,8 @@ export function CreateChallengeScreen({
         {step === 3 ? (
           <div>
             <h2 className="text-xl font-light">{t("checkpointsTitle")}</h2>
-            {template === "cine" ? (
-              <><p className="mt-1 mb-4 text-sm leading-6 text-[var(--muted)]">{t("cineItemsHint")}</p><CineItemsEditor value={cineItems} onChange={setCineItems} members={group.members ?? []} groupId={group.id} /><p className="mt-3 text-xs font-semibold text-[var(--muted)]">{t("itemsCount", { count: itemInputs.length })}</p></>
+            {tracksCatalog ? (
+              <><p className="mt-1 mb-4 text-sm leading-6 text-[var(--muted)]">{tracksCatalog === "book" ? t("bookItemsHint") : t("cineItemsHint")}</p><CineItemsEditor value={cineItems} onChange={setCineItems} members={group.members ?? []} groupId={group.id} /><p className="mt-3 text-xs font-semibold text-[var(--muted)]">{t("itemsCount", { count: itemInputs.length })}</p></>
             ) : scheduleMode === "period" ? (
               <div className="mt-5 rounded-2xl border border-[var(--ok-line)] bg-[var(--ok-soft)] p-5"><strong className="text-[var(--ok)]">{t("dailyTitle")}</strong><p className="mt-2 text-sm leading-6 text-[var(--ok)]">{t("dailyBody", { start: f.date(startsOn), end: f.date(endsOn) })}</p></div>
             ) : (
@@ -183,7 +191,7 @@ export function CreateChallengeScreen({
                 {group.members.map((member) => <label className="flex min-h-14 items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4" key={member.id}><input type="checkbox" aria-label={t("selectMember", { name: member.name })} checked={participantIds.includes(member.id)} onChange={(event) => setParticipantIds((current) => event.target.checked ? [...current, member.id] : current.filter((id) => id !== member.id))} /><span><strong className="block text-sm">{member.name}</strong><small className="text-[var(--muted)]">@{member.username}</small></span></label>)}
               </fieldset>
             ) : <EmptyState title={t("noMembersTitle")} description={t("noMembersBody")} />}
-            <div className="mt-6 rounded-2xl bg-[var(--wash)] p-5 text-sm leading-6"><strong className="block text-base">{t("summaryTitle")}</strong><span className="mt-2 block text-[var(--muted)]">{t("summaryFields", { count: fields.length })} · {template === "reading" ? scheduleMode === "period" ? t("summaryDaily") : t("summaryHabit") : t("summaryItems", { count: itemInputs.length })} · {t("summaryParticipants", { count: participantIds.length })}</span><p className="mt-2 text-[var(--muted)]">{t("summaryNote")}</p></div>
+            <div className="mt-6 rounded-2xl bg-[var(--wash)] p-5 text-sm leading-6"><strong className="block text-base">{t("summaryTitle")}</strong><span className="mt-2 block text-[var(--muted)]">{t("summaryFields", { count: fields.length })} · {tracksCatalog ? t("summaryItems", { count: itemInputs.length }) : scheduleMode === "period" ? t("summaryDaily") : t("summaryHabit")} · {t("summaryParticipants", { count: participantIds.length })}</span><p className="mt-2 text-[var(--muted)]">{t("summaryNote")}</p></div>
           </div>
         ) : null}
 

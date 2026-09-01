@@ -324,13 +324,12 @@ export default function GoaApp() {
       method: "POST",
       csrfToken: bootstrap.csrfToken,
       body: {
-        template: input.template,
+        recipe: input.recipe,
         title: input.title,
         description: input.description,
         ruleSections: input.ruleSections,
         startsOn: input.startsOn,
         endsOn: input.endsOn,
-        submissionMode: input.submissionMode,
         fields: input.fields,
         items: input.items,
         generateDaily: input.generateDaily,
@@ -366,6 +365,7 @@ export default function GoaApp() {
     values: Record<Id, unknown>,
     entry?: Entry,
     occurredOn?: string,
+    entryTypeId?: Id,
   ) {
     if (!bootstrap || !selectedChallenge) return;
     if (entry) {
@@ -373,7 +373,7 @@ export default function GoaApp() {
     } else {
       await apiRequest(API_PATHS.entries(selectedChallenge.id), {
         method: "POST",
-        body: { itemId, values, ...(occurredOn ? { occurredOn } : {}) },
+        body: { itemId, values, ...(occurredOn ? { occurredOn } : {}), ...(entryTypeId ? { entryTypeId } : {}) },
         csrfToken: bootstrap.csrfToken,
       });
     }
