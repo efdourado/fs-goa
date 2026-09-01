@@ -6,7 +6,7 @@ import { type ReactNode, useEffect, useState } from "react";
 
 import { useGoaFormat } from "./format";
 import { SettingsMenu } from "./SettingsMenu";
-import type { ChallengeStatus, Id, MemberRequest, User } from "./types";
+import type { ChallengeStatus, Id, MemberRequest, SubmissionMode, User } from "./types";
 import {
   dateKeyInSaoPaulo,
   inclusiveDayCount,
@@ -416,15 +416,15 @@ const CHALLENGE_STATUS_TONE: Record<
   closed: { dot: "bg-[var(--line)]", border: "border-[var(--line)]", solid: "bg-[var(--line)]" },
 };
 
-export function challengeStatusTone(status: ChallengeStatus, startsOn?: string | null) {
-  return CHALLENGE_STATUS_TONE[isChallengeScheduled(status, startsOn) ? "scheduled" : status];
+export function challengeStatusTone(status: ChallengeStatus, startsOn?: string | null, submissionMode?: SubmissionMode) {
+  return CHALLENGE_STATUS_TONE[isChallengeScheduled(status, startsOn, submissionMode) ? "scheduled" : status];
 }
 
-export function ChallengeStatusBadge({ status, startsOn }: { status: ChallengeStatus; startsOn?: string | null }) {
+export function ChallengeStatusBadge({ status, startsOn, submissionMode }: { status: ChallengeStatus; startsOn?: string | null; submissionMode?: SubmissionMode }) {
   const t = useTranslations("challengeStatus");
   const f = useGoaFormat();
-  const tone = challengeStatusTone(status, startsOn);
-  const label = f.challengeStatusLabel(status, startsOn);
+  const tone = challengeStatusTone(status, startsOn, submissionMode);
+  const label = f.challengeStatusLabel(status, startsOn, submissionMode);
   return (
     <span
       className={cx("inline-block h-2.5 w-2.5 flex-none rounded-full ring-1 ring-inset ring-[var(--edge)]", tone.dot)}

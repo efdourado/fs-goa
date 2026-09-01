@@ -8,13 +8,15 @@ import { AppHeader, ChallengeStatusBadge, SchedulePeriodFields } from "../app/go
 import { inclusiveDayCount, isChallengeScheduled, shiftDateKey } from "../app/goa/utils";
 import { ptFormat, renderWithIntl } from "./helpers/intl";
 
-test("distingue desafio agendado do ciclo persistido ativo", () => {
+test("desafio agendado existe só no diário com início futuro", () => {
   const now = new Date("2026-08-29T15:00:00Z");
-  assert.equal(isChallengeScheduled("active", "2026-08-30", now), true);
-  assert.equal(isChallengeScheduled("active", "2026-08-29", now), false);
-  assert.equal(isChallengeScheduled("draft", "2026-08-30", now), false);
-  assert.equal(isChallengeScheduled("closed", "2026-08-30", now), false);
-  assert.equal(isChallengeScheduled("active", null, now), false);
+  assert.equal(isChallengeScheduled("active", "2026-08-30", "daily", now), true);
+  assert.equal(isChallengeScheduled("active", "2026-08-29", "daily", now), false);
+  assert.equal(isChallengeScheduled("draft", "2026-08-30", "daily", now), false);
+  assert.equal(isChallengeScheduled("closed", "2026-08-30", "daily", now), false);
+  assert.equal(isChallengeScheduled("active", null, "daily", now), false);
+  // Cine (item) com início futuro não é "agendado" — é ativo, aceita avaliação.
+  assert.equal(isChallengeScheduled("active", "2026-08-30", "item", now), false);
 });
 
 test("apresenta período ou ausência de prazo sem datas fictícias", () => {
@@ -81,11 +83,20 @@ test("renderiza estado agendado e regras tituladas em destaque", () => {
   const badge = renderWithIntl(createElement(ChallengeStatusBadge, {
     status: "active",
     startsOn: "2099-01-01",
+    submissionMode: "daily",
   }));
   // Text-less status dot: the label lives in the accessible name + tooltip.
   assert.match(badge, /aria-label="Situação: Agendado"/);
   assert.match(badge, /title="Agendado"/);
   assert.match(badge, /rounded-full/);
+
+  // A cine round (item) with a future start is just "Ativo" — no scheduled state.
+  const cineFuture = renderWithIntl(createElement(ChallengeStatusBadge, {
+    status: "active",
+    startsOn: "2099-01-01",
+    submissionMode: "item",
+  }));
+  assert.match(cineFuture, /aria-label="Situação: Ativo"/);
 
   const activeBadge = renderWithIntl(createElement(ChallengeStatusBadge, { status: "active" }));
   assert.match(activeBadge, /aria-label="Situação: Ativo"/);

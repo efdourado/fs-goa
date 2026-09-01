@@ -2,7 +2,7 @@ import { useFormatter, useTranslations } from "next-intl";
 import { useMemo } from "react";
 
 import { ApiError } from "./api";
-import type { ChallengeItem, ChallengeStatus } from "./types";
+import type { ChallengeItem, ChallengeStatus, SubmissionMode } from "./types";
 import { isChallengeScheduled } from "./utils";
 
 export type Translator = ((key: string, values?: Record<string, string | number | Date>) => string) & {
@@ -45,8 +45,8 @@ export function makeGoaFormat(t: Translator, format: Formatter) {
     return t(`itemStatus.${status ?? "planned"}`);
   }
 
-  function challengeStatusLabel(status: ChallengeStatus, startsOn?: string | null): string {
-    return t(`challengeStatus.${isChallengeScheduled(status, startsOn) ? "scheduled" : status}`);
+  function challengeStatusLabel(status: ChallengeStatus, startsOn?: string | null, submissionMode?: SubmissionMode): string {
+    return t(`challengeStatus.${isChallengeScheduled(status, startsOn, submissionMode) ? "scheduled" : status}`);
   }
 
   function entryUnavailableMessage(input: {

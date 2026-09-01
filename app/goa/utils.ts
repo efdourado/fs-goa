@@ -1,4 +1,4 @@
-import type { ChallengeItem, ChallengeStatus, Entry, Id, Role } from "./types";
+import type { ChallengeItem, ChallengeStatus, Entry, Id, Role, SubmissionMode } from "./types";
 
 export function canManage(role?: Role): boolean {
   return role === "owner" || role === "admin";
@@ -97,12 +97,20 @@ export function dateKeyInSaoPaulo(now: Date): string {
   return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
+/**
+ * "Agendado" só faz sentido no diário: os checkpoints ainda não foram alcançados.
+ * Uma rodada de cine (item/free) com início futuro é simplesmente `active` — o
+ * formulário e a API já aceitam avaliações.
+ */
 export function isChallengeScheduled(
   status: ChallengeStatus,
   startsOn?: string | null,
+  submissionMode?: SubmissionMode,
   now = new Date(),
 ): boolean {
-  return status === "active" && Boolean(startsOn && startsOn > dateKeyInSaoPaulo(now));
+  return status === "active"
+    && submissionMode === "daily"
+    && Boolean(startsOn && startsOn > dateKeyInSaoPaulo(now));
 }
 
 export function entryUnavailableMessage({

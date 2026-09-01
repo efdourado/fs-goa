@@ -29,7 +29,7 @@ export function CreateChallengeScreen({
   const [description, setDescription] = useState("");
   const [meetingUrl, setMeetingUrl] = useState("");
   const [ruleSections, setRuleSections] = useState<ChallengeRule[]>([]);
-  const [scheduleMode, setScheduleMode] = useState<"period" | "none">("period");
+  const [scheduleMode, setScheduleMode] = useState<"period" | "none">("none");
   const [startsOn, setStartsOn] = useState("");
   const [endsOn, setEndsOn] = useState("");
   const [fields, setFields] = useState<ChallengeField[]>([]);
@@ -43,6 +43,8 @@ export function CreateChallengeScreen({
     setTemplate(next);
     setFields(presetFields(next, (key) => tp(key)));
     setTitle(next === "cine" ? t("templateCineTitle") : t("templateReadingTitle"));
+    // Cine Livre é o padrão: sem prazo. Leitura (diário) começa com período.
+    setScheduleMode(next === "reading" ? "period" : "none");
     setCineItems([]);
   }
 
