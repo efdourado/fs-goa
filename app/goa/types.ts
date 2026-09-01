@@ -104,6 +104,8 @@ export interface CatalogItemDetail extends CatalogItem {
 
 export interface ChallengeItem {
   id: Id;
+  /** Set when this round item is bound to a dated session (checkpoint). */
+  checkpointId?: Id | null;
   title: string;
   description?: string | null;
   position?: number;
@@ -200,6 +202,8 @@ export interface ChallengeResult {
   metrics?: Metric[];
   comments?: ResultComment[];
   publishedAt?: string | null;
+  /** Raw public share token, present once the showcase has been published. */
+  shareToken?: string | null;
 }
 
 export interface RuleTopic {
@@ -240,6 +244,8 @@ export interface ChallengeDetail extends ChallengeSummary {
   fields: ChallengeField[];
   entryTypes: EntryTypeView[];
   items: ChallengeItem[];
+  /** Dated sessions, always present (empty for undated rounds), independent of `items`. */
+  checkpoints: ChallengeItem[];
   participants: Participant[];
   metrics: Metric[];
   result?: ChallengeResult | null;

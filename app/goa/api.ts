@@ -52,6 +52,8 @@ export const API_PATHS = {
     `/api/challenges/${encodeURIComponent(challengeId)}/items/${encodeURIComponent(itemId)}`,
   metrics: (challengeId: Id) => `/api/challenges/${encodeURIComponent(challengeId)}/metrics`,
   results: (challengeId: Id) => `/api/challenges/${encodeURIComponent(challengeId)}/results`,
+  resultsPublish: (challengeId: Id) =>
+    `/api/challenges/${encodeURIComponent(challengeId)}/results/publish`,
   entries: (challengeId: Id) => `/api/challenges/${encodeURIComponent(challengeId)}/entries`,
   entry: (entryId: Id) => `/api/entries/${encodeURIComponent(entryId)}`,
   transition: (challengeId: Id) =>
@@ -145,7 +147,8 @@ export function normalizeChallenge(
   return {
     ...value,
     fields: aliases.fields ?? aliases.challengeFields ?? [],
-    items: aliases.items ?? aliases.checkpoints ?? aliases.challengeItems ?? [],
+    items: aliases.items ?? aliases.challengeItems ?? [],
+    checkpoints: aliases.checkpoints ?? [],
     participants: aliases.participants ?? aliases.challengeParticipants ?? [],
     metrics: aliases.metrics ?? aliases.challengeMetrics ?? [],
     result: aliases.result ?? aliases.results ?? null,

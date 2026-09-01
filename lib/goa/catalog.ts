@@ -200,7 +200,7 @@ export async function listGroupCatalog(session: SessionContext, groupId: string)
              FROM challenge_items it
              JOIN challenges c ON c.id = it.challenge_id AND c.deleted_at IS NULL AND c.status <> 'draft'
              JOIN entries e ON e.item_id = it.id AND e.deleted_at IS NULL
-              AND e.entry_type_id IN (SELECT id FROM entry_types WHERE challenge_id = c.id AND purpose = 'rating')
+              AND e.entry_type_id IN (SELECT id FROM entry_types WHERE challenge_id = c.id AND purpose IN ('rating', 'completion'))
              JOIN entry_values ev ON ev.entry_id = e.id AND ev.number_scaled IS NOT NULL
              JOIN challenge_fields f ON f.id = ev.field_id AND f.kind = 'rating'
             WHERE it.catalog_item_id = ci.id AND it.archived_at IS NULL
@@ -280,7 +280,7 @@ export async function catalogItemDetail(session: SessionContext, groupId: string
          JOIN challenges c ON c.id = it.challenge_id AND c.deleted_at IS NULL AND c.status <> 'draft'
          LEFT JOIN users ru ON ru.id = it.recommended_by_user_id
          LEFT JOIN entries e ON e.item_id = it.id AND e.deleted_at IS NULL
-          AND e.entry_type_id IN (SELECT id FROM entry_types WHERE challenge_id = c.id AND purpose = 'rating')
+          AND e.entry_type_id IN (SELECT id FROM entry_types WHERE challenge_id = c.id AND purpose IN ('rating', 'completion'))
          LEFT JOIN entry_values ev ON ev.entry_id = e.id AND ev.number_scaled IS NOT NULL
          LEFT JOIN challenge_fields f ON f.id = ev.field_id AND f.kind = 'rating'
         WHERE it.catalog_item_id = $1 AND it.archived_at IS NULL

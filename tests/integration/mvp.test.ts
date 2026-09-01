@@ -376,7 +376,8 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
   assert.equal(closedItemEdit.response.status, 409, "item de desafio encerrado deve permanecer bloqueado");
   const finalDetail = await call("GET", `/api/challenges/${challengeId}`, { session: owner });
   const finalMetrics = (finalDetail.body as { metrics: Array<{ id: string }> }).metrics;
-  const results = await call("POST", `/api/challenges/${challengeId}/results`, {
+  // Salvar rascunho não publica: nenhum link é criado.
+  const draft = await call("POST", `/api/challenges/${challengeId}/results`, {
     session: owner,
     body: {
       headline: "Duas histórias na tela",
@@ -385,24 +386,72 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
       comments: [{ entryId, fieldId: commentId }],
     },
   });
-  assert.equal(results.response.status, 200, JSON.stringify(results.body));
-  const shareToken = (results.body as { shareToken: string }).shareToken;
+  assert.equal(draft.response.status, 200, JSON.stringify(draft.body));
+  assert.equal((draft.body as { published: boolean }).published, false);
+
+  const publish = await call("POST", `/api/challenges/${challengeId}/results/publish`, {
+    session: owner, body: {},
+  });
+  assert.equal(publish.response.status, 200, JSON.stringify(publish.body));
+  const shareToken = (publish.body as { shareToken: string }).shareToken;
+  const shareUrl = (publish.body as { url: string }).url;
   assert.ok(shareToken);
+  assert.ok(shareUrl.endsWith(`/results/${shareToken}`), shareUrl);
   const showcase = await call("GET", `/api/results/${shareToken}`);
   assert.equal(showcase.response.status, 200, JSON.stringify(showcase.body));
   assert.match(JSON.stringify(showcase.body), /Duas histórias na tela/);
 
-  // anonimização: republica com a opção ligada e os nomes somem da vitrine pública
+  // O link é recuperável: o detalhe do desafio traz o mesmo token.
+  const detailWithToken = await call("GET", `/api/challenges/${challengeId}`, { session: owner });
+  assert.equal((detailWithToken.body as { result: { shareToken: string } }).result.shareToken, shareToken);
+
+  // Snapshot congelado: salvar rascunho de novo não muda a vitrine pública.
   await call("POST", `/api/challenges/${challengeId}/results`, {
     session: owner,
-    body: { headline: "Duas histórias na tela", summary: "x", metricIds: [], comments: [], anonymizeParticipants: true },
+    body: { headline: "Manchete só no rascunho", summary: "x", metricIds: [], comments: [] },
   });
-  const anonToken = ((await call("POST", `/api/challenges/${challengeId}/results`, {
-    session: owner, body: { headline: "h", summary: "s", metricIds: [], comments: [], anonymizeParticipants: true },
+  const stillFrozen = await call("GET", `/api/results/${shareToken}`);
+  assert.match(JSON.stringify(stillFrozen.body), /Duas histórias na tela/, "o link publicado não segue o rascunho");
+  assert.doesNotMatch(JSON.stringify(stillFrozen.body), /Manchete só no rascunho/);
+
+  // "Gerar novo link" invalida o token antigo.
+  const rotated = await call("POST", `/api/challenges/${challengeId}/results/publish`, {
+    session: owner, body: { rotateLink: true },
+  });
+  const rotatedToken = (rotated.body as { shareToken: string }).shareToken;
+  assert.notEqual(rotatedToken, shareToken);
+  assert.equal((await call("GET", `/api/results/${shareToken}`)).response.status, 404, "o link antigo para de funcionar");
+  assert.equal((await call("GET", `/api/results/${rotatedToken}`)).response.status, 200);
+
+  // Anonimização: marca a opção, republica, e os nomes somem — inclusive das séries por pessoa.
+  await call("POST", `/api/challenges/${challengeId}/results`, {
+    session: owner,
+    body: { headline: "Duas histórias na tela", summary: "s", metricIds: finalMetrics.map((m) => m.id), comments: [], anonymizeParticipants: true },
+  });
+  const anonToken = ((await call("POST", `/api/challenges/${challengeId}/results/publish`, {
+    session: owner, body: {},
   })).body as { shareToken: string }).shareToken;
   const anon = await call("GET", `/api/results/${anonToken}`);
-  const anonParticipants = (anon.body as { challenge: { participants: string[] } }).challenge.participants;
-  assert.ok(anonParticipants.every((name) => /^Participante \d+$/.test(name)), JSON.stringify(anonParticipants));
+  const anonBody = anon.body as { challenge: { participants: string[]; result: { metrics: Array<{ groupBy?: string; series?: Array<{ label: string; key: string }> }> } } };
+  assert.ok(anonBody.challenge.participants.every((name) => /^Participante \d+$/.test(name)), JSON.stringify(anonBody.challenge.participants));
+  for (const metric of anonBody.challenge.result.metrics) {
+    if (metric.groupBy !== "participant" || !metric.series) continue;
+    for (const row of metric.series) {
+      assert.match(row.label, /^Participante \d+$|^Participante \?$/, JSON.stringify(row));
+      assert.doesNotMatch(row.key, /^[0-9a-f-]{36}$/i, "a série não pode manter o user id");
+    }
+  }
+
+  // Reabrir revoga a publicação atomicamente (o CHECK do banco exige desafio fechado).
+  const reopen = await call("POST", `/api/challenges/${challengeId}/transition`, {
+    session: owner, body: { status: "active" },
+  });
+  assert.equal(reopen.response.status, 200, JSON.stringify(reopen.body));
+  assert.equal((await call("GET", `/api/results/${anonToken}`)).response.status, 404, "reabrir some com o link público");
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "closed" } });
+  const republished = await call("POST", `/api/challenges/${challengeId}/results/publish`, { session: owner, body: {} });
+  assert.equal(republished.response.status, 200, JSON.stringify(republished.body));
+  assert.notEqual((republished.body as { shareToken: string }).shareToken, anonToken, "re-publicar gera um link novo");
 
   const crossGroupDuplicate = await call("POST", `/api/challenges/${challengeId}/duplicate`, {
     session: owner, body: { title: "Cópia fora do grupo", targetGroupId: outsiderGroupId },
@@ -1819,6 +1868,14 @@ test("fundação: dois livros no mesmo dia, conclusão e nota sem comentário", 
     session: owner, body: { itemId: norwegian.id, entryTypeId: progress.id, occurredOn: day, values: { paginas: 55 } },
   });
   assert.equal((again.body as { updated?: boolean }).updated, true);
+
+  // #9c: a nota do livro fica no tipo `completion`; a memória do acervo enxerga.
+  const bookCatalog = (await call("GET", `/api/groups/${gid}/catalog`, { session: owner })).body as {
+    items: Array<{ title: string; ratingAvg: number | null; ratingCount: number }>;
+  };
+  const norwegianCatalog = bookCatalog.items.find((entry) => entry.title === "Norwegian Wood");
+  assert.equal(norwegianCatalog?.ratingCount, 1, "avaliação de livro no tipo completion conta no acervo");
+  assert.equal(norwegianCatalog?.ratingAvg, 5);
 });
 
 test("Cine Curadoria: expectativa e avaliação coexistem, e a expectativa trava ao avaliar", async () => {
@@ -2039,4 +2096,94 @@ test("memória do acervo: um filme reconhecido em duas rodadas encerradas", asyn
   };
   assert.deepEqual(detail.rounds.map((r) => r.title), ["Ciclo A", "Ciclo B"]);
   assert.deepEqual(detail.rounds.map((r) => r.ratingAvg), [4, 2]);
+});
+
+test("item + checkpoint são ortogonais: um registro carrega filme e sessão", async () => {
+  const owner = await register("Ícaro", "icaro_ortho");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Sessões" } })).body as { id: string }).id;
+
+  // reading_daily materializa checkpoints; ajustamos o tipo à mão para exigir
+  // também um item (nenhuma receita do wizard produz essa combinação ainda).
+  const created = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "reading_daily", title: "Ciclo de sessões",
+      startsOn: "2024-03-01", endsOn: "2024-03-03",
+      participantIds: [owner.user.id],
+      fields: [{ key: "nota", label: "Nota", type: "rating", required: true }],
+    },
+  });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const challengeId = (created.body as { id: string }).id;
+
+  const checkpointRows = await adminPool.query<{ id: string }>(
+    "SELECT id FROM challenge_checkpoints WHERE challenge_id=$1 ORDER BY position", [challengeId]);
+  const sessionId = checkpointRows.rows[0].id;
+  await adminPool.query("UPDATE entry_types SET target_policy='required' WHERE challenge_id=$1", [challengeId]);
+  const itemId = crypto.randomUUID();
+  await adminPool.query(
+    `INSERT INTO challenge_items (id, challenge_id, checkpoint_id, semantic_key, title, position, metadata, created_at, updated_at)
+     VALUES ($1,$2,$3,'sessao_1','Solaris',0,'{}'::jsonb,now(),now())`,
+    [itemId, challengeId, sessionId]);
+
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } })).response.status, 200);
+  const detailBody = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    fields: Array<{ id: string }>;
+    items: Array<{ id: string; checkpointId: string | null }>;
+    checkpoints: Array<{ id: string }>;
+  };
+  assert.equal(detailBody.checkpoints.length, 3, "o detalhe traz checkpoints como array próprio");
+  assert.equal(detailBody.items.find((i) => i.id === itemId)?.checkpointId, sessionId, "o item aponta para a sessão");
+  const field = detailBody.fields[0].id;
+
+  const saved = await call("POST", `/api/challenges/${challengeId}/entries`, {
+    session: owner, body: { itemId, checkpointId: sessionId, values: { [field]: 4 } },
+  });
+  assert.equal(saved.response.status, 201, JSON.stringify(saved.body));
+  assert.equal((saved.body as { itemId: string }).itemId, itemId);
+  assert.equal((saved.body as { checkpointId: string }).checkpointId, sessionId);
+
+  const entryRow = await adminPool.query<{ item_id: string | null; checkpoint_id: string | null }>(
+    "SELECT item_id, checkpoint_id FROM entries WHERE challenge_id=$1 AND deleted_at IS NULL", [challengeId]);
+  assert.equal(entryRow.rows[0].item_id, itemId, "item_id persistido");
+  assert.equal(entryRow.rows[0].checkpoint_id, sessionId, "checkpoint_id persistido, sem exclusão mútua");
+});
+
+test("auditoria de correção de registro guarda só metadados", async () => {
+  const owner = await register("Nara", "nara_audit");
+  const member = await register("Bruno", "bruno_audit");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Auditoria" } })).body as { id: string }).id;
+  const inv = (await call("POST", `/api/groups/${gid}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
+  await call("POST", `/api/invites/${inv.token}`, { session: member, body: {} });
+
+  const created = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: { recipe: "cine_free", title: "Auditável", participantIds: [owner.user.id, member.user.id], items: [{ title: "Blow-Up" }] },
+  });
+  const challengeId = (created.body as { id: string }).id;
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } })).response.status, 200);
+  const detail = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    fields: Array<{ id: string; type: string }>; items: Array<{ id: string }>;
+  };
+  const ratingField = detail.fields.find((entry) => entry.type === "rating")!.id;
+  const commentField = detail.fields.find((entry) => entry.type === "text")!.id;
+  const itemId = detail.items[0].id;
+
+  const entry = await call("POST", `/api/challenges/${challengeId}/entries`, {
+    session: member, body: { itemId, values: { [ratingField]: 3, [commentField]: "texto secreto do participante" } },
+  });
+  const entryId = (entry.body as { id: string }).id;
+
+  const corrected = await call("PATCH", `/api/entries/${entryId}`, {
+    session: owner, body: { values: { [ratingField]: 5, [commentField]: "outro texto secreto" }, reason: "ajuste combinado" },
+  });
+  assert.equal(corrected.response.status, 200, JSON.stringify(corrected.body));
+
+  const audit = await adminPool.query<{ before: unknown; after: unknown; metadata: { fields?: string[]; reason?: string } }>(
+    "SELECT before, after, metadata FROM audit_events WHERE challenge_id=$1 AND action='entry.corrected'", [challengeId]);
+  assert.equal(audit.rows[0].before, null, "sem before/after com valores");
+  assert.equal(audit.rows[0].after, null);
+  assert.deepEqual([...(audit.rows[0].metadata.fields ?? [])].sort(), [commentField, ratingField].sort());
+  assert.equal(audit.rows[0].metadata.reason, "ajuste combinado");
+  assert.doesNotMatch(JSON.stringify(audit.rows[0]), /texto secreto/, "nenhum conteúdo do participante na auditoria");
 });
