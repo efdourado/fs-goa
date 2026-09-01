@@ -127,7 +127,7 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
               gm.role,
               (SELECT et.submission_mode FROM entry_types et
                 WHERE et.challenge_id = c.id AND et.archived_at IS NULL
-                ORDER BY et.created_at LIMIT 1) AS submission_mode,
+                ORDER BY (et.purpose = 'expectation'), et.created_at LIMIT 1) AS submission_mode,
               EXISTS (SELECT 1 FROM challenge_participants cp
                        WHERE cp.challenge_id = c.id AND cp.user_id = $1 AND cp.removed_at IS NULL)
                 AS is_participant,

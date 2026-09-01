@@ -2,6 +2,7 @@ import type { SessionContext } from "../../auth";
 import { inTransaction, oneOrNull } from "../../db";
 import { challengeAccess, publicId, writeAudit } from "../../goa-domain";
 import { ApiError } from "../../http";
+import { entryTypesForChallenge, usesCheckpoints, usesRoundItems } from "./entry-types";
 import { calculateMetricRow } from "./results";
 import type { MetricRow } from "./types";
 
@@ -19,25 +20,23 @@ export async function transitionChallenge(
       (access.challenge.status === "active" && target === "closed");
     if (!valid) throw new ApiError(409, "invalid_transition", "A transição de estado não é permitida.");
     if (target === "active") {
+      const types = await entryTypesForChallenge(client, challengeId);
+      const challengeHasPeriod =
+        access.challenge.start_date !== null && access.challenge.end_date !== null;
       const readiness = await oneOrNull<{
-        submission_mode: "item" | "daily" | "free";
         fields: number; participants: number; items: number; checkpoints: number;
       }>(client,
-        `SELECT et.submission_mode,
+        `SELECT
            (SELECT count(*)::int FROM challenge_fields WHERE challenge_id=$1 AND archived_at IS NULL) AS fields,
            (SELECT count(*)::int FROM challenge_participants WHERE challenge_id=$1 AND removed_at IS NULL) AS participants,
            (SELECT count(*)::int FROM challenge_items WHERE challenge_id=$1 AND archived_at IS NULL) AS items,
-           (SELECT count(*)::int FROM challenge_checkpoints WHERE challenge_id=$1 AND archived_at IS NULL) AS checkpoints
-           FROM entry_types et WHERE et.challenge_id=$1 AND et.archived_at IS NULL
-           ORDER BY et.created_at LIMIT 1`,
+           (SELECT count(*)::int FROM challenge_checkpoints WHERE challenge_id=$1 AND archived_at IS NULL) AS checkpoints`,
         [challengeId]);
       if (!readiness?.fields || !readiness.participants) {
         throw new ApiError(409, "challenge_incomplete", "Adicione campos e participantes antes de ativar.");
       }
-      if ((readiness.submission_mode === "item" && !readiness.items) ||
-          (readiness.submission_mode === "daily"
-            && access.challenge.start_date !== null
-            && !readiness.checkpoints)) {
+      if ((usesRoundItems(types) && !readiness.items)
+          || (usesCheckpoints(types, challengeHasPeriod) && !readiness.checkpoints)) {
         throw new ApiError(409, "challenge_incomplete", "Adicione os itens ou checkpoints antes de ativar.");
       }
       await client.query("UPDATE challenges SET status='active', activated_at=now(), updated_at=now() WHERE id=$1", [challengeId]);

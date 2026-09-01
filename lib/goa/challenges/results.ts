@@ -11,6 +11,7 @@ import {
 import { ApiError, stringValue } from "../../http";
 import { calculateMetric } from "../../metrics";
 import { generateOpaqueToken, hashToken } from "../../security";
+import { primaryEntryType } from "./entry-types";
 import type { MetricRow } from "./types";
 
 export async function calculateMetricRow(
@@ -36,7 +37,7 @@ export async function calculateMetricRow(
               (SELECT count(*)::int FROM entries e
                 WHERE e.challenge_id = c.id AND e.entry_type_id = et.id AND e.deleted_at IS NULL) AS completed,
               (SELECT count(*)::int FROM challenge_items ci
-                WHERE ci.challenge_id = c.id AND ci.entry_type_id = et.id AND ci.archived_at IS NULL) AS item_count,
+                WHERE ci.challenge_id = c.id AND ci.archived_at IS NULL) AS item_count,
               (SELECT count(*)::int FROM challenge_checkpoints cc
                 WHERE cc.challenge_id = c.id AND cc.archived_at IS NULL) AS checkpoint_count,
               CASE WHEN c.activated_at IS NULL THEN 0
@@ -203,8 +204,7 @@ export async function addMetric(
       if (["sum", "average", "min", "max"].includes(operation)) {
         throw new ApiError(400, "invalid_metric", "Selecione um campo numérico.");
       }
-      const type = await oneOrNull<{ id: string }>(client,
-        "SELECT id FROM entry_types WHERE challenge_id=$1 AND archived_at IS NULL ORDER BY created_at LIMIT 1", [challengeId]);
+      const type = await primaryEntryType(client, challengeId);
       if (!type) throw new ApiError(409, "missing_entry_type", "Tipo de registro ausente.");
       entryTypeId = type.id;
       if (operation === "completion_rate") fieldId = null;

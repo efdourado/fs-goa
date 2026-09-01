@@ -44,7 +44,7 @@ export async function listTemplates() {
               c.end_date::text AS end_date, c.published_as_template_at,
               (SELECT et.submission_mode FROM entry_types et
                 WHERE et.challenge_id = c.id AND et.archived_at IS NULL
-                ORDER BY et.created_at LIMIT 1) AS submission_mode,
+                ORDER BY (et.purpose = 'expectation'), et.created_at LIMIT 1) AS submission_mode,
               (SELECT count(*)::int FROM challenge_fields f
                 WHERE f.challenge_id = c.id AND f.archived_at IS NULL) AS field_count,
               (SELECT count(*)::int FROM challenge_items i
@@ -84,7 +84,7 @@ async function templateRowById(client: PoolClient, challengeId: string) {
             c.rule_sections, c.start_date::text AS start_date, c.end_date::text AS end_date,
             (SELECT et.submission_mode FROM entry_types et
               WHERE et.challenge_id = c.id AND et.archived_at IS NULL
-              ORDER BY et.created_at LIMIT 1) AS submission_mode
+              ORDER BY (et.purpose = 'expectation'), et.created_at LIMIT 1) AS submission_mode
        FROM challenges c
        JOIN groups g ON g.id = c.group_id AND g.deleted_at IS NULL AND g.archived_at IS NULL
       WHERE c.id = $1 AND c.published_as_template_at IS NOT NULL AND c.deleted_at IS NULL`,

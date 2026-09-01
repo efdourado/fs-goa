@@ -18,6 +18,12 @@ import {
   upsertCatalogItem,
 } from "../catalog";
 import { syncDailyCheckpoints } from "../daily-checkpoints";
+import {
+  entryTypesForChallenge,
+  primaryEntryType,
+  recipeCatalogKind,
+  usesRoundItems,
+} from "./entry-types";
 
 export async function generateDailyCheckpoints(
   client: PoolClient,
@@ -66,17 +72,17 @@ export async function addChallengeItem(
     const access = await challengeAccess(session.user.id, challengeId, client, true);
     if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores podem criar itens.");
     if (access.challenge.status === "closed") throw new ApiError(409, "challenge_locked", "Itens não podem ser criados depois do encerramento.");
-    const entryType = await oneOrNull<{ id: string; submission_mode: string }>(client,
-      "SELECT id, submission_mode FROM entry_types WHERE challenge_id=$1 AND archived_at IS NULL ORDER BY created_at LIMIT 1", [challengeId]);
-    if (!entryType || entryType.submission_mode !== "item") throw new ApiError(409, "invalid_mode", "Este desafio não usa itens.");
+    const types = await entryTypesForChallenge(client, challengeId);
+    if (!usesRoundItems(types)) throw new ApiError(409, "invalid_mode", "Este desafio não usa itens.");
+    const catalogKind = recipeCatalogKind(access.challenge.recipe_key) ?? "film";
     const position = integerValue(body.position, 0, 0, 10_000);
     const id = publicId();
     let catalogItemId: string;
     if (typeof body.catalogItemId === "string" && body.catalogItemId) {
-      await assertCatalogItemInGroup(client, body.catalogItemId, access.challenge.group_id, "film");
+      await assertCatalogItemInGroup(client, body.catalogItemId, access.challenge.group_id, catalogKind);
       catalogItemId = body.catalogItemId;
     } else {
-      catalogItemId = await upsertCatalogItem(client, access.challenge.group_id, session.user.id, { kind: "film", title });
+      catalogItemId = await upsertCatalogItem(client, access.challenge.group_id, session.user.id, { kind: catalogKind, title });
     }
     await client.query(
       `INSERT INTO challenge_items
@@ -104,10 +110,8 @@ export async function saveChallengeItems(
       const access = await challengeAccess(session.user.id, challengeId, client, true);
       if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores podem gerar checkpoints.");
       if (access.challenge.status === "closed") throw new ApiError(409, "challenge_locked", "Checkpoints não podem ser gerados depois do encerramento.");
-      const type = await oneOrNull<{ submission_mode: string }>(client,
-        "SELECT submission_mode FROM entry_types WHERE challenge_id=$1 AND archived_at IS NULL ORDER BY created_at LIMIT 1",
-        [challengeId]);
-      if (type?.submission_mode !== "daily") {
+      const primary = await primaryEntryType(client, challengeId);
+      if (primary?.submission_mode !== "daily") {
         throw new ApiError(409, "invalid_mode", "Este desafio não usa checkpoints diários.");
       }
       if (startsOn !== access.challenge.start_date || endsOn !== access.challenge.end_date) {
@@ -126,9 +130,9 @@ export async function saveChallengeItems(
     const access = await challengeAccess(session.user.id, challengeId, client, true);
     if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores podem criar itens.");
     if (access.challenge.status === "closed") throw new ApiError(409, "challenge_locked", "Itens não podem ser editados depois do encerramento.");
-    const type = await oneOrNull<{ id: string; submission_mode: string }>(client,
-      "SELECT id,submission_mode FROM entry_types WHERE challenge_id=$1 AND archived_at IS NULL ORDER BY created_at LIMIT 1", [challengeId]);
-    if (!type || type.submission_mode !== "item") throw new ApiError(409, "invalid_mode", "Este desafio não usa itens.");
+    const types = await entryTypesForChallenge(client, challengeId);
+    if (!usesRoundItems(types)) throw new ApiError(409, "invalid_mode", "Este desafio não usa itens.");
+    const catalogKind = recipeCatalogKind(access.challenge.recipe_key) ?? "film";
     // This branch only ever appends. Land new items after whatever already
     // exists so adding a batch mid-challenge keeps a stable reading order.
     const base = await oneOrNull<{ position: number }>(client,
@@ -149,11 +153,12 @@ export async function saveChallengeItems(
 
       let catalogItemId: string;
       if (typeof item.catalogItemId === "string" && item.catalogItemId) {
-        await assertCatalogItemInGroup(client, item.catalogItemId, access.challenge.group_id, "film");
+        await assertCatalogItemInGroup(client, item.catalogItemId, access.challenge.group_id, catalogKind);
         catalogItemId = item.catalogItemId;
       } else {
         catalogItemId = await upsertCatalogItem(client, access.challenge.group_id, session.user.id, {
-          kind: "film", title, year: item.year, runtimeMinutes: item.runtimeMinutes,
+          kind: catalogKind, title, year: item.year, runtimeMinutes: item.runtimeMinutes,
+          pageCount: item.pageCount,
         });
       }
       if (Array.isArray(item.genres) && item.genres.length) {
@@ -198,26 +203,17 @@ export async function updateChallengeItem(
       throw new ApiError(409, "challenge_locked", "Desafios encerrados preservam sua leitura histórica.");
     }
 
-    const type = await oneOrNull<{ submission_mode: "item" | "daily" | "free" }>(
+    // Type-agnostic: resolve whatever `itemId` names — a round item or a dated
+    // checkpoint — instead of guessing from the entry type.
+    const checkpointRow = await oneOrNull<{ title: string; description: string | null }>(
       client,
-      `SELECT submission_mode
-         FROM entry_types
-        WHERE challenge_id = $1 AND archived_at IS NULL
-        ORDER BY created_at
-        LIMIT 1`,
-      [challengeId],
+      `SELECT title, description FROM challenge_checkpoints
+        WHERE id = $1 AND challenge_id = $2 AND archived_at IS NULL FOR UPDATE`,
+      [itemId, challengeId],
     );
 
-    if (type?.submission_mode === "daily") {
-      const current = await oneOrNull<{ title: string; description: string | null }>(
-        client,
-        `SELECT title, description
-           FROM challenge_checkpoints
-          WHERE id = $1 AND challenge_id = $2 AND archived_at IS NULL
-          FOR UPDATE`,
-        [itemId, challengeId],
-      );
-      if (!current) throw new ApiError(404, "not_found", "Checkpoint não encontrado.");
+    if (checkpointRow) {
+      const current = checkpointRow;
       const title = body.title === undefined
         ? current.title
         : stringValue(body, "title", { min: 1, max: 160 })!;
@@ -244,16 +240,15 @@ export async function updateChallengeItem(
       return { id: itemId, title, description };
     }
 
-    if (type?.submission_mode === "item") {
-      const current = await oneOrNull<{ title: string; description: string | null; recommended_by_user_id: string | null }>(
-        client,
-        `SELECT title, description, recommended_by_user_id
-           FROM challenge_items
-          WHERE id = $1 AND challenge_id = $2 AND archived_at IS NULL
-          FOR UPDATE`,
-        [itemId, challengeId],
-      );
-      if (!current) throw new ApiError(404, "not_found", "Item não encontrado.");
+    const current = await oneOrNull<{ title: string; description: string | null; recommended_by_user_id: string | null }>(
+      client,
+      `SELECT title, description, recommended_by_user_id
+         FROM challenge_items
+        WHERE id = $1 AND challenge_id = $2 AND archived_at IS NULL
+        FOR UPDATE`,
+      [itemId, challengeId],
+    );
+    if (current) {
       const title = body.title === undefined
         ? current.title
         : stringValue(body, "title", { min: 1, max: 200 })!;
@@ -294,7 +289,7 @@ export async function updateChallengeItem(
       return { id: itemId, title, description, ...(touchesRecommender ? { recommendedByUserId: recommendedBy } : {}) };
     }
 
-    throw new ApiError(409, "invalid_mode", "Este desafio não usa itens ou checkpoints.");
+    throw new ApiError(404, "not_found", "Item ou checkpoint não encontrado.");
   });
 }
 
@@ -311,21 +306,23 @@ export async function archiveChallengeItem(
     if (access.challenge.status === "closed") {
       throw new ApiError(409, "challenge_locked", "Desafios encerrados preservam sua leitura histórica.");
     }
-    const type = await oneOrNull<{ submission_mode: "item" | "daily" | "free" }>(
-      client,
-      "SELECT submission_mode FROM entry_types WHERE challenge_id=$1 AND archived_at IS NULL ORDER BY created_at LIMIT 1",
-      [challengeId],
-    );
-    if (type?.submission_mode !== "item") {
-      // Checkpoints diários são derivados do período — mexer neles é pela agenda.
-      throw new ApiError(409, "invalid_mode", "Os dias de um desafio diário seguem o período; ajuste as datas na aba Geral.");
-    }
     const current = await oneOrNull<{ title: string }>(
       client,
       "SELECT title FROM challenge_items WHERE id=$1 AND challenge_id=$2 AND archived_at IS NULL FOR UPDATE",
       [itemId, challengeId],
     );
-    if (!current) throw new ApiError(404, "not_found", "Item não encontrado.");
+    if (!current) {
+      // A missing row is usually a dated checkpoint — those follow the period.
+      const checkpoint = await oneOrNull<{ id: string }>(
+        client,
+        "SELECT id FROM challenge_checkpoints WHERE id=$1 AND challenge_id=$2 AND archived_at IS NULL",
+        [itemId, challengeId],
+      );
+      if (checkpoint) {
+        throw new ApiError(409, "invalid_mode", "Os dias de um desafio diário seguem o período; ajuste as datas na aba Geral.");
+      }
+      throw new ApiError(404, "not_found", "Item não encontrado.");
+    }
     const usage = await oneOrNull<{ count: number }>(
       client,
       "SELECT count(*)::int AS count FROM entries WHERE item_id=$1 AND deleted_at IS NULL",

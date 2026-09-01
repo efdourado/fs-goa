@@ -11,7 +11,28 @@ import {
   writeAudit,
 } from "../../goa-domain";
 import { ApiError } from "../../http";
+import { entryTypeById, primaryEntryType } from "./entry-types";
 import type { FieldRow } from "./types";
+
+/**
+ * Which entry type a fields edit targets. The admin's Fields tab passes an
+ * explicit `entryTypeId` for multi-type recipes (Cine Curadoria); everything else
+ * falls back to the primary type.
+ */
+async function targetEntryType(
+  client: PoolClient,
+  challengeId: string,
+  body: Record<string, unknown>,
+): Promise<{ id: string }> {
+  if (typeof body.entryTypeId === "string" && body.entryTypeId) {
+    const type = await entryTypeById(client, challengeId, body.entryTypeId);
+    if (!type) throw new ApiError(400, "invalid_entry_type", "Tipo de registro inválido.");
+    return type;
+  }
+  const primary = await primaryEntryType(client, challengeId);
+  if (!primary) throw new ApiError(409, "missing_entry_type", "O desafio não possui tipo de registro.");
+  return primary;
+}
 
 function unscale(value: number | null, scale: number | null): number | undefined {
   return value === null || scale === null ? undefined : value / 10 ** scale;
@@ -115,9 +136,7 @@ export async function addChallengeField(
     const access = await challengeAccess(session.user.id, challengeId, client, true);
     if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores podem criar campos.");
     if (access.challenge.status === "closed") throw new ApiError(409, "challenge_locked", "Campos não podem ser criados depois do encerramento.");
-    const entryType = await oneOrNull<{ id: string }>(client,
-      "SELECT id FROM entry_types WHERE challenge_id=$1 AND archived_at IS NULL ORDER BY created_at LIMIT 1", [challengeId]);
-    if (!entryType) throw new ApiError(409, "missing_entry_type", "O desafio não possui tipo de registro.");
+    const entryType = await targetEntryType(client, challengeId, body);
     const positionRow = await oneOrNull<{ position: number }>(client,
       "SELECT coalesce(max(position),-1)::int + 1 AS position FROM challenge_fields WHERE challenge_id=$1", [challengeId]);
     const position = positionRow?.position ?? 0;
@@ -141,9 +160,7 @@ export async function saveChallengeFields(
     const access = await challengeAccess(session.user.id, challengeId, client, true);
     if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores podem editar campos.");
     if (access.challenge.status === "closed") throw new ApiError(409, "challenge_locked", "Campos não podem ser editados depois do encerramento.");
-    const entryType = await oneOrNull<{ id: string }>(client,
-      "SELECT id FROM entry_types WHERE challenge_id=$1 AND archived_at IS NULL ORDER BY created_at LIMIT 1", [challengeId]);
-    if (!entryType) throw new ApiError(409, "missing_entry_type", "Tipo de registro ausente.");
+    const entryType = await targetEntryType(client, challengeId, body);
     const keptIds: string[] = [];
     for (let position = 0; position < requestedFields.length; position += 1) {
       const field = asRecord(requestedFields[position]);
@@ -159,8 +176,9 @@ export async function saveChallengeFields(
         settings: Record<string, unknown>;
       }>(client,
         `SELECT id,kind,number_scale,min_scaled,max_scaled,step_scaled,max_length,settings
-           FROM challenge_fields WHERE id=$1 AND challenge_id=$2`, [field.id, challengeId]);
-      if (!current) throw new ApiError(400, "invalid_field", "Campo não pertence ao desafio.");
+           FROM challenge_fields WHERE id=$1 AND challenge_id=$2 AND entry_type_id=$3`,
+        [field.id, challengeId, entryType.id]);
+      if (!current) throw new ApiError(400, "invalid_field", "Campo não pertence a este tipo de registro.");
       const requestedKind = field.type === "select" ? "choice" : field.type;
       if (requestedKind !== undefined && requestedKind !== current.kind) {
         throw new ApiError(409, "immutable_field_type", "O tipo de um campo persistido não pode ser alterado.");
@@ -233,9 +251,10 @@ export async function saveChallengeFields(
       if (access.challenge.status !== "draft") {
         const withData = await client.query<{ label: string }>(
           `SELECT f.label FROM challenge_fields f
-            WHERE f.challenge_id=$1 AND f.archived_at IS NULL AND NOT (f.id=ANY($2::text[]))
+            WHERE f.challenge_id=$1 AND f.entry_type_id=$2 AND f.archived_at IS NULL
+              AND NOT (f.id=ANY($3::text[]))
               AND EXISTS (SELECT 1 FROM entry_values ev WHERE ev.field_id=f.id)`,
-          [challengeId, keptIds],
+          [challengeId, entryType.id, keptIds],
         );
         if (withData.rows.length) {
           throw new ApiError(
@@ -247,8 +266,8 @@ export async function saveChallengeFields(
       }
       await client.query(
         `UPDATE challenge_fields SET archived_at=now(),updated_at=now()
-          WHERE challenge_id=$1 AND archived_at IS NULL AND NOT (id=ANY($2::text[]))`,
-        [challengeId, keptIds],
+          WHERE challenge_id=$1 AND entry_type_id=$2 AND archived_at IS NULL AND NOT (id=ANY($3::text[]))`,
+        [challengeId, entryType.id, keptIds],
       );
     }
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,

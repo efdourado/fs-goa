@@ -496,6 +496,7 @@
     "fieldsHintDraft": "Tipos e ordem podem ser ajustados livremente antes da ativação.",
     "fieldsHintActive": "Adicione, renomeie ou reordene campos a qualquer momento. O tipo de um campo já salvo é fixo, e um campo com respostas não pode ser removido — o histórico fica intacto.",
     "fieldsHintClosed": "Os campos foram congelados no encerramento para preservar o resultado.",
+    "fieldsTypeLegend": "Tipo de registro",
     "fieldsSaved": "Campos salvos.",
     "saveFields": "Salvar campos",
     "itemRemoveConfirm": "Remover \"{title}\" do desafio? Ele sai da lista; registros já enviados continuam no histórico.",
