@@ -4,6 +4,7 @@ import { challengeAccess, dateRange, writeAudit } from "../../goa-domain";
 import { ApiError, stringValue } from "../../http";
 import {
   cardinalityOf,
+  completionEntryType,
   entryTypesForChallenge,
   primaryEntryType,
   purposeOf,
@@ -89,6 +90,7 @@ export async function getChallengeDetail(session: SessionContext, challengeId: s
       list.push(field);
       fieldsByType.set(field.entryTypeId as string, list);
     }
+    const completionType = await completionEntryType(client, challengeId);
     const entryTypes = allTypes.map((type) => ({
       id: type.id,
       name: type.name,
@@ -98,10 +100,12 @@ export async function getChallengeDetail(session: SessionContext, challengeId: s
       targetPolicy: targetPolicyOf(type),
       cardinality: cardinalityOf(type),
       schedulePolicy: schedulePolicyOf(type, challengeHasPeriod),
-      isPrimary: type.id === primaryType?.id,
+      isPrimary: type.is_primary || type.id === primaryType?.id,
+      countsCompletion: type.id === completionType?.id,
       fields: fieldsByType.get(type.id) ?? [],
     }));
     const primaryEntryTypeId = primaryType?.id ?? null;
+    const completionEntryTypeId = completionType?.id ?? null;
     const metrics = await metricsForChallenge(client, challengeId);
     const result = await resultForChallenge(client, challengeId, metrics);
     // The client's `submissionMode` answers "how does a participant pick what to
@@ -155,6 +159,7 @@ export async function getChallengeDetail(session: SessionContext, challengeId: s
       meetingUrl: access.challenge.meeting_url,
       recipeKey: access.challenge.recipe_key ?? null,
       submissionMode,
+      completionEntryTypeId,
       viewerRole: access.challenge.role,
       isParticipant: access.challenge.is_participant,
       fields: primaryFields,

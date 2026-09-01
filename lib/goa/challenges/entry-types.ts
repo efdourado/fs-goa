@@ -22,10 +22,11 @@ export interface EntryTypeRow {
   target_policy: TargetPolicy | null;
   cardinality: Cardinality | null;
   schedule_policy: SchedulePolicy | null;
+  is_primary: boolean;
 }
 
 const SELECT_COLUMNS = `id, challenge_id, semantic_key, name, submission_mode,
-  purpose, target_policy, cardinality, schedule_policy`;
+  purpose, target_policy, cardinality, schedule_policy, is_primary`;
 
 /**
  * The four orthogonal axes are nullable until every legacy row is backfilled, so
@@ -71,9 +72,29 @@ export async function primaryEntryType(
     client,
     `SELECT ${SELECT_COLUMNS} FROM entry_types
       WHERE challenge_id = $1 AND archived_at IS NULL
-      ORDER BY (coalesce(purpose, '') = 'expectation'), created_at
+      ORDER BY is_primary DESC, (coalesce(purpose, '') = 'expectation'), created_at
       LIMIT 1`,
     [challengeId],
+  );
+}
+
+/**
+ * The type whose entries mean "done" for progress counters and completion rate:
+ * a dedicated `completion` type wins, otherwise the primary type is the signal
+ * (a rating = "assisti e avaliei", a check-in = "fiz hoje" — an expectation or a
+ * mid-round progress note never counts).
+ */
+export async function completionEntryType(
+  client: PoolClient,
+  challengeId: string,
+): Promise<EntryTypeRow | null> {
+  const types = await entryTypesForChallenge(client, challengeId);
+  return (
+    types.find((type) => type.purpose === "completion")
+    ?? types.find((type) => type.is_primary)
+    ?? types.find((type) => type.purpose !== "expectation")
+    ?? types[0]
+    ?? null
   );
 }
 

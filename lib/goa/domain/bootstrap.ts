@@ -130,24 +130,22 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
                               AND et.archived_at IS NULL
                               AND (et.submission_mode = 'item' OR et.target_policy IN ('required','optional')))
                 THEN 'item'
-                ELSE (SELECT et.submission_mode FROM entry_types et
-                       WHERE et.challenge_id = c.id AND et.archived_at IS NULL
-                       ORDER BY (et.purpose = 'expectation'), et.created_at LIMIT 1)
+                ELSE ct.submission_mode
               END) AS submission_mode,
               EXISTS (SELECT 1 FROM challenge_participants cp
                        WHERE cp.challenge_id = c.id AND cp.user_id = $1 AND cp.removed_at IS NULL)
                 AS is_participant,
               (SELECT count(*)::int FROM entries e
-                WHERE e.challenge_id = c.id AND e.participant_user_id = $1 AND e.deleted_at IS NULL)
+                WHERE e.challenge_id = c.id AND e.participant_user_id = $1 AND e.deleted_at IS NULL
+                  AND (ct.id IS NULL OR e.entry_type_id = ct.id))
                 AS completed_count,
               CASE
-                WHEN EXISTS (SELECT 1 FROM entry_types et WHERE et.challenge_id = c.id AND et.submission_mode = 'item')
+                WHEN ct.target_policy IN ('required', 'optional')
                 THEN (SELECT count(*)::int FROM challenge_items ci WHERE ci.challenge_id = c.id AND ci.archived_at IS NULL)
-                WHEN EXISTS (SELECT 1 FROM entry_types et WHERE et.challenge_id = c.id AND et.submission_mode = 'daily')
-                  AND c.start_date IS NOT NULL
+                WHEN ct.schedule_policy = 'checkpoint' AND c.start_date IS NOT NULL
                 THEN (SELECT count(*)::int FROM challenge_checkpoints cc
                        WHERE cc.challenge_id = c.id AND cc.archived_at IS NULL)
-                WHEN EXISTS (SELECT 1 FROM entry_types et WHERE et.challenge_id = c.id AND et.submission_mode = 'daily')
+                WHEN ct.submission_mode = 'daily'
                 THEN NULL
                 ELSE 1
               END AS total_count
@@ -155,6 +153,17 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
          JOIN groups g ON g.id = c.group_id AND g.deleted_at IS NULL AND g.archived_at IS NULL
          JOIN group_members gm ON gm.group_id = c.group_id
           AND gm.user_id = $1 AND gm.removed_at IS NULL
+         LEFT JOIN LATERAL (
+           SELECT et.id, et.submission_mode,
+                  coalesce(et.target_policy,
+                    CASE WHEN et.submission_mode = 'item' THEN 'required' ELSE 'none' END) AS target_policy,
+                  coalesce(et.schedule_policy,
+                    CASE WHEN et.submission_mode = 'daily' AND c.start_date IS NOT NULL THEN 'checkpoint' ELSE 'free' END) AS schedule_policy
+             FROM entry_types et
+            WHERE et.challenge_id = c.id AND et.archived_at IS NULL
+            ORDER BY (et.purpose = 'completion') DESC, et.is_primary DESC, et.created_at
+            LIMIT 1
+         ) ct ON true
         WHERE c.deleted_at IS NULL
           AND (c.status <> 'draft' OR gm.role IN ('owner','admin'))
         ORDER BY CASE c.status WHEN 'active' THEN 0 WHEN 'draft' THEN 1 ELSE 2 END, c.created_at DESC`,

@@ -1670,7 +1670,7 @@ test("modelo de registros: um filme aceita mais de um tipo de registro por pesso
   assert.equal((future.body as { error: string }).error, "watch_in_future");
 });
 
-type DetailType = { id: string; purpose: string; semanticKey: string; cardinality: string };
+type DetailType = { id: string; purpose: string; semanticKey: string; cardinality: string; countsCompletion?: boolean };
 type DetailItem = { id: string; title: string };
 
 test("fundação: dois livros no mesmo dia, conclusão e nota sem comentário", async () => {
@@ -1693,8 +1693,8 @@ test("fundação: dois livros no mesmo dia, conclusão e nota sem comentário", 
   const items = (detail.body as { items: DetailItem[] }).items;
   const progress = types.find((type) => type.purpose === "progress")!;
   const completion = types.find((type) => type.purpose === "completion")!;
-  const rating = types.find((type) => type.purpose === "rating")!;
   assert.equal(progress.cardinality, "once_per_item_day");
+  assert.equal(completion.countsCompletion, true);
   const norwegian = items.find((item) => item.title === "Norwegian Wood")!;
   const kafka = items.find((item) => item.title === "Kafka à Beira-Mar")!;
 
@@ -1706,11 +1706,9 @@ test("fundação: dois livros no mesmo dia, conclusão e nota sem comentário", 
     });
     assert.equal(res.response.status, 201, JSON.stringify(res.body));
   }
+  // "Terminei" is an event; the nota rides along, no comment required.
   assert.equal((await call("POST", `/api/challenges/${challengeId}/entries`, {
-    session: owner, body: { itemId: norwegian.id, entryTypeId: completion.id, values: { concluido: true } },
-  })).response.status, 201);
-  assert.equal((await call("POST", `/api/challenges/${challengeId}/entries`, {
-    session: owner, body: { itemId: norwegian.id, entryTypeId: rating.id, values: { nota: 5 } },
+    session: owner, body: { itemId: norwegian.id, entryTypeId: completion.id, values: { nota: 5 } },
   })).response.status, 201);
 
   const rows = await adminPool.query<{ purpose: string; item_id: string; occurred_on: string }>(
@@ -1723,10 +1721,8 @@ test("fundação: dois livros no mesmo dia, conclusão e nota sem comentário", 
   const byPurpose = (name: string) => rows.rows.filter((row) => row.purpose === name);
   assert.equal(byPurpose("progress").length, 2, "um progresso por livro no mesmo dia");
   assert.deepEqual(byPurpose("progress").map((row) => row.occurred_on), [day, day]);
-  assert.equal(byPurpose("completion").length, 1);
+  assert.equal(byPurpose("completion").length, 1, "uma conclusão, no livro certo");
   assert.equal(byPurpose("completion")[0].item_id, norwegian.id);
-  assert.equal(byPurpose("rating").length, 1);
-  assert.equal(byPurpose("rating")[0].item_id, norwegian.id);
 
   const commentValues = await adminPool.query<{ count: number }>(
     `SELECT count(*)::int AS count FROM entry_values ev
