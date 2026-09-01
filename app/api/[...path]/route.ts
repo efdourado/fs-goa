@@ -24,7 +24,7 @@ import {
   setUserPlatformAdmin,
 } from "@/lib/admin";
 import { adminFeedback, submitFeedback } from "@/lib/feedback";
-import { listGroupCatalog, updateCatalogItem } from "@/lib/goa/catalog";
+import { catalogItemDetail, listGroupCatalog, updateCatalogItem } from "@/lib/goa/catalog";
 import {
   addMetric,
   archiveChallengeItem,
@@ -108,6 +108,9 @@ export async function GET(request: Request): Promise<Response> {
     if (path[0] === "results" && path.length === 2) return json(await publicResults(path[1]));
     if (path[0] === "groups" && path[2] === "catalog" && path.length === 3) {
       return json(await listGroupCatalog(await requireSession(request), path[1]));
+    }
+    if (path[0] === "groups" && path[2] === "catalog" && path.length === 4) {
+      return json(await catalogItemDetail(await requireSession(request), path[1], path[3]));
     }
     if (path[0] === "challenges" && path.length === 2) {
       return json(await getChallengeDetail(await requireSession(request), path[1]));

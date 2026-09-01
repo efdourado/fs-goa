@@ -298,11 +298,31 @@
     "noChallengesManage": "Escolha um preset e configure a primeira edição.",
     "noChallengesMember": "Quando um administrador criar um desafio, ele aparecerá aqui.",
     "createChallengeCta": "Criar desafio",
+    "catalogTitle": "Acervo",
+    "catalogSortLabel": "Ordenar acervo",
+    "catalogSortTitle": "Por título",
+    "catalogSortRating": "Por nota",
+    "catalogRounds": "{count, plural, one {# rodada} other {# rodadas}}",
     "peopleTitle": "Pessoas",
     "membersUnavailable": "A lista de membros aparecerá quando o bootstrap a disponibilizar.",
     "pendingInvitesTitle": "Convites aguardando resposta",
     "pendingInviteMeta": "@{username} · convidado em {date}",
     "cancel": "Cancelar"
+  },
+  "catalog": {
+    "back": "← Voltar ao grupo",
+    "errorTitle": "Não foi possível abrir o item",
+    "runtime": "{minutes} min",
+    "pages": "{count} páginas",
+    "historyTitle": "Nas rodadas do grupo",
+    "historyAvg": "média histórica {value} em {rounds} rodada(s) com nota",
+    "recommendedBy": "indicado por {name}",
+    "noRounds": "Este item ainda não entrou em nenhuma rodada visível.",
+    "status": {
+      "draft": "rascunho",
+      "active": "em andamento",
+      "closed": "encerrada"
+    }
   },
   "cineItems": {
     "titleLabel": "Título do filme",

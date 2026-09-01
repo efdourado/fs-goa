@@ -47,6 +47,11 @@ export function screenFromUrl(pathname: string, search = ""): Screen | null {
       ? { kind: "create-challenge", groupId }
       : { kind: "group", groupId };
   }
+  if (parts[0] === "groups" && parts[2] === "catalog" && parts.length === 4) {
+    const groupId = decoded(parts[1]);
+    const itemId = decoded(parts[3]);
+    return groupId && itemId ? { kind: "catalog-item", groupId, itemId } : null;
+  }
   if (parts[0] === "challenges" && parts.length >= 2) {
     const challengeId = decoded(parts[1]);
     if (!challengeId) return null;
@@ -75,6 +80,8 @@ export function urlForScreen(screen: Screen): string | null {
       return "/";
     case "group":
       return `/groups/${encodeURIComponent(screen.groupId)}`;
+    case "catalog-item":
+      return `/groups/${encodeURIComponent(screen.groupId)}/catalog/${encodeURIComponent(screen.itemId)}`;
     case "create-challenge":
       return `/groups/${encodeURIComponent(screen.groupId)}?create=challenge`;
     case "challenge":

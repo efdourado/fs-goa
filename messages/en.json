@@ -298,11 +298,31 @@
     "noChallengesManage": "Pick a preset and set up the first edition.",
     "noChallengesMember": "When an admin creates a challenge, it will appear here.",
     "createChallengeCta": "Create challenge",
+    "catalogTitle": "Catalog",
+    "catalogSortLabel": "Sort catalog",
+    "catalogSortTitle": "By title",
+    "catalogSortRating": "By rating",
+    "catalogRounds": "{count, plural, one {# round} other {# rounds}}",
     "peopleTitle": "People",
     "membersUnavailable": "The member list will appear once the bootstrap provides it.",
     "pendingInvitesTitle": "Invitations awaiting a reply",
     "pendingInviteMeta": "@{username} · invited on {date}",
     "cancel": "Cancel"
+  },
+  "catalog": {
+    "back": "← Back to the group",
+    "errorTitle": "Couldn't open the item",
+    "runtime": "{minutes} min",
+    "pages": "{count} pages",
+    "historyTitle": "Across the group's rounds",
+    "historyAvg": "historical average {value} over {rounds} rated round(s)",
+    "recommendedBy": "recommended by {name}",
+    "noRounds": "This item hasn't been in any visible round yet.",
+    "status": {
+      "draft": "draft",
+      "active": "in progress",
+      "closed": "closed"
+    }
   },
   "cineItems": {
     "titleLabel": "Film title",

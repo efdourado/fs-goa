@@ -83,6 +83,23 @@ export interface CatalogItem {
   pageCount?: number | null;
   genres: string[];
   roundCount?: number;
+  ratingAvg?: number | null;
+  ratingCount?: number;
+}
+
+export interface CatalogRoundHistory {
+  challengeId: Id;
+  title: string;
+  status: ChallengeStatus;
+  startsOn?: string | null;
+  endsOn?: string | null;
+  recommendedBy?: string | null;
+  ratingAvg: number | null;
+  ratingCount: number;
+}
+
+export interface CatalogItemDetail extends CatalogItem {
+  rounds: CatalogRoundHistory[];
 }
 
 export interface ChallengeItem {
@@ -325,6 +342,7 @@ export type Screen =
   | { kind: "dashboard" }
   | { kind: "account" }
   | { kind: "group"; groupId: Id }
+  | { kind: "catalog-item"; groupId: Id; itemId: Id }
   | { kind: "invite"; token: string }
   | { kind: "invite-success"; invitation: InviteAcceptance }
   | { kind: "create-challenge"; groupId: Id }

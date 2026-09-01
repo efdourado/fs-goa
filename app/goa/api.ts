@@ -33,6 +33,8 @@ export const API_PATHS = {
   groups: "/api/groups",
   group: (groupId: Id) => `/api/groups/${encodeURIComponent(groupId)}`,
   groupCatalog: (groupId: Id) => `/api/groups/${encodeURIComponent(groupId)}/catalog`,
+  groupCatalogItem: (groupId: Id, itemId: Id) =>
+    `/api/groups/${encodeURIComponent(groupId)}/catalog/${encodeURIComponent(itemId)}`,
   catalogItem: (itemId: Id) => `/api/catalog/${encodeURIComponent(itemId)}`,
   groupMembers: (groupId: Id) => `/api/groups/${encodeURIComponent(groupId)}/members`,
   groupInvites: (groupId: Id) => `/api/groups/${encodeURIComponent(groupId)}/invites`,
