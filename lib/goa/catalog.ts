@@ -64,12 +64,19 @@ export async function upsertCatalogItem(
   const normalized = normalizeTitle(title);
   const attributes = readAttributes(input);
 
-  const existing = await oneOrNull<{ id: string; year: number | null; runtime_minutes: number | null; page_count: number | null }>(
-    client,
+  // Year participates in the identity so "Dune (1984)" and "Dune (2021)" stay
+  // apart. But a bare title still matches a single dated row of the same name
+  // (and adopts its year), so "Aftersun" folds into "Aftersun (2022)".
+  type Row = { id: string; year: number | null; runtime_minutes: number | null; page_count: number | null };
+  const sameTitle = await client.query<Row>(
     `SELECT id, year, runtime_minutes, page_count FROM catalog_items
-      WHERE group_id = $1 AND kind = $2 AND normalized_title = $3 AND archived_at IS NULL`,
+      WHERE group_id = $1 AND kind = $2 AND normalized_title = $3 AND archived_at IS NULL
+      ORDER BY created_at`,
     [groupId, input.kind, normalized],
   );
+  const existing: Row | null =
+    sameTitle.rows.find((row) => (row.year ?? -1) === (attributes.year ?? -1))
+    ?? (attributes.year === null && sameTitle.rows.length === 1 ? sameTitle.rows[0] : null);
   if (existing) {
     const sets: string[] = [];
     const params: unknown[] = [existing.id];

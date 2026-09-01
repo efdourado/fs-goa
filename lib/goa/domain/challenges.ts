@@ -95,6 +95,7 @@ export async function createChallenge(
         ).rows.map((row) => row.user_id),
       );
       const catalogKind = body.template === "reading" ? "book" : "film";
+      const usedKeys = new Set<string>();
       for (let index = 0; index < items.length; index += 1) {
         const item = asRecord(items[index]);
         const itemTitle = typeof item.title === "string" ? item.title.trim() : "";
@@ -125,11 +126,17 @@ export async function createChallenge(
           recommendedBy = item.recommendedByUserId;
         }
 
+        let itemKey = semanticKey(itemTitle, `item_${index + 1}`);
+        for (let suffix = 2; usedKeys.has(itemKey); suffix += 1) {
+          itemKey = `${semanticKey(itemTitle, `item_${index + 1}`)}_${suffix}`.slice(0, 64);
+        }
+        usedKeys.add(itemKey);
+
         await client.query(
           `INSERT INTO challenge_items
             (id, challenge_id, entry_type_id, catalog_item_id, recommended_by_user_id, semantic_key, title, position, metadata, created_at, updated_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'{}'::jsonb,now(),now())`,
-          [publicId(), id, entryTypeId, catalogItemId, recommendedBy, semanticKey(itemTitle, `item_${index + 1}`), itemTitle, index],
+           VALUES ($1,$2,NULL,$3,$4,$5,$6,$7,'{}'::jsonb,now(),now())`,
+          [publicId(), id, catalogItemId, recommendedBy, itemKey, itemTitle, index],
         );
       }
     } else if (

@@ -91,7 +91,7 @@ export async function copyChallengeStructure(
   }
 
   const sourceItems = await client.query<{
-    checkpoint_id: string | null; entry_type_id: string; semantic_key: string; title: string;
+    checkpoint_id: string | null; entry_type_id: string | null; semantic_key: string; title: string;
     description: string | null; position: number; opens_at: Date | null; due_at: Date | null; metadata: unknown;
   }>(
     `SELECT checkpoint_id,entry_type_id,semantic_key,title,description,position,opens_at,due_at,metadata
@@ -103,7 +103,7 @@ export async function copyChallengeStructure(
          opens_at,due_at,metadata,created_at,updated_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,now(),now())`,
       [publicId(), targetId, source.checkpoint_id ? checkpointMap.get(source.checkpoint_id) : null,
-        typeMap.get(source.entry_type_id), source.semantic_key, source.title, source.description,
+        source.entry_type_id ? typeMap.get(source.entry_type_id) : null, source.semantic_key, source.title, source.description,
         source.position, source.opens_at, source.due_at, JSON.stringify(source.metadata ?? {})],
     );
   }
