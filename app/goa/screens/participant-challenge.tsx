@@ -211,7 +211,7 @@ export function ParticipantChallengeScreen({
       ? entriesByItem.get(selectedItem.id)
       : ownEntries.find((entry) => !itemIdForEntry(entry));
   const completion = sortedItems.length ? Math.round((ownEntries.length / sortedItems.length) * 100) : 0;
-  const scheduled = isChallengeScheduled(challenge.status, challenge.startsOn);
+  const scheduled = isChallengeScheduled(challenge.status, challenge.startsOn, challenge.submissionMode);
   const ruleSections = useMemo(
     () => visibleRuleSections(challenge.ruleSections, challenge.rules, trules("legacyTitle")),
     [challenge.ruleSections, challenge.rules, trules],
@@ -234,7 +234,7 @@ export function ParticipantChallengeScreen({
       <div className="mb-5 flex items-center justify-between gap-3"><button className={backLinkClass} type="button" onClick={onBack}>{t("backHome")}</button>{onAdmin ? <Button variant="secondary" onClick={onAdmin}>{t("manage")}</Button> : null}</div>
       <section className="relative overflow-hidden rounded-[28px] bg-[var(--spotlight)] p-6 text-[var(--spotlight-ink)] sm:p-9">
         <div className="relative z-10">
-          <div className="flex flex-wrap items-center justify-between gap-3"><ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} /><span className="text-xs text-white/65">{f.dateRange(challenge.startsOn, challenge.endsOn)}</span></div>
+          <div className="flex flex-wrap items-center justify-between gap-3"><ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} /><span className="text-xs text-white/65">{f.dateRange(challenge.startsOn, challenge.endsOn)}</span></div>
           <h1 className="mt-10 max-w-3xl text-4xl font-semibold leading-none tracking-[-0.055em] sm:text-6xl">{challenge.title}</h1>
           {challenge.description ? <p className="mt-4 max-w-2xl text-sm leading-6 text-white/70">{challenge.description}</p> : null}
           {challenge.meetingUrl ? <a className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl bg-white/15 px-4 text-sm font-light text-white hover:bg-white/25" href={challenge.meetingUrl} target="_blank" rel="noreferrer"><span aria-hidden="true">↗</span>{t("joinMeeting")}</a> : null}

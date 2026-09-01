@@ -82,7 +82,7 @@ function AdminOverview({
   const [success, setSuccess] = useState<string | null>(null);
   const expected = challenge.items.length * challenge.participants.length;
   const missing = Math.max(0, expected - entries.length);
-  const scheduled = isChallengeScheduled(challenge.status, challenge.startsOn);
+  const scheduled = isChallengeScheduled(challenge.status, challenge.startsOn, challenge.submissionMode);
 
   async function run(label: string, action: () => Promise<void>, successText: string) {
     setBusy(label);
@@ -167,7 +167,7 @@ function AdminOverview({
       <section className={cx(cardClass, "p-5 sm:p-7")}>
         <h2 className="text-xl font-light">{t("stateTitle")}</h2>
         <div className="mt-4 flex flex-col gap-4 rounded-2xl bg-[var(--wash)] p-5 sm:flex-row sm:items-center sm:justify-between">
-          <div><ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} /><p className="mt-2 max-w-xl text-sm leading-6 text-[var(--muted)]">{challenge.status === "draft" ? t("stateDraft") : scheduled ? t("stateScheduled", { date: f.date(challenge.startsOn, longDate) }) : challenge.status === "active" ? t("stateActive") : t("stateClosed")}</p></div>
+          <div><ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} /><p className="mt-2 max-w-xl text-sm leading-6 text-[var(--muted)]">{challenge.status === "draft" ? t("stateDraft") : scheduled ? t("stateScheduled", { date: f.date(challenge.startsOn, longDate) }) : challenge.status === "active" ? t("stateActive") : t("stateClosed")}</p></div>
           {challenge.status === "draft" ? <Button disabled={Boolean(busy)} onClick={() => { if (window.confirm(t("activateConfirm"))) void run("transition", () => onTransition("active"), t("activated")); }}>{t("activate")}</Button> : null}
           {challenge.status === "active" ? <Button variant="danger" disabled={Boolean(busy)} onClick={() => { if (window.confirm(t("closeConfirm"))) void run("transition", () => onTransition("closed"), t("closedDone")); }}>{t("close")}</Button> : null}
         </div>
@@ -645,7 +645,7 @@ export function AdminScreen({
   return (
     <main className="mx-auto max-w-7xl px-4 py-6 pb-24 sm:px-6 sm:py-10">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><button className={backLinkClass} type="button" onClick={onBack}>{t("back", { group: group?.name ?? tc("home") })}</button><div className="flex flex-wrap gap-2">{challenge.meetingUrl ? <a className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--main-line)] bg-[var(--main-soft)] px-4 text-sm font-light text-[var(--main-strong)] hover:opacity-90" href={challenge.meetingUrl} target="_blank" rel="noreferrer">{t("joinMeeting")}</a> : null}<Button variant="secondary" onClick={onViewParticipant}>{t("viewAsParticipant")}</Button></div></div>
-      <PageHeading title={challenge.title} description={t("subtitle")} action={<ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} />} />
+      <PageHeading title={challenge.title} description={t("subtitle")} action={<ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />} />
       <nav className="mb-6 flex gap-1 overflow-x-auto rounded-2xl bg-[var(--wash-strong)]/70 p-1" aria-label={t("tabsAria")}>{tabs.map((id) => <button className={cx("min-h-11 flex-none rounded-xl px-4 text-sm font-light", tab === id ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]")} type="button" onClick={() => onTab(id)} key={id}>{t(`tabs.${id}`)}</button>)}</nav>
       {tab === "overview" ? <AdminOverview challenge={challenge} entries={entries} onSave={onSaveBasics} onTransition={onTransition} onDuplicate={onDuplicate} duplicateTargets={duplicateTargets} onDelete={onDelete} /> : null}
       {tab === "participants" ? <AdminParticipants key={`${challenge.id}:${challenge.participants.map((participant) => participant.userId ?? participant.id).join(",")}`} challenge={challenge} group={group} onSave={onSaveParticipants} /> : null}

@@ -120,10 +120,14 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
       is_participant: boolean;
       completed_count: number;
       total_count: number | null;
+      submission_mode: "item" | "daily" | "free" | null;
     }>(
       `SELECT c.id, c.group_id, c.title, c.description, c.status,
               c.start_date::text AS start_date, c.end_date::text AS end_date,
               gm.role,
+              (SELECT et.submission_mode FROM entry_types et
+                WHERE et.challenge_id = c.id AND et.archived_at IS NULL
+                ORDER BY et.created_at LIMIT 1) AS submission_mode,
               EXISTS (SELECT 1 FROM challenge_participants cp
                        WHERE cp.challenge_id = c.id AND cp.user_id = $1 AND cp.removed_at IS NULL)
                 AS is_participant,
@@ -177,6 +181,7 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
         status: challenge.status,
         startsOn: challenge.start_date,
         endsOn: challenge.end_date,
+        submissionMode: challenge.submission_mode ?? undefined,
         viewerRole: challenge.role,
         isParticipant: challenge.is_participant,
         completedCount: challenge.completed_count,
