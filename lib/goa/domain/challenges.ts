@@ -9,12 +9,11 @@ import {
   upsertCatalogItem,
 } from "../catalog";
 import { syncDailyCheckpoints } from "../daily-checkpoints";
+import { resolveRecipe } from "../challenges/recipes";
 import { writeAudit } from "./audit";
-import { defaultFields, insertField, type ClientField } from "./fields";
+import { insertField, type ClientField } from "./fields";
 import { parseRuleSections, rulesCompatibilityText } from "./rules";
 import { asRecord, dateRange, meetingUrlValue, publicId, semanticKey } from "./shared";
-
-const SUBMISSION_MODES = new Set(["item", "daily", "free"]);
 
 export async function createChallenge(
   session: SessionContext,
@@ -30,10 +29,11 @@ export async function createChallenge(
     Object.hasOwn(body, "startsOn") ? body.startsOn : body.startDate,
     Object.hasOwn(body, "endsOn") ? body.endsOn : body.endDate,
   );
-  const submissionMode = typeof body.submissionMode === "string" ? body.submissionMode : body.template === "reading" ? "daily" : "item";
-  if (!SUBMISSION_MODES.has(submissionMode)) throw new ApiError(400, "submission_mode", "Modo de registro inválido.");
-  const fields = Array.isArray(body.fields) && body.fields.length ? (body.fields as ClientField[]) : defaultFields(body.template);
-  if (fields.length > 30) throw new ApiError(400, "field_limit", "Use no máximo 30 campos.");
+  const recipe = resolveRecipe(body);
+  const wizardFields = Array.isArray(body.fields) && body.fields.length ? (body.fields as ClientField[]) : null;
+  if (wizardFields && wizardFields.length > 30) throw new ApiError(400, "field_limit", "Use no máximo 30 campos.");
+  const wantsItems = recipe.catalogKind !== null && recipe.entryTypes.some((type) => type.submissionMode === "item");
+  const wantsCheckpoints = recipe.entryTypes.some((type) => type.schedulePolicy === "checkpoint");
   const items = Array.isArray(body.items) ? body.items : [];
   assertArrayWithin(body.items, 200, "Adicione no máximo 200 itens.");
   assertArrayWithin(body.participantIds, LIMITS.membersPerGroup, "Participantes demais para um único desafio.");
@@ -66,25 +66,41 @@ export async function createChallenge(
     const id = publicId();
     await client.query(
       `INSERT INTO challenges
-        (id, group_id, created_by_user_id, title, description, meeting_url, rules, rule_sections, start_date, end_date,
-         time_zone, status, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,'draft',now(),now())`,
-      [id, groupId, session.user.id, title, description, meetingUrl, rules, JSON.stringify(ruleSections), startDate, endDate, "America/Sao_Paulo"],
-    );
-    const entryTypeId = publicId();
-    await client.query(
-      `INSERT INTO entry_types
-        (id, challenge_id, semantic_key, name, submission_mode, created_at, updated_at)
-       VALUES ($1,$2,'registro','Registro',$3,now(),now())`,
-      [entryTypeId, id, submissionMode],
+        (id, group_id, created_by_user_id, title, description, meeting_url, rules, rule_sections, recipe_key, recipe_version,
+         start_date, end_date, time_zone, status, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12,$13,'draft',now(),now())`,
+      [id, groupId, session.user.id, title, description, meetingUrl, rules, JSON.stringify(ruleSections),
+        recipe.key, recipe.version, startDate, endDate, "America/Sao_Paulo"],
     );
 
-    const insertedFields: Array<{ id: string; kind: string; semanticKey: string }> = [];
-    for (let index = 0; index < fields.length; index += 1) {
-      insertedFields.push(await insertField(client, id, entryTypeId, fields[index], index));
+    let primaryTypeId = "";
+    let primaryFields: Array<{ id: string; kind: string; semanticKey: string }> = [];
+    let primaryFieldDefs: ClientField[] = [];
+    for (const type of recipe.entryTypes) {
+      const typeId = publicId();
+      await client.query(
+        `INSERT INTO entry_types
+          (id, challenge_id, semantic_key, name, submission_mode, purpose, target_policy, cardinality, schedule_policy,
+           created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,now(),now())`,
+        [typeId, id, type.semanticKey, type.name, type.submissionMode, type.purpose,
+          type.targetPolicy, type.cardinality, type.schedulePolicy],
+      );
+      const typeFields = type.primary && wizardFields ? wizardFields : type.fields;
+      const inserted: Array<{ id: string; kind: string; semanticKey: string }> = [];
+      for (let index = 0; index < typeFields.length; index += 1) {
+        inserted.push(await insertField(client, id, typeId, typeFields[index], index));
+      }
+      if (type.primary || !primaryTypeId) {
+        primaryTypeId = typeId;
+        primaryFields = inserted;
+        primaryFieldDefs = typeFields;
+      }
     }
+    const entryTypeId = primaryTypeId;
+    const insertedFields = primaryFields;
 
-    if (submissionMode === "item") {
+    if (wantsItems) {
       if (!items.length || items.length > 200) throw new ApiError(400, "item_limit", "Adicione de 1 a 200 itens.");
       const memberIds = new Set(
         (
@@ -94,7 +110,7 @@ export async function createChallenge(
           )
         ).rows.map((row) => row.user_id),
       );
-      const catalogKind = body.template === "reading" ? "book" : "film";
+      const catalogKind = recipe.catalogKind ?? "film";
       const usedKeys = new Set<string>();
       for (let index = 0; index < items.length; index += 1) {
         const item = asRecord(items[index]);
@@ -139,8 +155,9 @@ export async function createChallenge(
           [publicId(), id, catalogItemId, recommendedBy, itemKey, itemTitle, index],
         );
       }
-    } else if (
-      submissionMode === "daily"
+    }
+    if (
+      wantsCheckpoints
       && startDate !== null
       && endDate !== null
       && body.generateDaily !== false
@@ -180,7 +197,7 @@ export async function createChallenge(
            group_by, decimal_places, visible_during_challenge, position, settings,
            created_by_user_id, created_at, updated_at)
          VALUES ($1,$2,$3,$4,$5,$6,'average','none',2,true,0,'{}'::jsonb,$7,now(),now())`,
-        [publicId(), id, entryTypeId, numeric.id, `media_${numeric.semanticKey}`, `Média de ${fields.find((field) => semanticKey(field.key, "") === numeric.semanticKey)?.label ?? "valores"}`, session.user.id],
+        [publicId(), id, entryTypeId, numeric.id, `media_${numeric.semanticKey}`, `Média de ${primaryFieldDefs.find((field) => semanticKey(field.key, "") === numeric.semanticKey)?.label ?? "valores"}`, session.user.id],
       );
     }
     await client.query(
