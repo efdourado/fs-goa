@@ -37,11 +37,12 @@ export async function getChallengeDetail(session: SessionContext, challengeId: s
     const itemsResult = await client.query<{
         id: string; title: string; description: string | null;
         position: number; opens_at: Date | null; due_at: Date | null;
+        checkpoint_id: string | null;
         catalog_item_id: string | null; catalog_title: string | null; catalog_year: number | null;
         catalog_runtime: number | null; catalog_pages: number | null;
         recommended_by_id: string | null; recommended_by_name: string | null;
       }>(
-        `SELECT i.id, i.title, i.description, i.position, i.opens_at, i.due_at,
+        `SELECT i.id, i.title, i.description, i.position, i.opens_at, i.due_at, i.checkpoint_id,
                 i.catalog_item_id, ci.title AS catalog_title, ci.year AS catalog_year,
                 ci.runtime_minutes AS catalog_runtime, ci.page_count AS catalog_pages,
                 i.recommended_by_user_id AS recommended_by_id, ru.display_name AS recommended_by_name
@@ -118,36 +119,42 @@ export async function getChallengeDetail(session: SessionContext, challengeId: s
     const primaryFields = primaryEntryTypeId
       ? fieldsByType.get(primaryEntryTypeId) ?? []
       : fields;
+    // Checkpoints (dated sessions) are an always-available array, independent of
+    // whether the round also has items. `items` stays overloaded for the
+    // single-axis screens: a pure daily round still gets its checkpoints here.
+    const checkpoints = checkpointsResult.rows.map((checkpoint) => ({
+      id: checkpoint.id, checkpointId: checkpoint.id, title: checkpoint.title,
+      description: checkpoint.description, position: checkpoint.position,
+      opensAt: checkpoint.starts_at?.toISOString() ?? null,
+      dueAt: checkpoint.due_at?.toISOString() ?? null,
+      date: checkpoint.starts_at?.toISOString().slice(0, 10) ?? null,
+      status: windowStatus(access.challenge.status, checkpoint.starts_at, checkpoint.due_at),
+    }));
+    const roundItems = itemsResult.rows.map((item) => ({
+      id: item.id, title: item.title,
+      description: item.description, position: item.position,
+      checkpointId: item.checkpoint_id ?? null,
+      opensAt: item.opens_at?.toISOString() ?? null, dueAt: item.due_at?.toISOString() ?? null,
+      status: windowStatus(access.challenge.status, item.opens_at, item.due_at),
+      catalogItem: item.catalog_item_id
+        ? {
+            id: item.catalog_item_id,
+            title: item.catalog_title ?? item.title,
+            year: item.catalog_year,
+            runtimeMinutes: item.catalog_runtime,
+            pageCount: item.catalog_pages,
+            genres: genresByCatalog.get(item.catalog_item_id) ?? [],
+          }
+        : null,
+      recommendedBy: item.recommended_by_id
+        ? { id: item.recommended_by_id, name: item.recommended_by_name ?? "" }
+        : null,
+    }));
     const items = submissionMode === "daily" && access.challenge.start_date === null
       ? []
-      : itemsResult.rows.length
-      ? itemsResult.rows.map((item) => ({
-          id: item.id, title: item.title,
-          description: item.description, position: item.position,
-          opensAt: item.opens_at?.toISOString() ?? null, dueAt: item.due_at?.toISOString() ?? null,
-          status: windowStatus(access.challenge.status, item.opens_at, item.due_at),
-          catalogItem: item.catalog_item_id
-            ? {
-                id: item.catalog_item_id,
-                title: item.catalog_title ?? item.title,
-                year: item.catalog_year,
-                runtimeMinutes: item.catalog_runtime,
-                pageCount: item.catalog_pages,
-                genres: genresByCatalog.get(item.catalog_item_id) ?? [],
-              }
-            : null,
-          recommendedBy: item.recommended_by_id
-            ? { id: item.recommended_by_id, name: item.recommended_by_name ?? "" }
-            : null,
-        }))
-      : checkpointsResult.rows.map((checkpoint) => ({
-          id: checkpoint.id, checkpointId: checkpoint.id, title: checkpoint.title,
-          description: checkpoint.description, position: checkpoint.position,
-          opensAt: checkpoint.starts_at?.toISOString() ?? null,
-          dueAt: checkpoint.due_at?.toISOString() ?? null,
-          date: checkpoint.starts_at?.toISOString().slice(0, 10) ?? null,
-          status: windowStatus(access.challenge.status, checkpoint.starts_at, checkpoint.due_at),
-        }));
+      : roundItems.length
+      ? roundItems
+      : checkpoints;
     return {
       id: access.challenge.id,
       groupId: access.challenge.group_id,
@@ -168,6 +175,7 @@ export async function getChallengeDetail(session: SessionContext, challengeId: s
       fields: primaryFields,
       entryTypes,
       items,
+      checkpoints,
       participants: participantsResult.rows.map((participant) => ({
         id: participant.id, userId: participant.id, name: participant.display_name, username: participant.username,
       })),

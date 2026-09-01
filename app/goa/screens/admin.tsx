@@ -1,10 +1,11 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { type FormEvent, useMemo, useState } from "react";
+import { type FormEvent, useMemo, useRef, useState } from "react";
 
 import { useGoaFormat } from "../format";
 import { CineItemsEditor, type CineRow, cineRowsToInput } from "../cine-items";
+import { copyText } from "../clipboard";
 import { cleanFields, FieldBuilder } from "../fields";
 import { RuleSectionsEditor, visibleRuleSections } from "../rules";
 import type {
@@ -616,14 +617,21 @@ function AdminResults({
   challenge,
   entries,
   onSave,
+  onPublish,
+  onUnpublish,
 }: {
   challenge: ChallengeDetail;
   entries: Entry[];
   onSave: (payload: Record<string, unknown>) => Promise<void>;
+  onPublish: (payload: Record<string, unknown>) => Promise<{ url?: string | null; publishedAt?: string; anonymized?: boolean } | undefined>;
+  onUnpublish: () => Promise<void>;
 }) {
   const t = useTranslations("adminChallenge");
   const tc = useTranslations("common");
   const f = useGoaFormat();
+  const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
+  const [copyState, setCopyState] = useState<"idle" | "done" | "failed">("idle");
+  const linkRef = useRef<HTMLInputElement>(null);
   const [headline, setHeadline] = useState(challenge.result?.headline ?? challenge.title);
   const [summary, setSummary] = useState(challenge.result?.summary ?? "");
   const [metricIds, setMetricIds] = useState<Id[]>(challenge.result?.metrics?.map((metric) => metric.id) ?? challenge.metrics.filter((metric) => metric.visibleInResults).map((metric) => metric.id));
@@ -649,6 +657,14 @@ function AdminResults({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [challenge.items, entries, textFields]);
 
+  const isClosed = challenge.status === "closed";
+  const isPublished = Boolean(challenge.result?.publishedAt);
+  const publicUrl =
+    publishedUrl
+    ?? (challenge.result?.shareToken && typeof window !== "undefined"
+      ? `${window.location.origin}/results/${challenge.result.shareToken}`
+      : null);
+
   async function save() {
     setBusy(true); setError(null); setSuccess(null);
     try {
@@ -659,7 +675,7 @@ function AdminResults({
         comments: candidates.filter((candidate) => commentKeys.includes(candidate.key)).map(({ entryId, fieldId }) => ({ entryId, fieldId })),
         anonymizeParticipants: anonymize,
       });
-      setSuccess(t("resultsSaved"));
+      setSuccess(isPublished ? t("draftSavedRepublishHint") : t("resultsSaved"));
     } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
   }
 
@@ -667,12 +683,75 @@ function AdminResults({
     setBusy(true); setError(null); setSuccess(null);
     try {
       await onSave({ regenerate: true, anonymizeParticipants: anonymize });
-      setSuccess(t("showcaseRegenerated"));
+      setSuccess(isPublished ? t("draftSavedRepublishHint") : t("showcaseRegenerated"));
     } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
+  }
+
+  async function publish(rotateLink: boolean) {
+    const confirmText = rotateLink
+      ? t("rotateLinkConfirm")
+      : anonymize ? t("publishConfirmAnon") : t("publishConfirmNoAnon");
+    if (!window.confirm(confirmText)) return;
+    setBusy(true); setError(null); setSuccess(null);
+    try {
+      const result = await onPublish(rotateLink ? { rotateLink: true } : {});
+      if (result?.url) setPublishedUrl(result.url);
+      setCopyState("idle");
+      setSuccess(rotateLink ? t("linkRotated") : t("showcasePublished"));
+    } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
+  }
+
+  async function unpublish() {
+    if (!window.confirm(t("unpublishConfirm"))) return;
+    setBusy(true); setError(null); setSuccess(null);
+    try {
+      await onUnpublish();
+      setPublishedUrl(null);
+      setSuccess(t("showcaseUnpublished"));
+    } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
+  }
+
+  async function copyLink() {
+    if (!publicUrl) return;
+    try {
+      await copyText(publicUrl, linkRef.current);
+      setCopyState("done");
+    } catch { setCopyState("failed"); }
   }
 
   return (
     <div className="space-y-6">
+      <section className={cx(cardClass, "p-5 sm:p-7")}>
+        <PageHeading title={t("publishTitle")} description={t("publishSubtitle")} />
+        <div className="rounded-2xl bg-[var(--wash)] p-4 text-sm">
+          {isPublished ? (
+            <p>
+              <strong>{t("publishedOn", { date: f.dateTime(challenge.result?.publishedAt) })}</strong>
+              {" · "}
+              {challenge.resultsAnon ? t("publishStateAnon") : t("publishStateNamed")}
+            </p>
+          ) : (
+            <p className="text-[var(--muted)]">{isClosed ? t("notPublished") : t("publishNeedsClose")}</p>
+          )}
+          {isPublished && publicUrl ? (
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <input ref={linkRef} className={cx(inputClass, "sm:flex-1")} readOnly value={publicUrl} onFocus={(event) => event.target.select()} aria-label={t("publicLinkLabel")} />
+              <Button variant="secondary" disabled={busy} onClick={() => void copyLink()}>
+                {copyState === "done" ? t("linkCopied") : copyState === "failed" ? t("copyFailed") : t("copyLink")}
+              </Button>
+            </div>
+          ) : null}
+        </div>
+        {isClosed ? (
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button disabled={busy} onClick={() => void publish(false)}>{isPublished ? t("republishShowcase") : t("publishShowcase")}</Button>
+            {isPublished ? <Button variant="secondary" disabled={busy} onClick={() => void publish(true)}>{t("rotateLink")}</Button> : null}
+            {isPublished ? <Button variant="danger" disabled={busy} onClick={() => void unpublish()}>{t("unpublish")}</Button> : null}
+          </div>
+        ) : null}
+        <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{t("publishHint")}</p>
+      </section>
+
       <section className={cx(cardClass, "p-5 sm:p-7")}>
         <PageHeading title={t("resultsTitle")} description={t("resultsSubtitle")} />
         <div className="grid gap-4 sm:grid-cols-2"><label className="sm:col-span-2"><span className={labelClass}>{t("headlineLabel")}</span><input className={inputClass} value={headline} onChange={(event) => setHeadline(event.target.value)} maxLength={180} /></label><label className="sm:col-span-2"><span className={labelClass}>{t("summaryLabel")}</span><textarea className={inputClass} rows={4} value={summary} onChange={(event) => setSummary(event.target.value)} maxLength={1500} /></label></div>
@@ -680,7 +759,7 @@ function AdminResults({
         <fieldset className="mt-6"><legend className="text-base font-light">{t("selectedComments")}</legend>{candidates.length ? <div className="mt-3 grid gap-2 sm:grid-cols-2">{candidates.map((candidate) => <label className="flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4 text-sm" key={candidate.key}><input className="mt-1" type="checkbox" aria-label={t("selectCommentAria", { author: candidate.authorName })} checked={commentKeys.includes(candidate.key)} onChange={(event) => setCommentKeys((current) => event.target.checked ? [...current, candidate.key] : current.filter((key) => key !== candidate.key))} /><span><span className="line-clamp-3 leading-6">“{candidate.text}”</span><small className="mt-2 block font-light text-[var(--muted)]">{candidate.authorName} · {candidate.itemTitle}</small></span></label>)}</div> : <p className="mt-2 text-sm text-[var(--muted)]">{t("noTextFields")}</p>}</fieldset>
         <label className="mt-6 flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4 text-sm"><input className="mt-0.5" type="checkbox" aria-label={t("anonymizeParticipants")} checked={anonymize} onChange={(event) => setAnonymize(event.target.checked)} /><span><strong className="block">{t("anonymizeParticipants")}</strong><small className="text-[var(--muted)]">{t("anonymizeHint")}</small></span></label>
         <div className="mt-5"><StatusMessage error={error} success={success} /></div>
-        <div className="mt-5 flex flex-col gap-2 sm:flex-row"><Button disabled={busy} onClick={() => void save()}>{busy ? tc("saving") : t("saveResults")}</Button><Button variant="secondary" disabled={busy} onClick={() => void regenerate()}>{t("regenerateShowcase")}</Button></div>
+        <div className="mt-5 flex flex-col gap-2 sm:flex-row"><Button disabled={busy} onClick={() => void save()}>{busy ? tc("saving") : t("saveDraft")}</Button><Button variant="secondary" disabled={busy} onClick={() => void regenerate()}>{t("regenerateDraft")}</Button></div>
         <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{t("regenerateHint")}</p>
       </section>
       {challenge.result || challenge.status === "closed" ? <section><PageHeading title={t("previewTitle")} description={t("previewSubtitle")} /><ResultView challenge={challenge} /></section> : <EmptyState title={t("previewEmptyTitle")} description={t("previewEmptyBody")} />}
@@ -710,6 +789,8 @@ export function AdminScreen({
   onExport,
   onAddMetric,
   onSaveResult,
+  onPublishResult,
+  onUnpublishResult,
 }: {
   challenge: ChallengeDetail;
   entries: Entry[];
@@ -735,6 +816,8 @@ export function AdminScreen({
   onExport: () => Promise<void>;
   onAddMetric: (payload: Record<string, unknown>) => Promise<void>;
   onSaveResult: (payload: Record<string, unknown>) => Promise<void>;
+  onPublishResult: (payload: Record<string, unknown>) => Promise<{ url?: string | null; publishedAt?: string; anonymized?: boolean } | undefined>;
+  onUnpublishResult: () => Promise<void>;
 }) {
   const t = useTranslations("adminChallenge");
   const tc = useTranslations("common");
@@ -750,7 +833,7 @@ export function AdminScreen({
       {tab === "items" ? <AdminItems challenge={challenge} group={group} onAdd={onAddItems} onUpdate={onUpdateItem} onArchive={onArchiveItem} /> : null}
       {tab === "review" ? <AdminReview challenge={challenge} entries={entries} onPatch={onPatchEntry} onExport={onExport} /> : null}
       {tab === "metrics" ? <AdminMetrics challenge={challenge} onAdd={onAddMetric} /> : null}
-      {tab === "results" ? <AdminResults challenge={challenge} entries={entries} onSave={onSaveResult} /> : null}
+      {tab === "results" ? <AdminResults challenge={challenge} entries={entries} onSave={onSaveResult} onPublish={onPublishResult} onUnpublish={onUnpublishResult} /> : null}
     </main>
   );
 }

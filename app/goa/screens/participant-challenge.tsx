@@ -228,6 +228,7 @@ function ItemEntryPanel({
   today,
   unavailableMessage,
   canEdit,
+  checkpointId,
   onSaveEntry,
 }: {
   challenge: ChallengeDetail;
@@ -243,7 +244,9 @@ function ItemEntryPanel({
   today: string;
   unavailableMessage: string | null;
   canEdit: boolean;
-  onSaveEntry: (itemId: Id | null, values: Record<Id, unknown>, entry?: Entry, occurredOn?: string | null, entryTypeId?: Id) => Promise<void>;
+  // The session this item is being logged against — "filme X na sessão Y".
+  checkpointId?: Id | null;
+  onSaveEntry: (itemId: Id | null, values: Record<Id, unknown>, entry?: Entry, occurredOn?: string | null, entryTypeId?: Id, checkpointId?: Id | null) => Promise<void>;
 }) {
   const t = useTranslations("participant");
   const types = itemEntryTypes(challenge);
@@ -269,7 +272,7 @@ function ItemEntryPanel({
           <div key={type.id || "registro"}>
             {stacked ? <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">{type.name}</h3> : null}
             <DynamicEntryForm
-              key={`${type.id}-${perDay ? occurredOn || today : "fixed"}-${entry?.id ?? "new"}`}
+              key={`${type.id}-${item.id}-${perDay ? occurredOn || today : "fixed"}-${entry?.id ?? "new"}`}
               fields={type.fields}
               item={item}
               entry={entry}
@@ -282,6 +285,7 @@ function ItemEntryPanel({
                 saved,
                 saved ? undefined : perDay ? occurredOn || today : offersDate ? occurredOn || null : undefined,
                 type.id || undefined,
+                type.schedulePolicy === "checkpoint" ? checkpointId ?? null : undefined,
               )}
             />
           </div>
@@ -308,7 +312,7 @@ export function ParticipantChallengeScreen({
   onTab: (tab: ParticipantTab) => void;
   onBack: () => void;
   onAdmin?: () => void;
-  onSaveEntry: (itemId: Id | null, values: Record<Id, unknown>, entry?: Entry, occurredOn?: string | null, entryTypeId?: Id) => Promise<void>;
+  onSaveEntry: (itemId: Id | null, values: Record<Id, unknown>, entry?: Entry, occurredOn?: string | null, entryTypeId?: Id, checkpointId?: Id | null) => Promise<void>;
 }) {
   const t = useTranslations("participant");
   const tc = useTranslations("common");
@@ -323,7 +327,24 @@ export function ParticipantChallengeScreen({
     ? ownEntries.filter((entry) => entry.entryTypeId === challenge.completionEntryTypeId)
     : ownEntries;
   const entriesByItem = useMemo(() => new Map(ownEntries.map((entry) => [itemIdForEntry(entry), entry])), [ownEntries]);
+  // The "done" tick tracks completion only — any other entry (an expectation, a
+  // half-read progress note) leaves the item still pending.
+  const doneByItem = useMemo(
+    () => new Set(doneEntries.map((entry) => itemIdForEntry(entry))),
+    [doneEntries],
+  );
   const sortedItems = useMemo(() => [...challenge.items].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)), [challenge.items]);
+  const sortedSessions = useMemo(
+    () => [...(challenge.checkpoints ?? [])].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
+    [challenge.checkpoints],
+  );
+  // "Filme X na sessão Y" — a round whose entries carry both a round item and a
+  // dated session. The session picker drives the item; a plain items-only or
+  // sessions-only round never enters this branch.
+  const sessionMode =
+    sortedSessions.length > 0
+    && sortedItems.length > 0
+    && challenge.entryTypes.some((type) => type.targetPolicy !== "none" && type.schedulePolicy === "checkpoint");
   const undatedDaily = challenge.submissionMode === "daily" && !challenge.startsOn && !challenge.endsOn;
   const today = dateKeyInSaoPaulo(new Date());
   // "" means the participant hasn't picked a date. The plain round form saves it
@@ -336,7 +357,16 @@ export function ParticipantChallengeScreen({
     ?? sortedItems[0]
     ?? null;
   const [selectedItemId, setSelectedItemId] = useState<Id | null>(defaultItem?.id ?? null);
-  const selectedItem = sortedItems.find((item) => item.id === selectedItemId) ?? defaultItem;
+  const [selectedSessionId, setSelectedSessionId] = useState<Id | null>(null);
+  const selectedSession = sessionMode
+    ? sortedSessions.find((session) => session.id === selectedSessionId)
+      ?? sortedSessions.find((session) => session.status === "open")
+      ?? sortedSessions[0]
+      ?? null
+    : null;
+  const selectedItem = sessionMode
+    ? sortedItems.find((item) => item.checkpointId === selectedSession?.id) ?? null
+    : sortedItems.find((item) => item.id === selectedItemId) ?? defaultItem;
   const currentEntry = undatedDaily
     ? ownEntries.find((entry) => entry.occurredOn === effectiveOccurredOn)
     : selectedItem
@@ -403,7 +433,7 @@ export function ParticipantChallengeScreen({
                       {selectedItem?.recommendedBy || selectedItem?.catalogItem?.year ? <p className="mt-1 text-xs text-[var(--muted)]">{[selectedItem.recommendedBy ? t("recommendedBy", { name: selectedItem.recommendedBy.name }) : null, selectedItem.catalogItem?.year ? String(selectedItem.catalogItem.year) : null, selectedItem.catalogItem?.genres.length ? selectedItem.catalogItem.genres.join(", ") : null].filter(Boolean).join(" · ")}</p> : null}</div>{selectedItem?.dueAt ? <span className="rounded-full bg-[var(--wash)] px-3 py-2 text-xs font-semibold text-[var(--muted)]">{t("dueBy", { date: f.dateTime(selectedItem.dueAt) })}</span> : null}</div>
                   {dateRequired ? <label className="mb-5 block"><span className={labelClass}>{t("occurredOnLabel")}</span><input className={inputClass} type="date" max={today} value={effectiveOccurredOn} disabled={Boolean(unavailableMessage)} onChange={(event) => setOccurredOn(event.target.value || today)} /><small className="mt-1 block text-[var(--muted)]">{t("occurredOnHint")}</small></label> : !useItemPanel && currentEntry?.occurredOn ? <p className="mb-5 text-xs text-[var(--muted)]">{t("occurredOn", { date: f.date(currentEntry.occurredOn, longDate) })}</p> : null}
                   {useItemPanel && selectedItem ? (
-                    <ItemEntryPanel challenge={challenge} item={selectedItem} ownEntries={ownEntries} occurredOn={occurredOn} onOccurredOnChange={setOccurredOn} offerOptionalDate={!perDayItem} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} onSaveEntry={onSaveEntry} />
+                    <ItemEntryPanel key={`${selectedItem.id}-${selectedSession?.id ?? "no-session"}`} challenge={challenge} item={selectedItem} ownEntries={ownEntries} occurredOn={occurredOn} onOccurredOnChange={setOccurredOn} offerOptionalDate={!perDayItem && !sessionMode} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} checkpointId={selectedSession?.id ?? null} onSaveEntry={onSaveEntry} />
                   ) : (
                     <DynamicEntryForm key={`${selectedItem?.id ?? "free"}-${undatedDaily ? effectiveOccurredOn : "fixed"}-${currentEntry?.id ?? "new"}`} fields={challenge.fields} item={selectedItem ?? null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry(selectedItem?.id ?? null, values, entry, undatedDaily ? effectiveOccurredOn : undefined)} />
                   )}
@@ -411,7 +441,8 @@ export function ParticipantChallengeScreen({
               )}
             </section>
             <aside className="space-y-5">
-              {sortedItems.length > 1 ? <section className={cx(cardClass, "p-5")}><h2 className="text-base font-light">{t("checkpointsTitle")}</h2><label className="mt-3 block"><span className="sr-only">{t("chooseCheckpoint")}</span><select className={inputClass} value={selectedItem?.id ?? ""} onChange={(event) => setSelectedItemId(event.target.value)}>{sortedItems.map((item, index) => <option value={item.id} key={item.id} disabled={item.status === "scheduled" && !entriesByItem.has(item.id)}>{entriesByItem.has(item.id) ? t("checkpointDone") : ""}{t("checkpointOption", { index: index + 1, title: item.title })}{item.status === "scheduled" ? t("checkpointSoon") : ""}</option>)}</select></label><ul className="mt-3 space-y-2 text-xs text-[var(--muted)]"><li>{t("checkpointTally", { done: Math.min(doneEntries.length, sortedItems.length), pending: Math.max(0, sortedItems.length - doneEntries.length) })}</li></ul></section> : null}
+              {sessionMode && sortedSessions.length > 1 ? <section className={cx(cardClass, "p-5")}><h2 className="text-base font-light">{t("sessionsTitle")}</h2><label className="mt-3 block"><span className="sr-only">{t("chooseSession")}</span><select className={inputClass} value={selectedSession?.id ?? ""} onChange={(event) => setSelectedSessionId(event.target.value)}>{sortedSessions.map((session, index) => { const boundItem = sortedItems.find((item) => item.checkpointId === session.id); return <option value={session.id} key={session.id} disabled={session.status === "scheduled"}>{t("checkpointOption", { index: index + 1, title: boundItem?.title ?? session.title })}{session.status === "scheduled" ? t("checkpointSoon") : ""}</option>; })}</select></label></section>
+                : sortedItems.length > 1 ? <section className={cx(cardClass, "p-5")}><h2 className="text-base font-light">{t("checkpointsTitle")}</h2><label className="mt-3 block"><span className="sr-only">{t("chooseCheckpoint")}</span><select className={inputClass} value={selectedItem?.id ?? ""} onChange={(event) => setSelectedItemId(event.target.value)}>{sortedItems.map((item, index) => <option value={item.id} key={item.id} disabled={item.status === "scheduled" && !entriesByItem.has(item.id)}>{doneByItem.has(item.id) ? t("checkpointDone") : ""}{t("checkpointOption", { index: index + 1, title: item.title })}{item.status === "scheduled" ? t("checkpointSoon") : ""}</option>)}</select></label><ul className="mt-3 space-y-2 text-xs text-[var(--muted)]"><li>{t("checkpointTally", { done: Math.min(doneEntries.length, sortedItems.length), pending: Math.max(0, sortedItems.length - doneEntries.length) })}</li></ul></section> : null}
             </aside>
           </div>
         ) : null}

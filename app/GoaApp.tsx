@@ -327,6 +327,7 @@ export default function GoaApp() {
         recipe: input.recipe,
         title: input.title,
         description: input.description,
+        meetingUrl: input.meetingUrl,
         ruleSections: input.ruleSections,
         startsOn: input.startsOn,
         endsOn: input.endsOn,
@@ -352,6 +353,16 @@ export default function GoaApp() {
     void refreshBootstrap().catch(() => undefined);
   }
 
+  // Same refresh contract as `mutateChallenge`, but hands the parsed response
+  // back — the showcase publish needs the returned share URL.
+  async function mutateChallengeReturning<T>(path: string, body: unknown, method: "POST" | "PATCH" | "DELETE" = "POST"): Promise<T | undefined> {
+    if (!bootstrap) return undefined;
+    const result = await apiRequest<T>(path, { method, body, csrfToken: bootstrap.csrfToken });
+    await reloadSelected();
+    void refreshBootstrap().catch(() => undefined);
+    return result;
+  }
+
   async function duplicateChallenge(payload: { title: string; targetGroupId: Id }) {
     if (!bootstrap || !selectedChallenge) return;
     const response = await apiRequest<unknown>(API_PATHS.duplicate(selectedChallenge.id), { method: "POST", body: payload, csrfToken: bootstrap.csrfToken });
@@ -366,6 +377,7 @@ export default function GoaApp() {
     entry?: Entry,
     occurredOn?: string | null,
     entryTypeId?: Id,
+    checkpointId?: Id | null,
   ) {
     if (!bootstrap || !selectedChallenge) return;
     if (entry) {
@@ -375,7 +387,13 @@ export default function GoaApp() {
         method: "POST",
         // `null` is meaningful — an entry saved with no date — so only an
         // `undefined` argument drops the key and lets the server assume today.
-        body: { itemId, values, ...(occurredOn !== undefined ? { occurredOn } : {}), ...(entryTypeId ? { entryTypeId } : {}) },
+        body: {
+          itemId,
+          values,
+          ...(occurredOn !== undefined ? { occurredOn } : {}),
+          ...(entryTypeId ? { entryTypeId } : {}),
+          ...(checkpointId !== undefined ? { checkpointId } : {}),
+        },
         csrfToken: bootstrap.csrfToken,
       });
     }
@@ -460,7 +478,7 @@ export default function GoaApp() {
   } else if (screen.kind === "challenge" && selectedChallenge) {
     content = <ParticipantChallengeScreen key={selectedChallenge.id} challenge={selectedChallenge} entries={entries} user={user} tab={screen.tab} onTab={(tab) => setScreen({ ...screen, tab })} onBack={() => setScreen({ kind: "dashboard" })} onAdmin={canManage(selectedRole) ? () => openAdmin(selectedChallenge.id) : undefined} onSaveEntry={saveEntry} />;
   } else if (screen.kind === "admin" && selectedChallenge && canManage(selectedRole)) {
-    content = <AdminScreen key={selectedChallenge.id} challenge={selectedChallenge} entries={entries} group={selectedGroup} duplicateTargets={bootstrap.groups.filter((candidate) => candidate.id !== selectedChallenge.groupId && canManage(candidate.role)).map((candidate) => ({ id: candidate.id, name: candidate.name, challengeCount: bootstrap.challenges.filter((item) => item.groupId === candidate.id).length, challengeLimit: bootstrap.limits.challengesPerGroup }))} tab={screen.tab} onTab={(tab) => setScreen({ ...screen, tab })} onBack={() => selectedGroup ? setScreen({ kind: "group", groupId: selectedGroup.id }) : setScreen({ kind: "dashboard" })} onViewParticipant={() => setScreen({ kind: "challenge", challengeId: selectedChallenge.id, tab: selectedChallenge.status === "closed" ? "results" : "today" })} onSaveBasics={(payload) => mutateChallenge(API_PATHS.challenge(selectedChallenge.id), payload, "PATCH")} onTransition={(status) => mutateChallenge(API_PATHS.transition(selectedChallenge.id), { status })} onDuplicate={duplicateChallenge} onDelete={canManage(selectedRole) ? () => deleteChallenge(selectedChallenge.id, selectedGroup?.id) : undefined} onSaveParticipants={(participantIds) => mutateChallenge(API_PATHS.participants(selectedChallenge.id), { replace: true, participantIds })} onSaveFields={(entryTypeId, fields) => mutateChallenge(API_PATHS.fields(selectedChallenge.id), { ...(entryTypeId ? { entryTypeId } : {}), replace: true, archiveMissing: true, fields })} onAddItems={(payload) => mutateChallenge(API_PATHS.items(selectedChallenge.id), payload)} onUpdateItem={(itemId, payload) => mutateChallenge(API_PATHS.item(selectedChallenge.id, itemId), payload, "PATCH")} onArchiveItem={(itemId) => mutateChallenge(API_PATHS.item(selectedChallenge.id, itemId), undefined, "DELETE")} onPatchEntry={(entryId, values, reason) => mutateChallenge(API_PATHS.entry(entryId), { values, reason }, "PATCH")} onExport={exportCsv} onAddMetric={(payload) => mutateChallenge(API_PATHS.metrics(selectedChallenge.id), payload)} onSaveResult={(payload) => mutateChallenge(API_PATHS.results(selectedChallenge.id), payload)} />;
+    content = <AdminScreen key={selectedChallenge.id} challenge={selectedChallenge} entries={entries} group={selectedGroup} duplicateTargets={bootstrap.groups.filter((candidate) => candidate.id !== selectedChallenge.groupId && canManage(candidate.role)).map((candidate) => ({ id: candidate.id, name: candidate.name, challengeCount: bootstrap.challenges.filter((item) => item.groupId === candidate.id).length, challengeLimit: bootstrap.limits.challengesPerGroup }))} tab={screen.tab} onTab={(tab) => setScreen({ ...screen, tab })} onBack={() => selectedGroup ? setScreen({ kind: "group", groupId: selectedGroup.id }) : setScreen({ kind: "dashboard" })} onViewParticipant={() => setScreen({ kind: "challenge", challengeId: selectedChallenge.id, tab: selectedChallenge.status === "closed" ? "results" : "today" })} onSaveBasics={(payload) => mutateChallenge(API_PATHS.challenge(selectedChallenge.id), payload, "PATCH")} onTransition={(status) => mutateChallenge(API_PATHS.transition(selectedChallenge.id), { status })} onDuplicate={duplicateChallenge} onDelete={canManage(selectedRole) ? () => deleteChallenge(selectedChallenge.id, selectedGroup?.id) : undefined} onSaveParticipants={(participantIds) => mutateChallenge(API_PATHS.participants(selectedChallenge.id), { replace: true, participantIds })} onSaveFields={(entryTypeId, fields) => mutateChallenge(API_PATHS.fields(selectedChallenge.id), { ...(entryTypeId ? { entryTypeId } : {}), replace: true, archiveMissing: true, fields })} onAddItems={(payload) => mutateChallenge(API_PATHS.items(selectedChallenge.id), payload)} onUpdateItem={(itemId, payload) => mutateChallenge(API_PATHS.item(selectedChallenge.id, itemId), payload, "PATCH")} onArchiveItem={(itemId) => mutateChallenge(API_PATHS.item(selectedChallenge.id, itemId), undefined, "DELETE")} onPatchEntry={(entryId, values, reason) => mutateChallenge(API_PATHS.entry(entryId), { values, reason }, "PATCH")} onExport={exportCsv} onAddMetric={(payload) => mutateChallenge(API_PATHS.metrics(selectedChallenge.id), payload)} onSaveResult={(payload) => mutateChallenge(API_PATHS.results(selectedChallenge.id), payload)} onPublishResult={(payload) => mutateChallengeReturning<{ url?: string | null; publishedAt?: string; anonymized?: boolean }>(API_PATHS.resultsPublish(selectedChallenge.id), payload)} onUnpublishResult={() => mutateChallenge(API_PATHS.results(selectedChallenge.id), undefined, "DELETE")} />;
   } else if (screen.kind === "admin" || screen.kind === "create-challenge") {
     content = <main className="mx-auto max-w-2xl px-5 py-16"><EmptyState title={t("adminUnavailableTitle")} description={t("adminUnavailableBody")} action={<Button onClick={() => setScreen({ kind: "dashboard" })}>{t("backToStart")}</Button>} /></main>;
   } else {

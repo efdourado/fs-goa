@@ -23,7 +23,23 @@ export async function transitionChallenge(
     if (reopening) {
       // Reabrir não repete a checagem de prontidão (já passou por ela uma vez) —
       // apenas libera os registros de novo e limpa a marca de encerramento.
-      await client.query("UPDATE challenges SET status='active', closed_at=NULL, updated_at=now() WHERE id=$1", [challengeId]);
+      // Uma vitrine publicada exige um desafio fechado (CHECK do banco) e o link é
+      // um snapshot congelado, então a mesma transação revoga a publicação e o
+      // token. Republicar depois de fechar de novo gera um link novo.
+      const wasPublished = access.challenge.results_published_at !== null;
+      await client.query(
+        `UPDATE challenges
+            SET status='active', closed_at=NULL,
+                results_published_at=NULL, result_share_token=NULL,
+                result_share_token_hash=NULL, results_published_snapshot=NULL,
+                updated_at=now()
+          WHERE id=$1`,
+        [challengeId],
+      );
+      if (wasPublished) {
+        await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
+          "results.unpublished", "challenge", challengeId, null, null, { reason: "reopen" });
+      }
     } else if (target === "active") {
       const types = await entryTypesForChallenge(client, challengeId);
       const challengeHasPeriod =

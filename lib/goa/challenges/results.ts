@@ -77,6 +77,37 @@ function groupBy<T>(rows: T[], key: (row: T) => { id: string; label: string } | 
   return groups;
 }
 
+/**
+ * How many "done" entries one participant can produce for a completion-rate
+ * metric, read off the completion type's orthogonal axes (not `submission_mode`):
+ * item-bound → one per item; session-bound → one per checkpoint; an undated daily
+ * habit → one per active day; otherwise a single expected entry.
+ */
+function expectedPerParticipant(ctx: {
+  submission_mode: "item" | "daily" | "free";
+  target_policy: string | null;
+  schedule_policy: string | null;
+  start_date: string | null;
+  item_count: number;
+  checkpoint_count: number;
+  active_days: number;
+}): number {
+  const targetPolicy = ctx.target_policy ?? (ctx.submission_mode === "item" ? "required" : "none");
+  const schedulePolicy =
+    ctx.schedule_policy
+    ?? (ctx.submission_mode === "item"
+      ? "while_active"
+      : ctx.submission_mode === "daily" && ctx.start_date !== null
+        ? "checkpoint"
+        : "free");
+  if (targetPolicy !== "none") return ctx.item_count;
+  if (schedulePolicy === "checkpoint" && ctx.start_date !== null) return ctx.checkpoint_count;
+  if (ctx.submission_mode === "daily") {
+    return ctx.start_date === null ? ctx.active_days : ctx.checkpoint_count;
+  }
+  return 1;
+}
+
 export async function calculateMetricRow(
   client: PoolClient,
   metric: MetricRow,
@@ -85,6 +116,8 @@ export async function calculateMetricRow(
   if (metric.operation === "completion_rate") {
     const context = await oneOrNull<{
       submission_mode: "item" | "daily" | "free";
+      target_policy: string | null;
+      schedule_policy: string | null;
       start_date: string | null;
       end_date: string | null;
       participants: number;
@@ -94,7 +127,8 @@ export async function calculateMetricRow(
       active_days: number;
     }>(
       client,
-      `SELECT et.submission_mode, c.start_date::text AS start_date, c.end_date::text AS end_date,
+      `SELECT et.submission_mode, et.target_policy, et.schedule_policy,
+              c.start_date::text AS start_date, c.end_date::text AS end_date,
               (SELECT count(*)::int FROM challenge_participants cp
                 WHERE cp.challenge_id = c.id AND cp.removed_at IS NULL) AS participants,
               (SELECT count(*)::int FROM entries e
@@ -113,16 +147,7 @@ export async function calculateMetricRow(
         WHERE et.id = $1 AND c.id = $2 AND c.deleted_at IS NULL`,
       [metric.entry_type_id, metric.challenge_id],
     );
-    const expected = !context
-      ? 0
-      : context.participants *
-        (context.submission_mode === "item"
-          ? context.item_count
-          : context.submission_mode === "daily"
-            ? context.start_date === null
-              ? context.active_days
-              : context.checkpoint_count
-            : 1);
+    const expected = !context ? 0 : context.participants * expectedPerParticipant(context);
     result = calculateMetric({
       operation: "completion_rate",
       completed: context?.completed ?? 0,
@@ -139,8 +164,10 @@ export async function calculateMetricRow(
         )
       : await oneOrNull<{ count: number }>(
           client,
-          "SELECT count(*)::int AS count FROM entries WHERE challenge_id = $1 AND deleted_at IS NULL",
-          [metric.challenge_id],
+          // Scoped to the metric's own entry type — a bare count must not fold in
+          // expectations, progress notes and other types' entries.
+          "SELECT count(*)::int AS count FROM entries WHERE challenge_id = $1 AND entry_type_id = $2 AND deleted_at IS NULL",
+          [metric.challenge_id, metric.entry_type_id],
         );
     result = { value: count?.count ?? 0, sampleSize: count?.count ?? 0 };
   } else {
@@ -344,9 +371,9 @@ export async function resultForChallenge(
   challengeId: string,
   calculatedMetrics?: Array<Record<string, unknown>>,
 ) {
-  const challenge = await oneOrNull<{ results_published_at: Date | null }>(
+  const challenge = await oneOrNull<{ results_published_at: Date | null; result_share_token: string | null }>(
     client,
-    "SELECT results_published_at FROM challenges WHERE id = $1",
+    "SELECT results_published_at, result_share_token FROM challenges WHERE id = $1",
     [challengeId],
   );
   const blocks = await client.query<{
@@ -381,6 +408,7 @@ export async function resultForChallenge(
       .filter((block) => block.kind === "entry_value")
       .map((block) => ({ id: block.id, text: block.body_snapshot ?? "", itemTitle: block.heading })),
     publishedAt: challenge?.results_published_at?.toISOString() ?? null,
+    shareToken: challenge?.result_share_token ?? null,
   };
 }
 
@@ -399,7 +427,12 @@ export async function addMetric(
   const label = stringValue(body, "label", { max: 120 })!;
   const minSample = Number(body.minSample);
   const bayesPriorWeight = Number(body.bayesPriorWeight);
-  const groupBy = typeof body.groupBy === "string" && ["none", "participant", "item", "day", "week"].includes(body.groupBy)
+  if (body.groupBy === "day" || body.groupBy === "week") {
+    // The compute path only expands `item`/`participant` into a series; day/week
+    // would be silently ignored, so refuse it until it is actually implemented.
+    throw new ApiError(400, "invalid_metric", "Agrupar por dia ou semana ainda não é suportado.");
+  }
+  const groupBy = typeof body.groupBy === "string" && ["none", "participant", "item"].includes(body.groupBy)
     ? body.groupBy : "none";
   const visibleDuring = body.visibleDuring !== false;
   const visibleInResults = body.visibleInResults !== false;
@@ -450,6 +483,11 @@ export async function addMetric(
   });
 }
 
+/**
+ * Saves the showcase **draft** — the `result_blocks` the admin curates and the
+ * in-app preview renders. Never publishes: `results_published_at` and the share
+ * token are only touched by `publishResults` / `unpublishChallengeResults`.
+ */
 export async function curateResults(
   session: SessionContext,
   challengeId: string,
@@ -463,7 +501,7 @@ export async function curateResults(
   const comments = Array.isArray(body.comments) ? body.comments : [];
   return inTransaction(async (client) => {
     const access = await challengeAccess(session.user.id, challengeId, client, true);
-    if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores podem publicar resultados.");
+    if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores podem editar a vitrine.");
     if (Object.hasOwn(body, "anonymizeParticipants")) {
       await client.query("UPDATE challenges SET results_anon = $2, updated_at = now() WHERE id = $1",
         [challengeId, body.anonymizeParticipants === true]);
@@ -472,7 +510,7 @@ export async function curateResults(
       await generateShowcase(client, challengeId, session.user.id);
       await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
         "results.regenerated", "challenge", challengeId, null, null);
-      return { challengeId, shareToken: null, published: false };
+      return { challengeId, published: access.challenge.results_published_at !== null };
     }
     await client.query("DELETE FROM result_blocks WHERE challenge_id=$1", [challengeId]);
     let position = 0;
@@ -524,18 +562,168 @@ export async function curateResults(
         [publicId(), challengeId, comment.entryId, comment.fieldId, value.item_title, value.body, position++, session.user.id],
       );
     }
-    let shareToken: string | null = null;
-    if (access.challenge.status === "closed") {
-      shareToken = generateOpaqueToken();
-      const shareHash = await hashToken(shareToken);
-      await client.query(
-        `UPDATE challenges SET results_published_at=now(),result_share_token_hash=$2,updated_at=now()
-          WHERE id=$1`, [challengeId, shareHash]);
-    }
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
-      "results.published", "challenge", challengeId, null,
+      "results.draft_saved", "challenge", challengeId, null, null,
       { metricCount: availableMetrics.rows.length, commentCount: comments.length });
-    return { challengeId, shareToken, published: access.challenge.status === "closed" };
+    return { challengeId, published: access.challenge.results_published_at !== null };
+  });
+}
+
+interface SnapshotChallenge {
+  id: string;
+  title: string;
+  description: string | null;
+  start_date: string | null;
+  end_date: string | null;
+}
+
+export interface PublishedShowcase {
+  id: string;
+  title: string;
+  description: string | null;
+  startsOn: string | null;
+  endsOn: string | null;
+  participants: string[];
+  result: {
+    headline: string | null;
+    summary: string | null;
+    metrics: Array<Record<string, unknown>>;
+    comments: Array<{ id: string; text: string; itemTitle: string | null }>;
+    publishedAt: string;
+  };
+}
+
+/**
+ * Freezes the current draft into the document served at `/results/<token>`. When
+ * anonymized, both the participant chips and every participant-grouped metric
+ * series (pages per person, indicator bias — keyed by the recommender) lose the
+ * real names and ids. Item-grouped series keep film / book titles by design.
+ */
+async function buildPublishedSnapshot(
+  client: PoolClient,
+  challenge: SnapshotChallenge,
+  anonymized: boolean,
+) {
+  const result = await resultForChallenge(client, challenge.id);
+  const participants = await client.query<{ id: string; display_name: string }>(
+    `SELECT u.id, u.display_name FROM challenge_participants cp JOIN users u ON u.id=cp.user_id
+      WHERE cp.challenge_id=$1 AND cp.removed_at IS NULL ORDER BY u.display_name`,
+    [challenge.id],
+  );
+  const metricList = result.metrics as Array<Record<string, unknown>>;
+  let participantNames: string[];
+  let metrics: Array<Record<string, unknown>> = metricList;
+
+  if (anonymized) {
+    const seriesIds = new Set<string>();
+    for (const metric of metricList) {
+      if (metric?.groupBy !== "participant" || !Array.isArray(metric.series)) continue;
+      for (const row of metric.series as Array<{ key?: unknown }>) {
+        if (typeof row.key === "string") seriesIds.add(row.key);
+      }
+    }
+    const roster = new Map<string, string>(participants.rows.map((row) => [row.id, row.display_name]));
+    const missing = [...seriesIds].filter((id) => !roster.has(id));
+    if (missing.length) {
+      const extra = await client.query<{ id: string; display_name: string }>(
+        "SELECT id, display_name FROM users WHERE id = ANY($1::text[])", [missing]);
+      for (const row of extra.rows) roster.set(row.id, row.display_name);
+    }
+    const labelById = new Map(
+      [...roster.entries()]
+        .sort((a, b) => a[1].localeCompare(b[1], "pt-BR"))
+        .map(([id], index) => [id, `Participante ${index + 1}`] as const),
+    );
+    participantNames = participants.rows.map((row) => labelById.get(row.id) ?? "Participante ?");
+    metrics = metricList.map((metric) => {
+      if (metric?.groupBy !== "participant" || !Array.isArray(metric.series)) return metric;
+      return {
+        ...metric,
+        series: (metric.series as Array<Record<string, unknown>>).map((row, index) => {
+          const label = typeof row.key === "string" ? labelById.get(row.key) : undefined;
+          return { ...row, key: label ?? `anon-${index}`, label: label ?? "Participante ?" };
+        }),
+      };
+    });
+  } else {
+    participantNames = participants.rows.map((row) => row.display_name);
+  }
+
+  return {
+    id: challenge.id,
+    title: challenge.title,
+    description: challenge.description,
+    startsOn: challenge.start_date,
+    endsOn: challenge.end_date,
+    participants: participantNames,
+    result: {
+      headline: result.headline,
+      summary: result.summary,
+      metrics,
+      comments: result.comments,
+      publishedAt: new Date().toISOString(),
+    },
+  };
+}
+
+/**
+ * Publishes the frozen snapshot. Mints the share token on the first publish and,
+ * with `rotateLink`, replaces it (invalidating the old URL). Never changes the
+ * draft blocks — the admin publishes only what they have reviewed.
+ */
+export async function publishResults(
+  session: SessionContext,
+  challengeId: string,
+  body: Record<string, unknown>,
+) {
+  return inTransaction(async (client) => {
+    const access = await challengeAccess(session.user.id, challengeId, client, true);
+    if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores podem publicar a vitrine.");
+    if (access.challenge.status !== "closed") {
+      throw new ApiError(409, "challenge_not_closed", "A vitrine só pode ser publicada depois que o desafio é encerrado.");
+    }
+    const anonymized = access.challenge.results_anon === true;
+    const snapshot = await buildPublishedSnapshot(client, access.challenge, anonymized);
+    const existing = await oneOrNull<{ token: string | null }>(
+      client, "SELECT result_share_token AS token FROM challenges WHERE id=$1", [challengeId]);
+    const rotate = body.rotateLink === true || !existing?.token;
+    const shareToken = rotate ? generateOpaqueToken() : existing?.token ?? generateOpaqueToken();
+    const shareHash = await hashToken(shareToken);
+    await client.query(
+      `UPDATE challenges
+          SET results_published_snapshot=$2::jsonb, results_published_at=now(),
+              result_share_token=$3, result_share_token_hash=$4, updated_at=now()
+        WHERE id=$1`,
+      [challengeId, JSON.stringify(snapshot), shareToken, shareHash],
+    );
+    await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
+      "results.published", "challenge", challengeId, null, null, { rotated: rotate, anonymized });
+    return { challengeId, publishedAt: new Date().toISOString(), anonymized, shareToken };
+  });
+}
+
+/** Clears publication + token + frozen snapshot. Shared by the route and reopen. */
+export async function unpublishResults(client: PoolClient, challengeId: string): Promise<void> {
+  await client.query(
+    `UPDATE challenges
+        SET results_published_at=NULL, result_share_token=NULL,
+            result_share_token_hash=NULL, results_published_snapshot=NULL, updated_at=now()
+      WHERE id=$1`,
+    [challengeId],
+  );
+}
+
+export async function unpublishChallengeResults(session: SessionContext, challengeId: string) {
+  return inTransaction(async (client) => {
+    const access = await challengeAccess(session.user.id, challengeId, client, true);
+    if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores podem despublicar a vitrine.");
+    const had = access.challenge.results_published_at !== null;
+    await unpublishResults(client, challengeId);
+    if (had) {
+      await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
+        "results.unpublished", "challenge", challengeId, null, null, {});
+    }
+    return { challengeId, published: false };
   });
 }
 
@@ -543,26 +731,14 @@ export async function publicResults(token: string) {
   let hash: string;
   try { hash = await hashToken(token); } catch { throw new ApiError(404, "not_found", "Resultados não encontrados."); }
   return withClient(async (client) => {
-    const challenge = await oneOrNull<{
-      id: string; title: string; description: string | null;
-      start_date: string | null; end_date: string | null; results_anon: boolean;
-    }>(client,
-      `SELECT id,title,description,start_date::text AS start_date,end_date::text AS end_date,results_anon FROM challenges
-        WHERE result_share_token_hash=$1 AND results_published_at IS NOT NULL AND status='closed'
-          AND deleted_at IS NULL`, [hash]);
-    if (!challenge) throw new ApiError(404, "not_found", "Resultados não encontrados.");
-    const participants = await client.query<{ display_name: string }>(
-      `SELECT u.display_name FROM challenge_participants cp JOIN users u ON u.id=cp.user_id
-        WHERE cp.challenge_id=$1 AND cp.removed_at IS NULL ORDER BY u.display_name`, [challenge.id]);
-    return {
-      challenge: {
-        id: challenge.id, title: challenge.title, description: challenge.description,
-        startsOn: challenge.start_date, endsOn: challenge.end_date,
-        participants: challenge.results_anon
-          ? participants.rows.map((_, index) => `Participante ${index + 1}`)
-          : participants.rows.map((participant) => participant.display_name),
-        result: await resultForChallenge(client, challenge.id),
-      },
-    };
+    const row = await oneOrNull<{ snapshot: unknown }>(
+      client,
+      `SELECT results_published_snapshot AS snapshot FROM challenges
+        WHERE result_share_token_hash=$1 AND results_published_at IS NOT NULL
+          AND status='closed' AND deleted_at IS NULL`,
+      [hash],
+    );
+    if (!row || !row.snapshot) throw new ApiError(404, "not_found", "Resultados não encontrados.");
+    return { challenge: row.snapshot as PublishedShowcase };
   });
 }

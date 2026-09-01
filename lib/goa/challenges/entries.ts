@@ -9,7 +9,7 @@ import {
   publicId,
   writeAudit,
 } from "../../goa-domain";
-import { ApiError } from "../../http";
+import { ApiError, stringValue } from "../../http";
 import {
   escapeCsvCell,
   type FieldDefinition,
@@ -180,7 +180,9 @@ export async function listEntries(session: SessionContext, challengeId: string) 
     const checkpointByDay = new Map(checkpoints.rows.map((checkpoint) => [checkpoint.day, checkpoint.id]));
     return result.rows.map((entry) => ({
       id: entry.id,
-      itemId: entry.item_id ?? entry.checkpoint_id ?? checkpointByDay.get(entry.occurred_on ?? "") ?? null,
+      // Item and checkpoint are independent axes — keep them distinct. The
+      // checkpoint still falls back to the entry's day for pre-orthogonal rows.
+      itemId: entry.item_id ?? null,
       checkpointId: entry.checkpoint_id ?? checkpointByDay.get(entry.occurred_on ?? "") ?? null,
       entryTypeId: entry.entry_type_id,
       participantId: entry.participant_user_id,
@@ -229,20 +231,26 @@ export async function saveEntry(
     // Day-keyed entries always need a date; a plain round entry may go without one.
     const dateOptional = cardinality !== "once_per_day" && cardinality !== "once_per_item_day";
 
-    if (effectiveSchedule !== "checkpoint") {
+    // Target axis — which round item the entry points at. Fully independent of the
+    // schedule axis below: a session-bound cine round is "filme X na sessão Y", so
+    // one entry can carry both `item_id` and `checkpoint_id`.
+    if (targetPolicy !== "none") {
       const requestedItemId =
         typeof body.itemId === "string" && body.itemId ? body.itemId : null;
       if (targetPolicy === "required" && !requestedItemId) {
         throw new ApiError(400, "missing_item", "Selecione um item.");
       }
-      // The round item is type-agnostic: expectation and rating both point at it.
-      if (targetPolicy !== "none" && requestedItemId) {
+      if (requestedItemId) {
         const item = await oneOrNull<{ id: string }>(client,
           "SELECT id FROM challenge_items WHERE id=$1 AND challenge_id=$2 AND archived_at IS NULL",
           [requestedItemId, challengeId]);
         if (!item) throw new ApiError(400, "invalid_item", "Item não pertence ao desafio.");
         itemId = item.id;
       }
+    }
+
+    // Schedule axis — a free/period date, or a dated checkpoint (session).
+    if (effectiveSchedule !== "checkpoint") {
       occurredOn = dateOptional && (body.occurredOn === null || body.occurredOn === "")
         ? null
         : typeof body.occurredOn === "string" && body.occurredOn
@@ -255,8 +263,15 @@ export async function saveEntry(
       }
     } else {
       const requestedDay = typeof body.occurredOn === "string" ? dateString(body.occurredOn, "Data") : null;
-      const requestedCheckpointId = typeof body.itemId === "string" || typeof body.checkpointId === "string"
-        ? String(body.itemId ?? body.checkpointId) : null;
+      // Only a type with no round item overloads `body.itemId` as the checkpoint
+      // id — that is how the pre-orthogonal clients addressed a daily round. When
+      // the type also targets an item, the session comes from `body.checkpointId`.
+      const requestedCheckpointId =
+        typeof body.checkpointId === "string" && body.checkpointId
+          ? body.checkpointId
+          : targetPolicy === "none" && typeof body.itemId === "string" && body.itemId
+            ? body.itemId
+            : null;
       const checkpoint = requestedCheckpointId
         ? await oneOrNull<{ id: string; day: string; starts_at: Date }>(client,
             `SELECT id,(starts_at AT TIME ZONE 'America/Sao_Paulo')::date::text AS day,starts_at
@@ -332,11 +347,13 @@ export async function saveEntry(
     }
     const normalized = await writeEntryValues(client, entryId, challengeId, entryType.id, fields, body.values);
     if (access.canManage && participantId !== session.user.id) {
+      // Audit rows are metadata-only — the platform console reads them, so a
+      // participant's ratings and comments never land there. Field ids only.
       await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
-        existing ? "entry.corrected" : "entry.created_by_admin", "entry", entryId, null,
-        { participantId, values: normalized });
+        existing ? "entry.corrected" : "entry.created_by_admin", "entry", entryId, null, null,
+        { participantId, fields: Object.keys(normalized) });
     }
-    return { id: entryId, itemId, participantId, occurredOn, values: normalized, updated: Boolean(existing) };
+    return { id: entryId, itemId, checkpointId, participantId, occurredOn, values: normalized, updated: Boolean(existing) };
   });
 }
 
@@ -370,13 +387,20 @@ export async function updateEntry(
         throw new ApiError(409, "expectation_locked", "A expectativa trava depois que você avalia o filme.");
       }
     }
+    const reason = stringValue(body, "reason", { max: 500, optional: true }) ?? null;
     const fields = await storageFields(client, entry.challenge_id, entry.entry_type_id);
     const before = (await entryValues(client, [entryId])).get(entryId) ?? {};
     await client.query("DELETE FROM entry_values WHERE entry_id=$1", [entryId]);
     const values = await writeEntryValues(client, entryId, entry.challenge_id, entry.entry_type_id, fields, body.values);
     await client.query("UPDATE entries SET last_edited_by_user_id=$2,updated_at=now() WHERE id=$1", [entryId, session.user.id]);
-    if (canManage) await writeAudit(client, entry.group_id, entry.challenge_id, session.user.id,
-      "entry.corrected", "entry", entryId, before, values);
+    if (canManage) {
+      // Metadata only — which fields changed and why, never the values. The
+      // platform audit console must not surface participant content.
+      const changed = [...new Set([...Object.keys(before), ...Object.keys(values)])];
+      await writeAudit(client, entry.group_id, entry.challenge_id, session.user.id,
+        "entry.corrected", "entry", entryId, null, null,
+        { fields: changed, ...(reason ? { reason } : {}) });
+    }
     return { id: entryId, values };
   });
 }

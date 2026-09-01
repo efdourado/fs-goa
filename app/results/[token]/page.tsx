@@ -28,7 +28,7 @@ export default async function SharedResultsPage({ params }: { params: Promise<{ 
 
   const challenge = payload.challenge;
   const tm = await getTranslations("metrics");
-  const result = challenge.result as {
+  const result = challenge.result as unknown as {
     headline?: string | null;
     summary?: string | null;
     metrics?: Metric[];

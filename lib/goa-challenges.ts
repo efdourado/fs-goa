@@ -27,4 +27,6 @@ export {
   curateResults,
   metricsForChallenge,
   publicResults,
+  publishResults,
+  unpublishChallengeResults,
 } from "./goa/challenges/results";

@@ -37,6 +37,7 @@ import {
   listEntries,
   listTemplates,
   publicResults,
+  publishResults,
   saveEntry,
   saveChallengeFields,
   saveChallengeItems,
@@ -44,6 +45,7 @@ import {
   setChallengeTemplate,
   softDeleteChallenge,
   transitionChallenge,
+  unpublishChallengeResults,
   unpublishChallengeTemplate,
   updateChallenge,
   updateChallengeItem,
@@ -228,14 +230,15 @@ export async function POST(request: Request): Promise<Response> {
     if (path[0] === "templates" && path[2] === "duplicate" && path.length === 3) {
       return json(await duplicateTemplate(session, path[1], body), 201);
     }
-    if (path[0] === "challenges" && path[2] === "results" && path.length === 3) {
-      const result = await curateResults(session, path[1], body);
+    if (path[0] === "challenges" && path[2] === "results" && path[3] === "publish" && path.length === 4) {
+      const result = await publishResults(session, path[1], body);
       return json({
         ...result,
-        url: result.shareToken
-          ? `${new URL(request.url).origin}/results/${encodeURIComponent(result.shareToken)}`
-          : null,
+        url: `${new URL(request.url).origin}/results/${encodeURIComponent(result.shareToken)}`,
       });
+    }
+    if (path[0] === "challenges" && path[2] === "results" && path.length === 3) {
+      return json(await curateResults(session, path[1], body));
     }
     throw new ApiError(404, "not_found", "Rota não encontrada.");
   });
@@ -284,6 +287,9 @@ export async function DELETE(request: Request): Promise<Response> {
     }
     if (path[0] === "challenges" && path[2] === "template" && path.length === 3) {
       return json(await unpublishChallengeTemplate(session, path[1]));
+    }
+    if (path[0] === "challenges" && path[2] === "results" && path.length === 3) {
+      return json(await unpublishChallengeResults(session, path[1]));
     }
     if (path[0] === "challenges" && path.length === 2) {
       return json(await softDeleteChallenge(session, path[1]));
