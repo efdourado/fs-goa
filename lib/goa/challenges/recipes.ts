@@ -7,6 +7,7 @@ import type {
   SubmissionMode,
   TargetPolicy,
 } from "./entry-types";
+import type { MetricOperation } from "./types";
 
 /**
  * A recipe is the versioned blueprint of a challenge: which entry types it opens
@@ -30,12 +31,29 @@ export interface RecipeEntryType {
   primary?: boolean;
 }
 
+/**
+ * A default metric the recipe seeds so a fresh round produces a full showcase
+ * with zero config. `fieldKey` is a field's semantic key on any of the recipe's
+ * entry types (undefined for `count`/`completion_rate`).
+ */
+export interface RecipeMetric {
+  key: string;
+  label: string;
+  operation: MetricOperation;
+  fieldKey?: string;
+  groupBy?: "none" | "participant" | "item";
+  visibleDuring?: boolean;
+  visibleInResults?: boolean;
+  settings?: { minSample?: number; bayesPriorWeight?: number };
+}
+
 export interface Recipe {
   key: RecipeKey;
   version: number;
   catalogKind: "film" | "book" | null;
   scheduleMode: "none" | "period";
   entryTypes: RecipeEntryType[];
+  metrics: RecipeMetric[];
 }
 
 export type RecipeKey = "cine_free" | "cine_curated" | "reading_club" | "reading_daily";
@@ -133,6 +151,36 @@ const registroDiario: RecipeEntryType = {
   primary: true,
 };
 
+const completionMetric: RecipeMetric = {
+  key: "taxa_conclusao",
+  label: "Taxa de conclusão",
+  operation: "completion_rate",
+  visibleDuring: true,
+  visibleInResults: true,
+};
+
+const cineMetrics: RecipeMetric[] = [
+  { key: "media_nota", label: "Nota média", operation: "average", fieldKey: "nota", groupBy: "none" },
+  {
+    key: "ranking",
+    label: "Ranking dos filmes",
+    operation: "bayesian_average",
+    fieldKey: "nota",
+    groupBy: "item",
+    settings: { minSample: 3, bayesPriorWeight: 4 },
+  },
+  { key: "polarizacao", label: "Polarização por filme", operation: "spread", fieldKey: "nota", groupBy: "item", settings: { minSample: 2 } },
+  {
+    key: "vies_indicador",
+    label: "Viés do indicador",
+    operation: "indicator_bias",
+    fieldKey: "nota",
+    groupBy: "participant",
+    settings: { minSample: 1 },
+  },
+  completionMetric,
+];
+
 export const RECIPES: Record<RecipeKey, Recipe> = {
   cine_free: {
     key: "cine_free",
@@ -140,6 +188,7 @@ export const RECIPES: Record<RecipeKey, Recipe> = {
     catalogKind: "film",
     scheduleMode: "none",
     entryTypes: [avaliacao(true)],
+    metrics: cineMetrics,
   },
   cine_curated: {
     key: "cine_curated",
@@ -147,6 +196,18 @@ export const RECIPES: Record<RecipeKey, Recipe> = {
     catalogKind: "film",
     scheduleMode: "none",
     entryTypes: [expectativa, avaliacao(true)],
+    metrics: [
+      ...cineMetrics.slice(0, 4),
+      {
+        key: "surpresa",
+        label: "Surpresa × decepção",
+        operation: "surprise",
+        fieldKey: "nota",
+        groupBy: "item",
+        settings: { minSample: 2 },
+      },
+      completionMetric,
+    ],
   },
   reading_club: {
     key: "reading_club",
@@ -154,6 +215,19 @@ export const RECIPES: Record<RecipeKey, Recipe> = {
     catalogKind: "book",
     scheduleMode: "period",
     entryTypes: [progressoDia, conclusao, notaLivro],
+    metrics: [
+      { key: "paginas_total", label: "Páginas lidas", operation: "sum", fieldKey: "paginas", groupBy: "none" },
+      { key: "paginas_por_pessoa", label: "Páginas por pessoa", operation: "sum", fieldKey: "paginas", groupBy: "participant" },
+      {
+        key: "ranking",
+        label: "Ranking dos livros",
+        operation: "bayesian_average",
+        fieldKey: "nota",
+        groupBy: "item",
+        settings: { minSample: 3, bayesPriorWeight: 4 },
+      },
+      completionMetric,
+    ],
   },
   reading_daily: {
     key: "reading_daily",
@@ -161,6 +235,10 @@ export const RECIPES: Record<RecipeKey, Recipe> = {
     catalogKind: null,
     scheduleMode: "period",
     entryTypes: [registroDiario],
+    metrics: [
+      { key: "media_paginas", label: "Média de páginas", operation: "average", fieldKey: "paginas_lidas", groupBy: "none" },
+      completionMetric,
+    ],
   },
 };
 
@@ -221,6 +299,11 @@ export function resolveRecipe(body: Record<string, unknown>): Recipe {
         fields: defaultFields(template),
         primary: true,
       },
+    ],
+    // Back-compat: the fixed pair the app seeded before recipes existed.
+    metrics: [
+      { key: "media", label: "Média", operation: "average", fieldKey: "nota", groupBy: "none" },
+      completionMetric,
     ],
   };
 }

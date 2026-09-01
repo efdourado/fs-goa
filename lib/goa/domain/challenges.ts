@@ -75,7 +75,7 @@ export async function createChallenge(
 
     let primaryTypeId = "";
     let primaryFields: Array<{ id: string; kind: string; semanticKey: string }> = [];
-    let primaryFieldDefs: ClientField[] = [];
+    const fieldByKey = new Map<string, { id: string; kind: string; entryTypeId: string }>();
     for (const type of recipe.entryTypes) {
       const typeId = publicId();
       await client.query(
@@ -89,12 +89,15 @@ export async function createChallenge(
       const typeFields = type.primary && wizardFields ? wizardFields : type.fields;
       const inserted: Array<{ id: string; kind: string; semanticKey: string }> = [];
       for (let index = 0; index < typeFields.length; index += 1) {
-        inserted.push(await insertField(client, id, typeId, typeFields[index], index));
+        const field = await insertField(client, id, typeId, typeFields[index], index);
+        inserted.push(field);
+        if (!fieldByKey.has(field.semanticKey)) {
+          fieldByKey.set(field.semanticKey, { id: field.id, kind: field.kind, entryTypeId: typeId });
+        }
       }
       if (type.primary || !primaryTypeId) {
         primaryTypeId = typeId;
         primaryFields = inserted;
-        primaryFieldDefs = typeFields;
       }
     }
     const entryTypeId = primaryTypeId;
@@ -189,26 +192,42 @@ export async function createChallenge(
       );
     }
 
-    const numeric = insertedFields.find((field) => field.kind === "rating" || field.kind === "number");
-    if (numeric) {
+    // Seed the recipe's analysis metrics so a fresh round produces a full
+    // showcase with zero config. A metric with an unresolvable `fieldKey` (the
+    // wizard renamed the field away) falls back to the first numeric field.
+    const fallbackNumeric = insertedFields.find((field) => field.kind === "rating" || field.kind === "number");
+    let metricPosition = 0;
+    for (const recipeMetric of recipe.metrics) {
+      let fieldId: string | null = null;
+      let metricTypeId = entryTypeId;
+      if (recipeMetric.fieldKey) {
+        const resolved = fieldByKey.get(recipeMetric.fieldKey)
+          ?? (fallbackNumeric
+            ? { id: fallbackNumeric.id, kind: fallbackNumeric.kind, entryTypeId }
+            : null);
+        if (!resolved) continue;
+        fieldId = resolved.id;
+        metricTypeId = resolved.entryTypeId;
+      }
       await client.query(
         `INSERT INTO challenge_metrics
           (id, challenge_id, entry_type_id, field_id, semantic_key, label, operation,
            group_by, decimal_places, visible_during_challenge, position, settings,
            created_by_user_id, created_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,'average','none',2,true,0,'{}'::jsonb,$7,now(),now())`,
-        [publicId(), id, entryTypeId, numeric.id, `media_${numeric.semanticKey}`, `Média de ${primaryFieldDefs.find((field) => semanticKey(field.key, "") === numeric.semanticKey)?.label ?? "valores"}`, session.user.id],
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13,now(),now())`,
+        [publicId(), id, metricTypeId, fieldId,
+          semanticKey(recipeMetric.key, `metrica_${metricPosition}`), recipeMetric.label,
+          recipeMetric.operation, recipeMetric.groupBy ?? "none",
+          recipeMetric.operation === "completion_rate" ? 1 : 2,
+          recipeMetric.visibleDuring !== false, metricPosition,
+          JSON.stringify({
+            visibleInResults: recipeMetric.visibleInResults !== false,
+            ...recipeMetric.settings,
+          }),
+          session.user.id],
       );
+      metricPosition += 1;
     }
-    await client.query(
-      `INSERT INTO challenge_metrics
-        (id, challenge_id, entry_type_id, field_id, semantic_key, label, operation,
-         group_by, decimal_places, visible_during_challenge, position, settings,
-         created_by_user_id, created_at, updated_at)
-       VALUES ($1,$2,$3,NULL,'taxa_conclusao','Taxa de conclusão','completion_rate',
-               'none',1,true,1,'{}'::jsonb,$4,now(),now())`,
-      [publicId(), id, entryTypeId, session.user.id],
-    );
     await writeAudit(client, groupId, id, session.user.id, "challenge.created", "challenge", id, null, {
       title,
       template: body.template ?? null,
