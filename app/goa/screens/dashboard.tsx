@@ -73,7 +73,32 @@ export function DashboardScreen({
         </form>
       ) : null}
 
-      <section aria-labelledby="active-title">
+      <section aria-labelledby="groups-title">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 id="groups-title" className="text-xl font-semibold tracking-[-0.03em]">{t("groupsTitle")}</h2>
+          <span className="text-xs font-semibold text-[var(--muted)]">{t("groupsCount", { count: groups.length })}</span>
+        </div>
+        {groups.length ? (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {groups.map((group) => {
+              const count = group.memberCount ?? group.members?.length ?? 0;
+              return (
+                <button className={cx(cardClass, "cursor-pointer flex min-h-24 items-center justify-between gap-4 p-4 text-left transition hover:-translate-y-0.5 hover:border-[var(--main-line)]")} type="button" onClick={() => onOpenGroup(group.id)} key={group.id}>
+                  <span>
+                    {group.name}
+                    <small className="mt-1 block text-[var(--muted)]">
+                      {t("peopleCount", { count })} · {tr(group.role)}
+                    </small>
+                  </span>
+                  <span className="text-lg text-[var(--main-strong)]" aria-hidden="true">→</span>
+                </button>
+              );
+            })}
+          </div>
+        ) : <EmptyState title={t("noGroupsTitle")} description={t("noGroupsBody")} action={<Button onClick={() => setShowGroupForm(true)}>{t("createGroup")}</Button>} />}
+      </section>
+
+      <section className="mt-10" aria-labelledby="active-title">
         <div className="mb-4 flex items-center justify-between">
           <h2 id="active-title" className="text-xl font-semibold tracking-[-0.03em]">{t("challengesTitle")}</h2>
           <span className="text-xs font-semibold text-[var(--muted)]">{t("challengesCount", { count: active.length })}</span>
@@ -105,31 +130,6 @@ export function DashboardScreen({
         ) : (
           <EmptyState title={t("noChallengesTitle")} description={t("noChallengesBody")} />
         )}
-      </section>
-
-      <section className="mt-10" aria-labelledby="groups-title">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 id="groups-title" className="text-xl font-semibold tracking-[-0.03em]">{t("groupsTitle")}</h2>
-          <span className="text-xs font-semibold text-[var(--muted)]">{t("groupsCount", { count: groups.length })}</span>
-        </div>
-        {groups.length ? (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {groups.map((group) => {
-              const count = group.memberCount ?? group.members?.length ?? 0;
-              return (
-                <button className={cx(cardClass, "cursor-pointer flex min-h-24 items-center justify-between gap-4 p-4 text-left transition hover:-translate-y-0.5 hover:border-[var(--main-line)]")} type="button" onClick={() => onOpenGroup(group.id)} key={group.id}>
-                  <span>
-                    {group.name}
-                    <small className="mt-1 block text-[var(--muted)]">
-                      {t("peopleCount", { count })} · {tr(group.role)}
-                    </small>
-                  </span>
-                  <span className="text-lg text-[var(--main-strong)]" aria-hidden="true">→</span>
-                </button>
-              );
-            })}
-          </div>
-        ) : <EmptyState title={t("noGroupsTitle")} description={t("noGroupsBody")} action={<Button onClick={() => setShowGroupForm(true)}>{t("createGroup")}</Button>} />}
       </section>
 
       {other.length ? (

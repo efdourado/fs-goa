@@ -304,6 +304,8 @@
     "catalogSortTitle": "By title",
     "catalogSortRating": "By rating",
     "catalogRounds": "{count, plural, one {# round} other {# rounds}}",
+    "catalogShowAll": "See the full catalog ({count})",
+    "catalogShowLess": "Show less",
     "peopleTitle": "People",
     "membersUnavailable": "The member list will appear once the bootstrap provides it.",
     "pendingInvitesTitle": "Invitations awaiting a reply",

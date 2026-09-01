@@ -10,6 +10,9 @@ import type { CatalogItem, ChallengeSummary, GroupInviteResult, GroupSummary, Id
 import { backLinkClass, Button, cardClass, challengeStatusTone, ChallengeStatusBadge, cx, EmptyState, inputClass, labelClass, linkClass, PageHeading, StatusMessage } from "../ui";
 import { canManage, isChallengeScheduled } from "../utils";
 
+/** The group page shows only the head of the catalog; the rest is one tap away. */
+const CATALOG_PREVIEW_COUNT = 10;
+
 export function GroupScreen({
   group,
   challenges,
@@ -59,6 +62,7 @@ export function GroupScreen({
   const [memberSuccess, setMemberSuccess] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<CatalogItem[] | null>(null);
   const [catalogSort, setCatalogSort] = useState<"title" | "rating">("title");
+  const [catalogExpanded, setCatalogExpanded] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -73,6 +77,7 @@ export function GroupScreen({
       ? (b.ratingAvg ?? -1) - (a.ratingAvg ?? -1)
       : a.title.localeCompare(b.title),
   );
+  const visibleCatalog = catalogExpanded ? sortedCatalog : sortedCatalog.slice(0, CATALOG_PREVIEW_COUNT);
   const [groupBusy, setGroupBusy] = useState(false);
   const [groupError, setGroupError] = useState<string | null>(null);
   const [groupSuccess, setGroupSuccess] = useState<string | null>(null);
@@ -304,18 +309,26 @@ export function GroupScreen({
         </section>
         {sortedCatalog.length ? (
           <section>
-            <div className="mb-4 flex items-baseline justify-between gap-3">
+            <div className="mb-4 flex items-center justify-between gap-3">
               <h2 className="text-xl font-light tracking-[-0.03em]">{t("catalogTitle")}</h2>
-              <label className="text-xs text-[var(--muted)]">
-                <span className="sr-only">{t("catalogSortLabel")}</span>
-                <select className="bg-transparent" value={catalogSort} onChange={(event) => setCatalogSort(event.target.value as "title" | "rating")}>
+              <div className="relative">
+                <label htmlFor="catalog-sort" className="sr-only">{t("catalogSortLabel")}</label>
+                <select
+                  id="catalog-sort"
+                  className="min-h-9 cursor-pointer appearance-none rounded-full border border-[var(--line)] bg-[var(--paper)] py-1.5 pl-3.5 pr-9 text-xs text-[var(--ink)] outline-none transition hover:border-[var(--main-line)] focus:border-[var(--main)] focus:ring-4 focus:ring-[var(--main)]/15"
+                  value={catalogSort}
+                  onChange={(event) => setCatalogSort(event.target.value as "title" | "rating")}
+                >
                   <option value="title">{t("catalogSortTitle")}</option>
                   <option value="rating">{t("catalogSortRating")}</option>
                 </select>
-              </label>
+                <svg viewBox="0 0 16 16" aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 h-3 w-3 -translate-y-1/2 text-[var(--muted)]">
+                  <path d="M4 6.5 8 10l4-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
             </div>
             <ul className="divide-y divide-[var(--line)] rounded-2xl border border-[var(--line)] bg-[var(--paper)]">
-              {sortedCatalog.map((item) => (
+              {visibleCatalog.map((item) => (
                 <li key={item.id}>
                   <button
                     type="button"
@@ -335,6 +348,16 @@ export function GroupScreen({
                 </li>
               ))}
             </ul>
+            {sortedCatalog.length > CATALOG_PREVIEW_COUNT ? (
+              <button
+                type="button"
+                onClick={() => setCatalogExpanded((value) => !value)}
+                aria-expanded={catalogExpanded}
+                className="mt-3 min-h-10 w-full rounded-xl border border-[var(--line)] text-xs font-light text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)]"
+              >
+                {catalogExpanded ? t("catalogShowLess") : t("catalogShowAll", { count: sortedCatalog.length })}
+              </button>
+            ) : null}
           </section>
         ) : null}
         <section>
