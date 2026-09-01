@@ -34,6 +34,8 @@ export const challenges = pgTable(
       .$type<Array<{ title: string; description: string }>>()
       .notNull()
       .default(sql`'[]'::jsonb`),
+    recipeKey: text("recipe_key"),
+    recipeVersion: integer("recipe_version").notNull().default(1),
     startDate: date("start_date", { mode: "string" }),
     endDate: date("end_date", { mode: "string" }),
     timeZone: text("time_zone").notNull().default("UTC"),
@@ -90,6 +92,11 @@ export const challenges = pgTable(
     ),
     check("challenges_time_zone_check", sql`char_length(btrim(${table.timeZone})) between 1 and 100`),
     check("challenges_status_check", sql`${table.status} in ('draft', 'active', 'closed')`),
+    check(
+      "challenges_recipe_key_check",
+      sql`${table.recipeKey} is null or ${table.recipeKey} in ('cine_free', 'cine_curated', 'reading_club', 'reading_daily')`,
+    ),
+    check("challenges_recipe_version_check", sql`${table.recipeVersion} >= 1`),
     check(
       "challenges_status_timestamps_check",
       sql`(${table.status} = 'draft' and ${table.activatedAt} is null and ${table.closedAt} is null)

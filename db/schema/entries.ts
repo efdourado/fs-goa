@@ -20,7 +20,7 @@ import {
   entryTypes,
   fieldOptions,
 } from "./challenge-definition";
-import { challengeParticipants } from "./challenges";
+import { challengeCheckpoints, challengeParticipants } from "./challenges";
 import { timestamptz } from "./columns";
 
 export const entries = pgTable(
@@ -30,7 +30,11 @@ export const entries = pgTable(
     challengeId: text("challenge_id").notNull(),
     entryTypeId: text("entry_type_id").notNull(),
     submissionMode: text("submission_mode").notNull(),
+    // Denormalized from the entry type (like `submission_mode`) so the partial
+    // unique indexes below can key off it. Set once, at insert.
+    cardinality: text("cardinality"),
     itemId: text("item_id"),
+    checkpointId: text("checkpoint_id"),
     participantUserId: text("participant_user_id").notNull(),
     occurredOn: date("occurred_on", { mode: "string" }).notNull(),
     submittedAt: timestamptz("submitted_at").defaultNow().notNull(),
@@ -65,9 +69,21 @@ export const entries = pgTable(
       columns: [table.itemId, table.challengeId],
       foreignColumns: [challengeItems.id, challengeItems.challengeId],
     }).onDelete("restrict"),
+    foreignKey({
+      name: "entries_checkpoint_challenge_fk",
+      columns: [table.checkpointId, table.challengeId],
+      foreignColumns: [challengeCheckpoints.id, challengeCheckpoints.challengeId],
+    }).onDelete("restrict"),
     uniqueIndex("entries_one_active_item_response_uidx")
       .on(table.itemId, table.entryTypeId, table.participantUserId)
-      .where(sql`${table.itemId} is not null and ${table.deletedAt} is null`),
+      .where(
+        sql`${table.cardinality} = 'once_per_item' and ${table.itemId} is not null and ${table.deletedAt} is null`,
+      ),
+    uniqueIndex("entries_one_active_item_day_uidx")
+      .on(table.itemId, table.entryTypeId, table.participantUserId, table.occurredOn)
+      .where(
+        sql`${table.cardinality} = 'once_per_item_day' and ${table.itemId} is not null and ${table.deletedAt} is null`,
+      ),
     uniqueIndex("entries_one_active_daily_response_uidx")
       .on(
         table.challengeId,
@@ -75,7 +91,7 @@ export const entries = pgTable(
         table.participantUserId,
         table.occurredOn,
       )
-      .where(sql`${table.submissionMode} = 'daily' and ${table.deletedAt} is null`),
+      .where(sql`${table.cardinality} = 'once_per_day' and ${table.deletedAt} is null`),
     index("entries_participant_history_idx").on(
       table.challengeId,
       table.participantUserId,
@@ -84,9 +100,8 @@ export const entries = pgTable(
     index("entries_challenge_active_idx").on(table.challengeId, table.deletedAt),
     index("entries_item_active_idx").on(table.itemId, table.deletedAt),
     check(
-      "entries_item_mode_check",
-      sql`(${table.submissionMode} = 'item' and ${table.itemId} is not null)
-        or (${table.submissionMode} in ('daily', 'free') and ${table.itemId} is null)`,
+      "entries_item_target_check",
+      sql`${table.submissionMode} <> 'item' or ${table.itemId} is not null`,
     ),
     check(
       "entries_deleted_at_check",
