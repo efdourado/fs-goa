@@ -311,6 +311,44 @@ export async function catalogItemDetail(session: SessionContext, groupId: string
   });
 }
 
+/**
+ * Applies whichever of title/year/runtime/pages/genres the body actually sets,
+ * leaving the rest untouched. Shared by the catalog item's own PATCH route and
+ * by editing a challenge item's linked catalog entry from inside a challenge.
+ */
+export async function applyCatalogItemUpdate(
+  client: PoolClient,
+  catalogItemId: string,
+  groupId: string,
+  body: Record<string, unknown>,
+): Promise<void> {
+  const title = body.title === undefined ? undefined : stringValue(body, "title", { min: 1, max: 300 })!;
+  const attributes = readAttributes(body as CatalogAttributes);
+  const sets: string[] = [];
+  const params: unknown[] = [catalogItemId];
+  if (title !== undefined) {
+    params.push(title, normalizeTitle(title));
+    sets.push(`title = $${params.length - 1}`, `normalized_title = $${params.length}`);
+  }
+  for (const [column, value, key] of [
+    ["year", attributes.year, "year"],
+    ["runtime_minutes", attributes.runtimeMinutes, "runtimeMinutes"],
+    ["page_count", attributes.pageCount, "pageCount"],
+  ] as const) {
+    if (Object.hasOwn(body, key)) {
+      params.push(value);
+      sets.push(`${column} = $${params.length}`);
+    }
+  }
+  if (sets.length) {
+    await client.query(`UPDATE catalog_items SET ${sets.join(", ")}, updated_at = now() WHERE id = $1`, params);
+  }
+  if (Object.hasOwn(body, "genres")) {
+    const tagIds = await resolveTags(client, groupId, "genre", body.genres);
+    await setCatalogItemTags(client, catalogItemId, tagIds);
+  }
+}
+
 export async function updateCatalogItem(
   session: SessionContext,
   catalogItemId: string,
@@ -324,32 +362,7 @@ export async function updateCatalogItem(
     );
     if (!item) throw new ApiError(404, "not_found", "Item do acervo não encontrado.");
     await requireGroupRole(session.user.id, item.group_id, ["owner", "admin"], client);
-
-    const title = body.title === undefined ? undefined : stringValue(body, "title", { min: 1, max: 300 })!;
-    const attributes = readAttributes(body as CatalogAttributes);
-    const sets: string[] = [];
-    const params: unknown[] = [catalogItemId];
-    if (title !== undefined) {
-      params.push(title, normalizeTitle(title));
-      sets.push(`title = $${params.length - 1}`, `normalized_title = $${params.length}`);
-    }
-    for (const [column, value] of [
-      ["year", attributes.year],
-      ["runtime_minutes", attributes.runtimeMinutes],
-      ["page_count", attributes.pageCount],
-    ] as const) {
-      if (Object.hasOwn(body, column) || (column === "runtime_minutes" && Object.hasOwn(body, "runtimeMinutes")) || (column === "page_count" && Object.hasOwn(body, "pageCount"))) {
-        params.push(value);
-        sets.push(`${column} = $${params.length}`);
-      }
-    }
-    if (sets.length) {
-      await client.query(`UPDATE catalog_items SET ${sets.join(", ")}, updated_at = now() WHERE id = $1`, params);
-    }
-    if (Object.hasOwn(body, "genres")) {
-      const tagIds = await resolveTags(client, item.group_id, "genre", body.genres);
-      await setCatalogItemTags(client, catalogItemId, tagIds);
-    }
+    await applyCatalogItemUpdate(client, catalogItemId, item.group_id, body);
     return { id: catalogItemId };
   });
 }

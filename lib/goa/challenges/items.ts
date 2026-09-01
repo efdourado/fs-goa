@@ -12,6 +12,7 @@ import {
 } from "../../goa-domain";
 import { ApiError, stringValue } from "../../http";
 import {
+  applyCatalogItemUpdate,
   assertCatalogItemInGroup,
   resolveTags,
   setCatalogItemTags,
@@ -240,9 +241,11 @@ export async function updateChallengeItem(
       return { id: itemId, title, description };
     }
 
-    const current = await oneOrNull<{ title: string; description: string | null; recommended_by_user_id: string | null }>(
+    const current = await oneOrNull<{
+      title: string; description: string | null; recommended_by_user_id: string | null; catalog_item_id: string | null;
+    }>(
       client,
-      `SELECT title, description, recommended_by_user_id
+      `SELECT title, description, recommended_by_user_id, catalog_item_id
          FROM challenge_items
         WHERE id = $1 AND challenge_id = $2 AND archived_at IS NULL
         FOR UPDATE`,
@@ -275,6 +278,14 @@ export async function updateChallengeItem(
           WHERE id = $1 AND challenge_id = $2`,
         [itemId, challengeId, title, description, recommendedBy],
       );
+      // Ano, duração/páginas e gêneros vivem no item do acervo compartilhado, não
+      // no item do desafio — atualizá-los aqui é o que deixa "esqueci de preencher
+      // na criação" corrigível depois, sem duplicar a lógica de `updateCatalogItem`.
+      if (current.catalog_item_id
+        && (Object.hasOwn(body, "year") || Object.hasOwn(body, "runtimeMinutes")
+          || Object.hasOwn(body, "pageCount") || Object.hasOwn(body, "genres"))) {
+        await applyCatalogItemUpdate(client, current.catalog_item_id, access.challenge.group_id, body);
+      }
       await writeAudit(
         client,
         access.challenge.group_id,

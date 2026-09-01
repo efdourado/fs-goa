@@ -38,11 +38,12 @@ export async function getChallengeDetail(session: SessionContext, challengeId: s
         id: string; title: string; description: string | null;
         position: number; opens_at: Date | null; due_at: Date | null;
         catalog_item_id: string | null; catalog_title: string | null; catalog_year: number | null;
-        catalog_runtime: number | null; recommended_by_id: string | null; recommended_by_name: string | null;
+        catalog_runtime: number | null; catalog_pages: number | null;
+        recommended_by_id: string | null; recommended_by_name: string | null;
       }>(
         `SELECT i.id, i.title, i.description, i.position, i.opens_at, i.due_at,
                 i.catalog_item_id, ci.title AS catalog_title, ci.year AS catalog_year,
-                ci.runtime_minutes AS catalog_runtime,
+                ci.runtime_minutes AS catalog_runtime, ci.page_count AS catalog_pages,
                 i.recommended_by_user_id AS recommended_by_id, ru.display_name AS recommended_by_name
            FROM challenge_items i
            LEFT JOIN catalog_items ci ON ci.id = i.catalog_item_id
@@ -131,6 +132,7 @@ export async function getChallengeDetail(session: SessionContext, challengeId: s
                 title: item.catalog_title ?? item.title,
                 year: item.catalog_year,
                 runtimeMinutes: item.catalog_runtime,
+                pageCount: item.catalog_pages,
                 genres: genresByCatalog.get(item.catalog_item_id) ?? [],
               }
             : null,
