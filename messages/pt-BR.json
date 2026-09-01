@@ -304,6 +304,8 @@
     "catalogSortTitle": "Por título",
     "catalogSortRating": "Por nota",
     "catalogRounds": "{count, plural, one {# rodada} other {# rodadas}}",
+    "catalogShowAll": "Ver acervo completo ({count})",
+    "catalogShowLess": "Ver menos",
     "peopleTitle": "Pessoas",
     "membersUnavailable": "A lista de membros aparecerá quando o bootstrap a disponibilizar.",
     "pendingInvitesTitle": "Convites aguardando resposta",
