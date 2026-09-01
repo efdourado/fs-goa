@@ -117,26 +117,20 @@ const progressoDia: RecipeEntryType = {
   primary: true,
 };
 
+// "Terminei o livro" — the entry existing means done; nota and comentário are
+// optional and can come later (fact first, opinion later).
 const conclusao: RecipeEntryType = {
   semanticKey: "conclusao",
-  name: "Conclusão",
+  name: "Terminei",
   purpose: "completion",
   submissionMode: "item",
   targetPolicy: "required",
   cardinality: "once_per_item",
   schedulePolicy: "while_active",
-  fields: [{ key: "concluido", label: "Livro concluído?", type: "boolean", required: true }],
-};
-
-const notaLivro: RecipeEntryType = {
-  semanticKey: "avaliacao",
-  name: "Avaliação",
-  purpose: "rating",
-  submissionMode: "item",
-  targetPolicy: "required",
-  cardinality: "once_per_item",
-  schedulePolicy: "while_active",
-  fields: ratingFields(500),
+  fields: [
+    { key: "nota", label: "Nota", type: "rating", required: false, config: { min: 0, max: 5, step: 0.5 } },
+    { key: "comentario", label: "Comentário", type: "text", required: false, config: { multiline: true, maxLength: 500 } },
+  ],
 };
 
 const registroDiario: RecipeEntryType = {
@@ -211,10 +205,10 @@ export const RECIPES: Record<RecipeKey, Recipe> = {
   },
   reading_club: {
     key: "reading_club",
-    version: 1,
+    version: 2,
     catalogKind: "book",
     scheduleMode: "period",
-    entryTypes: [progressoDia, conclusao, notaLivro],
+    entryTypes: [progressoDia, conclusao],
     metrics: [
       { key: "paginas_total", label: "Páginas lidas", operation: "sum", fieldKey: "paginas", groupBy: "none" },
       { key: "paginas_por_pessoa", label: "Páginas por pessoa", operation: "sum", fieldKey: "paginas", groupBy: "participant" },

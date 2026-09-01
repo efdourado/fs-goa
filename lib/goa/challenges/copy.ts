@@ -38,8 +38,9 @@ export async function copyChallengeStructure(
   const sourceTypes = await client.query<{
     id: string; semantic_key: string; name: string; description: string | null; submission_mode: string;
     purpose: string | null; target_policy: string | null; cardinality: string | null; schedule_policy: string | null;
+    is_primary: boolean;
   }>(
-    `SELECT id,semantic_key,name,description,submission_mode,purpose,target_policy,cardinality,schedule_policy
+    `SELECT id,semantic_key,name,description,submission_mode,purpose,target_policy,cardinality,schedule_policy,is_primary
        FROM entry_types WHERE challenge_id=$1 AND archived_at IS NULL ORDER BY created_at`,
     [sourceChallengeId]);
   for (const source of sourceTypes.rows) {
@@ -47,10 +48,10 @@ export async function copyChallengeStructure(
     typeMap.set(source.id, id);
     await client.query(
       `INSERT INTO entry_types
-        (id,challenge_id,semantic_key,name,description,submission_mode,purpose,target_policy,cardinality,schedule_policy,created_at,updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now(),now())`,
+        (id,challenge_id,semantic_key,name,description,submission_mode,purpose,target_policy,cardinality,schedule_policy,is_primary,created_at,updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,now(),now())`,
       [id, targetId, source.semantic_key, source.name, source.description, source.submission_mode,
-        source.purpose, source.target_policy, source.cardinality, source.schedule_policy],
+        source.purpose, source.target_policy, source.cardinality, source.schedule_policy, source.is_primary],
     );
   }
 

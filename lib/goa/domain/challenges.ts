@@ -74,18 +74,23 @@ export async function createChallenge(
     );
 
     let primaryTypeId = "";
+    let completionTypeId = "";
     let primaryFields: Array<{ id: string; kind: string; semanticKey: string }> = [];
     const fieldByKey = new Map<string, { id: string; kind: string; entryTypeId: string }>();
-    for (const type of recipe.entryTypes) {
+    const hasExplicitPrimary = recipe.entryTypes.some((type) => type.primary);
+    for (let typeIndex = 0; typeIndex < recipe.entryTypes.length; typeIndex += 1) {
+      const type = recipe.entryTypes[typeIndex];
       const typeId = publicId();
+      const isPrimary = hasExplicitPrimary ? type.primary === true : typeIndex === 0;
       await client.query(
         `INSERT INTO entry_types
           (id, challenge_id, semantic_key, name, submission_mode, purpose, target_policy, cardinality, schedule_policy,
-           created_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,now(),now())`,
+           is_primary, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now(),now())`,
         [typeId, id, type.semanticKey, type.name, type.submissionMode, type.purpose,
-          type.targetPolicy, type.cardinality, type.schedulePolicy],
+          type.targetPolicy, type.cardinality, type.schedulePolicy, isPrimary],
       );
+      if (type.purpose === "completion") completionTypeId = typeId;
       const typeFields = type.primary && wizardFields ? wizardFields : type.fields;
       const inserted: Array<{ id: string; kind: string; semanticKey: string }> = [];
       for (let index = 0; index < typeFields.length; index += 1) {
@@ -95,7 +100,7 @@ export async function createChallenge(
           fieldByKey.set(field.semanticKey, { id: field.id, kind: field.kind, entryTypeId: typeId });
         }
       }
-      if (type.primary || !primaryTypeId) {
+      if (isPrimary || !primaryTypeId) {
         primaryTypeId = typeId;
         primaryFields = inserted;
       }
@@ -199,7 +204,11 @@ export async function createChallenge(
     let metricPosition = 0;
     for (const recipeMetric of recipe.metrics) {
       let fieldId: string | null = null;
-      let metricTypeId = entryTypeId;
+      // Completion rate counts the "done" signal — a dedicated completion type
+      // when the recipe has one, otherwise the primary type.
+      let metricTypeId = recipeMetric.operation === "completion_rate" && completionTypeId
+        ? completionTypeId
+        : entryTypeId;
       if (recipeMetric.fieldKey) {
         const resolved = fieldByKey.get(recipeMetric.fieldKey)
           ?? (fallbackNumeric

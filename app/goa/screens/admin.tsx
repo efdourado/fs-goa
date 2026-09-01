@@ -83,8 +83,11 @@ function AdminOverview({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const doneEntries = challenge.completionEntryTypeId
+    ? entries.filter((entry) => entry.entryTypeId === challenge.completionEntryTypeId)
+    : entries;
   const expected = challenge.items.length * challenge.participants.length;
-  const missing = Math.max(0, expected - entries.length);
+  const missing = Math.max(0, expected - doneEntries.length);
   const scheduled = isChallengeScheduled(challenge.status, challenge.startsOn, challenge.submissionMode);
 
   async function run(label: string, action: () => Promise<void>, successText: string) {
@@ -463,11 +466,14 @@ function AdminReview({
     && challenge.entryTypes.find((type) => type.id === selected.entryTypeId)?.fields)
     || challenge.fields;
   const expected = challenge.items.length * challenge.participants.length;
+  const doneCount = challenge.completionEntryTypeId
+    ? entries.filter((entry) => entry.entryTypeId === challenge.completionEntryTypeId).length
+    : entries.length;
 
   return (
     <div className="space-y-6">
       <section className={cx(cardClass, "p-5 sm:p-7")}>
-        <PageHeading title={t("reviewTitle")} description={t("reviewSummary", { sent: entries.length, pending: Math.max(0, expected - entries.length), late: entries.filter((entry) => entry.isLate).length })} action={<Button variant="secondary" disabled={exporting} onClick={() => { setExporting(true); setError(null); onExport().catch((cause: unknown) => setError(f.error(cause))).finally(() => setExporting(false)); }}>{exporting ? t("preparing") : t("exportCsv")}</Button>} />
+        <PageHeading title={t("reviewTitle")} description={t("reviewSummary", { sent: entries.length, pending: Math.max(0, expected - doneCount), late: entries.filter((entry) => entry.isLate).length })} action={<Button variant="secondary" disabled={exporting} onClick={() => { setExporting(true); setError(null); onExport().catch((cause: unknown) => setError(f.error(cause))).finally(() => setExporting(false)); }}>{exporting ? t("preparing") : t("exportCsv")}</Button>} />
         <div className="mb-5 grid gap-3 sm:grid-cols-[1fr_auto]">
           <label><span className="sr-only">{t("searchEntries")}</span><input className={inputClass} type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("searchPlaceholder")} /></label>
           <label className="flex min-h-12 items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4 text-sm font-semibold"><input type="checkbox" checked={lateOnly} onChange={(event) => setLateOnly(event.target.checked)} />{t("lateOnly")}</label>
@@ -478,10 +484,12 @@ function AdminReview({
             {filtered.map((entry) => {
               const item = challenge.items.find((candidate) => candidate.id === itemIdForEntry(entry));
               const values = valuesAsRecord(entry.values);
+              const type = challenge.entryTypes.find((candidate) => candidate.id === entry.entryTypeId);
+              const entryFields = type?.fields ?? challenge.fields;
               return (
                 <article className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-4" key={entry.id}>
-                  <div className="flex items-start justify-between gap-3"><div><strong className="block">{entry.participantName ?? entry.participantUsername ?? t("participantFallback")}</strong><span className="mt-1 block text-xs text-[var(--muted)]">{item?.title ?? t("freeEntry")} · {f.dateTime(entry.submittedAt ?? entry.updatedAt)}</span></div>{entry.isLate ? <span className="rounded-full bg-[var(--warn-soft)] px-2 py-1 text-[10px] font-light uppercase text-[var(--warn)]">{t("late")}</span> : null}</div>
-                  <dl className="mt-4 grid gap-2 sm:grid-cols-2">{challenge.fields.slice(0, 4).map((field) => field.id && values[field.id] !== undefined ? <div className="rounded-lg bg-[var(--wash)] px-3 py-2" key={field.id}><dt className="text-[10px] font-light uppercase text-[var(--muted)]">{field.label}</dt><dd className="mt-1 truncate text-sm font-semibold">{typeof values[field.id] === "boolean" ? values[field.id] ? tc("yes") : tc("no") : String(values[field.id])}</dd></div> : null)}</dl>
+                  <div className="flex items-start justify-between gap-3"><div><strong className="block">{entry.participantName ?? entry.participantUsername ?? t("participantFallback")}</strong><span className="mt-1 block text-xs text-[var(--muted)]">{[item?.title ?? t("freeEntry"), type && challenge.entryTypes.length > 1 ? type.name : null, f.dateTime(entry.submittedAt ?? entry.updatedAt)].filter(Boolean).join(" · ")}</span></div>{entry.isLate ? <span className="rounded-full bg-[var(--warn-soft)] px-2 py-1 text-[10px] font-light uppercase text-[var(--warn)]">{t("late")}</span> : null}</div>
+                  <dl className="mt-4 grid gap-2 sm:grid-cols-2">{entryFields.slice(0, 4).map((field) => field.id && values[field.id] !== undefined ? <div className="rounded-lg bg-[var(--wash)] px-3 py-2" key={field.id}><dt className="text-[10px] font-light uppercase text-[var(--muted)]">{field.label}</dt><dd className="mt-1 truncate text-sm font-semibold">{typeof values[field.id] === "boolean" ? values[field.id] ? tc("yes") : tc("no") : String(values[field.id])}</dd></div> : null)}</dl>
                   <Button className="mt-4 w-full" variant="secondary" onClick={() => { setSelectedId(entry.id); setReason(""); }}>{t("inspect")}</Button>
                 </article>
               );

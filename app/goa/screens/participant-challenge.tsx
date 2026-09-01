@@ -289,6 +289,11 @@ export function ParticipantChallengeScreen({
   const f = useGoaFormat();
   const longDate: Intl.DateTimeFormatOptions = { day: "2-digit", month: "long", year: "numeric" };
   const ownEntries = entries.filter((entry) => !entry.userId || entry.userId === user.id);
+  // Progress counts only the "done" signal — an expectation or a mid-round
+  // progress note isn't a completion.
+  const doneEntries = challenge.completionEntryTypeId
+    ? ownEntries.filter((entry) => entry.entryTypeId === challenge.completionEntryTypeId)
+    : ownEntries;
   const entriesByItem = useMemo(() => new Map(ownEntries.map((entry) => [itemIdForEntry(entry), entry])), [ownEntries]);
   const sortedItems = useMemo(() => [...challenge.items].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)), [challenge.items]);
   const undatedDaily = challenge.submissionMode === "daily" && !challenge.startsOn && !challenge.endsOn;
@@ -306,7 +311,7 @@ export function ParticipantChallengeScreen({
     : selectedItem
       ? entriesByItem.get(selectedItem.id)
       : ownEntries.find((entry) => !itemIdForEntry(entry));
-  const completion = sortedItems.length ? Math.round((ownEntries.length / sortedItems.length) * 100) : 0;
+  const completion = sortedItems.length ? Math.min(100, Math.round((doneEntries.length / sortedItems.length) * 100)) : 0;
   const scheduled = isChallengeScheduled(challenge.status, challenge.startsOn, challenge.submissionMode);
   const ruleSections = useMemo(
     () => visibleRuleSections(challenge.ruleSections, challenge.rules, trules("legacyTitle")),
@@ -337,7 +342,7 @@ export function ParticipantChallengeScreen({
           <h1 className="mt-10 max-w-3xl text-4xl font-semibold leading-none tracking-[-0.055em] sm:text-6xl">{challenge.title}</h1>
           {challenge.description ? <p className="mt-4 max-w-2xl text-sm leading-6 text-white/70">{challenge.description}</p> : null}
           {challenge.meetingUrl ? <a className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl bg-white/15 px-4 text-sm font-light text-white hover:bg-white/25" href={challenge.meetingUrl} target="_blank" rel="noreferrer"><span aria-hidden="true">↗</span>{t("joinMeeting")}</a> : null}
-          {sortedItems.length ? <div className="mt-8 max-w-2xl"><div className="mb-2 flex justify-between text-xs text-white/70"><span>{t.rich("entriesProgress", { done: ownEntries.length, total: sortedItems.length, b: (chunks) => <strong className="text-white">{chunks}</strong> })}</span><span>{completion}%</span></div><div className="h-2 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-[var(--main-2)]" style={{ width: `${Math.min(100, completion)}%` }} /></div></div> : null}
+          {sortedItems.length ? <div className="mt-8 max-w-2xl"><div className="mb-2 flex justify-between text-xs text-white/70"><span>{t.rich("entriesProgress", { done: Math.min(doneEntries.length, sortedItems.length), total: sortedItems.length, b: (chunks) => <strong className="text-white">{chunks}</strong> })}</span><span>{completion}%</span></div><div className="h-2 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-[var(--main-2)]" style={{ width: `${Math.min(100, completion)}%` }} /></div></div> : null}
         </div>
         <span className="absolute -right-28 -top-36 h-96 w-96 rounded-full border border-white/10" aria-hidden="true" />
       </section>
@@ -372,13 +377,13 @@ export function ParticipantChallengeScreen({
               )}
             </section>
             <aside className="space-y-5">
-              {sortedItems.length > 1 ? <section className={cx(cardClass, "p-5")}><h2 className="text-base font-light">{t("checkpointsTitle")}</h2><label className="mt-3 block"><span className="sr-only">{t("chooseCheckpoint")}</span><select className={inputClass} value={selectedItem?.id ?? ""} onChange={(event) => setSelectedItemId(event.target.value)}>{sortedItems.map((item, index) => <option value={item.id} key={item.id} disabled={item.status === "scheduled" && !entriesByItem.has(item.id)}>{entriesByItem.has(item.id) ? t("checkpointDone") : ""}{t("checkpointOption", { index: index + 1, title: item.title })}{item.status === "scheduled" ? t("checkpointSoon") : ""}</option>)}</select></label><ul className="mt-3 space-y-2 text-xs text-[var(--muted)]"><li>{t("checkpointTally", { done: ownEntries.length, pending: Math.max(0, sortedItems.length - ownEntries.length) })}</li></ul></section> : null}
+              {sortedItems.length > 1 ? <section className={cx(cardClass, "p-5")}><h2 className="text-base font-light">{t("checkpointsTitle")}</h2><label className="mt-3 block"><span className="sr-only">{t("chooseCheckpoint")}</span><select className={inputClass} value={selectedItem?.id ?? ""} onChange={(event) => setSelectedItemId(event.target.value)}>{sortedItems.map((item, index) => <option value={item.id} key={item.id} disabled={item.status === "scheduled" && !entriesByItem.has(item.id)}>{entriesByItem.has(item.id) ? t("checkpointDone") : ""}{t("checkpointOption", { index: index + 1, title: item.title })}{item.status === "scheduled" ? t("checkpointSoon") : ""}</option>)}</select></label><ul className="mt-3 space-y-2 text-xs text-[var(--muted)]"><li>{t("checkpointTally", { done: Math.min(doneEntries.length, sortedItems.length), pending: Math.max(0, sortedItems.length - doneEntries.length) })}</li></ul></section> : null}
             </aside>
           </div>
         ) : null}
 
         {tab === "history" ? (
-          <section className={cx(cardClass, "p-5 sm:p-7")}><PageHeading title={t("historyTitle")} description={t("historySubtitle")} />{ownEntries.length ? <ul className="divide-y divide-[var(--line)]">{[...ownEntries].sort((a, b) => String(b.occurredOn ?? b.submittedAt).localeCompare(String(a.occurredOn ?? a.submittedAt))).map((entry) => { const item = sortedItems.find((candidate) => candidate.id === itemIdForEntry(entry)); const values = valuesAsRecord(entry.values); return <li className="py-5" key={entry.id}><div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div><strong>{item?.title ?? (challenge.submissionMode === "daily" ? t("dailyCheckIn") : t("freeEntry"))}</strong><p className="mt-1 text-xs text-[var(--muted)]">{entry.occurredOn ? t("occurredOnPrefix", { date: f.date(entry.occurredOn, longDate) }) : ""}{t("savedAt", { date: f.dateTime(entry.submittedAt ?? entry.updatedAt) })}{entry.isLate ? t("lateSuffix") : ""}</p></div><dl className="grid gap-2 text-sm sm:grid-cols-2">{challenge.fields.map((field) => field.id && values[field.id] !== undefined ? <div className="rounded-lg bg-[var(--wash)] px-3 py-2" key={field.id}><dt className="text-[10px] font-light uppercase text-[var(--muted)]">{field.label}</dt><dd className="mt-1 font-semibold">{typeof values[field.id] === "boolean" ? values[field.id] ? tc("yes") : tc("no") : String(values[field.id])}</dd></div> : null)}</dl></div></li>; })}</ul> : <EmptyState title={t("noHistoryTitle")} description={t("noHistoryBody")} />}</section>
+          <section className={cx(cardClass, "p-5 sm:p-7")}><PageHeading title={t("historyTitle")} description={t("historySubtitle")} />{ownEntries.length ? <ul className="divide-y divide-[var(--line)]">{[...ownEntries].sort((a, b) => String(b.occurredOn ?? b.submittedAt).localeCompare(String(a.occurredOn ?? a.submittedAt))).map((entry) => { const item = sortedItems.find((candidate) => candidate.id === itemIdForEntry(entry)); const values = valuesAsRecord(entry.values); const type = challenge.entryTypes.find((candidate) => candidate.id === entry.entryTypeId); const entryFields = type?.fields ?? challenge.fields; return <li className="py-5" key={entry.id}><div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div><strong>{item?.title ?? (challenge.submissionMode === "daily" ? t("dailyCheckIn") : t("freeEntry"))}</strong>{type && challenge.entryTypes.length > 1 ? <span className="ml-2 rounded-full bg-[var(--wash)] px-2 py-0.5 text-[10px] font-light uppercase text-[var(--muted)]">{type.name}</span> : null}<p className="mt-1 text-xs text-[var(--muted)]">{entry.occurredOn ? t("occurredOnPrefix", { date: f.date(entry.occurredOn, longDate) }) : ""}{t("savedAt", { date: f.dateTime(entry.submittedAt ?? entry.updatedAt) })}{entry.isLate ? t("lateSuffix") : ""}</p></div><dl className="grid gap-2 text-sm sm:grid-cols-2">{entryFields.map((field) => field.id && values[field.id] !== undefined ? <div className="rounded-lg bg-[var(--wash)] px-3 py-2" key={field.id}><dt className="text-[10px] font-light uppercase text-[var(--muted)]">{field.label}</dt><dd className="mt-1 font-semibold">{typeof values[field.id] === "boolean" ? values[field.id] ? tc("yes") : tc("no") : String(values[field.id])}</dd></div> : null)}</dl></div></li>; })}</ul> : <EmptyState title={t("noHistoryTitle")} description={t("noHistoryBody")} />}</section>
         ) : null}
 
         {tab === "progress" ? (

@@ -132,6 +132,8 @@ export interface EntryTypeView {
   cardinality: Cardinality;
   schedulePolicy: SchedulePolicy;
   isPrimary: boolean;
+  /** Its entries are the "done" signal for progress counters and completion rate. */
+  countsCompletion?: boolean;
   fields: ChallengeField[];
 }
 
@@ -226,6 +228,7 @@ export interface ChallengeSummary {
   template?: Template | null;
   recipeKey?: RecipeKey | null;
   submissionMode?: SubmissionMode;
+  completionEntryTypeId?: Id | null;
   viewerRole?: Role;
   isParticipant?: boolean;
   completedCount?: number;
