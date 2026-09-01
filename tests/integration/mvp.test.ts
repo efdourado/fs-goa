@@ -391,6 +391,18 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
   assert.equal(showcase.response.status, 200, JSON.stringify(showcase.body));
   assert.match(JSON.stringify(showcase.body), /Duas histórias na tela/);
 
+  // anonimização: republica com a opção ligada e os nomes somem da vitrine pública
+  await call("POST", `/api/challenges/${challengeId}/results`, {
+    session: owner,
+    body: { headline: "Duas histórias na tela", summary: "x", metricIds: [], comments: [], anonymizeParticipants: true },
+  });
+  const anonToken = ((await call("POST", `/api/challenges/${challengeId}/results`, {
+    session: owner, body: { headline: "h", summary: "s", metricIds: [], comments: [], anonymizeParticipants: true },
+  })).body as { shareToken: string }).shareToken;
+  const anon = await call("GET", `/api/results/${anonToken}`);
+  const anonParticipants = (anon.body as { challenge: { participants: string[] } }).challenge.participants;
+  assert.ok(anonParticipants.every((name) => /^Participante \d+$/.test(name)), JSON.stringify(anonParticipants));
+
   const crossGroupDuplicate = await call("POST", `/api/challenges/${challengeId}/duplicate`, {
     session: owner, body: { title: "Cópia fora do grupo", targetGroupId: outsiderGroupId },
   });

@@ -626,6 +626,8 @@
     "saveResults": "Save showcase",
     "regenerateShowcase": "Regenerate showcase",
     "regenerateHint": "Rebuilds the blocks from the current data (headline, metrics, best comments). Your manual curation is replaced.",
+    "anonymizeParticipants": "Anonymize participants on the public page",
+    "anonymizeHint": "On the public showcase (/results) names become Participant 1, 2… In-group views keep real names.",
     "showcaseRegenerated": "Showcase regenerated.",
     "previewTitle": "How the group will see it",
     "previewSubtitle": "Preview of the showcase with the current curation.",

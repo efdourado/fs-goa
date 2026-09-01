@@ -158,6 +158,7 @@ export async function getChallengeDetail(session: SessionContext, challengeId: s
       status: access.challenge.status,
       meetingUrl: access.challenge.meeting_url,
       recipeKey: access.challenge.recipe_key ?? null,
+      resultsAnon: access.challenge.results_anon,
       submissionMode,
       completionEntryTypeId,
       viewerRole: access.challenge.role,
