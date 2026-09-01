@@ -104,6 +104,9 @@ export function AuthScreen({
           ) : null}
           <h2 className="mt-2 text-3xl font-light tracking-[-0.045em]">{heading}</h2>
           <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{subheading}</p>
+          {mode !== "forgot" ? (
+            <p className="mt-3 rounded-xl bg-[var(--wash)] px-4 py-3 text-xs leading-5 text-[var(--muted)]">{t("reassure")}</p>
+          ) : null}
 
           {mode === "forgot" && forgotSent ? (
             <div className="mt-6 space-y-4">
@@ -176,6 +179,7 @@ export function AuthScreen({
           </p>
           {onShowTemplates ? (
             <p className="mt-2 text-center text-sm text-[var(--muted)]">
+              {t("browseFirst")}
               <button className="min-h-11 font-light underline-offset-4 hover:underline cursor-pointer" type="button" onClick={onShowTemplates}>{t("showTemplates")}</button>
             </p>
           ) : null}

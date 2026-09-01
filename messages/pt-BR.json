@@ -217,7 +217,9 @@
     "goRegister": "Cadastre-se",
     "goLogin": "Entrar",
     "back": "Voltar",
-    "showTemplates": "Modelos prontos"
+    "reassure": "Pode criar a conta sem susto: somos um app novo e já tem um botão de apagar a conta nas configurações (rs). Testa à vontade.",
+    "browseFirst": "Quer espiar antes de decidir? ",
+    "showTemplates": "Ver os modelos prontos"
   },
   "dashboard": {
     "greeting": "Olá, {name}.",

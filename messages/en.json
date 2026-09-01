@@ -217,7 +217,9 @@
     "goRegister": "Sign up",
     "goLogin": "Sign in",
     "back": "Back",
-    "showTemplates": "Ready-made templates"
+    "reassure": "Go ahead and create an account — we're a new app and there's already a delete-account button in settings (heh). Kick the tires.",
+    "browseFirst": "Want a peek before you decide? ",
+    "showTemplates": "Browse the ready-made templates"
   },
   "dashboard": {
     "greeting": "Hi, {name}.",
