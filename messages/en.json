@@ -329,6 +329,7 @@
     "errRules": "Fill in the title and description of every rule and topic, or remove the empty ones.",
     "errNoFields": "Add at least one field.",
     "errNoItems": "Add at least one item for the movie challenge.",
+    "errNoBooks": "Add at least one book for the reading club.",
     "stepsNav": "Creation steps",
     "steps": {
       "base": "Basics",
@@ -340,6 +341,28 @@
     "title": "Build the next experience",
     "subtitle": "Start with a preset and adjust only what your group needs.",
     "startTitle": "Choose a starting point",
+    "recipes": {
+      "cine_free": {
+        "name": "Open Cinema",
+        "body": "A list of films; each person rates and comments once they watch.",
+        "title": "Cinema — new edition"
+      },
+      "cine_curated": {
+        "name": "Curated Cinema",
+        "body": "Before the session, log what you expect; afterwards, the rating. Expectation locks once you rate.",
+        "title": "Curated Cinema — new edition"
+      },
+      "reading_club": {
+        "name": "Reading club",
+        "body": "Several books in the catalog; progress per book and per day, completion, and a rating.",
+        "title": "Reading club — new season"
+      },
+      "reading_daily": {
+        "name": "Journal / habit",
+        "body": "One check-in per day with pages, current book, and completion.",
+        "title": "90 days of reading"
+      }
+    },
     "templateCine": "Cinema",
     "templateReading": "Reading",
     "templateCineBody": "A list of titles, with a rating and comment per item.",
@@ -364,6 +387,7 @@
     "fieldsSubtitle": "Each field's identifier stays stable even if the label changes.",
     "checkpointsTitle": "Set the checkpoints",
     "cineItemsHint": "Paste one title per line. Each item becomes a logging opportunity for every participant.",
+    "bookItemsHint": "Paste one book per line. Each book joins the catalog and gets progress, completion, and a rating.",
     "itemsLabel": "Item list",
     "itemsPlaceholder": "First title\nSecond title\nThird title",
     "itemsCount": "{count, plural, one {# item} other {# items}}",

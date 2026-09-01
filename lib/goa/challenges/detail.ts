@@ -2,6 +2,14 @@ import type { SessionContext } from "../../auth";
 import { inTransaction, oneOrNull, withClient } from "../../db";
 import { challengeAccess, dateRange, writeAudit } from "../../goa-domain";
 import { ApiError, stringValue } from "../../http";
+import {
+  cardinalityOf,
+  entryTypesForChallenge,
+  primaryEntryType,
+  purposeOf,
+  schedulePolicyOf,
+  targetPolicyOf,
+} from "./entry-types";
 import { fieldsForChallenge } from "./fields";
 import { generateDailyCheckpoints } from "./items";
 import { metricsForChallenge, resultForChallenge } from "./results";
@@ -70,13 +78,35 @@ export async function getChallengeDetail(session: SessionContext, challengeId: s
           WHERE cp.challenge_id = $1 AND cp.removed_at IS NULL ORDER BY u.display_name`,
         [challengeId],
       );
-    const typeResult = await client.query<{ submission_mode: "item" | "daily" | "free" }>(
-        "SELECT submission_mode FROM entry_types WHERE challenge_id=$1 AND archived_at IS NULL ORDER BY created_at LIMIT 1",
-        [challengeId],
-      );
+    const allTypes = await entryTypesForChallenge(client, challengeId);
+    const primaryType = await primaryEntryType(client, challengeId);
+    const challengeHasPeriod =
+      access.challenge.start_date !== null && access.challenge.end_date !== null;
+    const fieldsByType = new Map<string, typeof fields>();
+    for (const field of fields) {
+      const list = fieldsByType.get(field.entryTypeId as string) ?? [];
+      list.push(field);
+      fieldsByType.set(field.entryTypeId as string, list);
+    }
+    const entryTypes = allTypes.map((type) => ({
+      id: type.id,
+      name: type.name,
+      semanticKey: type.semantic_key,
+      purpose: purposeOf(type),
+      submissionMode: type.submission_mode,
+      targetPolicy: targetPolicyOf(type),
+      cardinality: cardinalityOf(type),
+      schedulePolicy: schedulePolicyOf(type, challengeHasPeriod),
+      isPrimary: type.id === primaryType?.id,
+      fields: fieldsByType.get(type.id) ?? [],
+    }));
+    const primaryEntryTypeId = primaryType?.id ?? null;
     const metrics = await metricsForChallenge(client, challengeId);
     const result = await resultForChallenge(client, challengeId, metrics);
-    const submissionMode = typeResult.rows[0]?.submission_mode ?? "free";
+    const submissionMode = primaryType?.submission_mode ?? "free";
+    const primaryFields = primaryEntryTypeId
+      ? fieldsByType.get(primaryEntryTypeId) ?? []
+      : fields;
     const items = submissionMode === "daily" && access.challenge.start_date === null
       ? []
       : itemsResult.rows.length
@@ -117,10 +147,12 @@ export async function getChallengeDetail(session: SessionContext, challengeId: s
       endsOn: access.challenge.end_date,
       status: access.challenge.status,
       meetingUrl: access.challenge.meeting_url,
+      recipeKey: access.challenge.recipe_key ?? null,
       submissionMode,
       viewerRole: access.challenge.role,
       isParticipant: access.challenge.is_participant,
-      fields,
+      fields: primaryFields,
+      entryTypes,
       items,
       participants: participantsResult.rows.map((participant) => ({
         id: participant.id, userId: participant.id, name: participant.display_name, username: participant.username,
@@ -166,9 +198,7 @@ export async function updateChallenge(
     const { startDate, endDate } = dateRange(rawStartDate, rawEndDate);
     const scheduleChanged =
       startDate !== access.challenge.start_date || endDate !== access.challenge.end_date;
-    const entryType = await oneOrNull<{ submission_mode: string }>(client,
-      "SELECT submission_mode FROM entry_types WHERE challenge_id=$1 AND archived_at IS NULL ORDER BY created_at LIMIT 1",
-      [challengeId]);
+    const entryType = await primaryEntryType(client, challengeId);
 
     if (access.challenge.status === "active" && scheduleChanged) {
       // A agenda de um desafio ativo pode ser estendida ou remarcada à vontade,

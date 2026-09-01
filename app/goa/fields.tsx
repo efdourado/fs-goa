@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import { type FormEvent, useState } from "react";
 
-import type { ChallengeField, FieldConfig, FieldType, Template } from "./types";
+import type { ChallengeField, FieldConfig, FieldType, RecipeKey } from "./types";
 import { Button, EmptyState, inputClass, labelClass } from "./ui";
 import { slugify } from "./utils";
 
@@ -11,11 +11,21 @@ export const FIELD_TYPES: FieldType[] = ["text", "number", "rating", "select", "
 
 type PresetLabels = (key: string) => string;
 
-export function presetFields(template: Template, label: PresetLabels): ChallengeField[] {
-  if (template === "cine") {
+/**
+ * The starting fields for a recipe's *primary* entry type (Avaliação / Progresso
+ * / Registro). Secondary types — expectation, book completion — are seeded by the
+ * server from the recipe and tuned later in the admin Fields tab.
+ */
+export function presetFields(recipe: RecipeKey, label: PresetLabels): ChallengeField[] {
+  if (recipe === "cine_free" || recipe === "cine_curated") {
     return [
       { key: "nota", label: label("nota"), type: "rating", required: true, config: { min: 0, max: 5, step: 0.5 } },
       { key: "comentario", label: label("comentario"), type: "text", required: false, config: { multiline: true, maxLength: 280 } },
+    ];
+  }
+  if (recipe === "reading_club") {
+    return [
+      { key: "paginas_lidas", label: label("paginasLidas"), type: "number", required: true, config: { min: 0, step: 1 } },
     ];
   }
   return [

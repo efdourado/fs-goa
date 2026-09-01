@@ -329,6 +329,7 @@
     "errRules": "Preencha o título e a descrição de cada regra e tópico, ou remova os vazios.",
     "errNoFields": "Adicione pelo menos um campo.",
     "errNoItems": "Adicione ao menos um item para o desafio de filmes.",
+    "errNoBooks": "Adicione ao menos um livro para o clube de leitura.",
     "stepsNav": "Etapas de criação",
     "steps": {
       "base": "Base",
@@ -340,6 +341,28 @@
     "title": "Monte a próxima experiência",
     "subtitle": "Comece com um preset e ajuste somente o que seu grupo precisa.",
     "startTitle": "Escolha um ponto de partida",
+    "recipes": {
+      "cine_free": {
+        "name": "Cine Livre",
+        "body": "Uma lista de filmes; cada pessoa dá nota e comentário quando assiste.",
+        "title": "Cine — nova edição"
+      },
+      "cine_curated": {
+        "name": "Cine Curadoria",
+        "body": "Antes da sessão, registre a expectativa; depois, a avaliação. A expectativa trava ao avaliar.",
+        "title": "Cine Curadoria — nova edição"
+      },
+      "reading_club": {
+        "name": "Clube de leitura",
+        "body": "Vários livros no acervo; progresso por livro e por dia, conclusão e nota.",
+        "title": "Clube de leitura — nova temporada"
+      },
+      "reading_daily": {
+        "name": "Diário / hábito",
+        "body": "Um check-in por dia com páginas, livro atual e conclusão.",
+        "title": "90 dias de leitura"
+      }
+    },
     "templateCine": "Cine",
     "templateReading": "Leitura",
     "templateCineBody": "Uma lista de títulos, nota e comentário por item.",
@@ -364,6 +387,7 @@
     "fieldsSubtitle": "O identificador de cada campo permanece estável mesmo se o rótulo mudar.",
     "checkpointsTitle": "Defina os checkpoints",
     "cineItemsHint": "Cole um título por linha. Cada item vira uma oportunidade de registro para cada participante.",
+    "bookItemsHint": "Cole um livro por linha. Cada livro entra no acervo e recebe progresso, conclusão e nota.",
     "itemsLabel": "Lista de itens",
     "itemsPlaceholder": "Primeiro título\nSegundo título\nTerceiro título",
     "itemsCount": "{count, plural, one {# item} other {# itens}}",
