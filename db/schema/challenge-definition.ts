@@ -11,6 +11,7 @@ import {
   smallint,
   text,
   unique,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 import { users } from "./accounts";
@@ -35,6 +36,9 @@ export const entryTypes = pgTable(
     targetPolicy: text("target_policy"),
     cardinality: text("cardinality"),
     schedulePolicy: text("schedule_policy"),
+    // The type the single-type surfaces default to (detail's flat `fields`, the
+    // metrics tab). Exactly one per challenge; set by the recipe at creation.
+    isPrimary: boolean("is_primary").notNull().default(false),
     archivedAt: timestamptz("archived_at"),
     createdAt: timestamptz("created_at").defaultNow().notNull(),
     updatedAt: timestamptz("updated_at").defaultNow().notNull(),
@@ -47,6 +51,9 @@ export const entryTypes = pgTable(
       table.challengeId,
       table.submissionMode,
     ),
+    uniqueIndex("entry_types_one_primary_uidx")
+      .on(table.challengeId)
+      .where(sql`${table.isPrimary}`),
     check("entry_types_key_check", sql`${table.semanticKey} ~ '^[a-z][a-z0-9_]{0,63}$'`),
     check("entry_types_name_check", sql`char_length(btrim(${table.name})) between 1 and 120`),
     check(
