@@ -65,7 +65,8 @@ export const challengeMetrics = pgTable(
     check("challenge_metrics_label_check", sql`char_length(btrim(${table.label})) between 1 and 120`),
     check(
       "challenge_metrics_operation_check",
-      sql`${table.operation} in ('sum', 'average', 'count', 'min', 'max', 'completion_rate')`,
+      sql`${table.operation} in ('sum', 'average', 'count', 'min', 'max', 'completion_rate',
+        'bayesian_average', 'spread', 'surprise', 'indicator_bias')`,
     ),
     check(
       "challenge_metrics_group_by_check",
@@ -73,7 +74,8 @@ export const challengeMetrics = pgTable(
     ),
     check(
       "challenge_metrics_field_requirement_check",
-      sql`(${table.operation} in ('sum', 'average', 'min', 'max') and ${table.fieldId} is not null)
+      sql`(${table.operation} in ('sum', 'average', 'min', 'max',
+            'bayesian_average', 'spread', 'surprise', 'indicator_bias') and ${table.fieldId} is not null)
         or (${table.operation} = 'completion_rate' and ${table.fieldId} is null)
         or (${table.operation} = 'count')`,
     ),
