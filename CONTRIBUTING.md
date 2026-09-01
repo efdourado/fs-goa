@@ -26,4 +26,4 @@ licenciamento — segue sob responsabilidade do mantenedor.
 - `npm run lint && npm run typecheck && npm test` precisam passar.
 - Alterou o schema? Gere a migração (`npm run db:generate`) e teste em `goa_test`.
 - Texto de interface novo entra em `messages/pt-BR.json` **e** `messages/en.json`.
-- Commits: uma linha, sem corpo, sem trailer de co-autoria — igual ao histórico.
+- Commits: uma linha, sem corpo — igual ao histórico.
