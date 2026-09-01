@@ -2,6 +2,7 @@
   "name": "goa",
   "version": "0.1.0",
   "private": true,
+  "license": "FSL-1.1-ALv2",
   "packageManager": "npm@10.9.3",
   "engines": {
     "node": "22.x"

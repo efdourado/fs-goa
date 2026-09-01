@@ -136,3 +136,9 @@ desenho de segurança e as decisões, e a lista do que ficou fora do MVP.
 [ROADMAP.md](ROADMAP.md) reúne as frentes de evolução, as decisões de arquitetura
 em aberto e as fases — de "avaliar a qualquer hora" e viés de indicação ao acervo
 vivo do grupo e ao motor de análise.
+
+## Licença
+
+[Functional Source License 1.1](LICENSE.md) com licença futura Apache 2.0
+(`FSL-1.1-ALv2`): uso livre para qualquer fim que não seja oferecer um produto ou
+serviço concorrente; cada versão passa a Apache 2.0 dois anos depois de publicada.
