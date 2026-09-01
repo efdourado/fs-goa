@@ -628,6 +628,7 @@
     "occurredOnLabel": "Date it happened",
     "occurredOnHint": "Use today or backfill an entry from the past.",
     "occurredOn": "Happened on {date}.",
+    "expectationLocked": "Expectation locks once you rate the film. This entry is read-only.",
     "checkpointsTitle": "Checkpoints",
     "chooseCheckpoint": "Choose checkpoint",
     "checkpointDone": "✓ ",

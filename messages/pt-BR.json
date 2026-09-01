@@ -628,6 +628,7 @@
     "occurredOnLabel": "Data em que aconteceu",
     "occurredOnHint": "Use hoje ou recupere um registro do passado.",
     "occurredOn": "Aconteceu em {date}.",
+    "expectationLocked": "A expectativa trava depois que você avalia. O registro fica só para leitura.",
     "checkpointsTitle": "Checkpoints",
     "chooseCheckpoint": "Escolher checkpoint",
     "checkpointDone": "✓ ",

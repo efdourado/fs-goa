@@ -10,6 +10,7 @@ import type {
   ChallengeField,
   ChallengeItem,
   Entry,
+  EntryTypeView,
   FieldConfig,
   Id,
   ParticipantTab,
@@ -168,6 +169,91 @@ export function ResultView({ challenge }: { challenge: ChallengeDetail }) {
   );
 }
 
+/** The entry types a round item can receive (expectation, rating, progress…). */
+function itemEntryTypes(challenge: ChallengeDetail): EntryTypeView[] {
+  if (challenge.entryTypes.length) {
+    return challenge.entryTypes.filter((type) => type.targetPolicy !== "none");
+  }
+  // Legacy detail payload without `entryTypes` — reconstruct from the flat fields.
+  return challenge.submissionMode === "item" && challenge.fields.length
+    ? [{
+        id: "",
+        name: "",
+        semanticKey: "registro",
+        purpose: "rating",
+        submissionMode: "item",
+        targetPolicy: "required",
+        cardinality: "once_per_item",
+        schedulePolicy: "while_active",
+        isPrimary: true,
+        fields: challenge.fields,
+      }]
+    : [];
+}
+
+/**
+ * One item, one or more forms. Cine Curadoria stacks an "Expectativa" form (which
+ * locks once the film is rated) above the "Avaliação"; a reading club stacks
+ * progress / completion / rating. A plain Cine round renders a single form.
+ */
+function ItemEntryPanel({
+  challenge,
+  item,
+  ownEntries,
+  occurredOn,
+  unavailableMessage,
+  canEdit,
+  onSaveEntry,
+}: {
+  challenge: ChallengeDetail;
+  item: ChallengeItem;
+  ownEntries: Entry[];
+  occurredOn: string;
+  unavailableMessage: string | null;
+  canEdit: boolean;
+  onSaveEntry: (itemId: Id | null, values: Record<Id, unknown>, entry?: Entry, occurredOn?: string, entryTypeId?: Id) => Promise<void>;
+}) {
+  const t = useTranslations("participant");
+  const types = itemEntryTypes(challenge);
+  const ratingTypeId = types.find((type) => type.purpose === "rating")?.id;
+  const stacked = types.length > 1;
+  return (
+    <div className={stacked ? "space-y-8" : undefined}>
+      {types.map((type) => {
+        const perDay = type.cardinality === "once_per_item_day";
+        const entry = ownEntries.find((candidate) =>
+          itemIdForEntry(candidate) === item.id
+          && (candidate.entryTypeId ?? "") === type.id
+          && (!perDay || candidate.occurredOn === occurredOn));
+        const rated = ratingTypeId
+          ? ownEntries.some((candidate) => itemIdForEntry(candidate) === item.id && candidate.entryTypeId === ratingTypeId)
+          : false;
+        const locked = type.purpose === "expectation" && rated;
+        return (
+          <div key={type.id || "registro"}>
+            {stacked ? <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">{type.name}</h3> : null}
+            <DynamicEntryForm
+              key={`${type.id}-${perDay ? occurredOn : "fixed"}-${entry?.id ?? "new"}`}
+              fields={type.fields}
+              item={item}
+              entry={entry}
+              canEdit={canEdit && !locked}
+              unavailableMessage={locked ? t("expectationLocked") : unavailableMessage}
+              onSave={(values, saved) => onSaveEntry(
+                item.id,
+                values,
+                saved,
+                perDay || !saved ? occurredOn : undefined,
+                type.id || undefined,
+              )}
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function ParticipantChallengeScreen({
   challenge,
   entries,
@@ -185,7 +271,7 @@ export function ParticipantChallengeScreen({
   onTab: (tab: ParticipantTab) => void;
   onBack: () => void;
   onAdmin?: () => void;
-  onSaveEntry: (itemId: Id | null, values: Record<Id, unknown>, entry?: Entry, occurredOn?: string) => Promise<void>;
+  onSaveEntry: (itemId: Id | null, values: Record<Id, unknown>, entry?: Entry, occurredOn?: string, entryTypeId?: Id) => Promise<void>;
 }) {
   const t = useTranslations("participant");
   const tc = useTranslations("common");
@@ -222,6 +308,9 @@ export function ParticipantChallengeScreen({
     itemStatus: selectedItem?.status,
     opensAt: selectedItem?.opensAt,
   });
+  const itemForms = itemEntryTypes(challenge);
+  const useItemPanel = itemForms.length > 0 && !undatedDaily && Boolean(selectedItem);
+  const perDayItem = itemForms.some((type) => type.cardinality === "once_per_item_day");
   const tabs: Array<{ id: ParticipantTab }> = [
     { id: "today" },
     { id: "history" },
@@ -263,8 +352,12 @@ export function ParticipantChallengeScreen({
                       </h2>
                       {selectedItem?.description ? <p className="mt-1 text-sm text-[var(--muted)]">{selectedItem.description}</p> : null}
                       {selectedItem?.recommendedBy || selectedItem?.catalogItem?.year ? <p className="mt-1 text-xs text-[var(--muted)]">{[selectedItem.recommendedBy ? t("recommendedBy", { name: selectedItem.recommendedBy.name }) : null, selectedItem.catalogItem?.year ? String(selectedItem.catalogItem.year) : null, selectedItem.catalogItem?.genres.length ? selectedItem.catalogItem.genres.join(", ") : null].filter(Boolean).join(" · ")}</p> : null}</div>{selectedItem?.dueAt ? <span className="rounded-full bg-[var(--wash)] px-3 py-2 text-xs font-semibold text-[var(--muted)]">{t("dueBy", { date: f.dateTime(selectedItem.dueAt) })}</span> : null}</div>
-                  {undatedDaily || (challenge.submissionMode === "item" && !currentEntry) ? <label className="mb-5 block"><span className={labelClass}>{t("occurredOnLabel")}</span><input className={inputClass} type="date" max={today} value={occurredOn} disabled={Boolean(unavailableMessage)} onChange={(event) => setOccurredOn(event.target.value || today)} /><small className="mt-1 block text-[var(--muted)]">{t("occurredOnHint")}</small></label> : currentEntry?.occurredOn ? <p className="mb-5 text-xs text-[var(--muted)]">{t("occurredOn", { date: f.date(currentEntry.occurredOn, longDate) })}</p> : null}
-                  <DynamicEntryForm key={`${selectedItem?.id ?? "free"}-${undatedDaily ? occurredOn : "fixed"}-${currentEntry?.id ?? "new"}`} fields={challenge.fields} item={selectedItem ?? null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry(selectedItem?.id ?? null, values, entry, undatedDaily || (challenge.submissionMode === "item" && !entry) ? occurredOn : undefined)} />
+                  {undatedDaily || (useItemPanel && (perDayItem || !currentEntry)) ? <label className="mb-5 block"><span className={labelClass}>{t("occurredOnLabel")}</span><input className={inputClass} type="date" max={today} value={occurredOn} disabled={Boolean(unavailableMessage)} onChange={(event) => setOccurredOn(event.target.value || today)} /><small className="mt-1 block text-[var(--muted)]">{t("occurredOnHint")}</small></label> : !useItemPanel && currentEntry?.occurredOn ? <p className="mb-5 text-xs text-[var(--muted)]">{t("occurredOn", { date: f.date(currentEntry.occurredOn, longDate) })}</p> : null}
+                  {useItemPanel && selectedItem ? (
+                    <ItemEntryPanel challenge={challenge} item={selectedItem} ownEntries={ownEntries} occurredOn={occurredOn} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} onSaveEntry={onSaveEntry} />
+                  ) : (
+                    <DynamicEntryForm key={`${selectedItem?.id ?? "free"}-${undatedDaily ? occurredOn : "fixed"}-${currentEntry?.id ?? "new"}`} fields={challenge.fields} item={selectedItem ?? null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry(selectedItem?.id ?? null, values, entry, undatedDaily ? occurredOn : undefined)} />
+                  )}
                 </>
               )}
             </section>
