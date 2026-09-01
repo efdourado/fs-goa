@@ -209,7 +209,10 @@ export async function updateChallenge(
     const { startDate, endDate } = dateRange(rawStartDate, rawEndDate);
     const scheduleChanged =
       startDate !== access.challenge.start_date || endDate !== access.challenge.end_date;
-    const entryType = await primaryEntryType(client, challengeId);
+    const allTypes = await entryTypesForChallenge(client, challengeId);
+    // Checkpoints are generated only for recipes that bind entries to them, not
+    // for every "daily" primary type (a reading club's progress is `while_active`).
+    const checkpointDriven = allTypes.some((type) => schedulePolicyOf(type, true) === "checkpoint");
 
     if (access.challenge.status === "active" && scheduleChanged) {
       // A agenda de um desafio ativo pode ser estendida ou remarcada à vontade,
@@ -229,7 +232,7 @@ export async function updateChallenge(
             `Este período deixaria ${stranded.count} registro(s) fora do desafio. Ajuste ou remova esses registros antes de encurtar as datas.`,
           );
         }
-      } else if (entryType?.submission_mode === "daily") {
+      } else if (checkpointDriven) {
         const anyEntry = await oneOrNull<{ count: number }>(
           client,
           "SELECT count(*)::int AS count FROM entries WHERE challenge_id=$1 AND deleted_at IS NULL",
@@ -251,7 +254,7 @@ export async function updateChallenge(
       [challengeId, title, description, meetingUrl, rules, JSON.stringify(ruleSections), startDate, endDate],
     );
     if (
-      entryType?.submission_mode === "daily"
+      checkpointDriven
       && (access.challenge.status === "draft"
         || (access.challenge.status === "active" && scheduleChanged))
     ) {
