@@ -26,4 +26,4 @@ export {
 } from "./schema/results";
 export { auditEvents } from "./schema/audit";
 export { feedback } from "./schema/feedback";
-export { catalogItems, catalogTags, catalogItemTags } from "./schema/catalog";
+export { catalogItems } from "./schema/catalog";

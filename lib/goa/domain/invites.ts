@@ -32,7 +32,8 @@ export async function createInvite(
     const group = await oneOrNull<{ id: string; name: string }>(
       client,
       `SELECT id, name FROM groups
-        WHERE id = $1 AND archived_at IS NULL AND deleted_at IS NULL`,
+        WHERE id = $1 AND kind = 'standard'
+          AND archived_at IS NULL AND deleted_at IS NULL`,
       [groupId],
     );
     if (!group) throw new ApiError(404, "not_found", "Grupo não encontrado.");
@@ -124,7 +125,8 @@ async function inviteByToken(token: string, client: PoolClient, lock = false): P
             gi.revoked_at, ict.challenge_id, c.title AS challenge_title,
             c.status AS challenge_status
        FROM group_invites gi
-       JOIN groups g ON g.id = gi.group_id AND g.deleted_at IS NULL AND g.archived_at IS NULL
+       JOIN groups g ON g.id = gi.group_id AND g.kind = 'standard'
+        AND g.deleted_at IS NULL AND g.archived_at IS NULL
        JOIN users u ON u.id = gi.created_by_user_id
        LEFT JOIN invite_challenge_targets ict ON ict.invite_id = gi.id AND ict.group_id = gi.group_id
        LEFT JOIN challenges c ON c.id = ict.challenge_id AND c.group_id = ict.group_id

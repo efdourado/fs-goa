@@ -547,8 +547,10 @@ export async function groupRole(userId: string, groupId: string, client?: PoolCl
   const work = async (activeClient: PoolClient) => {
     const row = await oneOrNull<{ role: GroupRole }>(
       activeClient,
-      `SELECT role FROM group_members
-        WHERE group_id = $1 AND user_id = $2 AND removed_at IS NULL`,
+      `SELECT gm.role FROM group_members gm
+         JOIN groups g ON g.id = gm.group_id
+        WHERE gm.group_id = $1 AND gm.user_id = $2 AND gm.removed_at IS NULL
+          AND (g.kind = 'standard' OR (g.kind = 'personal' AND g.owner_user_id = $2))`,
       [groupId, userId],
     );
     return row?.role ?? null;
@@ -572,4 +574,3 @@ export const LOGIN_SECURITY_POLICY = Object.freeze({
   maxFailures: LOGIN_MAX_FAILURES,
   windowMs: LOGIN_WINDOW_MS,
 });
-

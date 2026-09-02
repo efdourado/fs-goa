@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
 
-import { API_PATHS, apiRequest } from "./api";
+import { apiRequest } from "./api";
 import type { CatalogItem, ChallengeItemInput, Id, Member } from "./types";
 import { Button, cx, inputClass, labelClass, StatusMessage } from "./ui";
 
@@ -14,13 +14,23 @@ export interface CineRow {
   recommendedByUserId: string;
   author: string;
   year: string;
-  runtime: string;
   pages: string;
-  genres: string;
+  mainGenre: string;
+  targetDate: string;
 }
 
 export function newCineRow(title = "", extra: Partial<CineRow> = {}): CineRow {
-  return { key: crypto.randomUUID(), title, recommendedByUserId: "", author: "", year: "", runtime: "", pages: "", genres: "", ...extra };
+  return {
+    key: crypto.randomUUID(),
+    title,
+    recommendedByUserId: "",
+    author: "",
+    year: "",
+    pages: "",
+    mainGenre: "",
+    targetDate: "",
+    ...extra,
+  };
 }
 
 /** Reads any of a small set of aliases off a pasted JSON object, first match wins. */
@@ -34,7 +44,7 @@ function asFieldString(value: unknown): string {
 }
 
 /**
- * Parses a pasted JSON array of `{title, year, runtimeMinutes|pageCount, genres}`
+ * Parses a pasted JSON array of `{title, year, pageCount, mainGenre, targetDate}`
  * objects into rows — the "already have the list ready" fast path, as an
  * alternative to typing titles one by one. Throws a translation key on failure.
  */
@@ -54,10 +64,10 @@ export function parseJsonItemsPaste(text: string, existingTitles: Set<string>): 
     const title = typeof raw.title === "string" ? raw.title.trim() : "";
     if (!title || known.has(title.toLowerCase())) continue;
     known.add(title.toLowerCase());
-    const genresValue = pick(raw, "genres", "genre");
-    const genres = Array.isArray(genresValue)
-      ? genresValue.filter((value): value is string => typeof value === "string").join(", ")
-      : typeof genresValue === "string" ? genresValue : "";
+    const genreValue = pick(raw, "mainGenre", "main_genre", "genre", "genres");
+    const mainGenre = Array.isArray(genreValue)
+      ? genreValue.find((value): value is string => typeof value === "string") ?? ""
+      : typeof genreValue === "string" ? genreValue : "";
     const authorValue = pick(raw, "author", "authors", "by");
     const author = Array.isArray(authorValue)
       ? authorValue.filter((value): value is string => typeof value === "string").join(", ")
@@ -65,9 +75,9 @@ export function parseJsonItemsPaste(text: string, existingTitles: Set<string>): 
     rows.push(newCineRow(title, {
       author,
       year: asFieldString(pick(raw, "year")),
-      runtime: asFieldString(pick(raw, "runtimeMinutes", "runtime", "duration", "durationMinutes")),
       pages: asFieldString(pick(raw, "pageCount", "pages")),
-      genres,
+      mainGenre,
+      targetDate: asFieldString(pick(raw, "targetDate", "target_date", "dueDate", "due_date")),
     }));
   }
   if (!rows.length) throw new Error("jsonNoItems");
@@ -80,9 +90,7 @@ export function cineRowsToInput(rows: CineRow[]): ChallengeItemInput[] {
     .filter(({ row }) => row.title.trim())
     .map(({ row, index }) => {
       const year = Number(row.year);
-      const runtime = Number(row.runtime);
       const pages = Number(row.pages);
-      const genres = row.genres.split(",").map((genre) => genre.trim()).filter(Boolean);
       return {
         title: row.title.trim(),
         position: index,
@@ -90,9 +98,9 @@ export function cineRowsToInput(rows: CineRow[]): ChallengeItemInput[] {
         ...(row.recommendedByUserId ? { recommendedByUserId: row.recommendedByUserId } : {}),
         ...(row.author.trim() ? { author: row.author.trim() } : {}),
         ...(Number.isInteger(year) && year > 1800 ? { year } : {}),
-        ...(Number.isInteger(runtime) && runtime > 0 ? { runtimeMinutes: runtime } : {}),
         ...(Number.isInteger(pages) && pages > 0 ? { pageCount: pages } : {}),
-        ...(genres.length ? { genres } : {}),
+        ...(row.mainGenre.trim() ? { mainGenre: row.mainGenre.trim() } : {}),
+        ...(row.targetDate ? { targetDate: row.targetDate } : {}),
       };
     });
 }
@@ -101,14 +109,19 @@ export function CineItemsEditor({
   value,
   onChange,
   members,
-  groupId,
+  catalogPath,
+  startsOn,
+  endsOn,
   kind = "film",
 }: {
   value: CineRow[];
   onChange: (rows: CineRow[]) => void;
   members: Member[];
-  groupId: Id;
-  /** Filters the "from catalog" picker and swaps the runtime field for pages. */
+  /** Group and personal catalogs have different public routes. */
+  catalogPath: string;
+  startsOn?: string | null;
+  endsOn?: string | null;
+  /** Filters the "from catalog" picker and shows attributes relevant to the medium. */
   kind?: "film" | "book";
 }) {
   const t = useTranslations("cineItems");
@@ -122,11 +135,11 @@ export function CineItemsEditor({
   useEffect(() => {
     if (!showCatalog || catalog) return;
     const controller = new AbortController();
-    apiRequest<{ items: CatalogItem[] }>(API_PATHS.groupCatalog(groupId), { signal: controller.signal })
+    apiRequest<{ items: CatalogItem[] }>(catalogPath, { signal: controller.signal })
       .then((response) => setCatalog(response.items.filter((item) => item.kind === kind)))
       .catch(() => setCatalog([]));
     return () => controller.abort();
-  }, [showCatalog, catalog, groupId, kind]);
+  }, [showCatalog, catalog, catalogPath, kind]);
 
   const usedCatalogIds = useMemo(
     () => new Set(value.map((row) => row.catalogItemId).filter(Boolean)),
@@ -196,13 +209,14 @@ export function CineItemsEditor({
                 </div>
                 {open ? (
                   <div className="mt-2 space-y-2">
-                    <div className="grid gap-2 sm:grid-cols-[110px_110px_1fr]">
-                      <label><span className={labelClass}>{t("year")}</span><input className={inputClass} type="number" inputMode="numeric" min={1870} max={2200} value={row.year} onChange={(event) => update(row.key, { year: event.target.value })} /></label>
+                    <div className="grid gap-2 sm:grid-cols-3">
+                      <label><span className={labelClass}>{t(kind === "film" ? "latestYear" : "year")}</span><input className={inputClass} type="number" inputMode="numeric" min={1870} max={2200} value={row.year} onChange={(event) => update(row.key, { year: event.target.value })} /></label>
                       {kind === "book"
                         ? <label><span className={labelClass}>{t("pages")}</span><input className={inputClass} type="number" inputMode="numeric" min={1} max={100000} value={row.pages} onChange={(event) => update(row.key, { pages: event.target.value })} /></label>
-                        : <label><span className={labelClass}>{t("runtime")}</span><input className={inputClass} type="number" inputMode="numeric" min={1} max={100000} value={row.runtime} onChange={(event) => update(row.key, { runtime: event.target.value })} /></label>}
-                      <label><span className={labelClass}>{t("genres")}</span><input className={inputClass} value={row.genres} placeholder={t("genresPlaceholder")} onChange={(event) => update(row.key, { genres: event.target.value })} /></label>
+                        : <label><span className={labelClass}>{t("mainGenre")}</span><input className={inputClass} value={row.mainGenre} maxLength={80} placeholder={t("mainGenrePlaceholder")} onChange={(event) => update(row.key, { mainGenre: event.target.value })} /></label>}
+                      <label><span className={labelClass}>{t("targetDate")}</span><input className={inputClass} type="date" min={startsOn ?? undefined} max={endsOn ?? undefined} value={row.targetDate} onChange={(event) => update(row.key, { targetDate: event.target.value })} /></label>
                     </div>
+                    <p className="text-xs leading-5 text-[var(--muted)]">{t("targetDateHint")}</p>
                     {kind === "book" && members.length ? (
                       <label className="block"><span className={labelClass}>{t("recommendedBy")}</span><select className={inputClass} value={row.recommendedByUserId} onChange={(event) => update(row.key, { recommendedByUserId: event.target.value })}><option value="">{t("recommendedByNone")}</option>{members.map((member) => <option value={member.id} key={member.id}>{member.name}</option>)}</select></label>
                     ) : null}
@@ -248,10 +262,10 @@ export function CineItemsEditor({
                   key={item.id}
                   type="button"
                   disabled={usedCatalogIds.has(item.id)}
-                  onClick={() => onChange([...value, newCineRow(item.title, { catalogItemId: item.id, author: item.author ?? "", year: item.year ? String(item.year) : "", runtime: item.runtimeMinutes ? String(item.runtimeMinutes) : "", pages: item.pageCount ? String(item.pageCount) : "", genres: item.genres.join(", ") })])}
+                  onClick={() => onChange([...value, newCineRow(item.title, { catalogItemId: item.id, author: item.author ?? "", year: item.year ? String(item.year) : "", pages: item.pageCount ? String(item.pageCount) : "", mainGenre: item.mainGenre ?? "" })])}
                   className={cx("flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-[var(--wash)] disabled:opacity-40", "")}
                 >
-                  <span>{item.title}{item.author ? <span className="text-[var(--muted)]"> · {item.author}</span> : null}{item.year ? <span className="text-[var(--muted)]"> · {item.year}</span> : null}{item.genres.length ? <span className="text-[var(--muted)]"> · {item.genres.join(", ")}</span> : null}</span>
+                  <span>{item.title}{item.author ? <span className="text-[var(--muted)]"> · {item.author}</span> : null}{item.year ? <span className="text-[var(--muted)]"> · {item.year}</span> : null}{item.mainGenre ? <span className="text-[var(--muted)]"> · {item.mainGenre}</span> : null}</span>
                   <span className="text-xs text-[var(--muted)]">{usedCatalogIds.has(item.id) ? t("alreadyAdded") : t("roundsCount", { count: item.roundCount ?? 0 })}</span>
                 </button>
               ))}

@@ -6,8 +6,8 @@ export function canManage(role?: Role): boolean {
 
 /** Mirrors `recipeCatalogKind` on the server — which acervo (filme/livro) a recipe tracks, if any. */
 export function recipeCatalogKind(recipeKey?: RecipeKey | null): "film" | "book" | null {
-  if (recipeKey === "cine_free" || recipeKey === "cine_curated") return "film";
-  if (recipeKey === "reading_club") return "book";
+  if (recipeKey === "cinema" || recipeKey === "cine_free" || recipeKey === "cine_curated") return "film";
+  if (recipeKey === "library" || recipeKey === "reading_club") return "book";
   return null;
 }
 

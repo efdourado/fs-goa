@@ -1,7 +1,7 @@
 import type { PoolClient } from "pg";
 
 import { publicId } from "../../goa-domain";
-import { resolveTags, setCatalogItemTags, upsertCatalogItem } from "../catalog";
+import { upsertCatalogItem } from "../catalog";
 import type { FieldRow, MetricRow } from "./types";
 
 /**
@@ -88,12 +88,12 @@ export async function copyChallengeStructure(
     entry_type_id: string | null; semantic_key: string; title: string;
     description: string | null; position: number; metadata: unknown;
     catalog_kind: string | null; catalog_title: string | null; catalog_author: string | null;
-    catalog_year: number | null; catalog_runtime: number | null; catalog_pages: number | null;
+    catalog_year: number | null; catalog_main_genre: string | null; catalog_pages: number | null;
     catalog_item_id: string | null;
   }>(
     `SELECT i.entry_type_id,i.semantic_key,i.title,i.description,i.position,i.metadata,i.catalog_item_id,
             ci.kind AS catalog_kind, ci.title AS catalog_title, ci.author AS catalog_author, ci.year AS catalog_year,
-            ci.runtime_minutes AS catalog_runtime, ci.page_count AS catalog_pages
+            ci.main_genre AS catalog_main_genre, ci.page_count AS catalog_pages
        FROM challenge_items i
        LEFT JOIN catalog_items ci ON ci.id = i.catalog_item_id
       WHERE i.challenge_id=$1 AND i.archived_at IS NULL ORDER BY i.position`, [sourceChallengeId]);
@@ -107,21 +107,9 @@ export async function copyChallengeStructure(
         title: source.catalog_title ?? source.title,
         author: source.catalog_author,
         year: source.catalog_year,
-        runtimeMinutes: source.catalog_runtime,
+        mainGenre: source.catalog_main_genre,
         pageCount: source.catalog_pages,
       });
-      const genres = await client.query<{ label: string }>(
-        `SELECT ct.label FROM catalog_item_tags cit JOIN catalog_tags ct ON ct.id = cit.tag_id
-          WHERE cit.catalog_item_id = $1 AND ct.kind = 'genre'`,
-        [source.catalog_item_id],
-      );
-      if (genres.rows.length) {
-        await setCatalogItemTags(
-          client,
-          catalogItemId,
-          await resolveTags(client, targetGroupId, "genre", genres.rows.map((row) => row.label)),
-        );
-      }
     }
     await client.query(
       `INSERT INTO challenge_items

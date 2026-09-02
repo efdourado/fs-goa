@@ -4,17 +4,16 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { useGoaFormat } from "../format";
+import { API_PATHS } from "../api";
 import { cleanFields, FieldBuilder, presetFields } from "../fields";
 import { CineItemsEditor, type CineRow, cineRowsToInput } from "../cine-items";
 import { RuleSectionsEditor } from "../rules";
-import type { ChallengeCreationInput, ChallengeField, ChallengeRule, GroupSummary, Id, RecipeKey } from "../types";
+import type { ChallengeCreationInput, ChallengeField, ChallengeRule, CreatableRecipeKey, GroupSummary, Id } from "../types";
 import { backLinkClass, Button, cardClass, cx, EmptyState, inputClass, labelClass, PageHeading, SchedulePeriodFields, StatusMessage } from "../ui";
 
-const RECIPES: Array<{ key: RecipeKey; catalogKind: "film" | "book" | null; scheduleMode: "period" | "none"; glyph: string }> = [
-  { key: "cine_free", catalogKind: "film", scheduleMode: "none", glyph: "◉" },
-  { key: "cine_curated", catalogKind: "film", scheduleMode: "none", glyph: "〇" },
-  { key: "reading_club", catalogKind: "book", scheduleMode: "period", glyph: "◎" },
-  { key: "reading_daily", catalogKind: null, scheduleMode: "period", glyph: "⭮" },
+const RECIPES: Array<{ key: CreatableRecipeKey; catalogKind: "film" | "book"; glyph: string }> = [
+  { key: "cinema", catalogKind: "film", glyph: "◉" },
+  { key: "library", catalogKind: "book", glyph: "◎" },
 ];
 
 export function CreateChallengeScreen({
@@ -23,7 +22,7 @@ export function CreateChallengeScreen({
   onBack,
   onCreate,
 }: {
-  group: GroupSummary;
+  group?: GroupSummary;
   /** Solo mode: no "people" step, no group chrome, submits to the personal workspace. */
   personal?: boolean;
   onBack: () => void;
@@ -34,17 +33,16 @@ export function CreateChallengeScreen({
   const tp = useTranslations("fields.preset");
   const f = useGoaFormat();
   const [step, setStep] = useState(1);
-  const [recipe, setRecipe] = useState<RecipeKey | null>(null);
+  const [recipe, setRecipe] = useState<CreatableRecipeKey | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [ruleSections, setRuleSections] = useState<ChallengeRule[]>([]);
   const [showOptional, setShowOptional] = useState(false);
-  const [scheduleMode, setScheduleMode] = useState<"period" | "none">("none");
   const [startsOn, setStartsOn] = useState("");
   const [endsOn, setEndsOn] = useState("");
   const [fields, setFields] = useState<ChallengeField[]>([]);
   const [cineItems, setCineItems] = useState<CineRow[]>([]);
-  const [participantIds, setParticipantIds] = useState<Id[]>(group.members?.map((member) => member.id) ?? []);
+  const [participantIds, setParticipantIds] = useState<Id[]>(group?.members?.map((member) => member.id) ?? []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const itemInputs = cineRowsToInput(cineItems);
@@ -56,12 +54,10 @@ export function CreateChallengeScreen({
   const lastStep = stepKeys.length;
   const optionalOpen = showOptional || Boolean(description.trim()) || ruleSections.length > 0;
 
-  function chooseRecipe(next: RecipeKey) {
-    const meta = RECIPES.find((entry) => entry.key === next)!;
+  function chooseRecipe(next: CreatableRecipeKey) {
     setRecipe(next);
     setFields(presetFields(next, (key) => tp(key)));
     setTitle(t(`recipes.${next}.title`));
-    setScheduleMode(meta.scheduleMode);
     setCineItems([]);
   }
 
@@ -71,11 +67,11 @@ export function CreateChallengeScreen({
       setError(t("errPickTemplate"));
       return;
     }
-    if (step === 1 && scheduleMode === "period" && (!startsOn || !endsOn)) {
+    if (step === 1 && (!startsOn || !endsOn)) {
       setError(t("errPeriod"));
       return;
     }
-    if (step === 1 && scheduleMode === "period" && endsOn < startsOn) {
+    if (step === 1 && endsOn < startsOn) {
       setError(t("errEndBeforeStart"));
       return;
     }
@@ -97,6 +93,10 @@ export function CreateChallengeScreen({
     if (step === 3 && tracksCatalog === "book"
       && cineItems.some((row) => row.title.trim() && !row.author.trim())) {
       setError(t("errNoAuthor"));
+      return;
+    }
+    if (step === 3 && cineItems.some((row) => row.targetDate && (row.targetDate < startsOn || row.targetDate > endsOn))) {
+      setError(t("errTargetOutsidePeriod"));
       return;
     }
     setStep((current) => Math.min(lastStep, current + 1));
@@ -126,11 +126,11 @@ export function CreateChallengeScreen({
             ? { topics: rule.topics.map((topic) => ({ title: topic.title.trim(), description: topic.description.trim() })) }
             : {}),
         })),
-        startsOn: scheduleMode === "period" ? startsOn : null,
-        endsOn: scheduleMode === "period" ? endsOn : null,
+        startsOn,
+        endsOn,
         fields: cleanFields(fields),
         items: tracksCatalog ? itemInputs : [],
-        generateDaily: scheduleMode === "period",
+        generateDaily: false,
         participantIds,
       });
     } catch (cause) {
@@ -142,7 +142,7 @@ export function CreateChallengeScreen({
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
-      <button className={cx(backLinkClass, "mb-6")} type="button" onClick={onBack}>{personal ? tc("backHome") : t("back", { group: group.name })}</button>
+      <button className={cx(backLinkClass, "mb-6")} type="button" onClick={onBack}>{personal ? tc("backHome") : t("back", { group: group?.name ?? "" })}</button>
       <PageHeading title={personal ? t("personalTitle") : t("title")} description={personal ? t("personalSubtitle") : t("subtitle")} />
       <nav className={cx("mb-6 grid gap-1 rounded-2xl bg-[var(--wash-strong)]/70 p-1", personal ? "grid-cols-3" : "grid-cols-2 sm:grid-cols-4")} aria-label={t("stepsNav")}>
         {stepKeys.map((key, index) => <button className={cx("min-h-11 truncate rounded-xl px-2 text-xs font-light sm:text-sm", step === index + 1 ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : index + 1 < step ? "text-[var(--ink)]" : "text-[var(--muted)]")} type="button" onClick={() => index + 1 < step && setStep(index + 1)} disabled={index + 1 > step} key={key}><span className="hidden sm:inline">{index + 1}. </span>{t(`steps.${key}`)}</button>)}
@@ -163,17 +163,12 @@ export function CreateChallengeScreen({
             </div>
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
               <label className="sm:col-span-2"><span className={labelClass}>{t("titleLabel")}</span><input className={inputClass} value={title} onChange={(event) => setTitle(event.target.value)} maxLength={140} required /></label>
-              <fieldset className="sm:col-span-2">
-                <legend className={labelClass}>{t("scheduleLegend")}</legend>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <button className={cx("min-h-16 rounded-xl border px-4 py-3 text-left", scheduleMode === "period" ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] bg-[var(--paper)]")} type="button" aria-pressed={scheduleMode === "period"} onClick={() => setScheduleMode("period")}><strong className="block text-sm">{t("schedulePeriod")}</strong><span className="mt-1 block text-xs font-normal text-[var(--muted)]">{t("schedulePeriodHint")}</span></button>
-                  <button className={cx("min-h-16 rounded-xl border px-4 py-3 text-left", scheduleMode === "none" ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] bg-[var(--paper)]")} type="button" aria-pressed={scheduleMode === "none"} onClick={() => setScheduleMode("none")}><strong className="block text-sm">{t("scheduleNone")}</strong><span className="mt-1 block text-xs font-normal text-[var(--muted)]">{t("scheduleNoneHint")}</span></button>
-                </div>
-              </fieldset>
-              {scheduleMode === "period" ? <>
-                <SchedulePeriodFields startsOn={startsOn} endsOn={endsOn} onStartsOn={setStartsOn} onEndsOn={setEndsOn} />
-                <p className="sm:col-span-2 text-xs leading-5 text-[var(--muted)]">{t("periodNote")}</p>
-              </> : <p className="sm:col-span-2 rounded-xl bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{t("noneNote")}</p>}
+              <div className="sm:col-span-2">
+                <span className={labelClass}>{t("scheduleLegend")}</span>
+                <p className="text-sm leading-6 text-[var(--muted)]">{t("requiredPeriodHint")}</p>
+              </div>
+              <SchedulePeriodFields startsOn={startsOn} endsOn={endsOn} onStartsOn={setStartsOn} onEndsOn={setEndsOn} />
+              <p className="sm:col-span-2 text-xs leading-5 text-[var(--muted)]">{t("periodNote")}</p>
 
               <div className="sm:col-span-2">
                 {optionalOpen ? (
@@ -196,12 +191,8 @@ export function CreateChallengeScreen({
           <div>
             <h2 className="text-xl font-light">{t("checkpointsTitle")}</h2>
             {tracksCatalog ? (
-              <><p className="mt-1 mb-4 text-sm leading-6 text-[var(--muted)]">{tracksCatalog === "book" ? t("bookItemsHint") : t("cineItemsHint")}</p><CineItemsEditor value={cineItems} onChange={setCineItems} members={personal ? [] : group.members ?? []} groupId={group.id} kind={tracksCatalog === "book" ? "book" : "film"} /><p className="mt-3 text-xs font-medium text-[var(--muted)]">{t("itemsCount", { count: itemInputs.length })}</p></>
-            ) : scheduleMode === "period" ? (
-              <div className="mt-5 rounded-2xl border border-[var(--ok-line)] bg-[var(--ok-soft)] p-5"><strong className="text-[var(--ok)]">{t("dailyTitle")}</strong><p className="mt-2 text-sm leading-6 text-[var(--ok)]">{t("dailyBody", { start: f.date(startsOn), end: f.date(endsOn) })}</p></div>
-            ) : (
-              <div className="mt-5 rounded-2xl border border-[var(--ok-line)] bg-[var(--ok-soft)] p-5"><strong className="text-[var(--ok)]">{t("habitTitle")}</strong><p className="mt-2 text-sm leading-6 text-[var(--ok)]">{t("habitBody")}</p></div>
-            )}
+              <><p className="mt-1 mb-4 text-sm leading-6 text-[var(--muted)]">{tracksCatalog === "book" ? t("bookItemsHint") : t("cineItemsHint")}</p><CineItemsEditor value={cineItems} onChange={setCineItems} members={personal ? [] : group?.members ?? []} catalogPath={personal ? API_PATHS.personalCatalog : API_PATHS.groupCatalog(group!.id)} startsOn={startsOn} endsOn={endsOn} kind={tracksCatalog === "book" ? "book" : "film"} /><p className="mt-3 text-xs font-medium text-[var(--muted)]">{t("itemsCount", { count: itemInputs.length })}</p></>
+            ) : null}
           </div>
         ) : null}
 
@@ -209,13 +200,13 @@ export function CreateChallengeScreen({
           <div>
             <h2 className="text-xl font-light">{t("peopleTitle")}</h2>
             <p className="mt-1 text-sm text-[var(--muted)]">{t("peopleSubtitle")}</p>
-            {group.members?.length ? (
+                {group?.members?.length ? (
               <fieldset className="mt-5 grid gap-3 sm:grid-cols-2">
                 <legend className="sr-only">{t("peopleLegend")}</legend>
                 {group.members.map((member) => <label className="flex min-h-14 items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4" key={member.id}><input type="checkbox" aria-label={t("selectMember", { name: member.name })} checked={participantIds.includes(member.id)} onChange={(event) => setParticipantIds((current) => event.target.checked ? [...current, member.id] : current.filter((id) => id !== member.id))} /><span><strong className="block text-sm">{member.name}</strong><small className="text-[var(--muted)]">@{member.username}</small></span></label>)}
               </fieldset>
             ) : <EmptyState title={t("noMembersTitle")} description={t("noMembersBody")} />}
-            <div className="mt-6 rounded-2xl bg-[var(--wash)] p-5 text-sm leading-6"><strong className="block text-base">{t("summaryTitle")}</strong><span className="mt-2 block text-[var(--muted)]">{t("summaryFields", { count: fields.length })} · {tracksCatalog ? t("summaryItems", { count: itemInputs.length }) : scheduleMode === "period" ? t("summaryDaily") : t("summaryHabit")} · {t("summaryParticipants", { count: participantIds.length })}</span><p className="mt-2 text-[var(--muted)]">{t("summaryNote")}</p></div>
+            <div className="mt-6 rounded-2xl bg-[var(--wash)] p-5 text-sm leading-6"><strong className="block text-base">{t("summaryTitle")}</strong><span className="mt-2 block text-[var(--muted)]">{t("summaryFields", { count: fields.length })} · {t("summaryItems", { count: itemInputs.length })} · {t("summaryParticipants", { count: participantIds.length })}</span><p className="mt-2 text-[var(--muted)]">{t("summaryNote")}</p></div>
           </div>
         ) : null}
 

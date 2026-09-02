@@ -4,6 +4,7 @@ import { challengeAccess, writeAudit } from "../../goa-domain";
 import { ApiError, stringValue } from "../../http";
 import { assertUnder, LIMITS } from "../../limits";
 import { copyChallengeStructure } from "./copy";
+import { isRecipeKey } from "./recipes";
 
 export async function duplicateChallenge(
   session: SessionContext,
@@ -13,6 +14,13 @@ export async function duplicateChallenge(
   return inTransaction(async (client) => {
     const sourceAccess = await challengeAccess(session.user.id, sourceChallengeId, client, true);
     await requireGroupRole(session.user.id, sourceAccess.challenge.group_id, ["owner", "admin"], client);
+    if (!isRecipeKey(sourceAccess.challenge.recipe_key)) {
+      throw new ApiError(
+        409,
+        "legacy_recipe_read_only",
+        "Este desafio antigo continua disponível para consulta, mas não pode originar uma nova cópia.",
+      );
+    }
     const targetGroupId = stringValue(body, "targetGroupId", { min: 1, max: 100 })!;
     if (targetGroupId === sourceAccess.challenge.group_id) {
       throw new ApiError(400, "same_group_copy", "Escolha outro grupo para reutilizar este desafio.");
@@ -21,7 +29,7 @@ export async function duplicateChallenge(
     const targetGroup = await oneOrNull<{ id: string }>(
       client,
       `SELECT id FROM groups
-        WHERE id=$1 AND archived_at IS NULL AND deleted_at IS NULL
+        WHERE id=$1 AND kind='standard' AND archived_at IS NULL AND deleted_at IS NULL
         FOR UPDATE`,
       [targetGroupId],
     );

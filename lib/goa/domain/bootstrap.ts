@@ -22,6 +22,15 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
   }
 
   return withClient(async (client) => {
+    const personalWorkspace = await client.query<{ id: string }>(
+      `SELECT id FROM groups
+        WHERE owner_user_id = $1 AND kind = 'personal'
+          AND archived_at IS NULL AND deleted_at IS NULL
+        LIMIT 1`,
+      [session.user.id],
+    );
+    const personalWorkspaceId = personalWorkspace.rows[0]?.id ?? null;
+
     const groupsResult = await client.query<{
       id: string;
       name: string;
@@ -37,13 +46,12 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
           AND gm.user_id = $1 AND gm.removed_at IS NULL
          LEFT JOIN group_members active_members ON active_members.group_id = g.id
           AND active_members.removed_at IS NULL
-        WHERE g.archived_at IS NULL AND g.deleted_at IS NULL
+        WHERE g.kind = 'standard'
+          AND g.archived_at IS NULL AND g.deleted_at IS NULL
         GROUP BY g.id, gm.role
         ORDER BY g.created_at`,
       [session.user.id],
     );
-    const personalWorkspaceId =
-      groupsResult.rows.find((group) => group.kind === "personal")?.id ?? null;
     const groupIds = groupsResult.rows.map((group) => group.id);
     const membersByGroup = new Map<string, Array<Record<string, unknown>>>();
     if (groupIds.length) {
@@ -105,7 +113,8 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
       `SELECT r.id, r.group_id, g.name AS group_name, r.role, r.created_at,
               inviter.display_name AS invited_by
          FROM group_member_requests r
-         JOIN groups g ON g.id = r.group_id AND g.deleted_at IS NULL AND g.archived_at IS NULL
+         JOIN groups g ON g.id = r.group_id AND g.kind = 'standard'
+          AND g.deleted_at IS NULL AND g.archived_at IS NULL
          LEFT JOIN users inviter ON inviter.id = r.invited_by_user_id
         WHERE r.user_id = $1 AND r.status = 'pending'
         ORDER BY r.created_at DESC`,
@@ -125,9 +134,11 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
       completed_count: number;
       total_count: number | null;
       submission_mode: "item" | "daily" | "free" | null;
+      group_kind: "standard" | "personal";
     }>(
       `SELECT c.id, c.group_id, c.title, c.description, c.status,
               c.start_date::text AS start_date, c.end_date::text AS end_date,
+              g.kind AS group_kind,
               gm.role,
               (CASE
                 WHEN EXISTS (SELECT 1 FROM entry_types et WHERE et.challenge_id = c.id
@@ -169,6 +180,7 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
             LIMIT 1
          ) ct ON true
         WHERE c.deleted_at IS NULL
+          AND (g.kind = 'standard' OR (g.kind = 'personal' AND g.owner_user_id = $1))
           AND (c.status <> 'draft' OR gm.role IN ('owner','admin'))
         ORDER BY CASE c.status WHEN 'active' THEN 0 WHEN 'draft' THEN 1 ELSE 2 END, c.created_at DESC`,
       [session.user.id],
@@ -196,7 +208,10 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
       })),
       challenges: challengesResult.rows.map((challenge) => ({
         id: challenge.id,
+        // The workspace id stays for the API's sake; `scope` is what the client
+        // branches on so a personal challenge is never drawn as a group.
         groupId: challenge.group_id,
+        scope: challenge.group_kind === "personal" ? ("personal" as const) : ("group" as const),
         title: challenge.title,
         description: challenge.description,
         status: challenge.status,

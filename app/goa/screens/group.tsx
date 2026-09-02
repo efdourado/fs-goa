@@ -336,7 +336,7 @@ export function GroupScreen({
                   >
                     <span className="min-w-0">
                       <strong className="block truncate text-sm font-light">{item.title}{item.year ? ` (${item.year})` : ""}</strong>
-                      <span className="text-xs text-[var(--muted)]">{[item.genres.join(", ") || null, t("catalogRounds", { count: item.roundCount ?? 0 })].filter(Boolean).join(" · ")}</span>
+                      <span className="text-xs text-[var(--muted)]">{[item.mainGenre, t("catalogRounds", { count: item.roundCount ?? 0 })].filter(Boolean).join(" · ")}</span>
                     </span>
                     <span className="flex-none text-sm tabular-nums">
                       {item.ratingAvg === null || item.ratingAvg === undefined

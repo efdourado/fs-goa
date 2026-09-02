@@ -6,7 +6,6 @@ import { ApiError, stringValue } from "../http";
 import { publicId } from "./domain/shared";
 
 export type CatalogKind = "film" | "book" | "other";
-export type TagKind = "genre" | "decade" | "mood" | "other";
 
 /** Human-insensitive match key: lowercase, no diacritics, collapsed whitespace. */
 export function normalizeTitle(value: string): string {
@@ -23,6 +22,11 @@ export function normalizeLabel(value: string): string {
   return normalizeTitle(value).slice(0, 80);
 }
 
+/** Matches the database's book-identity expression without altering accents. */
+function normalizeAuthor(value: string): string {
+  return value.toLowerCase().replace(/\s+/gu, " ").trim();
+}
+
 function optionalInt(value: unknown, min: number, max: number, name: string): number | null {
   if (value === undefined || value === null || value === "") return null;
   const number = Number(value);
@@ -35,7 +39,7 @@ function optionalInt(value: unknown, min: number, max: number, name: string): nu
 export interface CatalogAttributes {
   author?: unknown;
   year?: unknown;
-  runtimeMinutes?: unknown;
+  mainGenre?: unknown;
   pageCount?: unknown;
 }
 
@@ -56,7 +60,7 @@ function readAttributes(input: CatalogAttributes) {
   return {
     author: optionalText(input.author, 200, "Autor"),
     year: optionalInt(input.year, 1870, 2200, "Ano"),
-    runtimeMinutes: optionalInt(input.runtimeMinutes, 1, 100_000, "Duração"),
+    mainGenre: optionalText(input.mainGenre, 80, "Gênero principal"),
     pageCount: optionalInt(input.pageCount, 1, 1_000_000, "Páginas"),
   };
 }
@@ -79,26 +83,27 @@ export async function upsertCatalogItem(
   const normalized = normalizeTitle(title);
   const attributes = readAttributes(input);
 
-  // Year participates in the identity so "Dune (1984)" and "Dune (2021)" stay
-  // apart. But when there's a single row of the same title and either side lacks
-  // a year, it's the same work: "Aftersun" folds into "Aftersun (2022)", and
-  // adding a year to a lone yearless "Dune" enriches it instead of forking.
+  // Film identity is title-only: `year` is the latest installment/season and may
+  // advance over time. Books additionally use the author, so equal titles by
+  // different people remain separate works. `other` keeps year as a legacy
+  // disambiguator because it has no stronger domain identity.
   type Row = {
     id: string; author: string | null; year: number | null;
-    runtime_minutes: number | null; page_count: number | null;
+    main_genre: string | null; page_count: number | null;
   };
   const sameTitle = await client.query<Row>(
-    `SELECT id, author, year, runtime_minutes, page_count FROM catalog_items
+    `SELECT id, author, year, main_genre, page_count FROM catalog_items
       WHERE group_id = $1 AND kind = $2 AND normalized_title = $3 AND archived_at IS NULL
       ORDER BY created_at`,
     [groupId, input.kind, normalized],
   );
-  const existing: Row | null =
-    sameTitle.rows.find((row) => (row.year ?? -1) === (attributes.year ?? -1))
-    ?? (sameTitle.rows.length === 1
-      && (attributes.year === null || sameTitle.rows[0].year === null)
-        ? sameTitle.rows[0]
-        : null);
+  const existing: Row | null = input.kind === "film"
+    ? sameTitle.rows[0] ?? null
+    : input.kind === "book"
+      ? sameTitle.rows.find(
+          (row) => normalizeAuthor(row.author ?? "") === normalizeAuthor(attributes.author ?? ""),
+        ) ?? null
+      : sameTitle.rows.find((row) => (row.year ?? -1) === (attributes.year ?? -1)) ?? null;
   if (existing) {
     const sets: string[] = [];
     const params: unknown[] = [existing.id];
@@ -109,8 +114,20 @@ export async function upsertCatalogItem(
       }
     };
     enrich("author", existing.author, attributes.author);
-    enrich("year", existing.year, attributes.year);
-    enrich("runtime_minutes", existing.runtime_minutes, attributes.runtimeMinutes);
+    // Re-adding a film/series with a new latest year updates its metadata instead
+    // of creating a second catalog identity. Explicit PATCHes can still correct a
+    // year downwards; normal upserts only advance it.
+    if (
+      input.kind === "film"
+      && attributes.year !== null
+      && (existing.year === null || attributes.year > existing.year)
+    ) {
+      params.push(attributes.year);
+      sets.push(`year = $${params.length}`);
+    } else {
+      enrich("year", existing.year, attributes.year);
+    }
+    enrich("main_genre", existing.main_genre, attributes.mainGenre);
     enrich("page_count", existing.page_count, attributes.pageCount);
     if (sets.length) {
       await client.query(`UPDATE catalog_items SET ${sets.join(", ")}, updated_at = now() WHERE id = $1`, params);
@@ -121,9 +138,9 @@ export async function upsertCatalogItem(
   const id = publicId();
   await client.query(
     `INSERT INTO catalog_items
-      (id, group_id, kind, title, normalized_title, author, year, runtime_minutes, page_count, created_by_user_id, created_at, updated_at)
+      (id, group_id, kind, title, normalized_title, author, year, main_genre, page_count, created_by_user_id, created_at, updated_at)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now(),now())`,
-    [id, groupId, input.kind, title, normalized, attributes.author, attributes.year, attributes.runtimeMinutes, attributes.pageCount, userId],
+    [id, groupId, input.kind, title, normalized, attributes.author, attributes.year, attributes.mainGenre, attributes.pageCount, userId],
   );
   return id;
 }
@@ -145,72 +162,20 @@ export async function assertCatalogItemInGroup(
   }
 }
 
-export async function resolveTags(
-  client: PoolClient,
-  groupId: string,
-  kind: TagKind,
-  labels: unknown,
-): Promise<string[]> {
-  if (!Array.isArray(labels)) return [];
-  const seen = new Set<string>();
-  const ids: string[] = [];
-  for (const raw of labels.slice(0, 30)) {
-    if (typeof raw !== "string") continue;
-    const label = raw.trim();
-    if (!label || label.length > 80) continue;
-    const normalized = normalizeLabel(label);
-    if (!normalized || seen.has(normalized)) continue;
-    seen.add(normalized);
-    const existing = await oneOrNull<{ id: string }>(
-      client,
-      "SELECT id FROM catalog_tags WHERE group_id = $1 AND kind = $2 AND normalized_label = $3",
-      [groupId, kind, normalized],
-    );
-    if (existing) {
-      ids.push(existing.id);
-      continue;
-    }
-    const id = publicId();
-    await client.query(
-      `INSERT INTO catalog_tags (id, group_id, kind, label, normalized_label, created_at)
-       VALUES ($1,$2,$3,$4,$5,now())`,
-      [id, groupId, kind, label, normalized],
-    );
-    ids.push(id);
-  }
-  return ids;
-}
-
-export async function setCatalogItemTags(
-  client: PoolClient,
-  catalogItemId: string,
-  tagIds: string[],
-): Promise<void> {
-  await client.query("DELETE FROM catalog_item_tags WHERE catalog_item_id = $1", [catalogItemId]);
-  for (const tagId of tagIds) {
-    await client.query(
-      "INSERT INTO catalog_item_tags (catalog_item_id, tag_id) VALUES ($1,$2) ON CONFLICT DO NOTHING",
-      [catalogItemId, tagId],
-    );
-  }
-}
-
-export async function listGroupCatalog(session: SessionContext, groupId: string) {
-  return withClient(async (client) => {
-    await requireGroupRole(session.user.id, groupId, ["owner", "admin", "participant"], client);
-    const items = await client.query<{
-      id: string;
-      kind: string;
-      title: string;
-      author: string | null;
-      year: number | null;
-      runtime_minutes: number | null;
-      page_count: number | null;
-      round_count: number;
-      rating_avg: number | null;
-      rating_count: number;
-    }>(
-      `SELECT ci.id, ci.kind, ci.title, ci.author, ci.year, ci.runtime_minutes, ci.page_count,
+async function listCatalogWithClient(client: PoolClient, workspaceId: string) {
+  const items = await client.query<{
+    id: string;
+    kind: string;
+    title: string;
+    author: string | null;
+    year: number | null;
+    main_genre: string | null;
+    page_count: number | null;
+    round_count: number;
+    rating_avg: number | null;
+    rating_count: number;
+  }>(
+    `SELECT ci.id, ci.kind, ci.title, ci.author, ci.year, ci.main_genre, ci.page_count,
               (SELECT count(DISTINCT it.challenge_id)::int FROM challenge_items it WHERE it.catalog_item_id = ci.id) AS round_count,
               agg.rating_avg, coalesce(agg.rating_count, 0)::int AS rating_count
          FROM catalog_items ci
@@ -227,39 +192,22 @@ export async function listGroupCatalog(session: SessionContext, groupId: string)
          ) agg ON true
         WHERE ci.group_id = $1 AND ci.archived_at IS NULL
         ORDER BY ci.title`,
-      [groupId],
-    );
-    const tags = await client.query<{ catalog_item_id: string; kind: string; label: string }>(
-      `SELECT cit.catalog_item_id, ct.kind, ct.label
-         FROM catalog_item_tags cit
-         JOIN catalog_tags ct ON ct.id = cit.tag_id
-        WHERE ct.group_id = $1
-        ORDER BY ct.label`,
-      [groupId],
-    );
-    const genresByItem = new Map<string, string[]>();
-    for (const row of tags.rows) {
-      if (row.kind !== "genre") continue;
-      const list = genresByItem.get(row.catalog_item_id) ?? [];
-      list.push(row.label);
-      genresByItem.set(row.catalog_item_id, list);
-    }
-    return {
-      items: items.rows.map((item) => ({
-        id: item.id,
-        kind: item.kind,
-        title: item.title,
-        author: item.author,
-        year: item.year,
-        runtimeMinutes: item.runtime_minutes,
-        pageCount: item.page_count,
-        genres: genresByItem.get(item.id) ?? [],
-        roundCount: item.round_count,
-        ratingAvg: item.rating_avg === null ? null : Number(item.rating_avg.toFixed(2)),
-        ratingCount: item.rating_count,
-      })),
-    };
-  });
+    [workspaceId],
+  );
+  return {
+    items: items.rows.map((item) => ({
+      id: item.id,
+      kind: item.kind,
+      title: item.title,
+      author: item.author,
+      year: item.year,
+      mainGenre: item.main_genre,
+      pageCount: item.page_count,
+      roundCount: item.round_count,
+      ratingAvg: item.rating_avg === null ? null : Number(item.rating_avg.toFixed(2)),
+      ratingCount: item.rating_count,
+    })),
+  };
 }
 
 /**
@@ -267,32 +215,28 @@ export async function listGroupCatalog(session: SessionContext, groupId: string)
  * round's average rating and who recommended it), so the group can see how a
  * film or book has done across editions.
  */
-export async function catalogItemDetail(session: SessionContext, groupId: string, catalogItemId: string) {
-  return withClient(async (client) => {
-    await requireGroupRole(session.user.id, groupId, ["owner", "admin", "participant"], client);
-    const item = await oneOrNull<{
-      id: string; kind: string; title: string; author: string | null;
-      year: number | null; runtime_minutes: number | null; page_count: number | null;
-    }>(
-      client,
-      `SELECT id, kind, title, author, year, runtime_minutes, page_count
+async function catalogItemDetailWithClient(
+  client: PoolClient,
+  workspaceId: string,
+  catalogItemId: string,
+) {
+  const item = await oneOrNull<{
+    id: string; kind: string; title: string; author: string | null;
+    year: number | null; main_genre: string | null; page_count: number | null;
+  }>(
+    client,
+    `SELECT id, kind, title, author, year, main_genre, page_count
          FROM catalog_items WHERE id = $1 AND group_id = $2 AND archived_at IS NULL`,
-      [catalogItemId, groupId],
-    );
-    if (!item) throw new ApiError(404, "not_found", "Item do acervo não encontrado.");
+    [catalogItemId, workspaceId],
+  );
+  if (!item) throw new ApiError(404, "not_found", "Item do acervo não encontrado.");
 
-    const tags = await client.query<{ kind: string; label: string }>(
-      `SELECT ct.kind, ct.label FROM catalog_item_tags cit
-         JOIN catalog_tags ct ON ct.id = cit.tag_id
-        WHERE cit.catalog_item_id = $1 ORDER BY ct.label`,
-      [catalogItemId],
-    );
-    const rounds = await client.query<{
-      challenge_id: string; title: string; status: string;
-      start_date: string | null; end_date: string | null;
-      recommended_by: string | null; rating_avg: number | null; rating_count: number;
-    }>(
-      `SELECT c.id AS challenge_id, c.title, c.status,
+  const rounds = await client.query<{
+    challenge_id: string; title: string; status: string;
+    start_date: string | null; end_date: string | null;
+    recommended_by: string | null; rating_avg: number | null; rating_count: number;
+  }>(
+    `SELECT c.id AS challenge_id, c.title, c.status,
               c.start_date::text AS start_date, c.end_date::text AS end_date,
               ru.display_name AS recommended_by,
               avg(ev.number_scaled::float8 / (10 ^ f.number_scale)) AS rating_avg,
@@ -307,34 +251,90 @@ export async function catalogItemDetail(session: SessionContext, groupId: string
         WHERE it.catalog_item_id = $1 AND it.archived_at IS NULL
         GROUP BY c.id, c.title, c.status, c.start_date, c.end_date, ru.display_name, c.created_at
         ORDER BY c.start_date NULLS LAST, c.created_at`,
-      [catalogItemId],
-    );
+    [catalogItemId],
+  );
 
-    return {
-      id: item.id,
-      kind: item.kind,
-      title: item.title,
-      author: item.author,
-      year: item.year,
-      runtimeMinutes: item.runtime_minutes,
-      pageCount: item.page_count,
-      genres: tags.rows.filter((tag) => tag.kind === "genre").map((tag) => tag.label),
-      rounds: rounds.rows.map((round) => ({
-        challengeId: round.challenge_id,
-        title: round.title,
-        status: round.status,
-        startsOn: round.start_date,
-        endsOn: round.end_date,
-        recommendedBy: round.recommended_by,
-        ratingAvg: round.rating_avg === null ? null : Number(round.rating_avg.toFixed(2)),
-        ratingCount: round.rating_count,
-      })),
-    };
+  return {
+    id: item.id,
+    kind: item.kind,
+    title: item.title,
+    author: item.author,
+    year: item.year,
+    mainGenre: item.main_genre,
+    pageCount: item.page_count,
+    rounds: rounds.rows.map((round) => ({
+      challengeId: round.challenge_id,
+      title: round.title,
+      status: round.status,
+      startsOn: round.start_date,
+      endsOn: round.end_date,
+      recommendedBy: round.recommended_by,
+      ratingAvg: round.rating_avg === null ? null : Number(round.rating_avg.toFixed(2)),
+      ratingCount: round.rating_count,
+    })),
+  };
+}
+
+async function requireStandardWorkspace(
+  client: PoolClient,
+  userId: string,
+  groupId: string,
+  roles: Array<"owner" | "admin" | "participant">,
+): Promise<void> {
+  await requireGroupRole(userId, groupId, roles, client);
+  const group = await oneOrNull<{ kind: string }>(
+    client,
+    "SELECT kind FROM groups WHERE id = $1 AND archived_at IS NULL AND deleted_at IS NULL",
+    [groupId],
+  );
+  if (!group || group.kind !== "standard") {
+    throw new ApiError(404, "not_found", "Grupo não encontrado.");
+  }
+}
+
+async function personalWorkspaceId(client: PoolClient, userId: string): Promise<string | null> {
+  const workspace = await oneOrNull<{ id: string }>(
+    client,
+    `SELECT id FROM groups
+      WHERE kind = 'personal' AND owner_user_id = $1
+        AND archived_at IS NULL AND deleted_at IS NULL`,
+    [userId],
+  );
+  return workspace?.id ?? null;
+}
+
+export async function listGroupCatalog(session: SessionContext, groupId: string) {
+  return withClient(async (client) => {
+    await requireStandardWorkspace(client, session.user.id, groupId, ["owner", "admin", "participant"]);
+    return listCatalogWithClient(client, groupId);
+  });
+}
+
+export async function catalogItemDetail(session: SessionContext, groupId: string, catalogItemId: string) {
+  return withClient(async (client) => {
+    await requireStandardWorkspace(client, session.user.id, groupId, ["owner", "admin", "participant"]);
+    return catalogItemDetailWithClient(client, groupId, catalogItemId);
+  });
+}
+
+/** The owner's catalog, without exposing the hidden backing workspace as a group. */
+export async function listPersonalCatalog(session: SessionContext) {
+  return withClient(async (client) => {
+    const workspaceId = await personalWorkspaceId(client, session.user.id);
+    return workspaceId ? listCatalogWithClient(client, workspaceId) : { items: [] };
+  });
+}
+
+export async function personalCatalogItemDetail(session: SessionContext, catalogItemId: string) {
+  return withClient(async (client) => {
+    const workspaceId = await personalWorkspaceId(client, session.user.id);
+    if (!workspaceId) throw new ApiError(404, "not_found", "Item do acervo não encontrado.");
+    return catalogItemDetailWithClient(client, workspaceId, catalogItemId);
   });
 }
 
 /**
- * Applies whichever of title/year/runtime/pages/genres the body actually sets,
+ * Applies whichever of title/author/year/main genre/pages the body actually sets,
  * leaving the rest untouched. Shared by the catalog item's own PATCH route and
  * by editing a challenge item's linked catalog entry from inside a challenge.
  */
@@ -347,7 +347,7 @@ export async function applyCatalogItemUpdate(
   const title = body.title === undefined ? undefined : stringValue(body, "title", { min: 1, max: 300 })!;
   const attributes = readAttributes(body as CatalogAttributes);
   const sets: string[] = [];
-  const params: unknown[] = [catalogItemId];
+  const params: unknown[] = [catalogItemId, groupId];
   if (title !== undefined) {
     params.push(title, normalizeTitle(title));
     sets.push(`title = $${params.length - 1}`, `normalized_title = $${params.length}`);
@@ -355,7 +355,7 @@ export async function applyCatalogItemUpdate(
   for (const [column, value, key] of [
     ["author", attributes.author, "author"],
     ["year", attributes.year, "year"],
-    ["runtime_minutes", attributes.runtimeMinutes, "runtimeMinutes"],
+    ["main_genre", attributes.mainGenre, "mainGenre"],
     ["page_count", attributes.pageCount, "pageCount"],
   ] as const) {
     if (Object.hasOwn(body, key)) {
@@ -364,11 +364,10 @@ export async function applyCatalogItemUpdate(
     }
   }
   if (sets.length) {
-    await client.query(`UPDATE catalog_items SET ${sets.join(", ")}, updated_at = now() WHERE id = $1`, params);
-  }
-  if (Object.hasOwn(body, "genres")) {
-    const tagIds = await resolveTags(client, groupId, "genre", body.genres);
-    await setCatalogItemTags(client, catalogItemId, tagIds);
+    await client.query(
+      `UPDATE catalog_items SET ${sets.join(", ")}, updated_at = now() WHERE id = $1 AND group_id = $2`,
+      params,
+    );
   }
 }
 
@@ -378,14 +377,46 @@ export async function updateCatalogItem(
   body: Record<string, unknown>,
 ) {
   return inTransaction(async (client) => {
-    const item = await oneOrNull<{ group_id: string; kind: CatalogKind }>(
+    const item = await oneOrNull<{
+      group_id: string; kind: CatalogKind; group_kind: "standard" | "personal"; owner_user_id: string;
+    }>(
       client,
-      "SELECT group_id, kind FROM catalog_items WHERE id = $1 AND archived_at IS NULL FOR UPDATE",
+      `SELECT ci.group_id, ci.kind, g.kind AS group_kind, g.owner_user_id
+         FROM catalog_items ci JOIN groups g ON g.id = ci.group_id
+        WHERE ci.id = $1 AND ci.archived_at IS NULL
+          AND g.archived_at IS NULL AND g.deleted_at IS NULL
+        FOR UPDATE OF ci`,
       [catalogItemId],
     );
     if (!item) throw new ApiError(404, "not_found", "Item do acervo não encontrado.");
-    await requireGroupRole(session.user.id, item.group_id, ["owner", "admin"], client);
+    if (item.group_kind === "personal") {
+      if (item.owner_user_id !== session.user.id) {
+        throw new ApiError(403, "forbidden", "Este item não pertence ao seu acervo pessoal.");
+      }
+    } else {
+      await requireGroupRole(session.user.id, item.group_id, ["owner", "admin"], client);
+    }
     await applyCatalogItemUpdate(client, catalogItemId, item.group_id, body);
+    return { id: catalogItemId };
+  });
+}
+
+export async function updatePersonalCatalogItem(
+  session: SessionContext,
+  catalogItemId: string,
+  body: Record<string, unknown>,
+) {
+  return inTransaction(async (client) => {
+    const workspaceId = await personalWorkspaceId(client, session.user.id);
+    if (!workspaceId) throw new ApiError(404, "not_found", "Item do acervo não encontrado.");
+    const item = await oneOrNull<{ id: string }>(
+      client,
+      `SELECT id FROM catalog_items
+        WHERE id = $1 AND group_id = $2 AND archived_at IS NULL FOR UPDATE`,
+      [catalogItemId, workspaceId],
+    );
+    if (!item) throw new ApiError(404, "not_found", "Item do acervo não encontrado.");
+    await applyCatalogItemUpdate(client, catalogItemId, workspaceId, body);
     return { id: catalogItemId };
   });
 }

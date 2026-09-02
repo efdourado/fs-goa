@@ -8,6 +8,7 @@ import { assertUnder, LIMITS } from "../../limits";
 import { parseRuleSections } from "../domain/rules";
 import { copyChallengeStructure } from "./copy";
 import { fieldsForChallenge } from "./fields";
+import { isRecipeKey } from "./recipes";
 
 /**
  * Templates are ordinary challenges that a platform admin has flagged for the
@@ -54,6 +55,7 @@ export async function listTemplates() {
          FROM challenges c
          JOIN groups g ON g.id = c.group_id AND g.deleted_at IS NULL AND g.archived_at IS NULL
         WHERE c.published_as_template_at IS NOT NULL AND c.deleted_at IS NULL
+          AND c.recipe_key IN ('cinema', 'library')
         ORDER BY c.published_as_template_at DESC`,
     );
     return {
@@ -87,7 +89,8 @@ async function templateRowById(client: PoolClient, challengeId: string) {
               ORDER BY (et.purpose = 'expectation'), et.created_at LIMIT 1) AS submission_mode
        FROM challenges c
        JOIN groups g ON g.id = c.group_id AND g.deleted_at IS NULL AND g.archived_at IS NULL
-      WHERE c.id = $1 AND c.published_as_template_at IS NOT NULL AND c.deleted_at IS NULL`,
+      WHERE c.id = $1 AND c.published_as_template_at IS NOT NULL AND c.deleted_at IS NULL
+        AND c.recipe_key IN ('cinema', 'library')`,
     [challengeId],
   );
 }
@@ -164,6 +167,13 @@ export async function setChallengeTemplate(
     if (!access.canManage) {
       throw new ApiError(403, "forbidden", "Você precisa administrar este desafio.");
     }
+    if (!isRecipeKey(access.challenge.recipe_key)) {
+      throw new ApiError(
+        409,
+        "legacy_recipe_read_only",
+        "Desafios antigos continuam disponíveis para consulta, mas não podem virar novos modelos.",
+      );
+    }
     const updated = await oneOrNull<{ published_as_template_at: Date | null }>(
       client,
       `UPDATE challenges
@@ -228,20 +238,23 @@ export async function duplicateTemplate(
 ) {
   const targetGroupId = stringValue(body, "targetGroupId", { min: 1, max: 100 })!;
   return inTransaction(async (client) => {
-    const template = await oneOrNull<{ id: string; group_id: string; title: string }>(
+    const template = await oneOrNull<{ id: string; group_id: string; title: string; recipe_key: string | null }>(
       client,
-      `SELECT id, group_id, title FROM challenges
+      `SELECT id, group_id, title, recipe_key FROM challenges
         WHERE id = $1 AND published_as_template_at IS NOT NULL AND deleted_at IS NULL
         FOR UPDATE`,
       [challengeId],
     );
     if (!template) throw new ApiError(404, "not_found", "Modelo não encontrado.");
+    if (!isRecipeKey(template.recipe_key)) {
+      throw new ApiError(409, "legacy_recipe_read_only", "Este modelo antigo não pode criar um novo desafio.");
+    }
 
     await requireGroupRole(session.user.id, targetGroupId, ["owner", "admin"], client);
     const targetGroup = await oneOrNull<{ id: string }>(
       client,
       `SELECT id FROM groups
-        WHERE id = $1 AND archived_at IS NULL AND deleted_at IS NULL
+        WHERE id = $1 AND kind = 'standard' AND archived_at IS NULL AND deleted_at IS NULL
         FOR UPDATE`,
       [targetGroupId],
     );

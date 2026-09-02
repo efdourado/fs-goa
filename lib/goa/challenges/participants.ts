@@ -17,6 +17,15 @@ export async function setChallengeParticipants(
     const access = await challengeAccess(session.user.id, challengeId, client, true);
     if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores podem definir participantes.");
     if (access.challenge.status === "closed") throw new ApiError(409, "challenge_closed", "O desafio está encerrado.");
+    const scope = await client.query<{ kind: "standard" | "personal"; owner_user_id: string }>(
+      "SELECT kind, owner_user_id FROM groups WHERE id = $1",
+      [access.challenge.group_id],
+    );
+    if (scope.rows[0]?.kind === "personal") {
+      if (requestedIds.length !== 1 || requestedIds[0] !== scope.rows[0].owner_user_id) {
+        throw new ApiError(400, "personal_participant", "Desafios pessoais têm somente o proprietário como participante.");
+      }
+    }
     const members = requestedIds.length
       ? await client.query<{ user_id: string }>(
           `SELECT user_id FROM group_members WHERE group_id=$1 AND user_id=ANY($2::text[]) AND removed_at IS NULL`,
