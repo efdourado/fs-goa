@@ -4,7 +4,6 @@ import {
   index,
   integer,
   pgTable,
-  primaryKey,
   smallint,
   text,
   unique,
@@ -31,11 +30,13 @@ export const catalogItems = pgTable(
     kind: text("kind").notNull(),
     title: text("title").notNull(),
     normalizedTitle: text("normalized_title").notNull(),
-    // Enrichable attribute, not part of the identity (title + year). Books treat
-    // it as required at the app layer; films leave it null.
+    // Books use author as part of identity; films leave it null. `year` remains
+    // mutable metadata for either kind.
     author: text("author"),
     year: smallint("year"),
-    runtimeMinutes: integer("runtime_minutes"),
+    // One primary classification, not an open-ended tag list. It is a scalar
+    // label (so values such as "ficção científica" remain valid).
+    mainGenre: text("main_genre"),
     pageCount: integer("page_count"),
     createdByUserId: text("created_by_user_id")
       .notNull()
@@ -45,14 +46,27 @@ export const catalogItems = pgTable(
     updatedAt: timestamptz("updated_at").defaultNow().notNull(),
   },
   (table) => [
-    // Year is part of the identity: "Dune" and "Dune (2021)" are different films.
-    // A title with no year is its own bucket.
-    uniqueIndex("catalog_items_group_kind_title_year_uidx").on(
+    // A film/series is the same catalog object when its normalized title matches.
+    // `year` is mutable metadata (the latest release/season), never identity.
+    uniqueIndex("catalog_items_group_film_title_uidx")
+      .on(table.groupId, table.normalizedTitle)
+      .where(sql`${table.kind} = 'film' and ${table.archivedAt} is null`),
+    // For books the author disambiguates equal titles. Case/outer whitespace are
+    // presentation details and therefore do not split the identity.
+    uniqueIndex("catalog_items_group_book_title_author_uidx")
+      .on(
+        table.groupId,
+        table.normalizedTitle,
+        sql`lower(regexp_replace(btrim(coalesce(${table.author}, '')), '\s+', ' ', 'g'))`,
+      )
+      .where(sql`${table.kind} = 'book' and ${table.archivedAt} is null`),
+    // `other` is retained for legacy/custom structures and keeps the old year
+    // disambiguation because no domain-specific identity is available for it.
+    uniqueIndex("catalog_items_group_other_title_year_uidx").on(
       table.groupId,
-      table.kind,
       table.normalizedTitle,
       sql`coalesce(${table.year}, -1)`,
-    ),
+    ).where(sql`${table.kind} = 'other' and ${table.archivedAt} is null`),
     unique("catalog_items_id_group_unique").on(table.id, table.groupId),
     index("catalog_items_group_kind_idx").on(table.groupId, table.kind),
     check("catalog_items_kind_check", sql`${table.kind} in ('film', 'book', 'other')`),
@@ -63,43 +77,10 @@ export const catalogItems = pgTable(
     ),
     check("catalog_items_normalized_title_check", sql`char_length(${table.normalizedTitle}) between 1 and 300`),
     check("catalog_items_year_check", sql`${table.year} is null or ${table.year} between 1870 and 2200`),
-    check("catalog_items_runtime_check", sql`${table.runtimeMinutes} is null or ${table.runtimeMinutes} between 1 and 100000`),
+    check(
+      "catalog_items_main_genre_check",
+      sql`${table.mainGenre} is null or char_length(btrim(${table.mainGenre})) between 1 and 80`,
+    ),
     check("catalog_items_pages_check", sql`${table.pageCount} is null or ${table.pageCount} between 1 and 1000000`),
-  ],
-);
-
-export const catalogTags = pgTable(
-  "catalog_tags",
-  {
-    id: text("id").primaryKey(),
-    groupId: text("group_id")
-      .notNull()
-      .references(() => groups.id, { onDelete: "cascade" }),
-    kind: text("kind").notNull(),
-    label: text("label").notNull(),
-    normalizedLabel: text("normalized_label").notNull(),
-    createdAt: timestamptz("created_at").defaultNow().notNull(),
-  },
-  (table) => [
-    unique("catalog_tags_group_kind_label_unique").on(table.groupId, table.kind, table.normalizedLabel),
-    check("catalog_tags_kind_check", sql`${table.kind} in ('genre', 'decade', 'mood', 'other')`),
-    check("catalog_tags_label_check", sql`char_length(btrim(${table.label})) between 1 and 80`),
-    check("catalog_tags_normalized_label_check", sql`char_length(${table.normalizedLabel}) between 1 and 80`),
-  ],
-);
-
-export const catalogItemTags = pgTable(
-  "catalog_item_tags",
-  {
-    catalogItemId: text("catalog_item_id")
-      .notNull()
-      .references(() => catalogItems.id, { onDelete: "cascade" }),
-    tagId: text("tag_id")
-      .notNull()
-      .references(() => catalogTags.id, { onDelete: "cascade" }),
-  },
-  (table) => [
-    primaryKey({ name: "catalog_item_tags_pk", columns: [table.catalogItemId, table.tagId] }),
-    index("catalog_item_tags_tag_idx").on(table.tagId),
   ],
 );

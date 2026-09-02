@@ -63,6 +63,7 @@ export function DashboardScreen({
   onOpenAdmin,
   onCreateGroup,
   onCreatePersonalChallenge,
+  onOpenPersonalCatalog,
 }: {
   user: User;
   groups: GroupSummary[];
@@ -74,6 +75,7 @@ export function DashboardScreen({
   onOpenAdmin: (id: Id) => void;
   onCreateGroup: (name: string) => Promise<void>;
   onCreatePersonalChallenge: () => void;
+  onOpenPersonalCatalog: () => void;
 }) {
   const t = useTranslations("dashboard");
   const tc = useTranslations("common");
@@ -84,7 +86,8 @@ export function DashboardScreen({
   const [error, setError] = useState<string | null>(null);
 
   const isPersonal = (challenge: ChallengeSummary) =>
-    personalWorkspaceId !== null && challenge.groupId === personalWorkspaceId;
+    challenge.scope === "personal"
+    || (personalWorkspaceId !== null && challenge.groupId === personalWorkspaceId);
   const personalChallenges = challenges.filter(isPersonal);
   const personalActive = personalChallenges.filter((challenge) => challenge.status === "active");
   const personalOther = personalChallenges.filter((challenge) => challenge.status !== "active");
@@ -139,7 +142,10 @@ export function DashboardScreen({
       <section aria-labelledby="personal-title">
         <div className="mb-4 flex items-center justify-between gap-3">
           <h2 id="personal-title" className="text-xl font-medium tracking-[-0.03em]">{t("personalTitle")}</h2>
-          <button type="button" className={cx(linkClass, "text-sm")} onClick={onCreatePersonalChallenge}>{t("personalCreate")}</button>
+          <span className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1">
+            <button type="button" className={cx(linkClass, "text-sm")} onClick={onOpenPersonalCatalog}>{t("personalCatalog")}</button>
+            <button type="button" className={cx(linkClass, "text-sm")} onClick={onCreatePersonalChallenge}>{t("personalCreate")}</button>
+          </span>
         </div>
         {personalChallenges.length ? (
           <div className="space-y-6">

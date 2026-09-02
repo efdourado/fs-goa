@@ -27,8 +27,8 @@ export async function adminOverview() {
         (SELECT count(*)::int FROM users) AS users_total,
         (SELECT count(*)::int FROM users WHERE created_at > now() - interval '7 days') AS users_new_week,
         (SELECT count(*)::int FROM users WHERE disabled_at IS NOT NULL) AS users_disabled,
-        (SELECT count(*)::int FROM groups WHERE deleted_at IS NULL AND archived_at IS NULL) AS groups_active,
-        (SELECT count(*)::int FROM groups WHERE deleted_at IS NOT NULL) AS groups_trashed,
+        (SELECT count(*)::int FROM groups WHERE kind = 'standard' AND deleted_at IS NULL AND archived_at IS NULL) AS groups_active,
+        (SELECT count(*)::int FROM groups WHERE kind = 'standard' AND deleted_at IS NOT NULL) AS groups_trashed,
         (SELECT count(*)::int FROM challenges WHERE deleted_at IS NULL) AS challenges_active,
         (SELECT count(*)::int FROM challenges WHERE deleted_at IS NOT NULL) AS challenges_trashed,
         (SELECT count(*)::int FROM entries WHERE deleted_at IS NULL) AS entries_active,
@@ -78,7 +78,7 @@ export async function adminUsers() {
       `SELECT u.id, u.display_name, u.username, u.email, u.created_at, u.disabled_at, u.deleted_at, u.platform_admin,
               (SELECT max(s.last_seen_at) FROM sessions s WHERE s.user_id = u.id) AS last_seen_at,
               (SELECT count(*)::int FROM groups g
-                WHERE g.owner_user_id = u.id AND g.deleted_at IS NULL) AS groups_owned,
+                WHERE g.owner_user_id = u.id AND g.kind = 'standard' AND g.deleted_at IS NULL) AS groups_owned,
               (SELECT count(*)::int FROM sessions s
                 WHERE s.user_id = u.id AND s.revoked_at IS NULL AND s.expires_at > now()) AS active_sessions,
               (SELECT max(prt.expires_at) FROM password_reset_tokens prt
@@ -299,12 +299,7 @@ export async function purgeTrashItem(session: SessionContext, body: Record<strin
       [id],
     );
     await client.query("DELETE FROM group_invites WHERE group_id = $1", [id]);
-    await client.query(
-      "DELETE FROM catalog_item_tags WHERE catalog_item_id IN (SELECT id FROM catalog_items WHERE group_id = $1)",
-      [id],
-    );
     await client.query("DELETE FROM catalog_items WHERE group_id = $1", [id]);
-    await client.query("DELETE FROM catalog_tags WHERE group_id = $1", [id]);
     await client.query("DELETE FROM audit_events WHERE group_id = $1", [id]);
     await client.query("DELETE FROM group_members WHERE group_id = $1", [id]);
     await client.query("DELETE FROM groups WHERE id = $1", [id]);

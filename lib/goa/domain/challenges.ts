@@ -5,8 +5,6 @@ import { assertArrayWithin, assertUnder, LIMITS } from "../../limits";
 import {
   applyCatalogItemUpdate,
   assertCatalogItemInGroup,
-  resolveTags,
-  setCatalogItemTags,
   upsertCatalogItem,
 } from "../catalog";
 import { syncDailyCheckpoints } from "../daily-checkpoints";
@@ -14,12 +12,13 @@ import { resolveRecipe } from "../challenges/recipes";
 import { writeAudit } from "./audit";
 import { insertField, type ClientField } from "./fields";
 import { parseRuleSections, rulesCompatibilityText } from "./rules";
-import { asRecord, dateRange, publicId, semanticKey } from "./shared";
+import { asRecord, dateRange, itemTargetDate, publicId, semanticKey } from "./shared";
 
 export async function createChallenge(
   session: SessionContext,
   groupId: string,
   body: Record<string, unknown>,
+  options: { personal?: boolean } = {},
 ) {
   const title = stringValue(body, "title", { min: 1, max: 160 })!;
   const description = stringValue(body, "description", { max: 2_000, optional: true }) ?? null;
@@ -30,6 +29,13 @@ export async function createChallenge(
     Object.hasOwn(body, "endsOn") ? body.endsOn : body.endDate,
   );
   const recipe = resolveRecipe(body);
+  if (recipe.scheduleMode === "period" && (startDate === null || endDate === null)) {
+    throw new ApiError(
+      400,
+      "challenge_period_required",
+      "Defina o início e o término do desafio.",
+    );
+  }
   const wizardFields = Array.isArray(body.fields) && body.fields.length ? (body.fields as ClientField[]) : null;
   if (wizardFields && wizardFields.length > 30) throw new ApiError(400, "field_limit", "Use no máximo 30 campos.");
   const wantsItems = recipe.catalogKind !== null && recipe.entryTypes.some((type) => type.submissionMode === "item");
@@ -37,7 +43,9 @@ export async function createChallenge(
   const items = Array.isArray(body.items) ? body.items : [];
   assertArrayWithin(body.items, 200, "Adicione no máximo 200 itens.");
   assertArrayWithin(body.participantIds, LIMITS.membersPerGroup, "Participantes demais para um único desafio.");
-  const participantIds = Array.isArray(body.participantIds)
+  const participantIds = options.personal
+    ? [session.user.id]
+    : Array.isArray(body.participantIds)
     ? [...new Set(body.participantIds.filter((id): id is string => typeof id === "string"))]
     : [session.user.id];
 
@@ -46,9 +54,11 @@ export async function createChallenge(
     const activeGroup = await oneOrNull<{ id: string }>(
       client,
       `SELECT id FROM groups
-        WHERE id=$1 AND archived_at IS NULL AND deleted_at IS NULL
+        WHERE id=$1 AND kind=$2
+          AND ($2 <> 'personal' OR owner_user_id=$3)
+          AND archived_at IS NULL AND deleted_at IS NULL
         FOR UPDATE`,
-      [groupId],
+      [groupId, options.personal ? "personal" : "standard", session.user.id],
     );
     if (!activeGroup) throw new ApiError(404, "not_found", "Grupo não encontrado.");
     const existing = await oneOrNull<{ count: number }>(
@@ -110,14 +120,16 @@ export async function createChallenge(
 
     if (wantsItems) {
       if (!items.length || items.length > 200) throw new ApiError(400, "item_limit", "Adicione de 1 a 200 itens.");
-      const memberIds = new Set(
-        (
-          await client.query<{ user_id: string }>(
-            "SELECT user_id FROM group_members WHERE group_id = $1 AND removed_at IS NULL",
-            [groupId],
-          )
-        ).rows.map((row) => row.user_id),
-      );
+      const memberIds = options.personal
+        ? new Set([session.user.id])
+        : new Set(
+            (
+              await client.query<{ user_id: string }>(
+                "SELECT user_id FROM group_members WHERE group_id = $1 AND removed_at IS NULL",
+                [groupId],
+              )
+            ).rows.map((row) => row.user_id),
+          );
       const catalogKind = recipe.catalogKind ?? "film";
       const usedKeys = new Set<string>();
       for (let index = 0; index < items.length; index += 1) {
@@ -142,12 +154,9 @@ export async function createChallenge(
             title: itemTitle,
             author: item.author,
             year: item.year,
-            runtimeMinutes: item.runtimeMinutes,
+            mainGenre: item.mainGenre,
             pageCount: item.pageCount,
           });
-        }
-        if (Array.isArray(item.genres) && item.genres.length) {
-          await setCatalogItemTags(client, catalogItemId, await resolveTags(client, groupId, "genre", item.genres));
         }
 
         let recommendedBy: string | null = null;
@@ -163,12 +172,13 @@ export async function createChallenge(
           itemKey = `${semanticKey(itemTitle, `item_${index + 1}`)}_${suffix}`.slice(0, 64);
         }
         usedKeys.add(itemKey);
+        const targetDate = itemTargetDate(item.targetDate, startDate, endDate);
 
         await client.query(
           `INSERT INTO challenge_items
-            (id, challenge_id, entry_type_id, catalog_item_id, recommended_by_user_id, semantic_key, title, position, metadata, created_at, updated_at)
-           VALUES ($1,$2,NULL,$3,$4,$5,$6,$7,'{}'::jsonb,now(),now())`,
-          [publicId(), id, catalogItemId, recommendedBy, itemKey, itemTitle, index],
+            (id, challenge_id, entry_type_id, catalog_item_id, recommended_by_user_id, semantic_key, title, position, target_date, metadata, created_at, updated_at)
+           VALUES ($1,$2,NULL,$3,$4,$5,$6,$7,$8,'{}'::jsonb,now(),now())`,
+          [publicId(), id, catalogItemId, recommendedBy, itemKey, itemTitle, index, targetDate],
         );
       }
     }
@@ -267,21 +277,25 @@ export async function ensurePersonalWorkspace(userId: string): Promise<string> {
         [userId],
       );
     const existing = await readId();
-    if (existing) return existing.id;
     // The partial unique index makes this a no-op under a concurrent request;
     // re-read to pick up whichever row won.
-    await client.query(
-      `INSERT INTO groups (id, name, kind, owner_user_id, created_at, updated_at)
-       VALUES ($1, 'Pessoal', 'personal', $2, now(), now())
-       ON CONFLICT DO NOTHING`,
-      [publicId(), userId],
-    );
-    const workspaceId = (await readId())?.id;
+    if (!existing) {
+      await client.query(
+        `INSERT INTO groups (id, name, kind, owner_user_id, created_at, updated_at)
+         VALUES ($1, 'Pessoal', 'personal', $2, now(), now())
+         ON CONFLICT DO NOTHING`,
+        [publicId(), userId],
+      );
+    }
+    const workspaceId = existing?.id ?? (await readId())?.id;
     if (!workspaceId) throw new ApiError(500, "workspace_unavailable", "Não foi possível preparar seu espaço pessoal.");
     await client.query(
       `INSERT INTO group_members (group_id, user_id, role, added_by_user_id, joined_at)
        VALUES ($1, $2, 'owner', $2, now())
-       ON CONFLICT (group_id, user_id) DO NOTHING`,
+       ON CONFLICT (group_id, user_id) DO UPDATE SET
+         role = 'owner',
+         removed_at = NULL,
+         joined_at = CASE WHEN group_members.removed_at IS NULL THEN group_members.joined_at ELSE now() END`,
       [workspaceId, userId],
     );
     return workspaceId;
@@ -294,5 +308,5 @@ export async function createPersonalChallenge(
   body: Record<string, unknown>,
 ) {
   const workspaceId = await ensurePersonalWorkspace(session.user.id);
-  return createChallenge(session, workspaceId, body);
+  return createChallenge(session, workspaceId, body, { personal: true });
 }

@@ -4,6 +4,7 @@ import { challengeAccess, writeAudit } from "../../goa-domain";
 import { ApiError } from "../../http";
 import { entryTypesForChallenge, usesCheckpoints, usesRoundItems } from "./entry-types";
 import { generateShowcase } from "./showcase";
+import { recipeRequiresPeriod } from "./recipes";
 
 export async function transitionChallenge(
   session: SessionContext,
@@ -20,6 +21,15 @@ export async function transitionChallenge(
       (access.challenge.status === "active" && target === "closed") ||
       reopening;
     if (!valid) throw new ApiError(409, "invalid_transition", "A transição de estado não é permitida.");
+    const challengeHasPeriod =
+      access.challenge.start_date !== null && access.challenge.end_date !== null;
+    if (target === "active" && recipeRequiresPeriod(access.challenge.recipe_key) && !challengeHasPeriod) {
+      throw new ApiError(
+        409,
+        "challenge_period_required",
+        "Defina o início e o término antes de ativar o desafio.",
+      );
+    }
     if (reopening) {
       // Reabrir não repete a checagem de prontidão (já passou por ela uma vez) —
       // apenas libera os registros de novo e limpa a marca de encerramento.
@@ -42,8 +52,6 @@ export async function transitionChallenge(
       }
     } else if (target === "active") {
       const types = await entryTypesForChallenge(client, challengeId);
-      const challengeHasPeriod =
-        access.challenge.start_date !== null && access.challenge.end_date !== null;
       const readiness = await oneOrNull<{
         fields: number; participants: number; items: number; checkpoints: number;
       }>(client,

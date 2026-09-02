@@ -6,6 +6,7 @@ import {
   challengeAccess,
   dateString,
   integerValue,
+  itemTargetDate,
   publicId,
   semanticKey,
   writeAudit,
@@ -14,8 +15,6 @@ import { ApiError, stringValue } from "../../http";
 import {
   applyCatalogItemUpdate,
   assertCatalogItemInGroup,
-  resolveTags,
-  setCatalogItemTags,
   upsertCatalogItem,
 } from "../catalog";
 import { syncDailyCheckpoints } from "../daily-checkpoints";
@@ -81,6 +80,7 @@ export async function addChallengeItem(
       throw new ApiError(400, "invalid_item", "Informe o autor de cada livro.");
     }
     const position = integerValue(body.position, 0, 0, 10_000);
+    const targetDate = itemTargetDate(body.targetDate, access.challenge.start_date, access.challenge.end_date);
     const id = publicId();
     let catalogItemId: string;
     if (typeof body.catalogItemId === "string" && body.catalogItemId) {
@@ -94,9 +94,9 @@ export async function addChallengeItem(
     }
     await client.query(
       `INSERT INTO challenge_items
-        (id, challenge_id, entry_type_id, catalog_item_id, semantic_key, title, description, position, metadata, created_at, updated_at)
-       VALUES ($1,$2,NULL,$3,$4,$5,$6,$7,'{}'::jsonb,now(),now())`,
-      [id, challengeId, catalogItemId, await uniqueItemKey(client, challengeId, body.key ?? title, position), title, description, position],
+        (id, challenge_id, entry_type_id, catalog_item_id, semantic_key, title, description, position, target_date, metadata, created_at, updated_at)
+       VALUES ($1,$2,NULL,$3,$4,$5,$6,$7,$8,'{}'::jsonb,now(),now())`,
+      [id, challengeId, catalogItemId, await uniqueItemKey(client, challengeId, body.key ?? title, position), title, description, position, targetDate],
     );
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
       "item.created", "challenge_item", id, null, { title });
@@ -148,7 +148,11 @@ export async function saveChallengeItems(
       [challengeId]);
     const memberIds = new Set(
       (await client.query<{ user_id: string }>(
-        "SELECT user_id FROM group_members WHERE group_id=$1 AND removed_at IS NULL", [access.challenge.group_id])
+        `SELECT gm.user_id
+           FROM group_members gm JOIN groups g ON g.id = gm.group_id
+          WHERE gm.group_id=$1 AND gm.removed_at IS NULL
+            AND (g.kind = 'standard' OR gm.user_id = g.owner_user_id)`,
+        [access.challenge.group_id])
       ).rows.map((row) => row.user_id),
     );
     const ids: string[] = [];
@@ -172,12 +176,9 @@ export async function saveChallengeItems(
         }
       } else {
         catalogItemId = await upsertCatalogItem(client, access.challenge.group_id, session.user.id, {
-          kind: catalogKind, title, author: item.author, year: item.year, runtimeMinutes: item.runtimeMinutes,
+          kind: catalogKind, title, author: item.author, year: item.year, mainGenre: item.mainGenre,
           pageCount: item.pageCount,
         });
-      }
-      if (Array.isArray(item.genres) && item.genres.length) {
-        await setCatalogItemTags(client, catalogItemId, await resolveTags(client, access.challenge.group_id, "genre", item.genres));
       }
       let recommendedBy: string | null = null;
       if (typeof item.recommendedByUserId === "string" && item.recommendedByUserId) {
@@ -189,11 +190,12 @@ export async function saveChallengeItems(
 
       await client.query(
         `INSERT INTO challenge_items
-          (id,challenge_id,entry_type_id,catalog_item_id,recommended_by_user_id,semantic_key,title,description,position,metadata,created_at,updated_at)
-         VALUES ($1,$2,NULL,$3,$4,$5,$6,$7,$8,'{}'::jsonb,now(),now())`,
+          (id,challenge_id,entry_type_id,catalog_item_id,recommended_by_user_id,semantic_key,title,description,position,target_date,metadata,created_at,updated_at)
+         VALUES ($1,$2,NULL,$3,$4,$5,$6,$7,$8,$9,'{}'::jsonb,now(),now())`,
         [id, challengeId, catalogItemId, recommendedBy,
           await uniqueItemKey(client, challengeId, item.key ?? title, position), title,
-          typeof item.description === "string" ? item.description.trim() || null : null, position],
+          typeof item.description === "string" ? item.description.trim() || null : null, position,
+          itemTargetDate(item.targetDate, access.challenge.start_date, access.challenge.end_date)],
       );
       ids.push(id);
     }
@@ -256,10 +258,11 @@ export async function updateChallengeItem(
     }
 
     const current = await oneOrNull<{
-      title: string; description: string | null; recommended_by_user_id: string | null; catalog_item_id: string | null;
+      title: string; description: string | null; recommended_by_user_id: string | null;
+      catalog_item_id: string | null; target_date: string | null;
     }>(
       client,
-      `SELECT title, description, recommended_by_user_id, catalog_item_id
+      `SELECT title, description, recommended_by_user_id, catalog_item_id, target_date::text AS target_date
          FROM challenge_items
         WHERE id = $1 AND challenge_id = $2 AND archived_at IS NULL
         FOR UPDATE`,
@@ -291,18 +294,21 @@ export async function updateChallengeItem(
           recommendedBy = wanted;
         }
       }
+      const targetDate = Object.hasOwn(body, "targetDate")
+        ? itemTargetDate(body.targetDate, access.challenge.start_date, access.challenge.end_date)
+        : current.target_date;
       await client.query(
         `UPDATE challenge_items
-            SET title = $3, description = $4, recommended_by_user_id = $5, updated_at = now()
+            SET title = $3, description = $4, recommended_by_user_id = $5, target_date = $6, updated_at = now()
           WHERE id = $1 AND challenge_id = $2`,
-        [itemId, challengeId, title, description, recommendedBy],
+        [itemId, challengeId, title, description, recommendedBy, targetDate],
       );
-      // Ano, duração/páginas e gêneros vivem no item do acervo compartilhado, não
+      // Autor, ano, gênero principal e páginas vivem no item do acervo compartilhado, não
       // no item do desafio — atualizá-los aqui é o que deixa "esqueci de preencher
       // na criação" corrigível depois, sem duplicar a lógica de `updateCatalogItem`.
       if (current.catalog_item_id
-        && (Object.hasOwn(body, "author") || Object.hasOwn(body, "year") || Object.hasOwn(body, "runtimeMinutes")
-          || Object.hasOwn(body, "pageCount") || Object.hasOwn(body, "genres"))) {
+        && (Object.hasOwn(body, "author") || Object.hasOwn(body, "year") || Object.hasOwn(body, "mainGenre")
+          || Object.hasOwn(body, "pageCount"))) {
         await applyCatalogItemUpdate(client, current.catalog_item_id, access.challenge.group_id, body);
       }
       await writeAudit(

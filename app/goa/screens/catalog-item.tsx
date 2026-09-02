@@ -3,18 +3,18 @@
 import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 
-import { API_PATHS, apiRequest } from "../api";
+import { apiRequest } from "../api";
 import { useGoaFormat } from "../format";
 import type { CatalogItemDetail, Id } from "../types";
 import { backLinkClass, Button, cardClass, cx, EmptyState, LoadingView, PageHeading } from "../ui";
 
 export function CatalogItemScreen({
-  groupId,
+  detailPath,
   itemId,
   onBack,
   onOpenChallenge,
 }: {
-  groupId: Id;
+  detailPath: string;
   itemId: Id;
   onBack: () => void;
   onOpenChallenge: (id: Id) => void;
@@ -26,12 +26,12 @@ export function CatalogItemScreen({
 
   useEffect(() => {
     const controller = new AbortController();
-    apiRequest<CatalogItemDetail>(API_PATHS.groupCatalogItem(groupId, itemId), { signal: controller.signal })
+    apiRequest<CatalogItemDetail>(detailPath, { signal: controller.signal })
       .then(setItem)
       .catch((cause: unknown) => setError(f.error(cause)));
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groupId, itemId]);
+  }, [detailPath, itemId]);
 
   if (error) return <main className="mx-auto max-w-3xl px-4 py-10"><EmptyState title={t("errorTitle")} description={error} action={<Button variant="secondary" onClick={onBack}>{t("back")}</Button>} /></main>;
   if (!item) return <LoadingView />;
@@ -39,9 +39,8 @@ export function CatalogItemScreen({
   const attrs = [
     item.author ? t("byAuthor", { name: item.author }) : null,
     item.year ? String(item.year) : null,
-    item.runtimeMinutes ? t("runtime", { minutes: item.runtimeMinutes }) : null,
     item.pageCount ? t("pages", { count: item.pageCount }) : null,
-    item.genres.length ? item.genres.join(", ") : null,
+    item.mainGenre,
   ].filter(Boolean);
   const rated = item.rounds.filter((round) => round.ratingAvg !== null);
   const historyAvg = rated.length

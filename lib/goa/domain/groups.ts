@@ -24,7 +24,11 @@ export async function assertGroupHasCapacity(
   joiningUserId: string,
   options: { reservePending?: boolean } = {},
 ): Promise<void> {
-  await client.query("SELECT id FROM groups WHERE id = $1 FOR UPDATE", [groupId]);
+  const group = await client.query(
+    "SELECT id FROM groups WHERE id = $1 AND kind = 'standard' AND archived_at IS NULL AND deleted_at IS NULL FOR UPDATE",
+    [groupId],
+  );
+  if (!group.rowCount) throw new ApiError(404, "not_found", "Grupo não encontrado.");
   const active = await oneOrNull<{ is_member: boolean }>(
     client,
     `SELECT EXISTS (
@@ -151,7 +155,8 @@ export async function requestGroupMember(
     const group = await oneOrNull<{ id: string }>(
       client,
       `SELECT id FROM groups
-        WHERE id = $1 AND archived_at IS NULL AND deleted_at IS NULL`,
+        WHERE id = $1 AND kind = 'standard'
+          AND archived_at IS NULL AND deleted_at IS NULL`,
       [groupId],
     );
     if (!group) throw new ApiError(404, "not_found", "Grupo não encontrado.");
@@ -247,7 +252,7 @@ export async function respondToMemberRequest(
       client,
       `SELECT r.id, r.group_id, g.name AS group_name, r.user_id, r.status
          FROM group_member_requests r
-         JOIN groups g ON g.id = r.group_id
+         JOIN groups g ON g.id = r.group_id AND g.kind = 'standard'
           AND g.archived_at IS NULL AND g.deleted_at IS NULL
         WHERE r.id = $1
         FOR UPDATE OF r`,
@@ -332,7 +337,7 @@ export async function cancelMemberRequest(session: SessionContext, requestId: st
       client,
       `SELECT r.id, r.group_id, g.name AS group_name, r.user_id, r.status
          FROM group_member_requests r
-         JOIN groups g ON g.id = r.group_id
+         JOIN groups g ON g.id = r.group_id AND g.kind = 'standard'
         WHERE r.id = $1
         FOR UPDATE OF r`,
       [requestId],
@@ -372,7 +377,8 @@ export async function updateGroup(
       client,
       `SELECT name, description
          FROM groups
-        WHERE id = $1 AND archived_at IS NULL AND deleted_at IS NULL
+        WHERE id = $1 AND kind = 'standard'
+          AND archived_at IS NULL AND deleted_at IS NULL
         FOR UPDATE`,
       [groupId],
     );
@@ -409,7 +415,7 @@ export async function softDeleteGroup(session: SessionContext, groupId: string) 
     await requireGroupRole(session.user.id, groupId, ["owner"], client);
     const current = await oneOrNull<{ name: string }>(
       client,
-      "SELECT name FROM groups WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
+      "SELECT name FROM groups WHERE id = $1 AND kind = 'standard' AND deleted_at IS NULL FOR UPDATE",
       [groupId],
     );
     if (!current) throw new ApiError(404, "not_found", "Grupo não encontrado.");

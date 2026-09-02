@@ -40,6 +40,11 @@ export function screenFromUrl(pathname: string, search = ""): Screen | null {
     const token = decoded(parts[1]);
     return token ? { kind: "invite", token } : null;
   }
+  if (parts[0] === "catalog" && parts.length === 1) return { kind: "personal-catalog" };
+  if (parts[0] === "catalog" && parts.length === 2) {
+    const itemId = decoded(parts[1]);
+    return itemId ? { kind: "personal-catalog-item", itemId } : null;
+  }
   if (parts[0] === "groups" && parts.length === 2) {
     const groupId = decoded(parts[1]);
     if (!groupId) return null;
@@ -85,6 +90,10 @@ export function urlForScreen(screen: Screen): string | null {
       return `/groups/${encodeURIComponent(screen.groupId)}`;
     case "catalog-item":
       return `/groups/${encodeURIComponent(screen.groupId)}/catalog/${encodeURIComponent(screen.itemId)}`;
+    case "personal-catalog":
+      return "/catalog";
+    case "personal-catalog-item":
+      return `/catalog/${encodeURIComponent(screen.itemId)}`;
     case "create-challenge":
       return `/groups/${encodeURIComponent(screen.groupId)}?create=challenge`;
     case "create-personal-challenge":

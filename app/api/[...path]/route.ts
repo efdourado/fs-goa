@@ -24,7 +24,14 @@ import {
   setUserPlatformAdmin,
 } from "@/lib/admin";
 import { adminFeedback, submitFeedback } from "@/lib/feedback";
-import { catalogItemDetail, listGroupCatalog, updateCatalogItem } from "@/lib/goa/catalog";
+import {
+  catalogItemDetail,
+  listGroupCatalog,
+  listPersonalCatalog,
+  personalCatalogItemDetail,
+  updateCatalogItem,
+  updatePersonalCatalogItem,
+} from "@/lib/goa/catalog";
 import {
   addMetric,
   archiveChallengeItem,
@@ -114,6 +121,12 @@ export async function GET(request: Request): Promise<Response> {
     }
     if (path[0] === "groups" && path[2] === "catalog" && path.length === 4) {
       return json(await catalogItemDetail(await requireSession(request), path[1], path[3]));
+    }
+    if (isPath(path, "personal", "catalog")) {
+      return json(await listPersonalCatalog(await requireSession(request)));
+    }
+    if (path[0] === "personal" && path[1] === "catalog" && path.length === 3) {
+      return json(await personalCatalogItemDetail(await requireSession(request), path[2]));
     }
     if (path[0] === "challenges" && path.length === 2) {
       return json(await getChallengeDetail(await requireSession(request), path[1]));
@@ -258,6 +271,9 @@ export async function PATCH(request: Request): Promise<Response> {
     }
     if (path[0] === "catalog" && path.length === 2) {
       return json(await updateCatalogItem(session, path[1], body));
+    }
+    if (path[0] === "personal" && path[1] === "catalog" && path.length === 3) {
+      return json(await updatePersonalCatalogItem(session, path[2], body));
     }
     if (path[0] === "groups" && path.length === 2) {
       return json(await updateGroup(session, path[1], body));

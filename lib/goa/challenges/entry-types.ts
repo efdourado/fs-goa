@@ -139,7 +139,7 @@ export function usesCheckpoints(types: EntryTypeRow[], challengeHasPeriod: boole
 
 /** The catalog kind a recipe tracks; null when it has no round items. */
 export function recipeCatalogKind(recipeKey: string | null): "film" | "book" | null {
-  if (recipeKey === "cine_free" || recipeKey === "cine_curated") return "film";
-  if (recipeKey === "reading_club") return "book";
+  if (recipeKey === "cinema" || recipeKey === "cine_free" || recipeKey === "cine_curated") return "film";
+  if (recipeKey === "library" || recipeKey === "reading_club") return "book";
   return null;
 }

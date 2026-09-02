@@ -4,7 +4,15 @@ export type ChallengeStatus = "draft" | "active" | "closed";
 export type FieldType = "text" | "number" | "rating" | "select" | "boolean" | "date";
 export type SubmissionMode = "item" | "daily" | "free";
 export type Template = "cine" | "reading";
-export type RecipeKey = "cine_free" | "cine_curated" | "reading_club" | "reading_daily";
+/** New challenges use the two product templates; the other keys remain readable legacy snapshots. */
+export type RecipeKey =
+  | "cinema"
+  | "library"
+  | "cine_free"
+  | "cine_curated"
+  | "reading_club"
+  | "reading_daily";
+export type CreatableRecipeKey = "cinema" | "library";
 export type EntryPurpose = "progress" | "completion" | "expectation" | "rating" | "checkin";
 export type TargetPolicy = "required" | "optional" | "none";
 export type Cardinality = "once_per_item" | "once_per_item_day" | "repeatable" | "once_per_day";
@@ -82,9 +90,8 @@ export interface CatalogItem {
   title: string;
   author?: string | null;
   year?: number | null;
-  runtimeMinutes?: number | null;
   pageCount?: number | null;
-  genres: string[];
+  mainGenre?: string | null;
   roundCount?: number;
   ratingAvg?: number | null;
   ratingCount?: number;
@@ -112,11 +119,13 @@ export interface ChallengeItem {
   title: string;
   description?: string | null;
   position?: number;
+  /** Optional, non-blocking goal date inside the challenge period. */
+  targetDate?: string | null;
   opensAt?: string | null;
   dueAt?: string | null;
   date?: string | null;
   status?: "scheduled" | "open" | "past_due" | "closed";
-  catalogItem?: Pick<CatalogItem, "id" | "title" | "author" | "year" | "runtimeMinutes" | "pageCount" | "genres"> | null;
+  catalogItem?: Pick<CatalogItem, "id" | "title" | "author" | "year" | "pageCount" | "mainGenre"> | null;
   recommendedBy?: { id: Id; name: string } | null;
 }
 
@@ -224,6 +233,8 @@ export interface ChallengeRule {
 export interface ChallengeSummary {
   id: Id;
   groupId: Id;
+  /** "personal" challenges live in a hidden workspace and are never drawn as a group. */
+  scope?: "personal" | "group";
   title: string;
   description?: string | null;
   rules?: string | null;
@@ -357,6 +368,8 @@ export type Screen =
   | { kind: "account" }
   | { kind: "group"; groupId: Id }
   | { kind: "catalog-item"; groupId: Id; itemId: Id }
+  | { kind: "personal-catalog" }
+  | { kind: "personal-catalog-item"; itemId: Id }
   | { kind: "invite"; token: string }
   | { kind: "invite-success"; invitation: InviteAcceptance }
   | { kind: "create-challenge"; groupId: Id }
@@ -367,7 +380,7 @@ export type Screen =
   | { kind: "template"; challengeId: Id };
 
 export interface ChallengeCreationInput {
-  recipe: RecipeKey;
+  recipe: CreatableRecipeKey;
   title: string;
   description: string;
   ruleSections: ChallengeRule[];
@@ -386,7 +399,7 @@ export interface ChallengeItemInput {
   recommendedByUserId?: Id;
   author?: string;
   year?: number;
-  runtimeMinutes?: number;
   pageCount?: number;
-  genres?: string[];
+  mainGenre?: string;
+  targetDate?: string;
 }

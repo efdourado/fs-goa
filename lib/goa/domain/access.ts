@@ -50,6 +50,7 @@ export async function challengeAccess(
          JOIN group_members gm ON gm.group_id = c.group_id
           AND gm.user_id = $2 AND gm.removed_at IS NULL
         WHERE c.id = $1 AND c.deleted_at IS NULL
+          AND (g.kind = 'standard' OR (g.kind = 'personal' AND g.owner_user_id = $2))
           AND (c.status <> 'draft' OR gm.role IN ('owner','admin'))${lock ? " FOR UPDATE OF c" : ""}`,
       [challengeId, userId],
     );

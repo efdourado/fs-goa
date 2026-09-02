@@ -1,5 +1,5 @@
 import type { ClientField } from "../domain/fields";
-import { defaultFields } from "../domain/fields";
+import { ApiError } from "../../http";
 import type {
   Cardinality,
   Purpose,
@@ -56,7 +56,40 @@ export interface Recipe {
   metrics: RecipeMetric[];
 }
 
-export type RecipeKey = "cine_free" | "cine_curated" | "reading_club" | "reading_daily";
+/** Recipes offered for new challenges. Historical rows keep their frozen shape. */
+export type RecipeKey = "cinema" | "library";
+
+/**
+ * Stored by challenges created before the two-template consolidation. These keys
+ * remain valid in the database so their existing entry types and fields can be
+ * read faithfully, but `resolveRecipe` never creates a new challenge from them.
+ */
+export type LegacyRecipeKey =
+  | "cine_free"
+  | "cine_curated"
+  | "reading_club"
+  | "reading_daily";
+
+export type StoredRecipeKey = RecipeKey | LegacyRecipeKey;
+
+const LEGACY_RECIPE_KEYS = new Set<string>([
+  "cine_free",
+  "cine_curated",
+  "reading_club",
+  "reading_daily",
+]);
+
+export function isLegacyRecipeKey(value: unknown): value is LegacyRecipeKey {
+  return typeof value === "string" && LEGACY_RECIPE_KEYS.has(value);
+}
+
+export function isRecipeKey(value: unknown): value is RecipeKey {
+  return value === "cinema" || value === "library";
+}
+
+export function recipeRequiresPeriod(recipeKey: string | null): boolean {
+  return recipeKey === "cinema" || recipeKey === "library";
+}
 
 const ratingFields = (commentMax: number): ClientField[] => [
   { key: "nota", label: "Nota", type: "rating", required: true },
@@ -80,26 +113,6 @@ const avaliacao = (primary: boolean): RecipeEntryType => ({
   fields: ratingFields(280),
   primary,
 });
-
-const expectativa: RecipeEntryType = {
-  semanticKey: "expectativa",
-  name: "Expectativa",
-  purpose: "expectation",
-  submissionMode: "item",
-  targetPolicy: "required",
-  cardinality: "once_per_item",
-  schedulePolicy: "while_active",
-  fields: [
-    { key: "expectativa", label: "Expectativa", type: "rating", required: true },
-    {
-      key: "por_que",
-      label: "Por quê?",
-      type: "text",
-      required: false,
-      config: { multiline: true, maxLength: 200 },
-    },
-  ],
-};
 
 const progressoDia: RecipeEntryType = {
   semanticKey: "progresso",
@@ -133,18 +146,6 @@ const conclusao: RecipeEntryType = {
   ],
 };
 
-const registroDiario: RecipeEntryType = {
-  semanticKey: "registro",
-  name: "Registro",
-  purpose: "checkin",
-  submissionMode: "daily",
-  targetPolicy: "none",
-  cardinality: "once_per_day",
-  schedulePolicy: "checkpoint",
-  fields: defaultFields("reading"),
-  primary: true,
-};
-
 const completionMetric: RecipeMetric = {
   key: "taxa_conclusao",
   label: "Taxa de conclusão",
@@ -176,36 +177,17 @@ const cineMetrics: RecipeMetric[] = [
 ];
 
 export const RECIPES: Record<RecipeKey, Recipe> = {
-  cine_free: {
-    key: "cine_free",
+  cinema: {
+    key: "cinema",
     version: 1,
     catalogKind: "film",
-    scheduleMode: "none",
+    scheduleMode: "period",
     entryTypes: [avaliacao(true)],
     metrics: cineMetrics,
   },
-  cine_curated: {
-    key: "cine_curated",
+  library: {
+    key: "library",
     version: 1,
-    catalogKind: "film",
-    scheduleMode: "none",
-    entryTypes: [expectativa, avaliacao(true)],
-    metrics: [
-      ...cineMetrics.slice(0, 4),
-      {
-        key: "surpresa",
-        label: "Surpresa × decepção",
-        operation: "surprise",
-        fieldKey: "nota",
-        groupBy: "item",
-        settings: { minSample: 2 },
-      },
-      completionMetric,
-    ],
-  },
-  reading_club: {
-    key: "reading_club",
-    version: 2,
     catalogKind: "book",
     scheduleMode: "period",
     entryTypes: [progressoDia, conclusao],
@@ -223,81 +205,38 @@ export const RECIPES: Record<RecipeKey, Recipe> = {
       completionMetric,
     ],
   },
-  reading_daily: {
-    key: "reading_daily",
-    version: 1,
-    catalogKind: null,
-    scheduleMode: "period",
-    entryTypes: [registroDiario],
-    metrics: [
-      { key: "media_paginas", label: "Média de páginas", operation: "average", fieldKey: "paginas_lidas", groupBy: "none" },
-      completionMetric,
-    ],
-  },
 };
 
 const TEMPLATE_ALIAS: Record<string, RecipeKey> = {
-  cine: "cine_free",
-  reading: "reading_daily",
-};
-
-const AXES_BY_MODE: Record<SubmissionMode, Omit<RecipeEntryType, "semanticKey" | "name" | "fields" | "primary">> = {
-  item: {
-    purpose: "rating",
-    submissionMode: "item",
-    targetPolicy: "required",
-    cardinality: "once_per_item",
-    schedulePolicy: "while_active",
-  },
-  daily: {
-    purpose: "checkin",
-    submissionMode: "daily",
-    targetPolicy: "none",
-    cardinality: "once_per_day",
-    schedulePolicy: "checkpoint",
-  },
-  free: {
-    purpose: "checkin",
-    submissionMode: "free",
-    targetPolicy: "none",
-    cardinality: "repeatable",
-    schedulePolicy: "free",
-  },
+  cine: "cinema",
+  reading: "library",
 };
 
 /**
- * Picks the recipe a create request wants. `recipe` is the modern field; a bare
- * `template` or `submissionMode` keeps older clients and the API test-suite
- * working — the latter builds a one-type recipe straight from the mode.
+ * Picks one of the only two recipes that can create a challenge. The four former
+ * recipe keys deliberately fail here: their rows remain readable because every
+ * challenge stores its concrete entry types/fields, but they cannot seed new
+ * structures. The old `cine`/`reading` template aliases lead to the current
+ * Cinema/Library definitions while clients migrate to `recipe`.
  */
 export function resolveRecipe(body: Record<string, unknown>): Recipe {
-  if (typeof body.recipe === "string" && body.recipe in RECIPES) {
-    return RECIPES[body.recipe as RecipeKey];
+  if (Object.hasOwn(body, "recipe")) {
+    if (!isRecipeKey(body.recipe)) {
+      throw new ApiError(400, "invalid_recipe", "Escolha o modelo Cinema ou Library.");
+    }
+    return RECIPES[body.recipe];
   }
-  if (typeof body.template === "string" && body.template in TEMPLATE_ALIAS) {
+  if (Object.hasOwn(body, "template")) {
+    if (typeof body.template !== "string" || !Object.hasOwn(TEMPLATE_ALIAS, body.template)) {
+      throw new ApiError(400, "invalid_recipe", "Escolha o modelo Cinema ou Library.");
+    }
     return RECIPES[TEMPLATE_ALIAS[body.template]];
   }
-  const mode: SubmissionMode =
-    body.submissionMode === "daily" || body.submissionMode === "free" ? body.submissionMode : "item";
-  const template = typeof body.template === "string" ? body.template : undefined;
-  return {
-    key: mode === "daily" ? "reading_daily" : "cine_free",
-    version: 1,
-    catalogKind: mode === "item" ? "film" : null,
-    scheduleMode: mode === "item" ? "none" : "period",
-    entryTypes: [
-      {
-        semanticKey: "registro",
-        name: "Registro",
-        ...AXES_BY_MODE[mode],
-        fields: defaultFields(template),
-        primary: true,
-      },
-    ],
-    // Back-compat: the fixed pair the app seeded before recipes existed.
-    metrics: [
-      { key: "media", label: "Média", operation: "average", fieldKey: "nota", groupBy: "none" },
-      completionMetric,
-    ],
-  };
+
+  // A pre-recipe item client maps naturally to Cinema. Daily/free no longer
+  // describe a supported template and must not silently recreate Journal.
+  if (body.submissionMode === undefined || body.submissionMode === "item") {
+    return RECIPES.cinema;
+  }
+  throw new ApiError(400, "invalid_recipe", "Escolha o modelo Cinema ou Library.");
 }
