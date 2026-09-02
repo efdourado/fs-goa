@@ -501,306 +501,6 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
       WHERE challenge_id=$1 AND label='Contagem reservada'`, [duplicateId]);
   assert.equal(copiedHiddenMetric.rows[0]?.visible, "false", "a duplicação deve preservar configurações da métrica");
 
-  const dailyDraft = await call("POST", `/api/groups/${groupId}/challenges`, {
-    session: owner,
-    body: {
-      template: "reading",
-      title: "Leitura diária",
-      startsOn: "2026-07-01",
-      endsOn: "2026-07-03",
-      submissionMode: "daily",
-      generateDaily: false,
-      participantIds: [owner.user.id],
-      fields: [{ key: "nota_do_dia", label: "Nota do dia", type: "text", required: true, config: { multiline: true, maxLength: 300 } }],
-    },
-  });
-  assert.equal(dailyDraft.response.status, 201, JSON.stringify(dailyDraft.body));
-  const dailyId = (dailyDraft.body as { id: string }).id;
-
-  const incompleteDaily = await call("POST", `/api/challenges/${dailyId}/transition`, {
-    session: owner, body: { status: "active" },
-  });
-  assert.equal(incompleteDaily.response.status, 409, "daily sem checkpoints não pode ser ativado");
-
-  const wrongModeGeneration = await call("POST", `/api/challenges/${duplicateId}/items`, {
-    session: owner,
-    body: { generate: { frequency: "daily", startsOn: "2026-08-01", endsOn: "2026-08-02" } },
-  });
-  assert.equal(wrongModeGeneration.response.status, 409, "desafio por item não aceita gerador diário");
-
-  const generated = await call("POST", `/api/challenges/${dailyId}/items`, {
-    session: owner,
-    body: { generate: { frequency: "daily", startsOn: "2026-07-01", endsOn: "2026-07-03" } },
-  });
-  assert.equal(generated.response.status, 201, JSON.stringify(generated.body));
-  const generatedCheckpointIds = (generated.body as { checkpointIds: string[] }).checkpointIds;
-  assert.equal(generatedCheckpointIds.length, 3);
-
-  const checkpointEdit = await call(
-    "PATCH",
-    `/api/challenges/${dailyId}/items/${generatedCheckpointIds[0]}`,
-    {
-      session: owner,
-      body: { title: "Abertura da leitura", description: "Primeiro encontro do diário." },
-    },
-  );
-  assert.equal(checkpointEdit.response.status, 200, JSON.stringify(checkpointEdit.body));
-  assert.deepEqual(checkpointEdit.body, {
-    id: generatedCheckpointIds[0],
-    title: "Abertura da leitura",
-    description: "Primeiro encontro do diário.",
-  });
-
-  const rescheduled = await call("PATCH", `/api/challenges/${dailyId}`, {
-    session: owner, body: { startsOn: "2026-07-01", endsOn: "2026-07-02" },
-  });
-  assert.equal(rescheduled.response.status, 200, JSON.stringify(rescheduled.body));
-  const dailyDetail = await call("GET", `/api/challenges/${dailyId}`, { session: owner });
-  assert.equal(dailyDetail.response.status, 200, JSON.stringify(dailyDetail.body));
-  const dailyChallenge = dailyDetail.body as {
-    fields: Array<{ id: string; config: { multiline?: boolean } }>;
-    items: Array<{ id: string; title: string; status: string }>;
-  };
-  assert.equal(dailyChallenge.items.length, 2, "regeneração deve arquivar checkpoints excedentes");
-  assert.equal(dailyChallenge.items[0].id, generatedCheckpointIds[0], "reagendar deve preservar o ID do checkpoint");
-  assert.equal(dailyChallenge.items[0].title, "Abertura da leitura", "reagendar deve preservar o título personalizado");
-  assert.equal(dailyChallenge.fields[0].config.multiline, true, "texto longo deve sobreviver ao round-trip");
-
-  const activateDaily = await call("POST", `/api/challenges/${dailyId}/transition`, {
-    session: owner, body: { status: "active" },
-  });
-  assert.equal(activateDaily.response.status, 200, JSON.stringify(activateDaily.body));
-  const activeCheckpointEdit = await call(
-    "PATCH",
-    `/api/challenges/${dailyId}/items/${dailyChallenge.items[0].id}`,
-    {
-      session: owner,
-      body: { title: "Abertura concluída", description: "Título corrigido com o desafio ativo." },
-    },
-  );
-  assert.equal(activeCheckpointEdit.response.status, 200, JSON.stringify(activeCheckpointEdit.body));
-  assert.equal((activeCheckpointEdit.body as { id: string }).id, dailyChallenge.items[0].id);
-  const dailyEntry = await call("POST", `/api/challenges/${dailyId}/entries`, {
-    session: owner,
-    body: { checkpointId: dailyChallenge.items[0].id, values: { [dailyChallenge.fields[0].id]: "canario-diario" } },
-  });
-  assert.equal(dailyEntry.response.status, 201, JSON.stringify(dailyEntry.body));
-  const dailyEntryId = (dailyEntry.body as { id: string }).id;
-  const dailyCsv = await call("GET", `/api/challenges/${dailyId}/export.csv`, { session: owner });
-  assert.equal(dailyCsv.response.status, 200);
-  assert.match(dailyCsv.body as string, /Abertura concluída/);
-
-  const dailyExtend = await call("PATCH", `/api/challenges/${dailyId}`, {
-    session: owner, body: { startsOn: "2026-07-01", endsOn: "2026-07-05" },
-  });
-  assert.equal(dailyExtend.response.status, 200, JSON.stringify(dailyExtend.body));
-  const dailyAfterExtend = await call("GET", `/api/challenges/${dailyId}`, { session: owner });
-  const extendedItems = (dailyAfterExtend.body as { items: Array<{ id: string; title: string }> }).items;
-  assert.equal(extendedItems.length, 5, "estender o período de um diário ativo materializa os novos dias");
-  assert.equal(extendedItems[0].id, dailyChallenge.items[0].id, "estender preserva o ID do checkpoint com check-in");
-  assert.equal(extendedItems[0].title, "Abertura concluída", "estender preserva o título personalizado");
-
-  const dailyShiftAwayFromEntry = await call("PATCH", `/api/challenges/${dailyId}`, {
-    session: owner, body: { startsOn: "2026-07-02", endsOn: "2026-07-05" },
-  });
-  assert.equal(dailyShiftAwayFromEntry.response.status, 409, "remarcar por cima de um check-in é barrado");
-  assert.equal((dailyShiftAwayFromEntry.body as { error: string }).error, "schedule_would_strand_entries");
-
-  const dailyDropSchedule = await call("PATCH", `/api/challenges/${dailyId}`, {
-    session: owner, body: { startsOn: null, endsOn: null },
-  });
-  assert.equal(dailyDropSchedule.response.status, 409, "tirar o período de um diário com check-ins é barrado");
-  assert.equal((dailyDropSchedule.body as { error: string }).error, "schedule_would_strand_entries");
-
-  const dailyShrinkBack = await call("PATCH", `/api/challenges/${dailyId}`, {
-    session: owner, body: { startsOn: "2026-07-01", endsOn: "2026-07-02" },
-  });
-  assert.equal(dailyShrinkBack.response.status, 200, "encurtar é permitido quando os dias removidos estão vazios");
-  const dailyAfterShrink = await call("GET", `/api/challenges/${dailyId}`, { session: owner });
-  assert.equal(
-    (dailyAfterShrink.body as { items: unknown[] }).items.length,
-    2,
-    "os dias vazios fora do novo período são arquivados",
-  );
-
-  const closeDaily = await call("POST", `/api/challenges/${dailyId}/transition`, {
-    session: owner, body: { status: "closed" },
-  });
-  assert.equal(closeDaily.response.status, 200, JSON.stringify(closeDaily.body));
-  const closedCheckpointEdit = await call(
-    "PATCH",
-    `/api/challenges/${dailyId}/items/${dailyChallenge.items[0].id}`,
-    { session: owner, body: { title: "Não pode mudar depois do encerramento" } },
-  );
-  assert.equal(closedCheckpointEdit.response.status, 409, "checkpoint encerrado deve preservar sua leitura histórica");
-  const dailyResult = await call("POST", `/api/challenges/${dailyId}/results`, {
-    session: owner,
-    body: { headline: "Diário concluído", comments: [{ entryId: dailyEntryId, fieldId: dailyChallenge.fields[0].id }] },
-  });
-  assert.equal(dailyResult.response.status, 200, JSON.stringify(dailyResult.body));
-  const curatedDaily = await call("GET", `/api/challenges/${dailyId}`, { session: owner });
-  assert.match(JSON.stringify(curatedDaily.body), /Abertura concluída/, "curadoria diária deve preservar o título do checkpoint");
-
-  const readingCopy = await call("POST", `/api/challenges/${dailyId}/duplicate`, {
-    session: owner,
-    body: { title: "Leitura diária — outro grupo", targetGroupId },
-  });
-  assert.equal(readingCopy.response.status, 201, JSON.stringify(readingCopy.body));
-  const readingCopyId = (readingCopy.body as { id: string }).id;
-  const copiedReading = await adminPool.query<{
-    group_id: string; mode: string; recipe_key: string | null; start_date: string | null;
-    checkpoints: number; participants: number; entries: number;
-  }>(
-    `SELECT c.group_id, c.recipe_key, c.start_date::text AS start_date,
-            (SELECT submission_mode FROM entry_types WHERE challenge_id=c.id AND archived_at IS NULL LIMIT 1) AS mode,
-            (SELECT count(*)::int FROM challenge_checkpoints WHERE challenge_id=c.id AND archived_at IS NULL) AS checkpoints,
-            (SELECT count(*)::int FROM challenge_participants WHERE challenge_id=c.id) AS participants,
-            (SELECT count(*)::int FROM entries WHERE challenge_id=c.id) AS entries
-       FROM challenges c WHERE c.id=$1`,
-    [readingCopyId],
-  );
-  assert.deepEqual(copiedReading.rows[0], {
-    group_id: targetGroupId,
-    mode: "daily",
-    recipe_key: "reading_daily",
-    // The copy starts undated: the schedule is relative, so checkpoints regenerate
-    // when the admin picks new dates.
-    start_date: null,
-    checkpoints: 0,
-    participants: 0,
-    entries: 0,
-  }, "um desafio de leitura pode ser reutilizado estruturalmente em outro grupo");
-
-  const futureDaily = await call("POST", `/api/groups/${groupId}/challenges`, {
-    session: owner,
-    body: {
-      template: "reading", title: "Leitura futura", startsOn: "2099-01-01", endsOn: "2099-01-02",
-      submissionMode: "daily", participantIds: [owner.user.id],
-      fields: [{ key: "paginas", label: "Páginas", type: "number", required: true, config: { min: 0, step: 1 } }],
-    },
-  });
-  assert.equal(futureDaily.response.status, 201, JSON.stringify(futureDaily.body));
-  const futureDailyId = (futureDaily.body as { id: string }).id;
-  const futureActivation = await call("POST", `/api/challenges/${futureDailyId}/transition`, {
-    session: owner, body: { status: "active" },
-  });
-  assert.equal(futureActivation.response.status, 200, JSON.stringify(futureActivation.body));
-  const futureDetail = await call("GET", `/api/challenges/${futureDailyId}`, { session: owner });
-  const futureChallenge = futureDetail.body as { fields: Array<{ id: string }>; items: Array<{ id: string; status: string }> };
-  assert.equal(futureChallenge.items[0].status, "scheduled");
-  const futureSubmission = await call("POST", `/api/challenges/${futureDailyId}/entries`, {
-    session: owner,
-    body: { checkpointId: futureChallenge.items[0].id, values: { [futureChallenge.fields[0].id]: 10 } },
-  });
-  assert.equal(futureSubmission.response.status, 409, "checkpoint futuro não pode receber registro");
-
-  const undatedItem = await call("POST", `/api/groups/${groupId}/challenges`, {
-    session: owner,
-    body: {
-      template: "cine",
-      title: "Lista contínua sem prazo",
-      startsOn: null,
-      endsOn: null,
-      submissionMode: "item",
-      participantIds: [owner.user.id],
-      items: [{ title: "Tarefa sem vencimento" }],
-      fields: [{ key: "concluida", label: "Concluída", type: "boolean", required: true }],
-    },
-  });
-  assert.equal(undatedItem.response.status, 201, JSON.stringify(undatedItem.body));
-  const undatedItemId = (undatedItem.body as { id: string }).id;
-  const undatedItemDetail = await call("GET", `/api/challenges/${undatedItemId}`, { session: owner });
-  assert.equal(undatedItemDetail.response.status, 200, JSON.stringify(undatedItemDetail.body));
-  assert.equal((undatedItemDetail.body as { startsOn: string | null }).startsOn, null);
-  assert.equal((undatedItemDetail.body as { endsOn: string | null }).endsOn, null);
-
-  const undatedDaily = await call("POST", `/api/groups/${groupId}/challenges`, {
-    session: owner,
-    body: {
-      template: "reading",
-      title: "Hábito diário sem prazo",
-      startsOn: null,
-      endsOn: null,
-      submissionMode: "daily",
-      participantIds: [owner.user.id],
-      fields: [{ key: "nota", label: "Nota do dia", type: "text", required: true }],
-    },
-  });
-  assert.equal(undatedDaily.response.status, 201, JSON.stringify(undatedDaily.body));
-  const undatedDailyId = (undatedDaily.body as { id: string }).id;
-  const undatedDailyDetail = await call("GET", `/api/challenges/${undatedDailyId}`, { session: owner });
-  assert.equal(undatedDailyDetail.response.status, 200, JSON.stringify(undatedDailyDetail.body));
-  const undatedDailyChallenge = undatedDailyDetail.body as {
-    startsOn: string | null;
-    endsOn: string | null;
-    fields: Array<{ id: string }>;
-    items: unknown[];
-  };
-  assert.equal(undatedDailyChallenge.startsOn, null);
-  assert.equal(undatedDailyChallenge.endsOn, null);
-  assert.deepEqual(undatedDailyChallenge.items, [], "daily sem prazo não materializa checkpoints futuros");
-  assert.ok(undatedDailyChallenge.fields[0]?.id);
-
-  const activateUndatedDaily = await call("POST", `/api/challenges/${undatedDailyId}/transition`, {
-    session: owner,
-    body: { status: "active" },
-  });
-  assert.equal(activateUndatedDaily.response.status, 200, JSON.stringify(activateUndatedDaily.body));
-
-  const historicalDay = "2020-01-02";
-  const firstUndatedCheckIn = await call("POST", `/api/challenges/${undatedDailyId}/entries`, {
-    session: owner,
-    body: {
-      occurredOn: historicalDay,
-      values: { [undatedDailyChallenge.fields[0].id]: "registro original" },
-    },
-  });
-  assert.equal(firstUndatedCheckIn.response.status, 201, JSON.stringify(firstUndatedCheckIn.body));
-  const firstUndatedEntry = firstUndatedCheckIn.body as {
-    id: string;
-    occurredOn: string;
-    updated: boolean;
-  };
-  assert.equal(firstUndatedEntry.occurredOn, historicalDay);
-  assert.equal(firstUndatedEntry.updated, false);
-
-  const repeatedUndatedCheckIn = await call("POST", `/api/challenges/${undatedDailyId}/entries`, {
-    session: owner,
-    body: {
-      occurredOn: historicalDay,
-      values: { [undatedDailyChallenge.fields[0].id]: "registro corrigido" },
-    },
-  });
-  assert.equal(repeatedUndatedCheckIn.response.status, 201, JSON.stringify(repeatedUndatedCheckIn.body));
-  const repeatedUndatedEntry = repeatedUndatedCheckIn.body as {
-    id: string;
-    occurredOn: string;
-    updated: boolean;
-  };
-  assert.equal(repeatedUndatedEntry.id, firstUndatedEntry.id, "o mesmo dia deve atualizar o registro existente");
-  assert.equal(repeatedUndatedEntry.occurredOn, historicalDay);
-  assert.equal(repeatedUndatedEntry.updated, true);
-
-  const undatedEntries = await call("GET", `/api/challenges/${undatedDailyId}/entries`, { session: owner });
-  assert.equal(undatedEntries.response.status, 200, JSON.stringify(undatedEntries.body));
-  const entriesForUndatedDaily = (undatedEntries.body as {
-    entries: Array<{ id: string; occurredOn: string; values: Record<string, unknown> }>;
-  }).entries;
-  assert.equal(entriesForUndatedDaily.length, 1, "repetir a data não deve duplicar o check-in");
-  assert.equal(entriesForUndatedDaily[0]?.id, firstUndatedEntry.id);
-  assert.equal(entriesForUndatedDaily[0]?.occurredOn, historicalDay);
-  assert.equal(entriesForUndatedDaily[0]?.values[undatedDailyChallenge.fields[0].id], "registro corrigido");
-
-  const futureUndatedCheckIn = await call("POST", `/api/challenges/${undatedDailyId}/entries`, {
-    session: owner,
-    body: {
-      occurredOn: "2099-01-01",
-      values: { [undatedDailyChallenge.fields[0].id]: "não deve entrar" },
-    },
-  });
-  assert.equal(futureUndatedCheckIn.response.status, 409, "daily sem prazo não aceita check-in futuro");
-  assert.equal((futureUndatedCheckIn.body as { error: string }).error, "checkin_in_future");
-
   const incompleteDatePair = await call("POST", `/api/groups/${groupId}/challenges`, {
     session: owner,
     body: {
@@ -1570,15 +1270,16 @@ test("fase 1a: acervo do grupo, identidade do filme entre rodadas e indicador", 
   const gid = groupId.id;
   const invite = await call("POST", `/api/groups/${gid}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } });
   await call("POST", `/api/invites/${(invite.body as { token: string }).token}`, { session: friend, body: {} });
+  const period = { startsOn: "2026-03-01", endsOn: "2026-03-31" };
 
   const first = await call("POST", `/api/groups/${gid}/challenges`, {
     session: owner,
     body: {
-      template: "cine", title: "Rodada 1", submissionMode: "item",
+      recipe: "cinema", title: "Rodada 1", ...period,
       participantIds: [owner.user.id, friend.user.id],
       fields: [{ key: "nota", label: "Nota", type: "rating", required: true }],
       items: [
-        { title: "Aftersun", recommendedByUserId: friend.user.id, year: 2022, genres: ["drama"] },
+        { title: "Aftersun", recommendedByUserId: friend.user.id, year: 2022, mainGenre: "drama" },
         { title: "  perfect days ", year: 2023 },
       ],
     },
@@ -1588,12 +1289,12 @@ test("fase 1a: acervo do grupo, identidade do filme entre rodadas e indicador", 
 
   const catalog = await call("GET", `/api/groups/${gid}/catalog`, { session: friend });
   assert.equal(catalog.response.status, 200);
-  const catalogItems = (catalog.body as { items: Array<{ id: string; title: string; year: number | null; genres: string[]; roundCount: number }> }).items;
+  const catalogItems = (catalog.body as { items: Array<{ id: string; title: string; year: number | null; mainGenre: string | null; roundCount: number }> }).items;
   assert.equal(catalogItems.length, 2, "dois filmes no acervo");
   const aftersun = catalogItems.find((item) => item.title === "Aftersun");
   assert.ok(aftersun);
   assert.equal(aftersun.year, 2022);
-  assert.deepEqual(aftersun.genres, ["drama"]);
+  assert.equal(aftersun.mainGenre, "drama");
 
   const detail = await call("GET", `/api/challenges/${firstId}`, { session: owner });
   const items = (detail.body as { items: Array<{ title: string; catalogItem: { id: string; year: number | null } | null; recommendedBy: { name: string } | null }> }).items;
@@ -1604,7 +1305,7 @@ test("fase 1a: acervo do grupo, identidade do filme entre rodadas e indicador", 
   const second = await call("POST", `/api/groups/${gid}/challenges`, {
     session: owner,
     body: {
-      template: "cine", title: "Rodada 2", submissionMode: "item",
+      recipe: "cinema", title: "Rodada 2", ...period,
       participantIds: [owner.user.id],
       fields: [{ key: "nota", label: "Nota", type: "rating", required: true }],
       items: [{ title: "AFTERSUN" }],
@@ -1618,17 +1319,18 @@ test("fase 1a: acervo do grupo, identidade do filme entre rodadas e indicador", 
   assert.equal((catalog2.body as { items: unknown[] }).items.length, 2, "reuso não cria filme novo");
   assert.equal((catalog2.body as { items: Array<{ id: string; roundCount: number }> }).items.find((i) => i.id === aftersun.id)?.roundCount, 2);
 
-  // editar atributos no acervo
-  const patched = await call("PATCH", `/api/catalog/${aftersun.id}`, { session: owner, body: { runtimeMinutes: 96, genres: ["drama", "coming of age"] } });
+  // editar atributos no acervo — gênero principal é um rótulo único
+  const patched = await call("PATCH", `/api/catalog/${aftersun.id}`, { session: owner, body: { mainGenre: "coming of age" } });
   assert.equal(patched.response.status, 200, JSON.stringify(patched.body));
   const afterPatch = await call("GET", `/api/challenges/${firstId}`, { session: owner });
-  assert.deepEqual((afterPatch.body as { items: Array<{ catalogItem: { genres: string[]; runtimeMinutes: number | null } | null }> }).items[0].catalogItem?.genres, ["coming of age", "drama"]);
+  assert.equal((afterPatch.body as { items: Array<{ catalogItem: { mainGenre: string | null } | null }> }).items[0].catalogItem?.mainGenre, "coming of age");
 
-  // ano desambigua: "Dune" (1984) e "Dune" (2021) são dois itens
+  // filme e série se identificam só pelo título: "Dune (1984)" e "Dune (2021)"
+  // são o mesmo item, e o ano avança para o lançamento mais recente.
   const dune = await call("POST", `/api/groups/${gid}/challenges`, {
     session: owner,
     body: {
-      template: "cine", title: "Duna", submissionMode: "item",
+      recipe: "cinema", title: "Duna", ...period,
       participantIds: [owner.user.id],
       fields: [{ key: "nota", label: "Nota", type: "rating", required: true }],
       items: [{ title: "Dune", year: 1984 }, { title: "Dune", year: 2021 }],
@@ -1636,13 +1338,15 @@ test("fase 1a: acervo do grupo, identidade do filme entre rodadas e indicador", 
   });
   assert.equal(dune.response.status, 201, JSON.stringify(dune.body));
   const duneCatalog = (await call("GET", `/api/groups/${gid}/catalog`, { session: owner })).body as { items: Array<{ title: string; year: number | null }> };
-  assert.equal(duneCatalog.items.filter((item) => item.title === "Dune").length, 2, "Dune 1984 e Dune 2021 não fundem");
+  const dunes = duneCatalog.items.filter((item) => item.title === "Dune");
+  assert.equal(dunes.length, 1, "Dune 1984 e Dune 2021 são o mesmo filme");
+  assert.equal(dunes[0].year, 2021, "o ano acompanha o lançamento mais recente");
 
   // indicador precisa ser membro do grupo
   const badRecommender = await call("POST", `/api/groups/${gid}/challenges`, {
     session: owner,
     body: {
-      template: "cine", title: "Rodada ruim", submissionMode: "item",
+      recipe: "cinema", title: "Rodada ruim", ...period,
       participantIds: [owner.user.id],
       fields: [{ key: "nota", label: "Nota", type: "rating", required: true }],
       items: [{ title: "Qualquer", recommendedByUserId: "user-que-nao-existe" }],
@@ -1658,7 +1362,7 @@ test("modelo de registros: um filme aceita mais de um tipo de registro por pesso
   const challenge = await call("POST", `/api/groups/${gid}/challenges`, {
     session: owner,
     body: {
-      template: "cine", title: "Curadoria", submissionMode: "item",
+      recipe: "cinema", title: "Curadoria", startsOn: "2026-08-01", endsOn: "2026-12-31",
       participantIds: [owner.user.id],
       fields: [{ key: "nota", label: "Nota", type: "rating", required: true }],
       items: [{ title: "Aftersun" }, { title: "Petite Maman" }],
@@ -1714,6 +1418,29 @@ test("modelo de registros: um filme aceita mais de um tipo de registro por pesso
 type DetailType = { id: string; purpose: string; semanticKey: string; cardinality: string; countsCompletion?: boolean };
 type DetailItem = { id: string; title: string };
 
+/**
+ * The wizard's two recipes never seed an "expectation" type, but the surprise
+ * metric and the expectation lock are generic machinery. Tests that exercise
+ * them add the type straight in the database, the same way an admin add-on would.
+ */
+async function addExpectationType(challengeId: string, fieldKey = "expectativa"): Promise<string> {
+  const typeId = crypto.randomUUID();
+  await adminPool.query(
+    `INSERT INTO entry_types
+       (id, challenge_id, semantic_key, name, submission_mode, purpose, target_policy, cardinality, schedule_policy, created_at, updated_at)
+     VALUES ($1, $2, 'expectativa', 'Expectativa', 'item', 'expectation', 'required', 'once_per_item', 'while_active', now(), now())`,
+    [typeId, challengeId],
+  );
+  await adminPool.query(
+    `INSERT INTO challenge_fields
+       (id, challenge_id, entry_type_id, semantic_key, label, kind, required, position,
+        number_scale, min_scaled, max_scaled, step_scaled, settings, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, 'Expectativa', 'rating', true, 0, 1, 0, 50, 5, '{}'::jsonb, now(), now())`,
+    [crypto.randomUUID(), challengeId, typeId, fieldKey],
+  );
+  return typeId;
+}
+
 test("data do registro é opcional: uma rodada aceita registro sem data, mas o diário não", async () => {
   const owner = await register("Nina", "nina_semdata");
   const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Sem data" } })).body as { id: string }).id;
@@ -1722,7 +1449,7 @@ test("data do registro é opcional: uma rodada aceita registro sem data, mas o d
   const challenge = await call("POST", `/api/groups/${gid}/challenges`, {
     session: owner,
     body: {
-      template: "cine", title: "Cine livre", submissionMode: "item",
+      recipe: "cinema", title: "Cine livre", startsOn: "2026-08-01", endsOn: "2026-12-31",
       participantIds: [owner.user.id],
       fields: [{ key: "nota", label: "Nota", type: "rating", required: true }],
       items: [{ title: "Sem data" }, { title: "Vazio" }, { title: "Padrão hoje" }],
@@ -1764,20 +1491,25 @@ test("data do registro é opcional: uma rodada aceita registro sem data, mas o d
   }).entries;
   assert.equal(listed.find((entry) => entry.itemId === byTitle("Sem data").id)?.occurredOn, null);
 
-  // um tipo diário (once_per_day) ignora o "sem data" e cai no hoje
+  // o progresso diário da Library ignora o "sem data" e cai no hoje
   const daily = await call("POST", `/api/groups/${gid}/challenges`, {
     session: owner,
     body: {
-      template: "reading", title: "Hábito", startsOn: null, endsOn: null,
-      submissionMode: "daily", participantIds: [owner.user.id],
-      fields: [{ key: "linha", label: "Linha do dia", type: "text", required: true }],
+      recipe: "library", title: "Hábito", startsOn: "2026-08-01", endsOn: "2026-12-31",
+      participantIds: [owner.user.id],
+      items: [{ title: "Diário de leitura", author: "Nina" }],
     },
   });
   const dailyId = (daily.body as { id: string }).id;
   assert.equal((await call("POST", `/api/challenges/${dailyId}/transition`, { session: owner, body: { status: "active" } })).response.status, 200);
-  const dailyField = ((await call("GET", `/api/challenges/${dailyId}`, { session: owner })).body as { fields: Array<{ id: string }> }).fields[0].id;
+  const dailyDetail = (await call("GET", `/api/challenges/${dailyId}`, { session: owner })).body as {
+    entryTypes: DetailType[]; items: DetailItem[]; fields: Array<{ id: string }>;
+  };
+  const progressType = dailyDetail.entryTypes.find((type) => type.purpose === "progress")!;
+  const pagesField = dailyDetail.fields[0].id;
   const dailyEntry = await call("POST", `/api/challenges/${dailyId}/entries`, {
-    session: owner, body: { occurredOn: null, values: { [dailyField]: "oi" } },
+    session: owner,
+    body: { itemId: dailyDetail.items[0].id, entryTypeId: progressType.id, occurredOn: null, values: { [pagesField]: 12 } },
   });
   assert.equal(dailyEntry.response.status, 201, JSON.stringify(dailyEntry.body));
   assert.equal((dailyEntry.body as { occurredOn: string }).occurredOn, today);
@@ -1787,20 +1519,23 @@ test("fundação: dois livros no mesmo dia, conclusão e nota sem comentário", 
   const owner = await register("Lúcia", "lucia_found");
   const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube de leitura" } })).body as { id: string }).id;
 
-  // livro sem autor é recusado — autor é obrigatório para o clube de leitura
+  const period = { startsOn: "2024-05-01", endsOn: "2024-06-30" };
+
+  // livro sem autor é recusado — autor é obrigatório para a Library
   const noAuthor = await call("POST", `/api/groups/${gid}/challenges`, {
     session: owner,
     body: {
-      recipe: "reading_club", title: "Sem autor", participantIds: [owner.user.id],
+      recipe: "library", title: "Sem autor", ...period, participantIds: [owner.user.id],
       items: [{ title: "Norwegian Wood" }],
     },
   });
   assert.equal(noAuthor.response.status, 400, "livro precisa de autor");
+  assert.equal((noAuthor.body as { error: string }).error, "invalid_item");
 
   const created = await call("POST", `/api/groups/${gid}/challenges`, {
     session: owner,
     body: {
-      recipe: "reading_club", title: "Temporada 1", participantIds: [owner.user.id],
+      recipe: "library", title: "Temporada 1", ...period, participantIds: [owner.user.id],
       items: [
         { title: "Norwegian Wood", author: "Haruki Murakami" },
         { title: "Kafka à Beira-Mar", author: "Haruki Murakami" },
@@ -1877,19 +1612,21 @@ test("fundação: dois livros no mesmo dia, conclusão e nota sem comentário", 
   );
 });
 
-test("Cine Curadoria: expectativa e avaliação coexistem, e a expectativa trava ao avaliar", async () => {
+test("expectativa e avaliação coexistem, e a expectativa trava ao avaliar", async () => {
   const owner = await register("Théo", "theo_cur");
   const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Curadoria" } })).body as { id: string }).id;
 
   const created = await call("POST", `/api/groups/${gid}/challenges`, {
     session: owner,
     body: {
-      recipe: "cine_curated", title: "Ciclo Lynch", participantIds: [owner.user.id],
+      recipe: "cinema", title: "Ciclo Lynch", startsOn: "2026-08-01", endsOn: "2026-12-31",
+      participantIds: [owner.user.id],
       items: [{ title: "Mulholland Drive" }],
     },
   });
   assert.equal(created.response.status, 201, JSON.stringify(created.body));
   const challengeId = (created.body as { id: string }).id;
+  await addExpectationType(challengeId);
   assert.equal((await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } })).response.status, 200);
 
   const detail = await call("GET", `/api/challenges/${challengeId}`, { session: owner });
@@ -1939,11 +1676,13 @@ test("cópia: carrega a receita, zera a agenda e remapeia o acervo do destino", 
   const created = await call("POST", `/api/groups/${source}/challenges`, {
     session: owner,
     body: {
-      recipe: "cine_curated", title: "Sessão", participantIds: [owner.user.id],
-      items: [{ title: "Stalker", year: 1979, genres: ["ficção científica"] }],
+      recipe: "cinema", title: "Sessão", startsOn: "2026-08-01", endsOn: "2026-12-31",
+      participantIds: [owner.user.id],
+      items: [{ title: "Stalker", year: 1979, mainGenre: "ficção científica" }],
     },
   });
   const sourceId = (created.body as { id: string }).id;
+  await addExpectationType(sourceId);
 
   const copy = await call("POST", `/api/challenges/${sourceId}/duplicate`, {
     session: owner, body: { title: "Sessão — bis", targetGroupId: target },
@@ -1966,7 +1705,7 @@ test("cópia: carrega a receita, zera a agenda e remapeia o acervo do destino", 
        FROM challenges c WHERE c.id = $1`,
     [copyId],
   );
-  assert.equal(row.rows[0].recipe_key, "cine_curated");
+  assert.equal(row.rows[0].recipe_key, "cinema");
   assert.equal(row.rows[0].start_date, null);
   assert.equal(row.rows[0].checkpoints, 0);
   assert.deepEqual(row.rows[0].purposes, ["expectation", "rating"]);
@@ -1993,7 +1732,7 @@ test("motor de análise: ranking ajustado, surpresa, viés e vitrine automática
   const created = await call("POST", `/api/groups/${gid}/challenges`, {
     session: owner,
     body: {
-      recipe: "cine_curated", title: "Ciclo 1",
+      recipe: "cinema", title: "Ciclo 1", startsOn: "2026-08-01", endsOn: "2026-12-31",
       participantIds: [owner.user.id, bob.user.id, carol.user.id],
       items: [
         { title: "Solaris", recommendedByUserId: owner.user.id },
@@ -2003,13 +1742,21 @@ test("motor de análise: ranking ajustado, surpresa, viés e vitrine automática
   });
   assert.equal(created.response.status, 201, JSON.stringify(created.body));
   const challengeId = (created.body as { id: string }).id;
-  assert.equal((await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } })).response.status, 200);
+  await addExpectationType(challengeId);
 
   const detail0 = await call("GET", `/api/challenges/${challengeId}`, { session: owner });
-  const types = (detail0.body as { entryTypes: Array<{ id: string; purpose: string }> }).entryTypes;
+  const types = (detail0.body as { entryTypes: Array<{ id: string; purpose: string; fields: Array<{ id: string; key: string }> }> }).entryTypes;
   const items = (detail0.body as { items: Array<{ id: string; title: string }> }).items;
   const expType = types.find((t) => t.purpose === "expectation")!.id;
-  const ratingType = types.find((t) => t.purpose === "rating")!.id;
+  const ratingEntryType = types.find((t) => t.purpose === "rating")!;
+  const ratingType = ratingEntryType.id;
+  const notaFieldId = ratingEntryType.fields.find((field) => field.key === "nota")!.id;
+  const surpriseMetric = await call("POST", `/api/challenges/${challengeId}/metrics`, {
+    session: owner,
+    body: { label: "Surpresa × decepção", operation: "surprise", fieldId: notaFieldId, groupBy: "item", minSample: 2 },
+  });
+  assert.equal(surpriseMetric.response.status, 201, JSON.stringify(surpriseMetric.body));
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } })).response.status, 200);
   const solaris = items.find((i) => i.title === "Solaris")!.id;
   const persona = items.find((i) => i.title === "Persona")!.id;
 
@@ -2066,7 +1813,10 @@ test("memória do acervo: um filme reconhecido em duas rodadas encerradas", asyn
   async function runRound(title: string, notas: number[]) {
     const res = await call("POST", `/api/groups/${gid}/challenges`, {
       session: owner,
-      body: { recipe: "cine_free", title, participantIds: [owner.user.id], items: [{ title: "Stalker", year: 1979 }] },
+      body: {
+        recipe: "cinema", title, startsOn: "2026-08-01", endsOn: "2026-12-31",
+        participantIds: [owner.user.id], items: [{ title: "Stalker", year: 1979 }],
+      },
     });
     const cid = (res.body as { id: string }).id;
     assert.equal((await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } })).response.status, 200);
@@ -2101,28 +1851,45 @@ test("item + checkpoint são ortogonais: um registro carrega filme e sessão", a
   const owner = await register("Ícaro", "icaro_ortho");
   const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Sessões" } })).body as { id: string }).id;
 
-  // reading_daily materializa checkpoints; ajustamos o tipo à mão para exigir
-  // também um item (nenhuma receita do wizard produz essa combinação ainda).
+  // Nenhuma receita do wizard produz checkpoints materializados + itens ao mesmo
+  // tempo; montamos a combinação à mão sobre um desafio de Cinema para provar que
+  // um registro carrega os dois eixos.
   const created = await call("POST", `/api/groups/${gid}/challenges`, {
     session: owner,
     body: {
-      recipe: "reading_daily", title: "Ciclo de sessões",
+      recipe: "cinema", title: "Ciclo de sessões",
       startsOn: "2024-03-01", endsOn: "2024-03-03",
       participantIds: [owner.user.id],
       fields: [{ key: "nota", label: "Nota", type: "rating", required: true }],
+      items: [{ title: "placeholder" }],
     },
   });
   assert.equal(created.response.status, 201, JSON.stringify(created.body));
   const challengeId = (created.body as { id: string }).id;
 
-  const checkpointRows = await adminPool.query<{ id: string }>(
-    "SELECT id FROM challenge_checkpoints WHERE challenge_id=$1 ORDER BY position", [challengeId]);
-  const sessionId = checkpointRows.rows[0].id;
-  await adminPool.query("UPDATE entry_types SET target_policy='required' WHERE challenge_id=$1", [challengeId]);
+  const sessionIds: string[] = [];
+  for (let day = 0; day < 3; day += 1) {
+    const id = crypto.randomUUID();
+    sessionIds.push(id);
+    await adminPool.query(
+      `INSERT INTO challenge_checkpoints
+         (id, challenge_id, semantic_key, title, position, starts_at, due_at, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6::timestamptz, $7::timestamptz, now(), now())`,
+      [id, challengeId, `dia_${day + 1}`, `Sessão ${day + 1}`, day,
+        `2024-03-0${day + 1} 00:00:00-03`, `2024-03-0${day + 1} 23:59:59-03`],
+    );
+  }
+  const sessionId = sessionIds[0];
+  await adminPool.query(
+    `UPDATE entry_types SET submission_mode='daily', schedule_policy='checkpoint',
+       cardinality='once_per_item_day', target_policy='required'
+      WHERE challenge_id=$1`,
+    [challengeId],
+  );
   const itemId = crypto.randomUUID();
   await adminPool.query(
     `INSERT INTO challenge_items (id, challenge_id, checkpoint_id, semantic_key, title, position, metadata, created_at, updated_at)
-     VALUES ($1,$2,$3,'sessao_1','Solaris',0,'{}'::jsonb,now(),now())`,
+     VALUES ($1,$2,$3,'sessao_1','Solaris',1,'{}'::jsonb,now(),now())`,
     [itemId, challengeId, sessionId]);
 
   assert.equal((await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } })).response.status, 200);
@@ -2157,7 +1924,10 @@ test("auditoria de correção de registro guarda só metadados", async () => {
 
   const created = await call("POST", `/api/groups/${gid}/challenges`, {
     session: owner,
-    body: { recipe: "cine_free", title: "Auditável", participantIds: [owner.user.id, member.user.id], items: [{ title: "Blow-Up" }] },
+    body: {
+      recipe: "cinema", title: "Auditável", startsOn: "2026-08-01", endsOn: "2026-12-31",
+      participantIds: [owner.user.id, member.user.id], items: [{ title: "Blow-Up" }],
+    },
   });
   const challengeId = (created.body as { id: string }).id;
   assert.equal((await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } })).response.status, 200);
@@ -2189,6 +1959,7 @@ test("auditoria de correção de registro guarda só metadados", async () => {
 
 test("desafio pessoal: workspace criado sob demanda, invisível como grupo e reusado", async () => {
   const owner = await register("Solange", "sol_personal");
+  const outsider = await register("Rita", "rita_personal_out");
 
   const before = await call("GET", "/api/bootstrap", { session: owner });
   assert.equal((before.body as { personalWorkspaceId: string | null }).personalWorkspaceId, null);
@@ -2196,7 +1967,14 @@ test("desafio pessoal: workspace criado sob demanda, invisível como grupo e reu
 
   const first = await call("POST", "/api/personal/challenges", {
     session: owner,
-    body: { recipe: "cine_free", title: "Minha maratona", items: [{ title: "Stalker", year: 1979 }] },
+    body: {
+      recipe: "cinema",
+      title: "Minha maratona",
+      startsOn: "2026-01-01",
+      endsOn: "2026-12-31",
+      participantIds: [owner.user.id, outsider.user.id],
+      items: [{ title: "Stalker", year: 1979 }],
+    },
   });
   assert.equal(first.response.status, 201, JSON.stringify(first.body));
   const firstId = (first.body as { id: string }).id;
@@ -2205,20 +1983,90 @@ test("desafio pessoal: workspace criado sob demanda, invisível como grupo e reu
   const workspaceId = (after.body as { personalWorkspaceId: string | null }).personalWorkspaceId;
   assert.ok(workspaceId, "workspace pessoal existe depois do primeiro desafio");
   const groups = (after.body as { groups: Array<{ id: string; kind?: string }> }).groups;
-  assert.equal(groups.length, groupsBefore + 1);
-  assert.equal(groups.find((group) => group.id === workspaceId)?.kind, "personal");
+  assert.equal(groups.length, groupsBefore, "workspace técnico não aparece na lista de grupos");
+  assert.equal(groups.some((group) => group.id === workspaceId), false);
   const challenges = (after.body as { challenges: Array<{ id: string; groupId: string }> }).challenges;
   assert.equal(challenges.find((challenge) => challenge.id === firstId)?.groupId, workspaceId);
+  const firstDetail = await call("GET", `/api/challenges/${firstId}`, { session: owner });
+  assert.deepEqual(
+    (firstDetail.body as { participants: Array<{ id: string }> }).participants.map((participant) => participant.id),
+    [owner.user.id],
+    "participantIds enviados pelo cliente não transformam desafio pessoal em grupo",
+  );
+
+  for (const blocked of [
+    await call("POST", `/api/groups/${workspaceId}/members`, {
+      session: owner,
+      body: { username: outsider.user.username },
+    }),
+    await call("POST", `/api/groups/${workspaceId}/invites`, {
+      session: owner,
+      body: { expiresInDays: 7, maxUses: 1 },
+    }),
+    await call("POST", `/api/groups/${workspaceId}/challenges`, {
+      session: owner,
+      body: {
+        recipe: "cinema",
+        title: "Atalho indevido",
+        startsOn: "2026-01-01",
+        endsOn: "2026-12-31",
+        items: [{ title: "Solaris" }],
+      },
+    }),
+    await call("PATCH", `/api/groups/${workspaceId}`, {
+      session: owner,
+      body: { name: "Grupo disfarçado" },
+    }),
+    await call("DELETE", `/api/groups/${workspaceId}`, { session: owner }),
+  ]) {
+    assert.equal(blocked.response.status, 404, JSON.stringify(blocked.body));
+  }
+
+  const participantChange = await call("POST", `/api/challenges/${firstId}/participants`, {
+    session: owner,
+    body: { replace: true, participantIds: [owner.user.id, outsider.user.id] },
+  });
+  assert.equal(participantChange.response.status, 400, "participantes extras não entram depois da criação");
 
   // segundo desafio pessoal reusa o mesmo workspace
   const second = await call("POST", "/api/personal/challenges", {
     session: owner,
-    body: { recipe: "reading_daily", title: "90 dias", startsOn: "2024-01-01", endsOn: "2024-01-30" },
+    body: {
+      recipe: "library",
+      title: "90 dias",
+      startsOn: "2024-01-01",
+      endsOn: "2024-01-30",
+      items: [{ title: "A hora da estrela", author: "Clarice Lispector" }],
+    },
   });
   assert.equal(second.response.status, 201, JSON.stringify(second.body));
   const afterSecond = await call("GET", "/api/bootstrap", { session: owner });
   assert.equal((afterSecond.body as { personalWorkspaceId: string }).personalWorkspaceId, workspaceId);
-  assert.equal((afterSecond.body as { groups: unknown[] }).groups.length, groupsBefore + 1, "sem grupo novo");
+  assert.equal((afterSecond.body as { groups: unknown[] }).groups.length, groupsBefore, "sem grupo visível novo");
+
+  // Mesmo que um dado legado associe outra pessoa ao workspace técnico, a
+  // autorização pessoal usa o proprietário, não a membership genérica.
+  await adminPool.query(
+    `INSERT INTO group_members (group_id, user_id, role, added_by_user_id, joined_at)
+     VALUES ($1, $2, 'participant', $3, now())`,
+    [workspaceId, outsider.user.id, owner.user.id],
+  );
+  const outsiderBootstrap = await call("GET", "/api/bootstrap", { session: outsider });
+  assert.equal((outsiderBootstrap.body as { personalWorkspaceId: string | null }).personalWorkspaceId, null);
+  assert.equal(
+    (outsiderBootstrap.body as { challenges: Array<{ id: string }> }).challenges.some((challenge) => challenge.id === firstId),
+    false,
+  );
+  assert.equal(
+    (await call("GET", `/api/challenges/${firstId}`, { session: outsider })).response.status,
+    404,
+    "membership legada não concede acesso ao escopo pessoal",
+  );
+  assert.equal(
+    (await call("GET", `/api/groups/${workspaceId}/catalog`, { session: outsider })).response.status,
+    404,
+    "membership legada também não abre o acervo pessoal",
+  );
 
   // o workspace pessoal não conta contra o limite de grupos do dono
   for (let index = 0; index < 6; index += 1) {
