@@ -11,9 +11,9 @@ import { RuleSectionsEditor } from "../rules";
 import type { ChallengeCreationInput, ChallengeField, ChallengeRule, CreatableRecipeKey, GroupSummary, Id } from "../types";
 import { backLinkClass, Button, cardClass, cx, EmptyState, inputClass, labelClass, PageHeading, SchedulePeriodFields, StatusMessage } from "../ui";
 
-const RECIPES: Array<{ key: CreatableRecipeKey; catalogKind: "film" | "book"; glyph: string }> = [
-  { key: "cinema", catalogKind: "film", glyph: "◉" },
-  { key: "library", catalogKind: "book", glyph: "◎" },
+const RECIPES: Array<{ key: CreatableRecipeKey; catalogKind: "film" | "book"; scheduleMode: "period" | "none"; glyph: string }> = [
+  { key: "cinema", catalogKind: "film", scheduleMode: "none", glyph: "◉" },
+  { key: "library", catalogKind: "book", scheduleMode: "period", glyph: "◎" },
 ];
 
 export function CreateChallengeScreen({
@@ -38,6 +38,7 @@ export function CreateChallengeScreen({
   const [description, setDescription] = useState("");
   const [ruleSections, setRuleSections] = useState<ChallengeRule[]>([]);
   const [showOptional, setShowOptional] = useState(false);
+  const [scheduleMode, setScheduleMode] = useState<"period" | "none">("none");
   const [startsOn, setStartsOn] = useState("");
   const [endsOn, setEndsOn] = useState("");
   const [fields, setFields] = useState<ChallengeField[]>([]);
@@ -55,9 +56,11 @@ export function CreateChallengeScreen({
   const optionalOpen = showOptional || Boolean(description.trim()) || ruleSections.length > 0;
 
   function chooseRecipe(next: CreatableRecipeKey) {
+    const meta = RECIPES.find((entry) => entry.key === next)!;
     setRecipe(next);
     setFields(presetFields(next, (key) => tp(key)));
     setTitle(t(`recipes.${next}.title`));
+    setScheduleMode(meta.scheduleMode);
     setCineItems([]);
   }
 
@@ -67,11 +70,11 @@ export function CreateChallengeScreen({
       setError(t("errPickTemplate"));
       return;
     }
-    if (step === 1 && (!startsOn || !endsOn)) {
+    if (step === 1 && scheduleMode === "period" && (!startsOn || !endsOn)) {
       setError(t("errPeriod"));
       return;
     }
-    if (step === 1 && endsOn < startsOn) {
+    if (step === 1 && scheduleMode === "period" && endsOn < startsOn) {
       setError(t("errEndBeforeStart"));
       return;
     }
@@ -93,10 +96,6 @@ export function CreateChallengeScreen({
     if (step === 3 && tracksCatalog === "book"
       && cineItems.some((row) => row.title.trim() && !row.author.trim())) {
       setError(t("errNoAuthor"));
-      return;
-    }
-    if (step === 3 && cineItems.some((row) => row.targetDate && (row.targetDate < startsOn || row.targetDate > endsOn))) {
-      setError(t("errTargetOutsidePeriod"));
       return;
     }
     setStep((current) => Math.min(lastStep, current + 1));
@@ -126,8 +125,8 @@ export function CreateChallengeScreen({
             ? { topics: rule.topics.map((topic) => ({ title: topic.title.trim(), description: topic.description.trim() })) }
             : {}),
         })),
-        startsOn,
-        endsOn,
+        startsOn: scheduleMode === "period" ? startsOn : null,
+        endsOn: scheduleMode === "period" ? endsOn : null,
         fields: cleanFields(fields),
         items: tracksCatalog ? itemInputs : [],
         generateDaily: false,
@@ -163,12 +162,17 @@ export function CreateChallengeScreen({
             </div>
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
               <label className="sm:col-span-2"><span className={labelClass}>{t("titleLabel")}</span><input className={inputClass} value={title} onChange={(event) => setTitle(event.target.value)} maxLength={140} required /></label>
-              <div className="sm:col-span-2">
-                <span className={labelClass}>{t("scheduleLegend")}</span>
-                <p className="text-sm leading-6 text-[var(--muted)]">{t("requiredPeriodHint")}</p>
-              </div>
-              <SchedulePeriodFields startsOn={startsOn} endsOn={endsOn} onStartsOn={setStartsOn} onEndsOn={setEndsOn} />
-              <p className="sm:col-span-2 text-xs leading-5 text-[var(--muted)]">{t("periodNote")}</p>
+              <fieldset className="sm:col-span-2">
+                <legend className={labelClass}>{t("scheduleLegend")}</legend>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <button className={cx("min-h-16 rounded-xl border px-4 py-3 text-left", scheduleMode === "period" ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] bg-[var(--paper)]")} type="button" aria-pressed={scheduleMode === "period"} onClick={() => setScheduleMode("period")}><strong className="block text-sm">{t("schedulePeriod")}</strong><span className="mt-1 block text-xs font-normal text-[var(--muted)]">{t("schedulePeriodHint")}</span></button>
+                  <button className={cx("min-h-16 rounded-xl border px-4 py-3 text-left", scheduleMode === "none" ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] bg-[var(--paper)]")} type="button" aria-pressed={scheduleMode === "none"} onClick={() => setScheduleMode("none")}><strong className="block text-sm">{t("scheduleNone")}</strong><span className="mt-1 block text-xs font-normal text-[var(--muted)]">{t("scheduleNoneHint")}</span></button>
+                </div>
+              </fieldset>
+              {scheduleMode === "period" ? <>
+                <SchedulePeriodFields startsOn={startsOn} endsOn={endsOn} onStartsOn={setStartsOn} onEndsOn={setEndsOn} />
+                <p className="sm:col-span-2 text-xs leading-5 text-[var(--muted)]">{t("periodNote")}</p>
+              </> : <p className="sm:col-span-2 rounded-xl bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{t("noneNote")}</p>}
 
               <div className="sm:col-span-2">
                 {optionalOpen ? (
@@ -191,7 +195,7 @@ export function CreateChallengeScreen({
           <div>
             <h2 className="text-xl font-light">{t("checkpointsTitle")}</h2>
             {tracksCatalog ? (
-              <><p className="mt-1 mb-4 text-sm leading-6 text-[var(--muted)]">{tracksCatalog === "book" ? t("bookItemsHint") : t("cineItemsHint")}</p><CineItemsEditor value={cineItems} onChange={setCineItems} members={personal ? [] : group?.members ?? []} catalogPath={personal ? API_PATHS.personalCatalog : API_PATHS.groupCatalog(group!.id)} startsOn={startsOn} endsOn={endsOn} kind={tracksCatalog === "book" ? "book" : "film"} /><p className="mt-3 text-xs font-medium text-[var(--muted)]">{t("itemsCount", { count: itemInputs.length })}</p></>
+              <><p className="mt-1 mb-4 text-sm leading-6 text-[var(--muted)]">{tracksCatalog === "book" ? t("bookItemsHint") : t("cineItemsHint")}</p><CineItemsEditor value={cineItems} onChange={setCineItems} members={personal ? [] : group?.members ?? []} catalogPath={personal ? API_PATHS.personalCatalog : API_PATHS.groupCatalog(group!.id)} kind={tracksCatalog === "book" ? "book" : "film"} /><p className="mt-3 text-xs font-medium text-[var(--muted)]">{t("itemsCount", { count: itemInputs.length })}</p></>
             ) : null}
           </div>
         ) : null}

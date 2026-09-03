@@ -12,7 +12,7 @@ import { resolveRecipe } from "../challenges/recipes";
 import { writeAudit } from "./audit";
 import { insertField, type ClientField } from "./fields";
 import { parseRuleSections, rulesCompatibilityText } from "./rules";
-import { asRecord, dateRange, itemTargetDate, publicId, semanticKey } from "./shared";
+import { asRecord, dateRange, publicId, semanticKey } from "./shared";
 
 export async function createChallenge(
   session: SessionContext,
@@ -29,13 +29,6 @@ export async function createChallenge(
     Object.hasOwn(body, "endsOn") ? body.endsOn : body.endDate,
   );
   const recipe = resolveRecipe(body);
-  if (recipe.scheduleMode === "period" && (startDate === null || endDate === null)) {
-    throw new ApiError(
-      400,
-      "challenge_period_required",
-      "Defina o início e o término do desafio.",
-    );
-  }
   const wizardFields = Array.isArray(body.fields) && body.fields.length ? (body.fields as ClientField[]) : null;
   if (wizardFields && wizardFields.length > 30) throw new ApiError(400, "field_limit", "Use no máximo 30 campos.");
   const wantsItems = recipe.catalogKind !== null && recipe.entryTypes.some((type) => type.submissionMode === "item");
@@ -172,13 +165,12 @@ export async function createChallenge(
           itemKey = `${semanticKey(itemTitle, `item_${index + 1}`)}_${suffix}`.slice(0, 64);
         }
         usedKeys.add(itemKey);
-        const targetDate = itemTargetDate(item.targetDate, startDate, endDate);
 
         await client.query(
           `INSERT INTO challenge_items
-            (id, challenge_id, entry_type_id, catalog_item_id, recommended_by_user_id, semantic_key, title, position, target_date, metadata, created_at, updated_at)
-           VALUES ($1,$2,NULL,$3,$4,$5,$6,$7,$8,'{}'::jsonb,now(),now())`,
-          [publicId(), id, catalogItemId, recommendedBy, itemKey, itemTitle, index, targetDate],
+            (id, challenge_id, entry_type_id, catalog_item_id, recommended_by_user_id, semantic_key, title, position, metadata, created_at, updated_at)
+           VALUES ($1,$2,NULL,$3,$4,$5,$6,$7,'{}'::jsonb,now(),now())`,
+          [publicId(), id, catalogItemId, recommendedBy, itemKey, itemTitle, index],
         );
       }
     }

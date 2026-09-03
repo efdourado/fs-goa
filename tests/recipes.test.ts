@@ -5,7 +5,6 @@ import { ApiError } from "../lib/http";
 import {
   isLegacyRecipeKey,
   isRecipeKey,
-  recipeRequiresPeriod,
   resolveRecipe,
 } from "../lib/goa/challenges/recipes";
 
@@ -22,12 +21,11 @@ function assertInvalidRecipe(recipe: unknown): void {
 }
 
 describe("current challenge recipes", () => {
-  test("Cinema is a period-bound film rating recipe", () => {
+  test("Cinema is a film rating recipe", () => {
     const recipe = resolveRecipe({ recipe: "cinema" });
 
     assert.equal(recipe.key, "cinema");
     assert.equal(recipe.catalogKind, "film");
-    assert.equal(recipe.scheduleMode, "period");
     assert.deepEqual(recipe.entryTypes.map((type) => type.purpose), ["rating"]);
     assert.deepEqual(recipe.entryTypes[0].fields.map((field) => field.key), ["nota", "comentario"]);
   });
@@ -37,7 +35,6 @@ describe("current challenge recipes", () => {
 
     assert.equal(recipe.key, "library");
     assert.equal(recipe.catalogKind, "book");
-    assert.equal(recipe.scheduleMode, "period");
     assert.deepEqual(recipe.entryTypes.map((type) => type.purpose), ["progress", "completion"]);
     assert.equal(recipe.entryTypes[0].cardinality, "once_per_item_day");
     assert.equal(recipe.entryTypes[1].cardinality, "once_per_item");
@@ -56,11 +53,10 @@ describe("current challenge recipes", () => {
     assert.equal(resolveRecipe({ template: "reading" }).key, "library");
   });
 
-  test("only the consolidated recipes require a period", () => {
-    assert.equal(recipeRequiresPeriod("cinema"), true);
-    assert.equal(recipeRequiresPeriod("library"), true);
-    assert.equal(recipeRequiresPeriod("cine_free"), false);
-    assert.equal(recipeRequiresPeriod("reading_club"), false);
-    assert.equal(recipeRequiresPeriod(null), false);
+  test("scheduleMode is only the wizard's initial toggle, not a hard rule", () => {
+    // Cinema opens undated (a watchlist), Library opens dated (a club season) —
+    // but the create/activate paths accept either with or without a period.
+    assert.equal(resolveRecipe({ recipe: "cinema" }).scheduleMode, "none");
+    assert.equal(resolveRecipe({ recipe: "library" }).scheduleMode, "period");
   });
 });

@@ -19,7 +19,6 @@ export {
   dateRange,
   dateString,
   integerValue,
-  itemTargetDate,
   publicId,
   semanticKey,
 } from "./goa/domain/shared";

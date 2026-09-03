@@ -57,28 +57,6 @@ export function dateRange(startValue: unknown, endValue: unknown): ChallengeDate
   return { startDate, endDate };
 }
 
-/**
- * A round item's optional goal date. Absent stays absent; when present it must
- * be a real date and, if the challenge has a period, fall inside it. The goal is
- * a soft organizer, never a gate, so this only rejects clearly wrong input.
- */
-export function itemTargetDate(
-  value: unknown,
-  startDate: string | null,
-  endDate: string | null,
-): string | null {
-  if (missingDate(value)) return null;
-  const date = dateString(value, "Data-meta do item");
-  if (startDate && endDate && (date < startDate || date > endDate)) {
-    throw new ApiError(
-      400,
-      "target_date_out_of_range",
-      "A data-meta de cada item precisa cair dentro do período do desafio.",
-    );
-  }
-  return date;
-}
-
 /** Canonical calendar key for business rules that must honor a named timezone. */
 export function dateKeyInTimeZone(date: Date, timeZone: string): string {
   if (Number.isNaN(date.getTime())) throw new RangeError("Data inválida.");

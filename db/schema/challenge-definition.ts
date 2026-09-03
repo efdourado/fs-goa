@@ -3,7 +3,6 @@ import {
   bigint,
   boolean,
   check,
-  date,
   foreignKey,
   index,
   integer,
@@ -96,9 +95,6 @@ export const challengeItems = pgTable(
     title: text("title").notNull(),
     description: text("description"),
     position: integer("position").notNull().default(0),
-    // A soft, date-only goal inside the challenge period. It helps organize
-    // batches (for example, four films in week one) but never blocks a log.
-    targetDate: date("target_date", { mode: "string" }),
     opensAt: timestamptz("opens_at"),
     dueAt: timestamptz("due_at"),
     metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
@@ -125,7 +121,6 @@ export const challengeItems = pgTable(
       table.position,
     ),
     index("challenge_items_due_idx").on(table.challengeId, table.dueAt),
-    index("challenge_items_target_date_idx").on(table.challengeId, table.targetDate),
     index("challenge_items_catalog_idx").on(table.catalogItemId),
     check("challenge_items_key_check", sql`${table.semanticKey} ~ '^[a-z][a-z0-9_]{0,63}$'`),
     check("challenge_items_title_check", sql`char_length(btrim(${table.title})) between 1 and 200`),
