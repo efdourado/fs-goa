@@ -175,14 +175,14 @@ export function DashboardScreen({
             {standardGroups.map((group) => {
               const count = group.memberCount ?? group.members?.length ?? 0;
               return (
-                <button className={cx(cardClass, "cursor-pointer flex min-h-24 items-center justify-between gap-4 p-4 text-left transition hover:-translate-y-0.5 hover:border-[var(--main-line)]")} type="button" onClick={() => onOpenGroup(group.id)} key={group.id}>
+                <button className={cx(cardClass, "cursor-pointer flex min-h-24 items-center justify-between gap-4 p-4 text-left transition hover:-translate-y-0.5 hover:border-[var(--muted)]")} type="button" onClick={() => onOpenGroup(group.id)} key={group.id}>
                   <span>
                     {group.name}
                     <small className="mt-1 block text-[var(--muted)]">
                       {t("peopleCount", { count })} · {tr(group.role)}
                     </small>
                   </span>
-                  <span className="text-lg text-[var(--main-strong)]" aria-hidden="true">→</span>
+                  <span className="text-lg text-[var(--muted)]" aria-hidden="true">→</span>
                 </button>
               );
             })}

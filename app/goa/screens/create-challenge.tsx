@@ -141,7 +141,7 @@ export function CreateChallengeScreen({
   }
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
+    <main className="mx-auto max-w-6xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
       <button className={cx(backLinkClass, "mb-6")} type="button" onClick={onBack}>{personal ? tc("backHome") : t("back", { group: group?.name ?? "" })}</button>
       <PageHeading title={personal ? t("personalTitle") : t("title")} description={personal ? t("personalSubtitle") : t("subtitle")} />
       <nav className={cx("mb-6 grid gap-1 rounded-2xl bg-[var(--wash-strong)]/70 p-1", personal ? "grid-cols-3" : "grid-cols-2 sm:grid-cols-4")} aria-label={t("stepsNav")}>

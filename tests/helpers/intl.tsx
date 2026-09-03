@@ -1,6 +1,7 @@
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createFormatter, createTranslator, NextIntlClientProvider } from "next-intl";
+import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 
 import ptBR from "../../messages/pt-BR.json";
 import { type Formatter, makeGoaFormat, type Translator } from "../../app/goa/format";
@@ -8,12 +9,24 @@ import { type Formatter, makeGoaFormat, type Translator } from "../../app/goa/fo
 const LOCALE = "pt-BR";
 const TIME_ZONE = "America/Sao_Paulo";
 
+// Enough of an app-router for components that call useRouter() during render.
+const stubRouter = {
+  push: () => undefined,
+  replace: () => undefined,
+  refresh: () => undefined,
+  back: () => undefined,
+  forward: () => undefined,
+  prefetch: () => undefined,
+} as unknown as Parameters<typeof AppRouterContext.Provider>[0]["value"];
+
 /** Renders a component tree with the pt-BR catalog, matching the app's default. */
 export function renderWithIntl(element: ReactElement): string {
   return renderToStaticMarkup(
-    <NextIntlClientProvider locale={LOCALE} messages={ptBR} timeZone={TIME_ZONE}>
-      {element}
-    </NextIntlClientProvider>,
+    <AppRouterContext.Provider value={stubRouter}>
+      <NextIntlClientProvider locale={LOCALE} messages={ptBR} timeZone={TIME_ZONE}>
+        {element}
+      </NextIntlClientProvider>
+    </AppRouterContext.Provider>,
   );
 }
 

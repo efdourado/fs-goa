@@ -6,7 +6,7 @@ import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "re
 import { API_PATHS, apiRequest } from "../api";
 import { useGoaFormat } from "../format";
 import { RuleSectionsView } from "../rules";
-import { SettingsMenu } from "../SettingsMenu";
+import { LanguageToggle } from "../LanguageToggle";
 import type {
   ChallengeSummary,
   GroupSummary,
@@ -26,7 +26,7 @@ function PublicChrome({ user, onSignIn, children }: { user: User | null; onSignI
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:h-[76px] sm:px-6">
           <Brand />
           <div className="flex items-center gap-2">
-            <SettingsMenu />
+            <LanguageToggle />
             <Button variant="secondary" onClick={onSignIn}>{t("signIn")}</Button>
           </div>
         </div>

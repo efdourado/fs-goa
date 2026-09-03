@@ -6,7 +6,7 @@ import { publicResults } from "@/lib/goa-challenges";
 import { type Formatter, makeGoaFormat, type Translator } from "@/app/goa/format";
 import { MetricBlock } from "@/app/goa/metrics-view";
 import { metricHasData, participantsSentence } from "@/app/goa/utils";
-import { SettingsMenu } from "@/app/goa/SettingsMenu";
+import { LanguageToggle } from "@/app/goa/LanguageToggle";
 import type { Metric } from "@/app/goa/types";
 
 export const runtime = "nodejs";
@@ -45,7 +45,7 @@ export default async function SharedResultsPage({ params }: { params: Promise<{ 
             <span className="grid h-9 w-9 place-items-center rounded-[50%_50%_50%_16%] bg-[var(--ink)] text-[var(--canvas)]">g</span>
             goa
           </Link>
-          <SettingsMenu />
+          <LanguageToggle />
         </div>
         <section className="overflow-hidden rounded-[30px] bg-[var(--spotlight)] px-6 py-12 text-[var(--spotlight-ink)] sm:px-12 sm:py-16">
           <p className="text-xs font-light uppercase tracking-[0.16em] text-white/50">
