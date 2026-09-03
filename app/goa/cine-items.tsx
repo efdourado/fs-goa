@@ -16,7 +16,6 @@ export interface CineRow {
   year: string;
   pages: string;
   mainGenre: string;
-  targetDate: string;
 }
 
 export function newCineRow(title = "", extra: Partial<CineRow> = {}): CineRow {
@@ -28,7 +27,6 @@ export function newCineRow(title = "", extra: Partial<CineRow> = {}): CineRow {
     year: "",
     pages: "",
     mainGenre: "",
-    targetDate: "",
     ...extra,
   };
 }
@@ -44,9 +42,9 @@ function asFieldString(value: unknown): string {
 }
 
 /**
- * Parses a pasted JSON array of `{title, year, pageCount, mainGenre, targetDate}`
- * objects into rows — the "already have the list ready" fast path, as an
- * alternative to typing titles one by one. Throws a translation key on failure.
+ * Parses a pasted JSON array of `{title, year, pageCount, mainGenre}` objects
+ * into rows — the "already have the list ready" fast path, as an alternative to
+ * typing titles one by one. Throws a translation key on failure.
  */
 export function parseJsonItemsPaste(text: string, existingTitles: Set<string>): CineRow[] {
   let parsed: unknown;
@@ -77,7 +75,6 @@ export function parseJsonItemsPaste(text: string, existingTitles: Set<string>): 
       year: asFieldString(pick(raw, "year")),
       pages: asFieldString(pick(raw, "pageCount", "pages")),
       mainGenre,
-      targetDate: asFieldString(pick(raw, "targetDate", "target_date", "dueDate", "due_date")),
     }));
   }
   if (!rows.length) throw new Error("jsonNoItems");
@@ -100,7 +97,6 @@ export function cineRowsToInput(rows: CineRow[]): ChallengeItemInput[] {
         ...(Number.isInteger(year) && year > 1800 ? { year } : {}),
         ...(Number.isInteger(pages) && pages > 0 ? { pageCount: pages } : {}),
         ...(row.mainGenre.trim() ? { mainGenre: row.mainGenre.trim() } : {}),
-        ...(row.targetDate ? { targetDate: row.targetDate } : {}),
       };
     });
 }
@@ -110,8 +106,6 @@ export function CineItemsEditor({
   onChange,
   members,
   catalogPath,
-  startsOn,
-  endsOn,
   kind = "film",
 }: {
   value: CineRow[];
@@ -119,8 +113,6 @@ export function CineItemsEditor({
   members: Member[];
   /** Group and personal catalogs have different public routes. */
   catalogPath: string;
-  startsOn?: string | null;
-  endsOn?: string | null;
   /** Filters the "from catalog" picker and shows attributes relevant to the medium. */
   kind?: "film" | "book";
 }) {
@@ -209,14 +201,13 @@ export function CineItemsEditor({
                 </div>
                 {open ? (
                   <div className="mt-2 space-y-2">
-                    <div className="grid gap-2 sm:grid-cols-3">
+                    <div className={cx("grid gap-2", kind === "book" ? "sm:grid-cols-3" : "sm:grid-cols-2")}>
                       <label><span className={labelClass}>{t(kind === "film" ? "latestYear" : "year")}</span><input className={inputClass} type="number" inputMode="numeric" min={1870} max={2200} value={row.year} onChange={(event) => update(row.key, { year: event.target.value })} /></label>
                       {kind === "book"
                         ? <label><span className={labelClass}>{t("pages")}</span><input className={inputClass} type="number" inputMode="numeric" min={1} max={100000} value={row.pages} onChange={(event) => update(row.key, { pages: event.target.value })} /></label>
-                        : <label><span className={labelClass}>{t("mainGenre")}</span><input className={inputClass} value={row.mainGenre} maxLength={80} placeholder={t("mainGenrePlaceholder")} onChange={(event) => update(row.key, { mainGenre: event.target.value })} /></label>}
-                      <label><span className={labelClass}>{t("targetDate")}</span><input className={inputClass} type="date" min={startsOn ?? undefined} max={endsOn ?? undefined} value={row.targetDate} onChange={(event) => update(row.key, { targetDate: event.target.value })} /></label>
+                        : null}
+                      <label><span className={labelClass}>{t("mainGenre")}</span><input className={inputClass} value={row.mainGenre} maxLength={80} placeholder={t("mainGenrePlaceholder")} onChange={(event) => update(row.key, { mainGenre: event.target.value })} /></label>
                     </div>
-                    <p className="text-xs leading-5 text-[var(--muted)]">{t("targetDateHint")}</p>
                     {kind === "book" && members.length ? (
                       <label className="block"><span className={labelClass}>{t("recommendedBy")}</span><select className={inputClass} value={row.recommendedByUserId} onChange={(event) => update(row.key, { recommendedByUserId: event.target.value })}><option value="">{t("recommendedByNone")}</option>{members.map((member) => <option value={member.id} key={member.id}>{member.name}</option>)}</select></label>
                     ) : null}

@@ -16,7 +16,6 @@ import { fieldsForChallenge } from "./fields";
 import { generateDailyCheckpoints } from "./items";
 import { metricsForChallenge, resultForChallenge } from "./results";
 import { parseRuleSections, rulesCompatibilityText } from "../domain/rules";
-import { recipeRequiresPeriod } from "./recipes";
 
 function windowStatus(
   challengeStatus: "draft" | "active" | "closed",
@@ -37,14 +36,13 @@ export async function getChallengeDetail(session: SessionContext, challengeId: s
     const itemsResult = await client.query<{
         id: string; title: string; description: string | null;
         position: number; opens_at: Date | null; due_at: Date | null;
-        target_date: string | null;
         checkpoint_id: string | null;
         catalog_item_id: string | null; catalog_title: string | null;
         catalog_author: string | null; catalog_year: number | null;
         catalog_main_genre: string | null; catalog_pages: number | null;
         recommended_by_id: string | null; recommended_by_name: string | null;
       }>(
-        `SELECT i.id, i.title, i.description, i.position, i.opens_at, i.due_at, i.target_date::text AS target_date, i.checkpoint_id,
+        `SELECT i.id, i.title, i.description, i.position, i.opens_at, i.due_at, i.checkpoint_id,
                 i.catalog_item_id, ci.title AS catalog_title, ci.author AS catalog_author, ci.year AS catalog_year,
                 ci.main_genre AS catalog_main_genre, ci.page_count AS catalog_pages,
                 i.recommended_by_user_id AS recommended_by_id, ru.display_name AS recommended_by_name
@@ -119,7 +117,6 @@ export async function getChallengeDetail(session: SessionContext, challengeId: s
     const roundItems = itemsResult.rows.map((item) => ({
       id: item.id, title: item.title,
       description: item.description, position: item.position,
-      targetDate: item.target_date ?? null,
       checkpointId: item.checkpoint_id ?? null,
       opensAt: item.opens_at?.toISOString() ?? null, dueAt: item.due_at?.toISOString() ?? null,
       status: windowStatus(access.challenge.status, item.opens_at, item.due_at),
@@ -201,13 +198,6 @@ export async function updateChallenge(
         ? body.endDate
         : access.challenge.end_date;
     const { startDate, endDate } = dateRange(rawStartDate, rawEndDate);
-    if (recipeRequiresPeriod(access.challenge.recipe_key) && (startDate === null || endDate === null)) {
-      throw new ApiError(
-        400,
-        "challenge_period_required",
-        "Defina o início e o término do desafio.",
-      );
-    }
     const scheduleChanged =
       startDate !== access.challenge.start_date || endDate !== access.challenge.end_date;
     const allTypes = await entryTypesForChallenge(client, challengeId);

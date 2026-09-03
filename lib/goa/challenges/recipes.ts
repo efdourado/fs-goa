@@ -87,10 +87,6 @@ export function isRecipeKey(value: unknown): value is RecipeKey {
   return value === "cinema" || value === "library";
 }
 
-export function recipeRequiresPeriod(recipeKey: string | null): boolean {
-  return recipeKey === "cinema" || recipeKey === "library";
-}
-
 const ratingFields = (commentMax: number): ClientField[] => [
   { key: "nota", label: "Nota", type: "rating", required: true },
   {
@@ -181,7 +177,10 @@ export const RECIPES: Record<RecipeKey, Recipe> = {
     key: "cinema",
     version: 1,
     catalogKind: "film",
-    scheduleMode: "period",
+    // The period is always optional: an undated Cinema round is an open-ended
+    // watchlist, an undated Library is a reading habit. The wizard only uses this
+    // as the initial toggle position.
+    scheduleMode: "none",
     entryTypes: [avaliacao(true)],
     metrics: cineMetrics,
   },

@@ -2028,18 +2028,36 @@ test("desafio pessoal: workspace criado sob demanda, invisível como grupo e reu
   });
   assert.equal(participantChange.response.status, 400, "participantes extras não entram depois da criação");
 
-  // segundo desafio pessoal reusa o mesmo workspace
+  // segundo desafio pessoal reusa o mesmo workspace — e sem datas: uma lista de
+  // hábitos de leitura, aberta, com registro por dia inclusive no passado.
   const second = await call("POST", "/api/personal/challenges", {
     session: owner,
     body: {
       recipe: "library",
-      title: "90 dias",
-      startsOn: "2024-01-01",
-      endsOn: "2024-01-30",
+      title: "Registros de leitura",
+      startsOn: null,
+      endsOn: null,
       items: [{ title: "A hora da estrela", author: "Clarice Lispector" }],
     },
   });
   assert.equal(second.response.status, 201, JSON.stringify(second.body));
+  const secondId = (second.body as { id: string }).id;
+  assert.equal(
+    (await call("POST", `/api/challenges/${secondId}/transition`, { session: owner, body: { status: "active" } })).response.status,
+    200,
+    "desafio pessoal sem datas ativa sem exigir período",
+  );
+  const secondDetail = (await call("GET", `/api/challenges/${secondId}`, { session: owner })).body as {
+    startsOn: string | null; entryTypes: Array<{ id: string; purpose: string }>; items: Array<{ id: string }>; fields: Array<{ id: string }>;
+  };
+  assert.equal(secondDetail.startsOn, null);
+  const progressType = secondDetail.entryTypes.find((type) => type.purpose === "progress")!;
+  const pageEntry = await call("POST", `/api/challenges/${secondId}/entries`, {
+    session: owner,
+    body: { itemId: secondDetail.items[0].id, entryTypeId: progressType.id, occurredOn: "2023-11-20", values: { [secondDetail.fields[0].id]: 30 } },
+  });
+  assert.equal(pageEntry.response.status, 201, JSON.stringify(pageEntry.body));
+  assert.equal((pageEntry.body as { occurredOn: string }).occurredOn, "2023-11-20", "hábito sem prazo aceita uma data passada");
   const afterSecond = await call("GET", "/api/bootstrap", { session: owner });
   assert.equal((afterSecond.body as { personalWorkspaceId: string }).personalWorkspaceId, workspaceId);
   assert.equal((afterSecond.body as { groups: unknown[] }).groups.length, groupsBefore, "sem grupo visível novo");

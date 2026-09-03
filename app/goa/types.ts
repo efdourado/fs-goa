@@ -119,8 +119,6 @@ export interface ChallengeItem {
   title: string;
   description?: string | null;
   position?: number;
-  /** Optional, non-blocking goal date inside the challenge period. */
-  targetDate?: string | null;
   opensAt?: string | null;
   dueAt?: string | null;
   date?: string | null;
@@ -401,5 +399,4 @@ export interface ChallengeItemInput {
   year?: number;
   pageCount?: number;
   mainGenre?: string;
-  targetDate?: string;
 }
