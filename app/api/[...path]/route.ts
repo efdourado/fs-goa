@@ -25,6 +25,8 @@ import {
 } from "@/lib/admin";
 import { adminFeedback, submitFeedback } from "@/lib/feedback";
 import {
+  archiveCatalogItem,
+  archivePersonalCatalogItem,
   catalogItemDetail,
   listGroupCatalog,
   listPersonalCatalog,
@@ -301,6 +303,12 @@ export async function DELETE(request: Request): Promise<Response> {
     }
     if (path[0] === "groups" && path.length === 2) {
       return json(await softDeleteGroup(session, path[1]));
+    }
+    if (path[0] === "catalog" && path.length === 2) {
+      return json(await archiveCatalogItem(session, path[1]));
+    }
+    if (path[0] === "personal" && path[1] === "catalog" && path.length === 3) {
+      return json(await archivePersonalCatalogItem(session, path[2]));
     }
     if (path[0] === "challenges" && path[2] === "items" && path.length === 4) {
       return json(await archiveChallengeItem(session, path[1], path[3]));

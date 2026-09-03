@@ -321,6 +321,9 @@
     "historyAvg": "historical average {value} over {rounds} rated round(s)",
     "recommendedBy": "recommended by {name}",
     "noRounds": "This item hasn't been in any visible round yet.",
+    "remove": "Remove from catalog",
+    "removeHint": "It leaves the list and the \"from catalog\" picker. Closed rounds that already used it stay intact.",
+    "removeConfirm": "Remove \"{title}\" from the catalog?",
     "status": {
       "draft": "draft",
       "active": "in progress",

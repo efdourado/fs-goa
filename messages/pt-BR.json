@@ -321,6 +321,9 @@
     "historyAvg": "média histórica {value} em {rounds} rodada(s) com nota",
     "recommendedBy": "indicado por {name}",
     "noRounds": "Este item ainda não entrou em nenhuma rodada visível.",
+    "remove": "Excluir do acervo",
+    "removeHint": "Some da lista e do seletor \"do acervo\". As rodadas encerradas que já usaram o item continuam intactas.",
+    "removeConfirm": "Excluir \"{title}\" do acervo?",
     "status": {
       "draft": "rascunho",
       "active": "em andamento",

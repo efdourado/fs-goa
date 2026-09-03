@@ -1847,6 +1847,76 @@ test("memória do acervo: um filme reconhecido em duas rodadas encerradas", asyn
   assert.deepEqual(detail.rounds.map((r) => r.ratingAvg), [4, 2]);
 });
 
+test("excluir do acervo: bloqueado enquanto o desafio corre, permitido depois, e escondido do seletor", async () => {
+  const owner = await register("Bea", "bea_del");
+  const member = await register("Caio", "caio_del");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Curadoria" } })).body as { id: string }).id;
+  const inv = (await call("POST", `/api/groups/${gid}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
+  await call("POST", `/api/invites/${inv.token}`, { session: member, body: {} });
+
+  const created = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "cinema", title: "Ciclo Herzog", startsOn: "2026-08-01", endsOn: "2026-12-31",
+      participantIds: [owner.user.id], items: [{ title: "Fitzcarraldo", year: 1982 }, { title: "Stroszek", year: 1977 }],
+    },
+  });
+  const challengeId = (created.body as { id: string }).id;
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } })).response.status, 200);
+
+  const catalog = (await call("GET", `/api/groups/${gid}/catalog`, { session: owner })).body as { items: Array<{ id: string; title: string }> };
+  const fitz = catalog.items.find((i) => i.title === "Fitzcarraldo")!;
+
+  const member403 = await call("DELETE", `/api/catalog/${fitz.id}`, { session: member });
+  assert.equal(member403.response.status, 403, "participante comum não exclui do acervo");
+
+  const blocked = await call("DELETE", `/api/catalog/${fitz.id}`, { session: owner });
+  assert.equal(blocked.response.status, 409, JSON.stringify(blocked.body));
+  assert.equal((blocked.body as { error: string }).error, "catalog_item_in_use");
+
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "closed" } })).response.status, 200);
+
+  const gone = await call("DELETE", `/api/catalog/${fitz.id}`, { session: owner });
+  assert.equal(gone.response.status, 200, JSON.stringify(gone.body));
+  assert.equal((gone.body as { archived: boolean }).archived, true);
+
+  const after = (await call("GET", `/api/groups/${gid}/catalog`, { session: owner })).body as { items: Array<{ title: string }> };
+  assert.deepEqual(after.items.map((i) => i.title), ["Stroszek"], "só o item excluído sai da lista");
+  assert.equal((await call("GET", `/api/groups/${gid}/catalog/${fitz.id}`, { session: owner })).response.status, 404, "a página do item excluído some");
+  const challengeDetail = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    items: Array<{ catalogItem: { title: string } | null }>;
+  };
+  assert.ok(
+    challengeDetail.items.some((it) => it.catalogItem?.title === "Fitzcarraldo"),
+    "a rodada encerrada continua mostrando o filme",
+  );
+  assert.equal((await call("DELETE", `/api/catalog/${fitz.id}`, { session: owner })).response.status, 404, "excluir de novo é 404");
+
+  const auditRows = await adminPool.query<{ count: number }>(
+    "SELECT count(*)::int AS count FROM audit_events WHERE group_id=$1 AND action='catalog.item_archived'",
+    [gid],
+  );
+  assert.equal(auditRows.rows[0].count, 1);
+
+  // acervo pessoal: mesmo caminho, sem grupo à vista
+  const personal = await call("POST", "/api/personal/challenges", {
+    session: owner,
+    body: { recipe: "cinema", title: "Minha lista", startsOn: null, endsOn: null, items: [{ title: "Aguirre", year: 1972 }] },
+  });
+  const personalId = (personal.body as { id: string }).id;
+  const personalCatalog = (await call("GET", "/api/personal/catalog", { session: owner })).body as { items: Array<{ id: string; title: string }> };
+  const aguirre = personalCatalog.items.find((i) => i.title === "Aguirre")!;
+  assert.equal((await call("DELETE", `/api/personal/catalog/${aguirre.id}`, { session: owner })).response.status, 409, "ativo bloqueia no acervo pessoal também");
+  await call("POST", `/api/challenges/${personalId}/transition`, { session: owner, body: { status: "active" } });
+  await call("POST", `/api/challenges/${personalId}/transition`, { session: owner, body: { status: "closed" } });
+  assert.equal((await call("DELETE", `/api/personal/catalog/${aguirre.id}`, { session: owner })).response.status, 200);
+  assert.deepEqual(
+    ((await call("GET", "/api/personal/catalog", { session: owner })).body as { items: unknown[] }).items,
+    [],
+    "acervo pessoal fica vazio",
+  );
+});
+
 test("item + checkpoint são ortogonais: um registro carrega filme e sessão", async () => {
   const owner = await register("Ícaro", "icaro_ortho");
   const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Sessões" } })).body as { id: string }).id;

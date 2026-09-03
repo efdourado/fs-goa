@@ -13,16 +13,22 @@ export function CatalogItemScreen({
   itemId,
   onBack,
   onOpenChallenge,
+  onDelete,
 }: {
   detailPath: string;
   itemId: Id;
   onBack: () => void;
   onOpenChallenge: (id: Id) => void;
+  /** Present only when the viewer may remove the item from the catalog. */
+  onDelete?: () => Promise<void>;
 }) {
   const t = useTranslations("catalog");
+  const tc = useTranslations("common");
   const f = useGoaFormat();
   const [item, setItem] = useState<CatalogItemDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [removing, setRemoving] = useState(false);
+  const [removeError, setRemoveError] = useState<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -46,6 +52,18 @@ export function CatalogItemScreen({
   const historyAvg = rated.length
     ? Number((rated.reduce((sum, round) => sum + (round.ratingAvg ?? 0), 0) / rated.length).toFixed(2))
     : null;
+
+  async function remove() {
+    if (!onDelete || !window.confirm(t("removeConfirm", { title: item!.title }))) return;
+    setRemoving(true);
+    setRemoveError(null);
+    try {
+      await onDelete();
+    } catch (cause) {
+      setRemoveError(f.error(cause));
+      setRemoving(false);
+    }
+  }
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
@@ -80,6 +98,16 @@ export function CatalogItemScreen({
           </ul>
         ) : <p className="mt-4 text-sm text-[var(--muted)]">{t("noRounds")}</p>}
       </section>
+
+      {onDelete ? (
+        <section className="mt-6 rounded-2xl border border-[var(--line)] p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm leading-6 text-[var(--muted)]">{t("removeHint")}</p>
+            <Button variant="danger" disabled={removing} onClick={remove}>{removing ? tc("saving") : t("remove")}</Button>
+          </div>
+          {removeError ? <p className="mt-3 text-sm text-[var(--danger)]">{removeError}</p> : null}
+        </section>
+      ) : null}
     </main>
   );
 }
