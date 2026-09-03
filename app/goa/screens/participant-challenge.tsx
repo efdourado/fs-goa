@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { type FormEvent, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { useGoaFormat } from "../format";
 import { MetricBlock } from "../metrics-view";
@@ -42,6 +42,64 @@ function ratingChoices(config?: FieldConfig): number[] {
   const step = config?.step && config.step > 0 ? config.step : 0.5;
   const count = Math.min(41, Math.floor((max - min) / step) + 1);
   return Array.from({ length: Math.max(0, count) }, (_, index) => Number((min + index * step).toFixed(4)));
+}
+
+/**
+ * On desktop this is one clean row of equal pills (`sm:grid-cols-11`). On a phone
+ * an odd count would wrap into a lopsided 6-over-5, so it becomes a single
+ * horizontal snap-scroller of same-size pills, pre-scrolled to the current pick.
+ */
+function RatingField({
+  id,
+  field,
+  value,
+  disabled,
+  ariaLabel,
+  onPick,
+}: {
+  id: string;
+  field: ChallengeField;
+  value: unknown;
+  disabled: boolean;
+  ariaLabel: (rating: string) => string;
+  onPick: (rating: number) => void;
+}) {
+  const scroller = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    scroller.current?.querySelector<HTMLElement>('[aria-pressed="true"]')
+      ?.scrollIntoView({ inline: "center", block: "nearest" });
+  }, []);
+  return (
+    <div
+      ref={scroller}
+      id={id}
+      tabIndex={-1}
+      className="-mx-1 flex snap-x gap-1.5 overflow-x-auto px-1 pb-2 sm:mx-0 sm:grid sm:grid-cols-11 sm:overflow-visible sm:px-0 sm:pb-0"
+    >
+      {ratingChoices(field.config).map((rating) => {
+        const picked = Number(value) === rating;
+        const text = String(rating).replace(".", ",");
+        return (
+          <button
+            key={rating}
+            type="button"
+            aria-pressed={picked}
+            aria-label={ariaLabel(text)}
+            disabled={disabled}
+            onClick={() => onPick(rating)}
+            className={cx(
+              "h-11 w-11 flex-none snap-center rounded-xl border text-sm font-light tabular-nums sm:w-auto sm:text-xs",
+              picked
+                ? "border-[var(--main)] bg-[var(--main)] text-white"
+                : "border-transparent bg-[var(--wash)] hover:border-[var(--main-line)]",
+            )}
+          >
+            {text}
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 export function DynamicEntryForm({
@@ -131,7 +189,7 @@ export function DynamicEntryForm({
             {field.type === "date" ? <input id={id} className={inputClass} type="date" value={typeof value === "string" ? value : ""} disabled={!canEdit || busy} onChange={(event) => setValue(field, event.target.value)} /> : null}
             {field.type === "select" ? <select id={id} className={inputClass} value={typeof value === "string" ? value : ""} disabled={!canEdit || busy} onChange={(event) => setValue(field, event.target.value)}><option value="">{t("select")}</option>{(field.config?.options ?? []).map((option) => <option value={option.id ?? option.value ?? option.label} key={option.id ?? option.value ?? option.label}>{option.label}</option>)}</select> : null}
             {field.type === "boolean" ? <div id={id} className="grid grid-cols-2 gap-2" tabIndex={-1}>{[{ label: tc("yes"), value: true }, { label: tc("no"), value: false }].map((option) => <button className={cx("min-h-12 rounded-xl border text-sm font-light", value === option.value ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] bg-[var(--paper)]")} type="button" aria-pressed={value === option.value} disabled={!canEdit || busy} onClick={() => setValue(field, option.value)} key={option.label}>{option.label}</button>)}</div> : null}
-            {field.type === "rating" ? <div id={id} className="grid grid-cols-6 gap-1.5 sm:grid-cols-11" tabIndex={-1}>{ratingChoices(field.config).map((rating) => <button className={cx("min-h-11 rounded-xl border text-xs font-light", Number(value) === rating ? "border-[var(--main)] bg-[var(--main)] text-white" : "border-transparent bg-[var(--wash)] hover:border-[var(--main-line)]")} type="button" aria-pressed={Number(value) === rating} aria-label={t("ratingAria", { rating: String(rating).replace(".", ",") })} disabled={!canEdit || busy} onClick={() => setValue(field, rating)} key={rating}>{String(rating).replace(".", ",")}</button>)}</div> : null}
+            {field.type === "rating" ? <RatingField id={id} field={field} value={value} disabled={!canEdit || busy} ariaLabel={(rating) => t("ratingAria", { rating })} onPick={(rating) => setValue(field, rating)} /> : null}
           </div>
         );
       })}
@@ -295,6 +353,83 @@ function ItemEntryPanel({
   );
 }
 
+function CheckGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
+      <path d="M3.5 8.5 6.5 11.5 12.5 4.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/**
+ * The "which one am I filling?" list in the sidebar — a stack of tappable rows
+ * with a numbered chip that flips to a checkmark once the entry is in. Replaces a
+ * bare `<select>` so progress reads at a glance on both phone and desktop.
+ */
+function EntryPicker({
+  title,
+  tally,
+  options,
+  selectedId,
+  onSelect,
+}: {
+  title: string;
+  tally?: string;
+  options: Array<{ id: Id; label: string; done?: boolean; soon?: boolean; statusLabel?: string }>;
+  selectedId: Id | null;
+  onSelect: (id: Id) => void;
+}) {
+  return (
+    <section className={cx(cardClass, "p-4 sm:p-5")}>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <h2 className="text-base font-light">{title}</h2>
+        {tally ? <span className="text-xs text-[var(--muted)]">{tally}</span> : null}
+      </div>
+      <ol className="mt-3 max-h-[21rem] space-y-1.5 overflow-y-auto pr-0.5">
+        {options.map((option, index) => {
+          const active = option.id === selectedId;
+          return (
+            <li key={option.id}>
+              <button
+                type="button"
+                disabled={option.soon}
+                aria-pressed={active}
+                aria-label={`${index + 1}. ${option.label}${option.statusLabel ? ` — ${option.statusLabel}` : ""}`}
+                onClick={() => onSelect(option.id)}
+                className={cx(
+                  "flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition disabled:opacity-45",
+                  active
+                    ? "border-[var(--main)] bg-[var(--main-soft)]"
+                    : "border-[var(--line)] bg-[var(--paper)] hover:border-[var(--main-line)]",
+                )}
+              >
+                <span
+                  className={cx(
+                    "grid h-7 w-7 flex-none place-items-center rounded-full text-xs font-medium tabular-nums",
+                    option.done
+                      ? "bg-[var(--ok)] text-white"
+                      : active
+                        ? "bg-[var(--main)] text-white"
+                        : "bg-[var(--wash)] text-[var(--muted)]",
+                  )}
+                >
+                  {option.done ? <CheckGlyph /> : index + 1}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className={cx("block truncate text-sm", active ? "font-medium text-[var(--main-strong)]" : "font-light")}>{option.label}</span>
+                  {option.statusLabel ? (
+                    <span className={cx("text-[11px]", option.done ? "text-[var(--ok)]" : "text-[var(--muted)]")}>{option.statusLabel}</span>
+                  ) : null}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
+}
+
 export function ParticipantChallengeScreen({
   challenge,
   entries,
@@ -440,8 +575,30 @@ export function ParticipantChallengeScreen({
               )}
             </section>
             <aside className="space-y-5">
-              {sessionMode && sortedSessions.length > 1 ? <section className={cx(cardClass, "p-5")}><h2 className="text-base font-light">{t("sessionsTitle")}</h2><label className="mt-3 block"><span className="sr-only">{t("chooseSession")}</span><select className={inputClass} value={selectedSession?.id ?? ""} onChange={(event) => setSelectedSessionId(event.target.value)}>{sortedSessions.map((session, index) => { const boundItem = sortedItems.find((item) => item.checkpointId === session.id); return <option value={session.id} key={session.id} disabled={session.status === "scheduled"}>{t("checkpointOption", { index: index + 1, title: boundItem?.title ?? session.title })}{session.status === "scheduled" ? t("checkpointSoon") : ""}</option>; })}</select></label></section>
-                : sortedItems.length > 1 ? <section className={cx(cardClass, "p-5")}><h2 className="text-base font-light">{t("checkpointsTitle")}</h2><label className="mt-3 block"><span className="sr-only">{t("chooseCheckpoint")}</span><select className={inputClass} value={selectedItem?.id ?? ""} onChange={(event) => setSelectedItemId(event.target.value)}>{sortedItems.map((item, index) => <option value={item.id} key={item.id} disabled={item.status === "scheduled" && !entriesByItem.has(item.id)}>{doneByItem.has(item.id) ? t("checkpointDone") : ""}{t("checkpointOption", { index: index + 1, title: item.title })}{item.status === "scheduled" ? t("checkpointSoon") : ""}</option>)}</select></label><ul className="mt-3 space-y-2 text-xs text-[var(--muted)]"><li>{t("checkpointTally", { done: Math.min(doneEntries.length, sortedItems.length), pending: Math.max(0, sortedItems.length - doneEntries.length) })}</li></ul></section> : null}
+              {sessionMode && sortedSessions.length > 1 ? (
+                <EntryPicker
+                  title={t("sessionsTitle")}
+                  selectedId={selectedSession?.id ?? null}
+                  onSelect={(id) => setSelectedSessionId(id)}
+                  options={sortedSessions.map((session) => {
+                    const boundItem = sortedItems.find((item) => item.checkpointId === session.id);
+                    const soon = session.status === "scheduled";
+                    return { id: session.id, label: boundItem?.title ?? session.title, soon, statusLabel: soon ? t("checkpointSoonLabel") : undefined };
+                  })}
+                />
+              ) : sortedItems.length > 1 ? (
+                <EntryPicker
+                  title={t("checkpointsTitle")}
+                  tally={t("checkpointTally", { done: Math.min(doneEntries.length, sortedItems.length), pending: Math.max(0, sortedItems.length - doneEntries.length) })}
+                  selectedId={selectedItem?.id ?? null}
+                  onSelect={(id) => setSelectedItemId(id)}
+                  options={sortedItems.map((item) => {
+                    const done = doneByItem.has(item.id);
+                    const soon = item.status === "scheduled" && !entriesByItem.has(item.id);
+                    return { id: item.id, label: item.title, done, soon, statusLabel: done ? t("checkpointDoneLabel") : soon ? t("checkpointSoonLabel") : undefined };
+                  })}
+                />
+              ) : null}
             </aside>
           </div>
         ) : null}
