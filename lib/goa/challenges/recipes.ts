@@ -44,6 +44,11 @@ export interface RecipeMetric {
   groupBy?: "none" | "participant" | "item";
   visibleDuring?: boolean;
   visibleInResults?: boolean;
+  /**
+   * Only meaningful with more than one participant (disagreement, curator bias…).
+   * A solo/personal round skips seeding these entirely.
+   */
+  needsGroup?: boolean;
   settings?: { minSample?: number; bayesPriorWeight?: number };
 }
 
@@ -52,12 +57,18 @@ export interface Recipe {
   version: number;
   catalogKind: "film" | "book" | null;
   scheduleMode: "none" | "period";
+  /**
+   * Whether a participant's entry form offers the optional "when did it happen"
+   * date. A retrospective list ("books I've already read") never needs it, so
+   * `bookshelf` opts out; the others default to true.
+   */
+  collectsEntryDate?: boolean;
   entryTypes: RecipeEntryType[];
   metrics: RecipeMetric[];
 }
 
 /** Recipes offered for new challenges. Historical rows keep their frozen shape. */
-export type RecipeKey = "cinema" | "library";
+export type RecipeKey = "cinema" | "library" | "bookshelf";
 
 /**
  * Stored by challenges created before the two-template consolidation. These keys
@@ -84,7 +95,15 @@ export function isLegacyRecipeKey(value: unknown): value is LegacyRecipeKey {
 }
 
 export function isRecipeKey(value: unknown): value is RecipeKey {
-  return value === "cinema" || value === "library";
+  return value === "cinema" || value === "library" || value === "bookshelf";
+}
+
+/**
+ * Whether a challenge on this recipe collects the optional per-entry date. Unknown
+ * / legacy keys keep the historical default (true).
+ */
+export function recipeCollectsEntryDate(key: string | null | undefined): boolean {
+  return isRecipeKey(key) ? RECIPES[key].collectsEntryDate !== false : true;
 }
 
 const ratingFields = (commentMax: number): ClientField[] => [
@@ -160,13 +179,14 @@ const cineMetrics: RecipeMetric[] = [
     groupBy: "item",
     settings: { minSample: 3, bayesPriorWeight: 4 },
   },
-  { key: "polarizacao", label: "Polarização por filme", operation: "spread", fieldKey: "nota", groupBy: "item", settings: { minSample: 2 } },
+  { key: "polarizacao", label: "Polarização por filme", operation: "spread", fieldKey: "nota", groupBy: "item", needsGroup: true, settings: { minSample: 2 } },
   {
     key: "vies_indicador",
     label: "Viés do indicador",
     operation: "indicator_bias",
     fieldKey: "nota",
     groupBy: "participant",
+    needsGroup: true,
     settings: { minSample: 1 },
   },
   completionMetric,
@@ -204,15 +224,48 @@ export const RECIPES: Record<RecipeKey, Recipe> = {
       completionMetric,
     ],
   },
+  // "Rate a list of books" — the Cinema shape for a bookshelf: each book gets a
+  // rating and an optional comment, no period, no pages, no "when did it happen".
+  bookshelf: {
+    key: "bookshelf",
+    version: 1,
+    catalogKind: "book",
+    scheduleMode: "none",
+    collectsEntryDate: false,
+    entryTypes: [avaliacao(true)],
+    metrics: [
+      { key: "media_nota", label: "Nota média", operation: "average", fieldKey: "nota", groupBy: "none" },
+      {
+        key: "ranking",
+        label: "Ranking dos livros",
+        operation: "bayesian_average",
+        fieldKey: "nota",
+        groupBy: "item",
+        settings: { minSample: 3, bayesPriorWeight: 4 },
+      },
+      { key: "polarizacao", label: "Polarização por livro", operation: "spread", fieldKey: "nota", groupBy: "item", needsGroup: true, settings: { minSample: 2 } },
+      {
+        key: "vies_indicador",
+        label: "Viés do indicador",
+        operation: "indicator_bias",
+        fieldKey: "nota",
+        groupBy: "participant",
+        needsGroup: true,
+        settings: { minSample: 1 },
+      },
+      completionMetric,
+    ],
+  },
 };
 
 const TEMPLATE_ALIAS: Record<string, RecipeKey> = {
   cine: "cinema",
   reading: "library",
+  estante: "bookshelf",
 };
 
 /**
- * Picks one of the only two recipes that can create a challenge. The four former
+ * Picks one of the only recipes that can create a challenge. The four former
  * recipe keys deliberately fail here: their rows remain readable because every
  * challenge stores its concrete entry types/fields, but they cannot seed new
  * structures. The old `cine`/`reading` template aliases lead to the current
@@ -221,13 +274,13 @@ const TEMPLATE_ALIAS: Record<string, RecipeKey> = {
 export function resolveRecipe(body: Record<string, unknown>): Recipe {
   if (Object.hasOwn(body, "recipe")) {
     if (!isRecipeKey(body.recipe)) {
-      throw new ApiError(400, "invalid_recipe", "Escolha o modelo Cinema ou Library.");
+      throw new ApiError(400, "invalid_recipe", "Escolha o modelo Cinema, Estante ou Clube de leitura.");
     }
     return RECIPES[body.recipe];
   }
   if (Object.hasOwn(body, "template")) {
     if (typeof body.template !== "string" || !Object.hasOwn(TEMPLATE_ALIAS, body.template)) {
-      throw new ApiError(400, "invalid_recipe", "Escolha o modelo Cinema ou Library.");
+      throw new ApiError(400, "invalid_recipe", "Escolha o modelo Cinema, Estante ou Clube de leitura.");
     }
     return RECIPES[TEMPLATE_ALIAS[body.template]];
   }
@@ -237,5 +290,5 @@ export function resolveRecipe(body: Record<string, unknown>): Recipe {
   if (body.submissionMode === undefined || body.submissionMode === "item") {
     return RECIPES.cinema;
   }
-  throw new ApiError(400, "invalid_recipe", "Escolha o modelo Cinema ou Library.");
+  throw new ApiError(400, "invalid_recipe", "Escolha o modelo Cinema, Estante ou Clube de leitura.");
 }

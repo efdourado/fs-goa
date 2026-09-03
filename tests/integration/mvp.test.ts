@@ -2246,3 +2246,66 @@ test("desafio pessoal: workspace criado sob demanda, invisível como grupo e reu
     assert.equal(group.response.status, 201, `grupo ${index}: ${JSON.stringify(group.body)}`);
   }
 });
+
+test("estante pessoal: só nota, sem data no registro, sem métricas de grupo, ranking por média simples", async () => {
+  const owner = await register("Manuel", "manu_shelf");
+
+  const created = await call("POST", "/api/personal/challenges", {
+    session: owner,
+    body: {
+      recipe: "bookshelf",
+      title: "Já li",
+      items: [
+        { title: "O deserto dos tártaros", author: "Dino Buzzati", year: 1940, mainGenre: "romance" },
+        { title: "Pedro Páramo", author: "Juan Rulfo", year: 1955, mainGenre: "romance" },
+      ],
+    },
+  });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const cid = (created.body as { id: string }).id;
+
+  const detail = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as {
+    scope: string;
+    collectsEntryDate: boolean;
+    entryTypes: Array<{ id: string; purpose: string; fields: Array<{ id: string; key: string }> }>;
+    metrics: ApiMetric[];
+    items: Array<{ id: string; title: string }>;
+  };
+  assert.equal(detail.scope, "personal");
+  assert.equal(detail.collectsEntryDate, false, "a estante não coleta data por registro");
+  assert.deepEqual(detail.entryTypes.map((type) => type.purpose), ["rating"], "só avaliação — sem progresso, sem conclusão");
+  assert.equal(detail.metrics.some((metric) => metric.operation === "indicator_bias"), false, "sem viés do indicador num desafio solo");
+  assert.equal(detail.metrics.some((metric) => metric.operation === "spread"), false, "sem polarização num desafio solo");
+  const ranking = detail.metrics.find((metric) => metric.label.toLowerCase().includes("ranking"))!;
+  assert.equal(ranking.operation, "average", "ranking solo é média simples, sem encolhimento bayesiano");
+
+  await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } });
+  const ratingEntryType = detail.entryTypes[0];
+  const notaField = ratingEntryType.fields.find((field) => field.key === "nota")!.id;
+  const ratingType = ratingEntryType.id;
+  for (const [item, nota] of [[detail.items[0], 5], [detail.items[1], 3]] as const) {
+    const entry = await call("POST", `/api/challenges/${cid}/entries`, {
+      session: owner,
+      body: { itemId: item.id, entryTypeId: ratingType, values: { [notaField]: nota } },
+    });
+    assert.equal(entry.response.status, 201, JSON.stringify(entry.body));
+  }
+
+  const rated = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { metrics: ApiMetric[] };
+  const topRow = rated.metrics
+    .find((metric) => metric.label.toLowerCase().includes("ranking"))!
+    .series!.find((row) => row.value !== null)!;
+  assert.equal(topRow.value, 5, "com uma nota por livro, a média é a própria nota");
+
+  await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "closed" } });
+  const blocks = await adminPool.query<{ value_snapshot: unknown }>(
+    "SELECT value_snapshot FROM result_blocks WHERE challenge_id=$1 AND kind='metric'",
+    [cid],
+  );
+  assert.ok(blocks.rows.length > 0, "a vitrine automática tem blocos de métrica");
+  for (const block of blocks.rows) {
+    const snap = block.value_snapshot as { value: number | null; series?: Array<{ value: number | null }> };
+    const hasData = snap.series ? snap.series.some((row) => row.value !== null) : snap.value !== null;
+    assert.ok(hasData, "todo bloco de métrica publicado carrega ao menos um valor");
+  }
+});

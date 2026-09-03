@@ -341,7 +341,26 @@
     "loadError": "Couldn't load the catalog.",
     "rounds": "{count, plural, =0 {no rounds} one {# round} other {# rounds}}",
     "emptyTitle": "Your catalog is empty",
-    "emptyBody": "Start a personal Cinema or Library challenge — the titles you add land here."
+    "emptyBody": "Start a personal Cinema or Bookshelf challenge — the titles you add land here.",
+    "viewLabel": "View",
+    "view": {
+      "list": "List",
+      "genre": "By genre",
+      "decade": "By decade",
+      "year": "By year"
+    },
+    "kindLabel": "Medium",
+    "kind": {
+      "all": "All",
+      "film": "Films",
+      "book": "Books"
+    },
+    "bucketMeta": "{ratings} ratings · {items} titles",
+    "bestGenres": "Best genres: {list}",
+    "bestYears": "Best years: {list}",
+    "noGenre": "No genre",
+    "bucketEmptyTitle": "Nothing to break down yet",
+    "bucketEmptyBody": "Add a genre or year to your catalog items and this view fills in."
   },
   "cineItems": {
     "titleLabel": "Film title",
@@ -408,10 +427,15 @@
         "body": "A list of films or series; each person rates and comments when they watch, with an optional date. Can have a deadline or stay open.",
         "title": "Cinema — new edition"
       },
+      "bookshelf": {
+        "name": "Bookshelf",
+        "body": "A list of books you just rate and comment on — no pages, no deadline, no \"when\". Great for logging what you've already read.",
+        "title": "Bookshelf"
+      },
       "library": {
-        "name": "Library",
-        "body": "A list of books; pages read per day and per book, plus a \"Finished\" with a rating when you close the book. With no deadline, it's a reading habit.",
-        "title": "Library — new season"
+        "name": "Reading club",
+        "body": "A list of books with pages read per day and per book, plus a \"Finished\" with a rating. Needs a period.",
+        "title": "Reading club — new season"
       }
     },
     "titleLabel": "Title",
@@ -433,6 +457,7 @@
     "checkpointsTitle": "Build the list",
     "cineItemsHint": "Paste one title per line (films or series). Each item becomes a logging opportunity for every participant.",
     "bookItemsHint": "Paste one book per line. Each book joins the catalog and gets per-day progress, a \"Finished\", and a rating.",
+    "bookshelfItemsHint": "Paste one book per line. Each book joins the catalog and gets a rating and an optional comment.",
     "itemsCount": "{count, plural, one {# item} other {# items}}",
     "peopleTitle": "Who takes part?",
     "peopleSubtitle": "Only selected members can submit entries. Admins keep review access.",
@@ -751,8 +776,13 @@
     "numbersAria": "Results in numbers",
     "emptyTitle": "The showcase is still being prepared",
     "emptyBody": "The entries are preserved. An admin can still choose metrics and comments to tell this story.",
+    "liveEmptyTitle": "No numbers yet",
+    "liveEmptyBody": "Once entries come in, the live standings show up here.",
+    "backToEntry": "Log an entry",
     "momentsTitle": "Moments kept",
-    "participantFallback": "Participant"
+    "participantFallback": "Participant",
+    "participantsSentence": "With {names}.",
+    "andMore": "{count} more"
   },
   "rules": {
     "legacyTitle": "Challenge rules",
@@ -929,6 +959,8 @@
   },
   "publicResults": {
     "numbersAria": "Results in numbers",
+    "participantsSentence": "With {names}.",
+    "andMore": "{count} more",
     "footer": "A memory published by the group on Goa."
   },
   "about": {

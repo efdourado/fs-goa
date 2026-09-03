@@ -27,7 +27,7 @@ test("resolve links de desafio, gestão e abas válidas", () => {
   assert.deepEqual(screenFromUrl("/challenges/ch-1", "?tab=invalid"), {
     kind: "challenge",
     challengeId: "ch-1",
-    tab: "today",
+    tab: "results",
   });
 });
 

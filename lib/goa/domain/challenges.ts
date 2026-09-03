@@ -213,10 +213,17 @@ export async function createChallenge(
     const fallbackNumeric = insertedFields.find((field) => field.kind === "rating" || field.kind === "number");
     let metricPosition = 0;
     for (const recipeMetric of recipe.metrics) {
+      // A solo round has no disagreement or curator dynamics, and a Bayesian
+      // shrink toward a one-person prior is meaningless — seed a plain average
+      // and drop the group-only metrics entirely.
+      if (options.personal && recipeMetric.needsGroup) continue;
+      const soloRanking = options.personal === true && recipeMetric.operation === "bayesian_average";
+      const operation = soloRanking ? "average" : recipeMetric.operation;
+      const settings = soloRanking ? { minSample: 1 } : recipeMetric.settings;
       let fieldId: string | null = null;
       // Completion rate counts the "done" signal — a dedicated completion type
       // when the recipe has one, otherwise the primary type.
-      let metricTypeId = recipeMetric.operation === "completion_rate" && completionTypeId
+      let metricTypeId = operation === "completion_rate" && completionTypeId
         ? completionTypeId
         : entryTypeId;
       if (recipeMetric.fieldKey) {
@@ -236,12 +243,12 @@ export async function createChallenge(
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13,now(),now())`,
         [publicId(), id, metricTypeId, fieldId,
           semanticKey(recipeMetric.key, `metrica_${metricPosition}`), recipeMetric.label,
-          recipeMetric.operation, recipeMetric.groupBy ?? "none",
-          recipeMetric.operation === "completion_rate" ? 1 : 2,
+          operation, recipeMetric.groupBy ?? "none",
+          operation === "completion_rate" ? 1 : 2,
           recipeMetric.visibleDuring !== false, metricPosition,
           JSON.stringify({
             visibleInResults: recipeMetric.visibleInResults !== false,
-            ...recipeMetric.settings,
+            ...settings,
           }),
           session.user.id],
       );

@@ -4,15 +4,16 @@ export type ChallengeStatus = "draft" | "active" | "closed";
 export type FieldType = "text" | "number" | "rating" | "select" | "boolean" | "date";
 export type SubmissionMode = "item" | "daily" | "free";
 export type Template = "cine" | "reading";
-/** New challenges use the two product templates; the other keys remain readable legacy snapshots. */
+/** New challenges use the product templates; the other keys remain readable legacy snapshots. */
 export type RecipeKey =
   | "cinema"
   | "library"
+  | "bookshelf"
   | "cine_free"
   | "cine_curated"
   | "reading_club"
   | "reading_daily";
-export type CreatableRecipeKey = "cinema" | "library";
+export type CreatableRecipeKey = "cinema" | "library" | "bookshelf";
 export type EntryPurpose = "progress" | "completion" | "expectation" | "rating" | "checkin";
 export type TargetPolicy = "required" | "optional" | "none";
 export type Cardinality = "once_per_item" | "once_per_item_day" | "repeatable" | "once_per_day";
@@ -260,6 +261,8 @@ export interface ChallengeDetail extends ChallengeSummary {
   participants: Participant[];
   metrics: Metric[];
   result?: ChallengeResult | null;
+  /** False for a retrospective list (e.g. Estante) — the entry form hides the "when" date. */
+  collectsEntryDate?: boolean;
 }
 
 export interface Limits {

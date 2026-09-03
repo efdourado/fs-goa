@@ -5,6 +5,7 @@ import { getFormatter, getTranslations } from "next-intl/server";
 import { publicResults } from "@/lib/goa-challenges";
 import { type Formatter, makeGoaFormat, type Translator } from "@/app/goa/format";
 import { MetricBlock } from "@/app/goa/metrics-view";
+import { metricHasData, participantsSentence } from "@/app/goa/utils";
 import { SettingsMenu } from "@/app/goa/SettingsMenu";
 import type { Metric } from "@/app/goa/types";
 
@@ -54,24 +55,27 @@ export default async function SharedResultsPage({ params }: { params: Promise<{ 
             {result.headline || challenge.title}
           </h1>
           {result.summary ? <p className="mt-7 max-w-2xl text-base leading-7 text-white/65">{result.summary}</p> : null}
-          <div className="mt-8 flex flex-wrap gap-2">
-            {challenge.participants.map((participant) => (
-              <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs" key={participant}>{participant}</span>
-            ))}
-          </div>
+          {challenge.participants.length ? (
+            <p className="mt-7 max-w-2xl text-sm leading-6 text-white/65">
+              {t("participantsSentence", { names: participantsSentence(challenge.participants, (count) => t("andMore", { count })) })}
+            </p>
+          ) : null}
         </section>
-        {result.metrics?.length ? (
-          <div className="mt-6 space-y-4" aria-label={t("numbersAria")}>
-            <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {result.metrics.filter((metric) => !metric.series?.length).map((metric) => (
+        {(() => {
+          const metrics = (result.metrics ?? []).filter(metricHasData);
+          return metrics.length ? (
+            <div className="mt-6 space-y-4" aria-label={t("numbersAria")}>
+              <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {metrics.filter((metric) => !metric.series?.length).map((metric) => (
+                  <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} />
+                ))}
+              </section>
+              {metrics.filter((metric) => metric.series?.length).map((metric) => (
                 <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} />
               ))}
-            </section>
-            {result.metrics.filter((metric) => metric.series?.length).map((metric) => (
-              <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} />
-            ))}
-          </div>
-        ) : null}
+            </div>
+          ) : null;
+        })()}
         {result.comments?.length ? (
           <section className="mt-6 grid gap-4 sm:grid-cols-2">
             {result.comments.map((comment) => (
