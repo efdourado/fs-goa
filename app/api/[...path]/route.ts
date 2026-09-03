@@ -38,6 +38,7 @@ import {
   addMetric,
   archiveChallengeItem,
   curateResults,
+  deleteEntry,
   duplicateChallenge,
   duplicateTemplate,
   exportEntriesCsv,
@@ -312,6 +313,9 @@ export async function DELETE(request: Request): Promise<Response> {
     }
     if (path[0] === "challenges" && path[2] === "items" && path.length === 4) {
       return json(await archiveChallengeItem(session, path[1], path[3]));
+    }
+    if (path[0] === "entries" && path.length === 2) {
+      return json(await deleteEntry(session, path[1]));
     }
     if (path[0] === "challenges" && path[2] === "template" && path.length === 3) {
       return json(await unpublishChallengeTemplate(session, path[1]));

@@ -1,6 +1,7 @@
 export { getChallengeDetail, updateChallenge } from "./goa/challenges/detail";
 export { duplicateChallenge } from "./goa/challenges/duplicate";
 export {
+  deleteEntry,
   exportEntriesCsv,
   listEntries,
   saveEntry,

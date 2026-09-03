@@ -405,6 +405,39 @@ export async function updateEntry(
   });
 }
 
+export async function deleteEntry(session: SessionContext, entryId: string) {
+  return inTransaction(async (client) => {
+    const entry = await oneOrNull<{
+      id: string; challenge_id: string; participant_user_id: string;
+      group_id: string; status: "draft" | "active" | "closed";
+    }>(client,
+      `SELECT e.id,e.challenge_id,e.participant_user_id,c.group_id,c.status
+         FROM entries e JOIN challenges c ON c.id=e.challenge_id
+        WHERE e.id=$1 AND e.deleted_at IS NULL AND c.deleted_at IS NULL FOR UPDATE`, [entryId]);
+    if (!entry) throw new ApiError(404, "not_found", "Registro não encontrado.");
+    const role = await requireGroupRole(session.user.id, entry.group_id, ["owner", "admin", "participant"], client);
+    const canManage = role === "owner" || role === "admin";
+    if (!canManage && entry.participant_user_id !== session.user.id) {
+      throw new ApiError(404, "not_found", "Registro não encontrado.");
+    }
+    if (entry.status !== "active") {
+      throw new ApiError(409, "challenge_not_active", "Registros só podem ser excluídos com o desafio ativo.");
+    }
+    // Soft-delete, like every other "removal" here: the row leaves listings,
+    // metrics and the showcase (all filter `deleted_at IS NULL`) and the partial
+    // unique indexes free up, but the audit trail keeps the reference.
+    await client.query(
+      "UPDATE entries SET deleted_at=now(),last_edited_by_user_id=$2,updated_at=now() WHERE id=$1",
+      [entryId, session.user.id]);
+    if (canManage) {
+      await writeAudit(client, entry.group_id, entry.challenge_id, session.user.id,
+        "entry.deleted", "entry", entryId, null, null,
+        { participantId: entry.participant_user_id });
+    }
+    return { id: entryId, deleted: true };
+  });
+}
+
 export async function exportEntriesCsv(session: SessionContext, challengeId: string): Promise<Response> {
   return withClient(async (client) => {
     const access = await challengeAccess(session.user.id, challengeId, client);

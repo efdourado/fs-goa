@@ -287,12 +287,14 @@ function AdminFields({
 function AdminItems({
   challenge,
   group,
+  entries,
   onAdd,
   onUpdate,
   onArchive,
 }: {
   challenge: ChallengeDetail;
   group?: GroupSummary;
+  entries: Entry[];
   onAdd: (payload: Record<string, unknown>) => Promise<void>;
   onUpdate: (itemId: Id, payload: {
     title: string; description: string; recommendedByUserId?: string | null;
@@ -331,7 +333,11 @@ function AdminItems({
   const editLabel = challenge.submissionMode === "daily" ? t("editCheckpoint") : t("editItem");
 
   async function archive(item: ChallengeItem) {
-    if (!window.confirm(t("itemRemoveConfirm", { title: item.title }))) return;
+    const entryCount = entries.filter((entry) => itemIdForEntry(entry) === item.id).length;
+    const confirmMessage = entryCount > 0
+      ? t("itemRemoveConfirmWithEntries", { title: item.title, count: entryCount })
+      : t("itemRemoveConfirm", { title: item.title });
+    if (!window.confirm(confirmMessage)) return;
     setArchivingId(item.id);
     setError(null);
     setSuccess(null);
@@ -480,11 +486,13 @@ function AdminReview({
   challenge,
   entries,
   onPatch,
+  onDelete,
   onExport,
 }: {
   challenge: ChallengeDetail;
   entries: Entry[];
   onPatch: (entryId: Id, values: Record<Id, unknown>, reason: string) => Promise<void>;
+  onDelete: (entryId: Id) => Promise<void>;
   onExport: () => Promise<void>;
 }) {
   const t = useTranslations("adminChallenge");
@@ -495,6 +503,7 @@ function AdminReview({
   const [selectedId, setSelectedId] = useState<Id | null>(null);
   const [reason, setReason] = useState("");
   const [exporting, setExporting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const filtered = entries.filter((entry) => {
     const item = challenge.items.find((candidate) => candidate.id === itemIdForEntry(entry));
@@ -544,6 +553,19 @@ function AdminReview({
           <div className="mb-5 flex items-start justify-between gap-3"><div><p className="text-xs font-light uppercase tracking-[0.1em] text-[var(--muted)]">{t("correctionKicker")}</p><h2 id="correction-title" className="mt-1 text-xl font-light">{t("correctionHeading", { name: selected.participantName ?? t("participantFallback"), item: selectedItem?.title ?? t("entryFallback") })}</h2></div><Button variant="ghost" onClick={() => setSelectedId(null)}>{tc("close")}</Button></div>
           <label className="mb-5 block"><span className={labelClass}>{t("reasonLabel")} <span className="text-[var(--main-2)]">*</span></span><textarea className={inputClass} rows={3} value={reason} onChange={(event) => setReason(event.target.value)} placeholder={t("reasonPlaceholder")} maxLength={500} disabled={challenge.status === "closed"} /></label>
           <DynamicEntryForm key={`${selected.id}-${selected.updatedAt ?? ""}`} fields={selectedFields} item={selectedItem} entry={selected} canEdit={challenge.status !== "closed"} unavailableMessage={challenge.status === "closed" ? f.entryUnavailableMessage({ challengeStatus: "closed" }) : null} onSave={async (values) => { if (!reason.trim()) throw new Error(t("reasonRequired")); await onPatch(selected.id, values, reason.trim()); setReason(""); }} />
+          {challenge.status !== "closed" ? (
+            <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--line)] pt-5">
+              <p className="text-sm text-[var(--muted)]">{t("deleteEntryHint")}</p>
+              <Button variant="danger" disabled={deleting} onClick={async () => {
+                if (!window.confirm(t("deleteEntryConfirm"))) return;
+                setDeleting(true); setError(null);
+                try { await onDelete(selected.id); setSelectedId(null); }
+                catch (cause) { setError(f.error(cause)); }
+                finally { setDeleting(false); }
+              }}>{deleting ? t("deletingEntry") : t("deleteEntry")}</Button>
+            </div>
+          ) : null}
+          <div className="mt-4"><StatusMessage error={error} /></div>
         </section>
       ) : null}
     </div>
@@ -789,6 +811,7 @@ export function AdminScreen({
   onUpdateItem,
   onArchiveItem,
   onPatchEntry,
+  onDeleteEntry,
   onExport,
   onAddMetric,
   onSaveResult,
@@ -816,6 +839,7 @@ export function AdminScreen({
   }) => Promise<void>;
   onArchiveItem: (itemId: Id) => Promise<void>;
   onPatchEntry: (entryId: Id, values: Record<Id, unknown>, reason: string) => Promise<void>;
+  onDeleteEntry: (entryId: Id) => Promise<void>;
   onExport: () => Promise<void>;
   onAddMetric: (payload: Record<string, unknown>) => Promise<void>;
   onSaveResult: (payload: Record<string, unknown>) => Promise<void>;
@@ -833,8 +857,8 @@ export function AdminScreen({
       {tab === "overview" ? <AdminOverview challenge={challenge} entries={entries} onSave={onSaveBasics} onTransition={onTransition} onDuplicate={onDuplicate} duplicateTargets={duplicateTargets} onDelete={onDelete} /> : null}
       {tab === "participants" ? <AdminParticipants key={`${challenge.id}:${challenge.participants.map((participant) => participant.userId ?? participant.id).join(",")}`} challenge={challenge} group={group} onSave={onSaveParticipants} /> : null}
       {tab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} /> : null}
-      {tab === "items" ? <AdminItems challenge={challenge} group={group} onAdd={onAddItems} onUpdate={onUpdateItem} onArchive={onArchiveItem} /> : null}
-      {tab === "review" ? <AdminReview challenge={challenge} entries={entries} onPatch={onPatchEntry} onExport={onExport} /> : null}
+      {tab === "items" ? <AdminItems challenge={challenge} group={group} entries={entries} onAdd={onAddItems} onUpdate={onUpdateItem} onArchive={onArchiveItem} /> : null}
+      {tab === "review" ? <AdminReview challenge={challenge} entries={entries} onPatch={onPatchEntry} onDelete={onDeleteEntry} onExport={onExport} /> : null}
       {tab === "metrics" ? <AdminMetrics challenge={challenge} onAdd={onAddMetric} /> : null}
       {tab === "results" ? <AdminResults challenge={challenge} entries={entries} onSave={onSaveResult} onPublish={onPublishResult} onUnpublish={onUnpublishResult} /> : null}
     </main>
