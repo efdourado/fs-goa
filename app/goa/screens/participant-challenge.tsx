@@ -33,6 +33,8 @@ import {
   dateKeyInSaoPaulo,
   isChallengeScheduled,
   itemIdForEntry,
+  metricHasData,
+  participantsSentence,
   valuesAsRecord,
 } from "../utils";
 
@@ -216,31 +218,49 @@ export function DynamicEntryForm({
   );
 }
 
-export function ResultView({ challenge }: { challenge: ChallengeDetail }) {
+export function ResultView({
+  challenge,
+  onBackToEntry,
+}: {
+  challenge: ChallengeDetail;
+  /** When the round is still open with nothing to show yet, offer a way back to logging. */
+  onBackToEntry?: () => void;
+}) {
   const t = useTranslations("resultView");
   const tm = useTranslations("metrics");
-  const f = useGoaFormat();
   const result = challenge.result;
-  const metrics = result?.metrics?.length ? result.metrics : challenge.metrics.filter((metric) => metric.visibleInResults);
+  const source = result?.metrics?.length
+    ? result.metrics
+    : challenge.metrics.filter((metric) => metric.visibleInResults !== false);
+  const metrics = source.filter(metricHasData);
+  const solo = challenge.scope === "personal" || challenge.participants.length < 2;
+  const hideThinLabel = solo;
+  const names = solo ? [] : challenge.participants.map((participant) => participant.name);
+  const headline = result?.headline || (result ? challenge.title : null);
   return (
     <div className="space-y-5">
-      <section className="overflow-hidden rounded-[28px] bg-[var(--spotlight)] px-6 py-10 text-[var(--spotlight-ink)] sm:px-10 sm:py-14">
-        <p className="text-xs font-light uppercase tracking-[0.16em] text-white/55">{challenge.startsOn || challenge.endsOn ? f.dateRange(challenge.startsOn, challenge.endsOn) : t("noDeadline")}</p>
-        <h2 className="mt-4 max-w-3xl text-4xl font-medium leading-none tracking-[-0.055em] sm:text-6xl">{result?.headline || challenge.title}</h2>
-        {result?.summary ? <p className="mt-6 max-w-2xl text-base leading-7 text-white/70">{result.summary}</p> : null}
-        <div className="mt-8 flex flex-wrap gap-2">{challenge.participants.map((participant) => <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs" key={participant.id}>{participant.name}</span>)}</div>
-      </section>
+      {headline || result?.summary || names.length ? (
+        <header className="space-y-3">
+          {headline ? <h2 className="max-w-3xl text-3xl font-medium leading-none tracking-[-0.045em] sm:text-4xl">{headline}</h2> : null}
+          {result?.summary ? <p className="max-w-2xl text-base leading-7 text-[var(--muted)]">{result.summary}</p> : null}
+          {names.length ? (
+            <p className="text-sm text-[var(--muted)]">{t("participantsSentence", { names: participantsSentence(names, (count) => t("andMore", { count })) })}</p>
+          ) : null}
+        </header>
+      ) : null}
       {metrics.length ? (
         <div className="space-y-3" aria-label={t("numbersAria")}>
           <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {metrics.filter((metric) => !metric.series?.length).map((metric) => (
-              <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} />
+              <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} hideThinLabel={hideThinLabel} />
             ))}
           </section>
           {metrics.filter((metric) => metric.series?.length).map((metric) => (
-            <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} />
+            <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} hideThinLabel={hideThinLabel} />
           ))}
         </div>
+      ) : onBackToEntry ? (
+        <EmptyState title={t("liveEmptyTitle")} description={t("liveEmptyBody")} action={<Button onClick={onBackToEntry}>{t("backToEntry")}</Button>} />
       ) : <EmptyState title={t("emptyTitle")} description={t("emptyBody")} />}
       {result?.comments?.length ? (
         <section className={cx(cardClass, "p-6 sm:p-8")}><h2 className="text-xl font-light">{t("momentsTitle")}</h2><div className="mt-5 grid gap-4 sm:grid-cols-2">{result.comments.map((comment) => <blockquote className="rounded-2xl bg-[var(--wash)] p-5" key={comment.id}><p className="text-sm leading-6">“{comment.text}”</p><footer className="mt-3 text-xs font-light text-[var(--muted)]">{comment.authorName ?? t("participantFallback")}{comment.itemTitle ? ` · ${comment.itemTitle}` : ""}</footer></blockquote>)}</div></section>
@@ -598,6 +618,9 @@ export function ParticipantChallengeScreen({
   const itemForms = itemEntryTypes(challenge);
   const useItemPanel = itemForms.length > 0 && !undatedDaily && Boolean(selectedItem);
   const perDayItem = itemForms.some((type) => type.cardinality === "once_per_item_day");
+  // A retrospective list (Estante) has no "when" — its entry form skips the date.
+  const collectsEntryDate = challenge.collectsEntryDate !== false;
+  const progressHideThin = challenge.scope === "personal" || challenge.participants.length < 2;
   // A daily / per-day round needs a concrete date, so it gets a prominent picker.
   // A plain round instead offers the date among the entry form's optional fields.
   const dateRequired = undatedDaily || (useItemPanel && perDayItem);
@@ -643,7 +666,7 @@ export function ParticipantChallengeScreen({
                       {selectedItem?.recommendedBy || selectedItem?.catalogItem?.author || selectedItem?.catalogItem?.year || selectedItem?.catalogItem?.mainGenre ? <p className="mt-1 text-xs text-[var(--muted)]">{[selectedItem.catalogItem?.author ? t("byAuthor", { name: selectedItem.catalogItem.author }) : null, selectedItem.recommendedBy ? t("recommendedBy", { name: selectedItem.recommendedBy.name }) : null, selectedItem.catalogItem?.year ? String(selectedItem.catalogItem.year) : null, selectedItem.catalogItem?.mainGenre || null].filter(Boolean).join(" · ")}</p> : null}</div>{selectedItem?.dueAt ? <span className="rounded-full bg-[var(--wash)] px-3 py-2 text-xs font-medium text-[var(--muted)]">{t("dueBy", { date: f.dateTime(selectedItem.dueAt) })}</span> : null}</div>
                   {dateRequired ? <label className="mb-5 block"><span className={labelClass}>{t("occurredOnLabel")}</span><input className={inputClass} type="date" max={today} value={effectiveOccurredOn} disabled={Boolean(unavailableMessage)} onChange={(event) => setOccurredOn(event.target.value || today)} /><small className="mt-1 block text-[var(--muted)]">{t("occurredOnHint")}</small></label> : !useItemPanel && currentEntry?.occurredOn ? <p className="mb-5 text-xs text-[var(--muted)]">{t("occurredOn", { date: f.date(currentEntry.occurredOn, longDate) })}</p> : null}
                   {useItemPanel && selectedItem ? (
-                    <ItemEntryPanel key={`${selectedItem.id}-${selectedSession?.id ?? "no-session"}`} challenge={challenge} item={selectedItem} ownEntries={ownEntries} occurredOn={occurredOn} onOccurredOnChange={setOccurredOn} offerOptionalDate={!perDayItem && !sessionMode} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} checkpointId={selectedSession?.id ?? null} onSaveEntry={onSaveEntry} />
+                    <ItemEntryPanel key={`${selectedItem.id}-${selectedSession?.id ?? "no-session"}`} challenge={challenge} item={selectedItem} ownEntries={ownEntries} occurredOn={occurredOn} onOccurredOnChange={setOccurredOn} offerOptionalDate={!perDayItem && !sessionMode && collectsEntryDate} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} checkpointId={selectedSession?.id ?? null} onSaveEntry={onSaveEntry} />
                   ) : (
                     <DynamicEntryForm key={`${selectedItem?.id ?? "free"}-${undatedDaily ? effectiveOccurredOn : "fixed"}-${currentEntry?.id ?? "new"}`} fields={challenge.fields} item={selectedItem ?? null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry(selectedItem?.id ?? null, values, entry, undatedDaily ? effectiveOccurredOn : undefined)} />
                   )}
@@ -684,10 +707,10 @@ export function ParticipantChallengeScreen({
         ) : null}
 
         {tab === "progress" ? (
-          <section><PageHeading title={t("progressTitle")} description={t("progressSubtitle")} />{challenge.metrics.filter((metric) => metric.visibleDuring).length ? <div className="space-y-3"><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{challenge.metrics.filter((metric) => metric.visibleDuring && !metric.series?.length).map((metric) => <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} />)}</div>{challenge.metrics.filter((metric) => metric.visibleDuring && metric.series?.length).map((metric) => <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} />)}</div> : <EmptyState title={t("noProgressTitle")} description={t("noProgressBody")} />}</section>
+          <section><PageHeading title={t("progressTitle")} description={t("progressSubtitle")} />{challenge.metrics.filter((metric) => metric.visibleDuring).length ? <div className="space-y-3"><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{challenge.metrics.filter((metric) => metric.visibleDuring && !metric.series?.length).map((metric) => <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} hideThinLabel={progressHideThin} />)}</div>{challenge.metrics.filter((metric) => metric.visibleDuring && metric.series?.length).map((metric) => <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} hideThinLabel={progressHideThin} />)}</div> : <EmptyState title={t("noProgressTitle")} description={t("noProgressBody")} />}</section>
         ) : null}
 
-        {tab === "results" ? challenge.status === "closed" || challenge.result ? <ResultView challenge={challenge} /> : <EmptyState title={t("storyOngoingTitle")} description={t("storyOngoingBody")} action={<Button onClick={() => onTab("today")}>{t("backToEntry")}</Button>} /> : null}
+        {tab === "results" ? <ResultView challenge={challenge} onBackToEntry={() => onTab("today")} /> : null}
       </div>
 
       <nav className="safe-area-bottom fixed inset-x-0 bottom-0 z-40 grid h-[72px] grid-cols-4 border-t border-[var(--line)] bg-[var(--paper)]/95 px-2 backdrop-blur-xl sm:hidden" aria-label={t("navMobileAria")}>

@@ -8,10 +8,13 @@ import type { Metric } from "./types";
 export function MetricBlock({
   metric,
   smallSampleLabel,
+  hideThinLabel = false,
 }: {
   metric: Metric;
   /** Shown in place of the value for a row below its sample floor. */
   smallSampleLabel: string;
+  /** Solo / two-person rounds: a thin row just shows its value (or —), no "small sample" wording. */
+  hideThinLabel?: boolean;
 }) {
   const series = metric.series;
   return (
@@ -31,7 +34,7 @@ export function MetricBlock({
                   <span className="truncate">{row.label}</span>
                 </span>
                 <span className="flex-none tabular-nums">
-                  <strong>{thin ? smallSampleLabel : row.formattedValue ?? row.value}</strong>
+                  <strong>{thin ? (hideThinLabel ? row.formattedValue ?? "—" : smallSampleLabel) : row.formattedValue ?? row.value}</strong>
                   <span className="ml-2 text-[10px] font-light text-[var(--muted)]">n={row.sampleSize}</span>
                 </span>
               </li>

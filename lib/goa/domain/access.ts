@@ -21,6 +21,7 @@ interface ChallengeAccessRow {
   role: GroupRole;
   is_participant: boolean;
   results_published_at: Date | null;
+  group_kind: "standard" | "personal";
 }
 
 export interface ChallengeAccess {
@@ -39,7 +40,7 @@ export async function challengeAccess(
       activeClient,
       `SELECT c.id, c.group_id, c.title, c.description, c.rules, c.rule_sections,
               c.start_date::text AS start_date, c.end_date::text AS end_date, c.recipe_key, c.results_anon,
-              c.time_zone, c.status, gm.role,
+              c.time_zone, c.status, gm.role, g.kind AS group_kind,
               EXISTS (
                 SELECT 1 FROM challenge_participants cp
                  WHERE cp.challenge_id = c.id AND cp.user_id = $2 AND cp.removed_at IS NULL

@@ -341,7 +341,26 @@
     "loadError": "Não foi possível carregar o acervo.",
     "rounds": "{count, plural, =0 {sem rodadas} one {# rodada} other {# rodadas}}",
     "emptyTitle": "Seu acervo está vazio",
-    "emptyBody": "Crie um desafio pessoal de Cinema ou Library — os títulos que você adicionar entram aqui."
+    "emptyBody": "Crie um desafio pessoal de Cinema ou Estante — os títulos que você adicionar entram aqui.",
+    "viewLabel": "Visão",
+    "view": {
+      "list": "Lista",
+      "genre": "Por gênero",
+      "decade": "Por década",
+      "year": "Por ano"
+    },
+    "kindLabel": "Mídia",
+    "kind": {
+      "all": "Tudo",
+      "film": "Filmes",
+      "book": "Livros"
+    },
+    "bucketMeta": "{ratings} notas · {items} títulos",
+    "bestGenres": "Melhores gêneros: {list}",
+    "bestYears": "Melhores anos: {list}",
+    "noGenre": "Sem gênero",
+    "bucketEmptyTitle": "Ainda não há o que cruzar",
+    "bucketEmptyBody": "Preencha o gênero ou o ano dos itens do acervo e esta visão se completa."
   },
   "cineItems": {
     "titleLabel": "Título do filme",
@@ -408,10 +427,15 @@
         "body": "Uma lista de filmes ou séries; cada pessoa dá nota e comentário ao assistir, com data opcional. Pode ter prazo ou ficar aberta.",
         "title": "Cinema — nova edição"
       },
+      "bookshelf": {
+        "name": "Estante",
+        "body": "Uma lista de livros que você só avalia e comenta — sem páginas, sem prazo, sem \"quando\". Ótimo pra registrar o que já leu.",
+        "title": "Estante"
+      },
       "library": {
-        "name": "Library",
-        "body": "Uma lista de livros; páginas lidas por dia e por livro, e um \"Terminei\" com nota ao fechar o livro. Sem prazo, vira um hábito de leitura.",
-        "title": "Library — nova temporada"
+        "name": "Clube de leitura",
+        "body": "Uma lista de livros com páginas lidas por dia e por livro, e um \"Terminei\" com nota. Precisa de período.",
+        "title": "Clube de leitura — nova temporada"
       }
     },
     "titleLabel": "Título",
@@ -433,6 +457,7 @@
     "checkpointsTitle": "Monte a lista",
     "cineItemsHint": "Cole um título por linha (filmes ou séries). Cada item vira uma oportunidade de registro para cada participante.",
     "bookItemsHint": "Cole um livro por linha. Cada livro entra no acervo e recebe progresso por dia, um \"Terminei\" e nota.",
+    "bookshelfItemsHint": "Cole um livro por linha. Cada livro entra no acervo e recebe uma nota e um comentário opcional.",
     "itemsCount": "{count, plural, one {# item} other {# itens}}",
     "peopleTitle": "Quem vai participar?",
     "peopleSubtitle": "Somente membros selecionados poderão enviar registros. Administradores continuam com acesso à revisão.",
@@ -751,8 +776,13 @@
     "numbersAria": "Resultados em números",
     "emptyTitle": "A vitrine ainda está sendo preparada",
     "emptyBody": "Os registros estão preservados. Um administrador ainda pode escolher métricas e comentários para contar esta história.",
+    "liveEmptyTitle": "Ainda sem números",
+    "liveEmptyBody": "Quando os registros chegarem, o placar ao vivo aparece aqui.",
+    "backToEntry": "Fazer um registro",
     "momentsTitle": "Momentos guardados",
-    "participantFallback": "Participante"
+    "participantFallback": "Participante",
+    "participantsSentence": "Com {names}.",
+    "andMore": "mais {count}"
   },
   "rules": {
     "legacyTitle": "Regras do desafio",
@@ -929,6 +959,8 @@
   },
   "publicResults": {
     "numbersAria": "Resultados em números",
+    "participantsSentence": "Com {names}.",
+    "andMore": "mais {count}",
     "footer": "Memória publicada pelo grupo no Goa."
   },
   "about": {

@@ -3,7 +3,8 @@ import { createElement } from "react";
 import test from "node:test";
 
 import { RuleSectionsView } from "../app/goa/rules";
-import { DynamicEntryForm } from "../app/goa/screens/participant-challenge";
+import { DynamicEntryForm, ResultView } from "../app/goa/screens/participant-challenge";
+import type { ChallengeDetail } from "../app/goa/types";
 import { AppHeader, ChallengeStatusBadge, SchedulePeriodFields } from "../app/goa/ui";
 import { inclusiveDayCount, isChallengeScheduled, shiftDateKey } from "../app/goa/utils";
 import { ptFormat, renderWithIntl } from "./helpers/intl";
@@ -132,6 +133,49 @@ test("formulário de registro esconde campos opcionais até a pessoa pedir", () 
   assert.match(form, /Páginas lidas/);
   assert.doesNotMatch(form, /Nota do livro/, "campo opcional fica oculto por padrão");
   assert.match(form, /Mostrar campos opcionais \(1\)/);
+});
+
+test("aba Resultados ao vivo: sem herói repetido, sem pílulas de nome, sem 'small sample' num solo", () => {
+  const challenge = {
+    title: "Minha estante",
+    scope: "personal",
+    participants: [{ id: "u1", userId: "u1", name: "Manuel", username: "manu" }],
+    result: null,
+    metrics: [
+      { id: "m1", label: "Nota média", operation: "average", value: 4.2, formattedValue: "4,2", visibleInResults: true },
+      {
+        id: "m2",
+        label: "Ranking dos livros",
+        operation: "average",
+        visibleInResults: true,
+        series: [
+          { key: "b1", label: "Pedro Páramo", value: 5, formattedValue: "5", sampleSize: 1 },
+          { key: "b2", label: "Sem nota ainda", value: null, sampleSize: 0 },
+        ],
+      },
+    ],
+  } as unknown as ChallengeDetail;
+
+  const html = renderWithIntl(createElement(ResultView, { challenge, onBackToEntry: () => undefined }));
+  assert.match(html, /Ranking dos livros/);
+  assert.match(html, /Pedro Páramo/);
+  assert.doesNotMatch(html, /var\(--spotlight\)/, "não repete o herói da capa");
+  assert.doesNotMatch(html, /Manuel/, "num desafio solo não lista o próprio nome");
+  assert.doesNotMatch(html, /small sample/i, "linha fina de um solo mostra o valor, não o rótulo");
+});
+
+test("aba Resultados sem números ainda oferece um caminho de volta ao registro", () => {
+  const challenge = {
+    title: "Ciclo novo",
+    scope: "group",
+    participants: [{ id: "u1", userId: "u1", name: "Ana", username: "ana" }, { id: "u2", userId: "u2", name: "Bruno", username: "bruno" }],
+    result: null,
+    metrics: [{ id: "m1", label: "Nota média", operation: "average", value: null, visibleInResults: true }],
+  } as unknown as ChallengeDetail;
+
+  const html = renderWithIntl(createElement(ResultView, { challenge, onBackToEntry: () => undefined }));
+  assert.match(html, /Ainda sem números/);
+  assert.match(html, /Fazer um registro/);
 });
 
 test("header sinaliza logo, perfil e sair como clicáveis", () => {

@@ -13,6 +13,7 @@ import { backLinkClass, Button, cardClass, cx, EmptyState, inputClass, labelClas
 
 const RECIPES: Array<{ key: CreatableRecipeKey; catalogKind: "film" | "book"; scheduleMode: "period" | "none"; glyph: string }> = [
   { key: "cinema", catalogKind: "film", scheduleMode: "none", glyph: "◉" },
+  { key: "bookshelf", catalogKind: "book", scheduleMode: "none", glyph: "〇" },
   { key: "library", catalogKind: "book", scheduleMode: "period", glyph: "◎" },
 ];
 
@@ -151,7 +152,7 @@ export function CreateChallengeScreen({
         {step === 1 ? (
           <div>
             <h2 className="text-xl font-light">{t("startTitle")}</h2>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
               {RECIPES.map((entry) => (
                 <button className={cx("rounded-2xl border p-5 text-left transition", recipe === entry.key ? "border-[var(--main)] bg-[var(--main-soft)] ring-2 ring-[var(--main)]/25" : "border-[var(--line)] bg-[var(--paper)] hover:border-[var(--main-line)]")} type="button" aria-pressed={recipe === entry.key} onClick={() => chooseRecipe(entry.key)} key={entry.key}>
                   <span className="text-2xl" aria-hidden="true">{entry.glyph}</span>
@@ -195,7 +196,7 @@ export function CreateChallengeScreen({
           <div>
             <h2 className="text-xl font-light">{t("checkpointsTitle")}</h2>
             {tracksCatalog ? (
-              <><p className="mt-1 mb-4 text-sm leading-6 text-[var(--muted)]">{tracksCatalog === "book" ? t("bookItemsHint") : t("cineItemsHint")}</p><CineItemsEditor value={cineItems} onChange={setCineItems} members={personal ? [] : group?.members ?? []} catalogPath={personal ? API_PATHS.personalCatalog : API_PATHS.groupCatalog(group!.id)} kind={tracksCatalog === "book" ? "book" : "film"} /><p className="mt-3 text-xs font-medium text-[var(--muted)]">{t("itemsCount", { count: itemInputs.length })}</p></>
+              <><p className="mt-1 mb-4 text-sm leading-6 text-[var(--muted)]">{recipe === "bookshelf" ? t("bookshelfItemsHint") : tracksCatalog === "book" ? t("bookItemsHint") : t("cineItemsHint")}</p><CineItemsEditor value={cineItems} onChange={setCineItems} members={personal ? [] : group?.members ?? []} catalogPath={personal ? API_PATHS.personalCatalog : API_PATHS.groupCatalog(group!.id)} kind={tracksCatalog === "book" ? "book" : "film"} /><p className="mt-3 text-xs font-medium text-[var(--muted)]">{t("itemsCount", { count: itemInputs.length })}</p></>
             ) : null}
           </div>
         ) : null}

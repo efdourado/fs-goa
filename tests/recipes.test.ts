@@ -5,6 +5,7 @@ import { ApiError } from "../lib/http";
 import {
   isLegacyRecipeKey,
   isRecipeKey,
+  recipeCollectsEntryDate,
   resolveRecipe,
 } from "../lib/goa/challenges/recipes";
 
@@ -40,6 +41,22 @@ describe("current challenge recipes", () => {
     assert.equal(recipe.entryTypes[1].cardinality, "once_per_item");
   });
 
+  test("Bookshelf rates a list of books with no pages, period, or entry date", () => {
+    const recipe = resolveRecipe({ recipe: "bookshelf" });
+
+    assert.equal(recipe.key, "bookshelf");
+    assert.equal(recipe.catalogKind, "book");
+    assert.equal(recipe.scheduleMode, "none");
+    assert.equal(recipe.collectsEntryDate, false);
+    assert.equal(recipeCollectsEntryDate("bookshelf"), false);
+    assert.equal(recipeCollectsEntryDate("cinema"), true);
+    assert.equal(recipeCollectsEntryDate(null), true);
+    assert.deepEqual(recipe.entryTypes.map((type) => type.purpose), ["rating"]);
+    assert.deepEqual(recipe.entryTypes[0].fields.map((field) => field.key), ["nota", "comentario"]);
+    assert.equal(recipe.metrics.some((metric) => metric.fieldKey === "paginas"), false);
+    assert.equal(recipe.metrics.some((metric) => metric.needsGroup), true);
+  });
+
   test("legacy keys remain identifiable but cannot seed a new challenge", () => {
     for (const key of ["cine_free", "cine_curated", "reading_club", "reading_daily"] as const) {
       assert.equal(isLegacyRecipeKey(key), true);
@@ -51,6 +68,7 @@ describe("current challenge recipes", () => {
   test("old template aliases resolve only to the consolidated recipes", () => {
     assert.equal(resolveRecipe({ template: "cine" }).key, "cinema");
     assert.equal(resolveRecipe({ template: "reading" }).key, "library");
+    assert.equal(resolveRecipe({ template: "estante" }).key, "bookshelf");
   });
 
   test("scheduleMode is only the wizard's initial toggle, not a hard rule", () => {

@@ -14,6 +14,7 @@ import {
 } from "./entry-types";
 import { fieldsForChallenge } from "./fields";
 import { generateDailyCheckpoints } from "./items";
+import { recipeCollectsEntryDate } from "./recipes";
 import { metricsForChallenge, resultForChallenge } from "./results";
 import { parseRuleSections, rulesCompatibilityText } from "../domain/rules";
 
@@ -150,6 +151,8 @@ export async function getChallengeDetail(session: SessionContext, challengeId: s
       endsOn: access.challenge.end_date,
       status: access.challenge.status,
       recipeKey: access.challenge.recipe_key ?? null,
+      scope: access.challenge.group_kind === "personal" ? "personal" : "group",
+      collectsEntryDate: recipeCollectsEntryDate(access.challenge.recipe_key),
       resultsAnon: access.challenge.results_anon,
       submissionMode,
       completionEntryTypeId,

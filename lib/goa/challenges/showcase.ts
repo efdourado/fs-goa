@@ -43,6 +43,7 @@ export async function generateShowcase(
 
   for (const metric of metrics) {
     if (metric.visibleInResults === false) continue;
+    if (!metricHasData(metric)) continue;
     await client.query(
       `INSERT INTO result_blocks
         (id,challenge_id,kind,metric_id,heading,value_snapshot,position,visible,created_by_user_id,created_at,updated_at)
@@ -62,6 +63,18 @@ export async function generateShowcase(
         position++, userId],
     );
   }
+}
+
+/**
+ * Whether a computed metric has anything worth showing: a non-null scalar, or a
+ * series with at least one non-null row. An all-"small sample" block is noise.
+ */
+function metricHasData(metric: Record<string, unknown>): boolean {
+  const series = metric.series;
+  if (Array.isArray(series)) {
+    return series.some((row) => (row as { value: number | null }).value !== null);
+  }
+  return metric.value !== null && metric.value !== undefined;
 }
 
 async function buildSummary(

@@ -7,8 +7,21 @@ export function canManage(role?: Role): boolean {
 /** Mirrors `recipeCatalogKind` on the server — which acervo (filme/livro) a recipe tracks, if any. */
 export function recipeCatalogKind(recipeKey?: RecipeKey | null): "film" | "book" | null {
   if (recipeKey === "cinema" || recipeKey === "cine_free" || recipeKey === "cine_curated") return "film";
-  if (recipeKey === "library" || recipeKey === "reading_club") return "book";
+  if (recipeKey === "library" || recipeKey === "bookshelf" || recipeKey === "reading_club") return "book";
   return null;
+}
+
+/** A metric worth rendering: a real scalar, or a series with ≥1 non-thin row. */
+export function metricHasData(metric: { value?: unknown; series?: Array<{ value: number | null }> }): boolean {
+  if (metric.series?.length) return metric.series.some((row) => row.value !== null);
+  return metric.value !== null && metric.value !== undefined && metric.value !== "";
+}
+
+/** "Ana", "Ana e Bruno", "Ana, Bruno e Caio", "Ana, Bruno e mais 4". */
+export function participantsSentence(names: string[], andMore: (count: number) => string): string {
+  const list = new Intl.ListFormat(undefined, { style: "long", type: "conjunction" });
+  if (names.length <= 3) return list.format(names);
+  return list.format([...names.slice(0, 2), andMore(names.length - 2)]);
 }
 
 export function slugify(value: string): string {
