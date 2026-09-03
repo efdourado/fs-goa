@@ -3,6 +3,7 @@ import type { PoolClient } from "pg";
 import { requireGroupRole, type SessionContext } from "../auth";
 import { inTransaction, oneOrNull, withClient } from "../db";
 import { ApiError, stringValue } from "../http";
+import { writeAudit } from "./domain/audit";
 import { publicId } from "./domain/shared";
 
 export type CatalogKind = "film" | "book" | "other";
@@ -418,5 +419,84 @@ export async function updatePersonalCatalogItem(
     if (!item) throw new ApiError(404, "not_found", "Item do acervo não encontrado.");
     await applyCatalogItemUpdate(client, catalogItemId, workspaceId, body);
     return { id: catalogItemId };
+  });
+}
+
+/**
+ * Soft-removes a catalog item (sets `archived_at`) so it leaves the browsable
+ * acervo and the "from catalog" picker. The row itself stays, so any round that
+ * already links to it keeps rendering; a round in a draft/active challenge blocks
+ * the removal so its live "from catalog" link never dangles.
+ */
+async function archiveCatalogItemWithClient(
+  client: PoolClient,
+  actorUserId: string,
+  workspaceId: string,
+  catalogItemId: string,
+): Promise<{ id: string; archived: true }> {
+  const item = await oneOrNull<{ id: string; title: string; kind: string }>(
+    client,
+    `SELECT id, title, kind FROM catalog_items
+      WHERE id = $1 AND group_id = $2 AND archived_at IS NULL FOR UPDATE`,
+    [catalogItemId, workspaceId],
+  );
+  if (!item) throw new ApiError(404, "not_found", "Item do acervo não encontrado.");
+  const live = await oneOrNull<{ count: number }>(
+    client,
+    `SELECT count(DISTINCT c.id)::int AS count
+       FROM challenge_items it
+       JOIN challenges c ON c.id = it.challenge_id
+      WHERE it.catalog_item_id = $1 AND it.archived_at IS NULL
+        AND c.deleted_at IS NULL AND c.status IN ('draft', 'active')`,
+    [catalogItemId],
+  );
+  if (live && live.count > 0) {
+    throw new ApiError(
+      409,
+      "catalog_item_in_use",
+      `"${item.title}" está em ${live.count} desafio(s) em andamento. Retire o item desses desafios antes de excluí-lo do acervo.`,
+    );
+  }
+  await client.query(
+    "UPDATE catalog_items SET archived_at = now(), updated_at = now() WHERE id = $1",
+    [catalogItemId],
+  );
+  await writeAudit(
+    client, workspaceId, null, actorUserId,
+    "catalog.item_archived", "catalog_item", catalogItemId, null, null,
+    { title: item.title, kind: item.kind },
+  );
+  return { id: catalogItemId, archived: true };
+}
+
+export async function archiveCatalogItem(session: SessionContext, catalogItemId: string) {
+  return inTransaction(async (client) => {
+    const item = await oneOrNull<{
+      group_id: string; group_kind: "standard" | "personal"; owner_user_id: string;
+    }>(
+      client,
+      `SELECT ci.group_id, g.kind AS group_kind, g.owner_user_id
+         FROM catalog_items ci JOIN groups g ON g.id = ci.group_id
+        WHERE ci.id = $1 AND ci.archived_at IS NULL
+          AND g.archived_at IS NULL AND g.deleted_at IS NULL`,
+      [catalogItemId],
+    );
+    if (!item) throw new ApiError(404, "not_found", "Item do acervo não encontrado.");
+    if (item.group_kind === "personal") {
+      if (item.owner_user_id !== session.user.id) {
+        throw new ApiError(403, "forbidden", "Este item não pertence ao seu acervo pessoal.");
+      }
+    } else {
+      await requireGroupRole(session.user.id, item.group_id, ["owner", "admin"], client);
+    }
+    return archiveCatalogItemWithClient(client, session.user.id, item.group_id, catalogItemId);
+  });
+}
+
+export async function archivePersonalCatalogItem(session: SessionContext, catalogItemId: string) {
+  return inTransaction(async (client) => {
+    const workspaceId = await personalWorkspaceId(client, session.user.id);
+    if (!workspaceId) throw new ApiError(404, "not_found", "Item do acervo não encontrado.");
+    return archiveCatalogItemWithClient(client, session.user.id, workspaceId, catalogItemId);
   });
 }
