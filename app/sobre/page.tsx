@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 
-import { SettingsMenu } from "@/app/goa/SettingsMenu";
+import { LanguageToggle } from "@/app/goa/LanguageToggle";
 import { Brand } from "@/app/goa/ui";
 
 export const runtime = "nodejs";
@@ -21,7 +21,7 @@ export default async function AboutPage() {
       <header className="border-b border-[var(--edge)] bg-[var(--canvas)]/92 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-3xl items-center justify-between px-4 sm:h-[76px] sm:px-6">
           <Link href="/" className="rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"><Brand /></Link>
-          <SettingsMenu />
+          <LanguageToggle />
         </div>
       </header>
       <main className="mx-auto max-w-3xl px-4 py-12 sm:px-6 sm:py-16">

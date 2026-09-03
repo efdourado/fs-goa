@@ -5,7 +5,8 @@ import { useTranslations } from "next-intl";
 import { type ReactNode, useEffect, useState } from "react";
 
 import { useGoaFormat } from "./format";
-import { SettingsMenu } from "./SettingsMenu";
+import { LanguageToggle } from "./LanguageToggle";
+import { ThemeToggle } from "./ThemeToggle";
 import type { ChallengeStatus, Id, MemberRequest, SubmissionMode, User } from "./types";
 import {
   dateKeyInSaoPaulo,
@@ -294,7 +295,7 @@ export function AppHeader({
             onAcceptRequest={onAcceptRequest}
             onDeclineRequest={onDeclineRequest}
           />
-          <SettingsMenu />
+          <LanguageToggle />
           <button
             className={cx(navLink, "hidden shrink-0 disabled:opacity-50 sm:inline-flex sm:items-center")}
             type="button"
@@ -383,6 +384,7 @@ function NotificationsMenu({
   onDeclineRequest: (id: Id) => Promise<void>;
 }) {
   const t = useTranslations("notifications");
+  const tTheme = useTranslations("theme");
   const f = useGoaFormat();
   const [open, setOpen] = useState(false);
   const [pendingId, setPendingId] = useState<Id | null>(null);
@@ -432,6 +434,10 @@ function NotificationsMenu({
         <>
           <button type="button" aria-hidden="true" tabIndex={-1} className="fixed inset-0 z-40 cursor-default" onClick={() => setOpen(false)} />
           <div className="absolute right-0 z-50 mt-2 w-[min(92vw,22rem)] overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--paper)] shadow-[var(--elevate-2)]" role="dialog" aria-label={t("title")}>
+            <div className="border-b border-[var(--line)] px-4 py-3">
+              <strong className="text-sm">{tTheme("legend")}</strong>
+              <div className="mt-2"><ThemeToggle /></div>
+            </div>
             <div className="flex items-center justify-between border-b border-[var(--line)] px-4 py-3">
               <strong className="text-sm">{t("title")}</strong>
               {count ? <span className="text-xs text-[var(--muted)]">{t("pending", { count })}</span> : null}

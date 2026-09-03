@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import { type FormEvent, useState } from "react";
 
 import { useGoaFormat } from "../format";
-import { SettingsMenu } from "../SettingsMenu";
+import { LanguageToggle } from "../LanguageToggle";
 import { Brand, Button, inputClass, labelClass, StatusMessage } from "../ui";
 
 type Mode = "login" | "register" | "forgot";
@@ -81,7 +81,7 @@ export function AuthScreen({
 
   return (
     <main className="relative grid min-h-screen lg:grid-cols-[minmax(0,1.1fr)_minmax(420px,0.9fr)]">
-      <div className="absolute right-4 top-4 z-20 hidden lg:block"><SettingsMenu /></div>
+      <div className="absolute right-4 top-4 z-20 hidden lg:block"><LanguageToggle /></div>
       <section className="relative hidden overflow-hidden bg-[var(--spotlight)] p-12 text-[var(--spotlight-ink)] lg:flex lg:flex-col lg:justify-between">
         <Brand />
         <div className="relative z-10 max-w-xl">
@@ -96,7 +96,7 @@ export function AuthScreen({
 
       <section className="flex min-h-screen items-center justify-center px-5 py-10 sm:px-10">
         <div className="w-full max-w-md">
-          <div className="mb-10 flex items-center justify-between gap-3 lg:hidden"><Brand /><SettingsMenu /></div>
+          <div className="mb-10 flex items-center justify-between gap-3 lg:hidden"><Brand /><LanguageToggle /></div>
           {invitePending ? (
             <button className="mb-5 w-full rounded-xl border border-[var(--main-line)] bg-[var(--main-soft)] px-4 py-3 text-left text-sm text-[var(--main-strong)]" type="button" onClick={onShowInvite}>
               <strong>{t("invitePendingTitle")}</strong>{t("invitePendingBody")}
