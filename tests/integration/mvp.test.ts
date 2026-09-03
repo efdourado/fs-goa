@@ -342,11 +342,22 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
   assert.equal(strandingShrink.response.status, 409, "encurtar o prazo por cima de um registro é barrado");
   assert.equal((strandingShrink.body as { error: string }).error, "schedule_would_strand_entries");
 
-  const archiveUsedItem = await call("DELETE", `/api/challenges/${challengeId}/items/${originalItemIds[0]}`, {
+  // Remover um item que já tem registro: os registros presos a ele saem em cascata.
+  const cascadeItem = await call("POST", `/api/challenges/${challengeId}/items`, {
+    session: owner, body: { items: [{ title: "Item removido junto com o registro" }] },
+  });
+  const cascadeItemId = (cascadeItem.body as { itemIds: string[] }).itemIds[0];
+  const cascadeEntry = await call("POST", `/api/challenges/${challengeId}/entries`, {
+    session: participant, body: { itemId: cascadeItemId, values: { [ratingId]: 3 } },
+  });
+  assert.equal(cascadeEntry.response.status, 201, JSON.stringify(cascadeEntry.body));
+  const archiveUsedItem = await call("DELETE", `/api/challenges/${challengeId}/items/${cascadeItemId}`, {
     session: owner,
   });
-  assert.equal(archiveUsedItem.response.status, 409, "item com registro não pode ser removido");
-  assert.equal((archiveUsedItem.body as { error: string }).error, "item_has_data");
+  assert.equal(archiveUsedItem.response.status, 200, JSON.stringify(archiveUsedItem.body));
+  assert.equal((archiveUsedItem.body as { entriesRemoved: number }).entriesRemoved, 1, "o registro do item sai junto");
+  const afterCascade = await call("GET", `/api/challenges/${challengeId}/entries`, { session: owner });
+  assert.equal((afterCascade.body as { entries: unknown[] }).entries.length, 1, "sobra apenas o registro do primeiro item");
 
   const extraItem = await call("POST", `/api/challenges/${challengeId}/items`, {
     session: owner, body: { items: [{ title: "Item adicionado no meio da rodada" }] },
@@ -1513,6 +1524,79 @@ test("data do registro é opcional: uma rodada aceita registro sem data, mas o d
   });
   assert.equal(dailyEntry.response.status, 201, JSON.stringify(dailyEntry.body));
   assert.equal((dailyEntry.body as { occurredOn: string }).occurredOn, today);
+});
+
+test("registros podem ser excluídos: pelo autor ou pelo admin, só com o desafio ativo", async () => {
+  const owner = await register("Bea", "bea_entrydel");
+  const author = await register("Caio", "caio_entrydel");
+  const other = await register("Dora", "dora_entrydel");
+  const stranger = await register("Edu", "edu_entrydel");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Exclusão" } })).body as { id: string }).id;
+  for (const member of [author, other]) {
+    const invite = (await call("POST", `/api/groups/${gid}/invites`, {
+      session: owner, body: { expiresInDays: 7, maxUses: 1 },
+    })).body as { token: string };
+    assert.equal((await call("POST", `/api/invites/${invite.token}`, { session: member, body: {} })).response.status, 200);
+  }
+
+  const challenge = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "cinema", title: "Sessão exclusão", startsOn: "2026-08-01", endsOn: "2026-12-31",
+      participantIds: [owner.user.id, author.user.id, other.user.id],
+      fields: [{ key: "nota", label: "Nota", type: "rating", required: true }],
+      items: [{ title: "Filme A" }, { title: "Filme B" }],
+    },
+  });
+  assert.equal(challenge.response.status, 201, JSON.stringify(challenge.body));
+  const challengeId = (challenge.body as { id: string }).id;
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } })).response.status, 200);
+  const items = ((await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { items: DetailItem[] }).items;
+
+  const mine = await call("POST", `/api/challenges/${challengeId}/entries`, {
+    session: author, body: { itemId: items[0].id, values: { nota: 4 } },
+  });
+  const myEntryId = (mine.body as { id: string }).id;
+
+  // um estranho não descobre o registro; outro participante não apaga registro alheio
+  assert.equal((await call("DELETE", `/api/entries/${myEntryId}`, { session: stranger })).response.status, 404);
+  assert.equal((await call("DELETE", `/api/entries/${myEntryId}`, { session: other })).response.status, 404);
+
+  // o autor apaga o próprio e recria (o índice único liberou)
+  assert.equal((await call("DELETE", `/api/entries/${myEntryId}`, { session: author })).response.status, 200);
+  const again = await call("POST", `/api/challenges/${challengeId}/entries`, {
+    session: author, body: { itemId: items[0].id, values: { nota: 2 } },
+  });
+  assert.equal(again.response.status, 201, "o índice único liberou após a exclusão");
+  const againId = (again.body as { id: string }).id;
+  assert.equal((await call("DELETE", `/api/entries/${againId}`, { session: author })).response.status, 200);
+  assert.equal(
+    ((await call("GET", `/api/challenges/${challengeId}/entries`, { session: owner })).body as { entries: unknown[] }).entries.length,
+    0,
+    "some das listagens após a exclusão",
+  );
+
+  // admin apaga registro de participante e isso vira auditoria
+  const ownerEntry = await call("POST", `/api/challenges/${challengeId}/entries`, {
+    session: owner, body: { participantId: author.user.id, itemId: items[1].id, values: { nota: 5 } },
+  });
+  const ownerEntryId = (ownerEntry.body as { id: string }).id;
+  assert.equal((await call("DELETE", `/api/entries/${ownerEntryId}`, { session: owner })).response.status, 200);
+  const audited = await adminPool.query<{ action: string }>(
+    "SELECT action FROM audit_events WHERE entity_type='entry' AND entity_id=$1 AND action='entry.deleted'",
+    [ownerEntryId],
+  );
+  assert.equal(audited.rows.length, 1, "a exclusão administrativa fica na auditoria");
+
+  // desafio encerrado não aceita exclusão
+  const late = await call("POST", `/api/challenges/${challengeId}/entries`, {
+    session: author, body: { itemId: items[0].id, values: { nota: 3 } },
+  });
+  const lateId = (late.body as { id: string }).id;
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "closed" } });
+  const blocked = await call("DELETE", `/api/entries/${lateId}`, { session: author });
+  assert.equal(blocked.response.status, 409);
+  assert.equal((blocked.body as { error: string }).error, "challenge_not_active");
 });
 
 test("fundação: dois livros no mesmo dia, conclusão e nota sem comentário", async () => {

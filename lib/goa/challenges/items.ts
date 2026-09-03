@@ -352,18 +352,12 @@ export async function archiveChallengeItem(
       }
       throw new ApiError(404, "not_found", "Item não encontrado.");
     }
-    const usage = await oneOrNull<{ count: number }>(
-      client,
-      "SELECT count(*)::int AS count FROM entries WHERE item_id=$1 AND deleted_at IS NULL",
-      [itemId],
+    // Um item com registros não trava mais a remoção: os registros presos a ele
+    // saem junto, em soft-delete, para sumir de métricas, histórico e showcase.
+    const purged = await client.query(
+      "UPDATE entries SET deleted_at=now(),last_edited_by_user_id=$3,updated_at=now() WHERE item_id=$1 AND challenge_id=$2 AND deleted_at IS NULL",
+      [itemId, challengeId, session.user.id],
     );
-    if (usage && usage.count > 0) {
-      throw new ApiError(
-        409,
-        "item_has_data",
-        `"${current.title}" já tem ${usage.count} registro(s). Apague os registros antes de remover o item.`,
-      );
-    }
     await client.query(
       "UPDATE challenge_items SET archived_at=now(),updated_at=now() WHERE id=$1 AND challenge_id=$2",
       [itemId, challengeId],
@@ -378,7 +372,8 @@ export async function archiveChallengeItem(
       itemId,
       { title: current.title },
       null,
+      { entriesRemoved: purged.rowCount ?? 0 },
     );
-    return { id: itemId, archived: true };
+    return { id: itemId, archived: true, entriesRemoved: purged.rowCount ?? 0 };
   });
 }

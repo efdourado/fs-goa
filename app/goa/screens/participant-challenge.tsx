@@ -430,6 +430,81 @@ function EntryPicker({
   );
 }
 
+/**
+ * "Seus registros" — the participant's own submissions, newest first. Each row
+ * can be deleted while the challenge is active; the list refreshes from the
+ * server after a delete so metrics and progress stay in sync.
+ */
+function HistoryTab({
+  challenge,
+  entries,
+  items,
+  canDelete,
+  onDeleteEntry,
+}: {
+  challenge: ChallengeDetail;
+  entries: Entry[];
+  items: ChallengeItem[];
+  canDelete: boolean;
+  onDeleteEntry?: (entryId: Id) => Promise<void>;
+}) {
+  const t = useTranslations("participant");
+  const tc = useTranslations("common");
+  const f = useGoaFormat();
+  const longDate: Intl.DateTimeFormatOptions = { day: "2-digit", month: "long", year: "numeric" };
+  const [deletingId, setDeletingId] = useState<Id | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const sorted = [...entries].sort((a, b) =>
+    String(b.occurredOn ?? b.submittedAt).localeCompare(String(a.occurredOn ?? a.submittedAt)));
+
+  async function remove(entryId: Id) {
+    if (!onDeleteEntry || !window.confirm(t("deleteEntryConfirm"))) return;
+    setDeletingId(entryId);
+    setError(null);
+    try {
+      await onDeleteEntry(entryId);
+    } catch (cause) {
+      setError(f.error(cause));
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  return (
+    <section className={cx(cardClass, "p-5 sm:p-7")}>
+      <PageHeading title={t("historyTitle")} description={t("historySubtitle")} />
+      <div className="mb-4"><StatusMessage error={error} /></div>
+      {sorted.length ? (
+        <ul className="divide-y divide-[var(--line)]">
+          {sorted.map((entry) => {
+            const item = items.find((candidate) => candidate.id === itemIdForEntry(entry));
+            const values = valuesAsRecord(entry.values);
+            const type = challenge.entryTypes.find((candidate) => candidate.id === entry.entryTypeId);
+            const entryFields = type?.fields ?? challenge.fields;
+            return (
+              <li className="py-5" key={entry.id}>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <strong>{item?.title ?? (challenge.submissionMode === "daily" ? t("dailyCheckIn") : t("freeEntry"))}</strong>
+                    {type && challenge.entryTypes.length > 1 ? <span className="ml-2 rounded-full bg-[var(--wash)] px-2 py-0.5 text-[10px] font-light uppercase text-[var(--muted)]">{type.name}</span> : null}
+                    <p className="mt-1 text-xs text-[var(--muted)]">{entry.occurredOn ? t("occurredOnPrefix", { date: f.date(entry.occurredOn, longDate) }) : ""}{t("savedAt", { date: f.dateTime(entry.submittedAt ?? entry.updatedAt) })}{entry.isLate ? t("lateSuffix") : ""}</p>
+                  </div>
+                  <dl className="grid gap-2 text-sm sm:grid-cols-2">{entryFields.map((field) => field.id && values[field.id] !== undefined ? <div className="rounded-lg bg-[var(--wash)] px-3 py-2" key={field.id}><dt className="text-[10px] font-light uppercase text-[var(--muted)]">{field.label}</dt><dd className="mt-1 font-medium">{typeof values[field.id] === "boolean" ? values[field.id] ? tc("yes") : tc("no") : String(values[field.id])}</dd></div> : null)}</dl>
+                </div>
+                {canDelete && onDeleteEntry ? (
+                  <button type="button" className="mt-3 text-xs font-light text-[var(--danger)] underline underline-offset-2 disabled:opacity-50" disabled={deletingId === entry.id} onClick={() => void remove(entry.id)}>
+                    {deletingId === entry.id ? t("deletingEntry") : t("deleteEntry")}
+                  </button>
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
+      ) : <EmptyState title={t("noHistoryTitle")} description={t("noHistoryBody")} />}
+    </section>
+  );
+}
+
 export function ParticipantChallengeScreen({
   challenge,
   entries,
@@ -439,6 +514,7 @@ export function ParticipantChallengeScreen({
   onBack,
   onAdmin,
   onSaveEntry,
+  onDeleteEntry,
 }: {
   challenge: ChallengeDetail;
   entries: Entry[];
@@ -448,9 +524,9 @@ export function ParticipantChallengeScreen({
   onBack: () => void;
   onAdmin?: () => void;
   onSaveEntry: (itemId: Id | null, values: Record<Id, unknown>, entry?: Entry, occurredOn?: string | null, entryTypeId?: Id, checkpointId?: Id | null) => Promise<void>;
+  onDeleteEntry?: (entryId: Id) => Promise<void>;
 }) {
   const t = useTranslations("participant");
-  const tc = useTranslations("common");
   const tm = useTranslations("metrics");
   const trules = useTranslations("rules");
   const f = useGoaFormat();
@@ -604,7 +680,7 @@ export function ParticipantChallengeScreen({
         ) : null}
 
         {tab === "history" ? (
-          <section className={cx(cardClass, "p-5 sm:p-7")}><PageHeading title={t("historyTitle")} description={t("historySubtitle")} />{ownEntries.length ? <ul className="divide-y divide-[var(--line)]">{[...ownEntries].sort((a, b) => String(b.occurredOn ?? b.submittedAt).localeCompare(String(a.occurredOn ?? a.submittedAt))).map((entry) => { const item = sortedItems.find((candidate) => candidate.id === itemIdForEntry(entry)); const values = valuesAsRecord(entry.values); const type = challenge.entryTypes.find((candidate) => candidate.id === entry.entryTypeId); const entryFields = type?.fields ?? challenge.fields; return <li className="py-5" key={entry.id}><div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div><strong>{item?.title ?? (challenge.submissionMode === "daily" ? t("dailyCheckIn") : t("freeEntry"))}</strong>{type && challenge.entryTypes.length > 1 ? <span className="ml-2 rounded-full bg-[var(--wash)] px-2 py-0.5 text-[10px] font-light uppercase text-[var(--muted)]">{type.name}</span> : null}<p className="mt-1 text-xs text-[var(--muted)]">{entry.occurredOn ? t("occurredOnPrefix", { date: f.date(entry.occurredOn, longDate) }) : ""}{t("savedAt", { date: f.dateTime(entry.submittedAt ?? entry.updatedAt) })}{entry.isLate ? t("lateSuffix") : ""}</p></div><dl className="grid gap-2 text-sm sm:grid-cols-2">{entryFields.map((field) => field.id && values[field.id] !== undefined ? <div className="rounded-lg bg-[var(--wash)] px-3 py-2" key={field.id}><dt className="text-[10px] font-light uppercase text-[var(--muted)]">{field.label}</dt><dd className="mt-1 font-medium">{typeof values[field.id] === "boolean" ? values[field.id] ? tc("yes") : tc("no") : String(values[field.id])}</dd></div> : null)}</dl></div></li>; })}</ul> : <EmptyState title={t("noHistoryTitle")} description={t("noHistoryBody")} />}</section>
+          <HistoryTab challenge={challenge} entries={ownEntries} items={sortedItems} canDelete={challenge.status === "active"} onDeleteEntry={onDeleteEntry} />
         ) : null}
 
         {tab === "progress" ? (
