@@ -74,7 +74,7 @@ function RatingField({
       ref={scroller}
       id={id}
       tabIndex={-1}
-      className="-mx-1 flex snap-x gap-1.5 overflow-x-auto px-1 pb-2 sm:mx-0 sm:grid sm:grid-cols-11 sm:overflow-visible sm:px-0 sm:pb-0"
+      className="flex w-full min-w-0 snap-x gap-1.5 overflow-x-auto pb-2 sm:grid sm:grid-cols-11 sm:overflow-visible sm:pb-0 [scrollbar-width:thin]"
     >
       {ratingChoices(field.config).map((rating) => {
         const picked = Number(value) === rating;
@@ -88,7 +88,7 @@ function RatingField({
             disabled={disabled}
             onClick={() => onPick(rating)}
             className={cx(
-              "h-11 w-11 flex-none snap-center rounded-xl border text-sm font-light tabular-nums sm:w-auto sm:text-xs",
+              "h-10 w-10 flex-none snap-center rounded-xl border text-sm font-light tabular-nums sm:h-11 sm:w-auto sm:text-xs",
               picked
                 ? "border-[var(--main)] bg-[var(--main)] text-white"
                 : "border-transparent bg-[var(--wash)] hover:border-[var(--main-line)]",
@@ -533,7 +533,7 @@ export function ParticipantChallengeScreen({
   ];
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-6 pb-28 sm:px-6 sm:py-10">
+    <main className="mx-auto max-w-7xl overflow-x-clip px-4 py-6 pb-28 sm:px-6 sm:py-10">
       <div className="mb-5 flex items-center justify-between gap-3"><button className={backLinkClass} type="button" onClick={onBack}>{t("backHome")}</button>{onAdmin ? <Button variant="secondary" onClick={onAdmin}>{t("manage")}</Button> : null}</div>
       <section className="relative overflow-hidden rounded-[28px] bg-[var(--spotlight)] p-6 text-[var(--spotlight-ink)] sm:p-9">
         <div className="relative z-10">
@@ -555,7 +555,7 @@ export function ParticipantChallengeScreen({
       <div className="mt-5">
         {tab === "today" ? (
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1.45fr)_minmax(290px,0.65fr)]">
-            <section className={cx(cardClass, "p-5 sm:p-7")}>
+            <section className={cx(cardClass, "min-w-0 p-5 sm:p-7")}>
               {challenge.status === "closed" ? <EmptyState title={t("closedTitle")} description={t("closedBody")} action={<Button onClick={() => onTab("results")}>{t("seeResults")}</Button>} /> : challenge.submissionMode !== "free" && !selectedItem && !undatedDaily ? <EmptyState title={t("noCheckpointTitle")} description={t("noCheckpointBody")} /> : (
                 <>
                   <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -574,7 +574,7 @@ export function ParticipantChallengeScreen({
                 </>
               )}
             </section>
-            <aside className="space-y-5">
+            <aside className="min-w-0 space-y-5">
               {sessionMode && sortedSessions.length > 1 ? (
                 <EntryPicker
                   title={t("sessionsTitle")}
