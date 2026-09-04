@@ -11,6 +11,15 @@ export function recipeCatalogKind(recipeKey?: RecipeKey | null): "film" | "book"
   return null;
 }
 
+/** A personal challenge lives in the hidden solo workspace — never a real group. */
+export function isPersonalChallenge(
+  challenge: { scope?: "personal" | "group"; groupId?: Id | null },
+  personalWorkspaceId: Id | null,
+): boolean {
+  return challenge.scope === "personal"
+    || (personalWorkspaceId !== null && challenge.groupId === personalWorkspaceId);
+}
+
 /** A metric worth rendering: a real scalar, or a series with ≥1 non-thin row. */
 export function metricHasData(metric: { value?: unknown; series?: Array<{ value: number | null }> }): boolean {
   if (metric.series?.length) return metric.series.some((row) => row.value !== null);

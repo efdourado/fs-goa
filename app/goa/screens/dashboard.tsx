@@ -6,9 +6,9 @@ import { type FormEvent, useState } from "react";
 import { useGoaFormat } from "../format";
 import type { ChallengeSummary, GroupSummary, Id, Limits, User } from "../types";
 import { Button, cardClass, challengeStatusTone, ChallengeStatusBadge, cx, EmptyState, inputClass, labelClass, linkClass, PageHeading, StatusMessage } from "../ui";
-import { canManage, isChallengeScheduled, isLivingList } from "../utils";
+import { canManage, isChallengeScheduled, isLivingList, isPersonalChallenge } from "../utils";
 
-function ActiveChallengeCard({
+export function ActiveChallengeCard({
   challenge,
   onOpen,
 }: {
@@ -39,7 +39,7 @@ function ActiveChallengeCard({
   );
 }
 
-function ArchiveChallengeRow({
+export function ArchiveChallengeRow({
   challenge,
   onOpen,
 }: {
@@ -63,8 +63,7 @@ export function DashboardScreen({
   onOpenChallenge,
   onOpenAdmin,
   onCreateGroup,
-  onCreatePersonalChallenge,
-  onOpenPersonalCatalog,
+  onOpenPersonalSpace,
 }: {
   user: User;
   groups: GroupSummary[];
@@ -75,8 +74,7 @@ export function DashboardScreen({
   onOpenChallenge: (id: Id) => void;
   onOpenAdmin: (id: Id) => void;
   onCreateGroup: (name: string) => Promise<void>;
-  onCreatePersonalChallenge: () => void;
-  onOpenPersonalCatalog: () => void;
+  onOpenPersonalSpace: () => void;
 }) {
   const t = useTranslations("dashboard");
   const tc = useTranslations("common");
@@ -86,14 +84,9 @@ export function DashboardScreen({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const isPersonal = (challenge: ChallengeSummary) =>
-    challenge.scope === "personal"
-    || (personalWorkspaceId !== null && challenge.groupId === personalWorkspaceId);
-  const personalChallenges = challenges.filter(isPersonal);
-  const personalActive = personalChallenges.filter((challenge) => challenge.status === "active");
-  const personalOther = personalChallenges.filter((challenge) => challenge.status !== "active");
+  const personalChallenges = challenges.filter((challenge) => isPersonalChallenge(challenge, personalWorkspaceId));
 
-  const groupChallenges = challenges.filter((challenge) => !isPersonal(challenge));
+  const groupChallenges = challenges.filter((challenge) => !isPersonalChallenge(challenge, personalWorkspaceId));
   const active = groupChallenges.filter((challenge) => challenge.status === "active");
   const other = groupChallenges.filter((challenge) => challenge.status !== "active");
 
@@ -140,55 +133,43 @@ export function DashboardScreen({
         </form>
       ) : null}
 
-      <section aria-labelledby="personal-title">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 id="personal-title" className="text-xl font-medium tracking-[-0.03em]">{t("personalTitle")}</h2>
-          <span className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1">
-            <button type="button" className={cx(linkClass, "text-sm")} onClick={onOpenPersonalCatalog}>{t("personalCatalog")}</button>
-            <button type="button" className={cx(linkClass, "text-sm")} onClick={onCreatePersonalChallenge}>{t("personalCreate")}</button>
-          </span>
-        </div>
-        {personalChallenges.length ? (
-          <div className="space-y-6">
-            {personalActive.length ? (
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {personalActive.map((challenge) => <ActiveChallengeCard key={challenge.id} challenge={challenge} onOpen={onOpenChallenge} />)}
-              </div>
-            ) : null}
-            {personalOther.length ? (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {personalOther.map((challenge) => <ArchiveChallengeRow key={challenge.id} challenge={challenge} onOpen={() => openChallenge(challenge)} />)}
-              </div>
-            ) : null}
-          </div>
-        ) : (
-          <EmptyState title={t("personalEmptyTitle")} description={t("personalEmptyBody")} action={<Button onClick={onCreatePersonalChallenge}>{t("personalCreate")}</Button>} />
-        )}
-      </section>
-
-      <section className="mt-10" aria-labelledby="groups-title">
+      <section aria-labelledby="groups-title">
         <div className="mb-4 flex items-center justify-between">
           <h2 id="groups-title" className="text-xl font-medium tracking-[-0.03em]">{t("groupsTitle")}</h2>
           <span className="text-xs font-medium text-[var(--muted)]">{t("groupsCount", { count: standardGroups.length })}</span>
         </div>
-        {standardGroups.length ? (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {standardGroups.map((group) => {
-              const count = group.memberCount ?? group.members?.length ?? 0;
-              return (
-                <button className={cx(cardClass, "cursor-pointer flex min-h-24 items-center justify-between gap-4 p-4 text-left transition hover:-translate-y-0.5 hover:border-[var(--muted)]")} type="button" onClick={() => onOpenGroup(group.id)} key={group.id}>
-                  <span>
-                    {group.name}
-                    <small className="mt-1 block text-[var(--muted)]">
-                      {t("peopleCount", { count })} · {tr(group.role)}
-                    </small>
-                  </span>
-                  <span className="text-lg text-[var(--muted)]" aria-hidden="true">→</span>
-                </button>
-              );
-            })}
-          </div>
-        ) : <EmptyState title={t("noGroupsTitle")} description={t("noGroupsBody")} action={<Button onClick={() => setShowGroupForm(true)}>{t("createGroup")}</Button>} />}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <button className={cx(cardClass, "cursor-pointer flex min-h-24 items-center justify-between gap-4 p-4 text-left transition hover:-translate-y-0.5 hover:border-[var(--muted)]")} type="button" onClick={onOpenPersonalSpace}>
+            <span>
+              {t("personalSpaceTitle")}
+              <small className="mt-1 block text-[var(--muted)]">{t("personalSpaceMeta", { count: personalChallenges.length })}</small>
+            </span>
+            <span className="text-lg text-[var(--muted)]" aria-hidden="true">→</span>
+          </button>
+          {standardGroups.map((group) => {
+            const count = group.memberCount ?? group.members?.length ?? 0;
+            return (
+              <button className={cx(cardClass, "cursor-pointer flex min-h-24 items-center justify-between gap-4 p-4 text-left transition hover:-translate-y-0.5 hover:border-[var(--muted)]")} type="button" onClick={() => onOpenGroup(group.id)} key={group.id}>
+                <span>
+                  {group.name}
+                  <small className="mt-1 block text-[var(--muted)]">
+                    {t("peopleCount", { count })} · {tr(group.role)}
+                  </small>
+                </span>
+                <span className="text-lg text-[var(--muted)]" aria-hidden="true">→</span>
+              </button>
+            );
+          })}
+          {standardGroups.length === 0 ? (
+            <button
+              type="button"
+              className="flex min-h-24 items-center justify-center rounded-2xl border border-dashed border-[var(--line)] p-4 text-center text-sm text-[var(--muted)] transition hover:border-[var(--muted)] hover:text-[var(--ink)]"
+              onClick={() => setShowGroupForm(true)}
+            >
+              {t("createGroup")}
+            </button>
+          ) : null}
+        </div>
       </section>
 
       <section className="mt-10" aria-labelledby="active-title">

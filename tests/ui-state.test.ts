@@ -12,6 +12,7 @@ import {
   isChallengeScheduled,
   isEmptySaveADelete,
   isLivingList,
+  isPersonalChallenge,
   shiftDateKey,
 } from "../app/goa/utils";
 import { ptFormat, renderWithIntl } from "./helpers/intl";
@@ -33,6 +34,13 @@ test("lista viva = pessoal sem datas e não encerrada", () => {
   assert.equal(isLivingList({ scope: "personal", startsOn: null, endsOn: null, status: "closed" }), false, "uma legada encerrada mantém o ciclo para poder reabrir");
   assert.equal(isLivingList({ scope: "personal", startsOn: "2026-01-01", endsOn: "2026-12-31", status: "active" }), false, "com período é uma rodada, não uma lista");
   assert.equal(isLivingList({ scope: "group", startsOn: null, endsOn: null, status: "active" }), false, "grupo nunca é lista viva");
+});
+
+test("desafio pessoal: pelo scope, ou pelo groupId bater com o workspace escondido", () => {
+  assert.equal(isPersonalChallenge({ scope: "personal", groupId: "g1" }, null), true, "scope já basta, mesmo sem o id do workspace");
+  assert.equal(isPersonalChallenge({ scope: "group", groupId: "ws" }, "ws"), true, "payload antigo sem scope: cai para o id do workspace");
+  assert.equal(isPersonalChallenge({ scope: "group", groupId: "g1" }, "ws"), false);
+  assert.equal(isPersonalChallenge({ groupId: "ws" }, null), false, "sem scope e sem workspace conhecido, não há como dizer que é pessoal");
 });
 
 test("apresenta período ou ausência de prazo sem datas fictícias", () => {

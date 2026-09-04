@@ -241,16 +241,11 @@
     "progress": "{done} of {total}",
     "noChallengesTitle": "Nothing pending here",
     "noChallengesBody": "When a challenge is active or scheduled, it shows up here with the date of the next entry.",
-    "personalTitle": "My challenges",
-    "personalCreate": "+ Personal challenge",
-    "personalCatalog": "My catalogue",
-    "personalEmptyTitle": "Start a challenge of your own",
-    "personalEmptyBody": "Personal challenges are just yours — no group, no invites. Great for a reading goal or a film marathon.",
+    "personalSpaceTitle": "My space",
+    "personalSpaceMeta": "{count, plural, one {# challenge} other {# challenges}} · just you",
     "groupsTitle": "Your groups",
     "groupsCount": "{count, plural, one {# group} other {# groups}}",
     "peopleCount": "{count, plural, one {# person} other {# people}}",
-    "noGroupsTitle": "Create your first group",
-    "noGroupsBody": "A group brings people together and lives on across different challenge editions.",
     "createGroup": "Create group",
     "archiveTitle": "Drafts and memories"
   },
@@ -344,6 +339,15 @@
       "active": "in progress",
       "closed": "closed"
     }
+  },
+  "personalSpace": {
+    "back": "← Back",
+    "title": "My space",
+    "subtitle": "Just yours — no group, no invites. A group of one, handled like one.",
+    "catalog": "My catalogue",
+    "create": "+ Personal challenge",
+    "emptyTitle": "Start a challenge of your own",
+    "emptyBody": "Personal challenges are just yours — no group, no invites. Great for a reading goal or a film marathon."
   },
   "personalCatalog": {
     "back": "← Back",

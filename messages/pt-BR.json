@@ -241,16 +241,11 @@
     "progress": "{done} de {total}",
     "noChallengesTitle": "Nada pendente por aqui",
     "noChallengesBody": "Quando um desafio estiver ativo ou agendado, ele aparecerá aqui com a data do próximo registro.",
-    "personalTitle": "Meus desafios",
-    "personalCreate": "+ Desafio pessoal",
-    "personalCatalog": "Meu acervo",
-    "personalEmptyTitle": "Comece um desafio só seu",
-    "personalEmptyBody": "Desafios pessoais são só seus — sem grupo, sem convites. Ótimo para uma meta de leitura ou uma maratona de filmes.",
+    "personalSpaceTitle": "Meu espaço",
+    "personalSpaceMeta": "{count, plural, one {# desafio} other {# desafios}} · só você",
     "groupsTitle": "Seus grupos",
     "groupsCount": "{count, plural, one {# grupo} other {# grupos}}",
     "peopleCount": "{count, plural, one {# pessoa} other {# pessoas}}",
-    "noGroupsTitle": "Crie seu primeiro grupo",
-    "noGroupsBody": "Um grupo reúne pessoas e continua existindo entre diferentes edições de desafios.",
     "createGroup": "Criar grupo",
     "archiveTitle": "Rascunhos e memórias"
   },
@@ -344,6 +339,15 @@
       "active": "em andamento",
       "closed": "encerrada"
     }
+  },
+  "personalSpace": {
+    "back": "← Voltar",
+    "title": "Meu espaço",
+    "subtitle": "Só seu — sem grupo, sem convites. Um grupo de uma pessoa, tratado como um.",
+    "catalog": "Meu acervo",
+    "create": "+ Desafio pessoal",
+    "emptyTitle": "Comece um desafio só seu",
+    "emptyBody": "Desafios pessoais são só seus — sem grupo, sem convites. Ótimo para uma meta de leitura ou uma maratona de filmes."
   },
   "personalCatalog": {
     "back": "← Voltar",
