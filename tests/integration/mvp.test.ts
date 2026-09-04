@@ -182,9 +182,11 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
   });
   assert.equal(challengeResponse.response.status, 201, JSON.stringify(challengeResponse.body));
   const challengeId = (challengeResponse.body as { id: string }).id;
+  assert.equal((challengeResponse.body as { kind: string }).kind, "round", "um desafio de grupo com período é um round, não uma lista");
 
   const originalDraftDetail = await call("GET", `/api/challenges/${challengeId}`, { session: owner });
   assert.equal(originalDraftDetail.response.status, 200, JSON.stringify(originalDraftDetail.body));
+  assert.equal((originalDraftDetail.body as { kind: string }).kind, "round", "o detalhe do desafio também expõe kind");
   const originalDraftItems = (originalDraftDetail.body as {
     items: Array<{ id: string; title: string; description: string | null }>;
   }).items;
@@ -1989,6 +1991,7 @@ test("excluir do acervo: bloqueado enquanto o desafio corre, permitido depois, e
   });
   const personalId = (personal.body as { id: string }).id;
   assert.equal((personal.body as { status: string }).status, "active", "lista pessoal sem datas nasce ativa");
+  assert.equal((personal.body as { kind: string }).kind, "list", "e vira uma categoria kind='list', não só um status");
   const noClose = await call("POST", `/api/challenges/${personalId}/transition`, { session: owner, body: { status: "closed" } });
   assert.equal(noClose.response.status, 409, "uma lista viva não é encerrada");
   assert.equal((noClose.body as { error: string }).error, "living_list_no_close");

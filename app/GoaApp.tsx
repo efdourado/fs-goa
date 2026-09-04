@@ -364,9 +364,9 @@ export default function GoaApp() {
     await refreshBootstrap();
     // A living list is born active with its items already in — drop the owner
     // straight into the list, not the (mostly empty) admin setup.
-    const bornActive = typeof created === "object" && created !== null
-      && (created as { status?: string }).status === "active";
-    if (bornActive) openParticipant(challengeId);
+    const isList = typeof created === "object" && created !== null
+      && (created as { kind?: string }).kind === "list";
+    if (isList) openParticipant(challengeId);
     else openAdmin(challengeId);
   }
 

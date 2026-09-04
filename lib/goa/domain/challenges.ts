@@ -72,14 +72,15 @@ export async function createChallenge(
 
     const id = publicId();
     const status = livingList ? "active" : "draft";
+    const kind = livingList ? "list" : "round";
     await client.query(
       `INSERT INTO challenges
         (id, group_id, created_by_user_id, title, description, rules, rule_sections, recipe_key, recipe_version,
-         start_date, end_date, time_zone, status, activated_at, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11,$12,$13,
-               CASE WHEN $13 = 'active' THEN now() END, now(), now())`,
+         start_date, end_date, time_zone, kind, status, activated_at, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11,$12,$13,$14,
+               CASE WHEN $14 = 'active' THEN now() END, now(), now())`,
       [id, groupId, session.user.id, title, description, rules, JSON.stringify(ruleSections),
-        recipe.key, recipe.version, startDate, endDate, "America/Sao_Paulo", status],
+        recipe.key, recipe.version, startDate, endDate, "America/Sao_Paulo", kind, status],
     );
 
     let primaryTypeId = "";
@@ -265,7 +266,7 @@ export async function createChallenge(
       template: body.template ?? null,
       livingList,
     });
-    return { id, challengeId: id, status };
+    return { id, challengeId: id, status, kind };
   });
 }
 

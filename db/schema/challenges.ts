@@ -39,6 +39,10 @@ export const challenges = pgTable(
     startDate: date("start_date", { mode: "string" }),
     endDate: date("end_date", { mode: "string" }),
     timeZone: text("time_zone").notNull().default("UTC"),
+    // `list` is a first-class category, not a derived condition: a personal
+    // running list ("films I've seen") with no round to open or close. Decided
+    // once at creation; `status` (draft/active/closed) only applies to `round`.
+    kind: text("kind").notNull().default("round"),
     status: text("status").notNull().default("draft"),
     activatedAt: timestamptz("activated_at"),
     closedAt: timestamptz("closed_at"),
@@ -97,6 +101,11 @@ export const challenges = pgTable(
       sql`${table.deletedAt} is null or ${table.deletedAt} >= ${table.createdAt}`,
     ),
     check("challenges_time_zone_check", sql`char_length(btrim(${table.timeZone})) between 1 and 100`),
+    check("challenges_kind_check", sql`${table.kind} in ('round', 'list')`),
+    check(
+      "challenges_kind_status_check",
+      sql`${table.kind} = 'round' or ${table.status} = 'active'`,
+    ),
     check("challenges_status_check", sql`${table.status} in ('draft', 'active', 'closed')`),
     check(
       "challenges_recipe_key_check",
