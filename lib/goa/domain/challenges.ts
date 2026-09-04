@@ -29,6 +29,10 @@ export async function createChallenge(
     Object.hasOwn(body, "endsOn") ? body.endsOn : body.endDate,
   );
   const recipe = resolveRecipe(body);
+  // A personal challenge with no start/end is a living list ("films I've seen",
+  // "books I've read") — it has no round to open or close, so it is born active
+  // and can never be closed. See `transitionChallenge` and `isLivingList`.
+  const livingList = options.personal === true && !startDate && !endDate;
   const wizardFields = Array.isArray(body.fields) && body.fields.length ? (body.fields as ClientField[]) : null;
   if (wizardFields && wizardFields.length > 30) throw new ApiError(400, "field_limit", "Use no máximo 30 campos.");
   const wantsItems = recipe.catalogKind !== null && recipe.entryTypes.some((type) => type.submissionMode === "item");
@@ -67,13 +71,15 @@ export async function createChallenge(
     );
 
     const id = publicId();
+    const status = livingList ? "active" : "draft";
     await client.query(
       `INSERT INTO challenges
         (id, group_id, created_by_user_id, title, description, rules, rule_sections, recipe_key, recipe_version,
-         start_date, end_date, time_zone, status, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11,$12,'draft',now(),now())`,
+         start_date, end_date, time_zone, status, activated_at, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11,$12,$13,
+               CASE WHEN $13 = 'active' THEN now() END, now(), now())`,
       [id, groupId, session.user.id, title, description, rules, JSON.stringify(ruleSections),
-        recipe.key, recipe.version, startDate, endDate, "America/Sao_Paulo"],
+        recipe.key, recipe.version, startDate, endDate, "America/Sao_Paulo", status],
     );
 
     let primaryTypeId = "";
@@ -257,8 +263,9 @@ export async function createChallenge(
     await writeAudit(client, groupId, id, session.user.id, "challenge.created", "challenge", id, null, {
       title,
       template: body.template ?? null,
+      livingList,
     });
-    return { id, challengeId: id, status: "draft" };
+    return { id, challengeId: id, status };
   });
 }
 

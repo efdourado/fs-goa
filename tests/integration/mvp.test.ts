@@ -1982,18 +1982,20 @@ test("excluir do acervo: bloqueado enquanto o desafio corre, permitido depois, e
   );
   assert.equal(auditRows.rows[0].count, 1);
 
-  // acervo pessoal: mesmo caminho, sem grupo à vista
+  // acervo pessoal: a lista viva (sem datas) nasce ativa e o item é sempre removível
   const personal = await call("POST", "/api/personal/challenges", {
     session: owner,
     body: { recipe: "cinema", title: "Minha lista", startsOn: null, endsOn: null, items: [{ title: "Aguirre", year: 1972 }] },
   });
   const personalId = (personal.body as { id: string }).id;
+  assert.equal((personal.body as { status: string }).status, "active", "lista pessoal sem datas nasce ativa");
+  const noClose = await call("POST", `/api/challenges/${personalId}/transition`, { session: owner, body: { status: "closed" } });
+  assert.equal(noClose.response.status, 409, "uma lista viva não é encerrada");
+  assert.equal((noClose.body as { error: string }).error, "living_list_no_close");
+
   const personalCatalog = (await call("GET", "/api/personal/catalog", { session: owner })).body as { items: Array<{ id: string; title: string }> };
   const aguirre = personalCatalog.items.find((i) => i.title === "Aguirre")!;
-  assert.equal((await call("DELETE", `/api/personal/catalog/${aguirre.id}`, { session: owner })).response.status, 409, "ativo bloqueia no acervo pessoal também");
-  await call("POST", `/api/challenges/${personalId}/transition`, { session: owner, body: { status: "active" } });
-  await call("POST", `/api/challenges/${personalId}/transition`, { session: owner, body: { status: "closed" } });
-  assert.equal((await call("DELETE", `/api/personal/catalog/${aguirre.id}`, { session: owner })).response.status, 200);
+  assert.equal((await call("DELETE", `/api/personal/catalog/${aguirre.id}`, { session: owner })).response.status, 200, "o acervo pessoal de uma lista viva é podável mesmo ativa");
   assert.deepEqual(
     ((await call("GET", "/api/personal/catalog", { session: owner })).body as { items: unknown[] }).items,
     [],
@@ -2196,10 +2198,11 @@ test("desafio pessoal: workspace criado sob demanda, invisível como grupo e reu
   });
   assert.equal(second.response.status, 201, JSON.stringify(second.body));
   const secondId = (second.body as { id: string }).id;
+  assert.equal((second.body as { status: string }).status, "active", "lista pessoal sem datas nasce ativa, sem passo de ativação");
   assert.equal(
-    (await call("POST", `/api/challenges/${secondId}/transition`, { session: owner, body: { status: "active" } })).response.status,
-    200,
-    "desafio pessoal sem datas ativa sem exigir período",
+    (await call("POST", `/api/challenges/${secondId}/transition`, { session: owner, body: { status: "closed" } })).response.status,
+    409,
+    "e não pode ser encerrada",
   );
   const secondDetail = (await call("GET", `/api/challenges/${secondId}`, { session: owner })).body as {
     startsOn: string | null; entryTypes: Array<{ id: string; purpose: string }>; items: Array<{ id: string }>; fields: Array<{ id: string }>;
@@ -2263,6 +2266,7 @@ test("estante pessoal: só nota, sem data no registro, sem métricas de grupo, r
   });
   assert.equal(created.response.status, 201, JSON.stringify(created.body));
   const cid = (created.body as { id: string }).id;
+  assert.equal((created.body as { status: string }).status, "active", "a estante sem datas é uma lista viva, nasce ativa");
 
   const detail = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as {
     scope: string;
@@ -2279,7 +2283,6 @@ test("estante pessoal: só nota, sem data no registro, sem métricas de grupo, r
   const ranking = detail.metrics.find((metric) => metric.label.toLowerCase().includes("ranking"))!;
   assert.equal(ranking.operation, "average", "ranking solo é média simples, sem encolhimento bayesiano");
 
-  await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } });
   const ratingEntryType = detail.entryTypes[0];
   const notaField = ratingEntryType.fields.find((field) => field.key === "nota")!.id;
   const ratingType = ratingEntryType.id;
@@ -2297,17 +2300,8 @@ test("estante pessoal: só nota, sem data no registro, sem métricas de grupo, r
     .series!.find((row) => row.value !== null)!;
   assert.equal(topRow.value, 5, "com uma nota por livro, a média é a própria nota");
 
-  await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "closed" } });
-  const blocks = await adminPool.query<{ value_snapshot: unknown }>(
-    "SELECT value_snapshot FROM result_blocks WHERE challenge_id=$1 AND kind='metric'",
-    [cid],
-  );
-  assert.ok(blocks.rows.length > 0, "a vitrine automática tem blocos de métrica");
-  for (const block of blocks.rows) {
-    const snap = block.value_snapshot as { value: number | null; series?: Array<{ value: number | null }> };
-    const hasData = snap.series ? snap.series.some((row) => row.value !== null) : snap.value !== null;
-    assert.ok(hasData, "todo bloco de métrica publicado carrega ao menos um valor");
-  }
+  const cannotClose = await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "closed" } });
+  assert.equal(cannotClose.response.status, 409, "uma estante-lista não é encerrada");
 });
 
 test("membro sai do grupo, opcionalmente apagando seus dados; o responsável não sai", async () => {

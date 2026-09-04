@@ -31,6 +31,7 @@ import {
 import {
   dateKeyInSaoPaulo,
   isChallengeScheduled,
+  isLivingList,
   itemIdForEntry,
   metricHasData,
   participantsSentence,
@@ -593,6 +594,7 @@ export function ParticipantChallengeScreen({
       : ownEntries.find((entry) => !itemIdForEntry(entry));
   const completion = sortedItems.length ? Math.min(100, Math.round((doneEntries.length / sortedItems.length) * 100)) : 0;
   const scheduled = isChallengeScheduled(challenge.status, challenge.startsOn, challenge.submissionMode);
+  const livingList = isLivingList(challenge);
   const ruleSections = useMemo(
     () => visibleRuleSections(challenge.ruleSections, challenge.rules, trules("legacyTitle")),
     [challenge.ruleSections, challenge.rules, trules],
@@ -659,7 +661,7 @@ export function ParticipantChallengeScreen({
       <div className="mb-5 flex items-center justify-between gap-3"><button className={backLinkClass} type="button" onClick={onBack}>{t("backHome")}</button>{onAdmin ? <Button variant="secondary" onClick={onAdmin}>{t("manage")}</Button> : null}</div>
       <section className="relative overflow-hidden rounded-[28px] bg-[var(--spotlight)] p-6 text-[var(--spotlight-ink)] sm:p-9">
         <div className="relative z-10">
-          <div className="flex flex-wrap items-center justify-between gap-3"><ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} /><span className="text-xs text-white/65">{f.dateRange(challenge.startsOn, challenge.endsOn)}</span></div>
+          <div className="flex flex-wrap items-center justify-between gap-3">{livingList ? <span /> : <ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />}<span className="text-xs text-white/65">{livingList ? t("livingListMeta", { count: sortedItems.length }) : f.dateRange(challenge.startsOn, challenge.endsOn)}</span></div>
           <h1 className="mt-10 max-w-3xl text-4xl font-medium leading-none tracking-[-0.055em] sm:text-6xl">{challenge.title}</h1>
           {challenge.description ? <p className="mt-4 max-w-2xl text-sm leading-6 text-white/70">{challenge.description}</p> : null}
           {sortedItems.length ? <div className="mt-8 max-w-2xl"><div className="mb-2 flex justify-between text-xs text-white/70"><span>{t.rich("entriesProgress", { done: Math.min(doneEntries.length, sortedItems.length), total: sortedItems.length, b: (chunks) => <strong className="text-white">{chunks}</strong> })}</span><span>{completion}%</span></div><div className="h-2 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-[var(--main-2)]" style={{ width: `${Math.min(100, completion)}%` }} /></div></div> : null}

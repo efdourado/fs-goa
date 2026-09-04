@@ -33,7 +33,7 @@ import {
   SchedulePeriodFields,
   StatusMessage,
 } from "../ui";
-import { isChallengeScheduled, itemIdForEntry, recipeCatalogKind, valuesAsRecord } from "../utils";
+import { isChallengeScheduled, isLivingList, itemIdForEntry, recipeCatalogKind, valuesAsRecord } from "../utils";
 import { DynamicEntryForm, ResultView } from "./participant-challenge";
 
 const METRIC_OPERATIONS: Metric["operation"][] = [
@@ -91,6 +91,7 @@ function AdminOverview({
   const expected = challenge.items.length * challenge.participants.length;
   const missing = Math.max(0, expected - doneEntries.length);
   const scheduled = isChallengeScheduled(challenge.status, challenge.startsOn, challenge.submissionMode);
+  const livingList = isLivingList(challenge);
 
   async function run(label: string, action: () => Promise<void>, successText: string) {
     setBusy(label);
@@ -159,22 +160,29 @@ function AdminOverview({
           </fieldset>
           {scheduleMode === "period" ? (
             <SchedulePeriodFields startsOn={startsOn} endsOn={endsOn} onStartsOn={setStartsOn} onEndsOn={setEndsOn} disabled={challenge.status === "closed"} />
-          ) : <p className="sm:col-span-2 rounded-xl bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{t("noPeriodNote")}</p>}
+          ) : <p className="sm:col-span-2 rounded-xl bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{livingList ? t("livingListBody") : t("noPeriodNote")}</p>}
           <label className="sm:col-span-2"><span className={labelClass}>{t("descriptionLabel")}</span><textarea className={inputClass} rows={3} value={description} onChange={(event) => setDescription(event.target.value)} maxLength={1000} disabled={challenge.status === "closed"} /></label>
           <div className="sm:col-span-2"><div className="mb-3"><span className={labelClass}>{t("rulesLabel")}</span><p className="text-xs leading-5 text-[var(--muted)]">{t("rulesHint")}</p></div><RuleSectionsEditor value={ruleSections} onChange={setRuleSections} disabled={challenge.status === "closed"} /></div>
           {challenge.status !== "closed" ? <div className="sm:col-span-2"><Button type="submit" disabled={busy === "save"}>{busy === "save" ? tc("saving") : t("saveBasics")}</Button></div> : null}
         </form>
       </section>
 
-      <section className={cx(cardClass, "p-5 sm:p-7")}>
-        <h2 className="text-xl font-light">{t("stateTitle")}</h2>
-        <div className="mt-4 flex flex-col gap-4 rounded-2xl bg-[var(--wash)] p-5 sm:flex-row sm:items-center sm:justify-between">
-          <div><ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} /><p className="mt-2 max-w-xl text-sm leading-6 text-[var(--muted)]">{challenge.status === "draft" ? t("stateDraft") : scheduled ? t("stateScheduled", { date: f.date(challenge.startsOn, longDate) }) : challenge.status === "active" ? t("stateActive") : t("stateClosed")}</p></div>
-          {challenge.status === "draft" ? <Button disabled={Boolean(busy)} onClick={() => { if (window.confirm(t("activateConfirm"))) void run("transition", () => onTransition("active"), t("activated")); }}>{t("activate")}</Button> : null}
-          {challenge.status === "active" ? <Button variant="danger" disabled={Boolean(busy)} onClick={() => { if (window.confirm(t("closeConfirm"))) void run("transition", () => onTransition("closed"), t("closedDone")); }}>{t("close")}</Button> : null}
-          {challenge.status === "closed" ? <Button variant="secondary" disabled={Boolean(busy)} onClick={() => { if (window.confirm(t("reopenConfirm"))) void run("transition", () => onTransition("active"), t("reopenedDone")); }}>{t("reopen")}</Button> : null}
-        </div>
-      </section>
+      {livingList ? (
+        <section className={cx(cardClass, "p-5 sm:p-7")}>
+          <h2 className="text-xl font-light">{t("livingListTitle")}</h2>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-[var(--muted)]">{t("livingListBody")}</p>
+        </section>
+      ) : (
+        <section className={cx(cardClass, "p-5 sm:p-7")}>
+          <h2 className="text-xl font-light">{t("stateTitle")}</h2>
+          <div className="mt-4 flex flex-col gap-4 rounded-2xl bg-[var(--wash)] p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div><ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} /><p className="mt-2 max-w-xl text-sm leading-6 text-[var(--muted)]">{challenge.status === "draft" ? t("stateDraft") : scheduled ? t("stateScheduled", { date: f.date(challenge.startsOn, longDate) }) : challenge.status === "active" ? t("stateActive") : t("stateClosed")}</p></div>
+            {challenge.status === "draft" ? <Button disabled={Boolean(busy)} onClick={() => { if (window.confirm(t("activateConfirm"))) void run("transition", () => onTransition("active"), t("activated")); }}>{t("activate")}</Button> : null}
+            {challenge.status === "active" ? <Button variant="danger" disabled={Boolean(busy)} onClick={() => { if (window.confirm(t("closeConfirm"))) void run("transition", () => onTransition("closed"), t("closedDone")); }}>{t("close")}</Button> : null}
+            {challenge.status === "closed" ? <Button variant="secondary" disabled={Boolean(busy)} onClick={() => { if (window.confirm(t("reopenConfirm"))) void run("transition", () => onTransition("active"), t("reopenedDone")); }}>{t("reopen")}</Button> : null}
+          </div>
+        </section>
+      )}
 
       <section className={cx(cardClass, "p-5 sm:p-7")}>
         <h2 className="text-xl font-light">{t("reuseTitle")}</h2>

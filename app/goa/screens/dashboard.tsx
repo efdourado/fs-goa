@@ -6,7 +6,7 @@ import { type FormEvent, useState } from "react";
 import { useGoaFormat } from "../format";
 import type { ChallengeSummary, GroupSummary, Id, Limits, User } from "../types";
 import { Button, cardClass, challengeStatusTone, ChallengeStatusBadge, cx, EmptyState, inputClass, labelClass, linkClass, PageHeading, StatusMessage } from "../ui";
-import { canManage, isChallengeScheduled } from "../utils";
+import { canManage, isChallengeScheduled, isLivingList } from "../utils";
 
 function ActiveChallengeCard({
   challenge,
@@ -20,10 +20,11 @@ function ActiveChallengeCard({
   const tone = challengeStatusTone(challenge.status, challenge.startsOn, challenge.submissionMode);
   const total = challenge.totalCount ?? 0;
   const done = challenge.completedCount ?? 0;
+  const livingList = isLivingList(challenge);
   return (
-    <article className={cx("relative flex flex-col overflow-hidden rounded-[20px] border bg-[var(--paper)] shadow-[var(--elevate-1)] transition hover:-translate-y-0.5 has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-[var(--main)]/25", tone.border)}>
+    <article className={cx("relative flex flex-col overflow-hidden rounded-[20px] border bg-[var(--paper)] shadow-[var(--elevate-1)] transition hover:-translate-y-0.5 has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-[var(--main)]/25", livingList ? "border-[var(--line)]" : tone.border)}>
       <div className="flex flex-1 flex-col p-5">
-        <div className="flex items-center justify-between gap-3"><ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} /><span className="text-xs text-[var(--muted)]">{isChallengeScheduled(challenge.status, challenge.startsOn, challenge.submissionMode) ? t("startsOn", { date: f.date(challenge.startsOn) }) : challenge.endsOn ? t("endsOn", { date: f.date(challenge.endsOn) }) : t("noDeadline")}</span></div>
+        <div className="flex items-center justify-between gap-3">{livingList ? <span /> : <ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />}<span className="text-xs text-[var(--muted)]">{livingList ? t("listMeta", { count: total }) : isChallengeScheduled(challenge.status, challenge.startsOn, challenge.submissionMode) ? t("startsOn", { date: f.date(challenge.startsOn) }) : challenge.endsOn ? t("endsOn", { date: f.date(challenge.endsOn) }) : t("noDeadline")}</span></div>
         <h3 className="mt-5 text-2xl font-light tracking-[-0.04em]"><button type="button" onClick={() => onOpen(challenge.id)} className="cursor-pointer text-left after:absolute after:inset-0 after:content-[''] focus-visible:outline-none">{challenge.title}</button></h3>
         {challenge.description ? <p className="mt-2 line-clamp-1 text-sm leading-6 text-[var(--muted)]">{challenge.description}</p> : null}
         {total > 0 ? (
@@ -33,7 +34,7 @@ function ActiveChallengeCard({
           </div>
         ) : null}
       </div>
-      <span className={cx("block w-full px-5 py-3.5", tone.solid)} />
+      <span className={cx("block w-full px-5 py-3.5", livingList ? "bg-[var(--wash-strong)]" : tone.solid)} />
     </article>
   );
 }

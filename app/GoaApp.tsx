@@ -362,7 +362,12 @@ export default function GoaApp() {
     if (!challengeId) throw new Error(t("draftWithoutId"));
 
     await refreshBootstrap();
-    openAdmin(challengeId);
+    // A living list is born active with its items already in — drop the owner
+    // straight into the list, not the (mostly empty) admin setup.
+    const bornActive = typeof created === "object" && created !== null
+      && (created as { status?: string }).status === "active";
+    if (bornActive) openParticipant(challengeId);
+    else openAdmin(challengeId);
   }
 
   async function mutateChallenge(path: string, body: unknown, method: "POST" | "PATCH" | "DELETE" = "POST") {
