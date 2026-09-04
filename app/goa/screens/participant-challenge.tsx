@@ -84,7 +84,10 @@ function RatingField({
       className="flex w-full min-w-0 snap-x gap-1.5 overflow-x-auto pb-2 sm:grid sm:grid-cols-11 sm:overflow-visible sm:pb-0 [scrollbar-width:thin]"
     >
       {ratingChoices(field.config).map((rating) => {
-        const picked = Number(value) === rating;
+        // `Number(null)` and `Number("")` are both 0 — without this guard, a
+        // cleared field wrongly re-lights the "0" pill instead of showing
+        // nothing picked.
+        const picked = value !== null && value !== undefined && value !== "" && Number(value) === rating;
         const text = String(rating).replace(".", ",");
         return (
           <button

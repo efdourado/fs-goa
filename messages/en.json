@@ -966,7 +966,7 @@
     "confirmNewPassword": "Confirm new password",
     "changingPassword": "Changing…",
     "changePassword": "Change password",
-    "dangerTitle": "Danger zone",
+    "dangerTitle": "Danger!",
     "deleteBody": "Deleting your account disables access and removes your personal data. Groups where you're the only person go to the bin. If you own a group with other people, transfer or delete that group first.",
     "deleteConfirm": "Delete your account? Access ends and your personal data is removed.",
     "deleteAccount": "Delete my account",
