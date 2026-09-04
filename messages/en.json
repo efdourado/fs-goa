@@ -113,7 +113,9 @@
       "catalog_author": "author",
       "catalog_genre": "genre"
     },
-    "smallSample": "small sample"
+    "smallSample": "small sample",
+    "showMore": "Show {count, plural, one {# more} other {# more}}",
+    "showLess": "Show less"
   },
   "errors": {
     "generic": "Something went wrong. Try again.",

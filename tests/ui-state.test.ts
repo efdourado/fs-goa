@@ -244,6 +244,35 @@ test("aba Resultados ao vivo: sem herói repetido, sem pílulas de nome, sem 'sm
   assert.doesNotMatch(html, /small sample/i, "linha fina de um solo mostra o valor, não o rótulo");
 });
 
+test("ranking grande esconde o excedente atrás de um <details> nativo, sem JS", () => {
+  const series = Array.from({ length: 12 }, (_, index) => ({
+    key: `item-${index}`,
+    label: `Item ${index + 1}`,
+    value: 5 - index * 0.1,
+    formattedValue: (5 - index * 0.1).toFixed(1),
+    sampleSize: 3,
+  }));
+  const challenge = {
+    title: "Maratona grande",
+    scope: "group",
+    participants: [{ id: "u1", userId: "u1", name: "Ana", username: "ana" }, { id: "u2", userId: "u2", name: "Bruno", username: "bruno" }],
+    result: null,
+    metrics: [{ id: "m1", label: "Ranking", operation: "average", visibleInResults: true, series }],
+  } as unknown as ChallengeDetail;
+
+  const html = renderWithIntl(createElement(ResultView, { challenge }));
+  const [beforeDetails, afterDetails] = html.split(/<details/);
+  assert.ok(afterDetails, "uma série com mais de 8 posições ganha um <details>");
+  for (let position = 1; position <= 8; position += 1) {
+    assert.match(beforeDetails, new RegExp(`Item ${position}<`), `posição ${position} aparece direto`);
+  }
+  assert.doesNotMatch(beforeDetails, /Item 9</, "a 9ª posição não vaza para fora do <details>");
+  for (let position = 9; position <= 12; position += 1) {
+    assert.match(afterDetails, new RegExp(`Item ${position}<`), `posição ${position} fica recolhida`);
+  }
+  assert.match(html, /Ver mais 4/, "o rótulo diz quantas posições estão escondidas");
+});
+
 test("aba Resultados: um resultado sem manchete curada não cai de volta no título", () => {
   const challenge = {
     title: "Retrospectiva 2026",
