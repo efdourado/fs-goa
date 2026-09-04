@@ -242,6 +242,37 @@ test("aba Resultados ao vivo: sem herói repetido, sem pílulas de nome, sem 'sm
   assert.doesNotMatch(html, /Minha estante/, "não repete o título do desafio (a capa acima já mostra)");
   assert.doesNotMatch(html, /Manuel/, "num desafio solo não lista o próprio nome");
   assert.doesNotMatch(html, /small sample/i, "linha fina de um solo mostra o valor, não o rótulo");
+  assert.doesNotMatch(html, /<h3/, "um único tema de ranking não precisa de um cabeçalho pra se distinguir de nada");
+});
+
+test("aba Resultados agrupa rankings por tema (ranking, por pessoa, o que dividiu opiniões) quando há mais de um", () => {
+  const challenge = {
+    title: "Retrospectiva do clube",
+    scope: "group",
+    participants: [{ id: "u1", userId: "u1", name: "Ana", username: "ana" }, { id: "u2", userId: "u2", name: "Bruno", username: "bruno" }],
+    result: null,
+    metrics: [
+      {
+        id: "m1", label: "Ranking dos filmes", operation: "bayesian_average", groupBy: "item", visibleInResults: true,
+        series: [{ key: "f1", label: "Aftersun", value: 4.5, formattedValue: "4,5", sampleSize: 2 }],
+      },
+      {
+        id: "m2", label: "Viés do indicador", operation: "indicator_bias", groupBy: "participant", visibleInResults: true,
+        series: [{ key: "u1", label: "Ana", value: 0.3, formattedValue: "+0,3", sampleSize: 2 }],
+      },
+      {
+        id: "m3", label: "Polarização por filme", operation: "spread", groupBy: "item", visibleInResults: true,
+        series: [{ key: "f1", label: "Aftersun", value: 1.1, formattedValue: "1,1", sampleSize: 2 }],
+      },
+    ],
+  } as unknown as ChallengeDetail;
+
+  const html = renderWithIntl(createElement(ResultView, { challenge }));
+  const rankingIndex = html.indexOf(">Ranking<");
+  const peopleIndex = html.indexOf(">Por pessoa<");
+  const debateIndex = html.indexOf(">O que dividiu opiniões<");
+  assert.ok(rankingIndex > -1 && peopleIndex > -1 && debateIndex > -1, "as três seções de tema aparecem");
+  assert.ok(rankingIndex < peopleIndex && peopleIndex < debateIndex, "ranking, depois por pessoa, depois o que dividiu opiniões");
 });
 
 test("ranking grande esconde o excedente atrás de um <details> nativo, sem JS", () => {

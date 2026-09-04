@@ -1,4 +1,4 @@
-import type { ChallengeField, ChallengeItem, ChallengeStatus, Entry, Id, RecipeKey, Role, SubmissionMode } from "./types";
+import type { ChallengeField, ChallengeItem, ChallengeStatus, Entry, Id, Metric, MetricOperation, RecipeKey, Role, SubmissionMode } from "./types";
 
 export function canManage(role?: Role): boolean {
   return role === "owner" || role === "admin";
@@ -18,6 +18,20 @@ export function isPersonalChallenge(
 ): boolean {
   return challenge.scope === "personal"
     || (personalWorkspaceId !== null && challenge.groupId === personalWorkspaceId);
+}
+
+export type MetricTheme = "ranking" | "people" | "debate";
+
+/**
+ * Groups a results-page ranking by theme instead of a flat stack: "by person"
+ * (indicator bias, or anything broken down per participant), "what split
+ * opinion" (polarisation/surprise), or the ranking itself — items, catalogue
+ * years, genres, whatever it's grouped by.
+ */
+export function metricTheme(metric: { operation: MetricOperation; groupBy?: Metric["groupBy"] }): MetricTheme {
+  if (metric.operation === "spread" || metric.operation === "surprise") return "debate";
+  if (metric.operation === "indicator_bias" || metric.groupBy === "participant") return "people";
+  return "ranking";
 }
 
 /** A metric worth rendering: a real scalar, or a series with ≥1 non-thin row. */
