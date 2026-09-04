@@ -14,10 +14,10 @@ test("resolve links canônicos e mantém compatibilidade com query de convite", 
 });
 
 test("resolve links de desafio, gestão e abas válidas", () => {
-  assert.deepEqual(screenFromUrl("/challenges/ch-1", "?tab=history"), {
+  assert.deepEqual(screenFromUrl("/challenges/ch-1", "?tab=today"), {
     kind: "challenge",
     challengeId: "ch-1",
-    tab: "history",
+    tab: "today",
   });
   assert.deepEqual(screenFromUrl("/challenges/ch-1/manage", "?tab=participants"), {
     kind: "admin",

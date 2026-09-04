@@ -26,7 +26,6 @@ import {
   EmptyState,
   inputClass,
   labelClass,
-  PageHeading,
   StatusMessage,
 } from "../ui";
 import {
@@ -112,6 +111,7 @@ export function DynamicEntryForm({
   unavailableMessage,
   dateField,
   onSave,
+  onDelete,
 }: {
   fields: ChallengeField[];
   item: ChallengeItem | null;
@@ -122,12 +122,16 @@ export function DynamicEntryForm({
   // means the entry is saved without a date. Owned by the caller.
   dateField?: { label: string; hint: string; value: string; max: string; onChange: (value: string) => void };
   onSave: (values: Record<Id, unknown>, entry?: Entry) => Promise<void>;
+  // Present only when this form is editing a saved entry the viewer may remove.
+  onDelete?: () => Promise<void>;
 }) {
   const t = useTranslations("entryForm");
+  const tp = useTranslations("participant");
   const tc = useTranslations("common");
   const f = useGoaFormat();
   const [values, setValues] = useState<Record<Id, unknown>>(() => entry ? valuesAsRecord(entry.values) : {});
   const [busy, setBusy] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -144,6 +148,18 @@ export function DynamicEntryForm({
     if (!field.id) return;
     setValues((current) => ({ ...current, [field.id as Id]: value }));
     setSuccess(null);
+  }
+
+  async function remove() {
+    if (!onDelete || !window.confirm(tp("deleteEntryConfirm"))) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      await onDelete();
+    } catch (cause) {
+      setError(f.error(cause));
+      setDeleting(false);
+    }
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -212,7 +228,12 @@ export function DynamicEntryForm({
         </button>
       ) : null}
       <StatusMessage error={error} success={success} />
-      {canEdit ? <Button type="submit" className="w-full" disabled={busy}>{busy ? tc("saving") : entry ? tc("saveChanges") : t("saveEntry")}<span aria-hidden="true">→</span></Button> : <p className="rounded-xl border border-[var(--line)] bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{unavailableMessage ?? t("readOnly")}</p>}
+      {canEdit ? <Button type="submit" className="w-full" disabled={busy || deleting}>{busy ? tc("saving") : entry ? tc("saveChanges") : t("saveEntry")}<span aria-hidden="true">→</span></Button> : <p className="rounded-xl border border-[var(--line)] bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{unavailableMessage ?? t("readOnly")}</p>}
+      {entry && canEdit && onDelete ? (
+        <button type="button" className="mx-auto block min-h-9 text-xs font-light text-[var(--danger)] underline underline-offset-2 disabled:opacity-50" disabled={busy || deleting} onClick={() => void remove()}>
+          {deleting ? tp("deletingEntry") : tp("deleteEntry")}
+        </button>
+      ) : null}
       {item?.dueAt ? <p className="text-center text-xs text-[var(--muted)]">{t("dueAt", { date: f.dateTime(item.dueAt) })}</p> : null}
     </form>
   );
@@ -236,7 +257,9 @@ export function ResultView({
   const solo = challenge.scope === "personal" || challenge.participants.length < 2;
   const hideThinLabel = solo;
   const names = solo ? [] : challenge.participants.map((participant) => participant.name);
-  const headline = result?.headline || (result ? challenge.title : null);
+  // Only a curated/generated headline — never fall back to the challenge title,
+  // which the cover above already shows in full.
+  const headline = result?.headline || null;
   return (
     <div className="space-y-5">
       {headline || result?.summary || names.length ? (
@@ -308,6 +331,7 @@ function ItemEntryPanel({
   canEdit,
   checkpointId,
   onSaveEntry,
+  onDeleteEntry,
 }: {
   challenge: ChallengeDetail;
   item: ChallengeItem;
@@ -325,6 +349,8 @@ function ItemEntryPanel({
   // The session this item is being logged against — "filme X na sessão Y".
   checkpointId?: Id | null;
   onSaveEntry: (itemId: Id | null, values: Record<Id, unknown>, entry?: Entry, occurredOn?: string | null, entryTypeId?: Id, checkpointId?: Id | null) => Promise<void>;
+  // Present only while the round is active and the viewer may remove entries.
+  onDeleteEntry?: (entryId: Id) => Promise<void>;
 }) {
   const t = useTranslations("participant");
   const types = itemEntryTypes(challenge);
@@ -365,6 +391,7 @@ function ItemEntryPanel({
                 type.id || undefined,
                 type.schedulePolicy === "checkpoint" ? checkpointId ?? null : undefined,
               )}
+              onDelete={entry && onDeleteEntry ? () => onDeleteEntry(entry.id) : undefined}
             />
           </div>
         );
@@ -450,81 +477,6 @@ function EntryPicker({
   );
 }
 
-/**
- * "Seus registros" — the participant's own submissions, newest first. Each row
- * can be deleted while the challenge is active; the list refreshes from the
- * server after a delete so metrics and progress stay in sync.
- */
-function HistoryTab({
-  challenge,
-  entries,
-  items,
-  canDelete,
-  onDeleteEntry,
-}: {
-  challenge: ChallengeDetail;
-  entries: Entry[];
-  items: ChallengeItem[];
-  canDelete: boolean;
-  onDeleteEntry?: (entryId: Id) => Promise<void>;
-}) {
-  const t = useTranslations("participant");
-  const tc = useTranslations("common");
-  const f = useGoaFormat();
-  const longDate: Intl.DateTimeFormatOptions = { day: "2-digit", month: "long", year: "numeric" };
-  const [deletingId, setDeletingId] = useState<Id | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const sorted = [...entries].sort((a, b) =>
-    String(b.occurredOn ?? b.submittedAt).localeCompare(String(a.occurredOn ?? a.submittedAt)));
-
-  async function remove(entryId: Id) {
-    if (!onDeleteEntry || !window.confirm(t("deleteEntryConfirm"))) return;
-    setDeletingId(entryId);
-    setError(null);
-    try {
-      await onDeleteEntry(entryId);
-    } catch (cause) {
-      setError(f.error(cause));
-    } finally {
-      setDeletingId(null);
-    }
-  }
-
-  return (
-    <section className={cx(cardClass, "p-5 sm:p-7")}>
-      <PageHeading title={t("historyTitle")} description={t("historySubtitle")} />
-      <div className="mb-4"><StatusMessage error={error} /></div>
-      {sorted.length ? (
-        <ul className="divide-y divide-[var(--line)]">
-          {sorted.map((entry) => {
-            const item = items.find((candidate) => candidate.id === itemIdForEntry(entry));
-            const values = valuesAsRecord(entry.values);
-            const type = challenge.entryTypes.find((candidate) => candidate.id === entry.entryTypeId);
-            const entryFields = type?.fields ?? challenge.fields;
-            return (
-              <li className="py-5" key={entry.id}>
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <strong>{item?.title ?? (challenge.submissionMode === "daily" ? t("dailyCheckIn") : t("freeEntry"))}</strong>
-                    {type && challenge.entryTypes.length > 1 ? <span className="ml-2 rounded-full bg-[var(--wash)] px-2 py-0.5 text-[10px] font-light uppercase text-[var(--muted)]">{type.name}</span> : null}
-                    <p className="mt-1 text-xs text-[var(--muted)]">{entry.occurredOn ? t("occurredOnPrefix", { date: f.date(entry.occurredOn, longDate) }) : ""}{t("savedAt", { date: f.dateTime(entry.submittedAt ?? entry.updatedAt) })}{entry.isLate ? t("lateSuffix") : ""}</p>
-                  </div>
-                  <dl className="grid gap-2 text-sm sm:grid-cols-2">{entryFields.map((field) => field.id && values[field.id] !== undefined ? <div className="rounded-lg bg-[var(--wash)] px-3 py-2" key={field.id}><dt className="text-[10px] font-light uppercase text-[var(--muted)]">{field.label}</dt><dd className="mt-1 font-medium">{typeof values[field.id] === "boolean" ? values[field.id] ? tc("yes") : tc("no") : String(values[field.id])}</dd></div> : null)}</dl>
-                </div>
-                {canDelete && onDeleteEntry ? (
-                  <button type="button" className="mt-3 text-xs font-light text-[var(--danger)] underline underline-offset-2 disabled:opacity-50" disabled={deletingId === entry.id} onClick={() => void remove(entry.id)}>
-                    {deletingId === entry.id ? t("deletingEntry") : t("deleteEntry")}
-                  </button>
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
-      ) : <EmptyState title={t("noHistoryTitle")} description={t("noHistoryBody")} />}
-    </section>
-  );
-}
-
 export function ParticipantChallengeScreen({
   challenge,
   entries,
@@ -547,7 +499,6 @@ export function ParticipantChallengeScreen({
   onDeleteEntry?: (entryId: Id) => Promise<void>;
 }) {
   const t = useTranslations("participant");
-  const tm = useTranslations("metrics");
   const trules = useTranslations("rules");
   const f = useGoaFormat();
   const longDate: Intl.DateTimeFormatOptions = { day: "2-digit", month: "long", year: "numeric" };
@@ -620,16 +571,38 @@ export function ParticipantChallengeScreen({
   const perDayItem = itemForms.some((type) => type.cardinality === "once_per_item_day");
   // A retrospective list (Estante) has no "when" — its entry form skips the date.
   const collectsEntryDate = challenge.collectsEntryDate !== false;
-  const progressHideThin = challenge.scope === "personal" || challenge.participants.length < 2;
   // A daily / per-day round needs a concrete date, so it gets a prominent picker.
   // A plain round instead offers the date among the entry form's optional fields.
   const dateRequired = undatedDaily || (useItemPanel && perDayItem);
-  const tabs: Array<{ id: ParticipantTab }> = [
-    { id: "today" },
-    { id: "history" },
-    { id: "progress" },
-    { id: "results" },
-  ];
+  const canDeleteEntry = challenge.status === "active" ? onDeleteEntry : undefined;
+  const tabs: Array<{ id: ParticipantTab }> = [{ id: "today" }, { id: "results" }];
+
+  // The checkpoint list lives on Results now: tapping a row jumps back to Today
+  // with that item (or session) selected.
+  const checkpointPicker = sessionMode && sortedSessions.length > 1 ? (
+    <EntryPicker
+      title={t("sessionsTitle")}
+      selectedId={null}
+      onSelect={(id) => { setSelectedSessionId(id); onTab("today"); }}
+      options={sortedSessions.map((session) => {
+        const boundItem = sortedItems.find((item) => item.checkpointId === session.id);
+        const soon = session.status === "scheduled";
+        return { id: session.id, label: boundItem?.title ?? session.title, soon, statusLabel: soon ? t("checkpointSoonLabel") : undefined };
+      })}
+    />
+  ) : sortedItems.length > 1 ? (
+    <EntryPicker
+      title={t("checkpointsTitle")}
+      tally={t("checkpointTally", { done: Math.min(doneEntries.length, sortedItems.length), pending: Math.max(0, sortedItems.length - doneEntries.length) })}
+      selectedId={null}
+      onSelect={(id) => { setSelectedItemId(id); onTab("today"); }}
+      options={sortedItems.map((item) => {
+        const done = doneByItem.has(item.id);
+        const soon = item.status === "scheduled" && !entriesByItem.has(item.id);
+        return { id: item.id, label: item.title, done, soon, statusLabel: done ? t("checkpointDoneLabel") : soon ? t("checkpointSoonLabel") : undefined };
+      })}
+    />
+  ) : null;
 
   return (
     <main className="mx-auto max-w-7xl overflow-x-clip px-4 py-6 pb-28 sm:px-6 sm:py-10">
@@ -653,68 +626,37 @@ export function ParticipantChallengeScreen({
 
       <div className="mt-5">
         {tab === "today" ? (
-          <div className="grid gap-5 lg:grid-cols-[minmax(0,1.45fr)_minmax(290px,0.65fr)]">
-            <section className={cx(cardClass, "min-w-0 p-5 sm:p-7")}>
-              {challenge.status === "closed" ? <EmptyState title={t("closedTitle")} description={t("closedBody")} action={<Button onClick={() => onTab("results")}>{t("seeResults")}</Button>} /> : challenge.submissionMode !== "free" && !selectedItem && !undatedDaily ? <EmptyState title={t("noCheckpointTitle")} description={t("noCheckpointBody")} /> : (
-                <>
-                  <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <h2 className="mt-2 text-2xl font-light tracking-[-0.04em]">
-                        {selectedItem?.title ?? (undatedDaily ? t("checkInOf", { date: f.date(effectiveOccurredOn, longDate) }) : t("newEntry"))}
-                      </h2>
-                      {selectedItem?.description ? <p className="mt-1 text-sm text-[var(--muted)]">{selectedItem.description}</p> : null}
-                      {selectedItem?.recommendedBy || selectedItem?.catalogItem?.author || selectedItem?.catalogItem?.year || selectedItem?.catalogItem?.mainGenre ? <p className="mt-1 text-xs text-[var(--muted)]">{[selectedItem.catalogItem?.author ? t("byAuthor", { name: selectedItem.catalogItem.author }) : null, selectedItem.recommendedBy ? t("recommendedBy", { name: selectedItem.recommendedBy.name }) : null, selectedItem.catalogItem?.year ? String(selectedItem.catalogItem.year) : null, selectedItem.catalogItem?.mainGenre || null].filter(Boolean).join(" · ")}</p> : null}</div>{selectedItem?.dueAt ? <span className="rounded-full bg-[var(--wash)] px-3 py-2 text-xs font-medium text-[var(--muted)]">{t("dueBy", { date: f.dateTime(selectedItem.dueAt) })}</span> : null}</div>
-                  {dateRequired ? <label className="mb-5 block"><span className={labelClass}>{t("occurredOnLabel")}</span><input className={inputClass} type="date" max={today} value={effectiveOccurredOn} disabled={Boolean(unavailableMessage)} onChange={(event) => setOccurredOn(event.target.value || today)} /><small className="mt-1 block text-[var(--muted)]">{t("occurredOnHint")}</small></label> : !useItemPanel && currentEntry?.occurredOn ? <p className="mb-5 text-xs text-[var(--muted)]">{t("occurredOn", { date: f.date(currentEntry.occurredOn, longDate) })}</p> : null}
-                  {useItemPanel && selectedItem ? (
-                    <ItemEntryPanel key={`${selectedItem.id}-${selectedSession?.id ?? "no-session"}`} challenge={challenge} item={selectedItem} ownEntries={ownEntries} occurredOn={occurredOn} onOccurredOnChange={setOccurredOn} offerOptionalDate={!perDayItem && !sessionMode && collectsEntryDate} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} checkpointId={selectedSession?.id ?? null} onSaveEntry={onSaveEntry} />
-                  ) : (
-                    <DynamicEntryForm key={`${selectedItem?.id ?? "free"}-${undatedDaily ? effectiveOccurredOn : "fixed"}-${currentEntry?.id ?? "new"}`} fields={challenge.fields} item={selectedItem ?? null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry(selectedItem?.id ?? null, values, entry, undatedDaily ? effectiveOccurredOn : undefined)} />
-                  )}
-                </>
-              )}
-            </section>
-            <aside className="min-w-0 space-y-5">
-              {sessionMode && sortedSessions.length > 1 ? (
-                <EntryPicker
-                  title={t("sessionsTitle")}
-                  selectedId={selectedSession?.id ?? null}
-                  onSelect={(id) => setSelectedSessionId(id)}
-                  options={sortedSessions.map((session) => {
-                    const boundItem = sortedItems.find((item) => item.checkpointId === session.id);
-                    const soon = session.status === "scheduled";
-                    return { id: session.id, label: boundItem?.title ?? session.title, soon, statusLabel: soon ? t("checkpointSoonLabel") : undefined };
-                  })}
-                />
-              ) : sortedItems.length > 1 ? (
-                <EntryPicker
-                  title={t("checkpointsTitle")}
-                  tally={t("checkpointTally", { done: Math.min(doneEntries.length, sortedItems.length), pending: Math.max(0, sortedItems.length - doneEntries.length) })}
-                  selectedId={selectedItem?.id ?? null}
-                  onSelect={(id) => setSelectedItemId(id)}
-                  options={sortedItems.map((item) => {
-                    const done = doneByItem.has(item.id);
-                    const soon = item.status === "scheduled" && !entriesByItem.has(item.id);
-                    return { id: item.id, label: item.title, done, soon, statusLabel: done ? t("checkpointDoneLabel") : soon ? t("checkpointSoonLabel") : undefined };
-                  })}
-                />
-              ) : null}
-            </aside>
+          <section className={cx(cardClass, "mx-auto min-w-0 max-w-3xl p-5 sm:p-7")}>
+            {challenge.status === "closed" ? <EmptyState title={t("closedTitle")} description={t("closedBody")} action={<Button onClick={() => onTab("results")}>{t("seeResults")}</Button>} /> : challenge.submissionMode !== "free" && !selectedItem && !undatedDaily ? <EmptyState title={t("noCheckpointTitle")} description={t("noCheckpointBody")} /> : (
+              <>
+                <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h2 className="mt-2 text-2xl font-light tracking-[-0.04em]">
+                      {selectedItem?.title ?? (undatedDaily ? t("checkInOf", { date: f.date(effectiveOccurredOn, longDate) }) : t("newEntry"))}
+                    </h2>
+                    {selectedItem?.description ? <p className="mt-1 text-sm text-[var(--muted)]">{selectedItem.description}</p> : null}
+                    {selectedItem?.recommendedBy || selectedItem?.catalogItem?.author || selectedItem?.catalogItem?.year || selectedItem?.catalogItem?.mainGenre ? <p className="mt-1 text-xs text-[var(--muted)]">{[selectedItem.catalogItem?.author ? t("byAuthor", { name: selectedItem.catalogItem.author }) : null, selectedItem.recommendedBy ? t("recommendedBy", { name: selectedItem.recommendedBy.name }) : null, selectedItem.catalogItem?.year ? String(selectedItem.catalogItem.year) : null, selectedItem.catalogItem?.mainGenre || null].filter(Boolean).join(" · ")}</p> : null}</div>{selectedItem?.dueAt ? <span className="rounded-full bg-[var(--wash)] px-3 py-2 text-xs font-medium text-[var(--muted)]">{t("dueBy", { date: f.dateTime(selectedItem.dueAt) })}</span> : null}</div>
+                {dateRequired ? <label className="mb-5 block"><span className={labelClass}>{t("occurredOnLabel")}</span><input className={inputClass} type="date" max={today} value={effectiveOccurredOn} disabled={Boolean(unavailableMessage)} onChange={(event) => setOccurredOn(event.target.value || today)} /><small className="mt-1 block text-[var(--muted)]">{t("occurredOnHint")}</small></label> : !useItemPanel && currentEntry?.occurredOn ? <p className="mb-5 text-xs text-[var(--muted)]">{t("occurredOn", { date: f.date(currentEntry.occurredOn, longDate) })}</p> : null}
+                {useItemPanel && selectedItem ? (
+                  <ItemEntryPanel key={`${selectedItem.id}-${selectedSession?.id ?? "no-session"}`} challenge={challenge} item={selectedItem} ownEntries={ownEntries} occurredOn={occurredOn} onOccurredOnChange={setOccurredOn} offerOptionalDate={!perDayItem && !sessionMode && collectsEntryDate} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} checkpointId={selectedSession?.id ?? null} onSaveEntry={onSaveEntry} onDeleteEntry={canDeleteEntry} />
+                ) : (
+                  <DynamicEntryForm key={`${selectedItem?.id ?? "free"}-${undatedDaily ? effectiveOccurredOn : "fixed"}-${currentEntry?.id ?? "new"}`} fields={challenge.fields} item={selectedItem ?? null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry(selectedItem?.id ?? null, values, entry, undatedDaily ? effectiveOccurredOn : undefined)} onDelete={currentEntry && canDeleteEntry ? () => canDeleteEntry(currentEntry.id) : undefined} />
+                )}
+              </>
+            )}
+          </section>
+        ) : null}
+
+        {tab === "results" ? (
+          <div className="space-y-5">
+            {checkpointPicker}
+            <ResultView challenge={challenge} onBackToEntry={() => onTab("today")} />
           </div>
         ) : null}
-
-        {tab === "history" ? (
-          <HistoryTab challenge={challenge} entries={ownEntries} items={sortedItems} canDelete={challenge.status === "active"} onDeleteEntry={onDeleteEntry} />
-        ) : null}
-
-        {tab === "progress" ? (
-          <section><PageHeading title={t("progressTitle")} description={t("progressSubtitle")} />{challenge.metrics.filter((metric) => metric.visibleDuring).length ? <div className="space-y-3"><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{challenge.metrics.filter((metric) => metric.visibleDuring && !metric.series?.length).map((metric) => <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} hideThinLabel={progressHideThin} />)}</div>{challenge.metrics.filter((metric) => metric.visibleDuring && metric.series?.length).map((metric) => <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} hideThinLabel={progressHideThin} />)}</div> : <EmptyState title={t("noProgressTitle")} description={t("noProgressBody")} />}</section>
-        ) : null}
-
-        {tab === "results" ? <ResultView challenge={challenge} onBackToEntry={() => onTab("today")} /> : null}
       </div>
 
-      <nav className="safe-area-bottom fixed inset-x-0 bottom-0 z-40 grid h-[72px] grid-cols-4 border-t border-[var(--line)] bg-[var(--paper)]/95 px-2 backdrop-blur-xl sm:hidden" aria-label={t("navMobileAria")}>
-        {tabs.map((item) => <button className={cx("flex min-h-12 flex-col items-center justify-center gap-1 text-[10px] font-light", tab === item.id ? "text-[var(--main-strong)]" : "text-[var(--muted)]")} type="button" onClick={() => onTab(item.id)} key={item.id}><span className="text-base" aria-hidden="true">{item.id === "today" ? "◉" : item.id === "history" ? "֎" : item.id === "progress" ? "◎" : "〇"}</span>{t(`tabs.${item.id}`)}</button>)}
+      <nav className="safe-area-bottom fixed inset-x-0 bottom-0 z-40 grid h-[72px] grid-cols-2 border-t border-[var(--line)] bg-[var(--paper)]/95 px-2 backdrop-blur-xl sm:hidden" aria-label={t("navMobileAria")}>
+        {tabs.map((item) => <button className={cx("flex min-h-12 flex-col items-center justify-center gap-1 text-[10px] font-light", tab === item.id ? "text-[var(--main-strong)]" : "text-[var(--muted)]")} type="button" onClick={() => onTab(item.id)} key={item.id}><span className="text-base" aria-hidden="true">{item.id === "today" ? "◉" : "〇"}</span>{t(`tabs.${item.id}`)}</button>)}
       </nav>
     </main>
   );

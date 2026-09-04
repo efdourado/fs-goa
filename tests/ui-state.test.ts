@@ -160,8 +160,23 @@ test("aba Resultados ao vivo: sem herói repetido, sem pílulas de nome, sem 'sm
   assert.match(html, /Ranking dos livros/);
   assert.match(html, /Pedro Páramo/);
   assert.doesNotMatch(html, /var\(--spotlight\)/, "não repete o herói da capa");
+  assert.doesNotMatch(html, /Minha estante/, "não repete o título do desafio (a capa acima já mostra)");
   assert.doesNotMatch(html, /Manuel/, "num desafio solo não lista o próprio nome");
   assert.doesNotMatch(html, /small sample/i, "linha fina de um solo mostra o valor, não o rótulo");
+});
+
+test("aba Resultados: um resultado sem manchete curada não cai de volta no título", () => {
+  const challenge = {
+    title: "Retrospectiva 2026",
+    scope: "group",
+    participants: [{ id: "u1", userId: "u1", name: "Ana", username: "ana" }, { id: "u2", userId: "u2", name: "Bruno", username: "bruno" }],
+    result: { headline: "", summary: "Fechamos o ano.", metrics: [], comments: [] },
+    metrics: [{ id: "m1", label: "Nota média", operation: "average", value: 4, formattedValue: "4", visibleInResults: true }],
+  } as unknown as ChallengeDetail;
+
+  const html = renderWithIntl(createElement(ResultView, { challenge }));
+  assert.match(html, /Fechamos o ano\./);
+  assert.doesNotMatch(html, /Retrospectiva 2026/, "sem headline curada, não mostra o título");
 });
 
 test("aba Resultados sem números ainda oferece um caminho de volta ao registro", () => {
