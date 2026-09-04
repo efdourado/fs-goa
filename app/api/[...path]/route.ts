@@ -89,6 +89,7 @@ import {
   previewInvite,
   requestGroupMember,
   respondToMemberRequest,
+  setGroupMemberRole,
   softDeleteGroup,
   updateGroup,
 } from "@/lib/goa-domain";
@@ -312,6 +313,9 @@ export async function PATCH(request: Request): Promise<Response> {
     }
     if (path[0] === "groups" && path.length === 2) {
       return json(await updateGroup(session, path[1], body));
+    }
+    if (path[0] === "groups" && path[2] === "members" && path.length === 4) {
+      return json(await setGroupMemberRole(session, path[1], path[3], body));
     }
     if (path[0] === "challenges" && path[2] === "items" && path.length === 4) {
       return json(await updateChallengeItem(session, path[1], path[3], body));

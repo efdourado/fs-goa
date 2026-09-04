@@ -393,6 +393,56 @@ export async function leaveGroup(session: SessionContext, groupId: string) {
   });
 }
 
+/**
+ * Owner-only: promotes an existing participant to admin, or demotes an admin
+ * back to participant. A group can have any number of admins — the schema
+ * only ever enforced a single active *owner*. The owner's own role and the
+ * departed-member "removed" state are both off-limits here; use `leaveGroup`
+ * or account deletion for those.
+ */
+export async function setGroupMemberRole(
+  session: SessionContext,
+  groupId: string,
+  memberUserId: string,
+  body: Record<string, unknown>,
+) {
+  const role = body.role === "admin" ? "admin" : body.role === "participant" ? "participant" : null;
+  if (!role) throw new ApiError(400, "invalid_role", "Escolha admin ou participante.");
+  return inTransaction(async (client) => {
+    await requireGroupRole(session.user.id, groupId, ["owner"], client);
+    if (memberUserId === session.user.id) {
+      throw new ApiError(400, "cannot_change_self", "Você não pode mudar seu próprio papel por aqui.");
+    }
+    const member = await oneOrNull<{ role: GroupRole }>(
+      client,
+      `SELECT role FROM group_members WHERE group_id = $1 AND user_id = $2 AND removed_at IS NULL FOR UPDATE`,
+      [groupId, memberUserId],
+    );
+    if (!member) throw new ApiError(404, "not_found", "Pessoa não encontrada no grupo.");
+    if (member.role === "owner") {
+      throw new ApiError(400, "cannot_change_owner", "O responsável não muda de papel por aqui.");
+    }
+    if (member.role !== role) {
+      await client.query(
+        "UPDATE group_members SET role = $3 WHERE group_id = $1 AND user_id = $2",
+        [groupId, memberUserId, role],
+      );
+      await writeAudit(
+        client,
+        groupId,
+        null,
+        session.user.id,
+        "group.member_role_changed",
+        "group_member",
+        memberUserId,
+        { role: member.role },
+        { role },
+      );
+    }
+    return { groupId, userId: memberUserId, role };
+  });
+}
+
 /** A group admin withdraws a directed invitation before the invitee answers. */
 export async function cancelMemberRequest(session: SessionContext, requestId: string) {
   return inTransaction(async (client) => {

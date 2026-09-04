@@ -318,6 +318,8 @@
     "catalogKindFilm": "Films",
     "catalogKindBook": "Books",
     "peopleTitle": "People",
+    "makeAdmin": "Make admin",
+    "makeParticipant": "Make participant",
     "membersUnavailable": "The member list will appear once the bootstrap provides it.",
     "pendingInvitesTitle": "Invitations awaiting a reply",
     "pendingInviteMeta": "@{username} · invited on {date}",
@@ -967,7 +969,7 @@
     "changingPassword": "Changing…",
     "changePassword": "Change password",
     "dangerTitle": "Danger!",
-    "deleteBody": "Deleting your account disables access and removes your personal data. Groups where you're the only person go to the bin. If you own a group with other people, transfer or delete that group first.",
+    "deleteBody": "Deleting your account disables access and removes your personal data. Groups where you're the only person go to the bin. A group with other people in it never gets stuck on you — ownership passes automatically to its oldest admin, or its oldest member if it has no other admin.",
     "deleteConfirm": "Delete your account? Access ends and your personal data is removed.",
     "deleteAccount": "Delete my account",
     "deleting": "Deleting…"

@@ -394,10 +394,36 @@ export async function updateAccount(
 }
 
 /**
- * Self-service account removal. Blocked while the person still owns a group that
- * has other active members (ownership transfer isn't a feature yet — they must
- * hand off or delete those groups first). Solo-owned groups are soft-deleted.
- * The account row is kept but scrubbed of PII and disabled; a hard purge is an
+ * Finds who inherits a group when its sole owner leaves: the longest-tenured
+ * active admin, or — if there is none — the longest-tenured active
+ * participant (who becomes owner directly; there is no separate "promote to
+ * admin first" step). Only called for a group that `other_members > 0`
+ * already guaranteed has someone else to hand it to.
+ */
+async function findOwnershipSuccessor(
+  client: PoolClient,
+  groupId: string,
+  departingUserId: string,
+): Promise<string> {
+  const successor = await oneOrNull<{ user_id: string }>(
+    client,
+    `SELECT user_id FROM group_members
+      WHERE group_id = $1 AND removed_at IS NULL AND user_id <> $2
+      ORDER BY (role = 'admin') DESC, joined_at ASC
+      LIMIT 1`,
+    [groupId, departingUserId],
+  );
+  if (!successor) throw new ApiError(500, "internal_error", "Não foi possível encontrar quem herda o grupo.");
+  return successor.user_id;
+}
+
+/**
+ * Self-service account removal. A solo-owned group is soft-deleted along with
+ * the account — nobody else depended on it. A group with other active people
+ * never gets destroyed or blocked on manual cleanup: ownership transfers
+ * automatically (oldest admin, or oldest member if there is no other admin) —
+ * no question asked, same "it just happens" rule as leaving a group. The
+ * account row is kept but scrubbed of PII and disabled; a hard purge is an
  * `/admin` follow-up.
  */
 export async function deleteOwnAccount(session: SessionContext): Promise<{ setCookie: string }> {
@@ -415,27 +441,36 @@ export async function deleteOwnAccount(session: SessionContext): Promise<{ setCo
       [session.user.id],
     );
 
-    const shared = ownedGroups.rows.filter((group) => group.other_members > 0);
-    if (shared.length) {
-      throw new ApiError(
-        409,
-        "owns_groups",
-        `Transfira ou apague os grupos onde você é responsável antes de apagar a conta: ${shared
-          .map((group) => group.name)
-          .join(", ")}.`,
-      );
-    }
-
     for (const group of ownedGroups.rows) {
+      if (group.other_members === 0) {
+        await client.query(
+          `UPDATE groups SET deleted_at = now(), deleted_by_user_id = $2, updated_at = now() WHERE id = $1`,
+          [group.id, session.user.id],
+        );
+        await client.query(
+          `INSERT INTO audit_events
+            (id, group_id, challenge_id, actor_user_id, action, entity_type, entity_id, before, after, metadata, created_at)
+           VALUES ($1,$2,NULL,$3,'group.deleted','group',$2,$4::jsonb,NULL,'{"reason":"account_deleted"}'::jsonb,now())`,
+          [crypto.randomUUID(), group.id, session.user.id, JSON.stringify({ name: group.name })],
+        );
+        continue;
+      }
+
+      // Demote the departing owner first — otherwise promoting the successor
+      // to 'owner' while this row still holds that role would momentarily
+      // give the group two active owners, which the unique index refuses.
+      const successorId = await findOwnershipSuccessor(client, group.id, session.user.id);
       await client.query(
-        `UPDATE groups SET deleted_at = now(), deleted_by_user_id = $2, updated_at = now() WHERE id = $1`,
+        "UPDATE group_members SET role = 'participant' WHERE group_id = $1 AND user_id = $2 AND removed_at IS NULL",
         [group.id, session.user.id],
       );
+      await client.query("UPDATE group_members SET role = 'owner' WHERE group_id = $1 AND user_id = $2", [group.id, successorId]);
+      await client.query("UPDATE groups SET owner_user_id = $2, updated_at = now() WHERE id = $1", [group.id, successorId]);
       await client.query(
         `INSERT INTO audit_events
           (id, group_id, challenge_id, actor_user_id, action, entity_type, entity_id, before, after, metadata, created_at)
-         VALUES ($1,$2,NULL,$3,'group.deleted','group',$2,$4::jsonb,NULL,'{"reason":"account_deleted"}'::jsonb,now())`,
-        [crypto.randomUUID(), group.id, session.user.id, JSON.stringify({ name: group.name })],
+         VALUES ($1,$2,NULL,$3,'group.ownership_transferred','group',$2,$4::jsonb,$5::jsonb,'{"reason":"account_deleted"}'::jsonb,now())`,
+        [crypto.randomUUID(), group.id, session.user.id, JSON.stringify({ ownerUserId: session.user.id }), JSON.stringify({ ownerUserId: successorId })],
       );
     }
 

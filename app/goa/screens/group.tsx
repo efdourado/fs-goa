@@ -6,7 +6,7 @@ import { type FormEvent, useEffect, useRef, useState } from "react";
 import { API_PATHS, apiRequest } from "../api";
 import { copyText } from "../clipboard";
 import { useGoaFormat } from "../format";
-import type { CatalogItem, ChallengeSummary, GroupInviteResult, GroupSummary, Id, PendingGroupRequest } from "../types";
+import type { CatalogItem, ChallengeSummary, GroupInviteResult, GroupSummary, Id, Member, PendingGroupRequest } from "../types";
 import { Segmented } from "../Segmented";
 import { backLinkClass, Button, cardClass, challengeStatusTone, ChallengeStatusBadge, cx, EmptyState, inputClass, labelClass, linkClass, PageHeading, StatusMessage } from "../ui";
 import { canManage, isChallengeScheduled } from "../utils";
@@ -28,6 +28,7 @@ export function GroupScreen({
   onUpdateGroup,
   onDeleteGroup,
   onLeaveGroup,
+  onSetMemberRole,
   challengeLimit,
 }: {
   group: GroupSummary;
@@ -45,6 +46,8 @@ export function GroupScreen({
   onDeleteGroup?: () => Promise<void>;
   /** Present for non-owners: leave the group. */
   onLeaveGroup?: () => Promise<void>;
+  /** Present for owners: promote a participant to admin or demote an admin back. */
+  onSetMemberRole?: (userId: Id, role: "admin" | "participant") => Promise<void>;
 }) {
   const t = useTranslations("group");
   const tc = useTranslations("common");
@@ -95,7 +98,23 @@ export function GroupScreen({
   const [groupSuccess, setGroupSuccess] = useState<string | null>(null);
   const [leaveBusy, setLeaveBusy] = useState(false);
   const [leaveError, setLeaveError] = useState<string | null>(null);
+  const [roleBusyId, setRoleBusyId] = useState<Id | null>(null);
+  const [roleError, setRoleError] = useState<string | null>(null);
   const memberCount = group.memberCount ?? group.members?.length ?? 0;
+
+  async function toggleRole(member: Member) {
+    if (!onSetMemberRole) return;
+    const nextRole = member.role === "admin" ? "participant" : "admin";
+    setRoleBusyId(member.id);
+    setRoleError(null);
+    try {
+      await onSetMemberRole(member.id, nextRole);
+    } catch (cause) {
+      setRoleError(f.error(cause));
+    } finally {
+      setRoleBusyId(null);
+    }
+  }
 
   async function leave() {
     if (!onLeaveGroup) return;
@@ -416,11 +435,23 @@ export function GroupScreen({
                       <small className="text-[var(--muted)]">@{member.username}</small>
                     </span>
                   </div>
-                  <span className="rounded-full bg-[var(--wash)] px-2 py-1 text-[10px] font-light uppercase">{tr(member.role)}</span>
+                  {onSetMemberRole && group.role === "owner" && member.role !== "owner" ? (
+                    <button
+                      type="button"
+                      className="min-h-8 rounded-full border border-[var(--line)] px-3 py-1 text-[10px] font-light uppercase tracking-[0.05em] transition hover:border-[var(--main-line)] disabled:opacity-50"
+                      disabled={roleBusyId === member.id}
+                      onClick={() => void toggleRole(member)}
+                    >
+                      {roleBusyId === member.id ? tc("saving") : member.role === "admin" ? t("makeParticipant") : t("makeAdmin")}
+                    </button>
+                  ) : (
+                    <span className="rounded-full bg-[var(--wash)] px-2 py-1 text-[10px] font-light uppercase">{tr(member.role)}</span>
+                  )}
                 </li>
               )}
             </ul>
           ) : <p className="mt-3 text-sm leading-6 text-[var(--muted)]">{t("membersUnavailable")}</p>}
+          {onSetMemberRole && group.role === "owner" ? <div className="mt-2"><StatusMessage error={roleError} /></div> : null}
 
           {canManage(group.role) && pendingRequests.length ? (
             <div className="mt-5 border-t border-[var(--line)] pt-4">

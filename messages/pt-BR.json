@@ -318,6 +318,8 @@
     "catalogKindFilm": "Filmes",
     "catalogKindBook": "Livros",
     "peopleTitle": "Pessoas",
+    "makeAdmin": "Tornar admin",
+    "makeParticipant": "Tornar participante",
     "membersUnavailable": "A lista de membros aparecerá quando o bootstrap a disponibilizar.",
     "pendingInvitesTitle": "Convites aguardando resposta",
     "pendingInviteMeta": "@{username} · convidado em {date}",
@@ -967,7 +969,7 @@
     "changingPassword": "Alterando…",
     "changePassword": "Alterar senha",
     "dangerTitle": "Perigo!",
-    "deleteBody": "Apagar a conta desativa o acesso e remove seus dados pessoais. Grupos onde você é a única pessoa vão para a lixeira. Se você é responsável por um grupo com outras pessoas, transfira ou apague esse grupo antes.",
+    "deleteBody": "Apagar a conta desativa o acesso e remove seus dados pessoais. Grupos onde você é a única pessoa vão para a lixeira. Um grupo com outras pessoas nunca fica travado em você — a posse passa automaticamente para o admin mais antigo ou, se não houver outro admin, para o membro mais antigo.",
     "deleteConfirm": "Apagar sua conta? O acesso é encerrado e os dados pessoais são removidos.",
     "deleteAccount": "Apagar minha conta",
     "deleting": "Apagando…"
