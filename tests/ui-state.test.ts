@@ -163,6 +163,19 @@ test("uma resposta já salva vira um único cartão clicável — sem botão de 
   assert.match(answered, /<button[^>]*>[\s\S]*Nota[\s\S]*4,5[\s\S]*<\/button>/, "os valores ficam dentro de um único botão clicável");
 });
 
+test("limpar a nota não marca a nota 0 por engano (Number(null) e Number('') são 0 em JS)", () => {
+  const cleared = renderWithIntl(createElement(DynamicEntryForm, {
+    fields: [{ id: "f1", key: "nota", label: "Nota", type: "rating", required: true, config: { min: 0, max: 5, step: 1 } }],
+    item: null,
+    entry: { id: "e1", values: { f1: null } },
+    canEdit: true,
+    alwaysEditable: true,
+    onSave: async () => undefined,
+  }));
+  assert.match(cleared, /aria-pressed="false" aria-label="Nota 0"/, "a nota 0 não aparece marcada quando o valor está vazio");
+  assert.doesNotMatch(cleared, /aria-pressed="true"/, "nenhuma nota fica marcada com o campo vazio");
+});
+
 test("sem botão de excluir: o rótulo 'Excluir registro' não aparece mais em lugar nenhum do formulário", () => {
   // `alwaysEditable` força a exibir o formulário (em vez do resumo) sem
   // precisar simular um clique — é o mesmo modo que a correção do admin usa,
