@@ -241,6 +241,8 @@ export interface ChallengeSummary {
   startsOn?: string | null;
   endsOn?: string | null;
   status: ChallengeStatus;
+  /** `list` is a first-class category (see `isLivingList`), decided once at creation. */
+  kind?: "round" | "list";
   template?: Template | null;
   recipeKey?: RecipeKey | null;
   resultsAnon?: boolean;

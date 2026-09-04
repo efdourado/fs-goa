@@ -127,6 +127,7 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
       title: string;
       description: string | null;
       status: ChallengeStatus;
+      challenge_kind: "round" | "list";
       start_date: string | null;
       end_date: string | null;
       role: GroupRole;
@@ -136,7 +137,7 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
       submission_mode: "item" | "daily" | "free" | null;
       group_kind: "standard" | "personal";
     }>(
-      `SELECT c.id, c.group_id, c.title, c.description, c.status,
+      `SELECT c.id, c.group_id, c.title, c.description, c.status, c.kind AS challenge_kind,
               c.start_date::text AS start_date, c.end_date::text AS end_date,
               g.kind AS group_kind,
               gm.role,
@@ -215,6 +216,7 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
         title: challenge.title,
         description: challenge.description,
         status: challenge.status,
+        kind: challenge.challenge_kind,
         startsOn: challenge.start_date,
         endsOn: challenge.end_date,
         submissionMode: challenge.submission_mode ?? undefined,

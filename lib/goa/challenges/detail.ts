@@ -158,6 +158,7 @@ export async function getChallengeDetail(session: SessionContext, challengeId: s
       startsOn: access.challenge.start_date,
       endsOn: access.challenge.end_date,
       status: access.challenge.status,
+      kind: access.challenge.kind,
       recipeKey: access.challenge.recipe_key ?? null,
       scope: access.challenge.group_kind === "personal" ? "personal" : "group",
       collectsEntryDate: recipeCollectsEntryDate(access.challenge.recipe_key),

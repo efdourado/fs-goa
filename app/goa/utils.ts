@@ -134,16 +134,20 @@ export function isChallengeScheduled(
 }
 
 /**
- * A personal challenge with no start/end is a living list ("films I've seen") —
- * it is born active and never closes, so the whole draft/activate/close lifecycle
- * (and its UI) is hidden. A closed legacy one keeps the lifecycle so it can reopen.
+ * A living list ("films I've seen") is `challenges.kind === "list"` — a real
+ * category decided once at creation (personal + no start/end), not a condition
+ * re-derived from today's dates. It is born active and never closes, so the
+ * whole draft/activate/close lifecycle (and its UI) is hidden. Falls back to the
+ * old derivation for any payload that predates the `kind` column.
  */
 export function isLivingList(challenge: {
+  kind?: "round" | "list";
   scope?: "personal" | "group";
   startsOn?: string | null;
   endsOn?: string | null;
   status: ChallengeStatus;
 }): boolean {
+  if (challenge.kind) return challenge.kind === "list";
   return challenge.scope === "personal"
     && !challenge.startsOn
     && !challenge.endsOn
