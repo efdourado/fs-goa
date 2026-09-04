@@ -38,6 +38,11 @@ export const API_PATHS = {
   personalCatalog: "/api/personal/catalog",
   personalCatalogItem: (itemId: Id) => `/api/personal/catalog/${encodeURIComponent(itemId)}`,
   catalogItem: (itemId: Id) => `/api/catalog/${encodeURIComponent(itemId)}`,
+  groupCatalogAttributes: (groupId: Id) => `/api/groups/${encodeURIComponent(groupId)}/catalog-attributes`,
+  groupCatalogAttribute: (groupId: Id, attributeId: Id) =>
+    `/api/groups/${encodeURIComponent(groupId)}/catalog-attributes/${encodeURIComponent(attributeId)}`,
+  personalCatalogAttributes: "/api/personal/catalog-attributes",
+  personalCatalogAttribute: (attributeId: Id) => `/api/personal/catalog-attributes/${encodeURIComponent(attributeId)}`,
   groupMembers: (groupId: Id) => `/api/groups/${encodeURIComponent(groupId)}/members`,
   groupLeave: (groupId: Id) => `/api/groups/${encodeURIComponent(groupId)}/leave`,
   groupInvites: (groupId: Id) => `/api/groups/${encodeURIComponent(groupId)}/invites`,

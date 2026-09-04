@@ -3,6 +3,7 @@ import type { PoolClient } from "pg";
 import { requireGroupRole, type SessionContext } from "../auth";
 import { inTransaction, oneOrNull, withClient } from "../db";
 import { ApiError, stringValue } from "../http";
+import { attributeValuesForItems, setCatalogItemAttributeValues } from "./catalog-attributes";
 import { writeAudit } from "./domain/audit";
 import { publicId } from "./domain/shared";
 
@@ -75,7 +76,7 @@ export async function upsertCatalogItem(
   client: PoolClient,
   groupId: string,
   userId: string,
-  input: { kind: CatalogKind; title: string } & CatalogAttributes,
+  input: { kind: CatalogKind; title: string; attributes?: unknown } & CatalogAttributes,
 ): Promise<string> {
   const title = input.title.trim();
   if (title.length < 1 || title.length > 300) {
@@ -133,6 +134,7 @@ export async function upsertCatalogItem(
     if (sets.length) {
       await client.query(`UPDATE catalog_items SET ${sets.join(", ")}, updated_at = now() WHERE id = $1`, params);
     }
+    if (input.attributes) await setCatalogItemAttributeValues(client, existing.id, groupId, input.kind, input.attributes);
     return existing.id;
   }
 
@@ -143,6 +145,7 @@ export async function upsertCatalogItem(
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now(),now())`,
     [id, groupId, input.kind, title, normalized, attributes.author, attributes.year, attributes.mainGenre, attributes.pageCount, userId],
   );
+  if (input.attributes) await setCatalogItemAttributeValues(client, id, groupId, input.kind, input.attributes);
   return id;
 }
 
@@ -195,6 +198,7 @@ async function listCatalogWithClient(client: PoolClient, workspaceId: string) {
         ORDER BY ci.title`,
     [workspaceId],
   );
+  const attributesByItem = await attributeValuesForItems(client, items.rows.map((item) => item.id));
   return {
     items: items.rows.map((item) => ({
       id: item.id,
@@ -207,6 +211,7 @@ async function listCatalogWithClient(client: PoolClient, workspaceId: string) {
       roundCount: item.round_count,
       ratingAvg: item.rating_avg === null ? null : Number(item.rating_avg.toFixed(2)),
       ratingCount: item.rating_count,
+      attributes: attributesByItem.get(item.id) ?? [],
     })),
   };
 }
@@ -261,6 +266,7 @@ async function catalogItemDetailWithClient(
     [catalogItemId, workspaceId],
   );
 
+  const attributes = (await attributeValuesForItems(client, [item.id])).get(item.id) ?? [];
   return {
     id: item.id,
     kind: item.kind,
@@ -269,6 +275,7 @@ async function catalogItemDetailWithClient(
     year: item.year,
     mainGenre: item.main_genre,
     pageCount: item.page_count,
+    attributes,
     rounds: rounds.rows.map((round) => ({
       challengeId: round.challenge_id,
       title: round.title,
@@ -350,6 +357,7 @@ export async function applyCatalogItemUpdate(
   catalogItemId: string,
   groupId: string,
   body: Record<string, unknown>,
+  kind?: CatalogKind,
 ): Promise<void> {
   const title = body.title === undefined ? undefined : stringValue(body, "title", { min: 1, max: 300 })!;
   const attributes = readAttributes(body as CatalogAttributes);
@@ -376,6 +384,7 @@ export async function applyCatalogItemUpdate(
       params,
     );
   }
+  if (kind && body.attributes) await setCatalogItemAttributeValues(client, catalogItemId, groupId, kind, body.attributes);
 }
 
 export async function updateCatalogItem(
@@ -403,7 +412,7 @@ export async function updateCatalogItem(
     } else {
       await requireGroupRole(session.user.id, item.group_id, ["owner", "admin"], client);
     }
-    await applyCatalogItemUpdate(client, catalogItemId, item.group_id, body);
+    await applyCatalogItemUpdate(client, catalogItemId, item.group_id, body, item.kind);
     return { id: catalogItemId };
   });
 }
@@ -416,14 +425,14 @@ export async function updatePersonalCatalogItem(
   return inTransaction(async (client) => {
     const workspaceId = await personalWorkspaceId(client, session.user.id);
     if (!workspaceId) throw new ApiError(404, "not_found", "Item do acervo não encontrado.");
-    const item = await oneOrNull<{ id: string }>(
+    const item = await oneOrNull<{ id: string; kind: CatalogKind }>(
       client,
-      `SELECT id FROM catalog_items
+      `SELECT id, kind FROM catalog_items
         WHERE id = $1 AND group_id = $2 AND archived_at IS NULL FOR UPDATE`,
       [catalogItemId, workspaceId],
     );
     if (!item) throw new ApiError(404, "not_found", "Item do acervo não encontrado.");
-    await applyCatalogItemUpdate(client, catalogItemId, workspaceId, body);
+    await applyCatalogItemUpdate(client, catalogItemId, workspaceId, body, item.kind);
     return { id: catalogItemId };
   });
 }

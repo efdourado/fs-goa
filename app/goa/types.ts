@@ -86,6 +86,23 @@ export interface ChallengeField {
   config?: FieldConfig;
 }
 
+/** A group- or personal-workspace-defined catalog column ("diretor" on films…). */
+export interface CatalogAttributeDef {
+  id: Id;
+  kind: "film" | "book" | "other";
+  key: string;
+  label: string;
+  type: "text" | "number" | "date" | "boolean";
+  position: number;
+}
+
+export interface CatalogAttributeValue {
+  key: string;
+  label: string;
+  type: "text" | "number" | "date" | "boolean";
+  value: string | number | boolean;
+}
+
 export interface CatalogItem {
   id: Id;
   kind: "film" | "book" | "other";
@@ -97,6 +114,8 @@ export interface CatalogItem {
   roundCount?: number;
   ratingAvg?: number | null;
   ratingCount?: number;
+  /** Custom attributes this group/person defined for this kind — never global. */
+  attributes?: CatalogAttributeValue[];
 }
 
 export interface CatalogRoundHistory {

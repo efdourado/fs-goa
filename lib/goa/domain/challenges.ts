@@ -145,8 +145,14 @@ export async function createChallenge(
         if (typeof item.catalogItemId === "string" && item.catalogItemId) {
           await assertCatalogItemInGroup(client, item.catalogItemId, groupId, catalogKind);
           catalogItemId = item.catalogItemId;
-          if (itemAuthor) {
-            await applyCatalogItemUpdate(client, catalogItemId, groupId, { author: itemAuthor });
+          if (itemAuthor || item.attributes) {
+            await applyCatalogItemUpdate(
+              client,
+              catalogItemId,
+              groupId,
+              { ...(itemAuthor ? { author: itemAuthor } : {}), attributes: item.attributes },
+              catalogKind,
+            );
           }
         } else {
           catalogItemId = await upsertCatalogItem(client, groupId, session.user.id, {
@@ -156,6 +162,7 @@ export async function createChallenge(
             year: item.year,
             mainGenre: item.mainGenre,
             pageCount: item.pageCount,
+            attributes: item.attributes,
           });
         }
 
