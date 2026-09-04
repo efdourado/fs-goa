@@ -2325,7 +2325,7 @@ test("membro sai do grupo, opcionalmente apagando seus dados; o responsável nã
       title: "Rodada com três",
       submissionMode: "item",
       participantIds: [owner.user.id, keeper.user.id, purger.user.id],
-      items: [{ title: "Primeiro filme" }],
+      items: [{ title: "Primeiro filme", recommendedByUserId: keeper.user.id }],
       fields: [{ key: "nota", label: "Nota", type: "rating", required: true }],
     },
   });
@@ -2346,44 +2346,80 @@ test("membro sai do grupo, opcionalmente apagando seus dados; o responsável nã
     });
     assert.equal(submitted.response.status, 201, JSON.stringify(submitted.body));
   }
+  const byPersonMetric = await call("POST", `/api/challenges/${challengeId}/metrics`, {
+    session: owner,
+    body: { label: "Nota por pessoa", operation: "average", fieldId: notaField, groupBy: "participant" },
+  });
+  assert.equal(byPersonMetric.response.status, 201, JSON.stringify(byPersonMetric.body));
 
   // The owner cannot walk away — no ownership transfer yet.
   const ownerLeaves = await call("POST", `/api/groups/${groupId}/leave`, { session: owner, body: {} });
   assert.equal(ownerLeaves.response.status, 409, JSON.stringify(ownerLeaves.body));
   assert.equal((ownerLeaves.body as { error: string }).error, "owner_cannot_leave");
 
-  // Leave keeping data: membership gone, entry still counted.
-  const keep = await call("POST", `/api/groups/${groupId}/leave`, { session: keeper, body: { purgeData: false } });
-  assert.equal(keep.response.status, 200, JSON.stringify(keep.body));
-  assert.deepEqual(keep.body, { groupId, left: true, purged: false, purgedEntries: 0 });
+  // Leaving asks nothing — it just happens: membership and participation close,
+  // the entry stays (the round's history stays intact).
+  const left = await call("POST", `/api/groups/${groupId}/leave`, { session: keeper, body: {} });
+  assert.equal(left.response.status, 200, JSON.stringify(left.body));
+  assert.deepEqual(left.body, { groupId, left: true });
 
-  const afterKeep = await adminPool.query<{ members: number; parts: number; live_entries: number }>(
+  const afterLeave = await adminPool.query<{ members: number; parts: number; live_entries: number }>(
     `SELECT
        (SELECT count(*)::int FROM group_members WHERE group_id = $1 AND user_id = $2 AND removed_at IS NULL) AS members,
        (SELECT count(*)::int FROM challenge_participants WHERE challenge_id = $3 AND user_id = $2 AND removed_at IS NULL) AS parts,
        (SELECT count(*)::int FROM entries WHERE challenge_id = $3 AND participant_user_id = $2 AND deleted_at IS NULL) AS live_entries`,
     [groupId, keeper.user.id, challengeId],
   );
-  assert.deepEqual(afterKeep.rows[0], { members: 0, parts: 0, live_entries: 1 }, "sem purge, o registro permanece");
+  assert.deepEqual(afterLeave.rows[0], { members: 0, parts: 0, live_entries: 1 }, "o registro de quem saiu permanece");
 
   const groupGone = (await call("GET", "/api/bootstrap", { session: keeper })).body as { groups: Array<{ id: string }> };
   assert.ok(!groupGone.groups.some((entry) => entry.id === groupId), "o grupo some do bootstrap de quem saiu");
 
-  // Leave purging: the entry is soft-deleted.
-  const purge = await call("POST", `/api/groups/${groupId}/leave`, { session: purger, body: { purgeData: true } });
-  assert.equal(purge.response.status, 200, JSON.stringify(purge.body));
-  assert.equal((purge.body as { purged: boolean }).purged, true);
-  assert.equal((purge.body as { purgedEntries: number }).purgedEntries, 1, "purge apaga o registro da rodada");
-
-  const afterPurge = await adminPool.query<{ live_entries: number }>(
-    "SELECT count(*)::int AS live_entries FROM entries WHERE challenge_id = $1 AND participant_user_id = $2 AND deleted_at IS NULL",
-    [challengeId, purger.user.id],
-  );
-  assert.equal(afterPurge.rows[0]?.live_entries, 0, "com purge, os registros de quem saiu são apagados");
+  // Anonymity instead of a question: the item this person recommended loses the
+  // byline, and their row in the per-person metric loses the name (not the value).
+  const detailAfterLeave = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    items: Array<{ recommendedBy: { name: string } | null }>;
+    metrics: ApiMetric[];
+  };
+  assert.equal(detailAfterLeave.items[0].recommendedBy, null, "indicação de quem saiu não aparece mais");
+  const byPersonSeries = detailAfterLeave.metrics.find((metric) => metric.label === "Nota por pessoa")!.series!;
+  const keeperRow = byPersonSeries.find((row) => row.value === 4)!;
+  assert.equal(keeperRow.label, "Quem já saiu", "a nota de quem saiu continua contando, sem o nome");
 
   const leftAudit = await adminPool.query<{ count: number }>(
     "SELECT count(*)::int AS count FROM audit_events WHERE group_id = $1 AND action = 'group.member_left'",
     [groupId],
   );
-  assert.equal(leftAudit.rows[0]?.count, 2, "cada saída fica auditada");
+  assert.equal(leftAudit.rows[0]?.count, 1, "a saída fica auditada");
+});
+
+test("apagar a conta também encerra a participação em desafios de outros grupos", async () => {
+  const owner = await register("Dona Encerra", "dona_encerra_conta");
+  const member = await register("Sai Ao Apagar", "sai_ao_apagar_conta");
+
+  const group = await call("POST", "/api/groups", { session: owner, body: { name: "Grupo que fica" } });
+  const groupId = (group.body as { id: string }).id;
+  const invite = await call("POST", `/api/groups/${groupId}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } });
+  await call("POST", `/api/invites/${(invite.body as { token: string }).token}`, { session: member, body: {} });
+
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: {
+      title: "Rodada de outra pessoa",
+      submissionMode: "item",
+      participantIds: [owner.user.id, member.user.id],
+      items: [{ title: "Um filme" }],
+      fields: [{ key: "nota", label: "Nota", type: "rating", required: true }],
+    },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });
+
+  assert.equal((await call("DELETE", "/api/account", { session: member })).response.status, 200);
+
+  const stillParticipant = await adminPool.query<{ count: number }>(
+    "SELECT count(*)::int AS count FROM challenge_participants WHERE challenge_id = $1 AND user_id = $2 AND removed_at IS NULL",
+    [challengeId, member.user.id],
+  );
+  assert.equal(stillParticipant.rows[0]?.count, 0, "apagar a conta fecha a participação, não só a membresia do grupo");
 });

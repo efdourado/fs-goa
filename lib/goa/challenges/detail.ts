@@ -43,15 +43,23 @@ export async function getChallengeDetail(session: SessionContext, challengeId: s
         catalog_main_genre: string | null; catalog_pages: number | null;
         recommended_by_id: string | null; recommended_by_name: string | null;
       }>(
+        // A recommender who left the group (or whose account is gone) never shows
+        // their name to the group again — `recommended_by_id` goes null right
+        // along with it, same as a deleted account already reads "Conta removida".
         `SELECT i.id, i.title, i.description, i.position, i.opens_at, i.due_at, i.checkpoint_id,
                 i.catalog_item_id, ci.title AS catalog_title, ci.author AS catalog_author, ci.year AS catalog_year,
                 ci.main_genre AS catalog_main_genre, ci.page_count AS catalog_pages,
-                i.recommended_by_user_id AS recommended_by_id, ru.display_name AS recommended_by_name
+                CASE WHEN active_recommender.user_id IS NOT NULL THEN i.recommended_by_user_id END AS recommended_by_id,
+                CASE WHEN active_recommender.user_id IS NOT NULL THEN ru.display_name END AS recommended_by_name
            FROM challenge_items i
            LEFT JOIN catalog_items ci ON ci.id = i.catalog_item_id
            LEFT JOIN users ru ON ru.id = i.recommended_by_user_id
+           LEFT JOIN group_members active_recommender
+             ON active_recommender.group_id = $2
+            AND active_recommender.user_id = i.recommended_by_user_id
+            AND active_recommender.removed_at IS NULL
           WHERE i.challenge_id = $1 AND i.archived_at IS NULL ORDER BY i.position`,
-        [challengeId],
+        [challengeId, access.challenge.group_id],
       );
     const checkpointsResult = await client.query<{
         id: string; title: string; description: string | null; position: number;

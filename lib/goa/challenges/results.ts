@@ -50,14 +50,20 @@ interface RatingRow {
 /** Numeric field values for a metric, tagged with their item and participant. */
 async function ratingRows(client: PoolClient, metric: MetricRow): Promise<RatingRow[]> {
   const result = await client.query<RatingRow>(
+    // A participant who has since left the challenge (or the group, or whose
+    // account is gone) keeps contributing to the numbers but not the name — the
+    // per-person breakdown labels them generically instead.
     `SELECT (ev.number_scaled::float8 / (10 ^ f.number_scale)) AS value,
             e.item_id, ci.title AS item_title,
-            e.participant_user_id AS participant_id, u.display_name AS participant_name
+            e.participant_user_id AS participant_id,
+            CASE WHEN cp.user_id IS NOT NULL THEN u.display_name ELSE 'Quem já saiu' END AS participant_name
        FROM entry_values ev
        JOIN entries e ON e.id = ev.entry_id
        JOIN challenge_fields f ON f.id = ev.field_id
        LEFT JOIN challenge_items ci ON ci.id = e.item_id
        LEFT JOIN users u ON u.id = e.participant_user_id
+       LEFT JOIN challenge_participants cp
+         ON cp.challenge_id = e.challenge_id AND cp.user_id = e.participant_user_id AND cp.removed_at IS NULL
       WHERE e.challenge_id = $1 AND ev.field_id = $2
         AND e.deleted_at IS NULL AND ev.number_scaled IS NOT NULL`,
     [metric.challenge_id, metric.field_id],
@@ -315,13 +321,21 @@ async function computeIndicatorBias(
   const all = await ratingRows(client, metric);
   const groupMean = mean(all.map((row) => row.value)) ?? 0;
   const picks = await client.query<{ person: string; person_name: string | null; value: number }>(
-    `SELECT ci.recommended_by_user_id AS person, u.display_name AS person_name,
+    // Same anonymity rule as everywhere else: a recommender no longer in the
+    // group keeps their bias score, loses their name.
+    `SELECT ci.recommended_by_user_id AS person,
+            CASE WHEN active_recommender.user_id IS NOT NULL THEN u.display_name ELSE 'Quem já saiu' END AS person_name,
             (ev.number_scaled::float8 / (10 ^ f.number_scale)) AS value
        FROM entry_values ev
        JOIN entries e ON e.id = ev.entry_id
        JOIN challenge_fields f ON f.id = ev.field_id
        JOIN challenge_items ci ON ci.id = e.item_id AND ci.recommended_by_user_id IS NOT NULL
        JOIN users u ON u.id = ci.recommended_by_user_id
+       JOIN challenges c ON c.id = e.challenge_id
+       LEFT JOIN group_members active_recommender
+         ON active_recommender.group_id = c.group_id
+        AND active_recommender.user_id = ci.recommended_by_user_id
+        AND active_recommender.removed_at IS NULL
       WHERE e.challenge_id = $1 AND ev.field_id = $2
         AND e.deleted_at IS NULL AND ev.number_scaled IS NOT NULL`,
     [metric.challenge_id, metric.field_id],

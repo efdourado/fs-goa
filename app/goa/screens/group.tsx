@@ -43,8 +43,8 @@ export function GroupScreen({
   onCancelRequest: (id: Id) => Promise<void>;
   onUpdateGroup: (payload: { name: string; description: string }) => Promise<void>;
   onDeleteGroup?: () => Promise<void>;
-  /** Present for non-owners: leave the group, optionally purging own entries. */
-  onLeaveGroup?: (purgeData: boolean) => Promise<void>;
+  /** Present for non-owners: leave the group. */
+  onLeaveGroup?: () => Promise<void>;
 }) {
   const t = useTranslations("group");
   const tc = useTranslations("common");
@@ -93,18 +93,17 @@ export function GroupScreen({
   const [groupBusy, setGroupBusy] = useState(false);
   const [groupError, setGroupError] = useState<string | null>(null);
   const [groupSuccess, setGroupSuccess] = useState<string | null>(null);
-  const [showLeave, setShowLeave] = useState(false);
-  const [leavePurge, setLeavePurge] = useState(false);
   const [leaveBusy, setLeaveBusy] = useState(false);
   const [leaveError, setLeaveError] = useState<string | null>(null);
   const memberCount = group.memberCount ?? group.members?.length ?? 0;
 
   async function leave() {
     if (!onLeaveGroup) return;
+    if (!window.confirm(t("leaveConfirm"))) return;
     setLeaveBusy(true);
     setLeaveError(null);
     try {
-      await onLeaveGroup(leavePurge);
+      await onLeaveGroup();
     } catch (cause) {
       setLeaveError(f.error(cause));
       setLeaveBusy(false);
@@ -443,22 +442,8 @@ export function GroupScreen({
 
           {onLeaveGroup ? (
             <div className="mt-5 border-t border-[var(--line)] pt-4">
-              {showLeave ? (
-                <div className="space-y-3">
-                  <p className="text-sm leading-6 text-[var(--muted)]">{t("leaveBody")}</p>
-                  <label className="flex items-start gap-2.5 text-sm leading-6">
-                    <input type="checkbox" className="mt-1" checked={leavePurge} onChange={(event) => setLeavePurge(event.target.checked)} />
-                    <span>{t("leavePurgeLabel")}</span>
-                  </label>
-                  <StatusMessage error={leaveError} />
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="danger" disabled={leaveBusy} onClick={() => void leave()}>{leaveBusy ? tc("saving") : t("leaveConfirm")}</Button>
-                    <Button variant="ghost" disabled={leaveBusy} onClick={() => { setShowLeave(false); setLeaveError(null); }}>{tc("cancel")}</Button>
-                  </div>
-                </div>
-              ) : (
-                <button type="button" className="min-h-9 text-xs font-light text-[var(--danger)] underline underline-offset-2" onClick={() => setShowLeave(true)}>{t("leaveToggle")}</button>
-              )}
+              <button type="button" className="min-h-9 text-xs font-light text-[var(--danger)] underline underline-offset-2 disabled:opacity-50" disabled={leaveBusy} onClick={() => void leave()}>{leaveBusy ? tc("saving") : t("leaveToggle")}</button>
+              <div className="mt-2"><StatusMessage error={leaveError} /></div>
             </div>
           ) : null}
         </section>

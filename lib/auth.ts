@@ -443,6 +443,12 @@ export async function deleteOwnAccount(session: SessionContext): Promise<{ setCo
       "UPDATE group_members SET removed_at = now() WHERE user_id = $1 AND removed_at IS NULL",
       [session.user.id],
     );
+    // Same close-out as leaving a group by hand — otherwise a deleted account
+    // keeps showing as an active participant (just under the scrubbed name).
+    await client.query(
+      "UPDATE challenge_participants SET removed_at = now() WHERE user_id = $1 AND removed_at IS NULL",
+      [session.user.id],
+    );
     await client.query(
       `UPDATE users
           SET deleted_at = now(), disabled_at = now(),

@@ -317,9 +317,7 @@
     "pendingInviteMeta": "@{username} · convidado em {date}",
     "cancel": "Cancelar",
     "leaveToggle": "Sair do grupo",
-    "leaveBody": "Você deixa de ver este grupo e seus desafios, e não pode mais enviar registros. Seus registros continuam contando, a não ser que você os remova abaixo.",
-    "leavePurgeLabel": "Também apagar meus registros e notas das rodadas deste grupo. Vitrines já publicadas mantêm o retrato congelado.",
-    "leaveConfirm": "Sair do grupo"
+    "leaveConfirm": "Sair deste grupo? Você deixa de vê-lo e a seus desafios. Seus registros continuam (a história do grupo fica intacta), mas passam a mostrar \"saiu do grupo\" no lugar do seu nome."
   },
   "catalog": {
     "back": "← Voltar",
