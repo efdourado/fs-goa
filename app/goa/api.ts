@@ -39,6 +39,7 @@ export const API_PATHS = {
   personalCatalogItem: (itemId: Id) => `/api/personal/catalog/${encodeURIComponent(itemId)}`,
   catalogItem: (itemId: Id) => `/api/catalog/${encodeURIComponent(itemId)}`,
   groupMembers: (groupId: Id) => `/api/groups/${encodeURIComponent(groupId)}/members`,
+  groupLeave: (groupId: Id) => `/api/groups/${encodeURIComponent(groupId)}/leave`,
   groupInvites: (groupId: Id) => `/api/groups/${encodeURIComponent(groupId)}/invites`,
   memberRequestAccept: (id: Id) => `/api/member-requests/${encodeURIComponent(id)}/accept`,
   memberRequestDecline: (id: Id) => `/api/member-requests/${encodeURIComponent(id)}/decline`,

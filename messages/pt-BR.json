@@ -307,11 +307,18 @@
     "catalogRounds": "{count, plural, one {# rodada} other {# rodadas}}",
     "catalogShowAll": "Ver acervo completo ({count})",
     "catalogShowLess": "Ver menos",
+    "catalogKindLabel": "Filmes ou livros",
+    "catalogKindFilm": "Filmes",
+    "catalogKindBook": "Livros",
     "peopleTitle": "Pessoas",
     "membersUnavailable": "A lista de membros aparecerá quando o bootstrap a disponibilizar.",
     "pendingInvitesTitle": "Convites aguardando resposta",
     "pendingInviteMeta": "@{username} · convidado em {date}",
-    "cancel": "Cancelar"
+    "cancel": "Cancelar",
+    "leaveToggle": "Sair do grupo",
+    "leaveBody": "Você deixa de ver este grupo e seus desafios, e não pode mais enviar registros. Seus registros continuam contando, a não ser que você os remova abaixo.",
+    "leavePurgeLabel": "Também apagar meus registros e notas das rodadas deste grupo. Vitrines já publicadas mantêm o retrato congelado.",
+    "leaveConfirm": "Sair do grupo"
   },
   "catalog": {
     "back": "← Voltar",
@@ -350,9 +357,8 @@
       "decade": "Por década",
       "year": "Por ano"
     },
-    "kindLabel": "Mídia",
+    "kindLabel": "Filmes ou livros",
     "kind": {
-      "all": "Tudo",
       "film": "Filmes",
       "book": "Livros"
     },
@@ -726,6 +732,8 @@
     "checkpointDoneLabel": "concluído",
     "checkpointSoonLabel": "em breve",
     "checkpointTally": "{done} feitos · {pending} restantes",
+    "completedTitle": "Concluídos",
+    "completedTally": "{done} de {total} · {pct}%",
     "historyTitle": "Seus registros",
     "historySubtitle": "Somente o que você enviou neste desafio.",
     "dailyCheckIn": "Check-in diário",

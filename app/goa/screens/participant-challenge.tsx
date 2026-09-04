@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { useGoaFormat } from "../format";
@@ -242,10 +242,13 @@ export function DynamicEntryForm({
 export function ResultView({
   challenge,
   onBackToEntry,
+  hideCompletionRate = false,
 }: {
   challenge: ChallengeDetail;
   /** When the round is still open with nothing to show yet, offer a way back to logging. */
   onBackToEntry?: () => void;
+  /** The participant tab shows a dedicated "completed" card, so the completion-rate metric is redundant there. */
+  hideCompletionRate?: boolean;
 }) {
   const t = useTranslations("resultView");
   const tm = useTranslations("metrics");
@@ -253,7 +256,9 @@ export function ResultView({
   const source = result?.metrics?.length
     ? result.metrics
     : challenge.metrics.filter((metric) => metric.visibleInResults !== false);
-  const metrics = source.filter(metricHasData);
+  const metrics = source
+    .filter((metric) => !hideCompletionRate || metric.operation !== "completion_rate")
+    .filter(metricHasData);
   const solo = challenge.scope === "personal" || challenge.participants.length < 2;
   const hideThinLabel = solo;
   const names = solo ? [] : challenge.participants.map((participant) => participant.name);
@@ -413,6 +418,16 @@ function CheckGlyph() {
  * with a numbered chip that flips to a checkmark once the entry is in. Replaces a
  * bare `<select>` so progress reads at a glance on both phone and desktop.
  */
+interface PickerOption {
+  id: Id;
+  label: string;
+  done?: boolean;
+  soon?: boolean;
+  statusLabel?: string;
+  /** The rating this participant gave the item, shown at the end of the row. */
+  rating?: number | null;
+}
+
 function EntryPicker({
   title,
   tally,
@@ -422,10 +437,11 @@ function EntryPicker({
 }: {
   title: string;
   tally?: string;
-  options: Array<{ id: Id; label: string; done?: boolean; soon?: boolean; statusLabel?: string }>;
+  options: PickerOption[];
   selectedId: Id | null;
   onSelect: (id: Id) => void;
 }) {
+  const nf = useFormatter();
   return (
     <section className={cx(cardClass, "p-4 sm:p-5")}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
@@ -435,6 +451,7 @@ function EntryPicker({
       <ol className="mt-3 max-h-[21rem] space-y-1.5 overflow-y-auto pr-0.5">
         {options.map((option, index) => {
           const active = option.id === selectedId;
+          const rating = typeof option.rating === "number" ? option.rating : null;
           return (
             <li key={option.id}>
               <button
@@ -468,6 +485,9 @@ function EntryPicker({
                     <span className={cx("text-[11px]", option.done ? "text-[var(--ok)]" : "text-[var(--muted)]")}>{option.statusLabel}</span>
                   ) : null}
                 </span>
+                {rating !== null ? (
+                  <span className="flex-none text-sm font-medium tabular-nums text-[var(--ink)]">{nf.number(rating, { maximumFractionDigits: 1 })}</span>
+                ) : null}
               </button>
             </li>
           );
@@ -515,6 +535,23 @@ export function ParticipantChallengeScreen({
     () => new Set(doneEntries.map((entry) => itemIdForEntry(entry))),
     [doneEntries],
   );
+  // The rating this participant gave each item (from whichever entry carries the
+  // rating field) — shown at the end of every checkpoint row.
+  const ratingByItem = useMemo(() => {
+    const ratingFieldByType = new Map(
+      challenge.entryTypes.map((type) => [type.id, type.fields.find((field) => field.type === "rating")?.id ?? null]),
+    );
+    const map = new Map<Id, number>();
+    for (const entry of ownEntries) {
+      const itemId = itemIdForEntry(entry);
+      const fieldId = ratingFieldByType.get(entry.entryTypeId ?? "");
+      if (!itemId || !fieldId) continue;
+      const raw = valuesAsRecord(entry.values)[fieldId];
+      const value = typeof raw === "number" ? raw : typeof raw === "string" && raw.trim() !== "" ? Number(raw) : NaN;
+      if (!Number.isNaN(value)) map.set(itemId, value);
+    }
+    return map;
+  }, [ownEntries, challenge.entryTypes]);
   const sortedItems = useMemo(() => [...challenge.items].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)), [challenge.items]);
   const sortedSessions = useMemo(
     () => [...(challenge.checkpoints ?? [])].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
@@ -575,32 +612,45 @@ export function ParticipantChallengeScreen({
   // A plain round instead offers the date among the entry form's optional fields.
   const dateRequired = undatedDaily || (useItemPanel && perDayItem);
   const canDeleteEntry = challenge.status === "active" ? onDeleteEntry : undefined;
+  const doneCount = Math.min(doneEntries.length, sortedItems.length);
   const tabs: Array<{ id: ParticipantTab }> = [{ id: "today" }, { id: "results" }];
 
-  // The checkpoint list lives on Results now: tapping a row jumps back to Today
-  // with that item (or session) selected.
+  // The picker on Today drives which checkpoint the form is filling; each row
+  // ends with the rating this participant gave it.
   const checkpointPicker = sessionMode && sortedSessions.length > 1 ? (
     <EntryPicker
       title={t("sessionsTitle")}
-      selectedId={null}
-      onSelect={(id) => { setSelectedSessionId(id); onTab("today"); }}
+      selectedId={selectedSession?.id ?? null}
+      onSelect={(id) => setSelectedSessionId(id)}
       options={sortedSessions.map((session) => {
         const boundItem = sortedItems.find((item) => item.checkpointId === session.id);
         const soon = session.status === "scheduled";
-        return { id: session.id, label: boundItem?.title ?? session.title, soon, statusLabel: soon ? t("checkpointSoonLabel") : undefined };
+        return { id: session.id, label: boundItem?.title ?? session.title, soon, statusLabel: soon ? t("checkpointSoonLabel") : undefined, rating: boundItem ? ratingByItem.get(boundItem.id) ?? null : null };
       })}
     />
   ) : sortedItems.length > 1 ? (
     <EntryPicker
       title={t("checkpointsTitle")}
-      tally={t("checkpointTally", { done: Math.min(doneEntries.length, sortedItems.length), pending: Math.max(0, sortedItems.length - doneEntries.length) })}
-      selectedId={null}
-      onSelect={(id) => { setSelectedItemId(id); onTab("today"); }}
+      tally={t("checkpointTally", { done: doneCount, pending: Math.max(0, sortedItems.length - doneCount) })}
+      selectedId={selectedItem?.id ?? null}
+      onSelect={(id) => setSelectedItemId(id)}
       options={sortedItems.map((item) => {
         const done = doneByItem.has(item.id);
         const soon = item.status === "scheduled" && !entriesByItem.has(item.id);
-        return { id: item.id, label: item.title, done, soon, statusLabel: done ? t("checkpointDoneLabel") : soon ? t("checkpointSoonLabel") : undefined };
+        return { id: item.id, label: item.title, done, soon, statusLabel: done ? t("checkpointDoneLabel") : soon ? t("checkpointSoonLabel") : undefined, rating: ratingByItem.get(item.id) ?? null };
       })}
+    />
+  ) : null;
+
+  // Results shows only what's finished, with the ratings and a % complete.
+  const doneItems = sortedItems.filter((item) => doneByItem.has(item.id));
+  const completedCard = doneItems.length ? (
+    <EntryPicker
+      title={t("completedTitle")}
+      tally={t("completedTally", { done: doneCount, total: sortedItems.length, pct: completion })}
+      selectedId={null}
+      onSelect={(id) => { setSelectedItemId(id); onTab("today"); }}
+      options={doneItems.map((item) => ({ id: item.id, label: item.title, done: true, rating: ratingByItem.get(item.id) ?? null }))}
     />
   ) : null;
 
@@ -626,31 +676,34 @@ export function ParticipantChallengeScreen({
 
       <div className="mt-5">
         {tab === "today" ? (
-          <section className={cx(cardClass, "mx-auto min-w-0 max-w-3xl p-5 sm:p-7")}>
-            {challenge.status === "closed" ? <EmptyState title={t("closedTitle")} description={t("closedBody")} action={<Button onClick={() => onTab("results")}>{t("seeResults")}</Button>} /> : challenge.submissionMode !== "free" && !selectedItem && !undatedDaily ? <EmptyState title={t("noCheckpointTitle")} description={t("noCheckpointBody")} /> : (
-              <>
-                <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <h2 className="mt-2 text-2xl font-light tracking-[-0.04em]">
-                      {selectedItem?.title ?? (undatedDaily ? t("checkInOf", { date: f.date(effectiveOccurredOn, longDate) }) : t("newEntry"))}
-                    </h2>
-                    {selectedItem?.description ? <p className="mt-1 text-sm text-[var(--muted)]">{selectedItem.description}</p> : null}
-                    {selectedItem?.recommendedBy || selectedItem?.catalogItem?.author || selectedItem?.catalogItem?.year || selectedItem?.catalogItem?.mainGenre ? <p className="mt-1 text-xs text-[var(--muted)]">{[selectedItem.catalogItem?.author ? t("byAuthor", { name: selectedItem.catalogItem.author }) : null, selectedItem.recommendedBy ? t("recommendedBy", { name: selectedItem.recommendedBy.name }) : null, selectedItem.catalogItem?.year ? String(selectedItem.catalogItem.year) : null, selectedItem.catalogItem?.mainGenre || null].filter(Boolean).join(" · ")}</p> : null}</div>{selectedItem?.dueAt ? <span className="rounded-full bg-[var(--wash)] px-3 py-2 text-xs font-medium text-[var(--muted)]">{t("dueBy", { date: f.dateTime(selectedItem.dueAt) })}</span> : null}</div>
-                {dateRequired ? <label className="mb-5 block"><span className={labelClass}>{t("occurredOnLabel")}</span><input className={inputClass} type="date" max={today} value={effectiveOccurredOn} disabled={Boolean(unavailableMessage)} onChange={(event) => setOccurredOn(event.target.value || today)} /><small className="mt-1 block text-[var(--muted)]">{t("occurredOnHint")}</small></label> : !useItemPanel && currentEntry?.occurredOn ? <p className="mb-5 text-xs text-[var(--muted)]">{t("occurredOn", { date: f.date(currentEntry.occurredOn, longDate) })}</p> : null}
-                {useItemPanel && selectedItem ? (
-                  <ItemEntryPanel key={`${selectedItem.id}-${selectedSession?.id ?? "no-session"}`} challenge={challenge} item={selectedItem} ownEntries={ownEntries} occurredOn={occurredOn} onOccurredOnChange={setOccurredOn} offerOptionalDate={!perDayItem && !sessionMode && collectsEntryDate} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} checkpointId={selectedSession?.id ?? null} onSaveEntry={onSaveEntry} onDeleteEntry={canDeleteEntry} />
-                ) : (
-                  <DynamicEntryForm key={`${selectedItem?.id ?? "free"}-${undatedDaily ? effectiveOccurredOn : "fixed"}-${currentEntry?.id ?? "new"}`} fields={challenge.fields} item={selectedItem ?? null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry(selectedItem?.id ?? null, values, entry, undatedDaily ? effectiveOccurredOn : undefined)} onDelete={currentEntry && canDeleteEntry ? () => canDeleteEntry(currentEntry.id) : undefined} />
-                )}
-              </>
-            )}
-          </section>
+          <div className={cx("grid gap-5", checkpointPicker ? "lg:grid-cols-[minmax(0,1.5fr)_minmax(270px,0.6fr)]" : "mx-auto max-w-3xl")}>
+            <section className={cx(cardClass, "min-w-0 p-5 sm:p-7")}>
+              {challenge.status === "closed" ? <EmptyState title={t("closedTitle")} description={t("closedBody")} action={<Button onClick={() => onTab("results")}>{t("seeResults")}</Button>} /> : challenge.submissionMode !== "free" && !selectedItem && !undatedDaily ? <EmptyState title={t("noCheckpointTitle")} description={t("noCheckpointBody")} /> : (
+                <>
+                  <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <h2 className="mt-2 text-2xl font-light tracking-[-0.04em]">
+                        {selectedItem?.title ?? (undatedDaily ? t("checkInOf", { date: f.date(effectiveOccurredOn, longDate) }) : t("newEntry"))}
+                      </h2>
+                      {selectedItem?.description ? <p className="mt-1 text-sm text-[var(--muted)]">{selectedItem.description}</p> : null}
+                      {selectedItem?.recommendedBy || selectedItem?.catalogItem?.author || selectedItem?.catalogItem?.year || selectedItem?.catalogItem?.mainGenre ? <p className="mt-1 text-xs text-[var(--muted)]">{[selectedItem.catalogItem?.author ? t("byAuthor", { name: selectedItem.catalogItem.author }) : null, selectedItem.recommendedBy ? t("recommendedBy", { name: selectedItem.recommendedBy.name }) : null, selectedItem.catalogItem?.year ? String(selectedItem.catalogItem.year) : null, selectedItem.catalogItem?.mainGenre || null].filter(Boolean).join(" · ")}</p> : null}</div>{selectedItem?.dueAt ? <span className="rounded-full bg-[var(--wash)] px-3 py-2 text-xs font-medium text-[var(--muted)]">{t("dueBy", { date: f.dateTime(selectedItem.dueAt) })}</span> : null}</div>
+                  {dateRequired ? <label className="mb-5 block"><span className={labelClass}>{t("occurredOnLabel")}</span><input className={inputClass} type="date" max={today} value={effectiveOccurredOn} disabled={Boolean(unavailableMessage)} onChange={(event) => setOccurredOn(event.target.value || today)} /><small className="mt-1 block text-[var(--muted)]">{t("occurredOnHint")}</small></label> : !useItemPanel && currentEntry?.occurredOn ? <p className="mb-5 text-xs text-[var(--muted)]">{t("occurredOn", { date: f.date(currentEntry.occurredOn, longDate) })}</p> : null}
+                  {useItemPanel && selectedItem ? (
+                    <ItemEntryPanel key={`${selectedItem.id}-${selectedSession?.id ?? "no-session"}`} challenge={challenge} item={selectedItem} ownEntries={ownEntries} occurredOn={occurredOn} onOccurredOnChange={setOccurredOn} offerOptionalDate={!perDayItem && !sessionMode && collectsEntryDate} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} checkpointId={selectedSession?.id ?? null} onSaveEntry={onSaveEntry} onDeleteEntry={canDeleteEntry} />
+                  ) : (
+                    <DynamicEntryForm key={`${selectedItem?.id ?? "free"}-${undatedDaily ? effectiveOccurredOn : "fixed"}-${currentEntry?.id ?? "new"}`} fields={challenge.fields} item={selectedItem ?? null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry(selectedItem?.id ?? null, values, entry, undatedDaily ? effectiveOccurredOn : undefined)} onDelete={currentEntry && canDeleteEntry ? () => canDeleteEntry(currentEntry.id) : undefined} />
+                  )}
+                </>
+              )}
+            </section>
+            {checkpointPicker ? <aside className="min-w-0">{checkpointPicker}</aside> : null}
+          </div>
         ) : null}
 
         {tab === "results" ? (
           <div className="space-y-5">
-            {checkpointPicker}
-            <ResultView challenge={challenge} onBackToEntry={() => onTab("today")} />
+            {completedCard}
+            <ResultView challenge={challenge} hideCompletionRate onBackToEntry={() => onTab("today")} />
           </div>
         ) : null}
       </div>

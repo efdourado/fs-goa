@@ -330,6 +330,90 @@ export async function respondToMemberRequest(
   });
 }
 
+/**
+ * A member walks away from a group they were added to. Soft-removes the
+ * membership and every challenge participation in that group. With
+ * `purgeData: true` their entries in the group's rounds are soft-deleted and
+ * their name is cleared from any "recommended by" — the round loses the person
+ * and their data. Already-published showcases are frozen snapshots and stay put.
+ * The owner cannot leave (no ownership transfer yet — delete the group instead).
+ */
+export async function leaveGroup(
+  session: SessionContext,
+  groupId: string,
+  body: Record<string, unknown>,
+) {
+  const purgeData = body.purgeData === true;
+  return inTransaction(async (client) => {
+    const group = await oneOrNull<{ id: string; name: string }>(
+      client,
+      `SELECT id, name FROM groups
+        WHERE id = $1 AND kind = 'standard' AND archived_at IS NULL AND deleted_at IS NULL
+        FOR UPDATE`,
+      [groupId],
+    );
+    if (!group) throw new ApiError(404, "not_found", "Grupo não encontrado.");
+
+    const membership = await oneOrNull<{ role: GroupRole }>(
+      client,
+      `SELECT role FROM group_members
+        WHERE group_id = $1 AND user_id = $2 AND removed_at IS NULL
+        FOR UPDATE`,
+      [groupId, session.user.id],
+    );
+    if (!membership) throw new ApiError(404, "not_found", "Você não participa deste grupo.");
+    if (membership.role === "owner") {
+      throw new ApiError(
+        409,
+        "owner_cannot_leave",
+        "Você é o responsável por este grupo. Transfira ou apague o grupo antes de sair.",
+      );
+    }
+
+    await client.query(
+      "UPDATE group_members SET removed_at = now() WHERE group_id = $1 AND user_id = $2 AND removed_at IS NULL",
+      [groupId, session.user.id],
+    );
+    await client.query(
+      `UPDATE challenge_participants SET removed_at = now()
+        WHERE user_id = $2 AND removed_at IS NULL
+          AND challenge_id IN (SELECT id FROM challenges WHERE group_id = $1)`,
+      [groupId, session.user.id],
+    );
+
+    let purgedEntries = 0;
+    if (purgeData) {
+      const deleted = await client.query(
+        `UPDATE entries SET deleted_at = now(), updated_at = now()
+          WHERE participant_user_id = $2 AND deleted_at IS NULL
+            AND challenge_id IN (SELECT id FROM challenges WHERE group_id = $1)`,
+        [groupId, session.user.id],
+      );
+      purgedEntries = deleted.rowCount ?? 0;
+      await client.query(
+        `UPDATE challenge_items SET recommended_by_user_id = NULL, updated_at = now()
+          WHERE recommended_by_user_id = $2
+            AND challenge_id IN (SELECT id FROM challenges WHERE group_id = $1)`,
+        [groupId, session.user.id],
+      );
+    }
+
+    await writeAudit(
+      client,
+      groupId,
+      null,
+      session.user.id,
+      "group.member_left",
+      "group_member",
+      session.user.id,
+      { role: membership.role },
+      { removedAt: new Date().toISOString() },
+      { purgeData, purgedEntries },
+    );
+    return { groupId, left: true as const, purged: purgeData, purgedEntries };
+  });
+}
+
 /** A group admin withdraws a directed invitation before the invitee answers. */
 export async function cancelMemberRequest(session: SessionContext, requestId: string) {
   return inTransaction(async (client) => {

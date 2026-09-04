@@ -5,10 +5,11 @@ import { useEffect, useMemo, useState } from "react";
 
 import { API_PATHS, apiRequest } from "../api";
 import { byRatingDesc, bucketize, type CatalogBucket, decadeOf, highlights } from "../catalog-insights";
+import { Segmented } from "../Segmented";
 import type { CatalogItem, Id } from "../types";
 import { backLinkClass, cardClass, cx, EmptyState, PageHeading, StatusMessage } from "../ui";
 
-type Kind = "film" | "book" | "all";
+type Kind = "film" | "book";
 type View = "list" | "genre" | "year" | "decade";
 
 /** Fixed 0–5 scale so a bar means the same thing across genre / year / decade. */
@@ -50,7 +51,7 @@ export function PersonalCatalogScreen({
   const t = useTranslations("personalCatalog");
   const [items, setItems] = useState<CatalogItem[] | null>(null);
   const [sort, setSort] = useState<"title" | "rating">("title");
-  const [kind, setKind] = useState<Kind>("all");
+  const [kindOverride, setKindOverride] = useState<Kind | null>(null);
   const [view, setView] = useState<View>("list");
   const [error, setError] = useState<string | null>(null);
 
@@ -66,10 +67,13 @@ export function PersonalCatalogScreen({
     return () => controller.abort();
   }, [t]);
 
-  const hasFilms = useMemo(() => (items ?? []).some((item) => item.kind === "film"), [items]);
-  const hasBooks = useMemo(() => (items ?? []).some((item) => item.kind === "book"), [items]);
+  const filmCount = useMemo(() => (items ?? []).filter((item) => item.kind === "film").length, [items]);
+  const bookCount = useMemo(() => (items ?? []).filter((item) => item.kind === "book").length, [items]);
+  // Film and book are separate shelves — never one list sorted across both.
+  const bothKinds = filmCount > 0 && bookCount > 0;
+  const kind: Kind = kindOverride ?? (bookCount > filmCount ? "book" : "film");
   const scoped = useMemo(
-    () => (items ?? []).filter((item) => kind === "all" || item.kind === kind),
+    () => (items ?? []).filter((item) => item.kind === kind),
     [items, kind],
   );
 
@@ -131,15 +135,17 @@ export function PersonalCatalogScreen({
               </button>
             ))}
           </nav>
-          {hasFilms && hasBooks ? (
-            <label className="text-xs text-[var(--muted)]">
-              <span className="sr-only">{t("kindLabel")}</span>
-              <select className="min-h-9 rounded-full border border-[var(--line)] bg-[var(--paper)] px-3 text-sm text-[var(--ink)]" value={kind} onChange={(event) => setKind(event.target.value as Kind)}>
-                <option value="all">{t("kind.all")}</option>
-                <option value="film">{t("kind.film")}</option>
-                <option value="book">{t("kind.book")}</option>
-              </select>
-            </label>
+          {bothKinds ? (
+            <Segmented
+              className="text-[11px]"
+              ariaLabel={t("kindLabel")}
+              value={kind}
+              onChange={setKindOverride}
+              options={[
+                { value: "film", label: t("kind.film") },
+                { value: "book", label: t("kind.book") },
+              ]}
+            />
           ) : null}
         </div>
       ) : null}

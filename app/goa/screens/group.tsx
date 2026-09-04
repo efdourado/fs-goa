@@ -7,6 +7,7 @@ import { API_PATHS, apiRequest } from "../api";
 import { copyText } from "../clipboard";
 import { useGoaFormat } from "../format";
 import type { CatalogItem, ChallengeSummary, GroupInviteResult, GroupSummary, Id, PendingGroupRequest } from "../types";
+import { Segmented } from "../Segmented";
 import { backLinkClass, Button, cardClass, challengeStatusTone, ChallengeStatusBadge, cx, EmptyState, inputClass, labelClass, linkClass, PageHeading, StatusMessage } from "../ui";
 import { canManage, isChallengeScheduled } from "../utils";
 
@@ -26,6 +27,7 @@ export function GroupScreen({
   onCancelRequest,
   onUpdateGroup,
   onDeleteGroup,
+  onLeaveGroup,
   challengeLimit,
 }: {
   group: GroupSummary;
@@ -41,6 +43,8 @@ export function GroupScreen({
   onCancelRequest: (id: Id) => Promise<void>;
   onUpdateGroup: (payload: { name: string; description: string }) => Promise<void>;
   onDeleteGroup?: () => Promise<void>;
+  /** Present for non-owners: leave the group, optionally purging own entries. */
+  onLeaveGroup?: (purgeData: boolean) => Promise<void>;
 }) {
   const t = useTranslations("group");
   const tc = useTranslations("common");
@@ -62,6 +66,7 @@ export function GroupScreen({
   const [memberSuccess, setMemberSuccess] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<CatalogItem[] | null>(null);
   const [catalogSort, setCatalogSort] = useState<"title" | "rating">("title");
+  const [catalogKind, setCatalogKind] = useState<"film" | "book" | null>(null);
   const [catalogExpanded, setCatalogExpanded] = useState(false);
 
   useEffect(() => {
@@ -72,16 +77,39 @@ export function GroupScreen({
     return () => controller.abort();
   }, [group.id]);
 
-  const sortedCatalog = [...(catalog ?? [])].sort((a, b) =>
-    catalogSort === "rating"
-      ? (b.ratingAvg ?? -1) - (a.ratingAvg ?? -1)
-      : a.title.localeCompare(b.title),
-  );
+  const catalogFilms = (catalog ?? []).filter((item) => item.kind === "film").length;
+  const catalogBooks = (catalog ?? []).filter((item) => item.kind === "book").length;
+  // Film and book are separate shelves — one sorted list never mixes the two.
+  const bothCatalogKinds = catalogFilms > 0 && catalogBooks > 0;
+  const activeCatalogKind: "film" | "book" = catalogKind ?? (catalogBooks > catalogFilms ? "book" : "film");
+  const sortedCatalog = [...(catalog ?? [])]
+    .filter((item) => !bothCatalogKinds || item.kind === activeCatalogKind)
+    .sort((a, b) =>
+      catalogSort === "rating"
+        ? (b.ratingAvg ?? -1) - (a.ratingAvg ?? -1)
+        : a.title.localeCompare(b.title),
+    );
   const visibleCatalog = catalogExpanded ? sortedCatalog : sortedCatalog.slice(0, CATALOG_PREVIEW_COUNT);
   const [groupBusy, setGroupBusy] = useState(false);
   const [groupError, setGroupError] = useState<string | null>(null);
   const [groupSuccess, setGroupSuccess] = useState<string | null>(null);
+  const [showLeave, setShowLeave] = useState(false);
+  const [leavePurge, setLeavePurge] = useState(false);
+  const [leaveBusy, setLeaveBusy] = useState(false);
+  const [leaveError, setLeaveError] = useState<string | null>(null);
   const memberCount = group.memberCount ?? group.members?.length ?? 0;
+
+  async function leave() {
+    if (!onLeaveGroup) return;
+    setLeaveBusy(true);
+    setLeaveError(null);
+    try {
+      await onLeaveGroup(leavePurge);
+    } catch (cause) {
+      setLeaveError(f.error(cause));
+      setLeaveBusy(false);
+    }
+  }
 
   function toggleGroupEdit() {
     if (!showGroupEdit) {
@@ -308,8 +336,22 @@ export function GroupScreen({
         </section>
         {sortedCatalog.length ? (
           <section>
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <h2 className="text-xl font-light tracking-[-0.03em]">{t("catalogTitle")}</h2>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <h2 className="text-xl font-light tracking-[-0.03em]">{t("catalogTitle")}</h2>
+                {bothCatalogKinds ? (
+                  <Segmented
+                    className="text-[11px]"
+                    ariaLabel={t("catalogKindLabel")}
+                    value={activeCatalogKind}
+                    onChange={setCatalogKind}
+                    options={[
+                      { value: "film", label: t("catalogKindFilm") },
+                      { value: "book", label: t("catalogKindBook") },
+                    ]}
+                  />
+                ) : null}
+              </div>
               <div className="relative">
                 <label htmlFor="catalog-sort" className="sr-only">{t("catalogSortLabel")}</label>
                 <select
@@ -396,6 +438,27 @@ export function GroupScreen({
                 ))}
               </ul>
               {!showInvite ? <div className="mt-3"><StatusMessage error={memberError} success={memberSuccess} /></div> : null}
+            </div>
+          ) : null}
+
+          {onLeaveGroup ? (
+            <div className="mt-5 border-t border-[var(--line)] pt-4">
+              {showLeave ? (
+                <div className="space-y-3">
+                  <p className="text-sm leading-6 text-[var(--muted)]">{t("leaveBody")}</p>
+                  <label className="flex items-start gap-2.5 text-sm leading-6">
+                    <input type="checkbox" className="mt-1" checked={leavePurge} onChange={(event) => setLeavePurge(event.target.checked)} />
+                    <span>{t("leavePurgeLabel")}</span>
+                  </label>
+                  <StatusMessage error={leaveError} />
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="danger" disabled={leaveBusy} onClick={() => void leave()}>{leaveBusy ? tc("saving") : t("leaveConfirm")}</Button>
+                    <Button variant="ghost" disabled={leaveBusy} onClick={() => { setShowLeave(false); setLeaveError(null); }}>{tc("cancel")}</Button>
+                  </div>
+                </div>
+              ) : (
+                <button type="button" className="min-h-9 text-xs font-light text-[var(--danger)] underline underline-offset-2" onClick={() => setShowLeave(true)}>{t("leaveToggle")}</button>
+              )}
             </div>
           ) : null}
         </section>

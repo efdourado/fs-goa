@@ -307,11 +307,18 @@
     "catalogRounds": "{count, plural, one {# round} other {# rounds}}",
     "catalogShowAll": "See the full catalogue ({count})",
     "catalogShowLess": "Show less",
+    "catalogKindLabel": "Films or books",
+    "catalogKindFilm": "Films",
+    "catalogKindBook": "Books",
     "peopleTitle": "People",
     "membersUnavailable": "The member list will appear once the bootstrap provides it.",
     "pendingInvitesTitle": "Invitations awaiting a reply",
     "pendingInviteMeta": "@{username} · invited on {date}",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "leaveToggle": "Leave group",
+    "leaveBody": "You stop seeing this group and its challenges, and you can't submit entries anymore. Your entries stay counted unless you remove them below.",
+    "leavePurgeLabel": "Also delete my entries and ratings from this group's rounds. Showcases already published keep their frozen snapshot.",
+    "leaveConfirm": "Leave group"
   },
   "catalog": {
     "back": "← Back",
@@ -350,9 +357,8 @@
       "decade": "By decade",
       "year": "By year"
     },
-    "kindLabel": "Medium",
+    "kindLabel": "Films or books",
     "kind": {
-      "all": "All",
       "film": "Films",
       "book": "Books"
     },
@@ -726,6 +732,8 @@
     "checkpointDoneLabel": "done",
     "checkpointSoonLabel": "soon",
     "checkpointTally": "{done} done · {pending} to go",
+    "completedTitle": "Completed",
+    "completedTally": "{done} of {total} · {pct}%",
     "historyTitle": "Your entries",
     "historySubtitle": "Only what you submitted in this challenge.",
     "dailyCheckIn": "Daily check-in",
