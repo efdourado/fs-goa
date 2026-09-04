@@ -30,7 +30,9 @@ import {
 } from "../ui";
 import {
   dateKeyInSaoPaulo,
+  findMissingRequiredField,
   isChallengeScheduled,
+  isEmptySaveADelete,
   isLivingList,
   itemIdForEntry,
   metricHasData,
@@ -50,6 +52,9 @@ function ratingChoices(config?: FieldConfig): number[] {
  * On desktop this is one clean row of equal pills (`sm:grid-cols-11`). On a phone
  * an odd count would wrap into a lopsided 6-over-5, so it becomes a single
  * horizontal snap-scroller of same-size pills, pre-scrolled to the current pick.
+ * Tapping the already-picked pill clears it — the field goes blank, same as
+ * never having answered, which on a required field lets a re-save delete the
+ * entry instead of needing a separate delete button.
  */
 function RatingField({
   id,
@@ -64,7 +69,7 @@ function RatingField({
   value: unknown;
   disabled: boolean;
   ariaLabel: (rating: string) => string;
-  onPick: (rating: number) => void;
+  onPick: (rating: number | null) => void;
 }) {
   const scroller = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -88,7 +93,7 @@ function RatingField({
             aria-pressed={picked}
             aria-label={ariaLabel(text)}
             disabled={disabled}
-            onClick={() => onPick(rating)}
+            onClick={() => onPick(picked ? null : rating)}
             className={cx(
               "h-10 w-10 flex-none snap-center rounded-xl border text-sm font-light tabular-nums sm:h-11 sm:w-auto sm:text-xs",
               picked
@@ -101,14 +106,6 @@ function RatingField({
         );
       })}
     </div>
-  );
-}
-
-function TrashGlyph({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 16 16" className={className ?? "h-3.5 w-3.5"} fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M3 4.5h10M6 4.5V3h4v1.5M5 4.5 6 13h5l1-8.5M6.5 7v4M9.5 7v4" />
-    </svg>
   );
 }
 
@@ -145,7 +142,10 @@ export function DynamicEntryForm({
   // means the entry is saved without a date. Owned by the caller.
   dateField?: { label: string; hint: string; value: string; max: string; onChange: (value: string) => void };
   onSave: (values: Record<Id, unknown>, entry?: Entry) => Promise<void>;
-  // Present only when this form is editing a saved entry the viewer may remove.
+  // Present only when this form is editing a saved entry the viewer may
+  // remove. There is no delete button: clearing a required field (e.g.
+  // tapping the already-picked rating again) and submitting calls this
+  // instead of blocking with a "fill this in" error.
   onDelete?: () => Promise<void>;
   // Admin correction always wants the live form, never the read-only summary —
   // that IS the point of that screen. The participant's Today tab leaves this
@@ -192,26 +192,24 @@ export function DynamicEntryForm({
     setSuccess(null);
   }
 
-  async function remove() {
-    if (!onDelete || !window.confirm(tp("deleteEntryConfirm"))) return;
-    setDeleting(true);
-    setError(null);
-    try {
-      await onDelete();
-    } catch (cause) {
-      setError(f.error(cause));
-      setDeleting(false);
-    }
-  }
-
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const missing = fields.find((field) => {
-      if (!field.required || !field.id) return false;
-      const value = values[field.id];
-      return value === undefined || value === null || value === "";
-    });
+    const missing = findMissingRequiredField(fields, values);
     if (missing) {
+      // No separate delete button: clearing the required answer (e.g. tapping
+      // the already-picked rating again) and saving removes the entry — the
+      // same intent, without an extra control sitting on screen at all times.
+      if (isEmptySaveADelete(missing, Boolean(entry), Boolean(onDelete))) {
+        setDeleting(true);
+        setError(null);
+        try {
+          await onDelete!();
+        } catch (cause) {
+          setError(f.error(cause));
+          setDeleting(false);
+        }
+        return;
+      }
       setError(t("fillField", { label: missing.label }));
       document.getElementById(`entry-field-${missing.id}`)?.focus();
       return;
@@ -292,9 +290,8 @@ export function DynamicEntryForm({
       <StatusMessage error={error} success={success} />
       {canEdit ? (
         <div className="flex flex-col gap-2 sm:flex-row">
-          <Button type="submit" className="w-full sm:flex-1" disabled={busy || deleting}>{busy ? tc("saving") : entry ? tc("saveChanges") : t("saveEntry")}<span aria-hidden="true">→</span></Button>
+          <Button type="submit" className="w-full sm:flex-1" disabled={busy || deleting}>{deleting ? tp("deletingEntry") : busy ? tc("saving") : entry ? tc("saveChanges") : t("saveEntry")}<span aria-hidden="true">→</span></Button>
           {entry && !alwaysEditable ? <Button type="button" variant="secondary" className="w-full sm:flex-1" disabled={busy || deleting} onClick={() => setEditing(false)}>{tc("cancel")}</Button> : null}
-          {entry && onDelete ? <Button type="button" variant="danger" className="w-full sm:w-auto sm:flex-none" disabled={busy || deleting} onClick={() => void remove()}><TrashGlyph />{deleting ? tp("deletingEntry") : tp("deleteEntry")}</Button> : null}
         </div>
       ) : <p className="rounded-xl border border-[var(--line)] bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{unavailableMessage ?? t("readOnly")}</p>}
       {item?.dueAt ? <p className="text-center text-xs text-[var(--muted)]">{t("dueAt", { date: f.dateTime(item.dueAt) })}</p> : null}

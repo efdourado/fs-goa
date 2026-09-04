@@ -1,4 +1,4 @@
-import type { ChallengeItem, ChallengeStatus, Entry, Id, RecipeKey, Role, SubmissionMode } from "./types";
+import type { ChallengeField, ChallengeItem, ChallengeStatus, Entry, Id, RecipeKey, Role, SubmissionMode } from "./types";
 
 export function canManage(role?: Role): boolean {
   return role === "owner" || role === "admin";
@@ -152,6 +152,26 @@ export function isLivingList(challenge: {
     && !challenge.startsOn
     && !challenge.endsOn
     && challenge.status !== "closed";
+}
+
+/** The first required field still blank, or undefined once every required field has a value. */
+export function findMissingRequiredField(fields: ChallengeField[], values: Record<Id, unknown>): ChallengeField | undefined {
+  return fields.find((field) => {
+    if (!field.required || !field.id) return false;
+    const value = values[field.id];
+    return value === undefined || value === null || value === "";
+  });
+}
+
+/**
+ * There is no delete button on an entry form: clearing the required answer
+ * (e.g. tapping an already-picked rating again) and submitting is the delete
+ * gesture instead, but only for an entry that already exists and can be
+ * removed — a first-time submission with a blank required field is still
+ * just an incomplete entry, not a request to delete something.
+ */
+export function isEmptySaveADelete(missingField: ChallengeField | undefined, hasEntry: boolean, canDelete: boolean): boolean {
+  return Boolean(missingField) && hasEntry && canDelete;
 }
 
 export function entryUnavailableMessage({

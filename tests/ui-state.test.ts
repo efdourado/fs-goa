@@ -4,9 +4,16 @@ import test from "node:test";
 
 import { RuleSectionsView } from "../app/goa/rules";
 import { DynamicEntryForm, ResultView } from "../app/goa/screens/participant-challenge";
-import type { ChallengeDetail } from "../app/goa/types";
+import type { ChallengeDetail, ChallengeField } from "../app/goa/types";
 import { AppHeader, ChallengeStatusBadge, SchedulePeriodFields } from "../app/goa/ui";
-import { inclusiveDayCount, isChallengeScheduled, isLivingList, shiftDateKey } from "../app/goa/utils";
+import {
+  findMissingRequiredField,
+  inclusiveDayCount,
+  isChallengeScheduled,
+  isEmptySaveADelete,
+  isLivingList,
+  shiftDateKey,
+} from "../app/goa/utils";
 import { ptFormat, renderWithIntl } from "./helpers/intl";
 
 test("desafio agendado existe só no diário com início futuro", () => {
@@ -141,6 +148,49 @@ test("formulário de registro esconde campos opcionais até a pessoa pedir", () 
   assert.match(form, /Páginas lidas/);
   assert.doesNotMatch(form, /Nota do livro/, "campo opcional fica oculto por padrão");
   assert.match(form, /Mostrar campos opcionais \(1\)/);
+});
+
+test("uma resposta já salva vira um único cartão clicável — sem botão de editar separado", () => {
+  const answered = renderWithIntl(createElement(DynamicEntryForm, {
+    fields: [{ id: "f1", key: "nota", label: "Nota", type: "rating", required: true, config: { min: 0, max: 5, step: 0.5 } }],
+    item: null,
+    entry: { id: "e1", values: { f1: 4.5 } },
+    canEdit: true,
+    onSave: async () => undefined,
+    onDelete: async () => undefined,
+  }));
+  assert.doesNotMatch(answered, />\s*Edit(ar)?\s*</i, "não sobra um rótulo de botão 'Editar' à parte");
+  assert.match(answered, /<button[^>]*>[\s\S]*Nota[\s\S]*4,5[\s\S]*<\/button>/, "os valores ficam dentro de um único botão clicável");
+});
+
+test("sem botão de excluir: o rótulo 'Excluir registro' não aparece mais em lugar nenhum do formulário", () => {
+  // `alwaysEditable` força a exibir o formulário (em vez do resumo) sem
+  // precisar simular um clique — é o mesmo modo que a correção do admin usa,
+  // e por isso também não mostra "Cancelar" aqui (nada a que voltar).
+  const editing = renderWithIntl(createElement(DynamicEntryForm, {
+    fields: [{ id: "f1", key: "nota", label: "Nota", type: "rating", required: true, config: { min: 0, max: 5, step: 0.5 } }],
+    item: null,
+    entry: { id: "e1", values: { f1: 4.5 } },
+    canEdit: true,
+    alwaysEditable: true,
+    onSave: async () => undefined,
+    onDelete: async () => undefined,
+  }));
+  assert.doesNotMatch(editing, /Excluir registro/, "o botão de excluir dedicado não existe mais");
+  assert.match(editing, /Salvar alterações/, "salvar continua presente");
+});
+
+test("limpar o campo obrigatório e salvar apaga o registro, em vez de bloquear com um erro", () => {
+  const fields = [{ id: "f1", key: "nota", label: "Nota", required: true }] as ChallengeField[];
+  assert.equal(findMissingRequiredField(fields, { f1: 4.5 }), undefined, "preenchido não falta nada");
+  const missing = findMissingRequiredField(fields, { f1: "" });
+  assert.equal(missing?.id, "f1", "o campo obrigatório vazio é encontrado");
+  assert.equal(findMissingRequiredField(fields, {})?.id, "f1", "nunca preenchido também conta como faltando");
+
+  assert.equal(isEmptySaveADelete(missing, true, true), true, "registro existente + exclusão disponível vira exclusão");
+  assert.equal(isEmptySaveADelete(missing, false, true), false, "sem registro existente ainda é só validação (nada a apagar)");
+  assert.equal(isEmptySaveADelete(missing, true, false), false, "sem callback de exclusão, continua validação");
+  assert.equal(isEmptySaveADelete(undefined, true, true), false, "nada faltando não é uma exclusão");
 });
 
 test("aba Resultados ao vivo: sem herói repetido, sem pílulas de nome, sem 'small sample' num solo", () => {
