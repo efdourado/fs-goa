@@ -317,9 +317,7 @@
     "pendingInviteMeta": "@{username} · invited on {date}",
     "cancel": "Cancel",
     "leaveToggle": "Leave group",
-    "leaveBody": "You stop seeing this group and its challenges, and you can't submit entries anymore. Your entries stay counted unless you remove them below.",
-    "leavePurgeLabel": "Also delete my entries and ratings from this group's rounds. Showcases already published keep their frozen snapshot.",
-    "leaveConfirm": "Leave group"
+    "leaveConfirm": "Leave this group? You stop seeing it and its challenges. Your entries stay (the group's history stays intact) but show as \"left the group\" instead of your name."
   },
   "catalog": {
     "back": "← Back",

@@ -204,7 +204,7 @@ export async function POST(request: Request): Promise<Response> {
       return json(await requestGroupMember(session, path[1], body));
     }
     if (path[0] === "groups" && path[2] === "leave" && path.length === 3) {
-      return json(await leaveGroup(session, path[1], body));
+      return json(await leaveGroup(session, path[1]));
     }
     if (path[0] === "member-requests" && path.length === 3 && path[2] === "accept") {
       return json(await respondToMemberRequest(session, path[1], "accept"));

@@ -332,18 +332,15 @@ export async function respondToMemberRequest(
 
 /**
  * A member walks away from a group they were added to. Soft-removes the
- * membership and every challenge participation in that group. With
- * `purgeData: true` their entries in the group's rounds are soft-deleted and
- * their name is cleared from any "recommended by" — the round loses the person
- * and their data. Already-published showcases are frozen snapshots and stay put.
- * The owner cannot leave (no ownership transfer yet — delete the group instead).
+ * membership and every challenge participation in that group — no question
+ * asked, because there is nothing to choose: their entries stay (the round's
+ * history stays intact) but every place that names them (recommended-by,
+ * per-participant metrics) shows a neutral "left the group" label instead, the
+ * same way a deleted account already shows "Conta removida". Already-published
+ * showcases are frozen snapshots and stay put. The owner cannot leave (no
+ * ownership transfer yet — delete the group instead).
  */
-export async function leaveGroup(
-  session: SessionContext,
-  groupId: string,
-  body: Record<string, unknown>,
-) {
-  const purgeData = body.purgeData === true;
+export async function leaveGroup(session: SessionContext, groupId: string) {
   return inTransaction(async (client) => {
     const group = await oneOrNull<{ id: string; name: string }>(
       client,
@@ -381,23 +378,6 @@ export async function leaveGroup(
       [groupId, session.user.id],
     );
 
-    let purgedEntries = 0;
-    if (purgeData) {
-      const deleted = await client.query(
-        `UPDATE entries SET deleted_at = now(), updated_at = now()
-          WHERE participant_user_id = $2 AND deleted_at IS NULL
-            AND challenge_id IN (SELECT id FROM challenges WHERE group_id = $1)`,
-        [groupId, session.user.id],
-      );
-      purgedEntries = deleted.rowCount ?? 0;
-      await client.query(
-        `UPDATE challenge_items SET recommended_by_user_id = NULL, updated_at = now()
-          WHERE recommended_by_user_id = $2
-            AND challenge_id IN (SELECT id FROM challenges WHERE group_id = $1)`,
-        [groupId, session.user.id],
-      );
-    }
-
     await writeAudit(
       client,
       groupId,
@@ -408,9 +388,8 @@ export async function leaveGroup(
       session.user.id,
       { role: membership.role },
       { removedAt: new Date().toISOString() },
-      { purgeData, purgedEntries },
     );
-    return { groupId, left: true as const, purged: purgeData, purgedEntries };
+    return { groupId, left: true as const };
   });
 }
 
