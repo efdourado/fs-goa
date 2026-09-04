@@ -5,7 +5,7 @@ import { getFormatter, getTranslations } from "next-intl/server";
 import { publicResults } from "@/lib/goa-challenges";
 import { type Formatter, makeGoaFormat, type Translator } from "@/app/goa/format";
 import { MetricBlock } from "@/app/goa/metrics-view";
-import { metricHasData, participantsSentence } from "@/app/goa/utils";
+import { metricHasData, metricTheme, participantsSentence } from "@/app/goa/utils";
 import { LanguageToggle } from "@/app/goa/LanguageToggle";
 import type { Metric } from "@/app/goa/types";
 
@@ -63,15 +63,29 @@ export default async function SharedResultsPage({ params }: { params: Promise<{ 
         </section>
         {(() => {
           const metrics = (result.metrics ?? []).filter(metricHasData);
+          const scalarMetrics = metrics.filter((metric) => !metric.series?.length);
+          const seriesMetrics = metrics.filter((metric) => metric.series?.length);
+          const themedSeries = (["ranking", "people", "debate"] as const)
+            .map((theme) => ({ theme, items: seriesMetrics.filter((metric) => metricTheme(metric) === theme) }))
+            .filter((group) => group.items.length);
           return metrics.length ? (
-            <div className="mt-6 space-y-4" aria-label={t("numbersAria")}>
-              <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {metrics.filter((metric) => !metric.series?.length).map((metric) => (
-                  <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} showMoreLabel={(count) => tm("showMore", { count })} showLessLabel={tm("showLess")} />
-                ))}
-              </section>
-              {metrics.filter((metric) => metric.series?.length).map((metric) => (
-                <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} showMoreLabel={(count) => tm("showMore", { count })} showLessLabel={tm("showLess")} />
+            <div className="mt-6 space-y-6" aria-label={t("numbersAria")}>
+              {scalarMetrics.length ? (
+                <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {scalarMetrics.map((metric) => (
+                    <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} showMoreLabel={(count) => tm("showMore", { count })} showLessLabel={tm("showLess")} />
+                  ))}
+                </section>
+              ) : null}
+              {themedSeries.map(({ theme, items }) => (
+                <section key={theme} className="space-y-3">
+                  {themedSeries.length > 1 ? <h3 className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--muted)]">{t(`theme.${theme}`)}</h3> : null}
+                  <div className="space-y-3">
+                    {items.map((metric) => (
+                      <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} showMoreLabel={(count) => tm("showMore", { count })} showLessLabel={tm("showLess")} />
+                    ))}
+                  </div>
+                </section>
               ))}
             </div>
           ) : null;

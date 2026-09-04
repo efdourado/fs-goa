@@ -36,6 +36,7 @@ import {
   isLivingList,
   itemIdForEntry,
   metricHasData,
+  metricTheme,
   participantsSentence,
   valuesAsRecord,
 } from "../utils";
@@ -328,6 +329,11 @@ export function ResultView({
   // Only a curated/generated headline — never fall back to the challenge title,
   // which the cover above already shows in full.
   const headline = result?.headline || null;
+  const scalarMetrics = metrics.filter((metric) => !metric.series?.length);
+  const seriesMetrics = metrics.filter((metric) => metric.series?.length);
+  const themedSeries = (["ranking", "people", "debate"] as const)
+    .map((theme) => ({ theme, items: seriesMetrics.filter((metric) => metricTheme(metric) === theme) }))
+    .filter((group) => group.items.length);
   return (
     <div className="space-y-5">
       {headline || result?.summary || names.length ? (
@@ -340,14 +346,23 @@ export function ResultView({
         </header>
       ) : null}
       {metrics.length ? (
-        <div className="space-y-3" aria-label={t("numbersAria")}>
-          <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {metrics.filter((metric) => !metric.series?.length).map((metric) => (
-              <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} hideThinLabel={hideThinLabel} showMoreLabel={(count) => tm("showMore", { count })} showLessLabel={tm("showLess")} />
-            ))}
-          </section>
-          {metrics.filter((metric) => metric.series?.length).map((metric) => (
-            <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} hideThinLabel={hideThinLabel} showMoreLabel={(count) => tm("showMore", { count })} showLessLabel={tm("showLess")} />
+        <div className="space-y-5" aria-label={t("numbersAria")}>
+          {scalarMetrics.length ? (
+            <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {scalarMetrics.map((metric) => (
+                <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} hideThinLabel={hideThinLabel} showMoreLabel={(count) => tm("showMore", { count })} showLessLabel={tm("showLess")} />
+              ))}
+            </section>
+          ) : null}
+          {themedSeries.map(({ theme, items }) => (
+            <section key={theme} className="space-y-3">
+              {themedSeries.length > 1 ? <h3 className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--muted)]">{t(`theme.${theme}`)}</h3> : null}
+              <div className="space-y-3">
+                {items.map((metric) => (
+                  <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} hideThinLabel={hideThinLabel} showMoreLabel={(count) => tm("showMore", { count })} showLessLabel={tm("showLess")} />
+                ))}
+              </div>
+            </section>
           ))}
         </div>
       ) : onBackToEntry ? (

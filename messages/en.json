@@ -813,7 +813,12 @@
     "momentsTitle": "Moments kept",
     "participantFallback": "Participant",
     "participantsSentence": "With {names}.",
-    "andMore": "{count} more"
+    "andMore": "{count} more",
+    "theme": {
+      "ranking": "Ranking",
+      "people": "By person",
+      "debate": "What split opinion"
+    }
   },
   "rules": {
     "legacyTitle": "Challenge rules",
@@ -993,6 +998,11 @@
     "numbersAria": "Results in numbers",
     "participantsSentence": "With {names}.",
     "andMore": "{count} more",
+    "theme": {
+      "ranking": "Ranking",
+      "people": "By person",
+      "debate": "What split opinion"
+    },
     "footer": "A memory published by the group on Goa."
   },
   "about": {
