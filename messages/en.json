@@ -434,7 +434,7 @@
       "checkpoints": "Checkpoints",
       "people": "People"
     },
-    "back": "← Back to {group}",
+    "back": "← Back",
     "title": "Build the next experience",
     "subtitle": "Start with a preset and adjust only what your group needs.",
     "personalTitle": "New personal challenge",
@@ -500,7 +500,7 @@
     "createDraft": "Create draft"
   },
   "adminChallenge": {
-    "back": "← {group}",
+    "back": "← Back",
     "simulateAsParticipant": "Simulate as participant",
     "subtitle": "Set it up, review it, and present it — admin controls stay validated on the server.",
     "tabsAria": "Admin areas",
@@ -728,7 +728,7 @@
       "today": "Today",
       "results": "Result"
     },
-    "back": "← {group}",
+    "back": "← Back",
     "manage": "Manage",
     "livingListMeta": "{count, plural, =0 {empty list} one {# title} other {# titles}}",
     "recommendedBy": "Recommended by {name}",

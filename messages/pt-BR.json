@@ -434,7 +434,7 @@
       "checkpoints": "Checkpoints",
       "people": "Pessoas"
     },
-    "back": "← Voltar para {group}",
+    "back": "← Voltar",
     "title": "Monte a próxima experiência",
     "subtitle": "Comece com um preset e ajuste somente o que seu grupo precisa.",
     "personalTitle": "Novo desafio pessoal",
@@ -500,7 +500,7 @@
     "createDraft": "Criar rascunho"
   },
   "adminChallenge": {
-    "back": "← {group}",
+    "back": "← Voltar",
     "simulateAsParticipant": "Simular como participante",
     "subtitle": "Configure, revise e apresente — controles administrativos continuam validados no servidor.",
     "tabsAria": "Áreas administrativas",
@@ -728,7 +728,7 @@
       "today": "Hoje",
       "results": "Resultado"
     },
-    "back": "← {group}",
+    "back": "← Voltar",
     "manage": "Gerenciar",
     "livingListMeta": "{count, plural, =0 {lista vazia} one {# título} other {# títulos}}",
     "recommendedBy": "Indicado por {name}",

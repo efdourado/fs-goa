@@ -888,7 +888,6 @@ export function AdminScreen({
   challenge,
   entries,
   group,
-  backLabel,
   tab,
   onTab,
   onBack,
@@ -916,8 +915,6 @@ export function AdminScreen({
   challenge: ChallengeDetail;
   entries: Entry[];
   group?: GroupSummary;
-  /** Where "back" leads: the group's name, "My space" for a personal challenge, or "Home". */
-  backLabel: string;
   tab: AdminTab;
   onTab: (tab: AdminTab) => void;
   onBack: () => void;
@@ -949,7 +946,7 @@ export function AdminScreen({
   const tabs: AdminTab[] = ["overview", "participants", "fields", "items", "review", "metrics", "results"];
   return (
     <main className="mx-auto max-w-7xl px-4 py-6 pb-24 sm:px-6 sm:py-10">
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><button className={backLinkClass} type="button" onClick={onBack}>{t("back", { group: backLabel })}</button><div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={onViewParticipant}>{t("simulateAsParticipant")}</Button></div></div>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><button className={backLinkClass} type="button" onClick={onBack}>{t("back")}</button><div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={onViewParticipant}>{t("simulateAsParticipant")}</Button></div></div>
       <PageHeading title={challenge.title} description={t("subtitle")} action={<ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />} />
       <nav className="mb-6 flex gap-1 overflow-x-auto rounded-2xl bg-[var(--wash-strong)]/70 p-1" aria-label={t("tabsAria")}>{tabs.map((id) => <button className={cx("min-h-11 flex-none rounded-xl px-4 text-sm font-light", tab === id ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]")} type="button" onClick={() => onTab(id)} key={id}>{t(`tabs.${id}`)}</button>)}</nav>
       {tab === "overview" ? <AdminOverview challenge={challenge} onSave={onSaveBasics} onTransition={onTransition} onDuplicate={onDuplicate} duplicateTargets={duplicateTargets} onDelete={onDelete} /> : null}
