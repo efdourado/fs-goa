@@ -113,7 +113,9 @@
       "catalog_author": "autor",
       "catalog_genre": "gênero"
     },
-    "smallSample": "amostra pequena"
+    "smallSample": "amostra pequena",
+    "showMore": "Ver mais {count, plural, one {#} other {#}}",
+    "showLess": "Ver menos"
   },
   "errors": {
     "generic": "Algo deu errado. Tente novamente.",

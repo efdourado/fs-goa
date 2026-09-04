@@ -67,11 +67,11 @@ export default async function SharedResultsPage({ params }: { params: Promise<{ 
             <div className="mt-6 space-y-4" aria-label={t("numbersAria")}>
               <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {metrics.filter((metric) => !metric.series?.length).map((metric) => (
-                  <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} />
+                  <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} showMoreLabel={(count) => tm("showMore", { count })} showLessLabel={tm("showLess")} />
                 ))}
               </section>
               {metrics.filter((metric) => metric.series?.length).map((metric) => (
-                <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} />
+                <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} showMoreLabel={(count) => tm("showMore", { count })} showLessLabel={tm("showLess")} />
               ))}
             </div>
           ) : null;

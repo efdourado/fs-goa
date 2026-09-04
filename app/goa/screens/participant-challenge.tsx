@@ -343,11 +343,11 @@ export function ResultView({
         <div className="space-y-3" aria-label={t("numbersAria")}>
           <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {metrics.filter((metric) => !metric.series?.length).map((metric) => (
-              <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} hideThinLabel={hideThinLabel} />
+              <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} hideThinLabel={hideThinLabel} showMoreLabel={(count) => tm("showMore", { count })} showLessLabel={tm("showLess")} />
             ))}
           </section>
           {metrics.filter((metric) => metric.series?.length).map((metric) => (
-            <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} hideThinLabel={hideThinLabel} />
+            <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} hideThinLabel={hideThinLabel} showMoreLabel={(count) => tm("showMore", { count })} showLessLabel={tm("showLess")} />
           ))}
         </div>
       ) : onBackToEntry ? (
