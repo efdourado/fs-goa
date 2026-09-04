@@ -697,8 +697,6 @@
   "participant": {
     "tabs": {
       "today": "Hoje",
-      "history": "Histórico",
-      "progress": "Progresso",
       "results": "Resultado"
     },
     "backHome": "← Início",
