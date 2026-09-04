@@ -2426,3 +2426,51 @@ test("apagar a conta também encerra a participação em desafios de outros grup
   );
   assert.equal(stillParticipant.rows[0]?.count, 0, "apagar a conta fecha a participação, não só a membresia do grupo");
 });
+
+test("hábito: sem catálogo, um campo numérico que o próprio usuário criou vira a base de uma métrica própria", async () => {
+  const owner = await register("Estuda Sozinho", "estuda_habito");
+
+  const created = await call("POST", "/api/personal/challenges", {
+    session: owner,
+    body: {
+      recipe: "habit",
+      title: "Estudos",
+      fields: [
+        { key: "materia", label: "Matéria", type: "text", required: false },
+        { key: "minutos", label: "Minutos estudados", type: "number", required: true, config: { min: 0, step: 1 } },
+      ],
+    },
+  });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  assert.equal((created.body as { status: string }).status, "active", "hábito pessoal sem datas nasce ativo, sem passo de ativação");
+  assert.equal((created.body as { kind: string }).kind, "list", "e é uma lista viva, não uma rodada com estado");
+  const challengeId = (created.body as { id: string }).id;
+
+  const detail = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    entryTypes: Array<{ id: string; purpose: string; fields: Array<{ id: string; key: string }> }>;
+    items: unknown[];
+  };
+  assert.deepEqual(detail.items, [], "hábito não cria nenhum item de acervo — não é filme, não é livro");
+  assert.deepEqual(detail.entryTypes.map((type) => type.purpose), ["checkin"]);
+  const typeId = detail.entryTypes[0].id;
+  const minutosField = detail.entryTypes[0].fields.find((field) => field.key === "minutos")!.id;
+  assert.ok(minutosField, "o campo criado pelo próprio usuário substitui o campo padrão da receita");
+
+  for (const [occurredOn, minutos] of [["2026-01-01", 30], ["2026-01-02", 50], ["2026-01-03", 40]] as const) {
+    const entry = await call("POST", `/api/challenges/${challengeId}/entries`, {
+      session: owner,
+      body: { entryTypeId: typeId, occurredOn, values: { [minutosField]: minutos } },
+    });
+    assert.equal(entry.response.status, 201, JSON.stringify(entry.body));
+  }
+
+  const metric = await call("POST", `/api/challenges/${challengeId}/metrics`, {
+    session: owner,
+    body: { label: "Média de minutos", operation: "average", fieldId: minutosField, groupBy: "none" },
+  });
+  assert.equal(metric.response.status, 201, JSON.stringify(metric.body));
+
+  const withMetric = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { metrics: ApiMetric[] };
+  const avg = withMetric.metrics.find((entry) => entry.label === "Média de minutos")!;
+  assert.equal(avg.value, 40, "a métrica calcula certo sobre um campo que não veio de receita nenhuma");
+});

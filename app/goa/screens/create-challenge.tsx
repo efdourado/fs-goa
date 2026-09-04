@@ -11,11 +11,14 @@ import { RuleSectionsEditor } from "../rules";
 import type { ChallengeCreationInput, ChallengeField, ChallengeRule, CreatableRecipeKey, GroupSummary, Id } from "../types";
 import { backLinkClass, Button, cardClass, cx, EmptyState, inputClass, labelClass, PageHeading, SchedulePeriodFields, StatusMessage } from "../ui";
 
-const RECIPES: Array<{ key: CreatableRecipeKey; catalogKind: "film" | "book"; scheduleMode: "period" | "none"; glyph: string }> = [
+const RECIPES: Array<{ key: CreatableRecipeKey; catalogKind: "film" | "book" | null; scheduleMode: "period" | "none"; glyph: string }> = [
   { key: "cinema", catalogKind: "film", scheduleMode: "none", glyph: "◉" },
   { key: "bookshelf", catalogKind: "book", scheduleMode: "none", glyph: "〇" },
   { key: "library", catalogKind: "book", scheduleMode: "period", glyph: "◎" },
+  { key: "habit", catalogKind: null, scheduleMode: "none", glyph: "◐" },
 ];
+
+type StepKey = "base" | "fields" | "checkpoints" | "people";
 
 export function CreateChallengeScreen({
   group,
@@ -50,10 +53,18 @@ export function CreateChallengeScreen({
   const itemInputs = cineRowsToInput(cineItems);
   const recipeMeta = RECIPES.find((entry) => entry.key === recipe) ?? null;
   const tracksCatalog = recipeMeta?.catalogKind ?? null;
-  const stepKeys = personal
-    ? (["base", "fields", "checkpoints"] as const)
-    : (["base", "fields", "checkpoints", "people"] as const);
+  // A no-catalog recipe (Hábito) has nothing to list, so the checkpoints step
+  // never appears — the wizard is base → fields (→ people) and nothing else.
+  const stepKeys: StepKey[] = [
+    "base",
+    "fields",
+    ...(tracksCatalog ? (["checkpoints"] as const) : []),
+    ...(personal ? [] : (["people"] as const)),
+  ];
   const lastStep = stepKeys.length;
+  const checkpointsStep = tracksCatalog ? stepKeys.indexOf("checkpoints") + 1 : null;
+  const peopleStep = personal ? null : stepKeys.indexOf("people") + 1;
+  const navColsClass = stepKeys.length <= 2 ? "grid-cols-2" : stepKeys.length === 3 ? "grid-cols-3" : "grid-cols-2 sm:grid-cols-4";
   const optionalOpen = showOptional || Boolean(description.trim()) || ruleSections.length > 0;
 
   function chooseRecipe(next: CreatableRecipeKey) {
@@ -90,11 +101,11 @@ export function CreateChallengeScreen({
       setError(t("errNoFields"));
       return;
     }
-    if (step === 3 && tracksCatalog && !itemInputs.length) {
+    if (step === checkpointsStep && tracksCatalog && !itemInputs.length) {
       setError(tracksCatalog === "book" ? t("errNoBooks") : t("errNoItems"));
       return;
     }
-    if (step === 3 && tracksCatalog === "book"
+    if (step === checkpointsStep && tracksCatalog === "book"
       && cineItems.some((row) => row.title.trim() && !row.author.trim())) {
       setError(t("errNoAuthor"));
       return;
@@ -144,7 +155,7 @@ export function CreateChallengeScreen({
     <main className="mx-auto max-w-6xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
       <button className={cx(backLinkClass, "mb-6")} type="button" onClick={onBack}>{personal ? tc("backHome") : t("back", { group: group?.name ?? "" })}</button>
       <PageHeading title={personal ? t("personalTitle") : t("title")} description={personal ? t("personalSubtitle") : t("subtitle")} />
-      <nav className={cx("mb-6 grid gap-1 rounded-2xl bg-[var(--wash-strong)]/70 p-1", personal ? "grid-cols-3" : "grid-cols-2 sm:grid-cols-4")} aria-label={t("stepsNav")}>
+      <nav className={cx("mb-6 grid gap-1 rounded-2xl bg-[var(--wash-strong)]/70 p-1", navColsClass)} aria-label={t("stepsNav")}>
         {stepKeys.map((key, index) => <button className={cx("min-h-11 truncate rounded-xl px-2 text-xs font-light sm:text-sm", step === index + 1 ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : index + 1 < step ? "text-[var(--ink)]" : "text-[var(--muted)]")} type="button" onClick={() => index + 1 < step && setStep(index + 1)} disabled={index + 1 > step} key={key}><span className="hidden sm:inline">{index + 1}. </span>{t(`steps.${key}`)}</button>)}
       </nav>
 
@@ -152,7 +163,7 @@ export function CreateChallengeScreen({
         {step === 1 ? (
           <div>
             <h2 className="text-xl font-light">{t("startTitle")}</h2>
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {RECIPES.map((entry) => (
                 <button className={cx("rounded-2xl border p-5 text-left transition", recipe === entry.key ? "border-[var(--main)] bg-[var(--main-soft)] ring-2 ring-[var(--main)]/25" : "border-[var(--line)] bg-[var(--paper)] hover:border-[var(--main-line)]")} type="button" aria-pressed={recipe === entry.key} onClick={() => chooseRecipe(entry.key)} key={entry.key}>
                   <span className="text-2xl" aria-hidden="true">{entry.glyph}</span>
@@ -192,16 +203,16 @@ export function CreateChallengeScreen({
 
         {step === 2 ? <div><h2 className="text-xl font-light">{t("fieldsTitle")}</h2><p className="mb-5 mt-1 text-sm text-[var(--muted)]">{t("fieldsSubtitle")}</p><FieldBuilder fields={fields} onChange={setFields} /></div> : null}
 
-        {step === 3 ? (
+        {step === checkpointsStep && tracksCatalog ? (
           <div>
             <h2 className="text-xl font-light">{t("checkpointsTitle")}</h2>
-            {tracksCatalog ? (
-              <><p className="mt-1 mb-4 text-sm leading-6 text-[var(--muted)]">{recipe === "bookshelf" ? t("bookshelfItemsHint") : tracksCatalog === "book" ? t("bookItemsHint") : t("cineItemsHint")}</p><CineItemsEditor value={cineItems} onChange={setCineItems} members={personal ? [] : group?.members ?? []} catalogPath={personal ? API_PATHS.personalCatalog : API_PATHS.groupCatalog(group!.id)} kind={tracksCatalog === "book" ? "book" : "film"} /><p className="mt-3 text-xs font-medium text-[var(--muted)]">{t("itemsCount", { count: itemInputs.length })}</p></>
-            ) : null}
+            <p className="mt-1 mb-4 text-sm leading-6 text-[var(--muted)]">{recipe === "bookshelf" ? t("bookshelfItemsHint") : tracksCatalog === "book" ? t("bookItemsHint") : t("cineItemsHint")}</p>
+            <CineItemsEditor value={cineItems} onChange={setCineItems} members={personal ? [] : group?.members ?? []} catalogPath={personal ? API_PATHS.personalCatalog : API_PATHS.groupCatalog(group!.id)} kind={tracksCatalog === "book" ? "book" : "film"} />
+            <p className="mt-3 text-xs font-medium text-[var(--muted)]">{t("itemsCount", { count: itemInputs.length })}</p>
           </div>
         ) : null}
 
-        {step === 4 && !personal ? (
+        {step === peopleStep ? (
           <div>
             <h2 className="text-xl font-light">{t("peopleTitle")}</h2>
             <p className="mt-1 text-sm text-[var(--muted)]">{t("peopleSubtitle")}</p>

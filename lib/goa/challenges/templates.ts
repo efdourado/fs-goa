@@ -55,7 +55,7 @@ export async function listTemplates() {
          FROM challenges c
          JOIN groups g ON g.id = c.group_id AND g.deleted_at IS NULL AND g.archived_at IS NULL
         WHERE c.published_as_template_at IS NOT NULL AND c.deleted_at IS NULL
-          AND c.recipe_key IN ('cinema', 'library', 'bookshelf')
+          AND c.recipe_key IN ('cinema', 'library', 'bookshelf', 'habit')
         ORDER BY c.published_as_template_at DESC`,
     );
     return {
@@ -90,7 +90,7 @@ async function templateRowById(client: PoolClient, challengeId: string) {
        FROM challenges c
        JOIN groups g ON g.id = c.group_id AND g.deleted_at IS NULL AND g.archived_at IS NULL
       WHERE c.id = $1 AND c.published_as_template_at IS NOT NULL AND c.deleted_at IS NULL
-        AND c.recipe_key IN ('cinema', 'library', 'bookshelf')`,
+        AND c.recipe_key IN ('cinema', 'library', 'bookshelf', 'habit')`,
     [challengeId],
   );
 }

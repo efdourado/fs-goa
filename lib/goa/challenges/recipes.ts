@@ -68,7 +68,7 @@ export interface Recipe {
 }
 
 /** Recipes offered for new challenges. Historical rows keep their frozen shape. */
-export type RecipeKey = "cinema" | "library" | "bookshelf";
+export type RecipeKey = "cinema" | "library" | "bookshelf" | "habit";
 
 /**
  * Stored by challenges created before the two-template consolidation. These keys
@@ -95,7 +95,7 @@ export function isLegacyRecipeKey(value: unknown): value is LegacyRecipeKey {
 }
 
 export function isRecipeKey(value: unknown): value is RecipeKey {
-  return value === "cinema" || value === "library" || value === "bookshelf";
+  return value === "cinema" || value === "library" || value === "bookshelf" || value === "habit";
 }
 
 /**
@@ -159,6 +159,25 @@ const conclusao: RecipeEntryType = {
     { key: "nota", label: "Nota", type: "rating", required: false, config: { min: 0, max: 5, step: 0.5 } },
     { key: "comentario", label: "Comentário", type: "text", required: false, config: { multiline: true, maxLength: 500 } },
   ],
+};
+
+// A blank check-in for anything that isn't a film/book list: no target item, no
+// preset numeric field. The idea is for the wizard's Fields step and the
+// admin's Metrics tab to carry the whole shape — this recipe just opens the
+// door (a daily "registro", once per day) so a personalized habit tracker
+// doesn't have to masquerade as Cinema or Library.
+const habitCheckin: RecipeEntryType = {
+  semanticKey: "registro",
+  name: "Registro",
+  purpose: "checkin",
+  submissionMode: "daily",
+  targetPolicy: "none",
+  cardinality: "once_per_day",
+  schedulePolicy: "while_active",
+  fields: [
+    { key: "nota_dia", label: "Como foi?", type: "text", required: false, config: { multiline: true, maxLength: 500 } },
+  ],
+  primary: true,
 };
 
 const completionMetric: RecipeMetric = {
@@ -256,6 +275,18 @@ export const RECIPES: Record<RecipeKey, Recipe> = {
       completionMetric,
     ],
   },
+  // A personalized daily check-in with no catalog at all — studying, a workout,
+  // a mood log. The wizard's Fields step and the admin's Metrics tab (any
+  // numeric field can already feed a Sum/Average/Min/Max metric) are the whole
+  // template; only completion rate is seeded.
+  habit: {
+    key: "habit",
+    version: 1,
+    catalogKind: null,
+    scheduleMode: "none",
+    entryTypes: [habitCheckin],
+    metrics: [completionMetric],
+  },
 };
 
 const TEMPLATE_ALIAS: Record<string, RecipeKey> = {
@@ -274,13 +305,13 @@ const TEMPLATE_ALIAS: Record<string, RecipeKey> = {
 export function resolveRecipe(body: Record<string, unknown>): Recipe {
   if (Object.hasOwn(body, "recipe")) {
     if (!isRecipeKey(body.recipe)) {
-      throw new ApiError(400, "invalid_recipe", "Escolha o modelo Cinema, Estante ou Clube de leitura.");
+      throw new ApiError(400, "invalid_recipe", "Escolha o modelo Cinema, Estante, Clube de leitura ou Hábito.");
     }
     return RECIPES[body.recipe];
   }
   if (Object.hasOwn(body, "template")) {
     if (typeof body.template !== "string" || !Object.hasOwn(TEMPLATE_ALIAS, body.template)) {
-      throw new ApiError(400, "invalid_recipe", "Escolha o modelo Cinema, Estante ou Clube de leitura.");
+      throw new ApiError(400, "invalid_recipe", "Escolha o modelo Cinema, Estante, Clube de leitura ou Hábito.");
     }
     return RECIPES[TEMPLATE_ALIAS[body.template]];
   }

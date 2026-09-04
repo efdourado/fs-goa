@@ -442,6 +442,11 @@
         "name": "Clube de leitura",
         "body": "Uma lista de livros com páginas lidas por dia e por livro, e um \"Terminei\" com nota. Precisa de período.",
         "title": "Clube de leitura — nova temporada"
+      },
+      "habit": {
+        "name": "Hábito",
+        "body": "Sem filme, sem livro — só um registro diário. Adicione os campos que o hábito precisar e crie suas próprias métricas a partir deles.",
+        "title": "Novo hábito"
       }
     },
     "titleLabel": "Título",
@@ -828,7 +833,8 @@
       "livroAtual": "Livro atual",
       "paginasLidas": "Páginas lidas",
       "livroConcluido": "Livro concluído?",
-      "notaDoLivro": "Nota do livro"
+      "notaDoLivro": "Nota do livro",
+      "comoFoi": "Como foi?"
     },
     "labelLabel": "Rótulo",
     "typeLabel": "Tipo",

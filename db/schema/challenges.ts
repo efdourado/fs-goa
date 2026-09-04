@@ -109,7 +109,7 @@ export const challenges = pgTable(
     check("challenges_status_check", sql`${table.status} in ('draft', 'active', 'closed')`),
     check(
       "challenges_recipe_key_check",
-      sql`${table.recipeKey} is null or ${table.recipeKey} in ('cinema', 'library', 'bookshelf', 'cine_free', 'cine_curated', 'reading_club', 'reading_daily')`,
+      sql`${table.recipeKey} is null or ${table.recipeKey} in ('cinema', 'library', 'bookshelf', 'habit', 'cine_free', 'cine_curated', 'reading_club', 'reading_daily')`,
     ),
     check("challenges_recipe_version_check", sql`${table.recipeVersion} >= 1`),
     check(

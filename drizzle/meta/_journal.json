@@ -169,6 +169,13 @@
       "when": 1788480000000,
       "tag": "0023_challenge_kind",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1788490000000,
+      "tag": "0024_habit_recipe",
+      "breakpoints": true
     }
   ]
 }

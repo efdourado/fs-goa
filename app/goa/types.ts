@@ -9,11 +9,12 @@ export type RecipeKey =
   | "cinema"
   | "library"
   | "bookshelf"
+  | "habit"
   | "cine_free"
   | "cine_curated"
   | "reading_club"
   | "reading_daily";
-export type CreatableRecipeKey = "cinema" | "library" | "bookshelf";
+export type CreatableRecipeKey = "cinema" | "library" | "bookshelf" | "habit";
 export type EntryPurpose = "progress" | "completion" | "expectation" | "rating" | "checkin";
 export type TargetPolicy = "required" | "optional" | "none";
 export type Cardinality = "once_per_item" | "once_per_item_day" | "repeatable" | "once_per_day";
