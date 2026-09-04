@@ -133,6 +133,23 @@ export function isChallengeScheduled(
     && Boolean(startsOn && startsOn > dateKeyInSaoPaulo(now));
 }
 
+/**
+ * A personal challenge with no start/end is a living list ("films I've seen") —
+ * it is born active and never closes, so the whole draft/activate/close lifecycle
+ * (and its UI) is hidden. A closed legacy one keeps the lifecycle so it can reopen.
+ */
+export function isLivingList(challenge: {
+  scope?: "personal" | "group";
+  startsOn?: string | null;
+  endsOn?: string | null;
+  status: ChallengeStatus;
+}): boolean {
+  return challenge.scope === "personal"
+    && !challenge.startsOn
+    && !challenge.endsOn
+    && challenge.status !== "closed";
+}
+
 export function entryUnavailableMessage({
   challengeStatus,
   isParticipant,

@@ -443,11 +443,15 @@ async function archiveCatalogItemWithClient(
   if (!item) throw new ApiError(404, "not_found", "Item do acervo não encontrado.");
   const live = await oneOrNull<{ count: number }>(
     client,
+    // A living list (personal, no dates) has no round to protect — its titles
+    // are always prunable, so it never counts as "in use".
     `SELECT count(DISTINCT c.id)::int AS count
        FROM challenge_items it
        JOIN challenges c ON c.id = it.challenge_id
+       JOIN groups g ON g.id = c.group_id
       WHERE it.catalog_item_id = $1 AND it.archived_at IS NULL
-        AND c.deleted_at IS NULL AND c.status IN ('draft', 'active')`,
+        AND c.deleted_at IS NULL AND c.status IN ('draft', 'active')
+        AND NOT (g.kind = 'personal' AND c.start_date IS NULL AND c.end_date IS NULL)`,
     [catalogItemId],
   );
   if (live && live.count > 0) {
@@ -459,6 +463,25 @@ async function archiveCatalogItemWithClient(
   }
   await client.query(
     "UPDATE catalog_items SET archived_at = now(), updated_at = now() WHERE id = $1",
+    [catalogItemId],
+  );
+  // In a living list the catalog identity and the list row are one and the same,
+  // so pruning the catalogue also drops the row (and its entries) from the list.
+  await client.query(
+    `UPDATE entries e SET deleted_at = now(), last_edited_by_user_id = $2, updated_at = now()
+       FROM challenge_items it
+       JOIN challenges c ON c.id = it.challenge_id
+       JOIN groups g ON g.id = c.group_id
+      WHERE it.catalog_item_id = $1 AND e.item_id = it.id AND e.deleted_at IS NULL
+        AND g.kind = 'personal' AND c.start_date IS NULL AND c.end_date IS NULL AND c.status <> 'closed'`,
+    [catalogItemId, actorUserId],
+  );
+  await client.query(
+    `UPDATE challenge_items it SET archived_at = now(), updated_at = now()
+       FROM challenges c, groups g
+      WHERE it.catalog_item_id = $1 AND it.archived_at IS NULL
+        AND c.id = it.challenge_id AND g.id = c.group_id
+        AND g.kind = 'personal' AND c.start_date IS NULL AND c.end_date IS NULL AND c.status <> 'closed'`,
     [catalogItemId],
   );
   await writeAudit(

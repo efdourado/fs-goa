@@ -6,7 +6,7 @@ import { RuleSectionsView } from "../app/goa/rules";
 import { DynamicEntryForm, ResultView } from "../app/goa/screens/participant-challenge";
 import type { ChallengeDetail } from "../app/goa/types";
 import { AppHeader, ChallengeStatusBadge, SchedulePeriodFields } from "../app/goa/ui";
-import { inclusiveDayCount, isChallengeScheduled, shiftDateKey } from "../app/goa/utils";
+import { inclusiveDayCount, isChallengeScheduled, isLivingList, shiftDateKey } from "../app/goa/utils";
 import { ptFormat, renderWithIntl } from "./helpers/intl";
 
 test("desafio agendado existe só no diário com início futuro", () => {
@@ -18,6 +18,14 @@ test("desafio agendado existe só no diário com início futuro", () => {
   assert.equal(isChallengeScheduled("active", null, "daily", now), false);
   // Cine (item) com início futuro não é "agendado" — é ativo, aceita avaliação.
   assert.equal(isChallengeScheduled("active", "2026-08-30", "item", now), false);
+});
+
+test("lista viva = pessoal sem datas e não encerrada", () => {
+  assert.equal(isLivingList({ scope: "personal", startsOn: null, endsOn: null, status: "active" }), true);
+  assert.equal(isLivingList({ scope: "personal", startsOn: null, endsOn: null, status: "draft" }), true);
+  assert.equal(isLivingList({ scope: "personal", startsOn: null, endsOn: null, status: "closed" }), false, "uma legada encerrada mantém o ciclo para poder reabrir");
+  assert.equal(isLivingList({ scope: "personal", startsOn: "2026-01-01", endsOn: "2026-12-31", status: "active" }), false, "com período é uma rodada, não uma lista");
+  assert.equal(isLivingList({ scope: "group", startsOn: null, endsOn: null, status: "active" }), false, "grupo nunca é lista viva");
 });
 
 test("apresenta período ou ausência de prazo sem datas fictícias", () => {

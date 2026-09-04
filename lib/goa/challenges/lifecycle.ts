@@ -15,6 +15,13 @@ export async function transitionChallenge(
   return inTransaction(async (client) => {
     const access = await challengeAccess(session.user.id, challengeId, client, true);
     if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores podem mudar o estado.");
+    // A personal list with no dates has no round to end — it just grows. Delete
+    // it if it is no longer wanted.
+    const livingList = access.challenge.group_kind === "personal"
+      && !access.challenge.start_date && !access.challenge.end_date;
+    if (livingList && target === "closed") {
+      throw new ApiError(409, "living_list_no_close", "Uma lista pessoal sem datas não é encerrada. Apague-a se não precisar mais dela.");
+    }
     const reopening = access.challenge.status === "closed" && target === "active";
     const valid = (access.challenge.status === "draft" && target === "active") ||
       (access.challenge.status === "active" && target === "closed") ||
