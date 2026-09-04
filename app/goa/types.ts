@@ -208,7 +208,7 @@ export interface Metric {
   label: string;
   operation: MetricOperation;
   fieldId?: Id | null;
-  groupBy?: "none" | "participant" | "item" | "day" | "week";
+  groupBy?: "none" | "participant" | "item" | "day" | "week" | "catalog_year" | "catalog_author" | "catalog_genre";
   visibleDuring?: boolean;
   visibleInResults?: boolean;
   minSample?: number;

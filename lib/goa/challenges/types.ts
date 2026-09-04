@@ -18,7 +18,7 @@ export interface MetricRow {
   semantic_key: string;
   label: string;
   operation: MetricOperation;
-  group_by: "none" | "participant" | "item" | "day" | "week";
+  group_by: "none" | "participant" | "item" | "day" | "week" | "catalog_year" | "catalog_author" | "catalog_genre";
   decimal_places: number;
   visible_during_challenge: boolean;
   position: number;

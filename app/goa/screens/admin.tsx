@@ -40,7 +40,14 @@ const METRIC_OPERATIONS: Metric["operation"][] = [
   "sum", "average", "count", "min", "max", "completion_rate",
   "bayesian_average", "spread", "surprise", "indicator_bias",
 ];
-const METRIC_GROUP_BY: NonNullable<Metric["groupBy"]>[] = ["none", "participant", "item"];
+/** "Best authors", "best movies of 2026" — only offered once the round actually tracks a catalog. */
+function metricGroupByOptions(catalogKind: "film" | "book" | null): NonNullable<Metric["groupBy"]>[] {
+  if (!catalogKind) return ["none", "participant", "item"];
+  return [
+    "none", "participant", "item", "catalog_year", "catalog_genre",
+    ...(catalogKind === "book" ? (["catalog_author"] as const) : []),
+  ];
+}
 
 export interface DuplicateTargetGroup {
   id: Id;
@@ -584,7 +591,7 @@ function AdminReview({
         <section className={cx(cardClass, "p-5 sm:p-7")} aria-labelledby="correction-title">
           <div className="mb-5 flex items-start justify-between gap-3"><div><p className="text-xs font-light uppercase tracking-[0.1em] text-[var(--muted)]">{t("correctionKicker")}</p><h2 id="correction-title" className="mt-1 text-xl font-light">{t("correctionHeading", { name: selected.participantName ?? t("participantFallback"), item: selectedItem?.title ?? t("entryFallback") })}</h2></div><Button variant="ghost" onClick={() => setSelectedId(null)}>{tc("close")}</Button></div>
           <label className="mb-5 block"><span className={labelClass}>{t("reasonLabel")} <span className="text-[var(--main-2)]">*</span></span><textarea className={inputClass} rows={3} value={reason} onChange={(event) => setReason(event.target.value)} placeholder={t("reasonPlaceholder")} maxLength={500} disabled={challenge.status === "closed"} /></label>
-          <DynamicEntryForm key={`${selected.id}-${selected.updatedAt ?? ""}`} fields={selectedFields} item={selectedItem} entry={selected} canEdit={challenge.status !== "closed"} unavailableMessage={challenge.status === "closed" ? f.entryUnavailableMessage({ challengeStatus: "closed" }) : null} onSave={async (values) => { if (!reason.trim()) throw new Error(t("reasonRequired")); await onPatch(selected.id, values, reason.trim()); setReason(""); }} />
+          <DynamicEntryForm key={`${selected.id}-${selected.updatedAt ?? ""}`} fields={selectedFields} item={selectedItem} entry={selected} canEdit={challenge.status !== "closed"} unavailableMessage={challenge.status === "closed" ? f.entryUnavailableMessage({ challengeStatus: "closed" }) : null} onSave={async (values) => { if (!reason.trim()) throw new Error(t("reasonRequired")); await onPatch(selected.id, values, reason.trim()); setReason(""); }} alwaysEditable />
           {challenge.status !== "closed" ? (
             <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--line)] pt-5">
               <p className="text-sm text-[var(--muted)]">{t("deleteEntryHint")}</p>
@@ -607,13 +614,21 @@ function AdminReview({
 function AdminMetrics({
   challenge,
   onAdd,
+  onUpdate,
+  onDelete,
 }: {
   challenge: ChallengeDetail;
   onAdd: (payload: Record<string, unknown>) => Promise<void>;
+  onUpdate: (metricId: Id, payload: Record<string, unknown>) => Promise<void>;
+  onDelete: (metricId: Id) => Promise<void>;
 }) {
   const t = useTranslations("adminChallenge");
+  const tc = useTranslations("common");
   const tm = useTranslations("metrics");
   const f = useGoaFormat();
+  const catalogKind = recipeCatalogKind(challenge.recipeKey);
+  const groupByOptions = metricGroupByOptions(catalogKind);
+  const [editingId, setEditingId] = useState<Id | null>(null);
   const [label, setLabel] = useState("");
   const [operation, setOperation] = useState<Metric["operation"]>("average");
   const [fieldId, setFieldId] = useState("");
@@ -621,20 +636,65 @@ function AdminMetrics({
   const [visibleDuring, setVisibleDuring] = useState(true);
   const [visibleInResults, setVisibleInResults] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [deletingId, setDeletingId] = useState<Id | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const needsNumericField = ["sum", "average", "min", "max"].includes(operation);
   const selectableFields = challenge.fields.filter((field) => !needsNumericField || field.type === "number" || field.type === "rating");
   const needsField = operation !== "count" && operation !== "completion_rate";
+  const closed = challenge.status === "closed";
+
+  function resetForm() {
+    setEditingId(null);
+    setLabel("");
+    setOperation("average");
+    setFieldId("");
+    setGroupBy("none");
+    setVisibleDuring(true);
+    setVisibleInResults(true);
+    setError(null);
+  }
+
+  function startEdit(metric: Metric) {
+    setEditingId(metric.id);
+    setLabel(metric.label);
+    setOperation(metric.operation);
+    setFieldId(metric.fieldId ?? "");
+    setGroupBy(metric.groupBy ?? "none");
+    setVisibleDuring(metric.visibleDuring !== false);
+    setVisibleInResults(metric.visibleInResults !== false);
+    setError(null);
+    setSuccess(null);
+  }
+
+  async function remove(metric: Metric) {
+    if (!window.confirm(t("deleteMetricConfirm", { label: metric.label }))) return;
+    setDeletingId(metric.id);
+    setError(null);
+    try {
+      await onDelete(metric.id);
+      if (editingId === metric.id) resetForm();
+    } catch (cause) {
+      setError(f.error(cause));
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (needsField && !fieldId) { setError(t("errPickField")); return; }
     setBusy(true); setError(null); setSuccess(null);
+    const payload = { label: label.trim(), operation, fieldId: needsField ? fieldId : null, groupBy, visibleDuring, visibleInResults };
     try {
-      await onAdd({ label: label.trim(), operation, fieldId: needsField ? fieldId : null, groupBy, visibleDuring, visibleInResults });
-      setLabel("");
-      setSuccess(t("metricAdded"));
+      if (editingId) {
+        await onUpdate(editingId, payload);
+        setSuccess(t("metricUpdated"));
+      } else {
+        await onAdd(payload);
+        setSuccess(t("metricAdded"));
+      }
+      resetForm();
     } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
   }
 
@@ -642,19 +702,19 @@ function AdminMetrics({
     <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
       <section>
         <PageHeading title={t("metricsTitle")} description={t("metricsSubtitle")} />
-        {challenge.metrics.length ? <div className="grid gap-3 sm:grid-cols-2">{challenge.metrics.map((metric) => <article className={cx(cardClass, "p-5")} key={metric.id}><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-light uppercase tracking-[0.1em] text-[var(--muted)]">{tm(`operationName.${metric.operation}`)}</p><h3 className="mt-1 font-light">{metric.label}</h3></div><strong className="text-2xl tracking-[-0.04em]">{metric.series?.length ? "" : metric.formattedValue ?? metric.value ?? "—"}</strong></div>{metric.series?.length ? <ol className="mt-3 space-y-1 text-sm">{metric.series.slice(0, 8).map((row, index) => <li key={row.key} className={cx("flex items-center justify-between gap-2", row.value === null && "opacity-45")}><span className="truncate"><span className="mr-2 tabular-nums text-[var(--muted)]">{index + 1}</span>{row.label}</span><span className="flex-none tabular-nums font-medium">{row.value === null ? tm("smallSample") : row.formattedValue ?? row.value}<span className="ml-1.5 text-[10px] font-light text-[var(--muted)]">n={row.sampleSize}</span></span></li>)}</ol> : null}<div className="mt-4 flex flex-wrap gap-2 text-[10px] font-light uppercase text-[var(--muted)]">{metric.visibleDuring ? <span className="rounded-full bg-[var(--ok-soft)] px-2 py-1">{t("metricDuring")}</span> : null}{metric.visibleInResults ? <span className="rounded-full bg-[var(--main-soft)] px-2 py-1">{t("metricInResults")}</span> : null}{metric.groupBy && metric.groupBy !== "none" ? <span className="rounded-full bg-[var(--wash)] px-2 py-1">{t("metricGroupedBy", { groupBy: tm(`groupByShort.${metric.groupBy}`) })}</span> : null}</div></article>)}</div> : <EmptyState title={t("noMetricsTitle")} description={t("noMetricsBody")} />}
+        {challenge.metrics.length ? <div className="grid gap-3 sm:grid-cols-2">{challenge.metrics.map((metric) => <article className={cx(cardClass, "p-5")} key={metric.id}><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-light uppercase tracking-[0.1em] text-[var(--muted)]">{tm(`operationName.${metric.operation}`)}</p><h3 className="mt-1 font-light">{metric.label}</h3></div><strong className="text-2xl tracking-[-0.04em]">{metric.series?.length ? "" : metric.formattedValue ?? metric.value ?? "—"}</strong></div>{metric.series?.length ? <ol className="mt-3 space-y-1 text-sm">{metric.series.slice(0, 8).map((row, index) => <li key={row.key} className={cx("flex items-center justify-between gap-2", row.value === null && "opacity-45")}><span className="truncate"><span className="mr-2 tabular-nums text-[var(--muted)]">{index + 1}</span>{row.label}</span><span className="flex-none tabular-nums font-medium">{row.value === null ? tm("smallSample") : row.formattedValue ?? row.value}<span className="ml-1.5 text-[10px] font-light text-[var(--muted)]">n={row.sampleSize}</span></span></li>)}</ol> : null}<div className="mt-4 flex flex-wrap items-center justify-between gap-2"><div className="flex flex-wrap gap-2 text-[10px] font-light uppercase text-[var(--muted)]">{metric.visibleDuring ? <span className="rounded-full bg-[var(--ok-soft)] px-2 py-1">{t("metricDuring")}</span> : null}{metric.visibleInResults ? <span className="rounded-full bg-[var(--main-soft)] px-2 py-1">{t("metricInResults")}</span> : null}{metric.groupBy && metric.groupBy !== "none" ? <span className="rounded-full bg-[var(--wash)] px-2 py-1">{t("metricGroupedBy", { groupBy: tm(`groupByShort.${metric.groupBy}`) })}</span> : null}</div>{!closed ? <div className="flex gap-3 text-xs font-light"><button type="button" className="cursor-pointer hover:underline" onClick={() => startEdit(metric)}>{t("edit")}</button><button type="button" className="cursor-pointer text-[var(--danger)] hover:underline disabled:opacity-50" disabled={deletingId === metric.id} onClick={() => void remove(metric)}>{deletingId === metric.id ? t("removing") : t("remove")}</button></div> : null}</div></article>)}</div> : <EmptyState title={t("noMetricsTitle")} description={t("noMetricsBody")} />}
       </section>
       <aside className={cx(cardClass, "h-fit p-5")}>
-        <h2 className="text-lg font-light">{t("addMetric")}</h2>
-        {challenge.status === "closed" ? <p className="mt-4 text-sm leading-6 text-[var(--muted)]">{t("metricsClosedNote")}</p> : <form className="mt-4 space-y-4" onSubmit={submit}>
+        <div className="flex items-center justify-between gap-2"><h2 className="text-lg font-light">{editingId ? t("editMetric") : t("addMetric")}</h2>{editingId ? <button type="button" className="text-xs font-light hover:underline" onClick={resetForm}>{t("cancelEditMetric")}</button> : null}</div>
+        {closed ? <p className="mt-4 text-sm leading-6 text-[var(--muted)]">{t("metricsClosedNote")}</p> : <form className="mt-4 space-y-4" onSubmit={submit}>
           <label><span className={labelClass}>{t("metricNameLabel")}</span><input className={inputClass} value={label} onChange={(event) => setLabel(event.target.value)} placeholder={t("metricNamePlaceholder")} required maxLength={100} /></label>
           <label><span className={labelClass}>{t("metricOperationLabel")}</span><select className={inputClass} value={operation} onChange={(event) => { const next = event.target.value as Metric["operation"]; setOperation(next); setFieldId(""); }}>{METRIC_OPERATIONS.map((op) => <option value={op} key={op}>{tm(`operationName.${op}`)}</option>)}</select></label>
           {needsField ? <label><span className={labelClass}>{t("metricFieldLabel")}</span><select className={inputClass} value={fieldId} onChange={(event) => setFieldId(event.target.value)} required><option value="">{t("metricFieldPlaceholder")}</option>{selectableFields.filter((field) => field.id).map((field) => <option value={field.id} key={field.id}>{field.label}</option>)}</select></label> : null}
-          <label><span className={labelClass}>{t("metricGroupByLabel")}</span><select className={inputClass} value={groupBy} onChange={(event) => setGroupBy(event.target.value as Metric["groupBy"])}>{METRIC_GROUP_BY.map((value) => <option value={value} key={value}>{tm(`groupBy.${value}`)}</option>)}</select></label>
+          <label><span className={labelClass}>{t("metricGroupByLabel")}</span><select className={inputClass} value={groupBy} onChange={(event) => setGroupBy(event.target.value as Metric["groupBy"])}>{groupByOptions.map((value) => <option value={value} key={value}>{tm(`groupBy.${value}`)}</option>)}</select></label>
           <label className="flex min-h-11 items-center gap-2 text-sm font-medium"><input type="checkbox" checked={visibleDuring} onChange={(event) => setVisibleDuring(event.target.checked)} />{t("metricVisibleDuring")}</label>
           <label className="flex min-h-11 items-center gap-2 text-sm font-medium"><input type="checkbox" checked={visibleInResults} onChange={(event) => setVisibleInResults(event.target.checked)} />{t("metricVisibleResults")}</label>
           <StatusMessage error={error} success={success} />
-          <Button type="submit" className="w-full" disabled={busy}>{busy ? t("calculating") : t("addMetric")}</Button>
+          <Button type="submit" className="w-full" disabled={busy}>{busy ? t("calculating") : editingId ? tc("saveChanges") : t("addMetric")}</Button>
         </form>}
       </aside>
     </div>
@@ -689,7 +749,7 @@ function AdminResults({
   const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
   const [copyState, setCopyState] = useState<"idle" | "done" | "failed">("idle");
   const linkRef = useRef<HTMLInputElement>(null);
-  const [headline, setHeadline] = useState(challenge.result?.headline ?? challenge.title);
+  const [headline, setHeadline] = useState(challenge.result?.headline ?? "");
   const [summary, setSummary] = useState(challenge.result?.summary ?? "");
   const [metricIds, setMetricIds] = useState<Id[]>(challenge.result?.metrics?.map((metric) => metric.id) ?? challenge.metrics.filter((metric) => metric.visibleInResults).map((metric) => metric.id));
   const [commentKeys, setCommentKeys] = useState<string[]>(
@@ -811,7 +871,7 @@ function AdminResults({
 
       <section className={cx(cardClass, "p-5 sm:p-7")}>
         <PageHeading title={t("resultsTitle")} description={t("resultsSubtitle")} />
-        <div className="grid gap-4 sm:grid-cols-2"><label className="sm:col-span-2"><span className={labelClass}>{t("headlineLabel")}</span><input className={inputClass} value={headline} onChange={(event) => setHeadline(event.target.value)} maxLength={180} /></label><label className="sm:col-span-2"><span className={labelClass}>{t("summaryLabel")}</span><textarea className={inputClass} rows={4} value={summary} onChange={(event) => setSummary(event.target.value)} maxLength={1500} /></label></div>
+        <div className="grid gap-4 sm:grid-cols-2"><label className="sm:col-span-2"><span className={labelClass}>{t("headlineLabel")}</span><input className={inputClass} value={headline} onChange={(event) => setHeadline(event.target.value)} maxLength={180} placeholder={challenge.title} /></label><label className="sm:col-span-2"><span className={labelClass}>{t("summaryLabel")}</span><textarea className={inputClass} rows={4} value={summary} onChange={(event) => setSummary(event.target.value)} maxLength={1500} /></label></div>
         <fieldset className="mt-6"><legend className="text-base font-light">{t("highlightMetrics")}</legend>{challenge.metrics.length ? <div className="mt-3 grid gap-2 sm:grid-cols-2">{challenge.metrics.map((metric) => <label className="flex min-h-12 items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4 text-sm" key={metric.id}><input type="checkbox" aria-label={t("highlightMetricAria", { label: metric.label })} checked={metricIds.includes(metric.id)} onChange={(event) => setMetricIds((current) => event.target.checked ? [...current, metric.id] : current.filter((id) => id !== metric.id))} /><span><strong className="block">{metric.label}</strong><small className="text-[var(--muted)]">{metric.formattedValue ?? metric.value ?? t("metricNoValue")}</small></span></label>)}</div> : <p className="mt-2 text-sm text-[var(--muted)]">{t("createMetricsFirst")}</p>}</fieldset>
         <fieldset className="mt-6"><legend className="text-base font-light">{t("selectedComments")}</legend>{candidates.length ? <div className="mt-3 grid gap-2 sm:grid-cols-2">{candidates.map((candidate) => <label className="flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4 text-sm" key={candidate.key}><input className="mt-1" type="checkbox" aria-label={t("selectCommentAria", { author: candidate.authorName })} checked={commentKeys.includes(candidate.key)} onChange={(event) => setCommentKeys((current) => event.target.checked ? [...current, candidate.key] : current.filter((key) => key !== candidate.key))} /><span><span className="line-clamp-3 leading-6">“{candidate.text}”</span><small className="mt-2 block font-light text-[var(--muted)]">{candidate.authorName} · {candidate.itemTitle}</small></span></label>)}</div> : <p className="mt-2 text-sm text-[var(--muted)]">{t("noTextFields")}</p>}</fieldset>
         <label className="mt-6 flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4 text-sm"><input className="mt-0.5" type="checkbox" aria-label={t("anonymizeParticipants")} checked={anonymize} onChange={(event) => setAnonymize(event.target.checked)} /><span><strong className="block">{t("anonymizeParticipants")}</strong><small className="text-[var(--muted)]">{t("anonymizeHint")}</small></span></label>
@@ -846,6 +906,8 @@ export function AdminScreen({
   onDeleteEntry,
   onExport,
   onAddMetric,
+  onUpdateMetric,
+  onDeleteMetric,
   onSaveResult,
   onPublishResult,
   onUnpublishResult,
@@ -874,6 +936,8 @@ export function AdminScreen({
   onDeleteEntry: (entryId: Id) => Promise<void>;
   onExport: () => Promise<void>;
   onAddMetric: (payload: Record<string, unknown>) => Promise<void>;
+  onUpdateMetric: (metricId: Id, payload: Record<string, unknown>) => Promise<void>;
+  onDeleteMetric: (metricId: Id) => Promise<void>;
   onSaveResult: (payload: Record<string, unknown>) => Promise<void>;
   onPublishResult: (payload: Record<string, unknown>) => Promise<{ url?: string | null; publishedAt?: string; anonymized?: boolean } | undefined>;
   onUnpublishResult: () => Promise<void>;
@@ -891,7 +955,7 @@ export function AdminScreen({
       {tab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} /> : null}
       {tab === "items" ? <AdminItems challenge={challenge} group={group} entries={entries} onAdd={onAddItems} onUpdate={onUpdateItem} onArchive={onArchiveItem} /> : null}
       {tab === "review" ? <AdminReview challenge={challenge} entries={entries} onPatch={onPatchEntry} onDelete={onDeleteEntry} onExport={onExport} /> : null}
-      {tab === "metrics" ? <AdminMetrics challenge={challenge} onAdd={onAddMetric} /> : null}
+      {tab === "metrics" ? <AdminMetrics challenge={challenge} onAdd={onAddMetric} onUpdate={onUpdateMetric} onDelete={onDeleteMetric} /> : null}
       {tab === "results" ? <AdminResults challenge={challenge} entries={entries} onSave={onSaveResult} onPublish={onPublishResult} onUnpublish={onUnpublishResult} /> : null}
     </main>
   );

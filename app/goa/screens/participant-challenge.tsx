@@ -113,6 +113,7 @@ export function DynamicEntryForm({
   dateField,
   onSave,
   onDelete,
+  alwaysEditable = false,
 }: {
   fields: ChallengeField[];
   item: ChallengeItem | null;
@@ -125,6 +126,11 @@ export function DynamicEntryForm({
   onSave: (values: Record<Id, unknown>, entry?: Entry) => Promise<void>;
   // Present only when this form is editing a saved entry the viewer may remove.
   onDelete?: () => Promise<void>;
+  // Admin correction always wants the live form, never the read-only summary —
+  // that IS the point of that screen. The participant's Today tab leaves this
+  // false: an already-answered checkpoint shows a quiet summary instead of a
+  // save button and a delete link sitting there forever.
+  alwaysEditable?: boolean;
 }) {
   const t = useTranslations("entryForm");
   const tp = useTranslations("participant");
@@ -135,6 +141,20 @@ export function DynamicEntryForm({
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  // An already-answered checkpoint opens as a summary; editing is opt-in.
+  const [editing, setEditing] = useState(alwaysEditable || !entry);
+
+  function formatFieldValue(field: ChallengeField, value: unknown): string {
+    if (value === undefined || value === null || value === "") return t("emptyValue");
+    if (field.type === "boolean") return value === true ? tc("yes") : value === false ? tc("no") : t("emptyValue");
+    if (field.type === "date" && typeof value === "string") return f.date(value);
+    if (field.type === "select") {
+      const option = field.config?.options?.find((candidate) => (candidate.id ?? candidate.value ?? candidate.label) === value);
+      return option?.label ?? String(value);
+    }
+    if (field.type === "rating" && typeof value === "number") return String(value).replace(".", ",");
+    return String(value);
+  }
 
   const optionalFields = fields.filter((field) => field.id && !field.required);
   const isBlank = (value: unknown) => value === undefined || value === null || value === "";
@@ -181,6 +201,7 @@ export function DynamicEntryForm({
     try {
       await onSave(values, entry);
       setSuccess(entry ? t("entryUpdated") : t("entrySaved"));
+      if (!alwaysEditable) setEditing(false);
     } catch (cause) {
       setError(f.error(cause));
     } finally {
@@ -190,6 +211,26 @@ export function DynamicEntryForm({
 
   if (!fields.length) {
     return <EmptyState title={t("notConfiguredTitle")} description={t("notConfiguredBody")} />;
+  }
+
+  if (entry && canEdit && !editing) {
+    const answered = fields.filter((field) => field.id && !isBlank(values[field.id]));
+    return (
+      <div className="space-y-4">
+        <dl className="space-y-3">
+          {(answered.length ? answered : fields.slice(0, 1)).map((field) => (
+            <div key={field.id}>
+              <dt className={labelClass}>{field.label}</dt>
+              <dd className="text-sm leading-6 whitespace-pre-wrap">{field.id ? formatFieldValue(field, values[field.id]) : t("emptyValue")}</dd>
+            </div>
+          ))}
+        </dl>
+        <button type="button" className="min-h-11 cursor-pointer text-sm font-light hover:underline" onClick={() => setEditing(true)}>
+          {t("editAnswer")}
+        </button>
+        {item?.dueAt ? <p className="text-center text-xs text-[var(--muted)]">{t("dueAt", { date: f.dateTime(item.dueAt) })}</p> : null}
+      </div>
+    );
   }
 
   return (
@@ -229,7 +270,12 @@ export function DynamicEntryForm({
         </button>
       ) : null}
       <StatusMessage error={error} success={success} />
-      {canEdit ? <Button type="submit" className="w-full" disabled={busy || deleting}>{busy ? tc("saving") : entry ? tc("saveChanges") : t("saveEntry")}<span aria-hidden="true">→</span></Button> : <p className="rounded-xl border border-[var(--line)] bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{unavailableMessage ?? t("readOnly")}</p>}
+      {canEdit ? (
+        <div className="flex gap-2">
+          <Button type="submit" className="w-full" disabled={busy || deleting}>{busy ? tc("saving") : entry ? tc("saveChanges") : t("saveEntry")}<span aria-hidden="true">→</span></Button>
+          {entry && !alwaysEditable ? <Button type="button" variant="secondary" disabled={busy || deleting} onClick={() => setEditing(false)}>{tc("cancel")}</Button> : null}
+        </div>
+      ) : <p className="rounded-xl border border-[var(--line)] bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{unavailableMessage ?? t("readOnly")}</p>}
       {entry && canEdit && onDelete ? (
         <button type="button" className="mx-auto block min-h-9 text-xs font-light text-[var(--danger)] underline underline-offset-2 disabled:opacity-50" disabled={busy || deleting} onClick={() => void remove()}>
           {deleting ? tp("deletingEntry") : tp("deleteEntry")}

@@ -21,11 +21,6 @@ export async function generateShowcase(
 ): Promise<void> {
   await client.query("DELETE FROM result_blocks WHERE challenge_id=$1", [challengeId]);
 
-  const challenge = await oneOrNull<{ title: string }>(
-    client,
-    "SELECT title FROM challenges WHERE id=$1",
-    [challengeId],
-  );
   const metrics = await metricsForChallenge(client, challengeId);
   const summary = await buildSummary(client, challengeId, metrics);
 
@@ -38,7 +33,10 @@ export async function generateShowcase(
       [publicId(), challengeId, heading, body, position++, userId],
     );
 
-  await insertText("headline", challenge?.title ?? "Resultados");
+  // Deliberately no title-based headline: the cover above the showcase already
+  // shows the challenge title in full, and regenerating used to silently
+  // overwrite a headline the admin had cleared on purpose. The admin types one
+  // if they want one; the summary line still generates on its own.
   if (summary) await insertText("summary", summary);
 
   for (const metric of metrics) {

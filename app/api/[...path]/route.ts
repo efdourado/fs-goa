@@ -51,6 +51,7 @@ function catalogKindParam(request: Request): CatalogKind | undefined {
 import {
   addMetric,
   archiveChallengeItem,
+  archiveMetric,
   curateResults,
   deleteEntry,
   duplicateChallenge,
@@ -64,6 +65,7 @@ import {
   publishResults,
   saveEntry,
   saveChallengeFields,
+  updateMetric,
   saveChallengeItems,
   setChallengeParticipants,
   setChallengeTemplate,
@@ -314,6 +316,9 @@ export async function PATCH(request: Request): Promise<Response> {
     if (path[0] === "challenges" && path[2] === "items" && path.length === 4) {
       return json(await updateChallengeItem(session, path[1], path[3], body));
     }
+    if (path[0] === "challenges" && path[2] === "metrics" && path.length === 4) {
+      return json(await updateMetric(session, path[1], path[3], body));
+    }
     if (path[0] === "challenges" && path.length === 2) {
       return json(await updateChallenge(session, path[1], body));
     }
@@ -349,6 +354,9 @@ export async function DELETE(request: Request): Promise<Response> {
     }
     if (path[0] === "challenges" && path[2] === "items" && path.length === 4) {
       return json(await archiveChallengeItem(session, path[1], path[3]));
+    }
+    if (path[0] === "challenges" && path[2] === "metrics" && path.length === 4) {
+      return json(await archiveMetric(session, path[1], path[3]));
     }
     if (path[0] === "entries" && path.length === 2) {
       return json(await deleteEntry(session, path[1]));

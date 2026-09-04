@@ -45,9 +45,17 @@ interface RatingRow {
   item_title: string | null;
   participant_id: string;
   participant_name: string | null;
+  catalog_year: number | null;
+  catalog_author: string | null;
+  catalog_genre: string | null;
 }
 
-/** Numeric field values for a metric, tagged with their item and participant. */
+/**
+ * Numeric field values for a metric, tagged with their item, participant, and
+ * — when the round tracks a catalog — the release year / author / main genre
+ * of the film or book that item points at. That's what lets a metric group by
+ * "best movies of 2026" or "best authors" instead of only participant/item.
+ */
 async function ratingRows(client: PoolClient, metric: MetricRow): Promise<RatingRow[]> {
   const result = await client.query<RatingRow>(
     // A participant who has since left the challenge (or the group, or whose
@@ -56,11 +64,13 @@ async function ratingRows(client: PoolClient, metric: MetricRow): Promise<Rating
     `SELECT (ev.number_scaled::float8 / (10 ^ f.number_scale)) AS value,
             e.item_id, ci.title AS item_title,
             e.participant_user_id AS participant_id,
-            CASE WHEN cp.user_id IS NOT NULL THEN u.display_name ELSE 'Quem já saiu' END AS participant_name
+            CASE WHEN cp.user_id IS NOT NULL THEN u.display_name ELSE 'Quem já saiu' END AS participant_name,
+            cat.year AS catalog_year, cat.author AS catalog_author, cat.main_genre AS catalog_genre
        FROM entry_values ev
        JOIN entries e ON e.id = ev.entry_id
        JOIN challenge_fields f ON f.id = ev.field_id
        LEFT JOIN challenge_items ci ON ci.id = e.item_id
+       LEFT JOIN catalog_items cat ON cat.id = ci.catalog_item_id
        LEFT JOIN users u ON u.id = e.participant_user_id
        LEFT JOIN challenge_participants cp
          ON cp.challenge_id = e.challenge_id AND cp.user_id = e.participant_user_id AND cp.removed_at IS NULL
@@ -217,7 +227,13 @@ async function computeValueMetric(client: PoolClient, metric: MetricRow): Promis
       ? (row: RatingRow) => (row.item_id ? { id: row.item_id, label: row.item_title ?? "—" } : null)
       : metric.group_by === "participant"
         ? (row: RatingRow) => ({ id: row.participant_id, label: row.participant_name ?? "—" })
-        : null;
+        : metric.group_by === "catalog_year"
+          ? (row: RatingRow) => (row.catalog_year ? { id: String(row.catalog_year), label: String(row.catalog_year) } : null)
+          : metric.group_by === "catalog_author"
+            ? (row: RatingRow) => (row.catalog_author ? { id: row.catalog_author, label: row.catalog_author } : null)
+            : metric.group_by === "catalog_genre"
+              ? (row: RatingRow) => (row.catalog_genre ? { id: row.catalog_genre, label: row.catalog_genre } : null)
+              : null;
   if (!keyFn) return overall;
 
   const series: SeriesEntry[] = [];
@@ -426,54 +442,91 @@ export async function resultForChallenge(
   };
 }
 
+const METRIC_OPERATIONS = new Set([
+  "sum", "average", "count", "min", "max", "completion_rate",
+  "bayesian_average", "spread", "surprise", "indicator_bias",
+]);
+const NUMERIC_FIELD_OPS = new Set([
+  "sum", "average", "min", "max", "bayesian_average", "spread", "surprise", "indicator_bias",
+]);
+// `day`/`week` stay refused: the compute path only expands item/participant/
+// catalog_* into a series, so they would be silently ignored today.
+const GROUP_BY_VALUES = new Set(["none", "participant", "item", "catalog_year", "catalog_author", "catalog_genre"]);
+
+interface ParsedMetricInput {
+  operation: string;
+  label: string;
+  groupBy: string;
+  visibleDuring: boolean;
+  visibleInResults: boolean;
+  minSample: number;
+  bayesPriorWeight: number;
+}
+
+function parseMetricInput(body: Record<string, unknown>): ParsedMetricInput {
+  const operation = typeof body.operation === "string" ? body.operation : "count";
+  if (!METRIC_OPERATIONS.has(operation)) throw new ApiError(400, "invalid_metric", "Operação de métrica inválida.");
+  const label = stringValue(body, "label", { max: 120 })!;
+  if (body.groupBy === "day" || body.groupBy === "week") {
+    throw new ApiError(400, "invalid_metric", "Agrupar por dia ou semana ainda não é suportado.");
+  }
+  const groupBy = typeof body.groupBy === "string" && GROUP_BY_VALUES.has(body.groupBy) ? body.groupBy : "none";
+  return {
+    operation,
+    label,
+    groupBy,
+    visibleDuring: body.visibleDuring !== false,
+    visibleInResults: body.visibleInResults !== false,
+    minSample: Number(body.minSample),
+    bayesPriorWeight: Number(body.bayesPriorWeight),
+  };
+}
+
+/** Resolves + validates the field/entry-type pair a metric computes over. Shared by create and edit. */
+async function resolveMetricField(
+  client: PoolClient,
+  challengeId: string,
+  operation: string,
+  fieldId: string | null,
+): Promise<{ entryTypeId: string; fieldId: string | null }> {
+  if (fieldId) {
+    const field = await oneOrNull<{ entry_type_id: string; kind: string }>(client,
+      "SELECT entry_type_id, kind FROM challenge_fields WHERE id=$1 AND challenge_id=$2 AND archived_at IS NULL",
+      [fieldId, challengeId]);
+    if (!field) throw new ApiError(400, "invalid_field", "Campo não pertence ao desafio.");
+    if (NUMERIC_FIELD_OPS.has(operation) && !["number", "rating"].includes(field.kind)) {
+      throw new ApiError(400, "invalid_metric", "Essa operação exige campo numérico ou nota.");
+    }
+    return { entryTypeId: field.entry_type_id, fieldId };
+  }
+  if (NUMERIC_FIELD_OPS.has(operation)) {
+    throw new ApiError(400, "invalid_metric", "Selecione um campo numérico.");
+  }
+  const type = await primaryEntryType(client, challengeId);
+  if (!type) throw new ApiError(409, "missing_entry_type", "Tipo de registro ausente.");
+  return { entryTypeId: type.id, fieldId: operation === "completion_rate" ? null : fieldId };
+}
+
+function metricSettingsJson(parsed: ParsedMetricInput): string {
+  return JSON.stringify({
+    visibleInResults: parsed.visibleInResults,
+    ...(Number.isFinite(parsed.minSample) && parsed.minSample > 0 ? { minSample: Math.floor(parsed.minSample) } : {}),
+    ...(Number.isFinite(parsed.bayesPriorWeight) && parsed.bayesPriorWeight >= 0 ? { bayesPriorWeight: parsed.bayesPriorWeight } : {}),
+  });
+}
+
 export async function addMetric(
   session: SessionContext,
   challengeId: string,
   body: Record<string, unknown>,
 ) {
-  const operations = new Set([
-    "sum", "average", "count", "min", "max", "completion_rate",
-    "bayesian_average", "spread", "surprise", "indicator_bias",
-  ]);
-  const numericFieldOps = ["sum", "average", "min", "max", "bayesian_average", "spread", "surprise", "indicator_bias"];
-  const operation = typeof body.operation === "string" ? body.operation : "count";
-  if (!operations.has(operation)) throw new ApiError(400, "invalid_metric", "Operação de métrica inválida.");
-  const label = stringValue(body, "label", { max: 120 })!;
-  const minSample = Number(body.minSample);
-  const bayesPriorWeight = Number(body.bayesPriorWeight);
-  if (body.groupBy === "day" || body.groupBy === "week") {
-    // The compute path only expands `item`/`participant` into a series; day/week
-    // would be silently ignored, so refuse it until it is actually implemented.
-    throw new ApiError(400, "invalid_metric", "Agrupar por dia ou semana ainda não é suportado.");
-  }
-  const groupBy = typeof body.groupBy === "string" && ["none", "participant", "item"].includes(body.groupBy)
-    ? body.groupBy : "none";
-  const visibleDuring = body.visibleDuring !== false;
-  const visibleInResults = body.visibleInResults !== false;
+  const parsed = parseMetricInput(body);
   return inTransaction(async (client) => {
     const access = await challengeAccess(session.user.id, challengeId, client, true);
     if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores podem criar métricas.");
     if (access.challenge.status === "closed") throw new ApiError(409, "challenge_closed", "O desafio está encerrado.");
-    let fieldId = typeof body.fieldId === "string" ? body.fieldId : null;
-    let entryTypeId: string;
-    if (fieldId) {
-      const field = await oneOrNull<{ entry_type_id: string; kind: string }>(client,
-        "SELECT entry_type_id, kind FROM challenge_fields WHERE id=$1 AND challenge_id=$2 AND archived_at IS NULL",
-        [fieldId, challengeId]);
-      if (!field) throw new ApiError(400, "invalid_field", "Campo não pertence ao desafio.");
-      if (numericFieldOps.includes(operation) && !["number", "rating"].includes(field.kind)) {
-        throw new ApiError(400, "invalid_metric", "Essa operação exige campo numérico ou nota.");
-      }
-      entryTypeId = field.entry_type_id;
-    } else {
-      if (numericFieldOps.includes(operation)) {
-        throw new ApiError(400, "invalid_metric", "Selecione um campo numérico.");
-      }
-      const type = await primaryEntryType(client, challengeId);
-      if (!type) throw new ApiError(409, "missing_entry_type", "Tipo de registro ausente.");
-      entryTypeId = type.id;
-      if (operation === "completion_rate") fieldId = null;
-    }
+    const requestedFieldId = typeof body.fieldId === "string" ? body.fieldId : null;
+    const { entryTypeId, fieldId } = await resolveMetricField(client, challengeId, parsed.operation, requestedFieldId);
     const id = publicId();
     const positionRow = await oneOrNull<{ position: number }>(client,
       "SELECT coalesce(max(position),-1)::int + 1 AS position FROM challenge_metrics WHERE challenge_id=$1", [challengeId]);
@@ -482,18 +535,65 @@ export async function addMetric(
         (id,challenge_id,entry_type_id,field_id,semantic_key,label,operation,group_by,
          decimal_places,visible_during_challenge,position,settings,created_by_user_id,created_at,updated_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,2,$9,$10,$11::jsonb,$12,now(),now())`,
-      [id, challengeId, entryTypeId, fieldId, semanticKey(body.key ?? label, `metrica_${positionRow?.position ?? 0}`),
-        label, operation, groupBy, visibleDuring, positionRow?.position ?? 0,
-        JSON.stringify({
-          visibleInResults,
-          ...(Number.isFinite(minSample) && minSample > 0 ? { minSample: Math.floor(minSample) } : {}),
-          ...(Number.isFinite(bayesPriorWeight) && bayesPriorWeight >= 0 ? { bayesPriorWeight } : {}),
-        }),
-        session.user.id],
+      [id, challengeId, entryTypeId, fieldId, semanticKey(body.key ?? parsed.label, `metrica_${positionRow?.position ?? 0}`),
+        parsed.label, parsed.operation, parsed.groupBy, parsed.visibleDuring, positionRow?.position ?? 0,
+        metricSettingsJson(parsed), session.user.id],
     );
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
-      "metric.created", "challenge_metric", id, null, { label, operation, fieldId });
+      "metric.created", "challenge_metric", id, null, { label: parsed.label, operation: parsed.operation, fieldId });
     return { id };
+  });
+}
+
+/**
+ * Edits an existing metric in place. Safe to change anything (operation,
+ * field, grouping) because a metric is only ever a live-computed view over
+ * entries — never data of its own — so there is nothing historical to break.
+ */
+export async function updateMetric(
+  session: SessionContext,
+  challengeId: string,
+  metricId: string,
+  body: Record<string, unknown>,
+) {
+  const parsed = parseMetricInput(body);
+  return inTransaction(async (client) => {
+    const access = await challengeAccess(session.user.id, challengeId, client, true);
+    if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores podem editar métricas.");
+    if (access.challenge.status === "closed") throw new ApiError(409, "challenge_closed", "O desafio está encerrado.");
+    const existing = await oneOrNull<{ id: string }>(client,
+      "SELECT id FROM challenge_metrics WHERE id=$1 AND challenge_id=$2 AND archived_at IS NULL FOR UPDATE",
+      [metricId, challengeId]);
+    if (!existing) throw new ApiError(404, "not_found", "Métrica não encontrada.");
+    const requestedFieldId = typeof body.fieldId === "string" ? body.fieldId : null;
+    const { entryTypeId, fieldId } = await resolveMetricField(client, challengeId, parsed.operation, requestedFieldId);
+    await client.query(
+      `UPDATE challenge_metrics
+          SET entry_type_id=$3, field_id=$4, label=$5, operation=$6, group_by=$7,
+              visible_during_challenge=$8, settings=$9::jsonb, updated_at=now()
+        WHERE id=$1 AND challenge_id=$2`,
+      [metricId, challengeId, entryTypeId, fieldId, parsed.label, parsed.operation, parsed.groupBy,
+        parsed.visibleDuring, metricSettingsJson(parsed)],
+    );
+    await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
+      "metric.updated", "challenge_metric", metricId, null, { label: parsed.label, operation: parsed.operation, fieldId });
+    return { id: metricId };
+  });
+}
+
+export async function archiveMetric(session: SessionContext, challengeId: string, metricId: string) {
+  return inTransaction(async (client) => {
+    const access = await challengeAccess(session.user.id, challengeId, client, true);
+    if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores podem remover métricas.");
+    if (access.challenge.status === "closed") throw new ApiError(409, "challenge_closed", "O desafio está encerrado.");
+    const existing = await oneOrNull<{ id: string; label: string }>(client,
+      "SELECT id, label FROM challenge_metrics WHERE id=$1 AND challenge_id=$2 AND archived_at IS NULL FOR UPDATE",
+      [metricId, challengeId]);
+    if (!existing) throw new ApiError(404, "not_found", "Métrica não encontrada.");
+    await client.query("UPDATE challenge_metrics SET archived_at=now(), updated_at=now() WHERE id=$1", [metricId]);
+    await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
+      "metric.archived", "challenge_metric", metricId, null, { label: existing.label });
+    return { id: metricId, archived: true as const };
   });
 }
 
