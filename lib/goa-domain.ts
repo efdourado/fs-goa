@@ -10,6 +10,7 @@ export {
   leaveGroup,
   requestGroupMember,
   respondToMemberRequest,
+  setGroupMemberRole,
   softDeleteGroup,
   updateGroup,
 } from "./goa/domain/groups";

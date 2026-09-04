@@ -1256,13 +1256,7 @@ test("fase 0: feedback, link de reunião e remoção da própria conta", async (
   const inv = await call("POST", `/api/groups/${sharedGroupId}/invites`, { session: host, body: { expiresInDays: 7, maxUses: 1 } });
   await call("POST", `/api/invites/${(inv.body as { token: string }).token}`, { session: guest, body: {} });
 
-  // remoção da conta: bloqueada enquanto há grupo com outra pessoa
-  const blocked = await call("DELETE", "/api/account", { session: host });
-  assert.equal(blocked.response.status, 409, "não apaga a conta com um grupo compartilhado");
-  assert.equal((blocked.body as { error: string }).error, "owns_groups");
-
-  // depois de apagar o grupo compartilhado, a remoção passa
-  assert.equal((await call("DELETE", `/api/groups/${sharedGroupId}`, { session: host })).response.status, 200);
+  // remoção da conta: grupo solo vai para a lixeira, grupo com outra pessoa transfere a posse
   const removed = await call("DELETE", "/api/account", { session: host });
   assert.equal(removed.response.status, 200, JSON.stringify(removed.body));
   assert.match(removed.response.headers.get("set-cookie") ?? "", /__Host-goa_session=;|Max-Age=0/i);
@@ -1274,6 +1268,12 @@ test("fase 0: feedback, link de reunião e remoção da própria conta", async (
   );
   const soloGone = await adminPool.query<{ deleted_at: Date | null }>("SELECT deleted_at FROM groups WHERE id=$1", [soloGroupId]);
   assert.ok(soloGone.rows[0]?.deleted_at, "grupos solo vão para a lixeira ao apagar a conta");
+  const sharedTransferred = await adminPool.query<{ owner_user_id: string; deleted_at: Date | null }>(
+    "SELECT owner_user_id, deleted_at FROM groups WHERE id = $1",
+    [sharedGroupId],
+  );
+  assert.equal(sharedTransferred.rows[0]?.owner_user_id, guest.user.id, "grupo com outra pessoa transfere a posse em vez de ser bloqueado");
+  assert.equal(sharedTransferred.rows[0]?.deleted_at, null, "o grupo transferido continua vivo");
 });
 
 test("fase 1a: acervo do grupo, identidade do filme entre rodadas e indicador", async () => {
@@ -2427,6 +2427,129 @@ test("apagar a conta também encerra a participação em desafios de outros grup
     [challengeId, member.user.id],
   );
   assert.equal(stillParticipant.rows[0]?.count, 0, "apagar a conta fecha a participação, não só a membresia do grupo");
+});
+
+test("mais de um admin por grupo: só o dono promove e rebaixa, com as guardas certas", async () => {
+  const owner = await register("Dona Admins", "dona_admins");
+  const promoted = await register("Vira Admin", "vira_admin");
+  const other = await register("Fica Participante", "fica_participante");
+
+  const group = await call("POST", "/api/groups", { session: owner, body: { name: "Grupo com dois admins" } });
+  const groupId = (group.body as { id: string }).id;
+  const invite = await call("POST", `/api/groups/${groupId}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 5 } });
+  const token = (invite.body as { token: string }).token;
+  await call("POST", `/api/invites/${token}`, { session: promoted, body: {} });
+  await call("POST", `/api/invites/${token}`, { session: other, body: {} });
+
+  const deniedByParticipant = await call("PATCH", `/api/groups/${groupId}/members/${promoted.user.id}`, {
+    session: other,
+    body: { role: "admin" },
+  });
+  assert.equal(deniedByParticipant.response.status, 403, JSON.stringify(deniedByParticipant.body));
+
+  const promote = await call("PATCH", `/api/groups/${groupId}/members/${promoted.user.id}`, {
+    session: owner,
+    body: { role: "admin" },
+  });
+  assert.equal(promote.response.status, 200, JSON.stringify(promote.body));
+  assert.deepEqual(promote.body, { groupId, userId: promoted.user.id, role: "admin" });
+
+  const bootAfterPromote = (await call("GET", "/api/bootstrap", { session: owner })).body as {
+    groups: Array<{ id: string; members?: Array<{ id: string; role: string }> }>;
+  };
+  const groupAfterPromote = bootAfterPromote.groups.find((entry) => entry.id === groupId)!;
+  assert.equal(groupAfterPromote.members?.find((member) => member.id === promoted.user.id)?.role, "admin");
+
+  // A group can have more than one admin, but promoting/demoting is still owner-only.
+  const deniedByAdmin = await call("PATCH", `/api/groups/${groupId}/members/${other.user.id}`, {
+    session: promoted,
+    body: { role: "admin" },
+  });
+  assert.equal(deniedByAdmin.response.status, 403, JSON.stringify(deniedByAdmin.body));
+
+  const selfChange = await call("PATCH", `/api/groups/${groupId}/members/${owner.user.id}`, {
+    session: owner,
+    body: { role: "admin" },
+  });
+  assert.equal(selfChange.response.status, 400, JSON.stringify(selfChange.body));
+  assert.equal((selfChange.body as { error: string }).error, "cannot_change_self");
+
+  const invalidRole = await call("PATCH", `/api/groups/${groupId}/members/${other.user.id}`, {
+    session: owner,
+    body: { role: "owner" },
+  });
+  assert.equal(invalidRole.response.status, 400, JSON.stringify(invalidRole.body));
+  assert.equal((invalidRole.body as { error: string }).error, "invalid_role");
+
+  const demote = await call("PATCH", `/api/groups/${groupId}/members/${promoted.user.id}`, {
+    session: owner,
+    body: { role: "participant" },
+  });
+  assert.equal(demote.response.status, 200, JSON.stringify(demote.body));
+  assert.deepEqual(demote.body, { groupId, userId: promoted.user.id, role: "participant" });
+
+  const roleAudit = await adminPool.query<{ count: number }>(
+    "SELECT count(*)::int AS count FROM audit_events WHERE group_id = $1 AND action = 'group.member_role_changed'",
+    [groupId],
+  );
+  assert.equal(roleAudit.rows[0]?.count, 2, "promoção e rebaixamento ficam auditados");
+});
+
+test("apagar a conta transfere a posse do grupo: admin mais antigo, ou membro mais antigo sem admin", async () => {
+  const ownerA = await register("Dona Transfere A", "dona_transfere_a");
+  const admin = await register("Admin Mais Antigo", "admin_mais_antigo");
+  const memberA = await register("Membro Recente A", "membro_recente_a");
+
+  const groupA = await call("POST", "/api/groups", { session: ownerA, body: { name: "Grupo com admin" } });
+  const groupAId = (groupA.body as { id: string }).id;
+  const inviteA = await call("POST", `/api/groups/${groupAId}/invites`, { session: ownerA, body: { expiresInDays: 7, maxUses: 5 } });
+  const tokenA = (inviteA.body as { token: string }).token;
+  await call("POST", `/api/invites/${tokenA}`, { session: admin, body: {} });
+  await call("POST", `/api/invites/${tokenA}`, { session: memberA, body: {} });
+  await call("PATCH", `/api/groups/${groupAId}/members/${admin.user.id}`, { session: ownerA, body: { role: "admin" } });
+
+  assert.equal((await call("DELETE", "/api/account", { session: ownerA })).response.status, 200);
+
+  const groupAAfter = await adminPool.query<{ owner_user_id: string; role: string }>(
+    `SELECT g.owner_user_id, gm.role FROM groups g
+       JOIN group_members gm ON gm.group_id = g.id AND gm.user_id = g.owner_user_id
+      WHERE g.id = $1`,
+    [groupAId],
+  );
+  assert.equal(groupAAfter.rows[0]?.owner_user_id, admin.user.id, "o admin mais antigo herda o grupo");
+  assert.equal(groupAAfter.rows[0]?.role, "owner");
+
+  const ownerARowGone = await adminPool.query<{ count: number }>(
+    "SELECT count(*)::int AS count FROM group_members WHERE group_id = $1 AND user_id = $2 AND removed_at IS NULL",
+    [groupAId, ownerA.user.id],
+  );
+  assert.equal(ownerARowGone.rows[0]?.count, 0, "quem apagou a conta sai do grupo");
+
+  const transferAudit = await adminPool.query<{ count: number }>(
+    "SELECT count(*)::int AS count FROM audit_events WHERE group_id = $1 AND action = 'group.ownership_transferred'",
+    [groupAId],
+  );
+  assert.equal(transferAudit.rows[0]?.count, 1, "a transferência de posse fica auditada");
+
+  // No admin at all: the oldest remaining participant inherits instead.
+  const ownerB = await register("Dona Transfere B", "dona_transfere_b");
+  const olderMember = await register("Membro Mais Velho B", "membro_mais_velho_b");
+  const newerMember = await register("Membro Mais Novo B", "membro_mais_novo_b");
+
+  const groupB = await call("POST", "/api/groups", { session: ownerB, body: { name: "Grupo sem admin" } });
+  const groupBId = (groupB.body as { id: string }).id;
+  const inviteB = await call("POST", `/api/groups/${groupBId}/invites`, { session: ownerB, body: { expiresInDays: 7, maxUses: 5 } });
+  const tokenB = (inviteB.body as { token: string }).token;
+  await call("POST", `/api/invites/${tokenB}`, { session: olderMember, body: {} });
+  await call("POST", `/api/invites/${tokenB}`, { session: newerMember, body: {} });
+
+  assert.equal((await call("DELETE", "/api/account", { session: ownerB })).response.status, 200);
+
+  const groupBAfter = await adminPool.query<{ owner_user_id: string }>(
+    "SELECT owner_user_id FROM groups WHERE id = $1",
+    [groupBId],
+  );
+  assert.equal(groupBAfter.rows[0]?.owner_user_id, olderMember.user.id, "sem admin, o membro mais antigo herda o grupo");
 });
 
 test("hábito: sem catálogo, um campo numérico que o próprio usuário criou vira a base de uma métrica própria", async () => {
