@@ -51,7 +51,6 @@ export interface DuplicateTargetGroup {
 
 function AdminOverview({
   challenge,
-  entries,
   onSave,
   onTransition,
   onDuplicate,
@@ -59,7 +58,6 @@ function AdminOverview({
   onDelete,
 }: {
   challenge: ChallengeDetail;
-  entries: Entry[];
   onSave: (payload: Partial<ChallengeSummary>) => Promise<void>;
   onTransition: (status: "active" | "closed") => Promise<void>;
   onDuplicate: (payload: { title: string; targetGroupId: Id }) => Promise<void>;
@@ -79,17 +77,14 @@ function AdminOverview({
   );
   const [startsOn, setStartsOn] = useState(challenge.startsOn ?? "");
   const [endsOn, setEndsOn] = useState(challenge.endsOn ?? "");
+  const [showOptional, setShowOptional] = useState(false);
+  const hasOptionalContent = Boolean(description.trim()) || ruleSections.length > 0;
   const [duplicateTitle, setDuplicateTitle] = useState(challenge.title);
   const availableTargets = duplicateTargets.filter((target) => target.challengeCount < target.challengeLimit);
   const [duplicateTargetGroupId, setDuplicateTargetGroupId] = useState<Id>(availableTargets[0]?.id ?? "");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const doneEntries = challenge.completionEntryTypeId
-    ? entries.filter((entry) => entry.entryTypeId === challenge.completionEntryTypeId)
-    : entries;
-  const expected = challenge.items.length * challenge.participants.length;
-  const missing = Math.max(0, expected - doneEntries.length);
   const scheduled = isChallengeScheduled(challenge.status, challenge.startsOn, challenge.submissionMode);
   const livingList = isLivingList(challenge);
 
@@ -132,22 +127,10 @@ function AdminOverview({
     }), t("basicsSaved"));
   }
 
-  const stats: Array<{ key: "participants" | "checkpoints" | "entries" | "pending"; value: number }> = [
-    { key: "participants", value: challenge.participants.length },
-    { key: "checkpoints", value: challenge.items.length },
-    { key: "entries", value: entries.length },
-    { key: "pending", value: missing },
-  ];
-
   return (
     <div className="space-y-6">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => <article className={cx(cardClass, "p-5")} key={stat.key}><p className="text-xs font-light uppercase tracking-[0.1em] text-[var(--muted)]">{t(`stat.${stat.key}`)}</p><strong className="mt-2 block text-4xl tracking-[-0.05em]">{stat.value}</strong></article>)}
-      </div>
-
       <section className={cx(cardClass, "p-5 sm:p-7")}>
         <h2 className="text-xl font-light">{t("basicsTitle")}</h2>
-        <p className="mt-1 text-sm text-[var(--muted)]">{challenge.status === "closed" ? t("basicsHintClosed") : t("basicsHintOpen")}</p>
         <form className="mt-5 grid gap-4 sm:grid-cols-2" onSubmit={saveBasics}>
           <label className="sm:col-span-2"><span className={labelClass}>{t("titleLabel")}</span><input className={inputClass} value={title} onChange={(event) => setTitle(event.target.value)} required maxLength={140} disabled={challenge.status === "closed"} /></label>
           <fieldset className="sm:col-span-2" disabled={challenge.status === "closed"}>
@@ -161,18 +144,69 @@ function AdminOverview({
           {scheduleMode === "period" ? (
             <SchedulePeriodFields startsOn={startsOn} endsOn={endsOn} onStartsOn={setStartsOn} onEndsOn={setEndsOn} disabled={challenge.status === "closed"} />
           ) : <p className="sm:col-span-2 rounded-xl bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{livingList ? t("livingListBody") : t("noPeriodNote")}</p>}
-          <label className="sm:col-span-2"><span className={labelClass}>{t("descriptionLabel")}</span><textarea className={inputClass} rows={3} value={description} onChange={(event) => setDescription(event.target.value)} maxLength={1000} disabled={challenge.status === "closed"} /></label>
-          <div className="sm:col-span-2"><div className="mb-3"><span className={labelClass}>{t("rulesLabel")}</span><p className="text-xs leading-5 text-[var(--muted)]">{t("rulesHint")}</p></div><RuleSectionsEditor value={ruleSections} onChange={setRuleSections} disabled={challenge.status === "closed"} /></div>
+          <div className="sm:col-span-2">
+            {showOptional ? (
+              <div className="grid gap-4">
+                <button type="button" className={cx(backLinkClass, "justify-self-start")} onClick={() => setShowOptional(false)}>{t("hideOptional")}</button>
+                <label><span className={labelClass}>{t("descriptionLabel")}</span><textarea className={inputClass} rows={3} value={description} onChange={(event) => setDescription(event.target.value)} maxLength={1000} disabled={challenge.status === "closed"} /></label>
+                <div><div className="mb-3"><span className={labelClass}>{t("rulesLabel")}</span><p className="text-xs leading-5 text-[var(--muted)]">{t("rulesHint")}</p></div><RuleSectionsEditor value={ruleSections} onChange={setRuleSections} disabled={challenge.status === "closed"} /></div>
+              </div>
+            ) : (
+              <button type="button" className={cx("min-h-11 rounded-xl border border-dashed border-[var(--line)] px-4 text-sm font-light text-[var(--muted)] hover:border-[var(--main-line)] hover:text-[var(--ink)]")} onClick={() => setShowOptional(true)}>{hasOptionalContent ? t("showOtherFields") : t("showOptional", { count: 2 })}</button>
+            )}
+          </div>
           {challenge.status !== "closed" ? <div className="sm:col-span-2"><Button type="submit" disabled={busy === "save"}>{busy === "save" ? tc("saving") : t("saveBasics")}</Button></div> : null}
         </form>
       </section>
 
-      {livingList ? (
-        <section className={cx(cardClass, "p-5 sm:p-7")}>
-          <h2 className="text-xl font-light">{t("livingListTitle")}</h2>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-[var(--muted)]">{t("livingListBody")}</p>
-        </section>
-      ) : (
+      <section className={cx(cardClass, "p-5 sm:p-7")}>
+        <h2 className="text-xl font-light">{t("reuseTitle")}</h2>
+        <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{t("reuseBody")}</p>
+        {duplicateTargets.length ? <form className="mt-5 grid gap-4 lg:grid-cols-[1fr_1fr_auto] lg:items-end" onSubmit={(event) => { event.preventDefault(); if (!duplicateTargetGroupId) { setError(t("reusePickTarget")); return; } void run("duplicate", () => onDuplicate({ title: duplicateTitle.trim(), targetGroupId: duplicateTargetGroupId }), t("reuseDone")); }}>
+          <label>
+            <span className={labelClass}>{t("reuseTitleLabel")}</span>
+            <input
+              className={inputClass}
+              value={duplicateTitle}
+              onChange={(event) => setDuplicateTitle(event.target.value)}
+              required
+              maxLength={160} />
+          </label>
+
+          <label>
+            <span className={labelClass}>{t("reuseTargetLabel")}</span>
+
+            <select
+              className={inputClass}
+              value={duplicateTargetGroupId}
+              onChange={(event) => setDuplicateTargetGroupId(event.target.value)}
+              required
+            >
+              <option value="">{t("reuseTargetPlaceholder")}</option>
+
+              {duplicateTargets.map((target) => {
+                const full = target.challengeCount >= target.challengeLimit;
+
+                return (
+                  <option key={target.id} value={target.id} disabled={full}>
+                    {t("reuseTargetOption", {
+                      name: target.name,
+                      count: target.challengeCount,
+                      limit: target.challengeLimit,
+                    })}
+                    {full ? t("reuseTargetFull") : ""}
+                  </option>
+                );
+              })}
+            </select>
+          </label>
+            
+          <div className="mb-1"><Button type="submit" variant="secondary" disabled={busy === "duplicate" || !duplicateTargetGroupId || !availableTargets.length}>{busy === "duplicate" ? t("reuseCreating") : t("reuseSubmit")}</Button></div>
+        </form> : <div className="mt-5 rounded-2xl border border-dashed border-[var(--line)] bg-[var(--wash)]/60 p-5"><strong className="text-sm">{t("reuseNoneTitle")}</strong><p className="mt-1 text-sm leading-6 text-[var(--muted)]">{t("reuseNoneBody")}</p></div>}
+      </section>
+      
+
+      {!livingList ? (
         <section className={cx(cardClass, "p-5 sm:p-7")}>
           <h2 className="text-xl font-light">{t("stateTitle")}</h2>
           <div className="mt-4 flex flex-col gap-4 rounded-2xl bg-[var(--wash)] p-5 sm:flex-row sm:items-center sm:justify-between">
@@ -182,18 +216,8 @@ function AdminOverview({
             {challenge.status === "closed" ? <Button variant="secondary" disabled={Boolean(busy)} onClick={() => { if (window.confirm(t("reopenConfirm"))) void run("transition", () => onTransition("active"), t("reopenedDone")); }}>{t("reopen")}</Button> : null}
           </div>
         </section>
-      )}
-
-      <section className={cx(cardClass, "p-5 sm:p-7")}>
-        <h2 className="text-xl font-light">{t("reuseTitle")}</h2>
-        <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{t("reuseBody")}</p>
-        {duplicateTargets.length ? <form className="mt-5 grid gap-4 lg:grid-cols-[1fr_1fr_auto]" onSubmit={(event) => { event.preventDefault(); if (!duplicateTargetGroupId) { setError(t("reusePickTarget")); return; } void run("duplicate", () => onDuplicate({ title: duplicateTitle.trim(), targetGroupId: duplicateTargetGroupId }), t("reuseDone")); }}>
-          <label><span className={labelClass}>{t("reuseTitleLabel")}</span><input className={inputClass} value={duplicateTitle} onChange={(event) => setDuplicateTitle(event.target.value)} required maxLength={160} /></label>
-          <label><span className={labelClass}>{t("reuseTargetLabel")}</span><select className={inputClass} value={duplicateTargetGroupId} onChange={(event) => setDuplicateTargetGroupId(event.target.value)} required><option value="">{t("reuseTargetPlaceholder")}</option>{duplicateTargets.map((target) => { const full = target.challengeCount >= target.challengeLimit; return <option value={target.id} disabled={full} key={target.id}>{t("reuseTargetOption", { name: target.name, count: target.challengeCount, limit: target.challengeLimit })}{full ? t("reuseTargetFull") : ""}</option>; })}</select></label>
-          <div className="flex items-end"><Button type="submit" variant="secondary" disabled={busy === "duplicate" || !duplicateTargetGroupId || !availableTargets.length}>{busy === "duplicate" ? t("reuseCreating") : t("reuseSubmit")}</Button></div>
-        </form> : <div className="mt-5 rounded-2xl border border-dashed border-[var(--line)] bg-[var(--wash)]/60 p-5"><strong className="text-sm">{t("reuseNoneTitle")}</strong><p className="mt-1 text-sm leading-6 text-[var(--muted)]">{t("reuseNoneBody")}</p></div>}
-      </section>
-
+      ) : null}
+      
       {onDelete ? (
         <section className={cx(cardClass, "p-5 sm:p-7")}>
           <h2 className="text-xl font-light">{t("deleteTitle")}</h2>
@@ -859,10 +883,10 @@ export function AdminScreen({
   const tabs: AdminTab[] = ["overview", "participants", "fields", "items", "review", "metrics", "results"];
   return (
     <main className="mx-auto max-w-7xl px-4 py-6 pb-24 sm:px-6 sm:py-10">
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><button className={backLinkClass} type="button" onClick={onBack}>{t("back", { group: group?.name ?? tc("home") })}</button><div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={onViewParticipant}>{t("viewAsParticipant")}</Button></div></div>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><button className={backLinkClass} type="button" onClick={onBack}>{t("back", { group: group?.name ?? tc("home") })}</button><div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={onViewParticipant}>{t("simulateAsParticipant")}</Button></div></div>
       <PageHeading title={challenge.title} description={t("subtitle")} action={<ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />} />
       <nav className="mb-6 flex gap-1 overflow-x-auto rounded-2xl bg-[var(--wash-strong)]/70 p-1" aria-label={t("tabsAria")}>{tabs.map((id) => <button className={cx("min-h-11 flex-none rounded-xl px-4 text-sm font-light", tab === id ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]")} type="button" onClick={() => onTab(id)} key={id}>{t(`tabs.${id}`)}</button>)}</nav>
-      {tab === "overview" ? <AdminOverview challenge={challenge} entries={entries} onSave={onSaveBasics} onTransition={onTransition} onDuplicate={onDuplicate} duplicateTargets={duplicateTargets} onDelete={onDelete} /> : null}
+      {tab === "overview" ? <AdminOverview challenge={challenge} onSave={onSaveBasics} onTransition={onTransition} onDuplicate={onDuplicate} duplicateTargets={duplicateTargets} onDelete={onDelete} /> : null}
       {tab === "participants" ? <AdminParticipants key={`${challenge.id}:${challenge.participants.map((participant) => participant.userId ?? participant.id).join(",")}`} challenge={challenge} group={group} onSave={onSaveParticipants} /> : null}
       {tab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} /> : null}
       {tab === "items" ? <AdminItems challenge={challenge} group={group} entries={entries} onAdd={onAddItems} onUpdate={onUpdateItem} onArchive={onArchiveItem} /> : null}

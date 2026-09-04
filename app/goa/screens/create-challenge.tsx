@@ -15,7 +15,7 @@ const RECIPES: Array<{ key: CreatableRecipeKey; catalogKind: "film" | "book" | n
   { key: "cinema", catalogKind: "film", scheduleMode: "none", glyph: "◉" },
   { key: "bookshelf", catalogKind: "book", scheduleMode: "none", glyph: "〇" },
   { key: "library", catalogKind: "book", scheduleMode: "period", glyph: "◎" },
-  { key: "habit", catalogKind: null, scheduleMode: "none", glyph: "◐" },
+  { key: "habit", catalogKind: null, scheduleMode: "none", glyph: "𖣐" },
 ];
 
 type StepKey = "base" | "fields" | "checkpoints" | "people";

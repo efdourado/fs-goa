@@ -18,8 +18,8 @@ import {
 export const cardClass =
   "rounded-[20px] border border-[var(--line)] bg-[var(--paper)] shadow-[var(--elevate-1)]";
 export const inputClass =
-  "mb-1 min-h-12 w-full rounded-xl border border-[var(--line)] bg-[var(--paper)] px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--main)] focus:ring-4 focus:ring-[var(--main)]/15 disabled:cursor-not-allowed disabled:bg-[var(--canvas)]";
-export const labelClass = "mb-1.5 block text-sm font-medium text-[var(--ink)]";
+  "mb-1 min-h-10 w-full rounded-xl border border-[var(--line)] bg-[var(--paper)] px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--main)] focus:ring-4 focus:ring-[var(--main)]/15 disabled:cursor-not-allowed disabled:bg-[var(--canvas)]";
+export const labelClass = "mb-1.5 block text-sm font-normal text-[var(--ink)]";
 export const linkClass =
   "px-4 py-2 border-l-1 rounded-xl border-[var(--muted)] underline-offset-4 hover:opacity-90 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50";
 /** The "← Voltar" links that sit at the top of most screens. */
@@ -54,7 +54,7 @@ export function Button({
   return (
     <button
       className={cx(
-        "cursor-pointer inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-light transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 disabled:cursor-not-allowed disabled:opacity-55",
+        "cursor-pointer inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-light transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 disabled:cursor-not-allowed disabled:opacity-55",
         tones[variant],
         className,
       )}

@@ -29,7 +29,7 @@ test("lista viva = pessoal sem datas e não encerrada", () => {
 });
 
 test("apresenta período ou ausência de prazo sem datas fictícias", () => {
-  assert.equal(ptFormat.dateRange(null, null), "Sem prazo");
+  assert.equal(ptFormat.dateRange(null, null), "Sem datas");
   assert.match(ptFormat.dateRange("2026-08-01", "2026-08-31"), /01.*ago.*31.*ago/i);
 });
 
