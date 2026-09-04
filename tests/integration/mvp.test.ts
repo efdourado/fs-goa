@@ -2474,3 +2474,90 @@ test("hábito: sem catálogo, um campo numérico que o próprio usuário criou v
   const avg = withMetric.metrics.find((entry) => entry.label === "Média de minutos")!;
   assert.equal(avg.value, 40, "a métrica calcula certo sobre um campo que não veio de receita nenhuma");
 });
+
+test("atributo de acervo tipado: nomeado pelo grupo, preenchido num item, travado enquanto tiver dado", async () => {
+  const owner = await register("Cataloga Tudo", "cataloga_atributos");
+  const member = await register("So Participa", "so_participa_atributos");
+
+  const group = await call("POST", "/api/groups", { session: owner, body: { name: "Cineclube atributos" } });
+  const groupId = (group.body as { id: string }).id;
+  const invite = await call("POST", `/api/groups/${groupId}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } });
+  await call("POST", `/api/invites/${(invite.body as { token: string }).token}`, { session: member, body: {} });
+
+  // só admin/dono define atributos, não qualquer participante
+  const blocked = await call("POST", `/api/groups/${groupId}/catalog-attributes`, {
+    session: member,
+    body: { kind: "film", label: "Diretor", type: "text" },
+  });
+  assert.equal(blocked.response.status, 403, "participante comum não pode criar atributo de acervo");
+
+  const created = await call("POST", `/api/groups/${groupId}/catalog-attributes`, {
+    session: owner,
+    body: { kind: "film", label: "Diretor", type: "text" },
+  });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const attr = created.body as { id: string; kind: string; key: string; label: string; type: string };
+  assert.equal(attr.kind, "film");
+  assert.equal(attr.key, "diretor", "a chave é derivada do rótulo");
+  assert.equal(attr.type, "text");
+
+  const listed = (await call("GET", `/api/groups/${groupId}/catalog-attributes?kind=film`, { session: member })).body as {
+    attributes: Array<{ id: string; key: string }>;
+  };
+  assert.ok(listed.attributes.some((a) => a.id === attr.id), "qualquer participante pode ver a forma do acervo (só não definir)");
+
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "cinema",
+      title: "Com atributo próprio",
+      items: [{ title: "Duna", attributes: { [attr.key]: "Denis Villeneuve" } }],
+    },
+  });
+  assert.equal(challenge.response.status, 201, JSON.stringify(challenge.body));
+
+  const catalog = (await call("GET", `/api/groups/${groupId}/catalog`, { session: owner })).body as {
+    items: Array<{ id: string; title: string; attributes: Array<{ key: string; label: string; type: string; value: unknown }> }>;
+  };
+  const duna = catalog.items.find((item) => item.title === "Duna")!;
+  assert.deepEqual(duna.attributes, [{ key: "diretor", label: "Diretor", type: "text", value: "Denis Villeneuve" }]);
+
+  const detail = (await call("GET", `/api/groups/${groupId}/catalog/${duna.id}`, { session: owner })).body as {
+    attributes: Array<{ key: string; value: unknown }>;
+  };
+  assert.deepEqual(detail.attributes, [{ key: "diretor", label: "Diretor", type: "text", value: "Denis Villeneuve" }]);
+
+  const cannotArchive = await call("DELETE", `/api/groups/${groupId}/catalog-attributes/${attr.id}`, { session: owner });
+  assert.equal(cannotArchive.response.status, 409, "atributo com valor preenchido não pode ser removido");
+  assert.equal((cannotArchive.body as { error: string }).error, "attribute_has_data");
+
+  const empty = await call("POST", `/api/groups/${groupId}/catalog-attributes`, {
+    session: owner,
+    body: { kind: "film", label: "Estúdio", type: "text" },
+  });
+  const emptyId = (empty.body as { id: string }).id;
+  const canArchive = await call("DELETE", `/api/groups/${groupId}/catalog-attributes/${emptyId}`, { session: owner });
+  assert.equal(canArchive.response.status, 200, "sem nenhum valor preenchido, o atributo é removível");
+
+  // acervo pessoal: mesma forma, workspace próprio
+  const personalAttr = await call("POST", "/api/personal/catalog-attributes", {
+    session: owner,
+    body: { kind: "book", label: "Editora", type: "text" },
+  });
+  assert.equal(personalAttr.response.status, 201, JSON.stringify(personalAttr.body));
+  const personalKey = (personalAttr.body as { key: string }).key;
+  const personalChallenge = await call("POST", "/api/personal/challenges", {
+    session: owner,
+    body: {
+      recipe: "bookshelf",
+      title: "Minha estante com atributo",
+      items: [{ title: "Duna", author: "Frank Herbert", attributes: { [personalKey]: "Aleph" } }],
+    },
+  });
+  assert.equal(personalChallenge.response.status, 201, JSON.stringify(personalChallenge.body));
+  const personalCatalog = (await call("GET", "/api/personal/catalog", { session: owner })).body as {
+    items: Array<{ title: string; attributes: Array<{ key: string; value: unknown }> }>;
+  };
+  const personalDuna = personalCatalog.items.find((item) => item.title === "Duna")!;
+  assert.deepEqual(personalDuna.attributes, [{ key: "editora", label: "Editora", type: "text", value: "Aleph" }]);
+});

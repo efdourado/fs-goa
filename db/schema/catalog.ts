@@ -1,9 +1,13 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   check,
+  date,
+  foreignKey,
   index,
   integer,
   pgTable,
+  primaryKey,
   smallint,
   text,
   unique,
@@ -82,5 +86,78 @@ export const catalogItems = pgTable(
       sql`${table.mainGenre} is null or char_length(btrim(${table.mainGenre})) between 1 and 80`,
     ),
     check("catalog_items_pages_check", sql`${table.pageCount} is null or ${table.pageCount} between 1 and 1000000`),
+  ],
+);
+
+/**
+ * A group- (or personal-workspace-) defined catalog attribute: "diretor" on
+ * films, "editora" on books, whatever a group actually wants to track instead
+ * of the fixed year/genre/author/pages columns above. Same mold as
+ * `challenge_fields` — named, typed, ordered, soft-archived, never a JSON blob.
+ * Scoped per `(group_id, kind)`: a personal workspace's film attributes never
+ * apply to a standard group's, and a group's film attributes never apply to
+ * its books.
+ */
+export const catalogAttributeDefs = pgTable(
+  "catalog_attribute_defs",
+  {
+    id: text("id").primaryKey(),
+    groupId: text("group_id")
+      .notNull()
+      .references(() => groups.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    semanticKey: text("semantic_key").notNull(),
+    label: text("label").notNull(),
+    type: text("type").notNull(),
+    position: integer("position").notNull().default(0),
+    createdByUserId: text("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    archivedAt: timestamptz("archived_at"),
+    createdAt: timestamptz("created_at").defaultNow().notNull(),
+    updatedAt: timestamptz("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    unique("catalog_attribute_defs_group_kind_key_unique").on(table.groupId, table.kind, table.semanticKey),
+    unique("catalog_attribute_defs_id_group_unique").on(table.id, table.groupId),
+    index("catalog_attribute_defs_order_idx").on(table.groupId, table.kind, table.position),
+    check("catalog_attribute_defs_kind_check", sql`${table.kind} in ('film', 'book', 'other')`),
+    check("catalog_attribute_defs_type_check", sql`${table.type} in ('text', 'number', 'date', 'boolean')`),
+    check("catalog_attribute_defs_key_check", sql`${table.semanticKey} ~ '^[a-z][a-z0-9_]{0,63}$'`),
+    check("catalog_attribute_defs_label_check", sql`char_length(btrim(${table.label})) between 1 and 80`),
+    check("catalog_attribute_defs_position_check", sql`${table.position} >= 0`),
+  ],
+);
+
+/** One typed value of one attribute on one catalog item — exactly one column set, like `entry_values`. */
+export const catalogAttributeValues = pgTable(
+  "catalog_attribute_values",
+  {
+    catalogItemId: text("catalog_item_id").notNull(),
+    attributeDefId: text("attribute_def_id").notNull(),
+    groupId: text("group_id").notNull(),
+    textValue: text("text_value"),
+    numberValue: integer("number_value"),
+    dateValue: date("date_value", { mode: "string" }),
+    booleanValue: boolean("boolean_value"),
+    createdAt: timestamptz("created_at").defaultNow().notNull(),
+    updatedAt: timestamptz("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ name: "catalog_attribute_values_pk", columns: [table.catalogItemId, table.attributeDefId] }),
+    foreignKey({
+      name: "catalog_attribute_values_item_scope_fk",
+      columns: [table.catalogItemId, table.groupId],
+      foreignColumns: [catalogItems.id, catalogItems.groupId],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "catalog_attribute_values_def_scope_fk",
+      columns: [table.attributeDefId, table.groupId],
+      foreignColumns: [catalogAttributeDefs.id, catalogAttributeDefs.groupId],
+    }).onDelete("restrict"),
+    check(
+      "catalog_attribute_values_exactly_one_check",
+      sql`num_nonnulls(${table.textValue}, ${table.numberValue}, ${table.dateValue}, ${table.booleanValue}) = 1`,
+    ),
   ],
 );

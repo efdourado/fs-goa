@@ -35,6 +35,20 @@ import {
   updatePersonalCatalogItem,
 } from "@/lib/goa/catalog";
 import {
+  archiveGroupCatalogAttribute,
+  archivePersonalCatalogAttribute,
+  createGroupCatalogAttribute,
+  createPersonalCatalogAttribute,
+  listGroupCatalogAttributes,
+  listPersonalCatalogAttributes,
+} from "@/lib/goa/catalog-attributes";
+import type { CatalogKind } from "@/lib/goa/catalog";
+
+function catalogKindParam(request: Request): CatalogKind | undefined {
+  const raw = new URL(request.url).searchParams.get("kind");
+  return raw === "film" || raw === "book" || raw === "other" ? raw : undefined;
+}
+import {
   addMetric,
   archiveChallengeItem,
   curateResults,
@@ -132,6 +146,12 @@ export async function GET(request: Request): Promise<Response> {
     if (path[0] === "personal" && path[1] === "catalog" && path.length === 3) {
       return json(await personalCatalogItemDetail(await requireSession(request), path[2]));
     }
+    if (path[0] === "groups" && path[2] === "catalog-attributes" && path.length === 3) {
+      return json(await listGroupCatalogAttributes(await requireSession(request), path[1], catalogKindParam(request)));
+    }
+    if (isPath(path, "personal", "catalog-attributes")) {
+      return json(await listPersonalCatalogAttributes(await requireSession(request), catalogKindParam(request)));
+    }
     if (path[0] === "challenges" && path.length === 2) {
       return json(await getChallengeDetail(await requireSession(request), path[1]));
     }
@@ -202,6 +222,12 @@ export async function POST(request: Request): Promise<Response> {
     if (isPath(path, "groups")) return json(await createGroup(session, body), 201);
     if (path[0] === "groups" && path[2] === "members" && path.length === 3) {
       return json(await requestGroupMember(session, path[1], body));
+    }
+    if (path[0] === "groups" && path[2] === "catalog-attributes" && path.length === 3) {
+      return json(await createGroupCatalogAttribute(session, path[1], body), 201);
+    }
+    if (isPath(path, "personal", "catalog-attributes")) {
+      return json(await createPersonalCatalogAttribute(session, body), 201);
     }
     if (path[0] === "groups" && path[2] === "leave" && path.length === 3) {
       return json(await leaveGroup(session, path[1]));
@@ -314,6 +340,12 @@ export async function DELETE(request: Request): Promise<Response> {
     }
     if (path[0] === "personal" && path[1] === "catalog" && path.length === 3) {
       return json(await archivePersonalCatalogItem(session, path[2]));
+    }
+    if (path[0] === "groups" && path[2] === "catalog-attributes" && path.length === 4) {
+      return json(await archiveGroupCatalogAttribute(session, path[1], path[3]));
+    }
+    if (path[0] === "personal" && path[1] === "catalog-attributes" && path.length === 3) {
+      return json(await archivePersonalCatalogAttribute(session, path[2]));
     }
     if (path[0] === "challenges" && path[2] === "items" && path.length === 4) {
       return json(await archiveChallengeItem(session, path[1], path[3]));
