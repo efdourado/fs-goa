@@ -787,6 +787,7 @@
     "readOnly": "This entry is read-only.",
     "dueAt": "Deadline: {date}",
     "editAnswer": "Edit",
+    "answeredLabel": "Answered",
     "emptyValue": "—",
     "unavailable": {
       "closed": "This challenge is closed. Logging is read-only.",
