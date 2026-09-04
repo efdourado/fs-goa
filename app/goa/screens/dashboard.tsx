@@ -63,7 +63,6 @@ export function DashboardScreen({
   onOpenChallenge,
   onOpenAdmin,
   onCreateGroup,
-  onOpenPersonalSpace,
 }: {
   user: User;
   groups: GroupSummary[];
@@ -74,7 +73,6 @@ export function DashboardScreen({
   onOpenChallenge: (id: Id) => void;
   onOpenAdmin: (id: Id) => void;
   onCreateGroup: (name: string) => Promise<void>;
-  onOpenPersonalSpace: () => void;
 }) {
   const t = useTranslations("dashboard");
   const tc = useTranslations("common");
@@ -83,8 +81,6 @@ export function DashboardScreen({
   const [showGroupForm, setShowGroupForm] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const personalChallenges = challenges.filter((challenge) => isPersonalChallenge(challenge, personalWorkspaceId));
 
   const groupChallenges = challenges.filter((challenge) => !isPersonalChallenge(challenge, personalWorkspaceId));
   const active = groupChallenges.filter((challenge) => challenge.status === "active");
@@ -139,13 +135,6 @@ export function DashboardScreen({
           <span className="text-xs font-medium text-[var(--muted)]">{t("groupsCount", { count: standardGroups.length })}</span>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <button className={cx(cardClass, "cursor-pointer flex min-h-24 items-center justify-between gap-4 p-4 text-left transition hover:-translate-y-0.5 hover:border-[var(--muted)]")} type="button" onClick={onOpenPersonalSpace}>
-            <span>
-              {t("personalSpaceTitle")}
-              <small className="mt-1 block text-[var(--muted)]">{t("personalSpaceMeta", { count: personalChallenges.length })}</small>
-            </span>
-            <span className="text-lg text-[var(--muted)]" aria-hidden="true">→</span>
-          </button>
           {standardGroups.map((group) => {
             const count = group.memberCount ?? group.members?.length ?? 0;
             return (

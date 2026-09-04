@@ -38,6 +38,7 @@
     "description": "Desafios privados e personalizáveis para grupos registrarem progresso e guardarem suas histórias."
   },
   "nav": {
+    "personalSpace": "Meu espaço",
     "templates": "Modelos",
     "about": "Sobre",
     "admin": "Gestão",
@@ -243,8 +244,6 @@
     "progress": "{done} de {total}",
     "noChallengesTitle": "Nada pendente por aqui",
     "noChallengesBody": "Quando um desafio estiver ativo ou agendado, ele aparecerá aqui com a data do próximo registro.",
-    "personalSpaceTitle": "Meu espaço",
-    "personalSpaceMeta": "{count, plural, one {# desafio} other {# desafios}} · só você",
     "groupsTitle": "Seus grupos",
     "groupsCount": "{count, plural, one {# grupo} other {# grupos}}",
     "peopleCount": "{count, plural, one {# pessoa} other {# pessoas}}",
@@ -729,7 +728,7 @@
       "today": "Hoje",
       "results": "Resultado"
     },
-    "backHome": "← Início",
+    "back": "← {group}",
     "manage": "Gerenciar",
     "livingListMeta": "{count, plural, =0 {lista vazia} one {# título} other {# títulos}}",
     "recommendedBy": "Indicado por {name}",
