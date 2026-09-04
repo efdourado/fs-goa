@@ -38,6 +38,7 @@
     "description": "Private, customisable challenges for groups to track progress and keep their stories."
   },
   "nav": {
+    "personalSpace": "My space",
     "templates": "Templates",
     "about": "About",
     "admin": "Console",
@@ -243,8 +244,6 @@
     "progress": "{done} of {total}",
     "noChallengesTitle": "Nothing pending here",
     "noChallengesBody": "When a challenge is active or scheduled, it shows up here with the date of the next entry.",
-    "personalSpaceTitle": "My space",
-    "personalSpaceMeta": "{count, plural, one {# challenge} other {# challenges}} · just you",
     "groupsTitle": "Your groups",
     "groupsCount": "{count, plural, one {# group} other {# groups}}",
     "peopleCount": "{count, plural, one {# person} other {# people}}",
@@ -729,7 +728,7 @@
       "today": "Today",
       "results": "Result"
     },
-    "backHome": "← Home",
+    "back": "← {group}",
     "manage": "Manage",
     "livingListMeta": "{count, plural, =0 {empty list} one {# title} other {# titles}}",
     "recommendedBy": "Recommended by {name}",

@@ -251,6 +251,7 @@ export function AppHeader({
   notifications,
   onHome,
   onAccount,
+  onOpenPersonalSpace,
   onLogout,
   onAcceptRequest,
   onDeclineRequest,
@@ -259,6 +260,7 @@ export function AppHeader({
   notifications: MemberRequest[];
   onHome: () => void;
   onAccount: () => void;
+  onOpenPersonalSpace: () => void;
   onLogout: () => Promise<void>;
   onAcceptRequest: (id: Id) => Promise<void>;
   onDeclineRequest: (id: Id) => Promise<void>;
@@ -271,6 +273,7 @@ export function AppHeader({
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:h-[76px] sm:px-6">
         <button className="cursor-pointer rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25" type="button" onClick={onHome}><Brand /></button>
         <div className="flex min-w-0 items-center gap-0.5 sm:gap-2">
+          <button className={cx(navLink, "hidden items-center sm:inline-flex")} type="button" onClick={onOpenPersonalSpace}>{t("personalSpace")}</button>
           <Link className={cx(navLink, "hidden items-center sm:inline-flex")} href="/modelos">{t("templates")}</Link>
           <Link className={cx(navLink, "hidden items-center sm:inline-flex")} href="/sobre">{t("about")}</Link>
           {user.platformAdmin ? (
@@ -304,7 +307,7 @@ export function AppHeader({
           >
             {busy ? t("signingOut") : t("signOut")}
           </button>
-          <HeaderOverflowMenu isPlatformAdmin={Boolean(user.platformAdmin)} busy={busy} onLogout={async () => { setBusy(true); try { await onLogout(); } finally { setBusy(false); } }} />
+          <HeaderOverflowMenu isPlatformAdmin={Boolean(user.platformAdmin)} busy={busy} onOpenPersonalSpace={onOpenPersonalSpace} onLogout={async () => { setBusy(true); try { await onLogout(); } finally { setBusy(false); } }} />
         </div>
       </div>
     </header>
@@ -319,10 +322,12 @@ export function AppHeader({
 function HeaderOverflowMenu({
   isPlatformAdmin,
   busy,
+  onOpenPersonalSpace,
   onLogout,
 }: {
   isPlatformAdmin: boolean;
   busy: boolean;
+  onOpenPersonalSpace: () => void;
   onLogout: () => Promise<void>;
 }) {
   const t = useTranslations("nav");
@@ -355,6 +360,7 @@ function HeaderOverflowMenu({
         <>
           <button type="button" aria-hidden="true" tabIndex={-1} className="fixed inset-0 z-40 cursor-default" onClick={() => setOpen(false)} />
           <div className="absolute right-0 z-50 mt-2 w-52 rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-1.5 shadow-[var(--elevate-2)]" role="dialog" aria-label={t("menu")}>
+            <button className={cx(itemClass, "w-full text-left")} type="button" onClick={() => { onOpenPersonalSpace(); setOpen(false); }}>{t("personalSpace")}</button>
             <Link className={itemClass} href="/modelos" onClick={() => setOpen(false)}>{t("templates")}</Link>
             <Link className={itemClass} href="/sobre" onClick={() => setOpen(false)}>{t("about")}</Link>
             {isPlatformAdmin ? <Link className={itemClass} href="/admin" onClick={() => setOpen(false)}>{t("admin")}</Link> : null}

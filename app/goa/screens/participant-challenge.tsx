@@ -582,6 +582,7 @@ export function ParticipantChallengeScreen({
   tab,
   onTab,
   onBack,
+  backLabel,
   onAdmin,
   onSaveEntry,
   onDeleteEntry,
@@ -592,6 +593,8 @@ export function ParticipantChallengeScreen({
   tab: ParticipantTab;
   onTab: (tab: ParticipantTab) => void;
   onBack: () => void;
+  /** Where "back" leads: the group's name, "My space" for a personal challenge, or "Home". */
+  backLabel: string;
   onAdmin?: () => void;
   onSaveEntry: (itemId: Id | null, values: Record<Id, unknown>, entry?: Entry, occurredOn?: string | null, entryTypeId?: Id, checkpointId?: Id | null) => Promise<void>;
   onDeleteEntry?: (entryId: Id) => Promise<void>;
@@ -735,7 +738,7 @@ export function ParticipantChallengeScreen({
 
   return (
     <main className="mx-auto max-w-7xl overflow-x-clip px-4 py-6 pb-28 sm:px-6 sm:py-10">
-      <div className="mb-5 flex items-center justify-between gap-3"><button className={backLinkClass} type="button" onClick={onBack}>{t("backHome")}</button>{onAdmin ? <Button variant="secondary" onClick={onAdmin}>{t("manage")}</Button> : null}</div>
+      <div className="mb-5 flex items-center justify-between gap-3"><button className={backLinkClass} type="button" onClick={onBack}>{t("back", { group: backLabel })}</button>{onAdmin ? <Button variant="secondary" onClick={onAdmin}>{t("manage")}</Button> : null}</div>
       <section className="relative overflow-hidden rounded-[28px] bg-[var(--spotlight)] p-6 text-[var(--spotlight-ink)] sm:p-9">
         <div className="relative z-10">
           <div className="flex flex-wrap items-center justify-between gap-3">{livingList ? <span /> : <ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />}<span className="text-xs text-white/65">{livingList ? t("livingListMeta", { count: sortedItems.length }) : f.dateRange(challenge.startsOn, challenge.endsOn)}</span></div>
