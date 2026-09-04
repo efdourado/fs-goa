@@ -786,8 +786,6 @@
     "saveEntry": "Salvar registro",
     "readOnly": "Este registro está disponível somente para leitura.",
     "dueAt": "Prazo: {date}",
-    "editAnswer": "Editar",
-    "answeredLabel": "Respondido",
     "emptyValue": "—",
     "unavailable": {
       "closed": "Este desafio foi encerrado. O registro está disponível somente para leitura.",

@@ -104,14 +104,6 @@ function RatingField({
   );
 }
 
-function EditGlyph({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 16 16" className={className ?? "h-3.5 w-3.5"} aria-hidden="true">
-      <path d="M12 2 14 4 6 12 4 10Z" fill="currentColor" />
-    </svg>
-  );
-}
-
 function TrashGlyph({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 16 16" className={className ?? "h-3.5 w-3.5"} fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -131,9 +123,7 @@ function ChevronGlyph({ open, className }: { open: boolean; className?: string }
 /** A small bordered pill for a secondary action — deliberately more present than an underlined word. */
 const actionChipClass =
   "inline-flex min-h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-50";
-const neutralChipClass = "border-[var(--line)] bg-[var(--paper)] text-[var(--ink)] hover:border-[var(--main-line)] hover:bg-[var(--wash)]";
 const ghostChipClass = "border-transparent bg-[var(--wash)] text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--ink)]";
-const dangerChipClass = "border-[var(--danger-line)] bg-transparent text-[var(--danger)] hover:bg-[var(--danger-soft)]";
 
 export function DynamicEntryForm({
   fields,
@@ -248,17 +238,12 @@ export function DynamicEntryForm({
     const answered = fields.filter((field) => field.id && !isBlank(values[field.id]));
     const shown = answered.length ? answered : fields.slice(0, 1);
     return (
-      <div className="rounded-2xl bg-[var(--wash)] p-4 sm:p-5">
-        <div className="flex items-start justify-between gap-3">
-          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--ok)]">
-            <span className="grid h-[18px] w-[18px] flex-none place-items-center rounded-full bg-[var(--ok)] text-white"><CheckGlyph /></span>
-            {t("answeredLabel")}
-          </span>
-          <button type="button" className={cx(actionChipClass, neutralChipClass)} onClick={() => setEditing(true)}>
-            <EditGlyph /> {t("editAnswer")}
-          </button>
-        </div>
-        <dl className="mt-4 space-y-3">
+      <button
+        type="button"
+        className="w-full cursor-pointer rounded-2xl bg-[var(--wash)] p-4 text-left transition hover:bg-[var(--wash-strong)] sm:p-5"
+        onClick={() => setEditing(true)}
+      >
+        <dl className="space-y-3">
           {shown.map((field) => (
             <div key={field.id}>
               <dt className="text-xs font-medium uppercase tracking-[0.06em] text-[var(--muted)]">{field.label}</dt>
@@ -267,7 +252,7 @@ export function DynamicEntryForm({
           ))}
         </dl>
         {item?.dueAt ? <p className="mt-4 text-center text-xs text-[var(--muted)]">{t("dueAt", { date: f.dateTime(item.dueAt) })}</p> : null}
-      </div>
+      </button>
     );
   }
 
@@ -306,19 +291,12 @@ export function DynamicEntryForm({
       ) : null}
       <StatusMessage error={error} success={success} />
       {canEdit ? (
-        <div className="flex gap-2">
-          <Button type="submit" className="w-full" disabled={busy || deleting}>{busy ? tc("saving") : entry ? tc("saveChanges") : t("saveEntry")}<span aria-hidden="true">→</span></Button>
-          {entry && !alwaysEditable ? <Button type="button" variant="secondary" disabled={busy || deleting} onClick={() => setEditing(false)}>{tc("cancel")}</Button> : null}
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Button type="submit" className="w-full sm:flex-1" disabled={busy || deleting}>{busy ? tc("saving") : entry ? tc("saveChanges") : t("saveEntry")}<span aria-hidden="true">→</span></Button>
+          {entry && !alwaysEditable ? <Button type="button" variant="secondary" className="w-full sm:flex-1" disabled={busy || deleting} onClick={() => setEditing(false)}>{tc("cancel")}</Button> : null}
+          {entry && onDelete ? <Button type="button" variant="danger" className="w-full sm:w-auto sm:flex-none" disabled={busy || deleting} onClick={() => void remove()}><TrashGlyph />{deleting ? tp("deletingEntry") : tp("deleteEntry")}</Button> : null}
         </div>
       ) : <p className="rounded-xl border border-[var(--line)] bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{unavailableMessage ?? t("readOnly")}</p>}
-      {entry && canEdit && onDelete ? (
-        <div className="flex justify-center">
-          <button type="button" className={cx(actionChipClass, dangerChipClass)} disabled={busy || deleting} onClick={() => void remove()}>
-            <TrashGlyph />
-            {deleting ? tp("deletingEntry") : tp("deleteEntry")}
-          </button>
-        </div>
-      ) : null}
       {item?.dueAt ? <p className="text-center text-xs text-[var(--muted)]">{t("dueAt", { date: f.dateTime(item.dueAt) })}</p> : null}
     </form>
   );
