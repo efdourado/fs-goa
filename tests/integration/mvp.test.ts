@@ -2309,3 +2309,87 @@ test("estante pessoal: só nota, sem data no registro, sem métricas de grupo, r
     assert.ok(hasData, "todo bloco de métrica publicado carrega ao menos um valor");
   }
 });
+
+test("membro sai do grupo, opcionalmente apagando seus dados; o responsável não sai", async () => {
+  const owner = await register("Dona Saída", "dona_saida");
+  const keeper = await register("Fica O Registro", "fica_o_registro");
+  const purger = await register("Some O Registro", "some_o_registro");
+
+  const group = await call("POST", "/api/groups", { session: owner, body: { name: "Grupo com porta" } });
+  const groupId = (group.body as { id: string }).id;
+  const invite = await call("POST", `/api/groups/${groupId}/invites`, {
+    session: owner,
+    body: { expiresInDays: 7, maxUses: 5 },
+  });
+  const token = (invite.body as { token: string }).token;
+  await call("POST", `/api/invites/${token}`, { session: keeper, body: {} });
+  await call("POST", `/api/invites/${token}`, { session: purger, body: {} });
+
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: {
+      title: "Rodada com três",
+      submissionMode: "item",
+      participantIds: [owner.user.id, keeper.user.id, purger.user.id],
+      items: [{ title: "Primeiro filme" }],
+      fields: [{ key: "nota", label: "Nota", type: "rating", required: true }],
+    },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });
+
+  const detail = (await call("GET", `/api/challenges/${challengeId}`, { session: keeper })).body as {
+    entryTypes: Array<{ id: string; fields: Array<{ id: string; key: string }> }>;
+    items: Array<{ id: string }>;
+  };
+  const notaField = detail.entryTypes[0].fields.find((field) => field.key === "nota")!.id;
+  const typeId = detail.entryTypes[0].id;
+  const itemId = detail.items[0].id;
+  for (const [session, nota] of [[keeper, 4], [purger, 2]] as const) {
+    const submitted = await call("POST", `/api/challenges/${challengeId}/entries`, {
+      session,
+      body: { itemId, entryTypeId: typeId, values: { [notaField]: nota } },
+    });
+    assert.equal(submitted.response.status, 201, JSON.stringify(submitted.body));
+  }
+
+  // The owner cannot walk away — no ownership transfer yet.
+  const ownerLeaves = await call("POST", `/api/groups/${groupId}/leave`, { session: owner, body: {} });
+  assert.equal(ownerLeaves.response.status, 409, JSON.stringify(ownerLeaves.body));
+  assert.equal((ownerLeaves.body as { error: string }).error, "owner_cannot_leave");
+
+  // Leave keeping data: membership gone, entry still counted.
+  const keep = await call("POST", `/api/groups/${groupId}/leave`, { session: keeper, body: { purgeData: false } });
+  assert.equal(keep.response.status, 200, JSON.stringify(keep.body));
+  assert.deepEqual(keep.body, { groupId, left: true, purged: false, purgedEntries: 0 });
+
+  const afterKeep = await adminPool.query<{ members: number; parts: number; live_entries: number }>(
+    `SELECT
+       (SELECT count(*)::int FROM group_members WHERE group_id = $1 AND user_id = $2 AND removed_at IS NULL) AS members,
+       (SELECT count(*)::int FROM challenge_participants WHERE challenge_id = $3 AND user_id = $2 AND removed_at IS NULL) AS parts,
+       (SELECT count(*)::int FROM entries WHERE challenge_id = $3 AND participant_user_id = $2 AND deleted_at IS NULL) AS live_entries`,
+    [groupId, keeper.user.id, challengeId],
+  );
+  assert.deepEqual(afterKeep.rows[0], { members: 0, parts: 0, live_entries: 1 }, "sem purge, o registro permanece");
+
+  const groupGone = (await call("GET", "/api/bootstrap", { session: keeper })).body as { groups: Array<{ id: string }> };
+  assert.ok(!groupGone.groups.some((entry) => entry.id === groupId), "o grupo some do bootstrap de quem saiu");
+
+  // Leave purging: the entry is soft-deleted.
+  const purge = await call("POST", `/api/groups/${groupId}/leave`, { session: purger, body: { purgeData: true } });
+  assert.equal(purge.response.status, 200, JSON.stringify(purge.body));
+  assert.equal((purge.body as { purged: boolean }).purged, true);
+  assert.equal((purge.body as { purgedEntries: number }).purgedEntries, 1, "purge apaga o registro da rodada");
+
+  const afterPurge = await adminPool.query<{ live_entries: number }>(
+    "SELECT count(*)::int AS live_entries FROM entries WHERE challenge_id = $1 AND participant_user_id = $2 AND deleted_at IS NULL",
+    [challengeId, purger.user.id],
+  );
+  assert.equal(afterPurge.rows[0]?.live_entries, 0, "com purge, os registros de quem saiu são apagados");
+
+  const leftAudit = await adminPool.query<{ count: number }>(
+    "SELECT count(*)::int AS count FROM audit_events WHERE group_id = $1 AND action = 'group.member_left'",
+    [groupId],
+  );
+  assert.equal(leftAudit.rows[0]?.count, 2, "cada saída fica auditada");
+});

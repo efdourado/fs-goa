@@ -7,6 +7,7 @@ export { insertField } from "./goa/domain/fields";
 export {
   cancelMemberRequest,
   createGroup,
+  leaveGroup,
   requestGroupMember,
   respondToMemberRequest,
   softDeleteGroup,
