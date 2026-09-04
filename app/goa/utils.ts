@@ -55,7 +55,7 @@ export function formatDateRange(startsOn?: string | null, endsOn?: string | null
   if (startsOn && endsOn) return `${formatDate(startsOn)} — ${formatDate(endsOn)}`;
   if (startsOn) return `Desde ${formatDate(startsOn)}`;
   if (endsOn) return `Até ${formatDate(endsOn)}`;
-  return "Sem prazo";
+  return "Sem datas";
 }
 
 /**
