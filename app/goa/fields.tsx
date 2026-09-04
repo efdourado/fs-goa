@@ -24,6 +24,14 @@ export function presetFields(recipe: CreatableRecipeKey, label: PresetLabels): C
       { key: "paginas", label: label("paginasLidas"), type: "number", required: true, config: { min: 0, step: 1 } },
     ];
   }
+  if (recipe === "habit") {
+    // Deliberately just a note — no rating, no preset numeric field. Add
+    // whatever the habit actually needs (minutes, a subject, a mood scale) and
+    // build a metric on it afterwards in the admin Metrics tab.
+    return [
+      { key: "nota_dia", label: label("comoFoi"), type: "text", required: false, config: { multiline: true, maxLength: 500 } },
+    ];
+  }
   return [
     { key: "nota", label: label("nota"), type: "rating", required: true, config: { min: 0, max: 5, step: 0.5 } },
     { key: "comentario", label: label("comentario"), type: "text", required: false, config: { multiline: true, maxLength: 280 } },

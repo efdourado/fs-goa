@@ -442,6 +442,11 @@
         "name": "Reading club",
         "body": "A list of books with pages read per day and per book, plus a \"Finished\" with a rating. Needs a period.",
         "title": "Reading club — new season"
+      },
+      "habit": {
+        "name": "Habit",
+        "body": "No film, no book — just a daily check-in. Add whatever fields the habit needs and build your own metrics on them.",
+        "title": "New habit"
       }
     },
     "titleLabel": "Title",
@@ -828,7 +833,8 @@
       "livroAtual": "Current book",
       "paginasLidas": "Pages read",
       "livroConcluido": "Book finished?",
-      "notaDoLivro": "Book rating"
+      "notaDoLivro": "Book rating",
+      "comoFoi": "How did it go?"
     },
     "labelLabel": "Label",
     "typeLabel": "Type",

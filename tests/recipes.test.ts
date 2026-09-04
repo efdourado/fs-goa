@@ -57,6 +57,21 @@ describe("current challenge recipes", () => {
     assert.equal(recipe.metrics.some((metric) => metric.needsGroup), true);
   });
 
+  test("Habit has no catalog and no preset numeric field — a blank daily check-in", () => {
+    const recipe = resolveRecipe({ recipe: "habit" });
+
+    assert.equal(recipe.key, "habit");
+    assert.equal(recipe.catalogKind, null);
+    assert.deepEqual(recipe.entryTypes.map((type) => type.purpose), ["checkin"]);
+    assert.equal(recipe.entryTypes[0].submissionMode, "daily");
+    assert.equal(recipe.entryTypes[0].targetPolicy, "none");
+    assert.equal(recipe.entryTypes[0].cardinality, "once_per_day");
+    assert.deepEqual(recipe.entryTypes[0].fields.map((field) => field.key), ["nota_dia"]);
+    // Nothing numeric is seeded — the whole point is that the person building it
+    // adds their own field and their own metric on top of it.
+    assert.deepEqual(recipe.metrics.map((metric) => metric.operation), ["completion_rate"]);
+  });
+
   test("legacy keys remain identifiable but cannot seed a new challenge", () => {
     for (const key of ["cine_free", "cine_curated", "reading_club", "reading_daily"] as const) {
       assert.equal(isLegacyRecipeKey(key), true);
