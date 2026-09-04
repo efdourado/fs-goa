@@ -101,11 +101,17 @@
     "groupBy": {
       "none": "Sem agrupamento",
       "participant": "Por participante",
-      "item": "Por item/checkpoint"
+      "item": "Por item/checkpoint",
+      "catalog_year": "Por ano de lançamento",
+      "catalog_author": "Por autor",
+      "catalog_genre": "Por gênero"
     },
     "groupByShort": {
       "participant": "participante",
-      "item": "item"
+      "item": "item",
+      "catalog_year": "ano",
+      "catalog_author": "autor",
+      "catalog_genre": "gênero"
     },
     "smallSample": "amostra pequena"
   },
@@ -641,6 +647,7 @@
     "reasonRequired": "Informe o motivo da correção administrativa.",
     "errPickField": "Escolha um campo compatível.",
     "metricAdded": "Métrica adicionada e recalculada sem alterar os registros.",
+    "metricUpdated": "Métrica atualizada e recalculada sem alterar os registros.",
     "metricsTitle": "Métricas",
     "metricsSubtitle": "Operações conhecidas referenciam IDs estáveis de campos, nunca sua posição na tela.",
     "metricDuring": "durante",
@@ -649,6 +656,9 @@
     "noMetricsTitle": "Nenhuma métrica configurada",
     "noMetricsBody": "Comece com contagem, média ou taxa de conclusão. Fórmulas arbitrárias ficam fora do MVP.",
     "addMetric": "Adicionar métrica",
+    "editMetric": "Editar métrica",
+    "cancelEditMetric": "Cancelar",
+    "deleteMetricConfirm": "Remover a métrica \"{label}\"? Ela deixa de aparecer durante o desafio e na vitrine.",
     "metricsClosedNote": "As métricas foram congeladas no encerramento para preservar o resultado histórico.",
     "metricNameLabel": "Nome",
     "metricNamePlaceholder": "Ex.: Média do grupo",
@@ -776,6 +786,8 @@
     "saveEntry": "Salvar registro",
     "readOnly": "Este registro está disponível somente para leitura.",
     "dueAt": "Prazo: {date}",
+    "editAnswer": "Editar",
+    "emptyValue": "—",
     "unavailable": {
       "closed": "Este desafio foi encerrado. O registro está disponível somente para leitura.",
       "draft": "Este desafio ainda é um rascunho. Ative-o para liberar os registros.",

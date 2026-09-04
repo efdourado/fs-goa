@@ -70,7 +70,8 @@ export const challengeMetrics = pgTable(
     ),
     check(
       "challenge_metrics_group_by_check",
-      sql`${table.groupBy} in ('none', 'participant', 'item', 'day', 'week')`,
+      sql`${table.groupBy} in ('none', 'participant', 'item', 'day', 'week',
+        'catalog_year', 'catalog_author', 'catalog_genre')`,
     ),
     check(
       "challenge_metrics_field_requirement_check",

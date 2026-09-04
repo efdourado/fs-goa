@@ -60,6 +60,8 @@ export const API_PATHS = {
   item: (challengeId: Id, itemId: Id) =>
     `/api/challenges/${encodeURIComponent(challengeId)}/items/${encodeURIComponent(itemId)}`,
   metrics: (challengeId: Id) => `/api/challenges/${encodeURIComponent(challengeId)}/metrics`,
+  metric: (challengeId: Id, metricId: Id) =>
+    `/api/challenges/${encodeURIComponent(challengeId)}/metrics/${encodeURIComponent(metricId)}`,
   results: (challengeId: Id) => `/api/challenges/${encodeURIComponent(challengeId)}/results`,
   resultsPublish: (challengeId: Id) =>
     `/api/challenges/${encodeURIComponent(challengeId)}/results/publish`,

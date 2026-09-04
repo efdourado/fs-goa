@@ -101,11 +101,17 @@
     "groupBy": {
       "none": "No grouping",
       "participant": "By participant",
-      "item": "By item/checkpoint"
+      "item": "By item/checkpoint",
+      "catalog_year": "By release year",
+      "catalog_author": "By author",
+      "catalog_genre": "By genre"
     },
     "groupByShort": {
       "participant": "participant",
-      "item": "item"
+      "item": "item",
+      "catalog_year": "year",
+      "catalog_author": "author",
+      "catalog_genre": "genre"
     },
     "smallSample": "small sample"
   },
@@ -641,6 +647,7 @@
     "reasonRequired": "Enter the reason for the admin correction.",
     "errPickField": "Choose a compatible field.",
     "metricAdded": "Metric added and recalculated without changing the entries.",
+    "metricUpdated": "Metric updated and recalculated without changing the entries.",
     "metricsTitle": "Metrics",
     "metricsSubtitle": "Known operations reference stable field IDs, never their position on screen.",
     "metricDuring": "during",
@@ -649,6 +656,9 @@
     "noMetricsTitle": "No metrics set up",
     "noMetricsBody": "Start with a count, average, or completion rate. Arbitrary formulas are out of scope for the MVP.",
     "addMetric": "Add metric",
+    "editMetric": "Edit metric",
+    "cancelEditMetric": "Cancel",
+    "deleteMetricConfirm": "Remove the metric \"{label}\"? It stops showing during the challenge and in the showcase.",
     "metricsClosedNote": "The metrics were frozen at closing to preserve the historical result.",
     "metricNameLabel": "Name",
     "metricNamePlaceholder": "e.g. Group average",
@@ -776,6 +786,8 @@
     "saveEntry": "Save entry",
     "readOnly": "This entry is read-only.",
     "dueAt": "Deadline: {date}",
+    "editAnswer": "Edit",
+    "emptyValue": "—",
     "unavailable": {
       "closed": "This challenge is closed. Logging is read-only.",
       "draft": "This challenge is still a draft. Activate it to open logging.",

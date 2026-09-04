@@ -1878,13 +1878,15 @@ test("motor de análise: ranking ajustado, surpresa, viés e vitrine automática
   const anaBias = bias.series!.find((s) => s.label === "Ana");
   assert.ok(anaBias && anaBias.value !== null, "viés do indicador calculado para quem indicou");
 
-  // a vitrine foi gerada sozinha ao encerrar
+  // a vitrine foi gerada sozinha ao encerrar — com resumo, mas sem repetir o
+  // título do desafio como manchete (o admin escreve uma se quiser).
   const blocks = await adminPool.query<{ kind: string; heading: string | null }>(
     "SELECT kind, heading FROM result_blocks WHERE challenge_id=$1 ORDER BY position",
     [challengeId],
   );
+  assert.ok(!blocks.rows.some((b) => b.heading === "headline"), "nenhuma manchete é gerada automaticamente");
   assert.equal(blocks.rows[0].kind, "text");
-  assert.equal(blocks.rows[0].heading, "headline");
+  assert.equal(blocks.rows[0].heading, "summary");
   assert.ok(blocks.rows.some((b) => b.kind === "metric"), "vitrine automática tem blocos de métrica");
 
   // regenerar substitui os blocos
@@ -2560,4 +2562,128 @@ test("atributo de acervo tipado: nomeado pelo grupo, preenchido num item, travad
   };
   const personalDuna = personalCatalog.items.find((item) => item.title === "Duna")!;
   assert.deepEqual(personalDuna.attributes, [{ key: "editora", label: "Editora", type: "text", value: "Aleph" }]);
+});
+
+test("métricas: editar e remover uma existente, e agrupar por ano/autor do acervo", async () => {
+  const owner = await register("Mede Tudo", "mede_tudo_metricas");
+  const participant = await register("So Vota", "so_vota_metricas");
+
+  const group = await call("POST", "/api/groups", { session: owner, body: { name: "Cineclube métricas" } });
+  const groupId = (group.body as { id: string }).id;
+  const invite = await call("POST", `/api/groups/${groupId}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } });
+  await call("POST", `/api/invites/${(invite.body as { token: string }).token}`, { session: participant, body: {} });
+
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "cinema",
+      title: "Melhores do ano",
+      participantIds: [owner.user.id, participant.user.id],
+      items: [
+        { title: "Filme A 2026", year: 2026 },
+        { title: "Filme B 2026", year: 2026 },
+        { title: "Filme C 2025", year: 2025 },
+      ],
+    },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });
+
+  const detail = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    entryTypes: Array<{ id: string; fields: Array<{ id: string; key: string }> }>;
+    items: Array<{ id: string; title: string }>;
+  };
+  const notaField = detail.entryTypes[0].fields.find((field) => field.key === "nota")!.id;
+  const typeId = detail.entryTypes[0].id;
+  const itemByTitle = new Map(detail.items.map((item) => [item.title, item.id]));
+  for (const [title, nota] of [["Filme A 2026", 5], ["Filme B 2026", 3], ["Filme C 2025", 4]] as const) {
+    const submitted = await call("POST", `/api/challenges/${challengeId}/entries`, {
+      session: owner,
+      body: { itemId: itemByTitle.get(title), entryTypeId: typeId, values: { [notaField]: nota } },
+    });
+    assert.equal(submitted.response.status, 201, JSON.stringify(submitted.body));
+  }
+
+  // Agrupar por ano do acervo: "melhores filmes de 2026 pra esse desafio".
+  const byYear = await call("POST", `/api/challenges/${challengeId}/metrics`, {
+    session: owner,
+    body: { label: "Nota por ano", operation: "average", fieldId: notaField, groupBy: "catalog_year" },
+  });
+  assert.equal(byYear.response.status, 201, JSON.stringify(byYear.body));
+  const metricId = (byYear.body as { id: string }).id;
+
+  const withByYear = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { metrics: ApiMetric[] };
+  const yearSeries = withByYear.metrics.find((metric) => metric.id === metricId)!.series!;
+  const year2026 = yearSeries.find((row) => row.key === "2026")!;
+  const year2025 = yearSeries.find((row) => row.key === "2025")!;
+  assert.equal(year2026.value, 4, "média de 5 e 3 nos dois filmes de 2026");
+  assert.equal(year2025.value, 4, "único filme de 2025");
+
+  // Participante comum não edita nem remove métrica.
+  assert.equal(
+    (await call("PATCH", `/api/challenges/${challengeId}/metrics/${metricId}`, {
+      session: participant, body: { label: "Hackeado", operation: "average", fieldId: notaField, groupBy: "none" },
+    })).response.status,
+    403,
+  );
+  assert.equal((await call("DELETE", `/api/challenges/${challengeId}/metrics/${metricId}`, { session: participant })).response.status, 403);
+
+  // Dono edita: rótulo e agrupamento mudam, sem perder o cálculo.
+  const edited = await call("PATCH", `/api/challenges/${challengeId}/metrics/${metricId}`, {
+    session: owner,
+    body: { label: "Nota geral", operation: "average", fieldId: notaField, groupBy: "none" },
+  });
+  assert.equal(edited.response.status, 200, JSON.stringify(edited.body));
+  const afterEdit = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { metrics: ApiMetric[] };
+  const editedMetric = afterEdit.metrics.find((metric) => metric.id === metricId)!;
+  assert.equal(editedMetric.label, "Nota geral");
+  assert.equal(editedMetric.groupBy, "none");
+  assert.equal(editedMetric.series, undefined, "sem groupBy, some a série");
+
+  // Dono remove: a métrica desaparece do desafio.
+  const removed = await call("DELETE", `/api/challenges/${challengeId}/metrics/${metricId}`, { session: owner });
+  assert.equal(removed.response.status, 200, JSON.stringify(removed.body));
+  const afterRemove = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { metrics: ApiMetric[] };
+  assert.ok(!afterRemove.metrics.some((metric) => metric.id === metricId), "métrica removida some da lista");
+
+  // Agrupar por autor: dois livros do mesmo autor, um de outro.
+  const bookGroup = await call("POST", "/api/groups", { session: owner, body: { name: "Clube de leitura métricas" } });
+  const bookGroupId = (bookGroup.body as { id: string }).id;
+  const bookChallenge = await call("POST", `/api/groups/${bookGroupId}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "bookshelf",
+      title: "Melhores autores",
+      participantIds: [owner.user.id],
+      items: [
+        { title: "Livro 1", author: "Autora X" },
+        { title: "Livro 2", author: "Autora X" },
+        { title: "Livro 3", author: "Autor Y" },
+      ],
+    },
+  });
+  const bookChallengeId = (bookChallenge.body as { id: string }).id;
+  await call("POST", `/api/challenges/${bookChallengeId}/transition`, { session: owner, body: { status: "active" } });
+  const bookDetail = (await call("GET", `/api/challenges/${bookChallengeId}`, { session: owner })).body as {
+    entryTypes: Array<{ id: string; fields: Array<{ id: string; key: string }> }>;
+    items: Array<{ id: string; title: string }>;
+  };
+  const bookNotaField = bookDetail.entryTypes[0].fields.find((field) => field.key === "nota")!.id;
+  const bookTypeId = bookDetail.entryTypes[0].id;
+  const bookItemByTitle = new Map(bookDetail.items.map((item) => [item.title, item.id]));
+  for (const [title, nota] of [["Livro 1", 5], ["Livro 2", 3], ["Livro 3", 2]] as const) {
+    await call("POST", `/api/challenges/${bookChallengeId}/entries`, {
+      session: owner,
+      body: { itemId: bookItemByTitle.get(title), entryTypeId: bookTypeId, values: { [bookNotaField]: nota } },
+    });
+  }
+  const byAuthor = await call("POST", `/api/challenges/${bookChallengeId}/metrics`, {
+    session: owner,
+    body: { label: "Nota por autor", operation: "average", fieldId: bookNotaField, groupBy: "catalog_author" },
+  });
+  assert.equal(byAuthor.response.status, 201, JSON.stringify(byAuthor.body));
+  const withByAuthor = (await call("GET", `/api/challenges/${bookChallengeId}`, { session: owner })).body as { metrics: ApiMetric[] };
+  const authorSeries = withByAuthor.metrics.find((metric) => metric.label === "Nota por autor")!.series!;
+  assert.equal(authorSeries.find((row) => row.key === "Autora X")!.value, 4, "média dos dois livros da mesma autora");
+  assert.equal(authorSeries.find((row) => row.key === "Autor Y")!.value, 2);
 });

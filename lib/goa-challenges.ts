@@ -25,9 +25,11 @@ export {
 } from "./goa/challenges/templates";
 export {
   addMetric,
+  archiveMetric,
   curateResults,
   metricsForChallenge,
   publicResults,
   publishResults,
   unpublishChallengeResults,
+  updateMetric,
 } from "./goa/challenges/results";
