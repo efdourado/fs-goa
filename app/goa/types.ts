@@ -391,6 +391,7 @@ export type Screen =
   | { kind: "account" }
   | { kind: "group"; groupId: Id }
   | { kind: "catalog-item"; groupId: Id; itemId: Id }
+  | { kind: "personal-space" }
   | { kind: "personal-catalog" }
   | { kind: "personal-catalog-item"; itemId: Id }
   | { kind: "invite"; token: string }

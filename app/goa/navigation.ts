@@ -40,6 +40,7 @@ export function screenFromUrl(pathname: string, search = ""): Screen | null {
     const token = decoded(parts[1]);
     return token ? { kind: "invite", token } : null;
   }
+  if (parts[0] === "personal" && parts.length === 1) return { kind: "personal-space" };
   if (parts[0] === "catalog" && parts.length === 1) return { kind: "personal-catalog" };
   if (parts[0] === "catalog" && parts.length === 2) {
     const itemId = decoded(parts[1]);
@@ -90,6 +91,8 @@ export function urlForScreen(screen: Screen): string | null {
       return `/groups/${encodeURIComponent(screen.groupId)}`;
     case "catalog-item":
       return `/groups/${encodeURIComponent(screen.groupId)}/catalog/${encodeURIComponent(screen.itemId)}`;
+    case "personal-space":
+      return "/personal";
     case "personal-catalog":
       return "/catalog";
     case "personal-catalog-item":
