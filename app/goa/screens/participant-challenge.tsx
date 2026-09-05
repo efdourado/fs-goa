@@ -416,23 +416,71 @@ export function ResultView({
   // Only a curated/generated headline — never fall back to the challenge title,
   // which the cover above already shows in full.
   const headline = result?.headline || null;
+  const rankLabels = rankingLabels((key, values) => tr(key, values));
+  const affLabels = affinityLabels((key, values) => tr(key, values));
+
+  function metricNode(metric: Metric) {
+    return metricTheme(metric) === "ranking" && metric.series?.length
+      ? <RankingCard key={metric.id} metric={metric} hideThinLabel={hideThinLabel} smallSampleLabel={tm("smallSample")} showMoreLabel={(count) => tm("showMore", { count })} showLessLabel={tm("showLess")} />
+      : <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} hideThinLabel={hideThinLabel} showMoreLabel={(count) => tm("showMore", { count })} showLessLabel={tm("showLess")} />;
+  }
+  function commentNode(comment: { id: Id; text: string; itemTitle?: string; authorName?: string }) {
+    return (
+      <blockquote className="rounded-2xl bg-[var(--wash)] p-5" key={comment.id}>
+        <p className="text-sm leading-6">“{comment.text}”</p>
+        <footer className="mt-3 text-xs font-light text-[var(--muted)]">{comment.authorName ?? t("participantFallback")}{comment.itemTitle ? ` · ${comment.itemTitle}` : ""}</footer>
+      </blockquote>
+    );
+  }
+
+  // The admin-arranged, ordered Wrapped — used whenever the showcase has been
+  // curated at all (blocks exist), even if every block is hidden. The default
+  // composition below is only for a live, never-curated round.
+  const curated = (result?.blocks?.length ?? 0) > 0;
+  const ordered = (result?.blocks ?? []).filter((block) => block.visible).sort((a, b) => a.position - b.position);
+  const orderedBody = curated ? ordered.map((block) => {
+    if (block.kind === "text") {
+      return block.heading === "headline"
+        ? null
+        : <p className="max-w-2xl text-base leading-7 text-[var(--muted)]" key={block.id}>{block.text}</p>;
+    }
+    if (block.kind === "metric" && block.metric && metricHasData(block.metric as unknown as Record<string, unknown>)) {
+      return <div key={block.id}>{metricNode(block.metric)}</div>;
+    }
+    if (block.kind === "ranking" && (block.ranking?.length ?? 0) > 1) {
+      return <section className={cx(cardClass, "p-6 sm:p-8")} key={block.id}><PersonalRankingsBlock rankings={block.ranking!} labels={rankLabels} /></section>;
+    }
+    if (block.kind === "affinity" && block.affinity && block.affinity.pairs.length) {
+      return <section className={cx(cardClass, "p-6 sm:p-8")} key={block.id}><AffinityBlockView affinity={block.affinity} labels={affLabels} /></section>;
+    }
+    if (block.kind === "entry_value" && block.comment) {
+      return <section className={cx(cardClass, "p-5 sm:p-6")} key={block.id}>{commentNode(block.comment)}</section>;
+    }
+    return null;
+  }).filter(Boolean) : null;
+
   const scalarMetrics = metrics.filter((metric) => !metric.series?.length);
   const seriesMetrics = metrics.filter((metric) => metric.series?.length);
   const themedSeries = (["ranking", "people", "debate"] as const)
     .map((theme) => ({ theme, items: seriesMetrics.filter((metric) => metricTheme(metric) === theme) }))
     .filter((group) => group.items.length);
+
   return (
     <div className="space-y-5">
       {headline || result?.summary || names.length ? (
         <header className="space-y-3">
           {headline ? <h2 className="max-w-3xl text-3xl font-medium leading-none tracking-[-0.045em] sm:text-4xl">{headline}</h2> : null}
-          {result?.summary ? <p className="max-w-2xl text-base leading-7 text-[var(--muted)]">{result.summary}</p> : null}
+          {!orderedBody && result?.summary ? <p className="max-w-2xl text-base leading-7 text-[var(--muted)]">{result.summary}</p> : null}
           {names.length ? (
             <p className="text-sm text-[var(--muted)]">{t("participantsSentence", { names: participantsSentence(names, (count) => t("andMore", { count })) })}</p>
           ) : null}
+          {result?.totalEntries ? <p className="text-xs text-[var(--muted)]">{t("totalEntries", { count: result.totalEntries })}</p> : null}
         </header>
       ) : null}
-      {metrics.length ? (
+
+      {orderedBody ? (
+        <div className="space-y-5" aria-label={t("numbersAria")}>{orderedBody}</div>
+      ) : metrics.length ? (
         <div className="space-y-5" aria-label={t("numbersAria")}>
           {scalarMetrics.length ? (
             <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -444,31 +492,26 @@ export function ResultView({
           {themedSeries.map(({ theme, items }) => (
             <section key={theme} className="space-y-3">
               {themedSeries.length > 1 ? <h3 className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--muted)]">{t(`theme.${theme}`)}</h3> : null}
-              <div className="space-y-3">
-                {items.map((metric) => (
-                  theme === "ranking"
-                    ? <RankingCard key={metric.id} metric={metric} hideThinLabel={hideThinLabel} smallSampleLabel={tm("smallSample")} showMoreLabel={(count) => tm("showMore", { count })} showLessLabel={tm("showLess")} />
-                    : <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} hideThinLabel={hideThinLabel} showMoreLabel={(count) => tm("showMore", { count })} showLessLabel={tm("showLess")} />
-                ))}
-              </div>
+              <div className="space-y-3">{items.map((metric) => metricNode(metric))}</div>
             </section>
           ))}
         </div>
       ) : onBackToEntry ? (
         <EmptyState title={t("liveEmptyTitle")} description={t("liveEmptyBody")} action={<Button onClick={onBackToEntry}>{t("backToEntry")}</Button>} />
       ) : <EmptyState title={t("emptyTitle")} description={t("emptyBody")} />}
-      {!solo && personalRankings.length > 1 ? (
+
+      {!orderedBody && !solo && personalRankings.length > 1 ? (
         <section className={cx(cardClass, "p-6 sm:p-8")}>
-          <PersonalRankingsBlock rankings={personalRankings} labels={rankingLabels((key, values) => tr(key, values))} />
+          <PersonalRankingsBlock rankings={personalRankings} labels={rankLabels} />
         </section>
       ) : null}
-      {!solo && affinity && affinity.pairs.length ? (
+      {!orderedBody && !solo && affinity && affinity.pairs.length ? (
         <section className={cx(cardClass, "p-6 sm:p-8")}>
-          <AffinityBlockView affinity={affinity} labels={affinityLabels((key, values) => tr(key, values))} />
+          <AffinityBlockView affinity={affinity} labels={affLabels} />
         </section>
       ) : null}
-      {result?.comments?.length ? (
-        <section className={cx(cardClass, "p-6 sm:p-8")}><h2 className="text-xl font-light">{t("momentsTitle")}</h2><div className="mt-5 grid gap-4 sm:grid-cols-2">{result.comments.map((comment) => <blockquote className="rounded-2xl bg-[var(--wash)] p-5" key={comment.id}><p className="text-sm leading-6">“{comment.text}”</p><footer className="mt-3 text-xs font-light text-[var(--muted)]">{comment.authorName ?? t("participantFallback")}{comment.itemTitle ? ` · ${comment.itemTitle}` : ""}</footer></blockquote>)}</div></section>
+      {!orderedBody && result?.comments?.length ? (
+        <section className={cx(cardClass, "p-6 sm:p-8")}><h2 className="text-xl font-light">{t("momentsTitle")}</h2><div className="mt-5 grid gap-4 sm:grid-cols-2">{result.comments.map((comment) => commentNode(comment))}</div></section>
       ) : null}
     </div>
   );
@@ -780,6 +823,45 @@ function CheckpointSchedule({ challenge }: { challenge: ChallengeDetail }) {
   );
 }
 
+/**
+ * The two-part entry notice (V1 §12): the group sees your records, and the admin
+ * may publish a retrospective — anonymous by default. Separately, you authorise
+ * (or not, the default) your real name in an external publication.
+ */
+function NameConsentCard({
+  challenge,
+  onSetNameConsent,
+}: {
+  challenge: ChallengeDetail;
+  onSetNameConsent: (nameConsent: boolean) => Promise<void>;
+}) {
+  const t = useTranslations("consent");
+  const [busy, setBusy] = useState(false);
+  const consented = challenge.viewerNameConsent === true;
+  return (
+    <section className="mt-5 rounded-2xl border border-[var(--line)] bg-[var(--paper)] px-5 py-4">
+      <p className="text-sm leading-6 text-[var(--muted)]">{t("notice")}</p>
+      <label className="mt-3 flex items-start gap-3 text-sm">
+        <input
+          type="checkbox"
+          className="mt-0.5"
+          aria-label={t("toggle")}
+          checked={consented}
+          disabled={busy}
+          onChange={(event) => {
+            setBusy(true);
+            void onSetNameConsent(event.target.checked).finally(() => setBusy(false));
+          }}
+        />
+        <span>
+          <strong className="block">{t("toggle")}</strong>
+          <span className="text-xs text-[var(--muted)]">{t("toggleHint")}</span>
+        </span>
+      </label>
+    </section>
+  );
+}
+
 export function ParticipantChallengeScreen({
   challenge,
   entries,
@@ -790,6 +872,7 @@ export function ParticipantChallengeScreen({
   onAdmin,
   onSaveEntry,
   onDeleteEntry,
+  onSetNameConsent,
 }: {
   challenge: ChallengeDetail;
   entries: Entry[];
@@ -800,6 +883,7 @@ export function ParticipantChallengeScreen({
   onAdmin?: () => void;
   onSaveEntry: (itemId: Id | null, values: Record<Id, unknown>, entry?: Entry, occurredOn?: string | null, entryTypeId?: Id, checkpointId?: Id | null) => Promise<void>;
   onDeleteEntry?: (entryId: Id) => Promise<void>;
+  onSetNameConsent: (nameConsent: boolean) => Promise<void>;
 }) {
   const t = useTranslations("participant");
   const trules = useTranslations("rules");
@@ -977,6 +1061,7 @@ export function ParticipantChallengeScreen({
 
       {scheduled ? <section className="mt-5 rounded-2xl border border-[var(--main-line)] bg-[var(--paper)] px-5 py-4"><strong className="text-[var(--main-strong)]">{t("scheduledTitle", { date: f.date(challenge.startsOn, longDate) })}</strong><p className="mt-1 text-sm leading-6 text-[var(--muted)]">{t("scheduledBody")}</p></section> : null}
       <RuleSectionsView rules={ruleSections} />
+      {challenge.isParticipant ? <NameConsentCard challenge={challenge} onSetNameConsent={onSetNameConsent} /> : null}
       <CheckpointSchedule challenge={challenge} />
 
       <nav className="mt-5 hidden gap-1 rounded-2xl bg-[var(--wash-strong)]/70 p-1 sm:flex" aria-label={t("navAria")}>

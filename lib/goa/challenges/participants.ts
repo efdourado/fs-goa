@@ -1,8 +1,10 @@
 import type { SessionContext } from "../../auth";
-import { inTransaction } from "../../db";
-import { challengeAccess, writeAudit } from "../../goa-domain";
+import { inTransaction, oneOrNull } from "../../db";
+import { challengeAccess } from "../domain/access";
+import { writeAudit } from "../domain/audit";
 import { ApiError } from "../../http";
 import { assertArrayWithin, LIMITS } from "../../limits";
+import { regeneratePublishedShowcases } from "./results";
 
 export async function setChallengeParticipants(
   session: SessionContext,
@@ -35,13 +37,20 @@ export async function setChallengeParticipants(
     if (members.rows.length !== requestedIds.length) {
       throw new ApiError(400, "invalid_participant", "Todos os participantes precisam ser membros ativos do grupo.");
     }
+    let removed = 0;
     if (body.replace === true) {
-      await client.query(
+      const result = await client.query(
         `UPDATE challenge_participants SET removed_at=now()
           WHERE challenge_id=$1 AND removed_at IS NULL
             AND NOT (user_id=ANY($2::text[]))`,
         [challengeId, requestedIds],
       );
+      removed = result.rowCount ?? 0;
+    }
+    // Someone dropped from a challenge with a live showcase — pull it offline and
+    // regenerate without them (V1 §12).
+    if (removed > 0) {
+      await regeneratePublishedShowcases(client, access.challenge.group_id, session.user.id, { challengeId });
     }
     for (const member of members.rows) {
       await client.query(
@@ -55,5 +64,40 @@ export async function setChallengeParticipants(
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
       "challenge.participants_updated", "challenge", challengeId, null, { participantIds: requestedIds });
     return { participantIds: requestedIds };
+  });
+}
+
+/**
+ * A participant authorises (or revokes) their real name appearing in an external
+ * publication of this challenge (V1 §12). Self-service — the admin never sets it
+ * for someone else. Starts false; safe to flip at any point in the round.
+ */
+export async function setParticipantNameConsent(
+  session: SessionContext,
+  challengeId: string,
+  body: Record<string, unknown>,
+) {
+  if (typeof body.nameConsent !== "boolean") {
+    throw new ApiError(400, "invalid_request", "Informe se você autoriza ou não o seu nome.");
+  }
+  return inTransaction(async (client) => {
+    const access = await challengeAccess(session.user.id, challengeId, client, true);
+    const row = await oneOrNull<{ name_consent: boolean }>(
+      client,
+      "SELECT name_consent FROM challenge_participants WHERE challenge_id = $1 AND user_id = $2 AND removed_at IS NULL FOR UPDATE",
+      [challengeId, session.user.id],
+    );
+    if (!row) throw new ApiError(403, "forbidden", "Você não participa deste desafio.");
+    if (row.name_consent !== body.nameConsent) {
+      await client.query(
+        "UPDATE challenge_participants SET name_consent = $3 WHERE challenge_id = $1 AND user_id = $2",
+        [challengeId, session.user.id, body.nameConsent],
+      );
+      // Metadata only — no content, and the actor is the participant themselves.
+      await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
+        "participant.name_consent_changed", "challenge_participant", session.user.id,
+        null, null, { nameConsent: body.nameConsent });
+    }
+    return { challengeId, nameConsent: body.nameConsent };
   });
 }

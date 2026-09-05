@@ -55,9 +55,11 @@ export const challenges = pgTable(
     // (already anonymized) participant list and result blocks as of the last
     // publish. Editing the draft afterwards never touches this until republish.
     resultsPublishedSnapshot: jsonb("results_published_snapshot"),
-    // When true, the public /results page replaces participant names with
-    // "Participante 1, 2…". In-group views keep real names.
-    resultsAnon: boolean("results_anon").notNull().default(false),
+    // When true (the default — V1 §12), the public /results page replaces
+    // participant names with "Participante 1, 2…". Even when false, a
+    // participant without `challenge_participants.name_consent` still shows
+    // anonymised. In-group views always keep real names.
+    resultsAnon: boolean("results_anon").notNull().default(true),
     publishedAsTemplateAt: timestamptz("published_as_template_at"),
     templateSummary: text("template_summary"),
     deletedAt: timestamptz("deleted_at"),
@@ -138,6 +140,10 @@ export const challengeParticipants = pgTable(
     addedByUserId: text("added_by_user_id").references(() => users.id, {
       onDelete: "set null",
     }),
+    // Per-challenge, per-person authorisation for the participant's real name to
+    // appear in an external (non-anonymised) publication. Starts false; the
+    // participant flips it themselves and can revoke it (V1 §12).
+    nameConsent: boolean("name_consent").notNull().default(false),
     joinedAt: timestamptz("joined_at").defaultNow().notNull(),
     removedAt: timestamptz("removed_at"),
   },

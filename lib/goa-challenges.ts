@@ -24,7 +24,7 @@ export {
 export { softDeleteChallenge, transitionChallenge } from "./goa/challenges/lifecycle";
 export { challengePreflight } from "./goa/challenges/preflight";
 export type { PreflightIssue, PreflightReport } from "./goa/challenges/preflight";
-export { setChallengeParticipants } from "./goa/challenges/participants";
+export { setChallengeParticipants, setParticipantNameConsent } from "./goa/challenges/participants";
 export {
   duplicateTemplate,
   getTemplateDetail,
@@ -39,6 +39,7 @@ export {
   metricsForChallenge,
   publicResults,
   publishResults,
+  reorderResultBlocks,
   unpublishChallengeResults,
   updateMetric,
 } from "./goa/challenges/results";

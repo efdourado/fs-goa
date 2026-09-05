@@ -163,6 +163,8 @@ export interface Participant {
   userId?: Id;
   name: string;
   username?: string;
+  /** Authorised their real name in an external publication of this challenge. */
+  nameConsent?: boolean;
 }
 
 export interface EntryTypeView {
@@ -290,6 +292,19 @@ interface ResultComment {
   itemTitle?: string;
 }
 
+export interface WrappedBlock {
+  id: Id;
+  kind: "text" | "metric" | "entry_value" | "ranking" | "affinity";
+  position: number;
+  visible: boolean;
+  heading?: string | null;
+  text?: string | null;
+  metric?: Metric | null;
+  comment?: ResultComment;
+  ranking?: PersonalRanking[];
+  affinity?: AffinityBlock | null;
+}
+
 export interface ChallengeResult {
   headline?: string | null;
   summary?: string | null;
@@ -297,6 +312,9 @@ export interface ChallengeResult {
   comments?: ResultComment[];
   personalRankings?: PersonalRanking[];
   affinity?: AffinityBlock | null;
+  /** The admin-arranged, ordered block list (empty while a draft has no blocks yet). */
+  blocks?: WrappedBlock[];
+  totalEntries?: number;
   publishedAt?: string | null;
   /** Whether a public link exists. The raw token itself is never sent back — it
    *  is shown once, in the publish response, and cannot be recovered. */
@@ -336,6 +354,8 @@ export interface ChallengeSummary {
   completionEntryTypeId?: Id | null;
   viewerRole?: Role;
   isParticipant?: boolean;
+  /** The viewer's own name-in-publication consent for this challenge (V1 §12). */
+  viewerNameConsent?: boolean;
   completedCount?: number;
   totalCount?: number | null;
 }

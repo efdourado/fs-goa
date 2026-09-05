@@ -1,13 +1,12 @@
 import type { PoolClient } from "pg";
 import type { SessionContext } from "../../auth";
 import { inTransaction, oneOrNull, withClient } from "../../db";
-import {
-  asRecord,
-  challengeAccess,
-  publicId,
-  semanticKey,
-  writeAudit,
-} from "../../goa-domain";
+// Direct module imports, not the `goa-domain` barrel — `leaveGroup` (in
+// `domain/groups`) calls into this file, and the barrel re-exports it, so going
+// through the barrel here would form an import cycle.
+import { challengeAccess } from "../domain/access";
+import { writeAudit } from "../domain/audit";
+import { asRecord, publicId, semanticKey } from "../domain/shared";
 import { ApiError, stringValue } from "../../http";
 import { bayesianAverage, consensus, indicatorBias, mean, meanDelta, median, spread } from "../analysis";
 import { calculateMetric } from "../../metrics";
@@ -386,7 +385,7 @@ async function computeValueMetric(client: PoolClient, metric: MetricRow): Promis
       ...(raw ? { rawValue: raw.value, rawFormattedValue: formatValue(raw.value, dp) } : {}),
     });
   }
-  series.sort((a, b) => (b.value ?? Number.NEGATIVE_INFINITY) - (a.value ?? Number.NEGATIVE_INFINITY));
+  series.sort((a, b) => (b.value ?? Number.NEGATIVE_INFINITY) - (a.value ?? Number.NEGATIVE_INFINITY) || a.label.localeCompare(b.label, "pt-BR"));
   return { value: overall.value, sampleSize: overall.sampleSize, series };
 }
 
@@ -498,7 +497,7 @@ async function computeSurprise(
       formattedValue: formatValue(delta.value, decimalPlaces),
     };
   });
-  series.sort((a, b) => (b.value ?? Number.NEGATIVE_INFINITY) - (a.value ?? Number.NEGATIVE_INFINITY));
+  series.sort((a, b) => (b.value ?? Number.NEGATIVE_INFINITY) - (a.value ?? Number.NEGATIVE_INFINITY) || a.label.localeCompare(b.label, "pt-BR"));
   return { value: overall.value, sampleSize: overall.sampleSize, series };
 }
 
@@ -546,7 +545,7 @@ async function computeIndicatorBias(
       formattedValue: formatValue(bias.value, decimalPlaces),
     };
   });
-  series.sort((a, b) => (b.value ?? Number.NEGATIVE_INFINITY) - (a.value ?? Number.NEGATIVE_INFINITY));
+  series.sort((a, b) => (b.value ?? Number.NEGATIVE_INFINITY) - (a.value ?? Number.NEGATIVE_INFINITY) || a.label.localeCompare(b.label, "pt-BR"));
   const values = series.map((entry) => entry.value).filter((value): value is number => value !== null);
   return {
     value: values.length ? mean(values.map(Math.abs)) ?? null : null,
@@ -574,6 +573,10 @@ export async function resultForChallenge(
   client: PoolClient,
   challengeId: string,
   calculatedMetrics?: Array<Record<string, unknown>>,
+  // Personal rankings + affinity are O(participants²) to compute. `getChallengeDetail`
+  // (a very hot path) skips them — during an active round the Wrapped shows them
+  // only once frozen. `generateShowcase` / `curateResults` freeze them on close.
+  options: { liveRankings?: boolean } = {},
 ) {
   const challenge = await oneOrNull<{ results_published_at: Date | null; result_share_token_hash: string | null }>(
     client,
@@ -606,10 +609,17 @@ export async function resultForChallenge(
   const metricById = new Map(currentMetrics.map((metric) => [metric.id, metric]));
   const textBlocks = blocks.rows.filter((block) => block.kind === "text");
 
+  const totalEntries = (await oneOrNull<{ count: number }>(
+    client,
+    "SELECT count(*)::int AS count FROM entries WHERE challenge_id = $1 AND deleted_at IS NULL",
+    [challengeId],
+  ))?.count ?? 0;
+
   const rankingBlock = blocksResult.rows.find((block) => block.kind === "ranking");
   const affinityBlock = blocksResult.rows.find((block) => block.kind === "affinity");
-  // Frozen when present; computed live while the round is open and unfrozen.
-  const live = !rankingBlock && !affinityBlock
+  // Frozen when present; computed live only when the caller asks (never for an
+  // empty challenge).
+  const live = options.liveRankings && !rankingBlock && !affinityBlock && totalEntries > 0
     ? await computeRankings(client, challengeId)
     : { personal: [], affinity: null };
   const personalRankings = rankingBlock
@@ -618,6 +628,24 @@ export async function resultForChallenge(
   const affinity = affinityBlock
     ? (affinityBlock.visible ? affinityBlock.value_snapshot : null)
     : live.affinity;
+
+  // The ordered, admin-arranged Wrapped — every stored block with its position
+  // and visibility, resolved to its payload. Empty while the round is open and
+  // no draft has been saved; the renderer then composes a default order.
+  const orderedBlocks = blocksResult.rows.map((block) => ({
+    id: block.id,
+    kind: block.kind,
+    position: block.position,
+    visible: block.visible,
+    heading: block.heading,
+    ...(block.kind === "text" ? { text: block.body_snapshot } : {}),
+    ...(block.kind === "metric"
+      ? { metric: block.value_snapshot ?? (block.metric_id ? metricById.get(block.metric_id) : null) }
+      : {}),
+    ...(block.kind === "entry_value" ? { comment: { id: block.id, text: block.body_snapshot ?? "", itemTitle: block.heading } } : {}),
+    ...(block.kind === "ranking" ? { ranking: (block.value_snapshot as { personal?: unknown })?.personal ?? [] } : {}),
+    ...(block.kind === "affinity" ? { affinity: block.value_snapshot } : {}),
+  }));
 
   return {
     headline: textBlocks.find((block) => block.heading === "headline")?.body_snapshot ?? null,
@@ -631,6 +659,8 @@ export async function resultForChallenge(
       .map((block) => ({ id: block.id, text: block.body_snapshot ?? "", itemTitle: block.heading })),
     personalRankings,
     affinity,
+    blocks: orderedBlocks,
+    totalEntries,
     publishedAt: challenge?.results_published_at?.toISOString() ?? null,
     // The raw link is never persisted; the admin sees it once, at publish time.
     hasPublishedLink: challenge?.result_share_token_hash != null,
@@ -959,6 +989,82 @@ export async function curateResults(
   });
 }
 
+/**
+ * Admin reorders the Wrapped's blocks and toggles which ones show, without
+ * rebuilding them — the frozen values stay frozen (V1 §11 "O administrador
+ * escolhe ordem e visibilidade dos blocos", "Valores calculados não podem ser
+ * editados").
+ */
+export async function reorderResultBlocks(
+  session: SessionContext,
+  challengeId: string,
+  body: Record<string, unknown>,
+) {
+  const wanted = Array.isArray(body.blocks) ? body.blocks : null;
+  if (!wanted) throw new ApiError(400, "invalid_request", "Envie a lista de blocos.");
+  const parsed = wanted.map((raw) => {
+    const record = asRecord(raw);
+    if (typeof record.id !== "string" || !record.id) throw new ApiError(400, "invalid_request", "Bloco sem id.");
+    return { id: record.id, visible: record.visible !== false };
+  });
+  return inTransaction(async (client) => {
+    const access = await challengeAccess(session.user.id, challengeId, client, true);
+    if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores organizam a vitrine.");
+    const existing = await client.query<{ id: string }>(
+      "SELECT id FROM result_blocks WHERE challenge_id = $1 FOR UPDATE",
+      [challengeId],
+    );
+    if (!existing.rows.length) throw new ApiError(409, "no_blocks", "Salve a vitrine primeiro.");
+    const known = new Set(existing.rows.map((row) => row.id));
+    for (const block of parsed) {
+      if (!known.has(block.id)) throw new ApiError(404, "not_found", "Um bloco não pertence a esta vitrine.");
+    }
+    let position = 0;
+    for (const block of parsed) {
+      await client.query(
+        "UPDATE result_blocks SET position = $2, visible = $3, updated_at = now() WHERE id = $1 AND challenge_id = $4",
+        [block.id, position++, block.visible, challengeId],
+      );
+    }
+    // Anything the client left out keeps its data but drops to the end, hidden.
+    await client.query(
+      `UPDATE result_blocks SET visible = false, position = position + $2, updated_at = now()
+        WHERE challenge_id = $1 AND NOT (id = ANY($3::text[]))`,
+      [challengeId, parsed.length, parsed.map((block) => block.id)],
+    );
+    await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
+      "results.blocks_reordered", "challenge", challengeId, null, null, { count: parsed.length });
+    return { challengeId, blocks: parsed.length };
+  });
+}
+
+/**
+ * A member left the group (or a challenge): every published showcase there is
+ * pulled offline and its blocks regenerated without them (V1 §12 "publicações
+ * existentes regeneradas anonimamente; link temporariamente despublicado até a
+ * regeneração"). The admin republishes when ready.
+ */
+export async function regeneratePublishedShowcases(
+  client: PoolClient,
+  groupId: string,
+  actorUserId: string,
+  options: { challengeId?: string } = {},
+): Promise<void> {
+  const published = await client.query<{ id: string }>(
+    `SELECT id FROM challenges
+      WHERE group_id = $1 AND deleted_at IS NULL AND results_published_at IS NOT NULL
+        AND ($2::text IS NULL OR id = $2)`,
+    [groupId, options.challengeId ?? null],
+  );
+  for (const row of published.rows) {
+    await unpublishResults(client, row.id);
+    await client.query("UPDATE challenges SET results_anon = true, updated_at = now() WHERE id = $1", [row.id]);
+    await generateShowcase(client, row.id, actorUserId);
+    await writeAudit(client, groupId, row.id, actorUserId,
+      "results.unpublished", "challenge", row.id, null, null, { reason: "member_left" });
+  }
+}
+
 interface SnapshotChallenge {
   id: string;
   title: string;
@@ -981,90 +1087,111 @@ export interface PublishedShowcase {
     comments: Array<{ id: string; text: string; itemTitle: string | null }>;
     personalRankings: unknown;
     affinity: unknown;
+    blocks: unknown;
+    totalEntries: number;
     publishedAt: string;
   };
 }
 
 /**
- * Freezes the current draft into the document served at `/results/<token>`. When
- * anonymized, both the participant chips and every participant-grouped metric
- * series (pages per person, indicator bias — keyed by the recommender) lose the
- * real names and ids. Item-grouped series keep film / book titles by design.
+ * Freezes the current draft into the document served at `/results/<token>`.
+ *
+ * Every participant-grouped series, the personal rankings and the affinity pairs
+ * lose the real name of anyone who is masked. Who is masked (V1 §12): when
+ * `anonymized`, everyone; otherwise only participants without `name_consent`.
+ * Item-grouped series keep film / book titles by design.
  */
 async function buildPublishedSnapshot(
   client: PoolClient,
   challenge: SnapshotChallenge,
   anonymized: boolean,
 ) {
-  const result = await resultForChallenge(client, challenge.id);
-  const participants = await client.query<{ id: string; display_name: string }>(
-    `SELECT u.id, u.display_name FROM challenge_participants cp JOIN users u ON u.id=cp.user_id
+  const result = await resultForChallenge(client, challenge.id, undefined, { liveRankings: true });
+  const participants = await client.query<{ id: string; display_name: string; name_consent: boolean }>(
+    `SELECT u.id, u.display_name, cp.name_consent FROM challenge_participants cp JOIN users u ON u.id=cp.user_id
       WHERE cp.challenge_id=$1 AND cp.removed_at IS NULL ORDER BY u.display_name`,
     [challenge.id],
   );
   const metricList = result.metrics as Array<Record<string, unknown>>;
-  let participantNames: string[];
-  let metrics: Array<Record<string, unknown>> = metricList;
   let personalRankings = result.personalRankings;
   let affinity = result.affinity;
 
-  if (anonymized) {
-    const seriesIds = new Set<string>();
-    for (const metric of metricList) {
-      if (metric?.groupBy !== "participant" || !Array.isArray(metric.series)) continue;
-      for (const row of metric.series as Array<{ key?: unknown }>) {
-        if (typeof row.key === "string") seriesIds.add(row.key);
-      }
-    }
-    for (const row of (Array.isArray(personalRankings) ? personalRankings : []) as Array<{ userId?: unknown }>) {
-      if (typeof row.userId === "string") seriesIds.add(row.userId);
-    }
-    for (const pair of ((affinity as { pairs?: unknown })?.pairs ?? []) as Array<{ a?: { userId?: unknown }; b?: { userId?: unknown } }>) {
-      if (typeof pair.a?.userId === "string") seriesIds.add(pair.a.userId);
-      if (typeof pair.b?.userId === "string") seriesIds.add(pair.b.userId);
-    }
-    const roster = new Map<string, string>(participants.rows.map((row) => [row.id, row.display_name]));
-    const missing = [...seriesIds].filter((id) => !roster.has(id));
-    if (missing.length) {
-      const extra = await client.query<{ id: string; display_name: string }>(
-        "SELECT id, display_name FROM users WHERE id = ANY($1::text[])", [missing]);
-      for (const row of extra.rows) roster.set(row.id, row.display_name);
-    }
-    const labelById = new Map(
-      [...roster.entries()]
-        .sort((a, b) => a[1].localeCompare(b[1], "pt-BR"))
-        .map(([id], index) => [id, `Participante ${index + 1}`] as const),
-    );
-    const anonName = (id: unknown) => (typeof id === "string" ? labelById.get(id) : undefined) ?? "Participante ?";
-    participantNames = participants.rows.map((row) => labelById.get(row.id) ?? "Participante ?");
-    metrics = metricList.map((metric) => {
-      if (metric?.groupBy !== "participant" || !Array.isArray(metric.series)) return metric;
-      return {
-        ...metric,
-        series: (metric.series as Array<Record<string, unknown>>).map((row, index) => {
-          const label = typeof row.key === "string" ? labelById.get(row.key) : undefined;
-          return { ...row, key: label ?? `anon-${index}`, label: label ?? "Participante ?" };
-        }),
-      };
-    });
-    if (Array.isArray(personalRankings)) {
-      personalRankings = (personalRankings as Array<Record<string, unknown>>).map((row, index) => ({
-        ...row, userId: `anon-${index}`, name: anonName(row.userId),
-      }));
-    }
-    if (affinity && Array.isArray((affinity as { pairs?: unknown }).pairs)) {
-      affinity = {
-        ...(affinity as Record<string, unknown>),
-        pairs: ((affinity as { pairs: Array<{ a: { userId: string }; b: { userId: string } }> }).pairs).map((pair, index) => ({
-          ...pair,
-          a: { userId: `anon-a-${index}`, name: anonName(pair.a.userId) },
-          b: { userId: `anon-b-${index}`, name: anonName(pair.b.userId) },
-        })),
-      };
-    }
-  } else {
-    participantNames = participants.rows.map((row) => row.display_name);
+  const maskedIds = new Set(
+    participants.rows.filter((row) => anonymized || !row.name_consent).map((row) => row.id),
+  );
+
+  // Every id that could carry a name in the payload — so a departed member who
+  // was still rated also gets a stable "Participante N" label.
+  const seriesIds = new Set<string>(maskedIds);
+  for (const metric of metricList) {
+    if (metric?.groupBy !== "participant" || !Array.isArray(metric.series)) continue;
+    for (const row of metric.series as Array<{ key?: unknown }>) if (typeof row.key === "string") seriesIds.add(row.key);
   }
+  for (const row of (Array.isArray(personalRankings) ? personalRankings : []) as Array<{ userId?: unknown }>) {
+    if (typeof row.userId === "string") seriesIds.add(row.userId);
+  }
+  for (const pair of ((affinity as { pairs?: unknown })?.pairs ?? []) as Array<{ a?: { userId?: unknown }; b?: { userId?: unknown } }>) {
+    if (typeof pair.a?.userId === "string") seriesIds.add(pair.a.userId);
+    if (typeof pair.b?.userId === "string") seriesIds.add(pair.b.userId);
+  }
+  const roster = new Map<string, string>(participants.rows.map((row) => [row.id, row.display_name]));
+  const consentById = new Map(participants.rows.map((row) => [row.id, row.name_consent]));
+  const extraIds = [...seriesIds].filter((id) => !roster.has(id));
+  if (extraIds.length) {
+    const extra = await client.query<{ id: string; display_name: string }>(
+      "SELECT id, display_name FROM users WHERE id = ANY($1::text[])", [extraIds]);
+    for (const row of extra.rows) roster.set(row.id, row.display_name);
+  }
+  // A series id not in the participant roster is a departed member — always masked.
+  const isMasked = (id: string) => maskedIds.has(id) || anonymized || !consentById.has(id) || consentById.get(id) === false;
+  const labelById = new Map(
+    [...seriesIds]
+      .filter(isMasked)
+      .sort((a, b) => (roster.get(a) ?? "").localeCompare(roster.get(b) ?? "", "pt-BR"))
+      .map((id, index) => [id, `Participante ${index + 1}`] as const),
+  );
+  const nameFor = (id: unknown) =>
+    typeof id === "string" ? labelById.get(id) ?? roster.get(id) ?? "Participante ?" : "Participante ?";
+
+  const participantNames = participants.rows.map((row) => labelById.get(row.id) ?? row.display_name);
+  const metrics = metricList.map((metric) => {
+    if (metric?.groupBy !== "participant" || !Array.isArray(metric.series)) return metric;
+    return {
+      ...metric,
+      series: (metric.series as Array<Record<string, unknown>>).map((row) => {
+        if (typeof row.key !== "string" || !labelById.has(row.key)) return row;
+        return { ...row, key: labelById.get(row.key), label: labelById.get(row.key) };
+      }),
+    };
+  });
+  if (Array.isArray(personalRankings)) {
+    personalRankings = (personalRankings as Array<Record<string, unknown>>).map((row) =>
+      typeof row.userId === "string" && labelById.has(row.userId)
+        ? { ...row, userId: labelById.get(row.userId), name: labelById.get(row.userId) }
+        : row,
+    );
+  }
+  if (affinity && Array.isArray((affinity as { pairs?: unknown }).pairs)) {
+    affinity = {
+      ...(affinity as Record<string, unknown>),
+      pairs: ((affinity as { pairs: Array<{ a: { userId: string }; b: { userId: string } }> }).pairs).map((pair) => ({
+        ...pair,
+        a: { userId: labelById.get(pair.a.userId) ?? pair.a.userId, name: nameFor(pair.a.userId) },
+        b: { userId: labelById.get(pair.b.userId) ?? pair.b.userId, name: nameFor(pair.b.userId) },
+      })),
+    };
+  }
+
+  // The ordered block list carries the same anonymised payloads.
+  const metricByPayloadId = new Map(metrics.map((metric) => [metric.id, metric]));
+  const blocks = (result.blocks as Array<Record<string, unknown>>).map((block) => {
+    if (block.kind === "metric" && block.metric && typeof (block.metric as { id?: unknown }).id === "string") {
+      return { ...block, metric: metricByPayloadId.get((block.metric as { id: string }).id) ?? block.metric };
+    }
+    if (block.kind === "ranking") return { ...block, ranking: personalRankings };
+    if (block.kind === "affinity") return { ...block, affinity };
+    return block;
+  });
 
   return {
     id: challenge.id,
@@ -1080,6 +1207,8 @@ async function buildPublishedSnapshot(
       comments: result.comments,
       personalRankings,
       affinity,
+      blocks,
+      totalEntries: result.totalEntries,
       publishedAt: new Date().toISOString(),
     },
   };

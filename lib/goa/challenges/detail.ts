@@ -77,8 +77,8 @@ export async function getChallengeDetail(session: SessionContext, challengeId: s
           ORDER BY cc.position`,
         [challengeId],
       );
-    const participantsResult = await client.query<{ id: string; display_name: string; username: string }>(
-        `SELECT u.id, u.display_name, u.username
+    const participantsResult = await client.query<{ id: string; display_name: string; username: string; name_consent: boolean }>(
+        `SELECT u.id, u.display_name, u.username, cp.name_consent
            FROM challenge_participants cp JOIN users u ON u.id = cp.user_id
           WHERE cp.challenge_id = $1 AND cp.removed_at IS NULL ORDER BY u.display_name`,
         [challengeId],
@@ -187,12 +187,15 @@ export async function getChallengeDetail(session: SessionContext, challengeId: s
       completionEntryTypeId,
       viewerRole: access.challenge.role,
       isParticipant: access.challenge.is_participant,
+      // The viewer's own name-in-publication consent for this challenge (V1 §12).
+      viewerNameConsent: participantsResult.rows.find((row) => row.id === session.user.id)?.name_consent ?? false,
       fields: primaryFields,
       entryTypes,
       items,
       checkpoints,
       participants: participantsResult.rows.map((participant) => ({
         id: participant.id, userId: participant.id, name: participant.display_name, username: participant.username,
+        nameConsent: participant.name_consent,
       })),
       metrics,
       result,

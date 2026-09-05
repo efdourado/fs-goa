@@ -501,6 +501,32 @@ test("expectativa vem antes da avaliação no formulário do item, independente 
   assert.deepEqual(itemEntryTypes(noExpectation).map((type) => type.id), ["progress", "done"], "sem expectativa, a ordem de criação vale");
 });
 
+test("Wrapped: quando há blocos, o Resultado os renderiza na ordem gravada e pula os escondidos", () => {
+  const challenge = {
+    title: "Retrospectiva",
+    scope: "group",
+    participants: [{ id: "u1", userId: "u1", name: "Ana", username: "ana" }, { id: "u2", userId: "u2", name: "Bruno", username: "bruno" }],
+    metrics: [],
+    result: {
+      totalEntries: 12,
+      blocks: [
+        { id: "b1", kind: "text", position: 0, visible: true, heading: "summary", text: "O clube viu 6 filmes." },
+        { id: "b2", kind: "metric", position: 1, visible: false, metric: { id: "mHidden", label: "Métrica escondida", operation: "average", value: 3, formattedValue: "3" } },
+        { id: "b3", kind: "metric", position: 2, visible: true, metric: { id: "mShown", label: "Nota média", operation: "average", value: 4.1, formattedValue: "4,1" } },
+      ],
+    },
+  } as unknown as ChallengeDetail;
+
+  const html = renderWithIntl(createElement(ResultView, { challenge }));
+  assert.match(html, /O clube viu 6 filmes\./);
+  assert.match(html, /Nota média/);
+  assert.doesNotMatch(html, /Métrica escondida/, "bloco com visible:false não aparece");
+  assert.match(html, /12 registros/, "o total de registros vai na capa");
+  const summaryIdx = html.indexOf("O clube viu 6 filmes");
+  const metricIdx = html.indexOf("Nota média");
+  assert.ok(summaryIdx > -1 && metricIdx > summaryIdx, "o resumo (posição 0) vem antes da métrica (posição 2)");
+});
+
 test("header lista convites de grupo pendentes no menu de novidades", () => {
   const header = renderWithIntl(createElement(AppHeader, {
     user: { id: "user-1", name: "Pessoa Teste", username: "pessoa" },
