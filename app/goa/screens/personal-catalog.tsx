@@ -8,6 +8,7 @@ import { byRatingDesc, bucketize, type CatalogBucket, decadeOf, highlights } fro
 import { Segmented } from "../Segmented";
 import type { CatalogItem, Id } from "../types";
 import { backLinkClass, cardClass, cx, EmptyState, PageHeading, StatusMessage } from "../ui";
+import { formatRuntime } from "../utils";
 
 type Kind = "film" | "book";
 type View = "list" | "genre" | "year" | "decade";
@@ -161,9 +162,9 @@ export function PersonalCatalogScreen({
               <li key={item.id}>
                 <button type="button" className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left hover:bg-[var(--wash)]" onClick={() => onOpenItem(item.id)}>
                   <span className="min-w-0">
-                    <strong className="block truncate font-light">{item.title}</strong>
+                    <strong className="block truncate font-light">{item.title}{item.year ? ` (${item.year})` : ""}</strong>
                     <small className="mt-1 block truncate text-[var(--muted)]">
-                      {[item.author, item.year ? String(item.year) : null, item.mainGenre, t("rounds", { count: item.roundCount ?? 0 })].filter(Boolean).join(" · ")}
+                      {[item.author, item.mainGenre, formatRuntime(item.runtimeMinutes), t("rounds", { count: item.roundCount ?? 0 })].filter(Boolean).join(" · ")}
                     </small>
                   </span>
                   <span className="flex-none text-sm tabular-nums">

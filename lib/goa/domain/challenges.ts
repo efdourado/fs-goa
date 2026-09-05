@@ -162,6 +162,7 @@ export async function createChallenge(
             year: item.year,
             mainGenre: item.mainGenre,
             pageCount: item.pageCount,
+            runtimeMinutes: item.runtimeMinutes,
             attributes: item.attributes,
           });
         }

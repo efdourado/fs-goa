@@ -329,7 +329,7 @@
     "pages": "{count} páginas",
     "byAuthor": "por {name}",
     "historyTitle": "Nas rodadas do grupo",
-    "historyAvg": "média histórica {value} em {rounds} rodada(s) com nota",
+    "groupRating": "{count, plural, =0 {sem notas ainda} one {nota do grupo · # avaliação} other {nota do grupo · # avaliações}}",
     "recommendedBy": "indicado por {name}",
     "noRounds": "Este item ainda não entrou em nenhuma rodada visível.",
     "remove": "Excluir do acervo",
@@ -407,6 +407,8 @@
     "alreadyAdded": "já na lista",
     "roundsCount": "{count, plural, =0 {novo} one {# rodada} other {# rodadas}}",
     "pages": "Páginas",
+    "runtimeMinutes": "Duração (minutos)",
+    "runtimeMinutesPlaceholder": "ex.: 105",
     "pasteModeAria": "Formato da lista colada",
     "pasteModeSimple": "Lista simples",
     "pasteModeJson": "Lista detalhada (JSON)",
@@ -826,7 +828,6 @@
     "sortByRating": "Por nota",
     "sortByName": "Por nome",
     "showRecommender": "Quem indicou",
-    "showYear": "Ano",
     "recommendedByShort": "por {name}"
   },
   "rules": {

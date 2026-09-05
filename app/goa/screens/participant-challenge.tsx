@@ -32,6 +32,7 @@ import {
 import {
   dateKeyInSaoPaulo,
   findMissingRequiredField,
+  formatRuntime,
   isChallengeScheduled,
   isEmptySaveADelete,
   isLivingList,
@@ -330,7 +331,6 @@ function RankingCard({
   const t = useTranslations("resultView");
   const [sort, setSort] = useState<"rating" | "name">("rating");
   const [showRecommender, setShowRecommender] = useState(false);
-  const [showYear, setShowYear] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const series = metric.series;
   const sorted = useMemo(
@@ -341,7 +341,6 @@ function RankingCard({
   );
   const visible = expanded ? sorted : sorted.slice(0, RANKING_PREVIEW_ROWS);
   const hasRecommenders = series?.some((row) => row.recommendedBy) ?? false;
-  const hasYears = series?.some((row) => row.year) ?? false;
 
   return (
     <article className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-5">
@@ -351,22 +350,18 @@ function RankingCard({
           <label className="flex cursor-pointer items-center gap-1"><input type="radio" name={`ranking-sort-${metric.id}`} checked={sort === "rating"} onChange={() => setSort("rating")} />{t("sortByRating")}</label>
           <label className="flex cursor-pointer items-center gap-1"><input type="radio" name={`ranking-sort-${metric.id}`} checked={sort === "name"} onChange={() => setSort("name")} />{t("sortByName")}</label>
           {hasRecommenders ? <label className="flex cursor-pointer items-center gap-1"><input type="checkbox" checked={showRecommender} onChange={(event) => setShowRecommender(event.target.checked)} />{t("showRecommender")}</label> : null}
-          {hasYears ? <label className="flex cursor-pointer items-center gap-1"><input type="checkbox" checked={showYear} onChange={(event) => setShowYear(event.target.checked)} />{t("showYear")}</label> : null}
         </div>
       </div>
       <ol className="mt-3 space-y-1.5">
         {visible.map((row, index) => {
           const thin = row.value === null;
-          const meta = [
-            showYear && row.year ? String(row.year) : null,
-            showRecommender && row.recommendedBy ? t("recommendedByShort", { name: row.recommendedBy }) : null,
-          ].filter(Boolean).join(" · ");
+          const meta = showRecommender && row.recommendedBy ? t("recommendedByShort", { name: row.recommendedBy }) : null;
           return (
             <li key={row.key} className={cx("flex items-center justify-between gap-3 text-sm", thin && "opacity-45")}>
               <span className="flex min-w-0 items-center gap-2">
                 <span className="w-5 flex-none tabular-nums text-[var(--muted)]">{index + 1}</span>
                 <span className="min-w-0">
-                  <span className="block truncate">{row.label}</span>
+                  <span className="block truncate">{row.label}{row.year ? ` (${row.year})` : ""}</span>
                   {meta ? <span className="block truncate text-[11px] text-[var(--muted)]">{meta}</span> : null}
                 </span>
               </span>
@@ -842,7 +837,8 @@ export function ParticipantChallengeScreen({
       options={sortedSessions.map((session) => {
         const boundItem = sortedItems.find((item) => item.checkpointId === session.id);
         const soon = session.status === "scheduled";
-        return { id: session.id, label: boundItem?.title ?? session.title, soon, statusLabel: soon ? t("checkpointSoonLabel") : undefined, rating: boundItem ? ratingByItem.get(boundItem.id) ?? null : null };
+        const label = boundItem?.title ?? session.title;
+        return { id: session.id, label: boundItem?.catalogItem?.year ? `${label} (${boundItem.catalogItem.year})` : label, soon, statusLabel: soon ? t("checkpointSoonLabel") : undefined, rating: boundItem ? ratingByItem.get(boundItem.id) ?? null : null };
       })}
     />
   ) : sortedItems.length > 1 ? (
@@ -854,7 +850,8 @@ export function ParticipantChallengeScreen({
       options={sortedItems.map((item) => {
         const done = doneByItem.has(item.id);
         const soon = item.status === "scheduled" && !entriesByItem.has(item.id);
-        return { id: item.id, label: item.title, done, soon, statusLabel: done ? t("checkpointDoneLabel") : soon ? t("checkpointSoonLabel") : undefined, rating: ratingByItem.get(item.id) ?? null };
+        const label = item.catalogItem?.year ? `${item.title} (${item.catalogItem.year})` : item.title;
+        return { id: item.id, label, done, soon, statusLabel: done ? t("checkpointDoneLabel") : soon ? t("checkpointSoonLabel") : undefined, rating: ratingByItem.get(item.id) ?? null };
       })}
     />
   ) : null;
@@ -867,7 +864,7 @@ export function ParticipantChallengeScreen({
       tally={t("completedTally", { done: doneCount, total: sortedItems.length, pct: completion })}
       selectedId={null}
       onSelect={(id) => { setSelectedItemId(id); onTab("today"); }}
-      options={doneItems.map((item) => ({ id: item.id, label: item.title, done: true, rating: ratingByItem.get(item.id) ?? null }))}
+      options={doneItems.map((item) => ({ id: item.id, label: item.catalogItem?.year ? `${item.title} (${item.catalogItem.year})` : item.title, done: true, rating: ratingByItem.get(item.id) ?? null }))}
     />
   ) : null;
 
@@ -900,10 +897,12 @@ export function ParticipantChallengeScreen({
                   <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <h2 className="mt-2 text-2xl font-light tracking-[-0.04em]">
-                        {selectedItem?.title ?? (undatedDaily ? t("checkInOf", { date: f.date(effectiveOccurredOn, longDate) }) : t("newEntry"))}
+                        {selectedItem
+                          ? `${selectedItem.title}${selectedItem.catalogItem?.year ? ` (${selectedItem.catalogItem.year})` : ""}`
+                          : (undatedDaily ? t("checkInOf", { date: f.date(effectiveOccurredOn, longDate) }) : t("newEntry"))}
                       </h2>
                       {selectedItem?.description ? <p className="mt-1 text-sm text-[var(--muted)]">{selectedItem.description}</p> : null}
-                      {selectedItem?.recommendedBy || selectedItem?.catalogItem?.author || selectedItem?.catalogItem?.year || selectedItem?.catalogItem?.mainGenre ? <p className="mt-1 text-xs text-[var(--muted)]">{[selectedItem.catalogItem?.author ? t("byAuthor", { name: selectedItem.catalogItem.author }) : null, selectedItem.recommendedBy ? t("recommendedBy", { name: selectedItem.recommendedBy.name }) : null, selectedItem.catalogItem?.year ? String(selectedItem.catalogItem.year) : null, selectedItem.catalogItem?.mainGenre || null].filter(Boolean).join(" · ")}</p> : null}</div>{selectedItem?.dueAt ? <span className="rounded-full bg-[var(--wash)] px-3 py-2 text-xs font-medium text-[var(--muted)]">{t("dueBy", { date: f.dateTime(selectedItem.dueAt) })}</span> : null}</div>
+                      {selectedItem?.recommendedBy || selectedItem?.catalogItem?.author || selectedItem?.catalogItem?.mainGenre || selectedItem?.catalogItem?.runtimeMinutes ? <p className="mt-1 text-xs text-[var(--muted)]">{[selectedItem.catalogItem?.author ? t("byAuthor", { name: selectedItem.catalogItem.author }) : null, selectedItem.recommendedBy ? t("recommendedBy", { name: selectedItem.recommendedBy.name }) : null, selectedItem.catalogItem?.mainGenre || null, formatRuntime(selectedItem.catalogItem?.runtimeMinutes)].filter(Boolean).join(" · ")}</p> : null}</div>{selectedItem?.dueAt ? <span className="rounded-full bg-[var(--wash)] px-3 py-2 text-xs font-medium text-[var(--muted)]">{t("dueBy", { date: f.dateTime(selectedItem.dueAt) })}</span> : null}</div>
                   {dateRequired ? <label className="mb-5 block"><span className={labelClass}>{t("occurredOnLabel")}</span><input className={inputClass} type="date" max={today} value={effectiveOccurredOn} disabled={Boolean(unavailableMessage)} onChange={(event) => setOccurredOn(event.target.value || today)} /><small className="mt-1 block text-[var(--muted)]">{t("occurredOnHint")}</small></label> : !useItemPanel && currentEntry?.occurredOn ? <p className="mb-5 text-xs text-[var(--muted)]">{t("occurredOn", { date: f.date(currentEntry.occurredOn, longDate) })}</p> : null}
                   {useItemPanel && selectedItem ? (
                     <ItemEntryPanel key={`${selectedItem.id}-${selectedSession?.id ?? "no-session"}`} challenge={challenge} item={selectedItem} ownEntries={ownEntries} groupRatings={challenge.participants.length > 1 ? groupRatingsByItem.get(selectedItem.id) ?? [] : null} occurredOn={occurredOn} onOccurredOnChange={setOccurredOn} offerOptionalDate={!perDayItem && !sessionMode && collectsEntryDate} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} checkpointId={selectedSession?.id ?? null} onSaveEntry={onSaveEntry} onDeleteEntry={canDeleteEntry} />

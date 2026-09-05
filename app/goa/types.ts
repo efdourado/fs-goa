@@ -110,6 +110,8 @@ export interface CatalogItem {
   author?: string | null;
   year?: number | null;
   pageCount?: number | null;
+  /** Films/series only. */
+  runtimeMinutes?: number | null;
   mainGenre?: string | null;
   roundCount?: number;
   ratingAvg?: number | null;
@@ -144,7 +146,7 @@ export interface ChallengeItem {
   dueAt?: string | null;
   date?: string | null;
   status?: "scheduled" | "open" | "past_due" | "closed";
-  catalogItem?: Pick<CatalogItem, "id" | "title" | "author" | "year" | "pageCount" | "mainGenre"> | null;
+  catalogItem?: Pick<CatalogItem, "id" | "title" | "author" | "year" | "pageCount" | "runtimeMinutes" | "mainGenre"> | null;
   recommendedBy?: { id: Id; name: string } | null;
 }
 
@@ -431,5 +433,6 @@ export interface ChallengeItemInput {
   author?: string;
   year?: number;
   pageCount?: number;
+  runtimeMinutes?: number;
   mainGenre?: string;
 }

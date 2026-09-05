@@ -329,7 +329,7 @@
     "pages": "{count} pages",
     "byAuthor": "by {name}",
     "historyTitle": "Across the group's rounds",
-    "historyAvg": "historical average {value} over {rounds} rated round(s)",
+    "groupRating": "{count, plural, =0 {no ratings yet} one {group rating · # rating} other {group rating · # ratings}}",
     "recommendedBy": "recommended by {name}",
     "noRounds": "This item hasn't been in any visible round yet.",
     "remove": "Remove from catalogue",
@@ -407,6 +407,8 @@
     "alreadyAdded": "already in the list",
     "roundsCount": "{count, plural, =0 {new} one {# round} other {# rounds}}",
     "pages": "Pages",
+    "runtimeMinutes": "Runtime (minutes)",
+    "runtimeMinutesPlaceholder": "e.g. 105",
     "pasteModeAria": "Pasted list format",
     "pasteModeSimple": "Simple list",
     "pasteModeJson": "Detailed list (JSON)",
@@ -826,7 +828,6 @@
     "sortByRating": "By rating",
     "sortByName": "By name",
     "showRecommender": "Who recommended",
-    "showYear": "Year",
     "recommendedByShort": "by {name}"
   },
   "rules": {

@@ -17,6 +17,12 @@ import {
 } from "../app/goa/utils";
 import { ptFormat, renderWithIntl } from "./helpers/intl";
 
+test("f.error não quebra com um fetch abortado — DOMException carrega um código numérico legado, não string", () => {
+  const aborted = new DOMException("The operation was aborted.", "AbortError");
+  assert.doesNotThrow(() => ptFormat.error(aborted));
+  assert.equal(typeof ptFormat.error(aborted), "string");
+});
+
 test("desafio agendado existe só no diário com início futuro", () => {
   const now = new Date("2026-08-29T15:00:00Z");
   assert.equal(isChallengeScheduled("active", "2026-08-30", "daily", now), true);
@@ -296,11 +302,12 @@ test("ranking do Resultado ordena por nota por padrão e mostra a média crua po
   const aftersunIndex = html.indexOf("Aftersun");
   const stalkerIndex = html.indexOf("Stalker");
   assert.ok(aftersunIndex > -1 && stalkerIndex > -1 && aftersunIndex < stalkerIndex, "por padrão ordena por nota — Aftersun (4,2) antes de Stalker (3,9)");
+  assert.match(html, /Aftersun \(2022\)/, "o ano sempre aparece ao lado do título, sem precisar marcar nada");
+  assert.match(html, /Stalker \(1979\)/, "mesmo pro segundo item");
   assert.match(html, /\(4,5\)/, "mostra a média crua entre parênteses ao lado da nota ajustada, quando diferem");
   assert.doesNotMatch(html, /\(3,9\)<\/span>\s*<span[^>]*>n=/, "quando a nota crua é igual à ajustada, não repete o número");
   assert.doesNotMatch(html, /por Ana|por Bruno/, "o indicador só aparece se a pessoa marcar a caixa 'quem indicou'");
   assert.match(html, />Quem indicou</, "a opção de mostrar quem indicou existe, mesmo desmarcada");
-  assert.match(html, />Ano</, "a opção de mostrar o ano existe");
 });
 
 test("RankingCard (tema ranking) também trunca um ranking grande, atrás de um botão", () => {

@@ -9,7 +9,7 @@ import { useGoaFormat } from "../format";
 import type { CatalogItem, ChallengeSummary, GroupInviteResult, GroupSummary, Id, Member, PendingGroupRequest } from "../types";
 import { Segmented } from "../Segmented";
 import { backLinkClass, Button, cardClass, challengeStatusTone, ChallengeStatusBadge, cx, EmptyState, inputClass, labelClass, linkClass, PageHeading, StatusMessage } from "../ui";
-import { canManage, isChallengeScheduled } from "../utils";
+import { canManage, formatRuntime, isChallengeScheduled } from "../utils";
 
 /** The group page shows only the head of the catalog; the rest is one tap away. */
 const CATALOG_PREVIEW_COUNT = 10;
@@ -396,7 +396,7 @@ export function GroupScreen({
                   >
                     <span className="min-w-0">
                       <strong className="block truncate text-sm font-light">{item.title}{item.year ? ` (${item.year})` : ""}</strong>
-                      <span className="text-xs text-[var(--muted)]">{[item.mainGenre, t("catalogRounds", { count: item.roundCount ?? 0 })].filter(Boolean).join(" · ")}</span>
+                      <span className="text-xs text-[var(--muted)]">{[item.mainGenre, formatRuntime(item.runtimeMinutes), t("catalogRounds", { count: item.roundCount ?? 0 })].filter(Boolean).join(" · ")}</span>
                     </span>
                     <span className="flex-none text-sm tabular-nums">
                       {item.ratingAvg === null || item.ratingAvg === undefined
