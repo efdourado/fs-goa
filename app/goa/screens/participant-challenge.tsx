@@ -5,6 +5,8 @@ import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { useGoaFormat } from "../format";
 import { MetricBlock } from "../metrics-view";
+import { AffinityBlockView, PersonalRankingsBlock } from "../rankings-view";
+import { rankingLabels, affinityLabels } from "../rankings-labels";
 import { RuleSectionsView, visibleRuleSections } from "../rules";
 import type {
   ChallengeDetail,
@@ -398,7 +400,10 @@ export function ResultView({
 }) {
   const t = useTranslations("resultView");
   const tm = useTranslations("metrics");
+  const tr = useTranslations("wrapped");
   const result = challenge.result;
+  const personalRankings = result?.personalRankings ?? [];
+  const affinity = result?.affinity ?? null;
   const source = result?.metrics?.length
     ? result.metrics
     : challenge.metrics.filter((metric) => metric.visibleInResults !== false);
@@ -452,6 +457,16 @@ export function ResultView({
       ) : onBackToEntry ? (
         <EmptyState title={t("liveEmptyTitle")} description={t("liveEmptyBody")} action={<Button onClick={onBackToEntry}>{t("backToEntry")}</Button>} />
       ) : <EmptyState title={t("emptyTitle")} description={t("emptyBody")} />}
+      {!solo && personalRankings.length > 1 ? (
+        <section className={cx(cardClass, "p-6 sm:p-8")}>
+          <PersonalRankingsBlock rankings={personalRankings} labels={rankingLabels((key, values) => tr(key, values))} />
+        </section>
+      ) : null}
+      {!solo && affinity && affinity.pairs.length ? (
+        <section className={cx(cardClass, "p-6 sm:p-8")}>
+          <AffinityBlockView affinity={affinity} labels={affinityLabels((key, values) => tr(key, values))} />
+        </section>
+      ) : null}
       {result?.comments?.length ? (
         <section className={cx(cardClass, "p-6 sm:p-8")}><h2 className="text-xl font-light">{t("momentsTitle")}</h2><div className="mt-5 grid gap-4 sm:grid-cols-2">{result.comments.map((comment) => <blockquote className="rounded-2xl bg-[var(--wash)] p-5" key={comment.id}><p className="text-sm leading-6">“{comment.text}”</p><footer className="mt-3 text-xs font-light text-[var(--muted)]">{comment.authorName ?? t("participantFallback")}{comment.itemTitle ? ` · ${comment.itemTitle}` : ""}</footer></blockquote>)}</div></section>
       ) : null}

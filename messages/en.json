@@ -98,7 +98,9 @@
       "bayesian_average": "Adjusted rating",
       "spread": "Polarisation",
       "surprise": "Surprise vs. letdown",
-      "indicator_bias": "Curator bias"
+      "indicator_bias": "Curator bias",
+      "median": "Median",
+      "consensus": "Consensus"
     },
     "groupBy": {
       "none": "No grouping",
@@ -106,14 +108,16 @@
       "item": "By item/checkpoint",
       "catalog_year": "By release year",
       "catalog_author": "By author",
-      "catalog_genre": "By genre"
+      "catalog_genre": "By genre",
+      "checkpoint": "By checkpoint"
     },
     "groupByShort": {
       "participant": "participant",
       "item": "item",
       "catalog_year": "year",
       "catalog_author": "author",
-      "catalog_genre": "genre"
+      "catalog_genre": "genre",
+      "checkpoint": "checkpoint"
     },
     "smallSample": "small sample",
     "showMore": "Show {count, plural, one {# more} other {# more}}",
@@ -737,7 +741,12 @@
     "expectationCheckbox": "Collect an expectation before the rating",
     "expectationOn": "Expectation rating enabled.",
     "expectationOff": "Expectation rating removed.",
-    "expectationLockedNote": "The challenge is live — the expectation type stays as it is."
+    "expectationLockedNote": "The challenge is live — the expectation type stays as it is.",
+    "metricCumulativeLabel": "Cumulative",
+    "metricCumulativeHint": "Each checkpoint folds in every earlier one (running average, participation to date).",
+    "wrappedBlocks": "Wrapped sections",
+    "includeRankings": "Personal rankings",
+    "includeAffinity": "Affinities"
   },
   "visibility": {
     "title": "Who sees these answers",
@@ -1203,5 +1212,34 @@
     "confirm": "Add {count, plural, one {# item} other {# items}}",
     "added": "{count, plural, one {# item added} other {# items added}}",
     "nothingToAdd": "Nothing selected to add."
+  },
+  "wrapped": {
+    "rankings": {
+      "title": "Personal rankings",
+      "entryCount": "Ratings",
+      "completion": "Completion",
+      "average": "Average given",
+      "median": "Median",
+      "range": "Low–high",
+      "consistency": "Consistency (σ)",
+      "topItems": "Favourites",
+      "bottomItems": "Lowest",
+      "surprise": "Biggest surprise",
+      "disappointment": "Biggest letdown",
+      "indication": "Own picks vs. group",
+      "none": "Not enough data yet."
+    },
+    "affinity": {
+      "title": "Affinities",
+      "explanation": "Similarity of ratings in this challenge — 100 × (1 − mean absolute difference ÷ scale). Not a personal compatibility score.",
+      "sample": "{n} shared items",
+      "composite": "Composite",
+      "compositeNote": "Composite affinity needs enough shared items per genre / year / length — shown once the data is there.",
+      "dimItems": "shared items",
+      "dimGenre": "genre",
+      "dimYearBand": "year band",
+      "dimDuration": "length",
+      "none": "No pair rated enough items in common (minimum 5)."
+    }
   }
 }

@@ -9,10 +9,11 @@ import {
   writeAudit,
 } from "../../goa-domain";
 import { ApiError, stringValue } from "../../http";
-import { bayesianAverage, indicatorBias, mean, meanDelta, spread } from "../analysis";
+import { bayesianAverage, consensus, indicatorBias, mean, meanDelta, median, spread } from "../analysis";
 import { calculateMetric } from "../../metrics";
 import { generateOpaqueToken, hashToken } from "../../security";
 import { primaryEntryType } from "./entry-types";
+import { computeRankings } from "./rankings";
 import { generateShowcase } from "./showcase";
 import type { MetricRow } from "./types";
 
@@ -56,7 +57,11 @@ interface RatingRow {
   catalog_author: string | null;
   catalog_genre: string | null;
   recommended_by_name: string | null;
+  checkpoint_id: string | null;
+  checkpoint_title: string | null;
+  checkpoint_position: number | null;
 }
+
 
 /**
  * Numeric field values for a metric, tagged with their item, participant, and
@@ -77,13 +82,18 @@ async function ratingRows(client: PoolClient, metric: MetricRow): Promise<Rating
             cat.year AS catalog_year, cat.author AS catalog_author, cat.main_genre AS catalog_genre,
             CASE WHEN ci.recommended_by_user_id IS NULL THEN NULL
                  WHEN active_recommender.user_id IS NOT NULL THEN recommender.display_name
-                 ELSE 'Quem já saiu' END AS recommended_by_name
+                 ELSE 'Quem já saiu' END AS recommended_by_name,
+            cc.id AS checkpoint_id, cc.title AS checkpoint_title, cc.position AS checkpoint_position
        FROM entry_values ev
        JOIN entries e ON e.id = ev.entry_id
        JOIN challenge_fields f ON f.id = ev.field_id
        JOIN challenges c ON c.id = e.challenge_id
        LEFT JOIN challenge_items ci ON ci.id = e.item_id
        LEFT JOIN catalog_items cat ON cat.id = ci.catalog_item_id
+       -- The checkpoint is the entry's own (session-bound types) or, for a plain
+       -- item rating, whichever checkpoint the item was organised under.
+       LEFT JOIN challenge_checkpoints cc
+         ON cc.id = coalesce(e.checkpoint_id, ci.checkpoint_id) AND cc.archived_at IS NULL
        LEFT JOIN users u ON u.id = e.participant_user_id
        LEFT JOIN challenge_participants cp
          ON cp.challenge_id = e.challenge_id AND cp.user_id = e.participant_user_id AND cp.removed_at IS NULL
@@ -97,6 +107,20 @@ async function ratingRows(client: PoolClient, metric: MetricRow): Promise<Rating
     [metric.challenge_id, metric.field_id],
   );
   return result.rows;
+}
+
+/** Scale span of the metric's numeric field (e.g. 5 for a 0–5 rating). */
+async function fieldRange(client: PoolClient, fieldId: string | null): Promise<number | null> {
+  if (!fieldId) return null;
+  const row = await oneOrNull<{ min_scaled: number | null; max_scaled: number | null; number_scale: number | null }>(
+    client,
+    "SELECT min_scaled, max_scaled, number_scale FROM challenge_fields WHERE id = $1",
+    [fieldId],
+  );
+  if (!row || row.min_scaled === null || row.max_scaled === null) return null;
+  const factor = 10 ** (row.number_scale ?? 0);
+  const span = (row.max_scaled - row.min_scaled) / factor;
+  return span > 0 ? span : null;
 }
 
 function groupBy<T>(rows: T[], key: (row: T) => { id: string; label: string } | null) {
@@ -142,11 +166,60 @@ function expectedPerParticipant(ctx: {
   return 1;
 }
 
+/**
+ * Plain-language formula + how the sample was counted for one calculated metric
+ * (V1 §9 "apresentar amostra e explicação"; §11 "Toda métrica mostra amostra e
+ * explicação"). `expected` / `expectedNote` are only set for completion rate.
+ */
+function explainMetric(
+  metric: MetricRow,
+  result: { value: number | null; sampleSize: number },
+  extra: { expected?: number; expectedNote?: string } = {},
+): { formula: string; sample: string } {
+  const { minSample, bayesPriorWeight } = metricSettings(metric);
+  const n = result.sampleSize;
+  switch (metric.operation) {
+    case "count":
+      return { formula: "Número de registros válidos.", sample: `${n} registro(s).` };
+    case "sum":
+      return { formula: "Soma dos valores do campo.", sample: `${n} valor(es).` };
+    case "average":
+      return { formula: "média = soma dos valores ÷ n.", sample: `n = ${n} avaliação(ões).` };
+    case "median":
+      return { formula: "Valor central da sequência ordenada (em contagem par, a média dos dois centrais).", sample: `n = ${n}.` };
+    case "min":
+      return { formula: "Menor valor registrado.", sample: `n = ${n}.` };
+    case "max":
+      return { formula: "Maior valor registrado.", sample: `n = ${n}.` };
+    case "completion_rate":
+      return {
+        formula: "conclusão = registros concluídos ÷ total esperado × 100.",
+        sample: `${n} de ${extra.expected ?? 0} esperados${extra.expectedNote ? ` (${extra.expectedNote})` : ""}.`,
+      };
+    case "bayesian_average":
+      return {
+        formula: `nota ajustada = (n × média do item + m × média global) ÷ (n + m); m = ${bayesPriorWeight}.`,
+        sample: `elegível a partir de ${minSample} avaliação(ões) por item.`,
+      };
+    case "spread":
+      return { formula: "Desvio-padrão populacional das avaliações — quanto maior, mais o grupo divergiu.", sample: `mínimo ${Math.max(2, minSample)} avaliações.` };
+    case "consensus":
+      return { formula: "consenso = max(0, 1 − desvio ÷ (amplitude ÷ 2)) × 100.", sample: `mínimo ${Math.max(2, minSample)} avaliações; 100 = unanimidade.` };
+    case "surprise":
+      return { formula: "surpresa = avaliação − expectativa, em respostas pareadas da mesma pessoa e item.", sample: `${n} par(es) avaliação/expectativa.` };
+    case "indicator_bias":
+      return { formula: "desempenho = média dos itens indicados pela pessoa − média global.", sample: `${n} indicação(ões) avaliada(s).` };
+    default:
+      return { formula: "", sample: `n = ${n}.` };
+  }
+}
+
 export async function calculateMetricRow(
   client: PoolClient,
   metric: MetricRow,
 ): Promise<Record<string, unknown>> {
   let result;
+  let explainExtra: { expected?: number; expectedNote?: string } = {};
   if (metric.operation === "completion_rate") {
     const context = await oneOrNull<{
       submission_mode: "item" | "daily" | "free";
@@ -188,6 +261,20 @@ export async function calculateMetricRow(
       expected,
       decimalPlaces: metric.decimal_places,
     });
+    if (context) {
+      const per = expectedPerParticipant(context);
+      const unit = context.target_policy !== "none"
+        ? `${context.item_count} itens`
+        : context.schedule_policy === "checkpoint" && context.start_date
+          ? `${context.checkpoint_count} checkpoints`
+          : context.submission_mode === "daily"
+            ? `${context.active_days} dias ativos`
+            : "1 registro";
+      explainExtra = {
+        expected,
+        expectedNote: `${context.participants} participante(s) × ${per} = ${unit} por pessoa`,
+      };
+    }
   } else if (metric.operation === "count") {
     const count = metric.field_id
       ? await oneOrNull<{ count: number }>(
@@ -208,6 +295,7 @@ export async function calculateMetricRow(
     result = await computeValueMetric(client, metric);
   }
   const suffix = metric.operation === "completion_rate" && result.value !== null ? "%" : "";
+  const explanation = explainMetric(metric, result, explainExtra);
   return {
     id: metric.id,
     key: metric.semantic_key,
@@ -215,6 +303,7 @@ export async function calculateMetricRow(
     operation: metric.operation,
     fieldId: metric.field_id,
     groupBy: metric.group_by,
+    cumulative: (metric.settings as { cumulative?: unknown })?.cumulative === true,
     visibleDuring: metric.visible_during_challenge,
     visibleInResults: metric.settings?.visibleInResults !== false,
     minSample: metricSettings(metric).minSample,
@@ -222,10 +311,20 @@ export async function calculateMetricRow(
     sampleSize: result.sampleSize,
     series: "series" in result ? result.series : undefined,
     formattedValue: formatValue(result.value, metric.decimal_places, suffix),
+    explanation: explanation.formula,
+    sample: explanation.sample,
   };
 }
 
 type ValueResult = { value: number | null; sampleSize: number; series?: SeriesEntry[] };
+
+interface AggregateContext {
+  priorMean: number;
+  priorWeight: number;
+  minSample: number;
+  decimalPlaces: number;
+  range: number | null;
+}
 
 /** Basic numeric ops + the analysis ops, with `group_by` expanded into a ranked series. */
 async function computeValueMetric(client: PoolClient, metric: MetricRow): Promise<ValueResult> {
@@ -238,7 +337,20 @@ async function computeValueMetric(client: PoolClient, metric: MetricRow): Promis
   const rows = await ratingRows(client, metric);
   const all = rows.map((row) => row.value);
   const globalMean = mean(all) ?? 0;
-  const overall = aggregateValues(metric.operation, all, globalMean, bayesPriorWeight, minSample, dp);
+  const ctx: AggregateContext = {
+    priorMean: globalMean,
+    priorWeight: bayesPriorWeight,
+    minSample,
+    decimalPlaces: dp,
+    range: metric.operation === "consensus" ? await fieldRange(client, metric.field_id) : null,
+  };
+  const overall = aggregateValues(metric.operation, all, ctx);
+
+  const cumulative = (metric.settings as { cumulative?: unknown })?.cumulative === true;
+
+  if (metric.group_by === "checkpoint") {
+    return checkpointSeries(rows, metric.operation, ctx, cumulative);
+  }
 
   const keyFn =
     metric.group_by === "item"
@@ -257,12 +369,12 @@ async function computeValueMetric(client: PoolClient, metric: MetricRow): Promis
   const series: SeriesEntry[] = [];
   for (const [id, bucket] of groupBy(rows, keyFn)) {
     const values = bucket.rows.map((row) => row.value);
-    const grouped = aggregateValues(metric.operation, values, globalMean, bayesPriorWeight, minSample, dp);
+    const grouped = aggregateValues(metric.operation, values, ctx);
     // Every row in an item bucket shares the same item, so its recommender and
     // year are constant within the bucket — read them off the first row.
     const first = metric.group_by === "item" ? bucket.rows[0] : undefined;
     const raw = metric.operation === "bayesian_average"
-      ? aggregateValues("average", values, globalMean, bayesPriorWeight, minSample, dp)
+      ? aggregateValues("average", values, ctx)
       : null;
     series.push({
       key: id,
@@ -278,18 +390,60 @@ async function computeValueMetric(client: PoolClient, metric: MetricRow): Promis
   return { value: overall.value, sampleSize: overall.sampleSize, series };
 }
 
+/**
+ * A metric grouped by checkpoint — one row per week/session in schedule order.
+ * `cumulative` folds in every earlier checkpoint's rows too ("média acumulada",
+ * "participação até a semana"); otherwise each row is that checkpoint alone.
+ */
+function checkpointSeries(
+  rows: RatingRow[],
+  operation: MetricRow["operation"],
+  ctx: AggregateContext,
+  cumulative: boolean,
+): ValueResult {
+  const buckets = new Map<string, { label: string; position: number; values: number[] }>();
+  for (const row of rows) {
+    if (!row.checkpoint_id) continue;
+    const bucket = buckets.get(row.checkpoint_id)
+      ?? { label: row.checkpoint_title ?? "—", position: row.checkpoint_position ?? 0, values: [] };
+    bucket.values.push(row.value);
+    buckets.set(row.checkpoint_id, bucket);
+  }
+  const ordered = [...buckets.entries()].sort((a, b) => a[1].position - b[1].position);
+  const series: SeriesEntry[] = [];
+  const running: number[] = [];
+  for (const [id, bucket] of ordered) {
+    running.push(...bucket.values);
+    const values = cumulative ? [...running] : bucket.values;
+    const result = aggregateValues(operation, values, ctx);
+    series.push({
+      key: id,
+      label: bucket.label,
+      value: result.value,
+      sampleSize: result.sampleSize,
+      formattedValue: formatValue(result.value, ctx.decimalPlaces),
+    });
+  }
+  // Checkpoint series read in schedule order, not ranked — the trend is the point.
+  const last = series[series.length - 1];
+  return { value: last?.value ?? null, sampleSize: rows.length, series };
+}
+
 function aggregateValues(
   operation: MetricRow["operation"],
   values: number[],
-  priorMean: number,
-  priorWeight: number,
-  minSample: number,
-  decimalPlaces: number,
+  ctx: AggregateContext,
 ): { value: number | null; sampleSize: number } {
+  const { priorMean, priorWeight, minSample, decimalPlaces, range } = ctx;
   if (operation === "bayesian_average") {
     return bayesianAverage(values, priorMean, priorWeight, { decimalPlaces, minSample });
   }
   if (operation === "spread") return spread(values, { decimalPlaces, minSample });
+  if (operation === "median") return median(values, { decimalPlaces, minSample });
+  if (operation === "consensus") {
+    if (range === null) return { value: null, sampleSize: values.length };
+    return consensus(values, range, { decimalPlaces, minSample });
+  }
   const basic = calculateMetric({
     operation: operation as "sum" | "average" | "count" | "min" | "max",
     values,
@@ -426,19 +580,23 @@ export async function resultForChallenge(
     "SELECT results_published_at, result_share_token_hash FROM challenges WHERE id = $1",
     [challengeId],
   );
-  const blocks = await client.query<{
+  // All blocks — visibility handled per kind below (a hidden ranking/affinity
+  // block means the admin turned that section off, not "recompute it live").
+  const blocksResult = await client.query<{
     id: string;
-    kind: "metric" | "entry_value" | "text";
+    kind: "metric" | "entry_value" | "text" | "ranking" | "affinity";
     metric_id: string | null;
     heading: string | null;
     body_snapshot: string | null;
     value_snapshot: unknown;
     position: number;
+    visible: boolean;
   }>(
-    `SELECT id, kind, metric_id, heading, body_snapshot, value_snapshot, position
-       FROM result_blocks WHERE challenge_id = $1 AND visible = true ORDER BY position`,
+    `SELECT id, kind, metric_id, heading, body_snapshot, value_snapshot, position, visible
+       FROM result_blocks WHERE challenge_id = $1 ORDER BY position`,
     [challengeId],
   );
+  const blocks = { rows: blocksResult.rows.filter((block) => block.visible) };
   const needsMetricFallback = blocks.rows.some(
     (block) => block.kind === "metric" && block.value_snapshot === null && block.metric_id !== null,
   );
@@ -447,6 +605,20 @@ export async function resultForChallenge(
     : [];
   const metricById = new Map(currentMetrics.map((metric) => [metric.id, metric]));
   const textBlocks = blocks.rows.filter((block) => block.kind === "text");
+
+  const rankingBlock = blocksResult.rows.find((block) => block.kind === "ranking");
+  const affinityBlock = blocksResult.rows.find((block) => block.kind === "affinity");
+  // Frozen when present; computed live while the round is open and unfrozen.
+  const live = !rankingBlock && !affinityBlock
+    ? await computeRankings(client, challengeId)
+    : { personal: [], affinity: null };
+  const personalRankings = rankingBlock
+    ? (rankingBlock.visible ? (rankingBlock.value_snapshot as { personal: unknown }).personal ?? [] : [])
+    : live.personal;
+  const affinity = affinityBlock
+    ? (affinityBlock.visible ? affinityBlock.value_snapshot : null)
+    : live.affinity;
+
   return {
     headline: textBlocks.find((block) => block.heading === "headline")?.body_snapshot ?? null,
     summary: textBlocks.find((block) => block.heading === "summary")?.body_snapshot ?? null,
@@ -457,6 +629,8 @@ export async function resultForChallenge(
     comments: blocks.rows
       .filter((block) => block.kind === "entry_value")
       .map((block) => ({ id: block.id, text: block.body_snapshot ?? "", itemTitle: block.heading })),
+    personalRankings,
+    affinity,
     publishedAt: challenge?.results_published_at?.toISOString() ?? null,
     // The raw link is never persisted; the admin sees it once, at publish time.
     hasPublishedLink: challenge?.result_share_token_hash != null,
@@ -464,15 +638,26 @@ export async function resultForChallenge(
 }
 
 const METRIC_OPERATIONS = new Set([
-  "sum", "average", "count", "min", "max", "completion_rate",
-  "bayesian_average", "spread", "surprise", "indicator_bias",
+  "sum", "average", "count", "min", "max", "median", "completion_rate",
+  "bayesian_average", "spread", "consensus", "surprise", "indicator_bias",
 ]);
 const NUMERIC_FIELD_OPS = new Set([
-  "sum", "average", "min", "max", "bayesian_average", "spread", "surprise", "indicator_bias",
+  "sum", "average", "min", "max", "median",
+  "bayesian_average", "spread", "consensus", "surprise", "indicator_bias",
 ]);
 // `day`/`week` stay refused: the compute path only expands item/participant/
-// catalog_* into a series, so they would be silently ignored today.
-const GROUP_BY_VALUES = new Set(["none", "participant", "item", "catalog_year", "catalog_author", "catalog_genre"]);
+// checkpoint/catalog_* into a series, so they would be silently ignored today.
+const GROUP_BY_VALUES = new Set([
+  "none", "participant", "item", "checkpoint", "catalog_year", "catalog_author", "catalog_genre",
+]);
+// Which groupings each analysis op accepts — the rest are refused as incoherent
+// combinations (V1 §9 "recusa combinações inválidas").
+const GROUP_BY_BY_OP: Record<string, Set<string>> = {
+  spread: new Set(["none", "item", "checkpoint", "catalog_year", "catalog_author", "catalog_genre"]),
+  consensus: new Set(["none", "item", "checkpoint", "catalog_year", "catalog_author", "catalog_genre"]),
+  surprise: new Set(["none", "item"]),
+  indicator_bias: new Set(["none", "participant"]),
+};
 
 interface ParsedMetricInput {
   operation: string;
@@ -482,6 +667,7 @@ interface ParsedMetricInput {
   visibleInResults: boolean;
   minSample: number;
   bayesPriorWeight: number;
+  cumulative: boolean;
 }
 
 function parseMetricInput(body: Record<string, unknown>): ParsedMetricInput {
@@ -492,6 +678,14 @@ function parseMetricInput(body: Record<string, unknown>): ParsedMetricInput {
     throw new ApiError(400, "invalid_metric", "Agrupar por dia ou semana ainda não é suportado.");
   }
   const groupBy = typeof body.groupBy === "string" && GROUP_BY_VALUES.has(body.groupBy) ? body.groupBy : "none";
+  const allowed = GROUP_BY_BY_OP[operation];
+  if (allowed && !allowed.has(groupBy)) {
+    throw new ApiError(400, "invalid_metric_grouping", "Essa operação não combina com esse agrupamento.");
+  }
+  const cumulative = body.cumulative === true;
+  if (cumulative && groupBy !== "checkpoint") {
+    throw new ApiError(400, "invalid_metric", "O modo acumulado só existe agrupando por checkpoint.");
+  }
   return {
     operation,
     label,
@@ -500,7 +694,44 @@ function parseMetricInput(body: Record<string, unknown>): ParsedMetricInput {
     visibleInResults: body.visibleInResults !== false,
     minSample: Number(body.minSample),
     bayesPriorWeight: Number(body.bayesPriorWeight),
+    cumulative,
   };
+}
+
+/**
+ * Relational coherence a bare `parseMetricInput` can't see: a checkpoint
+ * grouping needs checkpoints, a catalogue grouping needs a catalogue, surprise
+ * needs an expectation type to pair against.
+ */
+async function assertMetricCoherent(
+  client: PoolClient,
+  challengeId: string,
+  parsed: ParsedMetricInput,
+): Promise<void> {
+  if (parsed.groupBy === "checkpoint") {
+    const has = await oneOrNull<{ count: number }>(client,
+      "SELECT count(*)::int AS count FROM challenge_checkpoints WHERE challenge_id=$1 AND archived_at IS NULL",
+      [challengeId]);
+    if (!has || has.count === 0) {
+      throw new ApiError(409, "metric_needs_checkpoints", "Agrupar por checkpoint exige checkpoints no desafio.");
+    }
+  }
+  if (parsed.groupBy.startsWith("catalog_")) {
+    const has = await oneOrNull<{ count: number }>(client,
+      "SELECT count(*)::int AS count FROM challenge_items ci WHERE ci.challenge_id=$1 AND ci.archived_at IS NULL AND ci.catalog_item_id IS NOT NULL",
+      [challengeId]);
+    if (!has || has.count === 0) {
+      throw new ApiError(409, "metric_needs_catalog", "Esse agrupamento só existe num desafio com acervo.");
+    }
+  }
+  if (parsed.operation === "surprise") {
+    const has = await oneOrNull<{ count: number }>(client,
+      "SELECT count(*)::int AS count FROM entry_types WHERE challenge_id=$1 AND purpose='expectation' AND archived_at IS NULL",
+      [challengeId]);
+    if (!has || has.count === 0) {
+      throw new ApiError(409, "metric_needs_expectation", "Surpresa precisa de um tipo de expectativa para comparar.");
+    }
+  }
 }
 
 /** Resolves + validates the field/entry-type pair a metric computes over. Shared by create and edit. */
@@ -533,6 +764,7 @@ function metricSettingsJson(parsed: ParsedMetricInput): string {
     visibleInResults: parsed.visibleInResults,
     ...(Number.isFinite(parsed.minSample) && parsed.minSample > 0 ? { minSample: Math.floor(parsed.minSample) } : {}),
     ...(Number.isFinite(parsed.bayesPriorWeight) && parsed.bayesPriorWeight >= 0 ? { bayesPriorWeight: parsed.bayesPriorWeight } : {}),
+    ...(parsed.cumulative ? { cumulative: true } : {}),
   });
 }
 
@@ -546,6 +778,7 @@ export async function addMetric(
     const access = await challengeAccess(session.user.id, challengeId, client, true);
     if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores podem criar métricas.");
     if (access.challenge.status === "closed") throw new ApiError(409, "challenge_closed", "O desafio está encerrado.");
+    await assertMetricCoherent(client, challengeId, parsed);
     const requestedFieldId = typeof body.fieldId === "string" ? body.fieldId : null;
     const { entryTypeId, fieldId } = await resolveMetricField(client, challengeId, parsed.operation, requestedFieldId);
     const id = publicId();
@@ -586,6 +819,7 @@ export async function updateMetric(
       "SELECT id FROM challenge_metrics WHERE id=$1 AND challenge_id=$2 AND archived_at IS NULL FOR UPDATE",
       [metricId, challengeId]);
     if (!existing) throw new ApiError(404, "not_found", "Métrica não encontrada.");
+    await assertMetricCoherent(client, challengeId, parsed);
     const requestedFieldId = typeof body.fieldId === "string" ? body.fieldId : null;
     const { entryTypeId, fieldId } = await resolveMetricField(client, challengeId, parsed.operation, requestedFieldId);
     await client.query(
@@ -674,6 +908,27 @@ export async function curateResults(
         [publicId(), challengeId, metric.id, metric.label, JSON.stringify(snapshot), position++, session.user.id],
       );
     }
+    // Personal rankings + affinity: on by default, dropped only when the admin
+    // clears their checkbox. Frozen from the same live computation.
+    if (body.includeRankings !== false || body.includeAffinity !== false) {
+      const { personal, affinity } = await computeRankings(client, challengeId);
+      if (body.includeRankings !== false && personal.length > 1) {
+        await client.query(
+          `INSERT INTO result_blocks
+            (id,challenge_id,kind,heading,value_snapshot,position,visible,created_by_user_id,created_at,updated_at)
+           VALUES ($1,$2,'ranking',$3,$4::jsonb,$5,true,$6,now(),now())`,
+          [publicId(), challengeId, "Rankings pessoais", JSON.stringify({ personal }), position++, session.user.id],
+        );
+      }
+      if (body.includeAffinity !== false && affinity && affinity.pairs.length > 0) {
+        await client.query(
+          `INSERT INTO result_blocks
+            (id,challenge_id,kind,heading,value_snapshot,position,visible,created_by_user_id,created_at,updated_at)
+           VALUES ($1,$2,'affinity',$3,$4::jsonb,$5,true,$6,now(),now())`,
+          [publicId(), challengeId, "Afinidades", JSON.stringify(affinity), position++, session.user.id],
+        );
+      }
+    }
     for (const candidate of comments.slice(0, 20)) {
       const comment = asRecord(candidate);
       if (typeof comment.entryId !== "string" || typeof comment.fieldId !== "string") continue;
@@ -724,6 +979,8 @@ export interface PublishedShowcase {
     summary: string | null;
     metrics: Array<Record<string, unknown>>;
     comments: Array<{ id: string; text: string; itemTitle: string | null }>;
+    personalRankings: unknown;
+    affinity: unknown;
     publishedAt: string;
   };
 }
@@ -748,6 +1005,8 @@ async function buildPublishedSnapshot(
   const metricList = result.metrics as Array<Record<string, unknown>>;
   let participantNames: string[];
   let metrics: Array<Record<string, unknown>> = metricList;
+  let personalRankings = result.personalRankings;
+  let affinity = result.affinity;
 
   if (anonymized) {
     const seriesIds = new Set<string>();
@@ -756,6 +1015,13 @@ async function buildPublishedSnapshot(
       for (const row of metric.series as Array<{ key?: unknown }>) {
         if (typeof row.key === "string") seriesIds.add(row.key);
       }
+    }
+    for (const row of (Array.isArray(personalRankings) ? personalRankings : []) as Array<{ userId?: unknown }>) {
+      if (typeof row.userId === "string") seriesIds.add(row.userId);
+    }
+    for (const pair of ((affinity as { pairs?: unknown })?.pairs ?? []) as Array<{ a?: { userId?: unknown }; b?: { userId?: unknown } }>) {
+      if (typeof pair.a?.userId === "string") seriesIds.add(pair.a.userId);
+      if (typeof pair.b?.userId === "string") seriesIds.add(pair.b.userId);
     }
     const roster = new Map<string, string>(participants.rows.map((row) => [row.id, row.display_name]));
     const missing = [...seriesIds].filter((id) => !roster.has(id));
@@ -769,6 +1035,7 @@ async function buildPublishedSnapshot(
         .sort((a, b) => a[1].localeCompare(b[1], "pt-BR"))
         .map(([id], index) => [id, `Participante ${index + 1}`] as const),
     );
+    const anonName = (id: unknown) => (typeof id === "string" ? labelById.get(id) : undefined) ?? "Participante ?";
     participantNames = participants.rows.map((row) => labelById.get(row.id) ?? "Participante ?");
     metrics = metricList.map((metric) => {
       if (metric?.groupBy !== "participant" || !Array.isArray(metric.series)) return metric;
@@ -780,6 +1047,21 @@ async function buildPublishedSnapshot(
         }),
       };
     });
+    if (Array.isArray(personalRankings)) {
+      personalRankings = (personalRankings as Array<Record<string, unknown>>).map((row, index) => ({
+        ...row, userId: `anon-${index}`, name: anonName(row.userId),
+      }));
+    }
+    if (affinity && Array.isArray((affinity as { pairs?: unknown }).pairs)) {
+      affinity = {
+        ...(affinity as Record<string, unknown>),
+        pairs: ((affinity as { pairs: Array<{ a: { userId: string }; b: { userId: string } }> }).pairs).map((pair, index) => ({
+          ...pair,
+          a: { userId: `anon-a-${index}`, name: anonName(pair.a.userId) },
+          b: { userId: `anon-b-${index}`, name: anonName(pair.b.userId) },
+        })),
+      };
+    }
   } else {
     participantNames = participants.rows.map((row) => row.display_name);
   }
@@ -796,6 +1078,8 @@ async function buildPublishedSnapshot(
       summary: result.summary,
       metrics,
       comments: result.comments,
+      personalRankings,
+      affinity,
       publishedAt: new Date().toISOString(),
     },
   };

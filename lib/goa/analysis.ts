@@ -31,6 +31,100 @@ export function mean(values: readonly number[]): number | null {
 }
 
 /**
+ * Middle value of the sorted sequence; with an even count, the mean of the two
+ * central values (V1 §9). Empty set → null.
+ */
+export function median(
+  values: readonly number[],
+  options: { decimalPlaces?: number; minSample?: number } = {},
+): AnalysisResult {
+  assertFinite(values);
+  if (belowFloor(values.length, options.minSample ?? 1)) {
+    return { value: null, sampleSize: values.length };
+  }
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  const raw = sorted.length % 2 === 0 ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle];
+  return { value: round(raw, options.decimalPlaces ?? 2), sampleSize: values.length };
+}
+
+/**
+ * Direct affinity between two people over the items they both rated (V1 §10):
+ *
+ *   afinidade = 100 × (1 − média(|a − b|) / amplitude)
+ *
+ * `pairs` is `[theirRating, myRating]` for each shared item; `range` is the scale
+ * span (5 for a 0–5 field). Never computed on 1–2 items — the hard floor is 3,
+ * and the recommended `minSample` is 5. Below the floor: `value: null`, sample
+ * still reported.
+ */
+export function directAffinity(
+  pairs: ReadonlyArray<readonly [number, number]>,
+  range: number,
+  options: { decimalPlaces?: number; minSample?: number } = {},
+): AnalysisResult {
+  const diffs = pairs.map(([a, b]) => Math.abs(a - b));
+  assertFinite(diffs);
+  assertFinite([range]);
+  const floor = Math.max(3, options.minSample ?? 5);
+  if (diffs.length < floor || range <= 0) {
+    return { value: null, sampleSize: diffs.length };
+  }
+  const score = Math.max(0, Math.min(100, 100 * (1 - mean(diffs)! / range)));
+  return { value: round(score, options.decimalPlaces ?? 0), sampleSize: diffs.length };
+}
+
+export interface AffinityDimension {
+  /** e.g. "items" | "genre" | "year_band" | "duration". */
+  key: string;
+  /** 0–100 affinity on this dimension, or null when it has no usable sample. */
+  value: number | null;
+  sampleSize: number;
+  /** Configured weight before redistribution. */
+  weight: number;
+}
+
+export interface CompositeAffinityResult {
+  value: number | null;
+  /** Dimensions that actually contributed, with their post-redistribution weight. */
+  used: Array<{ key: string; value: number; weight: number; sampleSize: number }>;
+  /** Dimensions dropped for want of a sample. */
+  skipped: string[];
+}
+
+/**
+ * Weighted blend of per-dimension affinities (V1 §10 "afinidade composta").
+ * A dimension with `value === null` (no sample) is dropped and its weight is
+ * redistributed proportionally across the ones that remain. Returns `null` when
+ * nothing qualifies — the caller then shows only the direct number.
+ */
+export function compositeAffinity(
+  dimensions: readonly AffinityDimension[],
+  options: { decimalPlaces?: number } = {},
+): CompositeAffinityResult {
+  const live = dimensions.filter(
+    (dimension): dimension is AffinityDimension & { value: number } =>
+      dimension.value !== null && dimension.weight > 0,
+  );
+  const totalWeight = live.reduce((sum, dimension) => sum + dimension.weight, 0);
+  if (!live.length || totalWeight <= 0) {
+    return { value: null, used: [], skipped: dimensions.map((dimension) => dimension.key) };
+  }
+  const used = live.map((dimension) => ({
+    key: dimension.key,
+    value: dimension.value,
+    weight: round(dimension.weight / totalWeight, 4),
+    sampleSize: dimension.sampleSize,
+  }));
+  const blended = used.reduce((sum, dimension) => sum + dimension.value * dimension.weight, 0);
+  return {
+    value: round(blended, options.decimalPlaces ?? 0),
+    used,
+    skipped: dimensions.filter((dimension) => dimension.value === null || dimension.weight <= 0).map((dimension) => dimension.key),
+  };
+}
+
+/**
  * Shrinks a small sample's average toward a prior (the global mean), weighted by
  * `priorWeight` "virtual" votes. The reference spreadsheet uses weight 4.
  */
@@ -66,8 +160,9 @@ export function spread(
 }
 
 /**
- * 0 = total disagreement, 1 = unanimity. `range` is the rating scale span
- * (e.g. 5 for a 0–5 field); consensus is `1 − stdev / (range / 2)` clamped.
+ * Agreement on a 0–100 scale (V1 §9): `max(0, 1 − stdev / (range / 2)) × 100`.
+ * `range` is the rating scale span (5 for a 0–5 field). 0 = total disagreement,
+ * 100 = unanimity.
  */
 export function consensus(
   values: readonly number[],
@@ -78,8 +173,8 @@ export function consensus(
   if (deviation.value === null || range <= 0) {
     return { value: null, sampleSize: values.length };
   }
-  const score = Math.max(0, Math.min(1, 1 - deviation.value / (range / 2)));
-  return { value: round(score, options.decimalPlaces ?? 2), sampleSize: values.length };
+  const score = Math.max(0, Math.min(1, 1 - deviation.value / (range / 2))) * 100;
+  return { value: round(score, options.decimalPlaces ?? 0), sampleSize: values.length };
 }
 
 /**

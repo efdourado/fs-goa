@@ -4,9 +4,11 @@ export type MetricOperation =
   | "count"
   | "min"
   | "max"
+  | "median"
   | "completion_rate"
   | "bayesian_average"
   | "spread"
+  | "consensus"
   | "surprise"
   | "indicator_bias";
 
@@ -18,7 +20,7 @@ export interface MetricRow {
   semantic_key: string;
   label: string;
   operation: MetricOperation;
-  group_by: "none" | "participant" | "item" | "day" | "week" | "catalog_year" | "catalog_author" | "catalog_genre";
+  group_by: "none" | "participant" | "item" | "checkpoint" | "day" | "week" | "catalog_year" | "catalog_author" | "catalog_genre";
   decimal_places: number;
   visible_during_challenge: boolean;
   position: number;

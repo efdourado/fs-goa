@@ -42,16 +42,30 @@ import { formatRuntime, isChallengeScheduled, isLivingList, itemIdForEntry, reci
 import { DynamicEntryForm, ResultView } from "./participant-challenge";
 
 const METRIC_OPERATIONS: Metric["operation"][] = [
-  "sum", "average", "count", "min", "max", "completion_rate",
-  "bayesian_average", "spread", "surprise", "indicator_bias",
+  "sum", "average", "median", "count", "min", "max", "completion_rate",
+  "bayesian_average", "spread", "consensus", "surprise", "indicator_bias",
 ];
 /** "Best authors", "best movies of 2026" — only offered once the round actually tracks a catalog. */
-function metricGroupByOptions(catalogKind: "film" | "book" | null): NonNullable<Metric["groupBy"]>[] {
-  if (!catalogKind) return ["none", "participant", "item"];
+function metricGroupByOptions(
+  catalogKind: "film" | "book" | null,
+  hasCheckpoints: boolean,
+): NonNullable<Metric["groupBy"]>[] {
+  const base: NonNullable<Metric["groupBy"]>[] = ["none", "participant", "item"];
+  if (hasCheckpoints) base.push("checkpoint");
+  if (!catalogKind) return base;
   return [
-    "none", "participant", "item", "catalog_year", "catalog_genre",
+    ...base, "catalog_year", "catalog_genre",
     ...(catalogKind === "book" ? (["catalog_author"] as const) : []),
   ];
+}
+/** Which groupings each operation actually accepts (mirrors the server). */
+function allowedGroupBy(operation: Metric["operation"]): Set<string> | null {
+  if (operation === "spread" || operation === "consensus") {
+    return new Set(["none", "item", "checkpoint", "catalog_year", "catalog_author", "catalog_genre"]);
+  }
+  if (operation === "surprise") return new Set(["none", "item"]);
+  if (operation === "indicator_bias") return new Set(["none", "participant"]);
+  return null;
 }
 
 export interface DuplicateTargetGroup {
@@ -797,23 +811,27 @@ function AdminMetrics({
   const tm = useTranslations("metrics");
   const f = useGoaFormat();
   const catalogKind = recipeCatalogKind(challenge.recipeKey);
-  const groupByOptions = metricGroupByOptions(catalogKind);
+  const hasCheckpoints = (challenge.checkpoints?.length ?? 0) > 0;
   const [editingId, setEditingId] = useState<Id | null>(null);
   const [label, setLabel] = useState("");
   const [operation, setOperation] = useState<Metric["operation"]>("average");
   const [fieldId, setFieldId] = useState("");
   const [groupBy, setGroupBy] = useState<Metric["groupBy"]>("none");
   const [minSample, setMinSample] = useState("");
+  const [cumulative, setCumulative] = useState(false);
   const [visibleDuring, setVisibleDuring] = useState(true);
   const [visibleInResults, setVisibleInResults] = useState(true);
   const [busy, setBusy] = useState(false);
   const [deletingId, setDeletingId] = useState<Id | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const needsNumericField = ["sum", "average", "min", "max"].includes(operation);
+  const needsNumericField = ["sum", "average", "median", "min", "max"].includes(operation);
   const selectableFields = challenge.fields.filter((field) => !needsNumericField || field.type === "number" || field.type === "rating");
   const needsField = operation !== "count" && operation !== "completion_rate";
   const closed = challenge.status === "closed";
+  const opAllows = allowedGroupBy(operation);
+  const groupByOptions = metricGroupByOptions(catalogKind, hasCheckpoints)
+    .filter((value) => !opAllows || opAllows.has(value));
 
   function resetForm() {
     setEditingId(null);
@@ -822,6 +840,7 @@ function AdminMetrics({
     setFieldId("");
     setGroupBy("none");
     setMinSample("");
+    setCumulative(false);
     setVisibleDuring(true);
     setVisibleInResults(true);
     setError(null);
@@ -834,6 +853,7 @@ function AdminMetrics({
     setFieldId(metric.fieldId ?? "");
     setGroupBy(metric.groupBy ?? "none");
     setMinSample(metric.minSample != null ? String(metric.minSample) : "");
+    setCumulative(metric.cumulative === true);
     setVisibleDuring(metric.visibleDuring !== false);
     setVisibleInResults(metric.visibleInResults !== false);
     setError(null);
@@ -861,6 +881,7 @@ function AdminMetrics({
     const payload = {
       label: label.trim(), operation, fieldId: needsField ? fieldId : null, groupBy,
       minSample: groupBy !== "none" && minSample.trim() ? Number(minSample) : undefined,
+      cumulative: groupBy === "checkpoint" ? cumulative : undefined,
       visibleDuring, visibleInResults,
     };
     try {
@@ -894,6 +915,9 @@ function AdminMetrics({
               <input className={inputClass} type="number" min={1} step={1} value={minSample} onChange={(event) => setMinSample(event.target.value)} placeholder={t("metricMinSamplePlaceholder")} />
               <small className="mt-1 block text-[var(--muted)]">{t("metricMinSampleHint")}</small>
             </label>
+          ) : null}
+          {groupBy === "checkpoint" ? (
+            <label className="flex min-h-11 items-start gap-2 text-sm"><input type="checkbox" className="mt-1" aria-label={t("metricCumulativeLabel")} checked={cumulative} onChange={(event) => setCumulative(event.target.checked)} /><span><strong className="block font-medium">{t("metricCumulativeLabel")}</strong><small className="text-[var(--muted)]">{t("metricCumulativeHint")}</small></span></label>
           ) : null}
           <label className="flex min-h-11 items-center gap-2 text-sm font-medium"><input type="checkbox" checked={visibleDuring} onChange={(event) => setVisibleDuring(event.target.checked)} />{t("metricVisibleDuring")}</label>
           <label className="flex min-h-11 items-center gap-2 text-sm font-medium"><input type="checkbox" checked={visibleInResults} onChange={(event) => setVisibleInResults(event.target.checked)} />{t("metricVisibleResults")}</label>
@@ -940,6 +964,8 @@ function AdminResults({
     challenge.result?.comments?.flatMap((comment) => comment.entryId && comment.fieldId ? [`${comment.entryId}:${comment.fieldId}`] : []) ?? [],
   );
   const [anonymize, setAnonymize] = useState(challenge.resultsAnon === true);
+  const [includeRankings, setIncludeRankings] = useState((challenge.result?.personalRankings?.length ?? 0) > 0 || !challenge.result);
+  const [includeAffinity, setIncludeAffinity] = useState(Boolean(challenge.result?.affinity?.pairs.length) || !challenge.result);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -974,6 +1000,8 @@ function AdminResults({
         metricIds,
         comments: candidates.filter((candidate) => commentKeys.includes(candidate.key)).map(({ entryId, fieldId }) => ({ entryId, fieldId })),
         anonymizeParticipants: anonymize,
+        includeRankings,
+        includeAffinity,
       });
       setSuccess(isPublished ? t("draftSavedRepublishHint") : t("resultsSaved"));
     } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
@@ -1058,6 +1086,12 @@ function AdminResults({
         <div className="grid gap-4 sm:grid-cols-2"><label className="sm:col-span-2"><span className={labelClass}>{t("headlineLabel")}</span><input className={inputClass} value={headline} onChange={(event) => setHeadline(event.target.value)} maxLength={180} placeholder={challenge.title} /></label><label className="sm:col-span-2"><span className={labelClass}>{t("summaryLabel")}</span><textarea className={inputClass} rows={4} value={summary} onChange={(event) => setSummary(event.target.value)} maxLength={1500} /></label></div>
         <fieldset className="mt-6"><legend className="text-base font-light">{t("highlightMetrics")}</legend>{challenge.metrics.length ? <div className="mt-3 grid gap-2 sm:grid-cols-2">{challenge.metrics.map((metric) => <label className="flex min-h-12 items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4 text-sm" key={metric.id}><input type="checkbox" aria-label={t("highlightMetricAria", { label: metric.label })} checked={metricIds.includes(metric.id)} onChange={(event) => setMetricIds((current) => event.target.checked ? [...current, metric.id] : current.filter((id) => id !== metric.id))} /><span><strong className="block">{metric.label}</strong><small className="text-[var(--muted)]">{metric.formattedValue ?? metric.value ?? t("metricNoValue")}</small></span></label>)}</div> : <p className="mt-2 text-sm text-[var(--muted)]">{t("createMetricsFirst")}</p>}</fieldset>
         <fieldset className="mt-6"><legend className="text-base font-light">{t("selectedComments")}</legend>{candidates.length ? <div className="mt-3 grid gap-2 sm:grid-cols-2">{candidates.map((candidate) => <label className="flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4 text-sm" key={candidate.key}><input className="mt-1" type="checkbox" aria-label={t("selectCommentAria", { author: candidate.authorName })} checked={commentKeys.includes(candidate.key)} onChange={(event) => setCommentKeys((current) => event.target.checked ? [...current, candidate.key] : current.filter((key) => key !== candidate.key))} /><span><span className="line-clamp-3 leading-6">“{candidate.text}”</span><small className="mt-2 block font-light text-[var(--muted)]">{candidate.authorName} · {candidate.itemTitle}</small></span></label>)}</div> : <p className="mt-2 text-sm text-[var(--muted)]">{t("noTextFields")}</p>}</fieldset>
+        <fieldset className="mt-6"><legend className="text-base font-light">{t("wrappedBlocks")}</legend>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <label className="flex min-h-12 items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4 text-sm"><input type="checkbox" aria-label={t("includeRankings")} checked={includeRankings} onChange={(event) => setIncludeRankings(event.target.checked)} /><span>{t("includeRankings")}</span></label>
+            <label className="flex min-h-12 items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4 text-sm"><input type="checkbox" aria-label={t("includeAffinity")} checked={includeAffinity} onChange={(event) => setIncludeAffinity(event.target.checked)} /><span>{t("includeAffinity")}</span></label>
+          </div>
+        </fieldset>
         <label className="mt-6 flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4 text-sm"><input className="mt-0.5" type="checkbox" aria-label={t("anonymizeParticipants")} checked={anonymize} onChange={(event) => setAnonymize(event.target.checked)} /><span><strong className="block">{t("anonymizeParticipants")}</strong><small className="text-[var(--muted)]">{t("anonymizeHint")}</small></span></label>
         <div className="mt-5"><StatusMessage error={error} success={success} /></div>
         <div className="mt-5 flex flex-col gap-2 sm:flex-row"><Button disabled={busy} onClick={() => void save()}>{busy ? tc("saving") : t("saveDraft")}</Button><Button variant="secondary" disabled={busy} onClick={() => void regenerate()}>{t("regenerateDraft")}</Button></div>

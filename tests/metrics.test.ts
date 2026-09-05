@@ -54,8 +54,13 @@ test("reaproveita métricas calculadas no detalhe sem consultá-las novamente", 
             body_snapshot: null,
             value_snapshot: null,
             position: 0,
+            visible: true,
           }],
         };
+      }
+      // Live-ranking probe: no rating field → computeRankings bails out early.
+      if (sql.includes("FROM challenge_fields f JOIN entry_types")) {
+        return { rows: [] };
       }
       throw new Error(`Consulta inesperada: ${sql}`);
     },
@@ -65,6 +70,6 @@ test("reaproveita métricas calculadas no detalhe sem consultá-las novamente", 
   const result = await resultForChallenge(client, "challenge-1", [metric]);
 
   assert.deepEqual(result.metrics, [metric]);
-  assert.equal(queries.length, 2);
+  assert.equal(queries.length, 3);
   assert.ok(queries.every((sql) => !sql.includes("FROM challenge_metrics")));
 });
