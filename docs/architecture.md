@@ -1,5 +1,8 @@
 # Arquitetura
 
+O que a V1 precisa entregar está em [`ROADMAP.md`](../ROADMAP.md); este documento
+descreve como o código está organizado hoje.
+
 ## Visão geral
 
 Next.js 16 (App Router) + React 19 + TypeScript. A API REST são route handlers no
@@ -27,7 +30,7 @@ navegador ──JSON + cookie HTTP-only──▶ Next.js / route handlers ──
 | `lib/admin.ts` | serviços do `/admin` — só metadados |
 | `lib/security.ts` | PBKDF2, tokens, cookies, origem e CSRF |
 | `lib/goa/domain/` | criação de grupos, convites e desafios |
-| `lib/goa/challenges/` | receitas, tipos de registro, campos, registros, análise, vitrine, duplicação |
+| `lib/goa/challenges/` | receitas, tipos de registro, campos, registros, prontidão, análise, vitrine, duplicação |
 | `lib/goa/catalog.ts` | acervo do grupo e histórico de um item entre rodadas |
 | `lib/goa/analysis.ts` · `lib/metrics.ts` | matemática pura das métricas (bayes, desvio, delta) |
 | `lib/validation.ts` | validação tipada e exportação CSV segura |
@@ -38,7 +41,8 @@ navegador ──JSON + cookie HTTP-only──▶ Next.js / route handlers ──
 
 ```
 Grupo
-├── Acervo — catalog_items (filme/livro), atributos tipados, tags (gênero)
+├── Acervo — catalog_items (filme/livro): ano, gênero principal (escalar),
+│              duração/páginas, atributos tipados por grupo
 │              identidade estável entre rodadas
 └── Rodada (challenges) — recipe_key + recipe_version
     ├── entry_types — 4 eixos ortogonais (o submission_mode fica, derivado):
@@ -46,26 +50,36 @@ Grupo
     │     target_policy (required·optional·none)  — precisa de um round item?
     │     cardinality (once_per_item·once_per_item_day·once_per_day·repeatable)
     │     schedule_policy (free·while_active·checkpoint)
+    │     visibility_policy (group_realtime·after_own·after_close·author_only)
+    │        — quem vê a resposta dos outros deste tipo, e quando
     ├── challenge_items — o filme/livro nesta rodada + catalog_item_id + recommended_by
     ├── challenge_checkpoints — dias, quando a receita usa checkpoints
     ├── challenge_fields — campos semânticos por tipo de registro
     └── entries — participante + tipo + item/checkpoint + occurred_on + entry_values
 ```
 
-- **Receitas** (`lib/goa/challenges/recipes.ts`): `cine_free`, `cine_curated`
-  (2 tipos: expectativa + avaliação), `reading_club` (3 tipos: progresso/dia,
-  conclusão, nota), `reading_daily` (check-in). Cada receita abre os tipos de
-  registro, os campos e as métricas de análise — um round novo já gera vitrine
-  completa sem configuração.
+- **Receitas** (`lib/goa/challenges/recipes.ts`): quatro criáveis — `cinema`
+  (avaliação: nota 0–5 + comentário até 500), `library` (progresso/dia +
+  conclusão), `bookshelf` (só avaliação, sem período), `habit` (check-in sem
+  catálogo). As quatro antigas (`cine_free`/`cine_curated`/`reading_club`/
+  `reading_daily`) continuam legíveis no banco mas não criam mais estrutura.
+  Campos mínimos e invariantes de cada uma: `ROADMAP.md` §3–4.
 - Um mesmo item aceita **mais de um tipo** de registro por pessoa (unicidade por
-  item × tipo × pessoa; `once_per_item_day` inclui `occurred_on`). A expectativa
-  **trava** assim que existe uma avaliação daquela pessoa para o item.
-- Números e notas são inteiros escalados. Campos e opções em uso são arquivados,
-  nunca apagados.
+  item × tipo × pessoa; `once_per_item_day` inclui `occurred_on`).
+- Números e notas são inteiros escalados (nota fixa em 0–5 passo 0,5). Campos e
+  opções em uso são arquivados, nunca apagados; um campo que alimenta uma
+  métrica só sai depois de resolver a métrica.
+- **Prontidão** (`lib/goa/challenges/preflight.ts`): antes de ativar, uma revisão
+  divide erros que bloqueiam (sem participantes, receita de item sem item,
+  métrica apontando para campo morto, checkpoint fora do período…) e avisos que
+  não bloqueiam. `GET /api/challenges/:id/preflight`; o mesmo cálculo é o portão
+  do `transition` para `active`.
 - **Métricas** referenciam IDs de campos e são recalculadas sem tocar nos dados.
-  `group_by` produz uma série (ranking por item, recorte por pessoa). Ao encerrar,
-  `result_blocks` guarda snapshots congelados; a página pública exige um token
-  aleatório cujo banco guarda só o hash (rotacionável).
+  `group_by` produz uma série (ranking por item, recorte por pessoa), com
+  `minSample` editável. Ao encerrar, `result_blocks` guarda snapshots congelados;
+  a página pública exige um token aleatório do qual o banco guarda **só o hash** —
+  o token cru é mostrado uma vez, na publicação, e nunca persistido (perdeu o
+  link? rotacione).
 - **Duplicação** é só estrutural, em transação: desafio, tipos, campos, opções,
   itens e métricas ganham novos IDs; a receita carrega, a agenda zera, os itens
   re-resolvem contra o acervo do grupo de destino. Participantes, registros,
@@ -83,8 +97,17 @@ Grupo
   concedem acesso; participante só altera o próprio registro;
 - payload JSON limitado, campos dinâmicos com validação estrita, CSV neutraliza
   células-fórmula, métricas usam enums (nunca SQL nem fórmula arbitrária);
-- auditoria append-only registra correções e transições, sem senha nem token;
-- `platform_admin` é um flag separado, sem poder sobre grupos — só abre `/admin`.
+- auditoria append-only registra correções e transições — `before`/`after`
+  passam por `redactAuditPayload`: texto longo (comentário, regra, manchete) vira
+  `[texto omitido]`, só a identificação do campo e valores curtos ficam;
+- `platform_admin` é um flag separado, sem poder sobre grupos — só abre `/admin`;
+  o console nunca vê conteúdo privado (título de desafio pessoal, comentário,
+  nota, resposta) — na lixeira, itens de espaço pessoal aparecem com rótulo
+  genérico;
+- visibilidade de registro é por tipo (`visibility_policy`): `group_realtime`
+  (todos, sempre), `after_own` (só depois de você responder o mesmo item),
+  `after_close` (só autor + admin até encerrar), `author_only` (só autor + admin,
+  métricas agregadas à parte). `listEntries` filtra por isso.
 
 Cobertura: `tests/{security,validation,metrics,analysis}.test.ts` e
 `tests/integration/mvp.test.ts` (contas distintas, convite, CSRF negativo,
