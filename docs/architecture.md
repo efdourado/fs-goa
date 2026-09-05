@@ -30,7 +30,7 @@ navegador ──JSON + cookie HTTP-only──▶ Next.js / route handlers ──
 | `lib/admin.ts` | serviços do `/admin` — só metadados |
 | `lib/security.ts` | PBKDF2, tokens, cookies, origem e CSRF |
 | `lib/goa/domain/` | criação de grupos, convites e desafios |
-| `lib/goa/challenges/` | receitas, tipos de registro, campos, registros, prontidão, análise, vitrine, duplicação |
+| `lib/goa/challenges/` | receitas, tipos de registro, campos, itens, checkpoints, importação de lista, registros, prontidão, análise, vitrine, duplicação |
 | `lib/goa/catalog.ts` | acervo do grupo e histórico de um item entre rodadas |
 | `lib/goa/analysis.ts` · `lib/metrics.ts` | matemática pura das métricas (bayes, desvio, delta) |
 | `lib/validation.ts` | validação tipada e exportação CSV segura |
@@ -52,8 +52,10 @@ Grupo
     │     schedule_policy (free·while_active·checkpoint)
     │     visibility_policy (group_realtime·after_own·after_close·author_only)
     │        — quem vê a resposta dos outros deste tipo, e quando
-    ├── challenge_items — o filme/livro nesta rodada + catalog_item_id + recommended_by
-    ├── challenge_checkpoints — dias, quando a receita usa checkpoints
+    ├── challenge_items — o filme/livro nesta rodada + catalog_item_id +
+    │        recommended_by_user_id OU origin_note (origem textual) + checkpoint_id
+    ├── challenge_checkpoints — kind (day·week·session·milestone), posição, janela;
+    │        "semana" é só uma apresentação, nunca uma entidade própria
     ├── challenge_fields — campos semânticos por tipo de registro
     └── entries — participante + tipo + item/checkpoint + occurred_on + entry_values
 ```
@@ -69,6 +71,21 @@ Grupo
 - Números e notas são inteiros escalados (nota fixa em 0–5 passo 0,5). Campos e
   opções em uso são arquivados, nunca apagados; um campo que alimenta uma
   métrica só sai depois de resolver a métrica.
+- **Listas** (`lib/goa/challenges/list-import.ts` + `app/goa/ordering.ts`): item a
+  item (só o título é obrigatório) ou colando um JSON. `previewListImport` analisa
+  sem salvar — valida cada linha, mapeia campos conhecidos, avisa sobre chaves
+  desconhecidas (nunca entram no banco sozinhas), aponta duplicatas no acervo e no
+  desafio, resolve o indicador para um participante ou guarda a origem como texto.
+  O commit reusa `saveChallengeItems`, numa transação (falha parcial não cria meia
+  lista, limite de 200). Ordenação/sorteio são puros no cliente: manter, ordenar,
+  sortear tudo, sortear por bloco, distribuir entre checkpoints — com prévia e
+  re-sorteio antes de salvar.
+- **Checkpoints** (`lib/goa/challenges/checkpoints.ts`): `saveCheckpoints` monta a
+  lista numa transação; um checkpoint com registros não pode ser removido (409
+  `checkpoint_has_entries`) e arquivar um vazio só solta os itens (`checkpoint_id
+  = NULL`), nunca deixa registro órfão. `assignCheckpointItems` liga itens a
+  checkpoints em massa. Rodadas dia-a-dia continuam derivando os checkpoints do
+  período (`kind = 'day'`) e não abrem o planejador manual.
 - **Prontidão** (`lib/goa/challenges/preflight.ts`): antes de ativar, uma revisão
   divide erros que bloqueiam (sem participantes, receita de item sem item,
   métrica apontando para campo morto, checkpoint fora do período…) e avisos que
