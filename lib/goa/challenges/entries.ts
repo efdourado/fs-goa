@@ -158,29 +158,51 @@ export async function listEntries(session: SessionContext, challengeId: string) 
     if (!access.canManage && !access.challenge.is_participant) {
       throw new ApiError(403, "forbidden", "Você não participa deste desafio.");
     }
-    // Every participant sees everyone's entries — not just their own — so a
-    // person can weigh their take against the group's while it's still open,
-    // not just once the round closes.
+    const closed = access.challenge.status === "closed";
     const result = await client.query<{
       id: string; item_id: string | null; checkpoint_id: string | null; entry_type_id: string;
-      participant_user_id: string; display_name: string;
+      participant_user_id: string; display_name: string; visibility_policy: string;
       username: string; occurred_on: string | null; submitted_at: Date; updated_at: Date;
     }>(
       `SELECT e.id,e.item_id,e.checkpoint_id,e.entry_type_id,e.participant_user_id,u.display_name,u.username,
+              coalesce(et.visibility_policy, 'group_realtime') AS visibility_policy,
               e.occurred_on::text AS occurred_on,e.submitted_at,e.updated_at
-         FROM entries e JOIN users u ON u.id=e.participant_user_id
+         FROM entries e
+         JOIN users u ON u.id=e.participant_user_id
+         LEFT JOIN entry_types et ON et.id = e.entry_type_id
         WHERE e.challenge_id=$1 AND e.deleted_at IS NULL
         ORDER BY e.occurred_on DESC NULLS LAST,e.created_at DESC`,
       [challengeId],
     );
-    const values = await entryValues(client, result.rows.map((entry) => entry.id));
+
+    // Per-type visibility. Admins and the author always see everything; the
+    // rest is gated by the entry type's policy.
+    //   after_own — needs an entry of the same (item, type) from the viewer
+    //   after_close — hidden until the round closes
+    //   author_only — never surfaced here (aggregate metrics aside)
+    const ownItemType = new Set(
+      result.rows
+        .filter((entry) => entry.participant_user_id === session.user.id)
+        .map((entry) => `${entry.entry_type_id}:${entry.item_id ?? entry.checkpoint_id ?? "-"}`),
+    );
+    const visibleRows = result.rows.filter((entry) => {
+      if (access.canManage || entry.participant_user_id === session.user.id) return true;
+      switch (entry.visibility_policy) {
+        case "author_only": return false;
+        case "after_close": return closed;
+        case "after_own": return ownItemType.has(`${entry.entry_type_id}:${entry.item_id ?? entry.checkpoint_id ?? "-"}`);
+        default: return true;
+      }
+    });
+
+    const values = await entryValues(client, visibleRows.map((entry) => entry.id));
     const checkpoints = await client.query<{ id: string; day: string }>(
       `SELECT id,(starts_at AT TIME ZONE 'America/Sao_Paulo')::date::text AS day
          FROM challenge_checkpoints WHERE challenge_id=$1 AND archived_at IS NULL`,
       [challengeId],
     );
     const checkpointByDay = new Map(checkpoints.rows.map((checkpoint) => [checkpoint.day, checkpoint.id]));
-    return result.rows.map((entry) => ({
+    return visibleRows.map((entry) => ({
       id: entry.id,
       // Item and checkpoint are independent axes — keep them distinct. The
       // checkpoint still falls back to the entry's day for pre-orthogonal rows.

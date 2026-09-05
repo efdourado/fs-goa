@@ -730,6 +730,29 @@
     "previewEmptyTitle": "Prévia disponível após salvar",
     "previewEmptyBody": "Você pode preparar a curadoria durante o desafio e publicar o resultado ao encerrá-lo."
   },
+  "visibility": {
+    "title": "Quem vê estas respostas",
+    "hint": "Vale para cada participante ver as respostas dos outros deste tipo. Admins e o autor sempre veem tudo.",
+    "saved": "Visibilidade atualizada.",
+    "policy": {
+      "group_realtime": "O grupo, em tempo real",
+      "after_own": "Os outros, depois que você responder",
+      "after_close": "O grupo, só depois de encerrar",
+      "author_only": "Só você e os admins"
+    },
+    "explain": {
+      "group_realtime": "Todo participante vê a resposta de todo mundo enquanto a rodada corre.",
+      "after_own": "Você só vê a resposta de outra pessoa para um item depois de enviar a sua.",
+      "after_close": "Durante a rodada, só você e os admins veem sua resposta; o grupo vê no resultado.",
+      "author_only": "Sua resposta nunca aparece coletivamente — só métricas agregadas podem incluí-la."
+    },
+    "note": {
+      "group_realtime": "O grupo vê sua resposta na hora.",
+      "after_own": "O grupo vê sua resposta quando também responder.",
+      "after_close": "Só os admins veem sua resposta até a rodada encerrar.",
+      "author_only": "Só você e os admins veem esta resposta."
+    }
+  },
   "preflight": {
     "title": "Revisão de prontidão",
     "checking": "Verificando…",

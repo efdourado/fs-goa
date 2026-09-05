@@ -3154,3 +3154,58 @@ test("preflight: bloqueia ativação com erros, lista avisos, e é o mesmo port�
   // Agora ativa.
   assert.equal((await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } })).response.status, 200);
 });
+
+test("visibilidade por tipo de registro: tempo real, depois da própria, autor-only, depois de encerrar", async () => {
+  const owner = await register("Dona Visao", "dona_visao_tipo");
+  const p1 = await register("Um Visao", "um_visao_tipo");
+  const p2 = await register("Dois Visao", "dois_visao_tipo");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube Visão" } })).body as { id: string }).id;
+  for (const member of [p1, p2]) {
+    const invite = (await call("POST", `/api/groups/${groupId}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
+    await call("POST", `/api/invites/${invite.token}`, { session: member, body: {} });
+  }
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "cinema", title: "Sessão Visão", participantIds: [owner.user.id, p1.user.id, p2.user.id],
+      items: [{ title: "Filme X" }, { title: "Filme Y" }],
+    },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });
+  const detail = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    entryTypes: Array<{ id: string; semanticKey: string; visibilityPolicy: string; fields: Array<{ id: string; key: string }> }>;
+    items: Array<{ id: string; title: string }>;
+  };
+  const type = detail.entryTypes[0];
+  assert.equal(type.visibilityPolicy, "group_realtime", "padrão da avaliação");
+  const notaField = type.fields.find((field) => field.key === "nota")!.id;
+  const typeId = type.id;
+  const itemX = detail.items.find((item) => item.title === "Filme X")!.id;
+
+  const countFor = async (session: Awaited<ReturnType<typeof register>>) =>
+    ((await call("GET", `/api/challenges/${challengeId}/entries`, { session })).body as { entries: unknown[] }).entries.length;
+
+  // "Depois da própria resposta".
+  assert.equal((await call("PATCH", `/api/challenges/${challengeId}/entry-types/${typeId}`, { session: owner, body: { visibilityPolicy: "after_own" } })).response.status, 200);
+  await call("POST", `/api/challenges/${challengeId}/entries`, { session: p1, body: { itemId: itemX, entryTypeId: typeId, values: { [notaField]: 5 } } });
+  assert.equal(await countFor(p2), 0, "p2 não vê a nota de p1 antes de responder");
+  assert.equal(await countFor(p1), 1, "o autor sempre vê a própria");
+  assert.equal(await countFor(owner), 1, "o admin sempre vê tudo");
+  await call("POST", `/api/challenges/${challengeId}/entries`, { session: p2, body: { itemId: itemX, entryTypeId: typeId, values: { [notaField]: 3 } } });
+  assert.equal(await countFor(p2), 2, "depois de responder, p2 vê as duas");
+
+  // "Somente autor e admins".
+  await call("PATCH", `/api/challenges/${challengeId}/entry-types/${typeId}`, { session: owner, body: { visibilityPolicy: "author_only" } });
+  assert.equal(await countFor(p2), 1, "author_only: p2 só vê a própria");
+  assert.equal(await countFor(owner), 2, "admin ainda vê tudo");
+
+  // "Depois do encerramento".
+  await call("PATCH", `/api/challenges/${challengeId}/entry-types/${typeId}`, { session: owner, body: { visibilityPolicy: "after_close" } });
+  assert.equal(await countFor(p2), 1, "durante o desafio, after_close esconde as alheias");
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "closed" } });
+  assert.equal(await countFor(p2), 2, "encerrado, o grupo vê tudo");
+
+  // Encerrado congela a política.
+  assert.equal((await call("PATCH", `/api/challenges/${challengeId}/entry-types/${typeId}`, { session: owner, body: { visibilityPolicy: "group_realtime" } })).response.status, 409);
+});

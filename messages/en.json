@@ -730,6 +730,29 @@
     "previewEmptyTitle": "Preview available after saving",
     "previewEmptyBody": "You can prepare the curation during the challenge and publish the result when you close it."
   },
+  "visibility": {
+    "title": "Who sees these answers",
+    "hint": "Applies to each participant seeing others' answers of this type. Admins and the author always see everything.",
+    "saved": "Visibility updated.",
+    "policy": {
+      "group_realtime": "The group, in real time",
+      "after_own": "Others, after you've answered",
+      "after_close": "The group, only after the round closes",
+      "author_only": "Only you and the admins"
+    },
+    "explain": {
+      "group_realtime": "Every participant sees everyone's answer while the round runs.",
+      "after_own": "You only see someone else's answer for an item after you've submitted your own.",
+      "after_close": "During the round only you and the admins see your answer; the group sees it in the result.",
+      "author_only": "Your answer never shows up collectively — only aggregate metrics can include it."
+    },
+    "note": {
+      "group_realtime": "The group sees your answer right away.",
+      "after_own": "The group sees your answer once they've answered too.",
+      "after_close": "Only the admins see your answer until the round closes.",
+      "author_only": "Only you and the admins see this answer."
+    }
+  },
   "preflight": {
     "title": "Readiness review",
     "checking": "Checking…",

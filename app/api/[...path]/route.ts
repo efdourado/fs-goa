@@ -77,6 +77,7 @@ import {
   updateChallenge,
   updateChallengeItem,
   updateEntry,
+  updateEntryTypeVisibility,
 } from "@/lib/goa-challenges";
 import {
   acceptInvite,
@@ -327,6 +328,9 @@ export async function PATCH(request: Request): Promise<Response> {
     }
     if (path[0] === "challenges" && path[2] === "items" && path.length === 4) {
       return json(await updateChallengeItem(session, path[1], path[3], body));
+    }
+    if (path[0] === "challenges" && path[2] === "entry-types" && path.length === 4) {
+      return json(await updateEntryTypeVisibility(session, path[1], path[3], body));
     }
     if (path[0] === "challenges" && path[2] === "metrics" && path.length === 4) {
       return json(await updateMetric(session, path[1], path[3], body));
