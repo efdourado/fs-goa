@@ -275,6 +275,60 @@ test("aba Resultados agrupa rankings por tema (ranking, por pessoa, o que dividi
   assert.ok(rankingIndex < peopleIndex && peopleIndex < debateIndex, "ranking, depois por pessoa, depois o que dividiu opiniões");
 });
 
+test("ranking do Resultado ordena por nota por padrão e mostra a média crua por trás da nota ajustada", () => {
+  const challenge = {
+    title: "Cineclube com indicação",
+    scope: "group",
+    participants: [{ id: "u1", userId: "u1", name: "Ana", username: "ana" }, { id: "u2", userId: "u2", name: "Bruno", username: "bruno" }],
+    result: null,
+    metrics: [
+      {
+        id: "m1", label: "Ranking dos filmes", operation: "bayesian_average", groupBy: "item", visibleInResults: true,
+        series: [
+          { key: "f1", label: "Aftersun", value: 4.2, formattedValue: "4,2", rawValue: 4.5, rawFormattedValue: "4,5", sampleSize: 2, recommendedBy: "Ana", year: 2022 },
+          { key: "f2", label: "Stalker", value: 3.9, formattedValue: "3,9", rawValue: 3.9, rawFormattedValue: "3,9", sampleSize: 2, recommendedBy: "Bruno", year: 1979 },
+        ],
+      },
+    ],
+  } as unknown as ChallengeDetail;
+
+  const html = renderWithIntl(createElement(ResultView, { challenge }));
+  const aftersunIndex = html.indexOf("Aftersun");
+  const stalkerIndex = html.indexOf("Stalker");
+  assert.ok(aftersunIndex > -1 && stalkerIndex > -1 && aftersunIndex < stalkerIndex, "por padrão ordena por nota — Aftersun (4,2) antes de Stalker (3,9)");
+  assert.match(html, /\(4,5\)/, "mostra a média crua entre parênteses ao lado da nota ajustada, quando diferem");
+  assert.doesNotMatch(html, /\(3,9\)<\/span>\s*<span[^>]*>n=/, "quando a nota crua é igual à ajustada, não repete o número");
+  assert.doesNotMatch(html, /por Ana|por Bruno/, "o indicador só aparece se a pessoa marcar a caixa 'quem indicou'");
+  assert.match(html, />Quem indicou</, "a opção de mostrar quem indicou existe, mesmo desmarcada");
+  assert.match(html, />Ano</, "a opção de mostrar o ano existe");
+});
+
+test("RankingCard (tema ranking) também trunca um ranking grande, atrás de um botão", () => {
+  const series = Array.from({ length: 12 }, (_, index) => ({
+    key: `item-${index}`,
+    label: `Filme ${index + 1}`,
+    value: 5 - index * 0.1,
+    formattedValue: (5 - index * 0.1).toFixed(1),
+    sampleSize: 3,
+  }));
+  const challenge = {
+    title: "Maratona de ranking",
+    scope: "group",
+    participants: [{ id: "u1", userId: "u1", name: "Ana", username: "ana" }, { id: "u2", userId: "u2", name: "Bruno", username: "bruno" }],
+    result: null,
+    metrics: [{ id: "m1", label: "Ranking", operation: "bayesian_average", groupBy: "item", visibleInResults: true, series }],
+  } as unknown as ChallengeDetail;
+
+  const html = renderWithIntl(createElement(ResultView, { challenge }));
+  for (let position = 1; position <= 8; position += 1) {
+    assert.match(html, new RegExp(`Filme ${position}<`), `posição ${position} aparece direto`);
+  }
+  for (let position = 9; position <= 12; position += 1) {
+    assert.doesNotMatch(html, new RegExp(`Filme ${position}<`), `posição ${position} ainda não está no DOM (só some com JS depois do clique)`);
+  }
+  assert.match(html, /Ver mais 4/, "o botão mostra quantas posições ficaram de fora");
+});
+
 test("ranking grande esconde o excedente atrás de um <details> nativo, sem JS", () => {
   const series = Array.from({ length: 12 }, (_, index) => ({
     key: `item-${index}`,
@@ -288,7 +342,10 @@ test("ranking grande esconde o excedente atrás de um <details> nativo, sem JS",
     scope: "group",
     participants: [{ id: "u1", userId: "u1", name: "Ana", username: "ana" }, { id: "u2", userId: "u2", name: "Bruno", username: "bruno" }],
     result: null,
-    metrics: [{ id: "m1", label: "Ranking", operation: "average", visibleInResults: true, series }],
+    // groupBy "participant" keeps this in MetricBlock's own no-JS <details>
+    // truncation (the "ranking" theme now renders through RankingCard
+    // instead, which needs JS — see the RankingCard-specific test below).
+    metrics: [{ id: "m1", label: "Ranking", operation: "average", groupBy: "participant", visibleInResults: true, series }],
   } as unknown as ChallengeDetail;
 
   const html = renderWithIntl(createElement(ResultView, { challenge }));

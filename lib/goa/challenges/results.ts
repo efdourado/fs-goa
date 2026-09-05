@@ -22,6 +22,13 @@ interface SeriesEntry {
   value: number | null;
   sampleSize: number;
   formattedValue: string;
+  /** Item-grouped rows only: who recommended it, the catalogue year, and the
+   *  plain (un-adjusted) average — shown next to the shrunk `bayesian_average`
+   *  so the group can see the raw math behind the adjusted number. */
+  recommendedBy?: string | null;
+  year?: number | null;
+  rawValue?: number | null;
+  rawFormattedValue?: string;
 }
 
 function metricSettings(metric: MetricRow): { minSample: number; bayesPriorWeight: number } {
@@ -48,6 +55,7 @@ interface RatingRow {
   catalog_year: number | null;
   catalog_author: string | null;
   catalog_genre: string | null;
+  recommended_by_name: string | null;
 }
 
 /**
@@ -60,20 +68,30 @@ async function ratingRows(client: PoolClient, metric: MetricRow): Promise<Rating
   const result = await client.query<RatingRow>(
     // A participant who has since left the challenge (or the group, or whose
     // account is gone) keeps contributing to the numbers but not the name — the
-    // per-person breakdown labels them generically instead.
+    // per-person breakdown labels them generically instead. Same rule for
+    // whoever recommended the item.
     `SELECT (ev.number_scaled::float8 / (10 ^ f.number_scale)) AS value,
             e.item_id, ci.title AS item_title,
             e.participant_user_id AS participant_id,
             CASE WHEN cp.user_id IS NOT NULL THEN u.display_name ELSE 'Quem já saiu' END AS participant_name,
-            cat.year AS catalog_year, cat.author AS catalog_author, cat.main_genre AS catalog_genre
+            cat.year AS catalog_year, cat.author AS catalog_author, cat.main_genre AS catalog_genre,
+            CASE WHEN ci.recommended_by_user_id IS NULL THEN NULL
+                 WHEN active_recommender.user_id IS NOT NULL THEN recommender.display_name
+                 ELSE 'Quem já saiu' END AS recommended_by_name
        FROM entry_values ev
        JOIN entries e ON e.id = ev.entry_id
        JOIN challenge_fields f ON f.id = ev.field_id
+       JOIN challenges c ON c.id = e.challenge_id
        LEFT JOIN challenge_items ci ON ci.id = e.item_id
        LEFT JOIN catalog_items cat ON cat.id = ci.catalog_item_id
        LEFT JOIN users u ON u.id = e.participant_user_id
        LEFT JOIN challenge_participants cp
          ON cp.challenge_id = e.challenge_id AND cp.user_id = e.participant_user_id AND cp.removed_at IS NULL
+       LEFT JOIN users recommender ON recommender.id = ci.recommended_by_user_id
+       LEFT JOIN group_members active_recommender
+         ON active_recommender.group_id = c.group_id
+        AND active_recommender.user_id = ci.recommended_by_user_id
+        AND active_recommender.removed_at IS NULL
       WHERE e.challenge_id = $1 AND ev.field_id = $2
         AND e.deleted_at IS NULL AND ev.number_scaled IS NOT NULL`,
     [metric.challenge_id, metric.field_id],
@@ -238,20 +256,22 @@ async function computeValueMetric(client: PoolClient, metric: MetricRow): Promis
 
   const series: SeriesEntry[] = [];
   for (const [id, bucket] of groupBy(rows, keyFn)) {
-    const grouped = aggregateValues(
-      metric.operation,
-      bucket.rows.map((row) => row.value),
-      globalMean,
-      bayesPriorWeight,
-      minSample,
-      dp,
-    );
+    const values = bucket.rows.map((row) => row.value);
+    const grouped = aggregateValues(metric.operation, values, globalMean, bayesPriorWeight, minSample, dp);
+    // Every row in an item bucket shares the same item, so its recommender and
+    // year are constant within the bucket — read them off the first row.
+    const first = metric.group_by === "item" ? bucket.rows[0] : undefined;
+    const raw = metric.operation === "bayesian_average"
+      ? aggregateValues("average", values, globalMean, bayesPriorWeight, minSample, dp)
+      : null;
     series.push({
       key: id,
       label: bucket.label,
       value: grouped.value,
       sampleSize: grouped.sampleSize,
       formattedValue: formatValue(grouped.value, dp),
+      ...(first ? { recommendedBy: first.recommended_by_name, year: first.catalog_year } : {}),
+      ...(raw ? { rawValue: raw.value, rawFormattedValue: formatValue(raw.value, dp) } : {}),
     });
   }
   series.sort((a, b) => (b.value ?? Number.NEGATIVE_INFINITY) - (a.value ?? Number.NEGATIVE_INFINITY));
