@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { useGoaFormat } from "./format";
 import { LanguageToggle } from "./LanguageToggle";
@@ -67,6 +67,34 @@ export function Button({
   );
 }
 
+function CircleCheckIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
+      <circle cx="8" cy="8" r="6.3" />
+      <path d="M5.4 8.2 7.2 10l3.4-3.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function CircleExclamationIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
+      <circle cx="8" cy="8" r="6.3" />
+      <path d="M8 4.6v4" strokeLinecap="round" />
+      <circle cx="8" cy="11.1" r="0.8" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function CircleMinusIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
+      <circle cx="8" cy="8" r="6.3" />
+      <path d="M5.2 8h5.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function StatusMessage({
   error,
   success,
@@ -74,17 +102,34 @@ export function StatusMessage({
   error?: string | null;
   success?: string | null;
 }) {
-  if (!error && !success) return null;
+  const tc = useTranslations("common");
+  const message = error ?? success ?? null;
+  const [dismissed, setDismissed] = useState(false);
+  const [lastMessage, setLastMessage] = useState(message);
+  if (message !== lastMessage) {
+    setLastMessage(message);
+    setDismissed(false);
+  }
+  if (!message || dismissed) return null;
   return (
     <div
       className={cx(
-        "rounded-xl border px-4 py-3 text-sm",
+        "flex items-start gap-2 rounded-xl border px-4 py-3 text-sm",
         error ? "border-[var(--danger-line)] bg-[var(--danger-soft)] text-[var(--danger-strong)]" : "border-[var(--ok-line)] bg-[var(--ok-soft)] text-[var(--ok)]",
       )}
       role={error ? "alert" : "status"}
       aria-live="polite"
     >
-      {error ?? success}
+      {error ? <CircleExclamationIcon className="mt-0.5 h-4 w-4 flex-none" /> : <CircleCheckIcon className="mt-0.5 h-4 w-4 flex-none" />}
+      <span className="flex-1">{message}</span>
+      <button
+        type="button"
+        className="flex-none rounded-full opacity-60 transition hover:opacity-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
+        onClick={() => setDismissed(true)}
+        aria-label={tc("close")}
+      >
+        <CircleMinusIcon className="h-4 w-4" />
+      </button>
     </div>
   );
 }
@@ -252,6 +297,8 @@ export function AppHeader({
   onHome,
   onAccount,
   onOpenPersonalSpace,
+  onOpenTemplates,
+  onOpenAbout,
   onLogout,
   onAcceptRequest,
   onDeclineRequest,
@@ -261,6 +308,8 @@ export function AppHeader({
   onHome: () => void;
   onAccount: () => void;
   onOpenPersonalSpace: () => void;
+  onOpenTemplates: () => void;
+  onOpenAbout: () => void;
   onLogout: () => Promise<void>;
   onAcceptRequest: (id: Id) => Promise<void>;
   onDeclineRequest: (id: Id) => Promise<void>;
@@ -274,8 +323,8 @@ export function AppHeader({
         <button className="cursor-pointer rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25" type="button" onClick={onHome}><Brand /></button>
         <div className="flex min-w-0 items-center gap-0.5 sm:gap-2">
           <button className={cx(navLink, "hidden items-center sm:inline-flex")} type="button" onClick={onOpenPersonalSpace}>{t("personalSpace")}</button>
-          <Link className={cx(navLink, "hidden items-center sm:inline-flex")} href="/modelos">{t("templates")}</Link>
-          <Link className={cx(navLink, "hidden items-center sm:inline-flex")} href="/sobre">{t("about")}</Link>
+          <button className={cx(navLink, "hidden items-center sm:inline-flex")} type="button" onClick={onOpenTemplates}>{t("templates")}</button>
+          <button className={cx(navLink, "hidden items-center sm:inline-flex")} type="button" onClick={onOpenAbout}>{t("about")}</button>
           {user.platformAdmin ? (
             <Link className={cx(navLink, "hidden items-center sm:inline-flex")} href="/admin">{t("admin")}</Link>
           ) : null}
@@ -307,7 +356,7 @@ export function AppHeader({
           >
             {busy ? t("signingOut") : t("signOut")}
           </button>
-          <HeaderOverflowMenu isPlatformAdmin={Boolean(user.platformAdmin)} busy={busy} onOpenPersonalSpace={onOpenPersonalSpace} onLogout={async () => { setBusy(true); try { await onLogout(); } finally { setBusy(false); } }} />
+          <HeaderOverflowMenu isPlatformAdmin={Boolean(user.platformAdmin)} busy={busy} onOpenPersonalSpace={onOpenPersonalSpace} onOpenTemplates={onOpenTemplates} onOpenAbout={onOpenAbout} onLogout={async () => { setBusy(true); try { await onLogout(); } finally { setBusy(false); } }} />
         </div>
       </div>
     </header>
@@ -323,26 +372,38 @@ function HeaderOverflowMenu({
   isPlatformAdmin,
   busy,
   onOpenPersonalSpace,
+  onOpenTemplates,
+  onOpenAbout,
   onLogout,
 }: {
   isPlatformAdmin: boolean;
   busy: boolean;
   onOpenPersonalSpace: () => void;
+  onOpenTemplates: () => void;
+  onOpenAbout: () => void;
   onLogout: () => Promise<void>;
 }) {
   const t = useTranslations("nav");
   const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
+    const onPointerDown = (event: PointerEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) setOpen(false);
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPointerDown);
+    };
   }, [open]);
 
   const itemClass = "block min-h-11 rounded-xl px-3 py-2.5 text-sm text-[var(--ink)] hover:bg-[var(--wash)]";
   return (
-    <div className="relative sm:hidden">
+    <div className="relative sm:hidden" ref={containerRef}>
       <button
         className="grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-xl text-[var(--muted)] hover:bg-[var(--wash)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
         type="button"
@@ -357,24 +418,21 @@ function HeaderOverflowMenu({
         </svg>
       </button>
       {open ? (
-        <>
-          <button type="button" aria-hidden="true" tabIndex={-1} className="fixed inset-0 z-40 cursor-default" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-50 mt-2 w-52 rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-1.5 shadow-[var(--elevate-2)]" role="dialog" aria-label={t("menu")}>
-            <button className={cx(itemClass, "w-full text-left")} type="button" onClick={() => { onOpenPersonalSpace(); setOpen(false); }}>{t("personalSpace")}</button>
-            <Link className={itemClass} href="/modelos" onClick={() => setOpen(false)}>{t("templates")}</Link>
-            <Link className={itemClass} href="/sobre" onClick={() => setOpen(false)}>{t("about")}</Link>
-            {isPlatformAdmin ? <Link className={itemClass} href="/admin" onClick={() => setOpen(false)}>{t("admin")}</Link> : null}
-            <div className="my-1 border-t border-[var(--line)]" />
-            <button
-              className={cx(itemClass, "w-full text-left disabled:opacity-50")}
-              type="button"
-              disabled={busy}
-              onClick={async () => { await onLogout(); setOpen(false); }}
-            >
-              {busy ? t("signingOut") : t("signOut")}
-            </button>
-          </div>
-        </>
+        <div className="absolute right-0 z-50 mt-2 w-52 rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-1.5 shadow-[var(--elevate-2)]" role="dialog" aria-label={t("menu")}>
+          <button className={cx(itemClass, "w-full text-left")} type="button" onClick={() => { onOpenPersonalSpace(); setOpen(false); }}>{t("personalSpace")}</button>
+          <button className={cx(itemClass, "w-full text-left")} type="button" onClick={() => { onOpenTemplates(); setOpen(false); }}>{t("templates")}</button>
+          <button className={cx(itemClass, "w-full text-left")} type="button" onClick={() => { onOpenAbout(); setOpen(false); }}>{t("about")}</button>
+          {isPlatformAdmin ? <Link className={itemClass} href="/admin" onClick={() => setOpen(false)}>{t("admin")}</Link> : null}
+          <div className="my-1 border-t border-[var(--line)]" />
+          <button
+            className={cx(itemClass, "w-full text-left disabled:opacity-50")}
+            type="button"
+            disabled={busy}
+            onClick={async () => { await onLogout(); setOpen(false); }}
+          >
+            {busy ? t("signingOut") : t("signOut")}
+          </button>
+        </div>
       ) : null}
     </div>
   );
@@ -397,12 +455,20 @@ function NotificationsMenu({
   const [error, setError] = useState<string | null>(null);
   const inbox = notifications ?? [];
   const count = inbox.length;
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
+    const onPointerDown = (event: PointerEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) setOpen(false);
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPointerDown);
+    };
   }, [open]);
 
   async function respond(id: Id, action: "accept" | "decline") {
@@ -418,7 +484,7 @@ function NotificationsMenu({
   }
 
   return (
-    <div className="relative">
+    <div className="relative" ref={containerRef}>
       <button
         className="relative grid h-9 w-9 cursor-pointer place-items-center rounded-xl text-[var(--muted)] hover:bg-[var(--wash)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
         type="button"
@@ -437,46 +503,43 @@ function NotificationsMenu({
         ) : null}
       </button>
       {open ? (
-        <>
-          <button type="button" aria-hidden="true" tabIndex={-1} className="fixed inset-0 z-40 cursor-default" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-50 mt-2 w-[min(92vw,22rem)] overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--paper)] shadow-[var(--elevate-2)]" role="dialog" aria-label={t("title")}>
-            <div className="border-b border-[var(--line)] px-4 py-3">
-              <strong className="text-sm">{tTheme("legend")}</strong>
-              <div className="mt-2"><ThemeToggle /></div>
-            </div>
-            <div className="flex items-center justify-between border-b border-[var(--line)] px-4 py-3">
-              <strong className="text-sm">{t("title")}</strong>
-              {count ? <span className="text-xs text-[var(--muted)]">{t("pending", { count })}</span> : null}
-            </div>
-            {error ? <p className="border-b border-[var(--line)] bg-[var(--danger-soft)] px-4 py-2 text-xs text-[var(--danger)]">{error}</p> : null}
-            {count ? (
-              <ul className="max-h-[70vh] divide-y divide-[var(--line)] overflow-y-auto">
-                {inbox.map((request) => (
-                  <li className="px-4 py-3" key={request.id}>
-                    <p className="text-sm leading-5">
-                      {t.rich("invited", {
-                        invitedBy: request.invitedBy ?? t("someone"),
-                        groupName: request.groupName,
-                        b: (chunks) => <strong>{chunks}</strong>,
-                      })}
-                    </p>
-                    <p className="mt-0.5 text-xs text-[var(--muted)]">{f.dateTime(request.createdAt)}</p>
-                    <div className="mt-2 flex gap-2">
-                      <Button className="min-h-9 px-3 py-1 text-xs" disabled={pendingId === request.id} onClick={() => void respond(request.id, "accept")}>
-                        {pendingId === request.id ? "…" : t("accept")}
-                      </Button>
-                      <Button className="min-h-9 px-3 py-1 text-xs" variant="ghost" disabled={pendingId === request.id} onClick={() => void respond(request.id, "decline")}>
-                        {t("decline")}
-                      </Button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="px-4 py-6 text-center text-sm text-[var(--muted)]">{t("empty")}</p>
-            )}
+        <div className="absolute right-0 z-50 mt-2 w-[min(92vw,22rem)] overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--paper)] shadow-[var(--elevate-2)]" role="dialog" aria-label={t("title")}>
+          <div className="border-b border-[var(--line)] px-4 py-3">
+            <strong className="text-sm">{tTheme("legend")}</strong>
+            <div className="mt-2"><ThemeToggle /></div>
           </div>
-        </>
+          <div className="flex items-center justify-between border-b border-[var(--line)] px-4 py-3">
+            <strong className="text-sm">{t("title")}</strong>
+            {count ? <span className="text-xs text-[var(--muted)]">{t("pending", { count })}</span> : null}
+          </div>
+          {error ? <p className="border-b border-[var(--line)] bg-[var(--danger-soft)] px-4 py-2 text-xs text-[var(--danger)]">{error}</p> : null}
+          {count ? (
+            <ul className="max-h-[70vh] divide-y divide-[var(--line)] overflow-y-auto">
+              {inbox.map((request) => (
+                <li className="px-4 py-3" key={request.id}>
+                  <p className="text-sm leading-5">
+                    {t.rich("invited", {
+                      invitedBy: request.invitedBy ?? t("someone"),
+                      groupName: request.groupName,
+                      b: (chunks) => <strong>{chunks}</strong>,
+                    })}
+                  </p>
+                  <p className="mt-0.5 text-xs text-[var(--muted)]">{f.dateTime(request.createdAt)}</p>
+                  <div className="mt-2 flex gap-2">
+                    <Button className="min-h-9 px-3 py-1 text-xs" disabled={pendingId === request.id} onClick={() => void respond(request.id, "accept")}>
+                      {pendingId === request.id ? "…" : t("accept")}
+                    </Button>
+                    <Button className="min-h-9 px-3 py-1 text-xs" variant="ghost" disabled={pendingId === request.id} onClick={() => void respond(request.id, "decline")}>
+                      {t("decline")}
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="px-4 py-6 text-center text-sm text-[var(--muted)]">{t("empty")}</p>
+          )}
+        </div>
       ) : null}
     </div>
   );

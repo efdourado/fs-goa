@@ -4,6 +4,7 @@ import Link from "next/link";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
 import { copyText } from "../goa/clipboard";
+import { Brand } from "../goa/ui";
 
 type Tab = "usage" | "trash" | "audit" | "accounts" | "feedback";
 
@@ -211,14 +212,21 @@ export default function AdminConsole({ viewerId, viewerName, csrfToken }: { view
   ];
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-      <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-light tracking-[-0.045em]">Gestão</h1>
-          <p className={cx("mt-1 text-sm", muted)}>Gestão interna · {viewerName}. Somente metadados — nunca o conteúdo dos grupos.</p>
+    <>
+      <header className="sticky top-0 z-30 border-b border-[var(--edge)] bg-[var(--canvas)]/92 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6">
+          <Link className="inline-flex items-center gap-3 rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25" href="/">
+            <Brand />
+            <span className={cx("text-sm font-light", muted)}>Gestão</span>
+          </Link>
+          <div className="flex items-center gap-4">
+            <span className={cx("hidden text-sm sm:inline", muted)}>{viewerName}</span>
+            <Link className={cx("text-sm font-light", muted, "hover:text-[var(--ink)]")} href="/">← Voltar ao app</Link>
+          </div>
         </div>
-        <Link className={cx("text-sm font-light", muted, "hover:text-[var(--ink)]")} href="/">← Voltar ao app</Link>
       </header>
+      <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+      <p className={cx("mb-8 text-sm", muted)}>Gestão interna · Somente metadados — nunca o conteúdo dos grupos.</p>
 
       <nav className="mb-6 flex gap-1 overflow-x-auto rounded-2xl bg-black/[0.04] p-1" aria-label="Seções da administração">
         {tabs.map((item) => (
@@ -278,7 +286,8 @@ export default function AdminConsole({ viewerId, viewerName, csrfToken }: { view
           }
         />
       ) : null}
-    </main>
+      </main>
+    </>
   );
 }
 

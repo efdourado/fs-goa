@@ -1005,6 +1005,7 @@
     "footer": "Memória publicada pelo grupo no Goa."
   },
   "about": {
+    "back": "← Voltar",
     "title": "Sobre o Goa",
     "lede": "O Goa nasceu de planilhas — as que um grupo de amigos mantinha para organizar um clube de cinema e um de leitura. Ele automatiza esse trabalho: o participante registra, o sistema calcula e o resultado vira memória.",
     "body": [

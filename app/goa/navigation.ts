@@ -40,6 +40,7 @@ export function screenFromUrl(pathname: string, search = ""): Screen | null {
     const token = decoded(parts[1]);
     return token ? { kind: "invite", token } : null;
   }
+  if (parts[0] === "sobre" && parts.length === 1) return { kind: "about" };
   if (parts[0] === "personal" && parts.length === 1) return { kind: "personal-space" };
   if (parts[0] === "catalog" && parts.length === 1) return { kind: "personal-catalog" };
   if (parts[0] === "catalog" && parts.length === 2) {
@@ -109,6 +110,8 @@ export function urlForScreen(screen: Screen): string | null {
       return "/modelos";
     case "template":
       return `/modelos/${encodeURIComponent(screen.challengeId)}`;
+    case "about":
+      return "/sobre";
     case "invite":
       return `/invites/${encodeURIComponent(screen.token)}`;
     case "invite-success":
