@@ -414,6 +414,7 @@ test("header sinaliza logo, perfil e sair como clicáveis", () => {
   assert.match(header, /aria-label="Sua conta"/);
   assert.match(header, /aria-label="Novidades"/);
   assert.match(header, />Sair<\/button>/);
+  assert.match(header, />Início<\/button>/, "há um link 'Início' explícito, não só o logo");
 });
 
 test("header lista convites de grupo pendentes no menu de novidades", () => {

@@ -38,6 +38,7 @@
     "description": "Desafios privados e personalizáveis para grupos registrarem progresso e guardarem suas histórias."
   },
   "nav": {
+    "home": "Início",
     "personalSpace": "Meu espaço",
     "templates": "Modelos",
     "about": "Sobre",
