@@ -158,6 +158,9 @@ export async function listEntries(session: SessionContext, challengeId: string) 
     if (!access.canManage && !access.challenge.is_participant) {
       throw new ApiError(403, "forbidden", "Você não participa deste desafio.");
     }
+    // Every participant sees everyone's entries — not just their own — so a
+    // person can weigh their take against the group's while it's still open,
+    // not just once the round closes.
     const result = await client.query<{
       id: string; item_id: string | null; checkpoint_id: string | null; entry_type_id: string;
       participant_user_id: string; display_name: string;
@@ -167,9 +170,8 @@ export async function listEntries(session: SessionContext, challengeId: string) 
               e.occurred_on::text AS occurred_on,e.submitted_at,e.updated_at
          FROM entries e JOIN users u ON u.id=e.participant_user_id
         WHERE e.challenge_id=$1 AND e.deleted_at IS NULL
-          AND ($2::boolean OR e.participant_user_id=$3)
         ORDER BY e.occurred_on DESC NULLS LAST,e.created_at DESC`,
-      [challengeId, access.canManage, session.user.id],
+      [challengeId],
     );
     const values = await entryValues(client, result.rows.map((entry) => entry.id));
     const checkpoints = await client.query<{ id: string; day: string }>(

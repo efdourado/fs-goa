@@ -402,10 +402,33 @@ function itemEntryTypes(challenge: ChallengeDetail): EntryTypeView[] {
  * locks once the film is rated) above the "Avaliação"; a reading club stacks
  * progress / completion / rating. A plain Cine round renders a single form.
  */
+function GroupRatings({ ratings }: { ratings: Array<{ id: Id; name: string; value: number }> }) {
+  const t = useTranslations("participant");
+  const nf = useFormatter();
+  return (
+    <div className="mt-4 rounded-xl border border-[var(--line)] bg-[var(--wash)]/50 p-3">
+      <p className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--muted)]">{t("groupRatingsTitle")}</p>
+      {ratings.length ? (
+        <ul className="mt-2 space-y-1">
+          {ratings.map((rating) => (
+            <li className="flex items-center justify-between gap-3 text-sm" key={rating.id}>
+              <span className="truncate font-light">{rating.name}</span>
+              <span className="flex-none font-medium tabular-nums">{nf.number(rating.value, { maximumFractionDigits: 1 })}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-1 text-sm text-[var(--muted)]">{t("groupRatingsEmpty")}</p>
+      )}
+    </div>
+  );
+}
+
 function ItemEntryPanel({
   challenge,
   item,
   ownEntries,
+  groupRatings,
   occurredOn,
   onOccurredOnChange,
   offerOptionalDate,
@@ -419,6 +442,9 @@ function ItemEntryPanel({
   challenge: ChallengeDetail;
   item: ChallengeItem;
   ownEntries: Entry[];
+  // Other participants' ratings for this item — `null` on a solo challenge,
+  // where there is no group to compare against.
+  groupRatings: Array<{ id: Id; name: string; value: number }> | null;
   // "" when the participant left the (optional) date blank; `today` is the
   // fallback for the day-keyed forms that still require one.
   occurredOn: string;
@@ -476,6 +502,7 @@ function ItemEntryPanel({
               )}
               onDelete={entry && onDeleteEntry ? () => onDeleteEntry(entry.id) : undefined}
             />
+            {groupRatings && type.purpose === "rating" ? <GroupRatings ratings={groupRatings} /> : null}
           </div>
         );
       })}
@@ -630,6 +657,28 @@ export function ParticipantChallengeScreen({
     }
     return map;
   }, [ownEntries, challenge.entryTypes]);
+  // Everyone else's rating for each item — shown alongside the entry form so a
+  // person can weigh their own take against the group's while filling it in,
+  // not just after the round closes.
+  const groupRatingsByItem = useMemo(() => {
+    const ratingFieldByType = new Map(
+      challenge.entryTypes.map((type) => [type.id, type.fields.find((field) => field.type === "rating")?.id ?? null]),
+    );
+    const map = new Map<Id, Array<{ id: Id; name: string; value: number }>>();
+    for (const entry of entries) {
+      if (entry.userId && entry.userId === user.id) continue;
+      const itemId = itemIdForEntry(entry);
+      const fieldId = ratingFieldByType.get(entry.entryTypeId ?? "");
+      if (!itemId || !fieldId) continue;
+      const raw = valuesAsRecord(entry.values)[fieldId];
+      const value = typeof raw === "number" ? raw : typeof raw === "string" && raw.trim() !== "" ? Number(raw) : NaN;
+      if (Number.isNaN(value)) continue;
+      const list = map.get(itemId) ?? [];
+      list.push({ id: entry.userId ?? entry.id, name: entry.participantName ?? "—", value });
+      map.set(itemId, list);
+    }
+    return map;
+  }, [entries, user.id, challenge.entryTypes]);
   const sortedItems = useMemo(() => [...challenge.items].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)), [challenge.items]);
   const sortedSessions = useMemo(
     () => [...(challenge.checkpoints ?? [])].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
@@ -768,7 +817,7 @@ export function ParticipantChallengeScreen({
                       {selectedItem?.recommendedBy || selectedItem?.catalogItem?.author || selectedItem?.catalogItem?.year || selectedItem?.catalogItem?.mainGenre ? <p className="mt-1 text-xs text-[var(--muted)]">{[selectedItem.catalogItem?.author ? t("byAuthor", { name: selectedItem.catalogItem.author }) : null, selectedItem.recommendedBy ? t("recommendedBy", { name: selectedItem.recommendedBy.name }) : null, selectedItem.catalogItem?.year ? String(selectedItem.catalogItem.year) : null, selectedItem.catalogItem?.mainGenre || null].filter(Boolean).join(" · ")}</p> : null}</div>{selectedItem?.dueAt ? <span className="rounded-full bg-[var(--wash)] px-3 py-2 text-xs font-medium text-[var(--muted)]">{t("dueBy", { date: f.dateTime(selectedItem.dueAt) })}</span> : null}</div>
                   {dateRequired ? <label className="mb-5 block"><span className={labelClass}>{t("occurredOnLabel")}</span><input className={inputClass} type="date" max={today} value={effectiveOccurredOn} disabled={Boolean(unavailableMessage)} onChange={(event) => setOccurredOn(event.target.value || today)} /><small className="mt-1 block text-[var(--muted)]">{t("occurredOnHint")}</small></label> : !useItemPanel && currentEntry?.occurredOn ? <p className="mb-5 text-xs text-[var(--muted)]">{t("occurredOn", { date: f.date(currentEntry.occurredOn, longDate) })}</p> : null}
                   {useItemPanel && selectedItem ? (
-                    <ItemEntryPanel key={`${selectedItem.id}-${selectedSession?.id ?? "no-session"}`} challenge={challenge} item={selectedItem} ownEntries={ownEntries} occurredOn={occurredOn} onOccurredOnChange={setOccurredOn} offerOptionalDate={!perDayItem && !sessionMode && collectsEntryDate} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} checkpointId={selectedSession?.id ?? null} onSaveEntry={onSaveEntry} onDeleteEntry={canDeleteEntry} />
+                    <ItemEntryPanel key={`${selectedItem.id}-${selectedSession?.id ?? "no-session"}`} challenge={challenge} item={selectedItem} ownEntries={ownEntries} groupRatings={challenge.participants.length > 1 ? groupRatingsByItem.get(selectedItem.id) ?? [] : null} occurredOn={occurredOn} onOccurredOnChange={setOccurredOn} offerOptionalDate={!perDayItem && !sessionMode && collectsEntryDate} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} checkpointId={selectedSession?.id ?? null} onSaveEntry={onSaveEntry} onDeleteEntry={canDeleteEntry} />
                   ) : (
                     <DynamicEntryForm key={`${selectedItem?.id ?? "free"}-${undatedDaily ? effectiveOccurredOn : "fixed"}-${currentEntry?.id ?? "new"}`} fields={challenge.fields} item={selectedItem ?? null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry(selectedItem?.id ?? null, values, entry, undatedDaily ? effectiveOccurredOn : undefined)} onDelete={currentEntry && canDeleteEntry ? () => canDeleteEntry(currentEntry.id) : undefined} />
                   )}

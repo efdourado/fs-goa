@@ -1601,6 +1601,40 @@ test("registros podem ser excluídos: pelo autor ou pelo admin, só com o desafi
   assert.equal((blocked.body as { error: string }).error, "challenge_not_active");
 });
 
+test("um participante comum vê os registros de todo mundo, não só os próprios", async () => {
+  const owner = await register("Bia Registros", "bia_registros_todos");
+  const first = await register("Caio Registros", "caio_registros_todos");
+  const second = await register("Dara Registros", "dara_registros_todos");
+  const outsider = await register("Estranho Registros", "estranho_registros_todos");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Grupo Transparente" } })).body as { id: string }).id;
+  for (const member of [first, second]) {
+    const invite = (await call("POST", `/api/groups/${gid}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
+    assert.equal((await call("POST", `/api/invites/${invite.token}`, { session: member, body: {} })).response.status, 200);
+  }
+
+  const challenge = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "cinema", title: "Sessão transparente", startsOn: "2026-08-01", endsOn: "2026-12-31",
+      participantIds: [owner.user.id, first.user.id, second.user.id],
+      fields: [{ key: "nota", label: "Nota", type: "rating", required: true }],
+      items: [{ title: "Filme Único" }],
+    },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } })).response.status, 200);
+  const items = ((await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { items: DetailItem[] }).items;
+
+  await call("POST", `/api/challenges/${challengeId}/entries`, { session: first, body: { itemId: items[0].id, values: { nota: 5 } } });
+  await call("POST", `/api/challenges/${challengeId}/entries`, { session: second, body: { itemId: items[0].id, values: { nota: 2 } } });
+
+  const seenBySecond = (await call("GET", `/api/challenges/${challengeId}/entries`, { session: second })).body as { entries: Array<{ participantName: string }> };
+  assert.equal(seenBySecond.entries.length, 2, "um participante comum vê os registros de todo mundo, não só o próprio");
+  assert.ok(seenBySecond.entries.some((entry) => entry.participantName === "Caio Registros"), "inclui a nota de outra pessoa");
+
+  assert.equal((await call("GET", `/api/challenges/${challengeId}/entries`, { session: outsider })).response.status, 404, "quem não participa continua sem acesso");
+});
+
 test("fundação: dois livros no mesmo dia, conclusão e nota sem comentário", async () => {
   const owner = await register("Lúcia", "lucia_found");
   const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube de leitura" } })).body as { id: string }).id;
@@ -1801,7 +1835,7 @@ test("cópia: carrega a receita, zera a agenda e remapeia o acervo do destino", 
 });
 
 type SeriesRow = { key: string; label: string; value: number | null; sampleSize: number };
-type ApiMetric = { id: string; label: string; operation: string; groupBy: string; value: number | null; series?: SeriesRow[] };
+type ApiMetric = { id: string; label: string; operation: string; groupBy: string; minSample?: number; value: number | null; series?: SeriesRow[] };
 
 test("motor de análise: ranking ajustado, surpresa, viés e vitrine automática", async () => {
   const owner = await register("Ana", "ana_an");
@@ -2857,4 +2891,56 @@ test("métricas: editar e remover uma existente, e agrupar por ano/autor do acer
   const authorSeries = withByAuthor.metrics.find((metric) => metric.label === "Nota por autor")!.series!;
   assert.equal(authorSeries.find((row) => row.key === "Autora X")!.value, 4, "média dos dois livros da mesma autora");
   assert.equal(authorSeries.find((row) => row.key === "Autor Y")!.value, 2);
+});
+
+test("amostra mínima de uma métrica é configurável — um grupo pequeno pode baixá-la pra 2", async () => {
+  const owner = await register("Dona Amostra", "dona_amostra_minima");
+  const participant = await register("Participa Amostra", "participa_amostra_minima");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Dupla" } })).body as { id: string }).id;
+  const invite = (await call("POST", `/api/groups/${groupId}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
+  await call("POST", `/api/invites/${invite.token}`, { session: participant, body: {} });
+
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "cinema", title: "Dupla avalia", participantIds: [owner.user.id, participant.user.id],
+      items: [{ title: "Só um voto" }, { title: "Os dois votam" }],
+    },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });
+  const detail = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    entryTypes: Array<{ id: string; fields: Array<{ id: string; key: string }> }>;
+    items: Array<{ id: string; title: string }>;
+  };
+  const notaField = detail.entryTypes[0].fields.find((field) => field.key === "nota")!.id;
+  const typeId = detail.entryTypes[0].id;
+  const itemByTitle = new Map(detail.items.map((item) => [item.title, item.id]));
+  await call("POST", `/api/challenges/${challengeId}/entries`, { session: owner, body: { itemId: itemByTitle.get("Só um voto"), entryTypeId: typeId, values: { [notaField]: 5 } } });
+  await call("POST", `/api/challenges/${challengeId}/entries`, { session: owner, body: { itemId: itemByTitle.get("Os dois votam"), entryTypeId: typeId, values: { [notaField]: 4 } } });
+  await call("POST", `/api/challenges/${challengeId}/entries`, { session: participant, body: { itemId: itemByTitle.get("Os dois votam"), entryTypeId: typeId, values: { [notaField]: 2 } } });
+
+  const ranking = await call("POST", `/api/challenges/${challengeId}/metrics`, {
+    session: owner,
+    body: { label: "Ranking a dois", operation: "average", fieldId: notaField, groupBy: "item", minSample: 2 },
+  });
+  assert.equal(ranking.response.status, 201, JSON.stringify(ranking.body));
+  const metricId = (ranking.body as { id: string }).id;
+
+  const withMinSample = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { metrics: ApiMetric[] };
+  const metric = withMinSample.metrics.find((entry) => entry.id === metricId)!;
+  assert.equal(metric.minSample, 2, "a amostra mínima escolhida é devolvida junto com a métrica");
+  const series = metric.series!;
+  assert.equal(series.find((row) => row.label === "Só um voto")!.value, null, "um voto só fica abaixo da amostra mínima de 2");
+  assert.equal(series.find((row) => row.label === "Os dois votam")!.value, 3, "com os dois votos, a média conta");
+
+  // Editar reduzindo pra 1 faz o item de voto único voltar a valer.
+  const lowered = await call("PATCH", `/api/challenges/${challengeId}/metrics/${metricId}`, {
+    session: owner,
+    body: { label: "Ranking a dois", operation: "average", fieldId: notaField, groupBy: "item", minSample: 1 },
+  });
+  assert.equal(lowered.response.status, 200, JSON.stringify(lowered.body));
+  const afterLowering = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { metrics: ApiMetric[] };
+  const loweredSeries = afterLowering.metrics.find((entry) => entry.id === metricId)!.series!;
+  assert.equal(loweredSeries.find((row) => row.label === "Só um voto")!.value, 5, "com amostra mínima 1, o voto único já conta");
 });
