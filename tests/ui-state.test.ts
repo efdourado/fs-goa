@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import { createElement } from "react";
 import test from "node:test";
 
+import { CheckpointPlanner } from "../app/goa/checkpoint-planner";
+import { ListImportPanel } from "../app/goa/list-import-panel";
 import { RuleSectionsView } from "../app/goa/rules";
 import { DynamicEntryForm, ResultView } from "../app/goa/screens/participant-challenge";
-import type { ChallengeDetail, ChallengeField } from "../app/goa/types";
+import type { ChallengeDetail, ChallengeField, ImportPreview } from "../app/goa/types";
 import { AppHeader, ChallengeStatusBadge, SchedulePeriodFields } from "../app/goa/ui";
 import {
   findMissingRequiredField,
@@ -415,6 +417,67 @@ test("header sinaliza logo, perfil e sair como clicáveis", () => {
   assert.match(header, /aria-label="Novidades"/);
   assert.match(header, />Sair<\/button>/);
   assert.match(header, />Início<\/button>/, "há um link 'Início' explícito, não só o logo");
+});
+
+test("planejador de checkpoints: mostra semanas, o tipo, o total de duração e a distribuição", () => {
+  const challenge = {
+    id: "c1",
+    status: "draft",
+    submissionMode: "item",
+    startsOn: "2026-03-02",
+    endsOn: "2026-03-29",
+    checkpoints: [
+      { id: "w1", title: "Semana 1", kind: "week", position: 0, opensAt: "2026-03-02T00:00:00Z", dueAt: "2026-03-08T00:00:00Z", itemCount: 1, totalRuntimeMinutes: 100, timeframe: "past" },
+      { id: "w2", title: "Semana 3", kind: "week", position: 1, opensAt: "2026-03-16T00:00:00Z", dueAt: "2026-03-22T00:00:00Z", itemCount: 0, totalRuntimeMinutes: null, timeframe: "future" },
+    ],
+    items: [
+      { id: "i1", title: "Filme A", position: 0, checkpointId: "w1", catalogItem: { id: "ci1", title: "Filme A", runtimeMinutes: 100 } },
+      { id: "i2", title: "Filme B", position: 1, checkpointId: null, catalogItem: { id: "ci2", title: "Filme B", runtimeMinutes: 120 } },
+    ],
+  } as unknown as ChallengeDetail;
+
+  const html = renderWithIntl(createElement(CheckpointPlanner, {
+    challenge,
+    onSaveCheckpoints: async () => undefined,
+    onAssign: async () => undefined,
+  }));
+  assert.match(html, /Semana 1/);
+  assert.match(html, /Semana 3/);
+  assert.match(html, /1h40/, "soma a duração dos filmes da semana");
+  assert.match(html, /Distribuir em ordem/, "oferece a distribuição sequencial");
+  assert.match(html, /Sortear dentro de cada/);
+  assert.match(html, /Sem checkpoint/, "há um balde para itens sem checkpoint");
+});
+
+test("planejador de checkpoints: um desafio diário com período não edita checkpoints à mão", () => {
+  const challenge = {
+    id: "c2", status: "active", submissionMode: "daily", startsOn: "2026-03-01", endsOn: "2026-03-10",
+    checkpoints: [], items: [],
+  } as unknown as ChallengeDetail;
+  const html = renderWithIntl(createElement(CheckpointPlanner, {
+    challenge, onSaveCheckpoints: async () => undefined, onAssign: async () => undefined,
+  }));
+  assert.match(html, /gera um checkpoint por dia/i);
+  assert.doesNotMatch(html, /Adicionar checkpoint/);
+});
+
+test("painel de importação: analisa e depois lista chaves desconhecidas e badges por linha", async () => {
+  const preview: ImportPreview = {
+    limit: 200,
+    catalogKind: "film",
+    summary: { total: 3, importable: 1, invalid: 1, duplicatesInCatalog: 0, duplicatesInChallenge: 1, unknownKeys: ["vibe"] },
+    rows: [
+      { index: 0, title: "Aftersun", valid: true, errors: [], mapped: { author: null, year: 2022, pageCount: null, runtimeMinutes: null, mainGenre: null }, recommendation: { kind: "participant", userId: "u1", name: "Ana" }, existingCatalogItemId: null, duplicateInChallenge: false, unknownKeys: ["vibe"] },
+      { index: 1, title: "Filme Repetido", valid: true, errors: [], mapped: { author: null, year: null, pageCount: null, runtimeMinutes: null, mainGenre: null }, recommendation: null, existingCatalogItemId: null, duplicateInChallenge: true, unknownKeys: [] },
+      { index: 2, title: "", valid: false, errors: ["Sem título."], mapped: { author: null, year: null, pageCount: null, runtimeMinutes: null, mainGenre: null }, recommendation: null, existingCatalogItemId: null, duplicateInChallenge: false, unknownKeys: [] },
+    ],
+  };
+  const empty = renderWithIntl(createElement(ListImportPanel, {
+    onPreview: async () => preview,
+    onCommit: async () => undefined,
+  }));
+  assert.match(empty, /Importar uma lista \(JSON\)/);
+  assert.match(empty, /Analisar/);
 });
 
 test("header lista convites de grupo pendentes no menu de novidades", () => {

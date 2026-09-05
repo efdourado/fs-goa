@@ -690,6 +690,79 @@ function EntryPicker({
   );
 }
 
+/**
+ * Read-only week/session view: each manual checkpoint as a card with its items,
+ * a past/now/upcoming badge, and the total runtime when the items carry one.
+ * Only shown for round-item challenges organised into non-daily checkpoints.
+ */
+function CheckpointSchedule({ challenge }: { challenge: ChallengeDetail }) {
+  const t = useTranslations("participant");
+  const tk = useTranslations("checkpointKind");
+  const tp = useTranslations("checkpointPlanner");
+  const planned = useMemo(
+    () =>
+      [...challenge.checkpoints]
+        .filter((cp) => cp.kind && cp.kind !== "day")
+        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
+    [challenge.checkpoints],
+  );
+  if (planned.length === 0) return null;
+  const itemsByCheckpoint = new Map<Id, ChallengeItem[]>();
+  for (const item of challenge.items) {
+    if (!item.checkpointId) continue;
+    const list = itemsByCheckpoint.get(item.checkpointId) ?? [];
+    list.push(item);
+    itemsByCheckpoint.set(item.checkpointId, list);
+  }
+
+  return (
+    <section className="mt-5">
+      <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-[var(--muted)]">{tp("title")}</h2>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {planned.map((cp) => {
+          const items = [...(itemsByCheckpoint.get(cp.id) ?? [])].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+          const runtime = formatRuntime(cp.totalRuntimeMinutes ?? items.reduce((sum, item) => sum + (item.catalogItem?.runtimeMinutes ?? 0), 0));
+          return (
+            <article
+              className={cx(
+                "rounded-2xl border p-4",
+                cp.timeframe === "current"
+                  ? "border-[var(--main)] bg-[var(--main-soft)]/40"
+                  : "border-[var(--line)] bg-[var(--paper)]",
+                cp.timeframe === "past" && "opacity-70",
+              )}
+              key={cp.id}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <strong className="text-sm">{cp.title}</strong>
+                <span className="rounded-full bg-[var(--wash)] px-2 py-0.5 text-[10px] uppercase text-[var(--muted)]">
+                  {tp(`timeframe.${cp.timeframe ?? "current"}`)}
+                </span>
+              </div>
+              <p className="mt-0.5 text-xs text-[var(--muted)]">
+                {tk(cp.kind ?? "session")}
+                {runtime ? ` · ${runtime}` : ""}
+              </p>
+              {items.length ? (
+                <ul className="mt-2 space-y-1 text-sm">
+                  {items.map((item) => (
+                    <li className="truncate" key={item.id}>
+                      {item.title}
+                      {item.catalogItem?.year ? ` (${item.catalogItem.year})` : ""}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-2 text-xs text-[var(--muted)]">{t("checkpointEmpty")}</p>
+              )}
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 export function ParticipantChallengeScreen({
   challenge,
   entries,
@@ -887,6 +960,7 @@ export function ParticipantChallengeScreen({
 
       {scheduled ? <section className="mt-5 rounded-2xl border border-[var(--main-line)] bg-[var(--paper)] px-5 py-4"><strong className="text-[var(--main-strong)]">{t("scheduledTitle", { date: f.date(challenge.startsOn, longDate) })}</strong><p className="mt-1 text-sm leading-6 text-[var(--muted)]">{t("scheduledBody")}</p></section> : null}
       <RuleSectionsView rules={ruleSections} />
+      <CheckpointSchedule challenge={challenge} />
 
       <nav className="mt-5 hidden gap-1 rounded-2xl bg-[var(--wash-strong)]/70 p-1 sm:flex" aria-label={t("navAria")}>
         {tabs.map((item) => <button className={cx("min-h-11 flex-1 rounded-xl px-3 text-sm font-light", tab === item.id ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]")} type="button" onClick={() => onTab(item.id)} key={item.id}>{t(`tabs.${item.id}`)}</button>)}

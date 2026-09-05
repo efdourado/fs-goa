@@ -24,6 +24,7 @@ export type AdminTab =
   | "participants"
   | "fields"
   | "items"
+  | "checkpoints"
   | "review"
   | "metrics"
   | "results";

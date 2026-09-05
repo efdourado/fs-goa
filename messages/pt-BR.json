@@ -511,10 +511,11 @@
       "overview": "Geral",
       "participants": "Pessoas",
       "fields": "Campos",
-      "items": "Checkpoints",
+      "items": "Itens",
       "review": "Revisão",
       "metrics": "Métricas",
-      "results": "Vitrine"
+      "results": "Vitrine",
+      "checkpoints": "Cronograma"
     },
     "errPeriod": "Preencha início e término, ou escolha um desafio sem prazo.",
     "errEndBeforeStart": "A data final deve ser igual ou posterior ao início.",
@@ -835,7 +836,8 @@
     "noProgressBody": "Seus registros continuam salvos. O administrador escolhe quais números ajudam o grupo durante o desafio.",
     "storyOngoingTitle": "A história ainda está acontecendo",
     "storyOngoingBody": "O resultado final será liberado quando o desafio for encerrado.",
-    "backToEntry": "Voltar ao registro"
+    "backToEntry": "Voltar ao registro",
+    "checkpointEmpty": "Nada ainda."
   },
   "entryForm": {
     "fillField": "Preencha o campo “{label}”.",
@@ -1118,5 +1120,79 @@
     "send": "Enviar",
     "thanksTitle": "Recebido. Obrigado!",
     "thanksBody": "Cada resposta é lida. Se você deixou um e-mail, talvez a gente escreva pra entender melhor."
+  },
+  "checkpointKind": {
+    "day": "Dia",
+    "week": "Semana",
+    "session": "Sessão",
+    "milestone": "Marco"
+  },
+  "checkpointPlanner": {
+    "title": "Cronograma",
+    "subtitle": "Divida a rodada em semanas, sessões ou marcos. Os checkpoints não precisam ser seguidos — deixe um intervalo para uma pausa.",
+    "dailyAutoNote": "Esta rodada gera um checkpoint por dia a partir do período. Ajuste as datas na aba Geral.",
+    "noItemsNote": "Este desafio não tem itens para organizar em checkpoints.",
+    "lockedNote": "Um desafio encerrado fica congelado.",
+    "newTitle": "Checkpoint {n}",
+    "cpTitle": "Nome",
+    "cpTitlePlaceholder": "ex.: Semana 1",
+    "cpKind": "Tipo",
+    "cpStarts": "Início",
+    "cpDue": "Fim",
+    "moveUp": "Subir",
+    "moveDown": "Descer",
+    "noCheckpointsTitle": "Nenhum checkpoint ainda",
+    "noCheckpointsBody": "Adicione um checkpoint para organizar a lista em semanas ou sessões.",
+    "addCheckpoint": "Adicionar checkpoint",
+    "saveCheckpoints": "Salvar checkpoints",
+    "saved": "Checkpoints salvos.",
+    "itemsTally": "{count, plural, =0 {sem itens} one {# item} other {# itens}}",
+    "timeframe": {
+      "past": "Passada",
+      "current": "Atual",
+      "future": "Futura"
+    },
+    "organiseTitle": "Organizar os itens",
+    "organiseSubtitle": "Atribua cada item a um checkpoint, ou use uma ferramenta. Veja o resultado aqui, sorteie de novo e salve.",
+    "distribute": "Distribuir em ordem",
+    "shuffleAll": "Sortear tudo",
+    "shuffleWithin": "Sortear dentro de cada",
+    "unassigned": "Sem checkpoint",
+    "emptyCheckpoint": "Nada aqui ainda.",
+    "saveOrganise": "Salvar organização",
+    "organiseSaved": "Organização salva."
+  },
+  "listImport": {
+    "title": "Importar uma lista (JSON)",
+    "hint": "Cole um array de objetos. A lista é analisada e só é salva quando você confirmar.",
+    "jsonLabel": "JSON",
+    "analyse": "Analisar",
+    "analysing": "Analisando…",
+    "reanalyse": "Analisar de novo",
+    "summary": "{total} linhas · {importable} a importar · {invalid} inválidas · {dupChallenge} já no desafio · {dupCatalog} conhecidas do acervo",
+    "unknownKeysTitle": "Chaves não reconhecidas",
+    "unknownKeysNote": "Chaves não mapeadas são ignoradas — nunca entram no banco.",
+    "ignoreKey": "ignorar",
+    "field": {
+      "title": "Título",
+      "year": "Ano",
+      "author": "Autor",
+      "pageCount": "Páginas",
+      "runtimeMinutes": "Duração (min)",
+      "mainGenre": "Gênero principal",
+      "recommendedBy": "Indicado por",
+      "origin": "Origem"
+    },
+    "badgeInvalid": "inválido",
+    "badgeInChallenge": "já no desafio",
+    "badgeInCatalogue": "no acervo",
+    "badgeRecommender": "indicado por {name}",
+    "badgeOrigin": "origem: {text}",
+    "rowUnknownKeys": "ignoradas: {keys}",
+    "includeRow": "Incluir {title}",
+    "noTitle": "(sem título)",
+    "confirm": "Adicionar {count, plural, one {# item} other {# itens}}",
+    "added": "{count, plural, one {# item adicionado} other {# itens adicionados}}",
+    "nothingToAdd": "Nada selecionado para adicionar."
   }
 }
