@@ -68,6 +68,22 @@ Grupo
   Campos mínimos e invariantes de cada uma: `ROADMAP.md` §3–4.
 - Um mesmo item aceita **mais de um tipo** de registro por pessoa (unicidade por
   item × tipo × pessoa; `once_per_item_day` inclui `occurred_on`).
+- **Expectativa** (`purpose = 'expectation'`, `seedExpectationType`): tipo opcional
+  do Cinema/Estante — nota 0–5 antes de assistir, `visibility_policy = 'after_own'`
+  por padrão, uma por item. `saveEntry`/`updateEntry` a travam (409
+  `expectation_locked`) assim que existe uma avaliação da mesma pessoa para o item.
+  Liga/desliga com `PATCH /api/challenges/:id/expectation` (só no rascunho; sair
+  bloqueado se já tem registros) ou `expectation: true` na criação.
+- **Visibilidade** é por tipo (`visibility_policy`), aplicada em `listEntries`:
+  `group_realtime` (todos, sempre), `after_own` (só depois de você responder o
+  mesmo item), `after_close` (só autor + admin até encerrar), `author_only` (só
+  autor + admin — métricas agregadas ainda contam). Admin e autor sempre veem
+  tudo. A interface diz quem verá a resposta antes do primeiro envio; o preflight
+  avisa (`expectation_visible_early`) se a expectativa ficar em `group_realtime`.
+- **Conclusão** é inferida dos registros: a existência de um registro do tipo de
+  conclusão (ou, na falta dele, do tipo principal — nunca da expectativa) conta
+  como "feito"; `bootstrap` deriva `completedCount`/`totalCount` daí, sem status
+  manual.
 - Números e notas são inteiros escalados (nota fixa em 0–5 passo 0,5). Campos e
   opções em uso são arquivados, nunca apagados; um campo que alimenta uma
   métrica só sai depois de resolver a métrica.
@@ -121,10 +137,9 @@ Grupo
   o console nunca vê conteúdo privado (título de desafio pessoal, comentário,
   nota, resposta) — na lixeira, itens de espaço pessoal aparecem com rótulo
   genérico;
-- visibilidade de registro é por tipo (`visibility_policy`): `group_realtime`
-  (todos, sempre), `after_own` (só depois de você responder o mesmo item),
-  `after_close` (só autor + admin até encerrar), `author_only` (só autor + admin,
-  métricas agregadas à parte). `listEntries` filtra por isso.
+- visibilidade de registro é por tipo (`visibility_policy`, ver Modelo de
+  domínio): `listEntries` decide quem vê a resposta de quem; métricas agregadas
+  leem os registros direto e não passam por esse filtro.
 
 Cobertura: `tests/{security,validation,metrics,analysis}.test.ts` e
 `tests/integration/mvp.test.ts` (contas distintas, convite, CSRF negativo,
