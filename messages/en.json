@@ -38,6 +38,7 @@
     "description": "Private, customisable challenges for groups to track progress and keep their stories."
   },
   "nav": {
+    "home": "Home",
     "personalSpace": "My space",
     "templates": "Templates",
     "about": "About",
