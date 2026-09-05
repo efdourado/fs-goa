@@ -1,6 +1,7 @@
 import type { PoolClient } from "pg";
 import { mintResetToken, type SessionContext } from "./auth";
 import { inTransaction, withClient } from "./db";
+import { redactAuditPayload } from "./goa/domain/audit";
 import { ApiError, stringValue } from "./http";
 
 /**
@@ -140,19 +141,32 @@ export async function adminTrash() {
       deleted_by: string | null;
       child_count: number;
     }>(
-      `SELECT 'group' AS kind, g.id, g.name AS label, g.deleted_at, du.username AS deleted_by,
+      // Personal-space names and titles are private content — the console shows
+      // a generic label for them; a shared group keeps its name so the admin
+      // can tell what a restore/purge would affect.
+      `SELECT 'group' AS kind, g.id,
+              CASE WHEN g.kind = 'personal' THEN 'Espaço pessoal' ELSE g.name END AS label,
+              g.deleted_at, du.username AS deleted_by,
               (SELECT count(*)::int FROM challenges c WHERE c.group_id = g.id) AS child_count
          FROM groups g LEFT JOIN users du ON du.id = g.deleted_by_user_id
         WHERE g.deleted_at IS NOT NULL
        UNION ALL
-       SELECT 'challenge', c.id, c.title, c.deleted_at, du.username,
+       SELECT 'challenge', c.id,
+              CASE WHEN g.kind = 'personal' THEN 'Desafio pessoal' ELSE c.title END,
+              c.deleted_at, du.username,
               (SELECT count(*)::int FROM entries e WHERE e.challenge_id = c.id) AS child_count
-         FROM challenges c LEFT JOIN users du ON du.id = c.deleted_by_user_id
+         FROM challenges c
+         JOIN groups g ON g.id = c.group_id
+         LEFT JOIN users du ON du.id = c.deleted_by_user_id
         WHERE c.deleted_at IS NOT NULL
        UNION ALL
-       SELECT 'entry', e.id, coalesce(ch.title, '—'), e.deleted_at, NULL,
+       SELECT 'entry', e.id,
+              CASE WHEN g.kind = 'personal' THEN 'Registro pessoal' ELSE coalesce(ch.title, '—') END,
+              e.deleted_at, NULL,
               (SELECT count(*)::int FROM entry_values ev WHERE ev.entry_id = e.id) AS child_count
-         FROM entries e JOIN challenges ch ON ch.id = e.challenge_id
+         FROM entries e
+         JOIN challenges ch ON ch.id = e.challenge_id
+         JOIN groups g ON g.id = ch.group_id
         WHERE e.deleted_at IS NOT NULL
        ORDER BY deleted_at DESC
        LIMIT 200`,
@@ -209,9 +223,10 @@ export async function adminAudit(query: URLSearchParams) {
         actor: event.actor,
         groupId: event.group_id,
         challengeId: event.challenge_id,
-        before: event.before ?? null,
-        after: event.after ?? null,
-        metadata: event.metadata ?? {},
+        // Defence in depth for rows written before redaction moved into writeAudit.
+        before: redactAuditPayload(event.before ?? null),
+        after: redactAuditPayload(event.after ?? null),
+        metadata: redactAuditPayload(event.metadata ?? {}),
       })),
     };
   });
