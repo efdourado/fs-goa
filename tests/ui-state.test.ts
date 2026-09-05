@@ -5,7 +5,7 @@ import test from "node:test";
 import { CheckpointPlanner } from "../app/goa/checkpoint-planner";
 import { ListImportPanel } from "../app/goa/list-import-panel";
 import { RuleSectionsView } from "../app/goa/rules";
-import { DynamicEntryForm, ResultView } from "../app/goa/screens/participant-challenge";
+import { DynamicEntryForm, itemEntryTypes, ResultView } from "../app/goa/screens/participant-challenge";
 import type { ChallengeDetail, ChallengeField, ImportPreview } from "../app/goa/types";
 import { AppHeader, ChallengeStatusBadge, SchedulePeriodFields } from "../app/goa/ui";
 import {
@@ -478,6 +478,27 @@ test("painel de importação: analisa e depois lista chaves desconhecidas e badg
   }));
   assert.match(empty, /Importar uma lista \(JSON\)/);
   assert.match(empty, /Analisar/);
+});
+
+test("expectativa vem antes da avaliação no formulário do item, independente da ordem de criação", () => {
+  const challenge = {
+    submissionMode: "item",
+    fields: [],
+    entryTypes: [
+      { id: "rating", name: "Avaliação", purpose: "rating", targetPolicy: "required", cardinality: "once_per_item", schedulePolicy: "while_active", isPrimary: true, fields: [] },
+      { id: "exp", name: "Expectativa", purpose: "expectation", targetPolicy: "required", cardinality: "once_per_item", schedulePolicy: "while_active", isPrimary: false, fields: [] },
+    ],
+  } as unknown as ChallengeDetail;
+  assert.deepEqual(itemEntryTypes(challenge).map((type) => type.id), ["exp", "rating"], "expectativa primeiro");
+
+  const noExpectation = {
+    submissionMode: "item", fields: [],
+    entryTypes: [
+      { id: "progress", purpose: "progress", targetPolicy: "required", cardinality: "once_per_item_day", schedulePolicy: "while_active", isPrimary: true, fields: [] },
+      { id: "done", purpose: "completion", targetPolicy: "required", cardinality: "once_per_item", schedulePolicy: "while_active", isPrimary: false, fields: [] },
+    ],
+  } as unknown as ChallengeDetail;
+  assert.deepEqual(itemEntryTypes(noExpectation).map((type) => type.id), ["progress", "done"], "sem expectativa, a ordem de criação vale");
 });
 
 test("header lista convites de grupo pendentes no menu de novidades", () => {

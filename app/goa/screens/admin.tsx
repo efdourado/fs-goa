@@ -357,15 +357,23 @@ function AdminFields({
   challenge,
   onSave,
   onSaveVisibility,
+  onSetExpectation,
 }: {
   challenge: ChallengeDetail;
   onSave: (entryTypeId: Id, fields: ChallengeField[]) => Promise<void>;
   onSaveVisibility: (entryTypeId: Id, visibilityPolicy: string) => Promise<void>;
+  onSetExpectation: (enabled: boolean) => Promise<void>;
 }) {
   const t = useTranslations("adminChallenge");
   const tv = useTranslations("visibility");
   const tc = useTranslations("common");
   const f = useGoaFormat();
+  const hasExpectation = challenge.entryTypes.some((type) => type.purpose === "expectation");
+  const canToggleExpectation =
+    challenge.status === "draft"
+    && challenge.submissionMode === "item"
+    && challenge.entryTypes.some((type) => type.purpose === "rating");
+  const [expectationBusy, setExpectationBusy] = useState(false);
   const types = challenge.entryTypes.length
     ? challenge.entryTypes
     : [{ id: "", name: "", fields: challenge.fields } as ChallengeDetail["entryTypes"][number]];
@@ -439,6 +447,33 @@ function AdminFields({
             </select>
           </label>
           <p className="mt-2 text-xs text-[var(--muted)]">{tv(`explain.${visibility}`)}</p>
+        </div>
+      ) : null}
+
+      {canToggleExpectation || hasExpectation ? (
+        <div className="mt-7 border-t border-[var(--line)] pt-5">
+          <h3 className="text-sm font-medium">{t("expectationTitle")}</h3>
+          <p className="mt-1 text-xs leading-5 text-[var(--muted)]">{t("expectationHint")}</p>
+          <label className="mt-3 flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={hasExpectation}
+              disabled={expectationBusy || !canToggleExpectation}
+              onChange={(event) => {
+                const next = event.target.checked;
+                setExpectationBusy(true);
+                setError(null);
+                onSetExpectation(next)
+                  .then(() => setSuccess(next ? t("expectationOn") : t("expectationOff")))
+                  .catch((cause: unknown) => setError(f.error(cause)))
+                  .finally(() => setExpectationBusy(false));
+              }}
+            />
+            {t("expectationCheckbox")}
+          </label>
+          {!canToggleExpectation && hasExpectation ? (
+            <p className="mt-2 text-xs text-[var(--muted)]">{t("expectationLockedNote")}</p>
+          ) : null}
         </div>
       ) : null}
     </section>
@@ -1049,6 +1084,7 @@ export function AdminScreen({
   onSaveParticipants,
   onSaveFields,
   onSaveEntryTypeVisibility,
+  onSetExpectation,
   onAddItems,
   onUpdateItem,
   onArchiveItem,
@@ -1080,6 +1116,7 @@ export function AdminScreen({
   onSaveParticipants: (ids: Id[]) => Promise<void>;
   onSaveFields: (entryTypeId: Id, fields: ChallengeField[]) => Promise<void>;
   onSaveEntryTypeVisibility: (entryTypeId: Id, visibilityPolicy: string) => Promise<void>;
+  onSetExpectation: (enabled: boolean) => Promise<void>;
   onAddItems: (payload: Record<string, unknown>) => Promise<void>;
   onUpdateItem: (itemId: Id, payload: {
     title: string; description: string; recommendedByUserId?: string | null;
@@ -1115,7 +1152,7 @@ export function AdminScreen({
       <nav className="mb-6 flex gap-1 overflow-x-auto rounded-2xl bg-[var(--wash-strong)]/70 p-1" aria-label={t("tabsAria")}>{tabs.map((id) => <button className={cx("min-h-11 flex-none rounded-xl px-4 text-sm font-light", tab === id ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]")} type="button" onClick={() => onTab(id)} key={id}>{t(`tabs.${id}`)}</button>)}</nav>
       {tab === "overview" ? <AdminOverview challenge={challenge} onSave={onSaveBasics} onTransition={onTransition} onDuplicate={onDuplicate} duplicateTargets={duplicateTargets} onDelete={onDelete} /> : null}
       {tab === "participants" ? <AdminParticipants key={`${challenge.id}:${challenge.participants.map((participant) => participant.userId ?? participant.id).join(",")}`} challenge={challenge} group={group} onSave={onSaveParticipants} /> : null}
-      {tab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.visibilityPolicy}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} onSaveVisibility={onSaveEntryTypeVisibility} /> : null}
+      {tab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.visibilityPolicy}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} onSaveVisibility={onSaveEntryTypeVisibility} onSetExpectation={onSetExpectation} /> : null}
       {tab === "items" ? <AdminItems challenge={challenge} group={group} entries={entries} onAdd={onAddItems} onUpdate={onUpdateItem} onArchive={onArchiveItem} onPreviewImport={onPreviewImport} /> : null}
       {tab === "checkpoints" ? <CheckpointPlanner key={`${challenge.id}:${challenge.checkpoints.map((cp) => cp.id).join(",")}`} challenge={challenge} onSaveCheckpoints={onSaveCheckpoints} onAssign={onAssignCheckpointItems} /> : null}
       {tab === "review" ? <AdminReview challenge={challenge} entries={entries} onPatch={onPatchEntry} onDelete={onDeleteEntry} onExport={onExport} /> : null}

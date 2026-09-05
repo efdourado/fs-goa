@@ -195,6 +195,15 @@ export async function computePreflight(
     warn("many_items_for_period", `São ${items} itens para ${checkpoints} checkpoint(s) — pode ser apertado.`);
   }
 
+  // An expectation everyone can see in real time colours the others' guesses —
+  // the sane default is "after_own".
+  const openExpectation = types.find(
+    (type) => type.purpose === "expectation" && type.visibility_policy === "group_realtime",
+  );
+  if (openExpectation) {
+    warn("expectation_visible_early", "A expectativa está visível para o grupo antes da avaliação — considere 'depois da própria resposta'.");
+  }
+
   return { ready: errors.length === 0, errors, warnings };
 }
 

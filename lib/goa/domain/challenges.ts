@@ -8,6 +8,7 @@ import {
   upsertCatalogItem,
 } from "../catalog";
 import { syncDailyCheckpoints } from "../daily-checkpoints";
+import { seedExpectationType } from "../challenges/entry-types";
 import { resolveRecipe } from "../challenges/recipes";
 import { writeAudit } from "./audit";
 import { insertField, type ClientField } from "./fields";
@@ -117,6 +118,17 @@ export async function createChallenge(
     }
     const entryTypeId = primaryTypeId;
     const insertedFields = primaryFields;
+
+    // The optional Cinema/Estante "Expectativa" type (V1 §3.1) — a pre-watch
+    // rating that locks once the real one is in. Enabled here or later in the
+    // admin Fields tab; only meaningful over a rating recipe with round items.
+    const wantsExpectation =
+      body.expectation === true
+      && wantsItems
+      && recipe.entryTypes.some((type) => type.purpose === "rating");
+    if (wantsExpectation) {
+      await seedExpectationType(client, id);
+    }
 
     if (wantsItems) {
       if (!items.length || items.length > 200) throw new ApiError(400, "item_limit", "Adicione de 1 a 200 itens.");

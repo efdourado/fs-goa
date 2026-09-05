@@ -3388,3 +3388,112 @@ test("checkpoints genéricos: semanas com pausa, atribuição de itens, total de
   assert.equal(blocked.response.status, 409, JSON.stringify(blocked.body));
   assert.equal((blocked.body as { error: string }).error, "checkpoint_has_entries");
 });
+
+test("expectativa opcional: liga/desliga no rascunho, trava ao avaliar, e a visibilidade after_own esconde a alheia", async () => {
+  const owner = await register("Dona Expect", "dona_expect_v1");
+  const b = await register("Bea Expect", "bea_expect_v1");
+  const c = await register("Cau Expect", "cau_expect_v1");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube Expectativa" } })).body as { id: string }).id;
+  for (const member of [b, c]) {
+    const invite = (await call("POST", `/api/groups/${groupId}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
+    await call("POST", `/api/invites/${invite.token}`, { session: member, body: {} });
+  }
+
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "cinema", title: "Ciclo com expectativa", participantIds: [owner.user.id, b.user.id, c.user.id],
+      expectation: true,
+      items: [{ title: "Filme X" }, { title: "Filme Y" }],
+    },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+
+  type ExpType = DetailType & { visibilityPolicy: string };
+  const readTypes = async (session: ClientSession) =>
+    ((await call("GET", `/api/challenges/${challengeId}`, { session })).body as { entryTypes: ExpType[] }).entryTypes;
+
+  let types = await readTypes(owner);
+  const expectation = types.find((type) => type.purpose === "expectation");
+  assert.ok(expectation, "a receita já nasceu com o tipo de expectativa (expectation: true)");
+  assert.equal(expectation!.visibilityPolicy, "after_own", "expectativa começa 'depois da própria resposta' (V1 §8)");
+
+  // Liga/desliga enquanto é rascunho.
+  assert.equal((await call("PATCH", `/api/challenges/${challengeId}/expectation`, { session: owner, body: { enabled: false } })).response.status, 200);
+  assert.equal((await readTypes(owner)).some((type) => type.purpose === "expectation"), false, "desligou");
+  assert.equal((await call("PATCH", `/api/challenges/${challengeId}/expectation`, { session: owner, body: { enabled: true } })).response.status, 200);
+  types = await readTypes(owner);
+  const expId = types.find((type) => type.purpose === "expectation")!.id;
+  const ratingType = types.find((type) => type.purpose === "rating")!;
+
+  const detail = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    entryTypes: Array<{ id: string; purpose: string; fields: Array<{ id: string; key: string }> }>;
+    items: DetailItem[];
+  };
+  const expField = detail.entryTypes.find((type) => type.purpose === "expectation")!.fields[0].key;
+  const notaField = detail.entryTypes.find((type) => type.purpose === "rating")!.fields.find((field) => field.key === "nota")!.id;
+  const filmX = detail.items.find((item) => item.title === "Filme X")!.id;
+  const filmY = detail.items.find((item) => item.title === "Filme Y")!.id;
+
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });
+
+  // Expectativa antes da avaliação — B.
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/entries`, {
+    session: b, body: { itemId: filmX, entryTypeId: expId, values: { [expField]: 4 } },
+  })).response.status, 201);
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/entries`, {
+    session: b, body: { itemId: filmX, entryTypeId: ratingType.id, values: { [notaField]: 3 } },
+  })).response.status, 201);
+
+  // Bloqueio posterior — a expectativa não muda depois da avaliação.
+  const reExpect = await call("POST", `/api/challenges/${challengeId}/entries`, {
+    session: b, body: { itemId: filmX, entryTypeId: expId, values: { [expField]: 1 } },
+  });
+  assert.equal(reExpect.response.status, 409);
+  assert.equal((reExpect.body as { error: string }).error, "expectation_locked");
+  const expEntryId = await adminPool.query<{ id: string }>(
+    "SELECT id FROM entries WHERE entry_type_id=$1 AND participant_user_id=$2 AND deleted_at IS NULL",
+    [expId, b.user.id],
+  );
+  assert.equal((await call("PATCH", `/api/entries/${expEntryId.rows[0].id}`, { session: b, body: { values: { [expField]: 2 } } })).response.status, 409);
+
+  // Visibilidade after_own: C não vê a expectativa de B enquanto não registra a sua.
+  const entriesFor = async (session: ClientSession) =>
+    ((await call("GET", `/api/challenges/${challengeId}/entries`, { session })).body as { entries: Array<{ entryTypeId: string; userId: string }> }).entries;
+  let cEntries = await entriesFor(c);
+  assert.equal(cEntries.some((entry) => entry.entryTypeId === expId && entry.userId === b.user.id), false, "C não vê a expectativa de B");
+  assert.equal(cEntries.some((entry) => entry.entryTypeId === ratingType.id && entry.userId === b.user.id), true, "mas vê a avaliação de B (tempo real)");
+  await call("POST", `/api/challenges/${challengeId}/entries`, { session: c, body: { itemId: filmX, entryTypeId: expId, values: { [expField]: 5 } } });
+  cEntries = await entriesFor(c);
+  assert.equal(cEntries.some((entry) => entry.entryTypeId === expId && entry.userId === b.user.id), true, "depois de registrar a sua, C passa a ver a de B");
+
+  // Conclusão inferida pelos registros: só a avaliação conta, não a expectativa.
+  const myChallenge = async (session: ClientSession) =>
+    ((await call("GET", "/api/bootstrap", { session })).body as { challenges: Array<{ id: string; completedCount: number; totalCount: number | null }> })
+      .challenges.find((entry) => entry.id === challengeId)!;
+  let mine = await myChallenge(b);
+  assert.equal(mine.completedCount, 1, "B avaliou 1 filme (a expectativa não conta como conclusão)");
+  assert.equal(mine.totalCount, 2);
+  await call("POST", `/api/challenges/${challengeId}/entries`, { session: b, body: { itemId: filmY, entryTypeId: ratingType.id, values: { [notaField]: 4 } } });
+  mine = await myChallenge(b);
+  assert.equal(mine.completedCount, 2, "avaliou os dois");
+});
+
+test("preflight avisa quando a expectativa fica visível para o grupo antes da avaliação", async () => {
+  const owner = await register("Dona Aviso", "dona_aviso_expect");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Aviso Expect" } })).body as { id: string }).id;
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: { recipe: "cinema", title: "Com aviso", participantIds: [owner.user.id], expectation: true, items: [{ title: "Filme" }] },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  const types = ((await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { entryTypes: Array<{ id: string; purpose: string }> }).entryTypes;
+  const expId = types.find((type) => type.purpose === "expectation")!.id;
+
+  const before = (await call("GET", `/api/challenges/${challengeId}/preflight`, { session: owner })).body as { warnings: Array<{ code: string }> };
+  assert.equal(before.warnings.some((warning) => warning.code === "expectation_visible_early"), false);
+
+  await call("PATCH", `/api/challenges/${challengeId}/entry-types/${expId}`, { session: owner, body: { visibilityPolicy: "group_realtime" } });
+  const after = (await call("GET", `/api/challenges/${challengeId}/preflight`, { session: owner })).body as { warnings: Array<{ code: string }> };
+  assert.equal(after.warnings.some((warning) => warning.code === "expectation_visible_early"), true);
+});

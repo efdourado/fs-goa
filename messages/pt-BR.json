@@ -500,7 +500,9 @@
     "backStep": "← Voltar",
     "next": "Continuar →",
     "creatingDraft": "Criando rascunho…",
-    "createDraft": "Criar rascunho"
+    "createDraft": "Criar rascunho",
+    "expectationLabel": "Coletar uma nota de expectativa",
+    "expectationHint": "Os participantes dão uma nota de quanto esperam gostar de cada título antes de assistir. Ela trava quando enviam a avaliação real. Dá para ligar isso depois também."
   },
   "adminChallenge": {
     "back": "← Voltar",
@@ -729,7 +731,13 @@
     "previewTitle": "Como o grupo verá",
     "previewSubtitle": "Prévia da vitrine com a curadoria atual.",
     "previewEmptyTitle": "Prévia disponível após salvar",
-    "previewEmptyBody": "Você pode preparar a curadoria durante o desafio e publicar o resultado ao encerrá-lo."
+    "previewEmptyBody": "Você pode preparar a curadoria durante o desafio e publicar o resultado ao encerrá-lo.",
+    "expectationTitle": "Nota de expectativa",
+    "expectationHint": "Uma nota opcional de 0 a 5 registrada antes de assistir. Trava assim que o participante envia a avaliação real daquele título. Só no rascunho.",
+    "expectationCheckbox": "Coletar uma expectativa antes da avaliação",
+    "expectationOn": "Nota de expectativa ativada.",
+    "expectationOff": "Nota de expectativa removida.",
+    "expectationLockedNote": "O desafio já está ativo — o tipo de expectativa fica como está."
   },
   "visibility": {
     "title": "Quem vê estas respostas",
@@ -780,7 +788,8 @@
       "many_required_fields": "O formulário tem muitos campos obrigatórios — considere tornar alguns opcionais.",
       "many_items_for_period": "São muitos itens para o número de checkpoints — pode ficar apertado.",
       "ranking_min_sample_unreachable": "Um ranking exige mais avaliações por item do que o desafio tem participantes.",
-      "metric_on_optional_field": "Uma métrica depende de um campo opcional, que pode ficar sem dados."
+      "metric_on_optional_field": "Uma métrica depende de um campo opcional, que pode ficar sem dados.",
+      "expectation_visible_early": "A expectativa está visível para o grupo antes da avaliação — considere \"depois da própria resposta\"."
     }
   },
   "participant": {

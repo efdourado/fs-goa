@@ -67,6 +67,7 @@ import {
   publicResults,
   publishResults,
   saveCheckpoints,
+  setExpectationEnabled,
   saveEntry,
   saveChallengeFields,
   updateMetric,
@@ -343,6 +344,9 @@ export async function PATCH(request: Request): Promise<Response> {
     }
     if (path[0] === "challenges" && path[2] === "entry-types" && path.length === 4) {
       return json(await updateEntryTypeVisibility(session, path[1], path[3], body));
+    }
+    if (path[0] === "challenges" && path[2] === "expectation" && path.length === 3) {
+      return json(await setExpectationEnabled(session, path[1], body));
     }
     if (path[0] === "challenges" && path[2] === "metrics" && path.length === 4) {
       return json(await updateMetric(session, path[1], path[3], body));

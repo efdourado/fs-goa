@@ -60,6 +60,8 @@ export const API_PATHS = {
   fields: (challengeId: Id) => `/api/challenges/${encodeURIComponent(challengeId)}/fields`,
   entryType: (challengeId: Id, entryTypeId: Id) =>
     `/api/challenges/${encodeURIComponent(challengeId)}/entry-types/${encodeURIComponent(entryTypeId)}`,
+  expectation: (challengeId: Id) =>
+    `/api/challenges/${encodeURIComponent(challengeId)}/expectation`,
   items: (challengeId: Id) => `/api/challenges/${encodeURIComponent(challengeId)}/items`,
   item: (challengeId: Id, itemId: Id) =>
     `/api/challenges/${encodeURIComponent(challengeId)}/items/${encodeURIComponent(itemId)}`,
