@@ -34,7 +34,7 @@ export function presetFields(recipe: CreatableRecipeKey, label: PresetLabels): C
   }
   return [
     { key: "nota", label: label("nota"), type: "rating", required: true, config: { min: 0, max: 5, step: 0.5 } },
-    { key: "comentario", label: label("comentario"), type: "text", required: false, config: { multiline: true, maxLength: 280 } },
+    { key: "comentario", label: label("comentario"), type: "text", required: false, config: { multiline: true, maxLength: 500 } },
   ];
 }
 

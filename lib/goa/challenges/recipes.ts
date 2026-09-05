@@ -125,7 +125,8 @@ const avaliacao = (primary: boolean): RecipeEntryType => ({
   targetPolicy: "required",
   cardinality: "once_per_item",
   schedulePolicy: "while_active",
-  fields: ratingFields(280),
+  // Nota 0–5 passo 0,5; comentário opcional até 500 (V1 §3.1).
+  fields: ratingFields(500),
   primary,
 });
 
