@@ -3090,3 +3090,67 @@ test("um filme carrega a duração em minutos, editável depois, e o item do ace
   const afterEdit = (await call("GET", `/api/groups/${groupId}/catalog/${catalogItemId}`, { session: owner })).body as { runtimeMinutes: number | null };
   assert.equal(afterEdit.runtimeMinutes, 132, "a duração é editável depois da criação");
 });
+
+test("preflight: bloqueia ativação com erros, lista avisos, e é o mesmo portão do transition", async () => {
+  const owner = await register("Dona Preflight", "dona_preflight");
+  const member = await register("Participa Preflight", "participa_preflight");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube Preflight" } })).body as { id: string }).id;
+  const invite = (await call("POST", `/api/groups/${groupId}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
+  await call("POST", `/api/invites/${invite.token}`, { session: member, body: {} });
+
+  const created = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: { recipe: "cinema", title: "Ainda cru", participantIds: [owner.user.id], items: [{ title: "Só um filme" }] },
+  });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const challengeId = (created.body as { id: string }).id;
+
+  // Esvazia participantes e arquiva o único item — chega num estado inativável.
+  await call("POST", `/api/challenges/${challengeId}/participants`, { session: owner, body: { replace: true, participantIds: [] } });
+  const soleItem = ((await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { items: Array<{ id: string }> }).items[0].id;
+  await call("DELETE", `/api/challenges/${challengeId}/items/${soleItem}`, { session: owner });
+
+  const badResp = await call("GET", `/api/challenges/${challengeId}/preflight`, { session: owner });
+  assert.equal(badResp.response.status, 200, JSON.stringify(badResp.body));
+  const bad = badResp.body as { ready: boolean; errors: Array<{ code: string }>; warnings: Array<{ code: string }> };
+  assert.equal(bad.ready, false);
+  const badCodes = bad.errors.map((issue) => issue.code);
+  assert.ok(badCodes.includes("no_participants"), JSON.stringify(badCodes));
+  assert.ok(badCodes.includes("no_items"), JSON.stringify(badCodes));
+
+  // O transition usa o mesmo portão.
+  const blocked = await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });
+  assert.equal(blocked.response.status, 409, JSON.stringify(blocked.body));
+  assert.equal((blocked.body as { error: string }).error, "challenge_incomplete");
+  assert.ok(((blocked.body as { details?: { issues?: string[] } }).details?.issues ?? []).includes("no_participants"));
+
+  // Participante comum não vê a revisão de um rascunho.
+  assert.equal((await call("GET", `/api/challenges/${challengeId}/preflight`, { session: member })).response.status, 404);
+
+  // Preenche participantes e itens.
+  assert.ok((await call("POST", `/api/challenges/${challengeId}/participants`, {
+    session: owner, body: { replace: true, participantIds: [owner.user.id, member.user.id] },
+  })).response.ok);
+  assert.ok((await call("POST", `/api/challenges/${challengeId}/items`, {
+    session: owner, body: { items: [{ title: "Filme A" }, { title: "Filme B" }] },
+  })).response.ok);
+
+  // Métrica com amostra mínima inalcançável vira aviso, não erro.
+  const detail = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    fields: Array<{ id: string; type: string }>;
+  };
+  const notaField = detail.fields.find((field) => field.type === "rating")!.id;
+  await call("POST", `/api/challenges/${challengeId}/metrics`, {
+    session: owner,
+    body: { label: "Ranking exigente", operation: "bayesian_average", fieldId: notaField, groupBy: "item", minSample: 9 },
+  });
+
+  const good = (await call("GET", `/api/challenges/${challengeId}/preflight`, { session: owner })).body as {
+    ready: boolean; errors: Array<{ code: string }>; warnings: Array<{ code: string }>;
+  };
+  assert.equal(good.ready, true, JSON.stringify(good.errors));
+  assert.ok(good.warnings.some((issue) => issue.code === "ranking_min_sample_unreachable"), JSON.stringify(good.warnings));
+
+  // Agora ativa.
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } })).response.status, 200);
+});

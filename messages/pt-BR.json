@@ -730,6 +730,35 @@
     "previewEmptyTitle": "Prévia disponível após salvar",
     "previewEmptyBody": "Você pode preparar a curadoria durante o desafio e publicar o resultado ao encerrá-lo."
   },
+  "preflight": {
+    "title": "Revisão de prontidão",
+    "checking": "Verificando…",
+    "recheck": "Verificar de novo",
+    "loadError": "Não foi possível fazer a revisão.",
+    "fixFirst": "{count, plural, one {# ponto para corrigir antes de ativar} other {# pontos para corrigir antes de ativar}}",
+    "worthReviewing": "{count, plural, one {# ponto que vale revisar} other {# pontos que valem revisar}}",
+    "allReady": "Tudo pronto — pode ativar.",
+    "readyWithWarnings": "Nada impede a ativação, mas os avisos acima merecem uma olhada.",
+    "codes": {
+      "no_participants": "O desafio não tem participantes.",
+      "no_entry_type": "O desafio não tem nenhum tipo de registro.",
+      "no_items": "A receita registra por item, mas nenhum item foi adicionado.",
+      "no_checkpoints": "O período precisa de checkpoints e nenhum foi gerado.",
+      "no_way_to_register": "Não há forma válida de registrar participação — falta item ou checkpoint.",
+      "primary_type_no_fields": "O tipo de registro principal não tem nenhum campo.",
+      "choice_without_options": "Um campo de escolha está sem opções.",
+      "metric_field_archived": "Uma métrica aponta para um campo que não existe mais.",
+      "metric_needs_field": "Uma métrica numérica não tem campo para calcular.",
+      "metric_field_not_numeric": "Uma métrica usa operação numérica sobre um campo que não é numérico.",
+      "checkpoint_outside_period": "Há um checkpoint fora do período do desafio.",
+      "no_metrics": "Nenhuma métrica configurada — a retrospectiva ficará vazia.",
+      "no_comment_source": "Nenhum campo de texto — não haverá comentários para a retrospectiva.",
+      "many_required_fields": "O formulário tem muitos campos obrigatórios — considere tornar alguns opcionais.",
+      "many_items_for_period": "São muitos itens para o número de checkpoints — pode ficar apertado.",
+      "ranking_min_sample_unreachable": "Um ranking exige mais avaliações por item do que o desafio tem participantes.",
+      "metric_on_optional_field": "Uma métrica depende de um campo opcional, que pode ficar sem dados."
+    }
+  },
   "participant": {
     "tabs": {
       "today": "Hoje",

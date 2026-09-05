@@ -730,6 +730,35 @@
     "previewEmptyTitle": "Preview available after saving",
     "previewEmptyBody": "You can prepare the curation during the challenge and publish the result when you close it."
   },
+  "preflight": {
+    "title": "Readiness review",
+    "checking": "Checking…",
+    "recheck": "Check again",
+    "loadError": "Couldn't run the review.",
+    "fixFirst": "{count, plural, one {# thing to fix before activating} other {# things to fix before activating}}",
+    "worthReviewing": "{count, plural, one {# thing worth reviewing} other {# things worth reviewing}}",
+    "allReady": "Everything's ready — you can activate.",
+    "readyWithWarnings": "Nothing blocks activation, but the notes above are worth a look.",
+    "codes": {
+      "no_participants": "The challenge has no participants.",
+      "no_entry_type": "The challenge has no record type.",
+      "no_items": "This recipe records per item, but no items have been added.",
+      "no_checkpoints": "The period needs checkpoints and none were generated.",
+      "no_way_to_register": "There's no valid way to record participation — an item or checkpoint is missing.",
+      "primary_type_no_fields": "The main record type has no fields.",
+      "choice_without_options": "A choice field has no options.",
+      "metric_field_archived": "A metric points at a field that no longer exists.",
+      "metric_needs_field": "A numeric metric has no field to compute over.",
+      "metric_field_not_numeric": "A metric runs a numeric operation over a field that isn't a number.",
+      "checkpoint_outside_period": "A checkpoint falls outside the challenge period.",
+      "no_metrics": "No metrics configured — the retrospective will be empty.",
+      "no_comment_source": "No text field — there'll be no comments to feature in the retrospective.",
+      "many_required_fields": "The form has a lot of required fields — consider making some optional.",
+      "many_items_for_period": "That's a lot of items for the number of checkpoints — it may be tight.",
+      "ranking_min_sample_unreachable": "A ranking needs more ratings per item than the challenge has participants.",
+      "metric_on_optional_field": "A metric depends on an optional field, which may end up with no data."
+    }
+  },
   "participant": {
     "tabs": {
       "today": "Today",
