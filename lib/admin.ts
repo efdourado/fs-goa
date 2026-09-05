@@ -190,6 +190,38 @@ export async function adminAudit(query: URLSearchParams) {
   });
 }
 
+/**
+ * Operational breadcrumbs for irreversible actions (permanent deletes, account
+ * removal). Already content-free by construction — the id is only a hash — so
+ * support can correlate a report without ever seeing private data (ROADMAP §14).
+ */
+export async function adminSystemAudit(query: URLSearchParams) {
+  const limitRaw = Number(query.get("limit") ?? 100);
+  const limit = Number.isSafeInteger(limitRaw) ? Math.min(Math.max(limitRaw, 1), 500) : 100;
+  return withClient(async (client) => {
+    const result = await client.query<{
+      id: string; action: string; entity_kind: string; entity_id_hash: string;
+      counts: unknown; created_at: Date; actor: string | null;
+    }>(
+      `SELECT s.id, s.action, s.entity_kind, s.entity_id_hash, s.counts, s.created_at, u.username AS actor
+         FROM system_audit_events s LEFT JOIN users u ON u.id = s.actor_user_id
+        ORDER BY s.created_at DESC LIMIT $1`,
+      [limit],
+    );
+    return {
+      events: result.rows.map((event) => ({
+        id: event.id,
+        action: event.action,
+        entityKind: event.entity_kind,
+        entityIdHash: event.entity_id_hash,
+        counts: event.counts ?? {},
+        actor: event.actor,
+        createdAt: event.created_at.toISOString(),
+      })),
+    };
+  });
+}
+
 export async function setUserDisabled(session: SessionContext, body: Record<string, unknown>) {
   const userId = stringValue(body, "userId", { min: 1, max: 100 })!;
   const disabled = body.disabled === true;

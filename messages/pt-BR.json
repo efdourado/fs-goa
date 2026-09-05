@@ -1333,7 +1333,7 @@
   },
   "accountDeactivated": {
     "title": "Sua conta está desativada",
-    "body": "Ninguém vê seu conteúdo enquanto ela estiver desativada. Reative quando quiser.",
+    "body": "Enquanto estiver desativada, sua conta fica fora do ar e você não aparece em novas ações. Reative quando quiser.",
     "reactivate": "Reativar conta",
     "reactivating": "Reativando…",
     "logout": "Sair"

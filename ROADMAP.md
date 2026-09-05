@@ -1,5 +1,9 @@
 # Roadmap GOA — Versão 1
 
+> **Estado:** tópicos 1–17 implementados em `main`. O gate final (§15–17) e a
+> execução dos 23 passos do §16 estão documentados em `docs/v1-acceptance.md`.
+> Pendências operacionais: migrações `0027`–`0033` no Neon; beta fechado real.
+
 ## 1. Definição do produto
 
 O GOA é um construtor guiado de hábitos, listas e desafios individuais ou em grupo.

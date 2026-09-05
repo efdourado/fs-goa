@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { API_PATHS, apiRequest } from "./api";
 import type { Id, TrashActionPreview, TrashItem } from "./types";
@@ -38,8 +38,16 @@ function PurgeDialog({
   const t = useTranslations("trash");
   const [confirmation, setConfirmation] = useState("");
   const [reason, setReason] = useState("");
+  const closeRef = useRef<HTMLButtonElement>(null);
   const entries = preview.dependencies.find((dep) => dep.type === "entries")?.count ?? 0;
   const needsReason = preview.kind === "entry";
+
+  useEffect(() => {
+    closeRef.current?.focus();
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape" && !busy) onCancel(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [busy, onCancel]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-label={t("purgeTitle")}>
@@ -89,7 +97,10 @@ function PurgeDialog({
 
         <div className="mt-4"><StatusMessage error={error} /></div>
         <div className="mt-4 flex justify-end gap-2">
-          <Button variant="ghost" onClick={onCancel} disabled={busy}>{t("cancel")}</Button>
+          <button ref={closeRef} type="button" onClick={onCancel} disabled={busy}
+            className="cursor-pointer inline-flex min-h-10 items-center rounded-xl px-4 py-2 text-sm font-light text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--ink)] disabled:opacity-55">
+            {t("cancel")}
+          </button>
           {!preview.blocked && (
             <Button variant="danger" onClick={() => onConfirm(confirmation.trim(), reason.trim())} disabled={busy}>
               {busy ? t("purging") : t("purgeConfirm")}
