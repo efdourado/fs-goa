@@ -47,10 +47,10 @@ export const challenges = pgTable(
     activatedAt: timestamptz("activated_at"),
     closedAt: timestamptz("closed_at"),
     resultsPublishedAt: timestamptz("results_published_at"),
+    // Only the hash of the public showcase link is stored. The full token is a
+    // bearer credential — it is returned once, at publish time, and never
+    // persisted. Lost the link? Rotate to mint a fresh one.
     resultShareTokenHash: text("result_share_token_hash"),
-    // The raw share token, kept alongside its hash so the admin console can always
-    // show and copy the public URL. The hash stays the lookup key on /results.
-    resultShareToken: text("result_share_token"),
     // The frozen document served at /results/<token>: title, dates, the
     // (already anonymized) participant list and result blocks as of the last
     // publish. Editing the draft afterwards never touches this until republish.
@@ -125,16 +125,6 @@ export const challenges = pgTable(
     check(
       "challenges_share_token_check",
       sql`${table.resultShareTokenHash} is null or (${table.resultsPublishedAt} is not null and ${table.resultShareTokenHash} ~ '^[A-Za-z0-9_-]{43}$')`,
-    ),
-    check(
-      "challenges_result_share_token_check",
-      sql`${table.resultShareToken} is null or ${table.resultShareToken} ~ '^[A-Za-z0-9_-]{43}$'`,
-    ),
-    check(
-      // One-directional: a raw token always has its lookup hash. Legacy rows may
-      // still carry a hash-only publication from before the raw column existed.
-      "challenges_result_share_pairing_check",
-      sql`${table.resultShareToken} is null or ${table.resultShareTokenHash} is not null`,
     ),
   ],
 );

@@ -287,7 +287,11 @@ export async function POST(request: Request): Promise<Response> {
       const result = await publishResults(session, path[1], body);
       return json({
         ...result,
-        url: `${new URL(request.url).origin}/results/${encodeURIComponent(result.shareToken)}`,
+        // Only a fresh mint (first publish / rotate) hands back a token; a plain
+        // re-publish keeps the existing link, which is never re-derivable.
+        url: result.shareToken
+          ? `${new URL(request.url).origin}/results/${encodeURIComponent(result.shareToken)}`
+          : null,
       });
     }
     if (path[0] === "challenges" && path[2] === "results" && path.length === 3) {

@@ -421,9 +421,9 @@ export async function resultForChallenge(
   challengeId: string,
   calculatedMetrics?: Array<Record<string, unknown>>,
 ) {
-  const challenge = await oneOrNull<{ results_published_at: Date | null; result_share_token: string | null }>(
+  const challenge = await oneOrNull<{ results_published_at: Date | null; result_share_token_hash: string | null }>(
     client,
-    "SELECT results_published_at, result_share_token FROM challenges WHERE id = $1",
+    "SELECT results_published_at, result_share_token_hash FROM challenges WHERE id = $1",
     [challengeId],
   );
   const blocks = await client.query<{
@@ -458,7 +458,8 @@ export async function resultForChallenge(
       .filter((block) => block.kind === "entry_value")
       .map((block) => ({ id: block.id, text: block.body_snapshot ?? "", itemTitle: block.heading })),
     publishedAt: challenge?.results_published_at?.toISOString() ?? null,
-    shareToken: challenge?.result_share_token ?? null,
+    // The raw link is never persisted; the admin sees it once, at publish time.
+    hasPublishedLink: challenge?.result_share_token_hash != null,
   };
 }
 
@@ -818,17 +819,24 @@ export async function publishResults(
     }
     const anonymized = access.challenge.results_anon === true;
     const snapshot = await buildPublishedSnapshot(client, access.challenge, anonymized);
-    const existing = await oneOrNull<{ token: string | null }>(
-      client, "SELECT result_share_token AS token FROM challenges WHERE id=$1", [challengeId]);
-    const rotate = body.rotateLink === true || !existing?.token;
-    const shareToken = rotate ? generateOpaqueToken() : existing?.token ?? generateOpaqueToken();
-    const shareHash = await hashToken(shareToken);
+    const existing = await oneOrNull<{ hash: string | null }>(
+      client, "SELECT result_share_token_hash AS hash FROM challenges WHERE id=$1", [challengeId]);
+    // First publish or an explicit rotate mints a fresh token (the old link dies).
+    // A plain re-publish keeps the current link working — its hash is left as is,
+    // and the raw token is not re-derivable, so nothing new is handed back.
+    const rotate = body.rotateLink === true || !existing?.hash;
+    let shareToken: string | null = null;
+    let shareHash = existing?.hash ?? "";
+    if (rotate) {
+      shareToken = generateOpaqueToken();
+      shareHash = await hashToken(shareToken);
+    }
     await client.query(
       `UPDATE challenges
           SET results_published_snapshot=$2::jsonb, results_published_at=now(),
-              result_share_token=$3, result_share_token_hash=$4, updated_at=now()
+              result_share_token_hash=$3, updated_at=now()
         WHERE id=$1`,
-      [challengeId, JSON.stringify(snapshot), shareToken, shareHash],
+      [challengeId, JSON.stringify(snapshot), shareHash],
     );
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
       "results.published", "challenge", challengeId, null, null, { rotated: rotate, anonymized });
@@ -840,8 +848,8 @@ export async function publishResults(
 export async function unpublishResults(client: PoolClient, challengeId: string): Promise<void> {
   await client.query(
     `UPDATE challenges
-        SET results_published_at=NULL, result_share_token=NULL,
-            result_share_token_hash=NULL, results_published_snapshot=NULL, updated_at=now()
+        SET results_published_at=NULL, result_share_token_hash=NULL,
+            results_published_snapshot=NULL, updated_at=now()
       WHERE id=$1`,
     [challengeId],
   );

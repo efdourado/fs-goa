@@ -414,9 +414,10 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
   assert.equal(showcase.response.status, 200, JSON.stringify(showcase.body));
   assert.match(JSON.stringify(showcase.body), /Duas histórias na tela/);
 
-  // O link é recuperável: o detalhe do desafio traz o mesmo token.
+  // O token não é guardado: o detalhe do desafio só diz que existe um link.
   const detailWithToken = await call("GET", `/api/challenges/${challengeId}`, { session: owner });
-  assert.equal((detailWithToken.body as { result: { shareToken: string } }).result.shareToken, shareToken);
+  assert.equal((detailWithToken.body as { result: { hasPublishedLink: boolean; shareToken?: unknown } }).result.hasPublishedLink, true);
+  assert.equal((detailWithToken.body as { result: { shareToken?: unknown } }).result.shareToken, undefined, "o token nunca volta na resposta");
 
   // Snapshot congelado: salvar rascunho de novo não muda a vitrine pública.
   await call("POST", `/api/challenges/${challengeId}/results`, {
@@ -427,7 +428,13 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
   assert.match(JSON.stringify(stillFrozen.body), /Duas histórias na tela/, "o link publicado não segue o rascunho");
   assert.doesNotMatch(JSON.stringify(stillFrozen.body), /Manchete só no rascunho/);
 
-  // "Gerar novo link" invalida o token antigo.
+  // Re-publicar sem rotacionar mantém o mesmo link e não devolve token novo.
+  const republishSame = await call("POST", `/api/challenges/${challengeId}/results/publish`, { session: owner, body: {} });
+  assert.equal((republishSame.body as { shareToken: string | null }).shareToken, null, "re-publicar não entrega um token novo");
+  assert.equal((republishSame.body as { url: string | null }).url, null);
+  assert.equal((await call("GET", `/api/results/${shareToken}`)).response.status, 200, "o link antigo continua valendo");
+
+  // "Gerar novo link" invalida o token anterior.
   const rotated = await call("POST", `/api/challenges/${challengeId}/results/publish`, {
     session: owner, body: { rotateLink: true },
   });
@@ -436,14 +443,13 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
   assert.equal((await call("GET", `/api/results/${shareToken}`)).response.status, 404, "o link antigo para de funcionar");
   assert.equal((await call("GET", `/api/results/${rotatedToken}`)).response.status, 200);
 
-  // Anonimização: marca a opção, republica, e os nomes somem — inclusive das séries por pessoa.
+  // Anonimização: marca a opção, republica no mesmo link, e os nomes somem.
   await call("POST", `/api/challenges/${challengeId}/results`, {
     session: owner,
     body: { headline: "Duas histórias na tela", summary: "s", metricIds: finalMetrics.map((m) => m.id), comments: [], anonymizeParticipants: true },
   });
-  const anonToken = ((await call("POST", `/api/challenges/${challengeId}/results/publish`, {
-    session: owner, body: {},
-  })).body as { shareToken: string }).shareToken;
+  await call("POST", `/api/challenges/${challengeId}/results/publish`, { session: owner, body: {} });
+  const anonToken = rotatedToken;
   const anon = await call("GET", `/api/results/${anonToken}`);
   const anonBody = anon.body as { challenge: { participants: string[]; result: { metrics: Array<{ groupBy?: string; series?: Array<{ label: string; key: string }> }> } } };
   assert.ok(anonBody.challenge.participants.every((name) => /^Participante \d+$/.test(name)), JSON.stringify(anonBody.challenge.participants));
@@ -464,7 +470,8 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
   await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "closed" } });
   const republished = await call("POST", `/api/challenges/${challengeId}/results/publish`, { session: owner, body: {} });
   assert.equal(republished.response.status, 200, JSON.stringify(republished.body));
-  assert.notEqual((republished.body as { shareToken: string }).shareToken, anonToken, "re-publicar gera um link novo");
+  assert.ok((republished.body as { shareToken: string | null }).shareToken, "reabrir zerou o link, então publicar de novo cunha um token novo");
+  assert.notEqual((republished.body as { shareToken: string }).shareToken, anonToken, "e não é o link revogado");
 
   const crossGroupDuplicate = await call("POST", `/api/challenges/${challengeId}/duplicate`, {
     session: owner, body: { title: "Cópia fora do grupo", targetGroupId: outsiderGroupId },

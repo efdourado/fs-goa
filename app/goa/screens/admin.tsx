@@ -793,11 +793,10 @@ function AdminResults({
 
   const isClosed = challenge.status === "closed";
   const isPublished = Boolean(challenge.result?.publishedAt);
-  const publicUrl =
-    publishedUrl
-    ?? (challenge.result?.shareToken && typeof window !== "undefined"
-      ? `${window.location.origin}/results/${challenge.result.shareToken}`
-      : null);
+  // The raw link only exists in memory right after this session published it —
+  // it is not stored, so navigating away loses it (rotate to mint a fresh one).
+  const publicUrl = publishedUrl;
+  const linkOnlyOnce = isPublished && !publicUrl && Boolean(challenge.result?.hasPublishedLink);
 
   async function save() {
     setBusy(true); setError(null); setSuccess(null);
@@ -829,7 +828,7 @@ function AdminResults({
     setBusy(true); setError(null); setSuccess(null);
     try {
       const result = await onPublish(rotateLink ? { rotateLink: true } : {});
-      if (result?.url) setPublishedUrl(result.url);
+      setPublishedUrl(result?.url ?? null);
       setCopyState("idle");
       setSuccess(rotateLink ? t("linkRotated") : t("showcasePublished"));
     } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
@@ -875,6 +874,7 @@ function AdminResults({
               </Button>
             </div>
           ) : null}
+          {linkOnlyOnce ? <p className="mt-3 text-xs text-[var(--muted)]">{t("linkNotStored")}</p> : null}
         </div>
         {isClosed ? (
           <div className="mt-4 flex flex-wrap gap-2">
