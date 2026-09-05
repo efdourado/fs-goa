@@ -7,6 +7,7 @@ import { apiRequest } from "../api";
 import { useGoaFormat } from "../format";
 import type { CatalogItemDetail, Id } from "../types";
 import { backLinkClass, Button, cardClass, cx, EmptyState, LoadingView, PageHeading } from "../ui";
+import { formatRuntime } from "../utils";
 
 export function CatalogItemScreen({
   detailPath,
@@ -34,7 +35,10 @@ export function CatalogItemScreen({
     const controller = new AbortController();
     apiRequest<CatalogItemDetail>(detailPath, { signal: controller.signal })
       .then(setItem)
-      .catch((cause: unknown) => setError(f.error(cause)));
+      .catch((cause: unknown) => {
+        if (cause instanceof DOMException && cause.name === "AbortError") return;
+        setError(f.error(cause));
+      });
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detailPath, itemId]);
@@ -42,16 +46,13 @@ export function CatalogItemScreen({
   if (error) return <main className="mx-auto max-w-3xl px-4 py-10"><EmptyState title={t("errorTitle")} description={error} action={<Button variant="secondary" onClick={onBack}>{t("back")}</Button>} /></main>;
   if (!item) return <LoadingView />;
 
+  const titleWithYear = item.year ? `${item.title} (${item.year})` : item.title;
   const attrs = [
     item.author ? t("byAuthor", { name: item.author }) : null,
-    item.year ? String(item.year) : null,
     item.pageCount ? t("pages", { count: item.pageCount }) : null,
+    formatRuntime(item.runtimeMinutes),
     item.mainGenre,
   ].filter(Boolean);
-  const rated = item.rounds.filter((round) => round.ratingAvg !== null);
-  const historyAvg = rated.length
-    ? Number((rated.reduce((sum, round) => sum + (round.ratingAvg ?? 0), 0) / rated.length).toFixed(2))
-    : null;
 
   async function remove() {
     if (!onDelete || !window.confirm(t("removeConfirm", { title: item!.title }))) return;
@@ -68,15 +69,19 @@ export function CatalogItemScreen({
   return (
     <main className="mx-auto max-w-3xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
       <button className={cx(backLinkClass, "mb-6")} type="button" onClick={onBack}>{t("back")}</button>
-      <PageHeading title={item.title} description={attrs.join(" · ")} />
+      <PageHeading
+        title={titleWithYear}
+        description={attrs.join(" · ")}
+        action={item.ratingAvg !== null && item.ratingAvg !== undefined ? (
+          <div className="text-right">
+            <strong className="block text-4xl tracking-[-0.05em]">{item.ratingAvg}</strong>
+            <span className="text-xs text-[var(--muted)]">{t("groupRating", { count: item.ratingCount ?? 0 })}</span>
+          </div>
+        ) : undefined}
+      />
 
       <section className={cx(cardClass, "mt-6 p-5 sm:p-7")}>
-        <div className="flex flex-wrap items-baseline justify-between gap-3">
-          <h2 className="text-lg font-light">{t("historyTitle")}</h2>
-          {historyAvg !== null ? (
-            <span className="text-sm text-[var(--muted)]">{t("historyAvg", { value: historyAvg, rounds: rated.length })}</span>
-          ) : null}
-        </div>
+        <h2 className="text-lg font-light">{t("historyTitle")}</h2>
         {item.rounds.length ? (
           <ul className="mt-4 divide-y divide-[var(--line)]">
             {item.rounds.map((round) => (

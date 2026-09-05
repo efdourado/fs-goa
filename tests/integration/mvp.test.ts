@@ -2997,3 +2997,47 @@ test("um ranking por item traz quem indicou, o ano do catálogo e a média crua 
   assert.notEqual(row.rawValue, row.value, "com uma amostra de 1, a média crua e a ajustada divergem (o ajuste encolhe rumo à média geral)");
   assert.equal(row.rawValue, 5, "a média crua é simplesmente a nota dada");
 });
+
+test("um filme carrega a duração em minutos, editável depois, e o item do acervo traz a nota geral do grupo", async () => {
+  const owner = await register("Dona Duração", "dona_duracao_filme");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube da Duração" } })).body as { id: string }).id;
+
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "cinema", title: "Sessão com duração", participantIds: [owner.user.id],
+      items: [{ title: "Aftersun", year: 2022, runtimeMinutes: 108 }],
+    },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });
+
+  const detail = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    entryTypes: Array<{ id: string; fields: Array<{ id: string; key: string }> }>;
+    items: Array<{ id: string; catalogItem: { id: string; runtimeMinutes: number | null } }>;
+  };
+  assert.equal(detail.items[0].catalogItem.runtimeMinutes, 108, "a duração aparece no item do desafio");
+  const catalogItemId = detail.items[0].catalogItem.id;
+  const itemId = detail.items[0].id;
+  const notaField = detail.entryTypes[0].fields.find((field) => field.key === "nota")!.id;
+  const typeId = detail.entryTypes[0].id;
+
+  const catalog = (await call("GET", `/api/groups/${groupId}/catalog`, { session: owner })).body as { items: Array<{ id: string; runtimeMinutes: number | null }> };
+  assert.equal(catalog.items.find((item) => item.id === catalogItemId)?.runtimeMinutes, 108, "a duração aparece na listagem do acervo");
+
+  await call("POST", `/api/challenges/${challengeId}/entries`, { session: owner, body: { itemId, entryTypeId: typeId, values: { [notaField]: 4 } } });
+  const beforeEdit = (await call("GET", `/api/groups/${groupId}/catalog/${catalogItemId}`, { session: owner })).body as {
+    runtimeMinutes: number | null; ratingAvg: number | null; ratingCount: number;
+  };
+  assert.equal(beforeEdit.runtimeMinutes, 108);
+  assert.equal(beforeEdit.ratingAvg, 4, "a página do item já traz a nota geral do grupo, não só o histórico por rodada");
+  assert.equal(beforeEdit.ratingCount, 1);
+
+  const edited = await call("PATCH", `/api/challenges/${challengeId}/items/${itemId}`, {
+    session: owner,
+    body: { title: "Aftersun", description: "", runtimeMinutes: 132 },
+  });
+  assert.equal(edited.response.status, 200, JSON.stringify(edited.body));
+  const afterEdit = (await call("GET", `/api/groups/${groupId}/catalog/${catalogItemId}`, { session: owner })).body as { runtimeMinutes: number | null };
+  assert.equal(afterEdit.runtimeMinutes, 132, "a duração é editável depois da criação");
+});

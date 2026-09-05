@@ -43,6 +43,7 @@ export interface CatalogAttributes {
   year?: unknown;
   mainGenre?: unknown;
   pageCount?: unknown;
+  runtimeMinutes?: unknown;
 }
 
 function optionalText(value: unknown, max: number, name: string): string | null {
@@ -64,6 +65,7 @@ function readAttributes(input: CatalogAttributes) {
     year: optionalInt(input.year, 1870, 2200, "Ano"),
     mainGenre: optionalText(input.mainGenre, 80, "Gênero principal"),
     pageCount: optionalInt(input.pageCount, 1, 1_000_000, "Páginas"),
+    runtimeMinutes: optionalInt(input.runtimeMinutes, 1, 2000, "Duração"),
   };
 }
 
@@ -91,10 +93,10 @@ export async function upsertCatalogItem(
   // disambiguator because it has no stronger domain identity.
   type Row = {
     id: string; author: string | null; year: number | null;
-    main_genre: string | null; page_count: number | null;
+    main_genre: string | null; page_count: number | null; runtime_minutes: number | null;
   };
   const sameTitle = await client.query<Row>(
-    `SELECT id, author, year, main_genre, page_count FROM catalog_items
+    `SELECT id, author, year, main_genre, page_count, runtime_minutes FROM catalog_items
       WHERE group_id = $1 AND kind = $2 AND normalized_title = $3 AND archived_at IS NULL
       ORDER BY created_at`,
     [groupId, input.kind, normalized],
@@ -131,6 +133,7 @@ export async function upsertCatalogItem(
     }
     enrich("main_genre", existing.main_genre, attributes.mainGenre);
     enrich("page_count", existing.page_count, attributes.pageCount);
+    enrich("runtime_minutes", existing.runtime_minutes, attributes.runtimeMinutes);
     if (sets.length) {
       await client.query(`UPDATE catalog_items SET ${sets.join(", ")}, updated_at = now() WHERE id = $1`, params);
     }
@@ -141,9 +144,9 @@ export async function upsertCatalogItem(
   const id = publicId();
   await client.query(
     `INSERT INTO catalog_items
-      (id, group_id, kind, title, normalized_title, author, year, main_genre, page_count, created_by_user_id, created_at, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now(),now())`,
-    [id, groupId, input.kind, title, normalized, attributes.author, attributes.year, attributes.mainGenre, attributes.pageCount, userId],
+      (id, group_id, kind, title, normalized_title, author, year, main_genre, page_count, runtime_minutes, created_by_user_id, created_at, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,now(),now())`,
+    [id, groupId, input.kind, title, normalized, attributes.author, attributes.year, attributes.mainGenre, attributes.pageCount, attributes.runtimeMinutes, userId],
   );
   if (input.attributes) await setCatalogItemAttributeValues(client, id, groupId, input.kind, input.attributes);
   return id;
@@ -175,11 +178,12 @@ async function listCatalogWithClient(client: PoolClient, workspaceId: string) {
     year: number | null;
     main_genre: string | null;
     page_count: number | null;
+    runtime_minutes: number | null;
     round_count: number;
     rating_avg: number | null;
     rating_count: number;
   }>(
-    `SELECT ci.id, ci.kind, ci.title, ci.author, ci.year, ci.main_genre, ci.page_count,
+    `SELECT ci.id, ci.kind, ci.title, ci.author, ci.year, ci.main_genre, ci.page_count, ci.runtime_minutes,
               (SELECT count(DISTINCT it.challenge_id)::int FROM challenge_items it WHERE it.catalog_item_id = ci.id) AS round_count,
               agg.rating_avg, coalesce(agg.rating_count, 0)::int AS rating_count
          FROM catalog_items ci
@@ -208,6 +212,7 @@ async function listCatalogWithClient(client: PoolClient, workspaceId: string) {
       year: item.year,
       mainGenre: item.main_genre,
       pageCount: item.page_count,
+      runtimeMinutes: item.runtime_minutes,
       roundCount: item.round_count,
       ratingAvg: item.rating_avg === null ? null : Number(item.rating_avg.toFixed(2)),
       ratingCount: item.rating_count,
@@ -228,10 +233,10 @@ async function catalogItemDetailWithClient(
 ) {
   const item = await oneOrNull<{
     id: string; kind: string; title: string; author: string | null;
-    year: number | null; main_genre: string | null; page_count: number | null;
+    year: number | null; main_genre: string | null; page_count: number | null; runtime_minutes: number | null;
   }>(
     client,
-    `SELECT id, kind, title, author, year, main_genre, page_count
+    `SELECT id, kind, title, author, year, main_genre, page_count, runtime_minutes
          FROM catalog_items WHERE id = $1 AND group_id = $2 AND archived_at IS NULL`,
     [catalogItemId, workspaceId],
   );
@@ -267,6 +272,14 @@ async function catalogItemDetailWithClient(
   );
 
   const attributes = (await attributeValuesForItems(client, [item.id])).get(item.id) ?? [];
+  // The group's overall rating for this item, across every round — a true
+  // weighted average (avg*count sums back to each round's total, so summing
+  // those and dividing by the total count is exact, not an average of averages).
+  const ratedRounds = rounds.rows.filter((round) => round.rating_count > 0);
+  const totalRatings = ratedRounds.reduce((sum, round) => sum + round.rating_count, 0);
+  const ratingAvg = totalRatings > 0
+    ? Number((ratedRounds.reduce((sum, round) => sum + (round.rating_avg ?? 0) * round.rating_count, 0) / totalRatings).toFixed(2))
+    : null;
   return {
     id: item.id,
     kind: item.kind,
@@ -275,6 +288,9 @@ async function catalogItemDetailWithClient(
     year: item.year,
     mainGenre: item.main_genre,
     pageCount: item.page_count,
+    runtimeMinutes: item.runtime_minutes,
+    ratingAvg,
+    ratingCount: totalRatings,
     attributes,
     rounds: rounds.rows.map((round) => ({
       challengeId: round.challenge_id,
@@ -372,6 +388,7 @@ export async function applyCatalogItemUpdate(
     ["year", attributes.year, "year"],
     ["main_genre", attributes.mainGenre, "mainGenre"],
     ["page_count", attributes.pageCount, "pageCount"],
+    ["runtime_minutes", attributes.runtimeMinutes, "runtimeMinutes"],
   ] as const) {
     if (Object.hasOwn(body, key)) {
       params.push(value);

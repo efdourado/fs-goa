@@ -42,6 +42,8 @@ export const catalogItems = pgTable(
     // label (so values such as "ficção científica" remain valid).
     mainGenre: text("main_genre"),
     pageCount: integer("page_count"),
+    // Films/series only — books use `pageCount` instead.
+    runtimeMinutes: integer("runtime_minutes"),
     createdByUserId: text("created_by_user_id")
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),

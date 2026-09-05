@@ -40,7 +40,7 @@ export async function getChallengeDetail(session: SessionContext, challengeId: s
         checkpoint_id: string | null;
         catalog_item_id: string | null; catalog_title: string | null;
         catalog_author: string | null; catalog_year: number | null;
-        catalog_main_genre: string | null; catalog_pages: number | null;
+        catalog_main_genre: string | null; catalog_pages: number | null; catalog_runtime_minutes: number | null;
         recommended_by_id: string | null; recommended_by_name: string | null;
       }>(
         // A recommender who left the group (or whose account is gone) never shows
@@ -48,7 +48,7 @@ export async function getChallengeDetail(session: SessionContext, challengeId: s
         // along with it, same as a deleted account already reads "Conta removida".
         `SELECT i.id, i.title, i.description, i.position, i.opens_at, i.due_at, i.checkpoint_id,
                 i.catalog_item_id, ci.title AS catalog_title, ci.author AS catalog_author, ci.year AS catalog_year,
-                ci.main_genre AS catalog_main_genre, ci.page_count AS catalog_pages,
+                ci.main_genre AS catalog_main_genre, ci.page_count AS catalog_pages, ci.runtime_minutes AS catalog_runtime_minutes,
                 CASE WHEN active_recommender.user_id IS NOT NULL THEN i.recommended_by_user_id END AS recommended_by_id,
                 CASE WHEN active_recommender.user_id IS NOT NULL THEN ru.display_name END AS recommended_by_name
            FROM challenge_items i
@@ -137,6 +137,7 @@ export async function getChallengeDetail(session: SessionContext, challengeId: s
             year: item.catalog_year,
             mainGenre: item.catalog_main_genre,
             pageCount: item.catalog_pages,
+            runtimeMinutes: item.catalog_runtime_minutes,
           }
         : null,
       recommendedBy: item.recommended_by_id

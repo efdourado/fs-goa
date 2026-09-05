@@ -33,7 +33,7 @@ import {
   SchedulePeriodFields,
   StatusMessage,
 } from "../ui";
-import { isChallengeScheduled, isLivingList, itemIdForEntry, recipeCatalogKind, valuesAsRecord } from "../utils";
+import { formatRuntime, isChallengeScheduled, isLivingList, itemIdForEntry, recipeCatalogKind, valuesAsRecord } from "../utils";
 import { DynamicEntryForm, ResultView } from "./participant-challenge";
 
 const METRIC_OPERATIONS: Metric["operation"][] = [
@@ -337,7 +337,7 @@ function AdminItems({
   onAdd: (payload: Record<string, unknown>) => Promise<void>;
   onUpdate: (itemId: Id, payload: {
     title: string; description: string; recommendedByUserId?: string | null;
-    author?: string; year?: number | null; mainGenre?: string; pageCount?: number | null;
+    author?: string; year?: number | null; mainGenre?: string; pageCount?: number | null; runtimeMinutes?: number | null;
   }) => Promise<void>;
   onArchive: (itemId: Id) => Promise<void>;
 }) {
@@ -365,6 +365,7 @@ function AdminItems({
   const [editAuthor, setEditAuthor] = useState("");
   const [editYear, setEditYear] = useState("");
   const [editPages, setEditPages] = useState("");
+  const [editRuntimeMinutes, setEditRuntimeMinutes] = useState("");
   const [editMainGenre, setEditMainGenre] = useState("");
   const [editBusy, setEditBusy] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
@@ -398,6 +399,7 @@ function AdminItems({
     setEditAuthor(item.catalogItem?.author ?? "");
     setEditYear(item.catalogItem?.year ? String(item.catalogItem.year) : "");
     setEditPages(item.catalogItem?.pageCount ? String(item.catalogItem.pageCount) : "");
+    setEditRuntimeMinutes(item.catalogItem?.runtimeMinutes ? String(item.catalogItem.runtimeMinutes) : "");
     setEditMainGenre(item.catalogItem?.mainGenre ?? "");
     setEditError(null);
     setEditSuccess(null);
@@ -415,6 +417,7 @@ function AdminItems({
     try {
       const year = Number(editYear);
       const pages = Number(editPages);
+      const runtimeMinutes = Number(editRuntimeMinutes);
       await onUpdate(itemId, {
         title: editTitle.trim(),
         description: editDescription.trim(),
@@ -424,7 +427,7 @@ function AdminItems({
           mainGenre: editMainGenre.trim(),
           ...(catalogKind === "book"
             ? { author: editAuthor.trim(), pageCount: Number.isInteger(pages) && pages > 0 ? pages : null }
-            : {}),
+            : { runtimeMinutes: Number.isInteger(runtimeMinutes) && runtimeMinutes > 0 ? runtimeMinutes : null }),
         } : {}),
       });
       setEditingId(null);
@@ -482,7 +485,7 @@ function AdminItems({
                         <label><span className={labelClass}>{tCine(catalogKind === "film" ? "latestYear" : "year")}</span><input className={inputClass} type="number" inputMode="numeric" min={1870} max={2200} value={editYear} onChange={(event) => setEditYear(event.target.value)} /></label>
                         {catalogKind === "book"
                           ? <label><span className={labelClass}>{tCine("pages")}</span><input className={inputClass} type="number" inputMode="numeric" min={1} max={100000} value={editPages} onChange={(event) => setEditPages(event.target.value)} /></label>
-                          : null}
+                          : <label><span className={labelClass}>{tCine("runtimeMinutes")}</span><input className={inputClass} type="number" inputMode="numeric" min={1} max={2000} value={editRuntimeMinutes} placeholder={tCine("runtimeMinutesPlaceholder")} onChange={(event) => setEditRuntimeMinutes(event.target.value)} /></label>}
                         <label><span className={labelClass}>{tCine("mainGenre")}</span><input className={inputClass} value={editMainGenre} maxLength={80} placeholder={tCine("mainGenrePlaceholder")} onChange={(event) => setEditMainGenre(event.target.value)} /></label>
                       </div>
                     ) : null}
@@ -493,7 +496,7 @@ function AdminItems({
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex min-w-0 gap-3">
                       <span className="grid h-8 w-8 flex-none place-items-center rounded-lg bg-[var(--wash)] text-xs font-light text-[var(--muted)]">{index + 1}</span>
-                      <span className="min-w-0"><strong className="block text-sm">{item.title}</strong>{item.description ? <span className="mt-1 block text-sm leading-6 text-[var(--muted)]">{item.description}</span> : null}{item.recommendedBy || item.catalogItem?.author || item.catalogItem?.year || item.catalogItem?.mainGenre ? <small className="mt-1 block text-[var(--muted)]">{[item.catalogItem?.author ? tCine("byAuthor", { name: item.catalogItem.author }) : null, item.recommendedBy ? t("itemRecommendedByLine", { name: item.recommendedBy.name }) : null, item.catalogItem?.year ? String(item.catalogItem.year) : null, item.catalogItem?.mainGenre || null].filter(Boolean).join(" · ")}</small> : null}{item.date || item.opensAt || item.dueAt ? <small className="mt-1 block text-[var(--muted)]">{item.date ? f.date(item.date) : t("itemWindow", { opens: f.date(item.opensAt), due: f.date(item.dueAt) })}</small> : null}</span>
+                      <span className="min-w-0"><strong className="block text-sm">{item.title}{item.catalogItem?.year ? ` (${item.catalogItem.year})` : ""}</strong>{item.description ? <span className="mt-1 block text-sm leading-6 text-[var(--muted)]">{item.description}</span> : null}{item.recommendedBy || item.catalogItem?.author || item.catalogItem?.mainGenre || item.catalogItem?.runtimeMinutes ? <small className="mt-1 block text-[var(--muted)]">{[item.catalogItem?.author ? tCine("byAuthor", { name: item.catalogItem.author }) : null, item.recommendedBy ? t("itemRecommendedByLine", { name: item.recommendedBy.name }) : null, item.catalogItem?.mainGenre || null, formatRuntime(item.catalogItem?.runtimeMinutes)].filter(Boolean).join(" · ")}</small> : null}{item.date || item.opensAt || item.dueAt ? <small className="mt-1 block text-[var(--muted)]">{item.date ? f.date(item.date) : t("itemWindow", { opens: f.date(item.opensAt), due: f.date(item.dueAt) })}</small> : null}</span>
                     </div>
                     <div className="flex flex-none flex-col items-end gap-2"><span className="rounded-full bg-[var(--wash)] px-2 py-1 text-[10px] font-light uppercase text-[var(--muted)]">{f.itemStatusLabel(item.status)}</span>{challenge.status !== "closed" ? <div className="flex gap-2"><Button variant="secondary" className="min-h-9 px-3 py-1 text-xs" onClick={() => startEditing(item)}>{t("edit")}</Button>{canArchiveItems ? <Button variant="danger" className="min-h-9 px-3 py-1 text-xs" disabled={archivingId === item.id} onClick={() => void archive(item)}>{archivingId === item.id ? t("removing") : t("remove")}</Button> : null}</div> : null}</div>
                   </div>
@@ -943,7 +946,7 @@ export function AdminScreen({
   onAddItems: (payload: Record<string, unknown>) => Promise<void>;
   onUpdateItem: (itemId: Id, payload: {
     title: string; description: string; recommendedByUserId?: string | null;
-    year?: number | null; mainGenre?: string; pageCount?: number | null;
+    author?: string; year?: number | null; mainGenre?: string; pageCount?: number | null; runtimeMinutes?: number | null;
   }) => Promise<void>;
   onArchiveItem: (itemId: Id) => Promise<void>;
   onPatchEntry: (entryId: Id, values: Record<Id, unknown>, reason: string) => Promise<void>;

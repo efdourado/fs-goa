@@ -175,7 +175,7 @@ export async function saveChallengeItems(
       } else {
         catalogItemId = await upsertCatalogItem(client, access.challenge.group_id, session.user.id, {
           kind: catalogKind, title, author: item.author, year: item.year, mainGenre: item.mainGenre,
-          pageCount: item.pageCount,
+          pageCount: item.pageCount, runtimeMinutes: item.runtimeMinutes,
         });
       }
       let recommendedBy: string | null = null;
@@ -296,12 +296,13 @@ export async function updateChallengeItem(
           WHERE id = $1 AND challenge_id = $2`,
         [itemId, challengeId, title, description, recommendedBy],
       );
-      // Autor, ano, gênero principal e páginas vivem no item do acervo compartilhado, não
-      // no item do desafio — atualizá-los aqui é o que deixa "esqueci de preencher
-      // na criação" corrigível depois, sem duplicar a lógica de `updateCatalogItem`.
+      // Autor, ano, gênero principal, páginas e duração vivem no item do acervo
+      // compartilhado, não no item do desafio — atualizá-los aqui é o que deixa
+      // "esqueci de preencher na criação" corrigível depois, sem duplicar a
+      // lógica de `updateCatalogItem`.
       if (current.catalog_item_id
         && (Object.hasOwn(body, "author") || Object.hasOwn(body, "year") || Object.hasOwn(body, "mainGenre")
-          || Object.hasOwn(body, "pageCount"))) {
+          || Object.hasOwn(body, "pageCount") || Object.hasOwn(body, "runtimeMinutes"))) {
         await applyCatalogItemUpdate(client, current.catalog_item_id, access.challenge.group_id, body);
       }
       await writeAudit(

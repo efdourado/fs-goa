@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { apiRequest } from "./api";
 import type { CatalogItem, ChallengeItemInput, Id, Member } from "./types";
 import { Button, cx, inputClass, labelClass, StatusMessage } from "./ui";
+import { formatRuntime } from "./utils";
 
 export interface CineRow {
   key: string;
@@ -15,6 +16,8 @@ export interface CineRow {
   author: string;
   year: string;
   pages: string;
+  /** Films/series only, in minutes. */
+  runtimeMinutes: string;
   mainGenre: string;
 }
 
@@ -26,6 +29,7 @@ export function newCineRow(title = "", extra: Partial<CineRow> = {}): CineRow {
     author: "",
     year: "",
     pages: "",
+    runtimeMinutes: "",
     mainGenre: "",
     ...extra,
   };
@@ -74,6 +78,7 @@ export function parseJsonItemsPaste(text: string, existingTitles: Set<string>): 
       author,
       year: asFieldString(pick(raw, "year")),
       pages: asFieldString(pick(raw, "pageCount", "pages")),
+      runtimeMinutes: asFieldString(pick(raw, "runtimeMinutes", "runtime_minutes", "duration", "durationMinutes")),
       mainGenre,
     }));
   }
@@ -88,6 +93,7 @@ export function cineRowsToInput(rows: CineRow[]): ChallengeItemInput[] {
     .map(({ row, index }) => {
       const year = Number(row.year);
       const pages = Number(row.pages);
+      const runtimeMinutes = Number(row.runtimeMinutes);
       return {
         title: row.title.trim(),
         position: index,
@@ -96,6 +102,7 @@ export function cineRowsToInput(rows: CineRow[]): ChallengeItemInput[] {
         ...(row.author.trim() ? { author: row.author.trim() } : {}),
         ...(Number.isInteger(year) && year > 1800 ? { year } : {}),
         ...(Number.isInteger(pages) && pages > 0 ? { pageCount: pages } : {}),
+        ...(Number.isInteger(runtimeMinutes) && runtimeMinutes > 0 ? { runtimeMinutes } : {}),
         ...(row.mainGenre.trim() ? { mainGenre: row.mainGenre.trim() } : {}),
       };
     });
@@ -201,11 +208,11 @@ export function CineItemsEditor({
                 </div>
                 {open ? (
                   <div className="mt-2 space-y-2">
-                    <div className={cx("grid gap-2", kind === "book" ? "sm:grid-cols-3" : "sm:grid-cols-2")}>
+                    <div className="grid gap-2 sm:grid-cols-3">
                       <label><span className={labelClass}>{t(kind === "film" ? "latestYear" : "year")}</span><input className={inputClass} type="number" inputMode="numeric" min={1870} max={2200} value={row.year} onChange={(event) => update(row.key, { year: event.target.value })} /></label>
                       {kind === "book"
                         ? <label><span className={labelClass}>{t("pages")}</span><input className={inputClass} type="number" inputMode="numeric" min={1} max={100000} value={row.pages} onChange={(event) => update(row.key, { pages: event.target.value })} /></label>
-                        : null}
+                        : <label><span className={labelClass}>{t("runtimeMinutes")}</span><input className={inputClass} type="number" inputMode="numeric" min={1} max={2000} value={row.runtimeMinutes} placeholder={t("runtimeMinutesPlaceholder")} onChange={(event) => update(row.key, { runtimeMinutes: event.target.value })} /></label>}
                       <label><span className={labelClass}>{t("mainGenre")}</span><input className={inputClass} value={row.mainGenre} maxLength={80} placeholder={t("mainGenrePlaceholder")} onChange={(event) => update(row.key, { mainGenre: event.target.value })} /></label>
                     </div>
                     {kind === "book" && members.length ? (
@@ -253,10 +260,10 @@ export function CineItemsEditor({
                   key={item.id}
                   type="button"
                   disabled={usedCatalogIds.has(item.id)}
-                  onClick={() => onChange([...value, newCineRow(item.title, { catalogItemId: item.id, author: item.author ?? "", year: item.year ? String(item.year) : "", pages: item.pageCount ? String(item.pageCount) : "", mainGenre: item.mainGenre ?? "" })])}
+                  onClick={() => onChange([...value, newCineRow(item.title, { catalogItemId: item.id, author: item.author ?? "", year: item.year ? String(item.year) : "", pages: item.pageCount ? String(item.pageCount) : "", runtimeMinutes: item.runtimeMinutes ? String(item.runtimeMinutes) : "", mainGenre: item.mainGenre ?? "" })])}
                   className={cx("flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-[var(--wash)] disabled:opacity-40", "")}
                 >
-                  <span>{item.title}{item.author ? <span className="text-[var(--muted)]"> · {item.author}</span> : null}{item.year ? <span className="text-[var(--muted)]"> · {item.year}</span> : null}{item.mainGenre ? <span className="text-[var(--muted)]"> · {item.mainGenre}</span> : null}</span>
+                  <span>{item.title}{item.year ? ` (${item.year})` : ""}{item.author ? <span className="text-[var(--muted)]"> · {item.author}</span> : null}{item.mainGenre ? <span className="text-[var(--muted)]"> · {item.mainGenre}</span> : null}{formatRuntime(item.runtimeMinutes) ? <span className="text-[var(--muted)]"> · {formatRuntime(item.runtimeMinutes)}</span> : null}</span>
                   <span className="text-xs text-[var(--muted)]">{usedCatalogIds.has(item.id) ? t("alreadyAdded") : t("roundsCount", { count: item.roundCount ?? 0 })}</span>
                 </button>
               ))}
