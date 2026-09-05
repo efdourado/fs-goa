@@ -4480,3 +4480,130 @@ test("P0: um Hábito com período e sem checkpoints ativa e aceita check-in dire
   });
   assert.equal(entry.response.status, 201, JSON.stringify(entry.body));
 });
+
+// ── Onda A — integridade das receitas ────────────────────────────────────
+
+test("A: uma receita Cinema sem campo de nota é bloqueada na ativação", async () => {
+  const owner = await register("A Dono", "a_dono_receita");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube A" } })).body as { id: string }).id;
+  // O wizard troca os campos do tipo primário — sem nota, só um comentário.
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "cinema", title: "Sem nota", participantIds: [owner.user.id], items: [{ title: "F" }],
+      fields: [{ key: "comentario", label: "Comentário", type: "text", required: false }],
+    },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+
+  const preflight = await call("GET", `/api/challenges/${challengeId}/preflight`, { session: owner });
+  assert.equal((preflight.body as { ready: boolean }).ready, false);
+  assert.ok((preflight.body as { errors: Array<{ code: string }> }).errors.some((e) => e.code === "recipe_essential_field_missing"));
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } })).response.status, 409);
+});
+
+test("A: métrica de receita com campo irresolvível é omitida, não repontada", async () => {
+  const owner = await register("A Metrica", "a_metrica_receita");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube A2" } })).body as { id: string }).id;
+  // O wizard renomeia a chave da nota → "media_nota" e o "ranking" não resolvem.
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "cinema", title: "Nota renomeada", participantIds: [owner.user.id], items: [{ title: "F" }],
+      fields: [{ key: "estrelas", label: "Estrelas", type: "rating", required: true }],
+    },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  const metrics = ((await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    metrics: Array<{ label: string; fieldId?: string | null }>;
+  }).metrics;
+  // Nenhuma métrica ligada a "nota" foi semeada apontando para "estrelas".
+  assert.equal(metrics.some((m) => m.label === "Nota média"), false, "métrica sem campo resolvível não é criada");
+});
+
+test("A: tornar um campo obrigatório com registros incompletos é recusado", async () => {
+  const owner = await register("A Obrig", "a_obrig_campo");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube A3" } })).body as { id: string }).id;
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner, body: { recipe: "cinema", title: "Comentário depois", participantIds: [owner.user.id], items: [{ title: "F" }] },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  const d = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    entryTypes: Array<{ id: string; purpose: string }>;
+    fields: Array<{ id: string; key: string; type: string; required: boolean }>;
+    items: Array<{ id: string }>;
+  };
+  const rating = d.entryTypes.find((t) => t.purpose === "rating")!;
+  const notaField = d.fields.find((f) => f.key === "nota")!;
+  const comentarioField = d.fields.find((f) => f.key === "comentario")!;
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });
+  // Registro só com a nota, sem comentário.
+  await call("POST", `/api/challenges/${challengeId}/entries`, { session: owner, body: { itemId: d.items[0].id, entryTypeId: rating.id, values: { [notaField.id]: 4 } } });
+
+  // Mantém os dois campos (com id) e torna o comentário obrigatório.
+  const forceRequired = await call("POST", `/api/challenges/${challengeId}/fields`, {
+    session: owner,
+    body: { entryTypeId: rating.id, replace: true, archiveMissing: true, fields: [
+      { id: notaField.id, key: "nota", label: "Nota", type: "rating", required: true },
+      { id: comentarioField.id, key: "comentario", label: "Comentário", type: "text", required: true },
+    ] },
+  });
+  assert.equal(forceRequired.response.status, 409, JSON.stringify(forceRequired.body));
+  assert.equal((forceRequired.body as { error: string }).error, "required_would_invalidate");
+});
+
+test("A: item adicionado depois numa Estante entra como livro, não filme", async () => {
+  const owner = await register("A Estante", "a_estante");
+  const created = await call("POST", "/api/personal/challenges", {
+    session: owner, body: { recipe: "bookshelf", title: "Minha estante", items: [{ title: "Duna", author: "Frank Herbert" }] },
+  });
+  const challengeId = (created.body as { id: string }).id;
+  const added = await call("POST", `/api/challenges/${challengeId}/items`, {
+    session: owner, body: { items: [{ title: "O Hobbit", author: "Tolkien" }] },
+  });
+  assert.equal(added.response.status, 201, JSON.stringify(added.body));
+  const catalog = (await call("GET", "/api/personal/catalog", { session: owner })).body as {
+    items: Array<{ title: string; kind: string }>;
+  };
+  assert.equal(catalog.items.find((i) => i.title === "O Hobbit")?.kind, "book", "livro adicionado depois não vira filme");
+});
+
+test("A: opção de escolha arquivada em uso ainda renderiza o rótulo, não o id", async () => {
+  const owner = await register("A Opcao", "a_opcao_uso");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube A5" } })).body as { id: string }).id;
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "habit", title: "Humor diário", participantIds: [owner.user.id],
+      fields: [{ key: "humor", label: "Humor", type: "select", required: true, config: { options: [{ label: "Bem" }, { label: "Mal" }, { label: "Neutro" }] } }],
+    },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  let d = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    entryTypes: Array<{ id: string; purpose: string }>;
+    fields: Array<{ id: string; key: string; config?: { options?: Array<{ id?: string; label: string; archived?: boolean }> } }>;
+    status: string;
+  };
+  const type = d.entryTypes.find((t) => t.purpose === "checkin")!;
+  const humor = d.fields.find((f) => f.key === "humor")!;
+  const opt = (label: string) => humor.config!.options!.find((o) => o.label === label)!.id!;
+  const optNeutro = opt("Neutro");
+  if (d.status === "draft") await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });
+  await call("POST", `/api/challenges/${challengeId}/entries`, { session: owner, body: { entryTypeId: type.id, occurredOn: "2026-01-01", values: { [humor.id]: optNeutro } } });
+
+  // Arquiva "Neutro" mantendo as outras (com id).
+  await call("POST", `/api/challenges/${challengeId}/fields`, {
+    session: owner,
+    body: { entryTypeId: type.id, replace: true, archiveMissing: true, fields: [
+      { id: humor.id, key: "humor", label: "Humor", type: "select", required: true, config: { options: [
+        { id: opt("Bem"), label: "Bem" }, { id: opt("Mal"), label: "Mal" },
+      ] } },
+    ] },
+  });
+  d = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as typeof d;
+  const humorAfter = d.fields.find((f) => f.key === "humor")!;
+  const neutroAfter = humorAfter.config!.options!.find((o) => o.id === optNeutro);
+  assert.ok(neutroAfter, "a opção arquivada continua na lista para renderizar o histórico");
+  assert.equal(neutroAfter!.archived, true);
+  assert.equal(neutroAfter!.label, "Neutro", "com o rótulo, não o id");
+});

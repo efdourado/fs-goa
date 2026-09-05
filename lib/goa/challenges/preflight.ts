@@ -10,6 +10,7 @@ import {
   usesCheckpoints,
   usesRoundItems,
 } from "./entry-types";
+import { isRecipeKey, RECIPES } from "./recipes";
 
 export type PreflightSeverity = "error" | "warning";
 
@@ -109,6 +110,27 @@ export async function computePreflight(
   const liveFields = fields.rows.filter((field) => field.archived_at === null);
   if (primaryType && !liveFields.some((field) => field.entry_type_id === primaryType.id)) {
     err("primary_type_no_fields", "O tipo de registro principal não tem nenhum campo.");
+  }
+
+  // The recipe's essential measure must survive editing: Cinema/Estante keep a
+  // rating, Clube de Leitura keeps a numeric progress field. Removing it would
+  // leave the round with no valid way to record the thing it exists to record.
+  const recipeKey = challenge.rows[0].recipe_key;
+  if (primaryType && isRecipeKey(recipeKey)) {
+    const recipePrimary = RECIPES[recipeKey].entryTypes.find((type) => type.primary);
+    const essentialKinds = new Set(
+      (recipePrimary?.fields ?? [])
+        .filter((field) => field.required === true && typeof field.type === "string")
+        .map((field) => (field.type === "select" ? "choice" : (field.type as string))),
+    );
+    const primaryLiveKinds = new Set(
+      liveFields.filter((field) => field.entry_type_id === primaryType.id).map((field) => field.kind),
+    );
+    for (const kind of essentialKinds) {
+      if (!primaryLiveKinds.has(kind)) {
+        err("recipe_essential_field_missing", `A receita ${recipeKey} precisa de um campo do tipo "${kind}" no registro principal, e ele foi removido.`);
+      }
+    }
   }
 
   const choiceFieldIds = liveFields.filter((field) => field.kind === "choice").map((field) => field.id);

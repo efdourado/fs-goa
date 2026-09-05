@@ -48,7 +48,9 @@ export function cleanFields(fields: ChallengeField[]): ChallengeField[] {
     position: index,
     config: {
       ...field.config,
-      options: field.config?.options?.filter((option) => option.label.trim()).map((option) => ({ ...option, label: option.label.trim(), value: option.value || slugify(option.label) })),
+      // Archived options only ride along to render a historical answer — they are
+      // never sent back as an editable option.
+      options: field.config?.options?.filter((option) => option.label.trim() && !option.archived).map((option) => ({ ...option, label: option.label.trim(), value: option.value || slugify(option.label) })),
     },
   }));
 }
@@ -124,7 +126,7 @@ export function FieldBuilder({
                 </div>
               ) : null}
               {field.type === "select" ? (
-                <label className="mt-3 block"><span className={labelClass}>{t("optionsLabel")}</span><input className={inputClass} value={(field.config?.options ?? []).map((option) => option.label).join(", ")} onChange={(event) => updateConfig(index, { options: event.target.value.split(",").map((option) => ({ label: option.trim(), value: slugify(option) })) })} placeholder={t("optionsPlaceholder")} /></label>
+                <label className="mt-3 block"><span className={labelClass}>{t("optionsLabel")}</span><input className={inputClass} value={(field.config?.options ?? []).filter((option) => !option.archived).map((option) => option.label).join(", ")} onChange={(event) => updateConfig(index, { options: event.target.value.split(",").map((option) => ({ label: option.trim(), value: slugify(option) })) })} placeholder={t("optionsPlaceholder")} /></label>
               ) : null}
               {field.type === "text" ? (
                 <div className="mt-3 grid gap-3 sm:grid-cols-2"><label className="flex min-h-12 items-center gap-2 rounded-xl border border-[var(--line)] px-3 text-sm font-medium"><input type="checkbox" checked={field.config?.multiline ?? false} onChange={(event) => updateConfig(index, { multiline: event.target.checked })} />{t("multiline")}</label><label><span className={labelClass}>{t("maxLength")}</span><input className={inputClass} type="number" min={1} max={5000} value={field.config?.maxLength ?? 280} onChange={(event) => updateConfig(index, { maxLength: Number(event.target.value) || 280 })} /></label></div>

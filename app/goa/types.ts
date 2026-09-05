@@ -98,6 +98,8 @@ interface FieldOption {
   id?: Id;
   label: string;
   value?: string;
+  /** Kept in the list only to render a historical answer — never offered for a new entry. */
+  archived?: boolean;
 }
 
 export interface FieldConfig {
