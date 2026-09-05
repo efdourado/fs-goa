@@ -401,7 +401,8 @@ export type Screen =
   | { kind: "challenge"; challengeId: Id; tab: ParticipantTab }
   | { kind: "admin"; challengeId: Id; tab: AdminTab }
   | { kind: "templates" }
-  | { kind: "template"; challengeId: Id };
+  | { kind: "template"; challengeId: Id }
+  | { kind: "about" };
 
 export interface ChallengeCreationInput {
   recipe: CreatableRecipeKey;

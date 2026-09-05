@@ -1005,6 +1005,7 @@
     "footer": "A memory published by the group on Goa."
   },
   "about": {
+    "back": "← Back",
     "title": "About Goa",
     "lede": "Goa grew out of spreadsheets — the ones a group of friends kept to run a film club and a reading club. It automates that work: people log their progress, the system does the maths, and the result becomes a memory.",
     "body": [
