@@ -39,6 +39,12 @@ export const entryTypes = pgTable(
     // The type the single-type surfaces default to (detail's flat `fields`, the
     // metrics tab). Exactly one per challenge; set by the recipe at creation.
     isPrimary: boolean("is_primary").notNull().default(false),
+    // Who sees another participant's entry of this type, and when:
+    //   group_realtime — everyone, always (during the round)
+    //   after_own      — only after the viewer has answered the same item
+    //   after_close    — only the author + admins until the round closes
+    //   author_only    — only the author + admins, ever (aggregate metrics aside)
+    visibilityPolicy: text("visibility_policy").notNull().default("group_realtime"),
     archivedAt: timestamptz("archived_at"),
     createdAt: timestamptz("created_at").defaultNow().notNull(),
     updatedAt: timestamptz("updated_at").defaultNow().notNull(),
@@ -75,6 +81,10 @@ export const entryTypes = pgTable(
     check(
       "entry_types_schedule_policy_check",
       sql`${table.schedulePolicy} is null or ${table.schedulePolicy} in ('free', 'while_active', 'checkpoint')`,
+    ),
+    check(
+      "entry_types_visibility_policy_check",
+      sql`${table.visibilityPolicy} in ('group_realtime', 'after_own', 'after_close', 'author_only')`,
     ),
   ],
 );

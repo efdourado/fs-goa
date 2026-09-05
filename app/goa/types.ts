@@ -169,8 +169,12 @@ export interface EntryTypeView {
   isPrimary: boolean;
   /** Its entries are the "done" signal for progress counters and completion rate. */
   countsCompletion?: boolean;
+  /** Who sees another participant's answer of this type, and when. */
+  visibilityPolicy?: VisibilityPolicy;
   fields: ChallengeField[];
 }
+
+export type VisibilityPolicy = "group_realtime" | "after_own" | "after_close" | "author_only";
 
 interface EntryValueItem {
   fieldId: Id;

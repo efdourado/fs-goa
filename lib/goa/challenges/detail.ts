@@ -97,6 +97,7 @@ export async function getChallengeDetail(session: SessionContext, challengeId: s
       schedulePolicy: schedulePolicyOf(type, challengeHasPeriod),
       isPrimary: type.is_primary || type.id === primaryType?.id,
       countsCompletion: type.id === completionType?.id,
+      visibilityPolicy: type.visibility_policy,
       fields: fieldsByType.get(type.id) ?? [],
     }));
     const primaryEntryTypeId = primaryType?.id ?? null;

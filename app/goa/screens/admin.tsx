@@ -346,14 +346,19 @@ function AdminParticipants({
   );
 }
 
+const VISIBILITY_POLICIES = ["group_realtime", "after_own", "after_close", "author_only"] as const;
+
 function AdminFields({
   challenge,
   onSave,
+  onSaveVisibility,
 }: {
   challenge: ChallengeDetail;
   onSave: (entryTypeId: Id, fields: ChallengeField[]) => Promise<void>;
+  onSaveVisibility: (entryTypeId: Id, visibilityPolicy: string) => Promise<void>;
 }) {
   const t = useTranslations("adminChallenge");
+  const tv = useTranslations("visibility");
   const tc = useTranslations("common");
   const f = useGoaFormat();
   const types = challenge.entryTypes.length
@@ -364,13 +369,17 @@ function AdminFields({
   );
   const activeType = types.find((type) => type.id === selectedTypeId) ?? types[0];
   const [fields, setFields] = useState(activeType?.fields ?? []);
+  const [visibility, setVisibility] = useState<string>(activeType?.visibilityPolicy ?? "group_realtime");
   const [busy, setBusy] = useState(false);
+  const [visibilityBusy, setVisibilityBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
   function pickType(id: Id) {
     setSelectedTypeId(id);
-    setFields(types.find((type) => type.id === id)?.fields ?? []);
+    const type = types.find((candidate) => candidate.id === id);
+    setFields(type?.fields ?? []);
+    setVisibility(type?.visibilityPolicy ?? "group_realtime");
     setError(null);
     setSuccess(null);
   }
@@ -397,6 +406,36 @@ function AdminFields({
       <FieldBuilder key={selectedTypeId} fields={fields} onChange={setFields} lockPersistedTypes={challenge.status !== "draft"} />
       <div className="mt-5"><StatusMessage error={error} success={success} /></div>
       <Button className="mt-5" disabled={busy || challenge.status === "closed"} onClick={() => { setBusy(true); setError(null); setSuccess(null); onSave(selectedTypeId, cleanFields(fields)).then(() => setSuccess(t("fieldsSaved"))).catch((cause: unknown) => setError(f.error(cause))).finally(() => setBusy(false)); }}>{busy ? tc("saving") : t("saveFields")}</Button>
+
+      {selectedTypeId && challenge.status !== "closed" ? (
+        <div className="mt-7 border-t border-[var(--line)] pt-5">
+          <h3 className="text-sm font-medium">{tv("title")}</h3>
+          <p className="mt-1 text-xs leading-5 text-[var(--muted)]">{tv("hint")}</p>
+          <label className="mt-3 block">
+            <span className="sr-only">{tv("title")}</span>
+            <select
+              className={inputClass}
+              value={visibility}
+              onChange={(event) => {
+                const next = event.target.value;
+                setVisibility(next);
+                setVisibilityBusy(true);
+                setError(null);
+                onSaveVisibility(selectedTypeId, next)
+                  .then(() => setSuccess(tv("saved")))
+                  .catch((cause: unknown) => { setError(f.error(cause)); setVisibility(activeType?.visibilityPolicy ?? "group_realtime"); })
+                  .finally(() => setVisibilityBusy(false));
+              }}
+              disabled={visibilityBusy}
+            >
+              {VISIBILITY_POLICIES.map((policy) => (
+                <option key={policy} value={policy}>{tv(`policy.${policy}`)}</option>
+              ))}
+            </select>
+          </label>
+          <p className="mt-2 text-xs text-[var(--muted)]">{tv(`explain.${visibility}`)}</p>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -994,6 +1033,7 @@ export function AdminScreen({
   onDelete,
   onSaveParticipants,
   onSaveFields,
+  onSaveEntryTypeVisibility,
   onAddItems,
   onUpdateItem,
   onArchiveItem,
@@ -1021,6 +1061,7 @@ export function AdminScreen({
   onDelete?: () => Promise<void>;
   onSaveParticipants: (ids: Id[]) => Promise<void>;
   onSaveFields: (entryTypeId: Id, fields: ChallengeField[]) => Promise<void>;
+  onSaveEntryTypeVisibility: (entryTypeId: Id, visibilityPolicy: string) => Promise<void>;
   onAddItems: (payload: Record<string, unknown>) => Promise<void>;
   onUpdateItem: (itemId: Id, payload: {
     title: string; description: string; recommendedByUserId?: string | null;
@@ -1046,7 +1087,7 @@ export function AdminScreen({
       <nav className="mb-6 flex gap-1 overflow-x-auto rounded-2xl bg-[var(--wash-strong)]/70 p-1" aria-label={t("tabsAria")}>{tabs.map((id) => <button className={cx("min-h-11 flex-none rounded-xl px-4 text-sm font-light", tab === id ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]")} type="button" onClick={() => onTab(id)} key={id}>{t(`tabs.${id}`)}</button>)}</nav>
       {tab === "overview" ? <AdminOverview challenge={challenge} onSave={onSaveBasics} onTransition={onTransition} onDuplicate={onDuplicate} duplicateTargets={duplicateTargets} onDelete={onDelete} /> : null}
       {tab === "participants" ? <AdminParticipants key={`${challenge.id}:${challenge.participants.map((participant) => participant.userId ?? participant.id).join(",")}`} challenge={challenge} group={group} onSave={onSaveParticipants} /> : null}
-      {tab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} /> : null}
+      {tab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.visibilityPolicy}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} onSaveVisibility={onSaveEntryTypeVisibility} /> : null}
       {tab === "items" ? <AdminItems challenge={challenge} group={group} entries={entries} onAdd={onAddItems} onUpdate={onUpdateItem} onArchive={onArchiveItem} /> : null}
       {tab === "review" ? <AdminReview challenge={challenge} entries={entries} onPatch={onPatchEntry} onDelete={onDeleteEntry} onExport={onExport} /> : null}
       {tab === "metrics" ? <AdminMetrics challenge={challenge} onAdd={onAddMetric} onUpdate={onUpdateMetric} onDelete={onDeleteMetric} /> : null}

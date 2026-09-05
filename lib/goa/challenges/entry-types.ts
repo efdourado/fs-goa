@@ -1,6 +1,9 @@
 import type { PoolClient } from "pg";
 
-import { oneOrNull } from "../../db";
+import type { SessionContext } from "../../auth";
+import { inTransaction, oneOrNull } from "../../db";
+import { challengeAccess, writeAudit } from "../../goa-domain";
+import { ApiError } from "../../http";
 
 export type SubmissionMode = "item" | "daily" | "free";
 export type Purpose = "progress" | "completion" | "expectation" | "rating" | "checkin";
@@ -11,6 +14,15 @@ export type Cardinality =
   | "repeatable"
   | "once_per_day";
 export type SchedulePolicy = "free" | "while_active" | "checkpoint";
+export type VisibilityPolicy = "group_realtime" | "after_own" | "after_close" | "author_only";
+
+export const VISIBILITY_POLICIES: readonly VisibilityPolicy[] = [
+  "group_realtime", "after_own", "after_close", "author_only",
+];
+
+export function isVisibilityPolicy(value: unknown): value is VisibilityPolicy {
+  return typeof value === "string" && (VISIBILITY_POLICIES as readonly string[]).includes(value);
+}
 
 export interface EntryTypeRow {
   id: string;
@@ -23,10 +35,11 @@ export interface EntryTypeRow {
   cardinality: Cardinality | null;
   schedule_policy: SchedulePolicy | null;
   is_primary: boolean;
+  visibility_policy: VisibilityPolicy;
 }
 
 const SELECT_COLUMNS = `id, challenge_id, semantic_key, name, submission_mode,
-  purpose, target_policy, cardinality, schedule_policy, is_primary`;
+  purpose, target_policy, cardinality, schedule_policy, is_primary, visibility_policy`;
 
 /**
  * The four orthogonal axes are nullable until every legacy row is backfilled, so
@@ -122,6 +135,47 @@ export async function entryTypeById(
       WHERE id = $1 AND challenge_id = $2 AND archived_at IS NULL`,
     [entryTypeId, challengeId],
   );
+}
+
+/**
+ * Owner/admin sets who sees other participants' answers of one entry type.
+ * A safe, non-destructive change — allowed while the round is active — but
+ * blocked once it is closed and frozen.
+ */
+export async function updateEntryTypeVisibility(
+  session: SessionContext,
+  challengeId: string,
+  entryTypeId: string,
+  body: Record<string, unknown>,
+) {
+  if (!isVisibilityPolicy(body.visibilityPolicy)) {
+    throw new ApiError(400, "invalid_visibility", "Política de visibilidade inválida.");
+  }
+  return inTransaction(async (client) => {
+    const access = await challengeAccess(session.user.id, challengeId, client, true);
+    if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores mudam a visibilidade.");
+    if (access.challenge.status === "closed") {
+      throw new ApiError(409, "challenge_closed", "Um desafio encerrado fica congelado.");
+    }
+    const type = await oneOrNull<{ visibility_policy: string; name: string }>(
+      client,
+      "SELECT visibility_policy, name FROM entry_types WHERE id = $1 AND challenge_id = $2 AND archived_at IS NULL FOR UPDATE",
+      [entryTypeId, challengeId],
+    );
+    if (!type) throw new ApiError(404, "not_found", "Tipo de registro não encontrado.");
+    if (type.visibility_policy !== body.visibilityPolicy) {
+      await client.query(
+        "UPDATE entry_types SET visibility_policy = $3, updated_at = now() WHERE id = $1 AND challenge_id = $2",
+        [entryTypeId, challengeId, body.visibilityPolicy],
+      );
+      await writeAudit(
+        client, access.challenge.group_id, challengeId, session.user.id,
+        "entry_type.visibility_changed", "entry_type", entryTypeId,
+        { visibilityPolicy: type.visibility_policy }, { visibilityPolicy: body.visibilityPolicy },
+      );
+    }
+    return { id: entryTypeId, visibilityPolicy: body.visibilityPolicy };
+  });
 }
 
 /** Any of the challenge's types point at a round item (film / book). */

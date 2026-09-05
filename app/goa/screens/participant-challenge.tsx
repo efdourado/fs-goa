@@ -546,6 +546,7 @@ function ItemEntryPanel({
   onDeleteEntry?: (entryId: Id) => Promise<void>;
 }) {
   const t = useTranslations("participant");
+  const tv = useTranslations("visibility");
   const types = itemEntryTypes(challenge);
   const ratingTypeId = types.find((type) => type.purpose === "rating")?.id;
   const stacked = types.length > 1;
@@ -568,6 +569,9 @@ function ItemEntryPanel({
         return (
           <div key={type.id || "registro"}>
             {stacked ? <h3 className="mb-3 text-sm font-medium uppercase tracking-[0.12em] text-[var(--muted)]">{type.name}</h3> : null}
+            {type.visibilityPolicy && type.visibilityPolicy !== "group_realtime" ? (
+              <p className="mb-3 rounded-lg bg-[var(--wash)] px-3 py-2 text-xs text-[var(--muted)]">{tv(`note.${type.visibilityPolicy}`)}</p>
+            ) : null}
             <DynamicEntryForm
               key={`${type.id}-${item.id}-${perDay ? occurredOn || today : "fixed"}-${entry?.id ?? "new"}`}
               fields={type.fields}
