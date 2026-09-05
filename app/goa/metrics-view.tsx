@@ -69,6 +69,11 @@ export function MetricBlock({
           {metric.formattedValue ?? metric.value ?? "—"}
         </strong>
       )}
+      {metric.explanation || metric.sample ? (
+        <p className="mt-3 border-t border-[var(--line)] pt-2 text-[11px] leading-5 text-[var(--muted)]">
+          {[metric.explanation, metric.sample].filter(Boolean).join(" ")}
+        </p>
+      ) : null}
     </article>
   );
 }

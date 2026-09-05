@@ -218,6 +218,13 @@
       "when": 1788550000000,
       "tag": "0030_checkpoint_kind_item_origin",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1788560000000,
+      "tag": "0031_metrics_median_consensus_rankings",
+      "breakpoints": true
     }
   ]
 }

@@ -5,9 +5,11 @@ import { getFormatter, getTranslations } from "next-intl/server";
 import { publicResults } from "@/lib/goa-challenges";
 import { type Formatter, makeGoaFormat, type Translator } from "@/app/goa/format";
 import { MetricBlock } from "@/app/goa/metrics-view";
+import { AffinityBlockView, PersonalRankingsBlock } from "@/app/goa/rankings-view";
+import { affinityLabels, rankingLabels } from "@/app/goa/rankings-labels";
 import { metricHasData, metricTheme, participantsSentence } from "@/app/goa/utils";
 import { LanguageToggle } from "@/app/goa/LanguageToggle";
-import type { Metric } from "@/app/goa/types";
+import type { AffinityBlock, Metric, PersonalRanking } from "@/app/goa/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,13 +31,18 @@ export default async function SharedResultsPage({ params }: { params: Promise<{ 
 
   const challenge = payload.challenge;
   const tm = await getTranslations("metrics");
+  const tw = await getTranslations("wrapped");
   const result = challenge.result as unknown as {
     headline?: string | null;
     summary?: string | null;
     metrics?: Metric[];
     comments?: PublicComment[];
+    personalRankings?: PersonalRanking[];
+    affinity?: AffinityBlock | null;
     publishedAt?: string | null;
   };
+  const personalRankings = result.personalRankings ?? [];
+  const affinity = result.affinity ?? null;
 
   return (
     <main className="min-h-screen bg-[var(--canvas)] px-4 py-8 text-[var(--ink)] sm:px-6 sm:py-14">
@@ -90,6 +97,16 @@ export default async function SharedResultsPage({ params }: { params: Promise<{ 
             </div>
           ) : null;
         })()}
+        {personalRankings.length > 1 ? (
+          <section className="mt-6 rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-6 sm:p-8">
+            <PersonalRankingsBlock rankings={personalRankings} labels={rankingLabels((key, values) => tw(key, values))} />
+          </section>
+        ) : null}
+        {affinity && affinity.pairs.length ? (
+          <section className="mt-6 rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-6 sm:p-8">
+            <AffinityBlockView affinity={affinity} labels={affinityLabels((key, values) => tw(key, values))} />
+          </section>
+        ) : null}
         {result.comments?.length ? (
           <section className="mt-6 grid gap-4 sm:grid-cols-2">
             {result.comments.map((comment) => (

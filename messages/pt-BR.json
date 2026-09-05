@@ -98,7 +98,9 @@
       "bayesian_average": "Nota ajustada",
       "spread": "Polarização",
       "surprise": "Surpresa × decepção",
-      "indicator_bias": "Viés do indicador"
+      "indicator_bias": "Viés do indicador",
+      "median": "Mediana",
+      "consensus": "Consenso"
     },
     "groupBy": {
       "none": "Sem agrupamento",
@@ -106,14 +108,16 @@
       "item": "Por item/checkpoint",
       "catalog_year": "Por ano de lançamento",
       "catalog_author": "Por autor",
-      "catalog_genre": "Por gênero"
+      "catalog_genre": "Por gênero",
+      "checkpoint": "Por checkpoint"
     },
     "groupByShort": {
       "participant": "participante",
       "item": "item",
       "catalog_year": "ano",
       "catalog_author": "autor",
-      "catalog_genre": "gênero"
+      "catalog_genre": "gênero",
+      "checkpoint": "checkpoint"
     },
     "smallSample": "amostra pequena",
     "showMore": "Ver mais {count, plural, one {#} other {#}}",
@@ -737,7 +741,12 @@
     "expectationCheckbox": "Coletar uma expectativa antes da avaliação",
     "expectationOn": "Nota de expectativa ativada.",
     "expectationOff": "Nota de expectativa removida.",
-    "expectationLockedNote": "O desafio já está ativo — o tipo de expectativa fica como está."
+    "expectationLockedNote": "O desafio já está ativo — o tipo de expectativa fica como está.",
+    "metricCumulativeLabel": "Acumulado",
+    "metricCumulativeHint": "Cada checkpoint soma todos os anteriores (média acumulada, participação até aqui).",
+    "wrappedBlocks": "Blocos do Wrapped",
+    "includeRankings": "Rankings pessoais",
+    "includeAffinity": "Afinidades"
   },
   "visibility": {
     "title": "Quem vê estas respostas",
@@ -1203,5 +1212,34 @@
     "confirm": "Adicionar {count, plural, one {# item} other {# itens}}",
     "added": "{count, plural, one {# item adicionado} other {# itens adicionados}}",
     "nothingToAdd": "Nada selecionado para adicionar."
+  },
+  "wrapped": {
+    "rankings": {
+      "title": "Rankings pessoais",
+      "entryCount": "Avaliações",
+      "completion": "Conclusão",
+      "average": "Média dada",
+      "median": "Mediana",
+      "range": "Menor–maior",
+      "consistency": "Consistência (σ)",
+      "topItems": "Preferidos",
+      "bottomItems": "Menores notas",
+      "surprise": "Maior surpresa",
+      "disappointment": "Maior decepção",
+      "indication": "Indicações vs. grupo",
+      "none": "Ainda não há dados suficientes."
+    },
+    "affinity": {
+      "title": "Afinidades",
+      "explanation": "Semelhança nas avaliações deste desafio — 100 × (1 − média das diferenças absolutas ÷ amplitude). Não é uma nota de compatibilidade pessoal.",
+      "sample": "{n} itens em comum",
+      "composite": "Composta",
+      "compositeNote": "A afinidade composta exige itens em comum suficientes por gênero / ano / duração — aparece quando há dados.",
+      "dimItems": "itens em comum",
+      "dimGenre": "gênero",
+      "dimYearBand": "faixa de ano",
+      "dimDuration": "duração",
+      "none": "Nenhum par avaliou itens em comum o bastante (mínimo 5)."
+    }
   }
 }

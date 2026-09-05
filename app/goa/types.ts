@@ -206,8 +206,12 @@ export interface Entry {
 }
 
 export type MetricOperation =
-  | "sum" | "average" | "count" | "min" | "max" | "completion_rate"
-  | "bayesian_average" | "spread" | "surprise" | "indicator_bias";
+  | "sum" | "average" | "count" | "min" | "max" | "median" | "completion_rate"
+  | "bayesian_average" | "spread" | "consensus" | "surprise" | "indicator_bias";
+
+export type MetricGroupBy =
+  | "none" | "participant" | "item" | "checkpoint" | "day" | "week"
+  | "catalog_year" | "catalog_author" | "catalog_genre";
 
 export interface MetricSeriesEntry {
   key: string;
@@ -228,14 +232,53 @@ export interface Metric {
   label: string;
   operation: MetricOperation;
   fieldId?: Id | null;
-  groupBy?: "none" | "participant" | "item" | "day" | "week" | "catalog_year" | "catalog_author" | "catalog_genre";
+  groupBy?: MetricGroupBy;
+  /** `groupBy: "checkpoint"` only — each row folds in every earlier checkpoint. */
+  cumulative?: boolean;
   visibleDuring?: boolean;
   visibleInResults?: boolean;
   minSample?: number;
   value?: string | number | null;
   formattedValue?: string | null;
+  /** Plain-language formula and how the sample was counted (V1 §9). */
+  explanation?: string;
+  sample?: string;
   /** Present when `groupBy !== "none"` — a ranking or per-person breakdown. */
   series?: MetricSeriesEntry[];
+}
+
+export interface PersonalRanking {
+  userId: Id;
+  name: string;
+  entryCount: number;
+  completionRate: number | null;
+  ratingsMean: number | null;
+  ratingsMedian: number | null;
+  ratingsMin: number | null;
+  ratingsMax: number | null;
+  consistency: number | null;
+  topItems: Array<{ title: string; value: number }>;
+  bottomItems: Array<{ title: string; value: number }>;
+  biggestSurprise: { title: string; delta: number } | null;
+  biggestDisappointment: { title: string; delta: number } | null;
+  indicationPerformance: number | null;
+}
+
+export interface AffinityPair {
+  a: { userId: Id; name: string };
+  b: { userId: Id; name: string };
+  sampleSize: number;
+  direct: number | null;
+  composite: number | null;
+  dimensions: Array<{ key: string; value: number; weight: number; sampleSize: number }>;
+  skippedDimensions: string[];
+}
+
+export interface AffinityBlock {
+  minSample: number;
+  scale: number;
+  pairs: AffinityPair[];
+  compositeAvailable: boolean;
 }
 
 interface ResultComment {
@@ -252,6 +295,8 @@ export interface ChallengeResult {
   summary?: string | null;
   metrics?: Metric[];
   comments?: ResultComment[];
+  personalRankings?: PersonalRanking[];
+  affinity?: AffinityBlock | null;
   publishedAt?: string | null;
   /** Whether a public link exists. The raw token itself is never sent back — it
    *  is shown once, in the publish response, and cannot be recovered. */

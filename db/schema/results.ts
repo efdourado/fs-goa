@@ -65,18 +65,18 @@ export const challengeMetrics = pgTable(
     check("challenge_metrics_label_check", sql`char_length(btrim(${table.label})) between 1 and 120`),
     check(
       "challenge_metrics_operation_check",
-      sql`${table.operation} in ('sum', 'average', 'count', 'min', 'max', 'completion_rate',
-        'bayesian_average', 'spread', 'surprise', 'indicator_bias')`,
+      sql`${table.operation} in ('sum', 'average', 'count', 'min', 'max', 'median', 'completion_rate',
+        'bayesian_average', 'spread', 'consensus', 'surprise', 'indicator_bias')`,
     ),
     check(
       "challenge_metrics_group_by_check",
-      sql`${table.groupBy} in ('none', 'participant', 'item', 'day', 'week',
+      sql`${table.groupBy} in ('none', 'participant', 'item', 'checkpoint', 'day', 'week',
         'catalog_year', 'catalog_author', 'catalog_genre')`,
     ),
     check(
       "challenge_metrics_field_requirement_check",
-      sql`(${table.operation} in ('sum', 'average', 'min', 'max',
-            'bayesian_average', 'spread', 'surprise', 'indicator_bias') and ${table.fieldId} is not null)
+      sql`(${table.operation} in ('sum', 'average', 'min', 'max', 'median',
+            'bayesian_average', 'spread', 'consensus', 'surprise', 'indicator_bias') and ${table.fieldId} is not null)
         or (${table.operation} = 'completion_rate' and ${table.fieldId} is null)
         or (${table.operation} = 'count')`,
     ),
@@ -122,7 +122,7 @@ export const resultBlocks = pgTable(
       foreignColumns: [entryValues.entryId, entryValues.fieldId, entryValues.challengeId],
     }).onDelete("restrict"),
     index("result_blocks_order_idx").on(table.challengeId, table.position),
-    check("result_blocks_kind_check", sql`${table.kind} in ('metric', 'entry_value', 'text')`),
+    check("result_blocks_kind_check", sql`${table.kind} in ('metric', 'entry_value', 'text', 'ranking', 'affinity')`),
     check("result_blocks_position_check", sql`${table.position} >= 0`),
     check(
       "result_blocks_source_check",
@@ -143,6 +143,12 @@ export const resultBlocks = pgTable(
           and ${table.sourceEntryId} is null
           and ${table.sourceFieldId} is null
           and ${table.bodySnapshot} is not null
+        ) or (
+          ${table.kind} in ('ranking', 'affinity')
+          and ${table.metricId} is null
+          and ${table.sourceEntryId} is null
+          and ${table.sourceFieldId} is null
+          and ${table.valueSnapshot} is not null
         )`,
     ),
   ],

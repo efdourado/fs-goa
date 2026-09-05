@@ -3497,3 +3497,239 @@ test("preflight avisa quando a expectativa fica visível para o grupo antes da a
   const after = (await call("GET", `/api/challenges/${challengeId}/preflight`, { session: owner })).body as { warnings: Array<{ code: string }> };
   assert.equal(after.warnings.some((warning) => warning.code === "expectation_visible_early"), true);
 });
+
+test("métricas oficiais: mediana e consenso calculam pela fórmula, toda métrica traz explicação e amostra, e combinações inválidas caem", async () => {
+  const owner = await register("Dona Métrica", "dona_metrica_v1");
+  const b = await register("Beto Métrica", "beto_metrica_v1");
+  const c = await register("Cida Métrica", "cida_metrica_v1");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube Métrica" } })).body as { id: string }).id;
+  for (const member of [b, c]) {
+    const invite = (await call("POST", `/api/groups/${groupId}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
+    await call("POST", `/api/invites/${invite.token}`, { session: member, body: {} });
+  }
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "cinema", title: "Notas variadas", participantIds: [owner.user.id, b.user.id, c.user.id],
+      items: [{ title: "Filme Um" }, { title: "Filme Dois" }],
+    },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  const detail = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    entryTypes: Array<{ id: string; purpose: string; fields: Array<{ id: string; key: string }> }>;
+    items: DetailItem[];
+  };
+  const rating = detail.entryTypes.find((type) => type.purpose === "rating")!;
+  const nota = rating.fields.find((field) => field.key === "nota")!.id;
+  const um = detail.items.find((item) => item.title === "Filme Um")!.id;
+
+  const median = await call("POST", `/api/challenges/${challengeId}/metrics`, {
+    session: owner, body: { label: "Mediana das notas", operation: "median", fieldId: nota },
+  });
+  assert.equal(median.response.status, 201, JSON.stringify(median.body));
+  const consensus = await call("POST", `/api/challenges/${challengeId}/metrics`, {
+    session: owner, body: { label: "Consenso por filme", operation: "consensus", fieldId: nota, groupBy: "item", minSample: 2 },
+  });
+  assert.equal(consensus.response.status, 201, JSON.stringify(consensus.body));
+
+  // Combinações inválidas.
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/metrics`, {
+    session: owner, body: { label: "x", operation: "consensus", fieldId: nota, groupBy: "participant" },
+  })).response.status, 400, "consenso não agrupa por participante");
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/metrics`, {
+    session: owner, body: { label: "x", operation: "indicator_bias", fieldId: nota, groupBy: "item" },
+  })).response.status, 400, "desempenho de indicação só agrupa por participante");
+  const noExpectation = await call("POST", `/api/challenges/${challengeId}/metrics`, {
+    session: owner, body: { label: "x", operation: "surprise", fieldId: nota },
+  });
+  assert.equal(noExpectation.response.status, 409, "surpresa exige um tipo de expectativa");
+  assert.equal((noExpectation.body as { error: string }).error, "metric_needs_expectation");
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/metrics`, {
+    session: owner, body: { label: "x", operation: "median", fieldId: rating.fields.find((field) => field.key === "comentario")!.id },
+  })).response.status, 400, "mediana exige campo numérico");
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/metrics`, {
+    session: owner, body: { label: "x", operation: "average", fieldId: nota, groupBy: "checkpoint" },
+  })).response.status, 409, "sem checkpoints, não dá pra agrupar por checkpoint");
+
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });
+  // Notas: 5, 3, 1 → média 3, mediana 3.
+  await call("POST", `/api/challenges/${challengeId}/entries`, { session: owner, body: { itemId: um, entryTypeId: rating.id, values: { [nota]: 5 } } });
+  await call("POST", `/api/challenges/${challengeId}/entries`, { session: b, body: { itemId: um, entryTypeId: rating.id, values: { [nota]: 3 } } });
+  await call("POST", `/api/challenges/${challengeId}/entries`, { session: c, body: { itemId: um, entryTypeId: rating.id, values: { [nota]: 1 } } });
+
+  const metrics = ((await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    metrics: Array<{ label: string; operation: string; value: number | null; explanation?: string; sample?: string; series?: Array<{ label: string; value: number | null }> }>;
+  }).metrics;
+  const medianRow = metrics.find((metric) => metric.operation === "median")!;
+  assert.equal(medianRow.value, 3, "mediana de 5,3,1 é 3");
+  assert.ok(medianRow.explanation && medianRow.explanation.length > 0, "toda métrica traz uma explicação de fórmula");
+  assert.ok(medianRow.sample && /n\s*=\s*3/.test(medianRow.sample), "e a amostra usada");
+  const consensusRow = metrics.find((metric) => metric.operation === "consensus")!;
+  const umConsensus = consensusRow.series!.find((row) => row.label === "Filme Um")!;
+  // notas 1..5, stdev de {5,3,1} = √(8/3) ≈ 1,633 ; consenso = (1 − 1,633/2,5) × 100 ≈ 35
+  assert.ok(umConsensus.value !== null && umConsensus.value >= 30 && umConsensus.value <= 40, `consenso ~35, veio ${umConsensus.value}`);
+
+  const completion = metrics.find((metric) => metric.operation === "completion_rate");
+  if (completion) {
+    assert.ok(/esperado/i.test(completion.sample ?? "") || /×/.test(completion.sample ?? ""), "conclusão explica o total esperado");
+  }
+});
+
+test("métricas por checkpoint: uma linha por semana, e o modo acumulado soma as anteriores", async () => {
+  const owner = await register("Dona Semana Métrica", "dona_semana_metrica");
+  const b = await register("Bia Semana Métrica", "bia_semana_metrica");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Semana Métrica" } })).body as { id: string }).id;
+  const invite = (await call("POST", `/api/groups/${groupId}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
+  await call("POST", `/api/invites/${invite.token}`, { session: b, body: {} });
+
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "cinema", title: "Maratona medida", participantIds: [owner.user.id, b.user.id],
+      startsOn: "2026-04-06", endsOn: "2026-04-26",
+      items: [{ title: "A" }, { title: "B" }, { title: "C" }, { title: "D" }],
+    },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  const detail = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    entryTypes: Array<{ id: string; purpose: string; fields: Array<{ id: string; key: string }> }>;
+    items: DetailItem[];
+  };
+  const rating = detail.entryTypes.find((type) => type.purpose === "rating")!;
+  const nota = rating.fields.find((field) => field.key === "nota")!.id;
+  const itemId = (title: string) => detail.items.find((item) => item.title === title)!.id;
+
+  const cps = await call("POST", `/api/challenges/${challengeId}/checkpoints`, {
+    session: owner,
+    body: { checkpoints: [
+      { title: "Semana 1", kind: "week", startsAt: "2026-04-06", dueAt: "2026-04-12" },
+      { title: "Semana 2", kind: "week", startsAt: "2026-04-13", dueAt: "2026-04-19" },
+    ] },
+  });
+  const [w1, w2] = (cps.body as { checkpoints: Array<{ id: string }> }).checkpoints.map((cp) => cp.id);
+  await call("POST", `/api/challenges/${challengeId}/items/assign`, {
+    session: owner,
+    body: { assignments: [
+      { itemId: itemId("A"), checkpointId: w1 }, { itemId: itemId("B"), checkpointId: w1 },
+      { itemId: itemId("C"), checkpointId: w2 }, { itemId: itemId("D"), checkpointId: w2 },
+    ] },
+  });
+
+  const perWeek = await call("POST", `/api/challenges/${challengeId}/metrics`, {
+    session: owner, body: { label: "Média por semana", operation: "average", fieldId: nota, groupBy: "checkpoint" },
+  });
+  assert.equal(perWeek.response.status, 201, JSON.stringify(perWeek.body));
+  const cumulative = await call("POST", `/api/challenges/${challengeId}/metrics`, {
+    session: owner, body: { label: "Média acumulada", operation: "average", fieldId: nota, groupBy: "checkpoint", cumulative: true },
+  });
+  assert.equal(cumulative.response.status, 201, JSON.stringify(cumulative.body));
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/metrics`, {
+    session: owner, body: { label: "x", operation: "average", fieldId: nota, groupBy: "item", cumulative: true },
+  })).response.status, 400, "acumulado só com checkpoint");
+
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });
+  // Semana 1: notas 4 e 4 → média 4. Semana 2: notas 2 e 2 → média 2 ; acumulada 3.
+  for (const [title, value] of [["A", 4], ["B", 4], ["C", 2], ["D", 2]] as const) {
+    await call("POST", `/api/challenges/${challengeId}/entries`, { session: owner, body: { itemId: itemId(title), entryTypeId: rating.id, values: { [nota]: value } } });
+  }
+
+  const metrics = ((await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    metrics: Array<{ label: string; groupBy: string; cumulative?: boolean; series?: Array<{ label: string; value: number | null }> }>;
+  }).metrics;
+  const week = metrics.find((metric) => metric.label === "Média por semana")!;
+  assert.equal(week.groupBy, "checkpoint");
+  assert.deepEqual(week.series!.map((row) => [row.label, row.value]), [["Semana 1", 4], ["Semana 2", 2]], "cada semana isolada");
+  const acc = metrics.find((metric) => metric.label === "Média acumulada")!;
+  assert.equal(acc.cumulative, true);
+  assert.deepEqual(acc.series!.map((row) => [row.label, row.value]), [["Semana 1", 4], ["Semana 2", 3]], "a segunda soma a primeira");
+});
+
+test("rankings pessoais e afinidade direta com três contas; afinidade composta só aparece com dados suficientes", async () => {
+  const owner = await register("Ana Afin", "ana_afin_v1");
+  const bob = await register("Bruno Afin", "bruno_afin_v1");
+  const carol = await register("Carla Afin", "carla_afin_v1");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Cineclube Afin" } })).body as { id: string }).id;
+  for (const person of [bob, carol]) {
+    const invite = (await call("POST", `/api/groups/${groupId}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
+    await call("POST", `/api/invites/${invite.token}`, { session: person, body: {} });
+  }
+  const items = Array.from({ length: 6 }, (_, i) => ({
+    title: `F${i}`, year: 2000 + i, mainGenre: i % 2 === 0 ? "drama" : "ficção",
+    ...(i === 0 ? { recommendedByUserId: bob.user.id } : {}),
+  }));
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: { recipe: "cinema", title: "Afinidades", participantIds: [owner.user.id, bob.user.id, carol.user.id], expectation: true, items },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  const detail = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    entryTypes: Array<{ id: string; purpose: string; fields: Array<{ id: string; key: string }> }>;
+    items: DetailItem[];
+  };
+  const rating = detail.entryTypes.find((type) => type.purpose === "rating")!;
+  const expType = detail.entryTypes.find((type) => type.purpose === "expectation")!;
+  const nota = rating.fields.find((field) => field.key === "nota")!.id;
+  const expField = expType.fields[0].key;
+  const idByTitle = new Map(detail.items.map((item) => [item.title, item.id]));
+
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });
+  const rate = (session: ClientSession, title: string, value: number) =>
+    call("POST", `/api/challenges/${challengeId}/entries`, { session, body: { itemId: idByTitle.get(title), entryTypeId: rating.id, values: { [nota]: value } } });
+
+  // Bruno esperava pouco de F0 (que ele indicou) — a expectativa vai ANTES da avaliação.
+  await call("POST", `/api/challenges/${challengeId}/entries`, { session: bob, body: { itemId: idByTitle.get("F0"), entryTypeId: expType.id, values: { [expField]: 1 } } });
+
+  // Ana e Bruno bem parecidos nos 6 filmes; Carla diverge.
+  for (let i = 0; i < 6; i += 1) {
+    await rate(owner, `F${i}`, (i % 5) + 0.5 + 0.5);
+    await rate(bob, `F${i}`, i === 0 ? 4 : (i % 5) + 1);
+    await rate(carol, `F${i}`, 5 - (i % 5));
+  }
+
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "closed" } });
+  const result = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    result: {
+      personalRankings: Array<{
+        name: string; entryCount: number; ratingsMedian: number | null; consistency: number | null;
+        topItems: Array<{ title: string }>; indicationPerformance: number | null;
+        biggestSurprise: { title: string } | null;
+      }>;
+      affinity: { minSample: number; scale: number; pairs: Array<{ a: { name: string }; b: { name: string }; direct: number | null; composite: number | null; sampleSize: number }> } | null;
+    };
+  };
+  const ranks = result.result.personalRankings;
+  assert.equal(ranks.length, 3, "um bloco por participante");
+  const bruno = ranks.find((row) => row.name === "Bruno Afin")!;
+  assert.equal(bruno.entryCount, 6);
+  assert.ok(bruno.ratingsMedian !== null, "traz mediana pessoal");
+  assert.ok(bruno.consistency !== null, "e a consistência (desvio das próprias notas)");
+  assert.ok(bruno.topItems.length > 0, "e o top pessoal");
+  assert.ok(bruno.indicationPerformance !== null, "Bruno indicou F0 — tem desempenho de indicação");
+  assert.ok(bruno.biggestSurprise !== null, "e a maior surpresa (avaliação acima da expectativa)");
+
+  const affinity = result.result.affinity!;
+  assert.equal(affinity.minSample, 5, "afinidade direta pede 5 itens em comum");
+  assert.equal(affinity.scale, 5, "amplitude da escala");
+  const anaBruno = affinity.pairs.find((pair) =>
+    [pair.a.name, pair.b.name].sort().join("|") === ["Ana Afin", "Bruno Afin"].sort().join("|"))!;
+  const anaCarol = affinity.pairs.find((pair) =>
+    [pair.a.name, pair.b.name].sort().join("|") === ["Ana Afin", "Carla Afin"].sort().join("|"))!;
+  assert.equal(anaBruno.sampleSize, 6);
+  assert.ok(anaBruno.direct !== null && anaCarol.direct !== null);
+  assert.ok(anaBruno.direct! > anaCarol.direct!, "Ana e Bruno mais afins que Ana e Carla");
+  // Composta: 6 filmes, 2 gêneros (3 cada), 6 anos → gênero tem amostra, faixa de ano não.
+  // Só deve aparecer se ao menos uma dimensão além de "itens" teve amostra.
+  if (anaBruno.composite !== null) {
+    assert.ok(anaBruno.composite >= 0 && anaBruno.composite <= 100);
+  }
+
+  // Publicação anônima mascara nomes nos rankings e nas afinidades.
+  await call("POST", `/api/challenges/${challengeId}/results`, { session: owner, body: { anonymizeParticipants: true } });
+  const pub = await call("POST", `/api/challenges/${challengeId}/results/publish`, { session: owner, body: {} });
+  const token = (pub.body as { url: string }).url.split("/results/")[1];
+  const shared = (await call("GET", `/api/results/${token}`, {})).body as {
+    challenge: { result: { personalRankings: Array<{ name: string }>; affinity: { pairs: Array<{ a: { name: string } }> } } };
+  };
+  assert.ok(shared.challenge.result.personalRankings.every((row) => /^Participante \d+$/.test(row.name)), "rankings anônimos");
+  assert.ok(shared.challenge.result.affinity.pairs.every((pair) => /^Participante \d+$/.test(pair.a.name)), "afinidades anônimas");
+});

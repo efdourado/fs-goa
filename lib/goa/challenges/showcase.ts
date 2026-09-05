@@ -2,6 +2,7 @@ import type { PoolClient } from "pg";
 
 import { oneOrNull } from "../../db";
 import { publicId } from "../domain/shared";
+import { computeRankings } from "./rankings";
 import { metricsForChallenge } from "./results";
 
 /**
@@ -48,6 +49,26 @@ export async function generateShowcase(
        VALUES ($1,$2,'metric',$3,$4,$5::jsonb,$6,true,$7,now(),now())`,
       [publicId(), challengeId, metric.id as string, metric.label as string,
         JSON.stringify(metric), position++, userId],
+    );
+  }
+
+  // Personal rankings + affinity (V1 §9–11). Frozen here like every other block;
+  // an empty result (solo round, no shared items) simply isn't inserted.
+  const { personal, affinity } = await computeRankings(client, challengeId);
+  if (personal.length > 1) {
+    await client.query(
+      `INSERT INTO result_blocks
+        (id,challenge_id,kind,heading,value_snapshot,position,visible,created_by_user_id,created_at,updated_at)
+       VALUES ($1,$2,'ranking',$3,$4::jsonb,$5,true,$6,now(),now())`,
+      [publicId(), challengeId, "Rankings pessoais", JSON.stringify({ personal }), position++, userId],
+    );
+  }
+  if (affinity && affinity.pairs.length > 0) {
+    await client.query(
+      `INSERT INTO result_blocks
+        (id,challenge_id,kind,heading,value_snapshot,position,visible,created_by_user_id,created_at,updated_at)
+       VALUES ($1,$2,'affinity',$3,$4::jsonb,$5,true,$6,now(),now())`,
+      [publicId(), challengeId, "Afinidades", JSON.stringify(affinity), position++, userId],
     );
   }
 
