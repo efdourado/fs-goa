@@ -538,3 +538,41 @@ export async function archivePersonalCatalogItem(session: SessionContext, catalo
     return archiveCatalogItemWithClient(client, session.user.id, workspaceId, catalogItemId);
   });
 }
+
+/**
+ * Called right after a challenge is deleted: archives every catalog item that
+ * challenge touched and that no *other* surviving challenge still links to.
+ * An item with history in another round (any status — draft, active, or
+ * closed) is left alone, since that's exactly the cross-round memory the
+ * acervo exists to keep. Best-effort: never blocks the deletion itself.
+ */
+export async function archiveOrphanedCatalogItemsForChallenge(
+  client: PoolClient,
+  actorUserId: string,
+  groupId: string,
+  challengeId: string,
+): Promise<void> {
+  const orphans = await client.query<{ id: string; title: string; kind: string }>(
+    `SELECT DISTINCT ci.id, ci.title, ci.kind
+       FROM catalog_items ci
+       JOIN challenge_items it ON it.catalog_item_id = ci.id
+      WHERE it.challenge_id = $1 AND ci.archived_at IS NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM challenge_items other
+            JOIN challenges c ON c.id = other.challenge_id
+           WHERE other.catalog_item_id = ci.id
+             AND other.challenge_id <> $1
+             AND other.archived_at IS NULL
+             AND c.deleted_at IS NULL
+        )`,
+    [challengeId],
+  );
+  for (const item of orphans.rows) {
+    await client.query("UPDATE catalog_items SET archived_at = now(), updated_at = now() WHERE id = $1", [item.id]);
+    await writeAudit(
+      client, groupId, null, actorUserId,
+      "catalog.item_archived", "catalog_item", item.id, null, null,
+      { title: item.title, kind: item.kind, reason: "challenge_deleted" },
+    );
+  }
+}

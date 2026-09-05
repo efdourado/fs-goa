@@ -2008,6 +2008,54 @@ test("excluir do acervo: bloqueado enquanto o desafio corre, permitido depois, e
   );
 });
 
+test("apagar um desafio arquiva do acervo só os itens órfãos, mantendo os que outra rodada ainda usa", async () => {
+  const owner = await register("Dona Acervo Órfão", "dona_acervo_orfao");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube Órfão" } })).body as { id: string }).id;
+
+  const first = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "cinema", title: "Rodada 1", startsOn: "2026-01-01", endsOn: "2026-02-01",
+      participantIds: [owner.user.id],
+      items: [{ title: "Filme Compartilhado", year: 2000 }, { title: "Só da Rodada 1", year: 2001 }],
+    },
+  });
+  assert.equal(first.response.status, 201, JSON.stringify(first.body));
+
+  const second = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "cinema", title: "Rodada 2", startsOn: "2026-03-01", endsOn: "2026-04-01",
+      participantIds: [owner.user.id],
+      items: [{ title: "Filme Compartilhado", year: 2000 }, { title: "Só da Rodada 2", year: 2002 }],
+    },
+  });
+  const secondId = (second.body as { id: string }).id;
+  assert.equal(second.response.status, 201, JSON.stringify(second.body));
+
+  const catalogBefore = (await call("GET", `/api/groups/${groupId}/catalog`, { session: owner })).body as { items: Array<{ title: string }> };
+  assert.deepEqual(
+    catalogBefore.items.map((item) => item.title).sort(),
+    ["Filme Compartilhado", "Só da Rodada 1", "Só da Rodada 2"],
+    "as três entradas convivem no acervo antes de qualquer exclusão",
+  );
+
+  assert.equal((await call("DELETE", `/api/challenges/${secondId}`, { session: owner })).response.status, 200);
+
+  const catalogAfter = (await call("GET", `/api/groups/${groupId}/catalog`, { session: owner })).body as { items: Array<{ title: string }> };
+  assert.deepEqual(
+    catalogAfter.items.map((item) => item.title).sort(),
+    ["Filme Compartilhado", "Só da Rodada 1"],
+    "só o item exclusivo da rodada apagada some; o compartilhado com a rodada 1 continua",
+  );
+
+  const orphanAudit = await adminPool.query<{ count: number }>(
+    "SELECT count(*)::int AS count FROM audit_events WHERE group_id = $1 AND action = 'catalog.item_archived' AND metadata->>'reason' = 'challenge_deleted'",
+    [groupId],
+  );
+  assert.equal(orphanAudit.rows[0]?.count, 1, "a limpeza automática de órfãos fica auditada");
+});
+
 test("item + checkpoint são ortogonais: um registro carrega filme e sessão", async () => {
   const owner = await register("Ícaro", "icaro_ortho");
   const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Sessões" } })).body as { id: string }).id;

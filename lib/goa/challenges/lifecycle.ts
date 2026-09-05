@@ -2,6 +2,7 @@ import type { SessionContext } from "../../auth";
 import { inTransaction, oneOrNull } from "../../db";
 import { challengeAccess, writeAudit } from "../../goa-domain";
 import { ApiError } from "../../http";
+import { archiveOrphanedCatalogItemsForChallenge } from "../catalog";
 import { entryTypesForChallenge, usesCheckpoints, usesRoundItems } from "./entry-types";
 import { generateShowcase } from "./showcase";
 
@@ -91,6 +92,7 @@ export async function softDeleteChallenge(session: SessionContext, challengeId: 
         WHERE id = $1`,
       [challengeId, session.user.id],
     );
+    await archiveOrphanedCatalogItemsForChallenge(client, session.user.id, access.challenge.group_id, challengeId);
     await writeAudit(
       client,
       access.challenge.group_id,
