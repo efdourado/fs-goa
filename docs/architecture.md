@@ -32,7 +32,8 @@ navegador ──JSON + cookie HTTP-only──▶ Next.js / route handlers ──
 | `lib/goa/domain/` | criação de grupos, convites e desafios |
 | `lib/goa/challenges/` | receitas, tipos de registro, campos, itens, checkpoints, importação de lista, registros, prontidão, análise, vitrine, duplicação |
 | `lib/goa/catalog.ts` | acervo do grupo e histórico de um item entre rodadas |
-| `lib/goa/analysis.ts` · `lib/metrics.ts` | matemática pura das métricas (bayes, desvio, delta) |
+| `lib/goa/analysis.ts` · `lib/metrics.ts` | matemática pura das métricas (bayes, mediana, desvio, consenso, afinidade) |
+| `lib/goa/challenges/rankings.ts` | rankings pessoais + afinidade direta/composta (blocos derivados) |
 | `lib/validation.ts` | validação tipada e exportação CSV segura |
 | `db/schema/` | schema Drizzle, dividido por área |
 | `drizzle/` | única fonte de migrações reproduzíveis |
@@ -107,12 +108,26 @@ Grupo
   métrica apontando para campo morto, checkpoint fora do período…) e avisos que
   não bloqueiam. `GET /api/challenges/:id/preflight`; o mesmo cálculo é o portão
   do `transition` para `active`.
-- **Métricas** referenciam IDs de campos e são recalculadas sem tocar nos dados.
-  `group_by` produz uma série (ranking por item, recorte por pessoa), com
-  `minSample` editável. Ao encerrar, `result_blocks` guarda snapshots congelados;
-  a página pública exige um token aleatório do qual o banco guarda **só o hash** —
-  o token cru é mostrado uma vez, na publicação, e nunca persistido (perdeu o
-  link? rotacione).
+- **Métricas** (`results.ts` + `analysis.ts`) referenciam IDs de campos e são
+  recalculadas sem tocar nos dados. Operações: contagem, soma, média, mediana,
+  mín/máx, conclusão, média ajustada (bayes), polarização, consenso, surpresa,
+  desempenho de indicação. `group_by` vira série: item, pessoa, `checkpoint`
+  (com `cumulative`), ano/autor/gênero do acervo — combinações incoerentes são
+  recusadas (409 `invalid_metric_grouping`, `metric_needs_checkpoints`,
+  `metric_needs_expectation`…). Toda métrica calculada carrega `explanation`
+  (fórmula) e `sample` (amostra usada, e como o total esperado foi contado).
+- **Rankings pessoais + afinidade** (`rankings.ts`): blocos derivados, não
+  `challenge_metrics`. Por pessoa: contagem, conclusão, média/mediana/faixa,
+  consistência, top e piores itens, maior surpresa/decepção, desempenho das
+  próprias indicações. Afinidade direta entre pares com ≥ 5 itens em comum
+  (`100 × (1 − média |a−b| ÷ amplitude)`); afinidade composta (itens 50%, gênero
+  25%, faixa de ano 15%, duração 10%, peso de dimensão sem amostra
+  redistribuído) só aparece quando há amostra por dimensão. Vivo enquanto o
+  desafio corre; `generateShowcase` congela em `result_blocks` (`kind ∈
+  {ranking, affinity}`); publicação anônima troca os nomes por "Participante N".
+- Ao encerrar, `result_blocks` guarda snapshots congelados; a página pública
+  exige um token aleatório do qual o banco guarda **só o hash** — o token cru é
+  mostrado uma vez, na publicação, e nunca persistido (perdeu o link? rotacione).
 - **Duplicação** é só estrutural, em transação: desafio, tipos, campos, opções,
   itens e métricas ganham novos IDs; a receita carrega, a agenda zera, os itens
   re-resolvem contra o acervo do grupo de destino. Participantes, registros,
