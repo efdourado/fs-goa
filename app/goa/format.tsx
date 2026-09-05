@@ -80,8 +80,11 @@ export function makeGoaFormat(t: Translator, format: Formatter) {
       return t("errors.operation");
     }
     if (cause instanceof Error) {
-      const code = (cause as { code?: string }).code;
-      if (code?.startsWith("clipboard_") && has(`clipboard.${code.slice("clipboard_".length)}`)) {
+      // A native DOMException (e.g. an aborted fetch) carries a legacy
+      // numeric `.code`, not a string — guard the type before calling
+      // string methods on it.
+      const code = (cause as { code?: unknown }).code;
+      if (typeof code === "string" && code.startsWith("clipboard_") && has(`clipboard.${code.slice("clipboard_".length)}`)) {
         return t(`clipboard.${code.slice("clipboard_".length)}`);
       }
       if (cause instanceof TypeError && /fetch|network/i.test(cause.message)) return t("errors.network");
