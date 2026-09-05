@@ -101,6 +101,10 @@ export const challengeItems = pgTable(
     entryTypeId: text("entry_type_id"),
     catalogItemId: text("catalog_item_id").references(() => catalogItems.id, { onDelete: "restrict" }),
     recommendedByUserId: text("recommended_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    // Free-text provenance for an item nobody in the group recommended
+    // ("list found online"). Mutually informational with `recommended_by_user_id`
+    // — never a stand-in for a real participant.
+    originNote: text("origin_note"),
     semanticKey: text("semantic_key").notNull(),
     title: text("title").notNull(),
     description: text("description"),
@@ -134,6 +138,10 @@ export const challengeItems = pgTable(
     index("challenge_items_catalog_idx").on(table.catalogItemId),
     check("challenge_items_key_check", sql`${table.semanticKey} ~ '^[a-z][a-z0-9_]{0,63}$'`),
     check("challenge_items_title_check", sql`char_length(btrim(${table.title})) between 1 and 200`),
+    check(
+      "challenge_items_origin_note_check",
+      sql`${table.originNote} is null or char_length(btrim(${table.originNote})) between 1 and 200`,
+    ),
     check("challenge_items_position_check", sql`${table.position} >= 0`),
     check(
       "challenge_items_schedule_check",

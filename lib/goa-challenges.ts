@@ -1,4 +1,8 @@
 export { getChallengeDetail, updateChallenge } from "./goa/challenges/detail";
+export { assignCheckpointItems, saveCheckpoints } from "./goa/challenges/checkpoints";
+export type { CheckpointKind } from "./goa/challenges/checkpoints";
+export { previewListImport, LIST_IMPORT_LIMIT } from "./goa/challenges/list-import";
+export type { ImportPreview, ImportPreviewRow, MappableField } from "./goa/challenges/list-import";
 export { duplicateChallenge } from "./goa/challenges/duplicate";
 export {
   deleteEntry,

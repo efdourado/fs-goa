@@ -211,6 +211,13 @@
       "when": 1788540000000,
       "tag": "0029_entry_type_visibility",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1788550000000,
+      "tag": "0030_checkpoint_kind_item_origin",
+      "breakpoints": true
     }
   ]
 }

@@ -37,7 +37,7 @@ export async function getChallengeDetail(session: SessionContext, challengeId: s
     const itemsResult = await client.query<{
         id: string; title: string; description: string | null;
         position: number; opens_at: Date | null; due_at: Date | null;
-        checkpoint_id: string | null;
+        checkpoint_id: string | null; origin_note: string | null;
         catalog_item_id: string | null; catalog_title: string | null;
         catalog_author: string | null; catalog_year: number | null;
         catalog_main_genre: string | null; catalog_pages: number | null; catalog_runtime_minutes: number | null;
@@ -46,7 +46,7 @@ export async function getChallengeDetail(session: SessionContext, challengeId: s
         // A recommender who left the group (or whose account is gone) never shows
         // their name to the group again — `recommended_by_id` goes null right
         // along with it, same as a deleted account already reads "Conta removida".
-        `SELECT i.id, i.title, i.description, i.position, i.opens_at, i.due_at, i.checkpoint_id,
+        `SELECT i.id, i.title, i.description, i.position, i.opens_at, i.due_at, i.checkpoint_id, i.origin_note,
                 i.catalog_item_id, ci.title AS catalog_title, ci.author AS catalog_author, ci.year AS catalog_year,
                 ci.main_genre AS catalog_main_genre, ci.page_count AS catalog_pages, ci.runtime_minutes AS catalog_runtime_minutes,
                 CASE WHEN active_recommender.user_id IS NOT NULL THEN i.recommended_by_user_id END AS recommended_by_id,
@@ -62,11 +62,19 @@ export async function getChallengeDetail(session: SessionContext, challengeId: s
         [challengeId, access.challenge.group_id],
       );
     const checkpointsResult = await client.query<{
-        id: string; title: string; description: string | null; position: number;
+        id: string; title: string; description: string | null; position: number; kind: string;
         starts_at: Date | null; due_at: Date | null;
+        item_count: number; total_runtime_minutes: number | null;
       }>(
-        `SELECT id, title, description, position, starts_at, due_at
-           FROM challenge_checkpoints WHERE challenge_id = $1 AND archived_at IS NULL ORDER BY position`,
+        `SELECT cc.id, cc.title, cc.description, cc.position, cc.kind, cc.starts_at, cc.due_at,
+                count(i.id)::int AS item_count,
+                nullif(sum(ci.runtime_minutes), 0)::int AS total_runtime_minutes
+           FROM challenge_checkpoints cc
+           LEFT JOIN challenge_items i ON i.checkpoint_id = cc.id AND i.archived_at IS NULL
+           LEFT JOIN catalog_items ci ON ci.id = i.catalog_item_id
+          WHERE cc.challenge_id = $1 AND cc.archived_at IS NULL
+          GROUP BY cc.id
+          ORDER BY cc.position`,
         [challengeId],
       );
     const participantsResult = await client.query<{ id: string; display_name: string; username: string }>(
@@ -116,18 +124,28 @@ export async function getChallengeDetail(session: SessionContext, challengeId: s
     // Checkpoints (dated sessions) are an always-available array, independent of
     // whether the round also has items. `items` stays overloaded for the
     // single-axis screens: a pure daily round still gets its checkpoints here.
+    const now = Date.now();
     const checkpoints = checkpointsResult.rows.map((checkpoint) => ({
       id: checkpoint.id, checkpointId: checkpoint.id, title: checkpoint.title,
       description: checkpoint.description, position: checkpoint.position,
+      kind: checkpoint.kind as "day" | "week" | "session" | "milestone",
       opensAt: checkpoint.starts_at?.toISOString() ?? null,
       dueAt: checkpoint.due_at?.toISOString() ?? null,
       date: checkpoint.starts_at?.toISOString().slice(0, 10) ?? null,
       status: windowStatus(access.challenge.status, checkpoint.starts_at, checkpoint.due_at),
+      itemCount: checkpoint.item_count,
+      totalRuntimeMinutes: checkpoint.total_runtime_minutes,
+      timeframe: checkpoint.starts_at && checkpoint.starts_at.getTime() > now
+        ? "future" as const
+        : checkpoint.due_at && checkpoint.due_at.getTime() <= now
+        ? "past" as const
+        : "current" as const,
     }));
     const roundItems = itemsResult.rows.map((item) => ({
       id: item.id, title: item.title,
       description: item.description, position: item.position,
       checkpointId: item.checkpoint_id ?? null,
+      originNote: item.origin_note ?? null,
       opensAt: item.opens_at?.toISOString() ?? null, dueAt: item.due_at?.toISOString() ?? null,
       status: windowStatus(access.challenge.status, item.opens_at, item.due_at),
       catalogItem: item.catalog_item_id
