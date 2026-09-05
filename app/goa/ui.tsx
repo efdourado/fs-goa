@@ -320,11 +320,9 @@ export function AppHeader({
   return (
     <header className="sticky top-0 z-30 border-b border-[var(--edge)] bg-[var(--canvas)]/92 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:h-[76px] sm:px-6">
-        <div className="flex items-center gap-1 sm:gap-2">
-          <button className="cursor-pointer rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25" type="button" onClick={onHome}><Brand /></button>
-          <button className={cx(navLink, "hidden items-center sm:inline-flex")} type="button" onClick={onHome}>{t("home")}</button>
-        </div>
+        <button className="cursor-pointer rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25" type="button" onClick={onHome}><Brand /></button>
         <div className="flex min-w-0 items-center gap-0.5 sm:gap-2">
+          <button className={cx(navLink, "hidden items-center sm:inline-flex")} type="button" onClick={onHome}>{t("home")}</button>
           <button className={cx(navLink, "hidden items-center sm:inline-flex")} type="button" onClick={onOpenPersonalSpace}>{t("personalSpace")}</button>
           <button className={cx(navLink, "hidden items-center sm:inline-flex")} type="button" onClick={onOpenTemplates}>{t("templates")}</button>
           <button className={cx(navLink, "hidden items-center sm:inline-flex")} type="button" onClick={onOpenAbout}>{t("about")}</button>
