@@ -15,6 +15,8 @@ export {
   updateChallengeItem,
 } from "./goa/challenges/items";
 export { softDeleteChallenge, transitionChallenge } from "./goa/challenges/lifecycle";
+export { challengePreflight } from "./goa/challenges/preflight";
+export type { PreflightIssue, PreflightReport } from "./goa/challenges/preflight";
 export { setChallengeParticipants } from "./goa/challenges/participants";
 export {
   duplicateTemplate,

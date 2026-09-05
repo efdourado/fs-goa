@@ -52,6 +52,7 @@ import {
   addMetric,
   archiveChallengeItem,
   archiveMetric,
+  challengePreflight,
   curateResults,
   deleteEntry,
   duplicateChallenge,
@@ -157,6 +158,9 @@ export async function GET(request: Request): Promise<Response> {
     }
     if (path[0] === "challenges" && path.length === 2) {
       return json(await getChallengeDetail(await requireSession(request), path[1]));
+    }
+    if (path[0] === "challenges" && path[2] === "preflight" && path.length === 3) {
+      return json(await challengePreflight(await requireSession(request), path[1]));
     }
     if (path[0] === "challenges" && path[2] === "entries" && path.length === 3) {
       return json({ entries: await listEntries(await requireSession(request), path[1]) });

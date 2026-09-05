@@ -69,6 +69,8 @@ export const API_PATHS = {
     `/api/challenges/${encodeURIComponent(challengeId)}/results/publish`,
   entries: (challengeId: Id) => `/api/challenges/${encodeURIComponent(challengeId)}/entries`,
   entry: (entryId: Id) => `/api/entries/${encodeURIComponent(entryId)}`,
+  preflight: (challengeId: Id) =>
+    `/api/challenges/${encodeURIComponent(challengeId)}/preflight`,
   transition: (challengeId: Id) =>
     `/api/challenges/${encodeURIComponent(challengeId)}/transition`,
   duplicate: (challengeId: Id) =>

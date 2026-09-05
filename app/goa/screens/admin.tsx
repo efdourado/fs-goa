@@ -1,9 +1,9 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { type FormEvent, useMemo, useRef, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { API_PATHS } from "../api";
+import { API_PATHS, apiRequest } from "../api";
 import { useGoaFormat } from "../format";
 import { CineItemsEditor, type CineRow, cineRowsToInput } from "../cine-items";
 import { copyText } from "../clipboard";
@@ -56,6 +56,79 @@ export interface DuplicateTargetGroup {
   challengeLimit: number;
 }
 
+interface PreflightIssue { code: string; severity: "error" | "warning"; message: string }
+interface PreflightReport { ready: boolean; errors: PreflightIssue[]; warnings: PreflightIssue[] }
+
+/**
+ * The pre-activation review: blocking errors, soft "worth reviewing" notes, or
+ * a clean bill of health. Re-fetches on demand so the admin can fix something
+ * in another tab and check again.
+ */
+function PreflightPanel({ challengeId, onReady }: { challengeId: Id; onReady: (ready: boolean) => void }) {
+  const t = useTranslations("preflight");
+  const tCodes = useTranslations("preflight.codes");
+  const [report, setReport] = useState<PreflightReport | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    const controller = new AbortController();
+    apiRequest<PreflightReport>(API_PATHS.preflight(challengeId), { signal: controller.signal })
+      .then((data) => { setReport(data); onReady(data.ready); })
+      .catch((cause: unknown) => {
+        if (cause instanceof DOMException && cause.name === "AbortError") return;
+        setError(cause instanceof Error ? cause.message : t("loadError"));
+      })
+      .finally(() => setLoading(false));
+    return () => controller.abort();
+  }, [challengeId, onReady, t]);
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => load(), [load]);
+
+  const label = (issue: PreflightIssue) => (tCodes.has(issue.code) ? tCodes(issue.code) : issue.message);
+
+  return (
+    <section className={cx(cardClass, "p-5 sm:p-7")}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-xl font-light">{t("title")}</h2>
+        <button type="button" className="text-xs font-light text-[var(--muted)] hover:text-[var(--ink)] hover:underline" onClick={load} disabled={loading}>
+          {loading ? t("checking") : t("recheck")}
+        </button>
+      </div>
+      {error ? <p className="mt-3 text-sm text-[var(--danger)]">{error}</p> : null}
+      {report ? (
+        <div className="mt-4 space-y-4">
+          {report.errors.length ? (
+            <div className="rounded-2xl border border-[var(--danger)]/40 bg-[var(--danger-soft)] p-4">
+              <p className="text-sm font-medium text-[var(--danger)]">{t("fixFirst", { count: report.errors.length })}</p>
+              <ul className="mt-2 space-y-1 text-sm">
+                {report.errors.map((issue, index) => <li key={`${issue.code}-${index}`}>· {label(issue)}</li>)}
+              </ul>
+            </div>
+          ) : null}
+          {report.warnings.length ? (
+            <div className="rounded-2xl border border-[var(--warn-line)]/50 bg-[var(--warn-soft)] p-4">
+              <p className="text-sm font-medium text-[var(--warn-strong)]">{t("worthReviewing", { count: report.warnings.length })}</p>
+              <ul className="mt-2 space-y-1 text-sm">
+                {report.warnings.map((issue, index) => <li key={`${issue.code}-${index}`}>· {label(issue)}</li>)}
+              </ul>
+            </div>
+          ) : null}
+          {report.ready && !report.warnings.length ? (
+            <p className="rounded-2xl border border-[var(--ok-line)]/40 bg-[var(--ok-soft)] p-4 text-sm font-medium text-[var(--ok-strong)]">{t("allReady")}</p>
+          ) : null}
+          {report.ready && report.warnings.length ? (
+            <p className="text-xs text-[var(--muted)]">{t("readyWithWarnings")}</p>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 function AdminOverview({
   challenge,
   onSave,
@@ -92,6 +165,7 @@ function AdminOverview({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [preflightReady, setPreflightReady] = useState(false);
   const scheduled = isChallengeScheduled(challenge.status, challenge.startsOn, challenge.submissionMode);
   const livingList = isLivingList(challenge);
 
@@ -213,12 +287,16 @@ function AdminOverview({
       </section>
       
 
+      {!livingList && challenge.status === "draft" ? (
+        <PreflightPanel challengeId={challenge.id} onReady={setPreflightReady} />
+      ) : null}
+
       {!livingList ? (
         <section className={cx(cardClass, "p-5 sm:p-7")}>
           <h2 className="text-xl font-light">{t("stateTitle")}</h2>
           <div className="mt-4 flex flex-col gap-4 rounded-2xl bg-[var(--wash)] p-5 sm:flex-row sm:items-center sm:justify-between">
             <div><ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} /><p className="mt-2 max-w-xl text-sm leading-6 text-[var(--muted)]">{challenge.status === "draft" ? t("stateDraft") : scheduled ? t("stateScheduled", { date: f.date(challenge.startsOn, longDate) }) : challenge.status === "active" ? t("stateActive") : t("stateClosed")}</p></div>
-            {challenge.status === "draft" ? <Button disabled={Boolean(busy)} onClick={() => { if (window.confirm(t("activateConfirm"))) void run("transition", () => onTransition("active"), t("activated")); }}>{t("activate")}</Button> : null}
+            {challenge.status === "draft" ? <Button disabled={Boolean(busy) || !preflightReady} onClick={() => { if (window.confirm(t("activateConfirm"))) void run("transition", () => onTransition("active"), t("activated")); }}>{t("activate")}</Button> : null}
             {challenge.status === "active" ? <Button variant="danger" disabled={Boolean(busy)} onClick={() => { if (window.confirm(t("closeConfirm"))) void run("transition", () => onTransition("closed"), t("closedDone")); }}>{t("close")}</Button> : null}
             {challenge.status === "closed" ? <Button variant="secondary" disabled={Boolean(busy)} onClick={() => { if (window.confirm(t("reopenConfirm"))) void run("transition", () => onTransition("active"), t("reopenedDone")); }}>{t("reopen")}</Button> : null}
           </div>
