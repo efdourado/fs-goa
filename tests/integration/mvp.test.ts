@@ -3209,3 +3209,182 @@ test("visibilidade por tipo de registro: tempo real, depois da própria, autor-o
   // Encerrado congela a política.
   assert.equal((await call("PATCH", `/api/challenges/${challengeId}/entry-types/${typeId}`, { session: owner, body: { visibilityPolicy: "group_realtime" } })).response.status, 409);
 });
+
+test("importação por JSON: prévia sem salvar, mapeia campos, avisa chave desconhecida, detecta duplicata, e o commit é atômico", async () => {
+  const owner = await register("Dona Import", "dona_import_json");
+  const keeper = await register("Curador Import", "curador_import_json");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube Import" } })).body as { id: string }).id;
+  const invite = (await call("POST", `/api/groups/${groupId}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
+  await call("POST", `/api/invites/${invite.token}`, { session: keeper, body: {} });
+
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "cinema", title: "Maratona Import", participantIds: [owner.user.id, keeper.user.id],
+      items: [{ title: "Filme Já Existe" }],
+    },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+
+  const json = JSON.stringify([
+    { title: "Aftersun", ano: 2022, indicadoPor: "Curador Import", vibe: "melancólica" },
+    { title: "Filme Já Existe" },
+    { notes: "sem título aqui" },
+    { title: "Achado na Internet", origem: "lista de um blog" },
+  ]);
+  const preview = await call("POST", `/api/challenges/${challengeId}/items/preview`, { session: owner, body: { json } });
+  assert.equal(preview.response.status, 200, JSON.stringify(preview.body));
+  const previewBody = preview.body as {
+    rows: Array<{
+      index: number; title: string; valid: boolean; errors: string[];
+      mapped: { year: number | null }; unknownKeys: string[];
+      recommendation: { kind: string; name?: string; text?: string } | null;
+      existingCatalogItemId: string | null; duplicateInChallenge: boolean;
+    }>;
+    summary: { total: number; importable: number; invalid: number; duplicatesInChallenge: number; unknownKeys: string[] };
+  };
+  assert.equal(previewBody.summary.total, 4);
+  assert.equal(previewBody.summary.invalid, 1, "a linha sem título é inválida");
+  assert.equal(previewBody.summary.duplicatesInChallenge, 1, "'Filme Já Existe' já é um item ativo");
+  assert.deepEqual(previewBody.summary.unknownKeys, ["notes", "vibe"], "chaves fora do mapa conhecido são listadas");
+  assert.equal(previewBody.rows[0].mapped.year, 2022, "'ano' foi mapeado para year");
+  assert.equal(previewBody.rows[0].recommendation?.kind, "participant", "'indicadoPor' bateu com um participante");
+  assert.equal(previewBody.rows[0].recommendation?.name, "Curador Import");
+  assert.equal(previewBody.rows[1].duplicateInChallenge, true);
+  assert.equal(previewBody.rows[2].valid, false);
+  assert.equal(previewBody.rows[3].recommendation?.kind, "origin", "origem externa vira texto, não participante");
+  assert.equal(previewBody.rows[3].recommendation?.text, "lista de um blog");
+
+  const stillOne = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { items: unknown[] };
+  assert.equal(stillOne.items.length, 1, "a prévia não escreve nada");
+
+  // Falha parcial: um item sem título derruba a operação inteira.
+  const partial = await call("POST", `/api/challenges/${challengeId}/items`, {
+    session: owner,
+    body: { items: [{ title: "Bom Filme" }, { title: "  " }] },
+  });
+  assert.equal(partial.response.status, 400, JSON.stringify(partial.body));
+  const afterPartial = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { items: unknown[] };
+  assert.equal(afterPartial.items.length, 1, "nada da lista parcial foi criado");
+
+  // Commit consistente: indicação por participante e origem textual convivem.
+  const commit = await call("POST", `/api/challenges/${challengeId}/items`, {
+    session: owner,
+    body: {
+      items: [
+        { title: "Aftersun", year: 2022, recommendedByUserId: keeper.user.id },
+        { title: "Achado na Internet", originNote: "lista de um blog" },
+      ],
+    },
+  });
+  assert.equal(commit.response.status, 201, JSON.stringify(commit.body));
+  const finalDetail = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    items: Array<{ title: string; recommendedBy: { name: string } | null; originNote: string | null }>;
+  };
+  assert.equal(finalDetail.items.length, 3);
+  const aftersun = finalDetail.items.find((item) => item.title === "Aftersun")!;
+  assert.equal(aftersun.recommendedBy?.name, "Curador Import");
+  assert.equal(aftersun.originNote, null);
+  const online = finalDetail.items.find((item) => item.title === "Achado na Internet")!;
+  assert.equal(online.recommendedBy, null);
+  assert.equal(online.originNote, "lista de um blog");
+
+  // O limite da operação vale.
+  const tooMany = await call("POST", `/api/challenges/${challengeId}/items/preview`, {
+    session: owner,
+    body: { json: JSON.stringify(Array.from({ length: 201 }, (_, i) => ({ title: `Filme ${i}` }))) },
+  });
+  assert.equal(tooMany.response.status, 400);
+  assert.equal((tooMany.body as { error: string }).error, "json_too_large");
+});
+
+test("checkpoints genéricos: semanas com pausa, atribuição de itens, total de duração, e nada de registro órfão", async () => {
+  const owner = await register("Dona Semana", "dona_semana_cp");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube Semanal" } })).body as { id: string }).id;
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "cinema", title: "Maratona semanal", participantIds: [owner.user.id],
+      startsOn: "2026-03-02", endsOn: "2026-03-29",
+      items: [
+        { title: "Filme A", runtimeMinutes: 100 },
+        { title: "Filme B", runtimeMinutes: 120 },
+        { title: "Filme C", runtimeMinutes: 90 },
+      ],
+    },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+
+  // Duas semanas, com uma pausa de uma semana entre elas (não são consecutivas).
+  const saved = await call("POST", `/api/challenges/${challengeId}/checkpoints`, {
+    session: owner,
+    body: {
+      checkpoints: [
+        { title: "Semana 1", kind: "week", startsAt: "2026-03-02", dueAt: "2026-03-08" },
+        { title: "Semana 3", kind: "week", startsAt: "2026-03-16", dueAt: "2026-03-22" },
+      ],
+    },
+  });
+  assert.equal(saved.response.status, 200, JSON.stringify(saved.body));
+  const savedCheckpoints = (saved.body as { checkpoints: Array<{ id: string; title: string }> }).checkpoints;
+  assert.equal(savedCheckpoints.length, 2);
+  const week1 = savedCheckpoints[0].id;
+  const week3 = savedCheckpoints[1].id;
+
+  const detail = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    entryTypes: Array<{ id: string; submissionMode: string }>;
+    items: Array<{ id: string; title: string; checkpointId: string | null }>;
+    checkpoints: Array<{ id: string; kind: string; itemCount: number; totalRuntimeMinutes: number | null; timeframe: string }>;
+  };
+  assert.equal(detail.checkpoints.every((cp) => cp.kind === "week"), true);
+  const entryTypeId = detail.entryTypes[0].id;
+  const entrySubmissionMode = detail.entryTypes[0].submissionMode;
+  const itemByTitle = new Map(detail.items.map((item) => [item.title, item.id]));
+
+  const assign = await call("POST", `/api/challenges/${challengeId}/items/assign`, {
+    session: owner,
+    body: {
+      assignments: [
+        { itemId: itemByTitle.get("Filme A"), checkpointId: week1 },
+        { itemId: itemByTitle.get("Filme B"), checkpointId: week1 },
+        { itemId: itemByTitle.get("Filme C"), checkpointId: week3 },
+      ],
+    },
+  });
+  assert.equal(assign.response.status, 200, JSON.stringify(assign.body));
+  assert.equal((assign.body as { changed: number }).changed, 3);
+
+  const withTotals = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    checkpoints: Array<{ id: string; itemCount: number; totalRuntimeMinutes: number | null }>;
+  };
+  const total1 = withTotals.checkpoints.find((cp) => cp.id === week1)!;
+  assert.equal(total1.itemCount, 2);
+  assert.equal(total1.totalRuntimeMinutes, 220, "soma a duração dos filmes da semana");
+
+  // Remover a Semana 3 da lista: ela some e seus itens ficam sem checkpoint (não órfãos).
+  const dropped = await call("POST", `/api/challenges/${challengeId}/checkpoints`, {
+    session: owner,
+    body: { checkpoints: [{ id: week1, title: "Semana 1", kind: "week", startsAt: "2026-03-02", dueAt: "2026-03-08" }] },
+  });
+  assert.equal(dropped.response.status, 200, JSON.stringify(dropped.body));
+  const afterDrop = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    items: Array<{ title: string; checkpointId: string | null }>;
+    checkpoints: Array<{ id: string }>;
+  };
+  assert.equal(afterDrop.checkpoints.length, 1);
+  assert.equal(afterDrop.items.find((item) => item.title === "Filme C")?.checkpointId, null, "o item da semana removida volta a não ter checkpoint");
+
+  // Um checkpoint com registro preso não pode ser removido.
+  await adminPool.query(
+    `INSERT INTO entries
+       (id, challenge_id, entry_type_id, submission_mode, cardinality, participant_user_id, item_id, checkpoint_id,
+        occurred_on, submitted_at, created_by_user_id, last_edited_by_user_id, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, 'once_per_item', $5, $6, $7, '2026-03-03', now(), $5, $5, now(), now())`,
+    [crypto.randomUUID(), challengeId, entryTypeId, entrySubmissionMode, owner.user.id, itemByTitle.get("Filme A"), week1],
+  );
+  const blocked = await call("POST", `/api/challenges/${challengeId}/checkpoints`, {
+    session: owner, body: { checkpoints: [] },
+  });
+  assert.equal(blocked.response.status, 409, JSON.stringify(blocked.body));
+  assert.equal((blocked.body as { error: string }).error, "checkpoint_has_entries");
+});

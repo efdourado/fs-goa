@@ -174,6 +174,10 @@ export async function createChallenge(
           }
           recommendedBy = item.recommendedByUserId;
         }
+        // Free-text provenance for an item nobody in the group recommended.
+        const originNote = typeof item.originNote === "string" && item.originNote.trim()
+          ? item.originNote.trim().slice(0, 200)
+          : null;
 
         let itemKey = semanticKey(itemTitle, `item_${index + 1}`);
         for (let suffix = 2; usedKeys.has(itemKey); suffix += 1) {
@@ -183,9 +187,9 @@ export async function createChallenge(
 
         await client.query(
           `INSERT INTO challenge_items
-            (id, challenge_id, entry_type_id, catalog_item_id, recommended_by_user_id, semantic_key, title, position, metadata, created_at, updated_at)
-           VALUES ($1,$2,NULL,$3,$4,$5,$6,$7,'{}'::jsonb,now(),now())`,
-          [publicId(), id, catalogItemId, recommendedBy, itemKey, itemTitle, index],
+            (id, challenge_id, entry_type_id, catalog_item_id, recommended_by_user_id, origin_note, semantic_key, title, position, metadata, created_at, updated_at)
+           VALUES ($1,$2,NULL,$3,$4,$5,$6,$7,$8,'{}'::jsonb,now(),now())`,
+          [publicId(), id, catalogItemId, recommendedBy, originNote, itemKey, itemTitle, index],
         );
       }
     }

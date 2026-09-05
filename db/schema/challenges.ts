@@ -178,6 +178,11 @@ export const challengeCheckpoints = pgTable(
     semanticKey: text("semantic_key").notNull(),
     title: text("title").notNull(),
     description: text("description"),
+    // How the checkpoint is presented — a calendar day, a week, a themed
+    // session, or a one-off milestone. "Week" is a presentation, not an entity:
+    // the app groups consecutive dated checkpoints of kind `week` into a
+    // week-by-week view. Day-by-day generated rounds carry `day`.
+    kind: text("kind").notNull().default("session"),
     position: integer("position").notNull().default(0),
     startsAt: timestamptz("starts_at"),
     dueAt: timestamptz("due_at"),
@@ -199,6 +204,10 @@ export const challengeCheckpoints = pgTable(
     check(
       "challenge_checkpoints_title_check",
       sql`char_length(btrim(${table.title})) between 1 and 160`,
+    ),
+    check(
+      "challenge_checkpoints_kind_check",
+      sql`${table.kind} in ('day', 'week', 'session', 'milestone')`,
     ),
     check("challenge_checkpoints_position_check", sql`${table.position} >= 0`),
     check(

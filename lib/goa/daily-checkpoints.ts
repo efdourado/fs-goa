@@ -53,8 +53,8 @@ export async function syncDailyCheckpoints(
   const upserted = await client.query<{ id: string; position: number }>(
     `WITH upserted AS (
        INSERT INTO challenge_checkpoints
-         (id,challenge_id,semantic_key,title,position,starts_at,due_at,created_at,updated_at)
-       SELECT input.id,$1,input.semantic_key,input.title,input.position,
+         (id,challenge_id,semantic_key,title,kind,position,starts_at,due_at,created_at,updated_at)
+       SELECT input.id,$1,input.semantic_key,input.title,'day',input.position,
               input.day::timestamp AT TIME ZONE 'America/Sao_Paulo',
               (input.day + 1)::timestamp AT TIME ZONE 'America/Sao_Paulo',now(),now()
          FROM jsonb_to_recordset($2::jsonb) AS input(
@@ -62,7 +62,7 @@ export async function syncDailyCheckpoints(
          )
        ON CONFLICT (challenge_id,semantic_key) DO UPDATE SET
          position=excluded.position,starts_at=excluded.starts_at,
-         due_at=excluded.due_at,archived_at=NULL,updated_at=now()
+         due_at=excluded.due_at,kind='day',archived_at=NULL,updated_at=now()
        RETURNING id,position
      )
      SELECT id,position FROM upserted ORDER BY position`,

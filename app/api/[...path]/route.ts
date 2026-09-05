@@ -52,6 +52,7 @@ import {
   addMetric,
   archiveChallengeItem,
   archiveMetric,
+  assignCheckpointItems,
   challengePreflight,
   curateResults,
   deleteEntry,
@@ -62,8 +63,10 @@ import {
   getTemplateDetail,
   listEntries,
   listTemplates,
+  previewListImport,
   publicResults,
   publishResults,
+  saveCheckpoints,
   saveEntry,
   saveChallengeFields,
   updateMetric,
@@ -267,8 +270,17 @@ export async function POST(request: Request): Promise<Response> {
     if (path[0] === "challenges" && path[2] === "fields" && path.length === 3) {
       return json(await saveChallengeFields(session, path[1], body), 201);
     }
+    if (path[0] === "challenges" && path[2] === "items" && path[3] === "preview" && path.length === 4) {
+      return json(await previewListImport(session, path[1], body));
+    }
+    if (path[0] === "challenges" && path[2] === "items" && path[3] === "assign" && path.length === 4) {
+      return json(await assignCheckpointItems(session, path[1], body));
+    }
     if (path[0] === "challenges" && path[2] === "items" && path.length === 3) {
       return json(await saveChallengeItems(session, path[1], body), 201);
+    }
+    if (path[0] === "challenges" && path[2] === "checkpoints" && path.length === 3) {
+      return json(await saveCheckpoints(session, path[1], body));
     }
     if (path[0] === "challenges" && path[2] === "metrics" && path.length === 3) {
       return json(await addMetric(session, path[1], body), 201);

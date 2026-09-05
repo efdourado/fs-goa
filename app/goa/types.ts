@@ -148,6 +148,13 @@ export interface ChallengeItem {
   status?: "scheduled" | "open" | "past_due" | "closed";
   catalogItem?: Pick<CatalogItem, "id" | "title" | "author" | "year" | "pageCount" | "runtimeMinutes" | "mainGenre"> | null;
   recommendedBy?: { id: Id; name: string } | null;
+  /** Free-text provenance for an item nobody in the group recommended. */
+  originNote?: string | null;
+  /** On checkpoint rows: how it's presented, plus roll-ups over its items. */
+  kind?: CheckpointKind;
+  itemCount?: number;
+  totalRuntimeMinutes?: number | null;
+  timeframe?: "past" | "current" | "future";
 }
 
 export interface Participant {
@@ -435,9 +442,59 @@ export interface ChallengeItemInput {
   position: number;
   catalogItemId?: Id;
   recommendedByUserId?: Id;
+  /** Free-text provenance when no participant recommended it. */
+  originNote?: string;
+  /** Checkpoint (week/session) this item is organised under. */
+  checkpointId?: Id | null;
   author?: string;
   year?: number;
   pageCount?: number;
   runtimeMinutes?: number;
   mainGenre?: string;
+}
+
+export type CheckpointKind = "day" | "week" | "session" | "milestone";
+
+export interface CheckpointInput {
+  id?: Id;
+  title: string;
+  kind: CheckpointKind;
+  description?: string | null;
+  startsAt?: string | null;
+  dueAt?: string | null;
+}
+
+export interface ImportPreviewRow {
+  index: number;
+  title: string;
+  valid: boolean;
+  errors: string[];
+  mapped: {
+    author: string | null;
+    year: number | null;
+    pageCount: number | null;
+    runtimeMinutes: number | null;
+    mainGenre: string | null;
+  };
+  recommendation:
+    | { kind: "participant"; userId: Id; name: string }
+    | { kind: "origin"; text: string }
+    | null;
+  existingCatalogItemId: Id | null;
+  duplicateInChallenge: boolean;
+  unknownKeys: string[];
+}
+
+export interface ImportPreview {
+  rows: ImportPreviewRow[];
+  summary: {
+    total: number;
+    importable: number;
+    invalid: number;
+    duplicatesInCatalog: number;
+    duplicatesInChallenge: number;
+    unknownKeys: string[];
+  };
+  limit: number;
+  catalogKind: "film" | "book";
 }
