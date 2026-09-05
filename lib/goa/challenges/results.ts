@@ -1288,9 +1288,12 @@ export async function publicResults(token: string) {
   return withClient(async (client) => {
     const row = await oneOrNull<{ snapshot: unknown }>(
       client,
-      `SELECT results_published_snapshot AS snapshot FROM challenges
-        WHERE result_share_token_hash=$1 AND results_published_at IS NOT NULL
-          AND status='closed' AND deleted_at IS NULL`,
+      // The parent group's state also gates the public link: a binned group
+      // takes its challenges' showcases offline with it (ROADMAP §13).
+      `SELECT c.results_published_snapshot AS snapshot FROM challenges c
+         JOIN groups g ON g.id = c.group_id AND g.deleted_at IS NULL
+        WHERE c.result_share_token_hash=$1 AND c.results_published_at IS NOT NULL
+          AND c.status='closed' AND c.deleted_at IS NULL`,
       [hash],
     );
     if (!row || !row.snapshot) throw new ApiError(404, "not_found", "Resultados não encontrados.");

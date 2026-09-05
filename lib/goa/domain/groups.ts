@@ -347,10 +347,12 @@ export async function respondToMemberRequest(
  */
 export async function leaveGroup(session: SessionContext, groupId: string) {
   return inTransaction(async (client) => {
+    // A binned group must still be leavable — otherwise its members stay stuck in
+    // it (and it keeps counting toward their group cap) with no way out.
     const group = await oneOrNull<{ id: string; name: string }>(
       client,
       `SELECT id, name FROM groups
-        WHERE id = $1 AND kind = 'standard' AND archived_at IS NULL AND deleted_at IS NULL
+        WHERE id = $1 AND kind = 'standard' AND archived_at IS NULL
         FOR UPDATE`,
       [groupId],
     );
@@ -377,7 +379,7 @@ export async function leaveGroup(session: SessionContext, groupId: string) {
       [groupId, session.user.id],
     );
     await client.query(
-      `UPDATE challenge_participants SET removed_at = now()
+      `UPDATE challenge_participants SET removed_at = now(), name_consent = false
         WHERE user_id = $2 AND removed_at IS NULL
           AND challenge_id IN (SELECT id FROM challenges WHERE group_id = $1)`,
       [groupId, session.user.id],
@@ -543,6 +545,14 @@ export async function softDeleteGroup(session: SessionContext, groupId: string) 
     // Sets `deleted_at` + records the explicit bin row (or 409s on a published
     // template). Restore and permanent deletion go through `lib/goa/trash.ts`.
     await moveToTrash(client, "group", groupId, session.user.id);
+    // Every public showcase in the group goes offline with it — the snapshot may
+    // still name people; the admin republishes after a restore.
+    await client.query(
+      `UPDATE challenges SET results_published_at = NULL, result_share_token_hash = NULL,
+          results_published_snapshot = NULL, updated_at = now()
+        WHERE group_id = $1 AND results_published_at IS NOT NULL`,
+      [groupId],
+    );
     await writeAudit(client, groupId, null, session.user.id, "group.deleted", "group", groupId, current, null);
     return { id: groupId, deleted: true };
   });

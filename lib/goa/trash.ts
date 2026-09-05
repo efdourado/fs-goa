@@ -654,6 +654,16 @@ export async function purgeTrashItem(session: SessionContext, body: Record<strin
   return inTransaction(async (client) => {
     const row = await locate(client, kind, id);
     await authorize(client, session, row, "purge");
+    // An object can only be destroyed for good *from the bin* (ROADMAP §13). A
+    // still-active group / challenge / structure is never a valid target, no
+    // matter the role or the confirmation string.
+    if (BIN_KINDS.includes(kind as BinKind)) {
+      const inBin = await oneOrNull<{ id: string }>(client,
+        "SELECT id FROM trash_items WHERE entity_kind=$1 AND entity_id=$2", [kind, id]);
+      if (!inBin) throw new ApiError(409, "not_in_trash", "Só é possível excluir permanentemente um item que está na lixeira.");
+    } else if (!(await isArchived(client, kind as ArchiveKind, id))) {
+      throw new ApiError(409, "not_archived", "Só é possível excluir em definitivo uma peça que já foi arquivada.");
+    }
     const blocked = await permanentGuard(client, row);
     if (blocked) throw new ApiError(409, blocked.code, blocked.message);
 
@@ -671,8 +681,9 @@ export async function purgeTrashItem(session: SessionContext, body: Record<strin
       throw new ApiError(400, "reason_required", "Informe o motivo da exclusão administrativa.");
     }
     const counts = await applyPurge(client, row);
-    await writeSystemAudit(client, session.user.id, `${row.kind}.purged`, row.kind, id, counts);
-    console.warn("trash.purge", { actor: session.user.username, kind: row.kind });
+    await writeSystemAudit(client, session.user.id, `${row.kind}.purged`, row.kind, id,
+      reason ? { ...counts, reason } : counts);
+    console.warn("trash.purge", { actor: session.user.username, kind: row.kind, hasReason: Boolean(reason) });
     return { kind, id, purged: true };
   });
 }

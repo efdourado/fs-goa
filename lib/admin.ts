@@ -1,6 +1,6 @@
 import { mintResetToken, type SessionContext } from "./auth";
 import { inTransaction, withClient } from "./db";
-import { redactAuditPayload } from "./goa/domain/audit";
+import { redactForPlatformAdmin } from "./goa/domain/audit";
 import { ApiError, stringValue } from "./http";
 
 /**
@@ -181,9 +181,9 @@ export async function adminAudit(query: URLSearchParams) {
           groupId: personal ? null : event.group_id,
           challengeId: personal ? null : event.challenge_id,
           personalScope: personal,
-          before: personal ? null : redactAuditPayload(event.before ?? null),
-          after: personal ? null : redactAuditPayload(event.after ?? null),
-          metadata: personal ? {} : redactAuditPayload(event.metadata ?? {}),
+          before: personal ? null : redactForPlatformAdmin(event.before ?? null),
+          after: personal ? null : redactForPlatformAdmin(event.after ?? null),
+          metadata: personal ? {} : redactForPlatformAdmin(event.metadata ?? {}),
         };
       }),
     };
