@@ -264,6 +264,23 @@ export async function saveChallengeFields(
           );
         }
       }
+      // A field a live metric computes over can't just vanish — resolve the
+      // metric first (V1 §4). Applies in draft too: a dangling metric would
+      // fail the preflight anyway.
+      const usedByMetric = await client.query<{ label: string }>(
+        `SELECT DISTINCT f.label FROM challenge_fields f
+          JOIN challenge_metrics m ON m.field_id = f.id AND m.archived_at IS NULL
+         WHERE f.challenge_id=$1 AND f.entry_type_id=$2 AND f.archived_at IS NULL
+           AND NOT (f.id=ANY($3::text[]))`,
+        [challengeId, entryType.id, keptIds],
+      );
+      if (usedByMetric.rows.length) {
+        throw new ApiError(
+          409,
+          "field_used_by_metric",
+          `Estes campos alimentam uma métrica e não podem ser removidos antes de resolver a métrica: ${usedByMetric.rows.map((row) => row.label).join(", ")}.`,
+        );
+      }
       await client.query(
         `UPDATE challenge_fields SET archived_at=now(),updated_at=now()
           WHERE challenge_id=$1 AND entry_type_id=$2 AND archived_at IS NULL AND NOT (id=ANY($3::text[]))`,
