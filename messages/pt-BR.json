@@ -822,7 +822,12 @@
       "ranking": "Ranking",
       "people": "Por pessoa",
       "debate": "O que dividiu opiniões"
-    }
+    },
+    "sortByRating": "Por nota",
+    "sortByName": "Por nome",
+    "showRecommender": "Quem indicou",
+    "showYear": "Ano",
+    "recommendedByShort": "por {name}"
   },
   "rules": {
     "legacyTitle": "Regras do desafio",

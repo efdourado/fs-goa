@@ -1834,7 +1834,10 @@ test("cópia: carrega a receita, zera a agenda e remapeia o acervo do destino", 
   assert.equal(row.rows[0].recommender, null, "o indicador do grupo de origem não é copiado");
 });
 
-type SeriesRow = { key: string; label: string; value: number | null; sampleSize: number };
+type SeriesRow = {
+  key: string; label: string; value: number | null; sampleSize: number;
+  recommendedBy?: string | null; year?: number | null; rawValue?: number | null; rawFormattedValue?: string;
+};
 type ApiMetric = { id: string; label: string; operation: string; groupBy: string; minSample?: number; value: number | null; series?: SeriesRow[] };
 
 test("motor de análise: ranking ajustado, surpresa, viés e vitrine automática", async () => {
@@ -2943,4 +2946,54 @@ test("amostra mínima de uma métrica é configurável — um grupo pequeno pode
   const afterLowering = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { metrics: ApiMetric[] };
   const loweredSeries = afterLowering.metrics.find((entry) => entry.id === metricId)!.series!;
   assert.equal(loweredSeries.find((row) => row.label === "Só um voto")!.value, 5, "com amostra mínima 1, o voto único já conta");
+});
+
+test("um ranking por item traz quem indicou, o ano do catálogo e a média crua ao lado da nota ajustada", async () => {
+  const owner = await register("Dona Ranking Rico", "dona_ranking_rico");
+  const keeper = await register("Indica Filme", "indica_filme_rico");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Ranking Rico" } })).body as { id: string }).id;
+  const invite = (await call("POST", `/api/groups/${groupId}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
+  await call("POST", `/api/invites/${invite.token}`, { session: keeper, body: {} });
+
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "cinema", title: "Ranking rico", participantIds: [owner.user.id, keeper.user.id],
+      items: [
+        { title: "Aftersun", year: 2022, recommendedByUserId: keeper.user.id },
+        { title: "Filme Contraponto", year: 2020 },
+      ],
+    },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });
+  const detail = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    entryTypes: Array<{ id: string; fields: Array<{ id: string; key: string }> }>;
+    items: Array<{ id: string; title: string }>;
+  };
+  const notaField = detail.entryTypes[0].fields.find((field) => field.key === "nota")!.id;
+  const typeId = detail.entryTypes[0].id;
+  const itemByTitle = new Map(detail.items.map((item) => [item.title, item.id]));
+  // A second, lower-rated item pulls the challenge's overall mean away from
+  // Aftersun's own rating, so its single-vote bayesian average visibly shrinks.
+  await call("POST", `/api/challenges/${challengeId}/entries`, { session: owner, body: { itemId: itemByTitle.get("Aftersun"), entryTypeId: typeId, values: { [notaField]: 5 } } });
+  await call("POST", `/api/challenges/${challengeId}/entries`, { session: owner, body: { itemId: itemByTitle.get("Filme Contraponto"), entryTypeId: typeId, values: { [notaField]: 1 } } });
+
+  // A custom metric with minSample:1 — the recipe's own "Ranking dos filmes"
+  // defaults to minSample:3, which would null out both numbers with just one
+  // vote per item and hide the shrinkage this test is actually after.
+  const customRanking = await call("POST", `/api/challenges/${challengeId}/metrics`, {
+    session: owner,
+    body: { label: "Ranking com 1 voto", operation: "bayesian_average", fieldId: notaField, groupBy: "item", minSample: 1 },
+  });
+  assert.equal(customRanking.response.status, 201, JSON.stringify(customRanking.body));
+
+  const withRanking = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { metrics: ApiMetric[] };
+  const ranking = withRanking.metrics.find((metric) => metric.label === "Ranking com 1 voto")!;
+  const row = ranking.series!.find((entry) => entry.label === "Aftersun")!;
+  assert.equal(row.recommendedBy, "Indica Filme", "a linha do ranking traz quem indicou o filme");
+  assert.equal(row.year, 2022, "e o ano do catálogo");
+  assert.ok(row.rawValue !== undefined && row.rawValue !== null, "traz a média crua por trás do ajuste bayesiano");
+  assert.notEqual(row.rawValue, row.value, "com uma amostra de 1, a média crua e a ajustada divergem (o ajuste encolhe rumo à média geral)");
+  assert.equal(row.rawValue, 5, "a média crua é simplesmente a nota dada");
 });

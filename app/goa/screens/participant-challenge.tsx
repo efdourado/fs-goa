@@ -14,6 +14,7 @@ import type {
   EntryTypeView,
   FieldConfig,
   Id,
+  Metric,
   ParticipantTab,
   User,
 } from "../types";
@@ -303,6 +304,92 @@ export function DynamicEntryForm({
   );
 }
 
+/** Rankings past this length fold behind a "show more" toggle. */
+const RANKING_PREVIEW_ROWS = 8;
+
+/**
+ * A ranking metric with a nicer, sortable presentation than `MetricBlock`:
+ * sort by rating or by name, and optionally reveal who recommended each item
+ * and its release year. When the metric's value is a bayesian-adjusted
+ * average, the plain average shows alongside it in parentheses — the "here's
+ * the math" the raw number came from, no separate override.
+ */
+function RankingCard({
+  metric,
+  hideThinLabel,
+  smallSampleLabel,
+  showMoreLabel,
+  showLessLabel,
+}: {
+  metric: Metric;
+  hideThinLabel: boolean;
+  smallSampleLabel: string;
+  showMoreLabel: (hiddenCount: number) => string;
+  showLessLabel: string;
+}) {
+  const t = useTranslations("resultView");
+  const [sort, setSort] = useState<"rating" | "name">("rating");
+  const [showRecommender, setShowRecommender] = useState(false);
+  const [showYear, setShowYear] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const series = metric.series;
+  const sorted = useMemo(
+    () => [...(series ?? [])].sort((a, b) => (sort === "name"
+      ? a.label.localeCompare(b.label)
+      : (b.value ?? Number.NEGATIVE_INFINITY) - (a.value ?? Number.NEGATIVE_INFINITY))),
+    [series, sort],
+  );
+  const visible = expanded ? sorted : sorted.slice(0, RANKING_PREVIEW_ROWS);
+  const hasRecommenders = series?.some((row) => row.recommendedBy) ?? false;
+  const hasYears = series?.some((row) => row.year) ?? false;
+
+  return (
+    <article className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-5">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <p className="text-xs font-light uppercase tracking-[0.1em] text-[var(--muted)]">{metric.label}</p>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--muted)]">
+          <label className="flex cursor-pointer items-center gap-1"><input type="radio" name={`ranking-sort-${metric.id}`} checked={sort === "rating"} onChange={() => setSort("rating")} />{t("sortByRating")}</label>
+          <label className="flex cursor-pointer items-center gap-1"><input type="radio" name={`ranking-sort-${metric.id}`} checked={sort === "name"} onChange={() => setSort("name")} />{t("sortByName")}</label>
+          {hasRecommenders ? <label className="flex cursor-pointer items-center gap-1"><input type="checkbox" checked={showRecommender} onChange={(event) => setShowRecommender(event.target.checked)} />{t("showRecommender")}</label> : null}
+          {hasYears ? <label className="flex cursor-pointer items-center gap-1"><input type="checkbox" checked={showYear} onChange={(event) => setShowYear(event.target.checked)} />{t("showYear")}</label> : null}
+        </div>
+      </div>
+      <ol className="mt-3 space-y-1.5">
+        {visible.map((row, index) => {
+          const thin = row.value === null;
+          const meta = [
+            showYear && row.year ? String(row.year) : null,
+            showRecommender && row.recommendedBy ? t("recommendedByShort", { name: row.recommendedBy }) : null,
+          ].filter(Boolean).join(" · ");
+          return (
+            <li key={row.key} className={cx("flex items-center justify-between gap-3 text-sm", thin && "opacity-45")}>
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="w-5 flex-none tabular-nums text-[var(--muted)]">{index + 1}</span>
+                <span className="min-w-0">
+                  <span className="block truncate">{row.label}</span>
+                  {meta ? <span className="block truncate text-[11px] text-[var(--muted)]">{meta}</span> : null}
+                </span>
+              </span>
+              <span className="flex-none text-right tabular-nums">
+                <strong>{thin ? (hideThinLabel ? row.formattedValue ?? "—" : smallSampleLabel) : row.formattedValue ?? row.value}</strong>
+                {!thin && row.rawFormattedValue && row.rawFormattedValue !== row.formattedValue ? (
+                  <span className="ml-1.5 text-[10px] font-light text-[var(--muted)]">({row.rawFormattedValue})</span>
+                ) : null}
+                <span className="ml-2 text-[10px] font-light text-[var(--muted)]">n={row.sampleSize}</span>
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+      {sorted.length > RANKING_PREVIEW_ROWS ? (
+        <button type="button" className="mt-1.5 text-xs font-light text-[var(--muted)] transition hover:text-[var(--ink)]" onClick={() => setExpanded((value) => !value)}>
+          {expanded ? showLessLabel : showMoreLabel(sorted.length - RANKING_PREVIEW_ROWS)}
+        </button>
+      ) : null}
+    </article>
+  );
+}
+
 export function ResultView({
   challenge,
   onBackToEntry,
@@ -359,7 +446,9 @@ export function ResultView({
               {themedSeries.length > 1 ? <h3 className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--muted)]">{t(`theme.${theme}`)}</h3> : null}
               <div className="space-y-3">
                 {items.map((metric) => (
-                  <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} hideThinLabel={hideThinLabel} showMoreLabel={(count) => tm("showMore", { count })} showLessLabel={tm("showLess")} />
+                  theme === "ranking"
+                    ? <RankingCard key={metric.id} metric={metric} hideThinLabel={hideThinLabel} smallSampleLabel={tm("smallSample")} showMoreLabel={(count) => tm("showMore", { count })} showLessLabel={tm("showLess")} />
+                    : <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} hideThinLabel={hideThinLabel} showMoreLabel={(count) => tm("showMore", { count })} showLessLabel={tm("showLess")} />
                 ))}
               </div>
             </section>

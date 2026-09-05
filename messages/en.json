@@ -822,7 +822,12 @@
       "ranking": "Ranking",
       "people": "By person",
       "debate": "What split opinion"
-    }
+    },
+    "sortByRating": "By rating",
+    "sortByName": "By name",
+    "showRecommender": "Who recommended",
+    "showYear": "Year",
+    "recommendedByShort": "by {name}"
   },
   "rules": {
     "legacyTitle": "Challenge rules",

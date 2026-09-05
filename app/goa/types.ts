@@ -201,6 +201,12 @@ export interface MetricSeriesEntry {
   value: number | null;
   formattedValue?: string;
   sampleSize: number;
+  /** Item-grouped rows only. */
+  recommendedBy?: string | null;
+  year?: number | null;
+  /** Present when `value` is a bayesian-adjusted average — the plain average for comparison. */
+  rawValue?: number | null;
+  rawFormattedValue?: string;
 }
 
 export interface Metric {
