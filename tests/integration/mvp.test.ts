@@ -2210,6 +2210,48 @@ test("auditoria de correção de registro guarda só metadados", async () => {
   assert.doesNotMatch(JSON.stringify(audit.rows[0]), /texto secreto/, "nenhum conteúdo do participante na auditoria");
 });
 
+test("o console da plataforma não vê texto privado: auditoria redigida e lixeira pessoal genérica", async () => {
+  const admin = await register("Plataforma", "plataforma_admin_priv");
+  await adminPool.query("UPDATE users SET platform_admin = true WHERE id = $1", [admin.user.id]);
+  const adminSession = await login("plataforma_admin_priv");
+
+  const owner = await register("Dono Privado", "dono_privado_console");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Grupo Público de Nome" } })).body as { id: string }).id;
+  const challenge = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "cinema",
+      title: "Desafio de Grupo",
+      description: "Uma descrição bem longa e cheia de detalhes privados que o admin da plataforma jamais deveria ler na auditoria de jeito nenhum.",
+      participantIds: [owner.user.id], items: [{ title: "Persona" }],
+    },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  await call("PATCH", `/api/challenges/${challengeId}`, {
+    session: owner,
+    body: { description: "Segunda versão da descrição privada, também longa o bastante para ser considerada prosa e portanto redigida." },
+  });
+
+  const audit = (await call("GET", `/api/admin/audit?groupId=${gid}`, { session: adminSession })).body as {
+    events: Array<{ before: unknown; after: unknown }>;
+  };
+  const dump = JSON.stringify(audit.events);
+  assert.doesNotMatch(dump, /detalhes privados|descrição privada/, "a prosa da descrição não aparece na auditoria da plataforma");
+  assert.match(dump, /texto omitido/, "o campo que mudou continua visível, só o texto é substituído");
+
+  // Espaço pessoal na lixeira: nome e título aparecem genéricos.
+  const personal = await call("POST", "/api/personal/challenges", {
+    session: owner,
+    body: { recipe: "cinema", title: "Meu Diário Secreto de Filmes", startsOn: null, endsOn: null, items: [{ title: "Stalker" }] },
+  });
+  const personalId = (personal.body as { id: string }).id;
+  await call("DELETE", `/api/challenges/${personalId}`, { session: owner });
+
+  const trash = (await call("GET", "/api/admin/trash", { session: adminSession })).body as { items: Array<{ kind: string; label: string }> };
+  assert.doesNotMatch(JSON.stringify(trash.items), /Diário Secreto/, "o título do desafio pessoal não vaza pra lixeira da plataforma");
+  assert.ok(trash.items.some((item) => item.kind === "challenge" && item.label === "Desafio pessoal"), "aparece com rótulo genérico");
+});
+
 test("desafio pessoal: workspace criado sob demanda, invisível como grupo e reusado", async () => {
   const owner = await register("Solange", "sol_personal");
   const outsider = await register("Rita", "rita_personal_out");
