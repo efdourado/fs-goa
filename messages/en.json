@@ -326,7 +326,8 @@
     "pendingInviteMeta": "@{username} · invited on {date}",
     "cancel": "Cancel",
     "leaveToggle": "Leave group",
-    "leaveConfirm": "Leave this group? You stop seeing it and its challenges. Your entries stay (the group's history stays intact) but show as \"left the group\" instead of your name."
+    "leaveConfirm": "Leave this group? You stop seeing it and its challenges. Your entries stay (the group's history stays intact) but show as \"left the group\" instead of your name.",
+    "trashLink": "Bin"
   },
   "catalog": {
     "back": "← Back",
@@ -353,7 +354,8 @@
     "catalog": "My catalogue",
     "create": "+ Personal challenge",
     "emptyTitle": "Start a challenge of your own",
-    "emptyBody": "Personal challenges are just yours — no group, no invites. Great for a reading goal or a film marathon."
+    "emptyBody": "Personal challenges are just yours — no group, no invites. Great for a reading goal or a film marathon.",
+    "trash": "Bin"
   },
   "personalCatalog": {
     "back": "← Back",
@@ -1079,7 +1081,20 @@
     "deleteBody": "Deleting your account disables access and removes your personal data. Groups where you're the only person go to the bin. A group with other people in it never gets stuck on you — ownership passes automatically to its oldest admin, or its oldest member if it has no other admin.",
     "deleteConfirm": "Delete your account? Access ends and your personal data is removed.",
     "deleteAccount": "Delete my account",
-    "deleting": "Deleting…"
+    "deleting": "Deleting…",
+    "deactivateConfirm": "Deactivate your account? You can reactivate it by logging in again.",
+    "deactivateTitle": "Deactivate account",
+    "deactivateBody": "Reversible. You are signed out everywhere and your content is kept; log back in to reactivate.",
+    "deactivate": "Deactivate account",
+    "deletePermanentTitle": "Delete the account permanently",
+    "deletePermanentBody": "Irreversible. Your personal space and solo groups are deleted; groups with other people transfer ownership; your contributions are anonymised.",
+    "deletePermanent": "Delete permanently",
+    "deletePermanentConfirm": "Delete for good",
+    "deletePasswordLabel": "Confirm with your password",
+    "consequenceTransfer": "The group “{name}” transfers ownership.",
+    "consequencePurgeGroup": "The group “{name}” is deleted for good.",
+    "consequencePersonal": "Your personal space and personal catalogue are deleted for good.",
+    "consequencePublications": "{count, plural, one {# published showcase of yours goes offline} other {# published showcases of yours go offline}}."
   },
   "resetPassword": {
     "passwordsDontMatch": "The passwords don't match.",
@@ -1261,5 +1276,66 @@
     "toggleHint": "Starts unchecked. Change it whenever you like.",
     "on": "Name authorised.",
     "off": "Name authorisation withdrawn."
+  },
+  "trash": {
+    "back": "← Back",
+    "loading": "Loading the bin…",
+    "loadError": "Could not open the bin.",
+    "restoreError": "Could not restore.",
+    "previewError": "Could not work out the impact.",
+    "purgeError": "Could not delete for good.",
+    "personalTitle": "My bin",
+    "personalSubtitle": "Groups, challenges and catalogue items you removed. They stay here until you restore them or delete them for good.",
+    "groupTitle": "Group bin",
+    "groupSubtitle": "Removed challenges and catalogue items. Restore or delete for good — nothing disappears on its own.",
+    "emptyTitle": "The bin is empty",
+    "emptyBody": "Anything you remove shows up here and can come back at any time.",
+    "restore": "Restore",
+    "purge": "Delete permanently",
+    "purging": "Deleting…",
+    "cancel": "Cancel",
+    "deletedAt": "removed on {date}",
+    "deletedBy": "by {who}",
+    "reasonShown": "Reason: {reason}",
+    "parentTrashed": "Restore the item that contains this one first.",
+    "purgeTitle": "Delete permanently",
+    "purgeBody": "“{label}” will be gone for good. This cannot be undone.",
+    "purgeConfirm": "Delete for good",
+    "purgeNoDeps": "Nothing else depends on this item.",
+    "confirmName": "Type {name} to confirm",
+    "confirmCount": "Type {count} to confirm that {count} records will be deleted",
+    "reasonLabel": "Reason (administrative deletion)",
+    "kind": {
+      "group": "Group",
+      "challenge": "Challenge",
+      "catalog_item": "Catalogue item",
+      "entry": "Record",
+      "challenge_item": "Challenge item",
+      "checkpoint": "Checkpoint",
+      "entry_type": "Record type",
+      "field": "Field",
+      "field_option": "Option",
+      "metric": "Metric",
+      "catalog_attribute_def": "Catalogue attribute"
+    },
+    "dependency": {
+      "challenges": "{count, plural, one {# challenge} other {# challenges}}",
+      "catalogItems": "{count, plural, one {# catalogue item} other {# catalogue items}}",
+      "members": "{count, plural, one {# person} other {# people}}",
+      "entries": "{count, plural, one {# record} other {# records}}",
+      "items": "{count, plural, one {# item} other {# items}}",
+      "checkpoints": "{count, plural, one {# checkpoint} other {# checkpoints}}",
+      "metrics": "{count, plural, one {# metric} other {# metrics}}",
+      "fields": "{count, plural, one {# field} other {# fields}}",
+      "values": "{count, plural, one {# answer} other {# answers}}",
+      "challengesUsing": "{count, plural, one {used by # challenge} other {used by # challenges}}"
+    }
+  },
+  "accountDeactivated": {
+    "title": "Your account is deactivated",
+    "body": "Nobody sees your content while it is deactivated. Reactivate whenever you like.",
+    "reactivate": "Reactivate account",
+    "reactivating": "Reactivating…",
+    "logout": "Log out"
   }
 }

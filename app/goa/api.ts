@@ -26,6 +26,31 @@ export const API_PATHS = {
     reset: "/api/auth/reset",
   },
   account: "/api/account",
+  accountDeactivate: "/api/account/deactivate",
+  accountReactivate: "/api/account/reactivate",
+  accountDelete: "/api/account/delete",
+  accountDeletionPreview: "/api/account/deletion-preview",
+  personalTrash: "/api/personal/trash",
+  groupTrash: (groupId: Id) => `/api/groups/${encodeURIComponent(groupId)}/trash`,
+  challengeArchive: (challengeId: Id) => `/api/challenges/${encodeURIComponent(challengeId)}/archive`,
+  trashPreview: (scope: "personal" | { groupId: Id } | { challengeId: Id }) =>
+    typeof scope === "object" && "groupId" in scope
+      ? `/api/groups/${encodeURIComponent(scope.groupId)}/trash/preview`
+      : typeof scope === "object" && "challengeId" in scope
+        ? `/api/challenges/${encodeURIComponent(scope.challengeId)}/trash/preview`
+        : "/api/personal/trash/preview",
+  trashRestore: (scope: "personal" | { groupId: Id } | { challengeId: Id }) =>
+    typeof scope === "object" && "groupId" in scope
+      ? `/api/groups/${encodeURIComponent(scope.groupId)}/trash/restore`
+      : typeof scope === "object" && "challengeId" in scope
+        ? `/api/challenges/${encodeURIComponent(scope.challengeId)}/trash/restore`
+        : "/api/personal/trash/restore",
+  trashPurge: (scope: "personal" | { groupId: Id } | { challengeId: Id }) =>
+    typeof scope === "object" && "groupId" in scope
+      ? `/api/groups/${encodeURIComponent(scope.groupId)}/trash/purge`
+      : typeof scope === "object" && "challengeId" in scope
+        ? `/api/challenges/${encodeURIComponent(scope.challengeId)}/trash/purge`
+        : "/api/personal/trash/purge",
   templates: "/api/templates",
   template: (challengeId: Id) => `/api/templates/${encodeURIComponent(challengeId)}`,
   templateDuplicate: (challengeId: Id) => `/api/templates/${encodeURIComponent(challengeId)}/duplicate`,

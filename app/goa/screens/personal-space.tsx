@@ -15,6 +15,7 @@ export function PersonalSpaceScreen({
   onOpenAdmin,
   onCreateChallenge,
   onOpenCatalog,
+  onOpenTrash,
 }: {
   challenges: ChallengeSummary[];
   onBack: () => void;
@@ -22,6 +23,7 @@ export function PersonalSpaceScreen({
   onOpenAdmin: (id: Id) => void;
   onCreateChallenge: () => void;
   onOpenCatalog: () => void;
+  onOpenTrash: () => void;
 }) {
   const t = useTranslations("personalSpace");
   const active = challenges.filter((challenge) => challenge.status === "active");
@@ -41,6 +43,7 @@ export function PersonalSpaceScreen({
         action={
           <span className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1">
             <button type="button" className={cx(linkClass, "text-sm")} onClick={onOpenCatalog}>{t("catalog")}</button>
+            <button type="button" className={cx(linkClass, "text-sm")} onClick={onOpenTrash}>{t("trash")}</button>
             <button type="button" className={cx(linkClass, "text-sm")} onClick={onCreateChallenge}>{t("create")}</button>
           </span>
         }

@@ -25,6 +25,7 @@ import {
 } from "./entry-types";
 import { fieldsForChallenge } from "./fields";
 import type { FieldRow } from "./types";
+import { moveToTrash } from "../trash";
 
 interface StorageField extends FieldRow {
   option_ids: string[];
@@ -445,14 +446,14 @@ export async function deleteEntry(session: SessionContext, entryId: string) {
       throw new ApiError(404, "not_found", "Registro não encontrado.");
     }
     if (entry.status !== "active") {
+      // A closed round's records are frozen — changing one needs a reopen or an
+      // audited admin correction, not a quiet delete (ROADMAP §13).
       throw new ApiError(409, "challenge_not_active", "Registros só podem ser excluídos com o desafio ativo.");
     }
-    // Soft-delete, like every other "removal" here: the row leaves listings,
-    // metrics and the showcase (all filter `deleted_at IS NULL`) and the partial
-    // unique indexes free up, but the audit trail keeps the reference.
-    await client.query(
-      "UPDATE entries SET deleted_at=now(),last_edited_by_user_id=$2,updated_at=now() WHERE id=$1",
-      [entryId, session.user.id]);
+    // Moves the entry to the bin: `deleted_at` (so it leaves listings, metrics
+    // and the showcase, and frees the partial unique indexes) plus the explicit
+    // `trash_items` row. The participant restores it from the challenge screen.
+    await moveToTrash(client, "entry", entryId, session.user.id, { skipMarker: false });
     if (canManage) {
       await writeAudit(client, entry.group_id, entry.challenge_id, session.user.id,
         "entry.deleted", "entry", entryId, null, null,

@@ -36,6 +36,38 @@ export interface User {
   username: string;
   email?: string | null;
   platformAdmin?: boolean;
+  /** Reversible "deactivate account" — the SPA shows only the reactivate screen. */
+  deactivated?: boolean;
+}
+
+export interface TrashDependency {
+  type: string;
+  count: number;
+}
+
+export type TrashKind =
+  | "group" | "challenge" | "catalog_item" | "entry"
+  | "challenge_item" | "checkpoint" | "entry_type" | "field" | "field_option" | "metric" | "catalog_attribute_def";
+
+export interface TrashItem {
+  kind: TrashKind;
+  id: Id;
+  label: string;
+  deletedAt: string | null;
+  deletedBy: string | null;
+  reason: string | null;
+  dependencies: TrashDependency[];
+  parentTrashed: boolean;
+  blocked: { code: string; message: string } | null;
+}
+
+export interface TrashActionPreview {
+  kind: TrashKind;
+  id: Id;
+  label: string;
+  dependencies: TrashDependency[];
+  blocked: { code: string; message: string } | null;
+  confirmation: "simple" | "count" | "name";
 }
 
 export interface Member extends User {
@@ -480,6 +512,9 @@ export type Screen =
   | { kind: "personal-space" }
   | { kind: "personal-catalog" }
   | { kind: "personal-catalog-item"; itemId: Id }
+  | { kind: "personal-trash" }
+  | { kind: "group-trash"; groupId: Id }
+  | { kind: "account-deactivated" }
   | { kind: "invite"; token: string }
   | { kind: "invite-success"; invitation: InviteAcceptance }
   | { kind: "create-challenge"; groupId: Id }

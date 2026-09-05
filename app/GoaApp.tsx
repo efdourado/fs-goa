@@ -14,6 +14,7 @@ import {
 import { useGoaFormat } from "./goa/format";
 import { AboutScreen } from "./goa/screens/about";
 import { AccountScreen } from "./goa/screens/account";
+import { AccountDeactivatedScreen } from "./goa/screens/account-deactivated";
 import { AdminScreen } from "./goa/screens/admin";
 import { AuthScreen } from "./goa/screens/auth";
 import { CreateChallengeScreen } from "./goa/screens/create-challenge";
@@ -24,6 +25,8 @@ import { InviteAcceptedScreen, InviteScreen } from "./goa/screens/invite";
 import { ParticipantChallengeScreen } from "./goa/screens/participant-challenge";
 import { PersonalCatalogScreen } from "./goa/screens/personal-catalog";
 import { PersonalSpaceScreen } from "./goa/screens/personal-space";
+import { PersonalTrashScreen } from "./goa/screens/personal-trash";
+import { TrashView } from "./goa/trash-view";
 import { ResetPasswordScreen } from "./goa/screens/reset-password";
 import { TemplateDetailScreen, TemplatesScreen } from "./goa/screens/templates";
 import { screenFromUrl, urlForScreen } from "./goa/navigation";
@@ -41,12 +44,13 @@ import type {
   Screen,
 } from "./goa/types";
 import { CACHE_KEYS, clearCache, readCache, writeCache } from "./goa/cache";
-import { AppHeader, Brand, Button, cardClass, cx, EmptyState, LoadingView } from "./goa/ui";
+import { AppHeader, Brand, Button, cardClass, cx, EmptyState, LoadingView, PageHeading } from "./goa/ui";
 import { canManage, isPersonalChallenge, slugify } from "./goa/utils";
 
 export default function GoaApp() {
   const t = useTranslations("app");
   const tc = useTranslations("common");
+  const tTrash = useTranslations("trash");
   const f = useGoaFormat();
   const fRef = useRef(f);
   fRef.current = f;
@@ -242,9 +246,9 @@ export default function GoaApp() {
     await refreshBootstrap();
   }
 
-  async function deleteAccount() {
+  async function deleteAccountPermanently(password: string) {
     if (!bootstrap) return;
-    await apiRequest(API_PATHS.account, { method: "DELETE", csrfToken: bootstrap.csrfToken });
+    await apiRequest(API_PATHS.accountDelete, { method: "POST", body: { password }, csrfToken: bootstrap.csrfToken });
     clearCache();
     setSelectedChallenge(null);
     setEntries([]);
@@ -252,6 +256,23 @@ export default function GoaApp() {
     setResumeTemplateCopy(null);
     await refreshBootstrap();
     setScreen({ kind: "auth", mode: "login" });
+  }
+
+  async function deactivateAccount() {
+    if (!bootstrap) return;
+    await apiRequest(API_PATHS.accountDeactivate, { method: "POST", body: {}, csrfToken: bootstrap.csrfToken });
+    clearCache();
+    setSelectedChallenge(null);
+    setEntries([]);
+    await refreshBootstrap();
+    setScreen({ kind: "auth", mode: "login" });
+  }
+
+  async function reactivateAccount() {
+    if (!bootstrap) return;
+    await apiRequest(API_PATHS.accountReactivate, { method: "POST", body: {}, csrfToken: bootstrap.csrfToken });
+    const data = await refreshBootstrap();
+    setScreen(data.user ? { kind: "dashboard" } : { kind: "auth", mode: "login" });
   }
 
   function openParticipant(challengeId: Id, requestedTab?: ParticipantTab) {
@@ -514,8 +535,20 @@ export default function GoaApp() {
   const selectedRole = selectedChallenge?.viewerRole ?? selectedGroup?.role;
 
   let content: ReactNode;
-  if (screen.kind === "account") {
-    content = <AccountScreen user={user} onBack={() => setScreen({ kind: "dashboard" })} onSaveProfile={saveAccount} onChangePassword={saveAccount} onDeleteAccount={deleteAccount} />;
+  if (user.deactivated) {
+    content = <AccountDeactivatedScreen onReactivate={reactivateAccount} onLogout={logout} />;
+  } else if (screen.kind === "account") {
+    content = <AccountScreen user={user} onBack={() => setScreen({ kind: "dashboard" })} onSaveProfile={saveAccount} onChangePassword={saveAccount} onDeactivate={deactivateAccount} onDeletePermanently={deleteAccountPermanently} />;
+  } else if (screen.kind === "personal-trash") {
+    content = <PersonalTrashScreen csrfToken={bootstrap.csrfToken} onBack={() => setScreen({ kind: "personal-space" })} onChanged={() => { void refreshBootstrap(); }} />;
+  } else if (screen.kind === "group-trash" && selectedGroup && canManage(selectedGroup.role)) {
+    content = (
+      <main className="mx-auto max-w-4xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
+        <button className="mb-6 text-sm text-[var(--muted)] hover:text-[var(--ink)]" type="button" onClick={() => setScreen({ kind: "group", groupId: selectedGroup.id })}>{t("backToStart")}</button>
+        <PageHeading title={tTrash("groupTitle")} description={tTrash("groupSubtitle")} />
+        <TrashView scope={{ groupId: selectedGroup.id }} csrfToken={bootstrap.csrfToken} onChanged={() => { void refreshBootstrap(); }} />
+      </main>
+    );
   } else if (screen.kind === "invite") {
     content = <InviteScreen key={screen.token} token={screen.token} user={user} csrfToken={bootstrap.csrfToken} onBack={() => setScreen({ kind: "dashboard" })} onNeedAuth={() => undefined} onAccepted={async (invitation) => { setPendingInviteToken(null); await refreshBootstrap(); setScreen({ kind: "invite-success", invitation }); }} />;
   } else if (screen.kind === "invite-success") {
@@ -528,11 +561,11 @@ export default function GoaApp() {
   } else if (screen.kind === "about") {
     content = <AboutScreen onBack={() => setScreen({ kind: "dashboard" })} />;
   } else if (screen.kind === "group" && selectedGroup) {
-    content = <GroupScreen key={selectedGroup.id} group={selectedGroup} challenges={bootstrap.challenges.filter((challenge) => challenge.groupId === selectedGroup.id)} challengeLimit={bootstrap.limits.challengesPerGroup} pendingRequests={selectedGroup.pendingRequests ?? []} onBack={() => setScreen({ kind: "dashboard" })} onCreateChallenge={() => setScreen({ kind: "create-challenge", groupId: selectedGroup.id })} onOpenChallenge={(id) => openParticipant(id)} onOpenCatalogItem={(itemId) => setScreen({ kind: "catalog-item", groupId: selectedGroup.id, itemId })} onCreateInvite={async (payload) => apiRequest<{ token?: string; url?: string }>(API_PATHS.groupInvites(selectedGroup.id), { method: "POST", body: payload, csrfToken: bootstrap.csrfToken })} onInviteByUsername={(username) => apiRequest<GroupInviteResult>(API_PATHS.groupMembers(selectedGroup.id), { method: "POST", body: { username }, csrfToken: bootstrap.csrfToken })} onCancelRequest={cancelMemberRequest} onUpdateGroup={(payload) => updateGroup(selectedGroup.id, payload)} onDeleteGroup={selectedGroup.role === "owner" ? () => deleteGroup(selectedGroup.id) : undefined} onLeaveGroup={selectedGroup.role === "owner" ? undefined : () => leaveGroup(selectedGroup.id)} onSetMemberRole={selectedGroup.role === "owner" ? (userId, role) => setMemberRole(selectedGroup.id, userId, role) : undefined} />;
+    content = <GroupScreen key={selectedGroup.id} group={selectedGroup} challenges={bootstrap.challenges.filter((challenge) => challenge.groupId === selectedGroup.id)} challengeLimit={bootstrap.limits.challengesPerGroup} pendingRequests={selectedGroup.pendingRequests ?? []} onBack={() => setScreen({ kind: "dashboard" })} onCreateChallenge={() => setScreen({ kind: "create-challenge", groupId: selectedGroup.id })} onOpenChallenge={(id) => openParticipant(id)} onOpenCatalogItem={(itemId) => setScreen({ kind: "catalog-item", groupId: selectedGroup.id, itemId })} onCreateInvite={async (payload) => apiRequest<{ token?: string; url?: string }>(API_PATHS.groupInvites(selectedGroup.id), { method: "POST", body: payload, csrfToken: bootstrap.csrfToken })} onInviteByUsername={(username) => apiRequest<GroupInviteResult>(API_PATHS.groupMembers(selectedGroup.id), { method: "POST", body: { username }, csrfToken: bootstrap.csrfToken })} onCancelRequest={cancelMemberRequest} onUpdateGroup={(payload) => updateGroup(selectedGroup.id, payload)} onDeleteGroup={selectedGroup.role === "owner" ? () => deleteGroup(selectedGroup.id) : undefined} onLeaveGroup={selectedGroup.role === "owner" ? undefined : () => leaveGroup(selectedGroup.id)} onSetMemberRole={selectedGroup.role === "owner" ? (userId, role) => setMemberRole(selectedGroup.id, userId, role) : undefined} onOpenTrash={canManage(selectedGroup.role) ? () => setScreen({ kind: "group-trash", groupId: selectedGroup.id }) : undefined} />;
   } else if (screen.kind === "catalog-item" && selectedGroup) {
     content = <CatalogItemScreen key={screen.itemId} detailPath={API_PATHS.groupCatalogItem(screen.groupId, screen.itemId)} itemId={screen.itemId} onBack={() => setScreen({ kind: "group", groupId: screen.groupId })} onOpenChallenge={(id) => openParticipant(id)} onDelete={canManage(selectedGroup.role) ? () => deleteCatalogItem(API_PATHS.catalogItem(screen.itemId), { kind: "group", groupId: screen.groupId }) : undefined} />;
   } else if (screen.kind === "personal-space") {
-    content = <PersonalSpaceScreen challenges={bootstrap.challenges.filter((challenge) => isPersonalChallenge(challenge, bootstrap.personalWorkspaceId))} onBack={() => setScreen({ kind: "dashboard" })} onOpenChallenge={(id) => openParticipant(id)} onOpenAdmin={(id) => openAdmin(id)} onCreateChallenge={() => setScreen({ kind: "create-personal-challenge" })} onOpenCatalog={() => setScreen({ kind: "personal-catalog" })} />;
+    content = <PersonalSpaceScreen challenges={bootstrap.challenges.filter((challenge) => isPersonalChallenge(challenge, bootstrap.personalWorkspaceId))} onBack={() => setScreen({ kind: "dashboard" })} onOpenChallenge={(id) => openParticipant(id)} onOpenAdmin={(id) => openAdmin(id)} onCreateChallenge={() => setScreen({ kind: "create-personal-challenge" })} onOpenCatalog={() => setScreen({ kind: "personal-catalog" })} onOpenTrash={() => setScreen({ kind: "personal-trash" })} />;
   } else if (screen.kind === "personal-catalog") {
     content = <PersonalCatalogScreen onBack={() => setScreen({ kind: "personal-space" })} onOpenItem={(itemId) => setScreen({ kind: "personal-catalog-item", itemId })} />;
   } else if (screen.kind === "personal-catalog-item") {

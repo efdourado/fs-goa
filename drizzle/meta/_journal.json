@@ -232,6 +232,13 @@
       "when": 1788570000000,
       "tag": "0032_name_consent_anon_default",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1788580000000,
+      "tag": "0033_trash_registry_and_deactivation",
+      "breakpoints": true
     }
   ]
 }

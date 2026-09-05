@@ -3,6 +3,7 @@ import { inTransaction } from "../../db";
 import { challengeAccess, writeAudit } from "../../goa-domain";
 import { ApiError } from "../../http";
 import { archiveOrphanedCatalogItemsForChallenge } from "../catalog";
+import { moveToTrash } from "../trash";
 import { computePreflight, type PreflightIssue } from "./preflight";
 import { generateShowcase } from "./showcase";
 
@@ -74,12 +75,8 @@ export async function softDeleteChallenge(session: SessionContext, challengeId: 
     if (!access.canManage) {
       throw new ApiError(403, "forbidden", "Somente administradores podem apagar o desafio.");
     }
-    await client.query(
-      `UPDATE challenges
-          SET deleted_at = now(), deleted_by_user_id = $2, updated_at = now()
-        WHERE id = $1`,
-      [challengeId, session.user.id],
-    );
+    // Sets `deleted_at` + the explicit bin row (or 409s on a published template).
+    await moveToTrash(client, "challenge", challengeId, session.user.id);
     await archiveOrphanedCatalogItemsForChallenge(client, session.user.id, access.challenge.group_id, challengeId);
     await writeAudit(
       client,
