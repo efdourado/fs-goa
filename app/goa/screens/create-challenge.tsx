@@ -46,6 +46,7 @@ export function CreateChallengeScreen({
   const [startsOn, setStartsOn] = useState("");
   const [endsOn, setEndsOn] = useState("");
   const [fields, setFields] = useState<ChallengeField[]>([]);
+  const [expectation, setExpectation] = useState(false);
   const [cineItems, setCineItems] = useState<CineRow[]>([]);
   const [participantIds, setParticipantIds] = useState<Id[]>(group?.members?.map((member) => member.id) ?? []);
   const [busy, setBusy] = useState(false);
@@ -53,6 +54,8 @@ export function CreateChallengeScreen({
   const itemInputs = cineRowsToInput(cineItems);
   const recipeMeta = RECIPES.find((entry) => entry.key === recipe) ?? null;
   const tracksCatalog = recipeMeta?.catalogKind ?? null;
+  // Expectation is the pre-watch rating for the two "rate each title" recipes.
+  const canOfferExpectation = recipe === "cinema" || recipe === "bookshelf";
   // A no-catalog recipe (Hábito) has nothing to list, so the checkpoints step
   // never appears — the wizard is base → fields (→ people) and nothing else.
   const stepKeys: StepKey[] = [
@@ -142,6 +145,7 @@ export function CreateChallengeScreen({
         fields: cleanFields(fields),
         items: tracksCatalog ? itemInputs : [],
         generateDaily: false,
+        expectation: canOfferExpectation && expectation,
         participantIds,
       });
     } catch (cause) {
@@ -201,7 +205,7 @@ export function CreateChallengeScreen({
           </div>
         ) : null}
 
-        {step === 2 ? <div><h2 className="text-xl font-light">{t("fieldsTitle")}</h2><p className="mb-5 mt-1 text-sm text-[var(--muted)]">{t("fieldsSubtitle")}</p><FieldBuilder fields={fields} onChange={setFields} /></div> : null}
+        {step === 2 ? <div><h2 className="text-xl font-light">{t("fieldsTitle")}</h2><p className="mb-5 mt-1 text-sm text-[var(--muted)]">{t("fieldsSubtitle")}</p><FieldBuilder fields={fields} onChange={setFields} />{canOfferExpectation ? <label className="mt-5 flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4 text-sm"><input type="checkbox" className="mt-0.5" aria-label={t("expectationLabel")} checked={expectation} onChange={(event) => setExpectation(event.target.checked)} /><span><strong className="block">{t("expectationLabel")}</strong><span className="mt-0.5 block text-xs text-[var(--muted)]">{t("expectationHint")}</span></span></label> : null}</div> : null}
 
         {step === checkpointsStep && tracksCatalog ? (
           <div>

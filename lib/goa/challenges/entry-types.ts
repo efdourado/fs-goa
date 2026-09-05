@@ -2,7 +2,12 @@ import type { PoolClient } from "pg";
 
 import type { SessionContext } from "../../auth";
 import { inTransaction, oneOrNull } from "../../db";
-import { challengeAccess, writeAudit } from "../../goa-domain";
+// Direct module imports, not the `goa-domain` barrel: that barrel also re-exports
+// `createChallenge`, which imports this file — going through it would form a cycle.
+import { challengeAccess } from "../domain/access";
+import { writeAudit } from "../domain/audit";
+import { publicId } from "../domain/shared";
+import { insertField } from "../domain/fields";
 import { ApiError } from "../../http";
 
 export type SubmissionMode = "item" | "daily" | "free";
@@ -181,6 +186,105 @@ export async function updateEntryTypeVisibility(
 /** Any of the challenge's types point at a round item (film / book). */
 export function usesRoundItems(types: EntryTypeRow[]): boolean {
   return types.some((type) => targetPolicyOf(type) !== "none");
+}
+
+export const EXPECTATION_SEMANTIC_KEY = "expectativa";
+
+/**
+ * The optional Cinema/Estante "Expectativa" type (V1 §3.1): a pre-watch 0–5
+ * rating, one per item, that stops being editable once the participant sends
+ * their real rating (`expectation_locked`). Its default visibility is
+ * "after_own" so nobody's number is coloured by seeing everyone else's guess
+ * before they commit their own.
+ */
+export async function seedExpectationType(
+  client: PoolClient,
+  challengeId: string,
+): Promise<string> {
+  const typeId = publicId();
+  await client.query(
+    `INSERT INTO entry_types
+       (id, challenge_id, semantic_key, name, submission_mode, purpose, target_policy,
+        cardinality, schedule_policy, is_primary, visibility_policy, created_at, updated_at)
+     VALUES ($1,$2,$3,'Expectativa','item','expectation','required','once_per_item','while_active',false,'after_own',now(),now())`,
+    [typeId, challengeId, EXPECTATION_SEMANTIC_KEY],
+  );
+  await insertField(
+    client,
+    challengeId,
+    typeId,
+    { key: EXPECTATION_SEMANTIC_KEY, label: "Expectativa", type: "rating", required: true, config: { min: 0, max: 5, step: 0.5 } },
+    0,
+  );
+  return typeId;
+}
+
+/**
+ * Owner/admin turns the optional expectation type on or off. Structural, so
+ * draft-only; turning it off is refused once it has entries. A recipe with no
+ * rating type over round items (Hábito, a reading club's progress) cannot host
+ * an expectation at all.
+ */
+export async function setExpectationEnabled(
+  session: SessionContext,
+  challengeId: string,
+  body: Record<string, unknown>,
+) {
+  if (typeof body.enabled !== "boolean") {
+    throw new ApiError(400, "invalid_request", "Informe se a expectativa fica ligada ou desligada.");
+  }
+  return inTransaction(async (client) => {
+    const access = await challengeAccess(session.user.id, challengeId, client, true);
+    if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores mudam os tipos de registro.");
+    if (access.challenge.status !== "draft") {
+      throw new ApiError(409, "challenge_locked", "A expectativa só entra ou sai enquanto o desafio é um rascunho.");
+    }
+    const types = await entryTypesForChallenge(client, challengeId);
+    const hasRatingOverItems =
+      usesRoundItems(types) && types.some((type) => purposeOf(type) === "rating");
+    if (!hasRatingOverItems) {
+      throw new ApiError(409, "expectation_unsupported", "A expectativa só existe num modelo de avaliação de filmes ou livros.");
+    }
+
+    const active = types.find((type) => purposeOf(type) === "expectation");
+    if (body.enabled) {
+      if (active) return { enabled: true, entryTypeId: active.id };
+      const archived = await oneOrNull<{ id: string }>(
+        client,
+        "SELECT id FROM entry_types WHERE challenge_id=$1 AND purpose='expectation' AND archived_at IS NOT NULL ORDER BY created_at DESC LIMIT 1",
+        [challengeId],
+      );
+      let entryTypeId: string;
+      if (archived) {
+        entryTypeId = archived.id;
+        await client.query("UPDATE entry_types SET archived_at=NULL, updated_at=now() WHERE id=$1", [entryTypeId]);
+        await client.query(
+          "UPDATE challenge_fields SET archived_at=NULL, updated_at=now() WHERE entry_type_id=$1",
+          [entryTypeId],
+        );
+      } else {
+        entryTypeId = await seedExpectationType(client, challengeId);
+      }
+      await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
+        "entry_type.created", "entry_type", entryTypeId, null, { purpose: "expectation" });
+      return { enabled: true, entryTypeId };
+    }
+
+    if (!active) return { enabled: false, entryTypeId: null };
+    const withEntries = await oneOrNull<{ count: number }>(
+      client,
+      "SELECT count(*)::int AS count FROM entries WHERE entry_type_id=$1 AND deleted_at IS NULL",
+      [active.id],
+    );
+    if (withEntries && withEntries.count > 0) {
+      throw new ApiError(409, "expectation_has_entries", "Já há expectativas registradas — não dá para remover o tipo.");
+    }
+    await client.query("UPDATE challenge_fields SET archived_at=now(), updated_at=now() WHERE entry_type_id=$1", [active.id]);
+    await client.query("UPDATE entry_types SET archived_at=now(), updated_at=now() WHERE id=$1", [active.id]);
+    await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
+      "entry_type.archived", "entry_type", active.id, null, { purpose: "expectation" });
+    return { enabled: false, entryTypeId: null };
+  });
 }
 
 /** Any type is bound to dated checkpoints — only meaningful with a fixed period. */

@@ -12,7 +12,7 @@ export {
   updateEntry,
 } from "./goa/challenges/entries";
 export { addChallengeField, saveChallengeFields } from "./goa/challenges/fields";
-export { updateEntryTypeVisibility } from "./goa/challenges/entry-types";
+export { setExpectationEnabled, updateEntryTypeVisibility } from "./goa/challenges/entry-types";
 export { VISIBILITY_POLICIES } from "./goa/challenges/entry-types";
 export type { VisibilityPolicy } from "./goa/challenges/entry-types";
 export {

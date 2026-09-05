@@ -460,9 +460,12 @@ export function ResultView({
 }
 
 /** The entry types a round item can receive (expectation, rating, progress…). */
-function itemEntryTypes(challenge: ChallengeDetail): EntryTypeView[] {
+export function itemEntryTypes(challenge: ChallengeDetail): EntryTypeView[] {
   if (challenge.entryTypes.length) {
-    return challenge.entryTypes.filter((type) => type.targetPolicy !== "none");
+    // Expectation is a pre-watch note — always render it first, above the rating.
+    return challenge.entryTypes
+      .filter((type) => type.targetPolicy !== "none")
+      .sort((a, b) => Number(b.purpose === "expectation") - Number(a.purpose === "expectation"));
   }
   // Legacy detail payload without `entryTypes` — reconstruct from the flat fields.
   return challenge.submissionMode === "item" && challenge.fields.length
@@ -569,9 +572,8 @@ function ItemEntryPanel({
         return (
           <div key={type.id || "registro"}>
             {stacked ? <h3 className="mb-3 text-sm font-medium uppercase tracking-[0.12em] text-[var(--muted)]">{type.name}</h3> : null}
-            {type.visibilityPolicy && type.visibilityPolicy !== "group_realtime" ? (
-              <p className="mb-3 rounded-lg bg-[var(--wash)] px-3 py-2 text-xs text-[var(--muted)]">{tv(`note.${type.visibilityPolicy}`)}</p>
-            ) : null}
+            {/* Always spell out who will see this answer, before the first submit (V1 §8). */}
+            <p className="mb-3 rounded-lg bg-[var(--wash)] px-3 py-2 text-xs text-[var(--muted)]">{tv(`note.${type.visibilityPolicy ?? "group_realtime"}`)}</p>
             <DynamicEntryForm
               key={`${type.id}-${item.id}-${perDay ? occurredOn || today : "fixed"}-${entry?.id ?? "new"}`}
               fields={type.fields}

@@ -500,7 +500,9 @@
     "backStep": "← Back",
     "next": "Continue →",
     "creatingDraft": "Creating draft…",
-    "createDraft": "Create draft"
+    "createDraft": "Create draft",
+    "expectationLabel": "Collect an expectation rating",
+    "expectationHint": "Participants rate how much they expect to like each title before watching. It locks once they send the real rating. You can also toggle this later."
   },
   "adminChallenge": {
     "back": "← Back",
@@ -729,7 +731,13 @@
     "previewTitle": "How the group will see it",
     "previewSubtitle": "Preview of the showcase with the current curation.",
     "previewEmptyTitle": "Preview available after saving",
-    "previewEmptyBody": "You can prepare the curation during the challenge and publish the result when you close it."
+    "previewEmptyBody": "You can prepare the curation during the challenge and publish the result when you close it.",
+    "expectationTitle": "Expectation rating",
+    "expectationHint": "An optional pre-watch 0–5 rating. It locks the moment the participant sends their real rating for that title. Draft only.",
+    "expectationCheckbox": "Collect an expectation before the rating",
+    "expectationOn": "Expectation rating enabled.",
+    "expectationOff": "Expectation rating removed.",
+    "expectationLockedNote": "The challenge is live — the expectation type stays as it is."
   },
   "visibility": {
     "title": "Who sees these answers",
@@ -780,7 +788,8 @@
       "many_required_fields": "The form has a lot of required fields — consider making some optional.",
       "many_items_for_period": "That's a lot of items for the number of checkpoints — it may be tight.",
       "ranking_min_sample_unreachable": "A ranking needs more ratings per item than the challenge has participants.",
-      "metric_on_optional_field": "A metric depends on an optional field, which may end up with no data."
+      "metric_on_optional_field": "A metric depends on an optional field, which may end up with no data.",
+      "expectation_visible_early": "An expectation is visible to the group before the rating — consider \"after your own answer\"."
     }
   },
   "participant": {

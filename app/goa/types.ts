@@ -435,6 +435,8 @@ export interface ChallengeCreationInput {
   fields: ChallengeField[];
   items: ChallengeItemInput[];
   generateDaily: boolean;
+  /** Cinema/Estante: also open the optional pre-watch "Expectativa" rating. */
+  expectation?: boolean;
   participantIds: Id[];
 }
 
