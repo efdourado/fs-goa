@@ -718,6 +718,7 @@
     "linkCopied": "Link copied",
     "copyFailed": "Couldn't copy",
     "showcasePublished": "Showcase published.",
+    "linkNotStored": "The link isn't kept on file — it was shown once when it was created. If you no longer have it, generate a new one.",
     "rotateLink": "Generate new link",
     "rotateLinkConfirm": "Generate a new link? The current one stops working immediately.",
     "linkRotated": "New link generated.",

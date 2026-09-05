@@ -718,6 +718,7 @@
     "linkCopied": "Link copiado",
     "copyFailed": "Não deu para copiar",
     "showcasePublished": "Vitrine publicada.",
+    "linkNotStored": "O link não fica guardado — ele apareceu uma vez, quando foi criado. Se você não tem mais, gere um novo.",
     "rotateLink": "Gerar novo link",
     "rotateLinkConfirm": "Gerar um novo link? O atual para de funcionar na hora.",
     "linkRotated": "Novo link gerado.",

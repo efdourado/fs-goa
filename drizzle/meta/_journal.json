@@ -197,6 +197,13 @@
       "when": 1788520000000,
       "tag": "0027_catalog_runtime_minutes",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1788530000000,
+      "tag": "0028_drop_raw_share_token",
+      "breakpoints": true
     }
   ]
 }

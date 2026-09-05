@@ -241,8 +241,9 @@ export interface ChallengeResult {
   metrics?: Metric[];
   comments?: ResultComment[];
   publishedAt?: string | null;
-  /** Raw public share token, present once the showcase has been published. */
-  shareToken?: string | null;
+  /** Whether a public link exists. The raw token itself is never sent back — it
+   *  is shown once, in the publish response, and cannot be recovered. */
+  hasPublishedLink?: boolean;
 }
 
 export interface RuleTopic {
