@@ -61,14 +61,16 @@ export async function createChallenge(
     if (!activeGroup) throw new ApiError(404, "not_found", "Grupo não encontrado.");
     const existing = await oneOrNull<{ count: number }>(
       client,
-      "SELECT count(*)::int AS count FROM challenges WHERE group_id = $1 AND deleted_at IS NULL",
+      // Binned challenges still count — the bin never expires (ROADMAP §13), so
+      // restore or permanently delete one to free the slot.
+      "SELECT count(*)::int AS count FROM challenges WHERE group_id = $1",
       [groupId],
     );
     assertUnder(
       existing?.count ?? 0,
       LIMITS.challengesPerGroup,
       "challenge_limit",
-      `Este grupo atingiu o limite de ${LIMITS.challengesPerGroup} desafios. Apague um desafio para criar outro.`,
+      `Este grupo atingiu o limite de ${LIMITS.challengesPerGroup} desafios. Apague um desafio da lixeira para criar outro.`,
     );
 
     const id = publicId();

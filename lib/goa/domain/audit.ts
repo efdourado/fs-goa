@@ -28,6 +28,31 @@ export function redactAuditPayload(value: unknown, depth = 0): unknown {
   return REDACTED;
 }
 
+/**
+ * Operational breadcrumb for an irreversible action (a permanent delete, an
+ * account removal). Goes to `system_audit_events`, which — unlike `audit_events`
+ * — has no content foreign keys and no private text, so it can be written in the
+ * same transaction that then deletes the group/challenge it refers to. The id is
+ * stored only as a SHA-256 hash so support can correlate a report without
+ * holding the raw identifier.
+ */
+export async function writeSystemAudit(
+  client: PoolClient,
+  actorUserId: string | null,
+  action: string,
+  entityKind: string,
+  entityId: string,
+  counts: Record<string, number> = {},
+): Promise<void> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(entityId));
+  const hash = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  await client.query(
+    `INSERT INTO system_audit_events (id, actor_user_id, action, entity_kind, entity_id_hash, counts, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb, now())`,
+    [publicId(), actorUserId, action, entityKind, hash, JSON.stringify(counts)],
+  );
+}
+
 export async function writeAudit(
   client: PoolClient,
   groupId: string,

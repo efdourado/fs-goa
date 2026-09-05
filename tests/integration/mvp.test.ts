@@ -1074,13 +1074,24 @@ test("aplica limites de criação por dono e por grupo", async () => {
   );
   assert.equal(fullGroupCount.rows[0]?.count, 6, "falha de limite não deixa cópia parcial");
 
-  await adminPool.query("UPDATE groups SET deleted_at = now(), deleted_by_user_id = $1 WHERE id = $2", [owner.user.id, groupIds[5]]);
-  const afterTrash = await call("POST", "/api/groups", { session: owner, body: { name: "Grupo pós-lixeira" } });
-  assert.equal(afterTrash.response.status, 201, "apagar um grupo deve liberar espaço no limite");
+  // A binned group keeps its slot — the bin never expires (ROADMAP §13).
+  assert.equal((await call("DELETE", `/api/groups/${groupIds[5]}`, { session: owner })).response.status, 200);
+  const stillCapped = await call("POST", "/api/groups", { session: owner, body: { name: "Ainda cheio" } });
+  assert.equal(stillCapped.response.status, 403, "grupo na lixeira continua ocupando a vaga");
 
   const bootstrapAfter = await call("GET", "/api/bootstrap", { session: owner });
   const visibleGroups = (bootstrapAfter.body as { groups: Array<{ id: string }> }).groups.map((group) => group.id);
   assert.ok(!visibleGroups.includes(groupIds[5]), "grupo na lixeira não aparece no bootstrap");
+
+  // Permanently deleting it frees the slot.
+  const preview = await call("POST", "/api/personal/trash/preview", { session: owner, body: { kind: "group", id: groupIds[5] } });
+  assert.equal(preview.response.status, 200, JSON.stringify(preview.body));
+  const purge = await call("POST", "/api/personal/trash/purge", {
+    session: owner, body: { kind: "group", id: groupIds[5], confirmation: "Grupo 6" },
+  });
+  assert.equal(purge.response.status, 200, JSON.stringify(purge.body));
+  const afterPurge = await call("POST", "/api/groups", { session: owner, body: { name: "Grupo pós-purga" } });
+  assert.equal(afterPurge.response.status, 201, "exclusão permanente libera a vaga");
 });
 
 test("soft-delete de grupo e desafio pelos endpoints DELETE", async () => {
@@ -1119,7 +1130,7 @@ test("soft-delete de grupo e desafio pelos endpoints DELETE", async () => {
   assert.ok(actions.includes("group.deleted"), "auditoria registra group.deleted");
 });
 
-test("área de administração: acesso, painel, lixeira e contas", async () => {
+test("área de administração: acesso, painel agregado e contas (sem lixeira global)", async () => {
   const admin = await register("Plataforma", "plataforma_admin");
   const member = await register("Membro Comum", "membro_comum_admin");
   await adminPool.query("UPDATE users SET platform_admin = true WHERE id = $1", [admin.user.id]);
@@ -1138,15 +1149,23 @@ test("área de administração: acesso, painel, lixeira e contas", async () => {
   assert.equal((await call("GET", "/api/admin/users", { session: adminSession })).response.status, 200);
   assert.equal((await call("GET", "/api/admin/audit", { session: adminSession })).response.status, 200);
 
-  // trash + purge round-trip
+  // The platform admin has NO global bin — not the list, not purge (ROADMAP §14).
+  assert.equal((await call("GET", "/api/admin/trash", { session: adminSession })).response.status, 404, "sem lixeira global no /admin");
+  assert.equal(
+    (await call("POST", "/api/admin/trash/purge", { session: adminSession, body: { kind: "group", id: "x" } })).response.status,
+    404,
+    "sem purge de conteúdo de terceiros pelo /admin",
+  );
+
+  // The owner runs the bin themselves: bin → it counts in the overview → purge.
   const group = await call("POST", "/api/groups", { session: member, body: { name: "Para purgar" } });
   const groupId = (group.body as { id: string }).id;
   await call("DELETE", `/api/groups/${groupId}`, { session: member });
-  const trash = await call("GET", "/api/admin/trash", { session: adminSession });
-  const trashed = (trash.body as { items: Array<{ kind: string; id: string }> }).items;
-  assert.ok(trashed.some((item) => item.kind === "group" && item.id === groupId), "grupo aparece na lixeira");
-
-  const purge = await call("POST", "/api/admin/trash/purge", { session: adminSession, body: { kind: "group", id: groupId } });
+  const withTrash = await call("GET", "/api/admin/overview", { session: adminSession });
+  assert.ok((withTrash.body as { groups: { trashed: number } }).groups.trashed >= 1, "o painel conta grupos na lixeira em agregado");
+  const purge = await call("POST", "/api/personal/trash/purge", {
+    session: member, body: { kind: "group", id: groupId, confirmation: "Para purgar" },
+  });
   assert.equal(purge.response.status, 200, JSON.stringify(purge.body));
   const stillThere = await adminPool.query("SELECT 1 FROM groups WHERE id = $1", [groupId]);
   assert.equal(stillThere.rowCount, 0, "purge remove a linha do grupo de vez");
@@ -1263,8 +1282,14 @@ test("fase 0: feedback, link de reunião e remoção da própria conta", async (
   const inv = await call("POST", `/api/groups/${sharedGroupId}/invites`, { session: host, body: { expiresInDays: 7, maxUses: 1 } });
   await call("POST", `/api/invites/${(inv.body as { token: string }).token}`, { session: guest, body: {} });
 
-  // remoção da conta: grupo solo vai para a lixeira, grupo com outra pessoa transfere a posse
-  const removed = await call("DELETE", "/api/account", { session: host });
+  // remoção permanente da conta: exige senha; grupo solo (e o espaço pessoal) são
+  // apagados de vez — nada de órfão; grupo com outra pessoa transfere a posse.
+  assert.equal(
+    (await call("POST", "/api/account/delete", { session: host, body: { password: "errada" } })).response.status,
+    403,
+    "exclusão permanente exige a senha certa",
+  );
+  const removed = await call("POST", "/api/account/delete", { session: host, body: { password: "uma senha segura 123" } });
   assert.equal(removed.response.status, 200, JSON.stringify(removed.body));
   assert.match(removed.response.headers.get("set-cookie") ?? "", /__Host-goa_session=;|Max-Age=0/i);
   assert.equal((await call("GET", "/api/bootstrap", { session: host })).response.status, 200);
@@ -1273,8 +1298,10 @@ test("fase 0: feedback, link de reunião e remoção da própria conta", async (
     201,
     "a sessão foi revogada, mas o feedback anônimo ainda funciona",
   );
-  const soloGone = await adminPool.query<{ deleted_at: Date | null }>("SELECT deleted_at FROM groups WHERE id=$1", [soloGroupId]);
-  assert.ok(soloGone.rows[0]?.deleted_at, "grupos solo vão para a lixeira ao apagar a conta");
+  const soloGone = await adminPool.query("SELECT 1 FROM groups WHERE id=$1", [soloGroupId]);
+  assert.equal(soloGone.rowCount, 0, "grupos solo são apagados de vez ao excluir a conta");
+  const personalGone = await adminPool.query("SELECT 1 FROM groups WHERE owner_user_id=$1 AND kind='personal'", [host.user.id]);
+  assert.equal(personalGone.rowCount, 0, "o espaço pessoal não fica órfão");
   const sharedTransferred = await adminPool.query<{ owner_user_id: string; deleted_at: Date | null }>(
     "SELECT owner_user_id, deleted_at FROM groups WHERE id = $1",
     [sharedGroupId],
@@ -2210,7 +2237,7 @@ test("auditoria de correção de registro guarda só metadados", async () => {
   assert.doesNotMatch(JSON.stringify(audit.rows[0]), /texto secreto/, "nenhum conteúdo do participante na auditoria");
 });
 
-test("o console da plataforma não vê texto privado: auditoria redigida e lixeira pessoal genérica", async () => {
+test("o console da plataforma não vê texto privado: auditoria redigida e nada de conteúdo pessoal", async () => {
   const admin = await register("Plataforma", "plataforma_admin_priv");
   await adminPool.query("UPDATE users SET platform_admin = true WHERE id = $1", [admin.user.id]);
   const adminSession = await login("plataforma_admin_priv");
@@ -2239,7 +2266,10 @@ test("o console da plataforma não vê texto privado: auditoria redigida e lixei
   assert.doesNotMatch(dump, /detalhes privados|descrição privada/, "a prosa da descrição não aparece na auditoria da plataforma");
   assert.match(dump, /texto omitido/, "o campo que mudou continua visível, só o texto é substituído");
 
-  // Espaço pessoal na lixeira: nome e título aparecem genéricos.
+  // The platform admin has no bin listing at all.
+  assert.equal((await call("GET", "/api/admin/trash", { session: adminSession })).response.status, 404);
+
+  // A personal challenge's audit rows carry no title/text for the platform admin.
   const personal = await call("POST", "/api/personal/challenges", {
     session: owner,
     body: { recipe: "cinema", title: "Meu Diário Secreto de Filmes", startsOn: null, endsOn: null, items: [{ title: "Stalker" }] },
@@ -2247,9 +2277,14 @@ test("o console da plataforma não vê texto privado: auditoria redigida e lixei
   const personalId = (personal.body as { id: string }).id;
   await call("DELETE", `/api/challenges/${personalId}`, { session: owner });
 
-  const trash = (await call("GET", "/api/admin/trash", { session: adminSession })).body as { items: Array<{ kind: string; label: string }> };
-  assert.doesNotMatch(JSON.stringify(trash.items), /Diário Secreto/, "o título do desafio pessoal não vaza pra lixeira da plataforma");
-  assert.ok(trash.items.some((item) => item.kind === "challenge" && item.label === "Desafio pessoal"), "aparece com rótulo genérico");
+  const allAudit = (await call("GET", "/api/admin/audit", { session: adminSession })).body as {
+    events: Array<{ action: string; personalScope?: boolean; before: unknown; after: unknown; challengeId: string | null }>;
+  };
+  assert.doesNotMatch(JSON.stringify(allAudit.events), /Diário Secreto/, "o título do desafio pessoal não aparece na auditoria da plataforma");
+  const personalEvents = allAudit.events.filter((event) => event.personalScope);
+  assert.ok(personalEvents.length > 0, "eventos do espaço pessoal ainda aparecem — só sem conteúdo");
+  assert.ok(personalEvents.every((event) => event.before === null && event.after === null && event.challengeId === null),
+    "eventos pessoais chegam sem before/after nem IDs de conteúdo");
 });
 
 test("desafio pessoal: workspace criado sob demanda, invisível como grupo e reusado", async () => {
@@ -2554,7 +2589,10 @@ test("apagar a conta também encerra a participação em desafios de outros grup
   const challengeId = (challenge.body as { id: string }).id;
   await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });
 
-  assert.equal((await call("DELETE", "/api/account", { session: member })).response.status, 200);
+  assert.equal(
+    (await call("POST", "/api/account/delete", { session: member, body: { password: "uma senha segura 123" } })).response.status,
+    200,
+  );
 
   const stillParticipant = await adminPool.query<{ count: number }>(
     "SELECT count(*)::int AS count FROM challenge_participants WHERE challenge_id = $1 AND user_id = $2 AND removed_at IS NULL",
@@ -2642,7 +2680,10 @@ test("apagar a conta transfere a posse do grupo: admin mais antigo, ou membro ma
   await call("POST", `/api/invites/${tokenA}`, { session: memberA, body: {} });
   await call("PATCH", `/api/groups/${groupAId}/members/${admin.user.id}`, { session: ownerA, body: { role: "admin" } });
 
-  assert.equal((await call("DELETE", "/api/account", { session: ownerA })).response.status, 200);
+  assert.equal(
+    (await call("POST", "/api/account/delete", { session: ownerA, body: { password: "uma senha segura 123" } })).response.status,
+    200,
+  );
 
   const groupAAfter = await adminPool.query<{ owner_user_id: string; role: string }>(
     `SELECT g.owner_user_id, gm.role FROM groups g
@@ -2677,7 +2718,10 @@ test("apagar a conta transfere a posse do grupo: admin mais antigo, ou membro ma
   await call("POST", `/api/invites/${tokenB}`, { session: olderMember, body: {} });
   await call("POST", `/api/invites/${tokenB}`, { session: newerMember, body: {} });
 
-  assert.equal((await call("DELETE", "/api/account", { session: ownerB })).response.status, 200);
+  assert.equal(
+    (await call("POST", "/api/account/delete", { session: ownerB, body: { password: "uma senha segura 123" } })).response.status,
+    200,
+  );
 
   const groupBAfter = await adminPool.query<{ owner_user_id: string }>(
     "SELECT owner_user_id FROM groups WHERE id = $1",
@@ -3898,4 +3942,161 @@ test("quem sai do grupo despublica e regenera a vitrine; resultado público e te
   const newToken = (republish.body as { url: string }).url.split("/results/")[1];
   assert.notEqual(newToken, token);
   assert.equal((await call("GET", `/api/results/${newToken}`)).response.status, 200);
+});
+
+// ── ROADMAP §13/§14 — recoverable deletion ────────────────────────────────
+
+test("lixeira: um desafio binado some das listas, aparece em /trash e restaura com o mesmo id", async () => {
+  const owner = await register("Dona Bin", "dona_bin_v1");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube Bin" } })).body as { id: string }).id;
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: { recipe: "cinema", title: "Some e volta", participantIds: [owner.user.id], items: [{ title: "F1" }, { title: "F2" }] },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+
+  assert.equal((await call("DELETE", `/api/challenges/${challengeId}`, { session: owner })).response.status, 200);
+  assert.equal((await call("GET", `/api/challenges/${challengeId}`, { session: owner })).response.status, 404, "some da experiência normal");
+
+  const trash = (await call("GET", `/api/groups/${groupId}/trash`, { session: owner })).body as {
+    items: Array<{ kind: string; id: string; dependencies: Array<{ type: string; count: number }> }>;
+  };
+  const row = trash.items.find((item) => item.id === challengeId)!;
+  assert.equal(row.kind, "challenge");
+  assert.ok(row.dependencies.some((dep) => dep.type === "items" && dep.count === 2), "a linha informa o conteúdo dependente");
+
+  // Repeated reads: it stays in the bin, nothing removes it automatically.
+  const again = (await call("GET", `/api/groups/${groupId}/trash`, { session: owner })).body as { items: Array<{ id: string }> };
+  assert.ok(again.items.some((item) => item.id === challengeId), "fica na lixeira até uma ação manual");
+
+  const restore = await call("POST", `/api/groups/${groupId}/trash/restore`, { session: owner, body: { kind: "challenge", id: challengeId } });
+  assert.equal(restore.response.status, 200, JSON.stringify(restore.body));
+  const back = await call("GET", `/api/challenges/${challengeId}`, { session: owner });
+  assert.equal(back.response.status, 200, "volta com o mesmo id");
+  assert.equal((back.body as { items: unknown[] }).items.length, 2, "a estrutura volta junto");
+});
+
+test("lixeira: exclusão permanente mostra os alvos, exige a contagem e some de vez", async () => {
+  const owner = await register("Dona Purga", "dona_purga_v1");
+  const b = await register("Beto Purga", "beto_purga_v1");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube Purga" } })).body as { id: string }).id;
+  const invite = (await call("POST", `/api/groups/${groupId}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
+  await call("POST", `/api/invites/${invite.token}`, { session: b, body: {} });
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: { recipe: "cinema", title: "Para apagar", participantIds: [owner.user.id, b.user.id], items: [{ title: "Filme" }] },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  const detail = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    entryTypes: Array<{ id: string; purpose: string; fields: Array<{ id: string; key: string }> }>;
+    items: Array<{ id: string; title: string }>;
+  };
+  const rating = detail.entryTypes.find((type) => type.purpose === "rating")!;
+  const nota = rating.fields.find((field) => field.key === "nota")!.id;
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });
+  for (const session of [owner, b]) {
+    await call("POST", `/api/challenges/${challengeId}/entries`, { session, body: { itemId: detail.items[0].id, entryTypeId: rating.id, values: { [nota]: 4 } } });
+  }
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "closed" } });
+  await call("DELETE", `/api/challenges/${challengeId}`, { session: owner });
+
+  // Show the targets first (never destroy before demonstrating what dies).
+  const preview = await call("POST", `/api/groups/${groupId}/trash/preview`, { session: owner, body: { kind: "challenge", id: challengeId } });
+  assert.equal(preview.response.status, 200, JSON.stringify(preview.body));
+  const entriesTarget = (preview.body as { dependencies: Array<{ type: string; count: number }>; confirmation: string });
+  assert.equal(entriesTarget.confirmation, "count");
+  const entryCount = entriesTarget.dependencies.find((dep) => dep.type === "entries")?.count ?? 0;
+  assert.equal(entryCount, 2);
+
+  // Wrong confirmation is refused.
+  assert.equal(
+    (await call("POST", `/api/groups/${groupId}/trash/purge`, { session: owner, body: { kind: "challenge", id: challengeId, confirmation: "0" } })).response.status,
+    409,
+  );
+  const purge = await call("POST", `/api/groups/${groupId}/trash/purge`, {
+    session: owner, body: { kind: "challenge", id: challengeId, confirmation: String(entryCount) },
+  });
+  assert.equal(purge.response.status, 200, JSON.stringify(purge.body));
+  const gone = await adminPool.query("SELECT 1 FROM challenges WHERE id = $1", [challengeId]);
+  assert.equal(gone.rowCount, 0, "a árvore inteira do desafio some");
+  const audit = await adminPool.query<{ action: string }>("SELECT action FROM system_audit_events WHERE entity_kind = 'challenge'");
+  assert.ok(audit.rows.some((r) => r.action === "challenge.purged"), "a purga fica no log operacional sem conteúdo");
+});
+
+test("lixeira: um item de catálogo usado por um desafio fechado é arquivado, não pode ser apagado", async () => {
+  const owner = await register("Dona Acervo", "dona_acervo_bin");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Cineclube Acervo" } })).body as { id: string }).id;
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: { recipe: "cinema", title: "Rodada única", startsOn: "2026-01-01", endsOn: "2026-01-31", participantIds: [owner.user.id], items: [{ title: "Stalker", year: 1979 }] },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "closed" } });
+  const catalog = (await call("GET", `/api/groups/${groupId}/catalog`, { session: owner })).body as { items: Array<{ id: string; title: string }> };
+  const itemId = catalog.items.find((item) => item.title === "Stalker")!.id;
+
+  assert.equal((await call("DELETE", `/api/catalog/${itemId}`, { session: owner })).response.status, 200, "remove do catálogo → vai para a lixeira");
+  const trash = (await call("GET", `/api/groups/${groupId}/trash`, { session: owner })).body as {
+    items: Array<{ kind: string; id: string; blocked: { code: string } | null }>;
+  };
+  const row = trash.items.find((item) => item.id === itemId)!;
+  assert.equal(row.kind, "catalog_item");
+  assert.ok(row.blocked && row.blocked.code === "catalog_in_use", "exclusão permanente bloqueada enquanto há histórico");
+  assert.equal(
+    (await call("POST", `/api/groups/${groupId}/trash/purge`, { session: owner, body: { kind: "catalog_item", id: itemId } })).response.status,
+    409,
+  );
+  assert.equal((await call("POST", `/api/groups/${groupId}/trash/restore`, { session: owner, body: { kind: "catalog_item", id: itemId } })).response.status, 200, "mas restaura");
+});
+
+test("lixeira: filho não restaura sem o pai; restaurar o pai traz o filho de volta", async () => {
+  const owner = await register("Dona Pai", "dona_pai_bin");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube Pai" } })).body as { id: string }).id;
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: { recipe: "cinema", title: "Pai e filho", participantIds: [owner.user.id], items: [{ title: "A" }, { title: "B" }] },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  const items = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { items: Array<{ id: string; title: string }> };
+  const itemB = items.items.find((item) => item.title === "B")!.id;
+
+  await call("DELETE", `/api/challenges/${challengeId}/items/${itemB}`, { session: owner }); // archive the item
+  await call("DELETE", `/api/challenges/${challengeId}`, { session: owner }); // bin the parent
+
+  const restoreChild = await call("POST", `/api/challenges/${challengeId}/trash/restore`, { session: owner, body: { kind: "challenge_item", id: itemB } });
+  assert.equal(restoreChild.response.status, 409, "o pai binado bloqueia o filho");
+  assert.equal((restoreChild.body as { error: string }).error, "parent_trashed");
+
+  await call("POST", `/api/groups/${groupId}/trash/restore`, { session: owner, body: { kind: "challenge", id: challengeId } });
+  const afterParent = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { items: Array<{ title: string }> };
+  assert.ok(afterParent.items.some((item) => item.title === "A"), "o item que não foi binado sozinho volta com o pai");
+});
+
+test("conta: desativar é reversível e trava mutações; excluir de vez exige senha", async () => {
+  const person = await register("Vai Voltar", "vai_voltar_v1");
+  const groupId = ((await call("POST", "/api/groups", { session: person, body: { name: "Clube Pausa" } })).body as { id: string }).id;
+
+  const off = await call("POST", "/api/account/deactivate", { session: person, body: {} });
+  assert.equal(off.response.status, 200);
+  assert.match(off.response.headers.get("set-cookie") ?? "", /Max-Age=0/i);
+
+  // Can log back in, but only to reactivate — every other mutation is blocked.
+  const relog = await login("vai_voltar_v1");
+  const boot = (await call("GET", "/api/bootstrap", { session: relog })).body as { user: { deactivated?: boolean } };
+  assert.equal(boot.user.deactivated, true);
+  const blocked = await call("POST", "/api/groups", { session: relog, body: { name: "Não deveria" } });
+  assert.equal(blocked.response.status, 403);
+  assert.equal((blocked.body as { error: string }).error, "account_deactivated");
+
+  const on = await call("POST", "/api/account/reactivate", { session: relog, body: {} });
+  assert.equal(on.response.status, 200);
+  assert.equal(((on.body as { user: { deactivated: boolean } }).user).deactivated, false);
+  assert.equal((await call("GET", `/api/groups/${groupId}/trash`, { session: relog })).response.status, 200, "de volta ao normal");
+
+  // Permanent delete needs the right password.
+  assert.equal((await call("POST", "/api/account/delete", { session: relog, body: { password: "errada" } })).response.status, 403);
+  assert.equal((await call("POST", "/api/account/delete", { session: relog, body: { password: "uma senha segura 123" } })).response.status, 200);
+  const groupGone = await adminPool.query("SELECT 1 FROM groups WHERE id = $1", [groupId]);
+  assert.equal(groupGone.rowCount, 0, "grupo solo apagado de vez, sem órfão");
 });

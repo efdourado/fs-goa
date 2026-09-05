@@ -6,6 +6,7 @@ import { ApiError, stringValue } from "../../http";
 import { assertUnder, LIMITS } from "../../limits";
 import { normalizeUsername } from "../../security";
 import { regeneratePublishedShowcases } from "../challenges/results";
+import { moveToTrash } from "../trash";
 import { writeAudit } from "./audit";
 import { publicId } from "./shared";
 
@@ -105,9 +106,11 @@ export async function createGroup(session: SessionContext, body: Record<string, 
   return inTransaction(async (client) => {
     const owned = await oneOrNull<{ count: number }>(
       client,
+      // A binned group still occupies its slot (ROADMAP §13 — the bin has no
+      // expiry, so it cannot be a free way around the cap). Restore it or delete
+      // it for good to free the slot.
       `SELECT count(*)::int AS count FROM groups
-        WHERE owner_user_id = $1 AND kind = 'standard'
-          AND deleted_at IS NULL AND archived_at IS NULL`,
+        WHERE owner_user_id = $1 AND kind = 'standard' AND archived_at IS NULL`,
       [session.user.id],
     );
     assertUnder(
@@ -537,23 +540,10 @@ export async function softDeleteGroup(session: SessionContext, groupId: string) 
       [groupId],
     );
     if (!current) throw new ApiError(404, "not_found", "Grupo não encontrado.");
-    await client.query(
-      `UPDATE groups
-          SET deleted_at = now(), deleted_by_user_id = $2, updated_at = now()
-        WHERE id = $1`,
-      [groupId, session.user.id],
-    );
-    await writeAudit(
-      client,
-      groupId,
-      null,
-      session.user.id,
-      "group.deleted",
-      "group",
-      groupId,
-      current,
-      null,
-    );
+    // Sets `deleted_at` + records the explicit bin row (or 409s on a published
+    // template). Restore and permanent deletion go through `lib/goa/trash.ts`.
+    await moveToTrash(client, "group", groupId, session.user.id);
+    await writeAudit(client, groupId, null, session.user.id, "group.deleted", "group", groupId, current, null);
     return { id: groupId, deleted: true };
   });
 }

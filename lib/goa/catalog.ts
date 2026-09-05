@@ -6,6 +6,7 @@ import { ApiError, stringValue } from "../http";
 import { attributeValuesForItems, setCatalogItemAttributeValues } from "./catalog-attributes";
 import { writeAudit } from "./domain/audit";
 import { publicId } from "./domain/shared";
+import { moveToTrash } from "./trash";
 
 export type CatalogKind = "film" | "book" | "other";
 
@@ -497,6 +498,10 @@ async function archiveCatalogItemWithClient(
     "UPDATE catalog_items SET archived_at = now(), updated_at = now() WHERE id = $1",
     [catalogItemId],
   );
+  // A catalogue item is an independent unit: "remover do catálogo" moves it to
+  // the bin (restore / permanent delete via lib/goa/trash.ts), it does not just
+  // archive it. The `archived_at` above is its hiding marker.
+  await moveToTrash(client, "catalog_item", catalogItemId, actorUserId, { skipMarker: true });
   // In a living list the catalog identity and the list row are one and the same,
   // so pruning the catalogue also drops the row (and its entries) from the list.
   await client.query(

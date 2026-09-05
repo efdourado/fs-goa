@@ -1,6 +1,9 @@
 import {
+  accountDeletionPreview,
+  deactivateOwnAccount,
   loginAccount,
   logoutSession,
+  reactivateOwnAccount,
   registerAccount,
   requestPasswordReset,
   requireMutationSession,
@@ -16,13 +19,19 @@ import {
   adminAudit,
   adminOverview,
   adminResetLink,
-  adminTrash,
   adminUsers,
-  purgeTrashItem,
   revokeUserSessions,
   setUserDisabled,
   setUserPlatformAdmin,
 } from "@/lib/admin";
+import {
+  challengeArchive,
+  groupTrash,
+  personalTrash,
+  previewTrashAction,
+  purgeTrashItem,
+  restoreTrashItem,
+} from "@/lib/goa/trash";
 import { adminFeedback, submitFeedback } from "@/lib/feedback";
 import {
   archiveCatalogItem,
@@ -134,7 +143,6 @@ export async function GET(request: Request): Promise<Response> {
       await requirePlatformAdminSession(request);
       if (isPath(path, "admin", "overview")) return json(await adminOverview());
       if (isPath(path, "admin", "users")) return json(await adminUsers());
-      if (isPath(path, "admin", "trash")) return json(await adminTrash());
       if (isPath(path, "admin", "feedback")) return json(await adminFeedback());
       if (isPath(path, "admin", "audit")) return json(await adminAudit(new URL(request.url).searchParams));
       return notFound();
@@ -174,6 +182,18 @@ export async function GET(request: Request): Promise<Response> {
     }
     if (path[0] === "challenges" && path[2] === "export.csv" && path.length === 3) {
       return exportEntriesCsv(await requireSession(request), path[1]);
+    }
+    if (isPath(path, "personal", "trash")) {
+      return json(await personalTrash(await requireSession(request)));
+    }
+    if (path[0] === "groups" && path[2] === "trash" && path.length === 3) {
+      return json(await groupTrash(await requireSession(request), path[1]));
+    }
+    if (path[0] === "challenges" && path[2] === "archive" && path.length === 3) {
+      return json(await challengeArchive(await requireSession(request), path[1]));
+    }
+    if (isPath(path, "account", "deletion-preview")) {
+      return json(await accountDeletionPreview(await requireSession(request)));
     }
     return notFound();
   });
@@ -219,7 +239,6 @@ export async function POST(request: Request): Promise<Response> {
     if (path[0] === "admin") {
       const adminSession = await requirePlatformAdminMutation(request);
       const adminBody = await readJsonObject(request);
-      if (isPath(path, "admin", "trash", "purge")) return json(await purgeTrashItem(adminSession, adminBody));
       if (isPath(path, "admin", "users", "disable")) return json(await setUserDisabled(adminSession, adminBody));
       if (isPath(path, "admin", "users", "set-admin")) return json(await setUserPlatformAdmin(adminSession, adminBody));
       if (isPath(path, "admin", "users", "revoke-sessions")) {
@@ -233,6 +252,41 @@ export async function POST(request: Request): Promise<Response> {
 
     const session = await requireMutationSession(request);
     const body = await readJsonObject(request);
+
+    // Account lifecycle. A deactivated account may only reactivate or log out.
+    if (isPath(path, "account", "reactivate")) {
+      return json(await reactivateOwnAccount(session));
+    }
+    if (session.user.deactivated) {
+      throw new ApiError(403, "account_deactivated", "Sua conta está desativada. Reative-a para continuar.");
+    }
+    if (isPath(path, "account", "deactivate")) {
+      const result = await deactivateOwnAccount(session);
+      return json({ ok: true }, 200, { "set-cookie": result.setCookie });
+    }
+    if (isPath(path, "account", "delete")) {
+      const result = await deleteOwnAccount(session, body);
+      return json({ ok: true }, 200, { "set-cookie": result.setCookie });
+    }
+
+    // Recoverable-deletion bin (ROADMAP §13). Scope lives in the URL; the
+    // service re-derives the caller's role from the object's group.
+    if ((isPath(path, "personal", "trash", "preview")) ||
+        (path[0] === "groups" && path[2] === "trash" && path[3] === "preview" && path.length === 4) ||
+        (path[0] === "challenges" && path[2] === "trash" && path[3] === "preview" && path.length === 4)) {
+      return json(await previewTrashAction(session, body));
+    }
+    if ((isPath(path, "personal", "trash", "restore")) ||
+        (path[0] === "groups" && path[2] === "trash" && path[3] === "restore" && path.length === 4) ||
+        (path[0] === "challenges" && path[2] === "trash" && path[3] === "restore" && path.length === 4)) {
+      return json(await restoreTrashItem(session, body));
+    }
+    if ((isPath(path, "personal", "trash", "purge")) ||
+        (path[0] === "groups" && path[2] === "trash" && path[3] === "purge" && path.length === 4) ||
+        (path[0] === "challenges" && path[2] === "trash" && path[3] === "purge" && path.length === 4)) {
+      return json(await purgeTrashItem(session, body));
+    }
+
     if (isPath(path, "groups")) return json(await createGroup(session, body), 201);
     if (path[0] === "groups" && path[2] === "members" && path.length === 3) {
       return json(await requestGroupMember(session, path[1], body));
@@ -326,6 +380,9 @@ export async function PATCH(request: Request): Promise<Response> {
     const path = segments(request);
     const session = await requireMutationSession(request);
     const body = await readJsonObject(request);
+    if (session.user.deactivated) {
+      throw new ApiError(403, "account_deactivated", "Sua conta está desativada. Reative-a para continuar.");
+    }
     if (isPath(path, "account")) {
       return json(await updateAccount(session, body));
     }
@@ -373,9 +430,8 @@ export async function DELETE(request: Request): Promise<Response> {
   return handleApi(async () => {
     const path = segments(request);
     const session = await requireMutationSession(request);
-    if (isPath(path, "account")) {
-      const result = await deleteOwnAccount(session);
-      return json({ ok: true }, 200, { "set-cookie": result.setCookie });
+    if (session.user.deactivated) {
+      throw new ApiError(403, "account_deactivated", "Sua conta está desativada. Reative-a para continuar.");
     }
     if (path[0] === "groups" && path.length === 2) {
       return json(await softDeleteGroup(session, path[1]));

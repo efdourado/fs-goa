@@ -43,6 +43,7 @@ export function screenFromUrl(pathname: string, search = ""): Screen | null {
   }
   if (parts[0] === "sobre" && parts.length === 1) return { kind: "about" };
   if (parts[0] === "personal" && parts.length === 1) return { kind: "personal-space" };
+  if (parts[0] === "personal" && parts[1] === "trash" && parts.length === 2) return { kind: "personal-trash" };
   if (parts[0] === "catalog" && parts.length === 1) return { kind: "personal-catalog" };
   if (parts[0] === "catalog" && parts.length === 2) {
     const itemId = decoded(parts[1]);
@@ -59,6 +60,10 @@ export function screenFromUrl(pathname: string, search = ""): Screen | null {
     const groupId = decoded(parts[1]);
     const itemId = decoded(parts[3]);
     return groupId && itemId ? { kind: "catalog-item", groupId, itemId } : null;
+  }
+  if (parts[0] === "groups" && parts[2] === "trash" && parts.length === 3) {
+    const groupId = decoded(parts[1]);
+    return groupId ? { kind: "group-trash", groupId } : null;
   }
   if (parts[0] === "challenges" && parts[1] === "new" && parts.length === 2) {
     return { kind: "create-personal-challenge" };
@@ -99,6 +104,10 @@ export function urlForScreen(screen: Screen): string | null {
       return "/catalog";
     case "personal-catalog-item":
       return `/catalog/${encodeURIComponent(screen.itemId)}`;
+    case "personal-trash":
+      return "/personal/trash";
+    case "group-trash":
+      return `/groups/${encodeURIComponent(screen.groupId)}/trash`;
     case "create-challenge":
       return `/groups/${encodeURIComponent(screen.groupId)}?create=challenge`;
     case "create-personal-challenge":
@@ -122,6 +131,7 @@ export function urlForScreen(screen: Screen): string | null {
     case "reset":
       return `/?reset=${encodeURIComponent(screen.token)}`;
     case "account":
+    case "account-deactivated":
     case "auth":
     case "loading":
       // Transient shells that should not rewrite the address bar; a refresh

@@ -29,6 +29,7 @@ export function GroupScreen({
   onDeleteGroup,
   onLeaveGroup,
   onSetMemberRole,
+  onOpenTrash,
   challengeLimit,
 }: {
   group: GroupSummary;
@@ -48,6 +49,8 @@ export function GroupScreen({
   onLeaveGroup?: () => Promise<void>;
   /** Present for owners: promote a participant to admin or demote an admin back. */
   onSetMemberRole?: (userId: Id, role: "admin" | "participant") => Promise<void>;
+  /** Present for owner/admin: open the group bin. */
+  onOpenTrash?: () => void;
 }) {
   const t = useTranslations("group");
   const tc = useTranslations("common");
@@ -258,6 +261,10 @@ export function GroupScreen({
               >
                 {showInvite ? t("inviteToggleOpen") : t("inviteToggleClosed")}
               </button>
+
+              {onOpenTrash ? (
+                <button type="button" className={linkClass} onClick={onOpenTrash}>{t("trashLink")}</button>
+              ) : null}
 
               {challenges.length >= challengeLimit ? (
                 <span className="text-[var(--muted)]">

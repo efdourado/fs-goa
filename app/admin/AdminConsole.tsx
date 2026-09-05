@@ -6,7 +6,7 @@ import { type ReactNode, useCallback, useEffect, useRef, useState } from "react"
 import { copyText } from "../goa/clipboard";
 import { Brand } from "../goa/ui";
 
-type Tab = "usage" | "trash" | "audit" | "accounts" | "feedback";
+type Tab = "usage" | "audit" | "accounts" | "feedback";
 
 interface Overview {
   users: { total: number; newThisWeek: number; disabled: number };
@@ -15,14 +15,6 @@ interface Overview {
   entries: { active: number; trashed: number };
   auditEvents: number;
   storage: { databaseBytes: number; tables: Array<{ name: string; bytes: number }> };
-}
-interface TrashItem {
-  kind: "group" | "challenge" | "entry";
-  id: string;
-  label: string;
-  deletedAt: string;
-  deletedBy: string | null;
-  childCount: number;
 }
 interface AuditEvent {
   id: string;
@@ -135,7 +127,6 @@ export default function AdminConsole({ viewerId, viewerName, csrfToken }: { view
   const [busy, setBusy] = useState(false);
 
   const [overview, setOverview] = useState<Overview | null>(null);
-  const [trash, setTrash] = useState<TrashItem[] | null>(null);
   const [audit, setAudit] = useState<AuditEvent[] | null>(null);
   const [users, setUsers] = useState<AdminUser[] | null>(null);
   const [feedback, setFeedback] = useState<FeedbackItem[] | null>(null);
@@ -157,10 +148,6 @@ export default function AdminConsole({ viewerId, viewerName, csrfToken }: { view
   );
 
   const loadOverview = useCallback(() => apiGet<Overview>("/api/admin/overview").then(setOverview), []);
-  const loadTrash = useCallback(
-    () => apiGet<{ items: TrashItem[] }>("/api/admin/trash").then((data) => setTrash(data.items)),
-    [],
-  );
   const loadUsers = useCallback(
     () => apiGet<{ users: AdminUser[] }>("/api/admin/users").then((data) => setUsers(data.users)),
     [],
@@ -180,7 +167,6 @@ export default function AdminConsole({ viewerId, viewerName, csrfToken }: { view
     let cancelled = false;
     const loader =
       tab === "usage" ? loadOverview
-      : tab === "trash" ? loadTrash
       : tab === "audit" ? () => loadAudit()
       : tab === "feedback" ? loadFeedback
       : loadUsers;
@@ -188,7 +174,7 @@ export default function AdminConsole({ viewerId, viewerName, csrfToken }: { view
       .then(() => { if (!cancelled) setError(null); })
       .catch((cause: unknown) => { if (!cancelled) setError(cause instanceof Error ? cause.message : "Falha ao carregar."); });
     return () => { cancelled = true; };
-  }, [tab, loadOverview, loadTrash, loadAudit, loadUsers, loadFeedback]);
+  }, [tab, loadOverview, loadAudit, loadUsers, loadFeedback]);
 
   async function run(action: () => Promise<unknown>, reload: () => Promise<unknown>) {
     setBusy(true);
@@ -205,7 +191,6 @@ export default function AdminConsole({ viewerId, viewerName, csrfToken }: { view
 
   const tabs: Array<{ id: Tab; label: string }> = [
     { id: "usage", label: "Uso" },
-    { id: "trash", label: "Lixeira" },
     { id: "audit", label: "Auditoria" },
     { id: "accounts", label: "Contas" },
     { id: "feedback", label: "Feedback" },
@@ -249,16 +234,6 @@ export default function AdminConsole({ viewerId, viewerName, csrfToken }: { view
       ) : null}
 
       {tab === "usage" ? <UsageTab overview={overview} /> : null}
-      {tab === "trash" ? (
-        <TrashTab
-          items={trash}
-          busy={busy}
-          onPurge={(item) =>
-            run(() => post("/api/admin/trash/purge", { kind: item.kind, id: item.id }), loadTrash)
-          }
-          onInspect={(item) => { setAuditEntity(item.id); setTab("audit"); loadAudit(item.id); }}
-        />
-      ) : null}
       {tab === "audit" ? (
         <AuditTab
           events={audit}
@@ -337,49 +312,6 @@ function UsageTab({ overview }: { overview: Overview | null }) {
   );
 }
 
-function TrashTab({
-  items,
-  busy,
-  onPurge,
-  onInspect,
-}: {
-  items: TrashItem[] | null;
-  busy: boolean;
-  onPurge: (item: TrashItem) => void;
-  onInspect: (item: TrashItem) => void;
-}) {
-  if (!items) return <p className={cx("text-sm", muted)}>Carregando…</p>;
-  if (!items.length) return <div className={cx(card, "p-8 text-center text-sm", muted)}>A lixeira está vazia.</div>;
-  const kindLabel = { group: "Grupo", challenge: "Desafio", entry: "Registro" };
-  return (
-    <ul className="space-y-2">
-      {items.map((item) => (
-        <li key={`${item.kind}:${item.id}`} className={cx(card, "flex flex-wrap items-center justify-between gap-3 p-4")}>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="rounded-full bg-black/[0.06] px-2 py-0.5 text-[10px] font-light uppercase tracking-wide">{kindLabel[item.kind]}</span>
-              <strong className="truncate">{item.label}</strong>
-            </div>
-            <p className={cx("mt-1 text-xs", muted)}>
-              apagado {formatDateTime(item.deletedAt)}{item.deletedBy ? ` por @${item.deletedBy}` : ""}
-              {item.kind !== "entry" ? ` · ${item.childCount} ${item.kind === "group" ? "desafios" : "registros"} embutidos` : ""}
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="ghost" onClick={() => onInspect(item)}>Auditoria</Button>
-            <Button
-              variant="danger"
-              disabled={busy}
-              onClick={() => { if (window.confirm(`Excluir "${item.label}" definitivamente? Não há como recuperar.`)) onPurge(item); }}
-            >
-              Excluir definitivo
-            </Button>
-          </div>
-        </li>
-      ))}
-    </ul>
-  );
-}
 
 function AuditTab({
   events,

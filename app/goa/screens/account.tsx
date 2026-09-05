@@ -1,24 +1,33 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 
+import { API_PATHS, apiRequest } from "../api";
 import { useGoaFormat } from "../format";
 import type { User } from "../types";
 import { backLinkClass, Button, cardClass, cx, inputClass, labelClass, PageHeading, StatusMessage } from "../ui";
+
+interface DeletionPreview {
+  ownedGroups: Array<{ name: string; members: number; willTransfer: boolean }>;
+  memberships: number;
+  publishedChallenges: number;
+}
 
 export function AccountScreen({
   user,
   onBack,
   onSaveProfile,
   onChangePassword,
-  onDeleteAccount,
+  onDeactivate,
+  onDeletePermanently,
 }: {
   user: User;
   onBack: () => void;
   onSaveProfile: (payload: { name: string }) => Promise<void>;
   onChangePassword: (payload: { currentPassword: string; newPassword: string }) => Promise<void>;
-  onDeleteAccount: () => Promise<void>;
+  onDeactivate: () => Promise<void>;
+  onDeletePermanently: (password: string) => Promise<void>;
 }) {
   const t = useTranslations("account");
   const tc = useTranslations("common");
@@ -30,15 +39,39 @@ export function AccountScreen({
   const [pwBusy, setPwBusy] = useState(false);
   const [pwMsg, setPwMsg] = useState<{ error?: string; success?: string }>({});
 
+  const [deactivateBusy, setDeactivateBusy] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [showDelete, setShowDelete] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [preview, setPreview] = useState<DeletionPreview | null>(null);
 
-  async function deleteAccount() {
-    if (!window.confirm(t("deleteConfirm"))) return;
+  useEffect(() => {
+    if (!showDelete) return;
+    const controller = new AbortController();
+    apiRequest<DeletionPreview>(API_PATHS.accountDeletionPreview, { signal: controller.signal })
+      .then(setPreview)
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [showDelete]);
+
+  async function deactivate() {
+    if (!window.confirm(t("deactivateConfirm"))) return;
+    setDeactivateBusy(true);
+    setDeleteError(null);
+    try {
+      await onDeactivate();
+    } catch (cause) {
+      setDeleteError(f.error(cause));
+      setDeactivateBusy(false);
+    }
+  }
+
+  async function deletePermanently() {
     setDeleteBusy(true);
     setDeleteError(null);
     try {
-      await onDeleteAccount();
+      await onDeletePermanently(deletePassword);
     } catch (cause) {
       setDeleteError(f.error(cause));
       setDeleteBusy(false);
@@ -110,11 +143,51 @@ export function AccountScreen({
 
       <section className={cx(cardClass, "mt-6 border-[var(--danger-line)] p-5 sm:p-7")}>
         <h2 className="text-xl font-light text-[var(--danger)]">{t("dangerTitle")}</h2>
-        <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{t("deleteBody")}</p>
+
+        <div className="mt-4">
+          <h3 className="text-sm font-normal">{t("deactivateTitle")}</h3>
+          <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{t("deactivateBody")}</p>
+          <Button variant="secondary" className="mt-3" disabled={deactivateBusy} onClick={() => void deactivate()}>
+            {deactivateBusy ? tc("saving") : t("deactivate")}
+          </Button>
+        </div>
+
+        <hr className="my-5 border-[var(--line)]" />
+
+        <div>
+          <h3 className="text-sm font-normal text-[var(--danger)]">{t("deletePermanentTitle")}</h3>
+          <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{t("deletePermanentBody")}</p>
+          {!showDelete ? (
+            <Button variant="danger" className="mt-3" onClick={() => setShowDelete(true)}>{t("deletePermanent")}</Button>
+          ) : (
+            <div className="mt-3 space-y-3">
+              {preview ? (
+                <ul className="space-y-1 text-sm text-[var(--muted)]">
+                  {preview.ownedGroups.map((group) => (
+                    <li key={group.name}>
+                      {group.willTransfer ? t("consequenceTransfer", { name: group.name }) : t("consequencePurgeGroup", { name: group.name })}
+                    </li>
+                  ))}
+                  <li>{t("consequencePersonal")}</li>
+                  {preview.publishedChallenges > 0 ? <li>{t("consequencePublications", { count: preview.publishedChallenges })}</li> : null}
+                </ul>
+              ) : null}
+              <label className="block">
+                <span className={labelClass}>{t("deletePasswordLabel")}</span>
+                <input className={inputClass} type="password" autoComplete="current-password" value={deletePassword}
+                  onChange={(event) => setDeletePassword(event.target.value)} aria-label={t("deletePasswordLabel")} />
+              </label>
+              <div className="flex gap-2">
+                <Button variant="ghost" onClick={() => { setShowDelete(false); setDeletePassword(""); }} disabled={deleteBusy}>{tc("cancel")}</Button>
+                <Button variant="danger" disabled={deleteBusy || deletePassword.length === 0} onClick={() => void deletePermanently()}>
+                  {deleteBusy ? t("deleting") : t("deletePermanentConfirm")}
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="mt-4"><StatusMessage error={deleteError} /></div>
-        <Button variant="danger" className="mt-4" disabled={deleteBusy} onClick={() => void deleteAccount()}>
-          {deleteBusy ? t("deleting") : t("deleteAccount")}
-        </Button>
       </section>
     </main>
   );

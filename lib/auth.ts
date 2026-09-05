@@ -1,5 +1,7 @@
 import type { PoolClient } from "pg";
 import { inTransaction, oneOrNull, withClient } from "./db";
+import { writeSystemAudit } from "./goa/domain/audit";
+import { purgeGroupRows } from "./goa/purge";
 import { ApiError, cookieValue, requireMutationOrigin } from "./http";
 import {
   clearSessionCookie,
@@ -23,6 +25,8 @@ export interface AuthenticatedUser {
   username: string;
   email: string | null;
   platformAdmin: boolean;
+  /** Reversible self-service "deactivate account" — the SPA shows only a reactivate screen. */
+  deactivated: boolean;
 }
 
 export interface SessionContext {
@@ -38,6 +42,7 @@ interface UserRow {
   email: string | null;
   password_hash: string;
   platform_admin: boolean;
+  deactivated_at?: Date | null;
 }
 
 interface SessionRow extends UserRow {
@@ -72,6 +77,7 @@ function publicUser(row: UserRow): AuthenticatedUser {
     username: row.username,
     email: row.email,
     platformAdmin: row.platform_admin === true,
+    deactivated: row.deactivated_at != null,
   };
 }
 
@@ -206,7 +212,9 @@ export async function loginAccount(body: Record<string, unknown>): Promise<{
     }
     const row = await oneOrNull<UserRow>(
       client,
-      `SELECT id, display_name, username, email, password_hash, platform_admin
+      // A deactivated account can still sign in — it lands on the reactivate
+      // screen. An admin-banned account (`disabled_at`) cannot.
+      `SELECT id, display_name, username, email, password_hash, platform_admin, deactivated_at
          FROM users WHERE ${identifier.column} = $1 AND disabled_at IS NULL`,
       [identifier.value],
     );
@@ -418,47 +426,109 @@ async function findOwnershipSuccessor(
 }
 
 /**
- * Self-service account removal. A solo-owned group is soft-deleted along with
- * the account — nobody else depended on it. A group with other active people
- * never gets destroyed or blocked on manual cleanup: ownership transfers
- * automatically (oldest admin, or oldest member if there is no other admin) —
- * no question asked, same "it just happens" rule as leaving a group. The
- * account row is kept but scrubbed of PII and disabled; a hard purge is an
- * `/admin` follow-up.
+ * Reversible "deactivate account": the person is signed out everywhere and their
+ * content is hidden from the normal experience, but nothing is destroyed. They
+ * log back in and reactivate whenever they want. Kept apart from `disabled_at`
+ * (an admin ban) so a returning user reactivates without lifting a ban.
  */
-export async function deleteOwnAccount(session: SessionContext): Promise<{ setCookie: string }> {
+export async function deactivateOwnAccount(session: SessionContext): Promise<{ setCookie: string }> {
   await inTransaction(async (client) => {
-    await client.query("SELECT id FROM users WHERE id = $1 FOR UPDATE", [session.user.id]);
+    await client.query(
+      "UPDATE users SET deactivated_at = now(), updated_at = now() WHERE id = $1 AND deactivated_at IS NULL",
+      [session.user.id],
+    );
+    await client.query(
+      "UPDATE sessions SET revoked_at = now(), revoke_reason = 'account_deactivated' WHERE user_id = $1 AND revoked_at IS NULL",
+      [session.user.id],
+    );
+    console.warn("auth.deactivateAccount", { userId: session.user.id });
+  });
+  return { setCookie: clearSessionCookie() };
+}
 
-    const ownedGroups = await client.query<{ id: string; name: string; other_members: number }>(
-      `SELECT g.id, g.name,
+export async function reactivateOwnAccount(session: SessionContext): Promise<{ user: AuthenticatedUser }> {
+  return inTransaction(async (client) => {
+    await client.query(
+      "UPDATE users SET deactivated_at = NULL, updated_at = now() WHERE id = $1",
+      [session.user.id],
+    );
+    const account = await oneOrNull<UserRow & { deactivated_at: Date | null }>(
+      client,
+      "SELECT id, display_name, username, email, password_hash, platform_admin, deactivated_at FROM users WHERE id = $1",
+      [session.user.id],
+    );
+    if (!account) throw new ApiError(404, "not_found", "Conta não encontrada.");
+    return { user: publicUser(account) };
+  });
+}
+
+/** What "delete permanently" will do — shown to the person before they confirm. */
+export async function accountDeletionPreview(session: SessionContext): Promise<{
+  ownedGroups: Array<{ name: string; members: number; willTransfer: boolean }>;
+  memberships: number;
+  publishedChallenges: number;
+}> {
+  return withClient(async (client) => {
+    const owned = await client.query<{ name: string; other_members: number; kind: string }>(
+      `SELECT g.name, g.kind,
+              (SELECT count(*)::int FROM group_members m WHERE m.group_id=g.id AND m.removed_at IS NULL AND m.user_id<>$1) AS other_members
+         FROM groups g JOIN group_members gm ON gm.group_id=g.id AND gm.user_id=$1 AND gm.role='owner' AND gm.removed_at IS NULL
+        WHERE g.deleted_at IS NULL AND g.kind='standard'`,
+      [session.user.id],
+    );
+    const memberships = await oneOrNull<{ count: number }>(client,
+      "SELECT count(*)::int AS count FROM group_members WHERE user_id=$1 AND removed_at IS NULL", [session.user.id]);
+    const published = await oneOrNull<{ count: number }>(client,
+      `SELECT count(DISTINCT c.id)::int AS count FROM challenges c
+         JOIN challenge_participants cp ON cp.challenge_id=c.id AND cp.user_id=$1
+        WHERE c.results_published_at IS NOT NULL AND c.deleted_at IS NULL`, [session.user.id]);
+    return {
+      ownedGroups: owned.rows.map((g) => ({ name: g.name, members: g.other_members + 1, willTransfer: g.other_members > 0 })),
+      memberships: memberships?.count ?? 0,
+      publishedChallenges: published?.count ?? 0,
+    };
+  });
+}
+
+/**
+ * Irreversible account removal (ROADMAP §13). Requires the password. Leaves no
+ * orphan: the hidden personal workspace and any solo-owned standard group are
+ * **physically purged**; a co-owned group transfers to its longest-tenured
+ * admin/member; contributions in surviving groups stay but anonymised (the
+ * "Quem já saiu" path), and the user's published showcases in those groups are
+ * unpublished. The `users` row is kept, scrubbed of PII and disabled — a hard
+ * `DELETE FROM users` is impossible against the `RESTRICT` FKs on entries/audit.
+ */
+export async function deleteOwnAccount(
+  session: SessionContext,
+  body: Record<string, unknown>,
+): Promise<{ setCookie: string }> {
+  await inTransaction(async (client) => {
+    const account = await oneOrNull<{ password_hash: string }>(
+      client, "SELECT password_hash FROM users WHERE id = $1 FOR UPDATE", [session.user.id],
+    );
+    if (!account || !(await verifyPassword(body.password, account.password_hash))) {
+      throw new ApiError(403, "invalid_password", "Senha incorreta.");
+    }
+
+    const ownedGroups = await client.query<{ id: string; kind: string; other_members: number }>(
+      `SELECT g.id, g.kind,
               (SELECT count(*)::int FROM group_members m
                 WHERE m.group_id = g.id AND m.removed_at IS NULL AND m.user_id <> $1) AS other_members
          FROM groups g
-         JOIN group_members gm ON gm.group_id = g.id AND gm.user_id = $1
-          AND gm.role = 'owner' AND gm.removed_at IS NULL
+         JOIN group_members gm ON gm.group_id = g.id AND gm.user_id = $1 AND gm.role = 'owner' AND gm.removed_at IS NULL
         WHERE g.deleted_at IS NULL`,
       [session.user.id],
     );
 
+    let purgedGroups = 0;
+    let transferredGroups = 0;
     for (const group of ownedGroups.rows) {
-      if (group.other_members === 0) {
-        await client.query(
-          `UPDATE groups SET deleted_at = now(), deleted_by_user_id = $2, updated_at = now() WHERE id = $1`,
-          [group.id, session.user.id],
-        );
-        await client.query(
-          `INSERT INTO audit_events
-            (id, group_id, challenge_id, actor_user_id, action, entity_type, entity_id, before, after, metadata, created_at)
-           VALUES ($1,$2,NULL,$3,'group.deleted','group',$2,$4::jsonb,NULL,'{"reason":"account_deleted"}'::jsonb,now())`,
-          [crypto.randomUUID(), group.id, session.user.id, JSON.stringify({ name: group.name })],
-        );
+      if (group.kind === "personal" || group.other_members === 0) {
+        await purgeGroupRows(client, group.id);
+        purgedGroups += 1;
         continue;
       }
-
-      // Demote the departing owner first — otherwise promoting the successor
-      // to 'owner' while this row still holds that role would momentarily
-      // give the group two active owners, which the unique index refuses.
       const successorId = await findOwnershipSuccessor(client, group.id, session.user.id);
       await client.query(
         "UPDATE group_members SET role = 'participant' WHERE group_id = $1 AND user_id = $2 AND removed_at IS NULL",
@@ -472,23 +542,31 @@ export async function deleteOwnAccount(session: SessionContext): Promise<{ setCo
          VALUES ($1,$2,NULL,$3,'group.ownership_transferred','group',$2,$4::jsonb,$5::jsonb,'{"reason":"account_deleted"}'::jsonb,now())`,
         [crypto.randomUUID(), group.id, session.user.id, JSON.stringify({ ownerUserId: session.user.id }), JSON.stringify({ ownerUserId: successorId })],
       );
+      transferredGroups += 1;
     }
 
+    // Unpublish the departing person's showcases in the groups that survive —
+    // the frozen snapshot may name them. An admin republishes when ready.
+    await client.query(
+      `UPDATE challenges c
+          SET results_published_at = NULL, result_share_token_hash = NULL,
+              results_published_snapshot = NULL, updated_at = now()
+        WHERE c.results_published_at IS NOT NULL AND c.deleted_at IS NULL
+          AND EXISTS (SELECT 1 FROM challenge_participants cp WHERE cp.challenge_id = c.id AND cp.user_id = $1)`,
+      [session.user.id],
+    );
     await client.query(
       "UPDATE group_members SET removed_at = now() WHERE user_id = $1 AND removed_at IS NULL",
       [session.user.id],
     );
-    // Same close-out as leaving a group by hand — otherwise a deleted account
-    // keeps showing as an active participant (just under the scrubbed name).
     await client.query(
       "UPDATE challenge_participants SET removed_at = now() WHERE user_id = $1 AND removed_at IS NULL",
       [session.user.id],
     );
     await client.query(
       `UPDATE users
-          SET deleted_at = now(), disabled_at = now(),
-              display_name = 'Conta removida', email = NULL, email_normalized = NULL,
-              updated_at = now()
+          SET deleted_at = now(), disabled_at = now(), deactivated_at = NULL,
+              display_name = 'Conta removida', email = NULL, email_normalized = NULL, updated_at = now()
         WHERE id = $1`,
       [session.user.id],
     );
@@ -496,7 +574,10 @@ export async function deleteOwnAccount(session: SessionContext): Promise<{ setCo
       "UPDATE sessions SET revoked_at = now(), revoke_reason = 'account_deleted' WHERE user_id = $1 AND revoked_at IS NULL",
       [session.user.id],
     );
-    console.warn("auth.deleteAccount", { userId: session.user.id });
+    await writeSystemAudit(client, null, "account.deleted", "account", session.user.id, {
+      purgedGroups, transferredGroups,
+    });
+    console.warn("auth.deleteAccount", { userId: session.user.id, purgedGroups, transferredGroups });
   });
 
   return { setCookie: clearSessionCookie() };
@@ -516,7 +597,7 @@ export async function sessionFromToken(rawToken: string | null): Promise<Session
     const row = await oneOrNull<SessionRow>(
       client,
       `SELECT s.id AS session_id, u.id, u.display_name, u.username, u.email, u.password_hash,
-              u.platform_admin
+              u.platform_admin, u.deactivated_at
          FROM sessions s
          JOIN users u ON u.id = s.user_id
         WHERE s.token_hash = $1 AND s.revoked_at IS NULL AND s.expires_at > now()

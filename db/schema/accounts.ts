@@ -26,6 +26,9 @@ export const users = pgTable(
     passwordChangedAt: timestamptz("password_changed_at").defaultNow().notNull(),
     platformAdmin: boolean("platform_admin").notNull().default(false),
     disabledAt: timestamptz("disabled_at"),
+    // Reversible self-service "deactivate account" — separate from disabledAt
+    // (an admin ban) so logging back in reactivates without lifting a ban.
+    deactivatedAt: timestamptz("deactivated_at"),
     deletedAt: timestamptz("deleted_at"),
     createdAt: timestamptz("created_at").defaultNow().notNull(),
     updatedAt: timestamptz("updated_at").defaultNow().notNull(),

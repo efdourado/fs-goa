@@ -326,7 +326,8 @@
     "pendingInviteMeta": "@{username} · convidado em {date}",
     "cancel": "Cancelar",
     "leaveToggle": "Sair do grupo",
-    "leaveConfirm": "Sair deste grupo? Você deixa de vê-lo e a seus desafios. Seus registros continuam (a história do grupo fica intacta), mas passam a mostrar \"saiu do grupo\" no lugar do seu nome."
+    "leaveConfirm": "Sair deste grupo? Você deixa de vê-lo e a seus desafios. Seus registros continuam (a história do grupo fica intacta), mas passam a mostrar \"saiu do grupo\" no lugar do seu nome.",
+    "trashLink": "Lixeira"
   },
   "catalog": {
     "back": "← Voltar",
@@ -353,7 +354,8 @@
     "catalog": "Meu acervo",
     "create": "+ Desafio pessoal",
     "emptyTitle": "Comece um desafio só seu",
-    "emptyBody": "Desafios pessoais são só seus — sem grupo, sem convites. Ótimo para uma meta de leitura ou uma maratona de filmes."
+    "emptyBody": "Desafios pessoais são só seus — sem grupo, sem convites. Ótimo para uma meta de leitura ou uma maratona de filmes.",
+    "trash": "Lixeira"
   },
   "personalCatalog": {
     "back": "← Voltar",
@@ -1079,7 +1081,20 @@
     "deleteBody": "Apagar a conta desativa o acesso e remove seus dados pessoais. Grupos onde você é a única pessoa vão para a lixeira. Um grupo com outras pessoas nunca fica travado em você — a posse passa automaticamente para o admin mais antigo ou, se não houver outro admin, para o membro mais antigo.",
     "deleteConfirm": "Apagar sua conta? O acesso é encerrado e os dados pessoais são removidos.",
     "deleteAccount": "Apagar minha conta",
-    "deleting": "Apagando…"
+    "deleting": "Apagando…",
+    "deactivateConfirm": "Desativar sua conta? Você pode reativá-la fazendo login de novo.",
+    "deactivateTitle": "Desativar conta",
+    "deactivateBody": "Reversível. Você sai de tudo e seu conteúdo fica guardado; é só entrar de novo para reativar.",
+    "deactivate": "Desativar conta",
+    "deletePermanentTitle": "Excluir a conta permanentemente",
+    "deletePermanentBody": "Irreversível. Espaço pessoal e grupos só seus são apagados; grupos com outras pessoas trocam de dono; suas contribuições ficam anônimas.",
+    "deletePermanent": "Excluir permanentemente",
+    "deletePermanentConfirm": "Excluir para sempre",
+    "deletePasswordLabel": "Confirme com sua senha",
+    "consequenceTransfer": "O grupo “{name}” troca de dono.",
+    "consequencePurgeGroup": "O grupo “{name}” é apagado de vez.",
+    "consequencePersonal": "Seu espaço pessoal e o acervo pessoal são apagados de vez.",
+    "consequencePublications": "{count, plural, one {# vitrine publicada sua sai do ar} other {# vitrines publicadas suas saem do ar}}."
   },
   "resetPassword": {
     "passwordsDontMatch": "As senhas não coincidem.",
@@ -1261,5 +1276,66 @@
     "toggleHint": "Começa desmarcado. Você muda quando quiser.",
     "on": "Nome autorizado.",
     "off": "Autorização do nome retirada."
+  },
+  "trash": {
+    "back": "← Voltar",
+    "loading": "Carregando a lixeira…",
+    "loadError": "Não foi possível abrir a lixeira.",
+    "restoreError": "Não foi possível restaurar.",
+    "previewError": "Não foi possível calcular o impacto.",
+    "purgeError": "Não foi possível excluir em definitivo.",
+    "personalTitle": "Minha lixeira",
+    "personalSubtitle": "Grupos, desafios e itens do acervo que você removeu. Ficam aqui até você restaurar ou excluir em definitivo.",
+    "groupTitle": "Lixeira do grupo",
+    "groupSubtitle": "Desafios e itens do acervo removidos. Restaure ou exclua em definitivo — nada some sozinho.",
+    "emptyTitle": "A lixeira está vazia",
+    "emptyBody": "O que você remover aparece aqui e pode voltar a qualquer momento.",
+    "restore": "Restaurar",
+    "purge": "Excluir permanentemente",
+    "purging": "Excluindo…",
+    "cancel": "Cancelar",
+    "deletedAt": "removido em {date}",
+    "deletedBy": "por {who}",
+    "reasonShown": "Motivo: {reason}",
+    "parentTrashed": "Restaure primeiro o item que contém este.",
+    "purgeTitle": "Excluir permanentemente",
+    "purgeBody": "“{label}” será removido para sempre. Isto não pode ser desfeito.",
+    "purgeConfirm": "Excluir para sempre",
+    "purgeNoDeps": "Nada mais depende deste item.",
+    "confirmName": "Digite {name} para confirmar",
+    "confirmCount": "Digite {count} para confirmar que {count} registros serão apagados",
+    "reasonLabel": "Motivo (exclusão administrativa)",
+    "kind": {
+      "group": "Grupo",
+      "challenge": "Desafio",
+      "catalog_item": "Item do acervo",
+      "entry": "Registro",
+      "challenge_item": "Item do desafio",
+      "checkpoint": "Checkpoint",
+      "entry_type": "Tipo de registro",
+      "field": "Campo",
+      "field_option": "Opção",
+      "metric": "Métrica",
+      "catalog_attribute_def": "Atributo do acervo"
+    },
+    "dependency": {
+      "challenges": "{count, plural, one {# desafio} other {# desafios}}",
+      "catalogItems": "{count, plural, one {# item de acervo} other {# itens de acervo}}",
+      "members": "{count, plural, one {# pessoa} other {# pessoas}}",
+      "entries": "{count, plural, one {# registro} other {# registros}}",
+      "items": "{count, plural, one {# item} other {# itens}}",
+      "checkpoints": "{count, plural, one {# checkpoint} other {# checkpoints}}",
+      "metrics": "{count, plural, one {# métrica} other {# métricas}}",
+      "fields": "{count, plural, one {# campo} other {# campos}}",
+      "values": "{count, plural, one {# resposta} other {# respostas}}",
+      "challengesUsing": "{count, plural, one {usado por # desafio} other {usado por # desafios}}"
+    }
+  },
+  "accountDeactivated": {
+    "title": "Sua conta está desativada",
+    "body": "Ninguém vê seu conteúdo enquanto ela estiver desativada. Reative quando quiser.",
+    "reactivate": "Reativar conta",
+    "reactivating": "Reativando…",
+    "logout": "Sair"
   }
 }
