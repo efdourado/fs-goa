@@ -616,21 +616,39 @@ Ao sair: perde acesso a conteúdo privado; nome removido de novas publicações;
 
 Tudo que puder ser excluído deve usar exclusão recuperável.
 
+> **Decisão de implementação (posterior ao texto original):** a lixeira da V1 é
+> **permanente e do usuário** — nada expira, não há `purge_after`, varredura nem
+> cron. Um item fica na lixeira até ser restaurado ou excluído em definitivo por
+> ação explícita. Conta não usa a lixeira: são duas ações separadas — **desativar**
+> (reversível) e **excluir permanentemente** (com senha, apaga espaço pessoal e
+> grupos solo, transfere grupos compartilhados, anonimiza contribuições). Ver
+> `docs/architecture.md` › "Lixeira e recuperação" / "Conta".
+
 ## Áreas
 
-- **Minha lixeira:** conteúdo do espaço pessoal, entradas próprias, desafios pessoais, itens pessoais.
-- **Lixeira do grupo** (owner/admin): desafios, itens de catálogo, checkpoints, itens do desafio, campos, opções, métricas, publicações.
-- **Conta:** fluxo separado — confirmar senha, período de exclusão, sessões revogadas, login apenas para cancelar, publicações anonimizadas, purga após 30 dias.
+- **Minha lixeira:** desafios/listas pessoais, itens do acervo pessoal, e os
+  grupos que a pessoa criou.
+- **Lixeira do grupo** (owner/admin): desafios e itens de catálogo do grupo.
+- **Estrutura removida do desafio:** checkpoints, itens, campos, opções, métricas
+  e tipos ficam **arquivados** dentro da administração do desafio (recuperáveis
+  ali); a exclusão física acontece junto com o desafio pai.
+- **Publicação:** despublicar não é lixeira — só invalida o link e some com o
+  snapshot público (o Wrapped interno fica).
 
 ## Regras gerais
 
-- `deleted_at`: quando foi enviado para a lixeira.
-- `purge_after`: quando será removido definitivamente. Prazo padrão: 30 dias.
+- `trash_items` registra o que está na lixeira (kind, id, escopo, autor, data);
+  `archived_at` continua significando "arquivado".
 - restauração mantém IDs e histórico.
 - filho não pode ser restaurado sem pai ativo.
 - conflito de nome/identidade resolvido antes da restauração.
-- excluir um pai deixa os filhos inacessíveis pelo estado do pai.
-- restauração e purga são auditadas.
+- excluir um pai deixa os filhos inacessíveis pelo estado do pai; restaurar o pai
+  revive quem não foi binado à parte.
+- exclusão permanente só a partir da lixeira, depois do preview de dependências,
+  e nunca quando corromperia o histórico.
+- itens na lixeira ainda contam nos limites de criação.
+- restauração e exclusão permanente são auditadas (`system_audit_events` sem
+  conteúdo para a purga).
 - administrador da plataforma não possui lixeira global de conteúdo.
 
 ---

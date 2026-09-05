@@ -953,7 +953,14 @@ export function ParticipantChallengeScreen({
     sortedSessions.length > 0
     && sortedItems.length > 0
     && challenge.entryTypes.some((type) => type.targetPolicy !== "none" && type.schedulePolicy === "checkpoint");
-  const undatedDaily = challenge.submissionMode === "daily" && !challenge.startsOn && !challenge.endsOn;
+  // A daily check-in that is NOT tied to a checkpoint (an undated habit, or a
+  // dated habit whose type is `while_active`) always shows the plain "check in
+  // today" form — it never needs an item or a checkpoint selected. Only a
+  // checkpoint-scheduled daily type (dated Library / reading_daily) uses the
+  // session picker.
+  const directDaily = challenge.submissionMode === "daily"
+    && !challenge.entryTypes.some((type) => type.submissionMode === "daily" && type.schedulePolicy === "checkpoint");
+  const undatedDaily = directDaily;
   const today = dateKeyInSaoPaulo(new Date());
   // "" means the participant hasn't picked a date. The plain round form saves it
   // as-is (no date); the daily / per-day forms fall back to `today`.

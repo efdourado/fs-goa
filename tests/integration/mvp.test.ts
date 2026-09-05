@@ -4332,3 +4332,151 @@ test("cenário de aceitação V1: grupo de 6, Cinema com semanas, JSON, expectat
     assert.ok(existsSync(new URL(`../../${page}`, import.meta.url)), `${page} existe`);
   }
 });
+
+// ── regressões P0 da revisão de aceite ───────────────────────────────────
+
+test("P0: exclusão permanente exige que o objeto esteja de fato na lixeira", async () => {
+  const owner = await register("P0 Purga", "p0_purga");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Grupo Vivo" } })).body as { id: string }).id;
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner, body: { recipe: "cinema", title: "Desafio Vivo", participantIds: [owner.user.id], items: [{ title: "F" }] },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+
+  // Objeto ATIVO — mesmo com papel e confirmação, o purge é recusado.
+  const purgeChallenge = await call("POST", `/api/groups/${groupId}/trash/purge`, {
+    session: owner, body: { kind: "challenge", id: challengeId, confirmation: "0" },
+  });
+  assert.equal(purgeChallenge.response.status, 409, JSON.stringify(purgeChallenge.body));
+  assert.equal((purgeChallenge.body as { error: string }).error, "not_in_trash");
+  const purgeGroup = await call("POST", `/api/personal/trash/purge`, {
+    session: owner, body: { kind: "group", id: groupId, confirmation: "Grupo Vivo" },
+  });
+  assert.equal(purgeGroup.response.status, 409);
+  assert.equal((purgeGroup.body as { error: string }).error, "not_in_trash");
+  assert.equal(((await call("GET", `/api/challenges/${challengeId}`, { session: owner })).response.status), 200, "o desafio segue vivo");
+
+  // Só depois de binar é que a exclusão permanente passa.
+  await call("DELETE", `/api/challenges/${challengeId}`, { session: owner });
+  assert.equal((await call("POST", `/api/groups/${groupId}/trash/purge`, {
+    session: owner, body: { kind: "challenge", id: challengeId, confirmation: "0" },
+  })).response.status, 200);
+});
+
+test("P0: apagar o grupo tira do ar a vitrine publicada dos seus desafios", async () => {
+  const owner = await register("P0 Vitrine", "p0_vitrine");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube Vitrine" } })).body as { id: string }).id;
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner, body: { recipe: "cinema", title: "Vitrine no ar", participantIds: [owner.user.id], items: [{ title: "F" }] },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  const d = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    entryTypes: Array<{ id: string; purpose: string; fields: Array<{ id: string; key: string }> }>; items: Array<{ id: string }>;
+  };
+  const rating = d.entryTypes.find((t) => t.purpose === "rating")!;
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });
+  await call("POST", `/api/challenges/${challengeId}/entries`, { session: owner, body: { itemId: d.items[0].id, entryTypeId: rating.id, values: { [rating.fields.find((f) => f.key === "nota")!.id]: 4 } } });
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "closed" } });
+  const pub = await call("POST", `/api/challenges/${challengeId}/results/publish`, { session: owner, body: {} });
+  const token = (pub.body as { shareToken: string }).shareToken;
+  assert.equal((await call("GET", `/api/results/${token}`)).response.status, 200);
+
+  assert.equal((await call("DELETE", `/api/groups/${groupId}`, { session: owner })).response.status, 200);
+  assert.equal((await call("GET", `/api/results/${token}`)).response.status, 404, "grupo na lixeira → vitrine fora do ar");
+
+  // Restaurar o grupo não republica sozinho.
+  await call("POST", `/api/personal/trash/restore`, { session: owner, body: { kind: "group", id: groupId } });
+  assert.equal((await call("GET", `/api/results/${token}`)).response.status, 404, "restaurar não republica");
+});
+
+test("P0: revogar consentimento nominal invalida a vitrine publicada; sair reinicia o consentimento", async () => {
+  const owner = await register("P0 Consent", "p0_consent");
+  const b = await register("P0 Bela", "p0_bela");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube Consent" } })).body as { id: string }).id;
+  const invite = (await call("POST", `/api/groups/${groupId}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
+  await call("POST", `/api/invites/${invite.token}`, { session: b, body: {} });
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner, body: { recipe: "cinema", title: "Com nomes", participantIds: [owner.user.id, b.user.id], items: [{ title: "F" }] },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  const d = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    entryTypes: Array<{ id: string; purpose: string; fields: Array<{ id: string; key: string }> }>; items: Array<{ id: string }>;
+  };
+  const rating = d.entryTypes.find((t) => t.purpose === "rating")!;
+  const nota = rating.fields.find((f) => f.key === "nota")!.id;
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });
+  assert.equal((await call("PATCH", `/api/challenges/${challengeId}/consent`, { session: b, body: { nameConsent: true } })).response.status, 200);
+  for (const s of [owner, b]) await call("POST", `/api/challenges/${challengeId}/entries`, { session: s, body: { itemId: d.items[0].id, entryTypeId: rating.id, values: { [nota]: 4 } } });
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "closed" } });
+  await call("POST", `/api/challenges/${challengeId}/results`, { session: owner, body: { anonymizeParticipants: false } });
+  const pub = await call("POST", `/api/challenges/${challengeId}/results/publish`, { session: owner, body: {} });
+  const token = (pub.body as { shareToken: string }).shareToken;
+  assert.ok(((await call("GET", `/api/results/${token}`)).body as { challenge: { participants: string[] } }).challenge.participants.includes("P0 Bela"));
+
+  // Bela revoga → o link cai.
+  assert.equal((await call("PATCH", `/api/challenges/${challengeId}/consent`, { session: b, body: { nameConsent: false } })).response.status, 200);
+  assert.equal((await call("GET", `/api/results/${token}`)).response.status, 404, "revogar consentimento tira o link do ar");
+
+  // Bela sai e volta: o consentimento não reaparece.
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });
+  await call("POST", `/api/challenges/${challengeId}/participants`, { session: owner, body: { replace: true, participantIds: [owner.user.id] } });
+  await call("POST", `/api/challenges/${challengeId}/participants`, { session: owner, body: { replace: true, participantIds: [owner.user.id, b.user.id] } });
+  const back = (await call("GET", `/api/challenges/${challengeId}`, { session: b })).body as { viewerNameConsent: boolean };
+  assert.equal(back.viewerNameConsent, false, "quem sai e volta precisa autorizar o nome de novo");
+});
+
+test("P0: a auditoria da plataforma não vaza títulos, nomes nem rótulos curtos", async () => {
+  const admin = await register("P0 Admin", "p0_admin_priv");
+  await adminPool.query("UPDATE users SET platform_admin = true WHERE id = $1", [admin.user.id]);
+  const adminSession = await login("p0_admin_priv");
+  const owner = await register("P0 Dono", "p0_dono_priv");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Grupo Secreto XYZ" } })).body as { id: string }).id;
+  const challenge = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner, body: { recipe: "cinema", title: "Título Curto Sensível", participantIds: [owner.user.id], items: [{ title: "F" }] },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  await call("POST", `/api/challenges/${challengeId}/metrics`, { session: owner, body: { label: "Métrica com Rótulo Privado", operation: "average", fieldId: ((await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { entryTypes: Array<{ purpose: string; fields: Array<{ id: string; key: string }> }> }).entryTypes.find((t) => t.purpose === "rating")!.fields.find((f) => f.key === "nota")!.id } });
+
+  const audit = (await call("GET", `/api/admin/audit?groupId=${gid}`, { session: adminSession })).body as { events: unknown[] };
+  const dump = JSON.stringify(audit.events);
+  assert.doesNotMatch(dump, /Título Curto Sensível/, "título de desafio (curto) não aparece");
+  assert.doesNotMatch(dump, /Grupo Secreto XYZ/, "nome de grupo não aparece");
+  assert.doesNotMatch(dump, /Métrica com Rótulo Privado/, "rótulo de métrica não aparece");
+  assert.match(dump, /"status":"(draft|active)"|"operation":"average"/, "valores estruturais continuam visíveis");
+});
+
+test("P0: um Hábito com período e sem checkpoints ativa e aceita check-in direto", async () => {
+  const owner = await register("P0 Habito", "p0_habito");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube Hábito" } })).body as { id: string }).id;
+  const created = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "habit", title: "Correr toda semana",
+      startsOn: "2026-05-01", endsOn: "2026-07-31", generateDaily: false,
+      participantIds: [owner.user.id],
+      fields: [{ key: "minutos", label: "Minutos", type: "number", required: true, config: { min: 0, step: 1 } }],
+    },
+  });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const challengeId = (created.body as { id: string }).id;
+
+  const preflight = await call("GET", `/api/challenges/${challengeId}/preflight`, { session: owner });
+  assert.equal((preflight.body as { ready: boolean }).ready, true);
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } })).response.status, 200);
+
+  const detail = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    entryTypes: Array<{ id: string; purpose: string; submissionMode: string; schedulePolicy: string; fields: Array<{ id: string; key: string }> }>;
+    checkpoints: unknown[]; items: unknown[];
+  };
+  const checkin = detail.entryTypes.find((t) => t.purpose === "checkin")!;
+  assert.equal(checkin.submissionMode, "daily");
+  assert.notEqual(checkin.schedulePolicy, "checkpoint", "o hábito não fica preso a checkpoints");
+  assert.deepEqual(detail.checkpoints, []);
+  assert.deepEqual(detail.items, []);
+
+  // Check-in direto, sem item nem checkpoint.
+  const entry = await call("POST", `/api/challenges/${challengeId}/entries`, {
+    session: owner, body: { entryTypeId: checkin.id, occurredOn: "2026-05-04", values: { [checkin.fields.find((f) => f.key === "minutos")!.id]: 30 } },
+  });
+  assert.equal(entry.response.status, 201, JSON.stringify(entry.body));
+});

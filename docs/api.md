@@ -41,6 +41,10 @@ Toda resposta é JSON `no-store` com `x-content-type-options: nosniff` e
 | `POST /api/auth/forgot` | origem | `{ email }` | `202 { ok }` **sempre** (não revela se a conta existe). Registra o pedido; o admin gera o link em `/admin` |
 | `POST /api/auth/reset` | origem | `{ token, password }` | `200 { user, csrfToken }` + `Set-Cookie` (login automático). Marca o token usado e revoga todas as sessões antigas da conta. `400 invalid_reset_token` |
 | `PATCH /api/account` | sessão+csrf | `{ name?, currentPassword?, newPassword? }` | `200 { user }`. Só o nome e a senha são editáveis; passar `email` ou `username` dá `403 email_locked` / `403 username_locked`. Trocar a senha exige `currentPassword` e revoga as outras sessões |
+| `POST /api/account/deactivate` | sessão+csrf | `{}` | `200 { ok }` + cookie limpo — reversível; revoga sessões, o conteúdo fica. Relogar cai na tela de reativação; toda mutação responde `403 account_deactivated` |
+| `POST /api/account/reactivate` | sessão+csrf | `{}` | `200 { user }` — limpa `deactivated_at` |
+| `GET /api/account/deletion-preview` | sessão | — | `{ ownedGroups[], memberships, publishedChallenges }` — o que a exclusão permanente vai fazer |
+| `POST /api/account/delete` | sessão+csrf | `{ password }` | `200 { ok }` + cookie limpo — **irreversível**. Apaga de vez espaço pessoal e grupos solo; transfere grupos compartilhados; anonimiza contribuições; despublica vitrines; `403 invalid_password` |
 
 ## Grupos
 
@@ -48,7 +52,7 @@ Toda resposta é JSON `no-store` com `x-content-type-options: nosniff` e
 | --- | --- | --- | --- |
 | `POST /api/groups` | sessão+csrf | `{ name, description? }` | `201 { id, name, role: "owner", memberCount }`. `403 group_limit` ao passar de `MAX_GROUPS_PER_OWNER` (6) |
 | `PATCH /api/groups/:id` | sessão+csrf (owner/admin) | `{ name?, description? }` | `200 { id, name, description }` |
-| `DELETE /api/groups/:id` | sessão+csrf (owner) | — | `200 { id, deleted: true }` — vai para a lixeira (`deleted_at`), some do app até ser purgado no `/admin` |
+| `DELETE /api/groups/:id` | sessão+csrf (owner) | — | `200 { id, deleted: true }` — vai para a lixeira (`trash_items`); restaura/exclui em definitivo via `/api/personal/trash/*`. Vitrines publicadas do grupo saem do ar |
 | `POST /api/groups/:id/members` | sessão+csrf (owner/admin) | `{ username }` | `200 { groupId, member, added, restored, idempotent }` — busca exata e normalizada; adiciona ou restaura como participante e preserva admin restaurado. `403 group_full` ao passar de `MAX_MEMBERS_PER_GROUP` (62) |
 | `POST /api/groups/:id/invites` | sessão+csrf (owner/admin) | `{ expiresInDays?, maxUses?, challengeId? }` | `201 { id, token, url, kind, groupId, groupName, challengeId, challengeTitle, expiresAt, maxUses }`. Com `challengeId`, o alvo deve pertencer ao grupo e não pode estar encerrado |
 | `POST /api/groups/:id/challenges` | sessão+csrf (owner/admin) | ver "criar desafio" abaixo | `201 { id, challengeId, status: "draft" }`. `403 challenge_limit` ao passar de `MAX_CHALLENGES_PER_GROUP` (6) |
@@ -112,7 +116,22 @@ encerrado manualmente.
 
 | Método · rota | Acesso | Retorna |
 | --- | --- | --- |
-| `GET /api/results/:token` | público (por token) | `{ challenge: { title, participants, result } }` — só desafios encerrados e publicados |
+| `GET /api/results/:token` | público (por token) | `{ challenge: { title, participants, result } }` — só desafios encerrados e publicados de um grupo ativo |
+
+## Lixeira (`/api/{personal|groups/:id|challenges/:id}/trash/*`)
+
+Lixeira **permanente e do usuário** — nada expira. O serviço deriva o papel do
+objeto, não da URL. `kind ∈ {group, challenge, catalog_item, entry,
+challenge_item, checkpoint, entry_type, field, field_option, metric,
+catalog_attribute_def}`.
+
+| Método · rota | Retorna / efeito |
+| --- | --- |
+| `GET /api/personal/trash` · `GET /api/groups/:id/trash` | `{ items: [{ kind, id, label, deletedAt, deletedBy, dependencies[], parentTrashed, blocked }] }` |
+| `GET /api/challenges/:id/archive` | estrutura arquivada do desafio + registros removidos (participante vê só os próprios) |
+| `POST …/trash/preview` `{ kind, id }` | `{ dependencies[], blocked, confirmation: "simple"\|"count"\|"name" }` |
+| `POST …/trash/restore` `{ kind, id, rename? }` | `409 parent_trashed` / `409 name_conflict`; restaura mantendo o id |
+| `POST …/trash/purge` `{ kind, id, confirmation, reason? }` | irreversível; `409 not_in_trash` se o objeto não estiver na lixeira; `409` de confirmação; `reason` obrigatório p/ registro de terceiro |
 
 ## Modelos
 
@@ -132,11 +151,10 @@ Só expõem metadados — nunca o conteúdo de grupos ou desafios.
 
 | Método · rota | Corpo | Retorna / efeito |
 | --- | --- | --- |
-| `GET /api/admin/overview` | — | contadores de contas/grupos/desafios/registros/lixeira + `pg_database_size` e tamanho por tabela |
-| `GET /api/admin/users` | — | por conta: cadastro, última sessão, grupos, sessões ativas, `pendingReset` |
-| `GET /api/admin/trash` | — | grupos/desafios/registros soft-deletados: rótulo, quando, por quem, itens embutidos |
-| `GET /api/admin/audit?groupId=&entityId=&limit=` | — | eventos de `audit_events` com autor, antes/depois; filtro por grupo/entidade |
-| `POST /api/admin/trash/purge` | `{ kind: "group"\|"challenge"\|"entry", id }` | apaga de vez, em ordem de dependência (o schema é cheio de `RESTRICT`) |
+| `GET /api/admin/overview` | — | contadores agregados de contas/grupos/desafios/registros (e quantos na lixeira, via `trash_items`) + `pg_database_size` e tamanho por tabela |
+| `GET /api/admin/users` | — | por conta: cadastro, última sessão, grupos, sessões ativas, `pendingReset`, `deactivatedAt` |
+| `GET /api/admin/audit?groupId=&entityId=&limit=` | — | eventos de `audit_events` — só valores **estruturais** (`redactForPlatformAdmin`); linhas de espaço pessoal vêm sem `before`/`after`/ids |
+| `GET /api/admin/system-audit?limit=` | — | rastro operacional de purgas e exclusão de conta: ator, ação, `entityKind`, **hash** do id, contagens — sem conteúdo |
 | `POST /api/admin/users/disable` | `{ userId, disabled }` | liga/desliga `disabled_at`; ao desativar revoga as sessões. Admins e a própria conta são protegidos |
 | `POST /api/admin/users/set-admin` | `{ userId, platformAdmin }` | liga/desliga `platform_admin`. Não permite mudar a própria conta (`400 self_target`) |
 | `POST /api/admin/users/revoke-sessions` | `{ userId }` | revoga todas as sessões ativas da conta |

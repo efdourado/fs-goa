@@ -529,7 +529,8 @@ export default function GoaApp() {
   }
 
   const user = bootstrap.user;
-  const selectedGroup = screen.kind === "group" || screen.kind === "create-challenge" || screen.kind === "catalog-item"
+  const selectedGroup = screen.kind === "group" || screen.kind === "create-challenge"
+    || screen.kind === "catalog-item" || screen.kind === "group-trash"
     ? bootstrap.groups.find((group) => group.id === screen.groupId)
     : selectedChallenge ? bootstrap.groups.find((group) => group.id === selectedChallenge.groupId) : undefined;
   const selectedRole = selectedChallenge?.viewerRole ?? selectedGroup?.role;

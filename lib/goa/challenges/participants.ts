@@ -40,7 +40,9 @@ export async function setChallengeParticipants(
     let removed = 0;
     if (body.replace === true) {
       const result = await client.query(
-        `UPDATE challenge_participants SET removed_at=now()
+        // Consent is per-round and does not survive removal — a re-added person
+        // opts in again (ROADMAP §12).
+        `UPDATE challenge_participants SET removed_at=now(), name_consent=false
           WHERE challenge_id=$1 AND removed_at IS NULL
             AND NOT (user_id=ANY($2::text[]))`,
         [challengeId, requestedIds],
@@ -57,7 +59,7 @@ export async function setChallengeParticipants(
         `INSERT INTO challenge_participants
           (challenge_id, group_id, user_id, added_by_user_id, joined_at)
          VALUES ($1,$2,$3,$4,now())
-         ON CONFLICT (challenge_id,user_id) DO UPDATE SET removed_at=NULL, joined_at=now(), added_by_user_id=$4`,
+         ON CONFLICT (challenge_id,user_id) DO UPDATE SET removed_at=NULL, joined_at=now(), added_by_user_id=$4, name_consent=false`,
         [challengeId, access.challenge.group_id, member.user_id, session.user.id],
       );
     }
@@ -97,6 +99,12 @@ export async function setParticipantNameConsent(
       await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
         "participant.name_consent_changed", "challenge_participant", session.user.id,
         null, null, { nameConsent: body.nameConsent });
+      // A published showcase is a frozen snapshot — a consent change would leave
+      // the public link stale. Pull it offline; the admin republishes when ready
+      // (same rule as someone leaving, ROADMAP §12).
+      if (access.challenge.results_published_at !== null) {
+        await regeneratePublishedShowcases(client, access.challenge.group_id, session.user.id, { challengeId });
+      }
     }
     return { challengeId, nameConsent: body.nameConsent };
   });

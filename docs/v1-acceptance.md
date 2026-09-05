@@ -1,12 +1,17 @@
 # GOA V1 — gate final (ROADMAP §15–17)
 
-Estado: os tópicos 1–17 da `ROADMAP.md` estão implementados em `main`. Este
-documento é a evidência do gate: o cenário autossuficiente do §16 rodando de
-ponta a ponta e cada item da definição de pronto do §17.
+**Estado:** os componentes dos tópicos 1–17 existem em `main` e os gates técnicos
+estão verdes, mas a V1 **ainda não está pronta para divulgação aberta**. Uma
+revisão de código (setembro/2026) encontrou 5 bloqueadores P0 — já corrigidos e
+cobertos por teste (ver "Correções P0" abaixo) — e uma lista de P1/P2 que precisa
+ser tratada antes do beta ("Pendências"). Este documento mapeia o cenário do §16
+e a definição de pronto do §17, e é honesto sobre o que falta.
 
 Gates verdes na entrega: `npm run typecheck`, `npm run lint`,
-`npm run test:unit` (109), `npm run test:integration` (55), `npm run build`,
-`npx drizzle-kit check`.
+`npm run test:unit` (109), `npm run test:integration` (60), `npm run build`,
+`npx drizzle-kit check`. Ressalva: o teste de aceite chama o roteador da API
+diretamente — não abre a interface nem percorre telas; falta um teste real de
+navegador.
 
 ---
 
@@ -60,8 +65,74 @@ com semanas, JSON, expectativa, métricas, Wrapped, publicação, lixeira"**.
 | Publicação opcional, revogável, anônima por padrão | `challenges.results_anon` default `true`; token só-hash + rotação; `mvp.test.ts` "vitrine é anônima por padrão" + aceite passo 20 |
 | Consentimento nominal explícito | `challenge_participants.name_consent` (`PATCH …/consent`); `mvp.test.ts` "consentimento nominal libera o nome só de quem autorizou" |
 | Tudo que for excluído tem recuperação compatível | `lib/goa/trash.ts`: lixeira real (grupo/desafio/catálogo/registro), arquivamento recuperável (estrutura interna); `mvp.test.ts` ×5 testes "lixeira: …" + aceite passo 22 |
-| O cenário autossuficiente passa integralmente | o teste de aceite acima — 55/55 na suíte |
-| Beta real não revela falhas bloqueantes | pendente (fora do escopo automatizado); os gates acima são o pré-requisito |
+| O cenário autossuficiente passa integralmente | o teste de aceite acima — 60/60 na suíte (nível de API) |
+| Beta real não revela falhas bloqueantes | **pendente** — não executado; ver "Pendências" |
+
+---
+
+## Correções P0 (revisão de setembro/2026)
+
+Cinco bloqueadores encontrados e corrigidos, cada um com teste de regressão em
+`tests/integration/mvp.test.ts` (testes com prefixo `P0:`):
+
+1. **Exclusão permanente não checava se o objeto estava na lixeira** —
+   `purgeTrashItem` agora recusa com 409 `not_in_trash` / `not_archived` qualquer
+   alvo que não esteja efetivamente binado/arquivado.
+   [trash.ts](../lib/goa/trash.ts).
+2. **Apagar um grupo não tirava do ar a vitrine publicada** — `publicResults`
+   passou a exigir `groups.deleted_at IS NULL`; `softDeleteGroup` despublica as
+   vitrines do grupo.
+3. **Revogar consentimento / anonimizar não invalidava o snapshot já publicado**
+   — `setParticipantNameConsent` chama `regeneratePublishedShowcases` quando há
+   publicação; `name_consent` é reiniciado ao sair/ser removido e ao voltar.
+4. **Auditoria vazava conteúdo curto para o `/admin`** — `redactForPlatformAdmin`
+   (allowlist de chaves estruturais) substitui a redação por tamanho; título,
+   nome de grupo e rótulo de campo/métrica não aparecem mais.
+5. **Hábito com período e sem checkpoints ficava inutilizável** — a tela do
+   participante mostra o check-in direto para todo tipo `daily` que não é
+   `checkpoint`-agendado (`directDaily`), datado ou não.
+
+Também nesta rodada: rota da lixeira do grupo (`selectedGroup` não incluía
+`group-trash`); `app/challenges/new/page.tsx` (refresh 404); motivo da exclusão
+administrativa gravado em `system_audit_events`; sair de um grupo binado passou a
+ser possível.
+
+## Pendências antes do beta (backlog P1/P2)
+
+A revisão listou ~40 itens P1 e ~15 P2. Os mais relevantes, agrupados:
+
+- **Receitas/integridade:** o preflight não garante que o campo *certo* de cada
+  receita exista (Cinema sem nota, Clube sem páginas); métrica pode se ligar ao
+  primeiro campo numérico; reduzir limite/tornar obrigatório após ativação não
+  valida registros; opção arquivada em uso mostra ID técnico; Estante omite
+  `bookshelf` na resolução de tipo ao adicionar item depois.
+- **Listas/checkpoints:** ordem sorteada não persiste (`items/assign` só grava
+  checkpoint, não posição); Clube com período fica preso a checkpoints diários;
+  editor sem campo de descrição do checkpoint; séries omitem semanas vazias.
+- **Atributos editoriais:** sem fluxo completo na interface (criar / preencher /
+  mapear chave JSON / ver no detalhe); wizard inicial usa importador simples que
+  descarta linhas.
+- **Métricas/Wrapped:** `count`/`completion_rate` aceitam `groupBy` mas ignoram;
+  rankings/afinidade não são vivos no detalhe; curadoria salva durante o desafio
+  ativo congela um snapshot que envelhece; afinidade composta não constrói o
+  "perfil de gosto"; percentual de páginas lido não é exibido.
+- **Lixeira/ciclo de vida:** nenhuma tela abre a lixeira interna do desafio;
+  restaurar item de catálogo pessoal não refaz o vínculo na lista; migração 0033
+  não faz backfill dos soft-deletes anteriores; alguns purges podem falhar por
+  dependência arquivada não contabilizada.
+- **Contas/admin:** `deleteOwnAccount` preserva `username`/`username_normalized`
+  e `password_hash`; contas desativadas ainda leem via `GET`; admin desativado
+  ainda acessa `/admin`; admin pode cunhar link de reset de qualquer conta
+  (assunção de conta); publicações nominais expõem IDs internos de participantes.
+- **Deep links:** `/modelos`, `/sobre` levam visitante deslogado ao login (a
+  resolução de sessão roda antes da rota pública).
+- **P2:** contraste do `muted` no tema claro ~3:1; modal de exclusão não prende
+  foco / não torna o fundo inerte; en-GB ainda recebe mensagens do backend e o
+  console em pt-BR; sem testes de viewport/teclado/axe; deploy pode preceder a
+  migração do Neon.
+
+Documentação a alinhar: README e docs de API ainda citam receitas antigas,
+convite imediato e a lixeira administrativa global (removidos).
 
 ---
 
