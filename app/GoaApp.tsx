@@ -435,7 +435,12 @@ export default function GoaApp() {
         csrfToken: bootstrap.csrfToken,
       });
     }
+    // The open challenge is what the user is looking at; refresh it before
+    // releasing the caller. Dashboard/group progress counts catch up in the
+    // background — otherwise navigating back right after saving shows stale
+    // numbers until something else happens to trigger a refresh.
     await reloadSelected();
+    void refreshBootstrap().catch(() => undefined);
   }
 
   async function exportCsv() {
