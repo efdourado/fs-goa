@@ -19,6 +19,7 @@ import {
   adminAudit,
   adminOverview,
   adminResetLink,
+  adminSystemAudit,
   adminUsers,
   revokeUserSessions,
   setUserDisabled,
@@ -145,6 +146,7 @@ export async function GET(request: Request): Promise<Response> {
       if (isPath(path, "admin", "users")) return json(await adminUsers());
       if (isPath(path, "admin", "feedback")) return json(await adminFeedback());
       if (isPath(path, "admin", "audit")) return json(await adminAudit(new URL(request.url).searchParams));
+      if (isPath(path, "admin", "system-audit")) return json(await adminSystemAudit(new URL(request.url).searchParams));
       return notFound();
     }
     if (path[0] === "invites" && path.length === 2) {

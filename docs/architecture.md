@@ -34,6 +34,7 @@ navegador ──JSON + cookie HTTP-only──▶ Next.js / route handlers ──
 | `lib/goa/catalog.ts` | acervo do grupo e histórico de um item entre rodadas |
 | `lib/goa/analysis.ts` · `lib/metrics.ts` | matemática pura das métricas (bayes, mediana, desvio, consenso, afinidade) |
 | `lib/goa/challenges/rankings.ts` | rankings pessoais + afinidade direta/composta (blocos derivados) |
+| `lib/goa/trash.ts` · `lib/goa/purge.ts` | lixeira recuperável (registro `trash_items`, restauração, exclusão permanente) e deleção física da árvore |
 | `lib/validation.ts` | validação tipada e exportação CSV segura |
 | `db/schema/` | schema Drizzle, dividido por área |
 | `drizzle/` | única fonte de migrações reproduzíveis |
@@ -147,6 +148,33 @@ Grupo
   itens e métricas ganham novos IDs; a receita carrega, a agenda zera, os itens
   re-resolvem contra o acervo do grupo de destino. Participantes, registros,
   valores, checkpoints, blocos, tokens e indicadores **nunca** são copiados.
+- **Lixeira e recuperação** (§13, `lib/goa/trash.ts`): quatro ações distintas —
+  **arquivar** (`archived_at`, fica no histórico, some do dia a dia, sem exclusão
+  possível enquanto a dependência existir); **mover para a lixeira** (linha
+  explícita em `trash_items`); **remover/revogar** (relações e tokens —
+  membresia, convite, sessão, publicação, template — nunca vão para a lixeira);
+  **excluir permanentemente** (só da lixeira, com preview das dependências, só
+  quando não corrompe histórico). A lixeira é **permanente e do usuário**: nada
+  expira, não há varredura, `/api/health` continua só health check; um item
+  binado ainda conta nos limites de criação. Lixeira principal (grupo, desafio,
+  item de catálogo) em `GET /api/personal/trash` e `GET /api/groups/:id/trash`;
+  estrutura removida do desafio (item, checkpoint, tipo, campo, opção, métrica) e
+  registros removidos em `GET /api/challenges/:id/archive` — a exclusão física
+  dessas peças acontece junto com o desafio, ou por confirmação simples enquanto
+  ainda são rascunho vazio. Restaurar um pai revive todo filho que não foi
+  binado à parte; filho não restaura sem pai ativo (409 `parent_trashed`);
+  conflito de identidade é resolvido antes (409 `name_conflict`, `rename`).
+  `system_audit_events` guarda o rastro operacional da purga (ator, ação, tipo,
+  **hash** do id, contagens) — sem FK para conteúdo e sem texto privado.
+- **Conta** (§13): duas ações separadas, não uma lixeira. **Desativar**
+  (`users.deactivated_at`) é reversível — encerra sessões, o conteúdo fica; ao
+  relogar, a SPA só mostra a tela de reativação e toda mutação responde 403
+  `account_deactivated`. **Excluir permanentemente** (`POST /api/account/delete`,
+  exige a senha) não deixa órfão: espaço pessoal e grupos só seus são apagados de
+  vez, grupos compartilhados transferem a posse, contribuições preservadas ficam
+  anônimas, publicações do usuário são despublicadas; a linha `users` fica
+  (scrub de PII + `deleted_at`, nunca `DELETE` — as FKs `RESTRICT` de
+  entries/audit impedem).
 
 ## Segurança
 
@@ -163,10 +191,16 @@ Grupo
 - auditoria append-only registra correções e transições — `before`/`after`
   passam por `redactAuditPayload`: texto longo (comentário, regra, manchete) vira
   `[texto omitido]`, só a identificação do campo e valores curtos ficam;
-- `platform_admin` é um flag separado, sem poder sobre grupos — só abre `/admin`;
-  o console nunca vê conteúdo privado (título de desafio pessoal, comentário,
-  nota, resposta) — na lixeira, itens de espaço pessoal aparecem com rótulo
-  genérico;
+- `platform_admin` é um flag separado, sem poder sobre grupos — só abre `/admin`.
+  **Pode ver** (§14): contas e estado operacional, sessões, eventos de
+  autenticação, uso agregado, volume aproximado por conta, limites, erros,
+  feedback, indicadores de abuso, datas e identificadores técnicos.
+  **Não pode ver nem apagar**: título/descrição/regra de desafio pessoal,
+  comentários, notas, respostas, catálogo privado, snapshots textuais completos.
+  Não existe lixeira global — um objeto binado é do dono, para restaurar ou
+  destruir; o `/admin` foi removido do poder de purgar conteúdo de terceiros.
+  `adminAudit` traz eventos de espaço pessoal só como metadado (ator/ação/data),
+  com `before`/`after`/`metadata` zerados e sem IDs de conteúdo;
 - visibilidade de registro é por tipo (`visibility_policy`, ver Modelo de
   domínio): `listEntries` decide quem vê a resposta de quem; métricas agregadas
   leem os registros direto e não passam por esse filtro;

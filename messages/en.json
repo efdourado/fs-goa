@@ -1333,7 +1333,7 @@
   },
   "accountDeactivated": {
     "title": "Your account is deactivated",
-    "body": "Nobody sees your content while it is deactivated. Reactivate whenever you like.",
+    "body": "While it is deactivated your account is offline and you take no new part in anything. Reactivate whenever you like.",
     "reactivate": "Reactivate account",
     "reactivating": "Reactivating…",
     "logout": "Log out"

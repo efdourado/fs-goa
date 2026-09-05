@@ -4100,3 +4100,235 @@ test("conta: desativar é reversível e trava mutações; excluir de vez exige s
   const groupGone = await adminPool.query("SELECT 1 FROM groups WHERE id = $1", [groupId]);
   assert.equal(groupGone.rowCount, 0, "grupo solo apagado de vez, sem órfão");
 });
+
+// ── ROADMAP §16 — cenário autossuficiente de aceitação (todos os 23 passos) ──
+
+test("cenário de aceitação V1: grupo de 6, Cinema com semanas, JSON, expectativa, métricas, Wrapped, publicação, lixeira", async () => {
+  // 1. Grupo com 6 participantes.
+  const owner = await register("Aceite Dona", "aceite_dona");
+  const members = await Promise.all(
+    ["b", "c", "d", "e", "f"].map((slug) => register(`Aceite ${slug.toUpperCase()}`, `aceite_${slug}`)),
+  );
+  const everyone = [owner, ...members];
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Cineclube de Aceite" } })).body as { id: string }).id;
+  for (const member of members) {
+    const invite = (await call("POST", `/api/groups/${groupId}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
+    assert.equal((await call("POST", `/api/invites/${invite.token}`, { session: member, body: {} })).response.status, 200);
+  }
+  const groupDetail = (await call("GET", "/api/bootstrap", { session: owner })).body as { groups: Array<{ id: string; members?: unknown[] }> };
+  assert.equal(groupDetail.groups.find((g) => g.id === groupId)?.members?.length, 6, "6 pessoas no grupo");
+
+  // 2 + 3. Desafio Cinema com período de 10 semanas; 8 checkpoints semanais e 2 pausas.
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "cinema", title: "Maratona do Aceite",
+      startsOn: "2026-05-04", endsOn: "2026-07-12",
+      participantIds: everyone.map((s) => s.user.id),
+      expectation: true,
+      items: [{ title: "Filme 07" }],
+    },
+  });
+  assert.equal(challenge.response.status, 201, JSON.stringify(challenge.body));
+  const challengeId = (challenge.body as { id: string }).id;
+
+  const weeks = [
+    ["Semana 1", "2026-05-04", "2026-05-10"], ["Semana 2", "2026-05-11", "2026-05-17"], ["Semana 3", "2026-05-18", "2026-05-24"],
+    ["Semana 5", "2026-06-01", "2026-06-07"], ["Semana 6", "2026-06-08", "2026-06-14"], ["Semana 7", "2026-06-15", "2026-06-21"],
+    ["Semana 9", "2026-06-29", "2026-07-05"], ["Semana 10", "2026-07-06", "2026-07-12"],
+  ];
+  const cpSave = await call("POST", `/api/challenges/${challengeId}/checkpoints`, {
+    session: owner,
+    body: { checkpoints: weeks.map(([title, startsAt, dueAt]) => ({ title, kind: "week", startsAt, dueAt })) },
+  });
+  assert.equal(cpSave.response.status, 200, JSON.stringify(cpSave.body));
+  const checkpoints = (cpSave.body as { checkpoints: Array<{ id: string; title: string }> }).checkpoints;
+  assert.equal(checkpoints.length, 8, "8 checkpoints (semanas 4 e 8 são pausas)");
+
+  // 9 (antes do commit): atributo editorial opcional no acervo do grupo.
+  const attr = await call("POST", `/api/groups/${groupId}/catalog-attributes`, {
+    session: owner, body: { kind: "film", label: "Diretor", type: "text" },
+  });
+  assert.equal(attr.response.status, 201, JSON.stringify(attr.body));
+  const attrKey = (attr.body as { key: string }).key;
+
+  // 4 + 5. Colar 30 filmes por JSON, revisar duplicidade / inválido / chave desconhecida antes de salvar.
+  const films = Array.from({ length: 30 }, (_v, i) => ({ title: `Filme ${String(i + 1).padStart(2, "0")}` }));
+  const listJson = JSON.stringify([
+    ...films,
+    { vibe: "sem título" },
+    { title: "Filme 31", diretorx: "Alguém" },
+  ]);
+  const preview = await call("POST", `/api/challenges/${challengeId}/items/preview`, { session: owner, body: { json: listJson } });
+  assert.equal(preview.response.status, 200, JSON.stringify(preview.body));
+  const pv = preview.body as { summary: { total: number; invalid: number; duplicatesInChallenge: number; unknownKeys: string[] } };
+  assert.equal(pv.summary.total, 32);
+  assert.equal(pv.summary.invalid, 1, "linha sem título é inválida");
+  assert.equal(pv.summary.duplicatesInChallenge, 1, "'Filme 07' já é um item ativo");
+  assert.deepEqual(pv.summary.unknownKeys, ["diretorx", "vibe"]);
+  assert.equal(((await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { items: unknown[] }).items.length, 1, "a prévia não grava nada");
+
+  // 6. Indicação opcional a cada filme (participante quando possível, texto de origem quando não).
+  const toCommit: Array<Record<string, unknown>> = films
+    .filter((film) => film.title !== "Filme 07")
+    .map((film, i) => ({
+      title: film.title,
+      runtimeMinutes: 90 + (i % 4) * 15,
+      ...(i % 3 === 0 ? { recommendedByUserId: everyone[i % everyone.length].user.id } : { originNote: "lista de um blog" }),
+      ...(i < 2 ? { attributes: { [attrKey]: `Diretor ${i}` } } : {}),
+    }));
+  toCommit.push({ title: "Filme 31", runtimeMinutes: 100 });
+  const commit = await call("POST", `/api/challenges/${challengeId}/items`, { session: owner, body: { items: toCommit } });
+  assert.equal(commit.response.status, 201, JSON.stringify(commit.body));
+
+  let detail = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    entryTypes: Array<{ id: string; purpose: string; visibilityPolicy: string; fields: Array<{ id: string; key: string }> }>;
+    items: Array<{ id: string; title: string; recommendedBy: { name: string } | null; originNote: string | null }>;
+    checkpoints: Array<{ id: string; title: string; totalRuntimeMinutes: number | null; itemCount: number }>;
+  };
+  assert.equal(detail.items.length, 31, "30 filmes + Filme 31");
+  assert.ok(detail.items.some((it) => it.recommendedBy), "alguns filmes têm indicador participante");
+  assert.ok(detail.items.some((it) => it.originNote), "outros têm origem textual");
+
+  // 7. Distribuir filmes entre os checkpoints.
+  const itemId = (title: string) => detail.items.find((it) => it.title === title)!.id;
+  const assignments = detail.items.map((it, i) => ({ itemId: it.id, checkpointId: checkpoints[i % checkpoints.length].id }));
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/items/assign`, { session: owner, body: { assignments } })).response.status, 200);
+
+  // 8. Consultar a duração total de cada semana.
+  detail = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as typeof detail;
+  const totals = detail.checkpoints.map((cp) => cp.totalRuntimeMinutes ?? 0);
+  assert.ok(totals.every((t) => t > 0), "cada semana calcula a duração total dos seus filmes");
+
+  // 10 + 11. Expectativa, avaliação e comentário habilitados; visibilidade por tipo.
+  const expType = detail.entryTypes.find((t) => t.purpose === "expectation")!;
+  const ratingType = detail.entryTypes.find((t) => t.purpose === "rating")!;
+  const nota = ratingType.fields.find((f) => f.key === "nota")!.id;
+  assert.equal(expType.visibilityPolicy, "after_own", "expectativa: depois da própria resposta (padrão §8)");
+  assert.equal((await call("PATCH", `/api/challenges/${challengeId}/entry-types/${ratingType.id}`, { session: owner, body: { visibilityPolicy: "after_close" } })).response.status, 200);
+  const expField = expType.fields[0].id;
+
+  // 12. Ativar somente após o preflight.
+  const preflight = await call("GET", `/api/challenges/${challengeId}/preflight`, { session: owner });
+  assert.equal(preflight.response.status, 200, JSON.stringify(preflight.body));
+  assert.equal((preflight.body as { ready: boolean }).ready, true, "o preflight passa antes de ativar");
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } })).response.status, 200);
+
+  // 13 + 14 + 15. Registrar expectativas e avaliações; expectativa trava após a avaliação; progresso sem status manual.
+  // "Aceite F" (índice 5) só avalia 4 filmes → sem amostra suficiente para afinidade.
+  const commonFilms = ["Filme 01", "Filme 02", "Filme 03", "Filme 04", "Filme 05", "Filme 06"];
+  for (let personIndex = 0; personIndex < everyone.length; personIndex += 1) {
+    const session = everyone[personIndex];
+    const filmsForPerson = personIndex === 5 ? commonFilms.slice(0, 4) : commonFilms;
+    for (let f = 0; f < filmsForPerson.length; f += 1) {
+      const id = itemId(filmsForPerson[f]);
+      await call("POST", `/api/challenges/${challengeId}/entries`, { session, body: { itemId: id, entryTypeId: expType.id, values: { [expField]: 3 } } });
+      const rated = await call("POST", `/api/challenges/${challengeId}/entries`, { session, body: { itemId: id, entryTypeId: ratingType.id, values: { [nota]: ((personIndex + f) % 5) + 1 } } });
+      assert.equal(rated.response.status, 201, JSON.stringify(rated.body));
+    }
+  }
+  const relock = await call("POST", `/api/challenges/${challengeId}/entries`, {
+    session: owner, body: { itemId: itemId("Filme 01"), entryTypeId: expType.id, values: { [expField]: 5 } },
+  });
+  assert.equal(relock.response.status, 409, "expectativa não muda depois da avaliação");
+  assert.equal((relock.body as { error: string }).error, "expectation_locked");
+  // 15. Progresso sem status manual redundante: a receita Cinema não tem um tipo
+  // "assisti/pulei" — a existência da avaliação é a participação.
+  assert.equal(detail.entryTypes.some((t) => t.purpose === "checkin" || t.purpose === "progress"), false, "sem status manual redundante");
+
+  // 16. Métricas gerais, pessoais e por checkpoint.
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/metrics`, { session: owner, body: { label: "Nota média geral", operation: "average", fieldId: nota } })).response.status, 201);
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/metrics`, { session: owner, body: { label: "Média por semana", operation: "average", fieldId: nota, groupBy: "checkpoint" } })).response.status, 201);
+  const liveMetrics = ((await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    metrics: Array<{ label: string; groupBy: string; value: number | null; explanation?: string; sample?: string; series?: unknown[] }>;
+  }).metrics;
+  const perWeek = liveMetrics.find((m) => m.label === "Média por semana")!;
+  assert.equal(perWeek.groupBy, "checkpoint");
+  assert.ok(Array.isArray(perWeek.series) && perWeek.series.length > 0, "uma linha por semana com registros");
+  assert.ok(liveMetrics.every((m) => (m.value === null) || (m.explanation && m.sample)), "toda métrica traz fórmula e amostra");
+
+  // 18. Encerrar.
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "closed" } })).response.status, 200);
+
+  // 17 + 19. Afinidade só para pares com amostra suficiente; Wrapped organizado.
+  const closed = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    result: {
+      totalEntries: number;
+      blocks: Array<{ kind: string; position: number; visible: boolean; affinity?: { pairs?: Array<{ a: { name: string }; b: { name: string } }> } }>;
+    };
+  };
+  const blocks = closed.result.blocks;
+  assert.ok(blocks.length >= 3, "o Wrapped tem vários blocos");
+  assert.deepEqual([...blocks].map((b) => b.position), [...blocks].map((b) => b.position).sort((x, y) => x - y), "blocos em ordem estável");
+  assert.ok(blocks.some((b) => b.kind === "metric"), "há blocos de métrica");
+  const affinityBlock = blocks.find((b) => b.kind === "affinity");
+  assert.ok(affinityBlock?.affinity?.pairs && affinityBlock.affinity.pairs.length > 0, "afinidade calculada para pares com ≥5 itens em comum");
+  assert.ok(
+    affinityBlock!.affinity!.pairs!.every((pair) => pair.a.name !== "Aceite F" && pair.b.name !== "Aceite F"),
+    "quem só avaliou 4 filmes fica de fora da afinidade",
+  );
+  assert.ok(closed.result.totalEntries > 0, "o total de registros aparece");
+
+  // 20. Publicar anonimamente por link, rotacionar e despublicar.
+  await call("POST", `/api/challenges/${challengeId}/results`, { session: owner, body: { headline: "Aceite", summary: "ok", metricIds: [], comments: [], anonymizeParticipants: true } });
+  const pub1 = await call("POST", `/api/challenges/${challengeId}/results/publish`, { session: owner, body: {} });
+  const token1 = (pub1.body as { shareToken: string }).shareToken;
+  assert.ok(token1, "a publicação cunha um token");
+  const shared = (await call("GET", `/api/results/${token1}`)).body as { challenge: { participants: string[] } };
+  assert.ok(shared.challenge.participants.every((name) => /^Participante \d+$/.test(name)), "vitrine anônima por padrão");
+  const rot = await call("POST", `/api/challenges/${challengeId}/results/publish`, { session: owner, body: { rotateLink: true } });
+  const token2 = (rot.body as { shareToken: string }).shareToken;
+  assert.notEqual(token2, token1);
+  assert.equal((await call("GET", `/api/results/${token1}`)).response.status, 404, "rotacionar invalida o link antigo");
+  assert.equal((await call("DELETE", `/api/challenges/${challengeId}/results`, { session: owner })).response.status, 200);
+  assert.equal((await call("GET", `/api/results/${token2}`)).response.status, 404, "despublicar tira o link do ar");
+
+  // 21. Anonimizar quem sai do grupo (a publicação existente é regenerada anonimamente).
+  const pub3 = await call("POST", `/api/challenges/${challengeId}/results/publish`, { session: owner, body: {} });
+  const token3 = (pub3.body as { shareToken: string }).shareToken;
+  assert.equal((await call("POST", `/api/groups/${groupId}/leave`, { session: members[0], body: {} })).response.status, 200);
+  assert.equal((await call("GET", `/api/results/${token3}`)).response.status, 404, "sair do grupo despublica até a regeneração");
+  const pub4 = await call("POST", `/api/challenges/${challengeId}/results/publish`, { session: owner, body: {} });
+  const afterLeave = (await call("GET", `/api/results/${(pub4.body as { shareToken: string }).shareToken}`)).body as { challenge: { participants: string[] } };
+  assert.ok(!afterLeave.challenge.participants.includes("Aceite B"), "o nome de quem saiu não volta na republicação");
+
+  // 22. Excluir e restaurar um objeto pela lixeira.
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });
+  const targetItem = itemId("Filme 20");
+  assert.equal((await call("DELETE", `/api/challenges/${challengeId}/items/${targetItem}`, { session: owner })).response.status, 200);
+  assert.equal(
+    ((await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { items: Array<{ id: string }> }).items.some((it) => it.id === targetItem),
+    false,
+    "o item removido some da listagem",
+  );
+  const archive = (await call("GET", `/api/challenges/${challengeId}/archive`, { session: owner })).body as {
+    structure: Array<{ kind: string; id: string }>;
+  };
+  assert.ok(archive.structure.some((row) => row.id === targetItem), "aparece na estrutura removida");
+  const restore = await call("POST", `/api/challenges/${challengeId}/trash/restore`, { session: owner, body: { kind: "challenge_item", id: targetItem } });
+  assert.equal(restore.response.status, 200, JSON.stringify(restore.body));
+  assert.equal(
+    ((await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { items: Array<{ id: string }> }).items.some((it) => it.id === targetItem),
+    true,
+    "restaurado com o mesmo id",
+  );
+
+  // 23. Abrir todas as telas diretamente por URL (deep-link + refresh).
+  const { screenFromUrl } = await import("../../app/goa/navigation");
+  const routes: Array<[string, string]> = [
+    ["/", "dashboard"], ["/personal", "personal-space"], ["/personal/trash", "personal-trash"],
+    ["/catalog", "personal-catalog"], ["/catalog/abc", "personal-catalog-item"],
+    [`/groups/${groupId}`, "group"], [`/groups/${groupId}/trash`, "group-trash"],
+    [`/groups/${groupId}/catalog/xyz`, "catalog-item"],
+    [`/challenges/${challengeId}`, "challenge"], [`/challenges/${challengeId}/manage`, "admin"],
+    ["/challenges/new", "create-personal-challenge"], ["/modelos", "templates"], ["/modelos/x", "template"],
+    ["/sobre", "about"], ["/invites/tok", "invite"],
+  ];
+  for (const [path, kind] of routes) {
+    assert.equal(screenFromUrl(path)?.kind, kind, `URL ${path} resolve para ${kind}`);
+  }
+  const { existsSync } = await import("node:fs");
+  for (const page of ["app/personal/trash/page.tsx", "app/groups/[groupId]/trash/page.tsx", "app/challenges/[challengeId]/manage/page.tsx"]) {
+    assert.ok(existsSync(new URL(`../../${page}`, import.meta.url)), `${page} existe`);
+  }
+});
