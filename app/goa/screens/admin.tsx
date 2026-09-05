@@ -4,20 +4,25 @@ import { useTranslations } from "next-intl";
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { API_PATHS, apiRequest } from "../api";
+import { CheckpointPlanner } from "../checkpoint-planner";
 import { useGoaFormat } from "../format";
 import { CineItemsEditor, type CineRow, cineRowsToInput } from "../cine-items";
 import { copyText } from "../clipboard";
 import { cleanFields, FieldBuilder } from "../fields";
+import { ListImportPanel } from "../list-import-panel";
 import { RuleSectionsEditor, visibleRuleSections } from "../rules";
 import type {
   AdminTab,
   ChallengeDetail,
   ChallengeField,
   ChallengeItem,
+  ChallengeItemInput,
   ChallengeSummary,
+  CheckpointInput,
   Entry,
   GroupSummary,
   Id,
+  ImportPreview,
   Metric,
 } from "../types";
 import {
@@ -447,6 +452,7 @@ function AdminItems({
   onAdd,
   onUpdate,
   onArchive,
+  onPreviewImport,
 }: {
   challenge: ChallengeDetail;
   group?: GroupSummary;
@@ -457,6 +463,7 @@ function AdminItems({
     author?: string; year?: number | null; mainGenre?: string; pageCount?: number | null; runtimeMinutes?: number | null;
   }) => Promise<void>;
   onArchive: (itemId: Id) => Promise<void>;
+  onPreviewImport: (body: { json: string; mapping?: Record<string, string> }) => Promise<ImportPreview>;
 }) {
   const t = useTranslations("adminChallenge");
   const tCine = useTranslations("cineItems");
@@ -636,6 +643,14 @@ function AdminItems({
           <StatusMessage error={error} success={success} />
           <Button type="submit" className="w-full" disabled={busy || (challenge.submissionMode === "daily" ? challenge.status !== "draft" : !canAddItems || !newItemRows.length)}>{busy ? tc("saving") : challenge.submissionMode === "daily" ? t("generateCheckpoints") : t("add")}</Button>
         </form>}
+        {challenge.submissionMode === "item" && challenge.status !== "closed" ? (
+          <div className="mt-5">
+            <ListImportPanel
+              onPreview={onPreviewImport}
+              onCommit={(items: ChallengeItemInput[]) => onAdd({ items })}
+            />
+          </div>
+        ) : null}
       </aside>
     </div>
   );
@@ -1037,6 +1052,9 @@ export function AdminScreen({
   onAddItems,
   onUpdateItem,
   onArchiveItem,
+  onPreviewImport,
+  onSaveCheckpoints,
+  onAssignCheckpointItems,
   onPatchEntry,
   onDeleteEntry,
   onExport,
@@ -1068,6 +1086,9 @@ export function AdminScreen({
     author?: string; year?: number | null; mainGenre?: string; pageCount?: number | null; runtimeMinutes?: number | null;
   }) => Promise<void>;
   onArchiveItem: (itemId: Id) => Promise<void>;
+  onPreviewImport: (body: { json: string; mapping?: Record<string, string> }) => Promise<ImportPreview>;
+  onSaveCheckpoints: (checkpoints: CheckpointInput[]) => Promise<void>;
+  onAssignCheckpointItems: (assignments: Array<{ itemId: Id; checkpointId: Id | null }>) => Promise<void>;
   onPatchEntry: (entryId: Id, values: Record<Id, unknown>, reason: string) => Promise<void>;
   onDeleteEntry: (entryId: Id) => Promise<void>;
   onExport: () => Promise<void>;
@@ -1079,7 +1100,14 @@ export function AdminScreen({
   onUnpublishResult: () => Promise<void>;
 }) {
   const t = useTranslations("adminChallenge");
-  const tabs: AdminTab[] = ["overview", "participants", "fields", "items", "review", "metrics", "results"];
+  // The checkpoint planner is for round-item challenges organised into
+  // weeks/sessions — a day-by-day round derives its checkpoints from the period.
+  const showCheckpoints = challenge.submissionMode === "item";
+  const tabs: AdminTab[] = [
+    "overview", "participants", "fields", "items",
+    ...(showCheckpoints ? (["checkpoints"] as const) : []),
+    "review", "metrics", "results",
+  ];
   return (
     <main className="mx-auto max-w-7xl px-4 py-6 pb-24 sm:px-6 sm:py-10">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><button className={backLinkClass} type="button" onClick={onBack}>{t("back")}</button><div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={onViewParticipant}>{t("simulateAsParticipant")}</Button></div></div>
@@ -1088,7 +1116,8 @@ export function AdminScreen({
       {tab === "overview" ? <AdminOverview challenge={challenge} onSave={onSaveBasics} onTransition={onTransition} onDuplicate={onDuplicate} duplicateTargets={duplicateTargets} onDelete={onDelete} /> : null}
       {tab === "participants" ? <AdminParticipants key={`${challenge.id}:${challenge.participants.map((participant) => participant.userId ?? participant.id).join(",")}`} challenge={challenge} group={group} onSave={onSaveParticipants} /> : null}
       {tab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.visibilityPolicy}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} onSaveVisibility={onSaveEntryTypeVisibility} /> : null}
-      {tab === "items" ? <AdminItems challenge={challenge} group={group} entries={entries} onAdd={onAddItems} onUpdate={onUpdateItem} onArchive={onArchiveItem} /> : null}
+      {tab === "items" ? <AdminItems challenge={challenge} group={group} entries={entries} onAdd={onAddItems} onUpdate={onUpdateItem} onArchive={onArchiveItem} onPreviewImport={onPreviewImport} /> : null}
+      {tab === "checkpoints" ? <CheckpointPlanner key={`${challenge.id}:${challenge.checkpoints.map((cp) => cp.id).join(",")}`} challenge={challenge} onSaveCheckpoints={onSaveCheckpoints} onAssign={onAssignCheckpointItems} /> : null}
       {tab === "review" ? <AdminReview challenge={challenge} entries={entries} onPatch={onPatchEntry} onDelete={onDeleteEntry} onExport={onExport} /> : null}
       {tab === "metrics" ? <AdminMetrics challenge={challenge} onAdd={onAddMetric} onUpdate={onUpdateMetric} onDelete={onDeleteMetric} /> : null}
       {tab === "results" ? <AdminResults challenge={challenge} entries={entries} onSave={onSaveResult} onPublish={onPublishResult} onUnpublish={onUnpublishResult} /> : null}

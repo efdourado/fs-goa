@@ -511,10 +511,11 @@
       "overview": "General",
       "participants": "People",
       "fields": "Fields",
-      "items": "Checkpoints",
+      "items": "Items",
       "review": "Review",
       "metrics": "Metrics",
-      "results": "Showcase"
+      "results": "Showcase",
+      "checkpoints": "Schedule"
     },
     "errPeriod": "Fill in the start and end, or choose a challenge with no deadline.",
     "errEndBeforeStart": "The end date must be the same as or after the start.",
@@ -835,7 +836,8 @@
     "noProgressBody": "Your entries stay saved. The admin chooses which numbers help the group during the challenge.",
     "storyOngoingTitle": "The story is still unfolding",
     "storyOngoingBody": "The final result opens when the challenge is closed.",
-    "backToEntry": "Back to logging"
+    "backToEntry": "Back to logging",
+    "checkpointEmpty": "No items yet."
   },
   "entryForm": {
     "fillField": "Fill in the “{label}” field.",
@@ -1118,5 +1120,79 @@
     "send": "Send",
     "thanksTitle": "Got it. Thank you!",
     "thanksBody": "Every response is read. If you left an email, we might write to understand it better."
+  },
+  "checkpointKind": {
+    "day": "Day",
+    "week": "Week",
+    "session": "Session",
+    "milestone": "Milestone"
+  },
+  "checkpointPlanner": {
+    "title": "Schedule",
+    "subtitle": "Split the round into weeks, sessions or milestones. Checkpoints don't have to be consecutive — leave a gap for a break.",
+    "dailyAutoNote": "This round generates one checkpoint per day from its period. Adjust the dates on the General tab.",
+    "noItemsNote": "This challenge has no items to organise into checkpoints.",
+    "lockedNote": "A closed challenge is frozen.",
+    "newTitle": "Checkpoint {n}",
+    "cpTitle": "Name",
+    "cpTitlePlaceholder": "e.g. Week 1",
+    "cpKind": "Type",
+    "cpStarts": "Starts",
+    "cpDue": "Ends",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "noCheckpointsTitle": "No checkpoints yet",
+    "noCheckpointsBody": "Add a checkpoint to organise the list into weeks or sessions.",
+    "addCheckpoint": "Add checkpoint",
+    "saveCheckpoints": "Save checkpoints",
+    "saved": "Checkpoints saved.",
+    "itemsTally": "{count, plural, =0 {no items} one {# item} other {# items}}",
+    "timeframe": {
+      "past": "Past",
+      "current": "Now",
+      "future": "Upcoming"
+    },
+    "organiseTitle": "Organise the items",
+    "organiseSubtitle": "Assign each item to a checkpoint, or use a tool. Preview here, reshuffle, then save.",
+    "distribute": "Spread in order",
+    "shuffleAll": "Shuffle all",
+    "shuffleWithin": "Shuffle within each",
+    "unassigned": "No checkpoint",
+    "emptyCheckpoint": "Nothing here yet.",
+    "saveOrganise": "Save layout",
+    "organiseSaved": "Layout saved."
+  },
+  "listImport": {
+    "title": "Import a list (JSON)",
+    "hint": "Paste an array of objects. It is analysed, never saved until you confirm.",
+    "jsonLabel": "JSON",
+    "analyse": "Analyse",
+    "analysing": "Analysing…",
+    "reanalyse": "Analyse again",
+    "summary": "{total} rows · {importable} to import · {invalid} invalid · {dupChallenge} already in the challenge · {dupCatalog} known from the catalogue",
+    "unknownKeysTitle": "Unrecognised keys",
+    "unknownKeysNote": "Unmapped keys are ignored — they never touch the database.",
+    "ignoreKey": "ignore",
+    "field": {
+      "title": "Title",
+      "year": "Year",
+      "author": "Author",
+      "pageCount": "Pages",
+      "runtimeMinutes": "Runtime (min)",
+      "mainGenre": "Main genre",
+      "recommendedBy": "Recommended by",
+      "origin": "Origin"
+    },
+    "badgeInvalid": "invalid",
+    "badgeInChallenge": "already in the challenge",
+    "badgeInCatalogue": "in the catalogue",
+    "badgeRecommender": "recommended by {name}",
+    "badgeOrigin": "origin: {text}",
+    "rowUnknownKeys": "ignored: {keys}",
+    "includeRow": "Include {title}",
+    "noTitle": "(no title)",
+    "confirm": "Add {count, plural, one {# item} other {# items}}",
+    "added": "{count, plural, one {# item added} other {# items added}}",
+    "nothingToAdd": "Nothing selected to add."
   }
 }
