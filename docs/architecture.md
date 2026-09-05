@@ -124,10 +124,25 @@ Grupo
   25%, faixa de ano 15%, duração 10%, peso de dimensão sem amostra
   redistribuído) só aparece quando há amostra por dimensão. Vivo enquanto o
   desafio corre; `generateShowcase` congela em `result_blocks` (`kind ∈
-  {ranking, affinity}`); publicação anônima troca os nomes por "Participante N".
-- Ao encerrar, `result_blocks` guarda snapshots congelados; a página pública
-  exige um token aleatório do qual o banco guarda **só o hash** — o token cru é
-  mostrado uma vez, na publicação, e nunca persistido (perdeu o link? rotacione).
+  {ranking, affinity}`).
+- **Wrapped interno** (`resultForChallenge` → `blocks[]`): o resultado interno é
+  a lista ordenada de `result_blocks` (capa · resumo · total de registros ·
+  métricas · ranking · afinidade · comentários). Vivo enquanto o desafio corre;
+  `generateShowcase` congela ao encerrar; reabrir invalida o snapshot publicado.
+  O admin reordena e esconde blocos com `PATCH …/results/blocks` — os valores
+  calculados **não** mudam. Empates nas séries desempatam por rótulo.
+- **Publicação** (§12): nada é público por padrão; só owner/admin, só desafio
+  encerrado. O token cru é mostrado uma vez, na publicação, e o banco guarda
+  **só o hash** — perdeu o link, rotacione (o antigo morre). A página pública é
+  `noindex`. Publicar a vitrine **não** cria template (conceitos e rotas
+  separados: `/results/:token` vs `/modelos/:id`).
+- **Consentimento** (§12): `challenges.results_anon` nasce `true` (anônima por
+  padrão). Cada participante autoriza o próprio nome por desafio
+  (`challenge_participants.name_consent`, começa `false`, revogável, `PATCH
+  …/consent`); numa publicação com nomes, quem não autorizou continua
+  "Participante N". Ao sair do grupo/desafio, toda vitrine publicada é retirada
+  do ar e regenerada sem a pessoa (`regeneratePublishedShowcases`); o admin
+  republica.
 - **Duplicação** é só estrutural, em transação: desafio, tipos, campos, opções,
   itens e métricas ganham novos IDs; a receita carrega, a agenda zera, os itens
   re-resolvem contra o acervo do grupo de destino. Participantes, registros,
@@ -154,7 +169,10 @@ Grupo
   genérico;
 - visibilidade de registro é por tipo (`visibility_policy`, ver Modelo de
   domínio): `listEntries` decide quem vê a resposta de quem; métricas agregadas
-  leem os registros direto e não passam por esse filtro.
+  leem os registros direto e não passam por esse filtro;
+- publicação externa é anônima por padrão, com consentimento nominal por
+  participante; token só-hash, rotacionável; página `/results/:token` é
+  `noindex`; sair do grupo retira e regenera a vitrine (ver Modelo de domínio).
 
 Cobertura: `tests/{security,validation,metrics,analysis}.test.ts` e
 `tests/integration/mvp.test.ts` (contas distintas, convite, CSRF negativo,
