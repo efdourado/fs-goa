@@ -66,8 +66,10 @@ import {
   previewListImport,
   publicResults,
   publishResults,
+  reorderResultBlocks,
   saveCheckpoints,
   setExpectationEnabled,
+  setParticipantNameConsent,
   saveEntry,
   saveChallengeFields,
   updateMetric,
@@ -347,6 +349,12 @@ export async function PATCH(request: Request): Promise<Response> {
     }
     if (path[0] === "challenges" && path[2] === "expectation" && path.length === 3) {
       return json(await setExpectationEnabled(session, path[1], body));
+    }
+    if (path[0] === "challenges" && path[2] === "consent" && path.length === 3) {
+      return json(await setParticipantNameConsent(session, path[1], body));
+    }
+    if (path[0] === "challenges" && path[2] === "results" && path[3] === "blocks" && path.length === 4) {
+      return json(await reorderResultBlocks(session, path[1], body));
     }
     if (path[0] === "challenges" && path[2] === "metrics" && path.length === 4) {
       return json(await updateMetric(session, path[1], path[3], body));

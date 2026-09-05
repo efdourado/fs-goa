@@ -58,9 +58,9 @@ test("reaproveita métricas calculadas no detalhe sem consultá-las novamente", 
           }],
         };
       }
-      // Live-ranking probe: no rating field → computeRankings bails out early.
-      if (sql.includes("FROM challenge_fields f JOIN entry_types")) {
-        return { rows: [] };
+      // Total records for the Wrapped cover — 0 entries means no live-ranking pass.
+      if (sql.includes("SELECT count(*)::int AS count FROM entries")) {
+        return { rows: [{ count: 0 }] };
       }
       throw new Error(`Consulta inesperada: ${sql}`);
     },

@@ -746,7 +746,18 @@
     "metricCumulativeHint": "Cada checkpoint soma todos os anteriores (média acumulada, participação até aqui).",
     "wrappedBlocks": "Blocos do Wrapped",
     "includeRankings": "Rankings pessoais",
-    "includeAffinity": "Afinidades"
+    "includeAffinity": "Afinidades",
+    "blockOrderTitle": "Ordem dos blocos",
+    "blockOrderSubtitle": "Reorganize o Wrapped e esconda o que não quer mostrar. Os valores continuam congelados.",
+    "blockOrderSave": "Salvar ordem",
+    "blockOrderSaved": "Ordem salva.",
+    "blockVisible": "Mostrar",
+    "blockUp": "Subir",
+    "blockDown": "Descer",
+    "blockHeadline": "Manchete",
+    "blockSummary": "Resumo",
+    "blockMetric": "Métrica",
+    "blockComment": "Comentário"
   },
   "visibility": {
     "title": "Quem vê estas respostas",
@@ -902,7 +913,8 @@
     "sortByRating": "Por nota",
     "sortByName": "Por nome",
     "showRecommender": "Quem indicou",
-    "recommendedByShort": "por {name}"
+    "recommendedByShort": "por {name}",
+    "totalEntries": "{count, plural, one {# registro} other {# registros}}"
   },
   "rules": {
     "legacyTitle": "Regras do desafio",
@@ -1240,6 +1252,14 @@
       "dimYearBand": "faixa de ano",
       "dimDuration": "duração",
       "none": "Nenhum par avaliou itens em comum o bastante (mínimo 5)."
-    }
+    },
+    "totalEntries": "{count, plural, one {# registro} other {# registros}}"
+  },
+  "consent": {
+    "notice": "Ao participar, o grupo vê seus registros. Ao encerrar, o admin pode publicar uma retrospectiva — anônima por padrão.",
+    "toggle": "Autorizo meu nome numa publicação externa",
+    "toggleHint": "Começa desmarcado. Você muda quando quiser.",
+    "on": "Nome autorizado.",
+    "off": "Autorização do nome retirada."
   }
 }

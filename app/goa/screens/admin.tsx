@@ -944,12 +944,14 @@ function AdminResults({
   onSave,
   onPublish,
   onUnpublish,
+  onReorderBlocks,
 }: {
   challenge: ChallengeDetail;
   entries: Entry[];
   onSave: (payload: Record<string, unknown>) => Promise<void>;
   onPublish: (payload: Record<string, unknown>) => Promise<{ url?: string | null; publishedAt?: string; anonymized?: boolean } | undefined>;
   onUnpublish: () => Promise<void>;
+  onReorderBlocks: (blocks: Array<{ id: Id; visible: boolean }>) => Promise<void>;
 }) {
   const t = useTranslations("adminChallenge");
   const tc = useTranslations("common");
@@ -966,9 +968,26 @@ function AdminResults({
   const [anonymize, setAnonymize] = useState(challenge.resultsAnon === true);
   const [includeRankings, setIncludeRankings] = useState((challenge.result?.personalRankings?.length ?? 0) > 0 || !challenge.result);
   const [includeAffinity, setIncludeAffinity] = useState(Boolean(challenge.result?.affinity?.pairs.length) || !challenge.result);
+  const [blockOrder, setBlockOrder] = useState(
+    [...(challenge.result?.blocks ?? [])].sort((a, b) => a.position - b.position).map((block) => ({ id: block.id, visible: block.visible })),
+  );
+  const [orderBusy, setOrderBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const blockLabelById = useMemo(() => {
+    const map = new Map<Id, string>();
+    for (const block of challenge.result?.blocks ?? []) {
+      map.set(block.id,
+        block.kind === "text" ? (block.heading === "headline" ? t("blockHeadline") : t("blockSummary"))
+        : block.kind === "metric" ? (block.metric?.label ?? t("blockMetric"))
+        : block.kind === "ranking" ? t("includeRankings")
+        : block.kind === "affinity" ? t("includeAffinity")
+        : block.kind === "entry_value" ? t("blockComment")
+        : block.kind);
+    }
+    return map;
+  }, [challenge.result?.blocks, t]);
   const textFields = challenge.fields.filter((field) => field.id && field.type === "text");
   const candidates = useMemo(() => {
     const result: CuratedCommentCandidate[] = [];
@@ -1097,6 +1116,25 @@ function AdminResults({
         <div className="mt-5 flex flex-col gap-2 sm:flex-row"><Button disabled={busy} onClick={() => void save()}>{busy ? tc("saving") : t("saveDraft")}</Button><Button variant="secondary" disabled={busy} onClick={() => void regenerate()}>{t("regenerateDraft")}</Button></div>
         <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{t("regenerateHint")}</p>
       </section>
+
+      {blockOrder.length ? (
+        <section className={cx(cardClass, "p-5 sm:p-7")}>
+          <PageHeading title={t("blockOrderTitle")} description={t("blockOrderSubtitle")} />
+          <ol className="space-y-2">
+            {blockOrder.map((entry, index) => (
+              <li className="flex items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] px-3 py-2 text-sm" key={entry.id}>
+                <span className="w-5 flex-none tabular-nums text-[var(--muted)]">{index + 1}</span>
+                <span className={cx("min-w-0 flex-1 truncate", !entry.visible && "text-[var(--muted)] line-through")}>{blockLabelById.get(entry.id) ?? entry.id}</span>
+                <label className="flex flex-none items-center gap-1.5 text-xs"><input type="checkbox" aria-label={t("blockVisible")} checked={entry.visible} onChange={(event) => setBlockOrder((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, visible: event.target.checked } : item))} />{t("blockVisible")}</label>
+                <Button variant="ghost" className="px-2" disabled={index === 0} onClick={() => setBlockOrder((current) => { const next = [...current]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; return next; })}>↑<span className="sr-only">{t("blockUp")}</span></Button>
+                <Button variant="ghost" className="px-2" disabled={index === blockOrder.length - 1} onClick={() => setBlockOrder((current) => { const next = [...current]; [next[index + 1], next[index]] = [next[index], next[index + 1]]; return next; })}>↓<span className="sr-only">{t("blockDown")}</span></Button>
+              </li>
+            ))}
+          </ol>
+          <Button className="mt-4" disabled={orderBusy} onClick={() => { setOrderBusy(true); setError(null); onReorderBlocks(blockOrder).then(() => setSuccess(t("blockOrderSaved"))).catch((cause: unknown) => setError(f.error(cause))).finally(() => setOrderBusy(false)); }}>{orderBusy ? tc("saving") : t("blockOrderSave")}</Button>
+        </section>
+      ) : null}
+
       {challenge.result || challenge.status === "closed" ? <section><PageHeading title={t("previewTitle")} description={t("previewSubtitle")} /><ResultView challenge={challenge} /></section> : <EmptyState title={t("previewEmptyTitle")} description={t("previewEmptyBody")} />}
     </div>
   );
@@ -1134,6 +1172,7 @@ export function AdminScreen({
   onSaveResult,
   onPublishResult,
   onUnpublishResult,
+  onReorderBlocks,
 }: {
   challenge: ChallengeDetail;
   entries: Entry[];
@@ -1169,6 +1208,7 @@ export function AdminScreen({
   onSaveResult: (payload: Record<string, unknown>) => Promise<void>;
   onPublishResult: (payload: Record<string, unknown>) => Promise<{ url?: string | null; publishedAt?: string; anonymized?: boolean } | undefined>;
   onUnpublishResult: () => Promise<void>;
+  onReorderBlocks: (blocks: Array<{ id: Id; visible: boolean }>) => Promise<void>;
 }) {
   const t = useTranslations("adminChallenge");
   // The checkpoint planner is for round-item challenges organised into
@@ -1191,7 +1231,7 @@ export function AdminScreen({
       {tab === "checkpoints" ? <CheckpointPlanner key={`${challenge.id}:${challenge.checkpoints.map((cp) => cp.id).join(",")}`} challenge={challenge} onSaveCheckpoints={onSaveCheckpoints} onAssign={onAssignCheckpointItems} /> : null}
       {tab === "review" ? <AdminReview challenge={challenge} entries={entries} onPatch={onPatchEntry} onDelete={onDeleteEntry} onExport={onExport} /> : null}
       {tab === "metrics" ? <AdminMetrics challenge={challenge} onAdd={onAddMetric} onUpdate={onUpdateMetric} onDelete={onDeleteMetric} /> : null}
-      {tab === "results" ? <AdminResults challenge={challenge} entries={entries} onSave={onSaveResult} onPublish={onPublishResult} onUnpublish={onUnpublishResult} /> : null}
+      {tab === "results" ? <AdminResults challenge={challenge} entries={entries} onSave={onSaveResult} onPublish={onPublishResult} onUnpublish={onUnpublishResult} onReorderBlocks={onReorderBlocks} /> : null}
     </main>
   );
 }

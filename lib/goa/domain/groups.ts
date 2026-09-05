@@ -5,6 +5,7 @@ import { inTransaction, oneOrNull } from "../../db";
 import { ApiError, stringValue } from "../../http";
 import { assertUnder, LIMITS } from "../../limits";
 import { normalizeUsername } from "../../security";
+import { regeneratePublishedShowcases } from "../challenges/results";
 import { writeAudit } from "./audit";
 import { publicId } from "./shared";
 
@@ -336,9 +337,10 @@ export async function respondToMemberRequest(
  * asked, because there is nothing to choose: their entries stay (the round's
  * history stays intact) but every place that names them (recommended-by,
  * per-participant metrics) shows a neutral "left the group" label instead, the
- * same way a deleted account already shows "Conta removida". Already-published
- * showcases are frozen snapshots and stay put. The owner cannot leave (no
- * ownership transfer yet — delete the group instead).
+ * same way a deleted account already shows "Conta removida". Any published
+ * showcase in the group is pulled offline and regenerated without them (V1 §12);
+ * the admin republishes when ready. The owner cannot leave (no ownership
+ * transfer yet — delete the group instead).
  */
 export async function leaveGroup(session: SessionContext, groupId: string) {
   return inTransaction(async (client) => {
@@ -377,6 +379,9 @@ export async function leaveGroup(session: SessionContext, groupId: string) {
           AND challenge_id IN (SELECT id FROM challenges WHERE group_id = $1)`,
       [groupId, session.user.id],
     );
+    // Any published showcase in the group goes offline and is regenerated
+    // without the departed member; the admin republishes when ready (V1 §12).
+    await regeneratePublishedShowcases(client, groupId, session.user.id);
 
     await writeAudit(
       client,

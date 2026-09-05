@@ -9,10 +9,12 @@ import { AffinityBlockView, PersonalRankingsBlock } from "@/app/goa/rankings-vie
 import { affinityLabels, rankingLabels } from "@/app/goa/rankings-labels";
 import { metricHasData, metricTheme, participantsSentence } from "@/app/goa/utils";
 import { LanguageToggle } from "@/app/goa/LanguageToggle";
-import type { AffinityBlock, Metric, PersonalRanking } from "@/app/goa/types";
+import type { AffinityBlock, Metric, PersonalRanking, WrappedBlock } from "@/app/goa/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// A published showcase is a private link — never in a search index (V1 §12).
+export const metadata = { robots: { index: false, follow: false } };
 
 type PublicComment = { id: string; text: string; itemTitle?: string | null };
 
@@ -39,10 +41,15 @@ export default async function SharedResultsPage({ params }: { params: Promise<{ 
     comments?: PublicComment[];
     personalRankings?: PersonalRanking[];
     affinity?: AffinityBlock | null;
+    blocks?: WrappedBlock[];
+    totalEntries?: number;
     publishedAt?: string | null;
   };
   const personalRankings = result.personalRankings ?? [];
   const affinity = result.affinity ?? null;
+  const ordered = (result.blocks ?? []).filter((block) => block.visible).sort((a, b) => a.position - b.position);
+  const rankLabels = rankingLabels((key, values) => tw(key, values));
+  const affLabels = affinityLabels((key, values) => tw(key, values));
 
   return (
     <main className="min-h-screen bg-[var(--canvas)] px-4 py-8 text-[var(--ink)] sm:px-6 sm:py-14">
@@ -61,14 +68,42 @@ export default async function SharedResultsPage({ params }: { params: Promise<{ 
           <h1 className="mt-5 max-w-4xl text-4xl font-medium leading-none tracking-[-0.055em] sm:text-7xl">
             {result.headline || challenge.title}
           </h1>
-          {result.summary ? <p className="mt-7 max-w-2xl text-base leading-7 text-white/65">{result.summary}</p> : null}
+          {!ordered.length && result.summary ? <p className="mt-7 max-w-2xl text-base leading-7 text-white/65">{result.summary}</p> : null}
           {challenge.participants.length ? (
             <p className="mt-7 max-w-2xl text-sm leading-6 text-white/65">
               {t("participantsSentence", { names: participantsSentence(challenge.participants, (count) => t("andMore", { count })) })}
             </p>
           ) : null}
+          {result.totalEntries ? <p className="mt-3 text-xs text-white/50">{tw("totalEntries", { count: result.totalEntries })}</p> : null}
         </section>
-        {(() => {
+        {ordered.length ? (
+          <div className="mt-6 space-y-6">
+            {ordered.map((block) => {
+              if (block.kind === "text") {
+                return block.heading === "headline" ? null
+                  : <p className="max-w-3xl text-base leading-7 text-[var(--muted)]" key={block.id}>{block.text}</p>;
+              }
+              if (block.kind === "metric" && block.metric && metricHasData(block.metric as unknown as Record<string, unknown>)) {
+                return <MetricBlock key={block.id} metric={block.metric} smallSampleLabel={tm("smallSample")} showMoreLabel={(count) => tm("showMore", { count })} showLessLabel={tm("showLess")} />;
+              }
+              if (block.kind === "ranking" && (block.ranking?.length ?? 0) > 1) {
+                return <section className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-6 sm:p-8" key={block.id}><PersonalRankingsBlock rankings={block.ranking!} labels={rankLabels} /></section>;
+              }
+              if (block.kind === "affinity" && block.affinity && block.affinity.pairs.length) {
+                return <section className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-6 sm:p-8" key={block.id}><AffinityBlockView affinity={block.affinity} labels={affLabels} /></section>;
+              }
+              if (block.kind === "entry_value" && block.comment) {
+                return (
+                  <blockquote className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-6" key={block.id}>
+                    <p className="text-lg leading-8">“{block.comment.text}”</p>
+                    {block.comment.itemTitle ? <footer className="mt-4 text-sm font-light text-[var(--muted)]">{block.comment.itemTitle}</footer> : null}
+                  </blockquote>
+                );
+              }
+              return null;
+            })}
+          </div>
+        ) : (() => {
           const metrics = (result.metrics ?? []).filter(metricHasData);
           const scalarMetrics = metrics.filter((metric) => !metric.series?.length);
           const seriesMetrics = metrics.filter((metric) => metric.series?.length);
@@ -97,17 +132,17 @@ export default async function SharedResultsPage({ params }: { params: Promise<{ 
             </div>
           ) : null;
         })()}
-        {personalRankings.length > 1 ? (
+        {!ordered.length && personalRankings.length > 1 ? (
           <section className="mt-6 rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-6 sm:p-8">
-            <PersonalRankingsBlock rankings={personalRankings} labels={rankingLabels((key, values) => tw(key, values))} />
+            <PersonalRankingsBlock rankings={personalRankings} labels={rankLabels} />
           </section>
         ) : null}
-        {affinity && affinity.pairs.length ? (
+        {!ordered.length && affinity && affinity.pairs.length ? (
           <section className="mt-6 rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-6 sm:p-8">
-            <AffinityBlockView affinity={affinity} labels={affinityLabels((key, values) => tw(key, values))} />
+            <AffinityBlockView affinity={affinity} labels={affLabels} />
           </section>
         ) : null}
-        {result.comments?.length ? (
+        {!ordered.length && result.comments?.length ? (
           <section className="mt-6 grid gap-4 sm:grid-cols-2">
             {result.comments.map((comment) => (
               <blockquote className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-6" key={comment.id}>

@@ -746,7 +746,18 @@
     "metricCumulativeHint": "Each checkpoint folds in every earlier one (running average, participation to date).",
     "wrappedBlocks": "Wrapped sections",
     "includeRankings": "Personal rankings",
-    "includeAffinity": "Affinities"
+    "includeAffinity": "Affinities",
+    "blockOrderTitle": "Block order",
+    "blockOrderSubtitle": "Reorder the Wrapped and hide what you don't want to show. The values stay frozen.",
+    "blockOrderSave": "Save order",
+    "blockOrderSaved": "Order saved.",
+    "blockVisible": "Show",
+    "blockUp": "Move up",
+    "blockDown": "Move down",
+    "blockHeadline": "Headline",
+    "blockSummary": "Summary",
+    "blockMetric": "Metric",
+    "blockComment": "Comment"
   },
   "visibility": {
     "title": "Who sees these answers",
@@ -902,7 +913,8 @@
     "sortByRating": "By rating",
     "sortByName": "By name",
     "showRecommender": "Who recommended",
-    "recommendedByShort": "by {name}"
+    "recommendedByShort": "by {name}",
+    "totalEntries": "{count, plural, one {# record} other {# records}}"
   },
   "rules": {
     "legacyTitle": "Challenge rules",
@@ -1240,6 +1252,14 @@
       "dimYearBand": "year band",
       "dimDuration": "length",
       "none": "No pair rated enough items in common (minimum 5)."
-    }
+    },
+    "totalEntries": "{count, plural, one {# record} other {# records}}"
+  },
+  "consent": {
+    "notice": "By taking part, the group sees your records. When the round closes, the admin may publish a retrospective — anonymous by default.",
+    "toggle": "Allow my real name in an external publication",
+    "toggleHint": "Starts unchecked. Change it whenever you like.",
+    "on": "Name authorised.",
+    "off": "Name authorisation withdrawn."
   }
 }

@@ -62,6 +62,10 @@ export const API_PATHS = {
     `/api/challenges/${encodeURIComponent(challengeId)}/entry-types/${encodeURIComponent(entryTypeId)}`,
   expectation: (challengeId: Id) =>
     `/api/challenges/${encodeURIComponent(challengeId)}/expectation`,
+  nameConsent: (challengeId: Id) =>
+    `/api/challenges/${encodeURIComponent(challengeId)}/consent`,
+  resultBlocks: (challengeId: Id) =>
+    `/api/challenges/${encodeURIComponent(challengeId)}/results/blocks`,
   items: (challengeId: Id) => `/api/challenges/${encodeURIComponent(challengeId)}/items`,
   item: (challengeId: Id, itemId: Id) =>
     `/api/challenges/${encodeURIComponent(challengeId)}/items/${encodeURIComponent(itemId)}`,
