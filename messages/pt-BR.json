@@ -893,7 +893,8 @@
       "scheduledWithDate": "Este checkpoint ainda não começou. O registro será liberado em {date}.",
       "scheduled": "Este checkpoint ainda não começou. O registro será liberado na data programada.",
       "itemClosed": "Este checkpoint foi encerrado. O registro está disponível somente para leitura."
-    }
+    },
+    "optionArchived": "(removida)"
   },
   "resultView": {
     "noDeadline": "Uma história sem prazo",

@@ -893,7 +893,8 @@
       "scheduledWithDate": "This checkpoint hasn't started yet. Logging opens on {date}.",
       "scheduled": "This checkpoint hasn't started yet. Logging opens on the scheduled date.",
       "itemClosed": "This checkpoint is closed. Logging is read-only."
-    }
+    },
+    "optionArchived": "(removed)"
   },
   "resultView": {
     "noDeadline": "A story with no deadline",

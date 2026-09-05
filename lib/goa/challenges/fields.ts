@@ -96,14 +96,22 @@ export async function fieldsForChallenge(
       field_id: string;
       semantic_key: string;
       label: string;
+      archived: boolean;
     }>(
-      `SELECT id, field_id, semantic_key, label FROM field_options
-        WHERE field_id = ANY($1::text[]) AND archived_at IS NULL ORDER BY position`,
+      // Archived options are kept in the list *only* while an entry still points
+      // at one, and flagged — so a historical answer renders its real label
+      // instead of a raw id, but new entries never offer it.
+      `SELECT o.id, o.field_id, o.semantic_key, o.label, (o.archived_at IS NOT NULL) AS archived
+         FROM field_options o
+        WHERE o.field_id = ANY($1::text[])
+          AND (o.archived_at IS NULL
+               OR EXISTS (SELECT 1 FROM entry_values ev WHERE ev.option_id = o.id))
+        ORDER BY o.position`,
       [ids],
     );
     for (const option of options.rows) {
       const list = optionsByField.get(option.field_id) ?? [];
-      list.push({ id: option.id, value: option.semantic_key, label: option.label });
+      list.push({ id: option.id, value: option.semantic_key, label: option.label, archived: option.archived });
       optionsByField.set(option.field_id, list);
     }
   }
@@ -206,6 +214,47 @@ export async function saveChallengeFields(
         maxLength = integerValue(config.maxLength, current.max_length ?? 5_000, 1, 20_000);
         settings = { ...settings, multiline: config.multiline === true };
       }
+
+      // Once the round is live, a non-destructive edit is still allowed but it
+      // must not orphan an answer already given (ROADMAP §4).
+      if (access.challenge.status !== "draft") {
+        if (current.kind === "number") {
+          const outOfRange = await oneOrNull<{ count: number }>(client,
+            `SELECT count(*)::int AS count FROM entry_values ev
+               JOIN entries e ON e.id = ev.entry_id AND e.deleted_at IS NULL
+              WHERE ev.field_id = $1 AND ev.number_scaled IS NOT NULL
+                AND (($2::bigint IS NOT NULL AND ev.number_scaled < $2)
+                  OR ($3::bigint IS NOT NULL AND ev.number_scaled > $3))`,
+            [field.id, minScaled, maxScaled]);
+          if (outOfRange && outOfRange.count > 0) {
+            throw new ApiError(409, "limit_would_invalidate",
+              `Reduzir os limites de "${label}" invalidaria ${outOfRange.count} resposta(s) já gravada(s).`);
+          }
+        }
+        if (current.kind === "text" && maxLength !== null) {
+          const tooLong = await oneOrNull<{ count: number }>(client,
+            `SELECT count(*)::int AS count FROM entry_values ev
+               JOIN entries e ON e.id = ev.entry_id AND e.deleted_at IS NULL
+              WHERE ev.field_id = $1 AND ev.text_value IS NOT NULL AND char_length(ev.text_value) > $2`,
+            [field.id, maxLength]);
+          if (tooLong && tooLong.count > 0) {
+            throw new ApiError(409, "limit_would_invalidate",
+              `Reduzir o tamanho de "${label}" cortaria ${tooLong.count} resposta(s) já gravada(s).`);
+          }
+        }
+        if (field.required === true) {
+          const missing = await oneOrNull<{ count: number }>(client,
+            `SELECT count(*)::int AS count FROM entries e
+              WHERE e.entry_type_id = $1 AND e.deleted_at IS NULL
+                AND NOT EXISTS (SELECT 1 FROM entry_values ev WHERE ev.entry_id = e.id AND ev.field_id = $2)`,
+            [entryType.id, field.id]);
+          if (missing && missing.count > 0) {
+            throw new ApiError(409, "required_would_invalidate",
+              `Tornar "${label}" obrigatório deixaria ${missing.count} registro(s) já feito(s) incompletos.`);
+          }
+        }
+      }
+
       await client.query(
         `UPDATE challenge_fields SET label=$2,help_text=$3,required=$4,position=$5,
                 min_scaled=$6,max_scaled=$7,step_scaled=$8,max_length=$9,settings=$10::jsonb,
