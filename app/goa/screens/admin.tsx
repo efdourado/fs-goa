@@ -633,6 +633,7 @@ function AdminMetrics({
   const [operation, setOperation] = useState<Metric["operation"]>("average");
   const [fieldId, setFieldId] = useState("");
   const [groupBy, setGroupBy] = useState<Metric["groupBy"]>("none");
+  const [minSample, setMinSample] = useState("");
   const [visibleDuring, setVisibleDuring] = useState(true);
   const [visibleInResults, setVisibleInResults] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -650,6 +651,7 @@ function AdminMetrics({
     setOperation("average");
     setFieldId("");
     setGroupBy("none");
+    setMinSample("");
     setVisibleDuring(true);
     setVisibleInResults(true);
     setError(null);
@@ -661,6 +663,7 @@ function AdminMetrics({
     setOperation(metric.operation);
     setFieldId(metric.fieldId ?? "");
     setGroupBy(metric.groupBy ?? "none");
+    setMinSample(metric.minSample != null ? String(metric.minSample) : "");
     setVisibleDuring(metric.visibleDuring !== false);
     setVisibleInResults(metric.visibleInResults !== false);
     setError(null);
@@ -685,7 +688,11 @@ function AdminMetrics({
     event.preventDefault();
     if (needsField && !fieldId) { setError(t("errPickField")); return; }
     setBusy(true); setError(null); setSuccess(null);
-    const payload = { label: label.trim(), operation, fieldId: needsField ? fieldId : null, groupBy, visibleDuring, visibleInResults };
+    const payload = {
+      label: label.trim(), operation, fieldId: needsField ? fieldId : null, groupBy,
+      minSample: groupBy !== "none" && minSample.trim() ? Number(minSample) : undefined,
+      visibleDuring, visibleInResults,
+    };
     try {
       if (editingId) {
         await onUpdate(editingId, payload);
@@ -711,6 +718,13 @@ function AdminMetrics({
           <label><span className={labelClass}>{t("metricOperationLabel")}</span><select className={inputClass} value={operation} onChange={(event) => { const next = event.target.value as Metric["operation"]; setOperation(next); setFieldId(""); }}>{METRIC_OPERATIONS.map((op) => <option value={op} key={op}>{tm(`operationName.${op}`)}</option>)}</select></label>
           {needsField ? <label><span className={labelClass}>{t("metricFieldLabel")}</span><select className={inputClass} value={fieldId} onChange={(event) => setFieldId(event.target.value)} required><option value="">{t("metricFieldPlaceholder")}</option>{selectableFields.filter((field) => field.id).map((field) => <option value={field.id} key={field.id}>{field.label}</option>)}</select></label> : null}
           <label><span className={labelClass}>{t("metricGroupByLabel")}</span><select className={inputClass} value={groupBy} onChange={(event) => setGroupBy(event.target.value as Metric["groupBy"])}>{groupByOptions.map((value) => <option value={value} key={value}>{tm(`groupBy.${value}`)}</option>)}</select></label>
+          {groupBy !== "none" ? (
+            <label>
+              <span className={labelClass}>{t("metricMinSampleLabel")}</span>
+              <input className={inputClass} type="number" min={1} step={1} value={minSample} onChange={(event) => setMinSample(event.target.value)} placeholder={t("metricMinSamplePlaceholder")} />
+              <small className="mt-1 block text-[var(--muted)]">{t("metricMinSampleHint")}</small>
+            </label>
+          ) : null}
           <label className="flex min-h-11 items-center gap-2 text-sm font-medium"><input type="checkbox" checked={visibleDuring} onChange={(event) => setVisibleDuring(event.target.checked)} />{t("metricVisibleDuring")}</label>
           <label className="flex min-h-11 items-center gap-2 text-sm font-medium"><input type="checkbox" checked={visibleInResults} onChange={(event) => setVisibleInResults(event.target.checked)} />{t("metricVisibleResults")}</label>
           <StatusMessage error={error} success={success} />
