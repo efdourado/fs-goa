@@ -425,7 +425,10 @@
     "pasteJsonPlaceholderBook": "[\n  { \"title\": \"Dune\", \"author\": \"Frank Herbert\", \"year\": 1965, \"pageCount\": 688, \"mainGenre\": \"sci-fi\" }\n]",
     "jsonInvalid": "That text isn't valid JSON.",
     "jsonMustBeArray": "Paste a list in brackets, e.g. [ {\"title\": \"...\"} ].",
-    "jsonNoItems": "No new items found — check that each object has a \"title\"."
+    "jsonNoItems": "The list is empty — paste at least one object with a \"title\".",
+    "pasteSummary": "{total} entries read · {added} added · {invalid} without a title or not an object · {duplicates} already on the list.",
+    "pasteSummaryNone": "Nothing was added: every entry was a repeat, had no \"title\" or wasn't an object.",
+    "pasteUnknownKeys": "Keys ignored because they matched nothing: {keys}. Fill that data in on each item's own fields."
   },
   "createChallenge": {
     "errPickTemplate": "Pick a template and fill in the title.",
@@ -761,7 +764,8 @@
     "blockMetric": "Metric",
     "blockComment": "Comment",
     "removedStructureTitle": "Removed structure",
-    "removedStructureBody": "Fields, options, metrics, checkpoints, items and records taken out of this challenge. Restore or delete for good."
+    "removedStructureBody": "Fields, options, metrics, checkpoints, items and records taken out of this challenge. Restore or delete for good.",
+    "commentPrivacyWarning": "Anonymising drops the authorship, but the text is published verbatim — reread each comment and drop any that names people, shares contacts, or gives away something the writer would not want public."
   },
   "visibility": {
     "title": "Who sees these answers",

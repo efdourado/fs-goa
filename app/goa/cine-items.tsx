@@ -45,12 +45,38 @@ function asFieldString(value: unknown): string {
   return value === undefined || value === null ? "" : String(value);
 }
 
+/** Keys the wizard understands; anything else is reported back, not silently dropped. */
+const KNOWN_PASTE_KEYS = new Set([
+  "title",
+  "mainGenre", "main_genre", "genre", "genres",
+  "author", "authors", "by",
+  "year",
+  "pageCount", "pages",
+  "runtimeMinutes", "runtime_minutes", "duration", "durationMinutes",
+].map((key) => key.toLowerCase()));
+
+export interface JsonPasteSummary {
+  /** Entries in the pasted array, valid or not. */
+  total: number;
+  added: number;
+  /** Not an object, or without a usable `title`. */
+  invalid: number;
+  /** Title already among the rows, or repeated inside the paste itself. */
+  duplicates: number;
+  unknownKeys: string[];
+}
+
 /**
  * Parses a pasted JSON array of `{title, year, pageCount, mainGenre}` objects
  * into rows — the "already have the list ready" fast path, as an alternative to
- * typing titles one by one. Throws a translation key on failure.
+ * typing titles one by one. Throws a translation key when the text isn't a JSON
+ * array at all; anything discarded per entry comes back in the summary, so the
+ * wizard can account for it the way the post-creation importer does.
  */
-export function parseJsonItemsPaste(text: string, existingTitles: Set<string>): CineRow[] {
+export function parseJsonItemsPaste(
+  text: string,
+  existingTitles: Set<string>,
+): { rows: CineRow[]; summary: JsonPasteSummary } {
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
@@ -58,13 +84,30 @@ export function parseJsonItemsPaste(text: string, existingTitles: Set<string>): 
     throw new Error("jsonInvalid");
   }
   if (!Array.isArray(parsed)) throw new Error("jsonMustBeArray");
+  if (!parsed.length) throw new Error("jsonNoItems");
   const known = new Set(existingTitles);
   const rows: CineRow[] = [];
+  const unknownKeys = new Set<string>();
+  let invalid = 0;
+  let duplicates = 0;
   for (const entry of parsed) {
-    if (!entry || typeof entry !== "object") continue;
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      invalid += 1;
+      continue;
+    }
     const raw = entry as Record<string, unknown>;
+    for (const key of Object.keys(raw)) {
+      if (!KNOWN_PASTE_KEYS.has(key.toLowerCase())) unknownKeys.add(key);
+    }
     const title = typeof raw.title === "string" ? raw.title.trim() : "";
-    if (!title || known.has(title.toLowerCase())) continue;
+    if (!title) {
+      invalid += 1;
+      continue;
+    }
+    if (known.has(title.toLowerCase())) {
+      duplicates += 1;
+      continue;
+    }
     known.add(title.toLowerCase());
     const genreValue = pick(raw, "mainGenre", "main_genre", "genre", "genres");
     const mainGenre = Array.isArray(genreValue)
@@ -82,8 +125,16 @@ export function parseJsonItemsPaste(text: string, existingTitles: Set<string>): 
       mainGenre,
     }));
   }
-  if (!rows.length) throw new Error("jsonNoItems");
-  return rows;
+  return {
+    rows,
+    summary: {
+      total: parsed.length,
+      added: rows.length,
+      invalid,
+      duplicates,
+      unknownKeys: [...unknownKeys].sort(),
+    },
+  };
 }
 
 export function cineRowsToInput(rows: CineRow[]): ChallengeItemInput[] {
@@ -127,6 +178,7 @@ export function CineItemsEditor({
   const [paste, setPaste] = useState("");
   const [pasteMode, setPasteMode] = useState<"simple" | "json">("simple");
   const [pasteError, setPasteError] = useState<string | null>(null);
+  const [pasteSummary, setPasteSummary] = useState<JsonPasteSummary | null>(null);
   const [catalog, setCatalog] = useState<CatalogItem[] | null>(null);
   const [showCatalog, setShowCatalog] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -153,12 +205,18 @@ export function CineItemsEditor({
   }
   function appendPaste() {
     setPasteError(null);
+    setPasteSummary(null);
     if (pasteMode === "json") {
       const known = new Set(value.map((row) => row.title.trim().toLowerCase()));
       try {
-        const rows = parseJsonItemsPaste(paste, known);
-        onChange([...value, ...rows]);
-        setPaste("");
+        const { rows, summary } = parseJsonItemsPaste(paste, known);
+        // Always report what came in — including entries dropped as invalid or
+        // duplicated — so nothing disappears without the person being told.
+        setPasteSummary(summary);
+        if (rows.length) {
+          onChange([...value, ...rows]);
+          setPaste("");
+        }
       } catch (cause) {
         setPasteError(t(cause instanceof Error ? cause.message : "jsonInvalid"));
       }
@@ -167,8 +225,21 @@ export function CineItemsEditor({
     const titles = paste.split("\n").map((line) => line.trim()).filter(Boolean);
     if (!titles.length) return;
     const known = new Set(value.map((row) => row.title.trim().toLowerCase()));
-    const fresh = titles.filter((title) => !known.has(title.toLowerCase())).map((title) => newCineRow(title));
+    const fresh = titles
+      .filter((title) => {
+        if (known.has(title.toLowerCase())) return false;
+        known.add(title.toLowerCase());
+        return true;
+      })
+      .map((title) => newCineRow(title));
     onChange([...value, ...fresh]);
+    setPasteSummary({
+      total: titles.length,
+      added: fresh.length,
+      invalid: 0,
+      duplicates: titles.length - fresh.length,
+      unknownKeys: [],
+    });
     setPaste("");
   }
 
@@ -236,7 +307,7 @@ export function CineItemsEditor({
               role="tab"
               aria-selected={pasteMode === mode}
               className={cx("min-h-9 flex-1 rounded-full px-3 font-light", pasteMode === mode ? "bg-[var(--main-soft)] text-[var(--main-strong)]" : "text-[var(--muted)] hover:text-[var(--ink)]")}
-              onClick={() => { setPasteMode(mode); setPasteError(null); }}
+              onClick={() => { setPasteMode(mode); setPasteError(null); setPasteSummary(null); }}
             >
               {mode === "simple" ? t("pasteModeSimple") : t("pasteModeJson")}
             </button>
@@ -247,6 +318,26 @@ export function CineItemsEditor({
         </label>
         {pasteMode === "json" ? <p className="mb-2 text-xs leading-5 text-[var(--muted)]">{t("pasteJsonHint")}</p> : null}
         <StatusMessage error={pasteError} />
+        {pasteSummary ? (
+          <div className="mb-2 space-y-1">
+            <StatusMessage
+              error={pasteSummary.added ? null : t("pasteSummaryNone")}
+              success={pasteSummary.added
+                ? t("pasteSummary", {
+                    total: pasteSummary.total,
+                    added: pasteSummary.added,
+                    invalid: pasteSummary.invalid,
+                    duplicates: pasteSummary.duplicates,
+                  })
+                : null}
+            />
+            {pasteSummary.unknownKeys.length ? (
+              <p className="text-[11px] leading-4 text-[var(--muted)]">
+                {t("pasteUnknownKeys", { keys: pasteSummary.unknownKeys.join(", ") })}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={appendPaste} disabled={!paste.trim()}>{t("addPasted")}</Button>
           <Button variant="ghost" onClick={() => setShowCatalog((open) => !open)}>{showCatalog ? t("hideCatalog") : t("fromCatalog")}</Button>
