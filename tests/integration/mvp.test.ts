@@ -1204,17 +1204,30 @@ test("e-mail, login por e-mail, conta e redefinição de senha", async () => {
   assert.equal((await call("POST", "/api/auth/login", { body: { username: "CARLA@example.com", password: "uma senha segura 123" } })).response.status, 200, "login por e-mail");
   assert.equal((await call("POST", "/api/auth/login", { body: { username: "carla_email", password: "uma senha segura 123" } })).response.status, 200, "login por usuário");
 
-  // forgot -> pending flag in admin -> admin mints a link
+  // forgot -> pending flag in admin. The admin can see that someone is locked
+  // out but has NO way to mint the link: that would be account takeover
+  // (ROADMAP §14). Delivery is an operator action until e-mail exists.
   assert.equal((await call("POST", "/api/auth/forgot", { body: { email: "carla@example.com" } })).response.status, 202);
   const users = await call("GET", "/api/admin/users", { session: adminSession });
   const carlaRow = (users.body as { users: Array<{ username: string; pendingReset: unknown }> }).users.find((u) => u.username === "carla_email");
   assert.ok(carlaRow?.pendingReset, "reset pendente aparece no painel");
   const carlaId = (users.body as { users: Array<{ id: string; username: string }> }).users.find((u) => u.username === "carla_email")!.id;
+  assert.equal(
+    (await call("POST", "/api/admin/users/reset-link", { session: adminSession, body: { userId: carlaId } })).response.status,
+    404,
+    "o /admin não cunha link de redefinição para ninguém",
+  );
 
-  const link = await call("POST", "/api/admin/users/reset-link", { session: adminSession, body: { userId: carlaId } });
-  assert.equal(link.response.status, 200, JSON.stringify(link.body));
-  const token = new URL((link.body as { url: string }).url).searchParams.get("reset");
-  assert.ok(token && token.length >= 40);
+  // O fluxo de redefinição em si continua correto — o token chega por fora.
+  const { mintResetToken } = await import("../../lib/auth");
+  const minter = await adminPool.connect();
+  let token: string;
+  try {
+    token = (await mintResetToken(minter, carlaId, { throttle: false })).rawToken;
+  } finally {
+    minter.release();
+  }
+  assert.ok(token.length >= 40);
 
   // reset sets a new password, kills old sessions, auto-logs-in
   const reset = await call("POST", "/api/auth/reset", { body: { token, password: "nova senha bem forte 9" } });
@@ -4934,25 +4947,26 @@ test("E: conta desativada não lê dados privados por GET; admin desativado perd
   assert.equal((await call("GET", "/api/admin/overview", { session: adminRelog })).response.status, 404, "admin desativado não abre o console");
 });
 
-test("E: o link de redefinição do admin só existe se a pessoa pediu, e não mira outro admin", async () => {
+test("E: o /admin não tem geração de link de redefinição — nem com pedido do usuário", async () => {
   const admin = await register("E Suporte", "e_suporte_reset");
   await adminPool.query("UPDATE users SET platform_admin = true WHERE id = $1", [admin.user.id]);
   const adminSession = await login("e_suporte_reset");
-  const other = await register("E Outro Admin", "e_outro_admin");
-  await adminPool.query("UPDATE users SET platform_admin = true WHERE id = $1", [other.user.id]);
   const userReg = await call("POST", "/api/auth/register", { body: { name: "E Usuário", username: "e_usuario_reset", password: "uma senha segura 123", email: "e_usuario_reset@example.com" } });
-  const user = { user: (userReg.body as { user: { id: string } }).user };
+  const userId = (userReg.body as { user: { id: string } }).user.id;
 
-  // Sem pedido da pessoa → recusado.
-  assert.equal((await call("POST", "/api/admin/users/reset-link", { session: adminSession, body: { userId: user.user.id } })).response.status, 409);
-  // Contra outro admin → recusado.
-  assert.equal((await call("POST", "/api/admin/users/reset-link", { session: adminSession, body: { userId: other.user.id } })).response.status, 403);
-  // Com pedido da pessoa → liberado.
+  // Exigir "a pessoa pediu antes" seria circular: o admin vê o e-mail no painel
+  // e pode chamar /auth/forgot sozinho. A rota simplesmente não existe.
   await call("POST", "/api/auth/forgot", { body: { email: "e_usuario_reset@example.com" } });
-  const link = await call("POST", "/api/admin/users/reset-link", { session: adminSession, body: { userId: user.user.id } });
-  assert.equal(link.response.status, 200, JSON.stringify(link.body));
-  const logged = await adminPool.query("SELECT 1 FROM system_audit_events WHERE action = 'admin.reset_link_issued'");
-  assert.ok((logged.rowCount ?? 0) >= 1, "a emissão fica no log operacional");
+  assert.equal(
+    (await call("POST", "/api/admin/users/reset-link", { session: adminSession, body: { userId } })).response.status,
+    404,
+    "mesmo com pedido recente, o admin não obtém o token",
+  );
+  // O sinal de suporte continua: o painel mostra que a pessoa está travada.
+  const users = (await call("GET", "/api/admin/users", { session: adminSession })).body as {
+    users: Array<{ id: string; pendingReset: unknown }>;
+  };
+  assert.ok(users.users.find((u) => u.id === userId)?.pendingReset, "o painel ainda mostra quem pediu ajuda");
 });
 
 test("E: a publicação nominal não expõe ids internos de participante", async () => {
@@ -4983,4 +4997,133 @@ test("E: a publicação nominal não expõe ids internos de participante", async
   assert.doesNotMatch(dump, new RegExp(owner.user.id), "o id do dono não aparece");
   assert.doesNotMatch(dump, new RegExp(b.user.id), "nem o id de Bela");
   assert.match(dump, /E Bela Pub/, "mas o nome de quem consentiu aparece");
+});
+
+// ── Segunda revisão — P0 do reset e P1 de ciclo de vida ─────────────────
+
+test("R2: binar um desafio derruba a vitrine, e restaurar NÃO ressuscita o link antigo", async () => {
+  const owner = await register("R2 Pub", "r2_pub_ressuscita");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube R2" } })).body as { id: string }).id;
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner, body: { recipe: "cinema", title: "Vitrine que cai", participantIds: [owner.user.id], items: [{ title: "F" }] },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  const d = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    entryTypes: Array<{ id: string; purpose: string; fields: Array<{ id: string; key: string }> }>; items: Array<{ id: string }>;
+  };
+  const rating = d.entryTypes.find((t) => t.purpose === "rating")!;
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });
+  await call("POST", `/api/challenges/${challengeId}/entries`, { session: owner, body: { itemId: d.items[0].id, entryTypeId: rating.id, values: { [rating.fields.find((f) => f.key === "nota")!.id]: 4 } } });
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "closed" } });
+  const token = ((await call("POST", `/api/challenges/${challengeId}/results/publish`, { session: owner, body: {} })).body as { shareToken: string }).shareToken;
+  assert.equal((await call("GET", `/api/results/${token}`)).response.status, 200);
+
+  assert.equal((await call("DELETE", `/api/challenges/${challengeId}`, { session: owner })).response.status, 200);
+  assert.equal((await call("GET", `/api/results/${token}`)).response.status, 404);
+  assert.equal((await call("POST", `/api/groups/${groupId}/trash/restore`, { session: owner, body: { kind: "challenge", id: challengeId } })).response.status, 200);
+  assert.equal((await call("GET", `/api/results/${token}`)).response.status, 404, "restaurar não republica o link antigo");
+  const after = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    result: { publishedAt: string | null; hasPublishedLink?: boolean };
+  };
+  assert.equal(after.result.publishedAt, null, "o desafio volta despublicado, até nova confirmação");
+});
+
+test("R2: excluir a conta também resolve os grupos que estavam na própria lixeira", async () => {
+  const owner = await register("R2 Órfão", "r2_orfao");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Grupo binado" } })).body as { id: string }).id;
+  assert.equal((await call("DELETE", `/api/groups/${gid}`, { session: owner })).response.status, 200);
+
+  assert.equal((await call("POST", "/api/account/delete", { session: owner, body: { password: "uma senha segura 123" } })).response.status, 200);
+  const left = await adminPool.query("SELECT 1 FROM groups WHERE id = $1", [gid]);
+  assert.equal(left.rowCount, 0, "o grupo binado é apagado junto — não fica sem responsável");
+  const orphanTrash = await adminPool.query("SELECT 1 FROM trash_items WHERE entity_id = $1", [gid]);
+  assert.equal(orphanTrash.rowCount, 0, "e sem registro de lixeira pendurado");
+});
+
+test("R2: grupo binado pelo dono não ocupa a cota dos outros participantes", async () => {
+  const owner = await register("R2 Dono", "r2_dono_cota");
+  const member = await register("R2 Membro", "r2_membro_cota");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Some da vista" } })).body as { id: string }).id;
+  const invite = (await call("POST", `/api/groups/${gid}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
+  await call("POST", `/api/invites/${invite.token}`, { session: member, body: {} });
+
+  const before = await adminPool.query<{ count: number }>(
+    `SELECT count(*)::int AS count FROM group_members gm JOIN groups g ON g.id = gm.group_id
+      AND g.kind = 'standard' AND g.deleted_at IS NULL WHERE gm.user_id = $1 AND gm.removed_at IS NULL`,
+    [member.user.id],
+  );
+  assert.equal(before.rows[0].count, 1);
+
+  assert.equal((await call("DELETE", `/api/groups/${gid}`, { session: owner })).response.status, 200);
+  const after = await adminPool.query<{ count: number }>(
+    `SELECT count(*)::int AS count FROM group_members gm JOIN groups g ON g.id = gm.group_id
+      AND g.kind = 'standard' AND g.deleted_at IS NULL WHERE gm.user_id = $1 AND gm.removed_at IS NULL`,
+    [member.user.id],
+  );
+  assert.equal(after.rows[0].count, 0, "o grupo binado sai da conta do participante");
+  // E o participante segue conseguindo entrar em outros grupos.
+  const other = await register("R2 Outro Dono", "r2_outro_dono");
+  const gid2 = ((await call("POST", "/api/groups", { session: other, body: { name: "Outro grupo" } })).body as { id: string }).id;
+  const inv2 = (await call("POST", `/api/groups/${gid2}/invites`, { session: other, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
+  assert.equal((await call("POST", `/api/invites/${inv2.token}`, { session: member, body: {} })).response.status, 200);
+});
+
+test("R2: métrica não é restaurada enquanto o campo que ela lê estiver arquivado", async () => {
+  const owner = await register("R2 Métrica", "r2_metrica_pai");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube R2b" } })).body as { id: string }).id;
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "habit", title: "Campo e métrica", participantIds: [owner.user.id],
+      fields: [
+        { key: "minutos", label: "Minutos", type: "number", required: true, config: { min: 0, step: 1 } },
+        { key: "extra", label: "Extra", type: "number", required: false, config: { min: 0, step: 1 } },
+      ],
+    },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  const d = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    entryTypes: Array<{ id: string }>; fields: Array<{ id: string; key: string }>;
+  };
+  const extra = d.fields.find((f) => f.key === "extra")!.id;
+  const minutos = d.fields.find((f) => f.key === "minutos")!.id;
+  const metricId = ((await call("POST", `/api/challenges/${challengeId}/metrics`, {
+    session: owner, body: { label: "Soma extra", operation: "sum", fieldId: extra },
+  })).body as { id: string }).id;
+
+  // Arquiva a métrica e, depois, o campo que ela lia.
+  await call("DELETE", `/api/challenges/${challengeId}/metrics/${metricId}`, { session: owner });
+  await call("POST", `/api/challenges/${challengeId}/fields`, {
+    session: owner,
+    body: { entryTypeId: d.entryTypes[0].id, replace: true, archiveMissing: true, fields: [
+      { id: minutos, key: "minutos", label: "Minutos", type: "number", required: true, config: { min: 0, step: 1 } },
+    ] },
+  });
+
+  const restore = await call("POST", `/api/challenges/${challengeId}/trash/restore`, { session: owner, body: { kind: "metric", id: metricId } });
+  assert.equal(restore.response.status, 409, JSON.stringify(restore.body));
+  assert.equal((restore.body as { error: string }).error, "parent_trashed");
+  // Restaurando o campo primeiro, a métrica volta.
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/trash/restore`, { session: owner, body: { kind: "field", id: extra } })).response.status, 200);
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/trash/restore`, { session: owner, body: { kind: "metric", id: metricId } })).response.status, 200);
+});
+
+test("R2: renomear ao restaurar um item do acervo usa a mesma chave de identidade da criação", async () => {
+  const owner = await register("R2 Acervo", "r2_acervo_rename");
+  const created = await call("POST", "/api/personal/challenges", {
+    session: owner, body: { recipe: "bookshelf", title: "Estante R2", items: [{ title: "Livro Velho", author: "A" }] },
+  });
+  void created;
+  const catalog = (await call("GET", "/api/personal/catalog", { session: owner })).body as { items: Array<{ id: string; title: string }> };
+  const itemId = catalog.items.find((i) => i.title === "Livro Velho")!.id;
+  await call("DELETE", `/api/personal/catalog/${itemId}`, { session: owner });
+  assert.equal(
+    (await call("POST", "/api/personal/trash/restore", { session: owner, body: { kind: "catalog_item", id: itemId, rename: "  Ficção   Científica  " } })).response.status,
+    200,
+  );
+  const row = await adminPool.query<{ title: string; normalized_title: string }>(
+    "SELECT title, normalized_title FROM catalog_items WHERE id = $1", [itemId],
+  );
+  assert.equal(row.rows[0].title, "Ficção   Científica", "o título guarda o que a pessoa digitou (só aparado)");
+  assert.equal(row.rows[0].normalized_title, "ficcao cientifica", "sem acento, espaços colapsados — igual à criação");
 });

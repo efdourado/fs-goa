@@ -69,8 +69,11 @@ export async function assertUnderMembershipCap(
 ): Promise<void> {
   const counted = await oneOrNull<{ count: number }>(
     client,
+    // A group its owner binned is gone from every member's app — it must not
+    // keep occupying their slot, since only the owner can restore or destroy it
+    // and the member has no screen that lists it.
     `SELECT count(*)::int AS count FROM group_members gm
-       JOIN groups g ON g.id = gm.group_id AND g.kind = 'standard'
+       JOIN groups g ON g.id = gm.group_id AND g.kind = 'standard' AND g.deleted_at IS NULL
       WHERE gm.user_id = $1 AND gm.removed_at IS NULL`,
     [userId],
   );

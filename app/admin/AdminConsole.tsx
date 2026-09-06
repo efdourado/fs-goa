@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
 
-import { copyText } from "../goa/clipboard";
 import { Brand } from "../goa/ui";
 
 type Tab = "usage" | "audit" | "accounts" | "feedback";
@@ -256,9 +255,6 @@ export default function AdminConsole({ viewerId, viewerName, csrfToken }: { view
           onRevoke={(user) =>
             run(() => post("/api/admin/users/revoke-sessions", { userId: user.id }), loadUsers)
           }
-          onResetLink={(user) =>
-            post("/api/admin/users/reset-link", { userId: user.id }) as Promise<{ url: string; expiresAt: string }>
-          }
         />
       ) : null}
       </main>
@@ -403,7 +399,6 @@ function AccountsTab({
   onDisable,
   onSetAdmin,
   onRevoke,
-  onResetLink,
 }: {
   users: AdminUser[] | null;
   viewerId: string;
@@ -411,57 +406,13 @@ function AccountsTab({
   onDisable: (user: AdminUser, disabled: boolean) => void;
   onSetAdmin: (user: AdminUser, platformAdmin: boolean) => void;
   onRevoke: (user: AdminUser) => void;
-  onResetLink: (user: AdminUser) => Promise<{ url: string; expiresAt: string }>;
 }) {
-  const [links, setLinks] = useState<Record<string, { url: string; expiresAt: string }>>({});
-  const [linkBusy, setLinkBusy] = useState<string | null>(null);
-  const [linkError, setLinkError] = useState<string | null>(null);
-  const [copyBusy, setCopyBusy] = useState<string | null>(null);
-  const [copyFeedback, setCopyFeedback] = useState<{
-    userId: string;
-    kind: "success" | "error";
-    message: string;
-  } | null>(null);
-  const linkInputs = useRef<Record<string, HTMLInputElement | null>>({});
-
   if (!users) return <p className={cx("text-sm", muted)}>Carregando…</p>;
 
-  async function generate(user: AdminUser) {
-    setLinkBusy(user.id);
-    setLinkError(null);
-    setCopyFeedback(null);
-    try {
-      const generated = await onResetLink(user);
-      setLinks((current) => ({ ...current, [user.id]: generated }));
-    } catch (cause) {
-      setLinkError(cause instanceof Error ? cause.message : "Falha ao gerar o link.");
-    } finally {
-      setLinkBusy(null);
-    }
-  }
-
-  async function copyResetLink(userId: string, url: string) {
-    setCopyBusy(userId);
-    setCopyFeedback(null);
-    try {
-      await copyText(url, linkInputs.current[userId]);
-      setCopyFeedback({ userId, kind: "success", message: "Link copiado." });
-    } catch (cause) {
-      setCopyFeedback({
-        userId,
-        kind: "error",
-        message: cause instanceof Error ? cause.message : "Não foi possível copiar o link.",
-      });
-    } finally {
-      setCopyBusy(null);
-    }
-  }
 
   return (
     <div className="space-y-2">
-      {linkError ? <div className="rounded-xl border border-[var(--danger-line)] bg-[var(--danger-soft)] px-4 py-3 text-sm text-[var(--danger-strong)]">{linkError}</div> : null}
       {users.map((user) => {
-        const link = links[user.id];
         return (
           <article key={user.id} className={cx(card, "p-4", user.disabledAt && "opacity-60")}>
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -490,9 +441,6 @@ function AccountsTab({
                   >
                     {user.platformAdmin ? "Remover admin" : "Tornar admin"}
                   </Button>
-                  <Button variant="ghost" disabled={!!linkBusy || !user.email} onClick={() => generate(user)}>
-                    {linkBusy === user.id ? "Gerando…" : "Gerar link de senha"}
-                  </Button>
                   <Button variant="ghost" disabled={busy || !user.activeSessions} onClick={() => onRevoke(user)}>Revogar sessões</Button>
                   {user.platformAdmin ? null : (
                     <Button variant={user.disabledAt ? "secondary" : "danger"} disabled={busy} onClick={() => onDisable(user, !user.disabledAt)}>
@@ -502,32 +450,6 @@ function AccountsTab({
                 </div>
               )}
             </div>
-            {link ? (
-              <div className="mt-3 rounded-xl bg-black/[0.04] p-3">
-                <p className={cx("text-[11px] font-light uppercase tracking-wide", muted)}>Link de uso único · expira {formatDateTime(link.expiresAt)}</p>
-                <div className="mt-1 flex items-center gap-2">
-                  <input
-                    ref={(element) => { linkInputs.current[user.id] = element; }}
-                    readOnly
-                    value={link.url}
-                    className="min-w-0 flex-1 rounded-lg border border-[var(--line)] bg-[var(--paper)] px-2 py-1 text-xs"
-                    onFocus={(event) => event.currentTarget.select()}
-                  />
-                  <Button variant="secondary" disabled={copyBusy === user.id} onClick={() => void copyResetLink(user.id, link.url)}>
-                    {copyBusy === user.id ? "Copiando…" : copyFeedback?.userId === user.id && copyFeedback.kind === "success" ? "Copiado" : "Copiar"}
-                  </Button>
-                </div>
-                {copyFeedback?.userId === user.id ? (
-                  <p
-                    className={cx("mt-2 text-xs", copyFeedback.kind === "error" ? "text-[var(--danger)]" : "text-[var(--ok)]")}
-                    role={copyFeedback.kind === "error" ? "alert" : "status"}
-                    aria-live="polite"
-                  >
-                    {copyFeedback.message}
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
           </article>
         );
       })}

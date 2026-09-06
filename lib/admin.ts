@@ -1,6 +1,6 @@
-import { mintResetToken, type SessionContext } from "./auth";
+import { type SessionContext } from "./auth";
 import { inTransaction, withClient } from "./db";
-import { redactForPlatformAdmin, writeSystemAudit } from "./goa/domain/audit";
+import { redactForPlatformAdmin } from "./goa/domain/audit";
 import { ApiError, stringValue } from "./http";
 
 /**
@@ -113,43 +113,19 @@ export async function adminUsers() {
   });
 }
 
-export async function adminResetLink(
-  session: SessionContext,
-  body: Record<string, unknown>,
-  origin: string,
-): Promise<{ url: string; expiresAt: string }> {
-  const userId = stringValue(body, "userId", { min: 1, max: 100 })!;
-  return inTransaction(async (client) => {
-    const target = await client.query<{ email: string | null; platform_admin: boolean }>(
-      "SELECT email, platform_admin FROM users WHERE id = $1 AND disabled_at IS NULL FOR UPDATE",
-      [userId],
-    );
-    if (!target.rowCount) throw new ApiError(404, "not_found", "Conta não encontrada ou desativada.");
-    // Without e-mail delivery, this link is the only way to hand a reset to a
-    // user who forgot their password — but the admin must not be able to mint one
-    // for an arbitrary account (that would be account takeover). It only
-    // *fulfils* a reset the user themselves asked for in the last 48h, never
-    // targets another admin, and is logged as a sensitive support action.
-    if (target.rows[0].platform_admin && userId !== session.user.id) {
-      throw new ApiError(403, "admin_target", "Não é possível gerar um link de redefinição para outra conta de administração.");
-    }
-    const pending = await client.query(
-      `SELECT 1 FROM password_reset_tokens
-        WHERE user_id = $1 AND used_at IS NULL AND created_at > now() - interval '48 hours' LIMIT 1`,
-      [userId],
-    );
-    if (!pending.rowCount) {
-      throw new ApiError(409, "no_reset_request", "A pessoa precisa pedir a redefinição pela tela de login antes de você gerar o link.");
-    }
-    const { rawToken, expiresAt } = await mintResetToken(client, userId, { throttle: false });
-    await writeSystemAudit(client, session.user.id, "admin.reset_link_issued", "account", userId, {});
-    console.warn("admin.resetLink", { actor: session.user.username, userId });
-    return {
-      url: `${origin}/?reset=${encodeURIComponent(rawToken)}`,
-      expiresAt: expiresAt.toISOString(),
-    };
-  });
-}
+/*
+ * There is deliberately **no** admin-issued password-reset link.
+ *
+ * Any "the user must have asked first" guard is circular: the admin sees the
+ * e-mail in this very console, can call the public `/api/auth/forgot` with it,
+ * and so manufacture the request they were supposed to be fulfilling. Handing
+ * them the raw token after that is account takeover, which would flatly
+ * contradict ROADMAP §14 ("o administrador não deve acessar conteúdo privado").
+ *
+ * Until a delivery channel exists (e-mail is out of scope for V1, §1), recovery
+ * is an **operator** action, not a product one: `node scripts/reset-password.mjs`
+ * needs `DATABASE_URL`, which holding the `platform_admin` flag does not grant.
+ */
 
 export async function adminAudit(query: URLSearchParams) {
   const groupId = query.get("groupId");

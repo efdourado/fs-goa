@@ -511,13 +511,15 @@ export async function deleteOwnAccount(
       throw new ApiError(403, "invalid_password", "Senha incorreta.");
     }
 
+    // Groups already in this person's own bin are included on purpose: only the
+    // owner may purge one, so leaving them behind would strand content with an
+    // owner who can no longer sign in.
     const ownedGroups = await client.query<{ id: string; kind: string; other_members: number }>(
       `SELECT g.id, g.kind,
               (SELECT count(*)::int FROM group_members m
                 WHERE m.group_id = g.id AND m.removed_at IS NULL AND m.user_id <> $1) AS other_members
          FROM groups g
-         JOIN group_members gm ON gm.group_id = g.id AND gm.user_id = $1 AND gm.role = 'owner' AND gm.removed_at IS NULL
-        WHERE g.deleted_at IS NULL`,
+         JOIN group_members gm ON gm.group_id = g.id AND gm.user_id = $1 AND gm.role = 'owner' AND gm.removed_at IS NULL`,
       [session.user.id],
     );
 

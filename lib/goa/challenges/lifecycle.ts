@@ -5,6 +5,7 @@ import { ApiError } from "../../http";
 import { archiveOrphanedCatalogItemsForChallenge } from "../catalog";
 import { moveToTrash } from "../trash";
 import { computePreflight, type PreflightIssue } from "./preflight";
+import { unpublishResults } from "./results";
 import { generateShowcase } from "./showcase";
 
 export async function transitionChallenge(
@@ -77,6 +78,10 @@ export async function softDeleteChallenge(session: SessionContext, challengeId: 
     }
     // Sets `deleted_at` + the explicit bin row (or 409s on a published template).
     await moveToTrash(client, "challenge", challengeId, session.user.id);
+    // Binning also takes the showcase offline for good: the snapshot may name
+    // people, and clearing the token here means a later restore cannot silently
+    // resurrect the old public URL — the admin has to publish again on purpose.
+    await unpublishResults(client, challengeId);
     await archiveOrphanedCatalogItemsForChallenge(client, session.user.id, access.challenge.group_id, challengeId);
     await writeAudit(
       client,
