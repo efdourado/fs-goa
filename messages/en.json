@@ -1206,7 +1206,9 @@
     "unassigned": "No checkpoint",
     "emptyCheckpoint": "Nothing here yet.",
     "saveOrganise": "Save layout",
-    "organiseSaved": "Layout saved."
+    "organiseSaved": "Layout saved.",
+    "cpDescription": "Description (optional)",
+    "cpDescriptionPlaceholder": "Week theme, agreed reading, a note…"
   },
   "listImport": {
     "title": "Import a list (JSON)",

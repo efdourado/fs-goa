@@ -1206,7 +1206,9 @@
     "unassigned": "Sem checkpoint",
     "emptyCheckpoint": "Nada aqui ainda.",
     "saveOrganise": "Salvar organização",
-    "organiseSaved": "Organização salva."
+    "organiseSaved": "Organização salva.",
+    "cpDescription": "Descrição (opcional)",
+    "cpDescriptionPlaceholder": "Tema da semana, leitura combinada, aviso…"
   },
   "listImport": {
     "title": "Importar uma lista (JSON)",

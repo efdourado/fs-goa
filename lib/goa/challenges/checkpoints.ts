@@ -4,7 +4,6 @@ import type { SessionContext } from "../../auth";
 import { inTransaction, oneOrNull } from "../../db";
 import { challengeAccess, publicId, semanticKey, writeAudit } from "../../goa-domain";
 import { ApiError } from "../../http";
-import { primaryEntryType } from "./entry-types";
 
 export type CheckpointKind = "day" | "week" | "session" | "milestone";
 const CHECKPOINT_KINDS: readonly CheckpointKind[] = ["day", "week", "session", "milestone"];
@@ -67,23 +66,21 @@ function normalizeInstant(value: unknown, label: string): string | null {
 }
 
 async function assertManualCheckpointsAllowed(client: PoolClient, challengeId: string): Promise<void> {
-  // Day-by-day rounds derive their checkpoints from the period — editing them by
-  // hand would fight `syncDailyCheckpoints`. Everything else (a Cinema round
-  // split into weeks, a book club with themed sessions) manages them here.
-  const primary = await primaryEntryType(client, challengeId);
-  if (primary?.submission_mode === "daily") {
-    const challenge = await oneOrNull<{ start_date: string | null }>(
-      client,
-      "SELECT start_date FROM challenges WHERE id = $1",
-      [challengeId],
+  // Only a round that actually generated day-by-day checkpoints derives them
+  // from the period — editing those by hand would fight `syncDailyCheckpoints`.
+  // A dated Library / reading round *without* auto days can still be split into
+  // weeks or themed sessions here.
+  const autoDays = await oneOrNull<{ count: number }>(
+    client,
+    "SELECT count(*)::int AS count FROM challenge_checkpoints WHERE challenge_id = $1 AND kind = 'day' AND archived_at IS NULL",
+    [challengeId],
+  );
+  if (autoDays && autoDays.count > 0) {
+    throw new ApiError(
+      409,
+      "daily_checkpoints_auto",
+      "Este desafio gera os checkpoints a partir do período. Ajuste as datas na aba Geral.",
     );
-    if (challenge?.start_date) {
-      throw new ApiError(
-        409,
-        "daily_checkpoints_auto",
-        "Este desafio gera os checkpoints a partir do período. Ajuste as datas na aba Geral.",
-      );
-    }
   }
 }
 
@@ -220,7 +217,7 @@ export async function assignCheckpointItems(
   if (assignments.length > 400) {
     throw new ApiError(400, "assignment_limit", "Atribuições demais numa só operação.");
   }
-  const parsed = assignments.map((raw) => {
+  const parsed = assignments.map((raw, index) => {
     const record = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
     const itemId = typeof record.itemId === "string" ? record.itemId : "";
     if (!itemId) throw new ApiError(400, "invalid_assignment", "Atribuição sem item.");
@@ -228,7 +225,10 @@ export async function assignCheckpointItems(
       record.checkpointId === null || record.checkpointId === undefined || record.checkpointId === ""
         ? null
         : String(record.checkpointId);
-    return { itemId, checkpointId };
+    // Explicit `position`, else the order the client sent them in — a shuffle or
+    // manual sort in the planner must survive a reload.
+    const position = Number.isSafeInteger(record.position) ? Number(record.position) : index;
+    return { itemId, checkpointId, position };
   });
 
   return inTransaction(async (client) => {
@@ -264,8 +264,10 @@ export async function assignCheckpointItems(
         throw new ApiError(400, "invalid_checkpoint", "Um checkpoint da atribuição não existe.");
       }
       const result = await client.query(
-        "UPDATE challenge_items SET checkpoint_id = $3, updated_at = now() WHERE id = $1 AND challenge_id = $2 AND checkpoint_id IS DISTINCT FROM $3",
-        [assignment.itemId, challengeId, assignment.checkpointId],
+        `UPDATE challenge_items SET checkpoint_id = $3, position = $4, updated_at = now()
+          WHERE id = $1 AND challenge_id = $2
+            AND (checkpoint_id IS DISTINCT FROM $3 OR position IS DISTINCT FROM $4)`,
+        [assignment.itemId, challengeId, assignment.checkpointId, assignment.position],
       );
       changed += result.rowCount ?? 0;
     }
