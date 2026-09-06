@@ -759,7 +759,9 @@
     "blockHeadline": "Headline",
     "blockSummary": "Summary",
     "blockMetric": "Metric",
-    "blockComment": "Comment"
+    "blockComment": "Comment",
+    "removedStructureTitle": "Removed structure",
+    "removedStructureBody": "Fields, options, metrics, checkpoints, items and records taken out of this challenge. Restore or delete for good."
   },
   "visibility": {
     "title": "Who sees these answers",

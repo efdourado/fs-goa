@@ -4793,3 +4793,105 @@ test("C: organizar a vitrine só é permitido depois de encerrar", async () => {
   assert.equal(early.response.status, 409, JSON.stringify(early.body));
   assert.equal((early.body as { error: string }).error, "challenge_not_closed");
 });
+
+// ── Onda D — lixeira e ciclo de vida ────────────────────────────────────
+
+test("D: registro binado num desafio ativo não pode ser restaurado nem apagado após encerrar", async () => {
+  const owner = await register("D Congela", "d_congela");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube D1" } })).body as { id: string }).id;
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner, body: { recipe: "cinema", title: "Memória fechada", participantIds: [owner.user.id], items: [{ title: "F1" }, { title: "F2" }] },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  const d = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    entryTypes: Array<{ id: string; purpose: string; fields: Array<{ id: string; key: string }> }>; items: Array<{ id: string }>;
+  };
+  const rating = d.entryTypes.find((t) => t.purpose === "rating")!;
+  const nota = rating.fields.find((f) => f.key === "nota")!.id;
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });
+  await call("POST", `/api/challenges/${challengeId}/entries`, { session: owner, body: { itemId: d.items[0].id, entryTypeId: rating.id, values: { [nota]: 4 } } });
+  const rated = (await call("GET", `/api/challenges/${challengeId}/entries`, { session: owner })).body as { entries: Array<{ id: string }> };
+  const entryId = rated.entries[0].id;
+  await call("POST", `/api/challenges/${challengeId}/entries`, { session: owner, body: { itemId: d.items[1].id, entryTypeId: rating.id, values: { [nota]: 5 } } });
+  assert.equal((await call("DELETE", `/api/entries/${entryId}`, { session: owner })).response.status, 200);
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "closed" } });
+
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/trash/restore`, { session: owner, body: { kind: "entry", id: entryId } })).response.status, 409, "não restaura registro em desafio fechado");
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/trash/purge`, { session: owner, body: { kind: "entry", id: entryId } })).response.status, 409, "nem apaga em definitivo");
+});
+
+test("D: restaurar um item do acervo pessoal traz de volta o vínculo e os registros da lista", async () => {
+  const owner = await register("D Lista", "d_lista_viva");
+  const created = await call("POST", "/api/personal/challenges", {
+    session: owner, body: { recipe: "bookshelf", title: "Minha estante viva", items: [{ title: "Duna", author: "Herbert" }, { title: "1984", author: "Orwell" }] },
+  });
+  const challengeId = (created.body as { id: string }).id;
+  const d = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    entryTypes: Array<{ id: string; purpose: string; fields: Array<{ id: string; key: string }> }>; items: Array<{ id: string; title: string }>;
+  };
+  const rating = d.entryTypes.find((t) => t.purpose === "rating")!;
+  const nota = rating.fields.find((f) => f.key === "nota")!.id;
+  const dunaItem = d.items.find((i) => i.title === "Duna")!.id;
+  await call("POST", `/api/challenges/${challengeId}/entries`, { session: owner, body: { itemId: dunaItem, entryTypeId: rating.id, values: { [nota]: 5 } } });
+
+  const catalog = (await call("GET", "/api/personal/catalog", { session: owner })).body as { items: Array<{ id: string; title: string }> };
+  const dunaCatalog = catalog.items.find((i) => i.title === "Duna")!.id;
+  assert.equal((await call("DELETE", `/api/personal/catalog/${dunaCatalog}`, { session: owner })).response.status, 200);
+  assert.equal(((await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { items: Array<{ title: string }> }).items.some((i) => i.title === "Duna"), false, "sai da lista");
+
+  assert.equal((await call("POST", `/api/personal/trash/restore`, { session: owner, body: { kind: "catalog_item", id: dunaCatalog } })).response.status, 200);
+  const back = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { items: Array<{ id: string; title: string }> };
+  assert.ok(back.items.some((i) => i.title === "Duna"), "a linha da lista volta");
+  const entries = (await call("GET", `/api/challenges/${challengeId}/entries`, { session: owner })).body as { entries: Array<{ itemId: string | null }> };
+  assert.ok(entries.entries.some((e) => e.itemId === back.items.find((i) => i.title === "Duna")!.id), "e a nota volta junto");
+});
+
+test("D: a lixeira interna do desafio lista a estrutura removida e restaura", async () => {
+  const owner = await register("D Estrutura", "d_estrutura_interna");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube D3" } })).body as { id: string }).id;
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner, body: { recipe: "cinema", title: "Estrutura mexe", participantIds: [owner.user.id], items: [{ title: "A" }, { title: "B" }] },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  const items = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { items: Array<{ id: string; title: string }> };
+  const itemB = items.items.find((i) => i.title === "B")!.id;
+  await call("DELETE", `/api/challenges/${challengeId}/items/${itemB}`, { session: owner });
+
+  const archive = (await call("GET", `/api/challenges/${challengeId}/archive`, { session: owner })).body as {
+    structure: Array<{ kind: string; id: string }>;
+  };
+  assert.ok(archive.structure.some((r) => r.kind === "challenge_item" && r.id === itemB), "o item removido aparece na estrutura removida");
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/trash/restore`, { session: owner, body: { kind: "challenge_item", id: itemB } })).response.status, 200);
+  assert.ok(((await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { items: Array<{ id: string }> }).items.some((i) => i.id === itemB));
+});
+
+test("D: excluir permanentemente um campo com métrica arquivada apontando para ele funciona", async () => {
+  const owner = await register("D Campo", "d_campo_metrica");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube D4" } })).body as { id: string }).id;
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "habit", title: "Campo extra", participantIds: [owner.user.id],
+      fields: [
+        { key: "minutos", label: "Minutos", type: "number", required: true, config: { min: 0, step: 1 } },
+        { key: "extra", label: "Extra", type: "number", required: false, config: { min: 0, step: 1 } },
+      ],
+    },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  const d = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    entryTypes: Array<{ id: string }>; fields: Array<{ id: string; key: string }>;
+  };
+  const extra = d.fields.find((f) => f.key === "extra")!.id;
+  const minutos = d.fields.find((f) => f.key === "minutos")!.id;
+  // Métrica sobre "extra", depois arquivada.
+  const m = await call("POST", `/api/challenges/${challengeId}/metrics`, { session: owner, body: { label: "Soma extra", operation: "sum", fieldId: extra } });
+  await call("DELETE", `/api/challenges/${challengeId}/metrics/${(m.body as { id: string }).id}`, { session: owner });
+  // Agora remove o campo "extra" (sem respostas → vai para a estrutura removida).
+  await call("POST", `/api/challenges/${challengeId}/fields`, {
+    session: owner,
+    body: { entryTypeId: d.entryTypes[0].id, replace: true, archiveMissing: true, fields: [{ id: minutos, key: "minutos", label: "Minutos", type: "number", required: true, config: { min: 0, step: 1 } }] },
+  });
+  const purge = await call("POST", `/api/challenges/${challengeId}/trash/purge`, { session: owner, body: { kind: "field", id: extra } });
+  assert.equal(purge.response.status, 200, JSON.stringify(purge.body));
+});
