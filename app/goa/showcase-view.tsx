@@ -227,7 +227,7 @@ export function ShowcaseView({
       ))}
       {participantNames.length || totalEntries ? (
         <div className={cx("flex flex-wrap items-center gap-x-2 gap-y-1 text-sm", onDark ? "text-white/70" : "text-[var(--muted)]")}>
-          {participantNames.length ? <span>{namesWithBullets(participantNames)}</span> : null}
+          {participantNames.length ? <span>| {namesWithBullets(participantNames)}</span> : null}
           {participantNames.length && totalEntries ? <span aria-hidden="true" className="opacity-40">•</span> : null}
           {totalEntries ? <span>{t("totalEntries", { count: totalEntries })}</span> : null}
         </div>

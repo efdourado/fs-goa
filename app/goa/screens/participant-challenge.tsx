@@ -631,9 +631,10 @@ function CheckpointSchedule({ challenge }: { challenge: ChallengeDetail }) {
               key={cp.id}
             >
               <div className="flex items-center justify-between gap-2">
-                <strong className="text-sm">
-                  {cp.title}
-                  {runtime ? <span className="ml-1.5 font-normal text-xs text-[var(--muted)]">· {runtime}</span> : null}
+                <strong className="text-sm">{cp.title}
+                  <span className="text-xs text-[var(--muted)]">
+                    {runtime ? ` | ${runtime}` : ""}
+                  </span>
                 </strong>
                 <span className="rounded-full bg-[var(--wash)] px-2 py-0.5 text-[10px] text-[var(--muted)]">
                   {tp(`timeframe.${cp.timeframe ?? "current"}`)}
