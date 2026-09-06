@@ -89,6 +89,13 @@ node --env-file=.env.production.local scripts/migrate.mjs
 npm run db:setup                                        # local
 node --env-file=.env.production.local scripts/seed-admin.mjs   # depois do migrate, em prod
 
+# dados de demonstração (grupo sintético, desafios preenchidos e encerrados)
+npm run db:seed-demo -- --scenario=cinema --dry-run     # valida contas/ambiente, não grava
+npm run db:seed-demo -- --scenario=cinema               # cria o cenário Cinema
+npm run db:seed-demo -- --reset --scenario=cinema       # apaga o grupo sintético e recria
+#   Precisa das contas `dudupizzas`, `teste` e `admin` já criadas (admin com platform_admin).
+#   Num banco remoto (Neon) pede uma frase de confirmação; --dry-run nunca grava.
+
 # verificações
 npm run lint
 npm run typecheck
@@ -141,7 +148,7 @@ app/        interface, API REST (app/api), vitrine (app/results), galeria de mod
 db/         schema Drizzle do PostgreSQL
 drizzle/    migrações versionadas
 lib/        autenticação, domínio, receitas, análise e validação
-scripts/    migração e seed da conta de administração
+scripts/    migração, seed da conta de administração e seed de demonstração (scripts/seed-demo)
 tests/      unidade, smoke e integração
 docs/       arquitetura (docs/architecture.md) e endpoints (docs/api.md)
 ```

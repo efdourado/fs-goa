@@ -155,6 +155,25 @@ integração, build verde.**
 | README sem contradição | a linha "`/admin` … lixeira (purga definitiva)" saiu — o painel não tem lixeira global (já dito no mesmo parágrafo) |
 | Cópia carrega o cronograma | `copyChallengeStructure` passou a copiar os checkpoints manuais (semana/sessão/marco — o `kind='day'` continua sendo regerado) e o `checkpoint_id` de cada item, remapeados; as datas seguem caindo (a cópia nasce sem período). A duração dos filmes (`runtime_minutes`) também vai junto pelo `upsertCatalogItem`. O detalhe do modelo ganhou `checkpoints[]` e uma seção "Cronograma"; o preview não promete mais "N dias" via `structure` fallback. Teste: "copiar um desafio carrega as semanas, a distribuição dos itens e a duração dos filmes" |
 
+### 5ª revisão — seed de demonstração + achado que ela revelou (2026-09-06)
+
+- **`npm run db:seed-demo`** (`scripts/seed-demo/`) — grupo sintético "Laboratório
+  GOA — Dados de demonstração" pelas contas `dudupizzas`/`admin`/`teste` (nunca
+  cria/edita as contas), dirigindo os **serviços do domínio** (nada de SQL para
+  conteúdo). Primeira entrega: **Cinema** — 12 filmes, 6 semanas, 2/semana,
+  expectativa + avaliação (36 + 36), 7 métricas (as 5 da receita + mediana +
+  surpresa), Wrapped curado, resultado público anônimo e modelo publicado.
+  `--dry-run` não grava (os serviços commitam sozinhos — sem rollback global);
+  falha no meio deixa o grupo parcial e a próxima execução exige `--reset`; Neon
+  pede frase de confirmação. `library`/`bookshelf`/`habit` são stubs até o
+  formato do Wrapped ser revisado com o primeiro resultado cheio.
+- **Achado (corrigido):** numa publicação **anônima**, o `recommendedBy` das
+  séries por item (ranking, polarização) trazia o **nome real** de quem indicou o
+  filme — os participantes eram mascarados, o indicador não. `buildPublishedSnapshot`
+  agora mapeia item → indicador e troca o nome pelo rótulo "Participante N" (ou
+  mantém, se essa pessoa consentiu numa publicação nominal). Teste: "publicação
+  anônima mascara o nome de quem indicou o filme no ranking".
+
 **Adiado para pós-lançamento (o roadmap já estaciona estes):** afinidade
 composta / "perfil de gosto relativo" (§10 "entra no final da V1"); autor e
 atributos personalizados na afinidade; percentual de páginas lido; fluxo
@@ -205,7 +224,7 @@ substituídos pela lixeira permanente); este arquivo.
 
 ## Revisão do §15 (qualidade de lançamento)
 
-- **Regressões**: suíte completa verde (114 unit + 86 integração + build).
+- **Regressões**: suíte completa verde (114 unit + 87 integração + build).
 - **Permissões / isolamento**: `challengeAccess`/`requireGroupRole` em toda rota;
   a lixeira deriva o papel do objeto, não da URL; `mvp.test.ts` "isolamento",
   "aplica limites", matriz de purga (participante não purga desafio de grupo;
