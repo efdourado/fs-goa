@@ -348,7 +348,11 @@ async function computeValueMetric(client: PoolClient, metric: MetricRow): Promis
   const cumulative = (metric.settings as { cumulative?: unknown })?.cumulative === true;
 
   if (metric.group_by === "checkpoint") {
-    return checkpointSeries(rows, metric.operation, ctx, cumulative);
+    const checkpoints = await client.query<{ id: string; title: string; position: number }>(
+      "SELECT id, title, position FROM challenge_checkpoints WHERE challenge_id = $1 AND archived_at IS NULL ORDER BY position",
+      [metric.challenge_id],
+    );
+    return checkpointSeries(rows, metric.operation, ctx, cumulative, checkpoints.rows);
   }
 
   const keyFn =
@@ -399,8 +403,14 @@ function checkpointSeries(
   operation: MetricRow["operation"],
   ctx: AggregateContext,
   cumulative: boolean,
+  allCheckpoints: Array<{ id: string; title: string; position: number }> = [],
 ): ValueResult {
   const buckets = new Map<string, { label: string; position: number; values: number[] }>();
+  // Seed every checkpoint so an empty week / session still shows as a row
+  // (value null, n = 0) instead of vanishing from the trend.
+  for (const cp of allCheckpoints) {
+    buckets.set(cp.id, { label: cp.title, position: cp.position, values: [] });
+  }
   for (const row of rows) {
     if (!row.checkpoint_id) continue;
     const bucket = buckets.get(row.checkpoint_id)

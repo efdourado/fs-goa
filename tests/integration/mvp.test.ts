@@ -4607,3 +4607,101 @@ test("A: opção de escolha arquivada em uso ainda renderiza o rótulo, não o i
   assert.equal(neutroAfter!.archived, true);
   assert.equal(neutroAfter!.label, "Neutro", "com o rótulo, não o id");
 });
+
+// ── Onda B — listas e checkpoints ────────────────────────────────────────
+
+test("B: a ordem enviada na atribuição de checkpoints persiste após recarregar", async () => {
+  const owner = await register("B Ordem", "b_ordem_cp");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube B1" } })).body as { id: string }).id;
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: { recipe: "cinema", title: "Ordem importa", startsOn: "2026-05-01", endsOn: "2026-05-31", participantIds: [owner.user.id], items: [{ title: "A" }, { title: "B" }, { title: "C" }] },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  const d = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { items: Array<{ id: string; title: string }> };
+  const id = (title: string) => d.items.find((i) => i.title === title)!.id;
+
+  // Reordena C, A, B.
+  const assign = await call("POST", `/api/challenges/${challengeId}/items/assign`, {
+    session: owner,
+    body: { assignments: [
+      { itemId: id("C"), checkpointId: null, position: 0 },
+      { itemId: id("A"), checkpointId: null, position: 1 },
+      { itemId: id("B"), checkpointId: null, position: 2 },
+    ] },
+  });
+  assert.equal(assign.response.status, 200, JSON.stringify(assign.body));
+
+  const reloaded = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { items: Array<{ title: string }> };
+  assert.deepEqual(reloaded.items.map((i) => i.title), ["C", "A", "B"], "a ordem sorteada sobrevive ao reload");
+});
+
+test("B: um Clube de Leitura com período e sem dias automáticos aceita semanas manuais", async () => {
+  const owner = await register("B Clube", "b_clube_semana");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube B2" } })).body as { id: string }).id;
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "library", title: "Leituras por semana", startsOn: "2026-06-01", endsOn: "2026-06-28",
+      generateDaily: false, participantIds: [owner.user.id], items: [{ title: "Livro 1", author: "X" }],
+    },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  const saved = await call("POST", `/api/challenges/${challengeId}/checkpoints`, {
+    session: owner,
+    body: { checkpoints: [
+      { title: "Semana 1", kind: "week", startsAt: "2026-06-01", dueAt: "2026-06-07", description: "Capítulos 1-5" },
+      { title: "Semana 2", kind: "week", startsAt: "2026-06-08", dueAt: "2026-06-14" },
+    ] },
+  });
+  assert.equal(saved.response.status, 200, JSON.stringify(saved.body));
+  const detail = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    checkpoints: Array<{ title: string; kind: string; description: string | null }>;
+  };
+  assert.equal(detail.checkpoints.length, 2);
+  assert.equal(detail.checkpoints[0].kind, "week");
+  assert.equal(detail.checkpoints[0].description, "Capítulos 1-5", "a descrição do checkpoint é gravada");
+});
+
+test("B: métrica por checkpoint mostra uma linha por semana, inclusive as vazias", async () => {
+  const owner = await register("B Vazio", "b_semana_vazia");
+  const b = await register("B Bea", "b_bea_vazia");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube B3" } })).body as { id: string }).id;
+  const invite = (await call("POST", `/api/groups/${groupId}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
+  await call("POST", `/api/invites/${invite.token}`, { session: b, body: {} });
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: { recipe: "cinema", title: "Semana cheia e vazia", startsOn: "2026-07-01", endsOn: "2026-07-21", participantIds: [owner.user.id, b.user.id], items: [{ title: "F1" }, { title: "F2" }] },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  const d = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    entryTypes: Array<{ id: string; purpose: string; fields: Array<{ id: string; key: string }> }>; items: Array<{ id: string; title: string }>;
+  };
+  const rating = d.entryTypes.find((t) => t.purpose === "rating")!;
+  const nota = rating.fields.find((f) => f.key === "nota")!.id;
+  const cps = (await call("POST", `/api/challenges/${challengeId}/checkpoints`, {
+    session: owner,
+    body: { checkpoints: [
+      { title: "S1", kind: "week", startsAt: "2026-07-01", dueAt: "2026-07-07" },
+      { title: "S2", kind: "week", startsAt: "2026-07-08", dueAt: "2026-07-14" },
+      { title: "S3", kind: "week", startsAt: "2026-07-15", dueAt: "2026-07-21" },
+    ] },
+  })).body as { checkpoints: Array<{ id: string; title: string }> };
+  await call("POST", `/api/challenges/${challengeId}/items/assign`, {
+    session: owner,
+    body: { assignments: [
+      { itemId: d.items[0].id, checkpointId: cps.checkpoints[0].id },
+      { itemId: d.items[1].id, checkpointId: cps.checkpoints[0].id },
+    ] },
+  });
+  await call("POST", `/api/challenges/${challengeId}/metrics`, { session: owner, body: { label: "Média por semana", operation: "average", fieldId: nota, groupBy: "checkpoint" } });
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });
+  // Só S1 recebe notas.
+  for (const s of [owner, b]) for (const it of d.items) await call("POST", `/api/challenges/${challengeId}/entries`, { session: s, body: { itemId: it.id, entryTypeId: rating.id, values: { [nota]: 4 } } });
+
+  const metric = ((await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    metrics: Array<{ label: string; series?: Array<{ label: string; value: number | null }> }>;
+  }).metrics.find((m) => m.label === "Média por semana")!;
+  assert.equal(metric.series!.length, 3, "uma linha por semana, mesmo S2 e S3 vazias");
+  assert.equal(metric.series!.find((r) => r.label === "S2")!.value, null, "semana sem registro aparece sem valor, não some");
+});

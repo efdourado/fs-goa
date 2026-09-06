@@ -1198,7 +1198,7 @@ export function AdminScreen({
   onArchiveItem: (itemId: Id) => Promise<void>;
   onPreviewImport: (body: { json: string; mapping?: Record<string, string> }) => Promise<ImportPreview>;
   onSaveCheckpoints: (checkpoints: CheckpointInput[]) => Promise<void>;
-  onAssignCheckpointItems: (assignments: Array<{ itemId: Id; checkpointId: Id | null }>) => Promise<void>;
+  onAssignCheckpointItems: (assignments: Array<{ itemId: Id; checkpointId: Id | null; position?: number }>) => Promise<void>;
   onPatchEntry: (entryId: Id, values: Record<Id, unknown>, reason: string) => Promise<void>;
   onDeleteEntry: (entryId: Id) => Promise<void>;
   onExport: () => Promise<void>;

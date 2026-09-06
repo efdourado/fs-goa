@@ -18,6 +18,7 @@ interface DraftCheckpoint {
   kind: CheckpointKind;
   startsAt: string;
   dueAt: string;
+  description: string;
 }
 
 function toDateInput(iso: string | null | undefined): string {
@@ -31,14 +32,17 @@ export function CheckpointPlanner({
 }: {
   challenge: ChallengeDetail;
   onSaveCheckpoints: (checkpoints: CheckpointInput[]) => Promise<void>;
-  onAssign: (assignments: Array<{ itemId: Id; checkpointId: Id | null }>) => Promise<void>;
+  onAssign: (assignments: Array<{ itemId: Id; checkpointId: Id | null; position: number }>) => Promise<void>;
 }) {
   const t = useTranslations("checkpointPlanner");
   const tc = useTranslations("common");
   const tk = useTranslations("checkpointKind");
   const f = useGoaFormat();
   const locked = challenge.status === "closed";
-  const dailyAuto = challenge.submissionMode === "daily" && Boolean(challenge.startsOn);
+  // Only a round that actually generated day-by-day checkpoints hides the manual
+  // planner — a dated Library / reading round without them can still be
+  // organised into weeks or sessions by hand.
+  const dailyAuto = challenge.checkpoints.some((cp) => cp.kind === "day");
 
   const savedCheckpoints = useMemo(
     () => [...challenge.checkpoints].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
@@ -53,6 +57,7 @@ export function CheckpointPlanner({
       kind: (cp.kind ?? "session") as CheckpointKind,
       startsAt: toDateInput(cp.opensAt),
       dueAt: toDateInput(cp.dueAt),
+      description: cp.description ?? "",
     })),
   );
   const [cpBusy, setCpBusy] = useState(false);
@@ -84,7 +89,7 @@ export function CheckpointPlanner({
   function addDraft() {
     setDrafts((current) => [
       ...current,
-      { key: crypto.randomUUID(), title: t("newTitle", { n: current.length + 1 }), kind: "week", startsAt: "", dueAt: "" },
+      { key: crypto.randomUUID(), title: t("newTitle", { n: current.length + 1 }), kind: "week", startsAt: "", dueAt: "", description: "" },
     ]);
   }
 
@@ -100,6 +105,7 @@ export function CheckpointPlanner({
           kind: draft.kind,
           startsAt: draft.startsAt || null,
           dueAt: draft.dueAt || null,
+          description: draft.description.trim() || null,
         })),
       );
       setCpDone(t("saved"));
@@ -145,7 +151,8 @@ export function CheckpointPlanner({
     setAssignError(null);
     setAssignDone(null);
     try {
-      await onAssign(challenge.items.map((item) => ({ itemId: item.id, checkpointId: assignment[item.id] ?? null })));
+      // Send in the arranged sequence so a shuffle / manual sort actually sticks.
+      await onAssign(order.map((id, index) => ({ itemId: id, checkpointId: assignment[id] ?? null, position: index })));
       setAssignDone(t("organiseSaved"));
     } catch (cause) {
       setAssignError(f.error(cause));
@@ -177,7 +184,9 @@ export function CheckpointPlanner({
     );
   }
 
-  if (challenge.submissionMode !== "item") {
+  // A check-in habit with no catalogue has nothing to organise; a Library round
+  // reports `daily` for its progress type yet still has books to place.
+  if (challenge.submissionMode !== "item" && challenge.items.length === 0) {
     return (
       <section className={cx(cardClass, "p-5 sm:p-7")}>
         <PageHeading title={t("title")} description={t("noItemsNote")} />
@@ -224,6 +233,9 @@ export function CheckpointPlanner({
                         <label><span className={labelClass}>{t("cpDue")}</span><input className={inputClass} type="date" min={draft.startsAt || undefined} value={draft.dueAt}
                           onChange={(event) => setDrafts((cur) => cur.map((d) => d.key === draft.key ? { ...d, dueAt: event.target.value } : d))} /></label>
                       </div>
+                      <label className="mt-2 block"><span className={labelClass}>{t("cpDescription")}</span>
+                        <textarea className={inputClass} rows={2} maxLength={2000} value={draft.description} placeholder={t("cpDescriptionPlaceholder")}
+                          onChange={(event) => setDrafts((cur) => cur.map((d) => d.key === draft.key ? { ...d, description: event.target.value } : d))} /></label>
                       {saved ? (
                         <p className="mt-2 text-xs text-[var(--muted)]">
                           {t(`timeframe.${saved.timeframe ?? "current"}`)} · {t("itemsTally", { count: saved.itemCount ?? 0 })}

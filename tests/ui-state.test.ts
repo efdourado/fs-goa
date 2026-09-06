@@ -449,16 +449,28 @@ test("planejador de checkpoints: mostra semanas, o tipo, o total de duração e 
   assert.match(html, /Sem checkpoint/, "há um balde para itens sem checkpoint");
 });
 
-test("planejador de checkpoints: um desafio diário com período não edita checkpoints à mão", () => {
+test("planejador de checkpoints: um desafio com checkpoints diários automáticos não os edita à mão", () => {
   const challenge = {
     id: "c2", status: "active", submissionMode: "daily", startsOn: "2026-03-01", endsOn: "2026-03-10",
-    checkpoints: [], items: [],
+    checkpoints: [{ id: "d1", title: "1 mar", kind: "day", position: 0 }], items: [],
   } as unknown as ChallengeDetail;
   const html = renderWithIntl(createElement(CheckpointPlanner, {
     challenge, onSaveCheckpoints: async () => undefined, onAssign: async () => undefined,
   }));
   assert.match(html, /gera um checkpoint por dia/i);
   assert.doesNotMatch(html, /Adicionar checkpoint/);
+});
+
+test("planejador de checkpoints: um desafio diário com período mas SEM dias automáticos ainda organiza por semanas", () => {
+  const challenge = {
+    id: "c3", status: "active", submissionMode: "daily", startsOn: "2026-03-01", endsOn: "2026-03-31",
+    checkpoints: [], items: [{ id: "b1", title: "Um livro", position: 0 }],
+  } as unknown as ChallengeDetail;
+  const html = renderWithIntl(createElement(CheckpointPlanner, {
+    challenge, onSaveCheckpoints: async () => undefined, onAssign: async () => undefined,
+  }));
+  assert.doesNotMatch(html, /gera um checkpoint por dia/i);
+  assert.match(html, /Adicionar checkpoint/);
 });
 
 test("painel de importação: analisa e depois lista chaves desconhecidas e badges por linha", async () => {
