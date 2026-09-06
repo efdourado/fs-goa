@@ -122,9 +122,6 @@ export const OPINIONS: Array<Record<DemoRole, DemoOpinion>> = [
   },
 ];
 
-export const CINEMA_TITLE = "Cine clube GOA — safra de demonstração";
-export const CINEMA_HEADLINE = "Seis semanas, doze filmes, três gostos que quase nunca batem";
-export const CINEMA_SUMMARY =
-  "Uma rodada fechada do cine clube, com expectativa antes de cada sessão e "
-  + "avaliação depois. Serve para ver o Wrapped, os rankings e a afinidade com "
-  + "dados de verdade — todas as opiniões são fictícias.";
+export const CINEMA_TITLE = "Cine clube — Demo";
+export const CINEMA_HEADLINE = "6 semanas, 12 filmes, 3 gostos diferentes";
+export const CINEMA_SUMMARY = "Uma rodada fechada do Cine clube, com expectativa antes de cada sessão e avaliação depois — todas as opiniões são fictícias.";

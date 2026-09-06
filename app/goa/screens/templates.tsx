@@ -166,7 +166,7 @@ export function TemplatesScreen({
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {templates.map((template) => (
             <article className={cx(cardClass, "relative flex flex-col p-5 transition hover:-translate-y-0.5")} key={template.id}>
-              <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-[var(--muted)]">{t("cardKicker", { mode: t(`mode.${template.submissionMode}`) })}</p>
+              <p className="text-xs font-extrabold text-[var(--muted)]">{t("cardKicker", { mode: t(`mode.${template.submissionMode}`) })}</p>
               <h3 className="mt-2 text-xl font-light tracking-[-0.03em]">
                 <button type="button" className="cursor-pointer text-left after:absolute after:inset-0 after:content-[''] focus-visible:outline-none" onClick={() => onOpen(template.id)}>{template.title}</button>
               </h3>
@@ -276,7 +276,7 @@ export function TemplateDetailScreen({
         <p className="text-sm text-[var(--muted)]" role="status">{t("detailLoading")}</p>
       ) : (
         <>
-          <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-[var(--muted)]">{t("detailKicker", { mode: t(`mode.${template.submissionMode}`), duration: template.durationDays === null ? t("durationNone") : t("durationDays", { count: template.durationDays }) })}</p>
+          <p className="text-xs font-extrabold text-[var(--muted)]">{t("detailKicker", { mode: t(`mode.${template.submissionMode}`), duration: template.durationDays === null ? t("durationNone") : t("durationDays", { count: template.durationDays }) })}</p>
           <h1 className="mt-2 text-3xl font-light tracking-[-0.04em] sm:text-4xl">{template.title}</h1>
           {template.description ? <p className="mt-3 text-sm leading-6 text-[var(--muted)]">{template.description}</p> : null}
 

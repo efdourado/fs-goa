@@ -1,12 +1,10 @@
 "use client";
 
-import { useFormatter, useLocale, useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { useGoaFormat } from "../format";
-import { MetricBlock } from "../metrics-view";
-import { AffinityBlockView, PersonalRankingsBlock } from "../rankings-view";
-import { rankingLabels, affinityLabels } from "../rankings-labels";
+import { defaultShowcaseBlocks, hasShowcaseContent, ShowcaseView } from "../showcase-view";
 import { RuleSectionsView, visibleRuleSections } from "../rules";
 import type {
   ChallengeDetail,
@@ -39,9 +37,6 @@ import {
   isEmptySaveADelete,
   isLivingList,
   itemIdForEntry,
-  metricHasData,
-  metricTheme,
-  participantsSentence,
   valuesAsRecord,
 } from "../utils";
 
@@ -252,7 +247,7 @@ export function DynamicEntryForm({
         <dl className="space-y-3">
           {shown.map((field) => (
             <div key={field.id}>
-              <dt className="text-xs font-medium uppercase tracking-[0.06em] text-[var(--muted)]">{field.label}</dt>
+              <dt className="text-xs font-medium text-[var(--muted)]">{field.label}</dt>
               <dd className="mt-0.5 text-sm leading-6 whitespace-pre-wrap">{field.id ? formatFieldValue(field, values[field.id]) : t("emptyValue")}</dd>
             </div>
           ))}
@@ -307,86 +302,6 @@ export function DynamicEntryForm({
   );
 }
 
-/** Rankings past this length fold behind a "show more" toggle. */
-const RANKING_PREVIEW_ROWS = 8;
-
-/**
- * A ranking metric with a nicer, sortable presentation than `MetricBlock`:
- * sort by rating or by name, and optionally reveal who recommended each item
- * and its release year. When the metric's value is a bayesian-adjusted
- * average, the plain average shows alongside it in parentheses — the "here's
- * the math" the raw number came from, no separate override.
- */
-function RankingCard({
-  metric,
-  hideThinLabel,
-  smallSampleLabel,
-  showMoreLabel,
-  showLessLabel,
-}: {
-  metric: Metric;
-  hideThinLabel: boolean;
-  smallSampleLabel: string;
-  showMoreLabel: (hiddenCount: number) => string;
-  showLessLabel: string;
-}) {
-  const t = useTranslations("resultView");
-  const [sort, setSort] = useState<"rating" | "name">("rating");
-  const [showRecommender, setShowRecommender] = useState(false);
-  const [expanded, setExpanded] = useState(false);
-  const series = metric.series;
-  const sorted = useMemo(
-    () => [...(series ?? [])].sort((a, b) => (sort === "name"
-      ? a.label.localeCompare(b.label)
-      : (b.value ?? Number.NEGATIVE_INFINITY) - (a.value ?? Number.NEGATIVE_INFINITY))),
-    [series, sort],
-  );
-  const visible = expanded ? sorted : sorted.slice(0, RANKING_PREVIEW_ROWS);
-  const hasRecommenders = series?.some((row) => row.recommendedBy) ?? false;
-
-  return (
-    <article className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-5">
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <p className="text-xs font-light uppercase tracking-[0.1em] text-[var(--muted)]">{metric.label}</p>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--muted)]">
-          <label className="flex cursor-pointer items-center gap-1"><input type="radio" name={`ranking-sort-${metric.id}`} checked={sort === "rating"} onChange={() => setSort("rating")} />{t("sortByRating")}</label>
-          <label className="flex cursor-pointer items-center gap-1"><input type="radio" name={`ranking-sort-${metric.id}`} checked={sort === "name"} onChange={() => setSort("name")} />{t("sortByName")}</label>
-          {hasRecommenders ? <label className="flex cursor-pointer items-center gap-1"><input type="checkbox" checked={showRecommender} onChange={(event) => setShowRecommender(event.target.checked)} />{t("showRecommender")}</label> : null}
-        </div>
-      </div>
-      <ol className="mt-3 space-y-1.5">
-        {visible.map((row, index) => {
-          const thin = row.value === null;
-          const meta = showRecommender && row.recommendedBy ? t("recommendedByShort", { name: row.recommendedBy }) : null;
-          return (
-            <li key={row.key} className={cx("flex items-center justify-between gap-3 text-sm", thin && "opacity-45")}>
-              <span className="flex min-w-0 items-center gap-2">
-                <span className="w-5 flex-none tabular-nums text-[var(--muted)]">{index + 1}</span>
-                <span className="min-w-0">
-                  <span className="block truncate">{row.label}{row.year ? ` (${row.year})` : ""}</span>
-                  {meta ? <span className="block truncate text-[11px] text-[var(--muted)]">{meta}</span> : null}
-                </span>
-              </span>
-              <span className="flex-none text-right tabular-nums">
-                <strong>{thin ? (hideThinLabel ? row.formattedValue ?? "—" : smallSampleLabel) : row.formattedValue ?? row.value}</strong>
-                {!thin && row.rawFormattedValue && row.rawFormattedValue !== row.formattedValue ? (
-                  <span className="ml-1.5 text-[10px] font-light text-[var(--muted)]">({row.rawFormattedValue})</span>
-                ) : null}
-                <span className="ml-2 text-[10px] font-light text-[var(--muted)]">n={row.sampleSize}</span>
-              </span>
-            </li>
-          );
-        })}
-      </ol>
-      {sorted.length > RANKING_PREVIEW_ROWS ? (
-        <button type="button" className="mt-1.5 text-xs font-light text-[var(--muted)] transition hover:text-[var(--ink)]" onClick={() => setExpanded((value) => !value)}>
-          {expanded ? showLessLabel : showMoreLabel(sorted.length - RANKING_PREVIEW_ROWS)}
-        </button>
-      ) : null}
-    </article>
-  );
-}
-
 export function ResultView({
   challenge,
   onBackToEntry,
@@ -399,124 +314,46 @@ export function ResultView({
   hideCompletionRate?: boolean;
 }) {
   const t = useTranslations("resultView");
-  const tm = useTranslations("metrics");
-  const tr = useTranslations("wrapped");
+  const f = useGoaFormat();
   const result = challenge.result;
-  const personalRankings = result?.personalRankings ?? [];
-  const affinity = result?.affinity ?? null;
-  const source = result?.metrics?.length
-    ? result.metrics
-    : challenge.metrics.filter((metric) => metric.visibleInResults !== false);
-  const metrics = source
-    .filter((metric) => !hideCompletionRate || metric.operation !== "completion_rate")
-    .filter(metricHasData);
   const solo = challenge.scope === "personal" || challenge.participants.length < 2;
-  const hideThinLabel = solo;
   const names = solo ? [] : challenge.participants.map((participant) => participant.name);
-  // Only a curated/generated headline — never fall back to the challenge title,
-  // which the cover above already shows in full.
-  const headline = result?.headline || null;
-  const wrappedLocale = useLocale();
-  const rankLabels = rankingLabels((key, values) => tr(key, values), wrappedLocale);
-  const affLabels = affinityLabels((key, values) => tr(key, values), wrappedLocale);
 
-  function metricNode(metric: Metric) {
-    return metricTheme(metric) === "ranking" && metric.series?.length
-      ? <RankingCard key={metric.id} metric={metric} hideThinLabel={hideThinLabel} smallSampleLabel={tm("smallSample")} showMoreLabel={(count) => tm("showMore", { count })} showLessLabel={tm("showLess")} />
-      : <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} hideThinLabel={hideThinLabel} showMoreLabel={(count) => tm("showMore", { count })} showLessLabel={tm("showLess")} />;
+  const dropsCompletion = (metric?: Metric | null) =>
+    hideCompletionRate && metric?.operation === "completion_rate";
+
+  const blocks = (result?.blocks?.length ?? 0) > 0
+    ? result!.blocks!.map((block) =>
+        block.kind === "metric" && dropsCompletion(block.metric) ? { ...block, visible: false } : block)
+    : defaultShowcaseBlocks({
+        metrics: (result?.metrics?.length
+          ? result.metrics
+          : challenge.metrics.filter((metric) => metric.visibleInResults !== false)
+        ).filter((metric) => !dropsCompletion(metric)),
+        personalRankings: solo ? [] : result?.personalRankings,
+        affinity: solo ? null : result?.affinity,
+        comments: result?.comments,
+      });
+
+  if (!hasShowcaseContent(blocks)) {
+    return onBackToEntry
+      ? <EmptyState title={t("liveEmptyTitle")} description={t("liveEmptyBody")} action={<Button onClick={onBackToEntry}>{t("backToEntry")}</Button>} />
+      : <EmptyState title={t("emptyTitle")} description={t("emptyBody")} />;
   }
-  function commentNode(comment: { id: Id; text: string; itemTitle?: string; authorName?: string }) {
-    return (
-      <blockquote className="rounded-2xl bg-[var(--wash)] p-5" key={comment.id}>
-        <p className="text-sm leading-6">“{comment.text}”</p>
-        <footer className="mt-3 text-xs font-light text-[var(--muted)]">{comment.authorName ?? t("participantFallback")}{comment.itemTitle ? ` · ${comment.itemTitle}` : ""}</footer>
-      </blockquote>
-    );
-  }
-
-  // The admin-arranged, ordered Wrapped — used whenever the showcase has been
-  // curated at all (blocks exist), even if every block is hidden. The default
-  // composition below is only for a live, never-curated round.
-  const curated = (result?.blocks?.length ?? 0) > 0;
-  const ordered = (result?.blocks ?? []).filter((block) => block.visible).sort((a, b) => a.position - b.position);
-  const orderedBody = curated ? ordered.map((block) => {
-    if (block.kind === "text") {
-      return block.heading === "headline"
-        ? null
-        : <p className="max-w-2xl text-base leading-7 text-[var(--muted)]" key={block.id}>{block.text}</p>;
-    }
-    if (block.kind === "metric" && block.metric && metricHasData(block.metric as unknown as Record<string, unknown>)) {
-      return <div key={block.id}>{metricNode(block.metric)}</div>;
-    }
-    if (block.kind === "ranking" && (block.ranking?.length ?? 0) > 1) {
-      return <section className={cx(cardClass, "p-6 sm:p-8")} key={block.id}><PersonalRankingsBlock rankings={block.ranking!} labels={rankLabels} /></section>;
-    }
-    if (block.kind === "affinity" && block.affinity && block.affinity.pairs.length) {
-      return <section className={cx(cardClass, "p-6 sm:p-8")} key={block.id}><AffinityBlockView affinity={block.affinity} labels={affLabels} /></section>;
-    }
-    if (block.kind === "entry_value" && block.comment) {
-      return <section className={cx(cardClass, "p-5 sm:p-6")} key={block.id}>{commentNode(block.comment)}</section>;
-    }
-    return null;
-  }).filter(Boolean) : null;
-
-  const scalarMetrics = metrics.filter((metric) => !metric.series?.length);
-  const seriesMetrics = metrics.filter((metric) => metric.series?.length);
-  const themedSeries = (["ranking", "people", "debate"] as const)
-    .map((theme) => ({ theme, items: seriesMetrics.filter((metric) => metricTheme(metric) === theme) }))
-    .filter((group) => group.items.length);
 
   return (
-    <div className="space-y-5">
-      {headline || result?.summary || names.length ? (
-        <header className="space-y-3">
-          {headline ? <h2 className="max-w-3xl text-3xl font-medium leading-none tracking-[-0.045em] sm:text-4xl">{headline}</h2> : null}
-          {!orderedBody && result?.summary ? <p className="max-w-2xl text-base leading-7 text-[var(--muted)]">{result.summary}</p> : null}
-          {names.length ? (
-            <p className="text-sm text-[var(--muted)]">{t("participantsSentence", { names: participantsSentence(names, (count) => t("andMore", { count })) })}</p>
-          ) : null}
-          {result?.totalEntries ? <p className="text-xs text-[var(--muted)]">{t("totalEntries", { count: result.totalEntries })}</p> : null}
-        </header>
-      ) : null}
-
-      {orderedBody ? (
-        <div className="space-y-5" aria-label={t("numbersAria")}>{orderedBody}</div>
-      ) : metrics.length ? (
-        <div className="space-y-5" aria-label={t("numbersAria")}>
-          {scalarMetrics.length ? (
-            <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {scalarMetrics.map((metric) => (
-                <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} hideThinLabel={hideThinLabel} showMoreLabel={(count) => tm("showMore", { count })} showLessLabel={tm("showLess")} />
-              ))}
-            </section>
-          ) : null}
-          {themedSeries.map(({ theme, items }) => (
-            <section key={theme} className="space-y-3">
-              {themedSeries.length > 1 ? <h3 className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--muted)]">{t(`theme.${theme}`)}</h3> : null}
-              <div className="space-y-3">{items.map((metric) => metricNode(metric))}</div>
-            </section>
-          ))}
-        </div>
-      ) : onBackToEntry ? (
-        <EmptyState title={t("liveEmptyTitle")} description={t("liveEmptyBody")} action={<Button onClick={onBackToEntry}>{t("backToEntry")}</Button>} />
-      ) : <EmptyState title={t("emptyTitle")} description={t("emptyBody")} />}
-
-      {!orderedBody && !solo && personalRankings.length > 1 ? (
-        <section className={cx(cardClass, "p-6 sm:p-8")}>
-          <PersonalRankingsBlock rankings={personalRankings} labels={rankLabels} />
-        </section>
-      ) : null}
-      {!orderedBody && !solo && affinity && affinity.pairs.length ? (
-        <section className={cx(cardClass, "p-6 sm:p-8")}>
-          <AffinityBlockView affinity={affinity} labels={affLabels} />
-        </section>
-      ) : null}
-      {!orderedBody && result?.comments?.length ? (
-        <section className={cx(cardClass, "p-6 sm:p-8")}><h2 className="text-xl font-light">{t("momentsTitle")}</h2><div className="mt-5 grid gap-4 sm:grid-cols-2">{result.comments.map((comment) => commentNode(comment))}</div></section>
-      ) : null}
-    </div>
+    <ShowcaseView
+      dateRange={f.dateRange(challenge.startsOn, challenge.endsOn)}
+      headline={result?.headline || ""}
+      summary={result?.summary}
+      participantNames={names}
+      totalEntries={result?.totalEntries ?? null}
+      blocks={blocks}
+      hideThinLabel={solo}
+    />
   );
 }
+
 
 /** The entry types a round item can receive (expectation, rating, progress…). */
 export function itemEntryTypes(challenge: ChallengeDetail): EntryTypeView[] {
@@ -553,7 +390,7 @@ function GroupRatings({ ratings }: { ratings: Array<{ id: Id; name: string; valu
   const nf = useFormatter();
   return (
     <div className="mt-4 rounded-xl border border-[var(--line)] bg-[var(--wash)]/50 p-3">
-      <p className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--muted)]">{t("groupRatingsTitle")}</p>
+      <p className="text-xs font-medium text-[var(--muted)]">{t("groupRatingsTitle")}</p>
       {ratings.length ? (
         <ul className="mt-2 space-y-1">
           {ratings.map((rating) => (
@@ -630,7 +467,7 @@ function ItemEntryPanel({
         const offersDate = offerOptionalDate && !perDay && !entry && canEdit && !locked && type.purpose !== "expectation";
         return (
           <div key={type.id || "registro"}>
-            {stacked ? <h3 className="mb-3 text-sm font-medium uppercase tracking-[0.12em] text-[var(--muted)]">{type.name}</h3> : null}
+            {stacked ? <h3 className="mb-3 text-sm font-medium text-[var(--muted)]">{type.name}</h3> : null}
             {/* Always spell out who will see this answer, before the first submit (V1 §8). */}
             <p className="mb-3 rounded-lg bg-[var(--wash)] px-3 py-2 text-xs text-[var(--muted)]">{tv(`note.${type.visibilityPolicy ?? "group_realtime"}`)}</p>
             <DynamicEntryForm
@@ -778,7 +615,7 @@ function CheckpointSchedule({ challenge }: { challenge: ChallengeDetail }) {
 
   return (
     <section className="mt-5">
-      <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-[var(--muted)]">{tp("title")}</h2>
+      <h2 className="mb-3 text-sm font-medium text-[var(--muted)]">{tp("title")}</h2>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {planned.map((cp) => {
           const items = [...(itemsByCheckpoint.get(cp.id) ?? [])].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
@@ -796,7 +633,7 @@ function CheckpointSchedule({ challenge }: { challenge: ChallengeDetail }) {
             >
               <div className="flex items-center justify-between gap-2">
                 <strong className="text-sm">{cp.title}</strong>
-                <span className="rounded-full bg-[var(--wash)] px-2 py-0.5 text-[10px] uppercase text-[var(--muted)]">
+                <span className="rounded-full bg-[var(--wash)] px-2 py-0.5 text-[10px] text-[var(--muted)]">
                   {tp(`timeframe.${cp.timeframe ?? "current"}`)}
                 </span>
               </div>
@@ -824,44 +661,6 @@ function CheckpointSchedule({ challenge }: { challenge: ChallengeDetail }) {
   );
 }
 
-/**
- * The two-part entry notice (V1 §12): the group sees your records, and the admin
- * may publish a retrospective — anonymous by default. Separately, you authorise
- * (or not, the default) your real name in an external publication.
- */
-function NameConsentCard({
-  challenge,
-  onSetNameConsent,
-}: {
-  challenge: ChallengeDetail;
-  onSetNameConsent: (nameConsent: boolean) => Promise<void>;
-}) {
-  const t = useTranslations("consent");
-  const [busy, setBusy] = useState(false);
-  const consented = challenge.viewerNameConsent === true;
-  return (
-    <section className="mt-5 rounded-2xl border border-[var(--line)] bg-[var(--paper)] px-5 py-4">
-      <p className="text-sm leading-6 text-[var(--muted)]">{t("notice")}</p>
-      <label className="mt-3 flex items-start gap-3 text-sm">
-        <input
-          type="checkbox"
-          className="mt-0.5"
-          aria-label={t("toggle")}
-          checked={consented}
-          disabled={busy}
-          onChange={(event) => {
-            setBusy(true);
-            void onSetNameConsent(event.target.checked).finally(() => setBusy(false));
-          }}
-        />
-        <span>
-          <strong className="block">{t("toggle")}</strong>
-          <span className="text-xs text-[var(--muted)]">{t("toggleHint")}</span>
-        </span>
-      </label>
-    </section>
-  );
-}
 
 export function ParticipantChallengeScreen({
   challenge,
@@ -873,7 +672,6 @@ export function ParticipantChallengeScreen({
   onAdmin,
   onSaveEntry,
   onDeleteEntry,
-  onSetNameConsent,
 }: {
   challenge: ChallengeDetail;
   entries: Entry[];
@@ -884,7 +682,6 @@ export function ParticipantChallengeScreen({
   onAdmin?: () => void;
   onSaveEntry: (itemId: Id | null, values: Record<Id, unknown>, entry?: Entry, occurredOn?: string | null, entryTypeId?: Id, checkpointId?: Id | null) => Promise<void>;
   onDeleteEntry?: (entryId: Id) => Promise<void>;
-  onSetNameConsent: (nameConsent: boolean) => Promise<void>;
 }) {
   const t = useTranslations("participant");
   const trules = useTranslations("rules");
@@ -1069,7 +866,6 @@ export function ParticipantChallengeScreen({
 
       {scheduled ? <section className="mt-5 rounded-2xl border border-[var(--main-line)] bg-[var(--paper)] px-5 py-4"><strong className="text-[var(--main-strong)]">{t("scheduledTitle", { date: f.date(challenge.startsOn, longDate) })}</strong><p className="mt-1 text-sm leading-6 text-[var(--muted)]">{t("scheduledBody")}</p></section> : null}
       <RuleSectionsView rules={ruleSections} />
-      {challenge.isParticipant ? <NameConsentCard challenge={challenge} onSetNameConsent={onSetNameConsent} /> : null}
       <CheckpointSchedule challenge={challenge} />
 
       <nav className="mt-5 hidden gap-1 rounded-2xl bg-[var(--wash-strong)]/70 p-1 sm:flex" aria-label={t("navAria")}>

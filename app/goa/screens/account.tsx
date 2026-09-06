@@ -5,7 +5,7 @@ import { type FormEvent, useEffect, useState } from "react";
 
 import { API_PATHS, apiRequest } from "../api";
 import { useGoaFormat } from "../format";
-import type { User } from "../types";
+import type { ChallengeSummary, User } from "../types";
 import { backLinkClass, Button, cardClass, cx, inputClass, labelClass, PageHeading, StatusMessage } from "../ui";
 
 interface DeletionPreview {
@@ -16,16 +16,20 @@ interface DeletionPreview {
 
 export function AccountScreen({
   user,
+  challenges,
   onBack,
   onSaveProfile,
   onChangePassword,
+  onSetNameConsent,
   onDeactivate,
   onDeletePermanently,
 }: {
   user: User;
+  challenges: ChallengeSummary[];
   onBack: () => void;
   onSaveProfile: (payload: { name: string }) => Promise<void>;
   onChangePassword: (payload: { currentPassword: string; newPassword: string }) => Promise<void>;
+  onSetNameConsent: (challengeId: string, consent: boolean) => Promise<void>;
   onDeactivate: () => Promise<void>;
   onDeletePermanently: (password: string) => Promise<void>;
 }) {
@@ -38,6 +42,26 @@ export function AccountScreen({
 
   const [pwBusy, setPwBusy] = useState(false);
   const [pwMsg, setPwMsg] = useState<{ error?: string; success?: string }>({});
+
+  const consentChallenges = challenges.filter(
+    (challenge) => challenge.isParticipant && challenge.scope !== "personal",
+  );
+  const [consentBusy, setConsentBusy] = useState<string | null>(null);
+  const [consentState, setConsentState] = useState<Record<string, boolean>>({});
+  const consentValue = (challenge: ChallengeSummary) =>
+    consentState[challenge.id] ?? challenge.viewerNameConsent ?? false;
+
+  async function toggleConsent(challenge: ChallengeSummary, next: boolean) {
+    setConsentBusy(challenge.id);
+    try {
+      await onSetNameConsent(challenge.id, next);
+      setConsentState((current) => ({ ...current, [challenge.id]: next }));
+    } catch {
+      // leave the checkbox where it was
+    } finally {
+      setConsentBusy(null);
+    }
+  }
 
   const [deactivateBusy, setDeactivateBusy] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
@@ -139,6 +163,34 @@ export function AccountScreen({
           <div className="sm:col-span-2"><StatusMessage error={pwMsg.error} success={pwMsg.success} /></div>
           <div className="sm:col-span-2"><Button type="submit" disabled={pwBusy}>{pwBusy ? t("changingPassword") : t("changePassword")}</Button></div>
         </form>
+      </section>
+
+      <section className={cx(cardClass, "mt-6 p-5 sm:p-7")}>
+        <h2 className="text-xl font-light">{t("nameConsentTitle")}</h2>
+        <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{t("nameConsentBody")}</p>
+        {consentChallenges.length ? (
+          <ul className="mt-4 space-y-2">
+            {consentChallenges.map((challenge) => (
+              <li className="flex items-center justify-between gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4 py-3 text-sm" key={challenge.id}>
+                <span className="min-w-0">
+                  <span className="block truncate font-medium">{challenge.title}</span>
+                  <span className="text-xs text-[var(--muted)]">{t(`nameConsentStatus.${challenge.status}`)}</span>
+                </span>
+                <label className="flex flex-none cursor-pointer items-center gap-2 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={consentValue(challenge)}
+                    disabled={consentBusy === challenge.id}
+                    onChange={(event) => void toggleConsent(challenge, event.target.checked)}
+                  />
+                  {consentValue(challenge) ? t("nameConsentOn") : t("nameConsentOff")}
+                </label>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-4 text-sm text-[var(--muted)]">{t("nameConsentEmpty")}</p>
+        )}
       </section>
 
       <section className={cx(cardClass, "mt-6 border-[var(--danger-line)] p-5 sm:p-7")}>

@@ -74,7 +74,7 @@ export function InviteScreen({
         <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[var(--main-2)] text-2xl" aria-hidden="true">◎</span>
         {loading ? <p className="mt-5 text-sm text-[var(--muted)]" role="status">{t("verifying")}</p> : preview ? (
           <>
-            <p className="mt-6 text-xs font-extrabold uppercase tracking-[0.14em] text-[var(--muted)]">{preview.challengeId ? t("kickerChallenge") : t("kickerGroup")}</p>
+            <p className="mt-6 text-xs font-extrabold text-[var(--muted)]">{preview.challengeId ? t("kickerChallenge") : t("kickerGroup")}</p>
             <h1 className="mt-2 text-3xl font-light tracking-[-0.04em]">{preview.challengeTitle ?? preview.groupName}</h1>
             <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-[var(--muted)]">{previewBody}</p>
             {preview.expiresAt ? <p className="mt-3 text-xs font-medium text-[var(--muted)]">{t("validUntil", { date: f.dateTime(preview.expiresAt) })}</p> : null}
@@ -103,7 +103,7 @@ export function InviteAcceptedScreen({
     <main className="mx-auto flex min-h-[calc(100vh-76px)] max-w-2xl items-center px-4 py-10 sm:px-6">
       <section className={cx(cardClass, "w-full p-6 text-center sm:p-10")}>
         <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[var(--ok-soft)] text-2xl text-[var(--ok)]" aria-hidden="true">✓</span>
-        <p className="mt-6 text-xs font-extrabold uppercase tracking-[0.14em] text-[var(--muted)]">{t("acceptedKicker")}</p>
+        <p className="mt-6 text-xs font-extrabold text-[var(--muted)]">{t("acceptedKicker")}</p>
         <h1 className="mt-2 text-3xl font-light tracking-[-0.04em]">{t("acceptedTitle")}</h1>
         <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-[var(--muted)]">
           {challenge

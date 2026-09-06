@@ -67,7 +67,7 @@ export function AuthScreen({
       <section className="relative hidden overflow-hidden bg-[var(--spotlight)] p-12 text-[var(--spotlight-ink)] lg:flex lg:flex-col lg:justify-between">
         <Brand />
         <div className="relative z-10 max-w-xl">
-          <p className="mb-5 text-xs font-light uppercase tracking-[0.18em] text-white/55">{t("heroKicker")}</p>
+          <p className="mb-5 text-xs font-light text-white/55">{t("heroKicker")}</p>
           <p className="text-6xl font-medium leading-[0.96] tracking-[-0.06em]">{t("heroTitleLine1")}<br />{t("heroTitleLine2")}</p>
           <p className="mt-6 max-w-lg text-base leading-7 text-white/70">{t("heroBody")}</p>
         </div>

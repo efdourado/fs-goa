@@ -132,6 +132,7 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
       end_date: string | null;
       role: GroupRole;
       is_participant: boolean;
+      name_consent: boolean | null;
       completed_count: number;
       total_count: number | null;
       submission_mode: "item" | "daily" | "free" | null;
@@ -151,6 +152,9 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
               EXISTS (SELECT 1 FROM challenge_participants cp
                        WHERE cp.challenge_id = c.id AND cp.user_id = $1 AND cp.removed_at IS NULL)
                 AS is_participant,
+              (SELECT cp.name_consent FROM challenge_participants cp
+                 WHERE cp.challenge_id = c.id AND cp.user_id = $1 AND cp.removed_at IS NULL)
+                AS name_consent,
               (SELECT count(*)::int FROM entries e
                 WHERE e.challenge_id = c.id AND e.participant_user_id = $1 AND e.deleted_at IS NULL
                   AND (ct.id IS NULL OR e.entry_type_id = ct.id))
@@ -223,6 +227,7 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
         submissionMode: challenge.submission_mode ?? undefined,
         viewerRole: challenge.role,
         isParticipant: challenge.is_participant,
+        viewerNameConsent: challenge.name_consent ?? false,
         completedCount: challenge.completed_count,
         totalCount: challenge.total_count,
       })),
