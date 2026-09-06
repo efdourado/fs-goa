@@ -203,23 +203,14 @@
     },
     "register": {
       "heading": "Create your account",
-      "subheading": "We only ask for the essentials. Email helps you recover access.",
+      "subheading": "We only ask for the essentials.",
       "submit": "Create account",
       "usernameLabel": "Username",
       "usernameHint": "Letters, numbers, dot, hyphen, or underscore.",
       "nameLabel": "Your name",
       "emailLabel": "Email (optional)",
-      "emailHint": "Recommended — it's how you recover access if you forget your password.",
+      "emailHint": "Recommended — password reset options are coming soon.",
       "passwordConfirmLabel": "Confirm password"
-    },
-    "forgot": {
-      "heading": "Reset password",
-      "subheading": "Enter your account email. The admin will send you a link to create a new password.",
-      "submit": "Send request",
-      "emailLabel": "Email",
-      "sent": "Request received. If an account exists for that email, the admin will send you a link to reset the password.",
-      "backToLogin": "Back to sign in",
-      "link": "Forgot your password?"
     },
     "passwordLabel": "Password",
     "noAccount": "No account? ",
@@ -1102,15 +1093,6 @@
     "consequencePurgeGroup": "The group “{name}” is deleted for good.",
     "consequencePersonal": "Your personal space and personal catalogue are deleted for good.",
     "consequencePublications": "{count, plural, one {# published showcase of yours goes offline} other {# published showcases of yours go offline}}."
-  },
-  "resetPassword": {
-    "passwordsDontMatch": "The passwords don't match.",
-    "title": "Create a new password",
-    "subtitle": "Choose a new password. Your other sessions will be ended for security.",
-    "newPassword": "New password",
-    "confirmNewPassword": "Confirm new password",
-    "submit": "Save and sign in",
-    "back": "← Back to sign in"
   },
   "publicResults": {
     "numbersAria": "Results in numbers",

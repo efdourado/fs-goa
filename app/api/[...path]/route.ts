@@ -5,13 +5,11 @@ import {
   logoutSession,
   reactivateOwnAccount,
   registerAccount,
-  requestPasswordReset,
   requireMutationSession,
   requirePlatformAdminMutation,
   requirePlatformAdminSession,
   deleteOwnAccount,
   requireSession,
-  resetPassword,
   sessionFromRequest,
   updateAccount,
 } from "@/lib/auth";
@@ -217,15 +215,10 @@ export async function POST(request: Request): Promise<Response> {
       const session = await requireMutationSession(request, { allowDeactivated: true });
       return json({ ok: true }, 200, { "set-cookie": await logoutSession(session) });
     }
-    if (isPath(path, "auth", "forgot")) {
-      requireMutationOrigin(request);
-      return json(await requestPasswordReset(await readJsonObject(request)), 202);
-    }
-    if (isPath(path, "auth", "reset")) {
-      requireMutationOrigin(request);
-      const result = await resetPassword(await readJsonObject(request));
-      return json({ user: result.user, csrfToken: result.csrfToken }, 200, { "set-cookie": result.setCookie });
-    }
+    // Self-service password reset (`auth/forgot`, `auth/reset`) is withdrawn until
+    // there is an e-mail channel to deliver the link — see the note in lib/auth.ts.
+    // 404 for everyone (not 401), the same as any route that does not exist.
+    if (isPath(path, "auth", "forgot") || isPath(path, "auth", "reset")) notFound();
 
     if (isPath(path, "feedback")) {
       requireMutationOrigin(request);

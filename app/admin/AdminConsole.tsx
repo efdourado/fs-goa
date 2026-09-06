@@ -37,7 +37,6 @@ interface AdminUser {
   lastSeenAt: string | null;
   groupsOwned: number;
   activeSessions: number;
-  pendingReset: { expiresAt: string } | null;
 }
 interface FeedbackItem {
   id: string;
@@ -421,7 +420,6 @@ function AccountsTab({
                   <strong>{user.name}</strong>
                   {user.platformAdmin ? <span className="rounded-full bg-black/[0.06] px-1.5 py-0.5 text-[10px] font-light uppercase tracking-wide">admin</span> : null}
                   {user.deletedAt ? <span className="rounded-full bg-[var(--danger-soft)] px-1.5 py-0.5 text-[10px] font-light text-[var(--danger)]">removida</span> : user.disabledAt ? <span className="rounded-full bg-[var(--danger-soft)] px-1.5 py-0.5 text-[10px] font-light text-[var(--danger)]">desativada</span> : null}
-                  {user.pendingReset ? <span className="rounded-full bg-[var(--warn-soft)] px-1.5 py-0.5 text-[10px] font-light text-[var(--warn)]">reset pedido</span> : null}
                 </div>
                 <p className={cx("mt-1 text-xs", muted)}>
                   @{user.username}{user.email ? ` · ${user.email}` : " · sem e-mail"} · criada {formatDateTime(user.createdAt)} · última sessão {formatDateTime(user.lastSeenAt)} · {user.groupsOwned} grupos · {user.activeSessions} sessões

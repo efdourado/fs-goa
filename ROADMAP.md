@@ -29,7 +29,9 @@ O sistema oferece modelos delimitados, permite personalização controlada e imp
 - Importar XLSX ou PDF.
 - Exportar PDF.
 - Consultar streaming automaticamente.
-- Integrar e-mail, calendário ou outros serviços.
+- Integrar e-mail, calendário ou outros serviços. _Como não há e-mail, a
+  redefinição de senha por link fica retirada na V1 (só a troca autenticada, com
+  a senha atual, funciona); ver `docs/v1-acceptance.md` › "3ª revisão"._
 - Editor livre de fórmulas.
 - Inteligência artificial interna.
 - Status obrigatório "assistindo" ou "pulado".

@@ -28,7 +28,7 @@ cria um grupo vira `owner` dele. Além disso, a conta criada pelo `db:seed` rece
 `platform_admin` e enxerga `/admin` — um painel privado do desenvolvedor com uso,
 armazenamento, auditoria (sem textos privados) e moderação de contas. Nenhuma
 outra conta vê essa área (respostas `404`). O `platform_admin` **não** tem lixeira
-global, não exclui conteúdo de terceiros e não gera links de redefinição de senha:
+global, não exclui conteúdo de terceiros e não redefine a senha de ninguém:
 a lixeira é sempre do dono do conteúdo.
 
 | Ambiente   | Usuário | Senha                                    |
@@ -43,23 +43,17 @@ As contas fazem login por **nome de usuário ou e-mail** + senha.
 
 ### Recuperação de senha
 
-O e-mail é opcional no cadastro, mas é o que permite recuperar o acesso: quem
-esquece a senha pede em "Esqueci a senha" (`POST /api/auth/forgot`) e recebe um
-link de uso único.
+**Fora do ar por enquanto.** A redefinição por link precisa de um canal de
+e-mail para entregar o link, e conectar um provedor de e-mail está fora do
+escopo da V1 (`ROADMAP.md` §1). Então todo o fluxo visível — a tela "Esqueci a
+senha", as rotas `/api/auth/forgot` e `/api/auth/reset`, o indicador de pedido
+pendente no `/admin` e o script de operador — foi retirado. O cadastro continua
+aceitando e-mail opcional (usado só para login), com o aviso "as opções de
+redefinição de senha chegam em breve".
 
-O `/admin` deliberadamente **não** gera esse link. A garantia de "só se a pessoa
-tiver pedido" seria circular — o administrador vê o e-mail no próprio painel,
-`/api/auth/forgot` é público e ele mesmo pode fabricar o pedido que deveria estar
-apenas atendendo; na prática seria poder assumir qualquer conta. Quando alguém
-perde tanto a senha quanto o acesso ao e-mail, a recuperação é uma ação de
-**operador**, não de administrador de plataforma:
-
-```bash
-DATABASE_URL=… node scripts/reset-password.mjs <usuario|email> '<nova senha>'
-```
-
-O script exige a `DATABASE_URL` — que a flag `platform_admin` não concede —,
-revoga todas as sessões da conta e invalida os pedidos de redefinição pendentes.
+Quem já está logado troca a senha normalmente em **Configurações** (exige a
+senha atual). A tabela `password_reset_tokens` segue no banco, dormente, para
+religar o fluxo como mudança só de código quando houver e-mail.
 
 ## Desenvolvimento sem Docker
 
@@ -155,9 +149,9 @@ docs/       arquitetura (docs/architecture.md) e endpoints (docs/api.md)
 ## O que o Goa faz
 
 - **Contas** — cadastro e login por usuário **ou** e-mail, sessão HTTP-only + CSRF;
-  redefinição de senha por link de uso único, pedida pela própria pessoa em
-  `/api/auth/forgot`. O e-mail é opcional mas é o que recupera o acesso — o
-  `/admin` **não** gera links de redefinição (ver "Recuperação de senha").
+  troca de senha nas Configurações (com a senha atual). O e-mail é opcional e por
+  ora serve só para login: a redefinição por link está fora do ar até haver um
+  canal de e-mail (ver "Recuperação de senha").
 - **Grupos e papéis** — o grupo é duradouro e reúne pessoas entre rodadas. `owner`
   > `admin` > `participant`. Convites por link expirável / código curto.
 - **Rodadas por receita** — quatro criáveis: `cinema` (nota 0–5 + comentário, com

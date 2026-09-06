@@ -203,23 +203,14 @@
     },
     "register": {
       "heading": "Crie sua conta",
-      "subheading": "Só pedimos o essencial. O e-mail ajuda a recuperar o acesso.",
+      "subheading": "Só pedimos o essencial.",
       "submit": "Criar conta",
       "usernameLabel": "Usuário",
       "usernameHint": "Letras, números, ponto, hífen ou sublinhado.",
       "nameLabel": "Seu nome",
       "emailLabel": "E-mail (opcional)",
-      "emailHint": "Recomendado — é como você recupera o acesso se esquecer a senha.",
+      "emailHint": "Recomendado — as opções de redefinição de senha chegam em breve.",
       "passwordConfirmLabel": "Confirme a senha"
-    },
-    "forgot": {
-      "heading": "Redefinir senha",
-      "subheading": "Informe o e-mail da sua conta. O administrador vai te enviar um link para criar uma nova senha.",
-      "submit": "Enviar pedido",
-      "emailLabel": "E-mail",
-      "sent": "Pedido registrado. Se houver uma conta com esse e-mail, o administrador vai te enviar um link para redefinir a senha.",
-      "backToLogin": "Voltar para o login",
-      "link": "Esqueci a senha"
     },
     "passwordLabel": "Senha",
     "noAccount": "Sem conta? ",
@@ -1102,15 +1093,6 @@
     "consequencePurgeGroup": "O grupo “{name}” é apagado de vez.",
     "consequencePersonal": "Seu espaço pessoal e o acervo pessoal são apagados de vez.",
     "consequencePublications": "{count, plural, one {# vitrine publicada sua sai do ar} other {# vitrines publicadas suas saem do ar}}."
-  },
-  "resetPassword": {
-    "passwordsDontMatch": "As senhas não coincidem.",
-    "title": "Criar uma nova senha",
-    "subtitle": "Escolha uma senha nova. Suas outras sessões serão encerradas por segurança.",
-    "newPassword": "Nova senha",
-    "confirmNewPassword": "Confirme a nova senha",
-    "submit": "Salvar e entrar",
-    "back": "← Voltar ao login"
   },
   "publicResults": {
     "numbersAria": "Resultados em números",

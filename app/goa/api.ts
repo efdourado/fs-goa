@@ -22,8 +22,6 @@ export const API_PATHS = {
     register: "/api/auth/register",
     login: "/api/auth/login",
     logout: "/api/auth/logout",
-    forgot: "/api/auth/forgot",
-    reset: "/api/auth/reset",
   },
   account: "/api/account",
   accountDeactivate: "/api/account/deactivate",

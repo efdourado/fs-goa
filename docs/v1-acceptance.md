@@ -110,14 +110,14 @@ integração + 114 unitários**.
 | **B — Listas/checkpoints** | a ordem enviada em `items/assign` persiste (`position`); Clube de Leitura datado sem dias automáticos organiza semanas/sessões à mão; editor de checkpoint ganha campo de descrição; série `groupBy:checkpoint` inclui semanas vazias (linha com `value:null`) |
 | **C — Métricas/Wrapped** | `count` vira série por pessoa/item/checkpoint; `completion_rate` agrupado é **recusado** (`invalid_metric_grouping`); rankings + afinidade **ao vivo** no detalhe do desafio ativo; `curateResults` só depois de encerrar (`challenge_not_closed`) e o resultado interno é sempre vivo enquanto aberto |
 | **D — Lixeira/ciclo de vida** | seção "Estrutura removida" (`<TrashView>`) na aba Revisão da admin; restaurar item de acervo pessoal refaz o vínculo da lista + registros; registro binado num desafio **encerrado** fica congelado (409); `applyPurge` cobre métricas/opções arquivadas; restaurar desafio desarquiva o catálogo órfão; **migração 0034** faz backfill de `trash_items` |
-| **E — Contas/admin** | exclusão de conta raspa `username`/`username_normalized`/`password_hash`; conta desativada não lê nada privado por `GET` (só `bootstrap`); admin desativado perde o `/admin`; `admin/users/reset-link` **removida** — a exigência de "pedido recente" era circular (o admin vê o e-mail no painel e `/api/auth/forgot` é público), então a recuperação virou ação de operador (`scripts/reset-password.mjs`, que exige a `DATABASE_URL`); publicação nominal usa token opaco `p_…` no lugar do id interno |
+| **E — Contas/admin** | exclusão de conta raspa `username`/`username_normalized`/`password_hash`; conta desativada não lê nada privado por `GET` (só `bootstrap`); admin desativado perde o `/admin`; `admin/users/reset-link` **removida** — a exigência de "pedido recente" era circular (o admin vê o e-mail no painel e `/api/auth/forgot` era público); publicação nominal usa token opaco `p_…` no lugar do id interno _(a redefinição por link foi retirada por inteiro depois — ver "3ª revisão")_ |
 | **F — Deep links** | `/modelos`, `/modelos/:id`, `/sobre` abrem por URL sem sessão; `app/challenges/new/page.tsx` (era 404 no refresh); testes de round-trip `urlForScreen ↔ screenFromUrl` e de existência de `page.tsx` para cada rota |
 
 ### 2ª revisão — o que entrou
 
 | Item | O que mudou |
 | --- | --- |
-| **P0 — reset administrativo** | rota, serviço e aba removidos; `scripts/reset-password.mjs` como ação de operador; teste garante que `POST /api/admin/users/reset-link` responde 404 |
+| **P0 — reset administrativo** | rota, serviço e aba removidos; teste garante que `POST /api/admin/users/reset-link` responde 404 _(o `scripts/reset-password.mjs` que entrou aqui foi retirado na 3ª revisão)_ |
 | Publicação ressuscitando | binar um desafio agora também despublica (`unpublishResults`), então restaurar não devolve a URL pública antiga |
 | Grupo binado órfão | a exclusão de conta passa a varrer também os grupos que já estavam na lixeira do dono (purga ou transfere) |
 | Cota de participantes | `assertUnderMembershipCap` ignora grupos binados — ninguém fica preso numa cota por um grupo que está na lixeira |
@@ -125,6 +125,26 @@ integração + 114 unitários**.
 | Migração 0034 | o backfill distingue registro removido à mão de registro varrido junto com o item (só o primeiro vira `trash_items`) |
 | Comentários públicos | a seleção de comentários na admin traz aviso de privacidade antes de publicar texto de terceiros |
 | Importação JSON no wizard | `parseJsonItemsPaste` deixou de engolir entradas inválidas, repetidas e chaves desconhecidas: devolve um resumo (`total/added/invalid/duplicates/unknownKeys`) que o wizard mostra, como o importador pós-criação já fazia |
+
+### 3ª revisão — redefinição de senha retirada (2026-09-06)
+
+Sem vincular um provedor de e-mail não há como entregar o link de redefinição, e
+e-mail está fora do escopo da V1 (`ROADMAP.md` §1). Decisão: retirar todo o fluxo
+visível, temporariamente.
+
+| O que saiu | Detalhe |
+| --- | --- |
+| Tela "Esqueci a senha" | `AuthScreen` perdeu o modo `forgot`; `app/goa/screens/reset-password.tsx` apagada; `Screen` não tem mais `kind:"reset"`; `navigation.ts` não lê mais `?reset=` |
+| Rotas | `POST /api/auth/forgot` e `POST /api/auth/reset` respondem `404` para todo mundo (não `401`) |
+| `/admin` | sumiu o indicador "reset pedido" e o campo `pendingReset` de `GET /api/admin/users` |
+| Textos | o aviso do e-mail no cadastro virou "as opções de redefinição de senha chegam em breve" / "password reset options are coming soon"; namespace i18n `resetPassword` + `auth.forgot` removidos dos dois catálogos |
+| Script de operador | `scripts/reset-password.mjs` apagado |
+| Mantido | cadastro ainda aceita e-mail opcional (só login); troca de senha autenticada em `PATCH /api/account`; tabela `password_reset_tokens` fica no banco, **dormente**, sem migração — religar é mudança só de código |
+
+Testes: o antigo teste 9 virou "e-mail, login por e-mail e edição de conta" (sem
+o trecho de reset) e a asserção da onda E virou "não há redefinição de senha por
+link — nem pública, nem pelo `/admin`" (as três rotas dão `404`). **114 unit + 84
+integração, build verde.**
 
 **Adiado para pós-lançamento (o roadmap já estaciona estes):** afinidade
 composta / "perfil de gosto relativo" (§10 "entra no final da V1"); autor e
@@ -165,11 +185,12 @@ API existe.
   não substitui uso real.
 
 Documentação alinhada: `docs/api.md` (rotas de lixeira/conta, `system-audit`, sem
-lixeira global e sem `reset-link` no `/admin`, receitas criáveis, CSV como única
-resposta não-JSON); `README.md` (receitas criáveis, poderes do `platform_admin`,
-seção "Recuperação de senha"); `ROADMAP.md` §13 e a linha do P1 de privacidade
-(os "30 dias" e a purga automática do texto original foram substituídos pela
-lixeira permanente); este arquivo.
+lixeira global no `/admin`, sem `/api/auth/forgot|reset`, receitas criáveis, CSV
+como única resposta não-JSON); `README.md` (receitas criáveis, poderes do
+`platform_admin`, seção "Recuperação de senha" = fora do ar); `docs/architecture.md`
+(identidade sem redefinição por link); `ROADMAP.md` §13 e a linha do P1 de
+privacidade (os "30 dias" e a purga automática do texto original foram
+substituídos pela lixeira permanente); este arquivo.
 
 ---
 
