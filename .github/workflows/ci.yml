@@ -22,11 +22,14 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run test:unit
-      - run: node --test tests/rendered-html.test.mjs
       - run: npm run build
         env:
           # `next build` reads env files if present; none exist in CI, and every
           # route is `force-dynamic`, so no database is needed here.
+          NEXT_TELEMETRY_DISABLED: "1"
+      # Needs the production `.next` output from the build above.
+      - run: node --test tests/rendered-html.test.mjs
+        env:
           NEXT_TELEMETRY_DISABLED: "1"
 
   integration:
