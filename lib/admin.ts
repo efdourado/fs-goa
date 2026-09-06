@@ -76,17 +76,13 @@ export async function adminUsers() {
       last_seen_at: Date | null;
       groups_owned: number;
       active_sessions: number;
-      pending_reset_expires_at: Date | null;
     }>(
       `SELECT u.id, u.display_name, u.username, u.email, u.created_at, u.disabled_at, u.deactivated_at, u.deleted_at, u.platform_admin,
               (SELECT max(s.last_seen_at) FROM sessions s WHERE s.user_id = u.id) AS last_seen_at,
               (SELECT count(*)::int FROM groups g
                 WHERE g.owner_user_id = u.id AND g.kind = 'standard' AND g.deleted_at IS NULL) AS groups_owned,
               (SELECT count(*)::int FROM sessions s
-                WHERE s.user_id = u.id AND s.revoked_at IS NULL AND s.expires_at > now()) AS active_sessions,
-              (SELECT max(prt.expires_at) FROM password_reset_tokens prt
-                WHERE prt.user_id = u.id AND prt.used_at IS NULL AND prt.expires_at > now())
-                AS pending_reset_expires_at
+                WHERE s.user_id = u.id AND s.revoked_at IS NULL AND s.expires_at > now()) AS active_sessions
          FROM users u
         ORDER BY u.created_at DESC
         LIMIT 200`,
@@ -105,26 +101,22 @@ export async function adminUsers() {
         lastSeenAt: user.last_seen_at ? user.last_seen_at.toISOString() : null,
         groupsOwned: user.groups_owned,
         activeSessions: user.active_sessions,
-        pendingReset: user.pending_reset_expires_at
-          ? { expiresAt: user.pending_reset_expires_at.toISOString() }
-          : null,
       })),
     };
   });
 }
 
 /*
- * There is deliberately **no** admin-issued password-reset link.
+ * `/admin` has no password-reset control at all.
  *
- * Any "the user must have asked first" guard is circular: the admin sees the
- * e-mail in this very console, can call the public `/api/auth/forgot` with it,
- * and so manufacture the request they were supposed to be fulfilling. Handing
- * them the raw token after that is account takeover, which would flatly
- * contradict ROADMAP §14 ("o administrador não deve acessar conteúdo privado").
- *
- * Until a delivery channel exists (e-mail is out of scope for V1, §1), recovery
- * is an **operator** action, not a product one: `node scripts/reset-password.mjs`
- * needs `DATABASE_URL`, which holding the `platform_admin` flag does not grant.
+ * An admin-issued link is account takeover: the admin sees the e-mail in this
+ * very console and could manufacture any "the user asked first" proof, which
+ * contradicts ROADMAP §14 ("o administrador não deve acessar conteúdo privado").
+ * A self-service flow needs an e-mail channel to deliver the link, and that is
+ * out of scope for V1 (§1). So the whole visible flow — the "forgot password"
+ * screen, `/api/auth/forgot`, `/api/auth/reset` and the pending-request
+ * indicator that used to live here — was withdrawn on 2026-09-06 until an
+ * e-mail provider is wired up. The `password_reset_tokens` table stays, dormant.
  */
 
 export async function adminAudit(query: URLSearchParams) {

@@ -54,8 +54,6 @@ const DUMMY_PASSWORD_HASH =
 const SESSION_LIFETIME_MS = SESSION_COOKIE_MAX_AGE_SECONDS * 1_000;
 const LOGIN_WINDOW_MS = 15 * 60 * 1_000;
 const LOGIN_MAX_FAILURES = 10;
-const PASSWORD_RESET_TTL_MS = 60 * 60 * 1_000;
-const PASSWORD_RESET_MIN_INTERVAL_MS = 60 * 1_000;
 
 /** Login accepts a username or an e-mail — resolve which, and how to normalize it. */
 function resolveIdentifier(raw: unknown): { column: "username_normalized" | "email_normalized"; value: string } {
@@ -234,117 +232,14 @@ export async function loginAccount(body: Record<string, unknown>): Promise<{
   });
 }
 
-/**
- * Invalidates any pending reset token for the user and mints a fresh one.
- * Only the hash is stored — the returned raw token lives only in the reset link.
- */
-export async function mintResetToken(
-  client: PoolClient,
-  userId: string,
-  options: { throttle?: boolean } = {},
-): Promise<{ rawToken: string; expiresAt: Date }> {
-  if (options.throttle !== false) {
-    const recent = await oneOrNull<{ created_at: Date }>(
-      client,
-      `SELECT created_at FROM password_reset_tokens
-        WHERE user_id = $1 AND used_at IS NULL AND expires_at > now()
-        ORDER BY created_at DESC LIMIT 1`,
-      [userId],
-    );
-    if (recent && Date.now() - recent.created_at.getTime() < PASSWORD_RESET_MIN_INTERVAL_MS) {
-      throw new ApiError(429, "reset_throttled", "Aguarde um minuto antes de pedir outro link.");
-    }
-  }
-  await client.query(
-    "UPDATE password_reset_tokens SET used_at = now() WHERE user_id = $1 AND used_at IS NULL",
-    [userId],
-  );
-  const rawToken = generateOpaqueToken();
-  const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MS);
-  await client.query(
-    `INSERT INTO password_reset_tokens (id, user_id, token_hash, created_at, expires_at)
-     VALUES ($1, $2, $3, now(), $4)`,
-    [crypto.randomUUID(), userId, await hashToken(rawToken), expiresAt],
-  );
-  return { rawToken, expiresAt };
-}
-
-/** Records that a user wants to reset. Always resolves — never leaks existence. */
-export async function requestPasswordReset(body: Record<string, unknown>): Promise<{ ok: true }> {
-  const { normalized } = normalizeEmail(body.email);
-  if (normalized) {
-    await inTransaction(async (client) => {
-      const user = await oneOrNull<{ id: string }>(
-        client,
-        "SELECT id FROM users WHERE email_normalized = $1 AND disabled_at IS NULL",
-        [normalized],
-      );
-      if (user) {
-        try {
-          await mintResetToken(client, user.id);
-        } catch (error) {
-          if (!(error instanceof ApiError && error.code === "reset_throttled")) throw error;
-        }
-      }
-    });
-  }
-  return { ok: true };
-}
-
-export async function resetPassword(body: Record<string, unknown>): Promise<{
-  user: AuthenticatedUser;
-  csrfToken: string;
-  setCookie: string;
-}> {
-  const token = typeof body.token === "string" ? body.token : "";
-  let tokenHash: string;
-  try {
-    tokenHash = await hashToken(token);
-  } catch {
-    throw new ApiError(400, "invalid_reset_token", "Link de redefinição inválido ou expirado.");
-  }
-  let passwordHash: string;
-  try {
-    passwordHash = await hashPassword(body.password);
-  } catch {
-    throw new ApiError(400, "invalid_password", "A senha precisa ter ao menos 10 caracteres.");
-  }
-
-  return inTransaction(async (client) => {
-    const row = await oneOrNull<{ id: string; user_id: string }>(
-      client,
-      `SELECT id, user_id FROM password_reset_tokens
-        WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now()
-        FOR UPDATE`,
-      [tokenHash],
-    );
-    if (!row) throw new ApiError(400, "invalid_reset_token", "Link de redefinição inválido ou expirado.");
-
-    await client.query(
-      "UPDATE users SET password_hash = $2, password_changed_at = now(), updated_at = now() WHERE id = $1",
-      [row.user_id, passwordHash],
-    );
-    await client.query("UPDATE password_reset_tokens SET used_at = now() WHERE id = $1", [row.id]);
-    await client.query(
-      "UPDATE sessions SET revoked_at = now(), revoke_reason = 'password_reset' WHERE user_id = $1 AND revoked_at IS NULL",
-      [row.user_id],
-    );
-    const account = await oneOrNull<UserRow>(
-      client,
-      `SELECT id, display_name, username, email, password_hash, platform_admin
-         FROM users WHERE id = $1`,
-      [row.user_id],
-    );
-    if (!account) throw new Error("User row vanished during password reset.");
-    console.warn("auth.reset", { userId: row.user_id });
-    const session = await createSession(client, row.user_id);
-    return {
-      user: publicUser(account),
-      csrfToken: await deriveCsrfToken(session.rawToken),
-      setCookie: serializeSessionCookie(session.rawToken),
-    };
-  });
-}
+// Self-service password reset is on hold for V1: it needs an e-mail channel to
+// deliver the link, and linking a mail provider is out of scope (ROADMAP §1).
+// The whole visible flow — the "forgot password" screen, `/api/auth/forgot`,
+// `/api/auth/reset`, the pending-request indicator in `/admin` and the operator
+// script — was removed on 2026-09-06. The `password_reset_tokens` table is left
+// in place, dormant, so switching the flow back on later is a code change only.
+// Authenticated password change (`updateAccount` below, with the current
+// password) is unaffected.
 
 export async function updateAccount(
   session: SessionContext,

@@ -1181,7 +1181,7 @@ test("área de administração: acesso, painel agregado e contas (sem lixeira gl
   assert.equal(selfDisable.response.status, 400, "admin não desativa a própria conta");
 });
 
-test("e-mail, login por e-mail, conta e redefinição de senha", async () => {
+test("e-mail, login por e-mail e edição de conta", async () => {
   const admin = await register("Suporte", "suporte_admin");
   await adminPool.query("UPDATE users SET platform_admin = true WHERE id = $1", [admin.user.id]);
   const adminSession = await login("suporte_admin");
@@ -1202,41 +1202,19 @@ test("e-mail, login por e-mail, conta e redefinição de senha", async () => {
 
   // login works by e-mail (case-insensitive) and by username
   assert.equal((await call("POST", "/api/auth/login", { body: { username: "CARLA@example.com", password: "uma senha segura 123" } })).response.status, 200, "login por e-mail");
-  assert.equal((await call("POST", "/api/auth/login", { body: { username: "carla_email", password: "uma senha segura 123" } })).response.status, 200, "login por usuário");
+  const relog = await call("POST", "/api/auth/login", { body: { username: "carla_email", password: "uma senha segura 123" } });
+  assert.equal(relog.response.status, 200, "login por usuário");
 
-  // forgot -> pending flag in admin. The admin can see that someone is locked
-  // out but has NO way to mint the link: that would be account takeover
-  // (ROADMAP §14). Delivery is an operator action until e-mail exists.
-  assert.equal((await call("POST", "/api/auth/forgot", { body: { email: "carla@example.com" } })).response.status, 202);
+  // Self-service password reset is withdrawn until there is an e-mail channel to
+  // deliver the link (ROADMAP §1). The routes simply do not exist.
+  assert.equal((await call("POST", "/api/auth/forgot", { body: { email: "carla@example.com" } })).response.status, 404, "sem rota de 'esqueci a senha'");
+  assert.equal((await call("POST", "/api/auth/reset", { body: { token: "x".repeat(43), password: "nova senha bem forte 9" } })).response.status, 404, "sem rota de redefinição");
   const users = await call("GET", "/api/admin/users", { session: adminSession });
-  const carlaRow = (users.body as { users: Array<{ username: string; pendingReset: unknown }> }).users.find((u) => u.username === "carla_email");
-  assert.ok(carlaRow?.pendingReset, "reset pendente aparece no painel");
-  const carlaId = (users.body as { users: Array<{ id: string; username: string }> }).users.find((u) => u.username === "carla_email")!.id;
-  assert.equal(
-    (await call("POST", "/api/admin/users/reset-link", { session: adminSession, body: { userId: carlaId } })).response.status,
-    404,
-    "o /admin não cunha link de redefinição para ninguém",
+  assert.ok(
+    !("pendingReset" in ((users.body as { users: Array<Record<string, unknown>> }).users[0] ?? {})),
+    "o painel não expõe mais um indicador de reset pendente",
   );
 
-  // O fluxo de redefinição em si continua correto — o token chega por fora.
-  const { mintResetToken } = await import("../../lib/auth");
-  const minter = await adminPool.connect();
-  let token: string;
-  try {
-    token = (await mintResetToken(minter, carlaId, { throttle: false })).rawToken;
-  } finally {
-    minter.release();
-  }
-  assert.ok(token.length >= 40);
-
-  // reset sets a new password, kills old sessions, auto-logs-in
-  const reset = await call("POST", "/api/auth/reset", { body: { token, password: "nova senha bem forte 9" } });
-  assert.equal(reset.response.status, 200, JSON.stringify(reset.body));
-  assert.match(reset.response.headers.get("set-cookie") ?? "", /__Host-goa_session=/);
-  assert.equal((await call("POST", "/api/auth/login", { body: { username: "carla_email", password: "uma senha segura 123" } })).response.status, 401, "senha antiga não vale mais");
-  const relog = await call("POST", "/api/auth/login", { body: { username: "carla_email", password: "nova senha bem forte 9" } });
-  assert.equal(relog.response.status, 200);
-  assert.equal((await call("POST", "/api/auth/reset", { body: { token, password: "outra senha qualquer 1" } })).response.status, 400, "token de uso único não repete");
   const carla: ClientSession = {
     cookie: (relog.response.headers.get("set-cookie") ?? "").split(";", 1)[0],
     csrf: (relog.body as { csrfToken: string }).csrfToken,
@@ -1255,7 +1233,7 @@ test("e-mail, login por e-mail, conta e redefinição de senha", async () => {
 
   // admin promove e rebaixa outra conta pela API
   async function carlaSession(): Promise<ClientSession> {
-    const r = await call("POST", "/api/auth/login", { body: { username: "carla_email", password: "nova senha bem forte 9" } });
+    const r = await call("POST", "/api/auth/login", { body: { username: "carla_email", password: "uma senha segura 123" } });
     assert.equal(r.response.status, 200, JSON.stringify(r.body));
     return { cookie: (r.response.headers.get("set-cookie") ?? "").split(";", 1)[0], csrf: (r.body as { csrfToken: string }).csrfToken, user: (r.body as { user: ClientSession["user"] }).user };
   }
@@ -4947,26 +4925,29 @@ test("E: conta desativada não lê dados privados por GET; admin desativado perd
   assert.equal((await call("GET", "/api/admin/overview", { session: adminRelog })).response.status, 404, "admin desativado não abre o console");
 });
 
-test("E: o /admin não tem geração de link de redefinição — nem com pedido do usuário", async () => {
+test("E: não há redefinição de senha por link — nem pública, nem pelo /admin", async () => {
   const admin = await register("E Suporte", "e_suporte_reset");
   await adminPool.query("UPDATE users SET platform_admin = true WHERE id = $1", [admin.user.id]);
   const adminSession = await login("e_suporte_reset");
   const userReg = await call("POST", "/api/auth/register", { body: { name: "E Usuário", username: "e_usuario_reset", password: "uma senha segura 123", email: "e_usuario_reset@example.com" } });
   const userId = (userReg.body as { user: { id: string } }).user.id;
 
-  // Exigir "a pessoa pediu antes" seria circular: o admin vê o e-mail no painel
-  // e pode chamar /auth/forgot sozinho. A rota simplesmente não existe.
-  await call("POST", "/api/auth/forgot", { body: { email: "e_usuario_reset@example.com" } });
-  assert.equal(
-    (await call("POST", "/api/admin/users/reset-link", { session: adminSession, body: { userId } })).response.status,
-    404,
-    "mesmo com pedido recente, o admin não obtém o token",
-  );
-  // O sinal de suporte continua: o painel mostra que a pessoa está travada.
+  // Um link emitido pelo admin seria assumir a conta (o admin vê o e-mail aqui e
+  // fabricaria qualquer "a pessoa pediu"); um fluxo público precisa de e-mail
+  // para entregar o link, e e-mail está fora do escopo da V1. Nenhuma das rotas
+  // existe.
+  for (const path of ["/api/auth/forgot", "/api/auth/reset", "/api/admin/users/reset-link"]) {
+    assert.equal(
+      (await call("POST", path, { session: adminSession, body: { email: "e_usuario_reset@example.com", userId, token: "x".repeat(43), password: "outra senha bem forte 1" } })).response.status,
+      404,
+      `${path} não existe`,
+    );
+  }
+  // E o painel não expõe mais nenhum indicador de "reset pedido".
   const users = (await call("GET", "/api/admin/users", { session: adminSession })).body as {
-    users: Array<{ id: string; pendingReset: unknown }>;
+    users: Array<Record<string, unknown>>;
   };
-  assert.ok(users.users.find((u) => u.id === userId)?.pendingReset, "o painel ainda mostra quem pediu ajuda");
+  assert.ok(users.users.every((u) => !("pendingReset" in u)), "sem indicador de reset no /admin");
 });
 
 test("E: a publicação nominal não expõe ids internos de participante", async () => {
@@ -4999,7 +4980,7 @@ test("E: a publicação nominal não expõe ids internos de participante", async
   assert.match(dump, /E Bela Pub/, "mas o nome de quem consentiu aparece");
 });
 
-// ── Segunda revisão — P0 do reset e P1 de ciclo de vida ─────────────────
+// ── Segunda revisão — ciclo de vida (binar/restaurar, conta, cota) ──────
 
 test("R2: binar um desafio derruba a vitrine, e restaurar NÃO ressuscita o link antigo", async () => {
   const owner = await register("R2 Pub", "r2_pub_ressuscita");

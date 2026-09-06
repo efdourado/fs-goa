@@ -23,9 +23,6 @@ function decoded(value: string | undefined): string | null {
 
 export function screenFromUrl(pathname: string, search = ""): Screen | null {
   const params = new URLSearchParams(search);
-  const resetToken = params.get("reset");
-  if (resetToken) return { kind: "reset", token: resetToken };
-
   const queryInvite = params.get("invite");
   if (queryInvite) return { kind: "invite", token: queryInvite };
 
@@ -128,8 +125,6 @@ export function urlForScreen(screen: Screen): string | null {
       return screen.invitation.challengeId
         ? `/challenges/${encodeURIComponent(screen.invitation.challengeId)}`
         : `/groups/${encodeURIComponent(screen.invitation.groupId)}`;
-    case "reset":
-      return `/?reset=${encodeURIComponent(screen.token)}`;
     case "account":
     case "account-deactivated":
     case "auth":

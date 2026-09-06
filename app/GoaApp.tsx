@@ -27,7 +27,6 @@ import { PersonalCatalogScreen } from "./goa/screens/personal-catalog";
 import { PersonalSpaceScreen } from "./goa/screens/personal-space";
 import { PersonalTrashScreen } from "./goa/screens/personal-trash";
 import { TrashView } from "./goa/trash-view";
-import { ResetPasswordScreen } from "./goa/screens/reset-password";
 import { TemplateDetailScreen, TemplatesScreen } from "./goa/screens/templates";
 import { screenFromUrl, urlForScreen } from "./goa/navigation";
 import type {
@@ -68,22 +67,19 @@ export default function GoaApp() {
   useEffect(() => {
     const controller = new AbortController();
     let active = true;
-    const params = new URLSearchParams(window.location.search);
-    const resetToken = params.get("reset");
-    const queryToken = params.get("invite");
+    const queryToken = new URLSearchParams(window.location.search).get("invite");
     const pathMatch = window.location.pathname.match(/\/invites?\/([^/]+)/);
     const inviteToken = queryToken || (pathMatch ? decodeURIComponent(pathMatch[1]) : null);
     const routed = screenFromUrl(window.location.pathname, window.location.search);
 
     const PUBLIC_KINDS = new Set<Screen["kind"]>(["templates", "template", "about"]);
     const resolveScreen = (data: BootstrapData): Screen => {
-      if (resetToken) return { kind: "reset", token: resetToken };
       if (inviteToken) return { kind: "invite", token: inviteToken };
       // A public page (gallery, template, about) opens for a logged-out visitor
       // straight from its URL — the session check comes after.
       if (routed && PUBLIC_KINDS.has(routed.kind)) return routed;
       if (!data.user) return { kind: "auth", mode: "login" };
-      return routed && routed.kind !== "invite" && routed.kind !== "reset" ? routed : { kind: "dashboard" };
+      return routed && routed.kind !== "invite" ? routed : { kind: "dashboard" };
     };
 
     // Paint from the last known bootstrap so the first screen is instant, then
@@ -108,7 +104,7 @@ export default function GoaApp() {
         writeCache(CACHE_KEYS.bootstrap, data);
         if (inviteToken) setPendingInviteToken(inviteToken);
         setBootstrap(data);
-        if (!data.user && !resetToken && !inviteToken && routed && routed.kind !== "dashboard") {
+        if (!data.user && !inviteToken && routed && routed.kind !== "dashboard") {
           setPendingRoute(routed);
         }
         setScreen(resolveScreen(data));
@@ -232,16 +228,6 @@ export default function GoaApp() {
     setResumeTemplateCopy(null);
     setScreen({ kind: "auth", mode: "login" });
     if (data.user) throw new Error(t("sessionNotEnded"));
-  }
-
-  async function forgotPassword(email: string) {
-    await apiRequest(API_PATHS.auth.forgot, { method: "POST", body: { email }, csrfToken: bootstrap?.csrfToken });
-  }
-
-  async function completeReset() {
-    window.history.replaceState({}, "", window.location.pathname);
-    const data = await refreshBootstrap();
-    setScreen(data.user ? { kind: "dashboard" } : { kind: "auth", mode: "login" });
   }
 
   async function saveAccount(payload: Record<string, unknown>) {
@@ -512,10 +498,6 @@ export default function GoaApp() {
   }
   if (!bootstrap || screen.kind === "loading") return <LoadingView />;
 
-  if (screen.kind === "reset") {
-    return <ResetPasswordScreen token={screen.token} onDone={completeReset} onCancel={() => { window.history.replaceState({}, "", window.location.pathname); setScreen({ kind: "auth", mode: "login" }); }} />;
-  }
-
   if (!bootstrap.user) {
     if (screen.kind === "invite") {
       return <InviteScreen token={screen.token} user={null} csrfToken={bootstrap.csrfToken} onBack={() => setScreen({ kind: "auth", mode: "login" })} onNeedAuth={() => setScreen({ kind: "auth", mode: "login" })} onAccepted={async () => undefined} />;
@@ -529,7 +511,7 @@ export default function GoaApp() {
     if (screen.kind === "about") {
       return <AboutScreen onBack={() => setScreen({ kind: "auth", mode: "login" })} />;
     }
-    return <AuthScreen initialMode={screen.kind === "auth" ? screen.mode : "login"} invitePending={Boolean(pendingInviteToken)} onAuthenticated={authenticate} onForgot={forgotPassword} onShowInvite={pendingInviteToken ? () => setScreen({ kind: "invite", token: pendingInviteToken }) : undefined} onShowTemplates={() => setScreen({ kind: "templates" })} />;
+    return <AuthScreen initialMode={screen.kind === "auth" ? screen.mode : "login"} invitePending={Boolean(pendingInviteToken)} onAuthenticated={authenticate} onShowInvite={pendingInviteToken ? () => setScreen({ kind: "invite", token: pendingInviteToken }) : undefined} onShowTemplates={() => setScreen({ kind: "templates" })} />;
   }
 
   const user = bootstrap.user;

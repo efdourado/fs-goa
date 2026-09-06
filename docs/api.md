@@ -22,7 +22,7 @@ Toda resposta é `no-store` com `x-content-type-options: nosniff` e
 
 | Rota | Acesso | O que é |
 | --- | --- | --- |
-| `GET /` | público | SPA (`app/GoaApp.tsx`). `?invite=<token>` abre um convite; `?reset=<token>` abre a criação de nova senha |
+| `GET /` | público | SPA (`app/GoaApp.tsx`). `?invite=<token>` abre um convite |
 | `GET /admin` | admin | Console privado do desenvolvedor (`app/admin/`). Componente de servidor: sem `platform_admin` responde `notFound()` |
 | `GET /results/[token]` | público (por token) | Vitrine pública de um desafio encerrado; o banco guarda só o hash do token |
 
@@ -40,13 +40,17 @@ Toda resposta é `no-store` com `x-content-type-options: nosniff` e
 | `POST /api/auth/register` | origem | `{ name, username, password, email? }` | `201 { user, csrfToken }` + `Set-Cookie`. `409 username_taken` / `409 email_taken` |
 | `POST /api/auth/login` | origem | `{ username, password }` — `username` aceita nome de usuário **ou** e-mail | `200 { user, csrfToken }` + `Set-Cookie`. `401 invalid_credentials`, `429 login_limited` |
 | `POST /api/auth/logout` | sessão+csrf | — | `200 { ok }` + cookie limpo; revoga a sessão atual |
-| `POST /api/auth/forgot` | origem | `{ email }` | `202 { ok }` **sempre** (não revela se a conta existe). Registra o pedido; o admin gera o link em `/admin` |
-| `POST /api/auth/reset` | origem | `{ token, password }` | `200 { user, csrfToken }` + `Set-Cookie` (login automático). Marca o token usado e revoga todas as sessões antigas da conta. `400 invalid_reset_token` |
 | `PATCH /api/account` | sessão+csrf | `{ name?, currentPassword?, newPassword? }` | `200 { user }`. Só o nome e a senha são editáveis; passar `email` ou `username` dá `403 email_locked` / `403 username_locked`. Trocar a senha exige `currentPassword` e revoga as outras sessões |
 | `POST /api/account/deactivate` | sessão+csrf | `{}` | `200 { ok }` + cookie limpo — reversível; revoga sessões, o conteúdo fica. Relogar cai na tela de reativação; toda mutação responde `403 account_deactivated` |
 | `POST /api/account/reactivate` | sessão+csrf | `{}` | `200 { user }` — limpa `deactivated_at` |
 | `GET /api/account/deletion-preview` | sessão | — | `{ ownedGroups[], memberships, publishedChallenges }` — o que a exclusão permanente vai fazer |
 | `POST /api/account/delete` | sessão+csrf | `{ password }` | `200 { ok }` + cookie limpo — **irreversível**. Apaga de vez espaço pessoal e grupos solo; transfere grupos compartilhados; anonimiza contribuições; despublica vitrines; `403 invalid_password` |
+
+Não há redefinição de senha por link. `POST /api/auth/forgot` e
+`POST /api/auth/reset` foram retirados (respondem `404`) até existir um canal de
+e-mail para entregar o link — e-mail está fora do escopo da V1 (`ROADMAP.md` §1).
+Quem está logado troca a senha em `PATCH /api/account` com a senha atual. A
+tabela `password_reset_tokens` fica no banco, dormente.
 
 ## Grupos
 
@@ -156,14 +160,13 @@ Só expõem metadados — nunca o conteúdo de grupos ou desafios.
 | Método · rota | Corpo | Retorna / efeito |
 | --- | --- | --- |
 | `GET /api/admin/overview` | — | contadores agregados de contas/grupos/desafios/registros (e quantos na lixeira, via `trash_items`) + `pg_database_size` e tamanho por tabela |
-| `GET /api/admin/users` | — | por conta: cadastro, última sessão, grupos, sessões ativas, `pendingReset`, `deactivatedAt` |
+| `GET /api/admin/users` | — | por conta: cadastro, última sessão, grupos, sessões ativas, `deactivatedAt` |
 | `GET /api/admin/audit?groupId=&entityId=&limit=` | — | eventos de `audit_events` — só valores **estruturais** (`redactForPlatformAdmin`); linhas de espaço pessoal vêm sem `before`/`after`/ids |
 | `GET /api/admin/system-audit?limit=` | — | rastro operacional de purgas e exclusão de conta: ator, ação, `entityKind`, **hash** do id, contagens — sem conteúdo |
 | `POST /api/admin/users/disable` | `{ userId, disabled }` | liga/desliga `disabled_at`; ao desativar revoga as sessões. Admins e a própria conta são protegidos |
 | `POST /api/admin/users/set-admin` | `{ userId, platformAdmin }` | liga/desliga `platform_admin`. Não permite mudar a própria conta (`400 self_target`) |
 | `POST /api/admin/users/revoke-sessions` | `{ userId }` | revoga todas as sessões ativas da conta |
 
-Não há rota de redefinição de senha no `/admin`: qualquer prova de "o usuário
-pediu" seria fabricável pelo próprio administrador (ele vê o e-mail no painel e
-`/api/auth/forgot` é público). A recuperação assistida é ação de operador —
-`node scripts/reset-password.mjs`, que exige a `DATABASE_URL`.
+O `/admin` não redefine senha e não mostra pedidos de redefinição pendentes: um
+link emitido pelo administrador seria assumir a conta (ele vê o e-mail aqui), e o
+fluxo público depende de um canal de e-mail que a V1 não tem (ver "Contas").

@@ -26,7 +26,7 @@ navegador ──JSON + cookie HTTP-only──▶ Next.js / route handlers ──
 | `app/goa/` | contrato REST (`api.ts`), tipos, telas e componentes |
 | `app/api/[...path]/route.ts` | roteamento HTTP fino; nenhuma decisão de autorização |
 | `app/admin/` | página `/admin` (server component com guarda) + console |
-| `lib/auth.ts` | contas, sessões, rate limit, papéis, redefinição de senha |
+| `lib/auth.ts` | contas, sessões, rate limit, papéis, troca de senha autenticada |
 | `lib/admin.ts` | serviços do `/admin` — só metadados |
 | `lib/security.ts` | PBKDF2, tokens, cookies, origem e CSRF |
 | `lib/goa/domain/` | criação de grupos, convites e desafios |
@@ -199,6 +199,9 @@ Grupo
   comentários, notas, respostas, catálogo privado, snapshots textuais completos.
   Não existe lixeira global — um objeto binado é do dono, para restaurar ou
   destruir; o `/admin` foi removido do poder de purgar conteúdo de terceiros.
+  O `/admin` também **não redefine senha** de ninguém (um link emitido pelo
+  admin seria assumir a conta): a redefinição por link está retirada até haver
+  e-mail, e a tabela `password_reset_tokens` fica dormente.
   `adminAudit` traz eventos de espaço pessoal só como metadado (ator/ação/data),
   com `before`/`after`/`metadata` zerados e sem IDs de conteúdo;
 - visibilidade de registro é por tipo (`visibility_policy`, ver Modelo de
@@ -230,8 +233,9 @@ repositório nem na imagem. A migração usa a URL **direta** do Neon; a aplica�
 - **Persistência** — Postgres + Drizzle; JSONB restrito a metadados e snapshots;
   FKs compostas garantem que participante, campo, item e opção pertençam ao mesmo
   escopo; transações cobrem convite, registro, encerramento e duplicação.
-- **Identidade** — contas com usuário e senha, e-mail opcional (login por ambos;
-  habilita a redefinição por token de uso único). Autorização sempre a partir da
+- **Identidade** — contas com usuário e senha, e-mail opcional (login por ambos).
+  A redefinição de senha por link está retirada até haver e-mail (§1); só a troca
+  autenticada, com a senha atual, funciona. Autorização sempre a partir da
   associação ativa ao grupo. Identidade de terceiros cabe depois sem mudar o
   domínio.
 - **`submission_mode`** — mantido como coluna derivada por compatibilidade com o
