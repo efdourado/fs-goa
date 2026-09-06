@@ -5,6 +5,7 @@ import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "re
 
 import { API_PATHS, apiRequest } from "../api";
 import { useGoaFormat } from "../format";
+import { PagedView, type PagedPage } from "../paged-view";
 import { RuleSectionsView } from "../rules";
 import { LanguageToggle } from "../LanguageToggle";
 import type {
@@ -196,6 +197,91 @@ export function TemplatesScreen({
   return <PublicChrome user={user} onSignIn={onSignIn}>{body}</PublicChrome>;
 }
 
+/** The template's structure — fields, schedule, items, metrics, rules — as flip-through pages. */
+export function TemplateStructure({ template }: { template: TemplateDetail }) {
+  const t = useTranslations("templates");
+  const tm = useTranslations("metrics");
+
+  const pages: PagedPage[] = [];
+
+  if (template.ruleSections.length) {
+    pages.push({ id: "rules", title: t("rulesTitle"), body: <RuleSectionsView rules={template.ruleSections} bare /> });
+  }
+
+  pages.push({
+    id: "fields",
+    title: t("formTitle"),
+    body: template.fields.length ? (
+      <ul className="divide-y divide-[var(--line)] rounded-2xl border border-[var(--line)] bg-[var(--paper)] px-4">
+        {template.fields.map((field, index) => (
+          <li className="flex items-baseline justify-between gap-4 py-3" key={`${field.label}-${index}`}>
+            <span className="text-sm">
+              {field.label}
+              {field.options.length ? <span className="text-[var(--muted)]">{t("fieldOptions", { options: field.options.join(", ") })}</span> : null}
+            </span>
+            <span className="shrink-0 text-xs text-[var(--muted)]">{field.type}{field.required ? t("fieldRequired") : ""}</span>
+          </li>
+        ))}
+      </ul>
+    ) : <p className="text-sm text-[var(--muted)]">{t("noFields")}</p>,
+  });
+
+  if (template.checkpoints.length) {
+    pages.push({
+      id: "schedule",
+      title: t("scheduleTitle"),
+      body: (
+        <div className="space-y-3">
+          <p className="text-xs text-[var(--muted)]">{t("scheduleHint", { count: template.checkpoints.length })}</p>
+          <ol className="grid gap-2 sm:grid-cols-2">
+            {template.checkpoints.map((checkpoint, index) => (
+              <li className="rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4 py-2 text-sm" key={`${checkpoint.title}-${index}`}>
+                <span className="mr-2 tabular-nums text-[var(--muted)]">{index + 1}</span>{checkpoint.title}
+              </li>
+            ))}
+          </ol>
+        </div>
+      ),
+    });
+  }
+
+  if (template.items.length) {
+    pages.push({
+      id: "items",
+      title: t("itemsTitle"),
+      body: (
+        <ol className="grid gap-2 sm:grid-cols-2">
+          {template.items.map((item, index) => (
+            <li className="rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4 py-2 text-sm" key={`${item.title}-${index}`}>
+              <span className="mr-2 tabular-nums text-[var(--muted)]">{index + 1}</span>{item.title}
+              {item.description ? <span className="block text-xs text-[var(--muted)]">{item.description}</span> : null}
+            </li>
+          ))}
+        </ol>
+      ),
+    });
+  }
+
+  if (template.metrics.length) {
+    pages.push({
+      id: "metrics",
+      title: t("metricsTitle"),
+      body: (
+        <ul className="grid gap-2 sm:grid-cols-2">
+          {template.metrics.map((metric, index) => (
+            <li className="rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4 py-3 text-sm" key={`${metric.label}-${index}`}>
+              <strong className="block font-medium">{metric.label}</strong>
+              <span className="text-xs text-[var(--muted)]">{tm(`operationName.${metric.operation}`)}</span>
+            </li>
+          ))}
+        </ul>
+      ),
+    });
+  }
+
+  return <PagedView pages={pages} contentAriaLabel={t("structureAria")} />;
+}
+
 export function TemplateDetailScreen({
   user,
   challengeId,
@@ -216,7 +302,6 @@ export function TemplateDetailScreen({
   autoCopy?: boolean;
 }) {
   const t = useTranslations("templates");
-  const tm = useTranslations("metrics");
   const f = useGoaFormat();
   const [template, setTemplate] = useState<TemplateDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -270,15 +355,25 @@ export function TemplateDetailScreen({
   }
 
   const body = (
-    <main className="mx-auto max-w-3xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
+    <main className="mx-auto max-w-4xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
       <button className={cx(backLinkClass, "mb-6")} type="button" onClick={onBack}>{t("allTemplates")}</button>
       {error ? <StatusMessage error={error} /> : !template ? (
         <p className="text-sm text-[var(--muted)]" role="status">{t("detailLoading")}</p>
       ) : (
         <>
-          <p className="text-xs font-extrabold text-[var(--muted)]">{t("detailKicker", { mode: t(`mode.${template.submissionMode}`), duration: template.durationDays === null ? t("durationNone") : t("durationDays", { count: template.durationDays }) })}</p>
+          <p className="text-xs font-medium text-[var(--muted)]">{t("detailKicker", { mode: t(`mode.${template.submissionMode}`), duration: template.durationDays === null ? t("durationNone") : t("durationDays", { count: template.durationDays }) })}</p>
           <h1 className="mt-2 text-3xl font-light tracking-[-0.04em] sm:text-4xl">{template.title}</h1>
-          {template.description ? <p className="mt-3 text-sm leading-6 text-[var(--muted)]">{template.description}</p> : null}
+          {template.summary || template.description ? (
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--muted)]">{template.summary ?? template.description}</p>
+          ) : null}
+          <p className="mt-3 text-xs text-[var(--muted)]">
+            {[
+              t("metaFields", { count: template.fields.length }),
+              template.checkpoints.length ? t("metaCheckpoints", { count: template.checkpoints.length }) : null,
+              template.items.length ? t("metaItems", { count: template.items.length }) : null,
+              template.metrics.length ? t("metaMetrics", { count: template.metrics.length }) : null,
+            ].filter(Boolean).join(" • ")}
+          </p>
 
           <div className="mt-6 flex flex-wrap gap-3">
             <Button onClick={() => (user ? setShowCopy((open) => !open) : onSignIn())}>
@@ -305,63 +400,7 @@ export function TemplateDetailScreen({
             </section>
           ) : null}
 
-          {template.ruleSections.length ? <RuleSectionsView rules={template.ruleSections} /> : null}
-
-          <section className="mt-8">
-            <h2 className="text-xl font-light tracking-[-0.03em]">{t("formTitle")}</h2>
-            {template.fields.length ? (
-              <ul className="mt-3 divide-y divide-[var(--line)]">
-                {template.fields.map((field, index) => (
-                  <li className="flex items-baseline justify-between gap-4 py-3" key={`${field.label}-${index}`}>
-                    <span className="text-sm">
-                      {field.label}
-                      {field.options.length ? <span className="text-[var(--muted)]">{t("fieldOptions", { options: field.options.join(", ") })}</span> : null}
-                    </span>
-                    <span className="shrink-0 text-xs text-[var(--muted)]">{field.type}{field.required ? t("fieldRequired") : ""}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : <p className="mt-2 text-sm text-[var(--muted)]">{t("noFields")}</p>}
-          </section>
-
-          {template.checkpoints.length ? (
-            <section className="mt-8">
-              <h2 className="text-xl font-light tracking-[-0.03em]">{t("scheduleTitle")}</h2>
-              <p className="mt-1 text-xs text-[var(--muted)]">{t("scheduleHint", { count: template.checkpoints.length })}</p>
-              <ol className="mt-3 space-y-2">
-                {template.checkpoints.map((checkpoint, index) => (
-                  <li className="text-sm" key={`${checkpoint.title}-${index}`}>
-                    <span className="text-[var(--muted)]">{t("itemIndex", { index: index + 1 })}</span> {checkpoint.title}
-                  </li>
-                ))}
-              </ol>
-            </section>
-          ) : null}
-
-          {template.items.length ? (
-            <section className="mt-8">
-              <h2 className="text-xl font-light tracking-[-0.03em]">{t("itemsTitle")}</h2>
-              <ol className="mt-3 space-y-2">
-                {template.items.map((item, index) => (
-                  <li className="text-sm" key={`${item.title}-${index}`}>
-                    <span className="text-[var(--muted)]">{t("itemIndex", { index: index + 1 })}</span> {item.title}
-                    {item.description ? <span className="text-[var(--muted)]">{t("itemDescription", { description: item.description })}</span> : null}
-                  </li>
-                ))}
-              </ol>
-            </section>
-          ) : null}
-
-          {template.metrics.length ? (
-            <section className="mt-8">
-              <h2 className="text-xl font-light tracking-[-0.03em]">{t("metricsTitle")}</h2>
-              <ul className="mt-3 space-y-1 text-sm">
-                {template.metrics.map((metric, index) => (
-                  <li key={`${metric.label}-${index}`}>{metric.label} <span className="text-[var(--muted)]">{t("metricLine", { operation: tm(`operationName.${metric.operation}`) })}</span></li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
+          <TemplateStructure template={template} />
         </>
       )}
     </main>

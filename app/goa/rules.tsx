@@ -101,13 +101,13 @@ export function RuleSectionsEditor({
   );
 }
 
-export function RuleSectionsView({ rules }: { rules: ChallengeRule[] }) {
+export function RuleSectionsView({ rules, bare = false }: { rules: ChallengeRule[]; bare?: boolean }) {
   const t = useTranslations("rules");
   if (!rules.length) return null;
   return (
-    <section className="mt-5 overflow-hidden rounded-[24px]" aria-labelledby="challenge-rules-title">
-      <h2 className="mt-2 text-2xl font-light tracking-[-0.035em]" id="challenge-rules-title">{t("viewTitle")}</h2>
-      <div className={cx("mt-5 grid gap-3", rules.length > 1 && "md:grid-cols-2")}>
+    <section className={bare ? undefined : "mt-5 overflow-hidden rounded-[24px]"} aria-labelledby={bare ? undefined : "challenge-rules-title"}>
+      {bare ? null : <h2 className="mt-2 text-2xl font-light tracking-[-0.035em]" id="challenge-rules-title">{t("viewTitle")}</h2>}
+      <div className={cx("grid gap-3", !bare && "mt-5", rules.length > 1 && "md:grid-cols-2")}>
         {rules.map((rule, index) => (
           <article className="rounded-2xl border border-[var(--main-line)]/70 bg-[var(--paper)] p-5" key={`${rule.title}-${index}`}>
             <div className="flex items-start gap-3">

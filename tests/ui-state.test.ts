@@ -7,7 +7,8 @@ import { parseJsonItemsPaste } from "../app/goa/cine-items";
 import { ListImportPanel } from "../app/goa/list-import-panel";
 import { RuleSectionsView } from "../app/goa/rules";
 import { DynamicEntryForm, itemEntryTypes, ResultView } from "../app/goa/screens/participant-challenge";
-import type { ChallengeDetail, ChallengeField, ImportPreview } from "../app/goa/types";
+import { TemplateStructure } from "../app/goa/screens/templates";
+import type { ChallengeDetail, ChallengeField, ImportPreview, TemplateDetail } from "../app/goa/types";
 import { AppHeader, ChallengeStatusBadge, SchedulePeriodFields } from "../app/goa/ui";
 import {
   findMissingRequiredField,
@@ -563,4 +564,31 @@ test("colagem JSON do wizard só lança erro quando o texto não é uma lista de
   const { rows, summary } = parseJsonItemsPaste('[{"title":"Duna"}]', new Set(["duna"]));
   assert.equal(rows.length, 0);
   assert.equal(summary.duplicates, 1);
+});
+
+test("detalhe do modelo: estrutura em páginas tituladas, todas no DOM antes do JS", () => {
+  const template = {
+    id: "t1",
+    title: "Cine clube",
+    submissionMode: "item",
+    durationDays: 42,
+    ruleSections: [{ title: "Uma sessão por semana", description: "Sem spoilers no grupo." }],
+    fields: [
+      { label: "Nota", type: "rating", required: true, options: [] },
+      { label: "Comentário", type: "text", required: false, options: [] },
+    ],
+    items: [{ title: "Parasita" }, { title: "Aftersun" }],
+    checkpoints: [{ title: "Semana 1", kind: "week" }, { title: "Semana 2", kind: "week" }],
+    metrics: [{ label: "Nota média", operation: "average", groupBy: "none" }],
+  } as unknown as TemplateDetail;
+
+  const html = renderWithIntl(createElement(TemplateStructure, { template }));
+  // Every page's heading and content is present pre-hydration.
+  for (const heading of ["Regras", "Formulário", "Cronograma", "Itens", "Métricas"]) {
+    assert.match(html, new RegExp(`>${heading}<`), `a página "${heading}" aparece`);
+  }
+  assert.match(html, /Parasita/);
+  assert.match(html, /Semana 1/);
+  assert.match(html, /Nota média/);
+  assert.match(html, /Sem spoilers no grupo\./);
 });
