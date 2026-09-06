@@ -51,6 +51,16 @@ export async function readJsonObject(request: Request): Promise<Record<string, u
   return body as Record<string, unknown>;
 }
 
+/**
+ * Like `readJsonObject`, but a request with no body (a bare DELETE, say) resolves
+ * to `{}` instead of a 415. A malformed body still errors.
+ */
+export async function readOptionalJsonObject(request: Request): Promise<Record<string, unknown>> {
+  const contentType = request.headers.get("content-type")?.toLowerCase() ?? "";
+  if (!contentType.startsWith("application/json")) return {};
+  return readJsonObject(request);
+}
+
 export function stringValue(
   body: Record<string, unknown>,
   key: string,

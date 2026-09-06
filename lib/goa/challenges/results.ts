@@ -964,15 +964,30 @@ export async function curateResults(
     if (access.challenge.status !== "closed") {
       throw new ApiError(409, "challenge_not_closed", "A vitrine só pode ser organizada depois que o desafio é encerrado.");
     }
+    // Changing the anonymisation setting is a privacy decision: a snapshot that
+    // is already public would keep serving the *previous* setting until someone
+    // remembers to republish. Take it down automatically instead — the admin
+    // publishes again when the new draft is ready (ROADMAP §12).
+    let unpublishedForAnon = false;
     if (Object.hasOwn(body, "anonymizeParticipants")) {
-      await client.query("UPDATE challenges SET results_anon = $2, updated_at = now() WHERE id = $1",
-        [challengeId, body.anonymizeParticipants === true]);
+      const nextAnon = body.anonymizeParticipants === true;
+      if (nextAnon !== access.challenge.results_anon) {
+        await client.query("UPDATE challenges SET results_anon = $2, updated_at = now() WHERE id = $1",
+          [challengeId, nextAnon]);
+        if (access.challenge.results_published_at !== null) {
+          await unpublishResults(client, challengeId);
+          await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
+            "results.unpublished", "challenge", challengeId, null, null, { reason: "anonymization_changed" });
+          unpublishedForAnon = true;
+        }
+      }
     }
+    const stillPublished = access.challenge.results_published_at !== null && !unpublishedForAnon;
     if (body.regenerate === true) {
       await generateShowcase(client, challengeId, session.user.id);
       await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
         "results.regenerated", "challenge", challengeId, null, null);
-      return { challengeId, published: access.challenge.results_published_at !== null };
+      return { challengeId, published: stillPublished, unpublished: unpublishedForAnon };
     }
     await client.query("DELETE FROM result_blocks WHERE challenge_id=$1", [challengeId]);
     let position = 0;
@@ -1048,7 +1063,7 @@ export async function curateResults(
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
       "results.draft_saved", "challenge", challengeId, null, null,
       { metricCount: availableMetrics.rows.length, commentCount: comments.length });
-    return { challengeId, published: access.challenge.results_published_at !== null };
+    return { challengeId, published: stillPublished, unpublished: unpublishedForAnon };
   });
 }
 
