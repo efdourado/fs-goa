@@ -595,7 +595,6 @@ function EntryPicker({
  */
 function CheckpointSchedule({ challenge }: { challenge: ChallengeDetail }) {
   const t = useTranslations("participant");
-  const tk = useTranslations("checkpointKind");
   const tp = useTranslations("checkpointPlanner");
   const planned = useMemo(
     () =>
@@ -632,15 +631,14 @@ function CheckpointSchedule({ challenge }: { challenge: ChallengeDetail }) {
               key={cp.id}
             >
               <div className="flex items-center justify-between gap-2">
-                <strong className="text-sm">{cp.title}</strong>
+                <strong className="text-sm">
+                  {cp.title}
+                  {runtime ? <span className="ml-1.5 font-normal text-xs text-[var(--muted)]">· {runtime}</span> : null}
+                </strong>
                 <span className="rounded-full bg-[var(--wash)] px-2 py-0.5 text-[10px] text-[var(--muted)]">
                   {tp(`timeframe.${cp.timeframe ?? "current"}`)}
                 </span>
               </div>
-              <p className="mt-0.5 text-xs text-[var(--muted)]">
-                {tk(cp.kind ?? "session")}
-                {runtime ? ` · ${runtime}` : ""}
-              </p>
               {items.length ? (
                 <ul className="mt-2 space-y-1 text-sm">
                   {items.map((item) => (
