@@ -759,7 +759,9 @@
     "blockHeadline": "Manchete",
     "blockSummary": "Resumo",
     "blockMetric": "Métrica",
-    "blockComment": "Comentário"
+    "blockComment": "Comentário",
+    "removedStructureTitle": "Estrutura removida",
+    "removedStructureBody": "Campos, opções, métricas, checkpoints, itens e registros que saíram deste desafio. Restaure ou apague em definitivo."
   },
   "visibility": {
     "title": "Quem vê estas respostas",

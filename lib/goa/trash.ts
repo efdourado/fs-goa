@@ -288,9 +288,11 @@ async function permanentGuard(client: PoolClient, row: RowContext): Promise<{ co
         : null;
     }
     case "entry":
-      // An entry only reaches the bin from an active round (see deleteEntry);
-      // purging it there never rewrites a closed challenge's memory.
-      return null;
+      // An entry reaches the bin from an active round; once that round closes its
+      // memory is frozen and even a binned entry stays put.
+      return row.challengeStatus === "closed"
+        ? { code: "challenge_closed", message: "Um desafio encerrado congela seus registros." }
+        : null;
     default:
       return null;
   }
@@ -307,8 +309,25 @@ async function parentTrashed(client: PoolClient, row: RowContext): Promise<boole
     return g?.gone ?? true;
   }
   if (row.kind === "field_option" && row.fieldId) {
-    const f = await oneOrNull<{ gone: boolean }>(client, "SELECT (archived_at IS NOT NULL) AS gone FROM challenge_fields WHERE id=$1", [row.fieldId]);
+    // The whole chain: the option's field, and that field's entry type.
+    const f = await oneOrNull<{ gone: boolean }>(client,
+      `SELECT (f.archived_at IS NOT NULL OR et.archived_at IS NOT NULL) AS gone
+         FROM challenge_fields f JOIN entry_types et ON et.id = f.entry_type_id
+        WHERE f.id = $1`, [row.fieldId]);
     if (f?.gone) return true;
+  }
+  if (row.kind === "field") {
+    const et = await oneOrNull<{ gone: boolean }>(client,
+      `SELECT (et.archived_at IS NOT NULL) AS gone
+         FROM challenge_fields f JOIN entry_types et ON et.id = f.entry_type_id WHERE f.id = $1`, [row.id]);
+    if (et?.gone) return true;
+  }
+  if (row.kind === "challenge_item") {
+    // An item pinned to an archived checkpoint would dangle on restore.
+    const cp = await oneOrNull<{ gone: boolean }>(client,
+      `SELECT (cc.archived_at IS NOT NULL) AS gone FROM challenge_items it
+         JOIN challenge_checkpoints cc ON cc.id = it.checkpoint_id WHERE it.id = $1`, [row.id]);
+    if (cp?.gone) return true;
   }
   if (!row.challengeId) return false;
   const c = await oneOrNull<{ gone: boolean }>(client,
@@ -402,13 +421,25 @@ async function applyPurge(client: PoolClient, row: RowContext): Promise<Record<s
       await client.query("DELETE FROM challenge_items WHERE id=$1", [row.id]);
       break;
     case "checkpoint":
+      // Anything the guard let through has no items/entries — but a leftover
+      // challenge_item pointer to this checkpoint would still RESTRICT.
+      await client.query("UPDATE challenge_items SET checkpoint_id=NULL WHERE checkpoint_id=$1", [row.id]);
       await client.query("DELETE FROM challenge_checkpoints WHERE id=$1", [row.id]);
       break;
     case "entry_type":
+      // Metrics, fields and options reference the type (RESTRICT) — archived or
+      // not, they go with it; a type-less challenge_item is left detached.
+      await client.query("DELETE FROM result_blocks WHERE metric_id IN (SELECT id FROM challenge_metrics WHERE entry_type_id=$1)", [row.id]);
+      await client.query("DELETE FROM challenge_metrics WHERE entry_type_id=$1", [row.id]);
+      await client.query("DELETE FROM field_options WHERE field_id IN (SELECT id FROM challenge_fields WHERE entry_type_id=$1)", [row.id]);
       await client.query("DELETE FROM challenge_fields WHERE entry_type_id=$1", [row.id]);
+      await client.query("UPDATE challenge_items SET entry_type_id=NULL WHERE entry_type_id=$1", [row.id]);
       await client.query("DELETE FROM entry_types WHERE id=$1", [row.id]);
       break;
     case "field":
+      // An archived metric can still hold `field_id` (RESTRICT).
+      await client.query("DELETE FROM result_blocks WHERE metric_id IN (SELECT id FROM challenge_metrics WHERE field_id=$1)", [row.id]);
+      await client.query("DELETE FROM challenge_metrics WHERE field_id=$1", [row.id]);
       await client.query("DELETE FROM field_options WHERE field_id=$1", [row.id]);
       await client.query("DELETE FROM challenge_fields WHERE id=$1", [row.id]);
       break;
@@ -617,6 +648,11 @@ export async function restoreTrashItem(session: SessionContext, body: Record<str
     if (CHALLENGE_STRUCTURE.includes(kind as ArchiveKind) && row.challengeStatus === "closed") {
       throw new ApiError(409, "challenge_closed", "Reabra o desafio para restaurar itens da estrutura.");
     }
+    if (kind === "entry" && row.challengeStatus === "closed") {
+      // A closed round's memory is frozen — bringing an entry back would rewrite
+      // its metrics and Wrapped after the fact (ROADMAP §13).
+      throw new ApiError(409, "challenge_closed", "Reabra o desafio ou use a correção administrativa para mexer nos registros.");
+    }
     if (await parentTrashed(client, row)) {
       throw new ApiError(409, "parent_trashed", "Restaure primeiro o item que contém este.");
     }
@@ -636,6 +672,40 @@ export async function restoreTrashItem(session: SessionContext, body: Record<str
         `UPDATE entries SET deleted_at=NULL, updated_at=now()
           WHERE item_id=$1 AND deleted_at IS NOT NULL
             AND id NOT IN (SELECT entity_id FROM trash_items WHERE entity_kind='entry')`, [id]);
+    }
+    if (kind === "catalog_item") {
+      // In a living list the catalogue identity and the list row are one and the
+      // same — restoring the item brings its list row and history back too
+      // (mirror of the cascade in archiveCatalogItemWithClient).
+      const revived = await client.query<{ id: string }>(
+        `UPDATE challenge_items it SET archived_at=NULL, updated_at=now()
+           FROM challenges c, groups g
+          WHERE it.catalog_item_id=$1 AND it.archived_at IS NOT NULL
+            AND c.id=it.challenge_id AND g.id=c.group_id
+            AND g.kind='personal' AND c.start_date IS NULL AND c.end_date IS NULL
+          RETURNING it.id`,
+        [id],
+      );
+      if (revived.rows.length) {
+        await client.query(
+          `UPDATE entries SET deleted_at=NULL, updated_at=now()
+            WHERE item_id = ANY($1::text[]) AND deleted_at IS NOT NULL
+              AND id NOT IN (SELECT entity_id FROM trash_items WHERE entity_kind='entry')`,
+          [revived.rows.map((r) => r.id)],
+        );
+      }
+    }
+    if (kind === "challenge") {
+      // A deleted challenge orphan-archives catalogue items only it referenced;
+      // if the challenge comes back, un-archive the ones it revives that no one
+      // binned on purpose (mirror of archiveOrphanedCatalogItemsForChallenge).
+      await client.query(
+        `UPDATE catalog_items ci SET archived_at=NULL, updated_at=now()
+          WHERE ci.archived_at IS NOT NULL
+            AND EXISTS (SELECT 1 FROM challenge_items it WHERE it.catalog_item_id=ci.id AND it.challenge_id=$1 AND it.archived_at IS NULL)
+            AND NOT EXISTS (SELECT 1 FROM trash_items ti WHERE ti.entity_kind='catalog_item' AND ti.entity_id=ci.id)`,
+        [id],
+      );
     }
     if (isBin) {
       await client.query("DELETE FROM trash_items WHERE entity_kind=$1 AND entity_id=$2", [kind, id]);

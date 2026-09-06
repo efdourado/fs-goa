@@ -11,6 +11,7 @@ import { copyText } from "../clipboard";
 import { cleanFields, FieldBuilder } from "../fields";
 import { ListImportPanel } from "../list-import-panel";
 import { RuleSectionsEditor, visibleRuleSections } from "../rules";
+import { TrashView } from "../trash-view";
 import type {
   AdminTab,
   ChallengeDetail,
@@ -711,12 +712,16 @@ function AdminReview({
   onPatch,
   onDelete,
   onExport,
+  csrfToken,
+  onArchiveChanged,
 }: {
   challenge: ChallengeDetail;
   entries: Entry[];
   onPatch: (entryId: Id, values: Record<Id, unknown>, reason: string) => Promise<void>;
   onDelete: (entryId: Id) => Promise<void>;
   onExport: () => Promise<void>;
+  csrfToken: string;
+  onArchiveChanged: () => void;
 }) {
   const t = useTranslations("adminChallenge");
   const tc = useTranslations("common");
@@ -791,6 +796,14 @@ function AdminReview({
           <div className="mt-4"><StatusMessage error={error} /></div>
         </section>
       ) : null}
+
+      <section className={cx(cardClass, "p-5 sm:p-7")} aria-labelledby="removed-structure-title">
+        <h2 id="removed-structure-title" className="text-xl font-light">{t("removedStructureTitle")}</h2>
+        <p className="mt-1 text-sm text-[var(--muted)]">{t("removedStructureBody")}</p>
+        <div className="mt-4">
+          <TrashView scope={{ challengeId: challenge.id }} csrfToken={csrfToken} onChanged={onArchiveChanged} />
+        </div>
+      </section>
     </div>
   );
 }
@@ -1173,6 +1186,8 @@ export function AdminScreen({
   onPublishResult,
   onUnpublishResult,
   onReorderBlocks,
+  csrfToken,
+  onArchiveChanged,
 }: {
   challenge: ChallengeDetail;
   entries: Entry[];
@@ -1209,6 +1224,8 @@ export function AdminScreen({
   onPublishResult: (payload: Record<string, unknown>) => Promise<{ url?: string | null; publishedAt?: string; anonymized?: boolean } | undefined>;
   onUnpublishResult: () => Promise<void>;
   onReorderBlocks: (blocks: Array<{ id: Id; visible: boolean }>) => Promise<void>;
+  csrfToken: string;
+  onArchiveChanged: () => void;
 }) {
   const t = useTranslations("adminChallenge");
   // The checkpoint planner is for round-item challenges organised into
@@ -1229,7 +1246,7 @@ export function AdminScreen({
       {tab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.visibilityPolicy}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} onSaveVisibility={onSaveEntryTypeVisibility} onSetExpectation={onSetExpectation} /> : null}
       {tab === "items" ? <AdminItems challenge={challenge} group={group} entries={entries} onAdd={onAddItems} onUpdate={onUpdateItem} onArchive={onArchiveItem} onPreviewImport={onPreviewImport} /> : null}
       {tab === "checkpoints" ? <CheckpointPlanner key={`${challenge.id}:${challenge.checkpoints.map((cp) => cp.id).join(",")}`} challenge={challenge} onSaveCheckpoints={onSaveCheckpoints} onAssign={onAssignCheckpointItems} /> : null}
-      {tab === "review" ? <AdminReview challenge={challenge} entries={entries} onPatch={onPatchEntry} onDelete={onDeleteEntry} onExport={onExport} /> : null}
+      {tab === "review" ? <AdminReview challenge={challenge} entries={entries} onPatch={onPatchEntry} onDelete={onDeleteEntry} onExport={onExport} csrfToken={csrfToken} onArchiveChanged={onArchiveChanged} /> : null}
       {tab === "metrics" ? <AdminMetrics challenge={challenge} onAdd={onAddMetric} onUpdate={onUpdateMetric} onDelete={onDeleteMetric} /> : null}
       {tab === "results" ? <AdminResults challenge={challenge} entries={entries} onSave={onSaveResult} onPublish={onPublishResult} onUnpublish={onUnpublishResult} onReorderBlocks={onReorderBlocks} /> : null}
     </main>

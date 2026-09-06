@@ -239,6 +239,13 @@
       "when": 1788580000000,
       "tag": "0033_trash_registry_and_deactivation",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1788590000000,
+      "tag": "0034_backfill_trash_items",
+      "breakpoints": true
     }
   ]
 }
