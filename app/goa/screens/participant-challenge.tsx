@@ -1,6 +1,6 @@
 "use client";
 
-import { useFormatter, useTranslations } from "next-intl";
+import { useFormatter, useLocale, useTranslations } from "next-intl";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { useGoaFormat } from "../format";
@@ -416,8 +416,9 @@ export function ResultView({
   // Only a curated/generated headline — never fall back to the challenge title,
   // which the cover above already shows in full.
   const headline = result?.headline || null;
-  const rankLabels = rankingLabels((key, values) => tr(key, values));
-  const affLabels = affinityLabels((key, values) => tr(key, values));
+  const wrappedLocale = useLocale();
+  const rankLabels = rankingLabels((key, values) => tr(key, values), wrappedLocale);
+  const affLabels = affinityLabels((key, values) => tr(key, values), wrappedLocale);
 
   function metricNode(metric: Metric) {
     return metricTheme(metric) === "ranking" && metric.series?.length

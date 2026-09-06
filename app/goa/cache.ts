@@ -19,12 +19,24 @@ function storage(): Storage | null {
   }
 }
 
+/** Painting private data from a stale cache risks flashing the previous user's
+ *  content on a shared device — only trust an entry written in the last minute;
+ *  older ones still get replaced by the live fetch, just without the instant paint. */
+const MAX_AGE_MS = 60_000;
+
 export function readCache<T>(key: string): T | null {
-  if (memory.has(key)) return memory.get(key) as T;
+  const cached = memory.has(key) ? (memory.get(key) as { at: number; value: T }) : parseStored<T>(key);
+  if (!cached) return null;
+  if (Date.now() - cached.at > MAX_AGE_MS) return null;
+  return cached.value;
+}
+
+function parseStored<T>(key: string): { at: number; value: T } | null {
   const raw = storage()?.getItem(PREFIX + key) ?? null;
   if (!raw) return null;
   try {
-    const parsed = JSON.parse(raw) as T;
+    const parsed = JSON.parse(raw) as { at: number; value: T };
+    if (typeof parsed?.at !== "number") return null;
     memory.set(key, parsed);
     return parsed;
   } catch {
@@ -33,9 +45,10 @@ export function readCache<T>(key: string): T | null {
 }
 
 export function writeCache<T>(key: string, value: T): void {
-  memory.set(key, value);
+  const entry = { at: Date.now(), value };
+  memory.set(key, entry);
   try {
-    storage()?.setItem(PREFIX + key, JSON.stringify(value));
+    storage()?.setItem(PREFIX + key, JSON.stringify(entry));
   } catch {
     // Quota or a disabled store: the in-memory mirror still serves this tab.
   }

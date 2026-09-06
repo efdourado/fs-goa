@@ -22,6 +22,7 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run test:unit
+      - run: node --test tests/rendered-html.test.mjs
       - run: npm run build
         env:
           # `next build` reads env files if present; none exist in CI, and every

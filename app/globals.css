@@ -26,7 +26,8 @@
   color-scheme: light;
 
   --ink: #20241f;
-  --muted: #8a8c84;
+  /* WCAG AA for small text: ≥ 4.5:1 on --paper / --canvas. */
+  --muted: #676960;
   --canvas: #f5f1e8;
   --paper: #fffdf8;
   --line: #e4ded1;

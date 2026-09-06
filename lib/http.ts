@@ -93,7 +93,10 @@ export function notFound(): never {
   throw new ApiError(404, "not_found", "Recurso não encontrado.");
 }
 
-export async function handleApi(work: () => Promise<Response>): Promise<Response> {
+export async function handleApi(
+  work: () => Promise<Response>,
+  request?: Request,
+): Promise<Response> {
   try {
     return await work();
   } catch (error) {
@@ -109,12 +112,23 @@ export async function handleApi(work: () => Promise<Response>): Promise<Response
       return json({ error: "invalid_relation", message: "A operação viola uma regra do domínio." }, 400);
     }
 
+    // A correlatable id the user can quote when reporting a 500; echoed back in
+    // the body and the `x-request-id` header.
+    const requestId = (request?.headers.get("x-request-id") || crypto.randomUUID()).slice(0, 64);
+    let route: string | undefined;
+    try { route = request ? `${request.method} ${new URL(request.url).pathname}` : undefined; } catch { /* ignore */ }
     console.error("Unhandled Goa API error", {
+      requestId,
+      route,
       name: error instanceof Error ? error.name : "unknown",
       message: error instanceof Error ? error.message : String(error),
       pgCode: databaseError?.code,
       constraint: databaseError?.constraint,
     });
-    return json({ error: "internal_error", message: "Não foi possível concluir a operação." }, 500);
+    return json(
+      { error: "internal_error", message: "Não foi possível concluir a operação.", requestId },
+      500,
+      { "x-request-id": requestId },
+    );
   }
 }

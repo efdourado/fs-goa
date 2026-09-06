@@ -86,7 +86,7 @@ export function AuthScreen({
         <Brand />
         <div className="relative z-10 max-w-xl">
           <p className="mb-5 text-xs font-light uppercase tracking-[0.18em] text-white/55">{t("heroKicker")}</p>
-          <h1 className="text-6xl font-medium leading-[0.96] tracking-[-0.06em]">{t("heroTitleLine1")}<br />{t("heroTitleLine2")}</h1>
+          <p className="text-6xl font-medium leading-[0.96] tracking-[-0.06em]">{t("heroTitleLine1")}<br />{t("heroTitleLine2")}</p>
           <p className="mt-6 max-w-lg text-base leading-7 text-white/70">{t("heroBody")}</p>
         </div>
         <p className="text-xs text-white/45">{t("heroFootnote")}</p>
@@ -102,7 +102,7 @@ export function AuthScreen({
               <strong>{t("invitePendingTitle")}</strong>{t("invitePendingBody")}
             </button>
           ) : null}
-          <h2 className="mt-2 text-3xl font-light tracking-[-0.045em]">{heading}</h2>
+          <h1 className="mt-2 text-3xl font-light tracking-[-0.045em]">{heading}</h1>
           <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{subheading}</p>
           {mode !== "forgot" ? (
             <p className="mt-3 rounded-xl bg-[var(--wash)] px-4 py-3 text-xs leading-5 text-[var(--muted)]">{t("reassure")}</p>

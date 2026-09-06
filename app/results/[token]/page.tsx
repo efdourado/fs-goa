@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getFormatter, getTranslations } from "next-intl/server";
+import { getFormatter, getLocale, getTranslations } from "next-intl/server";
 
 import { publicResults } from "@/lib/goa-challenges";
 import { type Formatter, makeGoaFormat, type Translator } from "@/app/goa/format";
@@ -48,8 +48,9 @@ export default async function SharedResultsPage({ params }: { params: Promise<{ 
   const personalRankings = result.personalRankings ?? [];
   const affinity = result.affinity ?? null;
   const ordered = (result.blocks ?? []).filter((block) => block.visible).sort((a, b) => a.position - b.position);
-  const rankLabels = rankingLabels((key, values) => tw(key, values));
-  const affLabels = affinityLabels((key, values) => tw(key, values));
+  const locale = await getLocale();
+  const rankLabels = rankingLabels((key, values) => tw(key, values), locale);
+  const affLabels = affinityLabels((key, values) => tw(key, values), locale);
 
   return (
     <main className="min-h-screen bg-[var(--canvas)] px-4 py-8 text-[var(--ink)] sm:px-6 sm:py-14">

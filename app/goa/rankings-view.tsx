@@ -7,6 +7,7 @@ import type { AffinityBlock, PersonalRanking } from "./types";
  */
 
 interface RankingLabels {
+  locale: string;
   title: string;
   entryCount: string;
   completion: string;
@@ -22,12 +23,13 @@ interface RankingLabels {
   none: string;
 }
 
-function fmt(value: number | null, suffix = ""): string {
-  return value === null ? "—" : `${value.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}${suffix}`;
-}
-function signed(value: number | null): string {
-  if (value === null) return "—";
-  return `${value > 0 ? "+" : ""}${value.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}`;
+/** Number formatters bound to the reader's locale (pt-BR vs en-GB decimal marks). */
+function makeFormatters(locale: string) {
+  const fmt = (value: number | null, suffix = ""): string =>
+    value === null ? "—" : `${value.toLocaleString(locale, { maximumFractionDigits: 2 })}${suffix}`;
+  const signed = (value: number | null): string =>
+    value === null ? "—" : `${value > 0 ? "+" : ""}${value.toLocaleString(locale, { maximumFractionDigits: 2 })}`;
+  return { fmt, signed };
 }
 
 export function PersonalRankingsBlock({
@@ -37,6 +39,7 @@ export function PersonalRankingsBlock({
   rankings: PersonalRanking[];
   labels: RankingLabels;
 }) {
+  const { fmt, signed } = makeFormatters(labels.locale);
   if (!rankings.length) return null;
   return (
     <section>
@@ -97,6 +100,7 @@ export function PersonalRankingsBlock({
 }
 
 interface AffinityLabels {
+  locale: string;
   title: string;
   explanation: string;
   sample: (n: number) => string;
@@ -113,6 +117,7 @@ export function AffinityBlockView({
   affinity: AffinityBlock;
   labels: AffinityLabels;
 }) {
+  const { fmt } = makeFormatters(labels.locale);
   const scored = affinity.pairs.filter((pair) => pair.direct !== null);
   if (!scored.length) {
     return (
