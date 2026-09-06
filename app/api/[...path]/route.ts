@@ -215,7 +215,7 @@ export async function POST(request: Request): Promise<Response> {
       return json({ user: result.user, csrfToken: result.csrfToken }, 200, { "set-cookie": result.setCookie });
     }
     if (isPath(path, "auth", "logout")) {
-      const session = await requireMutationSession(request);
+      const session = await requireMutationSession(request, { allowDeactivated: true });
       return json({ ok: true }, 200, { "set-cookie": await logoutSession(session) });
     }
     if (isPath(path, "auth", "forgot")) {
@@ -252,7 +252,7 @@ export async function POST(request: Request): Promise<Response> {
       return notFound();
     }
 
-    const session = await requireMutationSession(request);
+    const session = await requireMutationSession(request, { allowDeactivated: true });
     const body = await readJsonObject(request);
 
     // Account lifecycle. A deactivated account may only reactivate or log out.

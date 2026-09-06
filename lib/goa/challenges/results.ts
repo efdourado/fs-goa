@@ -1213,35 +1213,47 @@ async function buildPublishedSnapshot(
       .sort((a, b) => (roster.get(a) ?? "").localeCompare(roster.get(b) ?? "", "pt-BR"))
       .map((id, index) => [id, `Participante ${index + 1}`] as const),
   );
-  const nameFor = (id: unknown) =>
+  // The published document never carries a real user id — not even for a
+  // consenting participant in a named publication. Each id becomes an opaque,
+  // per-publication token; the *name* is the only thing that can be shown.
+  const publicKeyCache = new Map<string, string>();
+  const publicKey = async (id: string): Promise<string> => {
+    const cached = publicKeyCache.get(id);
+    if (cached) return cached;
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${challenge.id}:${id}`));
+    const token = "p_" + Array.from(new Uint8Array(digest)).slice(0, 6).map((b) => b.toString(16).padStart(2, "0")).join("");
+    publicKeyCache.set(id, token);
+    return token;
+  };
+  const publicName = (id: unknown) =>
     typeof id === "string" ? labelById.get(id) ?? roster.get(id) ?? "Participante ?" : "Participante ?";
 
   const participantNames = participants.rows.map((row) => labelById.get(row.id) ?? row.display_name);
-  const metrics = metricList.map((metric) => {
+  const metrics = await Promise.all(metricList.map(async (metric) => {
     if (metric?.groupBy !== "participant" || !Array.isArray(metric.series)) return metric;
     return {
       ...metric,
-      series: (metric.series as Array<Record<string, unknown>>).map((row) => {
-        if (typeof row.key !== "string" || !labelById.has(row.key)) return row;
-        return { ...row, key: labelById.get(row.key), label: labelById.get(row.key) };
-      }),
+      series: await Promise.all((metric.series as Array<Record<string, unknown>>).map(async (row) => {
+        if (typeof row.key !== "string") return row;
+        return { ...row, key: await publicKey(row.key), label: publicName(row.key) };
+      })),
     };
-  });
+  }));
   if (Array.isArray(personalRankings)) {
-    personalRankings = (personalRankings as Array<Record<string, unknown>>).map((row) =>
-      typeof row.userId === "string" && labelById.has(row.userId)
-        ? { ...row, userId: labelById.get(row.userId), name: labelById.get(row.userId) }
+    personalRankings = await Promise.all((personalRankings as Array<Record<string, unknown>>).map(async (row) =>
+      typeof row.userId === "string"
+        ? { ...row, userId: await publicKey(row.userId), name: publicName(row.userId) }
         : row,
-    );
+    ));
   }
   if (affinity && Array.isArray((affinity as { pairs?: unknown }).pairs)) {
     affinity = {
       ...(affinity as Record<string, unknown>),
-      pairs: ((affinity as { pairs: Array<{ a: { userId: string }; b: { userId: string } }> }).pairs).map((pair) => ({
+      pairs: await Promise.all(((affinity as { pairs: Array<{ a: { userId: string }; b: { userId: string } }> }).pairs).map(async (pair) => ({
         ...pair,
-        a: { userId: labelById.get(pair.a.userId) ?? pair.a.userId, name: nameFor(pair.a.userId) },
-        b: { userId: labelById.get(pair.b.userId) ?? pair.b.userId, name: nameFor(pair.b.userId) },
-      })),
+        a: { userId: await publicKey(pair.a.userId), name: publicName(pair.a.userId) },
+        b: { userId: await publicKey(pair.b.userId), name: publicName(pair.b.userId) },
+      }))),
     };
   }
 
