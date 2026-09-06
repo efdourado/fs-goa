@@ -13,8 +13,9 @@ const DIMENSION_KEYS: Record<string, string> = {
   duration: "dimDuration",
 };
 
-export function rankingLabels(t: Translator) {
+export function rankingLabels(t: Translator, locale = "pt-BR") {
   return {
+    locale,
     title: t("rankings.title"),
     entryCount: t("rankings.entryCount"),
     completion: t("rankings.completion"),
@@ -31,8 +32,9 @@ export function rankingLabels(t: Translator) {
   };
 }
 
-export function affinityLabels(t: Translator) {
+export function affinityLabels(t: Translator, locale = "pt-BR") {
   return {
+    locale,
     title: t("affinity.title"),
     explanation: t("affinity.explanation"),
     sample: (n: number) => t("affinity.sample", { n }),

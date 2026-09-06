@@ -39,19 +39,36 @@ function PurgeDialog({
   const [confirmation, setConfirmation] = useState("");
   const [reason, setReason] = useState("");
   const closeRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const entries = preview.dependencies.find((dep) => dep.type === "entries")?.count ?? 0;
   const needsReason = preview.kind === "entry";
 
   useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
     closeRef.current?.focus();
-    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape" && !busy) onCancel(); };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !busy) { onCancel(); return; }
+      if (event.key !== "Tab") return;
+      // Keep focus inside the dialog.
+      const focusables = panelRef.current?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+      );
+      if (!focusables || focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      opener?.focus?.();
+    };
   }, [busy, onCancel]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-label={t("purgeTitle")}>
-      <div className={cx(cardClass, "w-full max-w-md p-5 sm:p-6")}>
+      <div ref={panelRef} className={cx(cardClass, "w-full max-w-md p-5 sm:p-6")}>
         <h2 className="text-lg font-light text-[var(--danger)]">{t("purgeTitle")}</h2>
         <p className="mt-2 text-sm text-[var(--muted)]">{t("purgeBody", { label: preview.label })}</p>
 

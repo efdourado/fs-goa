@@ -117,15 +117,34 @@ atributos personalizados na afinidade; percentual de páginas lido; fluxo
 completo de UI para atributos editoriais (criar/mapear-JSON/ver no detalhe) — a
 API existe.
 
-### P2 — em andamento
+### P2 — feito nesta rodada (commit `fix(P2)`)
 
-- contraste do token `--muted` no tema claro; foco preso + fundo inerte no
-  `PurgeDialog`; números de ranking na locale do leitor; `<h1>` visível no login
-  mobile; cache do `sessionStorage` não deve pintar conteúdo do usuário anterior.
-- **fora do escopo de código:** en-GB completo nas mensagens do backend + console
-  `/admin` (precisa de i18n no servidor); testes reais de navegador / axe /
-  Lighthouse; observabilidade além de auditoria (request-id, latência, alertas);
-  garantir que a migração do Neon anteceda o deploy da Vercel.
+- `--muted` do tema claro escurecido para ≥ 4.5:1 em `--paper`/`--canvas`.
+- `PurgeDialog`: foco inicial no botão fechar, **trap de Tab** dentro do painel,
+  Escape, e o foco volta para quem abriu.
+- números de ranking/afinidade usam a locale do leitor (`rankingLabels`/
+  `affinityLabels` recebem `locale`; `pt-BR` vs `en-GB` no separador decimal).
+- login: o `<h1>` do documento agora é o cabeçalho do formulário (visível no
+  mobile); a manchete decorativa do herói virou `<p>`.
+- cache do `sessionStorage`: entradas com mais de 60s não são mais pintadas na
+  hora — o fetch ao vivo ainda as substitui, sem risco de flash do usuário
+  anterior num aparelho compartilhado.
+- 500s trazem um `requestId` correlacionável (corpo + header `x-request-id`),
+  logado com a rota.
+- CI roda `tests/rendered-html.test.mjs`.
+
+### P2 — fora do escopo de código (decisão)
+
+- en-GB completo nas mensagens do backend + console `/admin` — exige i18n no
+  servidor (o roadmap §1 mantém e-mail/integrações fora da V1; i18n de servidor
+  segue a mesma régua).
+- testes reais de navegador / teclado / axe / Lighthouse — precisa de
+  infra nova (Playwright + CI headless).
+- observabilidade de produção (latência agregada, contadores, alertas) — é
+  plataforma, não código de app.
+- garantir que a migração do Neon anteceda o deploy da Vercel — processo de
+  operação; hoje o push dispara a Vercel e a migração é manual (ver memória
+  "Deployment model").
 
 Documentação alinhada nesta rodada: `docs/api.md` (rotas de lixeira/conta,
 `system-audit`, sem lixeira global do `/admin`); `ROADMAP.md` §13; este arquivo.

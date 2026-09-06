@@ -198,7 +198,7 @@ export async function GET(request: Request): Promise<Response> {
       return json(await accountDeletionPreview(await requireSession(request)));
     }
     return notFound();
-  });
+  }, request);
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -374,7 +374,7 @@ export async function POST(request: Request): Promise<Response> {
       return json(await curateResults(session, path[1], body));
     }
     throw new ApiError(404, "not_found", "Rota não encontrada.");
-  });
+  }, request);
 }
 
 export async function PATCH(request: Request): Promise<Response> {
@@ -425,7 +425,7 @@ export async function PATCH(request: Request): Promise<Response> {
       return json(await updateEntry(session, path[1], body));
     }
     return notFound();
-  });
+  }, request);
 }
 
 export async function DELETE(request: Request): Promise<Response> {
@@ -469,5 +469,5 @@ export async function DELETE(request: Request): Promise<Response> {
       return json(await softDeleteChallenge(session, path[1]));
     }
     return notFound();
-  });
+  }, request);
 }
