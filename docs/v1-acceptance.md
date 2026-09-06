@@ -97,42 +97,39 @@ Também nesta rodada: rota da lixeira do grupo (`selectedGroup` não incluía
 administrativa gravado em `system_audit_events`; sair de um grupo binado passou a
 ser possível.
 
-## Pendências antes do beta (backlog P1/P2)
+## Backlog pós-P0 — estado
 
-A revisão listou ~40 itens P1 e ~15 P2. Os mais relevantes, agrupados:
+O P1 da revisão foi trabalhado em **6 ondas** (commits `fix(P1 onda A–F)`), cada
+uma com testes de regressão. Total: **79 testes de integração + 112 unitários**.
 
-- **Receitas/integridade:** o preflight não garante que o campo *certo* de cada
-  receita exista (Cinema sem nota, Clube sem páginas); métrica pode se ligar ao
-  primeiro campo numérico; reduzir limite/tornar obrigatório após ativação não
-  valida registros; opção arquivada em uso mostra ID técnico; Estante omite
-  `bookshelf` na resolução de tipo ao adicionar item depois.
-- **Listas/checkpoints:** ordem sorteada não persiste (`items/assign` só grava
-  checkpoint, não posição); Clube com período fica preso a checkpoints diários;
-  editor sem campo de descrição do checkpoint; séries omitem semanas vazias.
-- **Atributos editoriais:** sem fluxo completo na interface (criar / preencher /
-  mapear chave JSON / ver no detalhe); wizard inicial usa importador simples que
-  descarta linhas.
-- **Métricas/Wrapped:** `count`/`completion_rate` aceitam `groupBy` mas ignoram;
-  rankings/afinidade não são vivos no detalhe; curadoria salva durante o desafio
-  ativo congela um snapshot que envelhece; afinidade composta não constrói o
-  "perfil de gosto"; percentual de páginas lido não é exibido.
-- **Lixeira/ciclo de vida:** nenhuma tela abre a lixeira interna do desafio;
-  restaurar item de catálogo pessoal não refaz o vínculo na lista; migração 0033
-  não faz backfill dos soft-deletes anteriores; alguns purges podem falhar por
-  dependência arquivada não contabilizada.
-- **Contas/admin:** `deleteOwnAccount` preserva `username`/`username_normalized`
-  e `password_hash`; contas desativadas ainda leem via `GET`; admin desativado
-  ainda acessa `/admin`; admin pode cunhar link de reset de qualquer conta
-  (assunção de conta); publicações nominais expõem IDs internos de participantes.
-- **Deep links:** `/modelos`, `/sobre` levam visitante deslogado ao login (a
-  resolução de sessão roda antes da rota pública).
-- **P2:** contraste do `muted` no tema claro ~3:1; modal de exclusão não prende
-  foco / não torna o fundo inerte; en-GB ainda recebe mensagens do backend e o
-  console em pt-BR; sem testes de viewport/teclado/axe; deploy pode preceder a
-  migração do Neon.
+| Onda | O que entrou |
+| --- | --- |
+| **A — Receitas/integridade** | preflight bloqueia receita sem o campo essencial (`recipe_essential_field_missing`); métrica de receita com `fieldKey` irresolvível é **omitida**, nunca repontada; após ativar, reduzir limite / tornar obrigatório valida registros (`limit_would_invalidate` / `required_would_invalidate`); Estante/`bookshelf` resolve `book`; opção `choice` arquivada em uso volta na lista com `archived:true` (rótulo, não id) |
+| **B — Listas/checkpoints** | a ordem enviada em `items/assign` persiste (`position`); Clube de Leitura datado sem dias automáticos organiza semanas/sessões à mão; editor de checkpoint ganha campo de descrição; série `groupBy:checkpoint` inclui semanas vazias (linha com `value:null`) |
+| **C — Métricas/Wrapped** | `count` vira série por pessoa/item/checkpoint; `completion_rate` agrupado é **recusado** (`invalid_metric_grouping`); rankings + afinidade **ao vivo** no detalhe do desafio ativo; `curateResults` só depois de encerrar (`challenge_not_closed`) e o resultado interno é sempre vivo enquanto aberto |
+| **D — Lixeira/ciclo de vida** | seção "Estrutura removida" (`<TrashView>`) na aba Revisão da admin; restaurar item de acervo pessoal refaz o vínculo da lista + registros; registro binado num desafio **encerrado** fica congelado (409); `applyPurge` cobre métricas/opções arquivadas; restaurar desafio desarquiva o catálogo órfão; **migração 0034** faz backfill de `trash_items` |
+| **E — Contas/admin** | exclusão de conta raspa `username`/`username_normalized`/`password_hash`; conta desativada não lê nada privado por `GET` (só `bootstrap`); admin desativado perde o `/admin`; `admin/users/reset-link` exige um pedido de reset do usuário nas últimas 48h e nunca mira outro admin (auditado em `system_audit_events`); publicação nominal usa token opaco `p_…` no lugar do id interno |
+| **F — Deep links** | `/modelos`, `/modelos/:id`, `/sobre` abrem por URL sem sessão; `app/challenges/new/page.tsx` (era 404 no refresh); testes de round-trip `urlForScreen ↔ screenFromUrl` e de existência de `page.tsx` para cada rota |
 
-Documentação a alinhar: README e docs de API ainda citam receitas antigas,
-convite imediato e a lixeira administrativa global (removidos).
+**Adiado para pós-lançamento (o roadmap já estaciona estes):** afinidade
+composta / "perfil de gosto relativo" (§10 "entra no final da V1"); autor e
+atributos personalizados na afinidade; percentual de páginas lido; fluxo
+completo de UI para atributos editoriais (criar/mapear-JSON/ver no detalhe) — a
+API existe.
+
+### P2 — em andamento
+
+- contraste do token `--muted` no tema claro; foco preso + fundo inerte no
+  `PurgeDialog`; números de ranking na locale do leitor; `<h1>` visível no login
+  mobile; cache do `sessionStorage` não deve pintar conteúdo do usuário anterior.
+- **fora do escopo de código:** en-GB completo nas mensagens do backend + console
+  `/admin` (precisa de i18n no servidor); testes reais de navegador / axe /
+  Lighthouse; observabilidade além de auditoria (request-id, latência, alertas);
+  garantir que a migração do Neon anteceda o deploy da Vercel.
+
+Documentação alinhada nesta rodada: `docs/api.md` (rotas de lixeira/conta,
+`system-audit`, sem lixeira global do `/admin`); `ROADMAP.md` §13; este arquivo.
+README ainda cita receitas legadas — a alinhar.
 
 ---
 
