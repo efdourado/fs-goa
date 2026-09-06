@@ -46,3 +46,45 @@ test("resolve a vitrine pública de modelos e mantém compatibilidade com /templ
   assert.equal(urlForScreen({ kind: "templates" }), "/modelos");
   assert.equal(urlForScreen({ kind: "template", challengeId: "ch 1" }), "/modelos/ch%201");
 });
+
+test("toda tela roteável volta de urlForScreen → screenFromUrl com o mesmo tipo", () => {
+  const screens = [
+    { kind: "dashboard" },
+    { kind: "group", groupId: "g1" },
+    { kind: "catalog-item", groupId: "g1", itemId: "i1" },
+    { kind: "personal-space" },
+    { kind: "personal-catalog" },
+    { kind: "personal-catalog-item", itemId: "i1" },
+    { kind: "personal-trash" },
+    { kind: "group-trash", groupId: "g1" },
+    { kind: "create-challenge", groupId: "g1" },
+    { kind: "create-personal-challenge" },
+    { kind: "challenge", challengeId: "c1", tab: "today" },
+    { kind: "admin", challengeId: "c1", tab: "metrics" },
+    { kind: "templates" },
+    { kind: "template", challengeId: "c1" },
+    { kind: "about" },
+    { kind: "invite", token: "t1" },
+  ] as const;
+  for (const screen of screens) {
+    const url = urlForScreen(screen);
+    assert.ok(url, `${screen.kind} tem URL`);
+    const [pathname, search = ""] = url!.split("?");
+    assert.equal(screenFromUrl(pathname, search ? `?${search}` : "")?.kind, screen.kind, `${url} → ${screen.kind}`);
+  }
+});
+
+test("todo deep-link tem um page.tsx no disco", async () => {
+  const { existsSync } = await import("node:fs");
+  const pages = [
+    "app/page.tsx", "app/groups/[groupId]/page.tsx", "app/groups/[groupId]/trash/page.tsx",
+    "app/groups/[groupId]/catalog/[itemId]/page.tsx", "app/personal/page.tsx", "app/personal/trash/page.tsx",
+    "app/catalog/page.tsx", "app/catalog/[itemId]/page.tsx", "app/challenges/[challengeId]/page.tsx",
+    "app/challenges/[challengeId]/manage/page.tsx", "app/challenges/new/page.tsx",
+    "app/modelos/page.tsx", "app/modelos/[challengeId]/page.tsx", "app/sobre/page.tsx",
+    "app/invites/[token]/page.tsx", "app/results/[token]/page.tsx",
+  ];
+  for (const page of pages) {
+    assert.ok(existsSync(new URL(`../${page}`, import.meta.url)), `${page} existe`);
+  }
+});
