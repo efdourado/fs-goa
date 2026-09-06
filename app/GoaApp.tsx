@@ -75,9 +75,13 @@ export default function GoaApp() {
     const inviteToken = queryToken || (pathMatch ? decodeURIComponent(pathMatch[1]) : null);
     const routed = screenFromUrl(window.location.pathname, window.location.search);
 
+    const PUBLIC_KINDS = new Set<Screen["kind"]>(["templates", "template", "about"]);
     const resolveScreen = (data: BootstrapData): Screen => {
       if (resetToken) return { kind: "reset", token: resetToken };
       if (inviteToken) return { kind: "invite", token: inviteToken };
+      // A public page (gallery, template, about) opens for a logged-out visitor
+      // straight from its URL — the session check comes after.
+      if (routed && PUBLIC_KINDS.has(routed.kind)) return routed;
       if (!data.user) return { kind: "auth", mode: "login" };
       return routed && routed.kind !== "invite" && routed.kind !== "reset" ? routed : { kind: "dashboard" };
     };
