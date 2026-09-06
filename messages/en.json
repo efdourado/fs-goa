@@ -745,6 +745,8 @@
     "wrappedBlocks": "Wrapped sections",
     "includeRankings": "Personal rankings",
     "includeAffinity": "Affinities",
+    "showMoreItems": "Show {count} more",
+    "showLess": "Show less",
     "blockOrderTitle": "Block order",
     "blockOrderSubtitle": "Reorder the Wrapped and hide what you don't want to show. The values stay frozen.",
     "blockOrderSave": "Save order",
@@ -896,27 +898,11 @@
     "optionArchived": "(removed)"
   },
   "resultView": {
-    "noDeadline": "A story with no deadline",
-    "numbersAria": "Results in numbers",
     "emptyTitle": "The showcase is still being prepared",
     "emptyBody": "The entries are preserved. An admin can still choose metrics and comments to tell this story.",
     "liveEmptyTitle": "No numbers yet",
     "liveEmptyBody": "Once entries come in, the live standings show up here.",
-    "backToEntry": "Log an entry",
-    "momentsTitle": "Moments kept",
-    "participantFallback": "Participant",
-    "participantsSentence": "With {names}.",
-    "andMore": "{count} more",
-    "theme": {
-      "ranking": "Ranking",
-      "people": "By person",
-      "debate": "What split opinion"
-    },
-    "sortByRating": "By rating",
-    "sortByName": "By name",
-    "showRecommender": "Who recommended",
-    "recommendedByShort": "by {name}",
-    "totalEntries": "{count, plural, one {# record} other {# records}}"
+    "backToEntry": "Log an entry"
   },
   "rules": {
     "legacyTitle": "Challenge rules",
@@ -1079,6 +1065,16 @@
     "confirmNewPassword": "Confirm new password",
     "changingPassword": "Changing…",
     "changePassword": "Change password",
+    "nameConsentTitle": "Your name in publications",
+    "nameConsentBody": "When a challenge closes, the admin may publish a retrospective. It's anonymous by default — tick the challenges where you're happy to appear by your real name.",
+    "nameConsentOn": "with my name",
+    "nameConsentOff": "anonymous",
+    "nameConsentEmpty": "You're not in any group challenge yet.",
+    "nameConsentStatus": {
+      "draft": "draft",
+      "active": "in progress",
+      "closed": "closed"
+    },
     "dangerTitle": "Danger!",
     "deleteBody": "Deleting your account disables access and removes your personal data. Groups where you're the only person go to the bin. A group with other people in it never gets stuck on you — ownership passes automatically to its oldest admin, or its oldest member if it has no other admin.",
     "deleteConfirm": "Delete your account? Access ends and your personal data is removed.",
@@ -1099,14 +1095,6 @@
     "consequencePublications": "{count, plural, one {# published showcase of yours goes offline} other {# published showcases of yours go offline}}."
   },
   "publicResults": {
-    "numbersAria": "Results in numbers",
-    "participantsSentence": "With {names}.",
-    "andMore": "{count} more",
-    "theme": {
-      "ranking": "Ranking",
-      "people": "By person",
-      "debate": "What split opinion"
-    },
     "footer": "A memory published by the group on Goa."
   },
   "about": {
@@ -1263,14 +1251,23 @@
       "dimDuration": "length",
       "none": "No pair rated enough items in common (minimum 5)."
     },
-    "totalEntries": "{count, plural, one {# record} other {# records}}"
-  },
-  "consent": {
-    "notice": "By taking part, the group sees your records. When the round closes, the admin may publish a retrospective — anonymous by default.",
-    "toggle": "Allow my real name in an external publication",
-    "toggleHint": "Starts unchecked. Change it whenever you like.",
-    "on": "Name authorised.",
-    "off": "Name authorisation withdrawn."
+    "totalEntries": "{count, plural, one {# record} other {# records}}",
+    "numbersAria": "Results in numbers",
+    "smallSample": "small sample",
+    "showMore": "Show {count, plural, one {# more} other {# more}}",
+    "showLess": "Show less",
+    "pageMain": "Key numbers",
+    "pageSeriesRanking": "Rankings",
+    "pageSeriesDebate": "What split the room",
+    "pageSeriesPeople": "By person",
+    "pageRankings": "Each person's profile",
+    "pageAffinity": "Affinities",
+    "pageComments": "Comments",
+    "paginatorAria": "Result pages",
+    "prev": "Previous page",
+    "next": "Next page",
+    "pageOf": "{current} of {total}",
+    "goToPage": "Go to page {n}"
   },
   "trash": {
     "back": "← Back",

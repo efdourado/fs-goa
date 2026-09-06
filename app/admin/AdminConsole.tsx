@@ -264,7 +264,7 @@ export default function AdminConsole({ viewerId, viewerName, csrfToken }: { view
 function Stat({ label, value, hint }: { label: string; value: ReactNode; hint?: string }) {
   return (
     <article className={cx(card, "p-5")}>
-      <p className={cx("text-xs font-light uppercase tracking-[0.1em]", muted)}>{label}</p>
+      <p className={cx("text-xs font-light", muted)}>{label}</p>
       <strong className="mt-2 block text-3xl tracking-[-0.04em]">{value}</strong>
       {hint ? <p className={cx("mt-1 text-xs", muted)}>{hint}</p> : null}
     </article>
@@ -371,7 +371,7 @@ function FeedbackTab({ items }: { items: FeedbackItem[] | null }) {
       {items.map((item) => (
         <li key={item.id} className={cx(card, "p-4 text-sm")}>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-black/[0.06] px-2 py-0.5 text-[10px] font-light uppercase tracking-wide">{IMPACT_LABEL[item.impact] ?? item.impact}</span>
+            <span className="rounded-full bg-black/[0.06] px-2 py-0.5 text-[10px] font-light">{IMPACT_LABEL[item.impact] ?? item.impact}</span>
             <strong>{item.area}</strong>
             {item.succeeded === false ? <span className="rounded-full bg-[var(--danger-soft)] px-1.5 py-0.5 text-[10px] font-light text-[var(--danger)]">não conseguiu</span> : null}
             {item.ease != null ? <span className={cx("text-xs", muted)}>facilidade {item.ease}/5</span> : null}
@@ -418,7 +418,7 @@ function AccountsTab({
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <strong>{user.name}</strong>
-                  {user.platformAdmin ? <span className="rounded-full bg-black/[0.06] px-1.5 py-0.5 text-[10px] font-light uppercase tracking-wide">admin</span> : null}
+                  {user.platformAdmin ? <span className="rounded-full bg-black/[0.06] px-1.5 py-0.5 text-[10px] font-light">admin</span> : null}
                   {user.deletedAt ? <span className="rounded-full bg-[var(--danger-soft)] px-1.5 py-0.5 text-[10px] font-light text-[var(--danger)]">removida</span> : user.disabledAt ? <span className="rounded-full bg-[var(--danger-soft)] px-1.5 py-0.5 text-[10px] font-light text-[var(--danger)]">desativada</span> : null}
                 </div>
                 <p className={cx("mt-1 text-xs", muted)}>

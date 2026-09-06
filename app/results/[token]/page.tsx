@@ -1,14 +1,11 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getFormatter, getLocale, getTranslations } from "next-intl/server";
+import { getFormatter, getTranslations } from "next-intl/server";
 
 import { publicResults } from "@/lib/goa-challenges";
 import { type Formatter, makeGoaFormat, type Translator } from "@/app/goa/format";
-import { MetricBlock } from "@/app/goa/metrics-view";
-import { AffinityBlockView, PersonalRankingsBlock } from "@/app/goa/rankings-view";
-import { affinityLabels, rankingLabels } from "@/app/goa/rankings-labels";
-import { metricHasData, metricTheme, participantsSentence } from "@/app/goa/utils";
 import { LanguageToggle } from "@/app/goa/LanguageToggle";
+import { defaultShowcaseBlocks, ShowcaseView } from "@/app/goa/showcase-view";
 import type { AffinityBlock, Metric, PersonalRanking, WrappedBlock } from "@/app/goa/types";
 
 export const runtime = "nodejs";
@@ -32,8 +29,6 @@ export default async function SharedResultsPage({ params }: { params: Promise<{ 
   const f = makeGoaFormat(tRoot as unknown as Translator, formatter as unknown as Formatter);
 
   const challenge = payload.challenge;
-  const tm = await getTranslations("metrics");
-  const tw = await getTranslations("wrapped");
   const result = challenge.result as unknown as {
     headline?: string | null;
     summary?: string | null;
@@ -43,14 +38,16 @@ export default async function SharedResultsPage({ params }: { params: Promise<{ 
     affinity?: AffinityBlock | null;
     blocks?: WrappedBlock[];
     totalEntries?: number;
-    publishedAt?: string | null;
   };
-  const personalRankings = result.personalRankings ?? [];
-  const affinity = result.affinity ?? null;
-  const ordered = (result.blocks ?? []).filter((block) => block.visible).sort((a, b) => a.position - b.position);
-  const locale = await getLocale();
-  const rankLabels = rankingLabels((key, values) => tw(key, values), locale);
-  const affLabels = affinityLabels((key, values) => tw(key, values), locale);
+
+  const blocks: WrappedBlock[] = result.blocks?.length
+    ? result.blocks
+    : defaultShowcaseBlocks({
+        metrics: result.metrics,
+        personalRankings: result.personalRankings,
+        affinity: result.affinity,
+        comments: result.comments,
+      });
 
   return (
     <main className="min-h-screen bg-[var(--canvas)] px-4 py-8 text-[var(--ink)] sm:px-6 sm:py-14">
@@ -62,98 +59,16 @@ export default async function SharedResultsPage({ params }: { params: Promise<{ 
           </Link>
           <LanguageToggle />
         </div>
-        <section className="overflow-hidden rounded-[30px] bg-[var(--spotlight)] px-6 py-12 text-[var(--spotlight-ink)] sm:px-12 sm:py-16">
-          <p className="text-xs font-light uppercase tracking-[0.16em] text-white/50">
-            {f.dateRange(challenge.startsOn, challenge.endsOn)}
-          </p>
-          <h1 className="mt-5 max-w-4xl text-4xl font-medium leading-none tracking-[-0.055em] sm:text-7xl">
-            {result.headline || challenge.title}
-          </h1>
-          {!ordered.length && result.summary ? <p className="mt-7 max-w-2xl text-base leading-7 text-white/65">{result.summary}</p> : null}
-          {challenge.participants.length ? (
-            <p className="mt-7 max-w-2xl text-sm leading-6 text-white/65">
-              {t("participantsSentence", { names: participantsSentence(challenge.participants, (count) => t("andMore", { count })) })}
-            </p>
-          ) : null}
-          {result.totalEntries ? <p className="mt-3 text-xs text-white/50">{tw("totalEntries", { count: result.totalEntries })}</p> : null}
-        </section>
-        {ordered.length ? (
-          <div className="mt-6 space-y-6">
-            {ordered.map((block) => {
-              if (block.kind === "text") {
-                return block.heading === "headline" ? null
-                  : <p className="max-w-3xl text-base leading-7 text-[var(--muted)]" key={block.id}>{block.text}</p>;
-              }
-              if (block.kind === "metric" && block.metric && metricHasData(block.metric as unknown as Record<string, unknown>)) {
-                return <MetricBlock key={block.id} metric={block.metric} smallSampleLabel={tm("smallSample")} showMoreLabel={(count) => tm("showMore", { count })} showLessLabel={tm("showLess")} />;
-              }
-              if (block.kind === "ranking" && (block.ranking?.length ?? 0) > 1) {
-                return <section className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-6 sm:p-8" key={block.id}><PersonalRankingsBlock rankings={block.ranking!} labels={rankLabels} /></section>;
-              }
-              if (block.kind === "affinity" && block.affinity && block.affinity.pairs.length) {
-                return <section className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-6 sm:p-8" key={block.id}><AffinityBlockView affinity={block.affinity} labels={affLabels} /></section>;
-              }
-              if (block.kind === "entry_value" && block.comment) {
-                return (
-                  <blockquote className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-6" key={block.id}>
-                    <p className="text-lg leading-8">“{block.comment.text}”</p>
-                    {block.comment.itemTitle ? <footer className="mt-4 text-sm font-light text-[var(--muted)]">{block.comment.itemTitle}</footer> : null}
-                  </blockquote>
-                );
-              }
-              return null;
-            })}
-          </div>
-        ) : (() => {
-          const metrics = (result.metrics ?? []).filter(metricHasData);
-          const scalarMetrics = metrics.filter((metric) => !metric.series?.length);
-          const seriesMetrics = metrics.filter((metric) => metric.series?.length);
-          const themedSeries = (["ranking", "people", "debate"] as const)
-            .map((theme) => ({ theme, items: seriesMetrics.filter((metric) => metricTheme(metric) === theme) }))
-            .filter((group) => group.items.length);
-          return metrics.length ? (
-            <div className="mt-6 space-y-6" aria-label={t("numbersAria")}>
-              {scalarMetrics.length ? (
-                <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {scalarMetrics.map((metric) => (
-                    <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} showMoreLabel={(count) => tm("showMore", { count })} showLessLabel={tm("showLess")} />
-                  ))}
-                </section>
-              ) : null}
-              {themedSeries.map(({ theme, items }) => (
-                <section key={theme} className="space-y-3">
-                  {themedSeries.length > 1 ? <h3 className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--muted)]">{t(`theme.${theme}`)}</h3> : null}
-                  <div className="space-y-3">
-                    {items.map((metric) => (
-                      <MetricBlock key={metric.id} metric={metric} smallSampleLabel={tm("smallSample")} showMoreLabel={(count) => tm("showMore", { count })} showLessLabel={tm("showLess")} />
-                    ))}
-                  </div>
-                </section>
-              ))}
-            </div>
-          ) : null;
-        })()}
-        {!ordered.length && personalRankings.length > 1 ? (
-          <section className="mt-6 rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-6 sm:p-8">
-            <PersonalRankingsBlock rankings={personalRankings} labels={rankLabels} />
-          </section>
-        ) : null}
-        {!ordered.length && affinity && affinity.pairs.length ? (
-          <section className="mt-6 rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-6 sm:p-8">
-            <AffinityBlockView affinity={affinity} labels={affLabels} />
-          </section>
-        ) : null}
-        {!ordered.length && result.comments?.length ? (
-          <section className="mt-6 grid gap-4 sm:grid-cols-2">
-            {result.comments.map((comment) => (
-              <blockquote className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-6" key={comment.id}>
-                <p className="text-lg leading-8">“{comment.text}”</p>
-                {comment.itemTitle ? <footer className="mt-4 text-sm font-light text-[var(--muted)]">{comment.itemTitle}</footer> : null}
-              </blockquote>
-            ))}
-          </section>
-        ) : null}
-        <p className="mt-8 text-center text-xs text-[var(--muted)]">{t("footer")}</p>
+        <ShowcaseView
+          variant="dark"
+          dateRange={f.dateRange(challenge.startsOn, challenge.endsOn)}
+          headline={result.headline || challenge.title}
+          summary={result.summary}
+          participantNames={challenge.participants}
+          totalEntries={result.totalEntries ?? null}
+          blocks={blocks}
+        />
+        <p className="mt-10 text-center text-xs text-[var(--muted)]">{t("footer")}</p>
       </div>
     </main>
   );

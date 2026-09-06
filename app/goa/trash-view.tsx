@@ -237,7 +237,7 @@ export function TrashView({
             <li key={`${item.kind}:${item.id}`} className="flex flex-wrap items-start justify-between gap-3 px-4 py-3.5 sm:px-5">
               <div className="min-w-0">
                 <p className="text-sm">
-                  <span className="mr-2 rounded bg-[var(--wash)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[var(--muted)]">{t(`kind.${item.kind}`)}</span>
+                  <span className="mr-2 rounded bg-[var(--wash)] px-1.5 py-0.5 text-[10px] text-[var(--muted)]">{t(`kind.${item.kind}`)}</span>
                   {item.label}
                 </p>
                 {sentence ? <p className="mt-0.5 text-xs text-[var(--muted)]">{sentence}</p> : null}

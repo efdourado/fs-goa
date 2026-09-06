@@ -436,7 +436,7 @@ export function GroupScreen({
               {group.members.map((member, index) =>
                 <li className="flex items-center justify-between gap-3 py-3" key={member.id}>
                   <div className="flex items-center gap-3">
-                    <span className="rounded-full bg-[var(--wash)] px-2 py-1 text-[10px] font-light uppercase">{index + 1}</span>
+                    <span className="rounded-full bg-[var(--wash)] px-2 py-1 text-[10px] font-light">{index + 1}</span>
                     <span>
                       <strong className="block text-sm">{member.name}</strong>
                       <small className="text-[var(--muted)]">@{member.username}</small>
@@ -445,14 +445,14 @@ export function GroupScreen({
                   {onSetMemberRole && group.role === "owner" && member.role !== "owner" ? (
                     <button
                       type="button"
-                      className="min-h-8 rounded-full border border-[var(--line)] px-3 py-1 text-[10px] font-light uppercase tracking-[0.05em] transition hover:border-[var(--main-line)] disabled:opacity-50"
+                      className="min-h-8 rounded-full border border-[var(--line)] px-3 py-1 text-[10px] font-light transition hover:border-[var(--main-line)] disabled:opacity-50"
                       disabled={roleBusyId === member.id}
                       onClick={() => void toggleRole(member)}
                     >
                       {roleBusyId === member.id ? tc("saving") : member.role === "admin" ? t("makeParticipant") : t("makeAdmin")}
                     </button>
                   ) : (
-                    <span className="rounded-full bg-[var(--wash)] px-2 py-1 text-[10px] font-light uppercase">{tr(member.role)}</span>
+                    <span className="rounded-full bg-[var(--wash)] px-2 py-1 text-[10px] font-light">{tr(member.role)}</span>
                   )}
                 </li>
               )}

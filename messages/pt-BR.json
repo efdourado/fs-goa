@@ -745,6 +745,8 @@
     "wrappedBlocks": "Blocos do Wrapped",
     "includeRankings": "Rankings pessoais",
     "includeAffinity": "Afinidades",
+    "showMoreItems": "Ver mais {count}",
+    "showLess": "Ver menos",
     "blockOrderTitle": "Ordem dos blocos",
     "blockOrderSubtitle": "Reorganize o Wrapped e esconda o que não quer mostrar. Os valores continuam congelados.",
     "blockOrderSave": "Salvar ordem",
@@ -896,27 +898,11 @@
     "optionArchived": "(removida)"
   },
   "resultView": {
-    "noDeadline": "Uma história sem prazo",
-    "numbersAria": "Resultados em números",
     "emptyTitle": "A vitrine ainda está sendo preparada",
     "emptyBody": "Os registros estão preservados. Um administrador ainda pode escolher métricas e comentários para contar esta história.",
     "liveEmptyTitle": "Ainda sem números",
     "liveEmptyBody": "Quando os registros chegarem, o placar ao vivo aparece aqui.",
-    "backToEntry": "Fazer um registro",
-    "momentsTitle": "Momentos guardados",
-    "participantFallback": "Participante",
-    "participantsSentence": "Com {names}.",
-    "andMore": "mais {count}",
-    "theme": {
-      "ranking": "Ranking",
-      "people": "Por pessoa",
-      "debate": "O que dividiu opiniões"
-    },
-    "sortByRating": "Por nota",
-    "sortByName": "Por nome",
-    "showRecommender": "Quem indicou",
-    "recommendedByShort": "por {name}",
-    "totalEntries": "{count, plural, one {# registro} other {# registros}}"
+    "backToEntry": "Fazer um registro"
   },
   "rules": {
     "legacyTitle": "Regras do desafio",
@@ -1079,6 +1065,16 @@
     "confirmNewPassword": "Confirme a nova senha",
     "changingPassword": "Alterando…",
     "changePassword": "Alterar senha",
+    "nameConsentTitle": "Nome em publicações",
+    "nameConsentBody": "Quando um desafio encerra, o admin pode publicar uma retrospectiva. Ela é anônima por padrão — marque aqui os desafios em que você aceita aparecer com o nome real.",
+    "nameConsentOn": "com meu nome",
+    "nameConsentOff": "anônimo",
+    "nameConsentEmpty": "Você ainda não participa de nenhum desafio de grupo.",
+    "nameConsentStatus": {
+      "draft": "rascunho",
+      "active": "em andamento",
+      "closed": "encerrado"
+    },
     "dangerTitle": "Perigo!",
     "deleteBody": "Apagar a conta desativa o acesso e remove seus dados pessoais. Grupos onde você é a única pessoa vão para a lixeira. Um grupo com outras pessoas nunca fica travado em você — a posse passa automaticamente para o admin mais antigo ou, se não houver outro admin, para o membro mais antigo.",
     "deleteConfirm": "Apagar sua conta? O acesso é encerrado e os dados pessoais são removidos.",
@@ -1099,14 +1095,6 @@
     "consequencePublications": "{count, plural, one {# vitrine publicada sua sai do ar} other {# vitrines publicadas suas saem do ar}}."
   },
   "publicResults": {
-    "numbersAria": "Resultados em números",
-    "participantsSentence": "Com {names}.",
-    "andMore": "mais {count}",
-    "theme": {
-      "ranking": "Ranking",
-      "people": "Por pessoa",
-      "debate": "O que dividiu opiniões"
-    },
     "footer": "Memória publicada pelo grupo no Goa."
   },
   "about": {
@@ -1263,14 +1251,23 @@
       "dimDuration": "duração",
       "none": "Nenhum par avaliou itens em comum o bastante (mínimo 5)."
     },
-    "totalEntries": "{count, plural, one {# registro} other {# registros}}"
-  },
-  "consent": {
-    "notice": "Ao participar, o grupo vê seus registros. Ao encerrar, o admin pode publicar uma retrospectiva — anônima por padrão.",
-    "toggle": "Autorizo meu nome numa publicação externa",
-    "toggleHint": "Começa desmarcado. Você muda quando quiser.",
-    "on": "Nome autorizado.",
-    "off": "Autorização do nome retirada."
+    "totalEntries": "{count, plural, one {# registro} other {# registros}}",
+    "numbersAria": "Resultados em números",
+    "smallSample": "amostra pequena",
+    "showMore": "Ver mais {count, plural, one {#} other {#}}",
+    "showLess": "Ver menos",
+    "pageMain": "Números principais",
+    "pageSeriesRanking": "Rankings",
+    "pageSeriesDebate": "O que dividiu opiniões",
+    "pageSeriesPeople": "Por pessoa",
+    "pageRankings": "Perfil de cada pessoa",
+    "pageAffinity": "Afinidades",
+    "pageComments": "Comentários",
+    "paginatorAria": "Páginas do resultado",
+    "prev": "Página anterior",
+    "next": "Próxima página",
+    "pageOf": "{current} de {total}",
+    "goToPage": "Ir para a página {n}"
   },
   "trash": {
     "back": "← Voltar",
