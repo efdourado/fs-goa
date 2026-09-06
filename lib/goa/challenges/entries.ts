@@ -430,7 +430,11 @@ export async function updateEntry(
   });
 }
 
-export async function deleteEntry(session: SessionContext, entryId: string) {
+export async function deleteEntry(
+  session: SessionContext,
+  entryId: string,
+  body: Record<string, unknown> = {},
+) {
   return inTransaction(async (client) => {
     const entry = await oneOrNull<{
       id: string; challenge_id: string; participant_user_id: string;
@@ -442,7 +446,8 @@ export async function deleteEntry(session: SessionContext, entryId: string) {
     if (!entry) throw new ApiError(404, "not_found", "Registro não encontrado.");
     const role = await requireGroupRole(session.user.id, entry.group_id, ["owner", "admin", "participant"], client);
     const canManage = role === "owner" || role === "admin";
-    if (!canManage && entry.participant_user_id !== session.user.id) {
+    const isOwnEntry = entry.participant_user_id === session.user.id;
+    if (!canManage && !isOwnEntry) {
       throw new ApiError(404, "not_found", "Registro não encontrado.");
     }
     if (entry.status !== "active") {
@@ -450,14 +455,25 @@ export async function deleteEntry(session: SessionContext, entryId: string) {
       // audited admin correction, not a quiet delete (ROADMAP §13).
       throw new ApiError(409, "challenge_not_active", "Registros só podem ser excluídos com o desafio ativo.");
     }
+    // Sending someone else's entry to the bin is an administrative act and needs a
+    // stated reason, the same as correcting or permanently deleting one — it is
+    // recorded on the `trash_items` row and in the audit trail. Deleting your own
+    // entry needs nothing.
+    const reason = stringValue(body, "reason", { min: 1, max: 500, optional: true }) ?? null;
+    if (canManage && !isOwnEntry && !reason) {
+      throw new ApiError(400, "reason_required", "Informe o motivo da exclusão administrativa.");
+    }
     // Moves the entry to the bin: `deleted_at` (so it leaves listings, metrics
     // and the showcase, and frees the partial unique indexes) plus the explicit
     // `trash_items` row. The participant restores it from the challenge screen.
-    await moveToTrash(client, "entry", entryId, session.user.id, { skipMarker: false });
+    await moveToTrash(client, "entry", entryId, session.user.id, {
+      skipMarker: false,
+      reason: isOwnEntry ? null : reason,
+    });
     if (canManage) {
       await writeAudit(client, entry.group_id, entry.challenge_id, session.user.id,
         "entry.deleted", "entry", entryId, null, null,
-        { participantId: entry.participant_user_id });
+        { participantId: entry.participant_user_id, ...(reason ? { reason } : {}) });
     }
     return { id: entryId, deleted: true };
   });

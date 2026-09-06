@@ -718,7 +718,7 @@ function AdminReview({
   challenge: ChallengeDetail;
   entries: Entry[];
   onPatch: (entryId: Id, values: Record<Id, unknown>, reason: string) => Promise<void>;
-  onDelete: (entryId: Id) => Promise<void>;
+  onDelete: (entryId: Id, reason: string) => Promise<void>;
   onExport: () => Promise<void>;
   csrfToken: string;
   onArchiveChanged: () => void;
@@ -785,9 +785,10 @@ function AdminReview({
             <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--line)] pt-5">
               <p className="text-sm text-[var(--muted)]">{t("deleteEntryHint")}</p>
               <Button variant="danger" disabled={deleting} onClick={async () => {
+                if (!reason.trim()) { setError(t("deleteEntryReasonRequired")); return; }
                 if (!window.confirm(t("deleteEntryConfirm"))) return;
                 setDeleting(true); setError(null);
-                try { await onDelete(selected.id); setSelectedId(null); }
+                try { await onDelete(selected.id, reason.trim()); setReason(""); setSelectedId(null); }
                 catch (cause) { setError(f.error(cause)); }
                 finally { setDeleting(false); }
               }}>{deleting ? t("deletingEntry") : t("deleteEntry")}</Button>
@@ -961,7 +962,7 @@ function AdminResults({
 }: {
   challenge: ChallengeDetail;
   entries: Entry[];
-  onSave: (payload: Record<string, unknown>) => Promise<void>;
+  onSave: (payload: Record<string, unknown>) => Promise<{ unpublished?: boolean } | undefined>;
   onPublish: (payload: Record<string, unknown>) => Promise<{ url?: string | null; publishedAt?: string; anonymized?: boolean } | undefined>;
   onUnpublish: () => Promise<void>;
   onReorderBlocks: (blocks: Array<{ id: Id; visible: boolean }>) => Promise<void>;
@@ -1023,10 +1024,15 @@ function AdminResults({
   const publicUrl = publishedUrl;
   const linkOnlyOnce = isPublished && !publicUrl && Boolean(challenge.result?.hasPublishedLink);
 
+  function savedMessage(result: { unpublished?: boolean } | undefined, base: string) {
+    if (result?.unpublished) return t("draftSavedUnpublishedAnon");
+    return isPublished ? t("draftSavedRepublishHint") : base;
+  }
+
   async function save() {
     setBusy(true); setError(null); setSuccess(null);
     try {
-      await onSave({
+      const result = await onSave({
         headline: headline.trim(),
         summary: summary.trim(),
         metricIds,
@@ -1035,15 +1041,15 @@ function AdminResults({
         includeRankings,
         includeAffinity,
       });
-      setSuccess(isPublished ? t("draftSavedRepublishHint") : t("resultsSaved"));
+      setSuccess(savedMessage(result, t("resultsSaved")));
     } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
   }
 
   async function regenerate() {
     setBusy(true); setError(null); setSuccess(null);
     try {
-      await onSave({ regenerate: true, anonymizeParticipants: anonymize });
-      setSuccess(isPublished ? t("draftSavedRepublishHint") : t("showcaseRegenerated"));
+      const result = await onSave({ regenerate: true, anonymizeParticipants: anonymize });
+      setSuccess(savedMessage(result, t("showcaseRegenerated")));
     } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
   }
 
@@ -1215,12 +1221,12 @@ export function AdminScreen({
   onSaveCheckpoints: (checkpoints: CheckpointInput[]) => Promise<void>;
   onAssignCheckpointItems: (assignments: Array<{ itemId: Id; checkpointId: Id | null; position?: number }>) => Promise<void>;
   onPatchEntry: (entryId: Id, values: Record<Id, unknown>, reason: string) => Promise<void>;
-  onDeleteEntry: (entryId: Id) => Promise<void>;
+  onDeleteEntry: (entryId: Id, reason: string) => Promise<void>;
   onExport: () => Promise<void>;
   onAddMetric: (payload: Record<string, unknown>) => Promise<void>;
   onUpdateMetric: (metricId: Id, payload: Record<string, unknown>) => Promise<void>;
   onDeleteMetric: (metricId: Id) => Promise<void>;
-  onSaveResult: (payload: Record<string, unknown>) => Promise<void>;
+  onSaveResult: (payload: Record<string, unknown>) => Promise<{ unpublished?: boolean } | undefined>;
   onPublishResult: (payload: Record<string, unknown>) => Promise<{ url?: string | null; publishedAt?: string; anonymized?: boolean } | undefined>;
   onUnpublishResult: () => Promise<void>;
   onReorderBlocks: (blocks: Array<{ id: Id; visible: boolean }>) => Promise<void>;

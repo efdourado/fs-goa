@@ -172,7 +172,8 @@ docs/       arquitetura (docs/architecture.md) e endpoints (docs/api.md)
   melhores comentários) e congela um snapshot; owner/admin ajustam manchete/
   resumo, regeneram e publicam em `/results/<token>` (o banco guarda só o hash).
 - **`/admin`** — painel só de metadados para a conta `platform_admin`: uso,
-  tamanho do banco, lixeira (purga definitiva), auditoria, moderação de contas.
+  tamanho do banco, auditoria (sem textos privados), moderação de contas. **Não**
+  tem lixeira global nem redefine senha — a lixeira é sempre do dono do conteúdo.
   Qualquer outra conta recebe `404`.
 
 Ver [docs/architecture.md](docs/architecture.md) para o modelo de domínio, a

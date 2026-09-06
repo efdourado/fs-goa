@@ -1603,17 +1603,30 @@ test("registros podem ser excluídos: pelo autor ou pelo admin, só com o desafi
     "some das listagens após a exclusão",
   );
 
-  // admin apaga registro de participante e isso vira auditoria
+  // admin manda o registro de um participante para a lixeira — exige motivo,
+  // igual à correção e à exclusão permanente, e o motivo fica registrado
   const ownerEntry = await call("POST", `/api/challenges/${challengeId}/entries`, {
     session: owner, body: { participantId: author.user.id, itemId: items[1].id, values: { nota: 5 } },
   });
   const ownerEntryId = (ownerEntry.body as { id: string }).id;
-  assert.equal((await call("DELETE", `/api/entries/${ownerEntryId}`, { session: owner })).response.status, 200);
-  const audited = await adminPool.query<{ action: string }>(
-    "SELECT action FROM audit_events WHERE entity_type='entry' AND entity_id=$1 AND action='entry.deleted'",
+  const noReason = await call("DELETE", `/api/entries/${ownerEntryId}`, { session: owner });
+  assert.equal(noReason.response.status, 400, "sem motivo o admin não exclui registro alheio");
+  assert.equal((noReason.body as { error: string }).error, "reason_required");
+  assert.equal(
+    (await call("DELETE", `/api/entries/${ownerEntryId}`, { session: owner, body: { reason: "duplicado com o registro do Filme A" } })).response.status,
+    200,
+  );
+  const audited = await adminPool.query<{ action: string; metadata: { reason?: string } }>(
+    "SELECT action, metadata FROM audit_events WHERE entity_type='entry' AND entity_id=$1 AND action='entry.deleted'",
     [ownerEntryId],
   );
   assert.equal(audited.rows.length, 1, "a exclusão administrativa fica na auditoria");
+  assert.equal(audited.rows[0]?.metadata?.reason, "duplicado com o registro do Filme A", "com o motivo");
+  const trashed = await adminPool.query<{ reason: string | null }>(
+    "SELECT reason FROM trash_items WHERE entity_kind='entry' AND entity_id=$1",
+    [ownerEntryId],
+  );
+  assert.equal(trashed.rows[0]?.reason, "duplicado com o registro do Filme A", "e também no registro da lixeira");
 
   // desafio encerrado não aceita exclusão
   const late = await call("POST", `/api/challenges/${challengeId}/entries`, {
@@ -3767,6 +3780,48 @@ test("rankings pessoais e afinidade direta com três contas; afinidade composta 
   };
   assert.ok(shared.challenge.result.personalRankings.every((row) => /^Participante \d+$/.test(row.name)), "rankings anônimos");
   assert.ok(shared.challenge.result.affinity.pairs.every((pair) => /^Participante \d+$/.test(pair.a.name)), "afinidades anônimas");
+});
+
+test("mudar a anonimização derruba a vitrine já publicada — o link antigo não serve a config antiga", async () => {
+  const owner = await register("Dona Anon", "dona_anon_flip");
+  const b = await register("Bento Anon", "bento_anon_flip");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube Anon" } })).body as { id: string }).id;
+  const invite = (await call("POST", `/api/groups/${groupId}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
+  await call("POST", `/api/invites/${invite.token}`, { session: b, body: {} });
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner, body: { recipe: "cinema", title: "Anon flip", participantIds: [owner.user.id, b.user.id], items: [{ title: "Filme A" }] },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  const d = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    entryTypes: Array<{ id: string; purpose: string; fields: Array<{ id: string; key: string }> }>; items: Array<{ id: string }>;
+  };
+  const rating = d.entryTypes.find((t) => t.purpose === "rating")!;
+  const nota = rating.fields.find((f) => f.key === "nota")!.id;
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });
+  for (const s of [owner, b]) {
+    await call("PATCH", `/api/challenges/${challengeId}/consent`, { session: s, body: { nameConsent: true } });
+    await call("POST", `/api/challenges/${challengeId}/entries`, { session: s, body: { itemId: d.items[0].id, entryTypeId: rating.id, values: { [nota]: 4 } } });
+  }
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "closed" } });
+
+  // Publica COM nomes.
+  await call("POST", `/api/challenges/${challengeId}/results`, { session: owner, body: { regenerate: true, anonymizeParticipants: false } });
+  const pub = await call("POST", `/api/challenges/${challengeId}/results/publish`, { session: owner, body: {} });
+  const token = (pub.body as { url: string }).url.split("/results/")[1];
+  assert.equal((await call("GET", `/api/results/${token}`)).response.status, 200);
+
+  // Salvar o rascunho com a anonimização invertida despublica sozinho.
+  const flipped = await call("POST", `/api/challenges/${challengeId}/results`, { session: owner, body: { anonymizeParticipants: true } });
+  assert.equal(flipped.response.status, 200, JSON.stringify(flipped.body));
+  assert.equal((flipped.body as { unpublished?: boolean }).unpublished, true, "a resposta avisa que despublicou");
+  assert.equal((await call("GET", `/api/results/${token}`)).response.status, 404, "o link antigo para de funcionar");
+
+  // Salvar de novo sem mexer na anonimização NÃO mexe na publicação.
+  await call("POST", `/api/challenges/${challengeId}/results/publish`, { session: owner, body: {} });
+  const again = await call("POST", `/api/challenges/${challengeId}/results`, { session: owner, body: { headline: "Só um ajuste", anonymizeParticipants: true } });
+  assert.equal((again.body as { unpublished?: boolean }).unpublished ?? false, false, "sem mudança de anonimização, a vitrine fica de pé");
+  const token2 = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { result?: { publishedAt?: string | null } };
+  assert.ok(token2.result?.publishedAt, "segue publicada");
 });
 
 test("vitrine é anônima por padrão, e consentimento nominal libera o nome só de quem autorizou", async () => {
