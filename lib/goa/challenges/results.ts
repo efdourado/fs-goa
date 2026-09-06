@@ -1198,9 +1198,19 @@ async function buildPublishedSnapshot(
     participants.rows.filter((row) => anonymized || !row.name_consent).map((row) => row.id),
   );
 
+  // Who recommended each item — an item-grouped ranking shows this name next to
+  // the film, so it needs the same masking as a per-person series.
+  const recommenderByItem = new Map<string, string>(
+    (await client.query<{ id: string; recommended_by_user_id: string | null }>(
+      "SELECT id, recommended_by_user_id FROM challenge_items WHERE challenge_id = $1 AND recommended_by_user_id IS NOT NULL",
+      [challenge.id],
+    )).rows.map((row) => [row.id, row.recommended_by_user_id as string]),
+  );
+
   // Every id that could carry a name in the payload — so a departed member who
-  // was still rated also gets a stable "Participante N" label.
+  // was still rated (or recommended a film) also gets a stable "Participante N" label.
   const seriesIds = new Set<string>(maskedIds);
+  for (const recommenderId of recommenderByItem.values()) seriesIds.add(recommenderId);
   for (const metric of metricList) {
     if (metric?.groupBy !== "participant" || !Array.isArray(metric.series)) continue;
     for (const row of metric.series as Array<{ key?: unknown }>) if (typeof row.key === "string") seriesIds.add(row.key);
@@ -1244,8 +1254,21 @@ async function buildPublishedSnapshot(
     typeof id === "string" ? labelById.get(id) ?? roster.get(id) ?? "Participante ?" : "Participante ?";
 
   const participantNames = participants.rows.map((row) => labelById.get(row.id) ?? row.display_name);
+  // An item-grouped row's `recommendedBy` is a real display name — swap it for the
+  // masked label when that recommender is masked.
+  const maskRecommender = (row: Record<string, unknown>): Record<string, unknown> => {
+    if (!("recommendedBy" in row) || typeof row.key !== "string") return row;
+    const recommenderId = recommenderByItem.get(row.key);
+    if (recommenderId && isMasked(recommenderId)) {
+      return { ...row, recommendedBy: labelById.get(recommenderId) ?? "Participante ?" };
+    }
+    return row;
+  };
   const metrics = await Promise.all(metricList.map(async (metric) => {
-    if (metric?.groupBy !== "participant" || !Array.isArray(metric.series)) return metric;
+    if (!Array.isArray(metric.series)) return metric;
+    if (metric?.groupBy !== "participant") {
+      return { ...metric, series: (metric.series as Array<Record<string, unknown>>).map(maskRecommender) };
+    }
     return {
       ...metric,
       series: await Promise.all((metric.series as Array<Record<string, unknown>>).map(async (row) => {

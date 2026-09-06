@@ -3898,6 +3898,48 @@ test("mudar a anonimização derruba a vitrine já publicada — o link antigo n
   assert.ok(token2.result?.publishedAt, "segue publicada");
 });
 
+test("publicação anônima mascara o nome de quem indicou o filme no ranking, não só os participantes", async () => {
+  const owner = await register("Marta Indica", "marta_indica_anon");
+  const b = await register("Beto Indica", "beto_indica_anon");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube Indica" } })).body as { id: string }).id;
+  const invite = (await call("POST", `/api/groups/${groupId}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
+  await call("POST", `/api/invites/${invite.token}`, { session: b, body: {} });
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "cinema", title: "Ciclo com indicações", participantIds: [owner.user.id, b.user.id],
+      items: [
+        { title: "O Filme da Marta", recommendedByUserId: owner.user.id },
+        { title: "O Filme do Beto", recommendedByUserId: b.user.id },
+        { title: "O Filme do Beto 2", recommendedByUserId: b.user.id },
+      ],
+    },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  const d = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    entryTypes: Array<{ id: string; purpose: string; fields: Array<{ id: string; key: string }> }>;
+    items: Array<{ id: string; title: string }>;
+  };
+  const rating = d.entryTypes.find((t) => t.purpose === "rating")!;
+  const nota = rating.fields.find((f) => f.key === "nota")!.id;
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });
+  await call("POST", `/api/challenges/${challengeId}/metrics`, {
+    session: owner, body: { label: "Ranking", operation: "bayesian_average", fieldId: nota, groupBy: "item", minSample: 1 },
+  });
+  for (const item of d.items) {
+    for (const s of [owner, b]) {
+      await call("POST", `/api/challenges/${challengeId}/entries`, { session: s, body: { itemId: item.id, entryTypeId: rating.id, values: { [nota]: 4 } } });
+    }
+  }
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "closed" } });
+  await call("POST", `/api/challenges/${challengeId}/results`, { session: owner, body: { regenerate: true, anonymizeParticipants: true } });
+  const pub = await call("POST", `/api/challenges/${challengeId}/results/publish`, { session: owner, body: {} });
+  const token = (pub.body as { url: string }).url.split("/results/")[1];
+  const dump = JSON.stringify((await call("GET", `/api/results/${token}`)).body);
+  assert.doesNotMatch(dump, /Marta Indica|Beto Indica/, "nenhum nome real de indicador aparece na vitrine anônima");
+  assert.match(dump, /"recommendedBy":"Participante \d+"/, "a indicação vira rótulo genérico");
+});
+
 test("vitrine é anônima por padrão, e consentimento nominal libera o nome só de quem autorizou", async () => {
   const owner = await register("Dona Wrapped", "dona_wrapped_v1");
   const b = await register("Bela Wrapped", "bela_wrapped_v1");
