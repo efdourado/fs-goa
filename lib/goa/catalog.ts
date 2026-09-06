@@ -5,21 +5,12 @@ import { inTransaction, oneOrNull, withClient } from "../db";
 import { ApiError, stringValue } from "../http";
 import { attributeValuesForItems, setCatalogItemAttributeValues } from "./catalog-attributes";
 import { writeAudit } from "./domain/audit";
-import { publicId } from "./domain/shared";
+import { normalizeTitle, publicId } from "./domain/shared";
 import { moveToTrash } from "./trash";
 
 export type CatalogKind = "film" | "book" | "other";
 
-/** Human-insensitive match key: lowercase, no diacritics, collapsed whitespace. */
-export function normalizeTitle(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/gu, "")
-    .toLowerCase()
-    .replace(/\s+/gu, " ")
-    .trim()
-    .slice(0, 300);
-}
+export { normalizeTitle } from "./domain/shared";
 
 export function normalizeLabel(value: string): string {
   return normalizeTitle(value).slice(0, 80);

@@ -4,7 +4,7 @@ import { requireGroupRole } from "../auth";
 import { inTransaction, oneOrNull, withClient } from "../db";
 import { ApiError, stringValue } from "../http";
 import { challengeAccess } from "./domain/access";
-import { publicId } from "./domain/shared";
+import { normalizeTitle, publicId } from "./domain/shared";
 import { writeAudit, writeSystemAudit } from "./domain/audit";
 import { purgeChallengeRows, purgeGroupRows } from "./purge";
 
@@ -181,10 +181,13 @@ async function dependencies(client: PoolClient, row: RowContext): Promise<Depend
       await push("entries", `SELECT count(*)::int AS count FROM entries e JOIN challenges c ON c.id=e.challenge_id WHERE c.group_id=$1`, [row.id]);
       break;
     case "challenge":
-      await push("items", "SELECT count(*)::int AS count FROM challenge_items WHERE challenge_id=$1 AND archived_at IS NULL", [row.id]);
-      await push("checkpoints", "SELECT count(*)::int AS count FROM challenge_checkpoints WHERE challenge_id=$1 AND archived_at IS NULL", [row.id]);
+      // No `archived_at` filter anywhere below: a permanent delete destroys the
+      // archived rows too, so the preview has to count them or it understates
+      // what is about to go.
+      await push("items", "SELECT count(*)::int AS count FROM challenge_items WHERE challenge_id=$1", [row.id]);
+      await push("checkpoints", "SELECT count(*)::int AS count FROM challenge_checkpoints WHERE challenge_id=$1", [row.id]);
       await push("entries", "SELECT count(*)::int AS count FROM entries WHERE challenge_id=$1", [row.id]);
-      await push("metrics", "SELECT count(*)::int AS count FROM challenge_metrics WHERE challenge_id=$1 AND archived_at IS NULL", [row.id]);
+      await push("metrics", "SELECT count(*)::int AS count FROM challenge_metrics WHERE challenge_id=$1", [row.id]);
       break;
     case "catalog_item":
       await push("challengesUsing", `SELECT count(DISTINCT it.challenge_id)::int AS count FROM challenge_items it
@@ -196,16 +199,16 @@ async function dependencies(client: PoolClient, row: RowContext): Promise<Depend
       await push("entries", "SELECT count(*)::int AS count FROM entries WHERE item_id=$1", [row.id]);
       break;
     case "checkpoint":
-      await push("items", "SELECT count(*)::int AS count FROM challenge_items WHERE checkpoint_id=$1 AND archived_at IS NULL", [row.id]);
+      await push("items", "SELECT count(*)::int AS count FROM challenge_items WHERE checkpoint_id=$1", [row.id]);
       await push("entries", "SELECT count(*)::int AS count FROM entries WHERE checkpoint_id=$1 AND deleted_at IS NULL", [row.id]);
       break;
     case "entry_type":
-      await push("fields", "SELECT count(*)::int AS count FROM challenge_fields WHERE entry_type_id=$1 AND archived_at IS NULL", [row.id]);
+      await push("fields", "SELECT count(*)::int AS count FROM challenge_fields WHERE entry_type_id=$1", [row.id]);
       await push("entries", "SELECT count(*)::int AS count FROM entries WHERE entry_type_id=$1", [row.id]);
       break;
     case "field":
       await push("values", "SELECT count(*)::int AS count FROM entry_values WHERE field_id=$1", [row.id]);
-      await push("metrics", "SELECT count(*)::int AS count FROM challenge_metrics WHERE field_id=$1 AND archived_at IS NULL", [row.id]);
+      await push("metrics", "SELECT count(*)::int AS count FROM challenge_metrics WHERE field_id=$1", [row.id]);
       break;
     case "field_option":
       await push("values", "SELECT count(*)::int AS count FROM entry_values WHERE option_id=$1", [row.id]);
@@ -254,15 +257,21 @@ async function permanentGuard(client: PoolClient, row: RowContext): Promise<{ co
     if (row.challengeStatus !== "draft") {
       return { code: "structure_rides_parent", message: "A remoção definitiva desta peça acontece junto com o desafio." };
     }
-    const deps = await dependencies(client, row);
-    if (deps.some((d) => d.count > 0)) {
-      const usedByMetric = deps.some((d) => d.type === "metrics");
-      return {
-        code: usedByMetric ? "field_used_by_metric" : "structure_has_data",
-        message: usedByMetric
-          ? "Resolva a métrica que usa este campo antes de apagá-lo em definitivo."
-          : "Esta peça já tem dados. Fica arquivada até o desafio ser apagado.",
-      };
+    // `dependencies` now counts archived rows too (the preview must show
+    // everything the purge destroys), but the *guard* only cares about what the
+    // purge cannot sweep on its own: real answers, and a metric still in use.
+    // An archived metric rides along with the field, so it must not block.
+    const blockers = await dependencies(client, row);
+    const liveMetrics = row.kind === "field"
+      ? (await oneOrNull<{ count: number }>(client,
+          "SELECT count(*)::int AS count FROM challenge_metrics WHERE field_id=$1 AND archived_at IS NULL",
+          [row.id]))?.count ?? 0
+      : 0;
+    if (liveMetrics > 0) {
+      return { code: "field_used_by_metric", message: "Resolva a métrica que usa este campo antes de apagá-lo em definitivo." };
+    }
+    if (blockers.some((d) => d.type !== "metrics" && d.count > 0)) {
+      return { code: "structure_has_data", message: "Esta peça já tem dados. Fica arquivada até o desafio ser apagado." };
     }
     return null;
   }
@@ -328,6 +337,17 @@ async function parentTrashed(client: PoolClient, row: RowContext): Promise<boole
       `SELECT (cc.archived_at IS NOT NULL) AS gone FROM challenge_items it
          JOIN challenge_checkpoints cc ON cc.id = it.checkpoint_id WHERE it.id = $1`, [row.id]);
     if (cp?.gone) return true;
+  }
+  if (row.kind === "metric") {
+    // A metric reads through its entry type and (usually) a field — reviving it
+    // over an archived one would surface a broken calculation.
+    const parents = await oneOrNull<{ gone: boolean }>(client,
+      `SELECT (et.archived_at IS NOT NULL OR (f.id IS NOT NULL AND f.archived_at IS NOT NULL)) AS gone
+         FROM challenge_metrics m
+         JOIN entry_types et ON et.id = m.entry_type_id
+         LEFT JOIN challenge_fields f ON f.id = m.field_id
+        WHERE m.id = $1`, [row.id]);
+    if (parents?.gone) return true;
   }
   if (!row.challengeId) return false;
   const c = await oneOrNull<{ gone: boolean }>(client,
@@ -659,7 +679,12 @@ export async function restoreTrashItem(session: SessionContext, body: Record<str
     const conflict = await identityConflict(client, row, rename);
     if (conflict) throw new ApiError(409, conflict.code, conflict.message);
     if (rename && kind === "catalog_item") {
-      await client.query("UPDATE catalog_items SET title=$2, normalized_title=lower(btrim($2)), updated_at=now() WHERE id=$1", [id, rename]);
+      // Same match key the creation path builds, or the renamed row would not
+      // collide with a future duplicate the way a normally-created one does.
+      await client.query(
+        "UPDATE catalog_items SET title=$2, normalized_title=$3, updated_at=now() WHERE id=$1",
+        [id, rename, normalizeTitle(rename)],
+      );
     }
     if (rename && kind === "group") {
       await client.query("UPDATE groups SET name=$2, updated_at=now() WHERE id=$1", [id, rename]);

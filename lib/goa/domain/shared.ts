@@ -79,6 +79,19 @@ export function integerValue(value: unknown, fallback: number, min: number, max:
   return number;
 }
 
+/** Human-insensitive match key for a catalogue title: lowercase, no diacritics,
+ *  collapsed whitespace. Lives here (a leaf) so both the catalogue and the bin's
+ *  restore-with-rename build the exact same key. */
+export function normalizeTitle(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/gu, "")
+    .toLowerCase()
+    .replace(/\s+/gu, " ")
+    .trim()
+    .slice(0, 300);
+}
+
 export function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)

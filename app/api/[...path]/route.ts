@@ -18,7 +18,6 @@ import {
 import {
   adminAudit,
   adminOverview,
-  adminResetLink,
   adminSystemAudit,
   adminUsers,
   revokeUserSessions,
@@ -245,9 +244,6 @@ export async function POST(request: Request): Promise<Response> {
       if (isPath(path, "admin", "users", "set-admin")) return json(await setUserPlatformAdmin(adminSession, adminBody));
       if (isPath(path, "admin", "users", "revoke-sessions")) {
         return json(await revokeUserSessions(adminSession, adminBody));
-      }
-      if (isPath(path, "admin", "users", "reset-link")) {
-        return json(await adminResetLink(adminSession, adminBody, new URL(request.url).origin));
       }
       return notFound();
     }
