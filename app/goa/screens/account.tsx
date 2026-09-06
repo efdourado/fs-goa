@@ -21,6 +21,7 @@ export function AccountScreen({
   onSaveProfile,
   onChangePassword,
   onSetNameConsent,
+  onOpenTrash,
   onDeactivate,
   onDeletePermanently,
 }: {
@@ -30,6 +31,7 @@ export function AccountScreen({
   onSaveProfile: (payload: { name: string }) => Promise<void>;
   onChangePassword: (payload: { currentPassword: string; newPassword: string }) => Promise<void>;
   onSetNameConsent: (challengeId: string, consent: boolean) => Promise<void>;
+  onOpenTrash: () => void;
   onDeactivate: () => Promise<void>;
   onDeletePermanently: (password: string) => Promise<void>;
 }) {
@@ -163,6 +165,16 @@ export function AccountScreen({
           <div className="sm:col-span-2"><StatusMessage error={pwMsg.error} success={pwMsg.success} /></div>
           <div className="sm:col-span-2"><Button type="submit" disabled={pwBusy}>{pwBusy ? t("changingPassword") : t("changePassword")}</Button></div>
         </form>
+      </section>
+
+      <section className={cx(cardClass, "mt-6 p-5 sm:p-7")}>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-light">{t("trashTitle")}</h2>
+            <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{t("trashBody")}</p>
+          </div>
+          <Button variant="secondary" onClick={onOpenTrash}>{t("trashOpen")}</Button>
+        </div>
       </section>
 
       <section className={cx(cardClass, "mt-6 p-5 sm:p-7")}>

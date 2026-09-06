@@ -531,7 +531,7 @@ export default function GoaApp() {
   if (user.deactivated) {
     content = <AccountDeactivatedScreen onReactivate={reactivateAccount} onLogout={logout} />;
   } else if (screen.kind === "account") {
-    content = <AccountScreen user={user} challenges={bootstrap.challenges} onBack={() => setScreen({ kind: "dashboard" })} onSaveProfile={saveAccount} onChangePassword={saveAccount} onSetNameConsent={setNameConsent} onDeactivate={deactivateAccount} onDeletePermanently={deleteAccountPermanently} />;
+    content = <AccountScreen user={user} challenges={bootstrap.challenges} onBack={() => setScreen({ kind: "dashboard" })} onSaveProfile={saveAccount} onChangePassword={saveAccount} onSetNameConsent={setNameConsent} onOpenTrash={() => setScreen({ kind: "personal-trash" })} onDeactivate={deactivateAccount} onDeletePermanently={deleteAccountPermanently} />;
   } else if (screen.kind === "personal-trash") {
     content = <PersonalTrashScreen csrfToken={bootstrap.csrfToken} onBack={() => setScreen({ kind: "personal-space" })} onChanged={() => { void refreshBootstrap(); }} />;
   } else if (screen.kind === "group-trash" && selectedGroup && canManage(selectedGroup.role)) {
