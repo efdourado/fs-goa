@@ -425,7 +425,10 @@
     "pasteJsonPlaceholderBook": "[\n  { \"title\": \"Duna\", \"author\": \"Frank Herbert\", \"year\": 1965, \"pageCount\": 688, \"mainGenre\": \"ficção científica\" }\n]",
     "jsonInvalid": "Esse texto não é um JSON válido.",
     "jsonMustBeArray": "Cole uma lista entre colchetes, ex.: [ {\"title\": \"...\"} ].",
-    "jsonNoItems": "Nenhum item novo encontrado — confira se cada objeto tem um \"title\"."
+    "jsonNoItems": "A lista está vazia — cole ao menos um objeto com \"title\".",
+    "pasteSummary": "{total} entradas lidas · {added} adicionadas · {invalid} sem título ou fora do formato · {duplicates} já na lista.",
+    "pasteSummaryNone": "Nenhuma entrada foi adicionada: todas estavam repetidas, sem \"title\" ou fora do formato de objeto.",
+    "pasteUnknownKeys": "Chaves ignoradas por não terem correspondência: {keys}. Preencha esses dados nos campos de cada item."
   },
   "createChallenge": {
     "errPickTemplate": "Escolha um modelo e preencha o título.",
@@ -761,7 +764,8 @@
     "blockMetric": "Métrica",
     "blockComment": "Comentário",
     "removedStructureTitle": "Estrutura removida",
-    "removedStructureBody": "Campos, opções, métricas, checkpoints, itens e registros que saíram deste desafio. Restaure ou apague em definitivo."
+    "removedStructureBody": "Campos, opções, métricas, checkpoints, itens e registros que saíram deste desafio. Restaure ou apague em definitivo.",
+    "commentPrivacyWarning": "A anonimização tira a autoria, mas o texto é publicado como está — releia cada comentário e descarte os que citam nomes, contatos ou detalhes que a pessoa não quer em público."
   },
   "visibility": {
     "title": "Quem vê estas respostas",

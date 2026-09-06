@@ -26,8 +26,10 @@ Encerrar sem apagar dados: `docker compose down`.
 Os papéis do produto (`owner` > `admin` > `participant`) valem por grupo, e quem
 cria um grupo vira `owner` dele. Além disso, a conta criada pelo `db:seed` recebe
 `platform_admin` e enxerga `/admin` — um painel privado do desenvolvedor com uso,
-armazenamento, lixeira do banco (purga definitiva), auditoria e moderação de
-contas. Nenhuma outra conta vê essa área (respostas `404`).
+armazenamento, auditoria (sem textos privados) e moderação de contas. Nenhuma
+outra conta vê essa área (respostas `404`). O `platform_admin` **não** tem lixeira
+global, não exclui conteúdo de terceiros e não gera links de redefinição de senha:
+a lixeira é sempre do dono do conteúdo.
 
 | Ambiente   | Usuário | Senha                                    |
 | ---------- | ------- | ---------------------------------------- |
@@ -37,10 +39,27 @@ contas. Nenhuma outra conta vê essa área (respostas `404`).
 Depois de entrar, use a interface para criar um grupo e convidar as demais pessoas.
 Rode `npm run db:seed` de novo a qualquer momento para redefinir a senha.
 
-As contas fazem login por **nome de usuário ou e-mail** + senha. O e-mail é
-opcional no cadastro, mas é o que permite recuperar o acesso: quem esquece a senha
-pede em "Esqueci a senha" e o administrador gera um link de uso único na aba
-*Contas* do `/admin`.
+As contas fazem login por **nome de usuário ou e-mail** + senha.
+
+### Recuperação de senha
+
+O e-mail é opcional no cadastro, mas é o que permite recuperar o acesso: quem
+esquece a senha pede em "Esqueci a senha" (`POST /api/auth/forgot`) e recebe um
+link de uso único.
+
+O `/admin` deliberadamente **não** gera esse link. A garantia de "só se a pessoa
+tiver pedido" seria circular — o administrador vê o e-mail no próprio painel,
+`/api/auth/forgot` é público e ele mesmo pode fabricar o pedido que deveria estar
+apenas atendendo; na prática seria poder assumir qualquer conta. Quando alguém
+perde tanto a senha quanto o acesso ao e-mail, a recuperação é uma ação de
+**operador**, não de administrador de plataforma:
+
+```bash
+DATABASE_URL=… node scripts/reset-password.mjs <usuario|email> '<nova senha>'
+```
+
+O script exige a `DATABASE_URL` — que a flag `platform_admin` não concede —,
+revoga todas as sessões da conta e invalida os pedidos de redefinição pendentes.
 
 ## Desenvolvimento sem Docker
 
@@ -136,14 +155,18 @@ docs/       arquitetura (docs/architecture.md) e endpoints (docs/api.md)
 ## O que o Goa faz
 
 - **Contas** — cadastro e login por usuário **ou** e-mail, sessão HTTP-only + CSRF;
-  redefinição de senha por link de uso único (hoje mediada pelo `/admin`). O
-  e-mail é opcional mas é o que recupera o acesso.
+  redefinição de senha por link de uso único, pedida pela própria pessoa em
+  `/api/auth/forgot`. O e-mail é opcional mas é o que recupera o acesso — o
+  `/admin` **não** gera links de redefinição (ver "Recuperação de senha").
 - **Grupos e papéis** — o grupo é duradouro e reúne pessoas entre rodadas. `owner`
   > `admin` > `participant`. Convites por link expirável / código curto.
-- **Rodadas por receita** — `cine_free`, `cine_curated` (expectativa + avaliação;
-  a expectativa trava ao avaliar), `reading_club` (livros no acervo, progresso por
-  dia + conclusão + nota) e `reading_daily` (check-in diário). Estados
-  `draft → active → closed`; período opcional; campos semânticos estáveis.
+- **Rodadas por receita** — quatro criáveis: `cinema` (nota 0–5 + comentário, com
+  expectativa opcional que trava ao avaliar), `library` (livros do acervo, progresso
+  por dia + conclusão + nota), `bookshelf` (só avaliação, sem período) e `habit`
+  (check-in sem catálogo). As quatro chaves antigas (`cine_free`, `cine_curated`,
+  `reading_club`, `reading_daily`) continuam legíveis no banco mas não criam mais
+  estrutura. Estados `draft → active → closed`; período opcional; campos
+  semânticos estáveis.
 - **Acervo** — filme/livro tem identidade estável no grupo (`catalog_items`), com
   atributos e gêneros; reaparece em outra rodada sem perder o histórico.
 - **Registros** — cada pessoa edita o próprio; owner/admin corrigem com motivo

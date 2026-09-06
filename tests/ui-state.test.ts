@@ -3,6 +3,7 @@ import { createElement } from "react";
 import test from "node:test";
 
 import { CheckpointPlanner } from "../app/goa/checkpoint-planner";
+import { parseJsonItemsPaste } from "../app/goa/cine-items";
 import { ListImportPanel } from "../app/goa/list-import-panel";
 import { RuleSectionsView } from "../app/goa/rules";
 import { DynamicEntryForm, itemEntryTypes, ResultView } from "../app/goa/screens/participant-challenge";
@@ -555,4 +556,41 @@ test("header lista convites de grupo pendentes no menu de novidades", () => {
     onDeclineRequest: async () => undefined,
   }));
   assert.match(header, /aria-label="Novidades \(1\)"/);
+});
+
+test("colagem JSON do wizard presta contas: descarta inválidos e repetidos, mas relata cada um", () => {
+  const { rows, summary } = parseJsonItemsPaste(
+    JSON.stringify([
+      { title: "Solaris", year: 1972, mainGenre: "Ficção científica" },
+      { title: "Solaris" },
+      { title: "  Stalker  ", diretor: "Tarkovski", tmdbId: 1899 },
+      { year: 1979 },
+      "Nostalgia",
+      [{ title: "Sacrifício" }],
+      { title: "Duna" },
+    ]),
+    new Set(["duna"]),
+  );
+
+  assert.deepEqual(rows.map((row) => row.title), ["Solaris", "Stalker"]);
+  assert.equal(rows[0]?.mainGenre, "Ficção científica");
+  assert.deepEqual(summary, {
+    total: 7,
+    added: 2,
+    // sem título, string solta e array
+    invalid: 3,
+    // repetido dentro da própria colagem e repetido com a lista existente
+    duplicates: 2,
+    unknownKeys: ["diretor", "tmdbId"],
+  });
+});
+
+test("colagem JSON do wizard só lança erro quando o texto não é uma lista de itens", () => {
+  assert.throws(() => parseJsonItemsPaste("{", new Set()), /jsonInvalid/);
+  assert.throws(() => parseJsonItemsPaste('{"title":"Solaris"}', new Set()), /jsonMustBeArray/);
+  assert.throws(() => parseJsonItemsPaste("[]", new Set()), /jsonNoItems/);
+  // Uma lista só de repetidos não é erro: vira um resumo com added=0.
+  const { rows, summary } = parseJsonItemsPaste('[{"title":"Duna"}]', new Set(["duna"]));
+  assert.equal(rows.length, 0);
+  assert.equal(summary.duplicates, 1);
 });

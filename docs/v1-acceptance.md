@@ -8,7 +8,7 @@ ser tratada antes do beta ("Pendências"). Este documento mapeia o cenário do �
 e a definição de pronto do §17, e é honesto sobre o que falta.
 
 Gates verdes na entrega: `npm run typecheck`, `npm run lint`,
-`npm run test:unit` (109), `npm run test:integration` (60), `npm run build`,
+`npm run test:unit` (114), `npm run test:integration` (84), `npm run build`,
 `npx drizzle-kit check`. Ressalva: o teste de aceite chama o roteador da API
 diretamente — não abre a interface nem percorre telas; falta um teste real de
 navegador.
@@ -31,7 +31,7 @@ com semanas, JSON, expectativa, métricas, Wrapped, publicação, lixeira"**.
 | 6 | Indicação opcional a cada filme | commit com `recommendedByUserId` em alguns, `originNote` em outros; assert ambos presentes |
 | 7 | Distribuir filmes entre os checkpoints | `POST …/items/assign` |
 | 8 | Duração total de cada semana | assert `checkpoints[].totalRuntimeMinutes > 0` |
-| 9 | Atributos editoriais opcionais | `POST …/catalog-attributes` "Diretor"; `attributes` no commit de itens |
+| 9 | Atributos editoriais opcionais | `POST …/catalog-attributes` "Diretor"; `attributes` no commit de itens. **Ressalva: só por API.** O backend está completo e testado, mas não existe tela para criar/mapear/ver atributos editoriais — este passo do cenário não é cumprível por uma pessoa usando a interface (ver "Pendências") |
 | 10 | Expectativa, avaliação e comentário habilitados | `expectation: true` na criação; tipos `expectation` + `rating` |
 | 11 | Visibilidade por tipo | `PATCH …/entry-types/:id` → `after_close`; expectativa já `after_own` |
 | 12 | Ativar somente após o preflight | `GET …/preflight` `ready === true`, então `transition active` |
@@ -100,7 +100,9 @@ ser possível.
 ## Backlog pós-P0 — estado
 
 O P1 da revisão foi trabalhado em **6 ondas** (commits `fix(P1 onda A–F)`), cada
-uma com testes de regressão. Total: **79 testes de integração + 112 unitários**.
+uma com testes de regressão. Depois vieram duas rodadas de revisão (P0 do
+reset administrativo + P1 de ciclo de vida). Total atual: **84 testes de
+integração + 114 unitários**.
 
 | Onda | O que entrou |
 | --- | --- |
@@ -108,8 +110,21 @@ uma com testes de regressão. Total: **79 testes de integração + 112 unitário
 | **B — Listas/checkpoints** | a ordem enviada em `items/assign` persiste (`position`); Clube de Leitura datado sem dias automáticos organiza semanas/sessões à mão; editor de checkpoint ganha campo de descrição; série `groupBy:checkpoint` inclui semanas vazias (linha com `value:null`) |
 | **C — Métricas/Wrapped** | `count` vira série por pessoa/item/checkpoint; `completion_rate` agrupado é **recusado** (`invalid_metric_grouping`); rankings + afinidade **ao vivo** no detalhe do desafio ativo; `curateResults` só depois de encerrar (`challenge_not_closed`) e o resultado interno é sempre vivo enquanto aberto |
 | **D — Lixeira/ciclo de vida** | seção "Estrutura removida" (`<TrashView>`) na aba Revisão da admin; restaurar item de acervo pessoal refaz o vínculo da lista + registros; registro binado num desafio **encerrado** fica congelado (409); `applyPurge` cobre métricas/opções arquivadas; restaurar desafio desarquiva o catálogo órfão; **migração 0034** faz backfill de `trash_items` |
-| **E — Contas/admin** | exclusão de conta raspa `username`/`username_normalized`/`password_hash`; conta desativada não lê nada privado por `GET` (só `bootstrap`); admin desativado perde o `/admin`; `admin/users/reset-link` exige um pedido de reset do usuário nas últimas 48h e nunca mira outro admin (auditado em `system_audit_events`); publicação nominal usa token opaco `p_…` no lugar do id interno |
+| **E — Contas/admin** | exclusão de conta raspa `username`/`username_normalized`/`password_hash`; conta desativada não lê nada privado por `GET` (só `bootstrap`); admin desativado perde o `/admin`; `admin/users/reset-link` **removida** — a exigência de "pedido recente" era circular (o admin vê o e-mail no painel e `/api/auth/forgot` é público), então a recuperação virou ação de operador (`scripts/reset-password.mjs`, que exige a `DATABASE_URL`); publicação nominal usa token opaco `p_…` no lugar do id interno |
 | **F — Deep links** | `/modelos`, `/modelos/:id`, `/sobre` abrem por URL sem sessão; `app/challenges/new/page.tsx` (era 404 no refresh); testes de round-trip `urlForScreen ↔ screenFromUrl` e de existência de `page.tsx` para cada rota |
+
+### 2ª revisão — o que entrou
+
+| Item | O que mudou |
+| --- | --- |
+| **P0 — reset administrativo** | rota, serviço e aba removidos; `scripts/reset-password.mjs` como ação de operador; teste garante que `POST /api/admin/users/reset-link` responde 404 |
+| Publicação ressuscitando | binar um desafio agora também despublica (`unpublishResults`), então restaurar não devolve a URL pública antiga |
+| Grupo binado órfão | a exclusão de conta passa a varrer também os grupos que já estavam na lixeira do dono (purga ou transfere) |
+| Cota de participantes | `assertUnderMembershipCap` ignora grupos binados — ninguém fica preso numa cota por um grupo que está na lixeira |
+| Restaurações incompletas | restaurar com renomeação usa o `normalizeTitle` canônico; métrica com tipo/campo arquivado é bloqueada (`parent_trashed`); a prévia de purga conta também as linhas arquivadas que vão morrer junto |
+| Migração 0034 | o backfill distingue registro removido à mão de registro varrido junto com o item (só o primeiro vira `trash_items`) |
+| Comentários públicos | a seleção de comentários na admin traz aviso de privacidade antes de publicar texto de terceiros |
+| Importação JSON no wizard | `parseJsonItemsPaste` deixou de engolir entradas inválidas, repetidas e chaves desconhecidas: devolve um resumo (`total/added/invalid/duplicates/unknownKeys`) que o wizard mostra, como o importador pós-criação já fazia |
 
 **Adiado para pós-lançamento (o roadmap já estaciona estes):** afinidade
 composta / "perfil de gosto relativo" (§10 "entra no final da V1"); autor e
@@ -145,16 +160,22 @@ API existe.
 - garantir que a migração do Neon anteceda o deploy da Vercel — processo de
   operação; hoje o push dispara a Vercel e a migração é manual (ver memória
   "Deployment model").
+- **beta fechado com pessoas reais e correção dos achados** (§15) — não é código,
+  é o próximo passo depois deste gate. O gate cobre o cenário do §16 pela API;
+  não substitui uso real.
 
-Documentação alinhada nesta rodada: `docs/api.md` (rotas de lixeira/conta,
-`system-audit`, sem lixeira global do `/admin`); `ROADMAP.md` §13; este arquivo.
-README ainda cita receitas legadas — a alinhar.
+Documentação alinhada: `docs/api.md` (rotas de lixeira/conta, `system-audit`, sem
+lixeira global e sem `reset-link` no `/admin`, receitas criáveis, CSV como única
+resposta não-JSON); `README.md` (receitas criáveis, poderes do `platform_admin`,
+seção "Recuperação de senha"); `ROADMAP.md` §13 e a linha do P1 de privacidade
+(os "30 dias" e a purga automática do texto original foram substituídos pela
+lixeira permanente); este arquivo.
 
 ---
 
 ## Revisão do §15 (qualidade de lançamento)
 
-- **Regressões**: suíte completa verde (109 unit + 55 integração + build).
+- **Regressões**: suíte completa verde (114 unit + 84 integração + build).
 - **Permissões / isolamento**: `challengeAccess`/`requireGroupRole` em toda rota;
   a lixeira deriva o papel do objeto, não da URL; `mvp.test.ts` "isolamento",
   "aplica limites", matriz de purga (participante não purga desafio de grupo;

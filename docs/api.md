@@ -13,8 +13,10 @@ para `lib/`. Esta tabela reflete o que existe; ao mexer numa rota, atualize aqui
 | **sessão+csrf** | sessão + header `x-csrf-token` ligado a ela + `Origin` exato |
 | **admin** | sessão de conta com `platform_admin = true`; respostas `404` para as demais |
 
-Toda resposta é JSON `no-store` com `x-content-type-options: nosniff` e
-`x-frame-options: DENY`. Erros seguem `{ "error": "<código>", "message": "<texto>" }`.
+Toda resposta é `no-store` com `x-content-type-options: nosniff` e
+`x-frame-options: DENY`, e o corpo é JSON — com uma única exceção:
+`GET /api/challenges/:id/export.csv` devolve `text/csv`. Erros seguem
+`{ "error": "<código>", "message": "<texto>" }`, sempre em JSON.
 
 ## Páginas
 
@@ -57,12 +59,14 @@ Toda resposta é JSON `no-store` com `x-content-type-options: nosniff` e
 | `POST /api/groups/:id/invites` | sessão+csrf (owner/admin) | `{ expiresInDays?, maxUses?, challengeId? }` | `201 { id, token, url, kind, groupId, groupName, challengeId, challengeTitle, expiresAt, maxUses }`. Com `challengeId`, o alvo deve pertencer ao grupo e não pode estar encerrado |
 | `POST /api/groups/:id/challenges` | sessão+csrf (owner/admin) | ver "criar desafio" abaixo | `201 { id, challengeId, status: "draft" }`. `403 challenge_limit` ao passar de `MAX_CHALLENGES_PER_GROUP` (6) |
 
-Criar desafio: `{ recipe: "cine_free"|"cine_curated"|"reading_club"|"reading_daily",
-title, description?, meetingUrl?, ruleSections?: [{ title, description }], startsOn?,
-endsOn?, fields[], items[], generateDaily?, participantIds[] }`. A receita abre os
-tipos de registro, os campos e as métricas de análise; `fields` sobrescreve os
-campos do tipo primário. Clientes antigos ainda podem enviar
-`template: "cine"|"reading"` ou `submissionMode` cru.
+Criar desafio: `{ recipe: "cinema"|"library"|"bookshelf"|"habit",
+title, description?, ruleSections?: [{ title, description }], startsOn?,
+endsOn?, expectation?, fields[], items[], generateDaily?, participantIds[] }`. A
+receita abre os tipos de registro, os campos e as métricas de análise; `fields`
+sobrescreve os campos do tipo primário. As quatro chaves antigas (`cine_free`,
+`cine_curated`, `reading_club`, `reading_daily`) continuam sendo **lidas** de
+desafios existentes, mas são recusadas na criação; clientes antigos ainda podem
+enviar `template: "cine"|"reading"` ou `submissionMode` cru.
 
 `startsOn` e `endsOn` formam um período opcional: enviados juntos ou omitidos
 juntos (`null` também remove ambos no rascunho). Aceita datas passadas; a única
@@ -158,4 +162,8 @@ Só expõem metadados — nunca o conteúdo de grupos ou desafios.
 | `POST /api/admin/users/disable` | `{ userId, disabled }` | liga/desliga `disabled_at`; ao desativar revoga as sessões. Admins e a própria conta são protegidos |
 | `POST /api/admin/users/set-admin` | `{ userId, platformAdmin }` | liga/desliga `platform_admin`. Não permite mudar a própria conta (`400 self_target`) |
 | `POST /api/admin/users/revoke-sessions` | `{ userId }` | revoga todas as sessões ativas da conta |
-| `POST /api/admin/users/reset-link` | `{ userId }` | `{ url, expiresAt }` — link de uso único (`/?reset=<token>`) para o admin repassar |
+
+Não há rota de redefinição de senha no `/admin`: qualquer prova de "o usuário
+pediu" seria fabricável pelo próprio administrador (ele vê o e-mail no painel e
+`/api/auth/forgot` é público). A recuperação assistida é ação de operador —
+`node scripts/reset-password.mjs`, que exige a `DATABASE_URL`.

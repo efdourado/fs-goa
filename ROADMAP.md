@@ -700,7 +700,7 @@ Operações básicas; mediana e consenso; média ajustada e elegibilidade; métr
 
 ## P1 — Privacidade e ciclo de vida
 
-Consentimento ao aceitar desafio; consentimento nominal separado; publicação anônima por padrão; rotação e revogação de links; anonimização ao sair; lixeira pessoal e de grupo; recuperação em até 30 dias; purga automática; fluxo de exclusão de conta; política de privacidade inicial.
+Consentimento ao aceitar desafio; consentimento nominal separado; publicação anônima por padrão; rotação e revogação de links; anonimização ao sair; lixeira pessoal e de grupo; restauração sem prazo (a lixeira é permanente e do usuário — ver a decisão em §13, que substitui os "30 dias" e a purga automática do texto original); exclusão em definitivo por ação explícita; fluxo de exclusão de conta; política de privacidade inicial.
 
 ## P0 — Qualidade de lançamento
 
