@@ -4895,3 +4895,92 @@ test("D: excluir permanentemente um campo com métrica arquivada apontando para 
   const purge = await call("POST", `/api/challenges/${challengeId}/trash/purge`, { session: owner, body: { kind: "field", id: extra } });
   assert.equal(purge.response.status, 200, JSON.stringify(purge.body));
 });
+
+// ── Onda E — contas e permissões administrativas ────────────────────────
+
+test("E: excluir a conta apaga usuário, e-mail e senha; a identidade some do login", async () => {
+  const person = await register("E Some", "e_some_conta");
+  const groupId = ((await call("POST", "/api/groups", { session: person, body: { name: "Só meu" } })).body as { id: string }).id;
+  void groupId;
+  assert.equal((await call("POST", "/api/account/delete", { session: person, body: { password: "uma senha segura 123" } })).response.status, 200);
+
+  const row = await adminPool.query<{ username: string; email: string | null; password_hash: string; display_name: string }>(
+    "SELECT username, email, password_hash, display_name FROM users WHERE id = $1", [person.user.id],
+  );
+  assert.equal(row.rows[0].email, null);
+  assert.equal(row.rows[0].display_name, "Conta removida");
+  assert.notEqual(row.rows[0].username, "e_some_conta", "o nome de usuário é raspado");
+  assert.equal(row.rows[0].password_hash, "ACCOUNT-DELETED", "a senha é destruída");
+  // O nome de usuário livre pode ser reusado por outra pessoa.
+  assert.equal((await call("POST", "/api/auth/register", { body: { name: "Novo", username: "e_some_conta", password: "uma senha segura 123" } })).response.status, 201);
+});
+
+test("E: conta desativada não lê dados privados por GET; admin desativado perde o /admin", async () => {
+  const admin = await register("E Admin", "e_admin_desativa");
+  await adminPool.query("UPDATE users SET platform_admin = true WHERE id = $1", [admin.user.id]);
+  const adminSession = await login("e_admin_desativa");
+  assert.equal((await call("GET", "/api/admin/overview", { session: adminSession })).response.status, 200);
+
+  const person = await register("E Pausa", "e_pausa_conta");
+  const gid = ((await call("POST", "/api/groups", { session: person, body: { name: "Grupo Pausa" } })).body as { id: string }).id;
+  await call("POST", "/api/account/deactivate", { session: person, body: {} });
+  const relog = await login("e_pausa_conta");
+  assert.equal((await call("GET", `/api/groups/${gid}/trash`, { session: relog })).response.status, 403, "GET privado bloqueado");
+  assert.equal((await call("GET", `/api/challenges/x`, { session: relog })).response.status, 403);
+  assert.equal((await call("GET", "/api/bootstrap", { session: relog })).response.status, 200, "só o bootstrap responde");
+
+  await call("POST", "/api/account/deactivate", { session: adminSession, body: {} });
+  const adminRelog = await login("e_admin_desativa");
+  assert.equal((await call("GET", "/api/admin/overview", { session: adminRelog })).response.status, 404, "admin desativado não abre o console");
+});
+
+test("E: o link de redefinição do admin só existe se a pessoa pediu, e não mira outro admin", async () => {
+  const admin = await register("E Suporte", "e_suporte_reset");
+  await adminPool.query("UPDATE users SET platform_admin = true WHERE id = $1", [admin.user.id]);
+  const adminSession = await login("e_suporte_reset");
+  const other = await register("E Outro Admin", "e_outro_admin");
+  await adminPool.query("UPDATE users SET platform_admin = true WHERE id = $1", [other.user.id]);
+  const userReg = await call("POST", "/api/auth/register", { body: { name: "E Usuário", username: "e_usuario_reset", password: "uma senha segura 123", email: "e_usuario_reset@example.com" } });
+  const user = { user: (userReg.body as { user: { id: string } }).user };
+
+  // Sem pedido da pessoa → recusado.
+  assert.equal((await call("POST", "/api/admin/users/reset-link", { session: adminSession, body: { userId: user.user.id } })).response.status, 409);
+  // Contra outro admin → recusado.
+  assert.equal((await call("POST", "/api/admin/users/reset-link", { session: adminSession, body: { userId: other.user.id } })).response.status, 403);
+  // Com pedido da pessoa → liberado.
+  await call("POST", "/api/auth/forgot", { body: { email: "e_usuario_reset@example.com" } });
+  const link = await call("POST", "/api/admin/users/reset-link", { session: adminSession, body: { userId: user.user.id } });
+  assert.equal(link.response.status, 200, JSON.stringify(link.body));
+  const logged = await adminPool.query("SELECT 1 FROM system_audit_events WHERE action = 'admin.reset_link_issued'");
+  assert.ok((logged.rowCount ?? 0) >= 1, "a emissão fica no log operacional");
+});
+
+test("E: a publicação nominal não expõe ids internos de participante", async () => {
+  const owner = await register("E Pub", "e_pub_nominal");
+  const b = await register("E Bela Pub", "e_bela_pub");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube E4" } })).body as { id: string }).id;
+  const invite = (await call("POST", `/api/groups/${groupId}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
+  await call("POST", `/api/invites/${invite.token}`, { session: b, body: {} });
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner, body: { recipe: "cinema", title: "Com nomes de novo", participantIds: [owner.user.id, b.user.id], items: [{ title: "F" }] },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  const d = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    entryTypes: Array<{ id: string; purpose: string; fields: Array<{ id: string; key: string }> }>; items: Array<{ id: string }>;
+  };
+  const rating = d.entryTypes.find((t) => t.purpose === "rating")!;
+  const nota = rating.fields.find((f) => f.key === "nota")!.id;
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });
+  await call("PATCH", `/api/challenges/${challengeId}/consent`, { session: b, body: { nameConsent: true } });
+  await call("PATCH", `/api/challenges/${challengeId}/consent`, { session: owner, body: { nameConsent: true } });
+  await call("POST", `/api/challenges/${challengeId}/metrics`, { session: owner, body: { label: "Notas por pessoa", operation: "average", fieldId: nota, groupBy: "participant" } });
+  for (const s of [owner, b]) await call("POST", `/api/challenges/${challengeId}/entries`, { session: s, body: { itemId: d.items[0].id, entryTypeId: rating.id, values: { [nota]: 4 } } });
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "closed" } });
+  await call("POST", `/api/challenges/${challengeId}/results`, { session: owner, body: { anonymizeParticipants: false } });
+  const pub = await call("POST", `/api/challenges/${challengeId}/results/publish`, { session: owner, body: {} });
+  const shared = await call("GET", `/api/results/${(pub.body as { shareToken: string }).shareToken}`);
+  const dump = JSON.stringify(shared.body);
+  assert.doesNotMatch(dump, new RegExp(owner.user.id), "o id do dono não aparece");
+  assert.doesNotMatch(dump, new RegExp(b.user.id), "nem o id de Bela");
+  assert.match(dump, /E Bela Pub/, "mas o nome de quem consentiu aparece");
+});

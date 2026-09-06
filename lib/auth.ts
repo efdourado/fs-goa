@@ -563,10 +563,16 @@ export async function deleteOwnAccount(
       "UPDATE challenge_participants SET removed_at = now() WHERE user_id = $1 AND removed_at IS NULL",
       [session.user.id],
     );
+    // Scrub every piece of PII, including the login identifiers and the
+    // password. The row stays (FK RESTRICT on entries/audit) but holds nothing
+    // personal and cannot be signed into.
     await client.query(
       `UPDATE users
           SET deleted_at = now(), disabled_at = now(), deactivated_at = NULL,
-              display_name = 'Conta removida', email = NULL, email_normalized = NULL, updated_at = now()
+              display_name = 'Conta removida', email = NULL, email_normalized = NULL,
+              username = 'removida_' || substr(replace(id, '-', ''), 1, 16),
+              username_normalized = 'removida_' || substr(replace(id, '-', ''), 1, 16),
+              password_hash = 'ACCOUNT-DELETED', updated_at = now()
         WHERE id = $1`,
       [session.user.id],
     );
@@ -618,15 +624,27 @@ export async function sessionFromRequest(request: Request): Promise<SessionConte
   return sessionFromToken(cookieValue(request, SESSION_COOKIE_NAME));
 }
 
-export async function requireSession(request: Request): Promise<SessionContext> {
+export async function requireSession(
+  request: Request,
+  options: { allowDeactivated?: boolean } = {},
+): Promise<SessionContext> {
   const session = await sessionFromRequest(request);
   if (!session) throw new ApiError(401, "unauthenticated", "Entre na sua conta para continuar.");
+  // A deactivated account reads nothing private — only `bootstrap` (which uses
+  // `sessionFromRequest` directly) and the reactivate / logout routes still
+  // resolve, to let the person come back.
+  if (session.user.deactivated && !options.allowDeactivated) {
+    throw new ApiError(403, "account_deactivated", "Sua conta está desativada. Reative-a para continuar.");
+  }
   return session;
 }
 
-export async function requireMutationSession(request: Request): Promise<SessionContext> {
+export async function requireMutationSession(
+  request: Request,
+  options: { allowDeactivated?: boolean } = {},
+): Promise<SessionContext> {
   requireMutationOrigin(request);
-  const session = await requireSession(request);
+  const session = await requireSession(request, options);
   if (!(await verifyCsrfToken(session.rawToken, request.headers.get("x-csrf-token")))) {
     throw new ApiError(403, "invalid_csrf", "Token de segurança inválido.");
   }
@@ -636,7 +654,7 @@ export async function requireMutationSession(request: Request): Promise<SessionC
 /** Read-only platform-admin gate: 404 (not 403) so the console stays invisible. */
 export async function requirePlatformAdminSession(request: Request): Promise<SessionContext> {
   const session = await sessionFromRequest(request);
-  if (!session?.user.platformAdmin) {
+  if (!session?.user.platformAdmin || session.user.deactivated) {
     throw new ApiError(404, "not_found", "Recurso não encontrado.");
   }
   return session;
@@ -645,7 +663,7 @@ export async function requirePlatformAdminSession(request: Request): Promise<Ses
 /** Mutating platform-admin gate: origin + CSRF + the flag. */
 export async function requirePlatformAdminMutation(request: Request): Promise<SessionContext> {
   const session = await requireMutationSession(request);
-  if (!session.user.platformAdmin) {
+  if (!session.user.platformAdmin || session.user.deactivated) {
     throw new ApiError(404, "not_found", "Recurso não encontrado.");
   }
   return session;
