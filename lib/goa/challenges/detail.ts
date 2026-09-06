@@ -111,7 +111,9 @@ export async function getChallengeDetail(session: SessionContext, challengeId: s
     const primaryEntryTypeId = primaryType?.id ?? null;
     const completionEntryTypeId = completionType?.id ?? null;
     const metrics = await metricsForChallenge(client, challengeId);
-    const result = await resultForChallenge(client, challengeId, metrics);
+    // Rankings + affinity update live while the round is open (ROADMAP §11).
+    // Once closed they are frozen in `result_blocks` and this flag is a no-op.
+    const result = await resultForChallenge(client, challengeId, metrics, { liveRankings: true });
     // The client's `submissionMode` answers "how does a participant pick what to
     // log". A round with catalog items is "item" even when its primary type
     // (a reading club's daily progress) is `daily`.

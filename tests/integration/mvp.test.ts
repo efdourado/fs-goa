@@ -4705,3 +4705,91 @@ test("B: métrica por checkpoint mostra uma linha por semana, inclusive as vazia
   assert.equal(metric.series!.length, 3, "uma linha por semana, mesmo S2 e S3 vazias");
   assert.equal(metric.series!.find((r) => r.label === "S2")!.value, null, "semana sem registro aparece sem valor, não some");
 });
+
+// ── Onda C — métricas e Wrapped ─────────────────────────────────────────
+
+test("C: contagem por pessoa vira série; conclusão por checkpoint é recusada", async () => {
+  const owner = await register("C Conta", "c_conta_serie");
+  const b = await register("C Bea", "c_bea_serie");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube C1" } })).body as { id: string }).id;
+  const invite = (await call("POST", `/api/groups/${groupId}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
+  await call("POST", `/api/invites/${invite.token}`, { session: b, body: {} });
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner, body: { recipe: "cinema", title: "Quem registra mais", participantIds: [owner.user.id, b.user.id], items: [{ title: "F1" }, { title: "F2" }] },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  const d = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    entryTypes: Array<{ id: string; purpose: string; fields: Array<{ id: string; key: string }> }>; items: Array<{ id: string }>;
+  };
+  const rating = d.entryTypes.find((t) => t.purpose === "rating")!;
+  const nota = rating.fields.find((f) => f.key === "nota")!.id;
+
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/metrics`, {
+    session: owner, body: { label: "x", operation: "completion_rate", groupBy: "checkpoint" },
+  })).response.status, 400, "conclusão por checkpoint ainda não existe → recusada");
+
+  const countMetric = await call("POST", `/api/challenges/${challengeId}/metrics`, {
+    session: owner, body: { label: "Registros por pessoa", operation: "count", groupBy: "participant" },
+  });
+  assert.equal(countMetric.response.status, 201, JSON.stringify(countMetric.body));
+
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });
+  await call("POST", `/api/challenges/${challengeId}/entries`, { session: owner, body: { itemId: d.items[0].id, entryTypeId: rating.id, values: { [nota]: 4 } } });
+  await call("POST", `/api/challenges/${challengeId}/entries`, { session: owner, body: { itemId: d.items[1].id, entryTypeId: rating.id, values: { [nota]: 5 } } });
+  await call("POST", `/api/challenges/${challengeId}/entries`, { session: b, body: { itemId: d.items[0].id, entryTypeId: rating.id, values: { [nota]: 3 } } });
+
+  const metric = ((await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    metrics: Array<{ label: string; series?: Array<{ label: string; value: number | null }> }>;
+  }).metrics.find((m) => m.label === "Registros por pessoa")!;
+  assert.ok(Array.isArray(metric.series) && metric.series.length === 2, "uma linha por pessoa");
+  assert.equal(metric.series!.find((r) => r.label === "C Conta")!.value, 2);
+  assert.equal(metric.series!.find((r) => r.label === "C Bea")!.value, 1);
+});
+
+test("C: rankings e afinidade aparecem ao vivo no detalhe do desafio ativo", async () => {
+  const people = await Promise.all(["ca", "cb", "cc", "cd", "ce"].map((s) => register(`C ${s}`, `c_live_${s}`)));
+  const owner = people[0];
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube C2" } })).body as { id: string }).id;
+  for (const m of people.slice(1)) {
+    const inv = (await call("POST", `/api/groups/${groupId}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
+    await call("POST", `/api/invites/${inv.token}`, { session: m, body: {} });
+  }
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: { recipe: "cinema", title: "Afinidade viva", participantIds: people.map((p) => p.user.id), items: Array.from({ length: 6 }, (_v, i) => ({ title: `F${i}` })) },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  const d = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    entryTypes: Array<{ id: string; purpose: string; fields: Array<{ id: string; key: string }> }>; items: Array<{ id: string }>;
+  };
+  const rating = d.entryTypes.find((t) => t.purpose === "rating")!;
+  const nota = rating.fields.find((f) => f.key === "nota")!.id;
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });
+  for (let p = 0; p < people.length; p += 1) {
+    for (let i = 0; i < d.items.length; i += 1) {
+      await call("POST", `/api/challenges/${challengeId}/entries`, { session: people[p], body: { itemId: d.items[i].id, entryTypeId: rating.id, values: { [nota]: ((p + i) % 5) + 1 } } });
+    }
+  }
+  const result = ((await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    result: { blocks?: Array<{ kind: string }>; personalRankings?: unknown[]; affinity?: { pairs?: unknown[] } | null };
+  }).result;
+  assert.ok(
+    (Array.isArray(result.personalRankings) && result.personalRankings.length > 0)
+      || (result.affinity?.pairs && result.affinity.pairs.length > 0)
+      || (result.blocks ?? []).some((b) => b.kind === "ranking" || b.kind === "affinity"),
+    "o detalhe do desafio ativo já traz ranking/afinidade ao vivo",
+  );
+});
+
+test("C: organizar a vitrine só é permitido depois de encerrar", async () => {
+  const owner = await register("C Curad", "c_curadoria");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube C3" } })).body as { id: string }).id;
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner, body: { recipe: "cinema", title: "Vitrine cedo", participantIds: [owner.user.id], items: [{ title: "F" }] },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });
+  const early = await call("POST", `/api/challenges/${challengeId}/results`, { session: owner, body: { headline: "Cedo demais", summary: "x", metricIds: [], comments: [] } });
+  assert.equal(early.response.status, 409, JSON.stringify(early.body));
+  assert.equal((early.body as { error: string }).error, "challenge_not_closed");
+});

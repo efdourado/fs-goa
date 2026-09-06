@@ -275,21 +275,7 @@ export async function calculateMetricRow(
       };
     }
   } else if (metric.operation === "count") {
-    const count = metric.field_id
-      ? await oneOrNull<{ count: number }>(
-          client,
-          `SELECT count(*)::int AS count FROM entry_values ev JOIN entries e ON e.id = ev.entry_id
-            WHERE e.challenge_id = $1 AND ev.field_id = $2 AND e.deleted_at IS NULL`,
-          [metric.challenge_id, metric.field_id],
-        )
-      : await oneOrNull<{ count: number }>(
-          client,
-          // Scoped to the metric's own entry type — a bare count must not fold in
-          // expectations, progress notes and other types' entries.
-          "SELECT count(*)::int AS count FROM entries WHERE challenge_id = $1 AND entry_type_id = $2 AND deleted_at IS NULL",
-          [metric.challenge_id, metric.entry_type_id],
-        );
-    result = { value: count?.count ?? 0, sampleSize: count?.count ?? 0 };
+    result = await computeCountMetric(client, metric);
   } else {
     result = await computeValueMetric(client, metric);
   }
@@ -316,6 +302,56 @@ export async function calculateMetricRow(
 }
 
 type ValueResult = { value: number | null; sampleSize: number; series?: SeriesEntry[] };
+
+/**
+ * Number of valid entries, optionally fanned out by participant ("registros por
+ * pessoa"), item, or checkpoint ("participação da semana"). A `field_id` narrows
+ * the count to entries that actually filled that field.
+ */
+async function computeCountMetric(client: PoolClient, metric: MetricRow): Promise<ValueResult> {
+  const fromWhere = metric.field_id
+    ? `FROM entry_values ev JOIN entries e ON e.id = ev.entry_id
+        LEFT JOIN challenge_items ci ON ci.id = e.item_id
+       WHERE e.challenge_id = $1 AND ev.field_id = $2 AND e.deleted_at IS NULL`
+    : `FROM entries e LEFT JOIN challenge_items ci ON ci.id = e.item_id
+       WHERE e.challenge_id = $1 AND e.entry_type_id = $2 AND e.deleted_at IS NULL`;
+  const params = [metric.challenge_id, metric.field_id ?? metric.entry_type_id];
+
+  if (metric.group_by === "none") {
+    const total = await oneOrNull<{ n: number }>(client, `SELECT count(*)::int AS n ${fromWhere}`, params);
+    return { value: total?.n ?? 0, sampleSize: total?.n ?? 0 };
+  }
+
+  const keyExpr =
+    metric.group_by === "participant" ? "e.participant_user_id"
+      : metric.group_by === "item" ? "e.item_id"
+        : "coalesce(e.checkpoint_id, ci.checkpoint_id)";
+  const rows = await client.query<{ key: string | null; label: string | null; position: number; n: number }>(
+    `SELECT k.key,
+            CASE $3
+              WHEN 'participant' THEN u.display_name
+              WHEN 'item' THEN it.title
+              ELSE cc.title END AS label,
+            coalesce(cc.position, 0)::int AS position,
+            k.n
+       FROM (SELECT ${keyExpr} AS key, count(*)::int AS n ${fromWhere} GROUP BY 1) k
+       LEFT JOIN users u ON u.id = k.key
+       LEFT JOIN challenge_items it ON it.id = k.key
+       LEFT JOIN challenge_checkpoints cc ON cc.id = k.key
+      WHERE k.key IS NOT NULL
+      ORDER BY position, n DESC`,
+    [...params, metric.group_by],
+  );
+  const series: SeriesEntry[] = rows.rows.map((row) => ({
+    key: row.key ?? "—",
+    label: row.label ?? "—",
+    value: row.n,
+    sampleSize: row.n,
+    formattedValue: formatValue(row.n, 0),
+  }));
+  const total = series.reduce((sum, entry) => sum + (entry.value ?? 0), 0);
+  return { value: total, sampleSize: total, series };
+}
 
 interface AggregateContext {
   priorMean: number;
@@ -588,27 +624,35 @@ export async function resultForChallenge(
   // only once frozen. `generateShowcase` / `curateResults` freeze them on close.
   options: { liveRankings?: boolean } = {},
 ) {
-  const challenge = await oneOrNull<{ results_published_at: Date | null; result_share_token_hash: string | null }>(
+  const challenge = await oneOrNull<{ results_published_at: Date | null; result_share_token_hash: string | null; status: string }>(
     client,
-    "SELECT results_published_at, result_share_token_hash FROM challenges WHERE id = $1",
+    "SELECT results_published_at, result_share_token_hash, status FROM challenges WHERE id = $1",
     [challengeId],
   );
-  // All blocks — visibility handled per kind below (a hidden ranking/affinity
-  // block means the admin turned that section off, not "recompute it live").
-  const blocksResult = await client.query<{
-    id: string;
-    kind: "metric" | "entry_value" | "text" | "ranking" | "affinity";
-    metric_id: string | null;
-    heading: string | null;
-    body_snapshot: string | null;
-    value_snapshot: unknown;
-    position: number;
-    visible: boolean;
-  }>(
-    `SELECT id, kind, metric_id, heading, body_snapshot, value_snapshot, position, visible
-       FROM result_blocks WHERE challenge_id = $1 ORDER BY position`,
-    [challengeId],
-  );
+  // Frozen blocks only stand once the round is closed (`generateShowcase` fills
+  // them then). While it is still open the internal result is always live — a
+  // draft curated too early must never override the running numbers.
+  const useFrozenBlocks = challenge?.status === "closed";
+  const blocksResult = useFrozenBlocks
+    ? await client.query<{
+        id: string;
+        kind: "metric" | "entry_value" | "text" | "ranking" | "affinity";
+        metric_id: string | null;
+        heading: string | null;
+        body_snapshot: string | null;
+        value_snapshot: unknown;
+        position: number;
+        visible: boolean;
+      }>(
+        `SELECT id, kind, metric_id, heading, body_snapshot, value_snapshot, position, visible
+           FROM result_blocks WHERE challenge_id = $1 ORDER BY position`,
+        [challengeId],
+      )
+    : { rows: [] as Array<{
+        id: string; kind: "metric" | "entry_value" | "text" | "ranking" | "affinity";
+        metric_id: string | null; heading: string | null; body_snapshot: string | null;
+        value_snapshot: unknown; position: number; visible: boolean;
+      }> };
   const blocks = { rows: blocksResult.rows.filter((block) => block.visible) };
   const needsMetricFallback = blocks.rows.some(
     (block) => block.kind === "metric" && block.value_snapshot === null && block.metric_id !== null,
@@ -697,6 +741,9 @@ const GROUP_BY_BY_OP: Record<string, Set<string>> = {
   consensus: new Set(["none", "item", "checkpoint", "catalog_year", "catalog_author", "catalog_genre"]),
   surprise: new Set(["none", "item"]),
   indicator_bias: new Set(["none", "participant"]),
+  // Count fans out into a real series; completion rate only computes its total.
+  count: new Set(["none", "item", "participant", "checkpoint"]),
+  completion_rate: new Set(["none"]),
 };
 
 interface ParsedMetricInput {
@@ -911,6 +958,12 @@ export async function curateResults(
   return inTransaction(async (client) => {
     const access = await challengeAccess(session.user.id, challengeId, client, true);
     if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores podem editar a vitrine.");
+    // The Wrapped is curated *after* the round closes — while it is open the
+    // internal result is always live, and closing regenerates the blocks anyway
+    // (ROADMAP §11).
+    if (access.challenge.status !== "closed") {
+      throw new ApiError(409, "challenge_not_closed", "A vitrine só pode ser organizada depois que o desafio é encerrado.");
+    }
     if (Object.hasOwn(body, "anonymizeParticipants")) {
       await client.query("UPDATE challenges SET results_anon = $2, updated_at = now() WHERE id = $1",
         [challengeId, body.anonymizeParticipants === true]);

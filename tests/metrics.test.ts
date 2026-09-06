@@ -42,7 +42,8 @@ test("reaproveita métricas calculadas no detalhe sem consultá-las novamente", 
     query: async (sql: string) => {
       queries.push(sql);
       if (sql.includes("SELECT results_published_at")) {
-        return { rows: [{ results_published_at: null }] };
+        // Closed round: the frozen `result_blocks` are what the detail renders.
+        return { rows: [{ results_published_at: null, status: "closed" }] };
       }
       if (sql.includes("FROM result_blocks")) {
         return {
