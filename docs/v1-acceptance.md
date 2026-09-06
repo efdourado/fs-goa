@@ -153,6 +153,7 @@ integração, build verde.**
 | Anonimização despublica sozinha | mudar `anonymizeParticipants` em `curateResults` quando já **há** vitrine publicada agora chama `unpublishResults` na hora — o link antigo para de servir a config anterior. A resposta traz `unpublished:true` e a UI mostra "a vitrine foi despublicada porque a anonimização mudou". Salvar o rascunho sem mexer na anonimização não toca na publicação. Teste: "mudar a anonimização derruba a vitrine já publicada" |
 | Motivo para binar registro alheio | `deleteEntry` passou a exigir `reason` quando owner/admin manda para a lixeira o registro **de outra pessoa** (igual à correção e à exclusão permanente); fica no `trash_items` e na auditoria. Excluir o próprio não pede nada. Novo `readOptionalJsonObject` no `lib/http.ts` para o `DELETE` aceitar corpo opcional. Teste dentro de "registros podem ser excluídos" |
 | README sem contradição | a linha "`/admin` … lixeira (purga definitiva)" saiu — o painel não tem lixeira global (já dito no mesmo parágrafo) |
+| Cópia carrega o cronograma | `copyChallengeStructure` passou a copiar os checkpoints manuais (semana/sessão/marco — o `kind='day'` continua sendo regerado) e o `checkpoint_id` de cada item, remapeados; as datas seguem caindo (a cópia nasce sem período). A duração dos filmes (`runtime_minutes`) também vai junto pelo `upsertCatalogItem`. O detalhe do modelo ganhou `checkpoints[]` e uma seção "Cronograma"; o preview não promete mais "N dias" via `structure` fallback. Teste: "copiar um desafio carrega as semanas, a distribuição dos itens e a duração dos filmes" |
 
 **Adiado para pós-lançamento (o roadmap já estaciona estes):** afinidade
 composta / "perfil de gosto relativo" (§10 "entra no final da V1"); autor e
@@ -204,7 +205,7 @@ substituídos pela lixeira permanente); este arquivo.
 
 ## Revisão do §15 (qualidade de lançamento)
 
-- **Regressões**: suíte completa verde (114 unit + 85 integração + build).
+- **Regressões**: suíte completa verde (114 unit + 86 integração + build).
 - **Permissões / isolamento**: `challengeAccess`/`requireGroupRole` em toda rota;
   a lixeira deriva o papel do objeto, não da URL; `mvp.test.ts` "isolamento",
   "aplica limites", matriz de purga (participante não purga desafio de grupo;

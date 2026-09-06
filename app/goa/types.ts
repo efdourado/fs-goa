@@ -494,6 +494,8 @@ export interface TemplateDetail {
   durationDays: number | null;
   fields: TemplateFieldPreview[];
   items: Array<{ title: string; description?: string | null }>;
+  /** Manual week/session/milestone layout — the schedule that survives a copy. */
+  checkpoints: Array<{ title: string; kind: "week" | "session" | "milestone" }>;
   metrics: Array<{ label: string; operation: Metric["operation"]; groupBy: string }>;
 }
 

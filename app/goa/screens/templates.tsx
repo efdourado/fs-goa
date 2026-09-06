@@ -324,9 +324,23 @@ export function TemplateDetailScreen({
             ) : <p className="mt-2 text-sm text-[var(--muted)]">{t("noFields")}</p>}
           </section>
 
+          {template.checkpoints.length ? (
+            <section className="mt-8">
+              <h2 className="text-xl font-light tracking-[-0.03em]">{t("scheduleTitle")}</h2>
+              <p className="mt-1 text-xs text-[var(--muted)]">{t("scheduleHint", { count: template.checkpoints.length })}</p>
+              <ol className="mt-3 space-y-2">
+                {template.checkpoints.map((checkpoint, index) => (
+                  <li className="text-sm" key={`${checkpoint.title}-${index}`}>
+                    <span className="text-[var(--muted)]">{t("itemIndex", { index: index + 1 })}</span> {checkpoint.title}
+                  </li>
+                ))}
+              </ol>
+            </section>
+          ) : null}
+
           {template.items.length ? (
             <section className="mt-8">
-              <h2 className="text-xl font-light tracking-[-0.03em]">{template.submissionMode === "daily" ? t("checkpointsTitle") : t("itemsTitle")}</h2>
+              <h2 className="text-xl font-light tracking-[-0.03em]">{t("itemsTitle")}</h2>
               <ol className="mt-3 space-y-2">
                 {template.items.map((item, index) => (
                   <li className="text-sm" key={`${item.title}-${index}`}>

@@ -6,11 +6,13 @@ import type { FieldRow, MetricRow } from "./types";
 
 /**
  * Copies a challenge's structure — rules, entry types, fields and their options,
- * round items, and metric definitions — into `targetGroupId` as a fresh `draft`.
- * The recipe carries over; the schedule does not (the copy starts undated, so the
- * admin picks new dates and checkpoints regenerate), and round items re-resolve
- * against the target group's catalog. No entries, participants, checkpoints,
- * results, share tokens, or recommenders come across.
+ * round items (with their week/session/milestone assignment), the manual
+ * checkpoint layout, and metric definitions — into `targetGroupId` as a fresh
+ * `draft`. The recipe carries over; **dates** do not (the copy starts undated, so
+ * the admin picks new ones), and round items re-resolve against the target
+ * group's catalog. Day-by-day checkpoints are left out — those regenerate from
+ * the period. No entries, participants, results, share tokens, or recommenders
+ * come across.
  *
  * Shared by "duplicate this challenge" and "duplicate this template". Callers own
  * every access check and their own audit/bookkeeping rows; this function only
@@ -84,16 +86,41 @@ export async function copyChallengeStructure(
     }
   }
 
+  // The manual checkpoint layout (weeks, sessions, milestones) is the structural
+  // promise a template makes — "six weeks, two films each". Carry it, but drop
+  // the absolute dates: the copy is undated, so the admin sets a fresh period (or
+  // leaves it open) and the schedule follows. Day-by-day checkpoints are skipped
+  // — those are derived from the period and regenerate on the copy.
+  const checkpointMap = new Map<string, string>();
+  const sourceCheckpoints = await client.query<{
+    id: string; semantic_key: string; title: string; description: string | null;
+    kind: string; position: number;
+  }>(
+    `SELECT id,semantic_key,title,description,kind,position
+       FROM challenge_checkpoints
+      WHERE challenge_id=$1 AND archived_at IS NULL AND kind <> 'day'
+      ORDER BY position`, [sourceChallengeId]);
+  for (const source of sourceCheckpoints.rows) {
+    const id = publicId();
+    checkpointMap.set(source.id, id);
+    await client.query(
+      `INSERT INTO challenge_checkpoints
+        (id,challenge_id,semantic_key,title,description,kind,position,starts_at,due_at,created_at,updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,NULL,NULL,now(),now())`,
+      [id, targetId, source.semantic_key, source.title, source.description, source.kind, source.position],
+    );
+  }
+
   const sourceItems = await client.query<{
-    entry_type_id: string | null; semantic_key: string; title: string;
+    entry_type_id: string | null; checkpoint_id: string | null; semantic_key: string; title: string;
     description: string | null; position: number; metadata: unknown;
     catalog_kind: string | null; catalog_title: string | null; catalog_author: string | null;
     catalog_year: number | null; catalog_main_genre: string | null; catalog_pages: number | null;
-    catalog_item_id: string | null;
+    catalog_runtime: number | null; catalog_item_id: string | null;
   }>(
-    `SELECT i.entry_type_id,i.semantic_key,i.title,i.description,i.position,i.metadata,i.catalog_item_id,
+    `SELECT i.entry_type_id,i.checkpoint_id,i.semantic_key,i.title,i.description,i.position,i.metadata,i.catalog_item_id,
             ci.kind AS catalog_kind, ci.title AS catalog_title, ci.author AS catalog_author, ci.year AS catalog_year,
-            ci.main_genre AS catalog_main_genre, ci.page_count AS catalog_pages
+            ci.main_genre AS catalog_main_genre, ci.page_count AS catalog_pages, ci.runtime_minutes AS catalog_runtime
        FROM challenge_items i
        LEFT JOIN catalog_items ci ON ci.id = i.catalog_item_id
       WHERE i.challenge_id=$1 AND i.archived_at IS NULL ORDER BY i.position`, [sourceChallengeId]);
@@ -109,15 +136,18 @@ export async function copyChallengeStructure(
         year: source.catalog_year,
         mainGenre: source.catalog_main_genre,
         pageCount: source.catalog_pages,
+        runtimeMinutes: source.catalog_runtime,
       });
     }
     await client.query(
       `INSERT INTO challenge_items
-        (id,challenge_id,entry_type_id,catalog_item_id,semantic_key,title,description,position,
+        (id,challenge_id,entry_type_id,checkpoint_id,catalog_item_id,semantic_key,title,description,position,
          metadata,created_at,updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,now(),now())`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,now(),now())`,
       [publicId(), targetId,
-        source.entry_type_id ? typeMap.get(source.entry_type_id) : null, catalogItemId,
+        source.entry_type_id ? typeMap.get(source.entry_type_id) : null,
+        source.checkpoint_id ? checkpointMap.get(source.checkpoint_id) ?? null : null,
+        catalogItemId,
         source.semantic_key, source.title, source.description,
         source.position, JSON.stringify(source.metadata ?? {})],
     );

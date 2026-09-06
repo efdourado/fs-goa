@@ -1022,6 +1022,8 @@
     "noFields": "No custom fields.",
     "checkpointsTitle": "Checkpoints",
     "itemsTitle": "Items",
+    "scheduleTitle": "Schedule",
+    "scheduleHint": "{count, plural, one {# stage} other {# stages}} — the copy keeps the stages and how items are spread across them; you set the dates.",
     "itemIndex": "{index}.",
     "itemDescription": " — {description}",
     "metricsTitle": "Metrics",
