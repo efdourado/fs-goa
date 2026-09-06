@@ -1024,6 +1024,80 @@ test("modelos públicos: publica, lista, detalha sem sessão e duplica para um g
   assert.equal((await call("GET", `/api/templates/${challengeId}`)).response.status, 404);
 });
 
+test("copiar um desafio carrega as semanas, a distribuição dos itens e a duração dos filmes", async () => {
+  const owner = await register("Dona Cópia", "dona_copia_cronograma");
+  const sourceGroup = ((await call("POST", "/api/groups", { session: owner, body: { name: "Origem" } })).body as { id: string }).id;
+  const targetGroup = ((await call("POST", "/api/groups", { session: owner, body: { name: "Destino" } })).body as { id: string }).id;
+  const challenge = await call("POST", `/api/groups/${sourceGroup}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "cinema", title: "Ciclo em 3 semanas", startsOn: "2026-03-02", endsOn: "2026-03-22",
+      participantIds: [owner.user.id],
+      items: [
+        { title: "Filme A", year: 2020, runtimeMinutes: 110 },
+        { title: "Filme B", year: 2021, runtimeMinutes: 95 },
+        { title: "Filme C", year: 2019, runtimeMinutes: 130 },
+      ],
+    },
+  });
+  const sourceId = (challenge.body as { id: string }).id;
+  const cps = await call("POST", `/api/challenges/${sourceId}/checkpoints`, {
+    session: owner,
+    body: { checkpoints: [
+      { title: "Semana 1", kind: "week", startsAt: "2026-03-02", dueAt: "2026-03-08" },
+      { title: "Semana 2", kind: "week", startsAt: "2026-03-09", dueAt: "2026-03-15" },
+    ] },
+  });
+  const [w1, w2] = (cps.body as { checkpoints: Array<{ id: string }> }).checkpoints.map((cp) => cp.id);
+  const srcDetail = (await call("GET", `/api/challenges/${sourceId}`, { session: owner })).body as {
+    items: Array<{ id: string; title: string }>;
+  };
+  const byTitle = new Map(srcDetail.items.map((item) => [item.title, item.id]));
+  await call("POST", `/api/challenges/${sourceId}/items/assign`, {
+    session: owner,
+    body: { assignments: [
+      { itemId: byTitle.get("Filme A"), checkpointId: w1 },
+      { itemId: byTitle.get("Filme B"), checkpointId: w1 },
+      { itemId: byTitle.get("Filme C"), checkpointId: w2 },
+    ] },
+  });
+
+  const copied = await call("POST", `/api/challenges/${sourceId}/duplicate`, {
+    session: owner, body: { targetGroupId: targetGroup, title: "Ciclo copiado" },
+  });
+  assert.equal(copied.response.status, 201, JSON.stringify(copied.body));
+  const copyId = (copied.body as { challengeId: string }).challengeId;
+
+  const copyDetail = (await call("GET", `/api/challenges/${copyId}`, { session: owner })).body as {
+    startsOn: string | null; endsOn: string | null;
+    items: Array<{ id: string; title: string; checkpointId: string | null; catalogItem: { runtimeMinutes: number | null } | null }>;
+    checkpoints: Array<{ id: string; title: string; kind: string; itemCount: number; totalRuntimeMinutes: number | null }>;
+  };
+  // As datas não vêm junto — a cópia nasce sem período.
+  assert.equal(copyDetail.startsOn, null);
+  assert.equal(copyDetail.endsOn, null);
+  // Mas as semanas e a distribuição sim.
+  assert.deepEqual(copyDetail.checkpoints.map((cp) => cp.title), ["Semana 1", "Semana 2"]);
+  assert.equal(copyDetail.checkpoints.every((cp) => cp.kind === "week"), true);
+  const copyW1 = copyDetail.checkpoints.find((cp) => cp.title === "Semana 1")!;
+  const copyW2 = copyDetail.checkpoints.find((cp) => cp.title === "Semana 2")!;
+  assert.equal(copyW1.itemCount, 2, "Semana 1 mantém os dois filmes");
+  assert.equal(copyW2.itemCount, 1, "Semana 2 mantém um filme");
+  const copyA = copyDetail.items.find((item) => item.title === "Filme A")!;
+  assert.equal(copyA.checkpointId, copyW1.id, "o filme aponta para a semana copiada");
+  assert.equal(copyA.catalogItem?.runtimeMinutes, 110, "a duração do filme veio junto");
+  assert.equal(copyW1.totalRuntimeMinutes, 205, "e o total da semana soma as durações copiadas");
+
+  // O detalhe público do modelo mostra o cronograma.
+  await adminPool.query("UPDATE users SET platform_admin = true WHERE id = $1", [owner.user.id]);
+  await call("POST", `/api/challenges/${sourceId}/template`, { session: await login("dona_copia_cronograma"), body: {} });
+  const tmpl = (await call("GET", `/api/templates/${sourceId}`)).body as {
+    checkpoints: Array<{ title: string; kind: string }>; items: Array<{ title: string }>;
+  };
+  assert.deepEqual(tmpl.checkpoints.map((cp) => cp.title), ["Semana 1", "Semana 2"]);
+  assert.equal(tmpl.items.length, 3);
+});
+
 test("aplica limites de criação por dono e por grupo", async () => {
   const owner = await register("Limite", "limite_dono");
 

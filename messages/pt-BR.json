@@ -1022,6 +1022,8 @@
     "noFields": "Sem campos personalizados.",
     "checkpointsTitle": "Checkpoints",
     "itemsTitle": "Itens",
+    "scheduleTitle": "Cronograma",
+    "scheduleHint": "{count, plural, one {# etapa} other {# etapas}} — a cópia mantém as etapas e a distribuição dos itens; você define as datas.",
     "itemIndex": "{index}.",
     "itemDescription": " — {description}",
     "metricsTitle": "Métricas",

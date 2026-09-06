@@ -108,9 +108,12 @@ export async function getTemplateDetail(challengeId: string) {
         WHERE challenge_id = $1 AND archived_at IS NULL ORDER BY position`,
       [challengeId],
     );
-    const checkpoints = await client.query<{ title: string; description: string | null; position: number }>(
-      `SELECT title, description, position FROM challenge_checkpoints
-        WHERE challenge_id = $1 AND archived_at IS NULL ORDER BY position`,
+    // Only the manual layout (weeks, sessions, milestones) — day-by-day
+    // checkpoints regenerate from the period and would just be noise here. This
+    // is the part of the schedule that survives a template copy.
+    const checkpoints = await client.query<{ title: string; kind: string; position: number }>(
+      `SELECT title, kind, position FROM challenge_checkpoints
+        WHERE challenge_id = $1 AND archived_at IS NULL AND kind <> 'day' ORDER BY position`,
       [challengeId],
     );
     const metrics = await client.query<{
@@ -121,7 +124,6 @@ export async function getTemplateDetail(challengeId: string) {
       [challengeId],
     );
 
-    const structure = items.rows.length ? items.rows : checkpoints.rows;
     return {
       id: template.id,
       title: template.title,
@@ -143,7 +145,8 @@ export async function getTemplateDetail(challengeId: string) {
           ? (field.options as Array<{ label: string }>).map((option) => option.label)
           : [],
       })),
-      items: structure.map((entry) => ({ title: entry.title, description: entry.description })),
+      items: items.rows.map((entry) => ({ title: entry.title, description: entry.description })),
+      checkpoints: checkpoints.rows.map((entry) => ({ title: entry.title, kind: entry.kind })),
       metrics: metrics.rows.map((metric) => ({
         label: metric.label,
         operation: metric.operation,
