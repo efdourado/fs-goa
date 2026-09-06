@@ -90,11 +90,13 @@ npm run db:setup                                        # local
 node --env-file=.env.production.local scripts/seed-admin.mjs   # depois do migrate, em prod
 
 # dados de demonstração (grupo sintético, desafios preenchidos e encerrados)
-npm run db:seed-demo -- --scenario=cinema --dry-run     # valida contas/ambiente, não grava
-npm run db:seed-demo -- --scenario=cinema               # cria o cenário Cinema
-npm run db:seed-demo -- --reset --scenario=cinema       # apaga o grupo sintético e recria
+npm run db:seed-demo -- --scenario=cinema --dry-run       # local: valida contas/ambiente, não grava
+npm run db:seed-demo -- --scenario=cinema                 # local: cria o cenário Cinema
+npm run db:seed-demo:prod -- --scenario=cinema --dry-run  # prod (Neon), via .env.production.local
+npm run db:seed-demo:prod -- --scenario=cinema            # prod: pede a frase "seed demo" (ou SEED_DEMO_CONFIRM)
 #   Precisa das contas `dudupizzas`, `teste` e `admin` já criadas (admin com platform_admin).
-#   Num banco remoto (Neon) pede uma frase de confirmação; --dry-run nunca grava.
+#   `--reset` remove só o grupo com o marcador ⟦seed-demo⟧ e recria. --dry-run nunca grava.
+#   Atenção: em prod o modelo entra na galeria pública /modelos e o link /results/<token> fica no ar.
 
 # verificações
 npm run lint
