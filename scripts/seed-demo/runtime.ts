@@ -2,7 +2,9 @@ import { createInterface } from "node:readline/promises";
 import process from "node:process";
 
 import type { SessionContext } from "../../lib/auth";
-import { getPool, oneOrNull, withClient } from "../../lib/db";
+import { getPool, inTransaction, oneOrNull, withClient } from "../../lib/db";
+import { writeAudit } from "../../lib/goa/domain/audit";
+import { publicId } from "../../lib/goa/domain/shared";
 import { purgeGroupRows } from "../../lib/goa/purge";
 
 /**
@@ -17,11 +19,10 @@ import { purgeGroupRows } from "../../lib/goa/purge";
  * it and refuses to continue until `--reset` removes it.
  */
 
-export const DEMO_GROUP_NAME = "Laboratório GOA — Dados de demonstração";
+export const DEMO_GROUP_NAME = "Lab — Demo";
 /** Embedded in the group description so `--reset` can only ever match a seed group. */
 export const SYNTHETIC_MARKER = "⟦seed-demo⟧";
-export const DEMO_GROUP_DESCRIPTION =
-  "Grupo de demonstração do GOA. Todas as opiniões, notas e comentários aqui são "
+export const DEMO_GROUP_DESCRIPTION = "Grupo de demonstração. Com opiniões, notas e comentários "
   + `fictícios e gerados automaticamente por \`npm run db:seed-demo\`. ${SYNTHETIC_MARKER}`;
 
 export const DEMO_USERNAMES = {
@@ -146,7 +147,11 @@ interface DemoGroupRow {
   entries: number;
 }
 
-/** The one synthetic group for an owner: exact name **and** the marker in the description. */
+/**
+ * The one synthetic group for an owner — matched by the `⟦seed-demo⟧` marker in
+ * the description, not the name (which the operator may rename between runs).
+ * The marker is distinctive enough that nothing else could carry it.
+ */
 export async function findDemoGroup(ownerId: string): Promise<DemoGroupRow | null> {
   return withClient((client) =>
     oneOrNull<DemoGroupRow>(
@@ -159,8 +164,10 @@ export async function findDemoGroup(ownerId: string): Promise<DemoGroupRow | nul
                 WHERE c.group_id = g.id) AS entries
          FROM groups g
         WHERE g.owner_user_id = $1 AND g.kind = 'standard' AND g.deleted_at IS NULL
-          AND g.name = $2 AND g.description LIKE $3`,
-      [ownerId, DEMO_GROUP_NAME, `%${SYNTHETIC_MARKER}%`],
+          AND g.description LIKE $2
+        ORDER BY g.created_at
+        LIMIT 1`,
+      [ownerId, `%${SYNTHETIC_MARKER}%`],
     ),
   );
 }
@@ -204,8 +211,8 @@ export async function resetDemoGroup(group: DemoGroupRow): Promise<void> {
         client,
         `SELECT id FROM groups
           WHERE id = $1 AND kind = 'standard' AND deleted_at IS NULL
-            AND name = $2 AND description LIKE $3 FOR UPDATE`,
-        [group.id, DEMO_GROUP_NAME, `%${SYNTHETIC_MARKER}%`],
+            AND description LIKE $2 FOR UPDATE`,
+        [group.id, `%${SYNTHETIC_MARKER}%`],
       );
       if (!guard) fail("O grupo de demonstração mudou entre a checagem e o reset. Rode de novo.");
       await purgeGroupRows(client, group.id);
@@ -214,6 +221,31 @@ export async function resetDemoGroup(group: DemoGroupRow): Promise<void> {
       await client.query("ROLLBACK");
       throw error;
     }
+  });
+}
+
+/**
+ * Creates the demo group directly, mirroring `createGroup`'s rows (group +
+ * owner membership + audit) but **without** the per-owner group cap. The seed is
+ * an operator action, not a product one — and the owner's own bin counts toward
+ * that cap (ROADMAP §13), so an account that has been testing would be locked out
+ * of a fresh demo group it does not actually "have".
+ */
+export async function createDemoGroup(ownerId: string): Promise<string> {
+  return inTransaction(async (client) => {
+    const id = publicId();
+    await client.query(
+      `INSERT INTO groups (id, name, description, owner_user_id, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, now(), now())`,
+      [id, DEMO_GROUP_NAME, DEMO_GROUP_DESCRIPTION, ownerId],
+    );
+    await client.query(
+      `INSERT INTO group_members (group_id, user_id, role, added_by_user_id, joined_at)
+       VALUES ($1, $2, 'owner', $2, now())`,
+      [id, ownerId],
+    );
+    await writeAudit(client, id, null, ownerId, "group.created", "group", id, null, { name: DEMO_GROUP_NAME });
+    return id;
   });
 }
 

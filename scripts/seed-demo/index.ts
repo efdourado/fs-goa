@@ -1,12 +1,11 @@
 import process from "node:process";
 
-import { createGroup } from "../../lib/goa/domain/groups";
 import { createInvite, acceptInvite } from "../../lib/goa/domain/invites";
 import { setGroupMemberRole } from "../../lib/goa/domain/groups";
 import { ApiError } from "../../lib/http";
 
 import {
-  closePool, confirmRemote, DEMO_GROUP_DESCRIPTION, DEMO_GROUP_NAME, fail, findDemoGroup,
+  closePool, confirmRemote, createDemoGroup, DEMO_GROUP_NAME, fail, findDemoGroup,
   isSeedError, looksRemote, parseArgs, resetDemoGroup, resolveAccounts, sessionFor,
   type DemoRole, type SeedContext,
 } from "./runtime";
@@ -22,17 +21,14 @@ function heading(text: string): void {
 async function buildGroup(context: Omit<SeedContext, "groupId">): Promise<string> {
   const { session, accounts, log } = context;
   log(`criando o grupo "${DEMO_GROUP_NAME}"`);
-  const group = await createGroup(session.owner, {
-    name: DEMO_GROUP_NAME,
-    description: DEMO_GROUP_DESCRIPTION,
-  });
+  const groupId = await createDemoGroup(accounts.owner.id);
   log("convidando admin e teste");
-  const invite = await createInvite(session.owner, group.id, { maxUses: 5, expiresInDays: 7 });
+  const invite = await createInvite(session.owner, groupId, { maxUses: 5, expiresInDays: 7 });
   for (const role of ["admin", "participant"] as const) {
     await acceptInvite(session[role], invite.token);
   }
-  await setGroupMemberRole(session.owner, group.id, accounts.admin.id, { role: "admin" });
-  return group.id;
+  await setGroupMemberRole(session.owner, groupId, accounts.admin.id, { role: "admin" });
+  return groupId;
 }
 
 function printSummary(results: ScenarioResult[]): void {
