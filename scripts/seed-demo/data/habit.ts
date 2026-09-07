@@ -96,6 +96,6 @@ export const PATTERNS: Record<Role, Pattern> = {
   participant: erratic,
 };
 
-export const HABIT_TITLE = "Estudo — Demo";
+export const HABIT_TITLE = "Estudo";
 export const HABIT_HEADLINE = "21 dias de estudo, 3 formas de (não) manter a régua";
 export const HABIT_SUMMARY = "Um hábito de estudo de 21 dias, com minutos, foco e uma observação por dia. Sem catálogo, sem item.";

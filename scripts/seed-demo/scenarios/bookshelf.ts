@@ -31,7 +31,7 @@ export const bookshelf: Scenario = {
     const created = await createChallenge(session.owner, groupId, {
       recipe: "bookshelf",
       title: BOOKSHELF_TITLE,
-      description: "Estante de demonstração — opiniões fictícias.",
+      description: BOOKSHELF_HEADLINE,
       participantIds: ROLES.map((role) => accounts[role].id),
       items: SHELF.map((book) => ({
         title: book.title,

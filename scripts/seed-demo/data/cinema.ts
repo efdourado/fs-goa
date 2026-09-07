@@ -122,6 +122,6 @@ export const OPINIONS: Array<Record<DemoRole, DemoOpinion>> = [
   },
 ];
 
-export const CINEMA_TITLE = "Cine clube — Demo";
+export const CINEMA_TITLE = "Cine clube";
 export const CINEMA_HEADLINE = "6 semanas, 12 filmes, 3 gostos diferentes";
 export const CINEMA_SUMMARY = "Uma rodada fechada do Cine clube, com expectativa antes de cada sessão e avaliação depois — todas as opiniões são fictícias.";

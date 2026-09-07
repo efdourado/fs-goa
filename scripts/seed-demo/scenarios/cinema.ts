@@ -58,7 +58,7 @@ export const cinema: Scenario = {
     const created = await createChallenge(session.owner, groupId, {
       recipe: "cinema",
       title: CINEMA_TITLE,
-      description: "Rodada de demonstração — opiniões fictícias.",
+      description: CINEMA_HEADLINE,
       startsOn,
       endsOn,
       expectation: true,

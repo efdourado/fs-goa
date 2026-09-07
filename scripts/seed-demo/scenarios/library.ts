@@ -36,7 +36,7 @@ export const library: Scenario = {
     const created = await createChallenge(session.owner, groupId, {
       recipe: "library",
       title: LIBRARY_TITLE,
-      description: "Clube de leitura de demonstração — opiniões fictícias.",
+      description: LIBRARY_HEADLINE,
       startsOn,
       endsOn,
       generateDaily: false,

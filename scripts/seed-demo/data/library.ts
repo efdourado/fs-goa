@@ -85,6 +85,6 @@ export const READING: Array<Record<Role, ReadingLog>> = [
   },
 ];
 
-export const LIBRARY_TITLE = "Clube de leitura — Demo";
+export const LIBRARY_TITLE = "Semanas de leitura";
 export const LIBRARY_HEADLINE = "3 livros, 6 semanas, 2 pausas no meio";
-export const LIBRARY_SUMMARY = "Um clube de leitura fechado: páginas registradas dia a dia, cada livro marcado como concluído ou não, e nota ao terminar.";
+export const LIBRARY_SUMMARY = "Páginas registradas dia a dia, cada livro marcado como concluído ou não, e nota ao terminar.";

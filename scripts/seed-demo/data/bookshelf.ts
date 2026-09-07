@@ -58,6 +58,6 @@ export const RATINGS: Array<Record<Role, ShelfOpinion>> = [
   { owner: { rating: 4.5 }, admin: { rating: 4 }, participant: { rating: 5, comment: "As quase mil páginas passam voando. Devia ser leitura obrigatória." } },
 ];
 
-export const BOOKSHELF_TITLE = "Estante — Demo";
+export const BOOKSHELF_TITLE = "Estante";
 export const BOOKSHELF_HEADLINE = "10 livros marcantes, 3 estantes que não se parecem";
 export const BOOKSHELF_SUMMARY = "Uma estante sem datas: com notas, comentários, e um resultado que mostra o perfil de gosto de cada um.";

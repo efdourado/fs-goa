@@ -39,7 +39,7 @@ export const habit: Scenario = {
     const created = await createChallenge(session.owner, groupId, {
       recipe: "habit",
       title: HABIT_TITLE,
-      description: "Hábito de estudo de demonstração — anotações fictícias.",
+      description: HABIT_HEADLINE,
       startsOn,
       endsOn,
       participantIds: ROLES.map((role) => accounts[role].id),
