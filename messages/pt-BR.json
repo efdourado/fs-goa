@@ -386,6 +386,7 @@
   "cineItems": {
     "titleLabel": "Título do filme",
     "titlePlaceholder": "Ex.: Aftersun",
+    "catalogFacts": "Dados do acervo",
     "author": "Autor",
     "authorPlaceholder": "Ex.: Ursula K. Le Guin",
     "authorRequired": "Informe o autor de cada livro.",

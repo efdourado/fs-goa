@@ -25,6 +25,7 @@ import type {
   GroupSummary,
   Id,
   ImportPreview,
+  Member,
 } from "../types";
 import {
   backLinkClass,
@@ -657,6 +658,115 @@ function FieldEditorDialog({
   );
 }
 
+type ItemUpdatePayload = {
+  title: string; description: string; recommendedByUserId?: string | null;
+  author?: string; year?: number | null; mainGenre?: string; pageCount?: number | null; runtimeMinutes?: number | null;
+};
+
+function ItemEditorDialog({
+  item,
+  challenge,
+  members,
+  catalogKind,
+  onCancel,
+  onSave,
+}: {
+  item: ChallengeItem;
+  challenge: ChallengeDetail;
+  members: Member[];
+  catalogKind: "film" | "book";
+  onCancel: () => void;
+  onSave: (payload: ItemUpdatePayload) => Promise<void>;
+}) {
+  const t = useTranslations("adminChallenge");
+  const tCine = useTranslations("cineItems");
+  const tc = useTranslations("common");
+  const f = useGoaFormat();
+  const hasCatalog = Boolean(item.catalogItem);
+  const initial = {
+    title: item.title,
+    description: item.description ?? "",
+    recommendedBy: item.recommendedBy?.id ?? "",
+    author: item.catalogItem?.author ?? "",
+    year: item.catalogItem?.year ? String(item.catalogItem.year) : "",
+    pages: item.catalogItem?.pageCount ? String(item.catalogItem.pageCount) : "",
+    runtime: item.catalogItem?.runtimeMinutes ? String(item.catalogItem.runtimeMinutes) : "",
+    genre: item.catalogItem?.mainGenre ?? "",
+  };
+  const [draft, setDraft] = useState(initial);
+  const set = (patch: Partial<typeof draft>) => setDraft((current) => ({ ...current, ...patch }));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [discard, setDiscard] = useState(false);
+  const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
+  const close = () => { if (dirty) setDiscard(true); else onCancel(); };
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (hasCatalog && catalogKind === "book" && !draft.author.trim()) { setError(tCine("authorRequired")); return; }
+    setBusy(true);
+    setError(null);
+    try {
+      const year = Number(draft.year);
+      const pages = Number(draft.pages);
+      const runtime = Number(draft.runtime);
+      await onSave({
+        title: draft.title.trim(),
+        description: draft.description.trim(),
+        ...(challenge.submissionMode === "item" ? { recommendedByUserId: draft.recommendedBy || null } : {}),
+        ...(hasCatalog ? {
+          year: Number.isInteger(year) && year > 0 ? year : null,
+          mainGenre: draft.genre.trim(),
+          ...(catalogKind === "book"
+            ? { author: draft.author.trim(), pageCount: Number.isInteger(pages) && pages > 0 ? pages : null }
+            : { runtimeMinutes: Number.isInteger(runtime) && runtime > 0 ? runtime : null }),
+        } : {}),
+      });
+    } catch (cause) { setError(f.error(cause)); setBusy(false); }
+  }
+
+  return (
+    <Dialog title={challenge.submissionMode === "daily" ? t("editCheckpoint") : t("editItem")} busy={busy} onClose={close}>
+      {discard ? (
+        <div role="alert" className="mb-5 space-y-3 rounded-xl bg-[var(--wash)] p-4">
+          <p className="text-sm">{tc("unsavedChanges")}</p>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" disabled={busy} onClick={() => setDiscard(false)}>{tc("keepEditing")}</Button>
+            <Button variant="danger" disabled={busy} onClick={onCancel}>{tc("discardChanges")}</Button>
+          </div>
+        </div>
+      ) : null}
+      <form onSubmit={submit} className="space-y-6">
+        <fieldset disabled={busy} className="min-w-0 space-y-5">
+          <label className="block"><span className={labelClass}>{t("itemTitleLabel")}</span><input className={inputClass} value={draft.title} onChange={(event) => set({ title: event.target.value })} required maxLength={challenge.submissionMode === "daily" ? 160 : 200} /></label>
+          <label className="block"><span className={labelClass}>{t("itemDescriptionLabel")}</span><textarea className={inputClass} rows={3} value={draft.description} onChange={(event) => set({ description: event.target.value })} maxLength={2000} placeholder={t("itemDescriptionPlaceholder")} /></label>
+          {challenge.submissionMode === "item" && members.length ? <label className="block"><span className={labelClass}>{t("itemRecommendedBy")}</span><select className={inputClass} value={draft.recommendedBy} onChange={(event) => set({ recommendedBy: event.target.value })}><option value="">{t("itemRecommendedByNone")}</option>{members.map((member) => <option value={member.id} key={member.id}>{member.name}</option>)}</select></label> : null}
+          {hasCatalog ? (
+            <details className="border-t border-[var(--line)] pt-4">
+              <summary className="cursor-pointer text-sm font-medium">{tCine("catalogFacts")}</summary>
+              <div className="mt-4 space-y-4">
+                {catalogKind === "book" ? <label className="block"><span className={labelClass}>{tCine("author")}</span><input className={cx(inputClass, draft.author.trim() ? "" : "border-[var(--danger)]")} value={draft.author} maxLength={200} placeholder={tCine("authorPlaceholder")} onChange={(event) => set({ author: event.target.value })} /></label> : null}
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <label className="block"><span className={labelClass}>{tCine(catalogKind === "film" ? "latestYear" : "year")}</span><input className={inputClass} type="number" inputMode="numeric" min={1870} max={2200} value={draft.year} onChange={(event) => set({ year: event.target.value })} /></label>
+                  {catalogKind === "book"
+                    ? <label className="block"><span className={labelClass}>{tCine("pages")}</span><input className={inputClass} type="number" inputMode="numeric" min={1} max={100000} value={draft.pages} onChange={(event) => set({ pages: event.target.value })} /></label>
+                    : <label className="block"><span className={labelClass}>{tCine("runtimeMinutes")}</span><input className={inputClass} type="number" inputMode="numeric" min={1} max={2000} value={draft.runtime} placeholder={tCine("runtimeMinutesPlaceholder")} onChange={(event) => set({ runtime: event.target.value })} /></label>}
+                  <label className="block"><span className={labelClass}>{tCine("mainGenre")}</span><input className={inputClass} value={draft.genre} maxLength={80} placeholder={tCine("mainGenrePlaceholder")} onChange={(event) => set({ genre: event.target.value })} /></label>
+                </div>
+              </div>
+            </details>
+          ) : null}
+        </fieldset>
+        <StatusMessage error={error} />
+        <div className="flex justify-end gap-3 border-t border-[var(--line)] pt-4">
+          <Button variant="secondary" disabled={busy} onClick={close}>{tc("cancel")}</Button>
+          <Button type="submit" disabled={busy}>{busy ? tc("saving") : tc("saveChanges")}</Button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
 function AdminItems({
   challenge,
   group,
@@ -670,10 +780,7 @@ function AdminItems({
   group?: GroupSummary;
   entries: Entry[];
   onAdd: (payload: Record<string, unknown>) => Promise<void>;
-  onUpdate: (itemId: Id, payload: {
-    title: string; description: string; recommendedByUserId?: string | null;
-    author?: string; year?: number | null; mainGenre?: string; pageCount?: number | null; runtimeMinutes?: number | null;
-  }) => Promise<void>;
+  onUpdate: (itemId: Id, payload: ItemUpdatePayload) => Promise<void>;
   onArchive: (itemId: Id) => Promise<void>;
   onPreviewImport: (body: { json: string; mapping?: Record<string, string> }) => Promise<ImportPreview>;
 }) {
@@ -690,23 +797,16 @@ function AdminItems({
   const datedDaily = challenge.submissionMode === "daily" && !undatedDaily;
   const canAddItems = challenge.submissionMode === "item" && challenge.status !== "closed";
   const canArchiveItems = challenge.submissionMode === "item" && challenge.status !== "closed";
+  const canShowAdd = challenge.status !== "closed"
+    && !(challenge.submissionMode === "free")
+    && !(undatedDaily)
+    && !(datedDaily && challenge.status === "active");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [editingId, setEditingId] = useState<Id | null>(null);
-  const [editTitle, setEditTitle] = useState("");
-  const [editDescription, setEditDescription] = useState("");
-  const [editRecommendedBy, setEditRecommendedBy] = useState("");
-  const [editAuthor, setEditAuthor] = useState("");
-  const [editYear, setEditYear] = useState("");
-  const [editPages, setEditPages] = useState("");
-  const [editRuntimeMinutes, setEditRuntimeMinutes] = useState("");
-  const [editMainGenre, setEditMainGenre] = useState("");
-  const [editBusy, setEditBusy] = useState(false);
-  const [editError, setEditError] = useState<string | null>(null);
-  const [editSuccess, setEditSuccess] = useState<string | null>(null);
+  const [editing, setEditing] = useState<ChallengeItem | null>(null);
   const [archiving, setArchiving] = useState<ChallengeItem | null>(null);
-  const editLabel = challenge.submissionMode === "daily" ? t("editCheckpoint") : t("editItem");
+  const [showAdd, setShowAdd] = useState(false);
 
   async function archive(item: ChallengeItem) {
     setError(null);
@@ -716,54 +816,6 @@ function AdminItems({
     setSuccess(t("itemRemoved"));
   }
 
-  function startEditing(item: ChallengeItem) {
-    setEditingId(item.id);
-    setEditTitle(item.title);
-    setEditDescription(item.description ?? "");
-    setEditRecommendedBy(item.recommendedBy?.id ?? "");
-    setEditAuthor(item.catalogItem?.author ?? "");
-    setEditYear(item.catalogItem?.year ? String(item.catalogItem.year) : "");
-    setEditPages(item.catalogItem?.pageCount ? String(item.catalogItem.pageCount) : "");
-    setEditRuntimeMinutes(item.catalogItem?.runtimeMinutes ? String(item.catalogItem.runtimeMinutes) : "");
-    setEditMainGenre(item.catalogItem?.mainGenre ?? "");
-    setEditError(null);
-    setEditSuccess(null);
-  }
-
-  async function submitEdit(event: FormEvent<HTMLFormElement>, itemId: Id, hasCatalogItem: boolean) {
-    event.preventDefault();
-    if (hasCatalogItem && catalogKind === "book" && !editAuthor.trim()) {
-      setEditError(tCine("authorRequired"));
-      return;
-    }
-    setEditBusy(true);
-    setEditError(null);
-    setEditSuccess(null);
-    try {
-      const year = Number(editYear);
-      const pages = Number(editPages);
-      const runtimeMinutes = Number(editRuntimeMinutes);
-      await onUpdate(itemId, {
-        title: editTitle.trim(),
-        description: editDescription.trim(),
-        ...(challenge.submissionMode === "item" ? { recommendedByUserId: editRecommendedBy || null } : {}),
-        ...(hasCatalogItem ? {
-          year: Number.isInteger(year) && year > 0 ? year : null,
-          mainGenre: editMainGenre.trim(),
-          ...(catalogKind === "book"
-            ? { author: editAuthor.trim(), pageCount: Number.isInteger(pages) && pages > 0 ? pages : null }
-            : { runtimeMinutes: Number.isInteger(runtimeMinutes) && runtimeMinutes > 0 ? runtimeMinutes : null }),
-        } : {}),
-      });
-      setEditingId(null);
-      setEditSuccess(challenge.submissionMode === "daily" ? t("checkpointUpdated") : t("itemUpdated"));
-    } catch (cause) {
-      setEditError(f.error(cause));
-    } finally {
-      setEditBusy(false);
-    }
-  }
-
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true); setError(null); setSuccess(null);
@@ -771,6 +823,7 @@ function AdminItems({
       if (challenge.submissionMode === "daily") {
         await onAdd({ generate: { frequency: "daily", startsOn, endsOn } });
         setSuccess(t("dailyGenerated"));
+        setShowAdd(false);
       } else {
         const items = cineRowsToInput(newItemRows);
         if (!items.length) { setError(t("errNoItem")); setBusy(false); return; }
@@ -780,79 +833,79 @@ function AdminItems({
         await onAdd({ items });
         setNewItemRows([]);
         setSuccess(t("itemsAdded"));
+        setShowAdd(false);
       }
     } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-      <section className={cx(cardClass, "p-5 sm:p-7")}>
-        <PageHeading title={t("itemsTitle")} description={undatedDaily ? t("itemsHintUndatedDaily") : datedDaily ? t("itemsHintDatedDaily") : challenge.status === "closed" ? t("itemsHintClosed") : t("itemsHintDefault")} />
-        {editSuccess ? <div className="mb-3"><StatusMessage success={editSuccess} /></div> : null}
-        {challenge.items.length ? (
-          <ol className="divide-y divide-[var(--line)]">
-            {[...challenge.items].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)).map((item, index) => (
-              <li className="py-4" key={item.id}>
-                {editingId === item.id ? (
-                  <form className="grid gap-3" onSubmit={(event) => void submitEdit(event, item.id, Boolean(item.catalogItem))}>
-                    <div className="flex items-center gap-3">
-                      <span className="grid h-8 w-8 flex-none place-items-center rounded-lg bg-[var(--wash)] text-xs font-light text-[var(--muted)]">{index + 1}</span>
-                      <strong className="text-sm">{editLabel}</strong>
-                    </div>
-                    <label><span className={labelClass}>{t("itemTitleLabel")}</span><input className={inputClass} value={editTitle} onChange={(event) => setEditTitle(event.target.value)} required maxLength={challenge.submissionMode === "daily" ? 160 : 200} /></label>
-                    <label><span className={labelClass}>{t("itemDescriptionLabel")}</span><textarea className={inputClass} rows={3} value={editDescription} onChange={(event) => setEditDescription(event.target.value)} maxLength={2000} placeholder={t("itemDescriptionPlaceholder")} /></label>
-                    {challenge.submissionMode === "item" && members.length ? <label><span className={labelClass}>{t("itemRecommendedBy")}</span><select className={inputClass} value={editRecommendedBy} onChange={(event) => setEditRecommendedBy(event.target.value)}><option value="">{t("itemRecommendedByNone")}</option>{members.map((member) => <option value={member.id} key={member.id}>{member.name}</option>)}</select></label> : null}
-                    {item.catalogItem && catalogKind === "book" ? (
-                      <label><span className={labelClass}>{tCine("author")}</span><input className={cx(inputClass, editAuthor.trim() ? "" : "border-[var(--danger)]")} value={editAuthor} maxLength={200} placeholder={tCine("authorPlaceholder")} onChange={(event) => setEditAuthor(event.target.value)} /></label>
-                    ) : null}
-                    {item.catalogItem ? (
-                      <div className="grid gap-2 sm:grid-cols-3">
-                        <label><span className={labelClass}>{tCine(catalogKind === "film" ? "latestYear" : "year")}</span><input className={inputClass} type="number" inputMode="numeric" min={1870} max={2200} value={editYear} onChange={(event) => setEditYear(event.target.value)} /></label>
-                        {catalogKind === "book"
-                          ? <label><span className={labelClass}>{tCine("pages")}</span><input className={inputClass} type="number" inputMode="numeric" min={1} max={100000} value={editPages} onChange={(event) => setEditPages(event.target.value)} /></label>
-                          : <label><span className={labelClass}>{tCine("runtimeMinutes")}</span><input className={inputClass} type="number" inputMode="numeric" min={1} max={2000} value={editRuntimeMinutes} placeholder={tCine("runtimeMinutesPlaceholder")} onChange={(event) => setEditRuntimeMinutes(event.target.value)} /></label>}
-                        <label><span className={labelClass}>{tCine("mainGenre")}</span><input className={inputClass} value={editMainGenre} maxLength={80} placeholder={tCine("mainGenrePlaceholder")} onChange={(event) => setEditMainGenre(event.target.value)} /></label>
-                      </div>
-                    ) : null}
-                    <StatusMessage error={editError} />
-                    <div className="flex flex-wrap gap-2"><Button type="submit" disabled={editBusy}>{editBusy ? tc("saving") : tc("save")}</Button><Button variant="ghost" disabled={editBusy} onClick={() => { setEditingId(null); setEditError(null); }}>{tc("cancel")}</Button></div>
-                  </form>
-                ) : (
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex min-w-0 gap-3">
-                      <span className="grid h-8 w-8 flex-none place-items-center rounded-lg bg-[var(--wash)] text-xs font-light text-[var(--muted)]">{index + 1}</span>
-                      <span className="min-w-0"><strong className="block text-sm">{item.title}{item.catalogItem?.year ? ` (${item.catalogItem.year})` : ""}</strong>{item.description ? <span className="mt-1 block text-sm leading-6 text-[var(--muted)]">{item.description}</span> : null}{item.recommendedBy || item.catalogItem?.author || item.catalogItem?.mainGenre || item.catalogItem?.runtimeMinutes ? <small className="mt-1 block text-[var(--muted)]">{[item.catalogItem?.author ? tCine("byAuthor", { name: item.catalogItem.author }) : null, item.recommendedBy ? t("itemRecommendedByLine", { name: item.recommendedBy.name }) : null, item.catalogItem?.mainGenre || null, formatRuntime(item.catalogItem?.runtimeMinutes)].filter(Boolean).join(" · ")}</small> : null}{item.date || item.opensAt || item.dueAt ? <small className="mt-1 block text-[var(--muted)]">{item.date ? f.date(item.date) : t("itemWindow", { opens: f.date(item.opensAt), due: f.date(item.dueAt) })}</small> : null}</span>
-                    </div>
-                    <div className="flex flex-none flex-col items-end gap-2"><span className="rounded-full bg-[var(--wash)] px-2 py-1 text-[10px] font-light text-[var(--muted)]">{f.itemStatusLabel(item.status)}</span>{challenge.status !== "closed" ? <div className="flex gap-2"><Button variant="secondary" className="min-h-9 px-3 py-1 text-xs" onClick={() => startEditing(item)}>{t("edit")}</Button>{canArchiveItems ? <button type="button" className="min-h-9 px-2 text-xs text-[var(--danger)] hover:underline" onClick={() => { setError(null); setArchiving(item); }}>{t("remove")}</button> : null}</div> : null}</div>
+    <section className="mx-auto max-w-5xl">
+      <PageHeading
+        title={t("itemsTitle")}
+        description={undatedDaily ? t("itemsHintUndatedDaily") : datedDaily ? t("itemsHintDatedDaily") : challenge.status === "closed" ? t("itemsHintClosed") : t("itemsHintDefault")}
+        action={canShowAdd ? <Button variant={showAdd ? "secondary" : "primary"} onClick={() => setShowAdd((open) => !open)}>{showAdd ? tc("close") : challenge.submissionMode === "daily" ? t("generateCheckpoints") : t("add")}</Button> : undefined}
+      />
+      <div className="mb-5"><StatusMessage error={error} success={success} /></div>
+
+      {showAdd && canShowAdd ? (
+        <div className="mb-8 rounded-2xl border border-[var(--line)] p-5">
+          <form className="space-y-4" onSubmit={submit}>
+            {challenge.submissionMode === "daily"
+              ? <><p className="text-xs leading-5 text-[var(--muted)]">{t("dailyGenNote")}</p><label className="block"><span className={labelClass}>{t("firstDay")}</span><input className={inputClass} type="date" value={startsOn} readOnly required /></label><label className="block"><span className={labelClass}>{t("lastDay")}</span><input className={inputClass} type="date" min={startsOn} value={endsOn} readOnly required /></label></>
+              : <><CineItemsEditor value={newItemRows} onChange={setNewItemRows} members={members} catalogPath={group ? API_PATHS.groupCatalog(group.id) : API_PATHS.personalCatalog} kind={catalogKind} />{challenge.status === "active" ? <p className="text-xs leading-5 text-[var(--muted)]">{t("activeItemsNote")}</p> : null}</>}
+            <Button type="submit" disabled={busy || (challenge.submissionMode === "daily" ? challenge.status !== "draft" : !canAddItems || !newItemRows.length)}>{busy ? tc("saving") : challenge.submissionMode === "daily" ? t("generateCheckpoints") : t("add")}</Button>
+          </form>
+          {challenge.submissionMode === "item" ? (
+            <div className="mt-5 border-t border-[var(--line)] pt-5">
+              <ListImportPanel onPreview={onPreviewImport} onCommit={(items: ChallengeItemInput[]) => onAdd({ items })} />
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {challenge.items.length ? (
+        <ol className="divide-y divide-[var(--line)]">
+          {[...challenge.items].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)).map((item, index) => (
+            <li className="flex items-start justify-between gap-4 py-4" key={item.id}>
+              <div className="flex min-w-0 gap-4">
+                <span className="w-6 shrink-0 pt-0.5 text-sm tabular-nums text-[var(--muted)]">{String(index + 1).padStart(2, "0")}</span>
+                <span className="min-w-0">
+                  <strong className="block text-base font-medium">{item.title}{item.catalogItem?.year ? ` (${item.catalogItem.year})` : ""}</strong>
+                  {item.description ? <span className="mt-1 block text-sm leading-6 text-[var(--muted)]">{item.description}</span> : null}
+                  {item.recommendedBy || item.catalogItem?.author || item.catalogItem?.mainGenre || item.catalogItem?.runtimeMinutes ? <small className="mt-1 block text-[var(--muted)]">{[item.catalogItem?.author ? tCine("byAuthor", { name: item.catalogItem.author }) : null, item.recommendedBy ? t("itemRecommendedByLine", { name: item.recommendedBy.name }) : null, item.catalogItem?.mainGenre || null, formatRuntime(item.catalogItem?.runtimeMinutes)].filter(Boolean).join(" · ")}</small> : null}
+                  {item.date || item.opensAt || item.dueAt ? <small className="mt-1 block text-[var(--muted)]">{item.date ? f.date(item.date) : t("itemWindow", { opens: f.date(item.opensAt), due: f.date(item.dueAt) })}</small> : null}
+                </span>
+              </div>
+              <div className="flex flex-none flex-col items-end gap-2">
+                <span className="rounded-full bg-[var(--wash)] px-2 py-1 text-[10px] font-light text-[var(--muted)]">{f.itemStatusLabel(item.status)}</span>
+                {challenge.status !== "closed" ? (
+                  <div className="flex items-center gap-2">
+                    <Button variant="secondary" className="min-h-9 px-3 py-1 text-xs" onClick={() => { setError(null); setEditing(item); }}>{t("edit")}</Button>
+                    {canArchiveItems ? <button type="button" className="min-h-9 px-2 text-xs text-[var(--danger)] hover:underline" onClick={() => { setError(null); setArchiving(item); }}>{t("remove")}</button> : null}
                   </div>
-                )}
-              </li>
-            ))}
-          </ol>
-        ) : undatedDaily
-          ? <EmptyState title={t("noItemsUndatedTitle")} description={t("noItemsUndatedBody")} />
-          : <EmptyState title={t("noItemsTitle")} description={t("noItemsBody")} />}
-      </section>
-      <aside className={cx(cardClass, "h-fit p-5")}>
-        <h2 className="text-lg font-light">{undatedDaily ? t("asideUndated") : datedDaily ? t("asideDatedDaily") : t("asideItems")}</h2>
-        {challenge.submissionMode === "free" ? <p className="mt-4 text-sm leading-6 text-[var(--muted)]">{t("freeModeNote")}</p>
-          : undatedDaily ? <p className="mt-4 text-sm leading-6 text-[var(--muted)]">{t("undatedAsideNote")}</p>
-          : datedDaily && challenge.status === "active" ? <p className="mt-4 text-sm leading-6 text-[var(--muted)]">{t("datedDailyActiveNote")}</p>
-          : challenge.submissionMode === "item" && challenge.status === "closed" ? <p className="mt-4 text-sm leading-6 text-[var(--muted)]">{t("itemClosedNote")}</p>
-          : <form className="mt-4 space-y-4" onSubmit={submit}>
-          {challenge.submissionMode === "daily" ? <><p className="text-xs leading-5 text-[var(--muted)]">{t("dailyGenNote")}</p><label><span className={labelClass}>{t("firstDay")}</span><input className={inputClass} type="date" value={startsOn} readOnly required /></label><label><span className={labelClass}>{t("lastDay")}</span><input className={inputClass} type="date" min={startsOn} value={endsOn} readOnly required /></label></> : <><CineItemsEditor value={newItemRows} onChange={setNewItemRows} members={members} catalogPath={group ? API_PATHS.groupCatalog(group.id) : API_PATHS.personalCatalog} kind={catalogKind} />{challenge.status === "active" ? <p className="text-xs leading-5 text-[var(--muted)]">{t("activeItemsNote")}</p> : null}</>}
-          <StatusMessage error={error} success={success} />
-          <Button type="submit" className="w-full" disabled={busy || (challenge.submissionMode === "daily" ? challenge.status !== "draft" : !canAddItems || !newItemRows.length)}>{busy ? tc("saving") : challenge.submissionMode === "daily" ? t("generateCheckpoints") : t("add")}</Button>
-        </form>}
-        {challenge.submissionMode === "item" && challenge.status !== "closed" ? (
-          <div className="mt-5">
-            <ListImportPanel
-              onPreview={onPreviewImport}
-              onCommit={(items: ChallengeItemInput[]) => onAdd({ items })}
-            />
-          </div>
-        ) : null}
-      </aside>
+                ) : null}
+              </div>
+            </li>
+          ))}
+        </ol>
+      ) : undatedDaily
+        ? <EmptyState title={t("noItemsUndatedTitle")} description={t("noItemsUndatedBody")} />
+        : <EmptyState title={t("noItemsTitle")} description={t("noItemsBody")} />}
+
+      {editing ? (
+        <ItemEditorDialog
+          item={editing}
+          challenge={challenge}
+          members={members}
+          catalogKind={catalogKind}
+          onCancel={() => setEditing(null)}
+          onSave={async (payload) => {
+            await onUpdate(editing.id, payload);
+            setEditing(null);
+            setSuccess(challenge.submissionMode === "daily" ? t("checkpointUpdated") : t("itemUpdated"));
+          }}
+        />
+      ) : null}
 
       {archiving ? (
         <ConfirmDialog
@@ -867,7 +920,7 @@ function AdminItems({
           onConfirm={() => archive(archiving)}
         />
       ) : null}
-    </div>
+    </section>
   );
 }
 

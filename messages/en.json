@@ -386,6 +386,7 @@
   "cineItems": {
     "titleLabel": "Film title",
     "titlePlaceholder": "e.g. Aftersun",
+    "catalogFacts": "Catalogue facts",
     "author": "Author",
     "authorPlaceholder": "e.g. Ursula K. Le Guin",
     "authorRequired": "Add the author of each book.",
