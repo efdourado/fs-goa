@@ -40,9 +40,17 @@ export function MetricBlock({ metric, hideThinLabel = false }: { metric: Metric;
       <h3 className="text-base font-medium tracking-tight">{metric.label}</h3>
       {series?.length ? (
         visibleRows.length ? (
-          <ol className={scrolls ? "mt-3 max-h-[21rem] overflow-y-auto overscroll-contain rounded-xl border border-[var(--line)] px-4 sm:px-5" : "mt-2"}>
-            {visibleRows.map(row)}
-          </ol>
+          scrolls ? (
+            <div className="relative mt-3">
+              <ol className="max-h-[21rem] overflow-y-auto overscroll-contain rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4 sm:px-5">
+                {visibleRows.map(row)}
+              </ol>
+              {/* soft fade so the last row doesn't look chopped off */}
+              <div aria-hidden="true" className="pointer-events-none absolute inset-x-px bottom-px h-14 rounded-b-[11px] bg-gradient-to-t from-[var(--paper)] to-transparent" />
+            </div>
+          ) : (
+            <ol className="mt-2">{visibleRows.map(row)}</ol>
+          )
         ) : <p className="mt-3 text-sm text-[var(--muted)]">{t("rankingPending")}</p>
       ) : <strong className="mt-3 block text-5xl font-medium tracking-[-0.05em] tabular-nums">{metric.formattedValue ?? metric.value ?? "—"}</strong>}
     </article>
