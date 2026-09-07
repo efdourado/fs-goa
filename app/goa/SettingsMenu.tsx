@@ -69,7 +69,7 @@ export function SettingsMenu({ className }: { className?: string }) {
   }, [open]);
 
   const label = (text: string) => (
-    <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">{text}</span>
+    <span className="text-[11px] font-semibold tracking-[0.06em] text-[var(--muted)]">{text}</span>
   );
 
   return (
