@@ -868,8 +868,6 @@
     "checkpointDoneLabel": "done",
     "checkpointSoonLabel": "soon",
     "checkpointTally": "{done} done · {pending} to go",
-    "completedTitle": "Completed",
-    "completedTally": "{done} of {total} · {pct}%",
     "historyTitle": "Your entries",
     "historySubtitle": "Only what you submitted in this challenge.",
     "dailyCheckIn": "Daily check-in",

@@ -896,17 +896,6 @@ export function ParticipantChallengeScreen({
     />
   ) : null;
 
-  // Results shows only what's finished, with the ratings and a % complete.
-  const doneItems = sortedItems.filter((item) => doneByItem.has(item.id));
-  const completedCard = doneItems.length ? (
-    <EntryPicker
-      title={t("completedTitle")}
-      tally={t("completedTally", { done: doneCount, total: sortedItems.length, pct: completion })}
-      selectedId={null}
-      onSelect={(id) => { setSelectedItemId(id); onTab("today"); }}
-      options={doneItems.map((item) => ({ id: item.id, label: item.catalogItem?.year ? `${item.title} (${item.catalogItem.year})` : item.title, done: true, rating: ratingByItem.get(item.id) ?? null }))}
-    />
-  ) : null;
 
   return (
     <main className="mx-auto max-w-7xl overflow-x-clip px-4 py-6 pb-28 sm:px-6 sm:py-10">
@@ -966,10 +955,7 @@ export function ParticipantChallengeScreen({
         ) : null}
 
         {activeTab === "results" ? (
-          <div className="space-y-5">
-            {completedCard}
-            <ResultView challenge={challenge} hideCompletionRate onBackToEntry={preview ? undefined : () => onTab("today")} />
-          </div>
+          <ResultView challenge={challenge} hideCompletionRate onBackToEntry={preview ? undefined : () => onTab("today")} />
         ) : null}
       </div>
 
