@@ -71,15 +71,23 @@ export function AccountScreen({
   const [showDelete, setShowDelete] = useState(false);
   const [deletePassword, setDeletePassword] = useState("");
   const [preview, setPreview] = useState<DeletionPreview | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewNonce, setPreviewNonce] = useState(0);
 
   useEffect(() => {
     if (!showDelete) return;
     const controller = new AbortController();
     apiRequest<DeletionPreview>(API_PATHS.accountDeletionPreview, { signal: controller.signal })
-      .then(setPreview)
-      .catch(() => undefined);
+      .then((data) => { setPreview(data); setPreviewError(null); })
+      .catch((cause: unknown) => {
+        if (cause instanceof DOMException && cause.name === "AbortError") return;
+        // Deletion must not proceed blind: if we can't show the consequences,
+        // the confirm button stays disabled until this succeeds.
+        setPreview(null);
+        setPreviewError(f.error(cause));
+      });
     return () => controller.abort();
-  }, [showDelete]);
+  }, [showDelete, previewNonce, f]);
 
   async function deactivate() {
     if (!window.confirm(t("deactivateConfirm"))) return;
@@ -234,8 +242,16 @@ export function AccountScreen({
                   ))}
                   <li>{t("consequencePersonal")}</li>
                   {preview.publishedChallenges > 0 ? <li>{t("consequencePublications", { count: preview.publishedChallenges })}</li> : null}
+                  <li>{t("consequenceContributions")}</li>
                 </ul>
-              ) : null}
+              ) : previewError ? (
+                <div className="space-y-2 text-sm">
+                  <StatusMessage error={t("consequencesFailed")} />
+                  <Button variant="secondary" onClick={() => setPreviewNonce((n) => n + 1)}>{tc("retry")}</Button>
+                </div>
+              ) : (
+                <p className="text-sm text-[var(--muted)]" role="status">{t("consequencesLoading")}</p>
+              )}
               <label className="block">
                 <span className={labelClass}>{t("deletePasswordLabel")}</span>
                 <input className={inputClass} type="password" autoComplete="current-password" value={deletePassword}
@@ -243,7 +259,7 @@ export function AccountScreen({
               </label>
               <div className="flex gap-2">
                 <Button variant="ghost" onClick={() => { setShowDelete(false); setDeletePassword(""); }} disabled={deleteBusy}>{tc("cancel")}</Button>
-                <Button variant="danger" disabled={deleteBusy || deletePassword.length === 0} onClick={() => void deletePermanently()}>
+                <Button variant="danger" disabled={deleteBusy || deletePassword.length === 0 || !preview} onClick={() => void deletePermanently()}>
                   {deleteBusy ? t("deleting") : t("deletePermanentConfirm")}
                 </Button>
               </div>

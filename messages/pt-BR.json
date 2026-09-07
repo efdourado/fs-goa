@@ -1084,7 +1084,10 @@
     "consequenceTransfer": "O grupo “{name}” troca de dono.",
     "consequencePurgeGroup": "O grupo “{name}” é apagado de vez.",
     "consequencePersonal": "Seu espaço pessoal e o acervo pessoal são apagados de vez.",
-    "consequencePublications": "{count, plural, one {# vitrine publicada sua sai do ar} other {# vitrines publicadas suas saem do ar}}."
+    "consequencePublications": "{count, plural, one {# vitrine publicada sua sai do ar} other {# vitrines publicadas suas saem do ar}}.",
+    "consequencesLoading": "Calculando o que será apagado…",
+    "consequencesFailed": "Não deu para calcular o que será apagado. A exclusão só continua depois que essa lista aparecer.",
+    "consequenceContributions": "Suas notas e comentários ficam no grupo, sem o seu nome — mas o texto que você escreveu não é reescrito."
   },
   "publicResults": {
     "footer": "Memória publicada pelo grupo no Goa."

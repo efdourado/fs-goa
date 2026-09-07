@@ -2,7 +2,9 @@
 
 > **Estado:** tópicos 1–17 implementados em `main`. O gate final (§15–17) e a
 > execução dos 23 passos do §16 estão documentados em `docs/v1-acceptance.md`.
-> Pendências operacionais: migrações `0027`–`0033` no Neon; beta fechado real.
+> O código já inclui migrações até `0035`; aplicação no Neon precisa de verificação
+> operacional. Beta fechado real ainda é um gate. Revisão atual e próximos passos:
+> `docs/releases.md` e `docs/phase-2.md`.
 
 ## 1. Definição do produto
 
@@ -593,12 +595,13 @@ O resultado interno é obrigatório e disponível aos participantes.
 
 ## Token
 
-Decisão fechada:
+Decisão atual (migração `0035`, substitui a decisão original de hash-only):
 
-- banco guarda apenas o hash;
-- token completo é mostrado quando o link é criado;
-- se o administrador perder o link, gera outro;
-- gerar outro invalida o anterior;
+- banco guarda hash e token completo para reapresentar o link aos autorizados;
+- consulta pública continua usando o hash;
+- rotação explícita gera outro token e invalida o anterior;
+- despublicar limpa hash, token completo e snapshot;
+- acesso ao banco pode revelar links publicados; revisar esse tradeoff no gate;
 - tokens nunca aparecem em logs ou auditoria.
 
 ## Consentimento de nomes
@@ -680,7 +683,7 @@ Registrar: ator; ação; tipo e ID da entidade; grupo/desafio; data; campos alte
 3. Corrigir deep links e refresh.
 4. Implementar preflight.
 5. Definir visibilidade por tipo de registro.
-6. Voltar token público para hash-only.
+6. Proteger token público (hash-only na entrega original; decisão atual de `0035` em §12).
 7. Limitar conteúdo visível ao administrador da plataforma.
 8. Atualizar documentação atual versus legado.
 

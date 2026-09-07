@@ -103,6 +103,15 @@ export function notFound(): never {
   throw new ApiError(404, "not_found", "Recurso não encontrado.");
 }
 
+/**
+ * Strips bearer tokens (public showcase links, invite tokens) out of a string
+ * before it reaches a log line. `/results/<token>` and `/invites/<token>` carry
+ * a credential in the path; a raw token must never land in `console.error`.
+ */
+export function redactTokens(value: string): string {
+  return value.replace(/\/(results|invites)\/[A-Za-z0-9_-]{8,}/g, "/$1/<token>");
+}
+
 export async function handleApi(
   work: () => Promise<Response>,
   request?: Request,
@@ -126,12 +135,12 @@ export async function handleApi(
     // the body and the `x-request-id` header.
     const requestId = (request?.headers.get("x-request-id") || crypto.randomUUID()).slice(0, 64);
     let route: string | undefined;
-    try { route = request ? `${request.method} ${new URL(request.url).pathname}` : undefined; } catch { /* ignore */ }
+    try { route = request ? redactTokens(`${request.method} ${new URL(request.url).pathname}`) : undefined; } catch { /* ignore */ }
     console.error("Unhandled Goa API error", {
       requestId,
       route,
       name: error instanceof Error ? error.name : "unknown",
-      message: error instanceof Error ? error.message : String(error),
+      message: redactTokens(error instanceof Error ? error.message : String(error)),
       pgCode: databaseError?.code,
       constraint: databaseError?.constraint,
     });

@@ -180,7 +180,8 @@ docs/       arquitetura (docs/architecture.md) e endpoints (docs/api.md)
   expectativa), viés do indicador. As receitas já semeiam as métricas certas.
 - **Vitrine** — ao encerrar, o Goa gera a história (hero, KPIs, ranking, perfis,
   melhores comentários) e congela um snapshot; owner/admin ajustam manchete/
-  resumo, regeneram e publicam em `/results/<token>` (o banco guarda só o hash).
+  resumo, regeneram e publicam em `/results/<token>` (desde a migração `0035`,
+  o banco guarda hash e token completo para reapresentar o link aos autorizados).
 - **`/admin`** — painel só de metadados para a conta `platform_admin`: uso,
   tamanho do banco, auditoria (sem textos privados), moderação de contas. **Não**
   tem lixeira global nem redefine senha — a lixeira é sempre do dono do conteúdo.
@@ -191,8 +192,9 @@ segurança e as decisões; [docs/api.md](docs/api.md) para os endpoints.
 
 ## Para onde vai
 
-[ROADMAP.md](ROADMAP.md) — o que já entrou e o que vem a seguir (afinidade entre
-pessoas, cortes por gênero/década, automação).
+[ROADMAP.md](ROADMAP.md) — escopo e histórico da V1.
+[Plano da Fase 2](docs/phase-2.md) — organização, edição e descoberta pública.
+[Releases](docs/releases.md) — revisão atual, pendências e versionamento no GitHub.
 
 ## Licença
 

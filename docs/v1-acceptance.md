@@ -62,7 +62,7 @@ com semanas, JSON, expectativa, métricas, Wrapped, publicação, lixeira"**.
 | Métricas corretas, explicáveis e úteis | `lib/goa/analysis.ts` + `lib/metrics.ts` (`tests/analysis.test.ts`, `tests/metrics.test.ts`); toda métrica calculada tem `explanation` + `sample` |
 | O Wrapped é a melhor tela | `resultForChallenge` → `blocks[]` ordenáveis; `mvp.test.ts` "blocos organizáveis" + "Wrapped renderiza blocos" |
 | Conteúdo privado inacessível pela administração | `lib/admin.ts` `adminAudit` (supressão de espaço pessoal) + `mvp.test.ts` "o console da plataforma não vê texto privado"; `/admin` sem lixeira global |
-| Publicação opcional, revogável, anônima por padrão | `challenges.results_anon` default `true`; token só-hash + rotação; `mvp.test.ts` "vitrine é anônima por padrão" + aceite passo 20 |
+| Publicação opcional, revogável, anônima por padrão | `challenges.results_anon` default `true`; token rotacionável (hash + token completo persistidos desde a migração `0035`, para reapresentar o link); `mvp.test.ts` "vitrine é anônima por padrão" + aceite passo 20 |
 | Consentimento nominal explícito | `challenge_participants.name_consent` (`PATCH …/consent`); `mvp.test.ts` "consentimento nominal libera o nome só de quem autorizou" |
 | Tudo que for excluído tem recuperação compatível | `lib/goa/trash.ts`: lixeira real (grupo/desafio/catálogo/registro), arquivamento recuperável (estrutura interna); `mvp.test.ts` ×5 testes "lixeira: …" + aceite passo 22 |
 | O cenário autossuficiente passa integralmente | o teste de aceite acima — 60/60 na suíte (nível de API) |

@@ -24,7 +24,7 @@ Toda resposta é `no-store` com `x-content-type-options: nosniff` e
 | --- | --- | --- |
 | `GET /` | público | SPA (`app/GoaApp.tsx`). `?invite=<token>` abre um convite |
 | `GET /admin` | admin | Console privado do desenvolvedor (`app/admin/`). Componente de servidor: sem `platform_admin` responde `notFound()` |
-| `GET /results/[token]` | público (por token) | Vitrine pública de um desafio encerrado; o banco guarda só o hash do token |
+| `GET /results/[token]` | público (por token) | Vitrine pública de um desafio encerrado; a busca é pelo hash do token, e desde a migração `0035` o token completo também fica no banco para reapresentar o link a quem já pode gerenciar/participar |
 
 ## Saúde e bootstrap
 

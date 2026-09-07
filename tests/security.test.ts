@@ -21,6 +21,7 @@ import {
   verifyCsrfToken,
   verifyPassword,
 } from "../lib/security";
+import { redactTokens } from "../lib/http";
 
 // The repository requires Node 22, where Web Crypto is global. The execution
 // image currently uses Node 18, so tests inject that runtime's mature Web
@@ -129,4 +130,22 @@ test("origin checks accept only the configured, exact HTTP origin", () => {
 
   const request = new Request(`${expected}/api/test`, { headers: { Origin: expected } });
   assert.equal(requestHasExactOrigin(request, expected), true);
+});
+
+test("redactTokens strips bearer tokens from anything about to be logged", () => {
+  assert.equal(
+    redactTokens("GET /api/results/Y0AjDFC4O_1-VWgkof5-tRO5rV_wuMU6ePneLtb6_3I"),
+    "GET /api/results/<token>",
+  );
+  assert.equal(
+    redactTokens("POST /invites/abc123DEF456ghi789 failed"),
+    "POST /invites/<token> failed",
+  );
+  assert.equal(
+    redactTokens("boom at https://goa.example/results/aaaabbbbccccdddd while rendering"),
+    "boom at https://goa.example/results/<token> while rendering",
+  );
+  // Leaves ordinary paths (and challenge ids under /results) alone.
+  assert.equal(redactTokens("GET /api/challenges/abc/results"), "GET /api/challenges/abc/results");
+  assert.equal(redactTokens("GET /api/groups/g1/challenges"), "GET /api/groups/g1/challenges");
 });

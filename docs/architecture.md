@@ -133,8 +133,11 @@ Grupo
   O admin reordena e esconde blocos com `PATCH …/results/blocks` — os valores
   calculados **não** mudam. Empates nas séries desempatam por rótulo.
 - **Publicação** (§12): nada é público por padrão; só owner/admin, só desafio
-  encerrado. O token cru é mostrado uma vez, na publicação, e o banco guarda
-  **só o hash** — perdeu o link, rotacione (o antigo morre). A página pública é
+  encerrado. Desde a migração `0035`, o banco guarda **hash e token completo**
+  para reapresentar o link aos usuários autorizados. A consulta pública usa o
+  hash; rotacionar invalida o link anterior e despublicar limpa ambos. Um acesso
+  ao banco também pode revelar esses links; esta é uma mudança em relação à
+  decisão original de guardar apenas hash. A página pública é
   `noindex`. Publicar a vitrine **não** cria template (conceitos e rotas
   separados: `/results/:token` vs `/modelos/:id`).
 - **Consentimento** (§12): `challenges.results_anon` nasce `true` (anônima por
@@ -174,7 +177,12 @@ Grupo
   vez, grupos compartilhados transferem a posse, contribuições preservadas ficam
   anônimas, publicações do usuário são despublicadas; a linha `users` fica
   (scrub de PII + `deleted_at`, nunca `DELETE` — as FKs `RESTRICT` de
-  entries/audit impedem).
+  entries/audit impedem). **Limitação conhecida**: a anonimização troca o **nome**
+  do autor por "Quem já saiu", mas não reescreve o **texto** que a pessoa digitou
+  — um comentário livre que se autoidentifica ("sou o João…") continua no grupo.
+  A exclusão avisa disso na tela (`account.consequenceContributions`); apagar
+  esses textos é uma decisão do grupo (arquivar/binar o item ou o registro), não
+  um efeito automático da exclusão de conta.
 
 ## Segurança
 
@@ -208,7 +216,8 @@ Grupo
   domínio): `listEntries` decide quem vê a resposta de quem; métricas agregadas
   leem os registros direto e não passam por esse filtro;
 - publicação externa é anônima por padrão, com consentimento nominal por
-  participante; token só-hash, rotacionável; página `/results/:token` é
+  participante; token rotacionável (hash e token completo persistidos desde
+  `0035`); página `/results/:token` é
   `noindex`; sair do grupo retira e regenera a vitrine (ver Modelo de domínio).
 
 Cobertura: `tests/{security,validation,metrics,analysis}.test.ts` e

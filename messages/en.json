@@ -1084,7 +1084,10 @@
     "consequenceTransfer": "The group “{name}” transfers ownership.",
     "consequencePurgeGroup": "The group “{name}” is deleted for good.",
     "consequencePersonal": "Your personal space and personal catalogue are deleted for good.",
-    "consequencePublications": "{count, plural, one {# published showcase of yours goes offline} other {# published showcases of yours go offline}}."
+    "consequencePublications": "{count, plural, one {# published showcase of yours goes offline} other {# published showcases of yours go offline}}.",
+    "consequencesLoading": "Working out what gets deleted…",
+    "consequencesFailed": "Couldn't work out what gets deleted. Deletion only continues once this list loads.",
+    "consequenceContributions": "Your ratings and comments stay in the group without your name — but the text you wrote isn't rewritten."
   },
   "publicResults": {
     "footer": "A memory published by the group on Goa."
