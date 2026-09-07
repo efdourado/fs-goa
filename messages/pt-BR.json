@@ -1284,8 +1284,7 @@
     "unavailableValue": "Não calculável com estes dados",
     "rankingPending": "Ainda não há resultados elegíveis. Veja abaixo o que falta.",
     "howCalculated": "Como este número é calculado",
-    "unadjusted": "Média simples: {value}",
-    "personDetails": "Ver perfil"
+    "unadjusted": "Média simples: {value}"
   },
   "paginator": {
     "pages": "Páginas",

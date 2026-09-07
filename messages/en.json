@@ -1284,8 +1284,7 @@
     "unavailableValue": "Cannot calculate with these data",
     "rankingPending": "No eligible results yet. See what’s needed below.",
     "howCalculated": "How this is calculated",
-    "unadjusted": "Simple arithmetic mean: {value}",
-    "personDetails": "View profile"
+    "unadjusted": "Simple arithmetic mean: {value}"
   },
   "paginator": {
     "pages": "Pages",
