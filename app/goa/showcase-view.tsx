@@ -147,7 +147,7 @@ function PageBody({ page, hideThinLabel }: { page: Page; hideThinLabel: boolean 
   }
   if (page.kind === "series") {
     return (
-      <div className={page.metrics.length === 1 ? "max-w-3xl" : "grid gap-x-12 gap-y-8 lg:grid-cols-2"}>
+      <div className={page.metrics.length === 1 ? "" : "grid gap-x-12 gap-y-8 lg:grid-cols-2"}>
         {page.metrics.map((metric) => <MetricBlock key={metric.id} metric={metric} hideThinLabel={hideThinLabel} />)}
       </div>
     );

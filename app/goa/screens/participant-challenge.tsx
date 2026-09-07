@@ -355,31 +355,52 @@ export function ResultView({
   );
 }
 
-/** The shareable `/results/<token>` link for a published showcase — shown to
- *  every member on the Results tab, not just the admin (who has it in Manage). */
-function SharePublishedLink({ token }: { token: string }) {
+/**
+ * Copies the public `/results/<token>` link — a header button beside "Manage",
+ * for every member (not just admins). On click the copy glyph fades out and a
+ * circled checkmark draws itself in, then reverts after a couple of seconds.
+ */
+function SharePublicButton({ token }: { token: string }) {
   const t = useTranslations("resultView");
-  const linkRef = useRef<HTMLInputElement>(null);
-  const [copied, setCopied] = useState<"idle" | "done" | "failed">("idle");
+  const [copied, setCopied] = useState(false);
   const url = typeof window === "undefined"
     ? `/results/${token}`
     : `${window.location.origin}/results/${encodeURIComponent(token)}`;
   return (
-    <div className={cx(cardClass, "p-4 sm:p-5")}>
-      <p className="text-sm font-medium">{t("shareTitle")}</p>
-      <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-        <input ref={linkRef} className={cx(inputClass, "sm:flex-1")} readOnly value={url} onFocus={(event) => event.target.select()} aria-label={t("shareTitle")} />
-        <Button
-          variant="secondary"
-          onClick={async () => {
-            try { await copyText(url, linkRef.current); setCopied("done"); }
-            catch { setCopied("failed"); }
-          }}
-        >
-          {copied === "done" ? t("shareCopied") : copied === "failed" ? t("shareCopyFailed") : t("shareCopy")}
-        </Button>
-      </div>
-    </div>
+    <button
+      type="button"
+      aria-live="polite"
+      onClick={async () => {
+        try { await copyText(url); setCopied(true); window.setTimeout(() => setCopied(false), 2200); }
+        catch { /* leave the button as it was */ }
+      }}
+      className={cx(
+        "inline-flex min-h-10 items-center gap-2 rounded-xl border px-4 py-2 text-sm font-light transition-colors",
+        copied ? "border-[var(--ok-line)] bg-[var(--ok-soft)] text-[var(--ok)]" : "border-[var(--line)] text-[var(--ink)] hover:bg-[var(--hover)]",
+      )}
+    >
+      <svg viewBox="0 0 20 20" className="size-4 flex-none" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+        <g className={cx("transition-opacity duration-150", copied ? "opacity-0" : "opacity-100")}>
+          <rect x="7" y="7" width="9" height="9" rx="2" />
+          <path d="M13 4H6a2 2 0 0 0-2 2v7" strokeLinecap="round" />
+        </g>
+        <circle
+          cx="10" cy="10" r="8"
+          pathLength={1}
+          className="transition-[stroke-dashoffset] duration-500 ease-out"
+          style={{ strokeDasharray: 1, strokeDashoffset: copied ? 0 : 1 }}
+        />
+        <path
+          d="M6 10.3 9 13l5-5.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          pathLength={1}
+          className="transition-[stroke-dashoffset] duration-300 ease-out [transition-delay:180ms]"
+          style={{ strokeDasharray: 1, strokeDashoffset: copied ? 0 : 1 }}
+        />
+      </svg>
+      {copied ? t("shareCopied") : t("shareCopy")}
+    </button>
   );
 }
 
@@ -889,7 +910,13 @@ export function ParticipantChallengeScreen({
 
   return (
     <main className="mx-auto max-w-7xl overflow-x-clip px-4 py-6 pb-28 sm:px-6 sm:py-10">
-      <div className="mb-5 flex items-center justify-between gap-3"><button className={backLinkClass} type="button" onClick={onBack}>{t("back")}</button>{previewActions ?? (onAdmin ? <Button variant="secondary" onClick={onAdmin}>{t("manage")}</Button> : null)}</div>
+      <div className="mb-5 flex items-center justify-between gap-3">
+        <button className={backLinkClass} type="button" onClick={onBack}>{t("back")}</button>
+        <div className="flex items-center gap-2">
+          {!preview && challenge.result?.shareToken && challenge.scope !== "personal" ? <SharePublicButton token={challenge.result.shareToken} /> : null}
+          {previewActions ?? (onAdmin ? <Button variant="secondary" onClick={onAdmin}>{t("manage")}</Button> : null)}
+        </div>
+      </div>
       <section className="relative overflow-hidden rounded-[28px] bg-[var(--spotlight)] p-6 text-[var(--spotlight-ink)] sm:p-9">
         <div className="relative z-10">
           <div className="flex flex-wrap items-center justify-between gap-3">{livingList ? <span /> : <ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />}<span className="text-xs text-white/65">{livingList ? t("livingListMeta", { count: sortedItems.length }) : f.dateRange(challenge.startsOn, challenge.endsOn)}</span></div>
@@ -941,9 +968,6 @@ export function ParticipantChallengeScreen({
         {activeTab === "results" ? (
           <div className="space-y-5">
             {completedCard}
-            {challenge.result?.shareToken && challenge.scope !== "personal"
-              ? <SharePublishedLink token={challenge.result.shareToken} />
-              : null}
             <ResultView challenge={challenge} hideCompletionRate onBackToEntry={preview ? undefined : () => onTab("today")} />
           </div>
         ) : null}

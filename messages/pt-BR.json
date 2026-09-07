@@ -921,10 +921,8 @@
     "liveEmptyTitle": "Ainda sem números",
     "liveEmptyBody": "Quando os registros chegarem, o placar ao vivo aparece aqui.",
     "backToEntry": "Fazer um registro",
-    "shareTitle": "Link público desta retrospectiva",
-    "shareCopy": "Copiar link",
-    "shareCopied": "Link copiado",
-    "shareCopyFailed": "Não deu para copiar"
+    "shareCopy": "Copiar página pública",
+    "shareCopied": "Copiado"
   },
   "rules": {
     "legacyTitle": "Regras do desafio",

@@ -40,7 +40,7 @@ export function MetricBlock({ metric, hideThinLabel = false }: { metric: Metric;
       <h3 className="text-base font-medium tracking-tight">{metric.label}</h3>
       {series?.length ? (
         visibleRows.length ? (
-          <ol className={scrolls ? "mt-2 max-h-[21rem] overflow-y-auto overscroll-contain border-y border-[var(--line)]" : "mt-2"}>
+          <ol className={scrolls ? "mt-3 max-h-[21rem] overflow-y-auto overscroll-contain rounded-xl border border-[var(--line)] px-4 sm:px-5" : "mt-2"}>
             {visibleRows.map(row)}
           </ol>
         ) : <p className="mt-3 text-sm text-[var(--muted)]">{t("rankingPending")}</p>

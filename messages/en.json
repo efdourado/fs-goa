@@ -921,10 +921,8 @@
     "liveEmptyTitle": "No numbers yet",
     "liveEmptyBody": "Once entries come in, the live standings show up here.",
     "backToEntry": "Log an entry",
-    "shareTitle": "Public link to this retrospective",
-    "shareCopy": "Copy link",
-    "shareCopied": "Link copied",
-    "shareCopyFailed": "Couldn't copy"
+    "shareCopy": "Copy public page",
+    "shareCopied": "Copied"
   },
   "rules": {
     "legacyTitle": "Challenge rules",
@@ -1111,7 +1109,7 @@
     "deleteDialogTitle": "Permanently delete your account?"
   },
   "publicResults": {
-    "footer": "A memory published by the group on Goa."
+    "footer": "Memory published by the group on Goa."
   },
   "about": {
     "back": "← Back",
