@@ -123,8 +123,6 @@
       "catalog_genre": "gênero",
       "checkpoint": "checkpoint"
     },
-    "smallSample": "amostra pequena",
-    "showMore": "Ver mais {count, plural, one {#} other {#}}",
     "showLess": "Ver menos"
   },
   "errors": {
@@ -1262,7 +1260,7 @@
       "explanation": "Semelhança nas avaliações deste desafio — 100 × (1 − média das diferenças absolutas ÷ amplitude). Não é uma nota de compatibilidade pessoal.",
       "sample": "{n} itens em comum",
       "composite": "Composta",
-      "compositeNote": "A afinidade composta exige itens em comum suficientes por gênero / ano / duração — aparece quando há dados.",
+      "compositeNote": "A afinidade composta exige itens em comum suficientes por gênero, ano e duração — aparece quando há dados.",
       "dimItems": "itens em comum",
       "dimGenre": "gênero",
       "dimYearBand": "faixa de ano",
@@ -1271,8 +1269,6 @@
     },
     "totalEntries": "{count, plural, one {# registro} other {# registros}}",
     "numbersAria": "Resultados em números",
-    "smallSample": "amostra pequena",
-    "showMore": "Ver mais {count, plural, one {#} other {#}}",
     "showLess": "Ver menos",
     "pageMain": "Números principais",
     "pageSeriesRanking": "Rankings",
@@ -1288,7 +1284,7 @@
     "unavailableValue": "Não calculável com estes dados",
     "rankingPending": "Ainda não há resultados elegíveis. Veja abaixo o que falta.",
     "howCalculated": "Como este número é calculado",
-    "unadjusted": "Média antes do ajuste: {value}",
+    "unadjusted": "Média simples: {value}",
     "personDetails": "Ver perfil"
   },
   "paginator": {

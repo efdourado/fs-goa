@@ -307,11 +307,11 @@ test("no ranking do Resultado o ano fica ao lado do título e a média crua apar
   assert.ok(aftersunIndex > -1 && stalkerIndex > -1 && aftersunIndex < stalkerIndex, "o servidor já entrega a série ordenada por nota");
   assert.match(html, /Aftersun \(2022\)/, "o ano aparece ao lado do título");
   assert.match(html, /Stalker \(1979\)/, "mesmo pro segundo item");
-  assert.match(html, /Média antes do ajuste: 4,5/, "identifica a média crua quando difere da ajustada");
-  assert.doesNotMatch(html, /Média antes do ajuste: 3,9/, "quando a crua é igual à ajustada, não repete o número");
+  assert.match(html, /Média simples: 4,5/, "identifica a média crua quando difere da ajustada");
+  assert.doesNotMatch(html, /Média simples: 3,9/, "quando a crua é igual à ajustada, não repete o número");
 });
 
-test("ranking grande esconde o excedente atrás de um <details> nativo, sem JS", () => {
+test("ranking grande rola dentro da própria caixa (~4 itens), sem recolher nada, sem JS", () => {
   const series = Array.from({ length: 12 }, (_, index) => ({
     key: `item-${index}`,
     label: `Item ${index + 1}`,
@@ -324,21 +324,16 @@ test("ranking grande esconde o excedente atrás de um <details> nativo, sem JS",
     scope: "group",
     participants: [{ id: "u1", userId: "u1", name: "Ana", username: "ana" }, { id: "u2", userId: "u2", name: "Bruno", username: "bruno" }],
     result: null,
-    // Every series metric renders through MetricBlock's no-JS <details> fold.
     metrics: [{ id: "m1", label: "Ranking", operation: "bayesian_average", groupBy: "item", visibleInResults: true, series }],
   } as unknown as ChallengeDetail;
 
   const html = renderWithIntl(createElement(ResultView, { challenge }));
-  const [beforeDetails, afterDetails] = html.split(/<details/);
-  assert.ok(afterDetails, "uma série com mais de 8 posições ganha um <details>");
-  for (let position = 1; position <= 8; position += 1) {
-    assert.match(beforeDetails, new RegExp(`Item ${position}<`), `posição ${position} aparece direto`);
+  assert.doesNotMatch(html, /<details/, "nada de disclosure — a lista rola");
+  assert.match(html, /overflow-y-auto/, "uma série longa ganha um contêiner rolável");
+  assert.match(html, /max-h-\[21rem\]/, "com altura limitada a ~4 itens");
+  for (let position = 1; position <= 12; position += 1) {
+    assert.match(html, new RegExp(`Item ${position}<`), `a posição ${position} está no DOM (alcançável rolando)`);
   }
-  assert.doesNotMatch(beforeDetails, /Item 9</, "a 9ª posição não vaza para fora do <details>");
-  for (let position = 9; position <= 12; position += 1) {
-    assert.match(afterDetails, new RegExp(`Item ${position}<`), `posição ${position} fica recolhida`);
-  }
-  assert.match(html, /Ver mais 4/, "o rótulo diz quantas posições estão escondidas");
 });
 
 test("aba Resultados: um resultado sem manchete curada não cai de volta no título", () => {

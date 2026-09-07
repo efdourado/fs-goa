@@ -123,8 +123,6 @@
       "catalog_genre": "genre",
       "checkpoint": "checkpoint"
     },
-    "smallSample": "small sample",
-    "showMore": "Show {count, plural, one {# more} other {# more}}",
     "showLess": "Show less"
   },
   "errors": {
@@ -1262,7 +1260,7 @@
       "explanation": "Similarity of ratings in this challenge — 100 × (1 − mean absolute difference ÷ scale). Not a personal compatibility score.",
       "sample": "{n} shared items",
       "composite": "Composite",
-      "compositeNote": "Composite affinity needs enough shared items per genre / year / length — shown once the data is there.",
+      "compositeNote": "Composite affinity needs enough shared items per genre, year and length — shown once the data is there.",
       "dimItems": "shared items",
       "dimGenre": "genre",
       "dimYearBand": "year band",
@@ -1271,8 +1269,6 @@
     },
     "totalEntries": "{count, plural, one {# record} other {# records}}",
     "numbersAria": "Results in numbers",
-    "smallSample": "small sample",
-    "showMore": "Show {count, plural, one {# more} other {# more}}",
     "showLess": "Show less",
     "pageMain": "Key numbers",
     "pageSeriesRanking": "Rankings",
@@ -1288,7 +1284,7 @@
     "unavailableValue": "Cannot calculate with these data",
     "rankingPending": "No eligible results yet. See what’s needed below.",
     "howCalculated": "How this is calculated",
-    "unadjusted": "Average before adjustment: {value}",
+    "unadjusted": "Simple arithmetic mean: {value}",
     "personDetails": "View profile"
   },
   "paginator": {

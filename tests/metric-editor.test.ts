@@ -42,7 +42,6 @@ test("small samples stay ineligible and explain the configured threshold, includ
     { key: "empty", label: "Sem respostas", value: null, sampleSize: 0 },
   ] };
   const html = renderWithIntl(createElement(MetricBlock, { metric }));
-  assert.match(html, /amostra pequena/i);
   assert.match(html, /2 de 3 registros/);
   assert.match(html, /Ainda sem registros/);
   assert.match(html, />0<\/strong>/);

@@ -4,7 +4,9 @@ import { useTranslations } from "next-intl";
 import { metricMinimum } from "./metric-editor";
 import type { Metric, MetricSeriesEntry } from "./types";
 
-const PREVIEW_ROWS = 8;
+// A long ranking scrolls inside its own box (~4 rows tall) instead of folding
+// behind a disclosure — every position stays reachable, no click needed.
+const SCROLL_AFTER_ROWS = 4;
 
 export function MetricBlock({ metric, hideThinLabel = false }: { metric: Metric; hideThinLabel?: boolean }) {
   const t = useTranslations("wrapped");
@@ -15,7 +17,7 @@ export function MetricBlock({ metric, hideThinLabel = false }: { metric: Metric;
   const chronological = metric.groupBy === "checkpoint";
   const sampleLabel = (count: number) => t(metric.operation === "surprise" ? "pairedRecords" : "records", { count });
   const unavailable = (entry: MetricSeriesEntry) => entry.sampleSize === 0 ? t("noRecordsYet")
-    : entry.sampleSize < minimum ? `${hideThinLabel ? "" : `${t("smallSample")} · `}${t("sampleProgress", { count: entry.sampleSize, minimum })}` : t("unavailableValue");
+    : entry.sampleSize < minimum ? `${hideThinLabel ? "" : ``}${t("sampleProgress", { count: entry.sampleSize, minimum })}` : t("unavailableValue");
   const rankOf = (entry: MetricSeriesEntry) => ranked.findIndex((candidate) => candidate.value === entry.value) + 1;
   const row = (entry: MetricSeriesEntry, index: number) => (
     <li key={entry.key} className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-4 gap-y-1 border-b border-[var(--line)] py-4 last:border-0">
@@ -32,13 +34,17 @@ export function MetricBlock({ metric, hideThinLabel = false }: { metric: Metric;
   // Rows that can't be calculated yet stay in the list, below the ranked ones —
   // they show what's still needed instead of hiding behind a disclosure.
   const visibleRows = chronological ? series ?? [] : [...ranked, ...pending];
+  const scrolls = visibleRows.length > SCROLL_AFTER_ROWS;
   return (
     <article className="min-w-0 py-2">
       <h3 className="text-base font-medium tracking-tight">{metric.label}</h3>
-      {series?.length ? <>
-        {visibleRows.length ? <ol className="mt-2">{visibleRows.slice(0, PREVIEW_ROWS).map(row)}</ol> : <p className="mt-3 text-sm text-[var(--muted)]">{t("rankingPending")}</p>}
-        {visibleRows.length > PREVIEW_ROWS ? <details className="mt-3"><summary className="cursor-pointer py-2 text-sm text-[var(--main-strong)]">{t("showMore", { count: visibleRows.length - PREVIEW_ROWS })}</summary><ol start={PREVIEW_ROWS + 1}>{visibleRows.slice(PREVIEW_ROWS).map((entry, index) => row(entry, index + PREVIEW_ROWS))}</ol></details> : null}
-      </> : <strong className="mt-3 block text-5xl font-medium tracking-[-0.05em] tabular-nums">{metric.formattedValue ?? metric.value ?? "—"}</strong>}
+      {series?.length ? (
+        visibleRows.length ? (
+          <ol className={scrolls ? "mt-2 max-h-[21rem] overflow-y-auto overscroll-contain border-y border-[var(--line)]" : "mt-2"}>
+            {visibleRows.map(row)}
+          </ol>
+        ) : <p className="mt-3 text-sm text-[var(--muted)]">{t("rankingPending")}</p>
+      ) : <strong className="mt-3 block text-5xl font-medium tracking-[-0.05em] tabular-nums">{metric.formattedValue ?? metric.value ?? "—"}</strong>}
     </article>
   );
 }
