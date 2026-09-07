@@ -1,6 +1,5 @@
 "use client";
 
-import type { ReactNode } from "react";
 import { useLocale, useTranslations } from "next-intl";
 
 import type { AffinityBlock, PersonalRanking } from "./types";
@@ -27,41 +26,12 @@ function useNumberFormatters() {
   return { fmt, signed };
 }
 
-/** Wraps one profile-layout candidate with a label so the reviewer can tell them apart. */
-function VariantSlot({ tag, children }: { tag: string; children: ReactNode }) {
-  return (
-    <div className="border-t border-dashed border-[var(--line)] pt-4 first:border-0 first:pt-0">
-      <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--main-strong)]">{tag}</p>
-      {children}
-    </div>
-  );
-}
-
-/** OPTION 0 — the current layout: a stats grid beside a column of favourites / lowest / moments. */
-function ProfileCurrent({ person }: { person: PersonalRanking }) {
-  const t = useTranslations("wrapped");
-  const { fmt, signed } = useNumberFormatters();
-  return (
-    <div className="grid gap-7 sm:grid-cols-2">
-      <dl className="grid content-start grid-cols-2 gap-x-4 gap-y-3 text-sm">
-        {([["average", person.ratingsMean], ["median", person.ratingsMedian], ["consistency", person.consistency]] as const)
-          .filter(([, value]) => value !== null)
-          .map(([key, value]) => <div className="contents" key={key}><dt className="text-[var(--muted)]">{t(`rankings.${key}`)}</dt><dd className="text-right font-medium tabular-nums">{fmt(value)}</dd></div>)}
-        {person.ratingsMin !== null && person.ratingsMax !== null ? <><dt className="text-[var(--muted)]">{t("rankings.range")}</dt><dd className="text-right tabular-nums">{fmt(person.ratingsMin)}–{fmt(person.ratingsMax)}</dd></> : null}
-        {person.indicationPerformance !== null ? <><dt className="text-[var(--muted)]">{t("rankings.indication")}</dt><dd className="text-right tabular-nums">{signed(person.indicationPerformance)}</dd></> : null}
-      </dl>
-      <div className="space-y-5">
-        {person.topItems.length ? <div><h4 className="text-xs font-medium text-[var(--muted)]">{t("rankings.topItems")}</h4><ol className="mt-2 space-y-2">{person.topItems.map((item, index) => <li key={index} className="flex justify-between gap-4 text-sm"><span>{item.title}</span><strong className="tabular-nums">{fmt(item.value)}</strong></li>)}</ol></div> : null}
-        {person.bottomItems.length ? <div><h4 className="text-xs font-medium text-[var(--muted)]">{t("rankings.bottomItems")}</h4><ol className="mt-2 space-y-2">{person.bottomItems.map((item, index) => <li key={index} className="flex justify-between gap-4 text-sm"><span>{item.title}</span><span className="tabular-nums">{fmt(item.value)}</span></li>)}</ol></div> : null}
-        {person.biggestSurprise ? <p className="text-sm"><span className="block text-xs text-[var(--muted)]">{t("rankings.surprise")}</span>{person.biggestSurprise.title} ({signed(person.biggestSurprise.delta)})</p> : null}
-        {person.biggestDisappointment ? <p className="text-sm"><span className="block text-xs text-[var(--muted)]">{t("rankings.disappointment")}</span>{person.biggestDisappointment.title} ({signed(person.biggestDisappointment.delta)})</p> : null}
-      </div>
-    </div>
-  );
-}
-
-/** OPTION 1 — a rating spectrum: where this person's scores sit on the scale, with a consistency band. */
-function ProfileSpectrum({ person }: { person: PersonalRanking }) {
+/**
+ * One person's taste at a glance: a rating spectrum — where their scores land on
+ * the scale, the min–max range, a soft band for how consistent they are (mean ±
+ * σ), the median tick and the mean dot — then their picks and stand-out moments.
+ */
+function PersonProfile({ person }: { person: PersonalRanking }) {
   const t = useTranslations("wrapped");
   const { fmt, signed } = useNumberFormatters();
   const min = person.ratingsMin;
@@ -116,56 +86,6 @@ function ProfileSpectrum({ person }: { person: PersonalRanking }) {
   );
 }
 
-/** OPTION 2 — a small dashboard of big-number tiles, then two compact pick rows. */
-function ProfileTiles({ person }: { person: PersonalRanking }) {
-  const t = useTranslations("wrapped");
-  const { fmt, signed } = useNumberFormatters();
-  const tiles: Array<{ label: string; value: string }> = [];
-  if (person.ratingsMean !== null) tiles.push({ label: t("rankings.average"), value: fmt(person.ratingsMean) });
-  if (person.ratingsMedian !== null) tiles.push({ label: t("rankings.median"), value: fmt(person.ratingsMedian) });
-  if (person.consistency !== null) tiles.push({ label: t("rankings.consistency"), value: fmt(person.consistency) });
-  if (person.ratingsMin !== null && person.ratingsMax !== null) tiles.push({ label: t("rankings.range"), value: `${fmt(person.ratingsMin)}–${fmt(person.ratingsMax)}` });
-  if (person.indicationPerformance !== null) tiles.push({ label: t("rankings.indication"), value: signed(person.indicationPerformance) });
-  return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        {tiles.map((tile) => (
-          <div key={tile.label} className="rounded-xl border border-[var(--line)] px-3 py-2.5">
-            <p className="text-xl font-medium tracking-tight tabular-nums">{tile.value}</p>
-            <p className="mt-0.5 text-[11px] leading-tight text-[var(--muted)]">{tile.label}</p>
-          </div>
-        ))}
-      </div>
-      {person.topItems.length ? <p className="text-sm"><span className="text-[var(--muted)]">{t("rankings.topItems").toLocaleLowerCase()}</span>  {person.topItems.map((i) => `${i.title} ${fmt(i.value)}`).join("  ·  ")}</p> : null}
-      {person.bottomItems.length ? <p className="text-sm"><span className="text-[var(--muted)]">{t("rankings.bottomItems").toLocaleLowerCase()}</span>  {person.bottomItems.map((i) => `${i.title} ${fmt(i.value)}`).join("  ·  ")}</p> : null}
-      {person.biggestSurprise ? <p className="text-sm"><span className="text-[var(--muted)]">{t("rankings.surprise").toLocaleLowerCase()}</span>  {person.biggestSurprise.title} ({signed(person.biggestSurprise.delta)})</p> : null}
-      {person.biggestDisappointment ? <p className="text-sm"><span className="text-[var(--muted)]">{t("rankings.disappointment").toLocaleLowerCase()}</span>  {person.biggestDisappointment.title} ({signed(person.biggestDisappointment.delta)})</p> : null}
-    </div>
-  );
-}
-
-/** OPTION 3 — pure prose, no grids: the profile read as a sentence, key numbers in bold. */
-function ProfileProse({ person }: { person: PersonalRanking }) {
-  const t = useTranslations("wrapped");
-  const { fmt, signed } = useNumberFormatters();
-  const b = (s: string) => <strong className="font-medium tabular-nums">{s}</strong>;
-  return (
-    <div className="space-y-2 text-sm leading-6">
-      <p>
-        {person.ratingsMean !== null ? <>{t("rankings.average").toLocaleLowerCase()} {b(fmt(person.ratingsMean))}</> : null}
-        {person.ratingsMedian !== null ? <> ({t("rankings.median").toLocaleLowerCase()} {b(fmt(person.ratingsMedian))})</> : null}
-        {person.ratingsMin !== null && person.ratingsMax !== null ? <>, {t("rankings.range").toLocaleLowerCase()} {b(`${fmt(person.ratingsMin)}–${fmt(person.ratingsMax)}`)}</> : null}
-        {person.consistency !== null ? <> — σ {b(fmt(person.consistency))}</> : null}
-        {person.indicationPerformance !== null ? <> · {t("rankings.indication").toLocaleLowerCase()} {b(signed(person.indicationPerformance))}</> : null}
-      </p>
-      {person.topItems.length ? <p className="text-[var(--muted)]">{t("rankings.topItems").toLocaleLowerCase()}: <span className="text-[var(--ink)]">{person.topItems.map((i) => `${i.title} (${fmt(i.value)})`).join(", ")}</span></p> : null}
-      {person.bottomItems.length ? <p className="text-[var(--muted)]">{t("rankings.bottomItems").toLocaleLowerCase()}: <span className="text-[var(--ink)]">{person.bottomItems.map((i) => `${i.title} (${fmt(i.value)})`).join(", ")}</span></p> : null}
-      {person.biggestSurprise ? <p className="text-[var(--muted)]">{t("rankings.surprise").toLocaleLowerCase()}: <span className="text-[var(--ink)]">{person.biggestSurprise.title} ({signed(person.biggestSurprise.delta)})</span></p> : null}
-      {person.biggestDisappointment ? <p className="text-[var(--muted)]">{t("rankings.disappointment").toLocaleLowerCase()}: <span className="text-[var(--ink)]">{person.biggestDisappointment.title} ({signed(person.biggestDisappointment.delta)})</span></p> : null}
-    </div>
-  );
-}
-
 export function PersonalRankingsBlock({ rankings }: { rankings: PersonalRanking[] }) {
   const t = useTranslations("wrapped");
   const locale = useLocale();
@@ -186,11 +106,8 @@ export function PersonalRankingsBlock({ rankings }: { rankings: PersonalRanking[
             </div>
             <span aria-hidden="true" className="shrink-0 text-xl text-[var(--muted)] transition-transform duration-300 group-open:rotate-90">+</span>
           </summary>
-          <div className="mt-5 space-y-6 sm:pl-12">
-            <VariantSlot tag="atual"><ProfileCurrent person={person} /></VariantSlot>
-            <VariantSlot tag="opção 1 · espectro"><ProfileSpectrum person={person} /></VariantSlot>
-            <VariantSlot tag="opção 2 · painel"><ProfileTiles person={person} /></VariantSlot>
-            <VariantSlot tag="opção 3 · texto"><ProfileProse person={person} /></VariantSlot>
+          <div className="mt-5 sm:pl-12">
+            <PersonProfile person={person} />
           </div>
         </details>
       ))}
