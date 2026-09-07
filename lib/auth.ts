@@ -365,10 +365,13 @@ export async function accountDeletionPreview(session: SessionContext): Promise<{
 }> {
   return withClient(async (client) => {
     const owned = await client.query<{ name: string; other_members: number; kind: string }>(
+      // No `deleted_at` filter: `deleteOwnAccount` also processes groups already
+      // in this person's own bin (only the owner can purge one), so the preview
+      // must list them too.
       `SELECT g.name, g.kind,
               (SELECT count(*)::int FROM group_members m WHERE m.group_id=g.id AND m.removed_at IS NULL AND m.user_id<>$1) AS other_members
          FROM groups g JOIN group_members gm ON gm.group_id=g.id AND gm.user_id=$1 AND gm.role='owner' AND gm.removed_at IS NULL
-        WHERE g.deleted_at IS NULL AND g.kind='standard'`,
+        WHERE g.kind='standard'`,
       [session.user.id],
     );
     const memberships = await oneOrNull<{ count: number }>(client,

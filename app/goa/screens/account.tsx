@@ -8,6 +8,9 @@ import { useGoaFormat } from "../format";
 import type { ChallengeSummary, User } from "../types";
 import { backLinkClass, Button, cardClass, cx, inputClass, labelClass, PageHeading, StatusMessage } from "../ui";
 
+// Mirror of `PASSWORD_MIN_LENGTH` in lib/security — the server rejects shorter.
+const PASSWORD_MIN_LENGTH = 10;
+
 interface DeletionPreview {
   ownedGroups: Array<{ name: string; members: number; willTransfer: boolean }>;
   memberships: number;
@@ -89,6 +92,25 @@ export function AccountScreen({
     return () => controller.abort();
   }, [showDelete, previewNonce, f]);
 
+  // Always open on a blank slate — a stale preview from a previous open must
+  // never gate (or worse, un-gate) the confirm button.
+  function openDelete() {
+    setPreview(null);
+    setPreviewError(null);
+    setDeletePassword("");
+    setDeleteError(null);
+    setShowDelete(true);
+  }
+  function closeDelete() {
+    setShowDelete(false);
+    setDeletePassword("");
+  }
+  function retryPreview() {
+    setPreview(null);
+    setPreviewError(null);
+    setPreviewNonce((n) => n + 1);
+  }
+
   async function deactivate() {
     if (!window.confirm(t("deactivateConfirm"))) return;
     setDeactivateBusy(true);
@@ -168,8 +190,8 @@ export function AccountScreen({
         <p className="mt-1 text-sm text-[var(--muted)]">{t("passwordSubtitle")}</p>
         <form className="mt-4 grid gap-4 sm:grid-cols-2" onSubmit={changePassword}>
           <label className="sm:col-span-2"><span className={labelClass}>{t("currentPassword")}</span><input className={inputClass} name="currentPassword" type="password" autoComplete="current-password" required disabled={pwBusy} /></label>
-          <label><span className={labelClass}>{t("newPassword")}</span><input className={inputClass} name="newPassword" type="password" autoComplete="new-password" required minLength={8} disabled={pwBusy} /></label>
-          <label><span className={labelClass}>{t("confirmNewPassword")}</span><input className={inputClass} name="confirmation" type="password" autoComplete="new-password" required minLength={8} disabled={pwBusy} /></label>
+          <label><span className={labelClass}>{t("newPassword")}</span><input className={inputClass} name="newPassword" type="password" autoComplete="new-password" required minLength={PASSWORD_MIN_LENGTH} disabled={pwBusy} /></label>
+          <label><span className={labelClass}>{t("confirmNewPassword")}</span><input className={inputClass} name="confirmation" type="password" autoComplete="new-password" required minLength={PASSWORD_MIN_LENGTH} disabled={pwBusy} /></label>
           <div className="sm:col-span-2"><StatusMessage error={pwMsg.error} success={pwMsg.success} /></div>
           <div className="sm:col-span-2"><Button type="submit" disabled={pwBusy}>{pwBusy ? t("changingPassword") : t("changePassword")}</Button></div>
         </form>
@@ -230,7 +252,7 @@ export function AccountScreen({
           <h3 className="text-sm font-normal text-[var(--danger)]">{t("deletePermanentTitle")}</h3>
           <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{t("deletePermanentBody")}</p>
           {!showDelete ? (
-            <Button variant="danger" className="mt-3" onClick={() => setShowDelete(true)}>{t("deletePermanent")}</Button>
+            <Button variant="danger" className="mt-3" onClick={openDelete}>{t("deletePermanent")}</Button>
           ) : (
             <div className="mt-3 space-y-3">
               {preview ? (
@@ -247,7 +269,7 @@ export function AccountScreen({
               ) : previewError ? (
                 <div className="space-y-2 text-sm">
                   <StatusMessage error={t("consequencesFailed")} />
-                  <Button variant="secondary" onClick={() => setPreviewNonce((n) => n + 1)}>{tc("retry")}</Button>
+                  <Button variant="secondary" onClick={retryPreview}>{tc("retry")}</Button>
                 </div>
               ) : (
                 <p className="text-sm text-[var(--muted)]" role="status">{t("consequencesLoading")}</p>
@@ -258,7 +280,7 @@ export function AccountScreen({
                   onChange={(event) => setDeletePassword(event.target.value)} aria-label={t("deletePasswordLabel")} />
               </label>
               <div className="flex gap-2">
-                <Button variant="ghost" onClick={() => { setShowDelete(false); setDeletePassword(""); }} disabled={deleteBusy}>{tc("cancel")}</Button>
+                <Button variant="ghost" onClick={closeDelete} disabled={deleteBusy}>{tc("cancel")}</Button>
                 <Button variant="danger" disabled={deleteBusy || deletePassword.length === 0 || !preview} onClick={() => void deletePermanently()}>
                   {deleteBusy ? t("deleting") : t("deletePermanentConfirm")}
                 </Button>

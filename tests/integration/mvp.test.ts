@@ -5243,6 +5243,26 @@ test("R2: excluir a conta também resolve os grupos que estavam na própria lixe
   assert.equal(orphanTrash.rowCount, 0, "e sem registro de lixeira pendurado");
 });
 
+test("R2: o preview de exclusão lista os grupos que estão na própria lixeira", async () => {
+  const owner = await register("R2 Preview", "r2_preview_lixeira");
+  const solo = ((await call("POST", "/api/groups", { session: owner, body: { name: "Só meu" } })).body as { id: string }).id;
+  const shared = ((await call("POST", "/api/groups", { session: owner, body: { name: "Compartilhado" } })).body as { id: string }).id;
+  const friend = await register("Amiga Preview", "amiga_preview_lixeira");
+  const invite = (await call("POST", `/api/groups/${shared}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
+  await call("POST", `/api/invites/${invite.token}`, { session: friend, body: {} });
+  // Ambos vão para a lixeira do dono — a exclusão ainda os processa.
+  assert.equal((await call("DELETE", `/api/groups/${solo}`, { session: owner })).response.status, 200);
+  assert.equal((await call("DELETE", `/api/groups/${shared}`, { session: owner })).response.status, 200);
+
+  const preview = (await call("GET", "/api/account/deletion-preview", { session: owner })).body as {
+    ownedGroups: Array<{ name: string; willTransfer: boolean }>;
+  };
+  const names = preview.ownedGroups.map((g) => g.name).sort();
+  assert.deepEqual(names, ["Compartilhado", "Só meu"], "os grupos binados aparecem no preview");
+  assert.equal(preview.ownedGroups.find((g) => g.name === "Só meu")?.willTransfer, false, "grupo solo é apagado");
+  assert.equal(preview.ownedGroups.find((g) => g.name === "Compartilhado")?.willTransfer, true, "grupo com outra pessoa transfere");
+});
+
 test("R2: grupo binado pelo dono não ocupa a cota dos outros participantes", async () => {
   const owner = await register("R2 Dono", "r2_dono_cota");
   const member = await register("R2 Membro", "r2_membro_cota");

@@ -9,6 +9,10 @@ import { Brand, Button, inputClass, labelClass, StatusMessage } from "../ui";
 
 type Mode = "login" | "register";
 
+// Mirror of `PASSWORD_MIN_LENGTH` in lib/security — the server rejects anything
+// shorter, so the form must not accept it either.
+const PASSWORD_MIN_LENGTH = 10;
+
 export function AuthScreen({
   initialMode,
   invitePending,
@@ -112,12 +116,12 @@ export function AuthScreen({
 
             <label>
               <span className={labelClass}>{t("passwordLabel")}</span>
-              <input className={inputClass} name="password" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} required minLength={8} disabled={busy} />
+              <input className={inputClass} name="password" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} required minLength={mode === "login" ? undefined : PASSWORD_MIN_LENGTH} disabled={busy} />
             </label>
             {mode === "register" ? (
               <label>
                 <span className={labelClass}>{t("register.passwordConfirmLabel")}</span>
-                <input className={inputClass} name="passwordConfirmation" type="password" autoComplete="new-password" required minLength={8} disabled={busy} />
+                <input className={inputClass} name="passwordConfirmation" type="password" autoComplete="new-password" required minLength={PASSWORD_MIN_LENGTH} disabled={busy} />
               </label>
             ) : null}
 
