@@ -279,7 +279,7 @@ test("aba Resultados agrupa rankings por tema (ranking, por pessoa, o que dividi
   const html = renderWithIntl(createElement(ResultView, { challenge }));
   const rankingIndex = html.indexOf(">Rankings<");
   const peopleIndex = html.indexOf(">Por pessoa<");
-  const debateIndex = html.indexOf(">O que dividiu opiniões<");
+  const debateIndex = html.indexOf(">Dividiu opiniões<");
   assert.ok(rankingIndex > -1 && peopleIndex > -1 && debateIndex > -1, "as três páginas de tema aparecem");
   assert.ok(rankingIndex < peopleIndex && peopleIndex < debateIndex, "ranking, depois por pessoa, depois o que dividiu opiniões");
 });
