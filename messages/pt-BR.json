@@ -36,7 +36,8 @@
     "legend": "Idioma",
     "switchTo": "Mudar para {lang}",
     "pt-BR": "Português",
-    "en": "English"
+    "en": "English",
+    "es": "Español"
   },
   "meta": {
     "description": "Desafios privados e personalizáveis para grupos registrarem progresso e guardarem suas histórias."

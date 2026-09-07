@@ -36,7 +36,8 @@
     "legend": "Language",
     "switchTo": "Switch to {lang}",
     "pt-BR": "Português",
-    "en": "English"
+    "en": "English",
+    "es": "Español"
   },
   "meta": {
     "description": "Private, customisable challenges for groups to track progress and keep their stories."
