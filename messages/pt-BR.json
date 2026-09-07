@@ -608,6 +608,8 @@
     "deleteEntryHint": "Manda este envio para a lixeira do desafio (a pessoa pode restaurar). Informe o motivo no campo acima — ele fica na auditoria.",
     "deleteEntryConfirm": "Enviar este registro para a lixeira do desafio?",
     "deleteEntryReasonRequired": "Preencha o motivo antes de excluir o registro de outra pessoa.",
+    "entryCorrected": "Registro corrigido.",
+    "entryDeleted": "Registro enviado para a lixeira.",
     "checkpointUpdated": "Checkpoint atualizado.",
     "itemUpdated": "Item atualizado.",
     "itemRecommendedBy": "Indicado por",

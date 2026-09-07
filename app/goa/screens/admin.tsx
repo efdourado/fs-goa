@@ -942,15 +942,13 @@ function AdminReview({
   onArchiveChanged: () => void;
 }) {
   const t = useTranslations("adminChallenge");
-  const tc = useTranslations("common");
   const f = useGoaFormat();
   const [query, setQuery] = useState("");
   const [lateOnly, setLateOnly] = useState(false);
   const [selectedId, setSelectedId] = useState<Id | null>(null);
-  const [reason, setReason] = useState("");
   const [exporting, setExporting] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const filtered = entries.filter((entry) => {
     const item = challenge.items.find((candidate) => candidate.id === itemIdForEntry(entry));
     const haystack = `${entry.participantName ?? ""} ${entry.participantUsername ?? ""} ${item?.title ?? ""}`.toLowerCase();
@@ -967,65 +965,113 @@ function AdminReview({
     : entries.length;
 
   return (
-    <div className="space-y-6">
-      <section className={cx(cardClass, "p-5 sm:p-7")}>
+    <section className="mx-auto max-w-5xl space-y-12">
+      <div>
         <PageHeading title={t("reviewTitle")} description={t("reviewSummary", { sent: entries.length, pending: Math.max(0, expected - doneCount), late: entries.filter((entry) => entry.isLate).length })} action={<Button variant="secondary" disabled={exporting} onClick={() => { setExporting(true); setError(null); onExport().catch((cause: unknown) => setError(f.error(cause))).finally(() => setExporting(false)); }}>{exporting ? t("preparing") : t("exportCsv")}</Button>} />
         <div className="mb-5 grid gap-3 sm:grid-cols-[1fr_auto]">
           <label><span className="sr-only">{t("searchEntries")}</span><input className={inputClass} type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("searchPlaceholder")} /></label>
           <label className="flex min-h-12 items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4 text-sm font-medium"><input type="checkbox" checked={lateOnly} onChange={(event) => setLateOnly(event.target.checked)} />{t("lateOnly")}</label>
         </div>
-        <StatusMessage error={error} />
+        <div className="mb-5"><StatusMessage error={error} success={success} /></div>
         {filtered.length ? (
-          <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          <ol className="divide-y divide-[var(--line)]">
             {filtered.map((entry) => {
               const item = challenge.items.find((candidate) => candidate.id === itemIdForEntry(entry));
-              const values = valuesAsRecord(entry.values);
               const type = challenge.entryTypes.find((candidate) => candidate.id === entry.entryTypeId);
-              const entryFields = type?.fields ?? challenge.fields;
               return (
-                <article className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-4" key={entry.id}>
-                  <div className="flex items-start justify-between gap-3"><div><strong className="block">{entry.participantName ?? entry.participantUsername ?? t("participantFallback")}</strong><span className="mt-1 block text-xs text-[var(--muted)]">{[item?.title ?? t("freeEntry"), type && challenge.entryTypes.length > 1 ? type.name : null, f.dateTime(entry.submittedAt ?? entry.updatedAt)].filter(Boolean).join(" · ")}</span></div>{entry.isLate ? <span className="rounded-full bg-[var(--warn-soft)] px-2 py-1 text-[10px] font-light text-[var(--warn)]">{t("late")}</span> : null}</div>
-                  <dl className="mt-4 grid gap-2 sm:grid-cols-2">{entryFields.slice(0, 4).map((field) => field.id && values[field.id] !== undefined ? <div className="rounded-lg bg-[var(--wash)] px-3 py-2" key={field.id}><dt className="text-[10px] font-light text-[var(--muted)]">{field.label}</dt><dd className="mt-1 truncate text-sm font-medium">{typeof values[field.id] === "boolean" ? values[field.id] ? tc("yes") : tc("no") : String(values[field.id])}</dd></div> : null)}</dl>
-                  <Button className="mt-4 w-full" variant="secondary" onClick={() => { setSelectedId(entry.id); setReason(""); }}>{t("inspect")}</Button>
-                </article>
+                <li className="flex items-start justify-between gap-4 py-4" key={entry.id}>
+                  <div className="min-w-0">
+                    <strong className="block text-base font-medium">{entry.participantName ?? entry.participantUsername ?? t("participantFallback")}</strong>
+                    <span className="mt-1 block text-xs text-[var(--muted)]">{[item?.title ?? t("freeEntry"), type && challenge.entryTypes.length > 1 ? type.name : null, f.dateTime(entry.submittedAt ?? entry.updatedAt)].filter(Boolean).join(" · ")}</span>
+                  </div>
+                  <div className="flex flex-none items-center gap-2">
+                    {entry.isLate ? <span className="rounded-full bg-[var(--warn-soft)] px-2 py-1 text-[10px] font-light text-[var(--warn)]">{t("late")}</span> : null}
+                    <Button variant="secondary" className="min-h-9 px-3 py-1 text-xs" onClick={() => setSelectedId(entry.id)}>{t("inspect")}</Button>
+                  </div>
+                </li>
               );
             })}
-          </div>
+          </ol>
         ) : <EmptyState title={t("noEntriesTitle")} description={entries.length ? t("noEntriesFiltered") : t("noEntriesEmpty")} />}
-      </section>
+      </div>
 
-      {selected ? (
-        <section className={cx(cardClass, "p-5 sm:p-7")} aria-labelledby="correction-title">
-          <div className="mb-5 flex items-start justify-between gap-3"><div><p className="text-xs font-light text-[var(--muted)]">{t("correctionKicker")}</p><h2 id="correction-title" className="mt-1 text-xl font-light">{t("correctionHeading", { name: selected.participantName ?? t("participantFallback"), item: selectedItem?.title ?? t("entryFallback") })}</h2></div><Button variant="ghost" onClick={() => setSelectedId(null)}>{tc("close")}</Button></div>
-          <label className="mb-5 block"><span className={labelClass}>{t("reasonLabel")} <span className="text-[var(--main-2)]">*</span></span><textarea className={inputClass} rows={3} value={reason} onChange={(event) => setReason(event.target.value)} placeholder={t("reasonPlaceholder")} maxLength={500} disabled={challenge.status === "closed"} /></label>
-          <DynamicEntryForm key={`${selected.id}-${selected.updatedAt ?? ""}`} fields={selectedFields} item={selectedItem} entry={selected} canEdit={challenge.status !== "closed"} unavailableMessage={challenge.status === "closed" ? f.entryUnavailableMessage({ challengeStatus: "closed" }) : null} onSave={async (values) => { if (!reason.trim()) throw new Error(t("reasonRequired")); await onPatch(selected.id, values, reason.trim()); setReason(""); }} alwaysEditable />
-          {challenge.status !== "closed" ? (
-            <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--line)] pt-5">
-              <p className="text-sm text-[var(--muted)]">{t("deleteEntryHint")}</p>
-              <Button variant="danger" disabled={confirmDelete} onClick={() => {
-                if (!reason.trim()) { setError(t("deleteEntryReasonRequired")); return; }
-                setError(null); setConfirmDelete(true);
-              }}>{t("deleteEntry")}</Button>
-            </div>
-          ) : null}
-          <div className="mt-4"><StatusMessage error={error} /></div>
-        </section>
-      ) : null}
-
-      {selected && confirmDelete ? (
-        <ConfirmDialog title={t("deleteEntry")} body={t("deleteEntryConfirm")} confirmLabel={t("deleteEntry")} busyLabel={t("deletingEntry")} danger
-          onClose={() => setConfirmDelete(false)}
-          onConfirm={async () => { await onDelete(selected.id, reason.trim()); setReason(""); setSelectedId(null); setConfirmDelete(false); }} />
-      ) : null}
-
-      <section className={cx(cardClass, "p-5 sm:p-7")} aria-labelledby="removed-structure-title">
-        <h2 id="removed-structure-title" className="text-xl font-light">{t("removedStructureTitle")}</h2>
+      <div className="border-t border-[var(--line)] pt-10">
+        <h2 className="text-lg font-medium tracking-tight">{t("removedStructureTitle")}</h2>
         <p className="mt-1 text-sm text-[var(--muted)]">{t("removedStructureBody")}</p>
         <div className="mt-4">
           <TrashView scope={{ challengeId: challenge.id }} csrfToken={csrfToken} onChanged={onArchiveChanged} />
         </div>
-      </section>
-    </div>
+      </div>
+
+      {selected ? (
+        <CorrectionDialog
+          entry={selected}
+          challenge={challenge}
+          item={selectedItem}
+          fields={selectedFields}
+          onClose={() => setSelectedId(null)}
+          onPatch={async (values, reason) => { await onPatch(selected.id, values, reason); setSuccess(t("entryCorrected")); }}
+          onDelete={async (reason) => { await onDelete(selected.id, reason); setSelectedId(null); setSuccess(t("entryDeleted")); }}
+        />
+      ) : null}
+    </section>
+  );
+}
+
+function CorrectionDialog({
+  entry,
+  challenge,
+  item,
+  fields,
+  onClose,
+  onPatch,
+  onDelete,
+}: {
+  entry: Entry;
+  challenge: ChallengeDetail;
+  item: ChallengeItem | null;
+  fields: ChallengeField[];
+  onClose: () => void;
+  onPatch: (values: Record<Id, unknown>, reason: string) => Promise<void>;
+  onDelete: (reason: string) => Promise<void>;
+}) {
+  const t = useTranslations("adminChallenge");
+  const f = useGoaFormat();
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const closed = challenge.status === "closed";
+
+  return (
+    <Dialog title={t("correctionHeading", { name: entry.participantName ?? t("participantFallback"), item: item?.title ?? t("entryFallback") })} onClose={onClose}>
+      <p className="text-xs text-[var(--muted)]">{t("correctionKicker")}</p>
+      <label className="mt-4 block"><span className={labelClass}>{t("reasonLabel")} <span className="text-[var(--main-2)]">*</span></span><textarea className={inputClass} rows={3} value={reason} onChange={(event) => setReason(event.target.value)} placeholder={t("reasonPlaceholder")} maxLength={500} disabled={closed} /></label>
+      <div className="mt-5">
+        <DynamicEntryForm
+          key={`${entry.id}-${entry.updatedAt ?? ""}`}
+          fields={fields}
+          item={item}
+          entry={entry}
+          canEdit={!closed}
+          unavailableMessage={closed ? f.entryUnavailableMessage({ challengeStatus: "closed" }) : null}
+          onSave={async (values) => { if (!reason.trim()) throw new Error(t("reasonRequired")); await onPatch(values, reason.trim()); onClose(); }}
+          alwaysEditable
+        />
+      </div>
+      {!closed ? (
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--line)] pt-4">
+          <p className="text-sm text-[var(--muted)]">{t("deleteEntryHint")}</p>
+          <Button variant="danger" onClick={() => { if (!reason.trim()) { setError(t("deleteEntryReasonRequired")); return; } setError(null); setConfirmDelete(true); }}>{t("deleteEntry")}</Button>
+        </div>
+      ) : null}
+      <div className="mt-4"><StatusMessage error={error} /></div>
+
+      {confirmDelete ? (
+        <ConfirmDialog title={t("deleteEntry")} body={t("deleteEntryConfirm")} confirmLabel={t("deleteEntry")} busyLabel={t("deletingEntry")} danger
+          onClose={() => setConfirmDelete(false)}
+          onConfirm={() => onDelete(reason.trim())} />
+      ) : null}
+    </Dialog>
   );
 }
 

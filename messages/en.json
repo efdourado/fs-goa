@@ -608,6 +608,8 @@
     "deleteEntryHint": "Sends this submission to the challenge bin (the person can restore it). Give the reason in the field above — it goes into the audit log.",
     "deleteEntryConfirm": "Send this entry to the challenge bin?",
     "deleteEntryReasonRequired": "Fill in the reason before deleting someone else's entry.",
+    "entryCorrected": "Entry corrected.",
+    "entryDeleted": "Entry sent to the bin.",
     "checkpointUpdated": "Checkpoint updated.",
     "itemUpdated": "Item updated.",
     "itemRecommendedBy": "Recommended by",
