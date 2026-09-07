@@ -4,7 +4,7 @@ import { getFormatter, getTranslations } from "next-intl/server";
 
 import { publicResults } from "@/lib/goa-challenges";
 import { type Formatter, makeGoaFormat, type Translator } from "@/app/goa/format";
-import { LanguageToggle } from "@/app/goa/LanguageToggle";
+import { SettingsMenu } from "@/app/goa/SettingsMenu";
 import { defaultShowcaseBlocks, ShowcaseView } from "@/app/goa/showcase-view";
 import type { AffinityBlock, Metric, PersonalRanking, WrappedBlock } from "@/app/goa/types";
 
@@ -57,7 +57,7 @@ export default async function SharedResultsPage({ params }: { params: Promise<{ 
             <span className="grid h-9 w-9 place-items-center rounded-[50%_50%_50%_16%] bg-[var(--ink)] text-[var(--canvas)]">g</span>
             goa
           </Link>
-          <LanguageToggle />
+          <SettingsMenu />
         </div>
         <ShowcaseView
           variant="dark"
