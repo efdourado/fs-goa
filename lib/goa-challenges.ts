@@ -27,7 +27,7 @@ export type { PreflightIssue, PreflightReport } from "./goa/challenges/preflight
 export { setChallengeParticipants, setParticipantNameConsent } from "./goa/challenges/participants";
 export {
   duplicateTemplate,
-  getTemplateDetail,
+  getTemplatePreview,
   listTemplates,
   setChallengeTemplate,
   unpublishChallengeTemplate,

@@ -558,7 +558,7 @@ export async function softDeleteGroup(session: SessionContext, groupId: string) 
     // still name people; the admin republishes after a restore.
     await client.query(
       `UPDATE challenges SET results_published_at = NULL, result_share_token_hash = NULL,
-          results_published_snapshot = NULL, updated_at = now()
+          result_share_token = NULL, results_published_snapshot = NULL, updated_at = now()
         WHERE group_id = $1 AND results_published_at IS NOT NULL`,
       [groupId],
     );

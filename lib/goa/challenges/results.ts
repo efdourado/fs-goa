@@ -626,9 +626,11 @@ export async function resultForChallenge(
   // only once frozen. `generateShowcase` / `curateResults` freeze them on close.
   options: { liveRankings?: boolean } = {},
 ) {
-  const challenge = await oneOrNull<{ results_published_at: Date | null; result_share_token_hash: string | null; status: string }>(
+  const challenge = await oneOrNull<{
+    results_published_at: Date | null; result_share_token: string | null; status: string;
+  }>(
     client,
-    "SELECT results_published_at, result_share_token_hash, status FROM challenges WHERE id = $1",
+    "SELECT results_published_at, result_share_token, status FROM challenges WHERE id = $1",
     [challengeId],
   );
   // Frozen blocks only stand once the round is closed (`generateShowcase` fills
@@ -718,8 +720,9 @@ export async function resultForChallenge(
     blocks: orderedBlocks,
     totalEntries,
     publishedAt: challenge?.results_published_at?.toISOString() ?? null,
-    // The raw link is never persisted; the admin sees it once, at publish time.
-    hasPublishedLink: challenge?.result_share_token_hash != null,
+    // The raw share token, so the /results/<token> link can be shown again in the
+    // admin and to participants — not just once at publish time (migration 0035).
+    shareToken: challenge?.result_share_token ?? null,
   };
 }
 
@@ -1347,13 +1350,16 @@ export async function publishResults(
     }
     const anonymized = access.challenge.results_anon === true;
     const snapshot = await buildPublishedSnapshot(client, access.challenge, anonymized);
-    const existing = await oneOrNull<{ hash: string | null }>(
-      client, "SELECT result_share_token_hash AS hash FROM challenges WHERE id=$1", [challengeId]);
+    const existing = await oneOrNull<{ hash: string | null; token: string | null }>(
+      client,
+      "SELECT result_share_token_hash AS hash, result_share_token AS token FROM challenges WHERE id=$1",
+      [challengeId],
+    );
     // First publish or an explicit rotate mints a fresh token (the old link dies).
-    // A plain re-publish keeps the current link working — its hash is left as is,
-    // and the raw token is not re-derivable, so nothing new is handed back.
+    // A plain re-publish keeps the current link working and hands it back so the
+    // admin can copy it without rotating (migration 0035 stores the raw token).
     const rotate = body.rotateLink === true || !existing?.hash;
-    let shareToken: string | null = null;
+    let shareToken = existing?.token ?? null;
     let shareHash = existing?.hash ?? "";
     if (rotate) {
       shareToken = generateOpaqueToken();
@@ -1362,9 +1368,9 @@ export async function publishResults(
     await client.query(
       `UPDATE challenges
           SET results_published_snapshot=$2::jsonb, results_published_at=now(),
-              result_share_token_hash=$3, updated_at=now()
+              result_share_token_hash=$3, result_share_token=$4, updated_at=now()
         WHERE id=$1`,
-      [challengeId, JSON.stringify(snapshot), shareHash],
+      [challengeId, JSON.stringify(snapshot), shareHash, shareToken],
     );
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
       "results.published", "challenge", challengeId, null, null, { rotated: rotate, anonymized });
@@ -1377,7 +1383,7 @@ export async function unpublishResults(client: PoolClient, challengeId: string):
   await client.query(
     `UPDATE challenges
         SET results_published_at=NULL, result_share_token_hash=NULL,
-            results_published_snapshot=NULL, updated_at=now()
+            result_share_token=NULL, results_published_snapshot=NULL, updated_at=now()
       WHERE id=$1`,
     [challengeId],
   );

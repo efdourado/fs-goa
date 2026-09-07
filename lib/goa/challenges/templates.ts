@@ -1,5 +1,3 @@
-import type { PoolClient } from "pg";
-
 import { requireGroupRole, type SessionContext } from "../../auth";
 import { inTransaction, oneOrNull, withClient } from "../../db";
 import { challengeAccess, writeAudit } from "../../goa-domain";
@@ -7,7 +5,7 @@ import { ApiError, stringValue } from "../../http";
 import { assertUnder, LIMITS } from "../../limits";
 import { parseRuleSections } from "../domain/rules";
 import { copyChallengeStructure } from "./copy";
-import { fieldsForChallenge } from "./fields";
+import { buildChallengeDetail, type DetailChallengeRow } from "./detail";
 import { isRecipeKey } from "./recipes";
 
 /**
@@ -74,85 +72,44 @@ export async function listTemplates() {
   });
 }
 
-async function templateRowById(client: PoolClient, challengeId: string) {
-  return oneOrNull<{
-    id: string; title: string; description: string | null; summary: string | null;
-    rules: string | null; rule_sections: unknown;
-    start_date: string | null; end_date: string | null;
-    submission_mode: "item" | "daily" | "free" | null;
-  }>(
-    client,
-    `SELECT c.id, c.title, c.description, c.template_summary AS summary, c.rules,
-            c.rule_sections, c.start_date::text AS start_date, c.end_date::text AS end_date,
-            (SELECT et.submission_mode FROM entry_types et
-              WHERE et.challenge_id = c.id AND et.archived_at IS NULL
-              ORDER BY (et.purpose = 'expectation'), et.created_at LIMIT 1) AS submission_mode
-       FROM challenges c
-       JOIN groups g ON g.id = c.group_id AND g.deleted_at IS NULL AND g.archived_at IS NULL
-      WHERE c.id = $1 AND c.published_as_template_at IS NOT NULL AND c.deleted_at IS NULL
-        AND c.recipe_key IN ('cinema', 'library', 'bookshelf', 'habit')`,
-    [challengeId],
-  );
-}
-
-export async function getTemplateDetail(challengeId: string) {
+/**
+ * A published template rendered as the same read-only `ChallengeDetail` the
+ * in-app challenge screen consumes — spotlight header, rules, schedule, and the
+ * Results tab. Public: no session. Privacy — never the origin group's members
+ * (`participants: []`); the Results showcase is only the frozen
+ * `results_published_snapshot` (already anonymised + admin-published), never the
+ * live in-group result.
+ */
+export async function getTemplatePreview(challengeId: string) {
   return withClient(async (client) => {
-    const template = await templateRowById(client, challengeId);
-    if (!template) throw new ApiError(404, "not_found", "Modelo não encontrado.");
-
-    const fields = await fieldsForChallenge(client, challengeId);
-    const items = await client.query<{
-      title: string; description: string | null; position: number;
+    const row = await oneOrNull<DetailChallengeRow & {
+      results_published_at: Date | null;
+      results_published_snapshot: { result?: unknown } | null;
     }>(
-      `SELECT title, description, position FROM challenge_items
-        WHERE challenge_id = $1 AND archived_at IS NULL ORDER BY position`,
+      client,
+      `SELECT c.id, c.group_id, c.title, c.description, c.rules, c.rule_sections,
+              c.start_date::text AS start_date, c.end_date::text AS end_date,
+              c.status, c.kind, c.recipe_key, g.kind AS group_kind, c.results_anon,
+              c.results_published_at, c.results_published_snapshot
+         FROM challenges c
+         JOIN groups g ON g.id = c.group_id AND g.deleted_at IS NULL AND g.archived_at IS NULL
+        WHERE c.id = $1 AND c.published_as_template_at IS NOT NULL AND c.deleted_at IS NULL
+          AND c.recipe_key IN ('cinema', 'library', 'bookshelf', 'habit')`,
       [challengeId],
     );
-    // Only the manual layout (weeks, sessions, milestones) — day-by-day
-    // checkpoints regenerate from the period and would just be noise here. This
-    // is the part of the schedule that survives a template copy.
-    const checkpoints = await client.query<{ title: string; kind: string; position: number }>(
-      `SELECT title, kind, position FROM challenge_checkpoints
-        WHERE challenge_id = $1 AND archived_at IS NULL AND kind <> 'day' ORDER BY position`,
-      [challengeId],
-    );
-    const metrics = await client.query<{
-      label: string; operation: string; group_by: string;
-    }>(
-      `SELECT label, operation, group_by FROM challenge_metrics
-        WHERE challenge_id = $1 AND archived_at IS NULL ORDER BY position`,
-      [challengeId],
-    );
+    if (!row) throw new ApiError(404, "not_found", "Modelo não encontrado.");
 
-    return {
-      id: template.id,
-      title: template.title,
-      description: template.description,
-      summary: template.summary,
-      ruleSections: parseRuleSections(template.rule_sections, template.rules),
-      submissionMode: template.submission_mode ?? "free",
-      durationDays: template.start_date && template.end_date
-        ? Math.round(
-            (Date.parse(`${template.end_date}T00:00:00Z`) - Date.parse(`${template.start_date}T00:00:00Z`))
-              / 86_400_000,
-          ) + 1
-        : null,
-      fields: fields.map((field) => ({
-        label: field.label,
-        type: field.kind === "choice" ? "select" : field.kind,
-        required: field.required === true,
-        options: Array.isArray(field.options)
-          ? (field.options as Array<{ label: string }>).map((option) => option.label)
-          : [],
-      })),
-      items: items.rows.map((entry) => ({ title: entry.title, description: entry.description })),
-      checkpoints: checkpoints.rows.map((entry) => ({ title: entry.title, kind: entry.kind })),
-      metrics: metrics.rows.map((metric) => ({
-        label: metric.label,
-        operation: metric.operation,
-        groupBy: metric.group_by,
-      })),
-    };
+    // Same gate as the public /results/<token> page.
+    const publishedResult = row.results_published_at !== null && row.status === "closed"
+      ? row.results_published_snapshot?.result ?? null
+      : null;
+
+    return buildChallengeDetail(
+      client,
+      row,
+      { userId: null, role: null, isParticipant: false },
+      { participants: [], result: publishedResult },
+    );
   });
 }
 

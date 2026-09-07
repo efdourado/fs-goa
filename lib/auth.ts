@@ -447,7 +447,7 @@ export async function deleteOwnAccount(
     await client.query(
       `UPDATE challenges c
           SET results_published_at = NULL, result_share_token_hash = NULL,
-              results_published_snapshot = NULL, updated_at = now()
+              result_share_token = NULL, results_published_snapshot = NULL, updated_at = now()
         WHERE c.results_published_at IS NOT NULL AND c.deleted_at IS NULL
           AND EXISTS (SELECT 1 FROM challenge_participants cp WHERE cp.challenge_id = c.id AND cp.user_id = $1)`,
       [session.user.id],

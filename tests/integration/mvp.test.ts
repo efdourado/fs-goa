@@ -414,10 +414,10 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
   assert.equal(showcase.response.status, 200, JSON.stringify(showcase.body));
   assert.match(JSON.stringify(showcase.body), /Duas histórias na tela/);
 
-  // O token não é guardado: o detalhe do desafio só diz que existe um link.
+  // O token fica guardado (migração 0035): o detalhe do desafio o devolve para
+  // que o link possa ser mostrado de novo, não só na hora de publicar.
   const detailWithToken = await call("GET", `/api/challenges/${challengeId}`, { session: owner });
-  assert.equal((detailWithToken.body as { result: { hasPublishedLink: boolean; shareToken?: unknown } }).result.hasPublishedLink, true);
-  assert.equal((detailWithToken.body as { result: { shareToken?: unknown } }).result.shareToken, undefined, "o token nunca volta na resposta");
+  assert.equal((detailWithToken.body as { result: { shareToken?: string } }).result.shareToken, shareToken, "o token volta no detalhe");
 
   // Snapshot congelado: salvar rascunho de novo não muda a vitrine pública.
   await call("POST", `/api/challenges/${challengeId}/results`, {
@@ -428,10 +428,9 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
   assert.match(JSON.stringify(stillFrozen.body), /Duas histórias na tela/, "o link publicado não segue o rascunho");
   assert.doesNotMatch(JSON.stringify(stillFrozen.body), /Manchete só no rascunho/);
 
-  // Re-publicar sem rotacionar mantém o mesmo link e não devolve token novo.
+  // Re-publicar sem rotacionar mantém o mesmo link e devolve o mesmo token.
   const republishSame = await call("POST", `/api/challenges/${challengeId}/results/publish`, { session: owner, body: {} });
-  assert.equal((republishSame.body as { shareToken: string | null }).shareToken, null, "re-publicar não entrega um token novo");
-  assert.equal((republishSame.body as { url: string | null }).url, null);
+  assert.equal((republishSame.body as { shareToken: string | null }).shareToken, shareToken, "re-publicar devolve o mesmo token guardado");
   assert.equal((await call("GET", `/api/results/${shareToken}`)).response.status, 200, "o link antigo continua valendo");
 
   // "Gerar novo link" invalida o token anterior.
@@ -982,8 +981,11 @@ test("modelos públicos: publica, lista, detalha sem sessão e duplica para um g
   const detailBody = detail.body as Record<string, unknown>;
   assert.equal(detailBody.title, "Cine clube do mês");
   assert.ok(Array.isArray(detailBody.fields) && (detailBody.fields as unknown[]).length === 1);
-  assert.ok(!("participants" in detailBody), "o detalhe público não expõe participantes");
-  assert.ok(!("result" in detailBody), "o detalhe público não expõe resultados");
+  // The preview is a read-only ChallengeDetail — never the origin group's members,
+  // and the Results tab is empty until the origin publishes its showcase.
+  assert.deepEqual(detailBody.participants, [], "o detalhe público nunca lista participantes");
+  assert.equal(detailBody.result, null, "sem vitrine publicada, o Resultado vem vazio");
+  assert.equal(detailBody.isParticipant, false);
 
   const strangerGroup = await call("POST", "/api/groups", { session: stranger, body: { name: "Meu grupo" } });
   const strangerGroupId = (strangerGroup.body as { id: string }).id;
@@ -1022,6 +1024,55 @@ test("modelos públicos: publica, lista, detalha sem sessão e duplica para um g
     "modelo despublicado sai da galeria",
   );
   assert.equal((await call("GET", `/api/templates/${challengeId}`)).response.status, 404);
+});
+
+test("modelo com vitrine publicada: o Resultado do preview traz a retrospectiva congelada, sem nomes reais", async () => {
+  const admin = await register("Curador Vitrine", "curador_vitrine_modelo");
+  await adminPool.query("UPDATE users SET platform_admin = true WHERE id = $1", [admin.user.id]);
+  const adminSession = await login("curador_vitrine_modelo");
+  const bea = await register("Beatriz Vitrine", "beatriz_vitrine_modelo");
+  const groupId = ((await call("POST", "/api/groups", { session: adminSession, body: { name: "Sala" } })).body as { id: string }).id;
+  const invite = (await call("POST", `/api/groups/${groupId}/invites`, { session: adminSession, body: { expiresInDays: 7, maxUses: 5 } })).body as { token: string };
+  await call("POST", `/api/invites/${invite.token}`, { session: bea, body: {} });
+
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: adminSession,
+    body: {
+      title: "Ciclo com resultado", startsOn: "2026-01-05", endsOn: "2026-01-19", submissionMode: "item",
+      participantIds: [admin.user.id, bea.user.id], items: [{ title: "Filme Único" }],
+      fields: [{ key: "nota", label: "Nota", type: "rating", required: true }],
+    },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  const detail = (await call("GET", `/api/challenges/${challengeId}`, { session: adminSession })).body as {
+    items: Array<{ id: string }>; entryTypes: Array<{ id: string; fields: Array<{ id: string; type: string }> }>;
+  };
+  const typeId = detail.entryTypes[0].id;
+  const notaField = detail.entryTypes[0].fields.find((field) => field.type === "rating")!.id;
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: adminSession, body: { status: "active" } });
+  for (const [session, value] of [[adminSession, 5], [bea, 3]] as const) {
+    await call("POST", `/api/challenges/${challengeId}/entries`, {
+      session, body: { itemId: detail.items[0].id, entryTypeId: typeId, values: { [notaField]: value } },
+    });
+  }
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: adminSession, body: { status: "closed" } });
+  await call("POST", `/api/challenges/${challengeId}/results`, {
+    session: adminSession, body: { regenerate: true, anonymizeParticipants: true },
+  });
+  await call("POST", `/api/challenges/${challengeId}/results/publish`, { session: adminSession, body: {} });
+  await call("POST", `/api/challenges/${challengeId}/template`, { session: adminSession, body: { summary: "Pronto." } });
+
+  const preview = (await call("GET", `/api/templates/${challengeId}`)).body as {
+    result: { blocks?: unknown[]; metrics?: unknown[] } | null;
+    participants: unknown[];
+  };
+  assert.deepEqual(preview.participants, []);
+  assert.ok(preview.result, "o preview traz a vitrine publicada");
+  assert.ok(
+    (preview.result.blocks?.length ?? 0) > 0 || (preview.result.metrics?.length ?? 0) > 0,
+    "com métricas/blocos congelados",
+  );
+  assert.doesNotMatch(JSON.stringify(preview.result), /Beatriz Vitrine|Curador Vitrine/, "sem nomes reais");
 });
 
 test("copiar um desafio carrega as semanas, a distribuição dos itens e a duração dos filmes", async () => {
@@ -4095,7 +4146,7 @@ test("quem sai do grupo despublica e regenera a vitrine; resultado público e te
   assert.equal((await call("POST", `/api/groups/${groupId}/leave`, { session: leaver, body: {} })).response.status, 200);
   assert.equal((await call("GET", `/api/results/${token}`)).response.status, 404, "o link publicado para de funcionar quando alguém sai");
   const reopened = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
-    result: { publishedAt: string | null; hasPublishedLink?: boolean };
+    result: { publishedAt: string | null; shareToken?: string | null };
   };
   assert.equal(reopened.result.publishedAt, null, "a publicação foi retirada até a regeneração");
 
@@ -5175,7 +5226,7 @@ test("R2: binar um desafio derruba a vitrine, e restaurar NÃO ressuscita o link
   assert.equal((await call("POST", `/api/groups/${groupId}/trash/restore`, { session: owner, body: { kind: "challenge", id: challengeId } })).response.status, 200);
   assert.equal((await call("GET", `/api/results/${token}`)).response.status, 404, "restaurar não republica o link antigo");
   const after = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
-    result: { publishedAt: string | null; hasPublishedLink?: boolean };
+    result: { publishedAt: string | null; shareToken?: string | null };
   };
   assert.equal(after.result.publishedAt, null, "o desafio volta despublicado, até nova confirmação");
 });

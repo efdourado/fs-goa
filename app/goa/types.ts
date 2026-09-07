@@ -350,9 +350,10 @@ export interface ChallengeResult {
   blocks?: WrappedBlock[];
   totalEntries?: number;
   publishedAt?: string | null;
-  /** Whether a public link exists. The raw token itself is never sent back — it
-   *  is shown once, in the publish response, and cannot be recovered. */
-  hasPublishedLink?: boolean;
+  /** The public showcase token — build `${origin}/results/${shareToken}`. Present
+   *  for a published round (null otherwise, or when published before migration
+   *  0035 stored the raw token — rotate to mint a fresh one). */
+  shareToken?: string | null;
 }
 
 export interface RuleTopic {
@@ -477,27 +478,9 @@ export interface TemplateSummary {
   publishedAt: string;
 }
 
-export interface TemplateFieldPreview {
-  label: string;
-  type: FieldType;
-  required: boolean;
-  options: string[];
-}
-
-export interface TemplateDetail {
-  id: Id;
-  title: string;
-  description?: string | null;
-  summary?: string | null;
-  ruleSections: ChallengeRule[];
-  submissionMode: SubmissionMode;
-  durationDays: number | null;
-  fields: TemplateFieldPreview[];
-  items: Array<{ title: string; description?: string | null }>;
-  /** Manual week/session/milestone layout — the schedule that survives a copy. */
-  checkpoints: Array<{ title: string; kind: "week" | "session" | "milestone" }>;
-  metrics: Array<{ label: string; operation: Metric["operation"]; groupBy: string }>;
-}
+// A published template's detail is served as a read-only `ChallengeDetail`
+// (see `getTemplatePreview`) and rendered by `ParticipantChallengeScreen` in
+// preview mode — there is no separate template-detail shape any more.
 
 export interface ApiErrorBody {
   message?: string;

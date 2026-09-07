@@ -1,8 +1,9 @@
 "use client";
 
 import { useFormatter, useTranslations } from "next-intl";
-import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
+import { copyText } from "../clipboard";
 import { useGoaFormat } from "../format";
 import { defaultShowcaseBlocks, hasShowcaseContent, ShowcaseView } from "../showcase-view";
 import { RuleSectionsView, visibleRuleSections } from "../rules";
@@ -354,6 +355,33 @@ export function ResultView({
   );
 }
 
+/** The shareable `/results/<token>` link for a published showcase — shown to
+ *  every member on the Results tab, not just the admin (who has it in Manage). */
+function SharePublishedLink({ token }: { token: string }) {
+  const t = useTranslations("resultView");
+  const linkRef = useRef<HTMLInputElement>(null);
+  const [copied, setCopied] = useState<"idle" | "done" | "failed">("idle");
+  const url = typeof window === "undefined"
+    ? `/results/${token}`
+    : `${window.location.origin}/results/${encodeURIComponent(token)}`;
+  return (
+    <div className={cx(cardClass, "p-4 sm:p-5")}>
+      <p className="text-sm font-medium">{t("shareTitle")}</p>
+      <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+        <input ref={linkRef} className={cx(inputClass, "sm:flex-1")} readOnly value={url} onFocus={(event) => event.target.select()} aria-label={t("shareTitle")} />
+        <Button
+          variant="secondary"
+          onClick={async () => {
+            try { await copyText(url, linkRef.current); setCopied("done"); }
+            catch { setCopied("failed"); }
+          }}
+        >
+          {copied === "done" ? t("shareCopied") : copied === "failed" ? t("shareCopyFailed") : t("shareCopy")}
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 /** The entry types a round item can receive (expectation, rating, progress…). */
 export function itemEntryTypes(challenge: ChallengeDetail): EntryTypeView[] {
@@ -671,22 +699,29 @@ export function ParticipantChallengeScreen({
   onAdmin,
   onSaveEntry,
   onDeleteEntry,
+  preview = false,
+  previewActions,
 }: {
   challenge: ChallengeDetail;
   entries: Entry[];
-  user: User;
+  user: User | null;
   tab: ParticipantTab;
   onTab: (tab: ParticipantTab) => void;
   onBack: () => void;
   onAdmin?: () => void;
-  onSaveEntry: (itemId: Id | null, values: Record<Id, unknown>, entry?: Entry, occurredOn?: string | null, entryTypeId?: Id, checkpointId?: Id | null) => Promise<void>;
+  onSaveEntry?: (itemId: Id | null, values: Record<Id, unknown>, entry?: Entry, occurredOn?: string | null, entryTypeId?: Id, checkpointId?: Id | null) => Promise<void>;
   onDeleteEntry?: (entryId: Id) => Promise<void>;
+  /** Read-only public view (a published template): drops the Today tab and every
+   *  entry form, keeps the header + rules + schedule + the Results showcase. */
+  preview?: boolean;
+  /** Replaces the "Manage" button in the header (the template's "Copiar" CTA). */
+  previewActions?: ReactNode;
 }) {
   const t = useTranslations("participant");
   const trules = useTranslations("rules");
   const f = useGoaFormat();
   const longDate: Intl.DateTimeFormatOptions = { day: "2-digit", month: "long", year: "numeric" };
-  const ownEntries = entries.filter((entry) => !entry.userId || entry.userId === user.id);
+  const ownEntries = entries.filter((entry) => !entry.userId || entry.userId === user?.id);
   // Progress counts only the "done" signal — an expectation or a mid-round
   // progress note isn't a completion.
   const doneEntries = challenge.completionEntryTypeId
@@ -725,7 +760,7 @@ export function ParticipantChallengeScreen({
     );
     const map = new Map<Id, Array<{ id: Id; name: string; value: number }>>();
     for (const entry of entries) {
-      if (entry.userId && entry.userId === user.id) continue;
+      if (entry.userId && entry.userId === user?.id) continue;
       const itemId = itemIdForEntry(entry);
       const fieldId = ratingFieldByType.get(entry.entryTypeId ?? "");
       if (!itemId || !fieldId) continue;
@@ -737,7 +772,7 @@ export function ParticipantChallengeScreen({
       map.set(itemId, list);
     }
     return map;
-  }, [entries, user.id, challenge.entryTypes]);
+  }, [entries, user?.id, challenge.entryTypes]);
   const sortedItems = useMemo(() => [...challenge.items].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)), [challenge.items]);
   const sortedSessions = useMemo(
     () => [...(challenge.checkpoints ?? [])].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
@@ -807,7 +842,9 @@ export function ParticipantChallengeScreen({
   const dateRequired = undatedDaily || (useItemPanel && perDayItem);
   const canDeleteEntry = challenge.status === "active" ? onDeleteEntry : undefined;
   const doneCount = Math.min(doneEntries.length, sortedItems.length);
-  const tabs: Array<{ id: ParticipantTab }> = [{ id: "today" }, { id: "results" }];
+  // A template preview has nothing to log — only the Results showcase.
+  const activeTab: ParticipantTab = preview ? "results" : tab;
+  const tabs: Array<{ id: ParticipantTab }> = preview ? [{ id: "results" }] : [{ id: "today" }, { id: "results" }];
 
   // The picker on Today drives which checkpoint the form is filling; each row
   // ends with the rating this participant gave it.
@@ -852,13 +889,13 @@ export function ParticipantChallengeScreen({
 
   return (
     <main className="mx-auto max-w-7xl overflow-x-clip px-4 py-6 pb-28 sm:px-6 sm:py-10">
-      <div className="mb-5 flex items-center justify-between gap-3"><button className={backLinkClass} type="button" onClick={onBack}>{t("back")}</button>{onAdmin ? <Button variant="secondary" onClick={onAdmin}>{t("manage")}</Button> : null}</div>
+      <div className="mb-5 flex items-center justify-between gap-3"><button className={backLinkClass} type="button" onClick={onBack}>{t("back")}</button>{previewActions ?? (onAdmin ? <Button variant="secondary" onClick={onAdmin}>{t("manage")}</Button> : null)}</div>
       <section className="relative overflow-hidden rounded-[28px] bg-[var(--spotlight)] p-6 text-[var(--spotlight-ink)] sm:p-9">
         <div className="relative z-10">
           <div className="flex flex-wrap items-center justify-between gap-3">{livingList ? <span /> : <ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />}<span className="text-xs text-white/65">{livingList ? t("livingListMeta", { count: sortedItems.length }) : f.dateRange(challenge.startsOn, challenge.endsOn)}</span></div>
           <h1 className="mt-10 max-w-3xl text-4xl font-medium leading-none tracking-[-0.055em] sm:text-6xl">{challenge.title}</h1>
           {challenge.description ? <p className="mt-4 max-w-2xl text-sm leading-6 text-white/70">{challenge.description}</p> : null}
-          {sortedItems.length ? <div className="mt-8 max-w-2xl"><div className="mb-2 flex justify-between text-xs text-white/70"><span>{t.rich("entriesProgress", { done: Math.min(doneEntries.length, sortedItems.length), total: sortedItems.length, b: (chunks) => <strong className="text-white">{chunks}</strong> })}</span><span>{completion}%</span></div><div className="h-2 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-[var(--main-2)]" style={{ width: `${Math.min(100, completion)}%` }} /></div></div> : null}
+          {!preview && sortedItems.length ? <div className="mt-8 max-w-2xl"><div className="mb-2 flex justify-between text-xs text-white/70"><span>{t.rich("entriesProgress", { done: Math.min(doneEntries.length, sortedItems.length), total: sortedItems.length, b: (chunks) => <strong className="text-white">{chunks}</strong> })}</span><span>{completion}%</span></div><div className="h-2 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-[var(--main-2)]" style={{ width: `${Math.min(100, completion)}%` }} /></div></div> : null}
         </div>
         <span className="absolute -right-28 -top-36 h-96 w-96 rounded-full border border-white/10" aria-hidden="true" />
       </section>
@@ -867,12 +904,14 @@ export function ParticipantChallengeScreen({
       <RuleSectionsView rules={ruleSections} />
       <CheckpointSchedule challenge={challenge} />
 
-      <nav className="mt-5 hidden gap-1 rounded-2xl bg-[var(--wash-strong)]/70 p-1 sm:flex" aria-label={t("navAria")}>
-        {tabs.map((item) => <button className={cx("min-h-11 flex-1 rounded-xl px-3 text-sm font-light", tab === item.id ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]")} type="button" onClick={() => onTab(item.id)} key={item.id}>{t(`tabs.${item.id}`)}</button>)}
-      </nav>
+      {tabs.length > 1 ? (
+        <nav className="mt-5 hidden gap-1 rounded-2xl bg-[var(--wash-strong)]/70 p-1 sm:flex" aria-label={t("navAria")}>
+          {tabs.map((item) => <button className={cx("min-h-11 flex-1 rounded-xl px-3 text-sm font-light", activeTab === item.id ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]")} type="button" onClick={() => onTab(item.id)} key={item.id}>{t(`tabs.${item.id}`)}</button>)}
+        </nav>
+      ) : null}
 
       <div className="mt-5">
-        {tab === "today" ? (
+        {activeTab === "today" ? (
           <div className={cx("grid gap-5", checkpointPicker ? "lg:grid-cols-[minmax(0,1.5fr)_minmax(270px,0.6fr)]" : "mx-auto max-w-3xl")}>
             <section className={cx(cardClass, "min-w-0 p-5 sm:p-7")}>
               {challenge.status === "closed" ? <EmptyState title={t("closedTitle")} description={t("closedBody")} action={<Button onClick={() => onTab("results")}>{t("seeResults")}</Button>} /> : challenge.submissionMode !== "free" && !selectedItem && !undatedDaily ? <EmptyState title={t("noCheckpointTitle")} description={t("noCheckpointBody")} /> : (
@@ -888,9 +927,9 @@ export function ParticipantChallengeScreen({
                       {selectedItem?.recommendedBy || selectedItem?.catalogItem?.author || selectedItem?.catalogItem?.mainGenre || selectedItem?.catalogItem?.runtimeMinutes ? <p className="mt-1 text-xs text-[var(--muted)]">{[selectedItem.catalogItem?.author ? t("byAuthor", { name: selectedItem.catalogItem.author }) : null, selectedItem.recommendedBy ? t("recommendedBy", { name: selectedItem.recommendedBy.name }) : null, selectedItem.catalogItem?.mainGenre || null, formatRuntime(selectedItem.catalogItem?.runtimeMinutes)].filter(Boolean).join(" · ")}</p> : null}</div>{selectedItem?.dueAt ? <span className="rounded-full bg-[var(--wash)] px-3 py-2 text-xs font-medium text-[var(--muted)]">{t("dueBy", { date: f.dateTime(selectedItem.dueAt) })}</span> : null}</div>
                   {dateRequired ? <label className="mb-5 block"><span className={labelClass}>{t("occurredOnLabel")}</span><input className={inputClass} type="date" max={today} value={effectiveOccurredOn} disabled={Boolean(unavailableMessage)} onChange={(event) => setOccurredOn(event.target.value || today)} /><small className="mt-1 block text-[var(--muted)]">{t("occurredOnHint")}</small></label> : !useItemPanel && currentEntry?.occurredOn ? <p className="mb-5 text-xs text-[var(--muted)]">{t("occurredOn", { date: f.date(currentEntry.occurredOn, longDate) })}</p> : null}
                   {useItemPanel && selectedItem ? (
-                    <ItemEntryPanel key={`${selectedItem.id}-${selectedSession?.id ?? "no-session"}`} challenge={challenge} item={selectedItem} ownEntries={ownEntries} groupRatings={challenge.participants.length > 1 ? groupRatingsByItem.get(selectedItem.id) ?? [] : null} occurredOn={occurredOn} onOccurredOnChange={setOccurredOn} offerOptionalDate={!perDayItem && !sessionMode && collectsEntryDate} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} checkpointId={selectedSession?.id ?? null} onSaveEntry={onSaveEntry} onDeleteEntry={canDeleteEntry} />
+                    <ItemEntryPanel key={`${selectedItem.id}-${selectedSession?.id ?? "no-session"}`} challenge={challenge} item={selectedItem} ownEntries={ownEntries} groupRatings={challenge.participants.length > 1 ? groupRatingsByItem.get(selectedItem.id) ?? [] : null} occurredOn={occurredOn} onOccurredOnChange={setOccurredOn} offerOptionalDate={!perDayItem && !sessionMode && collectsEntryDate} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} checkpointId={selectedSession?.id ?? null} onSaveEntry={onSaveEntry!} onDeleteEntry={canDeleteEntry} />
                   ) : (
-                    <DynamicEntryForm key={`${selectedItem?.id ?? "free"}-${undatedDaily ? effectiveOccurredOn : "fixed"}-${currentEntry?.id ?? "new"}`} fields={challenge.fields} item={selectedItem ?? null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry(selectedItem?.id ?? null, values, entry, undatedDaily ? effectiveOccurredOn : undefined)} onDelete={currentEntry && canDeleteEntry ? () => canDeleteEntry(currentEntry.id) : undefined} />
+                    <DynamicEntryForm key={`${selectedItem?.id ?? "free"}-${undatedDaily ? effectiveOccurredOn : "fixed"}-${currentEntry?.id ?? "new"}`} fields={challenge.fields} item={selectedItem ?? null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry!(selectedItem?.id ?? null, values, entry, undatedDaily ? effectiveOccurredOn : undefined)} onDelete={currentEntry && canDeleteEntry ? () => canDeleteEntry(currentEntry.id) : undefined} />
                   )}
                 </>
               )}
@@ -899,17 +938,22 @@ export function ParticipantChallengeScreen({
           </div>
         ) : null}
 
-        {tab === "results" ? (
+        {activeTab === "results" ? (
           <div className="space-y-5">
             {completedCard}
-            <ResultView challenge={challenge} hideCompletionRate onBackToEntry={() => onTab("today")} />
+            {challenge.result?.shareToken && challenge.scope !== "personal"
+              ? <SharePublishedLink token={challenge.result.shareToken} />
+              : null}
+            <ResultView challenge={challenge} hideCompletionRate onBackToEntry={preview ? undefined : () => onTab("today")} />
           </div>
         ) : null}
       </div>
 
-      <nav className="safe-area-bottom fixed inset-x-0 bottom-0 z-40 grid h-[72px] grid-cols-2 border-t border-[var(--line)] bg-[var(--paper)]/95 px-2 backdrop-blur-xl sm:hidden" aria-label={t("navMobileAria")}>
-        {tabs.map((item) => <button className={cx("flex min-h-12 flex-col items-center justify-center gap-1 text-[10px] font-light", tab === item.id ? "text-[var(--main-strong)]" : "text-[var(--muted)]")} type="button" onClick={() => onTab(item.id)} key={item.id}><span className="text-base" aria-hidden="true">{item.id === "today" ? "◉" : "〇"}</span>{t(`tabs.${item.id}`)}</button>)}
-      </nav>
+      {tabs.length > 1 ? (
+        <nav className="safe-area-bottom fixed inset-x-0 bottom-0 z-40 grid h-[72px] grid-cols-2 border-t border-[var(--line)] bg-[var(--paper)]/95 px-2 backdrop-blur-xl sm:hidden" aria-label={t("navMobileAria")}>
+          {tabs.map((item) => <button className={cx("flex min-h-12 flex-col items-center justify-center gap-1 text-[10px] font-light", activeTab === item.id ? "text-[var(--main-strong)]" : "text-[var(--muted)]")} type="button" onClick={() => onTab(item.id)} key={item.id}><span className="text-base" aria-hidden="true">{item.id === "today" ? "◉" : "〇"}</span>{t(`tabs.${item.id}`)}</button>)}
+        </nav>
+      ) : null}
     </main>
   );
 }

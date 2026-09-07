@@ -1050,10 +1050,15 @@ function AdminResults({
 
   const isClosed = challenge.status === "closed";
   const isPublished = Boolean(challenge.result?.publishedAt);
-  // The raw link only exists in memory right after this session published it —
-  // it is not stored, so navigating away loses it (rotate to mint a fresh one).
-  const publicUrl = publishedUrl;
-  const linkOnlyOnce = isPublished && !publicUrl && Boolean(challenge.result?.hasPublishedLink);
+  // The link is durable now (migration 0035): build it from the stored token,
+  // falling back to the one this session just minted. A round published before
+  // 0035 has no stored token — the admin rotates once to get a fresh link.
+  const origin = typeof window === "undefined" ? "" : window.location.origin;
+  const storedUrl = challenge.result?.shareToken && origin
+    ? `${origin}/results/${encodeURIComponent(challenge.result.shareToken)}`
+    : null;
+  const publicUrl = publishedUrl ?? storedUrl;
+  const linkOnlyOnce = isPublished && !publicUrl;
 
   function savedMessage(result: { unpublished?: boolean } | undefined, base: string) {
     if (result?.unpublished) return t("draftSavedUnpublishedAnon");

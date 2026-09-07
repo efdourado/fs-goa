@@ -67,7 +67,7 @@ import {
   duplicateTemplate,
   exportEntriesCsv,
   getChallengeDetail,
-  getTemplateDetail,
+  getTemplatePreview,
   listEntries,
   listTemplates,
   previewListImport,
@@ -151,7 +151,7 @@ export async function GET(request: Request): Promise<Response> {
       return json(await previewInvite(path[1], await sessionFromRequest(request)));
     }
     if (isPath(path, "templates")) return json(await listTemplates());
-    if (path[0] === "templates" && path.length === 2) return json(await getTemplateDetail(path[1]));
+    if (path[0] === "templates" && path.length === 2) return json(await getTemplatePreview(path[1]));
     if (path[0] === "results" && path.length === 2) return json(await publicResults(path[1]));
     if (path[0] === "groups" && path[2] === "catalog" && path.length === 3) {
       return json(await listGroupCatalog(await requireSession(request), path[1]));

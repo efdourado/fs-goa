@@ -40,7 +40,7 @@ export async function transitionChallenge(
         `UPDATE challenges
             SET status='active', closed_at=NULL,
                 results_published_at=NULL, result_share_token_hash=NULL,
-                results_published_snapshot=NULL, updated_at=now()
+                result_share_token=NULL, results_published_snapshot=NULL, updated_at=now()
           WHERE id=$1`,
         [challengeId],
       );

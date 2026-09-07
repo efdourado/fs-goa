@@ -6,9 +6,8 @@ import { CheckpointPlanner } from "../app/goa/checkpoint-planner";
 import { parseJsonItemsPaste } from "../app/goa/cine-items";
 import { ListImportPanel } from "../app/goa/list-import-panel";
 import { RuleSectionsView } from "../app/goa/rules";
-import { DynamicEntryForm, itemEntryTypes, ResultView } from "../app/goa/screens/participant-challenge";
-import { TemplateStructure } from "../app/goa/screens/templates";
-import type { ChallengeDetail, ChallengeField, ImportPreview, TemplateDetail } from "../app/goa/types";
+import { DynamicEntryForm, itemEntryTypes, ParticipantChallengeScreen, ResultView } from "../app/goa/screens/participant-challenge";
+import type { ChallengeDetail, ChallengeField, ImportPreview } from "../app/goa/types";
 import { AppHeader, ChallengeStatusBadge, SchedulePeriodFields } from "../app/goa/ui";
 import {
   findMissingRequiredField,
@@ -566,29 +565,51 @@ test("colagem JSON do wizard só lança erro quando o texto não é uma lista de
   assert.equal(summary.duplicates, 1);
 });
 
-test("detalhe do modelo: estrutura em páginas tituladas, todas no DOM antes do JS", () => {
-  const template = {
+test("detalhe do modelo: a mesma tela do desafio, só leitura — cabeçalho, regras, cronograma e o Resultado", () => {
+  const challenge = {
     id: "t1",
     title: "Cine clube",
+    description: "Uma rodada fechada.",
+    status: "closed",
+    scope: "group",
+    kind: "round",
+    startsOn: "2026-01-01",
+    endsOn: "2026-02-11",
     submissionMode: "item",
-    durationDays: 42,
-    ruleSections: [{ title: "Uma sessão por semana", description: "Sem spoilers no grupo." }],
-    fields: [
-      { label: "Nota", type: "rating", required: true, options: [] },
-      { label: "Comentário", type: "text", required: false, options: [] },
+    participants: [],
+    entryTypes: [],
+    fields: [],
+    items: [
+      { id: "i1", title: "Parasita", position: 0, checkpointId: "w1", catalogItem: { year: 2019 } },
     ],
-    items: [{ title: "Parasita" }, { title: "Aftersun" }],
-    checkpoints: [{ title: "Semana 1", kind: "week" }, { title: "Semana 2", kind: "week" }],
-    metrics: [{ label: "Nota média", operation: "average", groupBy: "none" }],
-  } as unknown as TemplateDetail;
+    checkpoints: [
+      { id: "w1", checkpointId: "w1", title: "Semana 1", kind: "week", position: 0, timeframe: "past", itemCount: 1 },
+    ],
+    metrics: [],
+    ruleSections: [{ title: "Uma sessão por semana", description: "Sem spoilers no grupo." }],
+    result: {
+      headline: "12 filmes",
+      summary: "Retrospectiva fictícia.",
+      metrics: [{ id: "m1", label: "Nota média", operation: "average", value: 4.1, formattedValue: "4,1" }],
+    },
+  } as unknown as ChallengeDetail;
 
-  const html = renderWithIntl(createElement(TemplateStructure, { template }));
-  // Every page's heading and content is present pre-hydration.
-  for (const heading of ["Regras", "Formulário", "Cronograma", "Itens", "Métricas"]) {
-    assert.match(html, new RegExp(`>${heading}<`), `a página "${heading}" aparece`);
-  }
-  assert.match(html, /Parasita/);
-  assert.match(html, /Semana 1/);
-  assert.match(html, /Nota média/);
-  assert.match(html, /Sem spoilers no grupo\./);
+  const html = renderWithIntl(createElement(ParticipantChallengeScreen, {
+    preview: true,
+    user: null,
+    challenge,
+    entries: [],
+    tab: "results",
+    onTab: () => undefined,
+    onBack: () => undefined,
+    previewActions: createElement("span", {}, "Copiar"),
+  }));
+
+  assert.match(html, /Cine clube/, "o cabeçalho traz o título");
+  assert.match(html, /Sem spoilers no grupo\./, "as regras aparecem");
+  assert.match(html, /Semana 1/, "o cronograma aparece");
+  assert.match(html, /Nota média/, "o Resultado (vitrine) aparece");
+  assert.match(html, /Copiar/, "o CTA de cópia entra no lugar do 'Gerenciar'");
+  assert.doesNotMatch(html, /<form/, "nenhum formulário de registro no preview");
+  assert.doesNotMatch(html, />Hoje</, "a aba 'Hoje' some no preview");
 });

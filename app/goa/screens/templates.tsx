@@ -5,18 +5,17 @@ import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "re
 
 import { API_PATHS, apiRequest } from "../api";
 import { useGoaFormat } from "../format";
-import { PagedView, type PagedPage } from "../paged-view";
-import { RuleSectionsView } from "../rules";
 import { LanguageToggle } from "../LanguageToggle";
 import type {
+  ChallengeDetail,
   ChallengeSummary,
   GroupSummary,
   Id,
-  TemplateDetail,
   TemplateSummary,
   User,
 } from "../types";
 import { backLinkClass, Brand, Button, cardClass, cx, EmptyState, inputClass, labelClass, PageHeading, StatusMessage } from "../ui";
+import { ParticipantChallengeScreen } from "./participant-challenge";
 
 function PublicChrome({ user, onSignIn, children }: { user: User | null; onSignIn: () => void; children: ReactNode }) {
   const t = useTranslations("templates");
@@ -197,91 +196,6 @@ export function TemplatesScreen({
   return <PublicChrome user={user} onSignIn={onSignIn}>{body}</PublicChrome>;
 }
 
-/** The template's structure — fields, schedule, items, metrics, rules — as flip-through pages. */
-export function TemplateStructure({ template }: { template: TemplateDetail }) {
-  const t = useTranslations("templates");
-  const tm = useTranslations("metrics");
-
-  const pages: PagedPage[] = [];
-
-  if (template.ruleSections.length) {
-    pages.push({ id: "rules", title: t("rulesTitle"), body: <RuleSectionsView rules={template.ruleSections} bare /> });
-  }
-
-  pages.push({
-    id: "fields",
-    title: t("formTitle"),
-    body: template.fields.length ? (
-      <ul className="divide-y divide-[var(--line)] rounded-2xl border border-[var(--line)] bg-[var(--paper)] px-4">
-        {template.fields.map((field, index) => (
-          <li className="flex items-baseline justify-between gap-4 py-3" key={`${field.label}-${index}`}>
-            <span className="text-sm">
-              {field.label}
-              {field.options.length ? <span className="text-[var(--muted)]">{t("fieldOptions", { options: field.options.join(", ") })}</span> : null}
-            </span>
-            <span className="shrink-0 text-xs text-[var(--muted)]">{field.type}{field.required ? t("fieldRequired") : ""}</span>
-          </li>
-        ))}
-      </ul>
-    ) : <p className="text-sm text-[var(--muted)]">{t("noFields")}</p>,
-  });
-
-  if (template.checkpoints.length) {
-    pages.push({
-      id: "schedule",
-      title: t("scheduleTitle"),
-      body: (
-        <div className="space-y-3">
-          <p className="text-xs text-[var(--muted)]">{t("scheduleHint", { count: template.checkpoints.length })}</p>
-          <ol className="grid gap-2 sm:grid-cols-2">
-            {template.checkpoints.map((checkpoint, index) => (
-              <li className="rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4 py-2 text-sm" key={`${checkpoint.title}-${index}`}>
-                <span className="mr-2 tabular-nums text-[var(--muted)]">{index + 1}</span>{checkpoint.title}
-              </li>
-            ))}
-          </ol>
-        </div>
-      ),
-    });
-  }
-
-  if (template.items.length) {
-    pages.push({
-      id: "items",
-      title: t("itemsTitle"),
-      body: (
-        <ol className="grid gap-2 sm:grid-cols-2">
-          {template.items.map((item, index) => (
-            <li className="rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4 py-2 text-sm" key={`${item.title}-${index}`}>
-              <span className="mr-2 tabular-nums text-[var(--muted)]">{index + 1}</span>{item.title}
-              {item.description ? <span className="block text-xs text-[var(--muted)]">{item.description}</span> : null}
-            </li>
-          ))}
-        </ol>
-      ),
-    });
-  }
-
-  if (template.metrics.length) {
-    pages.push({
-      id: "metrics",
-      title: t("metricsTitle"),
-      body: (
-        <ul className="grid gap-2 sm:grid-cols-2">
-          {template.metrics.map((metric, index) => (
-            <li className="rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4 py-3 text-sm" key={`${metric.label}-${index}`}>
-              <strong className="block font-medium">{metric.label}</strong>
-              <span className="text-xs text-[var(--muted)]">{tm(`operationName.${metric.operation}`)}</span>
-            </li>
-          ))}
-        </ul>
-      ),
-    });
-  }
-
-  return <PagedView pages={pages} contentAriaLabel={t("structureAria")} />;
-}
-
 export function TemplateDetailScreen({
   user,
   challengeId,
@@ -303,7 +217,7 @@ export function TemplateDetailScreen({
 }) {
   const t = useTranslations("templates");
   const f = useGoaFormat();
-  const [template, setTemplate] = useState<TemplateDetail | null>(null);
+  const [detail, setDetail] = useState<ChallengeDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showCopy, setShowCopy] = useState(Boolean(autoCopy && user));
   const [busy, setBusy] = useState(false);
@@ -313,8 +227,8 @@ export function TemplateDetailScreen({
 
   useEffect(() => {
     const controller = new AbortController();
-    apiRequest<TemplateDetail>(API_PATHS.template(challengeId), { signal: controller.signal })
-      .then(setTemplate)
+    apiRequest<ChallengeDetail>(API_PATHS.template(challengeId), { signal: controller.signal })
+      .then(setDetail)
       .catch((cause: unknown) => {
         if (!(cause instanceof DOMException && cause.name === "AbortError")) setError(f.error(cause));
       });
@@ -354,56 +268,55 @@ export function TemplateDetailScreen({
     }
   }
 
-  const body = (
-    <main className="mx-auto max-w-4xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
+  const copyButton = (
+    <Button onClick={() => (user ? setShowCopy((open) => !open) : onSignIn())}>
+      {user ? (showCopy ? t("closeCopy") : t("duplicateCta")) : t("signInToDuplicate")}
+    </Button>
+  );
+
+  const body = error ? (
+    <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12">
       <button className={cx(backLinkClass, "mb-6")} type="button" onClick={onBack}>{t("allTemplates")}</button>
-      {error ? <StatusMessage error={error} /> : !template ? (
-        <p className="text-sm text-[var(--muted)]" role="status">{t("detailLoading")}</p>
-      ) : (
-        <>
-          <p className="text-xs font-medium text-[var(--muted)]">{t("detailKicker", { mode: t(`mode.${template.submissionMode}`), duration: template.durationDays === null ? t("durationNone") : t("durationDays", { count: template.durationDays }) })}</p>
-          <h1 className="mt-2 text-3xl font-light tracking-[-0.04em] sm:text-4xl">{template.title}</h1>
-          {template.summary || template.description ? (
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--muted)]">{template.summary ?? template.description}</p>
-          ) : null}
-          <p className="mt-3 text-xs text-[var(--muted)]">
-            {[
-              t("metaFields", { count: template.fields.length }),
-              template.checkpoints.length ? t("metaCheckpoints", { count: template.checkpoints.length }) : null,
-              template.items.length ? t("metaItems", { count: template.items.length }) : null,
-              template.metrics.length ? t("metaMetrics", { count: template.metrics.length }) : null,
-            ].filter(Boolean).join(" • ")}
-          </p>
-
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Button onClick={() => (user ? setShowCopy((open) => !open) : onSignIn())}>
-              {user ? (showCopy ? t("closeCopy") : t("duplicateCta")) : t("signInToDuplicate")}
-            </Button>
-          </div>
-
-          {user && showCopy ? (
-            <section className={cx(cardClass, "mt-4 p-5")} aria-label={t("duplicateAria")}>
-              <p className="text-sm text-[var(--muted)]">{t("duplicateBody")}</p>
-              <form className="mt-4 grid gap-3" onSubmit={duplicate}>
-                <label><span className={labelClass}>{t("targetGroupLabel")}</span>
-                  <select className={inputClass} name="target" defaultValue={manageable[0]?.id ?? "__new__"}>
-                    {manageable.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
-                    <option value="__new__">{t("newGroupOption")}</option>
-                  </select>
-                </label>
-                <label><span className={labelClass}>{t("newGroupNameLabel")}</span>
-                  <input className={inputClass} name="newGroupName" maxLength={120} placeholder={template.title} />
-                </label>
-                <div><Button type="submit" disabled={busy}>{busy ? t("duplicating") : t("duplicateSubmit")}</Button></div>
-                <StatusMessage error={copyError} />
-              </form>
-            </section>
-          ) : null}
-
-          <TemplateStructure template={template} />
-        </>
-      )}
+      <StatusMessage error={error} />
     </main>
+  ) : !detail ? (
+    <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12">
+      <button className={cx(backLinkClass, "mb-6")} type="button" onClick={onBack}>{t("allTemplates")}</button>
+      <p className="text-sm text-[var(--muted)]" role="status">{t("detailLoading")}</p>
+    </main>
+  ) : (
+    <>
+      <ParticipantChallengeScreen
+        preview
+        user={user}
+        challenge={detail}
+        entries={[]}
+        tab="results"
+        onTab={() => undefined}
+        onBack={onBack}
+        previewActions={copyButton}
+      />
+      {user && showCopy ? (
+        <div className="mx-auto max-w-7xl px-4 pb-24 sm:px-6">
+          <section className={cx(cardClass, "p-5")} aria-label={t("duplicateAria")}>
+            <p className="text-sm text-[var(--muted)]">{t("duplicateBody")}</p>
+            <form className="mt-4 grid gap-3" onSubmit={duplicate}>
+              <label><span className={labelClass}>{t("targetGroupLabel")}</span>
+                <select className={inputClass} name="target" defaultValue={manageable[0]?.id ?? "__new__"}>
+                  {manageable.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
+                  <option value="__new__">{t("newGroupOption")}</option>
+                </select>
+              </label>
+              <label><span className={labelClass}>{t("newGroupNameLabel")}</span>
+                <input className={inputClass} name="newGroupName" maxLength={120} placeholder={detail.title} />
+              </label>
+              <div><Button type="submit" disabled={busy}>{busy ? t("duplicating") : t("duplicateSubmit")}</Button></div>
+              <StatusMessage error={copyError} />
+            </form>
+          </section>
+        </div>
+      ) : null}
+    </>
   );
 
   return <PublicChrome user={user} onSignIn={onSignIn}>{body}</PublicChrome>;
