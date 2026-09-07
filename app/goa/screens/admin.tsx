@@ -30,7 +30,6 @@ import type {
 import {
   backLinkClass,
   Button,
-  cardClass,
   ChallengeStatusBadge,
   cx,
   EmptyState,
@@ -116,9 +115,9 @@ function PreflightPanel({ challengeId, onReady }: { challengeId: Id; onReady: (r
   const label = (issue: PreflightIssue) => (tCodes.has(issue.code) ? tCodes(issue.code) : issue.message);
 
   return (
-    <section className={cx(cardClass, "p-5 sm:p-7")}>
+    <section className="border-t border-[var(--line)] pt-10">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-xl font-light">{t("title")}</h2>
+        <h2 className="text-lg font-medium tracking-tight">{t("title")}</h2>
         <button type="button" className="text-xs font-light text-[var(--muted)] hover:text-[var(--ink)] hover:underline" onClick={load} disabled={loading}>
           {loading ? t("checking") : t("recheck")}
         </button>
@@ -1218,8 +1217,8 @@ function AdminResults({
   }
 
   return (
-    <div className="space-y-6">
-      <section className={cx(cardClass, "p-5 sm:p-7")}>
+    <div className="mx-auto max-w-5xl space-y-12">
+      <section>
         <PageHeading title={t("publishTitle")} description={t("publishSubtitle")} />
         <div className="rounded-2xl bg-[var(--wash)] p-4 text-sm">
           {isPublished ? (
@@ -1264,7 +1263,7 @@ function AdminResults({
           onClose={() => setConfirm(null)} onConfirm={() => doUnpublish()} />
       ) : null}
 
-      <section className={cx(cardClass, "p-5 sm:p-7")}>
+      <section className="border-t border-[var(--line)] pt-10">
         <PageHeading title={t("resultsTitle")} description={t("resultsSubtitle")} />
         <div className="grid gap-4 sm:grid-cols-2"><label className="sm:col-span-2"><span className={labelClass}>{t("headlineLabel")}</span><input className={inputClass} value={headline} onChange={(event) => setHeadline(event.target.value)} maxLength={180} placeholder={challenge.title} /></label><label className="sm:col-span-2"><span className={labelClass}>{t("summaryLabel")}</span><textarea className={inputClass} rows={4} value={summary} onChange={(event) => setSummary(event.target.value)} maxLength={1500} /></label></div>
         <fieldset className="mt-6"><legend className="text-base font-light">{t("highlightMetrics")}</legend>{challenge.metrics.length ? <div className="mt-3"><ShowMoreList items={challenge.metrics} preview={6} className="grid gap-2 sm:grid-cols-2" render={(metric) => <label className="flex min-h-12 items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4 text-sm" key={metric.id}><input type="checkbox" aria-label={t("highlightMetricAria", { label: metric.label })} checked={metricIds.includes(metric.id)} onChange={(event) => setMetricIds((current) => event.target.checked ? [...current, metric.id] : current.filter((id) => id !== metric.id))} /><span><strong className="block">{metric.label}</strong><small className="text-[var(--muted)]">{metric.formattedValue ?? metric.value ?? t("metricNoValue")}</small></span></label>} /></div> : <p className="mt-2 text-sm text-[var(--muted)]">{t("createMetricsFirst")}</p>}</fieldset>
@@ -1282,7 +1281,7 @@ function AdminResults({
       </section>
 
       {blockOrder.length ? (
-        <section className={cx(cardClass, "p-5 sm:p-7")}>
+        <section className="border-t border-[var(--line)] pt-10">
           <PageHeading title={t("blockOrderTitle")} description={t("blockOrderSubtitle")} />
           <ShowMoreList
             items={blockOrder}

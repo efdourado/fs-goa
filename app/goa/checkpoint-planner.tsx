@@ -6,7 +6,7 @@ import { useMemo, useState } from "react";
 import { useGoaFormat } from "./format";
 import { applyOrder, type OrderableItem, type OrderStrategy } from "./ordering";
 import type { ChallengeDetail, CheckpointInput, CheckpointKind, Id } from "./types";
-import { Button, cardClass, cx, EmptyState, inputClass, labelClass, PageHeading, StatusMessage } from "./ui";
+import { Button, EmptyState, inputClass, labelClass, PageHeading, StatusMessage } from "./ui";
 import { formatRuntime } from "./utils";
 
 const KINDS: CheckpointKind[] = ["week", "session", "milestone", "day"];
@@ -178,7 +178,7 @@ export function CheckpointPlanner({
 
   if (dailyAuto) {
     return (
-      <section className={cx(cardClass, "p-5 sm:p-7")}>
+      <section className="mx-auto max-w-5xl">
         <PageHeading title={t("title")} description={t("dailyAutoNote")} />
       </section>
     );
@@ -188,26 +188,26 @@ export function CheckpointPlanner({
   // reports `daily` for its progress type yet still has books to place.
   if (challenge.submissionMode !== "item" && challenge.items.length === 0) {
     return (
-      <section className={cx(cardClass, "p-5 sm:p-7")}>
+      <section className="mx-auto max-w-5xl">
         <PageHeading title={t("title")} description={t("noItemsNote")} />
       </section>
     );
   }
 
   return (
-    <div className="grid gap-6">
-      <section className={cx(cardClass, "p-5 sm:p-7")}>
+    <div className="mx-auto max-w-5xl space-y-12">
+      <section>
         <PageHeading title={t("title")} description={t("subtitle")} />
         {locked ? (
           <p className="mt-4 text-sm text-[var(--muted)]">{t("lockedNote")}</p>
         ) : (
           <div className="mt-4 space-y-3">
             {drafts.length ? (
-              <ol className="space-y-2">
+              <ol className="divide-y divide-[var(--line)]">
                 {drafts.map((draft, index) => {
                   const saved = savedCheckpoints.find((cp) => cp.id === draft.id);
                   return (
-                    <li className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-3" key={draft.key}>
+                    <li className="py-5 first:pt-0" key={draft.key}>
                       <div className="grid gap-2 sm:grid-cols-[1.4fr_0.8fr_auto]">
                         <label>
                           <span className="sr-only">{t("cpTitle")}</span>
@@ -224,7 +224,7 @@ export function CheckpointPlanner({
                         <div className="flex items-start gap-1">
                           <Button variant="ghost" className="px-2" disabled={index === 0} onClick={() => move(index, -1)}>↑<span className="sr-only">{t("moveUp")}</span></Button>
                           <Button variant="ghost" className="px-2" disabled={index === drafts.length - 1} onClick={() => move(index, 1)}>↓<span className="sr-only">{t("moveDown")}</span></Button>
-                          <Button variant="danger" className="px-2 text-xs" onClick={() => setDrafts((cur) => cur.filter((d) => d.key !== draft.key))}>{tc("remove")}</Button>
+                          <button type="button" className="min-h-11 px-2 text-xs text-[var(--danger)] hover:underline" onClick={() => setDrafts((cur) => cur.filter((d) => d.key !== draft.key))}>{tc("remove")}</button>
                         </div>
                       </div>
                       <div className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -259,8 +259,8 @@ export function CheckpointPlanner({
       </section>
 
       {savedCheckpoints.length && !locked ? (
-        <section className={cx(cardClass, "p-5 sm:p-7")}>
-          <h2 className="text-lg font-light">{t("organiseTitle")}</h2>
+        <section className="border-t border-[var(--line)] pt-10">
+          <h2 className="text-lg font-medium tracking-tight">{t("organiseTitle")}</h2>
           <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{t("organiseSubtitle")}</p>
           <div className="mt-4 flex flex-wrap gap-2">
             <Button variant="secondary" onClick={distribute}>{t("distribute")}</Button>
