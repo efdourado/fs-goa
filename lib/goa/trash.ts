@@ -485,9 +485,17 @@ function confirmationTier(kind: TrashKind): ActionPreview["confirmation"] {
 
 // ── move to trash (called by the soft-delete services) ────────────────────
 
-async function personalWorkspaceId(client: PoolClient, userId: string): Promise<string | null> {
-  const ws = await oneOrNull<{ id: string }>(client, "SELECT id FROM groups WHERE kind='personal' AND owner_user_id=$1", [userId]);
-  return ws?.id ?? null;
+/**
+ * Every personal workspace the caller owns. Normally one, but a workspace that
+ * was soft-deleted (an old bug, account churn) leaves its challenges and
+ * catalogue items behind — the bin still has to reach them, so all ids count.
+ */
+async function personalWorkspaceIds(client: PoolClient, userId: string): Promise<string[]> {
+  const { rows } = await client.query<{ id: string }>(
+    "SELECT id FROM groups WHERE kind='personal' AND owner_user_id=$1",
+    [userId],
+  );
+  return rows.map((r) => r.id);
 }
 
 /**
@@ -547,13 +555,15 @@ async function annotate(client: PoolClient, row: RowContext, trashRow?: { delete
   };
 }
 
-async function listBinScope(client: PoolClient, scopeType: "personal" | "group", scopeId: string): Promise<TrashItemView[]> {
+async function listBinScope(client: PoolClient, scopeType: "personal" | "group", scopeId: string | string[]): Promise<TrashItemView[]> {
+  const scopeIds = Array.isArray(scopeId) ? scopeId : [scopeId];
+  if (!scopeIds.length) return [];
   const rows = await client.query<{ entity_kind: BinKind; entity_id: string; deleted_at: string; reason: string | null; deleted_by: string | null }>(
     `SELECT ti.entity_kind, ti.entity_id, ti.deleted_at::text AS deleted_at, ti.reason, du.username AS deleted_by
        FROM trash_items ti LEFT JOIN users du ON du.id = ti.deleted_by_user_id
-      WHERE ti.scope_type=$1 AND ti.scope_id=$2 AND ti.entity_kind NOT IN ('entry','group')
+      WHERE ti.scope_type=$1 AND ti.scope_id = ANY($2::text[]) AND ti.entity_kind NOT IN ('entry','group')
       ORDER BY ti.deleted_at DESC`,
-    [scopeType, scopeId],
+    [scopeType, scopeIds],
   );
   const out: TrashItemView[] = [];
   for (const r of rows.rows) {
@@ -567,9 +577,9 @@ async function listBinScope(client: PoolClient, scopeType: "personal" | "group",
 /** "Minha lixeira" — trashed personal challenges, personal catalogue items, and the owner's trashed standard groups. */
 export async function personalTrash(session: SessionContext) {
   return withClient(async (client) => {
-    const wsId = await personalWorkspaceId(client, session.user.id);
-    if (!wsId) throw new ApiError(404, "not_found", "Espaço pessoal não encontrado.");
-    const items = await listBinScope(client, "personal", wsId);
+    const wsIds = await personalWorkspaceIds(client, session.user.id);
+    if (!wsIds.length) throw new ApiError(404, "not_found", "Espaço pessoal não encontrado.");
+    const items = await listBinScope(client, "personal", wsIds);
     const ownedGroups = await client.query<{
       entity_id: string; deleted_at: string; reason: string | null; deleted_by: string | null;
     }>(

@@ -18,6 +18,14 @@ export const LIMITS = {
   get challengesPerGroup(): number {
     return positiveIntEnv("MAX_CHALLENGES_PER_GROUP", 6);
   },
+  /**
+   * Solo challenges live in the caller's hidden personal workspace. There is no
+   * sharing blast radius there, and "a reading goal, a film marathon" adds up
+   * over years — so this is far more generous than a shared group.
+   */
+  get challengesPerPersonalSpace(): number {
+    return positiveIntEnv("MAX_CHALLENGES_PER_PERSONAL_SPACE", 30);
+  },
   get membersPerGroup(): number {
     return positiveIntEnv("MAX_MEMBERS_PER_GROUP", 62);
   },

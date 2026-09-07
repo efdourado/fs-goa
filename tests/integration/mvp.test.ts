@@ -5373,3 +5373,45 @@ test("o marcador do db:seed-demo sobrevive a uma edição da descrição do grup
   });
   assert.equal((plainEdit.body as { description: string }).description, "Só uma descrição.");
 });
+
+test("lixeira pessoal: mostra o desafio pessoal binado e um fantasma pré-registro não trava a criação", async () => {
+  const owner = await register("Dona Lixo Pessoal", "dona_lixo_pessoal");
+
+  const a = await call("POST", "/api/personal/challenges", {
+    session: owner, body: { recipe: "cinema", title: "Maratona A", startsOn: null, endsOn: null, items: [{ title: "F1" }] },
+  });
+  assert.equal(a.response.status, 201, JSON.stringify(a.body));
+  const b = await call("POST", "/api/personal/challenges", {
+    session: owner, body: { recipe: "cinema", title: "Maratona B", startsOn: null, endsOn: null, items: [{ title: "F2" }] },
+  });
+  const binnedId = (b.body as { id: string }).id;
+
+  // Binar pela via normal: some da tela e aparece na lixeira pessoal.
+  assert.equal((await call("DELETE", `/api/challenges/${binnedId}`, { session: owner })).response.status, 200);
+  const bin = await call("GET", "/api/personal/trash", { session: owner });
+  assert.equal(bin.response.status, 200, JSON.stringify(bin.body));
+  const binItems = (bin.body as { items: Array<{ kind: string; id: string }> }).items;
+  assert.ok(binItems.some((i) => i.kind === "challenge" && i.id === binnedId), "o desafio pessoal binado aparece em Minha lixeira");
+
+  // Fantasma: soft-delete direto no banco, sem registro em trash_items (estado
+  // anterior à lixeira). Não pode aparecer na lixeira nem contar para o limite.
+  const wsRow = await adminPool.query<{ id: string }>(
+    "SELECT id FROM groups WHERE kind='personal' AND owner_user_id=$1", [owner.user.id],
+  );
+  const workspaceId = wsRow.rows[0].id;
+  const ghost = await adminPool.query<{ id: string }>(
+    `INSERT INTO challenges (id, group_id, created_by_user_id, title, recipe_key, recipe_version, time_zone, kind, status, deleted_at, created_at, updated_at)
+     VALUES ('ghost_pers_1', $1, $2, 'Fantasma', 'cinema', 1, 'America/Sao_Paulo', 'round', 'draft', now(), now(), now())
+     RETURNING id`,
+    [workspaceId, owner.user.id],
+  );
+  assert.equal(ghost.rows[0].id, "ghost_pers_1");
+
+  const bin2 = (await call("GET", "/api/personal/trash", { session: owner })).body as { items: Array<{ id: string }> };
+  assert.ok(!bin2.items.some((i) => i.id === "ghost_pers_1"), "o fantasma não aparece na lixeira");
+
+  const stillWorks = await call("POST", "/api/personal/challenges", {
+    session: owner, body: { recipe: "cinema", title: "Maratona C", startsOn: null, endsOn: null, items: [{ title: "F3" }] },
+  });
+  assert.equal(stillWorks.response.status, 201, "o fantasma não conta para o limite do espaço pessoal");
+});

@@ -61,16 +61,25 @@ export async function createChallenge(
     if (!activeGroup) throw new ApiError(404, "not_found", "Grupo não encontrado.");
     const existing = await oneOrNull<{ count: number }>(
       client,
-      // Binned challenges still count — the bin never expires (ROADMAP §13), so
-      // restore or permanently delete one to free the slot.
-      "SELECT count(*)::int AS count FROM challenges WHERE group_id = $1",
+      // A challenge counts while it is live or sitting in a bin the owner can
+      // empty (the bin never expires — ROADMAP §13). A row that is soft-deleted
+      // with no `trash_items` record is a ghost from before the bin registry
+      // existed: it is invisible and unrecoverable, so it must not hold a slot.
+      `SELECT count(*)::int AS count FROM challenges c
+        WHERE c.group_id = $1
+          AND (c.deleted_at IS NULL
+               OR EXISTS (SELECT 1 FROM trash_items ti
+                           WHERE ti.entity_kind = 'challenge' AND ti.entity_id = c.id))`,
       [groupId],
     );
+    const limit = options.personal ? LIMITS.challengesPerPersonalSpace : LIMITS.challengesPerGroup;
     assertUnder(
       existing?.count ?? 0,
-      LIMITS.challengesPerGroup,
+      limit,
       "challenge_limit",
-      `Este grupo atingiu o limite de ${LIMITS.challengesPerGroup} desafios. Apague um desafio da lixeira para criar outro.`,
+      options.personal
+        ? `Seu espaço pessoal atingiu o limite de ${limit} desafios. Restaure ou exclua um da sua lixeira (Sua conta → Sua lixeira) para criar outro.`
+        : `Este grupo atingiu o limite de ${limit} desafios. Apague um desafio da lixeira para criar outro.`,
     );
 
     const id = publicId();
