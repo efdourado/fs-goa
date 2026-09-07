@@ -20,10 +20,14 @@ import { purgeGroupRows } from "../../lib/goa/purge";
  */
 
 export const DEMO_GROUP_NAME = "Lab — Demo";
-/** Embedded in the group description so `--reset` can only ever match a seed group. */
+/**
+ * Embedded verbatim in the group description — `findDemoGroup` and `--reset`
+ * match on this marker (never the name), so it must always be part of
+ * `DEMO_GROUP_DESCRIPTION`.
+ */
 export const SYNTHETIC_MARKER = "⟦seed-demo⟧";
-export const DEMO_GROUP_DESCRIPTION = "Grupo de demonstração. Com opiniões, notas e comentários "
-  + `fictícios e gerados automaticamente por \`npm run db:seed-demo\`. ${SYNTHETIC_MARKER}`;
+export const DEMO_GROUP_DESCRIPTION =
+  `Grupo de demonstração. Opiniões, notas e comentários fictícios, gerados automaticamente. ${SYNTHETIC_MARKER}`;
 
 export const DEMO_USERNAMES = {
   owner: "dudupizzas",
