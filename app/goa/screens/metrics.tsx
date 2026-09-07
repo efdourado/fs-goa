@@ -95,7 +95,7 @@ export function MetricEditor({ challenge, metric, onCancel, onSave }: {
     } catch (cause) { setError(f.error(cause)); setBusy(false); }
   }
   return <Dialog title={metric ? t("editMetric") : t("addMetric")} busy={busy} onClose={close}>
-    {discard ? <div role="alert" className="mb-5 space-y-3 rounded-xl bg-[var(--wash)] p-4"><p className="text-sm">{t("unsavedMetric")}</p><div className="flex flex-wrap gap-2"><Button variant="secondary" disabled={busy} onClick={() => setDiscard(false)}>{t("keepEditing")}</Button><Button variant="danger" disabled={busy} onClick={onCancel}>{t("discardChanges")}</Button></div></div> : null}
+    {discard ? <div role="alert" className="mb-5 space-y-3 rounded-xl bg-[var(--wash)] p-4"><p className="text-sm">{tc("unsavedChanges")}</p><div className="flex flex-wrap gap-2"><Button variant="secondary" disabled={busy} onClick={() => setDiscard(false)}>{tc("keepEditing")}</Button><Button variant="danger" disabled={busy} onClick={onCancel}>{tc("discardChanges")}</Button></div></div> : null}
     <form onSubmit={submit} className="space-y-6">
       <fieldset disabled={busy} className="min-w-0 space-y-6">
         <label className="block"><span className={labelClass}>{t("metricNameLabel")}</span><input className={inputClass} value={label} onChange={(e) => setLabel(e.target.value)} required maxLength={100} placeholder={t("metricNamePlaceholder")} /></label>

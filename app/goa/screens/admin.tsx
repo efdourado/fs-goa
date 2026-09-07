@@ -8,8 +8,8 @@ import { CheckpointPlanner } from "../checkpoint-planner";
 import { useGoaFormat } from "../format";
 import { CineItemsEditor, type CineRow, cineRowsToInput } from "../cine-items";
 import { copyText } from "../clipboard";
-import { ConfirmDialog } from "../dialog";
-import { cleanFields, FieldBuilder } from "../fields";
+import { ConfirmDialog, Dialog } from "../dialog";
+import { cleanFields, FIELD_TYPES, FieldConfigInputs, newFieldConfig, uniqueFieldKey } from "../fields";
 import { ListImportPanel } from "../list-import-panel";
 import { RuleSectionsEditor, visibleRuleSections } from "../rules";
 import { TrashView } from "../trash-view";
@@ -381,10 +381,10 @@ function AdminParticipants({
   const [success, setSuccess] = useState<string | null>(null);
 
   return (
-    <section className={cx(cardClass, "p-5 sm:p-7")}>
+    <section className="mx-auto max-w-5xl">
       <PageHeading title={t("participantsTitle")} description={t("participantsSubtitle")} />
       {group?.members?.length ? (
-        <div className="grid gap-3 sm:grid-cols-2">{group.members.map((member) => { const checked = selected.includes(member.id); return <label className={cx("flex min-h-16 items-center gap-3 rounded-xl border bg-[var(--paper)] px-4", checked ? "border-[var(--main-line)]" : "border-[var(--line)]")} key={member.id}><input type="checkbox" aria-label={t("selectMember", { name: member.name })} checked={checked} disabled={challenge.status === "closed" || busy} onChange={(event) => setSelected((current) => event.target.checked ? [...current, member.id] : current.filter((id) => id !== member.id))} /><span><strong className="block text-sm">{member.name}</strong><small className="text-[var(--muted)]">{t("memberMeta", { username: member.username, role: tr(member.role) })}</small></span></label>; })}</div>
+        <ul className="divide-y divide-[var(--line)]">{group.members.map((member) => { const checked = selected.includes(member.id); return <li key={member.id}><label className="flex min-h-16 cursor-pointer items-center gap-4 py-4"><input type="checkbox" aria-label={t("selectMember", { name: member.name })} checked={checked} disabled={challenge.status === "closed" || busy} onChange={(event) => setSelected((current) => event.target.checked ? [...current, member.id] : current.filter((id) => id !== member.id))} /><span className="min-w-0"><strong className="block text-base font-medium">{member.name}</strong><small className="text-[var(--muted)]">{t("memberMeta", { username: member.username, role: tr(member.role) })}</small></span></label></li>; })}</ul>
       ) : <EmptyState title={t("noMembersTitle")} description={t("noMembersBody")} />}
       <div className="mt-5"><StatusMessage error={error} success={success} /></div>
       {challenge.status !== "closed" && group?.members?.length ? <Button className="mt-5" disabled={busy} onClick={() => { setBusy(true); setError(null); setSuccess(null); onSave(selected).then(() => setSuccess(t("participantsSaved"))).catch((cause: unknown) => setError(f.error(cause))).finally(() => setBusy(false)); }}>{busy ? tc("saving") : t("saveParticipants")}</Button> : null}
@@ -406,8 +406,8 @@ function AdminFields({
   onSetExpectation: (enabled: boolean) => Promise<void>;
 }) {
   const t = useTranslations("adminChallenge");
+  const tf = useTranslations("fields");
   const tv = useTranslations("visibility");
-  const tc = useTranslations("common");
   const f = useGoaFormat();
   const hasExpectation = challenge.entryTypes.some((type) => type.purpose === "expectation");
   const canToggleExpectation =
@@ -429,6 +429,9 @@ function AdminFields({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  const [editing, setEditing] = useState<ChallengeField | "new" | null>(null);
+  const locked = challenge.status === "closed";
+
   function pickType(id: Id) {
     setSelectedTypeId(id);
     const type = types.find((candidate) => candidate.id === id);
@@ -438,11 +441,38 @@ function AdminFields({
     setSuccess(null);
   }
 
+  async function commit(next: ChallengeField[], message: string) {
+    setBusy(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      await onSave(selectedTypeId, cleanFields(next));
+      setFields(next);
+      setSuccess(message);
+    } catch (cause) {
+      setError(f.error(cause));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function move(index: number, delta: number) {
+    const target = index + delta;
+    if (target < 0 || target >= fields.length) return;
+    const next = [...fields];
+    [next[index], next[target]] = [next[target], next[index]];
+    void commit(next, t("fieldsSaved"));
+  }
+
   return (
-    <section className={cx(cardClass, "p-5 sm:p-7")}>
-      <PageHeading title={t("fieldsTitle")} description={challenge.status === "draft" ? t("fieldsHintDraft") : challenge.status === "active" ? t("fieldsHintActive") : t("fieldsHintClosed")} />
+    <section className="mx-auto max-w-5xl">
+      <PageHeading
+        title={t("fieldsTitle")}
+        description={challenge.status === "draft" ? t("fieldsHintDraft") : challenge.status === "active" ? t("fieldsHintActive") : t("fieldsHintClosed")}
+        action={!locked ? <Button onClick={() => { setError(null); setEditing("new"); }}>{t("addField")}</Button> : undefined}
+      />
       {types.length > 1 ? (
-        <div className="mb-5 flex flex-wrap gap-1 rounded-2xl bg-[var(--wash-strong)]/70 p-1" role="tablist" aria-label={t("fieldsTypeLegend")}>
+        <div className="mb-6 flex flex-wrap gap-1 rounded-2xl bg-[var(--wash-strong)]/70 p-1" role="tablist" aria-label={t("fieldsTypeLegend")}>
           {types.map((type) => (
             <button
               key={type.id}
@@ -457,9 +487,46 @@ function AdminFields({
           ))}
         </div>
       ) : null}
-      <FieldBuilder key={selectedTypeId} fields={fields} onChange={setFields} lockPersistedTypes={challenge.status !== "draft"} />
-      <div className="mt-5"><StatusMessage error={error} success={success} /></div>
-      <Button className="mt-5" disabled={busy || challenge.status === "closed"} onClick={() => { setBusy(true); setError(null); setSuccess(null); onSave(selectedTypeId, cleanFields(fields)).then(() => setSuccess(t("fieldsSaved"))).catch((cause: unknown) => setError(f.error(cause))).finally(() => setBusy(false)); }}>{busy ? tc("saving") : t("saveFields")}</Button>
+      <div className="mb-5"><StatusMessage error={error} success={success} /></div>
+      {fields.length ? (
+        <ol className="divide-y divide-[var(--line)]">
+          {fields.map((field, index) => (
+            <li className="flex items-start justify-between gap-4 py-4" key={field.id ?? field.key}>
+              <div className="min-w-0">
+                <strong className="block text-base font-medium">{field.label}</strong>
+                <span className="mt-1 block text-xs text-[var(--muted)]">
+                  {[tf(`type.${field.type}`), field.required ? t("fieldRequiredShort") : null].filter(Boolean).join(" · ")}
+                  {" · "}<code className="rounded bg-[var(--wash)] px-1.5 py-0.5 text-[11px]">{field.key}</code>
+                </span>
+              </div>
+              {!locked ? (
+                <div className="flex flex-none items-center gap-1">
+                  <button type="button" className="min-h-11 px-2 text-[var(--muted)] disabled:opacity-30" disabled={index === 0 || busy} onClick={() => move(index, -1)} aria-label={tf("moveUp")}>↑</button>
+                  <button type="button" className="min-h-11 px-2 text-[var(--muted)] disabled:opacity-30" disabled={index === fields.length - 1 || busy} onClick={() => move(index, 1)} aria-label={tf("moveDown")}>↓</button>
+                  <Button variant="secondary" className="min-h-9 px-3 py-1 text-xs" onClick={() => { setError(null); setEditing(field); }}>{t("edit")}</Button>
+                  <button type="button" className="min-h-11 px-2 text-xs text-[var(--danger)] hover:underline disabled:opacity-40" disabled={busy} onClick={() => void commit(fields.filter((candidate) => candidate !== field), t("fieldsSaved"))}>{t("remove")}</button>
+                </div>
+              ) : null}
+            </li>
+          ))}
+        </ol>
+      ) : <EmptyState title={t("fieldsEmptyTitle")} description={t("fieldsEmptyBody")} />}
+
+      {editing ? (
+        <FieldEditorDialog
+          field={editing === "new" ? undefined : editing}
+          takenKeys={fields.filter((candidate) => candidate !== editing).map((candidate) => candidate.key)}
+          lockType={challenge.status !== "draft" && editing !== "new" && Boolean(editing.id)}
+          onCancel={() => setEditing(null)}
+          onSave={async (built) => {
+            const next = editing === "new"
+              ? [...fields, built]
+              : fields.map((candidate) => candidate === editing ? { ...candidate, ...built } : candidate);
+            await commit(next, editing === "new" ? t("fieldAdded") : t("fieldsSaved"));
+            setEditing(null);
+          }}
+        />
+      ) : null}
 
       {selectedTypeId && challenge.status !== "closed" ? (
         <div className="mt-7 border-t border-[var(--line)] pt-5">
@@ -518,6 +585,75 @@ function AdminFields({
         </div>
       ) : null}
     </section>
+  );
+}
+
+function FieldEditorDialog({
+  field,
+  takenKeys,
+  lockType,
+  onCancel,
+  onSave,
+}: {
+  field?: ChallengeField;
+  takenKeys: string[];
+  lockType: boolean;
+  onCancel: () => void;
+  onSave: (field: ChallengeField) => Promise<void>;
+}) {
+  const t = useTranslations("adminChallenge");
+  const tf = useTranslations("fields");
+  const tc = useTranslations("common");
+  const f = useGoaFormat();
+  const [draft, setDraft] = useState<ChallengeField>(field ?? { key: "", label: "", type: "text", required: true, config: newFieldConfig("text") });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [discard, setDiscard] = useState(false);
+  const dirty = JSON.stringify(draft) !== JSON.stringify(field ?? { key: "", label: "", type: "text", required: true, config: newFieldConfig("text") });
+  const close = () => { if (dirty) setDiscard(true); else onCancel(); };
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const label = draft.label.trim();
+    if (!label) { setError(tf("labelRequired")); return; }
+    setBusy(true);
+    setError(null);
+    try {
+      await onSave({
+        ...draft,
+        label,
+        key: draft.key || uniqueFieldKey(label, takenKeys),
+      });
+    } catch (cause) { setError(f.error(cause)); setBusy(false); }
+  }
+
+  return (
+    <Dialog title={field ? tf("editFieldTitle") : t("addField")} busy={busy} onClose={close}>
+      {discard ? (
+        <div role="alert" className="mb-5 space-y-3 rounded-xl bg-[var(--wash)] p-4">
+          <p className="text-sm">{tc("unsavedChanges")}</p>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" disabled={busy} onClick={() => setDiscard(false)}>{tc("keepEditing")}</Button>
+            <Button variant="danger" disabled={busy} onClick={onCancel}>{tc("discardChanges")}</Button>
+          </div>
+        </div>
+      ) : null}
+      <form onSubmit={submit} className="space-y-6">
+        <fieldset disabled={busy} className="min-w-0 space-y-6">
+          <label className="block"><span className={labelClass}>{tf("labelLabel")}</span><input className={inputClass} value={draft.label} maxLength={100} required onChange={(event) => setDraft((current) => ({ ...current, label: event.target.value }))} /></label>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block"><span className={labelClass}>{tf("typeLabel")}</span><select className={inputClass} value={draft.type} disabled={lockType} onChange={(event) => { const type = event.target.value as ChallengeField["type"]; setDraft((current) => ({ ...current, type, config: newFieldConfig(type) })); }}>{FIELD_TYPES.map((value) => <option value={value} key={value}>{tf(`type.${value}`)}</option>)}</select></label>
+            <label className="flex min-h-12 items-center gap-3 self-end rounded-xl border border-[var(--line)] px-3 text-sm font-medium"><input type="checkbox" checked={draft.required} onChange={(event) => setDraft((current) => ({ ...current, required: event.target.checked }))} />{tf("required")}</label>
+          </div>
+          <FieldConfigInputs field={draft} onChange={(patch) => setDraft((current) => ({ ...current, ...patch }))} />
+        </fieldset>
+        <StatusMessage error={error} />
+        <div className="flex justify-end gap-3 border-t border-[var(--line)] pt-4">
+          <Button variant="secondary" disabled={busy} onClick={close}>{tc("cancel")}</Button>
+          <Button type="submit" disabled={busy}>{busy ? tc("saving") : field ? tc("saveChanges") : t("addField")}</Button>
+        </div>
+      </form>
+    </Dialog>
   );
 }
 

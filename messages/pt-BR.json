@@ -9,6 +9,9 @@
     "close": "Fechar",
     "continue": "Continuar",
     "remove": "Remover",
+    "unsavedChanges": "Você tem alterações não salvas. Quer continuar editando ou descartá-las?",
+    "keepEditing": "Continuar editando",
+    "discardChanges": "Descartar alterações",
     "save": "Salvar",
     "saving": "Salvando…",
     "saveChanges": "Salvar alterações",
@@ -770,9 +773,11 @@
     "metricCalculation": "Configurar cálculo",
     "metricAdvanced": "Quantidade mínima de dados",
     "metricNoFields": "Adicione um campo de número ou nota a um formulário antes de usar este cálculo.",
-    "unsavedMetric": "Você tem alterações não salvas. Quer continuar editando ou descartá-las?",
-    "keepEditing": "Continuar editando",
-    "discardChanges": "Descartar alterações"
+    "addField": "Adicionar campo",
+    "fieldRequiredShort": "obrigatório",
+    "fieldAdded": "Campo adicionado.",
+    "fieldsEmptyTitle": "Nenhum campo ainda",
+    "fieldsEmptyBody": "Adicione um campo para o participante preencher a cada registro."
   },
   "visibility": {
     "title": "Quem vê estas respostas",
@@ -959,6 +964,8 @@
       "comoFoi": "Como foi?"
     },
     "labelLabel": "Rótulo",
+    "labelRequired": "Dê um rótulo ao campo.",
+    "editFieldTitle": "Editar campo",
     "typeLabel": "Tipo",
     "required": "Obrigatório",
     "min": "Mínimo",
