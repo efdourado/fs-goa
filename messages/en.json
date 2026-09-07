@@ -1287,7 +1287,6 @@
     "noRecordsYet": "No records yet",
     "unavailableValue": "Cannot calculate with these data",
     "rankingPending": "No eligible results yet. See what’s needed below.",
-    "pendingRows": "Waiting for data ({count})",
     "howCalculated": "How this is calculated",
     "unadjusted": "Average before adjustment: {value}",
     "personDetails": "View profile"

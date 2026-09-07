@@ -1287,7 +1287,6 @@
     "noRecordsYet": "Ainda sem registros",
     "unavailableValue": "Não calculável com estes dados",
     "rankingPending": "Ainda não há resultados elegíveis. Veja abaixo o que falta.",
-    "pendingRows": "Aguardando dados ({count})",
     "howCalculated": "Como este número é calculado",
     "unadjusted": "Média antes do ajuste: {value}",
     "personDetails": "Ver perfil"
