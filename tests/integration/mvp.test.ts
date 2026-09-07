@@ -5279,3 +5279,26 @@ test("R2: renomear ao restaurar um item do acervo usa a mesma chave de identidad
   assert.equal(row.rows[0].title, "Ficção   Científica", "o título guarda o que a pessoa digitou (só aparado)");
   assert.equal(row.rows[0].normalized_title, "ficcao cientifica", "sem acento, espaços colapsados — igual à criação");
 });
+
+test("o marcador do db:seed-demo sobrevive a uma edição da descrição do grupo", async () => {
+  const owner = await register("Dona Marcador", "dona_marcador_seed");
+  const groupId = ((await call("POST", "/api/groups", {
+    session: owner, body: { name: "Grupo Marcado", description: "Demonstração. ⟦seed-demo⟧" },
+  })).body as { id: string }).id;
+
+  // Uma edição bem-intencionada apaga o marcador invisível — updateGroup o reanexa.
+  const edited = await call("PATCH", `/api/groups/${groupId}`, {
+    session: owner, body: { description: "Descrição nova, sem o marcador." },
+  });
+  assert.equal(edited.response.status, 200, JSON.stringify(edited.body));
+  assert.equal((edited.body as { description: string }).description, "Descrição nova, sem o marcador. ⟦seed-demo⟧");
+
+  // Um grupo comum, sem marcador, continua editável sem ganhar nada.
+  const plain = ((await call("POST", "/api/groups", {
+    session: owner, body: { name: "Grupo Comum" },
+  })).body as { id: string }).id;
+  const plainEdit = await call("PATCH", `/api/groups/${plain}`, {
+    session: owner, body: { description: "Só uma descrição." },
+  });
+  assert.equal((plainEdit.body as { description: string }).description, "Só uma descrição.");
+});

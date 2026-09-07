@@ -6,6 +6,7 @@ import { getPool, inTransaction, oneOrNull, withClient } from "../../lib/db";
 import { writeAudit } from "../../lib/goa/domain/audit";
 import { publicId } from "../../lib/goa/domain/shared";
 import { purgeGroupRows } from "../../lib/goa/purge";
+import { SYNTHETIC_MARKER } from "../../lib/goa/synthetic";
 
 /**
  * `db:seed-demo` builds a self-contained demonstration group so the Wrapped,
@@ -19,15 +20,15 @@ import { purgeGroupRows } from "../../lib/goa/purge";
  * it and refuses to continue until `--reset` removes it.
  */
 
-export const DEMO_GROUP_NAME = "Lab — Demo";
+export const DEMO_GROUP_NAME = "Lab";
 /**
- * Embedded verbatim in the group description — `findDemoGroup` and `--reset`
- * match on this marker (never the name), so it must always be part of
- * `DEMO_GROUP_DESCRIPTION`.
+ * `findDemoGroup` and `--reset` match on this marker (never the name, which the
+ * operator may rename), so it must always be part of `DEMO_GROUP_DESCRIPTION`.
+ * The app renders it invisibly and re-appends it after any edit — see
+ * `lib/goa/synthetic.ts`.
  */
-export const SYNTHETIC_MARKER = "⟦seed-demo⟧";
-export const DEMO_GROUP_DESCRIPTION =
-  `Grupo de demonstração. Opiniões, notas e comentários fictícios, gerados automaticamente. ${SYNTHETIC_MARKER}`;
+export { SYNTHETIC_MARKER };
+export const DEMO_GROUP_DESCRIPTION = `Desafios fictícios, gerados automaticamente. ${SYNTHETIC_MARKER}`;
 
 export const DEMO_USERNAMES = {
   owner: "dudupizzas",
