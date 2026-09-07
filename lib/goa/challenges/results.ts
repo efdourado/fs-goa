@@ -160,7 +160,9 @@ function expectedPerParticipant(ctx: {
   if (targetPolicy !== "none") return ctx.item_count;
   if (schedulePolicy === "checkpoint" && ctx.start_date !== null) return ctx.checkpoint_count;
   if (ctx.submission_mode === "daily") {
-    return ctx.start_date === null ? ctx.active_days : ctx.checkpoint_count;
+    // A checkpoint-scheduled daily challenge expects one entry per checkpoint; a
+    // while_active / free one (e.g. Hábito) expects one per active day, dated or not.
+    return schedulePolicy === "checkpoint" ? ctx.checkpoint_count : ctx.active_days;
   }
   return 1;
 }
