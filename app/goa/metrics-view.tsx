@@ -1,15 +1,17 @@
 "use client";
 
+import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { metricMinimum } from "./metric-editor";
 import type { Metric, MetricSeriesEntry } from "./types";
 
-// A long ranking scrolls inside its own box (~4 rows tall) instead of folding
-// behind a disclosure — every position stays reachable, no click needed.
-const SCROLL_AFTER_ROWS = 4;
+// A long list shows its first rows, then a "see the full list (N)" button —
+// same pattern as the group catalogue.
+const PREVIEW_ROWS = 5;
 
 export function MetricBlock({ metric, hideThinLabel = false }: { metric: Metric; hideThinLabel?: boolean }) {
   const t = useTranslations("wrapped");
+  const [expanded, setExpanded] = useState(false);
   const series = metric.series;
   const minimum = metricMinimum(metric);
   const ranked = series?.filter((entry) => entry.value !== null) ?? [];
@@ -34,23 +36,26 @@ export function MetricBlock({ metric, hideThinLabel = false }: { metric: Metric;
   // Rows that can't be calculated yet stay in the list, below the ranked ones —
   // they show what's still needed instead of hiding behind a disclosure.
   const visibleRows = chronological ? series ?? [] : [...ranked, ...pending];
-  const scrolls = visibleRows.length > SCROLL_AFTER_ROWS;
+  const overflow = visibleRows.length - PREVIEW_ROWS;
+  const shown = expanded ? visibleRows : visibleRows.slice(0, PREVIEW_ROWS);
   return (
     <article className="min-w-0 py-2">
       <h3 className="text-base font-medium tracking-tight">{metric.label}</h3>
       {series?.length ? (
         visibleRows.length ? (
-          scrolls ? (
-            <div className="relative mt-3">
-              <ol className="max-h-[21rem] overflow-y-auto overscroll-contain rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4 sm:px-5">
-                {visibleRows.map(row)}
-              </ol>
-              {/* soft fade so the last row doesn't look chopped off */}
-              <div aria-hidden="true" className="pointer-events-none absolute inset-x-px bottom-px h-14 rounded-b-[11px] bg-gradient-to-t from-[var(--paper)] to-transparent" />
-            </div>
-          ) : (
-            <ol className="mt-2">{visibleRows.map(row)}</ol>
-          )
+          <>
+            <ol className="mt-2">{shown.map(row)}</ol>
+            {overflow > 0 ? (
+              <button
+                type="button"
+                onClick={() => setExpanded((value) => !value)}
+                aria-expanded={expanded}
+                className="mt-3 min-h-10 w-full rounded-xl border border-[var(--line)] text-xs font-light text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)]"
+              >
+                {expanded ? t("seriesShowLess") : t("seriesShowAll", { count: visibleRows.length })}
+              </button>
+            ) : null}
+          </>
         ) : <p className="mt-3 text-sm text-[var(--muted)]">{t("rankingPending")}</p>
       ) : <strong className="mt-3 block text-5xl font-medium tracking-[-0.05em] tabular-nums">{metric.formattedValue ?? metric.value ?? "—"}</strong>}
     </article>

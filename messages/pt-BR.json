@@ -1279,6 +1279,8 @@
     "noRecordsYet": "Ainda sem registros",
     "unavailableValue": "Não calculável com estes dados",
     "rankingPending": "Ainda não há resultados elegíveis. Veja abaixo o que falta.",
+    "seriesShowAll": "Ver a lista completa ({count})",
+    "seriesShowLess": "Ver menos",
     "howCalculated": "Como este número é calculado",
     "unadjusted": "Média simples: {value}"
   },

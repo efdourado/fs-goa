@@ -311,7 +311,7 @@ test("no ranking do Resultado o ano fica ao lado do título e a média crua apar
   assert.doesNotMatch(html, /Média simples: 3,9/, "quando a crua é igual à ajustada, não repete o número");
 });
 
-test("ranking grande rola dentro da própria caixa (~4 itens), sem recolher nada, sem JS", () => {
+test("ranking grande: mostra as primeiras posições e um botão 'ver a lista completa (12)'", () => {
   const series = Array.from({ length: 12 }, (_, index) => ({
     key: `item-${index}`,
     label: `Item ${index + 1}`,
@@ -328,12 +328,13 @@ test("ranking grande rola dentro da própria caixa (~4 itens), sem recolher nada
   } as unknown as ChallengeDetail;
 
   const html = renderWithIntl(createElement(ResultView, { challenge }));
-  assert.doesNotMatch(html, /<details/, "nada de disclosure — a lista rola");
-  assert.match(html, /overflow-y-auto/, "uma série longa ganha um contêiner rolável");
-  assert.match(html, /max-h-\[21rem\]/, "com altura limitada a ~4 itens");
-  for (let position = 1; position <= 12; position += 1) {
-    assert.match(html, new RegExp(`Item ${position}<`), `a posição ${position} está no DOM (alcançável rolando)`);
+  assert.doesNotMatch(html, /<details/, "nem disclosure nem scroll — é um botão");
+  assert.doesNotMatch(html, /overflow-y-auto/);
+  for (let position = 1; position <= 5; position += 1) {
+    assert.match(html, new RegExp(`Item ${position}<`), `a posição ${position} aparece direto`);
   }
+  assert.doesNotMatch(html, /Item 6</, "a 6ª posição fica atrás do botão");
+  assert.match(html, /Ver a lista completa \(12\)/, "o botão diz o total");
 });
 
 test("aba Resultados: um resultado sem manchete curada não cai de volta no título", () => {
