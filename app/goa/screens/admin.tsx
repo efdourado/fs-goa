@@ -588,7 +588,7 @@ function AdminFields({
   );
 }
 
-function FieldEditorDialog({
+export function FieldEditorDialog({
   field,
   takenKeys,
   lockType,
@@ -662,7 +662,7 @@ type ItemUpdatePayload = {
   author?: string; year?: number | null; mainGenre?: string; pageCount?: number | null; runtimeMinutes?: number | null;
 };
 
-function ItemEditorDialog({
+export function ItemEditorDialog({
   item,
   challenge,
   members,
@@ -1017,7 +1017,7 @@ function AdminReview({
   );
 }
 
-function CorrectionDialog({
+export function CorrectionDialog({
   entry,
   challenge,
   item,
