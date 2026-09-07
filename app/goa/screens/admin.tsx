@@ -8,6 +8,7 @@ import { CheckpointPlanner } from "../checkpoint-planner";
 import { useGoaFormat } from "../format";
 import { CineItemsEditor, type CineRow, cineRowsToInput } from "../cine-items";
 import { copyText } from "../clipboard";
+import { ConfirmDialog } from "../dialog";
 import { cleanFields, FieldBuilder } from "../fields";
 import { ListImportPanel } from "../list-import-panel";
 import { RuleSectionsEditor, visibleRuleSections } from "../rules";
@@ -24,7 +25,6 @@ import type {
   GroupSummary,
   Id,
   ImportPreview,
-  Metric,
 } from "../types";
 import {
   backLinkClass,
@@ -40,12 +40,8 @@ import {
   StatusMessage,
 } from "../ui";
 import { formatRuntime, isChallengeScheduled, isLivingList, itemIdForEntry, recipeCatalogKind, valuesAsRecord } from "../utils";
+import { AdminMetrics } from "./metrics";
 import { DynamicEntryForm, ResultView } from "./participant-challenge";
-
-const METRIC_OPERATIONS: Metric["operation"][] = [
-  "sum", "average", "median", "count", "min", "max", "completion_rate",
-  "bayesian_average", "spread", "consensus", "surprise", "indicator_bias",
-];
 
 /** A curation list that shows its first `preview` rows, the rest behind a toggle. */
 function ShowMoreList<T>({
@@ -77,29 +73,6 @@ function ShowMoreList<T>({
     </>
   );
 }
-/** "Best authors", "best movies of 2026" — only offered once the round actually tracks a catalog. */
-function metricGroupByOptions(
-  catalogKind: "film" | "book" | null,
-  hasCheckpoints: boolean,
-): NonNullable<Metric["groupBy"]>[] {
-  const base: NonNullable<Metric["groupBy"]>[] = ["none", "participant", "item"];
-  if (hasCheckpoints) base.push("checkpoint");
-  if (!catalogKind) return base;
-  return [
-    ...base, "catalog_year", "catalog_genre",
-    ...(catalogKind === "book" ? (["catalog_author"] as const) : []),
-  ];
-}
-/** Which groupings each operation actually accepts (mirrors the server). */
-function allowedGroupBy(operation: Metric["operation"]): Set<string> | null {
-  if (operation === "spread" || operation === "consensus") {
-    return new Set(["none", "item", "checkpoint", "catalog_year", "catalog_author", "catalog_genre"]);
-  }
-  if (operation === "surprise") return new Set(["none", "item"]);
-  if (operation === "indicator_bias") return new Set(["none", "participant"]);
-  return null;
-}
-
 export interface DuplicateTargetGroup {
   id: Id;
   name: string;
@@ -216,6 +189,7 @@ function AdminOverview({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<"activate" | "close" | "reopen" | "delete" | null>(null);
   const [preflightReady, setPreflightReady] = useState(false);
   const scheduled = isChallengeScheduled(challenge.status, challenge.startsOn, challenge.submissionMode);
   const livingList = isLivingList(challenge);
@@ -260,9 +234,9 @@ function AdminOverview({
   }
 
   return (
-    <div className="space-y-6">
-      <section className={cx(cardClass, "p-5 sm:p-7")}>
-        <h2 className="text-xl font-light">{t("basicsTitle")}</h2>
+    <div className="mx-auto max-w-5xl space-y-12">
+      <section>
+        <h2 className="text-lg font-medium tracking-tight">{t("basicsTitle")}</h2>
         <form className="mt-5 grid gap-4 sm:grid-cols-2" onSubmit={saveBasics}>
           <label className="sm:col-span-2"><span className={labelClass}>{t("titleLabel")}</span><input className={inputClass} value={title} onChange={(event) => setTitle(event.target.value)} required maxLength={140} disabled={challenge.status === "closed"} /></label>
           <fieldset className="sm:col-span-2" disabled={challenge.status === "closed"}>
@@ -291,8 +265,8 @@ function AdminOverview({
         </form>
       </section>
 
-      <section className={cx(cardClass, "p-5 sm:p-7")}>
-        <h2 className="text-xl font-light">{t("reuseTitle")}</h2>
+      <section className="border-t border-[var(--line)] pt-10">
+        <h2 className="text-lg font-medium tracking-tight">{t("reuseTitle")}</h2>
         <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{t("reuseBody")}</p>
         {duplicateTargets.length ? <form className="mt-5 grid gap-4 lg:grid-cols-[1fr_1fr_auto] lg:items-end" onSubmit={(event) => { event.preventDefault(); if (!duplicateTargetGroupId) { setError(t("reusePickTarget")); return; } void run("duplicate", () => onDuplicate({ title: duplicateTitle.trim(), targetGroupId: duplicateTargetGroupId }), t("reuseDone")); }}>
           <label>
@@ -343,25 +317,46 @@ function AdminOverview({
       ) : null}
 
       {!livingList ? (
-        <section className={cx(cardClass, "p-5 sm:p-7")}>
-          <h2 className="text-xl font-light">{t("stateTitle")}</h2>
+        <section className="border-t border-[var(--line)] pt-10">
+          <h2 className="text-lg font-medium tracking-tight">{t("stateTitle")}</h2>
           <div className="mt-4 flex flex-col gap-4 rounded-2xl bg-[var(--wash)] p-5 sm:flex-row sm:items-center sm:justify-between">
             <div><ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} /><p className="mt-2 max-w-xl text-sm leading-6 text-[var(--muted)]">{challenge.status === "draft" ? t("stateDraft") : scheduled ? t("stateScheduled", { date: f.date(challenge.startsOn, longDate) }) : challenge.status === "active" ? t("stateActive") : t("stateClosed")}</p></div>
-            {challenge.status === "draft" ? <Button disabled={Boolean(busy) || !preflightReady} onClick={() => { if (window.confirm(t("activateConfirm"))) void run("transition", () => onTransition("active"), t("activated")); }}>{t("activate")}</Button> : null}
-            {challenge.status === "active" ? <Button variant="danger" disabled={Boolean(busy)} onClick={() => { if (window.confirm(t("closeConfirm"))) void run("transition", () => onTransition("closed"), t("closedDone")); }}>{t("close")}</Button> : null}
-            {challenge.status === "closed" ? <Button variant="secondary" disabled={Boolean(busy)} onClick={() => { if (window.confirm(t("reopenConfirm"))) void run("transition", () => onTransition("active"), t("reopenedDone")); }}>{t("reopen")}</Button> : null}
+            {challenge.status === "draft" ? <Button disabled={Boolean(busy) || !preflightReady} onClick={() => setConfirm("activate")}>{t("activate")}</Button> : null}
+            {challenge.status === "active" ? <Button variant="danger" disabled={Boolean(busy)} onClick={() => setConfirm("close")}>{t("close")}</Button> : null}
+            {challenge.status === "closed" ? <Button variant="secondary" disabled={Boolean(busy)} onClick={() => setConfirm("reopen")}>{t("reopen")}</Button> : null}
           </div>
         </section>
       ) : null}
-      
+
       {onDelete ? (
-        <section className={cx(cardClass, "p-5 sm:p-7")}>
-          <h2 className="text-xl font-light">{t("deleteTitle")}</h2>
+        <section className="border-t border-[var(--line)] pt-10">
+          <h2 className="text-lg font-medium tracking-tight">{t("deleteTitle")}</h2>
           <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{t("deleteBody")}</p>
-          <div className="mt-4"><Button variant="danger" disabled={Boolean(busy)} onClick={() => { if (window.confirm(t("deleteConfirm", { title: challenge.title }))) void run("delete", onDelete, t("deleteDone")); }}>{t("delete")}</Button></div>
+          <div className="mt-4"><Button variant="danger" disabled={Boolean(busy)} onClick={() => setConfirm("delete")}>{t("delete")}</Button></div>
         </section>
       ) : null}
       <StatusMessage error={error} success={success} />
+
+      {confirm === "activate" ? (
+        <ConfirmDialog title={t("activateTitle")} body={t("activateConfirm")} confirmLabel={t("activate")} busyLabel={tc("saving")}
+          onClose={() => setConfirm(null)}
+          onConfirm={async () => { await onTransition("active"); setConfirm(null); setSuccess(t("activated")); }} />
+      ) : null}
+      {confirm === "close" ? (
+        <ConfirmDialog title={t("closeTitle")} body={t("closeConfirm")} confirmLabel={t("close")} busyLabel={tc("saving")} danger
+          onClose={() => setConfirm(null)}
+          onConfirm={async () => { await onTransition("closed"); setConfirm(null); setSuccess(t("closedDone")); }} />
+      ) : null}
+      {confirm === "reopen" ? (
+        <ConfirmDialog title={t("reopenTitle")} body={t("reopenConfirm")} confirmLabel={t("reopen")} busyLabel={tc("saving")}
+          onClose={() => setConfirm(null)}
+          onConfirm={async () => { await onTransition("active"); setConfirm(null); setSuccess(t("reopenedDone")); }} />
+      ) : null}
+      {confirm === "delete" && onDelete ? (
+        <ConfirmDialog title={t("deleteTitle")} body={t("deleteConfirm", { title: challenge.title })} confirmLabel={t("delete")} busyLabel={t("deleting")} danger
+          onClose={() => setConfirm(null)}
+          onConfirm={async () => { await onDelete(); setConfirm(null); setSuccess(t("deleteDone")); }} />
+      ) : null}
     </div>
   );
 }
@@ -562,7 +557,6 @@ function AdminItems({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [archivingId, setArchivingId] = useState<Id | null>(null);
   const [editingId, setEditingId] = useState<Id | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
@@ -575,25 +569,15 @@ function AdminItems({
   const [editBusy, setEditBusy] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [editSuccess, setEditSuccess] = useState<string | null>(null);
+  const [archiving, setArchiving] = useState<ChallengeItem | null>(null);
   const editLabel = challenge.submissionMode === "daily" ? t("editCheckpoint") : t("editItem");
 
   async function archive(item: ChallengeItem) {
-    const entryCount = entries.filter((entry) => itemIdForEntry(entry) === item.id).length;
-    const confirmMessage = entryCount > 0
-      ? t("itemRemoveConfirmWithEntries", { title: item.title, count: entryCount })
-      : t("itemRemoveConfirm", { title: item.title });
-    if (!window.confirm(confirmMessage)) return;
-    setArchivingId(item.id);
     setError(null);
     setSuccess(null);
-    try {
-      await onArchive(item.id);
-      setSuccess(t("itemRemoved"));
-    } catch (cause) {
-      setError(f.error(cause));
-    } finally {
-      setArchivingId(null);
-    }
+    await onArchive(item.id);
+    setArchiving(null);
+    setSuccess(t("itemRemoved"));
   }
 
   function startEditing(item: ChallengeItem) {
@@ -703,7 +687,7 @@ function AdminItems({
                       <span className="grid h-8 w-8 flex-none place-items-center rounded-lg bg-[var(--wash)] text-xs font-light text-[var(--muted)]">{index + 1}</span>
                       <span className="min-w-0"><strong className="block text-sm">{item.title}{item.catalogItem?.year ? ` (${item.catalogItem.year})` : ""}</strong>{item.description ? <span className="mt-1 block text-sm leading-6 text-[var(--muted)]">{item.description}</span> : null}{item.recommendedBy || item.catalogItem?.author || item.catalogItem?.mainGenre || item.catalogItem?.runtimeMinutes ? <small className="mt-1 block text-[var(--muted)]">{[item.catalogItem?.author ? tCine("byAuthor", { name: item.catalogItem.author }) : null, item.recommendedBy ? t("itemRecommendedByLine", { name: item.recommendedBy.name }) : null, item.catalogItem?.mainGenre || null, formatRuntime(item.catalogItem?.runtimeMinutes)].filter(Boolean).join(" · ")}</small> : null}{item.date || item.opensAt || item.dueAt ? <small className="mt-1 block text-[var(--muted)]">{item.date ? f.date(item.date) : t("itemWindow", { opens: f.date(item.opensAt), due: f.date(item.dueAt) })}</small> : null}</span>
                     </div>
-                    <div className="flex flex-none flex-col items-end gap-2"><span className="rounded-full bg-[var(--wash)] px-2 py-1 text-[10px] font-light text-[var(--muted)]">{f.itemStatusLabel(item.status)}</span>{challenge.status !== "closed" ? <div className="flex gap-2"><Button variant="secondary" className="min-h-9 px-3 py-1 text-xs" onClick={() => startEditing(item)}>{t("edit")}</Button>{canArchiveItems ? <Button variant="danger" className="min-h-9 px-3 py-1 text-xs" disabled={archivingId === item.id} onClick={() => void archive(item)}>{archivingId === item.id ? t("removing") : t("remove")}</Button> : null}</div> : null}</div>
+                    <div className="flex flex-none flex-col items-end gap-2"><span className="rounded-full bg-[var(--wash)] px-2 py-1 text-[10px] font-light text-[var(--muted)]">{f.itemStatusLabel(item.status)}</span>{challenge.status !== "closed" ? <div className="flex gap-2"><Button variant="secondary" className="min-h-9 px-3 py-1 text-xs" onClick={() => startEditing(item)}>{t("edit")}</Button>{canArchiveItems ? <button type="button" className="min-h-9 px-2 text-xs text-[var(--danger)] hover:underline" onClick={() => { setError(null); setArchiving(item); }}>{t("remove")}</button> : null}</div> : null}</div>
                   </div>
                 )}
               </li>
@@ -733,6 +717,20 @@ function AdminItems({
           </div>
         ) : null}
       </aside>
+
+      {archiving ? (
+        <ConfirmDialog
+          title={challenge.submissionMode === "daily" ? t("editCheckpoint") : t("remove")}
+          body={entries.filter((entry) => itemIdForEntry(entry) === archiving.id).length > 0
+            ? t("itemRemoveConfirmWithEntries", { title: archiving.title, count: entries.filter((entry) => itemIdForEntry(entry) === archiving.id).length })
+            : t("itemRemoveConfirm", { title: archiving.title })}
+          confirmLabel={t("remove")}
+          busyLabel={t("removing")}
+          danger
+          onClose={() => setArchiving(null)}
+          onConfirm={() => archive(archiving)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -762,7 +760,7 @@ function AdminReview({
   const [selectedId, setSelectedId] = useState<Id | null>(null);
   const [reason, setReason] = useState("");
   const [exporting, setExporting] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const filtered = entries.filter((entry) => {
     const item = challenge.items.find((candidate) => candidate.id === itemIdForEntry(entry));
@@ -815,18 +813,20 @@ function AdminReview({
           {challenge.status !== "closed" ? (
             <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--line)] pt-5">
               <p className="text-sm text-[var(--muted)]">{t("deleteEntryHint")}</p>
-              <Button variant="danger" disabled={deleting} onClick={async () => {
+              <Button variant="danger" disabled={confirmDelete} onClick={() => {
                 if (!reason.trim()) { setError(t("deleteEntryReasonRequired")); return; }
-                if (!window.confirm(t("deleteEntryConfirm"))) return;
-                setDeleting(true); setError(null);
-                try { await onDelete(selected.id, reason.trim()); setReason(""); setSelectedId(null); }
-                catch (cause) { setError(f.error(cause)); }
-                finally { setDeleting(false); }
-              }}>{deleting ? t("deletingEntry") : t("deleteEntry")}</Button>
+                setError(null); setConfirmDelete(true);
+              }}>{t("deleteEntry")}</Button>
             </div>
           ) : null}
           <div className="mt-4"><StatusMessage error={error} /></div>
         </section>
+      ) : null}
+
+      {selected && confirmDelete ? (
+        <ConfirmDialog title={t("deleteEntry")} body={t("deleteEntryConfirm")} confirmLabel={t("deleteEntry")} busyLabel={t("deletingEntry")} danger
+          onClose={() => setConfirmDelete(false)}
+          onConfirm={async () => { await onDelete(selected.id, reason.trim()); setReason(""); setSelectedId(null); setConfirmDelete(false); }} />
       ) : null}
 
       <section className={cx(cardClass, "p-5 sm:p-7")} aria-labelledby="removed-structure-title">
@@ -836,140 +836,6 @@ function AdminReview({
           <TrashView scope={{ challengeId: challenge.id }} csrfToken={csrfToken} onChanged={onArchiveChanged} />
         </div>
       </section>
-    </div>
-  );
-}
-
-function AdminMetrics({
-  challenge,
-  onAdd,
-  onUpdate,
-  onDelete,
-}: {
-  challenge: ChallengeDetail;
-  onAdd: (payload: Record<string, unknown>) => Promise<void>;
-  onUpdate: (metricId: Id, payload: Record<string, unknown>) => Promise<void>;
-  onDelete: (metricId: Id) => Promise<void>;
-}) {
-  const t = useTranslations("adminChallenge");
-  const tc = useTranslations("common");
-  const tm = useTranslations("metrics");
-  const f = useGoaFormat();
-  const catalogKind = recipeCatalogKind(challenge.recipeKey);
-  const hasCheckpoints = (challenge.checkpoints?.length ?? 0) > 0;
-  const [editingId, setEditingId] = useState<Id | null>(null);
-  const [label, setLabel] = useState("");
-  const [operation, setOperation] = useState<Metric["operation"]>("average");
-  const [fieldId, setFieldId] = useState("");
-  const [groupBy, setGroupBy] = useState<Metric["groupBy"]>("none");
-  const [minSample, setMinSample] = useState("");
-  const [cumulative, setCumulative] = useState(false);
-  const [visibleDuring, setVisibleDuring] = useState(true);
-  const [visibleInResults, setVisibleInResults] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [deletingId, setDeletingId] = useState<Id | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const needsNumericField = ["sum", "average", "median", "min", "max"].includes(operation);
-  const selectableFields = challenge.fields.filter((field) => !needsNumericField || field.type === "number" || field.type === "rating");
-  const needsField = operation !== "count" && operation !== "completion_rate";
-  const closed = challenge.status === "closed";
-  const opAllows = allowedGroupBy(operation);
-  const groupByOptions = metricGroupByOptions(catalogKind, hasCheckpoints)
-    .filter((value) => !opAllows || opAllows.has(value));
-
-  function resetForm() {
-    setEditingId(null);
-    setLabel("");
-    setOperation("average");
-    setFieldId("");
-    setGroupBy("none");
-    setMinSample("");
-    setCumulative(false);
-    setVisibleDuring(true);
-    setVisibleInResults(true);
-    setError(null);
-  }
-
-  function startEdit(metric: Metric) {
-    setEditingId(metric.id);
-    setLabel(metric.label);
-    setOperation(metric.operation);
-    setFieldId(metric.fieldId ?? "");
-    setGroupBy(metric.groupBy ?? "none");
-    setMinSample(metric.minSample != null ? String(metric.minSample) : "");
-    setCumulative(metric.cumulative === true);
-    setVisibleDuring(metric.visibleDuring !== false);
-    setVisibleInResults(metric.visibleInResults !== false);
-    setError(null);
-    setSuccess(null);
-  }
-
-  async function remove(metric: Metric) {
-    if (!window.confirm(t("deleteMetricConfirm", { label: metric.label }))) return;
-    setDeletingId(metric.id);
-    setError(null);
-    try {
-      await onDelete(metric.id);
-      if (editingId === metric.id) resetForm();
-    } catch (cause) {
-      setError(f.error(cause));
-    } finally {
-      setDeletingId(null);
-    }
-  }
-
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (needsField && !fieldId) { setError(t("errPickField")); return; }
-    setBusy(true); setError(null); setSuccess(null);
-    const payload = {
-      label: label.trim(), operation, fieldId: needsField ? fieldId : null, groupBy,
-      minSample: groupBy !== "none" && minSample.trim() ? Number(minSample) : undefined,
-      cumulative: groupBy === "checkpoint" ? cumulative : undefined,
-      visibleDuring, visibleInResults,
-    };
-    try {
-      if (editingId) {
-        await onUpdate(editingId, payload);
-        setSuccess(t("metricUpdated"));
-      } else {
-        await onAdd(payload);
-        setSuccess(t("metricAdded"));
-      }
-      resetForm();
-    } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
-  }
-
-  return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
-      <section>
-        <PageHeading title={t("metricsTitle")} description={t("metricsSubtitle")} />
-        {challenge.metrics.length ? <div className="grid gap-3 sm:grid-cols-2">{challenge.metrics.map((metric) => <article className={cx(cardClass, "p-5")} key={metric.id}><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-light text-[var(--muted)]">{tm(`operationName.${metric.operation}`)}</p><h3 className="mt-1 font-light">{metric.label}</h3></div><strong className="text-2xl tracking-[-0.04em]">{metric.series?.length ? "" : metric.formattedValue ?? metric.value ?? "—"}</strong></div>{metric.series?.length ? <ol className="mt-3 space-y-1 text-sm">{metric.series.slice(0, 8).map((row, index) => <li key={row.key} className={cx("flex items-center justify-between gap-2", row.value === null && "opacity-45")}><span className="truncate"><span className="mr-2 tabular-nums text-[var(--muted)]">{index + 1}</span>{row.label}</span><span className="flex-none tabular-nums font-medium">{row.value === null ? tm("smallSample") : row.formattedValue ?? row.value}<span className="ml-1.5 text-[10px] font-light text-[var(--muted)]">n={row.sampleSize}</span></span></li>)}</ol> : null}<div className="mt-4 flex flex-wrap items-center justify-between gap-2"><div className="flex flex-wrap gap-2 text-[10px] font-light text-[var(--muted)]">{metric.visibleDuring ? <span className="rounded-full bg-[var(--ok-soft)] px-2 py-1">{t("metricDuring")}</span> : null}{metric.visibleInResults ? <span className="rounded-full bg-[var(--main-soft)] px-2 py-1">{t("metricInResults")}</span> : null}{metric.groupBy && metric.groupBy !== "none" ? <span className="rounded-full bg-[var(--wash)] px-2 py-1">{t("metricGroupedBy", { groupBy: tm(`groupByShort.${metric.groupBy}`) })}</span> : null}</div>{!closed ? <div className="flex gap-3 text-xs font-light"><button type="button" className="cursor-pointer hover:underline" onClick={() => startEdit(metric)}>{t("edit")}</button><button type="button" className="cursor-pointer text-[var(--danger)] hover:underline disabled:opacity-50" disabled={deletingId === metric.id} onClick={() => void remove(metric)}>{deletingId === metric.id ? t("removing") : t("remove")}</button></div> : null}</div></article>)}</div> : <EmptyState title={t("noMetricsTitle")} description={t("noMetricsBody")} />}
-      </section>
-      <aside className={cx(cardClass, "h-fit p-5")}>
-        <div className="flex items-center justify-between gap-2"><h2 className="text-lg font-light">{editingId ? t("editMetric") : t("addMetric")}</h2>{editingId ? <button type="button" className="text-xs font-light hover:underline" onClick={resetForm}>{t("cancelEditMetric")}</button> : null}</div>
-        {closed ? <p className="mt-4 text-sm leading-6 text-[var(--muted)]">{t("metricsClosedNote")}</p> : <form className="mt-4 space-y-4" onSubmit={submit}>
-          <label><span className={labelClass}>{t("metricNameLabel")}</span><input className={inputClass} value={label} onChange={(event) => setLabel(event.target.value)} placeholder={t("metricNamePlaceholder")} required maxLength={100} /></label>
-          <label><span className={labelClass}>{t("metricOperationLabel")}</span><select className={inputClass} value={operation} onChange={(event) => { const next = event.target.value as Metric["operation"]; setOperation(next); setFieldId(""); }}>{METRIC_OPERATIONS.map((op) => <option value={op} key={op}>{tm(`operationName.${op}`)}</option>)}</select></label>
-          {needsField ? <label><span className={labelClass}>{t("metricFieldLabel")}</span><select className={inputClass} value={fieldId} onChange={(event) => setFieldId(event.target.value)} required><option value="">{t("metricFieldPlaceholder")}</option>{selectableFields.filter((field) => field.id).map((field) => <option value={field.id} key={field.id}>{field.label}</option>)}</select></label> : null}
-          <label><span className={labelClass}>{t("metricGroupByLabel")}</span><select className={inputClass} value={groupBy} onChange={(event) => setGroupBy(event.target.value as Metric["groupBy"])}>{groupByOptions.map((value) => <option value={value} key={value}>{tm(`groupBy.${value}`)}</option>)}</select></label>
-          {groupBy !== "none" ? (
-            <label>
-              <span className={labelClass}>{t("metricMinSampleLabel")}</span>
-              <input className={inputClass} type="number" min={1} step={1} value={minSample} onChange={(event) => setMinSample(event.target.value)} placeholder={t("metricMinSamplePlaceholder")} />
-              <small className="mt-1 block text-[var(--muted)]">{t("metricMinSampleHint")}</small>
-            </label>
-          ) : null}
-          {groupBy === "checkpoint" ? (
-            <label className="flex min-h-11 items-start gap-2 text-sm"><input type="checkbox" className="mt-1" aria-label={t("metricCumulativeLabel")} checked={cumulative} onChange={(event) => setCumulative(event.target.checked)} /><span><strong className="block font-medium">{t("metricCumulativeLabel")}</strong><small className="text-[var(--muted)]">{t("metricCumulativeHint")}</small></span></label>
-          ) : null}
-          <label className="flex min-h-11 items-center gap-2 text-sm font-medium"><input type="checkbox" checked={visibleDuring} onChange={(event) => setVisibleDuring(event.target.checked)} />{t("metricVisibleDuring")}</label>
-          <label className="flex min-h-11 items-center gap-2 text-sm font-medium"><input type="checkbox" checked={visibleInResults} onChange={(event) => setVisibleInResults(event.target.checked)} />{t("metricVisibleResults")}</label>
-          <StatusMessage error={error} success={success} />
-          <Button type="submit" className="w-full" disabled={busy}>{busy ? t("calculating") : editingId ? tc("saveChanges") : t("addMetric")}</Button>
-        </form>}
-      </aside>
     </div>
   );
 }
@@ -1089,28 +955,23 @@ function AdminResults({
     } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
   }
 
-  async function publish(rotateLink: boolean) {
-    const confirmText = rotateLink
-      ? t("rotateLinkConfirm")
-      : anonymize ? t("publishConfirmAnon") : t("publishConfirmNoAnon");
-    if (!window.confirm(confirmText)) return;
-    setBusy(true); setError(null); setSuccess(null);
-    try {
-      const result = await onPublish(rotateLink ? { rotateLink: true } : {});
-      setPublishedUrl(result?.url ?? null);
-      setCopyState("idle");
-      setSuccess(rotateLink ? t("linkRotated") : t("showcasePublished"));
-    } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
+  const [confirm, setConfirm] = useState<"publish" | "rotate" | "unpublish" | null>(null);
+
+  async function doPublish(rotateLink: boolean) {
+    setError(null); setSuccess(null);
+    const result = await onPublish(rotateLink ? { rotateLink: true } : {});
+    setPublishedUrl(result?.url ?? null);
+    setCopyState("idle");
+    setConfirm(null);
+    setSuccess(rotateLink ? t("linkRotated") : t("showcasePublished"));
   }
 
-  async function unpublish() {
-    if (!window.confirm(t("unpublishConfirm"))) return;
-    setBusy(true); setError(null); setSuccess(null);
-    try {
-      await onUnpublish();
-      setPublishedUrl(null);
-      setSuccess(t("showcaseUnpublished"));
-    } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
+  async function doUnpublish() {
+    setError(null); setSuccess(null);
+    await onUnpublish();
+    setPublishedUrl(null);
+    setConfirm(null);
+    setSuccess(t("showcaseUnpublished"));
   }
 
   async function copyLink() {
@@ -1147,13 +1008,26 @@ function AdminResults({
         </div>
         {isClosed ? (
           <div className="mt-4 flex flex-wrap gap-2">
-            <Button disabled={busy} onClick={() => void publish(false)}>{isPublished ? t("republishShowcase") : t("publishShowcase")}</Button>
-            {isPublished ? <Button variant="secondary" disabled={busy} onClick={() => void publish(true)}>{t("rotateLink")}</Button> : null}
-            {isPublished ? <Button variant="danger" disabled={busy} onClick={() => void unpublish()}>{t("unpublish")}</Button> : null}
+            <Button disabled={busy} onClick={() => setConfirm("publish")}>{isPublished ? t("republishShowcase") : t("publishShowcase")}</Button>
+            {isPublished ? <Button variant="secondary" disabled={busy} onClick={() => setConfirm("rotate")}>{t("rotateLink")}</Button> : null}
+            {isPublished ? <Button variant="danger" disabled={busy} onClick={() => setConfirm("unpublish")}>{t("unpublish")}</Button> : null}
           </div>
         ) : null}
         <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{t("publishHint")}</p>
       </section>
+
+      {confirm === "publish" ? (
+        <ConfirmDialog title={isPublished ? t("republishShowcase") : t("publishShowcase")} body={anonymize ? t("publishConfirmAnon") : t("publishConfirmNoAnon")}
+          confirmLabel={isPublished ? t("republishShowcase") : t("publishShowcase")} onClose={() => setConfirm(null)} onConfirm={() => doPublish(false)} />
+      ) : null}
+      {confirm === "rotate" ? (
+        <ConfirmDialog title={t("rotateLink")} body={t("rotateLinkConfirm")} confirmLabel={t("rotateLink")} danger
+          onClose={() => setConfirm(null)} onConfirm={() => doPublish(true)} />
+      ) : null}
+      {confirm === "unpublish" ? (
+        <ConfirmDialog title={t("unpublish")} body={t("unpublishConfirm")} confirmLabel={t("unpublish")} danger
+          onClose={() => setConfirm(null)} onConfirm={() => doUnpublish()} />
+      ) : null}
 
       <section className={cx(cardClass, "p-5 sm:p-7")}>
         <PageHeading title={t("resultsTitle")} description={t("resultsSubtitle")} />

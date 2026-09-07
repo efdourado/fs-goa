@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import { type FormEvent, useEffect, useState } from "react";
 
+import { Dialog } from "../dialog";
 import { API_PATHS, apiRequest } from "../api";
 import { useGoaFormat } from "../format";
 import type { ChallengeSummary, User } from "../types";
@@ -51,6 +52,7 @@ export function AccountScreen({
   const consentChallenges = challenges.filter(
     (challenge) => challenge.isParticipant && challenge.scope !== "personal",
   );
+  const [consentError, setConsentError] = useState<string | null>(null);
   const [consentBusy, setConsentBusy] = useState<string | null>(null);
   const [consentState, setConsentState] = useState<Record<string, boolean>>({});
   const consentValue = (challenge: ChallengeSummary) =>
@@ -58,16 +60,18 @@ export function AccountScreen({
 
   async function toggleConsent(challenge: ChallengeSummary, next: boolean) {
     setConsentBusy(challenge.id);
+    setConsentError(null);
     try {
       await onSetNameConsent(challenge.id, next);
       setConsentState((current) => ({ ...current, [challenge.id]: next }));
-    } catch {
-      // leave the checkbox where it was
+    } catch (cause) {
+      setConsentError(f.error(cause));
     } finally {
       setConsentBusy(null);
     }
   }
 
+  const [showDeactivate, setShowDeactivate] = useState(false);
   const [deactivateBusy, setDeactivateBusy] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -81,9 +85,9 @@ export function AccountScreen({
     if (!showDelete) return;
     const controller = new AbortController();
     apiRequest<DeletionPreview>(API_PATHS.accountDeletionPreview, { signal: controller.signal })
-      .then((data) => { setPreview(data); setPreviewError(null); })
+      .then((data) => { if (!controller.signal.aborted) { setPreview(data); setPreviewError(null); } })
       .catch((cause: unknown) => {
-        if (cause instanceof DOMException && cause.name === "AbortError") return;
+        if (controller.signal.aborted) return;
         // Deletion must not proceed blind: if we can't show the consequences,
         // the confirm button stays disabled until this succeeds.
         setPreview(null);
@@ -112,7 +116,6 @@ export function AccountScreen({
   }
 
   async function deactivate() {
-    if (!window.confirm(t("deactivateConfirm"))) return;
     setDeactivateBusy(true);
     setDeleteError(null);
     try {
@@ -124,6 +127,7 @@ export function AccountScreen({
   }
 
   async function deletePermanently() {
+    if (!preview || deleteBusy || !deletePassword) return;
     setDeleteBusy(true);
     setDeleteError(null);
     try {
@@ -178,15 +182,14 @@ export function AccountScreen({
         <h2 className="text-xl font-light">{t("profileTitle")}</h2>
         <form className="mt-4 grid gap-4 sm:grid-cols-2" onSubmit={saveProfile}>
           <label className="sm:col-span-2"><span className={labelClass}>{t("nameLabel")}</span><input className={inputClass} value={name} onChange={(event) => setName(event.target.value)} required maxLength={80} disabled={profileBusy} /></label>
-          <label><span className={labelClass}>{t("usernameLabel")}</span><input className={cx(inputClass, "opacity-60")} value={`@${user.username}`} readOnly disabled /></label>
-          <label><span className={labelClass}>{t("emailLabel")}</span><input className={cx(inputClass, "opacity-60")} value={user.email ?? t("emailEmpty")} readOnly disabled /></label>
+          <dl className="grid gap-4 sm:col-span-2 sm:grid-cols-2"><div><dt className={labelClass}>{t("usernameLabel")}</dt><dd className="text-sm">@{user.username}</dd></div>{user.email ? <div><dt className={labelClass}>{t("emailLabel")}</dt><dd className="break-all text-sm">{user.email}</dd></div> : null}</dl>
           <div className="sm:col-span-2"><StatusMessage error={profileMsg.error} success={profileMsg.success} /></div>
           <div className="sm:col-span-2"><Button type="submit" disabled={profileBusy}>{profileBusy ? tc("saving") : t("saveProfile")}</Button></div>
         </form>
       </section>
 
       <section className={cx(cardClass, "mt-6 p-5 sm:p-7")}>
-        <h2 className="text-xl font-light">{t("passwordTitle")}</h2>
+        <details><summary className="cursor-pointer text-xl font-light">{t("passwordTitle")}</summary>
         <p className="mt-1 text-sm text-[var(--muted)]">{t("passwordSubtitle")}</p>
         <form className="mt-4 grid gap-4 sm:grid-cols-2" onSubmit={changePassword}>
           <label className="sm:col-span-2"><span className={labelClass}>{t("currentPassword")}</span><input className={inputClass} name="currentPassword" type="password" autoComplete="current-password" required disabled={pwBusy} /></label>
@@ -195,6 +198,7 @@ export function AccountScreen({
           <div className="sm:col-span-2"><StatusMessage error={pwMsg.error} success={pwMsg.success} /></div>
           <div className="sm:col-span-2"><Button type="submit" disabled={pwBusy}>{pwBusy ? t("changingPassword") : t("changePassword")}</Button></div>
         </form>
+        </details>
       </section>
 
       <section className={cx(cardClass, "mt-6 p-5 sm:p-7")}>
@@ -210,6 +214,7 @@ export function AccountScreen({
       <section className={cx(cardClass, "mt-6 p-5 sm:p-7")}>
         <h2 className="text-xl font-light">{t("nameConsentTitle")}</h2>
         <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{t("nameConsentBody")}</p>
+        <StatusMessage error={consentError} />
         {consentChallenges.length ? (
           <ul className="mt-4 space-y-2">
             {consentChallenges.map((challenge) => (
@@ -241,7 +246,7 @@ export function AccountScreen({
         <div className="mt-4">
           <h3 className="text-sm font-normal">{t("deactivateTitle")}</h3>
           <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{t("deactivateBody")}</p>
-          <Button variant="secondary" className="mt-3" disabled={deactivateBusy} onClick={() => void deactivate()}>
+          <Button variant="secondary" className="mt-3" disabled={deactivateBusy} onClick={() => { setDeleteError(null); setShowDeactivate(true); }}>
             {deactivateBusy ? tc("saving") : t("deactivate")}
           </Button>
         </div>
@@ -251,10 +256,11 @@ export function AccountScreen({
         <div>
           <h3 className="text-sm font-normal text-[var(--danger)]">{t("deletePermanentTitle")}</h3>
           <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{t("deletePermanentBody")}</p>
-          {!showDelete ? (
-            <Button variant="danger" className="mt-3" onClick={openDelete}>{t("deletePermanent")}</Button>
-          ) : (
-            <div className="mt-3 space-y-3">
+          <Button variant="danger" className="mt-3" onClick={openDelete}>{t("deletePermanent")}</Button>
+          {showDelete ? (
+            <Dialog title={t("deleteDialogTitle")} busy={deleteBusy} onClose={closeDelete}>
+            <div className="space-y-4">
+              <p className="text-sm leading-6">{t("deletePermanentBody")}</p>
               {preview ? (
                 <ul className="space-y-1 text-sm text-[var(--muted)]">
                   {preview.ownedGroups.map((group) => (
@@ -279,6 +285,7 @@ export function AccountScreen({
                 <input className={inputClass} type="password" autoComplete="current-password" value={deletePassword}
                   onChange={(event) => setDeletePassword(event.target.value)} aria-label={t("deletePasswordLabel")} />
               </label>
+              <StatusMessage error={deleteError} />
               <div className="flex gap-2">
                 <Button variant="ghost" onClick={closeDelete} disabled={deleteBusy}>{tc("cancel")}</Button>
                 <Button variant="danger" disabled={deleteBusy || deletePassword.length === 0 || !preview} onClick={() => void deletePermanently()}>
@@ -286,10 +293,10 @@ export function AccountScreen({
                 </Button>
               </div>
             </div>
-          )}
+            </Dialog>
+          ) : null}
         </div>
-
-        <div className="mt-4"><StatusMessage error={deleteError} /></div>
+        {showDeactivate ? <Dialog title={t("deactivateTitle")} busy={deactivateBusy} onClose={() => setShowDeactivate(false)}><p className="text-sm leading-6">{t("deactivateConfirm")}</p><StatusMessage error={deleteError} /><div className="mt-6 flex justify-end"><Button disabled={deactivateBusy} onClick={() => void deactivate()}>{deactivateBusy ? tc("saving") : t("deactivate")}</Button></div></Dialog> : null}
       </section>
     </main>
   );

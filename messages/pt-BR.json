@@ -551,12 +551,15 @@
     "stateScheduled": "O desafio já está ativado, mas está agendado para {date}. Os registros serão liberados quando os checkpoints começarem.",
     "stateActive": "Participantes podem enviar e editar seus registros. Encerrar bloqueia os dados de origem.",
     "stateClosed": "Registros e estrutura estão congelados; a curadoria da vitrine ainda pode ser atualizada. Reabrir libera tudo de novo.",
+    "activateTitle": "Ativar o desafio?",
     "activateConfirm": "Ativar este desafio? Participantes selecionados poderão registrar.",
     "activated": "Desafio ativado.",
     "activate": "Ativar desafio",
+    "closeTitle": "Encerrar o desafio?",
     "closeConfirm": "Encerrar o desafio? Os registros e a estrutura ficam bloqueados até você reabrir.",
     "closedDone": "Desafio encerrado.",
     "reopen": "Reabrir desafio",
+    "reopenTitle": "Reabrir o desafio?",
     "reopenConfirm": "Reabrir este desafio? Registros e estrutura voltam a ficar editáveis.",
     "reopenedDone": "Desafio reaberto.",
     "close": "Encerrar desafio",
@@ -664,7 +667,7 @@
     "metricAdded": "Métrica adicionada e recalculada sem alterar os registros.",
     "metricUpdated": "Métrica atualizada e recalculada sem alterar os registros.",
     "metricsTitle": "Métricas",
-    "metricsSubtitle": "Operações conhecidas referenciam IDs estáveis de campos, nunca sua posição na tela.",
+    "metricsSubtitle": "Escolha os números que contam a história do desafio. Edite o nome e onde aparecem; ajuste o cálculo quando precisar.",
     "metricDuring": "durante",
     "metricInResults": "resultado",
     "metricGroupedBy": "por {groupBy}",
@@ -683,7 +686,7 @@
     "metricGroupByLabel": "Agrupar",
     "metricMinSampleLabel": "Amostra mínima",
     "metricMinSamplePlaceholder": "Padrão: 1",
-    "metricMinSampleHint": "Quantas notas uma linha precisa ter pra contar como número de verdade em vez de amostra pequena. Diminua num grupo pequeno.",
+    "metricMinSampleHint": "Mínimo de registros para cada valor calculado. Resultados abaixo desse limite continuam indicados como amostra pequena. Alterar essa configuração não muda as respostas de ninguém.",
     "metricVisibleDuring": "Mostrar durante o desafio",
     "metricVisibleResults": "Disponível na vitrine final",
     "calculating": "Calculando…",
@@ -761,7 +764,15 @@
     "blockComment": "Comentário",
     "removedStructureTitle": "Estrutura removida",
     "removedStructureBody": "Campos, opções, métricas, checkpoints, itens e registros que saíram deste desafio. Restaure ou apague em definitivo.",
-    "commentPrivacyWarning": "A anonimização tira a autoria, mas o texto é publicado como está — releia cada comentário e descarte os que citam nomes, contatos ou detalhes que a pessoa não quer em público."
+    "commentPrivacyWarning": "A anonimização tira a autoria, mas o texto é publicado como está — releia cada comentário e descarte os que citam nomes, contatos ou detalhes que a pessoa não quer em público.",
+    "metricHidden": "Oculta nas duas visualizações",
+    "metricWhere": "Onde aparece",
+    "metricCalculation": "Configurar cálculo",
+    "metricAdvanced": "Quantidade mínima de dados",
+    "metricNoFields": "Adicione um campo de número ou nota a um formulário antes de usar este cálculo.",
+    "unsavedMetric": "Você tem alterações não salvas. Quer continuar editando ou descartá-las?",
+    "keepEditing": "Continuar editando",
+    "discardChanges": "Descartar alterações"
   },
   "visibility": {
     "title": "Quem vê estas respostas",
@@ -1088,7 +1099,8 @@
     "consequencePublications": "{count, plural, one {# vitrine publicada sua sai do ar} other {# vitrines publicadas suas saem do ar}}.",
     "consequencesLoading": "Calculando o que será apagado…",
     "consequencesFailed": "Não deu para calcular o que será apagado. A exclusão só continua depois que essa lista aparecer.",
-    "consequenceContributions": "Suas notas e comentários ficam no grupo, sem o seu nome — mas o texto que você escreveu não é reescrito."
+    "consequenceContributions": "Suas notas e comentários ficam no grupo, sem o seu nome — mas o texto que você escreveu não é reescrito.",
+    "deleteDialogTitle": "Excluir sua conta permanentemente?"
   },
   "publicResults": {
     "footer": "Memória publicada pelo grupo no Goa."
@@ -1258,7 +1270,17 @@
     "pageSeriesPeople": "Por pessoa",
     "pageRankings": "Perfil de cada pessoa",
     "pageAffinity": "Afinidades",
-    "pageComments": "Comentários"
+    "pageComments": "Comentários",
+    "records": "{count, plural, one {# registro} other {# registros}}",
+    "pairedRecords": "{count, plural, one {# par de respostas} other {# pares de respostas}}",
+    "sampleProgress": "{count} de {minimum} registros necessários",
+    "noRecordsYet": "Ainda sem registros",
+    "unavailableValue": "Não calculável com estes dados",
+    "rankingPending": "Ainda não há resultados elegíveis. Veja abaixo o que falta.",
+    "pendingRows": "Aguardando dados ({count})",
+    "howCalculated": "Como este número é calculado",
+    "unadjusted": "Média antes do ajuste: {value}",
+    "personDetails": "Ver perfil"
   },
   "paginator": {
     "pages": "Páginas",

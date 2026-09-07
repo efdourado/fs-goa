@@ -294,6 +294,7 @@ export async function calculateMetricRow(
     visibleDuring: metric.visible_during_challenge,
     visibleInResults: metric.settings?.visibleInResults !== false,
     minSample: metricSettings(metric).minSample,
+    bayesPriorWeight: metricSettings(metric).bayesPriorWeight,
     value: result.value,
     sampleSize: result.sampleSize,
     series: "series" in result ? result.series : undefined,

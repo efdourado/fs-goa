@@ -31,59 +31,33 @@ export function PersonalRankingsBlock({ rankings }: { rankings: PersonalRanking[
   const { fmt, signed } = useNumberFormatters();
   if (!rankings.length) return null;
   return (
-    <section>
-      <h3 className="mb-3 text-sm font-medium text-[var(--muted)]">{t("rankings.title")}</h3>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {rankings.map((person) => (
-          <article className="rounded-2xl border border-[var(--line)] bg-[var(--wash)] p-4" key={person.userId}>
-            <strong className="block text-sm">{person.name}</strong>
-            <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-              <dt className="text-[var(--muted)]">{t("rankings.entryCount")}</dt>
-              <dd className="text-right tabular-nums">{person.entryCount}</dd>
-              <dt className="text-[var(--muted)]">{t("rankings.completion")}</dt>
-              <dd className="text-right tabular-nums">{fmt(person.completionRate, "%")}</dd>
-              <dt className="text-[var(--muted)]">{t("rankings.average")}</dt>
-              <dd className="text-right tabular-nums">{fmt(person.ratingsMean)}</dd>
-              <dt className="text-[var(--muted)]">{t("rankings.median")}</dt>
-              <dd className="text-right tabular-nums">{fmt(person.ratingsMedian)}</dd>
-              <dt className="text-[var(--muted)]">{t("rankings.range")}</dt>
-              <dd className="text-right tabular-nums">{fmt(person.ratingsMin)}–{fmt(person.ratingsMax)}</dd>
-              <dt className="text-[var(--muted)]">{t("rankings.consistency")}</dt>
-              <dd className="text-right tabular-nums">{fmt(person.consistency)}</dd>
-              {person.indicationPerformance !== null ? (
-                <>
-                  <dt className="text-[var(--muted)]">{t("rankings.indication")}</dt>
-                  <dd className="text-right tabular-nums">{signed(person.indicationPerformance)}</dd>
-                </>
-              ) : null}
+    <section className="divide-y divide-[var(--line)]">
+      {rankings.map((person) => (
+        <details className="group py-5 first:pt-0" key={person.userId}>
+          <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-4 py-2 [&::-webkit-details-marker]:hidden">
+            <div className="flex min-w-0 items-center gap-4">
+              <span aria-hidden="true" className="grid size-12 shrink-0 place-items-center rounded-full bg-[var(--main-soft)] text-lg text-[var(--main-strong)]">{person.name.slice(0, 1).toLocaleUpperCase()}</span>
+              <div className="min-w-0"><h3 className="break-words text-xl font-medium tracking-tight">{person.name}</h3><p className="mt-1 text-xs text-[var(--muted)]">{t("records", { count: person.entryCount })}{person.completionRate !== null ? ` · ${fmt(person.completionRate, "%")} ${t("rankings.completion")}` : ""}</p></div>
+            </div>
+            <span className="flex items-center gap-5 text-sm"><span className="text-[var(--main-strong)] group-open:hidden">{t("personDetails")}</span><span className="hidden text-[var(--main-strong)] group-open:inline">{t("showLess")}</span><span aria-hidden="true" className="text-xl transition-transform group-open:rotate-45">+</span></span>
+          </summary>
+          <div className="mt-5 grid gap-7 sm:grid-cols-2 sm:pl-16">
+            <dl className="grid content-start grid-cols-2 gap-x-4 gap-y-3 text-sm">
+              {([
+                ["average", person.ratingsMean], ["median", person.ratingsMedian], ["consistency", person.consistency],
+              ] as const).filter(([, value]) => value !== null).map(([key, value]) => <div className="contents" key={key}><dt className="text-[var(--muted)]">{t(`rankings.${key}`)}</dt><dd className="text-right font-medium tabular-nums">{fmt(value)}</dd></div>)}
+              {person.ratingsMin !== null && person.ratingsMax !== null ? <><dt className="text-[var(--muted)]">{t("rankings.range")}</dt><dd className="text-right tabular-nums">{fmt(person.ratingsMin)}–{fmt(person.ratingsMax)}</dd></> : null}
+              {person.indicationPerformance !== null ? <><dt className="text-[var(--muted)]">{t("rankings.indication")}</dt><dd className="text-right tabular-nums">{signed(person.indicationPerformance)}</dd></> : null}
             </dl>
-            {person.topItems.length ? (
-              <p className="mt-2 text-xs text-[var(--muted)]">
-                <span className="font-medium text-[var(--ink)]">{t("rankings.topItems")}:</span>{" "}
-                {person.topItems.map((item) => `${item.title} (${fmt(item.value)})`).join(", ")}
-              </p>
-            ) : null}
-            {person.bottomItems.length ? (
-              <p className="mt-1 text-xs text-[var(--muted)]">
-                <span className="font-medium text-[var(--ink)]">{t("rankings.bottomItems")}:</span>{" "}
-                {person.bottomItems.map((item) => `${item.title} (${fmt(item.value)})`).join(", ")}
-              </p>
-            ) : null}
-            {person.biggestSurprise ? (
-              <p className="mt-1 text-xs text-[var(--muted)]">
-                <span className="font-medium text-[var(--ink)]">{t("rankings.surprise")}:</span>{" "}
-                {person.biggestSurprise.title} ({signed(person.biggestSurprise.delta)})
-              </p>
-            ) : null}
-            {person.biggestDisappointment ? (
-              <p className="mt-1 text-xs text-[var(--muted)]">
-                <span className="font-medium text-[var(--ink)]">{t("rankings.disappointment")}:</span>{" "}
-                {person.biggestDisappointment.title} ({signed(person.biggestDisappointment.delta)})
-              </p>
-            ) : null}
-          </article>
-        ))}
-      </div>
+            <div className="space-y-5">
+              {person.topItems.length ? <div><h4 className="text-xs font-medium text-[var(--muted)]">{t("rankings.topItems")}</h4><ol className="mt-2 space-y-2">{person.topItems.map((item, index) => <li key={index} className="flex justify-between gap-4 text-sm"><span>{item.title}</span><strong className="tabular-nums">{fmt(item.value)}</strong></li>)}</ol></div> : null}
+              {person.bottomItems.length ? <div><h4 className="text-xs font-medium text-[var(--muted)]">{t("rankings.bottomItems")}</h4><ol className="mt-2 space-y-2">{person.bottomItems.map((item, index) => <li key={index} className="flex justify-between gap-4 text-sm"><span>{item.title}</span><span className="tabular-nums">{fmt(item.value)}</span></li>)}</ol></div> : null}
+              {person.biggestSurprise ? <p className="text-sm"><span className="block text-xs text-[var(--muted)]">{t("rankings.surprise")}</span>{person.biggestSurprise.title} ({signed(person.biggestSurprise.delta)})</p> : null}
+              {person.biggestDisappointment ? <p className="text-sm"><span className="block text-xs text-[var(--muted)]">{t("rankings.disappointment")}</span>{person.biggestDisappointment.title} ({signed(person.biggestDisappointment.delta)})</p> : null}
+            </div>
+          </div>
+        </details>
+      ))}
     </section>
   );
 }
@@ -106,7 +80,7 @@ export function AffinityBlockView({ affinity }: { affinity: AffinityBlock }) {
       <p className="mb-3 text-xs leading-5 text-[var(--muted)]">{t("affinity.explanation")}</p>
       <ul className="space-y-2">
         {scored.map((pair) => (
-          <li className="rounded-xl border border-[var(--line)] bg-[var(--wash)] p-3 text-sm" key={`${pair.a.userId}-${pair.b.userId}`}>
+          <li className="border-b border-[var(--line)] py-4 text-sm" key={`${pair.a.userId}-${pair.b.userId}`}>
             <div className="flex items-center justify-between gap-3">
               <span className="min-w-0 truncate">{pair.a.name} • {pair.b.name}</span>
               <span className="flex-none tabular-nums">

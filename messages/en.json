@@ -551,12 +551,15 @@
     "stateScheduled": "The challenge is already active but scheduled for {date}. Entries open once the checkpoints begin.",
     "stateActive": "Participants can submit and edit their entries. Closing locks the source data.",
     "stateClosed": "Entries and structure are frozen; the showcase curation can still be updated. Reopening unlocks everything again.",
+    "activateTitle": "Activate the challenge?",
     "activateConfirm": "Activate this challenge? Selected participants will be able to log entries.",
     "activated": "Challenge activated.",
     "activate": "Activate challenge",
+    "closeTitle": "Close the challenge?",
     "closeConfirm": "Close the challenge? Entries and structure get locked until you reopen it.",
     "closedDone": "Challenge closed.",
     "reopen": "Reopen challenge",
+    "reopenTitle": "Reopen the challenge?",
     "reopenConfirm": "Reopen this challenge? Entries and structure become editable again.",
     "reopenedDone": "Challenge reopened.",
     "close": "Close challenge",
@@ -664,7 +667,7 @@
     "metricAdded": "Metric added and recalculated without changing the entries.",
     "metricUpdated": "Metric updated and recalculated without changing the entries.",
     "metricsTitle": "Metrics",
-    "metricsSubtitle": "Known operations reference stable field IDs, never their position on screen.",
+    "metricsSubtitle": "Choose which numbers tell your challenge’s story. Edit a name or where it appears; adjust the calculation only when you need to.",
     "metricDuring": "during",
     "metricInResults": "showcase",
     "metricGroupedBy": "by {groupBy}",
@@ -683,7 +686,7 @@
     "metricGroupByLabel": "Group by",
     "metricMinSampleLabel": "Minimum sample",
     "metricMinSamplePlaceholder": "Default: 1",
-    "metricMinSampleHint": "How many ratings a row needs before it counts as a real number instead of a small sample. Lower it for a small group.",
+    "metricMinSampleHint": "Minimum records for each calculated value. Results below this threshold remain marked as a small sample. Changing this setting does not change anyone’s responses.",
     "metricVisibleDuring": "Show during the challenge",
     "metricVisibleResults": "Available in the final showcase",
     "calculating": "Calculating…",
@@ -761,7 +764,15 @@
     "blockComment": "Comment",
     "removedStructureTitle": "Removed structure",
     "removedStructureBody": "Fields, options, metrics, checkpoints, items and records taken out of this challenge. Restore or delete for good.",
-    "commentPrivacyWarning": "Anonymising drops the authorship, but the text is published verbatim — reread each comment and drop any that names people, shares contacts, or gives away something the writer would not want public."
+    "commentPrivacyWarning": "Anonymising drops the authorship, but the text is published verbatim — reread each comment and drop any that names people, shares contacts, or gives away something the writer would not want public.",
+    "metricHidden": "Hidden from both views",
+    "metricWhere": "Where it appears",
+    "metricCalculation": "Calculation settings",
+    "metricAdvanced": "Minimum data required",
+    "metricNoFields": "Add a number or rating field to a form before using this calculation.",
+    "unsavedMetric": "You have unsaved changes. Keep editing or discard them?",
+    "keepEditing": "Keep editing",
+    "discardChanges": "Discard changes"
   },
   "visibility": {
     "title": "Who sees these answers",
@@ -1088,7 +1099,8 @@
     "consequencePublications": "{count, plural, one {# published showcase of yours goes offline} other {# published showcases of yours go offline}}.",
     "consequencesLoading": "Working out what gets deleted…",
     "consequencesFailed": "Couldn't work out what gets deleted. Deletion only continues once this list loads.",
-    "consequenceContributions": "Your ratings and comments stay in the group without your name — but the text you wrote isn't rewritten."
+    "consequenceContributions": "Your ratings and comments stay in the group without your name — but the text you wrote isn't rewritten.",
+    "deleteDialogTitle": "Permanently delete your account?"
   },
   "publicResults": {
     "footer": "A memory published by the group on Goa."
@@ -1258,7 +1270,17 @@
     "pageSeriesPeople": "By person",
     "pageRankings": "Each person's profile",
     "pageAffinity": "Affinities",
-    "pageComments": "Comments"
+    "pageComments": "Comments",
+    "records": "{count, plural, one {# record} other {# records}}",
+    "pairedRecords": "{count, plural, one {# paired response} other {# paired responses}}",
+    "sampleProgress": "{count} of {minimum} required records",
+    "noRecordsYet": "No records yet",
+    "unavailableValue": "Cannot calculate with these data",
+    "rankingPending": "No eligible results yet. See what’s needed below.",
+    "pendingRows": "Waiting for data ({count})",
+    "howCalculated": "How this is calculated",
+    "unadjusted": "Average before adjustment: {value}",
+    "personDetails": "View profile"
   },
   "paginator": {
     "pages": "Pages",

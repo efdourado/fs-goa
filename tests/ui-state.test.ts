@@ -251,7 +251,7 @@ test("aba Resultados ao vivo: sem herói repetido, sem pílulas de nome, sem 'sm
   assert.doesNotMatch(html, /Minha estante/, "não repete o título do desafio (a capa acima já mostra)");
   assert.doesNotMatch(html, /Manuel/, "num desafio solo não lista o próprio nome");
   assert.doesNotMatch(html, /small sample/i, "linha fina de um solo mostra o valor, não o rótulo");
-  assert.doesNotMatch(html, /<h3/, "um único tema de ranking não precisa de um cabeçalho pra se distinguir de nada");
+  assert.match(html, /<h3[^>]*>Ranking dos livros<\/h3>/, "o nome da métrica é um cabeçalho acessível");
 });
 
 test("aba Resultados agrupa rankings por tema (ranking, por pessoa, o que dividiu opiniões) quando há mais de um", () => {
@@ -307,8 +307,8 @@ test("no ranking do Resultado o ano fica ao lado do título e a média crua apar
   assert.ok(aftersunIndex > -1 && stalkerIndex > -1 && aftersunIndex < stalkerIndex, "o servidor já entrega a série ordenada por nota");
   assert.match(html, /Aftersun \(2022\)/, "o ano aparece ao lado do título");
   assert.match(html, /Stalker \(1979\)/, "mesmo pro segundo item");
-  assert.match(html, /\(4,5\)/, "mostra a média crua entre parênteses quando difere da ajustada");
-  assert.doesNotMatch(html, /\(3,9\)</, "quando a crua é igual à ajustada, não repete o número");
+  assert.match(html, /Média antes do ajuste: 4,5/, "identifica a média crua quando difere da ajustada");
+  assert.doesNotMatch(html, /Média antes do ajuste: 3,9/, "quando a crua é igual à ajustada, não repete o número");
 });
 
 test("ranking grande esconde o excedente atrás de um <details> nativo, sem JS", () => {
@@ -504,7 +504,6 @@ test("Wrapped: quando há blocos, o Resultado os renderiza na ordem gravada e pu
   assert.match(html, /O clube viu 6 filmes\./);
   assert.match(html, /Nota média/);
   assert.doesNotMatch(html, /Métrica escondida/, "bloco com visible:false não aparece");
-  assert.match(html, /12 registros/, "o total de registros vai na capa");
   const summaryIdx = html.indexOf("O clube viu 6 filmes");
   const metricIdx = html.indexOf("Nota média");
   assert.ok(summaryIdx > -1 && metricIdx > summaryIdx, "o resumo (posição 0) vem antes da métrica (posição 2)");

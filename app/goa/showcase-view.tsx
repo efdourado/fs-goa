@@ -140,28 +140,28 @@ export function defaultShowcaseBlocks(input: {
 function PageBody({ page, hideThinLabel }: { page: Page; hideThinLabel: boolean }) {
   if (page.kind === "cards") {
     return (
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-x-10 gap-y-6 sm:grid-cols-2 lg:grid-cols-4">
         {page.metrics.map((metric) => <MetricBlock key={metric.id} metric={metric} hideThinLabel={hideThinLabel} />)}
       </div>
     );
   }
   if (page.kind === "series") {
     return (
-      <div className="grid gap-3 lg:grid-cols-2">
+      <div className={page.metrics.length === 1 ? "max-w-3xl" : "grid gap-x-12 gap-y-8 lg:grid-cols-2"}>
         {page.metrics.map((metric) => <MetricBlock key={metric.id} metric={metric} hideThinLabel={hideThinLabel} />)}
       </div>
     );
   }
   if (page.kind === "ranking") {
     return (
-      <div className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-5 sm:p-7">
+      <div className="py-2">
         <PersonalRankingsBlock rankings={page.rankings} />
       </div>
     );
   }
   if (page.kind === "affinity") {
     return (
-      <div className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-5 sm:p-7">
+      <div className="py-2">
         <AffinityBlockView affinity={page.affinity} />
       </div>
     );
@@ -225,13 +225,6 @@ export function ShowcaseView({
       {intro.map((paragraph, index) => (
         <p key={index} className={cx("max-w-2xl text-sm leading-6", onDark ? "text-white/65" : "text-[var(--muted)]")}>{paragraph}</p>
       ))}
-      {participantNames.length || totalEntries ? (
-        <div className={cx("flex flex-wrap items-center gap-x-2 gap-y-1 text-sm", onDark ? "text-white/70" : "text-[var(--muted)]")}>
-          {participantNames.length ? <span>| {namesWithBullets(participantNames)}</span> : null}
-          {participantNames.length && totalEntries ? <span aria-hidden="true" className="opacity-40">•</span> : null}
-          {totalEntries ? <span>{t("totalEntries", { count: totalEntries })}</span> : null}
-        </div>
-      ) : null}
     </header>
   ) : null;
 

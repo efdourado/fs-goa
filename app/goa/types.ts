@@ -274,6 +274,8 @@ export interface Metric {
   visibleDuring?: boolean;
   visibleInResults?: boolean;
   minSample?: number;
+  bayesPriorWeight?: number;
+  sampleSize?: number;
   value?: string | number | null;
   formattedValue?: string | null;
   /** Plain-language formula and how the sample was counted (V1 §9). */
