@@ -83,6 +83,7 @@ export async function listTemplates() {
 export async function getTemplatePreview(challengeId: string) {
   return withClient(async (client) => {
     const row = await oneOrNull<DetailChallengeRow & {
+      template_summary: string | null;
       results_published_at: Date | null;
       results_published_snapshot: { result?: unknown } | null;
     }>(
@@ -90,7 +91,7 @@ export async function getTemplatePreview(challengeId: string) {
       `SELECT c.id, c.group_id, c.title, c.description, c.rules, c.rule_sections,
               c.start_date::text AS start_date, c.end_date::text AS end_date,
               c.status, c.kind, c.recipe_key, g.kind AS group_kind, c.results_anon,
-              c.results_published_at, c.results_published_snapshot
+              c.template_summary, c.results_published_at, c.results_published_snapshot
          FROM challenges c
          JOIN groups g ON g.id = c.group_id AND g.deleted_at IS NULL AND g.archived_at IS NULL
         WHERE c.id = $1 AND c.published_as_template_at IS NOT NULL AND c.deleted_at IS NULL
@@ -104,12 +105,13 @@ export async function getTemplatePreview(challengeId: string) {
       ? row.results_published_snapshot?.result ?? null
       : null;
 
-    return buildChallengeDetail(
+    const detail = await buildChallengeDetail(
       client,
       row,
       { userId: null, role: null, isParticipant: false },
       { participants: [], result: publishedResult },
     );
+    return { ...detail, templateSummary: row.template_summary ?? null };
   });
 }
 

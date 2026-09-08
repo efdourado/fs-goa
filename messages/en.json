@@ -998,6 +998,8 @@
     "publishing": "Publishing…",
     "publish": "Publish",
     "published": "Template published.",
+    "summaryTitle": "Gallery blurb",
+    "summarySaved": "Summary updated.",
     "loading": "Loading templates…",
     "emptyTitle": "No templates yet",
     "emptyBody": "As soon as a template is published, it shows up here for anyone.",

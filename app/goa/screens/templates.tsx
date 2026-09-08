@@ -192,6 +192,7 @@ export function TemplateDetailScreen({
   autoCopy?: boolean;
 }) {
   const t = useTranslations("templates");
+  const tc = useTranslations("common");
   const f = useGoaFormat();
   const canPublish = Boolean(user?.platformAdmin);
   const [detail, setDetail] = useState<ChallengeDetail | null>(null);
@@ -201,6 +202,11 @@ export function TemplateDetailScreen({
   const [copyError, setCopyError] = useState<string | null>(null);
   const [unpublishing, setUnpublishing] = useState(false);
   const [unpublishError, setUnpublishError] = useState<string | null>(null);
+  const [summaryBusy, setSummaryBusy] = useState(false);
+  const [summaryStatus, setSummaryStatus] = useState<{ ok?: string; err?: string } | null>(null);
+
+  const reloadDetail = () =>
+    apiRequest<ChallengeDetail>(API_PATHS.template(challengeId)).then(setDetail).catch((cause: unknown) => setError(f.error(cause)));
 
   const manageable = groups.filter((group) => group.role === "owner" || group.role === "admin");
 
@@ -259,6 +265,23 @@ export function TemplateDetailScreen({
     }
   }
 
+  async function saveSummary(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const summary = String(new FormData(event.currentTarget).get("summary") ?? "").trim();
+    setSummaryBusy(true);
+    setSummaryStatus(null);
+    try {
+      // Re-publishing keeps the original publish date and just rewrites the blurb.
+      await apiRequest(API_PATHS.challengeTemplate(challengeId), { method: "POST", body: summary ? { summary } : {}, csrfToken });
+      await reloadDetail();
+      setSummaryStatus({ ok: t("summarySaved") });
+    } catch (cause) {
+      setSummaryStatus({ err: f.error(cause) });
+    } finally {
+      setSummaryBusy(false);
+    }
+  }
+
   const headerActions = (
     <>
       <Button onClick={() => (user ? setShowCopy((open) => !open) : onSignIn())}>
@@ -296,6 +319,20 @@ export function TemplateDetailScreen({
       />
       {unpublishError ? (
         <div className="mx-auto max-w-7xl px-4 sm:px-6"><StatusMessage error={unpublishError} /></div>
+      ) : null}
+      {canPublish ? (
+        <div className="mx-auto max-w-7xl px-4 pb-4 sm:px-6">
+          <section className={cx(cardClass, "p-5")} aria-labelledby="template-summary-title">
+            <h2 id="template-summary-title" className="text-lg font-light">{t("summaryTitle")}</h2>
+            <form className="mt-3 grid gap-3" onSubmit={saveSummary}>
+              <label><span className={labelClass}>{t("publishSummaryLabel")}</span>
+                <input className={inputClass} name="summary" maxLength={280} defaultValue={detail.templateSummary ?? ""} placeholder={t("publishSummaryPlaceholder")} key={detail.templateSummary ?? ""} />
+              </label>
+              <div><Button type="submit" disabled={summaryBusy}>{summaryBusy ? tc("saving") : tc("saveChanges")}</Button></div>
+              <StatusMessage error={summaryStatus?.err ?? null} success={summaryStatus?.ok ?? null} />
+            </form>
+          </section>
+        </div>
       ) : null}
       {user && showCopy ? (
         <div className="mx-auto max-w-7xl px-4 pb-24 sm:px-6">

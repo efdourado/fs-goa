@@ -408,6 +408,8 @@ export interface ChallengeDetail extends ChallengeSummary {
   result?: ChallengeResult | null;
   /** False for a retrospective list (e.g. Estante) — the entry form hides the "when" date. */
   collectsEntryDate?: boolean;
+  /** Only on a template preview: the editable gallery blurb (null = the card falls back to the description). */
+  templateSummary?: string | null;
 }
 
 export interface Limits {
