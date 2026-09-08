@@ -550,7 +550,7 @@ export default function GoaApp() {
   } else if (screen.kind === "templates") {
     content = <TemplatesScreen user={user} manageableChallenges={bootstrap.challenges.filter((challenge) => canManage(challenge.viewerRole))} csrfToken={bootstrap.csrfToken} onOpen={(id) => setScreen({ kind: "template", challengeId: id })} onBack={() => setScreen({ kind: "dashboard" })} onSignIn={() => undefined} onChanged={() => { void refreshBootstrap(); }} />;
   } else if (screen.kind === "template") {
-    content = <TemplateDetailScreen key={screen.challengeId} user={user} challengeId={screen.challengeId} groups={bootstrap.groups.filter((candidate) => candidate.kind !== "personal")} csrfToken={bootstrap.csrfToken} autoCopy={resumeTemplateCopy === screen.challengeId} onBack={() => { setResumeTemplateCopy(null); setScreen({ kind: "templates" }); }} onSignIn={() => undefined} onDuplicated={async (result) => { setResumeTemplateCopy(null); await refreshBootstrap(); openAdmin(result.challengeId); }} />;
+    content = <TemplateDetailScreen key={screen.challengeId} user={user} challengeId={screen.challengeId} groups={bootstrap.groups.filter((candidate) => candidate.kind !== "personal")} csrfToken={bootstrap.csrfToken} autoCopy={resumeTemplateCopy === screen.challengeId} onBack={() => { setResumeTemplateCopy(null); setScreen({ kind: "templates" }); }} onSignIn={() => undefined} onDuplicated={async (result) => { setResumeTemplateCopy(null); await refreshBootstrap(); openAdmin(result.challengeId); }} onUnpublished={async () => { await refreshBootstrap(); setScreen({ kind: "templates" }); }} />;
   } else if (screen.kind === "about") {
     content = <AboutScreen onBack={() => setScreen({ kind: "dashboard" })} />;
   } else if (screen.kind === "group" && selectedGroup) {

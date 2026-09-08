@@ -114,21 +114,6 @@ export function TemplatesScreen({
     }
   }
 
-  async function unpublish(challengeId: Id) {
-    setAdminBusy(true);
-    setAdminError(null);
-    setAdminSuccess(null);
-    try {
-      await apiRequest(API_PATHS.challengeTemplate(challengeId), { method: "DELETE", csrfToken });
-      await load();
-      onChanged();
-    } catch (cause) {
-      setAdminError(f.error(cause));
-    } finally {
-      setAdminBusy(false);
-    }
-  }
-
   const body = (
     <main className="mx-auto max-w-7xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
       <button className={cx(backLinkClass, "mb-6")} type="button" onClick={onBack}>{t("back")}</button>
@@ -166,7 +151,6 @@ export function TemplatesScreen({
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {templates.map((template) => (
             <article className={cx(cardClass, "relative flex flex-col p-5 transition hover:-translate-y-0.5")} key={template.id}>
-              <p className="text-xs font-extrabold text-[var(--muted)]">{t("cardKicker", { mode: t(`mode.${template.submissionMode}`) })}</p>
               <h3 className="mt-2 text-xl font-light tracking-[-0.03em]">
                 <button type="button" className="cursor-pointer text-left after:absolute after:inset-0 after:content-[''] focus-visible:outline-none" onClick={() => onOpen(template.id)}>{template.title}</button>
               </h3>
@@ -176,16 +160,6 @@ export function TemplatesScreen({
                 {template.itemCount ? t("cardItems", { count: template.itemCount }) : ""}
                 {template.metricCount ? t("cardMetrics", { count: template.metricCount }) : ""}
               </p>
-              {canPublish ? (
-                <button
-                  type="button"
-                  className="relative z-10 mt-4 cursor-pointer self-start text-xs font-medium text-[var(--danger)] hover:underline disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={adminBusy}
-                  onClick={() => void unpublish(template.id)}
-                >
-                  {t("unpublish")}
-                </button>
-              ) : null}
             </article>
           ))}
         </div>
@@ -203,6 +177,7 @@ export function TemplateDetailScreen({
   onBack,
   onSignIn,
   onDuplicated,
+  onUnpublished,
   csrfToken,
   autoCopy = false,
 }: {
@@ -212,16 +187,20 @@ export function TemplateDetailScreen({
   onBack: () => void;
   onSignIn: () => void;
   onDuplicated: (result: { challengeId: Id }) => void;
+  onUnpublished?: () => void;
   csrfToken: string;
   autoCopy?: boolean;
 }) {
   const t = useTranslations("templates");
   const f = useGoaFormat();
+  const canPublish = Boolean(user?.platformAdmin);
   const [detail, setDetail] = useState<ChallengeDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showCopy, setShowCopy] = useState(Boolean(autoCopy && user));
   const [busy, setBusy] = useState(false);
   const [copyError, setCopyError] = useState<string | null>(null);
+  const [unpublishing, setUnpublishing] = useState(false);
+  const [unpublishError, setUnpublishError] = useState<string | null>(null);
 
   const manageable = groups.filter((group) => group.role === "owner" || group.role === "admin");
 
@@ -268,10 +247,29 @@ export function TemplateDetailScreen({
     }
   }
 
-  const copyButton = (
-    <Button onClick={() => (user ? setShowCopy((open) => !open) : onSignIn())}>
-      {user ? (showCopy ? t("closeCopy") : t("duplicateCta")) : t("signInToDuplicate")}
-    </Button>
+  async function unpublish() {
+    setUnpublishing(true);
+    setUnpublishError(null);
+    try {
+      await apiRequest(API_PATHS.challengeTemplate(challengeId), { method: "DELETE", csrfToken });
+      onUnpublished?.();
+    } catch (cause) {
+      setUnpublishError(f.error(cause));
+      setUnpublishing(false);
+    }
+  }
+
+  const headerActions = (
+    <>
+      <Button onClick={() => (user ? setShowCopy((open) => !open) : onSignIn())}>
+        {user ? (showCopy ? t("closeCopy") : t("duplicateCta")) : t("signInToDuplicate")}
+      </Button>
+      {canPublish ? (
+        <Button variant="danger" disabled={unpublishing} onClick={() => void unpublish()}>
+          {t("unpublish")}
+        </Button>
+      ) : null}
+    </>
   );
 
   const body = error ? (
@@ -294,8 +292,11 @@ export function TemplateDetailScreen({
         tab="results"
         onTab={() => undefined}
         onBack={onBack}
-        previewActions={copyButton}
+        previewActions={headerActions}
       />
+      {unpublishError ? (
+        <div className="mx-auto max-w-7xl px-4 sm:px-6"><StatusMessage error={unpublishError} /></div>
+      ) : null}
       {user && showCopy ? (
         <div className="mx-auto max-w-7xl px-4 pb-24 sm:px-6">
           <section className={cx(cardClass, "p-5")} aria-label={t("duplicateAria")}>
