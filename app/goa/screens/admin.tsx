@@ -32,7 +32,7 @@ import {
   Button,
   ChallengeStatusBadge,
   cx,
-  EmptyState,
+  EmptyState, EmptyStateAction,
   inputClass,
   labelClass,
   PageHeading,
@@ -447,7 +447,7 @@ function AdminFields({
             </li>
           ))}
         </ol>
-      ) : <EmptyState title={t("fieldsEmptyTitle")} description={t("fieldsEmptyBody")} />}
+      ) : <EmptyState title={t("fieldsEmptyTitle")} description={locked ? t("fieldsEmptyBody") : t.rich("fieldsEmptyCreatePrompt", { action: (chunks) => <EmptyStateAction onClick={() => { setError(null); setEditing("new"); }}>{chunks}</EmptyStateAction> })} />}
 
       {editing ? (
         <FieldEditorDialog
@@ -826,7 +826,7 @@ function AdminItems({
         </ol>
       ) : undatedDaily
         ? <EmptyState title={t("noItemsUndatedTitle")} description={t("noItemsUndatedBody")} />
-        : <EmptyState title={t("noItemsTitle")} description={t("noItemsBody")} />}
+        : <EmptyState title={t("noItemsTitle")} description={canShowAdd && !showAdd ? t.rich("itemsEmptyCreatePrompt", { action: (chunks) => <EmptyStateAction onClick={() => { setError(null); setShowAdd(true); }}>{chunks}</EmptyStateAction> }) : t("noItemsBody")} />}
 
       {editing ? (
         <ItemEditorDialog

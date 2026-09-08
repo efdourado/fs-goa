@@ -3,31 +3,12 @@
 import { useTranslations } from "next-intl";
 import { type FormEvent, useState } from "react";
 
+import { AddTile } from "../add-tile";
 import { Dialog } from "../dialog";
 import { useGoaFormat } from "../format";
 import type { ChallengeSummary, GroupSummary, Id, Limits, User } from "../types";
-import { Button, cardClass, challengeStatusTone, ChallengeStatusBadge, cx, EmptyState, inputClass, labelClass, PageHeading, StatusMessage } from "../ui";
+import { Button, cardClass, challengeStatusTone, ChallengeStatusBadge, cx, EmptyState, EmptyStateAction, inputClass, labelClass, PageHeading, StatusMessage } from "../ui";
 import { canManage, isChallengeScheduled, isLivingList, isPersonalChallenge } from "../utils";
-
-/**
- * A slim dashed "+" tile at the end of a card grid — one more slot to fill. It
- * stays narrow but stretches to the height of the card beside it (grid
- * `align-self: stretch`), with a floor for when it starts a row on its own.
- */
-function AddTile({ label, onClick, disabled = false }: { label: string; onClick: () => void; disabled?: boolean }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={label}
-      title={label}
-      className="grid min-h-14 w-14 shrink-0 cursor-pointer select-none place-items-center justify-self-start rounded-2xl border border-dashed border-[var(--line)] text-2xl font-light leading-none text-[var(--muted)] transition hover:border-[var(--muted)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[var(--line)] disabled:hover:text-[var(--muted)]"
-    >
-      <span aria-hidden="true">+</span>
-    </button>
-  );
-}
 
 /** Group creation moved into a modal — the "+" tile in the groups grid opens it. */
 function GroupCreateDialog({ onClose, onCreate }: { onClose: () => void; onCreate: (name: string) => Promise<void> }) {
@@ -174,7 +155,7 @@ export function DashboardScreen({
           <h2 id="groups-title" className="text-xl font-medium tracking-[-0.03em]">{t("groupsTitle")}</h2>
           <span className="text-xs font-medium text-[var(--muted)]">{t("groupsCount", { count: standardGroups.length })}</span>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {standardGroups.length ? <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {standardGroups.map((group) => {
             const count = group.memberCount ?? group.members?.length ?? 0;
             return (
@@ -189,12 +170,8 @@ export function DashboardScreen({
               </button>
             );
           })}
-          <AddTile
-            label={atGroupLimit ? t("groupLimitReached", { limit: limits.groupsPerOwner }) : t("createGroup")}
-            onClick={() => setShowGroupDialog(true)}
-            disabled={atGroupLimit}
-          />
-        </div>
+          {!atGroupLimit ? <AddTile label={t("createGroup")} onClick={() => setShowGroupDialog(true)} /> : null}
+        </div> : <EmptyState title={t("emptyGroupsTitle")} description={atGroupLimit ? t("groupLimitReached", { limit: limits.groupsPerOwner }) : t.rich("emptyGroupsCreatePrompt", { action: (chunks) => <EmptyStateAction onClick={() => setShowGroupDialog(true)}>{chunks}</EmptyStateAction> })} />}
       </section>
 
       <section className="mt-10" aria-labelledby="active-title">
@@ -233,7 +210,7 @@ export function DashboardScreen({
             ) : null}
           </div>
         ) : (
-          <EmptyState title={tPersonal("emptyTitle")} description={tPersonal("emptyBody")} action={<Button onClick={onCreatePersonalChallenge}>{tPersonal("create")}</Button>} />
+          <EmptyState title={tPersonal("emptyTitle")} description={tPersonal.rich("emptyCreatePrompt", { action: (chunks) => <EmptyStateAction onClick={onCreatePersonalChallenge}>{chunks}</EmptyStateAction> })} />
         )}
       </section>
 

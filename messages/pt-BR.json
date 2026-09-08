@@ -258,6 +258,8 @@
     "showTemplates": "Ver os modelos prontos"
   },
   "dashboard": {
+    "emptyGroupsTitle": "Crie seu primeiro grupo",
+    "emptyGroupsCreatePrompt": "Crie um grupo e comece desafios em conjunto clicando <action>aqui</action>.",
     "greeting": "Olá, {name}.",
     "subtitle": "O que pede sua atenção hoje e seus grupos.",
     "groupLimitReached": "Você atingiu o limite de {limit} grupos",
@@ -281,6 +283,7 @@
     "archiveTitle": "Rascunhos e memórias"
   },
   "group": {
+    "emptyCreatePrompt": "Escolha um modelo e prepare a 1ª edição clicando <action>aqui</action>.",
     "updated": "Grupo atualizado.",
     "deleteConfirm": "Mover \"{name}\" para a lixeira? Os desafios e registros somem do app.",
     "linkCopied": "Link copiado.",
@@ -294,7 +297,7 @@
     "inviteToggleOpen": "Fechar convite",
     "inviteToggleClosed": "+ Convidar",
     "challengeLimitReached": "Limite de {limit} desafios atingido",
-    "createChallenge": "+ Desafio (limite {limit})",
+    "createChallenge": "+ Novo desafio (limite {limit})",
     "editTitle": "Editar grupo",
     "editBody": "O nome atualizado aparece para todas as pessoas do grupo.",
     "nameLabel": "Nome",
@@ -373,6 +376,7 @@
     }
   },
   "personalSpace": {
+    "emptyCreatePrompt": "Escolha um modelo e crie seu primeiro desafio pessoal clicando <action>aqui</action>.",
     "back": "← Voltar",
     "title": "Meu espaço",
     "subtitle": "Só seu — sem grupo, sem convites.",
@@ -540,6 +544,8 @@
     "expectationHint": "Os participantes dão uma nota de quanto esperam gostar de cada título antes de assistir. Ela trava quando enviam a avaliação real. Dá para ligar isso depois também."
   },
   "adminChallenge": {
+    "fieldsEmptyCreatePrompt": "Adicione o primeiro campo deste formulário clicando <action>aqui</action>.",
+    "itemsEmptyCreatePrompt": "Prepare os primeiros itens ou etapas clicando <action>aqui</action>.",
     "back": "← Voltar",
     "simulateAsParticipant": "Simular como participante",
     "subtitle": "Configure, revise e apresente — controles administrativos continuam validados no servidor.",

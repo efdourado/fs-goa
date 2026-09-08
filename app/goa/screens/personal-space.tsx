@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 
 import { ActiveChallengeCard, ArchiveChallengeRow } from "./dashboard";
 import type { ChallengeSummary, Id } from "../types";
-import { backLinkClass, Button, cx, EmptyState, linkClass, PageHeading } from "../ui";
+import { backLinkClass, cx, EmptyState, EmptyStateAction, linkClass, PageHeading } from "../ui";
 import { canManage } from "../utils";
 
 /** The hidden solo workspace, treated as a group of one: its own page, its own catalogue link. */
@@ -63,7 +63,7 @@ export function PersonalSpaceScreen({
           ) : null}
         </div>
       ) : (
-        <EmptyState title={t("emptyTitle")} description={t("emptyBody")} action={<Button onClick={onCreateChallenge}>{t("create")}</Button>} />
+        <EmptyState title={t("emptyTitle")} description={t.rich("emptyCreatePrompt", { action: (chunks) => <EmptyStateAction onClick={onCreateChallenge}>{chunks}</EmptyStateAction> })} />
       )}
     </main>
   );

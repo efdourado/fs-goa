@@ -258,6 +258,8 @@
     "showTemplates": "Browse the ready-made templates"
   },
   "dashboard": {
+    "emptyGroupsTitle": "Create your first group",
+    "emptyGroupsCreatePrompt": "Create a group and start challenges together by clicking <action>here</action>.",
     "greeting": "Hi, {name}.",
     "subtitle": "What needs your attention today, and your groups.",
     "groupLimitReached": "You've reached the limit of {limit} groups",
@@ -281,6 +283,7 @@
     "archiveTitle": "Drafts and memories"
   },
   "group": {
+    "emptyCreatePrompt": "Pick a preset and set up the 1st edition by clicking <action>here</action>.",
     "updated": "Group updated.",
     "deleteConfirm": "Move \"{name}\" to the bin? Its challenges and entries disappear from the app.",
     "linkCopied": "Link copied.",
@@ -294,7 +297,7 @@
     "inviteToggleOpen": "Close invite",
     "inviteToggleClosed": "+ Invite",
     "challengeLimitReached": "Limit of {limit} challenges reached",
-    "createChallenge": "+ Challenge (limit {limit})",
+    "createChallenge": "+ New challenge (limit {limit})",
     "editTitle": "Edit group",
     "editBody": "The updated name shows for everyone in the group.",
     "nameLabel": "Name",
@@ -373,6 +376,7 @@
     }
   },
   "personalSpace": {
+    "emptyCreatePrompt": "Pick a preset and create your first personal challenge by clicking <action>here</action>.",
     "back": "← Back",
     "title": "My space",
     "subtitle": "Just yours — no group, no invites.",
@@ -540,6 +544,8 @@
     "expectationHint": "Participants rate how much they expect to like each title before watching. It locks once they send the real rating. You can also toggle this later."
   },
   "adminChallenge": {
+    "fieldsEmptyCreatePrompt": "Add the first field to this form by clicking <action>here</action>.",
+    "itemsEmptyCreatePrompt": "Set up the first items or checkpoints by clicking <action>here</action>.",
     "back": "← Back",
     "simulateAsParticipant": "Simulate as participant",
     "subtitle": "Set it up, review it, and present it — admin controls stay validated on the server.",

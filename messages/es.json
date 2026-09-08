@@ -258,6 +258,8 @@
     "showTemplates": "Ver las plantillas listas"
   },
   "dashboard": {
+    "emptyGroupsTitle": "Crea tu primer grupo",
+    "emptyGroupsCreatePrompt": "Crea un grupo y empieza retos en compañía haciendo clic <action>aquí</action>.",
     "greeting": "Hola, {name}.",
     "subtitle": "Lo que necesita tu atención hoy y tus grupos.",
     "groupLimitReached": "Alcanzaste el límite de {limit} grupos",
@@ -281,6 +283,7 @@
     "archiveTitle": "Borradores y recuerdos"
   },
   "group": {
+    "emptyCreatePrompt": "Elige una plantilla y prepara la 1.ª edición haciendo clic <action>aquí</action>.",
     "updated": "Grupo actualizado.",
     "deleteConfirm": "¿Mover \"{name}\" a la papelera? Sus desafíos y registros desaparecen de la app.",
     "linkCopied": "Enlace copiado.",
@@ -294,7 +297,7 @@
     "inviteToggleOpen": "Cerrar invitación",
     "inviteToggleClosed": "+ Invitar",
     "challengeLimitReached": "Límite de {limit} desafíos alcanzado",
-    "createChallenge": "+ Desafío (límite {limit})",
+    "createChallenge": "+ Nuevo desafío (límite {limit})",
     "editTitle": "Editar grupo",
     "editBody": "El nombre actualizado se muestra a todas las personas del grupo.",
     "nameLabel": "Nombre",
@@ -373,6 +376,7 @@
     }
   },
   "personalSpace": {
+    "emptyCreatePrompt": "Elige una plantilla y crea tu primer reto personal haciendo clic <action>aquí</action>.",
     "back": "← Volver",
     "title": "Mi espacio",
     "subtitle": "Solo tuyo — sin grupo, sin invitaciones.",
@@ -540,6 +544,8 @@
     "expectationHint": "Los participantes dan una nota de cuánto esperan disfrutar cada título antes de verlo. Se bloquea cuando envían la valoración real. También puedes activarlo después."
   },
   "adminChallenge": {
+    "fieldsEmptyCreatePrompt": "Añade el primer campo de este formulario haciendo clic <action>aquí</action>.",
+    "itemsEmptyCreatePrompt": "Prepara los primeros elementos o etapas haciendo clic <action>aquí</action>.",
     "back": "← Volver",
     "simulateAsParticipant": "Simular como participante",
     "subtitle": "Configura, revisa y presenta — los controles de administración se siguen validando en el servidor.",

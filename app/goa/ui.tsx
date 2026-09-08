@@ -133,13 +133,17 @@ export function StatusMessage({
   );
 }
 
+export function EmptyStateAction({ children, onClick }: { children: ReactNode; onClick: () => void }) {
+  return <button type="button" onClick={onClick} className="cursor-pointer rounded text-inherit no-underline underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-current">{children}</button>;
+}
+
 export function EmptyState({
   title,
   description,
   action,
 }: {
   title: string;
-  description: string;
+  description: ReactNode;
   action?: ReactNode;
 }) {
   return (

@@ -6,12 +6,13 @@ import { type FormEvent, useEffect, useRef, useState } from "react";
 import { splitSyntheticMarker, stripSyntheticMarker } from "../../../lib/goa/synthetic";
 import { API_PATHS, apiRequest } from "../api";
 import { copyText } from "../clipboard";
+import { AddTile } from "../add-tile";
 import { ActionMenu, ActionMenuItem } from "../action-menu";
 import { Dialog } from "../dialog";
 import { useGoaFormat } from "../format";
 import type { CatalogItem, ChallengeSummary, GroupInviteResult, GroupSummary, Id, Member, PendingGroupRequest } from "../types";
 import { Segmented } from "../Segmented";
-import { backLinkClass, Button, challengeStatusTone, ChallengeStatusBadge, cx, EmptyState, inputClass, labelClass, PageHeading, StatusMessage } from "../ui";
+import { backLinkClass, Button, challengeStatusTone, ChallengeStatusBadge, cx, EmptyState, EmptyStateAction, inputClass, labelClass, PageHeading, StatusMessage } from "../ui";
 import { canManage, formatRuntime, isChallengeScheduled } from "../utils";
 
 /** The group page shows only the head of the catalog; the rest is one tap away. */
@@ -259,10 +260,9 @@ export function GroupScreen({
         description={groupHeaderDescription}
         action={
           canManage(group.role) ? (
-            <ActionMenu label={tx("groupActions")} iconOnly>
+            <ActionMenu label={tx("groupActions")}>
               <ActionMenuItem onClick={toggleGroupEdit}>{t("editToggleClosed")}</ActionMenuItem>
               <ActionMenuItem onClick={() => setShowInvite(true)}>{t("inviteTitle")}</ActionMenuItem>
-              <ActionMenuItem disabled={challenges.length >= challengeLimit} onClick={onCreateChallenge}>{challenges.length >= challengeLimit ? t("challengeLimitReached", { limit: challengeLimit }) : t("createChallenge", { limit: challengeLimit })}</ActionMenuItem>
             </ActionMenu>
           ) : undefined
         }
@@ -343,8 +343,9 @@ export function GroupScreen({
                   </article>
                 );
               })}
+              {canManage(group.role) && challenges.length < challengeLimit ? <AddTile label={t("createChallengeCta")} onClick={onCreateChallenge} /> : null}
             </div>
-          ) : <EmptyState title={t("noChallengesTitle")} description={canManage(group.role) ? t("noChallengesManage") : t("noChallengesMember")} action={canManage(group.role) ? <Button onClick={onCreateChallenge}>{t("createChallengeCta")}</Button> : undefined} />}
+          ) : <EmptyState title={t("noChallengesTitle")} description={canManage(group.role) ? challenges.length < challengeLimit ? t.rich("emptyCreatePrompt", { action: (chunks) => <EmptyStateAction onClick={onCreateChallenge}>{chunks}</EmptyStateAction> }) : t("challengeLimitReached", { limit: challengeLimit }) : t("noChallengesMember")} />}
         </section>
         {sortedCatalog.length ? (
           <section>
