@@ -22,7 +22,7 @@ function AddTile({ label, onClick, disabled = false }: { label: string; onClick:
       disabled={disabled}
       aria-label={label}
       title={label}
-      className="grid min-h-14 w-14 shrink-0 cursor-pointer select-none place-items-center justify-self-start rounded-xl border border-dashed border-[var(--line)] text-2xl font-light leading-none text-[var(--muted)] transition hover:border-[var(--muted)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[var(--line)] disabled:hover:text-[var(--muted)]"
+      className="grid min-h-14 w-14 shrink-0 cursor-pointer select-none place-items-center justify-self-start rounded-2xl border border-dashed border-[var(--line)] text-2xl font-light leading-none text-[var(--muted)] transition hover:border-[var(--muted)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[var(--line)] disabled:hover:text-[var(--muted)]"
     >
       <span aria-hidden="true">+</span>
     </button>
