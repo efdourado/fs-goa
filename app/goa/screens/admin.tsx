@@ -1,18 +1,18 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { type FormEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type FormEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 
 import { API_PATHS, apiRequest } from "../api";
 import { CheckpointPlanner } from "../checkpoint-planner";
 import { useGoaFormat } from "../format";
 import { CineItemsEditor, type CineRow, cineRowsToInput } from "../cine-items";
-import { copyText } from "../clipboard";
+import { buildShowcaseDraft } from "../showcase-draft";
 import { ConfirmDialog, Dialog } from "../dialog";
 import { cleanFields, FIELD_TYPES, FieldConfigInputs, newFieldConfig, uniqueFieldKey } from "../fields";
 import { ListImportPanel } from "../list-import-panel";
 import { RuleSectionsEditor, visibleRuleSections } from "../rules";
-import { TrashView } from "../trash-view";
+import { ChallengeActions } from "./challenge-actions";
 import type {
   AdminTab,
   ChallengeDetail,
@@ -158,80 +158,14 @@ function PreflightPanel({ challengeId, onReady }: { challengeId: Id; onReady: (r
  * `/modelos` gallery or take it down, and to adjust its blurb. A challenge
  * admin who is not a platform admin never sees this section.
  */
-function TemplatePublishSection({ challenge, onPublish, onUnpublish }: {
-  challenge: ChallengeDetail;
-  onPublish: (summary: string) => Promise<void>;
-  onUnpublish: () => Promise<void>;
-}) {
-  const t = useTranslations("adminChallenge");
-  const tc = useTranslations("common");
-  const f = useGoaFormat();
-  const [summary, setSummary] = useState(challenge.templateSummary ?? "");
-  const [busy, setBusy] = useState<"publish" | "unpublish" | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const published = Boolean(challenge.publishedAsTemplate);
-
-  async function run(kind: "publish" | "unpublish", action: () => Promise<void>, ok: string) {
-    setBusy(kind);
-    setError(null);
-    setSuccess(null);
-    try {
-      await action();
-      setSuccess(ok);
-    } catch (cause) {
-      setError(f.error(cause));
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  return (
-    <section className="border-t border-[var(--line)] pt-10">
-      <h2 className="text-lg font-medium tracking-tight">{t("platformTemplateTitle")}</h2>
-      <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{t("platformTemplateHint")}</p>
-      {published ? (
-        <div className="mt-4 grid gap-3 sm:max-w-xl">
-          <p className="text-sm text-[var(--ok)]">{t("platformTemplateOn")}</p>
-          <label>
-            <span className={labelClass}>{t("summaryLabel")}</span>
-            <textarea className={inputClass} rows={2} value={summary} onChange={(event) => setSummary(event.target.value)} maxLength={280} placeholder={challenge.description ?? ""} />
-          </label>
-          <div className="flex flex-wrap gap-3">
-            <Button variant="secondary" disabled={busy !== null} onClick={() => void run("publish", () => onPublish(summary.trim()), t("platformTemplateSaved"))}>{busy === "publish" ? tc("saving") : tc("saveChanges")}</Button>
-            <Button variant="danger" disabled={busy !== null} onClick={() => void run("unpublish", onUnpublish, t("platformTemplateRemoved"))}>{busy === "unpublish" ? tc("saving") : t("platformTemplateUnpublish")}</Button>
-          </div>
-        </div>
-      ) : (
-        <div className="mt-4">
-          <Button disabled={busy !== null} onClick={() => void run("publish", () => onPublish(summary.trim()), t("platformTemplatePublished"))}>{busy === "publish" ? tc("saving") : t("platformTemplatePublish")}</Button>
-        </div>
-      )}
-      <StatusMessage error={error} success={success} />
-    </section>
-  );
-}
-
 function AdminOverview({
   challenge,
   onSave,
   onTransition,
-  onDuplicate,
-  isPlatformAdmin,
-  onPublishTemplate,
-  onUnpublishTemplate,
-  duplicateTargets,
-  onDelete,
 }: {
   challenge: ChallengeDetail;
   onSave: (payload: Partial<ChallengeSummary>) => Promise<void>;
   onTransition: (status: "active" | "closed") => Promise<void>;
-  onDuplicate: (payload: { title: string; targetGroupId: Id }) => Promise<void>;
-  isPlatformAdmin: boolean;
-  onPublishTemplate: (summary: string) => Promise<void>;
-  onUnpublishTemplate: () => Promise<void>;
-  duplicateTargets: DuplicateTargetGroup[];
-  onDelete?: () => Promise<void>;
 }) {
   const t = useTranslations("adminChallenge");
   const tc = useTranslations("common");
@@ -248,13 +182,10 @@ function AdminOverview({
   const [endsOn, setEndsOn] = useState(challenge.endsOn ?? "");
   const [showOptional, setShowOptional] = useState(false);
   const hasOptionalContent = Boolean(description.trim()) || ruleSections.length > 0;
-  const [duplicateTitle, setDuplicateTitle] = useState(challenge.title);
-  const availableTargets = duplicateTargets.filter((target) => target.challengeCount < target.challengeLimit);
-  const [duplicateTargetGroupId, setDuplicateTargetGroupId] = useState<Id>(availableTargets[0]?.id ?? "");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [confirm, setConfirm] = useState<"activate" | "close" | "reopen" | "delete" | null>(null);
+  const [confirm, setConfirm] = useState<"activate" | "close" | "reopen" | null>(null);
   const [preflightReady, setPreflightReady] = useState(false);
   const scheduled = isChallengeScheduled(challenge.status, challenge.startsOn, challenge.submissionMode);
   const livingList = isLivingList(challenge);
@@ -330,56 +261,6 @@ function AdminOverview({
         </form>
       </section>
 
-      <section className="border-t border-[var(--line)] pt-10">
-        <h2 className="text-lg font-medium tracking-tight">{t("reuseTitle")}</h2>
-        <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{t("reuseBody")}</p>
-        {duplicateTargets.length ? <form className="mt-5 grid gap-4 lg:grid-cols-[1fr_1fr_auto] lg:items-end" onSubmit={(event) => { event.preventDefault(); if (!duplicateTargetGroupId) { setError(t("reusePickTarget")); return; } void run("duplicate", () => onDuplicate({ title: duplicateTitle.trim(), targetGroupId: duplicateTargetGroupId }), t("reuseDone")); }}>
-          <label>
-            <span className={labelClass}>{t("reuseTitleLabel")}</span>
-            <input
-              className={inputClass}
-              value={duplicateTitle}
-              onChange={(event) => setDuplicateTitle(event.target.value)}
-              required
-              maxLength={160} />
-          </label>
-
-          <label>
-            <span className={labelClass}>{t("reuseTargetLabel")}</span>
-
-            <select
-              className={inputClass}
-              value={duplicateTargetGroupId}
-              onChange={(event) => setDuplicateTargetGroupId(event.target.value)}
-              required
-            >
-              <option value="">{t("reuseTargetPlaceholder")}</option>
-
-              {duplicateTargets.map((target) => {
-                const full = target.challengeCount >= target.challengeLimit;
-
-                return (
-                  <option key={target.id} value={target.id} disabled={full}>
-                    {t("reuseTargetOption", {
-                      name: target.name,
-                      count: target.challengeCount,
-                      limit: target.challengeLimit,
-                    })}
-                    {full ? t("reuseTargetFull") : ""}
-                  </option>
-                );
-              })}
-            </select>
-          </label>
-            
-          <div className="mb-1"><Button type="submit" variant="secondary" disabled={busy === "duplicate" || !duplicateTargetGroupId || !availableTargets.length}>{busy === "duplicate" ? t("reuseCreating") : t("reuseSubmit")}</Button></div>
-        </form> : <div className="mt-5 rounded-2xl border border-dashed border-[var(--line)] bg-[var(--wash)]/60 p-5"><strong className="text-sm">{t("reuseNoneTitle")}</strong><p className="mt-1 text-sm leading-6 text-[var(--muted)]">{t("reuseNoneBody")}</p></div>}
-      </section>
-
-      {isPlatformAdmin ? (
-        <TemplatePublishSection challenge={challenge} onPublish={onPublishTemplate} onUnpublish={onUnpublishTemplate} />
-      ) : null}
-
       {!livingList && challenge.status === "draft" ? (
         <PreflightPanel challengeId={challenge.id} onReady={setPreflightReady} />
       ) : null}
@@ -396,13 +277,6 @@ function AdminOverview({
         </section>
       ) : null}
 
-      {onDelete ? (
-        <section className="border-t border-[var(--line)] pt-10">
-          <h2 className="text-lg font-medium tracking-tight">{t("deleteTitle")}</h2>
-          <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{t("deleteBody")}</p>
-          <div className="mt-4"><Button variant="danger" disabled={Boolean(busy)} onClick={() => setConfirm("delete")}>{t("delete")}</Button></div>
-        </section>
-      ) : null}
       <StatusMessage error={error} success={success} />
 
       {confirm === "activate" ? (
@@ -419,11 +293,6 @@ function AdminOverview({
         <ConfirmDialog title={t("reopenTitle")} body={t("reopenConfirm")} confirmLabel={t("reopen")} busyLabel={tc("saving")}
           onClose={() => setConfirm(null)}
           onConfirm={async () => { await onTransition("active"); setConfirm(null); setSuccess(t("reopenedDone")); }} />
-      ) : null}
-      {confirm === "delete" && onDelete ? (
-        <ConfirmDialog title={t("deleteTitle")} body={t("deleteConfirm", { title: challenge.title })} confirmLabel={t("delete")} busyLabel={t("deleting")} danger
-          onClose={() => setConfirm(null)}
-          onConfirm={async () => { await onDelete(); setConfirm(null); setSuccess(t("deleteDone")); }} />
       ) : null}
     </div>
   );
@@ -997,16 +866,12 @@ function AdminReview({
   onPatch,
   onDelete,
   onExport,
-  csrfToken,
-  onArchiveChanged,
 }: {
   challenge: ChallengeDetail;
   entries: Entry[];
   onPatch: (entryId: Id, values: Record<Id, unknown>, reason: string) => Promise<void>;
   onDelete: (entryId: Id, reason: string) => Promise<void>;
   onExport: () => Promise<void>;
-  csrfToken: string;
-  onArchiveChanged: () => void;
 }) {
   const t = useTranslations("adminChallenge");
   const f = useGoaFormat();
@@ -1062,13 +927,6 @@ function AdminReview({
         ) : <EmptyState title={t("noEntriesTitle")} description={entries.length ? t("noEntriesFiltered") : t("noEntriesEmpty")} />}
       </div>
 
-      <div className="border-t border-[var(--line)] pt-10">
-        <h2 className="text-lg font-medium tracking-tight">{t("removedStructureTitle")}</h2>
-        <p className="mt-1 text-sm text-[var(--muted)]">{t("removedStructureBody")}</p>
-        <div className="mt-4">
-          <TrashView scope={{ challengeId: challenge.id }} csrfToken={csrfToken} onChanged={onArchiveChanged} />
-        </div>
-      </div>
 
       {selected ? (
         <CorrectionDialog
@@ -1155,23 +1013,17 @@ function AdminResults({
   challenge,
   entries,
   onSave,
-  onPublish,
-  onUnpublish,
   onReorderBlocks,
 }: {
   challenge: ChallengeDetail;
   entries: Entry[];
   onSave: (payload: Record<string, unknown>) => Promise<{ unpublished?: boolean } | undefined>;
-  onPublish: (payload: Record<string, unknown>) => Promise<{ url?: string | null; publishedAt?: string; anonymized?: boolean } | undefined>;
-  onUnpublish: () => Promise<void>;
   onReorderBlocks: (blocks: Array<{ id: Id; visible: boolean }>) => Promise<void>;
 }) {
   const t = useTranslations("adminChallenge");
+  const tx = useTranslations("managementUX");
   const tc = useTranslations("common");
   const f = useGoaFormat();
-  const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
-  const [copyState, setCopyState] = useState<"idle" | "done" | "failed">("idle");
-  const linkRef = useRef<HTMLInputElement>(null);
   const [headline, setHeadline] = useState(challenge.result?.headline ?? "");
   const [summary, setSummary] = useState(challenge.result?.summary ?? "");
   const [metricIds, setMetricIds] = useState<Id[]>(challenge.result?.metrics?.map((metric) => metric.id) ?? challenge.metrics.filter((metric) => metric.visibleInResults).map((metric) => metric.id));
@@ -1181,9 +1033,15 @@ function AdminResults({
   const [anonymize, setAnonymize] = useState(challenge.resultsAnon === true);
   const [includeRankings, setIncludeRankings] = useState((challenge.result?.personalRankings?.length ?? 0) > 0 || !challenge.result);
   const [includeAffinity, setIncludeAffinity] = useState(Boolean(challenge.result?.affinity?.pairs.length) || !challenge.result);
+  const savedOrderKey = (challenge.result?.blocks ?? []).map((b) => b.id).join(",");
   const [blockOrder, setBlockOrder] = useState(
     [...(challenge.result?.blocks ?? [])].sort((a, b) => a.position - b.position).map((block) => ({ id: block.id, visible: block.visible })),
   );
+  const [previousOrderKey, setPreviousOrderKey] = useState(savedOrderKey);
+  if (previousOrderKey !== savedOrderKey) {
+    setPreviousOrderKey(savedOrderKey);
+    setBlockOrder([...(challenge.result?.blocks ?? [])].sort((a, b) => a.position - b.position).map((b) => ({ id: b.id, visible: b.visible })));
+  }
   const [orderBusy, setOrderBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1201,7 +1059,7 @@ function AdminResults({
     }
     return map;
   }, [challenge.result?.blocks, t]);
-  const textFields = challenge.fields.filter((field) => field.id && field.type === "text");
+  const textFields = useMemo(() => [...new Map([...challenge.fields, ...challenge.entryTypes.flatMap((type) => type.fields)].filter((field) => field.id && field.type === "text").map((field) => [field.id, field])).values()], [challenge.fields, challenge.entryTypes]);
   const candidates = useMemo(() => {
     const result: CuratedCommentCandidate[] = [];
     for (const entry of entries) {
@@ -1218,16 +1076,6 @@ function AdminResults({
 
   const isClosed = challenge.status === "closed";
   const isPublished = Boolean(challenge.result?.publishedAt);
-  // The link is durable now (migration 0035): build it from the stored token,
-  // falling back to the one this session just minted. A round published before
-  // 0035 has no stored token — the admin rotates once to get a fresh link.
-  const origin = typeof window === "undefined" ? "" : window.location.origin;
-  const storedUrl = challenge.result?.shareToken && origin
-    ? `${origin}/results/${encodeURIComponent(challenge.result.shareToken)}`
-    : null;
-  const publicUrl = publishedUrl ?? storedUrl;
-  const linkOnlyOnce = isPublished && !publicUrl;
-
   function savedMessage(result: { unpublished?: boolean } | undefined, base: string) {
     if (result?.unpublished) return t("draftSavedUnpublishedAnon");
     return isPublished ? t("draftSavedRepublishHint") : base;
@@ -1257,84 +1105,18 @@ function AdminResults({
     } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
   }
 
-  const [confirm, setConfirm] = useState<"publish" | "rotate" | "unpublish" | null>(null);
-
-  async function doPublish(rotateLink: boolean) {
-    setError(null); setSuccess(null);
-    const result = await onPublish(rotateLink ? { rotateLink: true } : {});
-    setPublishedUrl(result?.url ?? null);
-    setCopyState("idle");
-    setConfirm(null);
-    setSuccess(rotateLink ? t("linkRotated") : t("showcasePublished"));
-  }
-
-  async function doUnpublish() {
-    setError(null); setSuccess(null);
-    await onUnpublish();
-    setPublishedUrl(null);
-    setConfirm(null);
-    setSuccess(t("showcaseUnpublished"));
-  }
-
-  async function copyLink() {
-    if (!publicUrl) return;
-    try {
-      await copyText(publicUrl, linkRef.current);
-      setCopyState("done");
-    } catch { setCopyState("failed"); }
-  }
-
+  const preview = buildShowcaseDraft(challenge, { headline, summary, metricIds, comments: candidates.filter((c) => commentKeys.includes(c.key)), includeRankings, includeAffinity, order: blockOrder });
   return (
-    <div className="mx-auto max-w-5xl space-y-12">
-      <section>
-        <PageHeading title={t("publishTitle")} description={t("publishSubtitle")} />
-        <div className="rounded-2xl bg-[var(--wash)] p-4 text-sm">
-          {isPublished ? (
-            <p>
-              <strong>{t("publishedOn", { date: f.dateTime(challenge.result?.publishedAt) })}</strong>
-              {" · "}
-              {challenge.resultsAnon ? t("publishStateAnon") : t("publishStateNamed")}
-            </p>
-          ) : (
-            <p className="text-[var(--muted)]">{isClosed ? t("notPublished") : t("publishNeedsClose")}</p>
-          )}
-          {isPublished && publicUrl ? (
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-              <input ref={linkRef} className={cx(inputClass, "sm:flex-1")} readOnly value={publicUrl} onFocus={(event) => event.target.select()} aria-label={t("publicLinkLabel")} />
-              <Button variant="secondary" disabled={busy} onClick={() => void copyLink()}>
-                {copyState === "done" ? t("linkCopied") : copyState === "failed" ? t("copyFailed") : t("copyLink")}
-              </Button>
-            </div>
-          ) : null}
-          {linkOnlyOnce ? <p className="mt-3 text-xs text-[var(--muted)]">{t("linkNotStored")}</p> : null}
-        </div>
-        {isClosed ? (
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Button disabled={busy} onClick={() => setConfirm("publish")}>{isPublished ? t("republishShowcase") : t("publishShowcase")}</Button>
-            {isPublished ? <Button variant="secondary" disabled={busy} onClick={() => setConfirm("rotate")}>{t("rotateLink")}</Button> : null}
-            {isPublished ? <Button variant="danger" disabled={busy} onClick={() => setConfirm("unpublish")}>{t("unpublish")}</Button> : null}
-          </div>
-        ) : null}
-        <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{t("publishHint")}</p>
-      </section>
-
-      {confirm === "publish" ? (
-        <ConfirmDialog title={isPublished ? t("republishShowcase") : t("publishShowcase")} body={anonymize ? t("publishConfirmAnon") : t("publishConfirmNoAnon")}
-          confirmLabel={isPublished ? t("republishShowcase") : t("publishShowcase")} onClose={() => setConfirm(null)} onConfirm={() => doPublish(false)} />
-      ) : null}
-      {confirm === "rotate" ? (
-        <ConfirmDialog title={t("rotateLink")} body={t("rotateLinkConfirm")} confirmLabel={t("rotateLink")} danger
-          onClose={() => setConfirm(null)} onConfirm={() => doPublish(true)} />
-      ) : null}
-      {confirm === "unpublish" ? (
-        <ConfirmDialog title={t("unpublish")} body={t("unpublishConfirm")} confirmLabel={t("unpublish")} danger
-          onClose={() => setConfirm(null)} onConfirm={() => doUnpublish()} />
-      ) : null}
-
-      <section className="border-t border-[var(--line)] pt-10">
-        <PageHeading title={t("resultsTitle")} description={t("resultsSubtitle")} />
-        <div className="grid gap-4 sm:grid-cols-2"><label className="sm:col-span-2"><span className={labelClass}>{t("headlineLabel")}</span><input className={inputClass} value={headline} onChange={(event) => setHeadline(event.target.value)} maxLength={180} placeholder={challenge.title} /></label><label className="sm:col-span-2"><span className={labelClass}>{t("summaryLabel")}</span><textarea className={inputClass} rows={4} value={summary} onChange={(event) => setSummary(event.target.value)} maxLength={1500} /></label></div>
-        <fieldset className="mt-6"><legend className="text-base font-light">{t("highlightMetrics")}</legend>{challenge.metrics.length ? <div className="mt-3"><ShowMoreList items={challenge.metrics} preview={6} className="grid gap-2 sm:grid-cols-2" render={(metric) => <label className="flex min-h-12 items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4 text-sm" key={metric.id}><input type="checkbox" aria-label={t("highlightMetricAria", { label: metric.label })} checked={metricIds.includes(metric.id)} onChange={(event) => setMetricIds((current) => event.target.checked ? [...current, metric.id] : current.filter((id) => id !== metric.id))} /><span><strong className="block">{metric.label}</strong><small className="text-[var(--muted)]">{metric.formattedValue ?? metric.value ?? t("metricNoValue")}</small></span></label>} /></div> : <p className="mt-2 text-sm text-[var(--muted)]">{t("createMetricsFirst")}</p>}</fieldset>
+    <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+      <div className="min-w-0 space-y-6">
+        {!isClosed ? <p className="rounded-xl bg-[var(--wash)] p-4 text-sm leading-6 text-[var(--muted)]">{tx("curationAfterClose")}</p> : null}
+        <details open className="group border-b border-[var(--line)] pb-6">
+          <summary className="cursor-pointer list-none py-3 text-xl font-medium tracking-tight [&::-webkit-details-marker]:hidden">{tx("curation")}</summary>
+          <fieldset disabled={!isClosed || busy} className="min-w-0 space-y-4">
+      <div>
+        <p className="mb-5 text-sm leading-6 text-[var(--muted)]">{t("resultsSubtitle")}</p>
+        <div className="grid gap-4 sm:grid-cols-2"><label className="sm:col-span-2"><span className={labelClass}>{t("headlineLabel")}</span><input className={inputClass} value={headline} onChange={(event) => setHeadline(event.target.value)} maxLength={160} placeholder={challenge.title} /></label><label className="sm:col-span-2"><span className={labelClass}>{t("summaryLabel")}</span><textarea className={inputClass} rows={4} value={summary} onChange={(event) => setSummary(event.target.value)} maxLength={1500} /></label></div>
+        <fieldset className="mt-6"><legend className="text-base font-light">{t("highlightMetrics")}</legend>{challenge.metrics.length ? <div className="mt-3"><ShowMoreList items={challenge.metrics} preview={6} className="grid gap-2" render={(metric) => <label className="flex min-h-12 items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4 text-sm" key={metric.id}><input type="checkbox" aria-label={t("highlightMetricAria", { label: metric.label })} checked={metricIds.includes(metric.id)} onChange={(event) => setMetricIds((current) => event.target.checked ? [...current, metric.id] : current.filter((id) => id !== metric.id))} /><span><strong className="block">{metric.label}</strong><small className="text-[var(--muted)]">{metric.formattedValue ?? metric.value ?? t("metricNoValue")}</small></span></label>} /></div> : <p className="mt-2 text-sm text-[var(--muted)]">{t("createMetricsFirst")}</p>}</fieldset>
         <fieldset className="mt-6"><legend className="text-base font-light">{t("selectedComments")}</legend><p className="mt-2 rounded-xl border border-[var(--warn-line)] bg-[var(--warn-soft)] px-3 py-2 text-sm text-[var(--warn)]">{t("commentPrivacyWarning")}</p>{candidates.length ? <div className="mt-3"><ShowMoreList items={candidates} preview={4} className="grid gap-2 sm:grid-cols-2" render={(candidate) => <label className="flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4 text-sm" key={candidate.key}><input className="mt-1" type="checkbox" aria-label={t("selectCommentAria", { author: candidate.authorName })} checked={commentKeys.includes(candidate.key)} onChange={(event) => setCommentKeys((current) => event.target.checked ? [...current, candidate.key] : current.filter((key) => key !== candidate.key))} /><span><span className="line-clamp-3 leading-6">“{candidate.text}”</span><small className="mt-2 block font-light text-[var(--muted)]">{candidate.authorName} · {candidate.itemTitle}</small></span></label>} /></div> : <p className="mt-2 text-sm text-[var(--muted)]">{t("noTextFields")}</p>}</fieldset>
         <fieldset className="mt-6"><legend className="text-base font-light">{t("wrappedBlocks")}</legend>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
@@ -1346,11 +1128,15 @@ function AdminResults({
         <div className="mt-5"><StatusMessage error={error} success={success} /></div>
         <div className="mt-5 flex flex-col gap-2 sm:flex-row"><Button disabled={busy} onClick={() => void save()}>{busy ? tc("saving") : t("saveDraft")}</Button><Button variant="secondary" disabled={busy} onClick={() => void regenerate()}>{t("regenerateDraft")}</Button></div>
         <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{t("regenerateHint")}</p>
-      </section>
+      </div>
+          </fieldset>
+        </details>
 
       {blockOrder.length ? (
-        <section className="border-t border-[var(--line)] pt-10">
-          <PageHeading title={t("blockOrderTitle")} description={t("blockOrderSubtitle")} />
+        <details className="border-b border-[var(--line)] pb-6">
+          <summary className="cursor-pointer list-none py-3 text-xl font-medium tracking-tight [&::-webkit-details-marker]:hidden">{tx("order")}</summary>
+          <p className="mb-4 text-sm leading-6 text-[var(--muted)]">{t("blockOrderSubtitle")}</p>
+          <fieldset disabled={!isClosed || busy || orderBusy} className="min-w-0">
           <ShowMoreList
             items={blockOrder}
             preview={8}
@@ -1366,10 +1152,15 @@ function AdminResults({
             )}
           />
           <Button className="mt-4" disabled={orderBusy} onClick={() => { setOrderBusy(true); setError(null); onReorderBlocks(blockOrder).then(() => setSuccess(t("blockOrderSaved"))).catch((cause: unknown) => setError(f.error(cause))).finally(() => setOrderBusy(false)); }}>{orderBusy ? tc("saving") : t("blockOrderSave")}</Button>
-        </section>
-      ) : null}
+          </fieldset>
+        </details>
+      ) : <p className="text-sm text-[var(--muted)]">{tx("orderAfterSave")}</p>}
 
-      {challenge.result || challenge.status === "closed" ? <section><PageHeading title={t("previewTitle")} description={t("previewSubtitle")} /><ResultView challenge={challenge} /></section> : <EmptyState title={t("previewEmptyTitle")} description={t("previewEmptyBody")} />}
+      </div>
+      <aside className="min-w-0 rounded-3xl border border-[var(--line)] bg-[var(--paper)] p-5 sm:p-7 lg:sticky lg:top-6 lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto">
+        <div className="mb-6 border-b border-[var(--line)] pb-4"><h2 className="text-base font-medium">{t("previewTitle")}</h2><p className="mt-2 text-xs leading-6 text-[var(--muted)]">{tx("livePreview")}</p></div>
+        <ResultView challenge={preview} />
+      </aside>
     </div>
   );
 }
@@ -1410,8 +1201,6 @@ export function AdminScreen({
   onPublishResult,
   onUnpublishResult,
   onReorderBlocks,
-  csrfToken,
-  onArchiveChanged,
 }: {
   challenge: ChallengeDetail;
   entries: Entry[];
@@ -1455,6 +1244,8 @@ export function AdminScreen({
   onArchiveChanged: () => void;
 }) {
   const t = useTranslations("adminChallenge");
+  const tx = useTranslations("managementUX");
+  const [showTechnical, setShowTechnical] = useState(false);
   // The checkpoint planner is for round-item challenges organised into
   // weeks/sessions — a day-by-day round derives its checkpoints from the period.
   const showCheckpoints = challenge.submissionMode === "item";
@@ -1468,20 +1259,29 @@ export function AdminScreen({
     ...(showCheckpoints ? (["checkpoints"] as const) : []),
     "review", "metrics", "results",
   ];
-  const activeTab = tabs.includes(tab) ? tab : "overview";
+  const requestedTab = tab === "participants" ? "overview" : tab;
+  const activeTab = tabs.includes(requestedTab) ? requestedTab : "overview";
+  const primaryTabs: AdminTab[] = ["overview", "review", "results"];
+  const technicalTabs = tabs.filter((id) => !primaryTabs.includes(id) && id !== "participants");
+  const technicalOpen = showTechnical || technicalTabs.includes(activeTab);
   return (
-    <main className="mx-auto max-w-5xl px-4 py-6 pb-24 sm:px-6 sm:py-10">
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><button className={backLinkClass} type="button" onClick={onBack}>{t("back")}</button><div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={onViewParticipant}>{t("simulateAsParticipant")}</Button></div></div>
+    <main className={cx("mx-auto px-4 py-6 pb-24 sm:px-6 sm:py-10", activeTab === "results" ? "max-w-[1440px]" : "max-w-5xl")}>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><button className={backLinkClass} type="button" onClick={onBack}>{t("back")}</button><div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={onViewParticipant}>{t("simulateAsParticipant")}</Button><ChallengeActions challenge={challenge} duplicateTargets={duplicateTargets} onDuplicate={onDuplicate} onDelete={onDelete} isPlatformAdmin={isPlatformAdmin} onPublishTemplate={onPublishTemplate} onUnpublishTemplate={onUnpublishTemplate} onPublish={onPublishResult} onUnpublish={onUnpublishResult} /></div></div>
       <PageHeading title={challenge.title} description={t("subtitle")} action={<ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />} />
-      <nav className="mb-8 flex gap-1 overflow-x-auto rounded-2xl bg-[var(--wash-strong)]/70 p-1" aria-label={t("tabsAria")}>{tabs.map((id) => <button className={cx("min-h-11 flex-none rounded-xl px-4 text-sm font-light", activeTab === id ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]")} type="button" onClick={() => onTab(id)} key={id}>{t(`tabs.${id}`)}</button>)}</nav>
-      {activeTab === "overview" ? <AdminOverview challenge={challenge} onSave={onSaveBasics} onTransition={onTransition} onDuplicate={onDuplicate} isPlatformAdmin={isPlatformAdmin} onPublishTemplate={onPublishTemplate} onUnpublishTemplate={onUnpublishTemplate} duplicateTargets={duplicateTargets} onDelete={onDelete} /> : null}
-      {activeTab === "participants" ? <AdminParticipants key={`${challenge.id}:${challenge.participants.map((participant) => participant.userId ?? participant.id).join(",")}`} challenge={challenge} group={group} onSave={onSaveParticipants} /> : null}
+      <nav className="mb-8 border-b border-[var(--line)]" aria-label={t("tabsAria")}>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex gap-1">{primaryTabs.map((id) => <button key={id} type="button" aria-current={activeTab === id ? "page" : undefined} onClick={() => onTab(id)} className={cx("min-h-12 border-b-2 px-4 text-sm font-medium transition", activeTab === id ? "border-[var(--main-strong)] text-[var(--main-strong)]" : "border-transparent text-[var(--muted)] hover:text-[var(--ink)]")}>{t(`tabs.${id}`)}</button>)}</div>
+          <button type="button" aria-expanded={technicalOpen} aria-controls="management-technical-tabs" className="min-h-11 px-3 text-sm text-[var(--muted)] hover:text-[var(--ink)]" onClick={() => { if (technicalTabs.includes(activeTab)) onTab("overview"); setShowTechnical(!technicalOpen); }}>{tx(technicalOpen ? "fewerOptions" : "moreOptions")}</button>
+        </div>
+        {technicalOpen ? <div id="management-technical-tabs" className="flex flex-wrap gap-2 border-t border-[var(--line)] py-3">{technicalTabs.map((id) => <button key={id} type="button" aria-current={activeTab === id ? "page" : undefined} onClick={() => onTab(id)} className={cx("min-h-11 rounded-xl px-4 text-sm", activeTab === id ? "bg-[var(--main-soft)] text-[var(--main-strong)]" : "text-[var(--muted)] hover:bg-[var(--wash)]")}>{t(`tabs.${id}`)}</button>)}</div> : null}
+      </nav>
+      {activeTab === "overview" ? <div className="space-y-12"><AdminOverview challenge={challenge} onSave={onSaveBasics} onTransition={onTransition} />{!isPersonal ? <div className="border-t border-[var(--line)] pt-8"><AdminParticipants key={challenge.participants.map((p) => p.userId ?? p.id).join(",")} challenge={challenge} group={group} onSave={onSaveParticipants} /></div> : null}</div> : null}
       {activeTab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.visibilityPolicy}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} onSaveVisibility={onSaveEntryTypeVisibility} onSetExpectation={onSetExpectation} /> : null}
       {activeTab === "items" ? <AdminItems challenge={challenge} group={group} entries={entries} onAdd={onAddItems} onUpdate={onUpdateItem} onArchive={onArchiveItem} onPreviewImport={onPreviewImport} /> : null}
       {activeTab === "checkpoints" ? <CheckpointPlanner key={`${challenge.id}:${challenge.checkpoints.map((cp) => cp.id).join(",")}`} challenge={challenge} onSaveCheckpoints={onSaveCheckpoints} onAssign={onAssignCheckpointItems} /> : null}
-      {activeTab === "review" ? <AdminReview challenge={challenge} entries={entries} onPatch={onPatchEntry} onDelete={onDeleteEntry} onExport={onExport} csrfToken={csrfToken} onArchiveChanged={onArchiveChanged} /> : null}
+      {activeTab === "review" ? <AdminReview challenge={challenge} entries={entries} onPatch={onPatchEntry} onDelete={onDeleteEntry} onExport={onExport} /> : null}
       {activeTab === "metrics" ? <AdminMetrics challenge={challenge} onAdd={onAddMetric} onUpdate={onUpdateMetric} onDelete={onDeleteMetric} /> : null}
-      {activeTab === "results" ? <AdminResults challenge={challenge} entries={entries} onSave={onSaveResult} onPublish={onPublishResult} onUnpublish={onUnpublishResult} onReorderBlocks={onReorderBlocks} /> : null}
+      {activeTab === "results" ? <AdminResults challenge={challenge} entries={entries} onSave={onSaveResult} onReorderBlocks={onReorderBlocks} /> : null}
     </main>
   );
 }

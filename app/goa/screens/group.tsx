@@ -6,10 +6,12 @@ import { type FormEvent, useEffect, useRef, useState } from "react";
 import { splitSyntheticMarker, stripSyntheticMarker } from "../../../lib/goa/synthetic";
 import { API_PATHS, apiRequest } from "../api";
 import { copyText } from "../clipboard";
+import { ActionMenu, ActionMenuItem } from "../action-menu";
+import { Dialog } from "../dialog";
 import { useGoaFormat } from "../format";
 import type { CatalogItem, ChallengeSummary, GroupInviteResult, GroupSummary, Id, Member, PendingGroupRequest } from "../types";
 import { Segmented } from "../Segmented";
-import { backLinkClass, Button, cardClass, challengeStatusTone, ChallengeStatusBadge, cx, EmptyState, inputClass, labelClass, linkClass, PageHeading, StatusMessage } from "../ui";
+import { backLinkClass, Button, challengeStatusTone, ChallengeStatusBadge, cx, EmptyState, inputClass, labelClass, PageHeading, StatusMessage } from "../ui";
 import { canManage, formatRuntime, isChallengeScheduled } from "../utils";
 
 /** The group page shows only the head of the catalog; the rest is one tap away. */
@@ -30,7 +32,6 @@ export function GroupScreen({
   onDeleteGroup,
   onLeaveGroup,
   onSetMemberRole,
-  onOpenTrash,
   challengeLimit,
 }: {
   group: GroupSummary;
@@ -50,10 +51,9 @@ export function GroupScreen({
   onLeaveGroup?: () => Promise<void>;
   /** Present for owners: promote a participant to admin or demote an admin back. */
   onSetMemberRole?: (userId: Id, role: "admin" | "participant") => Promise<void>;
-  /** Present for owner/admin: open the group bin. */
-  onOpenTrash?: () => void;
 }) {
   const t = useTranslations("group");
+  const tx = useTranslations("managementUX");
   const tc = useTranslations("common");
   const tr = useTranslations("roles");
   const f = useGoaFormat();
@@ -259,40 +259,17 @@ export function GroupScreen({
         description={groupHeaderDescription}
         action={
           canManage(group.role) ? (
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm sm:justify-end">
-              <button type="button" className={linkClass} onClick={toggleGroupEdit}>
-                {showGroupEdit ? t("editToggleOpen") : t("editToggleClosed")}
-              </button>
-
-              <button
-                type="button"
-                className={linkClass}
-                onClick={() => setShowInvite((open) => !open)}
-              >
-                {showInvite ? t("inviteToggleOpen") : t("inviteToggleClosed")}
-              </button>
-
-              {onOpenTrash ? (
-                <button type="button" className={linkClass} onClick={onOpenTrash}>{t("trashLink")}</button>
-              ) : null}
-
-              {challenges.length >= challengeLimit ? (
-                <span className="text-[var(--muted)]">
-                  {t("challengeLimitReached", { limit: challengeLimit })}
-                </span>
-              ) : (
-                <button type="button" className={linkClass} onClick={onCreateChallenge}>
-                  {t("createChallenge", { limit: challengeLimit })}
-                </button>
-              )}
-            </div>
+            <ActionMenu label={tx("groupActions")} iconOnly>
+              <ActionMenuItem onClick={toggleGroupEdit}>{t("editToggleClosed")}</ActionMenuItem>
+              <ActionMenuItem onClick={() => setShowInvite(true)}>{t("inviteTitle")}</ActionMenuItem>
+              <ActionMenuItem disabled={challenges.length >= challengeLimit} onClick={onCreateChallenge}>{challenges.length >= challengeLimit ? t("challengeLimitReached", { limit: challengeLimit }) : t("createChallenge", { limit: challengeLimit })}</ActionMenuItem>
+            </ActionMenu>
           ) : undefined
         }
       />
 
       {showGroupEdit ? (
-        <section className={cx(cardClass, "mb-7 p-5")} aria-labelledby="group-edit-title">
-          <h2 id="group-edit-title" className="text-lg font-light">{t("editTitle")}</h2>
+        <Dialog title={t("editTitle")} onClose={() => setShowGroupEdit(false)} busy={groupBusy}>
           <p className="mt-1 text-sm text-[var(--muted)]">{t("editBody")}</p>
           <form className="mt-4 grid gap-4 sm:grid-cols-2" onSubmit={updateGroup}>
             <label className="sm:col-span-2"><span className={labelClass}>{t("nameLabel")}</span><input className={inputClass} value={groupName} onChange={(event) => setGroupName(event.target.value)} required maxLength={120} /></label>
@@ -305,12 +282,11 @@ export function GroupScreen({
               <Button variant="danger" disabled={groupBusy} onClick={() => void deleteGroup()}>{t("deleteGroup")}</Button>
             </div>
           ) : null}
-        </section>
+        </Dialog>
       ) : null}
 
       {showInvite ? (
-        <section className={cx(cardClass, "mb-7 p-5")} aria-labelledby="invite-create-title">
-          <h2 id="invite-create-title" className="text-lg font-light">{t("inviteTitle")}</h2>
+        <Dialog title={t("inviteTitle")} onClose={() => setShowInvite(false)} busy={busy || memberBusy}>
           <p className="mt-1 text-sm text-[var(--muted)]">{t("inviteBody")}</p>
 
           <form className="mt-4" onSubmit={inviteMember}>
@@ -322,7 +298,7 @@ export function GroupScreen({
           <div className="mt-5 border-t border-[var(--line)] pt-5">
             <span className={labelClass}>{t("inviteLinkLabel")}</span>
             <p className="text-sm text-[var(--muted)]">{t("inviteLinkBody")}</p>
-            <form className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-[1.2fr_1fr_1fr_auto]" onSubmit={createInvite}>
+            <form className="mt-3 grid gap-4 sm:grid-cols-2" onSubmit={createInvite}>
               <label><span className={labelClass}>{t("destinationLabel")}</span><select className={inputClass} name="challengeId" defaultValue=""><option value="">{t("destinationGroupOnly")}</option>{challenges.filter((challenge) => challenge.status === "active").map((challenge) => <option value={challenge.id} key={challenge.id}>{t("destinationChallenge", { title: challenge.title })}</option>)}</select></label>
               <label><span className={labelClass}>{t("expiresLabel")}</span><select className={inputClass} name="expiresInDays" defaultValue="7"><option value="1">{t("expires1")}</option><option value="7">{t("expires7")}</option><option value="30">{t("expires30")}</option></select></label>
               <label><span className={labelClass}>{t("maxUsesLabel")}</span><input className={inputClass} name="maxUses" type="number" min={1} max={100} defaultValue={1} /></label>
@@ -337,7 +313,8 @@ export function GroupScreen({
             ) : null}
             <div className="mt-3"><StatusMessage error={copyError} success={copySuccess} /></div>
           </div>
-        </section>
+          <div className="mt-5 flex justify-end"><Button variant="secondary" disabled={busy || memberBusy} onClick={() => setShowInvite(false)}>{tc("close")}</Button></div>
+        </Dialog>
       ) : null}
 
       <div className="grid gap-7">
