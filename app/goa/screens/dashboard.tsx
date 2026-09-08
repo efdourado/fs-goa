@@ -47,7 +47,7 @@ export function ArchiveChallengeRow({
   onOpen: () => void;
 }) {
   return (
-    <button className={cx(cardClass, "cursor-pointer flex items-center justify-between gap-3 p-4 text-left hover:border-[var(--main-line)]")} type="button" onClick={onOpen}>
+    <button className={cx(cardClass, "cursor-pointer flex items-center justify-between gap-3 p-4 text-left hover:border-[var(--muted)]")} type="button" onClick={onOpen}>
       <span className="flex items-center gap-2"><ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />{challenge.title}</span><span aria-hidden="true">→</span>
     </button>
   );
@@ -63,6 +63,8 @@ export function DashboardScreen({
   onOpenChallenge,
   onOpenAdmin,
   onCreateGroup,
+  onOpenPersonalSpace,
+  onCreatePersonalChallenge,
 }: {
   user: User;
   groups: GroupSummary[];
@@ -73,10 +75,13 @@ export function DashboardScreen({
   onOpenChallenge: (id: Id) => void;
   onOpenAdmin: (id: Id) => void;
   onCreateGroup: (name: string) => Promise<void>;
+  onOpenPersonalSpace: () => void;
+  onCreatePersonalChallenge: () => void;
 }) {
   const t = useTranslations("dashboard");
   const tc = useTranslations("common");
   const tr = useTranslations("roles");
+  const tPersonal = useTranslations("personalSpace");
   const f = useGoaFormat();
   const [showGroupForm, setShowGroupForm] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -85,6 +90,10 @@ export function DashboardScreen({
   const groupChallenges = challenges.filter((challenge) => !isPersonalChallenge(challenge, personalWorkspaceId));
   const active = groupChallenges.filter((challenge) => challenge.status === "active");
   const other = groupChallenges.filter((challenge) => challenge.status !== "active");
+
+  const personalChallenges = challenges.filter((challenge) => isPersonalChallenge(challenge, personalWorkspaceId));
+  const personalActive = personalChallenges.filter((challenge) => challenge.status === "active");
+  const personalOther = personalChallenges.filter((challenge) => challenge.status !== "active");
 
   const standardGroups = groups.filter((group) => group.kind !== "personal");
   const ownedGroups = standardGroups.filter((group) => group.role === "owner").length;
@@ -172,6 +181,31 @@ export function DashboardScreen({
           </div>
         ) : (
           <EmptyState title={t("noChallengesTitle")} description={t("noChallengesBody")} />
+        )}
+      </section>
+
+      <section className="mt-10" aria-labelledby="personal-title">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 id="personal-title" className="text-xl font-medium tracking-[-0.03em]">
+            <button type="button" onClick={onOpenPersonalSpace} className="cursor-pointer underline-offset-4 hover:underline">{tPersonal("title")}</button>
+          </h2>
+          <button type="button" className={cx(linkClass, "text-sm")} onClick={onCreatePersonalChallenge}>{tPersonal("create")}</button>
+        </div>
+        {personalChallenges.length ? (
+          <div className="space-y-4">
+            {personalActive.length ? (
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {personalActive.map((challenge) => <ActiveChallengeCard key={challenge.id} challenge={challenge} onOpen={onOpenChallenge} />)}
+              </div>
+            ) : null}
+            {personalOther.length ? (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {personalOther.map((challenge) => <ArchiveChallengeRow key={challenge.id} challenge={challenge} onOpen={() => openChallenge(challenge)} />)}
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <EmptyState title={tPersonal("emptyTitle")} description={tPersonal("emptyBody")} action={<Button onClick={onCreatePersonalChallenge}>{tPersonal("create")}</Button>} />
         )}
       </section>
 
