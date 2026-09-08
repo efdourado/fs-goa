@@ -222,12 +222,15 @@ export function DashboardScreen({
             {personalActive.length ? (
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {personalActive.map((challenge) => <ActiveChallengeCard key={challenge.id} challenge={challenge} onOpen={onOpenChallenge} />)}
+                {personalOther.length === 0 ? <AddTile label={tPersonal("create")} onClick={onCreatePersonalChallenge} /> : null}
               </div>
             ) : null}
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {personalOther.map((challenge) => <ArchiveChallengeRow key={challenge.id} challenge={challenge} onOpen={() => openChallenge(challenge)} />)}
-              <AddTile label={tPersonal("create")} onClick={onCreatePersonalChallenge} />
-            </div>
+            {personalOther.length ? (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {personalOther.map((challenge) => <ArchiveChallengeRow key={challenge.id} challenge={challenge} onOpen={() => openChallenge(challenge)} />)}
+                <AddTile label={tPersonal("create")} onClick={onCreatePersonalChallenge} />
+              </div>
+            ) : null}
           </div>
         ) : (
           <EmptyState title={tPersonal("emptyTitle")} description={tPersonal("emptyBody")} action={<Button onClick={onCreatePersonalChallenge}>{tPersonal("create")}</Button>} />
