@@ -3,10 +3,71 @@
 import { useTranslations } from "next-intl";
 import { type FormEvent, useState } from "react";
 
+import { Dialog } from "../dialog";
 import { useGoaFormat } from "../format";
 import type { ChallengeSummary, GroupSummary, Id, Limits, User } from "../types";
-import { Button, cardClass, challengeStatusTone, ChallengeStatusBadge, cx, EmptyState, inputClass, labelClass, linkClass, PageHeading, StatusMessage } from "../ui";
+import { Button, cardClass, challengeStatusTone, ChallengeStatusBadge, cx, EmptyState, inputClass, labelClass, PageHeading, StatusMessage } from "../ui";
 import { canManage, isChallengeScheduled, isLivingList, isPersonalChallenge } from "../utils";
+
+/**
+ * A slim dashed "+" tile at the end of a card grid — one more slot to fill. It
+ * stays narrow but stretches to the height of the card beside it (grid
+ * `align-self: stretch`), with a floor for when it starts a row on its own.
+ */
+function AddTile({ label, onClick, disabled = false }: { label: string; onClick: () => void; disabled?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      title={label}
+      className="grid min-h-14 w-14 shrink-0 cursor-pointer select-none place-items-center justify-self-start rounded-xl border border-dashed border-[var(--line)] text-2xl font-light leading-none text-[var(--muted)] transition hover:border-[var(--muted)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[var(--line)] disabled:hover:text-[var(--muted)]"
+    >
+      <span aria-hidden="true">+</span>
+    </button>
+  );
+}
+
+/** Group creation moved into a modal — the "+" tile in the groups grid opens it. */
+function GroupCreateDialog({ onClose, onCreate }: { onClose: () => void; onCreate: (name: string) => Promise<void> }) {
+  const t = useTranslations("dashboard");
+  const tc = useTranslations("common");
+  const f = useGoaFormat();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const name = String(new FormData(event.currentTarget).get("name") ?? "").trim();
+    if (!name) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await onCreate(name);
+      onClose();
+    } catch (cause) {
+      setError(f.error(cause));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog title={t("createGroup")} busy={busy} onClose={onClose}>
+      <form className="space-y-4" onSubmit={submit}>
+        <label className="block">
+          <span className={labelClass}>{t("groupNameLabel")}</span>
+          <input className={inputClass} name="name" placeholder={t("groupNamePlaceholder")} required maxLength={100} disabled={busy} />
+        </label>
+        <StatusMessage error={error} />
+        <div className="flex justify-end gap-3 border-t border-[var(--line)] pt-4">
+          <Button variant="secondary" type="button" disabled={busy} onClick={onClose}>{tc("cancel")}</Button>
+          <Button type="submit" disabled={busy}>{busy ? t("creating") : t("create")}</Button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
 
 export function ActiveChallengeCard({
   challenge,
@@ -79,13 +140,9 @@ export function DashboardScreen({
   onCreatePersonalChallenge: () => void;
 }) {
   const t = useTranslations("dashboard");
-  const tc = useTranslations("common");
   const tr = useTranslations("roles");
   const tPersonal = useTranslations("personalSpace");
-  const f = useGoaFormat();
-  const [showGroupForm, setShowGroupForm] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [showGroupDialog, setShowGroupDialog] = useState(false);
 
   const groupChallenges = challenges.filter((challenge) => !isPersonalChallenge(challenge, personalWorkspaceId));
   const active = groupChallenges.filter((challenge) => challenge.status === "active");
@@ -104,38 +161,12 @@ export function DashboardScreen({
     else onOpenChallenge(challenge.id);
   }
 
-  async function createGroup(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const name = String(new FormData(event.currentTarget).get("name") ?? "").trim();
-    if (!name) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await onCreateGroup(name);
-      setShowGroupForm(false);
-    } catch (cause) {
-      setError(f.error(cause));
-    } finally {
-      setBusy(false);
-    }
-  }
-
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
-      <PageHeading title={t("greeting", { name: user.name.split(" ")[0] })} description={t("subtitle")} action={atGroupLimit ? <span className="text-sm text-[var(--muted)]">{t("groupLimitReached", { limit: limits.groupsPerOwner })}</span> : <button type="button" className={cx(linkClass, "text-sm")} onClick={() => setShowGroupForm((open) => !open)}>{showGroupForm ? tc("close") : t("createGroupToggle", { limit: limits.groupsPerOwner })}</button>} />
+      <PageHeading title={t("greeting", { name: user.name.split(" ")[0] })} description={t("subtitle")} />
 
-      {showGroupForm ? (
-        <form className={cx(cardClass, "mb-7 grid gap-4 p-5 sm:grid-cols-[1fr_auto]")} onSubmit={createGroup}>
-          <label>
-            <span className={labelClass}>{t("groupNameLabel")}</span>
-            <input className={inputClass} name="name" placeholder={t("groupNamePlaceholder")} required maxLength={100} disabled={busy} />
-          </label>
-          <div className="flex items-end gap-2">
-            <Button type="submit" disabled={busy}>{busy ? t("creating") : t("create")}</Button>
-            <Button variant="ghost" onClick={() => setShowGroupForm(false)}>{tc("cancel")}</Button>
-          </div>
-          <div className="sm:col-span-2"><StatusMessage error={error} /></div>
-        </form>
+      {showGroupDialog ? (
+        <GroupCreateDialog onClose={() => setShowGroupDialog(false)} onCreate={onCreateGroup} />
       ) : null}
 
       <section aria-labelledby="groups-title">
@@ -158,15 +189,11 @@ export function DashboardScreen({
               </button>
             );
           })}
-          {standardGroups.length === 0 ? (
-            <button
-              type="button"
-              className="flex min-h-24 items-center justify-center rounded-2xl border border-dashed border-[var(--line)] p-4 text-center text-sm text-[var(--muted)] transition hover:border-[var(--muted)] hover:text-[var(--ink)]"
-              onClick={() => setShowGroupForm(true)}
-            >
-              {t("createGroup")}
-            </button>
-          ) : null}
+          <AddTile
+            label={atGroupLimit ? t("groupLimitReached", { limit: limits.groupsPerOwner }) : t("createGroup")}
+            onClick={() => setShowGroupDialog(true)}
+            disabled={atGroupLimit}
+          />
         </div>
       </section>
 
@@ -185,11 +212,10 @@ export function DashboardScreen({
       </section>
 
       <section className="mt-10" aria-labelledby="personal-title">
-        <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="mb-4 flex items-center justify-between">
           <h2 id="personal-title" className="text-xl font-medium tracking-[-0.03em]">
             <button type="button" onClick={onOpenPersonalSpace} className="cursor-pointer underline-offset-4 hover:underline">{tPersonal("title")}</button>
           </h2>
-          <button type="button" className={cx(linkClass, "text-sm")} onClick={onCreatePersonalChallenge}>{tPersonal("create")}</button>
         </div>
         {personalChallenges.length ? (
           <div className="space-y-4">
@@ -198,11 +224,10 @@ export function DashboardScreen({
                 {personalActive.map((challenge) => <ActiveChallengeCard key={challenge.id} challenge={challenge} onOpen={onOpenChallenge} />)}
               </div>
             ) : null}
-            {personalOther.length ? (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {personalOther.map((challenge) => <ArchiveChallengeRow key={challenge.id} challenge={challenge} onOpen={() => openChallenge(challenge)} />)}
-              </div>
-            ) : null}
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {personalOther.map((challenge) => <ArchiveChallengeRow key={challenge.id} challenge={challenge} onOpen={() => openChallenge(challenge)} />)}
+              <AddTile label={tPersonal("create")} onClick={onCreatePersonalChallenge} />
+            </div>
           </div>
         ) : (
           <EmptyState title={tPersonal("emptyTitle")} description={tPersonal("emptyBody")} action={<Button onClick={onCreatePersonalChallenge}>{tPersonal("create")}</Button>} />

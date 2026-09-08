@@ -228,7 +228,6 @@
     "greeting": "Hola, {name}.",
     "subtitle": "Lo que necesita tu atención hoy y tus grupos.",
     "groupLimitReached": "Alcanzaste el límite de {limit} grupos",
-    "createGroupToggle": "+ Grupo (límite: {limit})",
     "groupNameLabel": "Nombre del grupo",
     "groupNamePlaceholder": "Ej.: Club del Sofá",
     "creating": "Creando…",
