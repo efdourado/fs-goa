@@ -38,7 +38,16 @@ function ruleCount(row: Pick<TemplateRow, "rule_sections" | "rules">): number {
 export async function listTemplates() {
   return withClient(async (client) => {
     const rows = await client.query<TemplateRow>(
-      `SELECT c.id, c.title, c.description, c.template_summary AS summary,
+      // The gallery blurb is the showcase summary — the one the challenge admin
+      // curates below the headline in the Vitrine tab — falling back to any
+      // legacy publish-time note, then the plain description.
+      `SELECT c.id, c.title, c.description,
+              COALESCE(
+                (SELECT rb.body_snapshot FROM result_blocks rb
+                  WHERE rb.challenge_id = c.id AND rb.kind = 'text' AND rb.heading = 'summary'
+                    AND rb.body_snapshot <> '' LIMIT 1),
+                c.template_summary
+              ) AS summary,
               c.rules, c.rule_sections, c.start_date::text AS start_date,
               c.end_date::text AS end_date, c.published_as_template_at,
               (SELECT et.submission_mode FROM entry_types et
