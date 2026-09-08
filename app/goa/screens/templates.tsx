@@ -152,11 +152,11 @@ export function TemplatesScreen({
           {templates.map((template) => (
             <article
               key={template.id}
-              className="relative flex flex-col overflow-hidden rounded-[20px] border border-[var(--main-2)] bg-[var(--paper)] shadow-[var(--elevate-1)] transition hover:-translate-y-0.5 has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-[var(--main)]/25"
+              className="relative flex flex-col overflow-hidden rounded-[20px] border border-[var(--main-line)] bg-[var(--paper)] shadow-[var(--elevate-1)] transition hover:-translate-y-0.5 has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-[var(--main)]/25"
             >
               <div className="flex flex-1 flex-col p-5">
                 <div className="flex items-center justify-between gap-3">
-                  <span className="inline-block h-2.5 w-2.5 flex-none rounded-full bg-[var(--main-2)] ring-1 ring-inset ring-[var(--edge)]" aria-hidden="true" />
+                  <span className="inline-block h-2.5 w-2.5 flex-none rounded-full bg-[var(--main-line)] ring-1 ring-inset ring-[var(--edge)]" aria-hidden="true" />
                   <span className="text-xs text-[var(--muted)]">{t(`mode.${template.submissionMode}`)}</span>
                 </div>
                 <h3 className="mt-5 text-2xl font-light tracking-[-0.04em]">
@@ -169,7 +169,7 @@ export function TemplatesScreen({
                   {template.metricCount ? t("cardMetrics", { count: template.metricCount }) : ""}
                 </p>
               </div>
-              <span className="block w-full bg-[var(--main-2)] px-5 py-3.5" aria-hidden="true" />
+              <span className="block w-full bg-[var(--main-line)] px-5 py-3.5" aria-hidden="true" />
             </article>
           ))}
         </div>
