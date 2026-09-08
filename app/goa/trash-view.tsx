@@ -9,6 +9,23 @@ import { Button, cardClass, cx, EmptyState, LoadingView, StatusMessage } from ".
 
 type Scope = "personal" | { groupId: Id } | { challengeId: Id };
 
+type TrashResponse = { items?: TrashItem[]; structure?: TrashItem[]; entries?: TrashItem[] };
+
+export function trashRows(scope: "personal" | "group" | "challenge", data: TrashResponse): TrashItem[] {
+  if (scope !== "challenge") return data.items ?? [];
+  return [...(data.structure ?? []), ...(data.entries ?? [])];
+}
+
+export function TrashLoadState({ loading, error, onRetry }: {
+  loading: boolean; error: string | null; onRetry: () => void;
+}) {
+  const t = useTranslations("trash");
+  const tc = useTranslations("common");
+  if (error) return <div className="space-y-3"><StatusMessage error={error} /><Button variant="secondary" onClick={onRetry}>{tc("retry")}</Button></div>;
+  if (loading) return <LoadingView label={t("loading")} />;
+  return <EmptyState title={t("emptyTitle")} description={t("emptyBody")} />;
+}
+
 function scopeListPath(scope: Scope): string {
   if (scope === "personal") return API_PATHS.personalTrash;
   if ("groupId" in scope) return API_PATHS.groupTrash(scope.groupId);
@@ -145,35 +162,38 @@ export function TrashView({
 }) {
   const t = useTranslations("trash");
   const [items, setItems] = useState<TrashItem[] | null>(null);
-  const [structure, setStructure] = useState<TrashItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<{ preview: TrashActionPreview } | null>(null);
   const [dialogBusy, setDialogBusy] = useState(false);
   const [dialogError, setDialogError] = useState<string | null>(null);
+  const requestRef = useRef<AbortController | null>(null);
 
   const listPath = scopeListPath(scope);
+  const listKind = scope === "personal" ? "personal" : "groupId" in scope ? "group" : "challenge";
 
   const load = useCallback(() => {
+    requestRef.current?.abort();
     const controller = new AbortController();
-    apiRequest<{ items?: TrashItem[]; structure?: TrashItem[]; entries?: TrashItem[] }>(listPath, { signal: controller.signal })
+    requestRef.current = controller;
+    setError(null);
+    setItems(null);
+    apiRequest<TrashResponse>(listPath, { signal: controller.signal })
       .then((data) => {
-        if ("groupId" in (scope as object) || scope === "personal") {
-          setItems(data.items ?? []);
-        } else {
-          setStructure([...(data.structure ?? []), ...(data.entries ?? [])]);
-          setItems(null);
-        }
+        if (controller.signal.aborted) return;
+        setItems(trashRows(listKind, data));
       })
       .catch((cause) => {
-        if ((cause as Error).name !== "AbortError") setError((cause as Error).message || t("loadError"));
+        if (!controller.signal.aborted) setError((cause as Error).message || t("loadError"));
       });
-    return () => controller.abort();
-  }, [listPath, scope, t]);
+    return () => requestRef.current?.abort();
+  }, [listPath, listKind, t]);
 
+  // Reset the previous request's state when the remote scope changes.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(load, [load]);
 
-  const rows = items ?? structure ?? [];
+  const rows = items ?? [];
 
   async function restore(item: TrashItem) {
     setBusyId(item.id);
@@ -224,8 +244,7 @@ export function TrashView({
     }
   }
 
-  if (items === null && structure === null && !error) return <LoadingView label={t("loading")} />;
-  if (!rows.length) return <EmptyState title={t("emptyTitle")} description={t("emptyBody")} />;
+  if (!rows.length) return <TrashLoadState loading={items === null} error={error} onRetry={load} />;
 
   return (
     <div className="space-y-3">
