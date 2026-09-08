@@ -11,24 +11,35 @@ export function Dialog({ title, children, onClose, busy = false }: {
   title: string; children: ReactNode; onClose: () => void; busy?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const downOnBackdrop = useRef(false);
   const titleId = useId();
-  const t = useTranslations("common");
   useEffect(() => {
     const dialog = ref.current;
     const opener = document.activeElement as HTMLElement | null;
     dialog?.showModal();
     return () => { dialog?.close(); opener?.focus(); };
   }, []);
+  // Light dismiss: a press that both starts and ends on the backdrop (the dialog
+  // element itself, never its content) closes it. The mousedown guard keeps a
+  // text drag that slips past the edge from counting as a backdrop click.
+  // Escape is already handled by onCancel, so the keyboard path is covered.
+  /* eslint-disable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/click-events-have-key-events */
   return (
-    <dialog ref={ref} aria-labelledby={titleId} onCancel={(event) => { event.preventDefault(); if (!busy) onClose(); }}
-      className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-xl overflow-y-auto rounded-3xl border border-[var(--line)] bg-[var(--paper)] p-0 text-[var(--ink)] shadow-2xl backdrop:bg-black/45">
+    <dialog
+      ref={ref}
+      aria-labelledby={titleId}
+      onCancel={(event) => { event.preventDefault(); if (!busy) onClose(); }}
+      onMouseDown={(event) => { downOnBackdrop.current = event.target === ref.current; }}
+      onClick={(event) => { if (!busy && downOnBackdrop.current && event.target === ref.current) onClose(); }}
+      className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-xl overflow-y-auto rounded-3xl border border-[var(--line)] bg-[var(--paper)] p-0 text-[var(--ink)] shadow-2xl backdrop:bg-black/45"
+    >
       <div className="flex items-start justify-between gap-4 border-b border-[var(--line)] px-6 py-5">
         <h2 id={titleId} className="text-xl font-medium tracking-tight">{title}</h2>
-        <button type="button" onClick={onClose} disabled={busy} className="min-h-11 px-2 text-sm text-[var(--muted)] disabled:opacity-50">{t("cancel")}</button>
       </div>
       <div className="p-6">{children}</div>
     </dialog>
   );
+  /* eslint-enable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/click-events-have-key-events */
 }
 
 /**
