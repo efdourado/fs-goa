@@ -153,11 +153,73 @@ function PreflightPanel({ challengeId, onReady }: { challengeId: Id; onReady: (r
   );
 }
 
+/**
+ * Platform-admin only — the sole place to list a challenge in the public
+ * `/modelos` gallery or take it down, and to adjust its blurb. A challenge
+ * admin who is not a platform admin never sees this section.
+ */
+function TemplatePublishSection({ challenge, onPublish, onUnpublish }: {
+  challenge: ChallengeDetail;
+  onPublish: (summary: string) => Promise<void>;
+  onUnpublish: () => Promise<void>;
+}) {
+  const t = useTranslations("adminChallenge");
+  const tc = useTranslations("common");
+  const f = useGoaFormat();
+  const [summary, setSummary] = useState(challenge.templateSummary ?? "");
+  const [busy, setBusy] = useState<"publish" | "unpublish" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const published = Boolean(challenge.publishedAsTemplate);
+
+  async function run(kind: "publish" | "unpublish", action: () => Promise<void>, ok: string) {
+    setBusy(kind);
+    setError(null);
+    setSuccess(null);
+    try {
+      await action();
+      setSuccess(ok);
+    } catch (cause) {
+      setError(f.error(cause));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <section className="border-t border-[var(--line)] pt-10">
+      <h2 className="text-lg font-medium tracking-tight">{t("platformTemplateTitle")}</h2>
+      <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{t("platformTemplateHint")}</p>
+      {published ? (
+        <div className="mt-4 grid gap-3 sm:max-w-xl">
+          <p className="text-sm text-[var(--ok)]">{t("platformTemplateOn")}</p>
+          <label>
+            <span className={labelClass}>{t("summaryLabel")}</span>
+            <textarea className={inputClass} rows={2} value={summary} onChange={(event) => setSummary(event.target.value)} maxLength={280} placeholder={challenge.description ?? ""} />
+          </label>
+          <div className="flex flex-wrap gap-3">
+            <Button variant="secondary" disabled={busy !== null} onClick={() => void run("publish", () => onPublish(summary.trim()), t("platformTemplateSaved"))}>{busy === "publish" ? tc("saving") : tc("saveChanges")}</Button>
+            <Button variant="danger" disabled={busy !== null} onClick={() => void run("unpublish", onUnpublish, t("platformTemplateRemoved"))}>{busy === "unpublish" ? tc("saving") : t("platformTemplateUnpublish")}</Button>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-4">
+          <Button disabled={busy !== null} onClick={() => void run("publish", () => onPublish(summary.trim()), t("platformTemplatePublished"))}>{busy === "publish" ? tc("saving") : t("platformTemplatePublish")}</Button>
+        </div>
+      )}
+      <StatusMessage error={error} success={success} />
+    </section>
+  );
+}
+
 function AdminOverview({
   challenge,
   onSave,
   onTransition,
   onDuplicate,
+  isPlatformAdmin,
+  onPublishTemplate,
+  onUnpublishTemplate,
   duplicateTargets,
   onDelete,
 }: {
@@ -165,6 +227,9 @@ function AdminOverview({
   onSave: (payload: Partial<ChallengeSummary>) => Promise<void>;
   onTransition: (status: "active" | "closed") => Promise<void>;
   onDuplicate: (payload: { title: string; targetGroupId: Id }) => Promise<void>;
+  isPlatformAdmin: boolean;
+  onPublishTemplate: (summary: string) => Promise<void>;
+  onUnpublishTemplate: () => Promise<void>;
   duplicateTargets: DuplicateTargetGroup[];
   onDelete?: () => Promise<void>;
 }) {
@@ -310,7 +375,10 @@ function AdminOverview({
           <div className="mb-1"><Button type="submit" variant="secondary" disabled={busy === "duplicate" || !duplicateTargetGroupId || !availableTargets.length}>{busy === "duplicate" ? t("reuseCreating") : t("reuseSubmit")}</Button></div>
         </form> : <div className="mt-5 rounded-2xl border border-dashed border-[var(--line)] bg-[var(--wash)]/60 p-5"><strong className="text-sm">{t("reuseNoneTitle")}</strong><p className="mt-1 text-sm leading-6 text-[var(--muted)]">{t("reuseNoneBody")}</p></div>}
       </section>
-      
+
+      {isPlatformAdmin ? (
+        <TemplatePublishSection challenge={challenge} onPublish={onPublishTemplate} onUnpublish={onUnpublishTemplate} />
+      ) : null}
 
       {!livingList && challenge.status === "draft" ? (
         <PreflightPanel challengeId={challenge.id} onReady={setPreflightReady} />
@@ -1317,6 +1385,9 @@ export function AdminScreen({
   onSaveBasics,
   onTransition,
   onDuplicate,
+  isPlatformAdmin = false,
+  onPublishTemplate,
+  onUnpublishTemplate,
   duplicateTargets,
   onDelete,
   onSaveParticipants,
@@ -1352,6 +1423,9 @@ export function AdminScreen({
   onSaveBasics: (payload: Partial<ChallengeSummary>) => Promise<void>;
   onTransition: (status: "active" | "closed") => Promise<void>;
   onDuplicate: (payload: { title: string; targetGroupId: Id }) => Promise<void>;
+  isPlatformAdmin?: boolean;
+  onPublishTemplate: (summary: string) => Promise<void>;
+  onUnpublishTemplate: () => Promise<void>;
   duplicateTargets: DuplicateTargetGroup[];
   onDelete?: () => Promise<void>;
   onSaveParticipants: (ids: Id[]) => Promise<void>;
@@ -1400,7 +1474,7 @@ export function AdminScreen({
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><button className={backLinkClass} type="button" onClick={onBack}>{t("back")}</button><div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={onViewParticipant}>{t("simulateAsParticipant")}</Button></div></div>
       <PageHeading title={challenge.title} description={t("subtitle")} action={<ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />} />
       <nav className="mb-8 flex gap-1 overflow-x-auto rounded-2xl bg-[var(--wash-strong)]/70 p-1" aria-label={t("tabsAria")}>{tabs.map((id) => <button className={cx("min-h-11 flex-none rounded-xl px-4 text-sm font-light", activeTab === id ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]")} type="button" onClick={() => onTab(id)} key={id}>{t(`tabs.${id}`)}</button>)}</nav>
-      {activeTab === "overview" ? <AdminOverview challenge={challenge} onSave={onSaveBasics} onTransition={onTransition} onDuplicate={onDuplicate} duplicateTargets={duplicateTargets} onDelete={onDelete} /> : null}
+      {activeTab === "overview" ? <AdminOverview challenge={challenge} onSave={onSaveBasics} onTransition={onTransition} onDuplicate={onDuplicate} isPlatformAdmin={isPlatformAdmin} onPublishTemplate={onPublishTemplate} onUnpublishTemplate={onUnpublishTemplate} duplicateTargets={duplicateTargets} onDelete={onDelete} /> : null}
       {activeTab === "participants" ? <AdminParticipants key={`${challenge.id}:${challenge.participants.map((participant) => participant.userId ?? participant.id).join(",")}`} challenge={challenge} group={group} onSave={onSaveParticipants} /> : null}
       {activeTab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.visibilityPolicy}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} onSaveVisibility={onSaveEntryTypeVisibility} onSetExpectation={onSetExpectation} /> : null}
       {activeTab === "items" ? <AdminItems challenge={challenge} group={group} entries={entries} onAdd={onAddItems} onUpdate={onUpdateItem} onArchive={onArchiveItem} onPreviewImport={onPreviewImport} /> : null}

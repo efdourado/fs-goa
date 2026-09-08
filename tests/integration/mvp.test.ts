@@ -961,6 +961,16 @@ test("modelos públicos: publica, lista, detalha sem sessão e duplica para um g
   });
   assert.equal(refusedPublish.response.status, 403, "quem não é platform admin não publica modelos");
 
+  // Even an admin OF THE CHALLENGE, if not a platform admin, cannot touch the gallery.
+  const challengeAdmin = await register("Admin do Desafio", "admin_desafio_modelo");
+  const adminInvite = (await call("POST", `/api/groups/${groupId}/invites`, { session: adminSession, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
+  await call("POST", `/api/invites/${adminInvite.token}`, { session: challengeAdmin, body: {} });
+  await call("PATCH", `/api/groups/${groupId}/members/${challengeAdmin.user.id}`, { session: adminSession, body: { role: "admin" } });
+  const refusedByChallengeAdmin = await call("POST", `/api/challenges/${challengeId}/template`, {
+    session: challengeAdmin, body: {},
+  });
+  assert.equal(refusedByChallengeAdmin.response.status, 403, "admin do desafio sem ser admin da plataforma não publica modelo");
+
   const published = await call("POST", `/api/challenges/${challengeId}/template`, {
     session: adminSession,
     body: { summary: "Um cine clube pronto para começar." },

@@ -22,6 +22,8 @@ interface ChallengeAccessRow {
   role: GroupRole;
   is_participant: boolean;
   results_published_at: Date | null;
+  published_as_template_at: Date | null;
+  template_summary: string | null;
   group_kind: "standard" | "personal";
 }
 
@@ -46,7 +48,7 @@ export async function challengeAccess(
                 SELECT 1 FROM challenge_participants cp
                  WHERE cp.challenge_id = c.id AND cp.user_id = $2 AND cp.removed_at IS NULL
               ) AS is_participant,
-              c.results_published_at
+              c.results_published_at, c.published_as_template_at, c.template_summary
          FROM challenges c
          JOIN groups g ON g.id = c.group_id AND g.deleted_at IS NULL AND g.archived_at IS NULL
          JOIN group_members gm ON gm.group_id = c.group_id

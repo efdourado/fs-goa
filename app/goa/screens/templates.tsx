@@ -1,14 +1,13 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 
 import { API_PATHS, apiRequest } from "../api";
 import { useGoaFormat } from "../format";
 import { SettingsMenu } from "../SettingsMenu";
 import type {
   ChallengeDetail,
-  ChallengeSummary,
   GroupSummary,
   Id,
   TemplateSummary,
@@ -38,37 +37,19 @@ function PublicChrome({ user, onSignIn, children }: { user: User | null; onSignI
 
 export function TemplatesScreen({
   user,
-  manageableChallenges,
   onOpen,
   onBack,
   onSignIn,
-  csrfToken,
-  onChanged,
 }: {
   user: User | null;
-  manageableChallenges: ChallengeSummary[];
   onOpen: (challengeId: Id) => void;
   onBack: () => void;
   onSignIn: () => void;
-  csrfToken: string;
-  onChanged: () => void;
 }) {
   const t = useTranslations("templates");
   const f = useGoaFormat();
   const [templates, setTemplates] = useState<TemplateSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [adminBusy, setAdminBusy] = useState(false);
-  const [adminError, setAdminError] = useState<string | null>(null);
-  const [adminSuccess, setAdminSuccess] = useState<string | null>(null);
-
-  async function load() {
-    try {
-      const response = await apiRequest<{ templates: TemplateSummary[] }>(API_PATHS.templates);
-      setTemplates(response.templates);
-    } catch (cause) {
-      setError(f.error(cause));
-    }
-  }
 
   useEffect(() => {
     const controller = new AbortController();
@@ -81,65 +62,10 @@ export function TemplatesScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const publishedIds = useMemo(() => new Set((templates ?? []).map((template) => template.id)), [templates]);
-  const canPublish = Boolean(user?.platformAdmin);
-  const publishable = canPublish
-    ? manageableChallenges.filter((challenge) => !publishedIds.has(challenge.id))
-    : [];
-
-  async function publish(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const data = new FormData(form);
-    const challengeId = String(data.get("challengeId") ?? "");
-    const summary = String(data.get("summary") ?? "").trim();
-    if (!challengeId) return;
-    setAdminBusy(true);
-    setAdminError(null);
-    setAdminSuccess(null);
-    try {
-      await apiRequest(API_PATHS.challengeTemplate(challengeId), {
-        method: "POST",
-        body: summary ? { summary } : {},
-        csrfToken,
-      });
-      setAdminSuccess(t("published"));
-      form.reset();
-      await load();
-      onChanged();
-    } catch (cause) {
-      setAdminError(f.error(cause));
-    } finally {
-      setAdminBusy(false);
-    }
-  }
-
   const body = (
     <main className="mx-auto max-w-7xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
       <button className={cx(backLinkClass, "mb-6")} type="button" onClick={onBack}>{t("back")}</button>
       <PageHeading title={t("title")} description={t("subtitle")} />
-
-      {canPublish ? (
-        <section className={cx(cardClass, "mb-8 p-5")} aria-labelledby="publish-template-title">
-          <h2 id="publish-template-title" className="text-lg font-light">{t("publishTitle")}</h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">{t("publishBody")}</p>
-          <form className="mt-4 grid gap-4 sm:grid-cols-[1fr_1.4fr_auto]" onSubmit={publish}>
-            <label><span className={labelClass}>{t("publishChallengeLabel")}</span>
-              <select className={inputClass} name="challengeId" defaultValue="" required>
-                <option value="" disabled>{t("publishChoose")}</option>
-                {publishable.map((challenge) => (
-                  <option key={challenge.id} value={challenge.id}>{challenge.title}</option>
-                ))}
-              </select>
-            </label>
-            <label><span className={labelClass}>{t("publishSummaryLabel")}</span>
-              <input className={inputClass} name="summary" maxLength={280} placeholder={t("publishSummaryPlaceholder")} />
-            </label>
-            <div className="flex items-end"><Button type="submit" disabled={adminBusy || !publishable.length}>{adminBusy ? t("publishing") : t("publish")}</Button></div>
-          </form>
-          <div className="mt-3"><StatusMessage error={adminError} success={adminSuccess} /></div>
-        </section>
-      ) : null}
 
       <div className="mt-2"><StatusMessage error={error} /></div>
 

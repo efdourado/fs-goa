@@ -151,6 +151,8 @@ export interface DetailChallengeRow {
   recipe_key: string | null;
   group_kind: string | null;
   results_anon: boolean;
+  published_as_template_at?: string | Date | null;
+  template_summary?: string | null;
 }
 
 type ParticipantRow = { id: string; display_name: string; username: string; name_consent: boolean };
@@ -242,6 +244,8 @@ export async function buildChallengeDetail(
     scope: ch.group_kind === "personal" ? "personal" : "group",
     collectsEntryDate: recipeCollectsEntryDate(ch.recipe_key),
     resultsAnon: ch.results_anon,
+    publishedAsTemplate: ch.published_as_template_at != null,
+    templateSummary: ch.template_summary ?? null,
     submissionMode,
     completionEntryTypeId,
     viewerRole: viewer.role,
