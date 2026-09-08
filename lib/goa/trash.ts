@@ -569,7 +569,18 @@ async function listBinScope(client: PoolClient, scopeType: "personal" | "group",
   for (const r of rows.rows) {
     const row = await locate(client, r.entity_kind, r.entity_id).catch(() => null);
     if (!row) continue;
-    out.push(await annotate(client, row, r));
+    // One malformed row must never blank the whole bin — the point of the bin is
+    // that everything in it stays recoverable. Fall back to a bare, restorable
+    // entry if the annotation queries throw.
+    try {
+      out.push(await annotate(client, row, r));
+    } catch {
+      out.push({
+        kind: row.kind, id: row.id, label: row.label,
+        deletedAt: r.deleted_at, deletedBy: r.deleted_by, reason: r.reason,
+        dependencies: [], parentTrashed: false, blocked: null,
+      });
+    }
   }
   return out;
 }
@@ -593,7 +604,16 @@ export async function personalTrash(session: SessionContext) {
     );
     for (const r of ownedGroups.rows) {
       const row = await locate(client, "group", r.entity_id).catch(() => null);
-      if (row) items.unshift(await annotate(client, row, r));
+      if (!row) continue;
+      try {
+        items.unshift(await annotate(client, row, r));
+      } catch {
+        items.unshift({
+          kind: row.kind, id: row.id, label: row.label,
+          deletedAt: r.deleted_at, deletedBy: r.deleted_by, reason: r.reason,
+          dependencies: [], parentTrashed: false, blocked: null,
+        });
+      }
     }
     return { scope: "personal" as const, items };
   });
