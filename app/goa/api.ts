@@ -49,6 +49,10 @@ export const API_PATHS = {
       : typeof scope === "object" && "challengeId" in scope
         ? `/api/challenges/${encodeURIComponent(scope.challengeId)}/trash/purge`
         : "/api/personal/trash/purge",
+  trashEmpty: (scope: "personal" | { groupId: Id }) =>
+    typeof scope === "object" && "groupId" in scope
+      ? `/api/groups/${encodeURIComponent(scope.groupId)}/trash/empty`
+      : "/api/personal/trash/empty",
   templates: "/api/templates",
   template: (challengeId: Id) => `/api/templates/${encodeURIComponent(challengeId)}`,
   templateDuplicate: (challengeId: Id) => `/api/templates/${encodeURIComponent(challengeId)}/duplicate`,

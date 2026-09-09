@@ -1358,6 +1358,13 @@
     "confirmName": "Escribe {name} para confirmar",
     "confirmCount": "Escribe {count} para confirmar que se borrarán {count} registros",
     "reasonLabel": "Motivo (eliminación administrativa)",
+    "empty": "Vaciar la papelera",
+    "emptyConfirmTitle": "¿Vaciar la papelera?",
+    "emptyConfirmBody": "Todo lo que está en la papelera se eliminará para siempre. Esto no se puede deshacer. Lo que aún no se pueda eliminar se queda aquí.",
+    "emptyConfirm": "Eliminar todo",
+    "emptying": "Vaciando…",
+    "emptyError": "No se pudo vaciar la papelera.",
+    "emptyKept": "{count, plural, one {# ítem no se pudo eliminar y quedó en la papelera.} other {# ítems no se pudieron eliminar y quedaron en la papelera.}}",
     "kind": {
       "group": "Grupo",
       "challenge": "Desafío",

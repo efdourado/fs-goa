@@ -24,6 +24,7 @@ import {
 } from "@/lib/admin";
 import {
   challengeArchive,
+  emptyBin,
   groupTrash,
   personalTrash,
   previewTrashAction,
@@ -277,6 +278,12 @@ export async function POST(request: Request): Promise<Response> {
         (path[0] === "groups" && path[2] === "trash" && path[3] === "purge" && path.length === 4) ||
         (path[0] === "challenges" && path[2] === "trash" && path[3] === "purge" && path.length === 4)) {
       return json(await purgeTrashItem(session, body));
+    }
+    if (isPath(path, "personal", "trash", "empty")) {
+      return json(await emptyBin(session, "personal"));
+    }
+    if (path[0] === "groups" && path[2] === "trash" && path[3] === "empty" && path.length === 4) {
+      return json(await emptyBin(session, { groupId: path[1] }));
     }
 
     if (isPath(path, "groups")) return json(await createGroup(session, body), 201);

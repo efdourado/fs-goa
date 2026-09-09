@@ -1358,6 +1358,13 @@
     "confirmName": "Digite {name} para confirmar",
     "confirmCount": "Digite {count} para confirmar que {count} registros serão apagados",
     "reasonLabel": "Motivo (exclusão administrativa)",
+    "empty": "Esvaziar a lixeira",
+    "emptyConfirmTitle": "Esvaziar a lixeira?",
+    "emptyConfirmBody": "Tudo o que está na lixeira será excluído para sempre. Isto não pode ser desfeito. O que ainda não puder ser excluído continua aqui.",
+    "emptyConfirm": "Excluir tudo",
+    "emptying": "Esvaziando…",
+    "emptyError": "Não foi possível esvaziar a lixeira.",
+    "emptyKept": "{count, plural, one {# item não pôde ser excluído e continua na lixeira.} other {# itens não puderam ser excluídos e continuam na lixeira.}}",
     "kind": {
       "group": "Grupo",
       "challenge": "Desafio",

@@ -4246,6 +4246,42 @@ test("lixeira: exclusão permanente mostra os alvos, exige a contagem e some de 
   assert.ok(audit.rows.some((r) => r.action === "challenge.purged"), "a purga fica no log operacional sem conteúdo");
 });
 
+test("lixeira: esvaziar apaga tudo de uma vez, registra no log e exige owner/admin", async () => {
+  const owner = await register("Dona Esvazia", "dona_esvazia_v1");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube Esvazia" } })).body as { id: string }).id;
+  const mk = async (title: string) =>
+    ((await call("POST", `/api/groups/${groupId}/challenges`, {
+      session: owner,
+      body: { recipe: "cinema", title, participantIds: [owner.user.id], items: [{ title: "Filme" }] },
+    })).body as { id: string }).id;
+  const a = await mk("Rascunho A");
+  const b = await mk("Rascunho B");
+  await call("DELETE", `/api/challenges/${a}`, { session: owner });
+  await call("DELETE", `/api/challenges/${b}`, { session: owner });
+
+  const before = (await call("GET", `/api/groups/${groupId}/trash`, { session: owner })).body as { items: Array<{ id: string }> };
+  assert.equal(before.items.length, 2, "dois desafios na lixeira");
+
+  // A non-admin stranger cannot empty someone else's group bin.
+  const stranger = await register("Estranho Esvazia", "estranho_esvazia_v1");
+  assert.ok(
+    [403, 404].includes((await call("POST", `/api/groups/${groupId}/trash/empty`, { session: stranger, body: {} })).response.status),
+  );
+
+  const empty = await call("POST", `/api/groups/${groupId}/trash/empty`, { session: owner, body: {} });
+  assert.equal(empty.response.status, 200, JSON.stringify(empty.body));
+  assert.deepEqual(empty.body, { emptied: true, purged: 2, skipped: 0 });
+
+  const after = (await call("GET", `/api/groups/${groupId}/trash`, { session: owner })).body as { items: unknown[] };
+  assert.deepEqual(after.items, [], "a lixeira fica vazia");
+  const gone = await adminPool.query("SELECT 1 FROM challenges WHERE id = ANY($1::text[])", [[a, b]]);
+  assert.equal(gone.rowCount, 0, "as linhas somem de vez");
+  const purged = await adminPool.query<{ action: string }>(
+    "SELECT action FROM system_audit_events WHERE entity_kind='challenge'",
+  );
+  assert.ok(purged.rows.some((r) => r.action === "challenge.purged"), "a purga fica no log operacional");
+});
+
 test("lixeira: um item de catálogo usado por um desafio fechado é arquivado, não pode ser apagado", async () => {
   const owner = await register("Dona Acervo", "dona_acervo_bin");
   const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Cineclube Acervo" } })).body as { id: string }).id;

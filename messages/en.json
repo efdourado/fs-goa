@@ -1358,6 +1358,13 @@
     "confirmName": "Type {name} to confirm",
     "confirmCount": "Type {count} to confirm that {count} records will be deleted",
     "reasonLabel": "Reason (administrative deletion)",
+    "empty": "Empty the bin",
+    "emptyConfirmTitle": "Empty the bin?",
+    "emptyConfirmBody": "Everything in the bin will be deleted for good. This cannot be undone. Anything that still can't be deleted stays here.",
+    "emptyConfirm": "Delete everything",
+    "emptying": "Emptying…",
+    "emptyError": "Could not empty the bin.",
+    "emptyKept": "{count, plural, one {# item could not be deleted and stayed in the bin.} other {# items could not be deleted and stayed in the bin.}}",
     "kind": {
       "group": "Group",
       "challenge": "Challenge",

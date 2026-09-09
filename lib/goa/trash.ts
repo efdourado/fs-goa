@@ -813,6 +813,72 @@ export async function purgeTrashItem(session: SessionContext, body: Record<strin
   });
 }
 
+/**
+ * "Esvaziar a lixeira" — one gesture that permanently deletes every bin item in
+ * a scope. The gesture itself is the confirmation, so the per-item name/count
+ * tiers are skipped; anything a `permanentGuard` still blocks (a published
+ * template, a closed challenge's frozen entry) is left in the bin and reported.
+ * Runs in a single transaction — all or nothing.
+ */
+export async function emptyBin(session: SessionContext, scope: "personal" | { groupId: string }) {
+  return inTransaction(async (client) => {
+    let targets: Array<{ kind: BinKind; id: string }> = [];
+    if (scope === "personal") {
+      const wsIds = await personalWorkspaceIds(client, session.user.id);
+      if (!wsIds.length) throw new ApiError(404, "not_found", "Espaço pessoal não encontrado.");
+      const scoped = await client.query<{ entity_kind: BinKind; entity_id: string }>(
+        `SELECT entity_kind, entity_id FROM trash_items
+          WHERE scope_type='personal' AND scope_id = ANY($1::text[]) AND entity_kind NOT IN ('entry','group')`,
+        [wsIds],
+      );
+      const groups = await client.query<{ entity_id: string }>(
+        `SELECT ti.entity_id FROM trash_items ti JOIN groups g ON g.id = ti.entity_id
+          WHERE ti.entity_kind='group' AND g.owner_user_id=$1`,
+        [session.user.id],
+      );
+      targets = [
+        ...scoped.rows.map((r) => ({ kind: r.entity_kind, id: r.entity_id })),
+        ...groups.rows.map((r) => ({ kind: "group" as const, id: r.entity_id })),
+      ];
+    } else {
+      await requireGroupRole(session.user.id, scope.groupId, ["owner", "admin"], client);
+      const scoped = await client.query<{ entity_kind: BinKind; entity_id: string }>(
+        `SELECT entity_kind, entity_id FROM trash_items
+          WHERE scope_type='group' AND scope_id=$1 AND entity_kind NOT IN ('entry','group')`,
+        [scope.groupId],
+      );
+      targets = scoped.rows.map((r) => ({ kind: r.entity_kind, id: r.entity_id }));
+    }
+
+    // Purge groups last: destroying a group cascades its challenges and catalogue
+    // items, which would 404 a separately-binned child mid-loop.
+    targets.sort((a, b) => Number(a.kind === "group") - Number(b.kind === "group"));
+
+    let purged = 0;
+    const skipped: Array<{ kind: BinKind; code: string }> = [];
+    for (const target of targets) {
+      const row = await locate(client, target.kind, target.id).catch(() => null);
+      if (!row) { purged += 1; continue; } // already gone via a parent's cascade
+      if (target.kind === "group") {
+        const owns = await oneOrNull<{ id: string }>(client,
+          "SELECT id FROM groups WHERE id=$1 AND owner_user_id=$2", [target.id, session.user.id]);
+        if (!owns) { skipped.push({ kind: target.kind, code: "not_owner" }); continue; }
+      }
+      const blocked = await permanentGuard(client, row);
+      if (blocked) { skipped.push({ kind: target.kind, code: blocked.code }); continue; }
+      const counts = await applyPurge(client, row);
+      await writeSystemAudit(client, session.user.id, `${row.kind}.purged`, row.kind, row.id, { ...counts, via: "empty_bin" });
+      purged += 1;
+    }
+    console.warn("trash.emptyBin", {
+      actor: session.user.username,
+      scope: scope === "personal" ? "personal" : scope.groupId,
+      purged, skipped: skipped.length,
+    });
+    return { emptied: true, purged, skipped: skipped.length };
+  });
+}
+
 const ARCHIVE_TABLE: Record<ArchiveKind, string> = {
   challenge_item: "challenge_items",
   checkpoint: "challenge_checkpoints",

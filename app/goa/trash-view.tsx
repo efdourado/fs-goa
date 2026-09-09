@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { API_PATHS, apiRequest } from "./api";
+import { ConfirmDialog } from "./dialog";
 import type { Id, TrashActionPreview, TrashItem } from "./types";
 import { Button, cardClass, cx, EmptyState, LoadingView, StatusMessage } from "./ui";
 
@@ -167,7 +168,13 @@ export function TrashView({
   const [dialog, setDialog] = useState<{ preview: TrashActionPreview } | null>(null);
   const [dialogBusy, setDialogBusy] = useState(false);
   const [dialogError, setDialogError] = useState<string | null>(null);
+  const [emptyOpen, setEmptyOpen] = useState(false);
+  const [kept, setKept] = useState<number | null>(null);
   const requestRef = useRef<AbortController | null>(null);
+
+  const emptyScope = scope === "personal" || "groupId" in scope
+    ? (scope as "personal" | { groupId: Id })
+    : null;
 
   const listPath = scopeListPath(scope);
   const listKind = scope === "personal" ? "personal" : "groupId" in scope ? "group" : "challenge";
@@ -244,11 +251,38 @@ export function TrashView({
     }
   }
 
-  if (!rows.length) return <TrashLoadState loading={items === null} error={error} onRetry={load} />;
+  async function emptyBin() {
+    if (!emptyScope) return;
+    const result = await apiRequest<{ purged: number; skipped: number }>(
+      API_PATHS.trashEmpty(emptyScope), { method: "POST", csrfToken, body: {} },
+    );
+    setEmptyOpen(false);
+    setKept(result.skipped > 0 ? result.skipped : null);
+    setError(null);
+    load();
+    onChanged?.();
+  }
+
+  if (!rows.length) {
+    return (
+      <div className="space-y-3">
+        {kept != null ? <p className="text-xs text-[var(--muted)]">{t("emptyKept", { count: kept })}</p> : null}
+        <TrashLoadState loading={items === null} error={error} onRetry={load} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3">
       <StatusMessage error={error} />
+      {kept != null ? <p className="text-xs text-[var(--muted)]">{t("emptyKept", { count: kept })}</p> : null}
+      {emptyScope ? (
+        <div className="flex justify-end">
+          <Button variant="ghost" onClick={() => setEmptyOpen(true)} disabled={busyId !== null}>
+            {t("empty")}
+          </Button>
+        </div>
+      ) : null}
       <ul className={cx(cardClass, "divide-y divide-[var(--line)] overflow-hidden")}>
         {rows.map((item) => {
           const sentence = dependencySentence(item, t);
@@ -286,6 +320,17 @@ export function TrashView({
           error={dialogError}
           onConfirm={confirmPurge}
           onCancel={() => setDialog(null)}
+        />
+      ) : null}
+      {emptyOpen ? (
+        <ConfirmDialog
+          title={t("emptyConfirmTitle")}
+          body={t("emptyConfirmBody")}
+          confirmLabel={t("emptyConfirm")}
+          busyLabel={t("emptying")}
+          danger
+          onConfirm={emptyBin}
+          onClose={() => setEmptyOpen(false)}
         />
       ) : null}
     </div>
