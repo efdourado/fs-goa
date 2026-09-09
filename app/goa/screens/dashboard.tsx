@@ -357,7 +357,6 @@ export function ArchiveChallengeRow({
       {challenge.colorTag ? <span className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: `var(--tag-${challenge.colorTag})` }} aria-hidden="true" /> : null}
       <ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />
       <span className="min-w-0 flex-1 truncate">{challenge.title}</span>
-      <span aria-hidden="true" className="flex-none text-[var(--muted)]">→</span>
     </button>
   );
 }

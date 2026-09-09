@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useRef } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { cx } from "./ui";
 
@@ -23,6 +23,21 @@ export function Shelf({
   children: ReactNode;
 }) {
   const railRef = useRef<HTMLDivElement>(null);
+  // The right-edge fade only means something while there is more to scroll to —
+  // it disappears once the rail is at (or near) its end, or fits without scrolling.
+  const [showFade, setShowFade] = useState(false);
+
+  function updateFade() {
+    const rail = railRef.current;
+    setShowFade(rail ? rail.scrollWidth - rail.clientWidth - rail.scrollLeft > 4 : false);
+  }
+
+  // Re-check after every render (children can change) and on viewport resize.
+  useEffect(updateFade);
+  useEffect(() => {
+    window.addEventListener("resize", updateFade);
+    return () => window.removeEventListener("resize", updateFade);
+  }, []);
 
   function nudge(direction: -1 | 1) {
     const rail = railRef.current;
@@ -60,6 +75,7 @@ export function Shelf({
       <div className="relative">
         <div
           ref={railRef}
+          onScroll={updateFade}
           className={cx(
             "flex gap-4 overflow-x-auto overflow-y-visible pb-3 pt-1",
             "snap-x snap-proximity [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
@@ -67,7 +83,10 @@ export function Shelf({
         >
           {children}
         </div>
-        <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-14 bg-gradient-to-r from-transparent to-[var(--canvas)] sm:block" />
+        <div className={cx(
+          "pointer-events-none absolute inset-y-0 right-0 hidden w-14 bg-gradient-to-r from-transparent to-[var(--canvas)] transition-opacity duration-200 sm:block",
+          showFade ? "opacity-100" : "opacity-0",
+        )} />
       </div>
     </section>
   );
