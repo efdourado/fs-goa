@@ -3,7 +3,6 @@
 import { useTranslations } from "next-intl";
 import { type DragEvent, type FormEvent, type ReactNode, useRef, useState } from "react";
 
-import { AddTile } from "../add-tile";
 import { API_PATHS, apiRequest } from "../api";
 import { Dialog } from "../dialog";
 import { useGoaFormat } from "../format";
@@ -81,7 +80,7 @@ export function applyColorFilter(
 
 // ── group-create dialog ─────────────────────────────────────────────────
 
-/** Group creation lives in a modal — the "+" tile in the groups shelf opens it. */
+/** Group creation lives in a modal — the "+ New group" button in the groups shelf header opens it. */
 function GroupCreateDialog({ onClose, onCreate }: { onClose: () => void; onCreate: (name: string) => Promise<void> }) {
   const t = useTranslations("dashboard");
   const tc = useTranslations("common");
@@ -118,6 +117,20 @@ function GroupCreateDialog({ onClose, onCreate }: { onClose: () => void; onCreat
         </div>
       </form>
     </Dialog>
+  );
+}
+
+/** A small dashed "+ new…" pill that sits in a shelf header, not in the rail. */
+function ShelfAddButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-full border border-dashed border-[var(--line)] px-3 text-xs text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)]"
+    >
+      <span aria-hidden="true" className="text-sm leading-none">+</span>
+      {label}
+    </button>
   );
 }
 
@@ -336,11 +349,15 @@ export function ArchiveChallengeRow({
   onOpen: () => void;
 }) {
   return (
-    <button className={cx(cardClass, "relative flex shrink-0 snap-start items-center gap-2.5 overflow-hidden px-4 py-3.5 text-left text-sm hover:border-[var(--muted)]")} type="button" onClick={onOpen}>
+    <button
+      type="button"
+      onClick={onOpen}
+      className={cx(cardClass, "relative flex w-[78vw] max-w-[19rem] shrink-0 snap-start items-center gap-2.5 overflow-hidden px-4 py-4 text-left text-sm hover:border-[var(--muted)] sm:w-[19rem]")}
+    >
       {challenge.colorTag ? <span className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: `var(--tag-${challenge.colorTag})` }} aria-hidden="true" /> : null}
       <ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />
-      <span className="whitespace-nowrap">{challenge.title}</span>
-      <span aria-hidden="true" className="text-[var(--muted)]">→</span>
+      <span className="min-w-0 flex-1 truncate">{challenge.title}</span>
+      <span aria-hidden="true" className="flex-none text-[var(--muted)]">→</span>
     </button>
   );
 }
@@ -493,6 +510,7 @@ export function DashboardScreen({
   };
   const filteredCount = filtered.pinned.length + filtered.running.length + filtered.space.length + filtered.archive.length;
   const hasAnyChallenge = challenges.length > 0;
+  const brandNew = !hasAnyChallenge && !standardGroups.length;
 
   function renderRail(shelfKey: ShelfKey, list: ChallengeSummary[]): ReactNode {
     return list.map((challenge) => (
@@ -563,57 +581,73 @@ export function DashboardScreen({
 
       <StatusMessage error={error} />
 
-      {filtered.pinned.length ? (
-        <Shelf title={t("shelf.pinned")} count={filtered.pinned.length}>
-          {renderRail("pinned", filtered.pinned)}
-        </Shelf>
-      ) : null}
-
-      <Shelf title={t("shelf.running")} count={filtered.running.length}>
-        {filtered.running.length
-          ? renderRail("running", filtered.running)
-          : <EmptyState title={t("noChallengesTitle")} description={colorFilter ? t("filter.empty") : t("noChallengesBody")} />}
-      </Shelf>
-
-      <Shelf title={tPersonal("title")} count={filtered.space.length} onTitleClick={onOpenPersonalSpace}>
-        {renderRail("space", filtered.space)}
-        {!colorFilter ? <AddTile label={tPersonal("create")} onClick={onCreatePersonalChallenge} /> : null}
-      </Shelf>
-
-      {!colorFilter ? (
-        <Shelf title={t("groupsTitle")} count={standardGroups.length}>
-          {standardGroups.map((group) => {
-            const count = group.memberCount ?? group.members?.length ?? 0;
-            return (
-              <button
-                key={group.id}
-                type="button"
-                onClick={() => onOpenGroup(group.id)}
-                className={cx(cardClass, "flex w-[68vw] max-w-[16rem] shrink-0 snap-start flex-col justify-center gap-1 p-4 text-left transition hover:-translate-y-0.5 hover:border-[var(--muted)] sm:w-[16rem]")}
-              >
-                <span className="text-sm">{group.name}</span>
-                <small className="text-[var(--muted)]">{t("peopleCount", { count })} · {tr(group.role)}</small>
-              </button>
-            );
-          })}
-          {!atGroupLimit ? <AddTile label={t("createGroup")} onClick={() => setShowGroupDialog(true)} /> : null}
-        </Shelf>
-      ) : null}
-
-      {filtered.archive.length ? (
-        <Shelf title={t("archiveTitle")} count={filtered.archive.length}>
-          {filtered.archive.map((challenge) => (
-            <ArchiveChallengeRow key={challenge.id} challenge={challenge} onOpen={() => openChallenge(challenge)} />
-          ))}
-        </Shelf>
-      ) : null}
-
-      {!hasAnyChallenge && !standardGroups.length ? (
+      {brandNew ? (
         <EmptyState
           title={t("emptyGroupsTitle")}
           description={t.rich("emptyGroupsCreatePrompt", { action: (chunks) => <EmptyStateAction onClick={() => setShowGroupDialog(true)}>{chunks}</EmptyStateAction> })}
+          action={<Button variant="secondary" onClick={onCreatePersonalChallenge}>{tPersonal("create")}</Button>}
         />
       ) : null}
+
+      {brandNew ? null : (
+        <>
+          {filtered.pinned.length ? (
+            <Shelf title={t("shelf.pinned")} count={filtered.pinned.length}>
+              {renderRail("pinned", filtered.pinned)}
+            </Shelf>
+          ) : null}
+
+          <Shelf title={t("shelf.running")} count={filtered.running.length}>
+            {filtered.running.length
+              ? renderRail("running", filtered.running)
+              : <div className="w-full max-w-xl"><EmptyState title={t("noChallengesTitle")} description={colorFilter ? t("filter.empty") : t("noChallengesBody")} /></div>}
+          </Shelf>
+
+          <Shelf
+            title={tPersonal("title")}
+            count={filtered.space.length}
+            onTitleClick={onOpenPersonalSpace}
+            actions={colorFilter ? undefined : <ShelfAddButton label={t("shelfAdd.personal")} onClick={onCreatePersonalChallenge} />}
+          >
+            {filtered.space.length
+              ? renderRail("space", filtered.space)
+              : <div className="w-full max-w-xl"><EmptyState title={tPersonal("emptyTitle")} description={colorFilter ? t("filter.empty") : tPersonal("emptyBody")} /></div>}
+          </Shelf>
+
+          {colorFilter ? null : (
+            <Shelf
+              title={t("groupsTitle")}
+              count={standardGroups.length}
+              actions={atGroupLimit ? undefined : <ShelfAddButton label={t("shelfAdd.group")} onClick={() => setShowGroupDialog(true)} />}
+            >
+              {standardGroups.length
+                ? standardGroups.map((group) => {
+                    const count = group.memberCount ?? group.members?.length ?? 0;
+                    return (
+                      <button
+                        key={group.id}
+                        type="button"
+                        onClick={() => onOpenGroup(group.id)}
+                        className={cx(cardClass, "flex min-h-[5.5rem] w-[78vw] max-w-[19rem] shrink-0 snap-start flex-col justify-center gap-1 p-4 text-left transition hover:-translate-y-0.5 hover:border-[var(--muted)] sm:w-[19rem]")}
+                      >
+                        <span className="text-sm">{group.name}</span>
+                        <small className="text-[var(--muted)]">{t("peopleCount", { count })} · {tr(group.role)}</small>
+                      </button>
+                    );
+                  })
+                : <div className="w-full max-w-xl"><EmptyState title={t("emptyGroupsTitle")} description={t("emptyGroupsShort")} /></div>}
+            </Shelf>
+          )}
+
+          {filtered.archive.length ? (
+            <Shelf title={t("archiveTitle")} count={filtered.archive.length}>
+              {filtered.archive.map((challenge) => (
+                <ArchiveChallengeRow key={challenge.id} challenge={challenge} onOpen={() => openChallenge(challenge)} />
+              ))}
+            </Shelf>
+          ) : null}
+        </>
+      )}
     </main>
   );
 }

@@ -308,7 +308,12 @@
       "open": "Abrir",
       "manage": "Gerenciar"
     },
-    "prefError": "Não foi possível salvar sua preferência."
+    "prefError": "Não foi possível salvar sua preferência.",
+    "shelfAdd": {
+      "personal": "Novo desafio",
+      "group": "Novo grupo"
+    },
+    "emptyGroupsShort": "Você ainda não está em nenhum grupo."
   },
   "group": {
     "emptyCreatePrompt": "Escolha um modelo e prepare a 1ª edição clicando <action>aqui</action>.",

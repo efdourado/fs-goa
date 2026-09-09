@@ -308,7 +308,12 @@
       "open": "Abrir",
       "manage": "Gestionar"
     },
-    "prefError": "No se pudo guardar tu preferencia."
+    "prefError": "No se pudo guardar tu preferencia.",
+    "shelfAdd": {
+      "personal": "Nuevo desafío",
+      "group": "Nuevo grupo"
+    },
+    "emptyGroupsShort": "Aún no estás en ningún grupo."
   },
   "group": {
     "emptyCreatePrompt": "Elige una plantilla y prepara la 1.ª edición haciendo clic <action>aquí</action>.",

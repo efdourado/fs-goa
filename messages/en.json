@@ -308,7 +308,12 @@
       "open": "Open",
       "manage": "Manage"
     },
-    "prefError": "Could not save your preference."
+    "prefError": "Could not save your preference.",
+    "shelfAdd": {
+      "personal": "New challenge",
+      "group": "New group"
+    },
+    "emptyGroupsShort": "You're not in any groups yet."
   },
   "group": {
     "emptyCreatePrompt": "Pick a preset and set up the 1st edition by clicking <action>here</action>.",
