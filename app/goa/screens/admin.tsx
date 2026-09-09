@@ -160,7 +160,7 @@ function AdminOverview({
             <input className={inputClass} value={title} onChange={(event) => setTitle(event.target.value)} required maxLength={140} />
           </Field>
 
-          <Field label={t("scheduleLegend")}>
+          <Field label={t("scheduleLegend")} plain>
             {livingList ? (
               <p className="rounded-xl bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{t("livingListBody")}</p>
             ) : (
@@ -191,7 +191,7 @@ function AdminOverview({
               <Field label={t("descriptionLabel")} optional>
                 <textarea className={inputClass} rows={3} value={description} onChange={(event) => setDescription(event.target.value)} maxLength={1000} disabled={locked} />
               </Field>
-              <Field label={t("rulesLabel")} hint={t("rulesHint")} optional>
+              <Field label={t("rulesLabel")} hint={t("rulesHint")} optional plain>
                 <RuleSectionsEditor value={ruleSections} onChange={setRuleSections} disabled={locked} />
               </Field>
             </div>

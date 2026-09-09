@@ -242,7 +242,7 @@ export function Field({
   hint,
   error,
   optional,
-  htmlFor,
+  plain = false,
   className,
   children,
 }: {
@@ -250,27 +250,29 @@ export function Field({
   hint?: ReactNode;
   error?: string | null;
   optional?: boolean;
-  htmlFor?: string;
+  /** Render as a plain `<div>` instead of a `<label>` — for a group of controls (a card picker, a sub-widget) that shouldn't all bind to one caption. */
+  plain?: boolean;
   className?: string;
   children: ReactNode;
 }) {
   const t = useTranslations("common");
+  const Wrapper = plain ? "div" : "label";
   return (
-    <div className={cx("flex flex-col gap-1.5", className)}>
+    <Wrapper className={cx("flex flex-col gap-1.5", className)}>
       {label ? (
-        <label className="text-[13px] font-medium text-[var(--ink)]" htmlFor={htmlFor}>
+        <span className="text-[13px] font-medium text-[var(--ink)]">
           {label}{optional ? <span className="font-normal text-[var(--muted)]"> · {t("optional")}</span> : null}
-        </label>
+        </span>
       ) : null}
-      {hint ? <p className="-mt-0.5 text-xs leading-5 text-[var(--muted)]">{hint}</p> : null}
+      {hint ? <span className="-mt-0.5 block text-xs leading-5 text-[var(--muted)]">{hint}</span> : null}
       {children}
       {error ? (
-        <p className="flex items-center gap-1.5 text-xs text-[var(--danger-strong)]">
+        <span className="flex items-center gap-1.5 text-xs text-[var(--danger-strong)]">
           <CircleExclamationIcon className="h-3.5 w-3.5 flex-none" />
           {error}
-        </p>
+        </span>
       ) : null}
-    </div>
+    </Wrapper>
   );
 }
 
