@@ -858,7 +858,7 @@
     "loadError": "No se pudo hacer la revisión.",
     "fixFirst": "{count, plural, one {# punto para corregir antes de activar} other {# puntos para corregir antes de activar}}",
     "worthReviewing": "{count, plural, one {# punto que vale revisar} other {# puntos que vale revisar}}",
-    "allReady": "Todo listo — puedes activar.",
+    "allReady": "Todo listo.",
     "readyWithWarnings": "Nada impide la activación, pero los avisos de arriba merecen una mirada.",
     "codes": {
       "no_participants": "El desafío no tiene participantes.",

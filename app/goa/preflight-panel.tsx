@@ -12,11 +12,10 @@ export interface PreflightReport { ready: boolean; errors: PreflightIssue[]; war
 
 type MarkerKind = "error" | "warning" | "ok";
 
-/** Circle-minus for a blocker, plain circle for a note, circle-check when ready. One per group, y-centred. */
+/** Circle-minus for a blocker, plain circle for a note, circle-check when ready. Inherits the message colour. */
 function Marker({ kind }: { kind: MarkerKind }) {
-  const tone = kind === "error" ? "text-[var(--danger)]" : kind === "warning" ? "text-[var(--warn-strong)]" : "text-[var(--ok-strong)]";
   return (
-    <svg viewBox="0 0 24 24" className={cx("size-4 flex-none", tone)} fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+    <svg viewBox="0 0 24 24" className="mt-1 size-4 flex-none" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
       <circle cx="12" cy="12" r="9" />
       {kind === "error" ? <path d="M8.5 12h7" strokeLinecap="round" /> : null}
       {kind === "ok" ? <path d="M8.5 12.3l2.4 2.4 4.6-5" strokeLinecap="round" strokeLinejoin="round" /> : null}
@@ -24,7 +23,7 @@ function Marker({ kind }: { kind: MarkerKind }) {
   );
 }
 
-/** One preflight group — a single y-centred marker beside the count headline and its issues. */
+/** One preflight group — a marker beside the count headline and its issues, same palette as StatusMessage. */
 function PreflightGroup({ heading, issues, kind, label }: {
   heading: string;
   issues: PreflightIssue[];
@@ -32,11 +31,14 @@ function PreflightGroup({ heading, issues, kind, label }: {
   label: (issue: PreflightIssue) => string;
 }) {
   return (
-    <div className={cx("flex items-center gap-3 rounded-2xl border p-4", kind === "error" ? "border-[var(--danger)]/40 bg-[var(--danger-soft)]" : "border-[var(--warn-line)]/50 bg-[var(--warn-soft)]")}>
+    <div className={cx(
+      "flex items-start gap-2 rounded-xl border px-4 py-3 text-sm",
+      kind === "error" ? "border-[var(--danger-line)] bg-[var(--danger-soft)] text-[var(--danger-strong)]" : "border-[var(--warn-line)] bg-[var(--warn-soft)] text-[var(--warn-strong)]",
+    )}>
       <Marker kind={kind} />
-      <div className="min-w-0">
-        <p className={cx("text-sm font-medium", kind === "error" ? "text-[var(--danger)]" : "text-[var(--warn-strong)]")}>{heading}</p>
-        <ul className="mt-1 space-y-1 text-sm">
+      <div className="min-w-0 flex-1">
+        <p className="font-medium">{heading}</p>
+        <ul className="mt-1.5 space-y-1 text-xs leading-5">
           {issues.map((issue, index) => <li key={`${issue.code}-${index}`}>{label(issue)}</li>)}
         </ul>
       </div>
@@ -89,7 +91,7 @@ export function PreflightPanel({ challengeId, onReady }: { challengeId: Id; onRe
             <PreflightGroup heading={t("worthReviewing", { count: report.warnings.length })} issues={report.warnings} kind="warning" label={label} />
           ) : null}
           {report.ready && !report.warnings.length ? (
-            <p className="flex items-center gap-3 rounded-2xl border border-[var(--ok-line)]/40 bg-[var(--ok-soft)] p-4 text-sm font-medium text-[var(--ok-strong)]"><Marker kind="ok" /><span>{t("allReady")}</span></p>
+            <p className="flex items-start gap-2 rounded-xl border border-[var(--ok-line)] bg-[var(--ok-soft)] px-4 py-3 text-sm font-medium text-[var(--ok)]"><Marker kind="ok" /><span>{t("allReady")}</span></p>
           ) : null}
           {report.ready && report.warnings.length ? (
             <p className="text-xs text-[var(--muted)]">{t("readyWithWarnings")}</p>

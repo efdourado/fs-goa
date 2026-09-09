@@ -858,7 +858,7 @@
     "loadError": "Couldn't run the review.",
     "fixFirst": "{count, plural, one {# thing to fix before activating} other {# things to fix before activating}}",
     "worthReviewing": "{count, plural, one {# thing worth reviewing} other {# things worth reviewing}}",
-    "allReady": "Everything's ready — you can activate.",
+    "allReady": "Everything's ready.",
     "readyWithWarnings": "Nothing blocks activation, but the notes above are worth a look.",
     "codes": {
       "no_participants": "The challenge has no participants.",
