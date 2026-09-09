@@ -28,8 +28,8 @@ import {
   DragDotsIcon,
   EmptyState,
   EmptyStateAction,
+  Field,
   inputClass,
-  labelClass,
   PageHeading,
   StatusMessage,
 } from "../ui";
@@ -105,11 +105,10 @@ function GroupCreateDialog({ onClose, onCreate }: { onClose: () => void; onCreat
 
   return (
     <Dialog title={t("createGroup")} busy={busy} onClose={onClose}>
-      <form className="space-y-4" onSubmit={submit}>
-        <label className="block">
-          <span className={labelClass}>{t("groupNameLabel")}</span>
+      <form className="space-y-5" onSubmit={submit}>
+        <Field label={t("groupNameLabel")}>
           <input className={inputClass} name="name" placeholder={t("groupNamePlaceholder")} required maxLength={100} disabled={busy} />
-        </label>
+        </Field>
         <StatusMessage error={error} />
         <div className="flex justify-end gap-3 border-t border-[var(--line)] pt-4">
           <Button variant="secondary" type="button" disabled={busy} onClick={onClose}>{tc("cancel")}</Button>

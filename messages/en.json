@@ -1057,7 +1057,8 @@
     "fieldNamePlaceholder": "e.g. Pages read",
     "fieldTypeSr": "Field type",
     "add": "Add",
-    "requiredHint": "Blocks the entry while it's left blank."
+    "requiredHint": "Blocks the entry while it's left blank.",
+    "ratingFixed": "Fixed scale: 0 to 5, half steps."
   },
   "templates": {
     "signIn": "Sign in",

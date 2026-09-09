@@ -25,21 +25,30 @@ test("ConfirmDialog renders the explanation and a danger confirm button", () => 
   assert.match(html, /<dialog/);
 });
 
-test("FieldEditorDialog shows the type-specific config for a rating field", () => {
+test("FieldEditorDialog shows the type-specific config for a number field", () => {
   const html = renderWithIntl(createElement(FieldEditorDialog, {
-    field: { key: "nota", label: "Nota", type: "rating", required: true, config: { min: 0, max: 5, step: 0.5 } },
+    field: { key: "paginas", label: "Páginas", type: "number", required: true, config: { step: 1 } },
     takenKeys: [],
     lockType: false,
     onCancel: () => undefined,
     onSave: noop,
   }));
   assert.match(html, /Editar campo/);
-  assert.match(html, /value="Nota"/);
-  // rating → min / max / step inputs from FieldConfigInputs
+  assert.match(html, /value="Páginas"/);
+  // number → min / max / step inputs from FieldConfigInputs
   assert.match(html, /Mínimo/);
   assert.match(html, /Máximo/);
   assert.match(html, /Intervalo/);
   assert.match(html, /Salvar alterações/);
+});
+
+test("FieldEditorDialog notes that a rating scale is fixed", () => {
+  const html = renderWithIntl(createElement(FieldEditorDialog, {
+    field: { key: "nota", label: "Nota", type: "rating", required: true, config: { min: 0, max: 5, step: 0.5 } },
+    takenKeys: [], lockType: false, onCancel: () => undefined, onSave: noop,
+  }));
+  assert.match(html, /Escala fixa/);
+  assert.doesNotMatch(html, /Mínimo/);
 });
 
 test("FieldEditorDialog in add mode has no field and a create action", () => {

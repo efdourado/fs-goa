@@ -1057,7 +1057,8 @@
     "fieldNamePlaceholder": "Ej.: Páginas leídas",
     "fieldTypeSr": "Tipo del campo",
     "add": "Agregar",
-    "requiredHint": "Bloquea el registro mientras esté vacío."
+    "requiredHint": "Bloquea el registro mientras esté vacío.",
+    "ratingFixed": "Escala fija: 0 a 5, con medio punto."
   },
   "templates": {
     "signIn": "Entrar",

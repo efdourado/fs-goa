@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import { type FormEvent, useState } from "react";
 
 import type { ChallengeField, CreatableRecipeKey, FieldConfig, FieldType } from "./types";
-import { Button, EmptyState, inputClass, labelClass } from "./ui";
+import { Button, EmptyState, Field, inputClass, labelClass, Toggle } from "./ui";
 import { slugify } from "./utils";
 
 export const FIELD_TYPES: FieldType[] = ["text", "number", "rating", "select", "boolean", "date"];
@@ -88,25 +88,31 @@ export function FieldConfigInputs({
 }) {
   const t = useTranslations("fields");
   const patchConfig = (patch: Partial<FieldConfig>) => onChange({ config: { ...field.config, ...patch } });
-  if (field.type === "rating" || field.type === "number") {
+  if (field.type === "rating") {
+    // A rating's bounds are fixed (0–5, half steps) — nothing to configure.
+    return <p className="text-xs leading-5 text-[var(--muted)]">{t("ratingFixed")}</p>;
+  }
+  if (field.type === "number") {
     return (
       <div className="grid grid-cols-3 gap-3">
-        <label><span className={labelClass}>{t("min")}</span><input className={inputClass} type="number" step="any" value={field.config?.min ?? ""} disabled={field.type === "rating"} onChange={(event) => patchConfig({ min: event.target.value === "" ? undefined : Number(event.target.value) })} /></label>
-        <label><span className={labelClass}>{t("max")}</span><input className={inputClass} type="number" step="any" value={field.config?.max ?? ""} disabled={field.type === "rating"} onChange={(event) => patchConfig({ max: event.target.value === "" ? undefined : Number(event.target.value) })} /></label>
-        <label><span className={labelClass}>{t("step")}</span><input className={inputClass} type="number" step="any" min="0.01" value={field.config?.step ?? 1} disabled={field.type === "rating"} onChange={(event) => patchConfig({ step: Number(event.target.value) || 1 })} /></label>
+        <Field label={t("min")}><input className={inputClass} type="number" step="any" value={field.config?.min ?? ""} onChange={(event) => patchConfig({ min: event.target.value === "" ? undefined : Number(event.target.value) })} /></Field>
+        <Field label={t("max")}><input className={inputClass} type="number" step="any" value={field.config?.max ?? ""} onChange={(event) => patchConfig({ max: event.target.value === "" ? undefined : Number(event.target.value) })} /></Field>
+        <Field label={t("step")}><input className={inputClass} type="number" step="any" min="0.01" value={field.config?.step ?? 1} onChange={(event) => patchConfig({ step: Number(event.target.value) || 1 })} /></Field>
       </div>
     );
   }
   if (field.type === "select") {
     return (
-      <label className="block"><span className={labelClass}>{t("optionsLabel")}</span><input className={inputClass} value={(field.config?.options ?? []).filter((option) => !option.archived).map((option) => option.label).join(", ")} onChange={(event) => patchConfig({ options: event.target.value.split(",").map((option) => ({ label: option.trim(), value: slugify(option) })) })} placeholder={t("optionsPlaceholder")} /></label>
+      <Field label={t("optionsLabel")} hint={t("optionsPlaceholder")}>
+        <input className={inputClass} value={(field.config?.options ?? []).filter((option) => !option.archived).map((option) => option.label).join(", ")} onChange={(event) => patchConfig({ options: event.target.value.split(",").map((option) => ({ label: option.trim(), value: slugify(option) })) })} placeholder={t("optionsPlaceholder")} />
+      </Field>
     );
   }
   if (field.type === "text") {
     return (
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="flex min-h-12 items-center gap-2 rounded-xl border border-[var(--line)] px-3 text-sm font-medium"><input type="checkbox" checked={field.config?.multiline ?? false} onChange={(event) => patchConfig({ multiline: event.target.checked })} />{t("multiline")}</label>
-        <label><span className={labelClass}>{t("maxLength")}</span><input className={inputClass} type="number" min={1} max={5000} value={field.config?.maxLength ?? 280} onChange={(event) => patchConfig({ maxLength: Number(event.target.value) || 280 })} /></label>
+      <div className="space-y-3">
+        <Toggle checked={field.config?.multiline ?? false} onChange={(next) => patchConfig({ multiline: next })} label={t("multiline")} />
+        <Field label={t("maxLength")}><input className={inputClass} type="number" min={1} max={5000} value={field.config?.maxLength ?? 280} onChange={(event) => patchConfig({ maxLength: Number(event.target.value) || 280 })} /></Field>
       </div>
     );
   }
