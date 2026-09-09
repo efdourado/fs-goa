@@ -16,7 +16,7 @@ type MarkerKind = "error" | "warning" | "ok";
 function Marker({ kind }: { kind: MarkerKind }) {
   const tone = kind === "error" ? "text-[var(--danger)]" : kind === "warning" ? "text-[var(--warn-strong)]" : "text-[var(--ok-strong)]";
   return (
-    <svg viewBox="0 0 24 24" className={cx("size-5 flex-none", tone)} fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+    <svg viewBox="0 0 24 24" className={cx("size-4 flex-none", tone)} fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
       <circle cx="12" cy="12" r="9" />
       {kind === "error" ? <path d="M8.5 12h7" strokeLinecap="round" /> : null}
       {kind === "ok" ? <path d="M8.5 12.3l2.4 2.4 4.6-5" strokeLinecap="round" strokeLinejoin="round" /> : null}

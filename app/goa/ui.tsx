@@ -113,13 +113,13 @@ export function StatusMessage({
   return (
     <div
       className={cx(
-        "flex items-start gap-2 rounded-xl border px-4 py-3 text-sm",
+        "flex items-center gap-2 rounded-xl border px-4 py-3 text-sm",
         error ? "border-[var(--danger-line)] bg-[var(--danger-soft)] text-[var(--danger-strong)]" : "border-[var(--ok-line)] bg-[var(--ok-soft)] text-[var(--ok)]",
       )}
       role={error ? "alert" : "status"}
       aria-live="polite"
     >
-      {error ? <CircleExclamationIcon className="mt-0.5 h-4 w-4 flex-none" /> : <CircleCheckIcon className="mt-0.5 h-4 w-4 flex-none" />}
+      {error ? <CircleExclamationIcon className="h-4 w-4 flex-none" /> : <CircleCheckIcon className="h-4 w-4 flex-none" />}
       <span className="flex-1">{message}</span>
       <button
         type="button"
