@@ -1146,19 +1146,29 @@ export function AdminScreen({
   ];
   const requestedTab = tab === "participants" ? "overview" : tab;
   const activeTab = tabs.includes(requestedTab) ? requestedTab : "overview";
-  const primaryTabs: AdminTab[] = ["overview", "review", "results"];
-  const technicalTabs = tabs.filter((id) => !primaryTabs.includes(id) && id !== "participants");
+  // One row. Overview / Review / Showcase are always there; the edit tabs
+  // (Fields, Items, Schedule, Metrics) slot in between Review and Showcase when
+  // "More options" is open. Showcase (results) always stays last.
+  const technicalTabs: AdminTab[] = [
+    "fields", "items",
+    ...(showCheckpoints ? (["checkpoints"] as const) : []),
+    "metrics",
+  ];
   const technicalOpen = showTechnical || technicalTabs.includes(activeTab);
+  const navTabs: AdminTab[] = [
+    "overview", "review",
+    ...(technicalOpen ? technicalTabs : []),
+    "results",
+  ];
   return (
     <main className={cx("mx-auto px-4 py-6 pb-24 sm:px-6 sm:py-10", activeTab === "results" ? "max-w-[1440px]" : "max-w-5xl")}>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><button className={backLinkClass} type="button" onClick={onBack}>{t("back")}</button><div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={onViewParticipant}>{t("simulateAsParticipant")}</Button><ChallengeActions challenge={challenge} duplicateTargets={duplicateTargets} onDuplicate={onDuplicate} onDelete={onDelete} onTransition={onTransition} isPlatformAdmin={isPlatformAdmin} onPublishTemplate={onPublishTemplate} onUnpublishTemplate={onUnpublishTemplate} onPublish={onPublishResult} onUnpublish={onUnpublishResult} /></div></div>
       <PageHeading title={challenge.title} description={t("subtitle")} action={<ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />} />
       <nav className="mb-8 border-b border-[var(--line)]" aria-label={t("tabsAria")}>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex gap-1">{primaryTabs.map((id) => <button key={id} type="button" aria-current={activeTab === id ? "page" : undefined} onClick={() => onTab(id)} className={cx("min-h-12 border-b-2 px-4 text-sm font-medium transition", activeTab === id ? "border-[var(--main-strong)] text-[var(--main-strong)]" : "border-transparent text-[var(--muted)] hover:text-[var(--ink)]")}>{t(`tabs.${id}`)}</button>)}</div>
-          <button type="button" aria-expanded={technicalOpen} aria-controls="management-technical-tabs" className="min-h-11 px-3 text-sm text-[var(--muted)] hover:text-[var(--ink)]" onClick={() => { if (technicalTabs.includes(activeTab)) onTab("overview"); setShowTechnical(!technicalOpen); }}>{tx(technicalOpen ? "fewerOptions" : "moreOptions")}</button>
+        <div className="flex flex-wrap items-center gap-1">
+          {navTabs.map((id) => <button key={id} type="button" aria-current={activeTab === id ? "page" : undefined} onClick={() => onTab(id)} className={cx("min-h-12 border-b-2 px-4 text-sm font-medium transition", activeTab === id ? "border-[var(--main-strong)] text-[var(--main-strong)]" : "border-transparent text-[var(--muted)] hover:text-[var(--ink)]")}>{t(`tabs.${id}`)}</button>)}
+          <button type="button" aria-expanded={technicalOpen} className="ml-1 min-h-11 px-3 text-sm text-[var(--muted)] hover:text-[var(--ink)]" onClick={() => { if (technicalTabs.includes(activeTab)) onTab("overview"); setShowTechnical(!technicalOpen); }}>{tx(technicalOpen ? "fewerOptions" : "moreOptions")}</button>
         </div>
-        {technicalOpen ? <div id="management-technical-tabs" className="flex flex-wrap gap-2 border-t border-[var(--line)] py-3">{technicalTabs.map((id) => <button key={id} type="button" aria-current={activeTab === id ? "page" : undefined} onClick={() => onTab(id)} className={cx("min-h-11 rounded-xl px-4 text-sm", activeTab === id ? "bg-[var(--main-soft)] text-[var(--main-strong)]" : "text-[var(--muted)] hover:bg-[var(--wash)]")}>{t(`tabs.${id}`)}</button>)}</div> : null}
       </nav>
       {activeTab === "overview" ? <div className="space-y-12"><AdminOverview challenge={challenge} onSave={onSaveBasics} />{!isPersonal ? <div className="border-t border-[var(--line)] pt-8"><AdminParticipants key={challenge.participants.map((p) => p.userId ?? p.id).join(",")} challenge={challenge} group={group} onSave={onSaveParticipants} /></div> : null}</div> : null}
       {activeTab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.visibilityPolicy}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} onSaveVisibility={onSaveEntryTypeVisibility} onSetExpectation={onSetExpectation} /> : null}
