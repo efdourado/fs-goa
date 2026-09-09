@@ -7,7 +7,6 @@ import { API_PATHS } from "../api";
 import { CheckpointPlanner } from "../checkpoint-planner";
 import { useGoaFormat } from "../format";
 import { CineItemsEditor, type CineRow, cineRowsToInput } from "../cine-items";
-import { buildShowcaseDraft } from "../showcase-draft";
 import { ConfirmDialog, Dialog } from "../dialog";
 import { cleanFields, FIELD_TYPES, FieldConfigInputs, newFieldConfig, uniqueFieldKey } from "../fields";
 import { ListImportPanel } from "../list-import-panel";
@@ -41,7 +40,7 @@ import {
 } from "../ui";
 import { formatRuntime, isLivingList, itemIdForEntry, recipeCatalogKind, valuesAsRecord } from "../utils";
 import { AdminMetrics } from "./metrics";
-import { DynamicEntryForm, ResultView } from "./participant-challenge";
+import { DynamicEntryForm } from "./participant-challenge";
 
 /** A curation list that shows its first `preview` rows, the rest behind a toggle. */
 function ShowMoreList<T>({
@@ -750,27 +749,16 @@ function AdminReview({
   entries,
   onPatch,
   onDelete,
-  onExport,
 }: {
   challenge: ChallengeDetail;
   entries: Entry[];
   onPatch: (entryId: Id, values: Record<Id, unknown>, reason: string) => Promise<void>;
   onDelete: (entryId: Id, reason: string) => Promise<void>;
-  onExport: () => Promise<void>;
 }) {
   const t = useTranslations("adminChallenge");
   const f = useGoaFormat();
-  const [query, setQuery] = useState("");
-  const [lateOnly, setLateOnly] = useState(false);
   const [selectedId, setSelectedId] = useState<Id | null>(null);
-  const [exporting, setExporting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const filtered = entries.filter((entry) => {
-    const item = challenge.items.find((candidate) => candidate.id === itemIdForEntry(entry));
-    const haystack = `${entry.participantName ?? ""} ${entry.participantUsername ?? ""} ${item?.title ?? ""}`.toLowerCase();
-    return (!query || haystack.includes(query.toLowerCase())) && (!lateOnly || entry.isLate);
-  });
   const selected = entries.find((entry) => entry.id === selectedId);
   const selectedItem = challenge.items.find((item) => item.id === (selected ? itemIdForEntry(selected) : null)) ?? null;
   const selectedFields = (selected?.entryTypeId
@@ -784,19 +772,18 @@ function AdminReview({
   return (
     <section className="mx-auto max-w-5xl space-y-12">
       <div>
-        <PageHeading title={t("reviewTitle")} description={t("reviewSummary", { sent: entries.length, pending: Math.max(0, expected - doneCount), late: entries.filter((entry) => entry.isLate).length })} action={<Button variant="secondary" disabled={exporting} onClick={() => { setExporting(true); setError(null); onExport().catch((cause: unknown) => setError(f.error(cause))).finally(() => setExporting(false)); }}>{exporting ? t("preparing") : t("exportCsv")}</Button>} />
-        <div className="mb-5 grid gap-3 sm:grid-cols-[1fr_auto]">
-          <label><span className="sr-only">{t("searchEntries")}</span><input className={inputClass} type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("searchPlaceholder")} /></label>
-          <label className="flex min-h-12 items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4 text-sm font-medium"><input type="checkbox" checked={lateOnly} onChange={(event) => setLateOnly(event.target.checked)} />{t("lateOnly")}</label>
-        </div>
-        <div className="mb-5"><StatusMessage error={error} success={success} /></div>
-        {filtered.length ? (
-          <ol className="divide-y divide-[var(--line)]">
-            {filtered.map((entry) => {
+        <PageHeading title={t("reviewTitle")} description={t("reviewSummary", { sent: entries.length, pending: Math.max(0, expected - doneCount), late: entries.filter((entry) => entry.isLate).length })} />
+        <div className="mb-5"><StatusMessage success={success} /></div>
+        {entries.length ? (
+          <ShowMoreList
+            items={entries}
+            preview={12}
+            className="divide-y divide-[var(--line)]"
+            render={(entry) => {
               const item = challenge.items.find((candidate) => candidate.id === itemIdForEntry(entry));
               const type = challenge.entryTypes.find((candidate) => candidate.id === entry.entryTypeId);
               return (
-                <li className="flex items-start justify-between gap-4 py-4" key={entry.id}>
+                <div className="flex items-start justify-between gap-4 py-4" key={entry.id}>
                   <div className="min-w-0">
                     <strong className="block text-base font-medium">{entry.participantName ?? entry.participantUsername ?? t("participantFallback")}</strong>
                     <span className="mt-1 block text-xs text-[var(--muted)]">{[item?.title ?? t("freeEntry"), type && challenge.entryTypes.length > 1 ? type.name : null, f.dateTime(entry.submittedAt ?? entry.updatedAt)].filter(Boolean).join(" · ")}</span>
@@ -805,11 +792,11 @@ function AdminReview({
                     {entry.isLate ? <span className="rounded-full bg-[var(--warn-soft)] px-2 py-1 text-[10px] font-light text-[var(--warn)]">{t("late")}</span> : null}
                     <Button variant="secondary" className="min-h-9 px-3 py-1 text-xs" onClick={() => setSelectedId(entry.id)}>{t("inspect")}</Button>
                   </div>
-                </li>
+                </div>
               );
-            })}
-          </ol>
-        ) : <EmptyState title={t("noEntriesTitle")} description={entries.length ? t("noEntriesFiltered") : t("noEntriesEmpty")} />}
+            }}
+          />
+        ) : <EmptyState title={t("noEntriesTitle")} description={t("noEntriesEmpty")} />}
       </div>
 
 
@@ -990,9 +977,8 @@ function AdminResults({
     } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
   }
 
-  const preview = buildShowcaseDraft(challenge, { headline, summary, metricIds, comments: candidates.filter((c) => commentKeys.includes(c.key)), includeRankings, includeAffinity, order: blockOrder });
   return (
-    <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+    <div className="mx-auto max-w-3xl">
       <div className="min-w-0 space-y-6">
         {!isClosed ? <p className="rounded-xl bg-[var(--wash)] p-4 text-sm leading-6 text-[var(--muted)]">{tx("curationAfterClose")}</p> : null}
         <details open className="group border-b border-[var(--line)] pb-6">
@@ -1042,10 +1028,6 @@ function AdminResults({
       ) : <p className="text-sm text-[var(--muted)]">{tx("orderAfterSave")}</p>}
 
       </div>
-      <aside className="min-w-0 rounded-3xl border border-[var(--line)] bg-[var(--paper)] p-5 sm:p-7 lg:sticky lg:top-6 lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto">
-        <div className="mb-6 border-b border-[var(--line)] pb-4"><h2 className="text-base font-medium">{t("previewTitle")}</h2><p className="mt-2 text-xs leading-6 text-[var(--muted)]">{tx("livePreview")}</p></div>
-        <ResultView challenge={preview} />
-      </aside>
     </div>
   );
 }
@@ -1078,7 +1060,6 @@ export function AdminScreen({
   onAssignCheckpointItems,
   onPatchEntry,
   onDeleteEntry,
-  onExport,
   onAddMetric,
   onUpdateMetric,
   onDeleteMetric,
@@ -1117,7 +1098,6 @@ export function AdminScreen({
   onAssignCheckpointItems: (assignments: Array<{ itemId: Id; checkpointId: Id | null; position?: number }>) => Promise<void>;
   onPatchEntry: (entryId: Id, values: Record<Id, unknown>, reason: string) => Promise<void>;
   onDeleteEntry: (entryId: Id, reason: string) => Promise<void>;
-  onExport: () => Promise<void>;
   onAddMetric: (payload: Record<string, unknown>) => Promise<void>;
   onUpdateMetric: (metricId: Id, payload: Record<string, unknown>) => Promise<void>;
   onDeleteMetric: (metricId: Id) => Promise<void>;
@@ -1161,7 +1141,7 @@ export function AdminScreen({
     "results",
   ];
   return (
-    <main className={cx("mx-auto px-4 py-6 pb-24 sm:px-6 sm:py-10", activeTab === "results" ? "max-w-[1440px]" : "max-w-5xl")}>
+    <main className="mx-auto max-w-5xl px-4 py-6 pb-24 sm:px-6 sm:py-10">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><button className={backLinkClass} type="button" onClick={onBack}>{t("back")}</button><div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={onViewParticipant}>{t("simulateAsParticipant")}</Button><ChallengeActions challenge={challenge} duplicateTargets={duplicateTargets} onDuplicate={onDuplicate} onDelete={onDelete} onTransition={onTransition} isPlatformAdmin={isPlatformAdmin} onPublishTemplate={onPublishTemplate} onUnpublishTemplate={onUnpublishTemplate} onPublish={onPublishResult} onUnpublish={onUnpublishResult} /></div></div>
       <PageHeading title={challenge.title} description={t("subtitle")} action={<ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />} />
       <nav className="mb-8 border-b border-[var(--line)]" aria-label={t("tabsAria")}>
@@ -1174,7 +1154,7 @@ export function AdminScreen({
       {activeTab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.visibilityPolicy}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} onSaveVisibility={onSaveEntryTypeVisibility} onSetExpectation={onSetExpectation} /> : null}
       {activeTab === "items" ? <AdminItems challenge={challenge} group={group} entries={entries} onAdd={onAddItems} onUpdate={onUpdateItem} onArchive={onArchiveItem} onPreviewImport={onPreviewImport} /> : null}
       {activeTab === "checkpoints" ? <CheckpointPlanner key={`${challenge.id}:${challenge.checkpoints.map((cp) => cp.id).join(",")}`} challenge={challenge} onSaveCheckpoints={onSaveCheckpoints} onAssign={onAssignCheckpointItems} /> : null}
-      {activeTab === "review" ? <AdminReview challenge={challenge} entries={entries} onPatch={onPatchEntry} onDelete={onDeleteEntry} onExport={onExport} /> : null}
+      {activeTab === "review" ? <AdminReview challenge={challenge} entries={entries} onPatch={onPatchEntry} onDelete={onDeleteEntry} /> : null}
       {activeTab === "metrics" ? <AdminMetrics challenge={challenge} onAdd={onAddMetric} onUpdate={onUpdateMetric} onDelete={onDeleteMetric} /> : null}
       {activeTab === "results" ? <AdminResults challenge={challenge} entries={entries} onSave={onSaveResult} onReorderBlocks={onReorderBlocks} /> : null}
     </main>

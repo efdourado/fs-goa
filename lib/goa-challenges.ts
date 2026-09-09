@@ -6,7 +6,6 @@ export type { ImportPreview, ImportPreviewRow, MappableField } from "./goa/chall
 export { duplicateChallenge } from "./goa/challenges/duplicate";
 export {
   deleteEntry,
-  exportEntriesCsv,
   listEntries,
   saveEntry,
   updateEntry,

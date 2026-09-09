@@ -333,10 +333,6 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
   const entries = await call("GET", `/api/challenges/${challengeId}/entries`, { session: owner });
   assert.equal(entries.response.status, 200);
   assert.equal((entries.body as { entries: unknown[] }).entries.length, 1);
-  const csv = await call("GET", `/api/challenges/${challengeId}/export.csv`, { session: owner });
-  assert.equal(csv.response.status, 200);
-  assert.match(csv.body as string, /canario-pessoal/);
-  assert.match(csv.body as string, /Aftersun \(2022\)/, "a exportação deve usar o título corrigido");
 
   const strandingShrink = await call("PATCH", `/api/challenges/${challengeId}`, {
     session: owner, body: { startsOn: "2026-08-01", endsOn: "2026-08-02" },

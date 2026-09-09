@@ -66,7 +66,6 @@ import {
   deleteEntry,
   duplicateChallenge,
   duplicateTemplate,
-  exportEntriesCsv,
   getChallengeDetail,
   getTemplatePreview,
   listEntries,
@@ -180,9 +179,6 @@ export async function GET(request: Request): Promise<Response> {
     }
     if (path[0] === "challenges" && path[2] === "entries" && path.length === 3) {
       return json({ entries: await listEntries(await requireSession(request), path[1]) });
-    }
-    if (path[0] === "challenges" && path[2] === "export.csv" && path.length === 3) {
-      return exportEntriesCsv(await requireSession(request), path[1]);
     }
     if (isPath(path, "personal", "trash")) {
       return json(await personalTrash(await requireSession(request)));

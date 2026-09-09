@@ -11,7 +11,6 @@ import {
 } from "../../goa-domain";
 import { ApiError, stringValue } from "../../http";
 import {
-  escapeCsvCell,
   type FieldDefinition,
   validateFieldValue,
 } from "../../validation";
@@ -23,7 +22,6 @@ import {
   schedulePolicyOf,
   targetPolicyOf,
 } from "./entry-types";
-import { fieldsForChallenge } from "./fields";
 import type { FieldRow } from "./types";
 import { moveToTrash } from "../trash";
 
@@ -479,54 +477,3 @@ export async function deleteEntry(
   });
 }
 
-export async function exportEntriesCsv(session: SessionContext, challengeId: string): Promise<Response> {
-  return withClient(async (client) => {
-    const access = await challengeAccess(session.user.id, challengeId, client);
-    if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores podem exportar registros.");
-    const fields = await fieldsForChallenge(client, challengeId);
-    const entries = await listEntriesWithClient(client, challengeId);
-    const header = ["registro_id", "participante", "usuario", "data", "item", ...fields.map((field) => String(field.label))];
-    const lines = [header.map((value) => escapeCsvCell(value)).join(",")];
-    for (const entry of entries) {
-      const values = entry.values as Record<string, unknown>;
-      const row = [entry.id, entry.participantName, entry.participantUsername, entry.occurredOn ?? "", entry.itemTitle ?? "",
-        ...fields.map((field) => {
-          const value = values[String(field.id)];
-          return value === null || value === undefined ? "" : String(value);
-        })];
-      lines.push(row.map((value) => escapeCsvCell(String(value))).join(","));
-    }
-    return new Response(`\uFEFF${lines.join("\r\n")}\r\n`, {
-      status: 200,
-      headers: {
-        "content-type": "text/csv; charset=utf-8",
-        "content-disposition": `attachment; filename="goa-${challengeId}.csv"`,
-        "cache-control": "no-store",
-        "x-content-type-options": "nosniff",
-      },
-    });
-  });
-}
-
-async function listEntriesWithClient(client: PoolClient, challengeId: string): Promise<Array<Record<string, unknown>>> {
-  const result = await client.query<{
-    id: string; item_id: string | null; item_title: string | null; participant_user_id: string;
-    display_name: string; username: string; occurred_on: string | null; submitted_at: Date; updated_at: Date;
-  }>(
-    `SELECT e.id,e.item_id,coalesce(ci.title,cc.title) AS item_title,e.participant_user_id,u.display_name,u.username,
-            e.occurred_on::text AS occurred_on,e.submitted_at,e.updated_at
-       FROM entries e JOIN users u ON u.id=e.participant_user_id
-       LEFT JOIN challenge_items ci ON ci.id=e.item_id
-       LEFT JOIN challenge_checkpoints cc ON cc.challenge_id=e.challenge_id
-        AND (cc.starts_at AT TIME ZONE 'America/Sao_Paulo')::date=e.occurred_on
-        AND cc.archived_at IS NULL
-      WHERE e.challenge_id=$1 AND e.deleted_at IS NULL ORDER BY e.occurred_on NULLS LAST,e.created_at`, [challengeId]);
-  const values = await entryValues(client, result.rows.map((entry) => entry.id));
-  return result.rows.map((entry) => ({
-    id: entry.id, itemId: entry.item_id, itemTitle: entry.item_title,
-    participantId: entry.participant_user_id, participantName: entry.display_name,
-    participantUsername: entry.username, occurredOn: entry.occurred_on,
-    submittedAt: entry.submitted_at.toISOString(), updatedAt: entry.updated_at.toISOString(),
-    values: values.get(entry.id) ?? {},
-  }));
-}

@@ -116,8 +116,6 @@ export const API_PATHS = {
     `/api/challenges/${encodeURIComponent(challengeId)}/transition`,
   duplicate: (challengeId: Id) =>
     `/api/challenges/${encodeURIComponent(challengeId)}/duplicate`,
-  exportEntries: (challengeId: Id) =>
-    `/api/challenges/${encodeURIComponent(challengeId)}/export.csv`,
 } as const;
 
 export class ApiError extends Error {
