@@ -570,6 +570,7 @@
       "pending": "Pendientes"
     },
     "basicsTitle": "Información básica",
+    "basicsSubtitle": "El título, la agenda y las reglas que todos siguen.",
     "titleLabel": "Título",
     "scheduleLegend": "Agenda",
     "schedulePeriod": "Con período",

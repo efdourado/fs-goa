@@ -1,9 +1,9 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { type FormEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { type FormEvent, type ReactNode, useMemo, useState } from "react";
 
-import { API_PATHS, apiRequest } from "../api";
+import { API_PATHS } from "../api";
 import { CheckpointPlanner } from "../checkpoint-planner";
 import { useGoaFormat } from "../format";
 import { CineItemsEditor, type CineRow, cineRowsToInput } from "../cine-items";
@@ -39,7 +39,7 @@ import {
   SchedulePeriodFields,
   StatusMessage,
 } from "../ui";
-import { formatRuntime, isChallengeScheduled, isLivingList, itemIdForEntry, recipeCatalogKind, valuesAsRecord } from "../utils";
+import { formatRuntime, isLivingList, itemIdForEntry, recipeCatalogKind, valuesAsRecord } from "../utils";
 import { AdminMetrics } from "./metrics";
 import { DynamicEntryForm, ResultView } from "./participant-challenge";
 
@@ -80,98 +80,18 @@ export interface DuplicateTargetGroup {
   challengeLimit: number;
 }
 
-interface PreflightIssue { code: string; severity: "error" | "warning"; message: string }
-interface PreflightReport { ready: boolean; errors: PreflightIssue[]; warnings: PreflightIssue[] }
-
-/**
- * The pre-activation review: blocking errors, soft "worth reviewing" notes, or
- * a clean bill of health. Re-fetches on demand so the admin can fix something
- * in another tab and check again.
- */
-function PreflightPanel({ challengeId, onReady }: { challengeId: Id; onReady: (ready: boolean) => void }) {
-  const t = useTranslations("preflight");
-  const tCodes = useTranslations("preflight.codes");
-  const [report, setReport] = useState<PreflightReport | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(() => {
-    setLoading(true);
-    setError(null);
-    const controller = new AbortController();
-    apiRequest<PreflightReport>(API_PATHS.preflight(challengeId), { signal: controller.signal })
-      .then((data) => { setReport(data); onReady(data.ready); })
-      .catch((cause: unknown) => {
-        if (cause instanceof DOMException && cause.name === "AbortError") return;
-        setError(cause instanceof Error ? cause.message : t("loadError"));
-      })
-      .finally(() => setLoading(false));
-    return () => controller.abort();
-  }, [challengeId, onReady, t]);
-
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => load(), [load]);
-
-  const label = (issue: PreflightIssue) => (tCodes.has(issue.code) ? tCodes(issue.code) : issue.message);
-
-  return (
-    <section className="border-t border-[var(--line)] pt-10">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-medium tracking-tight">{t("title")}</h2>
-        <button type="button" className="text-xs font-light text-[var(--muted)] hover:text-[var(--ink)] hover:underline" onClick={load} disabled={loading}>
-          {loading ? t("checking") : t("recheck")}
-        </button>
-      </div>
-      {error ? <p className="mt-3 text-sm text-[var(--danger)]">{error}</p> : null}
-      {report ? (
-        <div className="mt-4 space-y-4">
-          {report.errors.length ? (
-            <div className="rounded-2xl border border-[var(--danger)]/40 bg-[var(--danger-soft)] p-4">
-              <p className="text-sm font-medium text-[var(--danger)]">{t("fixFirst", { count: report.errors.length })}</p>
-              <ul className="mt-2 space-y-1 text-sm">
-                {report.errors.map((issue, index) => <li key={`${issue.code}-${index}`}>· {label(issue)}</li>)}
-              </ul>
-            </div>
-          ) : null}
-          {report.warnings.length ? (
-            <div className="rounded-2xl border border-[var(--warn-line)]/50 bg-[var(--warn-soft)] p-4">
-              <p className="text-sm font-medium text-[var(--warn-strong)]">{t("worthReviewing", { count: report.warnings.length })}</p>
-              <ul className="mt-2 space-y-1 text-sm">
-                {report.warnings.map((issue, index) => <li key={`${issue.code}-${index}`}>· {label(issue)}</li>)}
-              </ul>
-            </div>
-          ) : null}
-          {report.ready && !report.warnings.length ? (
-            <p className="rounded-2xl border border-[var(--ok-line)]/40 bg-[var(--ok-soft)] p-4 text-sm font-medium text-[var(--ok-strong)]">{t("allReady")}</p>
-          ) : null}
-          {report.ready && report.warnings.length ? (
-            <p className="text-xs text-[var(--muted)]">{t("readyWithWarnings")}</p>
-          ) : null}
-        </div>
-      ) : null}
-    </section>
-  );
-}
-
-/**
- * Platform-admin only — the sole place to list a challenge in the public
- * `/modelos` gallery or take it down, and to adjust its blurb. A challenge
- * admin who is not a platform admin never sees this section.
- */
+/** Basic details form. Lifecycle + publication live in the "Challenge state" dialog. */
 function AdminOverview({
   challenge,
   onSave,
-  onTransition,
 }: {
   challenge: ChallengeDetail;
   onSave: (payload: Partial<ChallengeSummary>) => Promise<void>;
-  onTransition: (status: "active" | "closed") => Promise<void>;
 }) {
   const t = useTranslations("adminChallenge");
   const tc = useTranslations("common");
   const trules = useTranslations("rules");
   const f = useGoaFormat();
-  const longDate: Intl.DateTimeFormatOptions = { day: "2-digit", month: "long", year: "numeric" };
   const [title, setTitle] = useState(challenge.title);
   const [description, setDescription] = useState(challenge.description ?? "");
   const [ruleSections, setRuleSections] = useState(() => visibleRuleSections(challenge.ruleSections, challenge.rules, trules("legacyTitle")));
@@ -185,9 +105,6 @@ function AdminOverview({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [confirm, setConfirm] = useState<"activate" | "close" | "reopen" | null>(null);
-  const [preflightReady, setPreflightReady] = useState(false);
-  const scheduled = isChallengeScheduled(challenge.status, challenge.startsOn, challenge.submissionMode);
   const livingList = isLivingList(challenge);
 
   async function run(label: string, action: () => Promise<void>, successText: string) {
@@ -232,8 +149,8 @@ function AdminOverview({
   return (
     <div className="mx-auto max-w-5xl space-y-12">
       <section>
-        <h2 className="text-lg font-medium tracking-tight">{t("basicsTitle")}</h2>
-        <form className="mt-5 grid gap-4 sm:grid-cols-2" onSubmit={saveBasics}>
+        <PageHeading title={t("basicsTitle")} description={t("basicsSubtitle")} />
+        <form className="grid gap-4 sm:grid-cols-2" onSubmit={saveBasics}>
           <label className="sm:col-span-2"><span className={labelClass}>{t("titleLabel")}</span><input className={inputClass} value={title} onChange={(event) => setTitle(event.target.value)} required maxLength={140} disabled={challenge.status === "closed"} /></label>
           <fieldset className="sm:col-span-2" disabled={challenge.status === "closed"}>
             <legend className={labelClass}>{t("scheduleLegend")}</legend>
@@ -257,43 +174,11 @@ function AdminOverview({
               <button type="button" className={cx("min-h-11 rounded-xl border border-dashed border-[var(--line)] px-4 text-sm font-light text-[var(--muted)] hover:border-[var(--main-line)] hover:text-[var(--ink)]")} onClick={() => setShowOptional(true)}>{hasOptionalContent ? t("showOtherFields") : t("showOptional", { count: 2 })}</button>
             )}
           </div>
-          {challenge.status !== "closed" ? <div className="sm:col-span-2"><Button type="submit" disabled={busy === "save"}>{busy === "save" ? tc("saving") : t("saveBasics")}</Button></div> : null}
+          {challenge.status !== "closed" ? <div className="sm:col-span-2"><Button type="submit" className="w-full" disabled={busy === "save"}>{busy === "save" ? tc("saving") : t("saveBasics")}</Button></div> : null}
         </form>
       </section>
 
-      {!livingList && challenge.status === "draft" ? (
-        <PreflightPanel challengeId={challenge.id} onReady={setPreflightReady} />
-      ) : null}
-
-      {!livingList ? (
-        <section className="border-t border-[var(--line)] pt-10">
-          <h2 className="text-lg font-medium tracking-tight">{t("stateTitle")}</h2>
-          <div className="mt-4 flex flex-col gap-4 rounded-2xl bg-[var(--wash)] p-5 sm:flex-row sm:items-center sm:justify-between">
-            <div><ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} /><p className="mt-2 max-w-xl text-sm leading-6 text-[var(--muted)]">{challenge.status === "draft" ? t("stateDraft") : scheduled ? t("stateScheduled", { date: f.date(challenge.startsOn, longDate) }) : challenge.status === "active" ? t("stateActive") : t("stateClosed")}</p></div>
-            {challenge.status === "draft" ? <Button disabled={Boolean(busy) || !preflightReady} onClick={() => setConfirm("activate")}>{t("activate")}</Button> : null}
-            {challenge.status === "active" ? <Button variant="danger" disabled={Boolean(busy)} onClick={() => setConfirm("close")}>{t("close")}</Button> : null}
-            {challenge.status === "closed" ? <Button variant="secondary" disabled={Boolean(busy)} onClick={() => setConfirm("reopen")}>{t("reopen")}</Button> : null}
-          </div>
-        </section>
-      ) : null}
-
       <StatusMessage error={error} success={success} />
-
-      {confirm === "activate" ? (
-        <ConfirmDialog title={t("activateTitle")} body={t("activateConfirm")} confirmLabel={t("activate")} busyLabel={tc("saving")}
-          onClose={() => setConfirm(null)}
-          onConfirm={async () => { await onTransition("active"); setConfirm(null); setSuccess(t("activated")); }} />
-      ) : null}
-      {confirm === "close" ? (
-        <ConfirmDialog title={t("closeTitle")} body={t("closeConfirm")} confirmLabel={t("close")} busyLabel={tc("saving")} danger
-          onClose={() => setConfirm(null)}
-          onConfirm={async () => { await onTransition("closed"); setConfirm(null); setSuccess(t("closedDone")); }} />
-      ) : null}
-      {confirm === "reopen" ? (
-        <ConfirmDialog title={t("reopenTitle")} body={t("reopenConfirm")} confirmLabel={t("reopen")} busyLabel={tc("saving")}
-          onClose={() => setConfirm(null)}
-          onConfirm={async () => { await onTransition("active"); setConfirm(null); setSuccess(t("reopenedDone")); }} />
-      ) : null}
     </div>
   );
 }
@@ -321,10 +206,10 @@ function AdminParticipants({
     <section className="mx-auto max-w-5xl">
       <PageHeading title={t("participantsTitle")} description={t("participantsSubtitle")} />
       {group?.members?.length ? (
-        <ul className="divide-y divide-[var(--line)]">{group.members.map((member) => { const checked = selected.includes(member.id); return <li key={member.id}><label className="flex min-h-16 cursor-pointer items-center gap-4 py-4"><input type="checkbox" aria-label={t("selectMember", { name: member.name })} checked={checked} disabled={challenge.status === "closed" || busy} onChange={(event) => setSelected((current) => event.target.checked ? [...current, member.id] : current.filter((id) => id !== member.id))} /><span className="min-w-0"><strong className="block text-base font-medium">{member.name}</strong><small className="text-[var(--muted)]">{t("memberMeta", { username: member.username, role: tr(member.role) })}</small></span></label></li>; })}</ul>
+        <ul className="grid gap-2 sm:grid-cols-2">{group.members.map((member) => { const checked = selected.includes(member.id); const disabled = challenge.status === "closed" || busy; return <li key={member.id}><label className={cx("flex min-h-16 items-center gap-3 rounded-xl border px-4 py-3 transition", disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer", checked ? "border-[var(--main)] bg-[var(--main-soft)]" : "border-[var(--line)] hover:border-[var(--muted)]")}><input type="checkbox" className="size-4 shrink-0 accent-[var(--main)]" aria-label={t("selectMember", { name: member.name })} checked={checked} disabled={disabled} onChange={(event) => setSelected((current) => event.target.checked ? [...current, member.id] : current.filter((id) => id !== member.id))} /><span className="min-w-0"><strong className="block text-sm font-medium">{member.name}</strong><small className="text-[var(--muted)]">{t("memberMeta", { username: member.username, role: tr(member.role) })}</small></span></label></li>; })}</ul>
       ) : <EmptyState title={t("noMembersTitle")} description={t("noMembersBody")} />}
       <div className="mt-5"><StatusMessage error={error} success={success} /></div>
-      {challenge.status !== "closed" && group?.members?.length ? <Button className="mt-5" disabled={busy} onClick={() => { setBusy(true); setError(null); setSuccess(null); onSave(selected).then(() => setSuccess(t("participantsSaved"))).catch((cause: unknown) => setError(f.error(cause))).finally(() => setBusy(false)); }}>{busy ? tc("saving") : t("saveParticipants")}</Button> : null}
+      {challenge.status !== "closed" && group?.members?.length ? <Button className="mt-5 w-full" disabled={busy} onClick={() => { setBusy(true); setError(null); setSuccess(null); onSave(selected).then(() => setSuccess(t("participantsSaved"))).catch((cause: unknown) => setError(f.error(cause))).finally(() => setBusy(false)); }}>{busy ? tc("saving") : t("saveParticipants")}</Button> : null}
     </section>
   );
 }
@@ -1266,7 +1151,7 @@ export function AdminScreen({
   const technicalOpen = showTechnical || technicalTabs.includes(activeTab);
   return (
     <main className={cx("mx-auto px-4 py-6 pb-24 sm:px-6 sm:py-10", activeTab === "results" ? "max-w-[1440px]" : "max-w-5xl")}>
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><button className={backLinkClass} type="button" onClick={onBack}>{t("back")}</button><div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={onViewParticipant}>{t("simulateAsParticipant")}</Button><ChallengeActions challenge={challenge} duplicateTargets={duplicateTargets} onDuplicate={onDuplicate} onDelete={onDelete} isPlatformAdmin={isPlatformAdmin} onPublishTemplate={onPublishTemplate} onUnpublishTemplate={onUnpublishTemplate} onPublish={onPublishResult} onUnpublish={onUnpublishResult} /></div></div>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><button className={backLinkClass} type="button" onClick={onBack}>{t("back")}</button><div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={onViewParticipant}>{t("simulateAsParticipant")}</Button><ChallengeActions challenge={challenge} duplicateTargets={duplicateTargets} onDuplicate={onDuplicate} onDelete={onDelete} onTransition={onTransition} isPlatformAdmin={isPlatformAdmin} onPublishTemplate={onPublishTemplate} onUnpublishTemplate={onUnpublishTemplate} onPublish={onPublishResult} onUnpublish={onUnpublishResult} /></div></div>
       <PageHeading title={challenge.title} description={t("subtitle")} action={<ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />} />
       <nav className="mb-8 border-b border-[var(--line)]" aria-label={t("tabsAria")}>
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1275,7 +1160,7 @@ export function AdminScreen({
         </div>
         {technicalOpen ? <div id="management-technical-tabs" className="flex flex-wrap gap-2 border-t border-[var(--line)] py-3">{technicalTabs.map((id) => <button key={id} type="button" aria-current={activeTab === id ? "page" : undefined} onClick={() => onTab(id)} className={cx("min-h-11 rounded-xl px-4 text-sm", activeTab === id ? "bg-[var(--main-soft)] text-[var(--main-strong)]" : "text-[var(--muted)] hover:bg-[var(--wash)]")}>{t(`tabs.${id}`)}</button>)}</div> : null}
       </nav>
-      {activeTab === "overview" ? <div className="space-y-12"><AdminOverview challenge={challenge} onSave={onSaveBasics} onTransition={onTransition} />{!isPersonal ? <div className="border-t border-[var(--line)] pt-8"><AdminParticipants key={challenge.participants.map((p) => p.userId ?? p.id).join(",")} challenge={challenge} group={group} onSave={onSaveParticipants} /></div> : null}</div> : null}
+      {activeTab === "overview" ? <div className="space-y-12"><AdminOverview challenge={challenge} onSave={onSaveBasics} />{!isPersonal ? <div className="border-t border-[var(--line)] pt-8"><AdminParticipants key={challenge.participants.map((p) => p.userId ?? p.id).join(",")} challenge={challenge} group={group} onSave={onSaveParticipants} /></div> : null}</div> : null}
       {activeTab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.visibilityPolicy}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} onSaveVisibility={onSaveEntryTypeVisibility} onSetExpectation={onSetExpectation} /> : null}
       {activeTab === "items" ? <AdminItems challenge={challenge} group={group} entries={entries} onAdd={onAddItems} onUpdate={onUpdateItem} onArchive={onArchiveItem} onPreviewImport={onPreviewImport} /> : null}
       {activeTab === "checkpoints" ? <CheckpointPlanner key={`${challenge.id}:${challenge.checkpoints.map((cp) => cp.id).join(",")}`} challenge={challenge} onSaveCheckpoints={onSaveCheckpoints} onAssign={onAssignCheckpointItems} /> : null}

@@ -5,11 +5,63 @@ import { useTranslations } from "next-intl";
 import { ActionMenu, ActionMenuItem } from "../action-menu";
 import { ConfirmDialog, Dialog } from "../dialog";
 import { useGoaFormat } from "../format";
+import { PreflightPanel } from "../preflight-panel";
 import type { ChallengeDetail, Id } from "../types";
-import { Button, inputClass, labelClass, StatusMessage } from "../ui";
+import { Button, ChallengeStatusBadge, inputClass, labelClass, StatusMessage } from "../ui";
+import { isChallengeScheduled, isLivingList } from "../utils";
 import { PublicationDialog } from "./publication";
 
 type Target = { id: Id; name: string; challengeCount: number; challengeLimit: number };
+
+/** Lifecycle (activate / close / reopen) + the pre-activation readiness check, in a dialog. */
+function ChallengeStateDialog({ challenge, onTransition, onClose }: {
+  challenge: ChallengeDetail;
+  onTransition: (status: "active" | "closed") => Promise<void>;
+  onClose: () => void;
+}) {
+  const t = useTranslations("adminChallenge");
+  const tc = useTranslations("common");
+  const f = useGoaFormat();
+  const longDate: Intl.DateTimeFormatOptions = { day: "2-digit", month: "long", year: "numeric" };
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<"activate" | "close" | "reopen" | null>(null);
+  const [preflightReady, setPreflightReady] = useState(false);
+  const scheduled = isChallengeScheduled(challenge.status, challenge.startsOn, challenge.submissionMode);
+
+  async function apply() {
+    if (!confirm) return;
+    setBusy(true); setError(null);
+    try {
+      await onTransition(confirm === "close" ? "closed" : "active");
+      setConfirm(null);
+    } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
+  }
+
+  return <Dialog title={t("stateTitle")} onClose={onClose} busy={busy}>
+    <div className="rounded-2xl bg-[var(--wash)] p-5">
+      <ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />
+      <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{challenge.status === "draft" ? t("stateDraft") : scheduled ? t("stateScheduled", { date: f.date(challenge.startsOn, longDate) }) : challenge.status === "active" ? t("stateActive") : t("stateClosed")}</p>
+      <div className="mt-4">
+        {challenge.status === "draft" ? <Button disabled={busy || !preflightReady || confirm !== null} onClick={() => setConfirm("activate")}>{t("activate")}</Button> : null}
+        {challenge.status === "active" ? <Button variant="danger" disabled={busy || confirm !== null} onClick={() => setConfirm("close")}>{t("close")}</Button> : null}
+        {challenge.status === "closed" ? <Button variant="secondary" disabled={busy || confirm !== null} onClick={() => setConfirm("reopen")}>{t("reopen")}</Button> : null}
+      </div>
+      {confirm ? <div className="mt-4 space-y-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4">
+        <p className="text-sm leading-6">{confirm === "activate" ? t("activateConfirm") : confirm === "close" ? t("closeConfirm") : t("reopenConfirm")}</p>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button variant="secondary" disabled={busy} onClick={() => setConfirm(null)}>{tc("cancel")}</Button>
+          <Button variant={confirm === "close" ? "danger" : "primary"} disabled={busy} onClick={() => void apply()}>{busy ? tc("saving") : confirm === "activate" ? t("activate") : confirm === "close" ? t("close") : t("reopen")}</Button>
+        </div>
+      </div> : null}
+    </div>
+    {challenge.status === "draft" && !isLivingList(challenge) ? (
+      <div className="mt-6 border-t border-[var(--line)] pt-6"><PreflightPanel challengeId={challenge.id} onReady={setPreflightReady} /></div>
+    ) : null}
+    <StatusMessage error={error} />
+    <div className="mt-6 flex justify-end border-t border-[var(--line)] pt-4"><Button variant="secondary" onClick={onClose} disabled={busy}>{tc("close")}</Button></div>
+  </Dialog>;
+}
 
 function TemplatePublishSection({ challenge, onPublish, onUnpublish }: {
   challenge: ChallengeDetail;
@@ -133,10 +185,11 @@ function CopyChallengeDialog({ challenge, duplicateTargets, onDuplicate, onClose
   </Dialog>;
 }
 
-export function ChallengeActions({ challenge, duplicateTargets, onDuplicate, onDelete, isPlatformAdmin, onPublishTemplate, onUnpublishTemplate, onPublish, onUnpublish }: {
+export function ChallengeActions({ challenge, duplicateTargets, onDuplicate, onDelete, onTransition, isPlatformAdmin, onPublishTemplate, onUnpublishTemplate, onPublish, onUnpublish }: {
   challenge: ChallengeDetail; duplicateTargets: Target[];
   onDuplicate: (payload: { title: string; targetGroupId: Id }) => Promise<void>;
   onDelete?: () => Promise<void>;
+  onTransition: (status: "active" | "closed") => Promise<void>;
   isPlatformAdmin: boolean;
   onPublishTemplate: (summary: string) => Promise<void>;
   onUnpublishTemplate: () => Promise<void>;
@@ -146,14 +199,16 @@ export function ChallengeActions({ challenge, duplicateTargets, onDuplicate, onD
   const t = useTranslations("adminChallenge");
   const tx = useTranslations("managementUX");
   const tc = useTranslations("common");
-  const [panel, setPanel] = useState<"copy" | "publication" | "template" | "delete" | null>(null);
+  const [panel, setPanel] = useState<"state" | "copy" | "publication" | "template" | "delete" | null>(null);
   return <>
     <ActionMenu label={tx("moreSettings")}>
+      {isLivingList(challenge) ? null : <ActionMenuItem onClick={() => setPanel("state")}>{t("stateTitle")}</ActionMenuItem>}
       <ActionMenuItem onClick={() => setPanel("publication")}>{tx("publication")}</ActionMenuItem>
       <ActionMenuItem onClick={() => setPanel("copy")}>{t("reuseTitle")}</ActionMenuItem>
       {isPlatformAdmin ? <ActionMenuItem onClick={() => setPanel("template")}>{t("platformTemplateTitle")}</ActionMenuItem> : null}
       {onDelete ? <div className="mt-1 border-t border-[var(--line)] pt-1"><ActionMenuItem danger onClick={() => setPanel("delete")}>{t("delete")}</ActionMenuItem></div> : null}
     </ActionMenu>
+    {panel === "state" ? <ChallengeStateDialog challenge={challenge} onTransition={onTransition} onClose={() => setPanel(null)} /> : null}
     {panel === "copy" ? <CopyChallengeDialog challenge={challenge} duplicateTargets={duplicateTargets} onDuplicate={onDuplicate} onClose={() => setPanel(null)} /> : null}
     {panel === "publication" ? <PublicationDialog challenge={challenge} onPublish={onPublish} onUnpublish={onUnpublish} onClose={() => setPanel(null)} /> : null}
     {panel === "template" && isPlatformAdmin ? <Dialog title={t("platformTemplateTitle")} onClose={() => setPanel(null)}><TemplatePublishSection challenge={challenge} onPublish={onPublishTemplate} onUnpublish={onUnpublishTemplate} /><div className="mt-5 flex justify-end"><Button variant="secondary" onClick={() => setPanel(null)}>{tc("close")}</Button></div></Dialog> : null}
