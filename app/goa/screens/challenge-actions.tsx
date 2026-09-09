@@ -200,9 +200,13 @@ export function ChallengeActions({ challenge, duplicateTargets, onDuplicate, onD
   const tx = useTranslations("managementUX");
   const tc = useTranslations("common");
   const [panel, setPanel] = useState<"state" | "copy" | "publication" | "template" | "delete" | null>(null);
+  const stateAction = isLivingList(challenge) ? null
+    : challenge.status === "draft" ? { label: t("activate"), variant: "primary" as const }
+    : challenge.status === "active" ? { label: t("close"), variant: "danger" as const }
+    : { label: t("reopen"), variant: "secondary" as const };
   return <>
+    {stateAction ? <Button variant={stateAction.variant} onClick={() => setPanel("state")}>{stateAction.label}</Button> : null}
     <ActionMenu label={tx("moreSettings")}>
-      {isLivingList(challenge) ? null : <ActionMenuItem onClick={() => setPanel("state")}>{t("stateTitle")}</ActionMenuItem>}
       <ActionMenuItem onClick={() => setPanel("publication")}>{tx("publication")}</ActionMenuItem>
       <ActionMenuItem onClick={() => setPanel("copy")}>{t("reuseTitle")}</ActionMenuItem>
       {isPlatformAdmin ? <ActionMenuItem onClick={() => setPanel("template")}>{t("platformTemplateTitle")}</ActionMenuItem> : null}
