@@ -20,7 +20,8 @@
 # design canvas working files (mockups drafted with the design skill)
 /*.dc.html
 /canvas.json
-/goa-homepage-redesign.html
+/*-canvas.json
+/goa-*-redesign.html
 
 # debug
 npm-debug.log*
