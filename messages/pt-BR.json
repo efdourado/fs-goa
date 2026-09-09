@@ -851,7 +851,9 @@
     "fieldRequiredShort": "obrigatório",
     "fieldAdded": "Campo adicionado.",
     "fieldsEmptyTitle": "Nenhum campo ainda",
-    "fieldsEmptyBody": "Adicione um campo para o participante preencher a cada registro."
+    "fieldsEmptyBody": "Adicione um campo para o participante preencher a cada registro.",
+    "descRulesTitle": "Descrição e regras",
+    "moreActions": "Mais ações"
   },
   "visibility": {
     "title": "Quem vê estas respostas",
@@ -1054,7 +1056,8 @@
     "fieldNameSr": "Nome do campo",
     "fieldNamePlaceholder": "Ex.: Páginas lidas",
     "fieldTypeSr": "Tipo do campo",
-    "add": "Adicionar"
+    "add": "Adicionar",
+    "requiredHint": "Bloqueia o registro enquanto estiver em branco."
   },
   "templates": {
     "signIn": "Entrar",

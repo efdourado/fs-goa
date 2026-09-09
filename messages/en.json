@@ -851,7 +851,9 @@
     "fieldRequiredShort": "required",
     "fieldAdded": "Field added.",
     "fieldsEmptyTitle": "No fields yet",
-    "fieldsEmptyBody": "Add a field for the participant to fill in on every entry."
+    "fieldsEmptyBody": "Add a field for the participant to fill in on every entry.",
+    "descRulesTitle": "Description & rules",
+    "moreActions": "More actions"
   },
   "visibility": {
     "title": "Who sees these answers",
@@ -1054,7 +1056,8 @@
     "fieldNameSr": "Field name",
     "fieldNamePlaceholder": "e.g. Pages read",
     "fieldTypeSr": "Field type",
-    "add": "Add"
+    "add": "Add",
+    "requiredHint": "Blocks the entry while it's left blank."
   },
   "templates": {
     "signIn": "Sign in",

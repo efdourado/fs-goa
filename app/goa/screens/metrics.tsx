@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { Dialog } from "../dialog";
+import { Dialog, FormDialog } from "../dialog";
 import { MetricBlock } from "../metrics-view";
 import { metricFields, metricGroupings, metricNeedsField, metricOperations } from "../metric-editor";
 import { useGoaFormat } from "../format";
 import type { ChallengeDetail, Id, Metric } from "../types";
-import { Button, EmptyState, inputClass, labelClass, PageHeading, StatusMessage } from "../ui";
+import { Button, Disclosure, EmptyState, Field, inputClass, PageHeading, StatusMessage, Toggle } from "../ui";
 
 type Props = {
   challenge: ChallengeDetail;
@@ -74,18 +74,15 @@ export function MetricEditor({ challenge, metric, onCancel, onSave }: {
   const [visibleInResults, setVisibleInResults] = useState(metric?.visibleInResults ?? true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [discard, setDiscard] = useState(false);
   const needsField = metricNeedsField(operation);
   const selectedField = fields.find((field) => field.id === fieldId);
   const options = metricGroupings(challenge, operation);
   // Existing configurations stay editable without silently changing their grouping.
   const groups = options.includes(groupBy) ? options : [groupBy, ...options];
   const dirty = label !== (metric?.label ?? "") || operation !== (metric?.operation ?? (fields.length ? "average" : "count")) || fieldId !== (metric?.fieldId ?? (fields.length === 1 ? fields[0].id! : "")) || groupBy !== (metric?.groupBy ?? "none") || minSample !== String(metric?.minSample ?? 1) || cumulative !== (metric?.cumulative ?? false) || visibleDuring !== (metric?.visibleDuring ?? true) || visibleInResults !== (metric?.visibleInResults ?? true);
-  const close = () => { if (dirty) setDiscard(true); else onCancel(); };
   const validSource = !needsField || Boolean(selectedField);
-  const [calculationOpen, setCalculationOpen] = useState(!metric || !validSource);
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  const [calculationOpen] = useState(!metric || !validSource);
+  async function submit() {
     if (!validSource) { setError(t("errPickField")); return; }
     setBusy(true); setError(null);
     try {
@@ -94,34 +91,57 @@ export function MetricEditor({ challenge, metric, onCancel, onSave }: {
         ...(metric?.bayesPriorWeight != null ? { bayesPriorWeight: metric.bayesPriorWeight } : {}), visibleDuring, visibleInResults });
     } catch (cause) { setError(f.error(cause)); setBusy(false); }
   }
-  return <Dialog title={metric ? t("editMetric") : t("addMetric")} busy={busy} onClose={close}>
-    {discard ? <div role="alert" className="mb-5 space-y-3 rounded-xl bg-[var(--wash)] p-4"><p className="text-sm">{tc("unsavedChanges")}</p><div className="flex flex-wrap gap-2"><Button variant="secondary" disabled={busy} onClick={() => setDiscard(false)}>{tc("keepEditing")}</Button><Button variant="danger" disabled={busy} onClick={onCancel}>{tc("discardChanges")}</Button></div></div> : null}
-    <form onSubmit={submit} className="space-y-6">
-      <fieldset disabled={busy} className="min-w-0 space-y-6">
-        <label className="block"><span className={labelClass}>{t("metricNameLabel")}</span><input className={inputClass} value={label} onChange={(e) => setLabel(e.target.value)} required maxLength={100} placeholder={t("metricNamePlaceholder")} /></label>
-        <fieldset className="space-y-2"><legend className="mb-2 text-sm font-medium">{t("metricWhere")}</legend>
-          <label className="flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={visibleDuring} onChange={(e) => setVisibleDuring(e.target.checked)} />{t("metricVisibleDuring")}</label>
-          <label className="flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={visibleInResults} onChange={(e) => setVisibleInResults(e.target.checked)} />{t("metricVisibleResults")}</label>
-        </fieldset>
-        <details open={calculationOpen} onToggle={(e) => setCalculationOpen(e.currentTarget.open)} className="border-t border-[var(--line)] pt-4">
-          <summary className="cursor-pointer text-sm font-medium">{t("metricCalculation")}<span className="mt-1 block text-xs font-normal text-[var(--muted)]">{[tm(`operationName.${operation}`), selectedField?.label, tm(`groupBy.${groupBy}`)].filter(Boolean).join(" · ")}</span></summary>
-          <div className="mt-5 space-y-4">
-            <label className="block"><span className={labelClass}>{t("metricOperationLabel")}</span><select className={inputClass} value={operation} onChange={(e) => {
+  return (
+    <FormDialog
+      title={metric ? t("editMetric") : t("addMetric")}
+      dirty={dirty}
+      busy={busy}
+      error={error}
+      onCancel={onCancel}
+      onSubmit={submit}
+      submitLabel={metric ? tc("saveChanges") : t("addMetric")}
+      submitDisabled={!validSource}
+    >
+      <Field label={t("metricNameLabel")}>
+        <input className={inputClass} value={label} onChange={(e) => setLabel(e.target.value)} required maxLength={100} placeholder={t("metricNamePlaceholder")} />
+      </Field>
+      <fieldset className="space-y-2.5">
+        <legend className="mb-2 text-[13px] font-medium">{t("metricWhere")}</legend>
+        <Toggle checked={visibleDuring} onChange={setVisibleDuring} label={t("metricVisibleDuring")} />
+        <Toggle checked={visibleInResults} onChange={setVisibleInResults} label={t("metricVisibleResults")} />
+      </fieldset>
+      <Disclosure summary={t("metricCalculation")} defaultOpen={calculationOpen} preview={[tm(`operationName.${operation}`), selectedField?.label, tm(`groupBy.${groupBy}`)].filter(Boolean).join(" · ")}>
+        <div className="space-y-4 pt-2">
+          <Field label={t("metricOperationLabel")}>
+            <select className={inputClass} value={operation} onChange={(e) => {
               const next = e.target.value as Metric["operation"]; setOperation(next);
               const nextGroups = metricGroupings(challenge, next); if (!nextGroups.includes(groupBy)) setGroupBy("none");
               if (!selectedField && fields.length === 1) setFieldId(fields[0].id!);
-            }}>{metricOperations.filter((op) => op === operation || ((!metricNeedsField(op) || fields.length > 0) && (op !== "surprise" || challenge.entryTypes.some((type) => type.purpose === "expectation")))).map((op) => <option value={op} key={op}>{tm(`operationName.${op}`)}</option>)}</select></label>
-            {needsField ? <label className="block"><span className={labelClass}>{t("metricFieldLabel")}</span><select className={inputClass} value={fieldId} onChange={(e) => setFieldId(e.target.value)} required>
-              <option value="">{t("metricFieldPlaceholder")}</option>{fields.map((field) => <option key={field.id} value={field.id}>{field.label}{field.source ? ` · ${field.source}` : ""}</option>)}
-            </select>{!fields.length ? <small className="mt-2 block text-[var(--danger)]">{t("metricNoFields")}</small> : null}</label> : null}
-            {groups.length > 1 ? <label className="block"><span className={labelClass}>{t("metricGroupByLabel")}</span><select className={inputClass} value={groupBy} onChange={(e) => setGroupBy(e.target.value as NonNullable<Metric["groupBy"]>)}>{groups.map((group) => <option key={group} value={group}>{tm(`groupBy.${group}`)}</option>)}</select></label> : null}
-            {groupBy === "checkpoint" ? <label className="flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={cumulative} onChange={(e) => setCumulative(e.target.checked)} />{t("metricCumulativeLabel")}</label> : null}
-            {needsField ? <details className="border-t border-[var(--line)] pt-4"><summary className="cursor-pointer text-sm">{t("metricAdvanced")}</summary><label className="mt-4 block"><span className={labelClass}>{t("metricMinSampleLabel")}</span><input className={inputClass} type="number" min={1} step={1} value={minSample} onChange={(e) => setMinSample(e.target.value)} required /><small className="mt-2 block leading-5 text-[var(--muted)]">{t("metricMinSampleHint")}</small></label></details> : null}
-          </div>
-        </details>
-      </fieldset>
-      <StatusMessage error={error} />
-      <div className="flex justify-end gap-3 border-t border-[var(--line)] pt-4"><Button variant="secondary" disabled={busy} onClick={close}>{tc("cancel")}</Button><Button type="submit" disabled={busy || !validSource}>{busy ? tc("saving") : metric ? tc("saveChanges") : t("addMetric")}</Button></div>
-    </form>
-  </Dialog>;
+            }}>{metricOperations.filter((op) => op === operation || ((!metricNeedsField(op) || fields.length > 0) && (op !== "surprise" || challenge.entryTypes.some((type) => type.purpose === "expectation")))).map((op) => <option value={op} key={op}>{tm(`operationName.${op}`)}</option>)}</select>
+          </Field>
+          {needsField ? (
+            <Field label={t("metricFieldLabel")} error={!fields.length ? t("metricNoFields") : null}>
+              <select className={inputClass} value={fieldId} onChange={(e) => setFieldId(e.target.value)} required>
+                <option value="">{t("metricFieldPlaceholder")}</option>
+                {fields.map((field) => <option key={field.id} value={field.id}>{field.label}{field.source ? ` · ${field.source}` : ""}</option>)}
+              </select>
+            </Field>
+          ) : null}
+          {groups.length > 1 ? (
+            <Field label={t("metricGroupByLabel")}>
+              <select className={inputClass} value={groupBy} onChange={(e) => setGroupBy(e.target.value as NonNullable<Metric["groupBy"]>)}>{groups.map((group) => <option key={group} value={group}>{tm(`groupBy.${group}`)}</option>)}</select>
+            </Field>
+          ) : null}
+          {groupBy === "checkpoint" ? <Toggle checked={cumulative} onChange={setCumulative} label={t("metricCumulativeLabel")} /> : null}
+          {needsField ? (
+            <Disclosure summary={t("metricAdvanced")}>
+              <Field label={t("metricMinSampleLabel")} hint={t("metricMinSampleHint")} className="pt-2">
+                <input className={inputClass} type="number" min={1} step={1} value={minSample} onChange={(e) => setMinSample(e.target.value)} required />
+              </Field>
+            </Disclosure>
+          ) : null}
+        </div>
+      </Disclosure>
+    </FormDialog>
+  );
 }
