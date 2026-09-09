@@ -4,12 +4,13 @@ import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 
 import { useGoaFormat } from "./format";
-import { Button, StatusMessage } from "./ui";
+import { Button, cx, StatusMessage } from "./ui";
 
 /** Native modal supplies background inertness, focus containment and restoration. */
 export function Dialog({ title, children, onClose, busy = false }: {
   title: string; children: ReactNode; onClose: () => void; busy?: boolean;
 }) {
+  const tc = useTranslations("common");
   const ref = useRef<HTMLDialogElement>(null);
   const downOnBackdrop = useRef(false);
   const titleId = useId();
@@ -33,13 +34,81 @@ export function Dialog({ title, children, onClose, busy = false }: {
       onClick={(event) => { if (!busy && downOnBackdrop.current && event.target === ref.current) onClose(); }}
       className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-xl overflow-y-auto rounded-3xl border border-[var(--line)] bg-[var(--paper)] p-0 text-[var(--ink)] shadow-2xl backdrop:bg-black/45"
     >
-      <div className="flex items-start justify-between gap-4 border-b border-[var(--line)] px-6 py-5">
-        <h2 id={titleId} className="text-xl font-medium tracking-tight">{title}</h2>
+      <div className="flex items-center justify-between gap-4 border-b border-[var(--line)] px-6 py-4">
+        <h2 id={titleId} className="text-lg font-semibold tracking-tight">{title}</h2>
+        <button
+          type="button"
+          onClick={() => { if (!busy) onClose(); }}
+          disabled={busy}
+          aria-label={tc("close")}
+          className={cx("-mr-1.5 grid h-8 w-8 flex-none place-items-center rounded-lg text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)] disabled:opacity-40")}
+        >
+          <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" strokeLinecap="round" /></svg>
+        </button>
       </div>
       <div className="p-6">{children}</div>
     </dialog>
   );
   /* eslint-enable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/click-events-have-key-events */
+}
+
+/**
+ * The shared shell for every editing modal (field, item, metric, correction, …):
+ * a `Dialog`, the "unsaved changes" guard, a `<form>` with a disabled-while-busy
+ * `<fieldset>`, an inline error, and a right-aligned Cancel · Save footer. A
+ * caller passes only the fields and the save action.
+ */
+export function FormDialog({
+  title,
+  dirty,
+  busy,
+  error,
+  onCancel,
+  onSubmit,
+  submitLabel,
+  busyLabel,
+  danger = false,
+  submitDisabled = false,
+  children,
+}: {
+  title: string;
+  dirty: boolean;
+  busy: boolean;
+  error?: string | null;
+  onCancel: () => void;
+  onSubmit: () => void | Promise<void>;
+  submitLabel: string;
+  busyLabel?: string;
+  danger?: boolean;
+  submitDisabled?: boolean;
+  children: ReactNode;
+}) {
+  const tc = useTranslations("common");
+  const [discard, setDiscard] = useState(false);
+  const close = () => { if (dirty) setDiscard(true); else onCancel(); };
+  return (
+    <Dialog title={title} busy={busy} onClose={close}>
+      {discard ? (
+        <div role="alert" className="mb-5 flex flex-col gap-3 rounded-xl border border-[var(--warn-line)] bg-[var(--warn-soft)] px-4 py-3.5">
+          <p className="text-sm text-[var(--warn)]">{tc("unsavedChanges")}</p>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" className="min-h-9" disabled={busy} onClick={() => setDiscard(false)}>{tc("keepEditing")}</Button>
+            <Button variant="danger" className="min-h-9" disabled={busy} onClick={onCancel}>{tc("discardChanges")}</Button>
+          </div>
+        </div>
+      ) : null}
+      <form onSubmit={(event) => { event.preventDefault(); void onSubmit(); }} className="space-y-6">
+        <fieldset disabled={busy} className="min-w-0 space-y-5">{children}</fieldset>
+        <StatusMessage error={error} />
+        <div className="flex justify-end gap-3 border-t border-[var(--line)] pt-4">
+          <Button variant="secondary" disabled={busy} onClick={close}>{tc("cancel")}</Button>
+          <Button type="submit" variant={danger ? "danger" : "primary"} disabled={busy || submitDisabled}>
+            {busy ? busyLabel ?? tc("saving") : submitLabel}
+          </Button>
+        </div>
+      </form>
+    </Dialog>
+  );
 }
 
 /**

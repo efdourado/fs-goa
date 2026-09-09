@@ -17,8 +17,8 @@ import {
 export const cardClass =
   "rounded-[20px] border border-[var(--line)] bg-[var(--paper)] shadow-[var(--elevate-1)]";
 export const inputClass =
-  "mb-1 min-h-10 w-full rounded-xl border border-[var(--line)] bg-[var(--paper)] px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--main)] focus:ring-4 focus:ring-[var(--main)]/15 disabled:cursor-not-allowed disabled:bg-[var(--canvas)]";
-export const labelClass = "mb-1.5 block text-sm font-normal text-[var(--ink)]";
+  "min-h-11 w-full rounded-xl border border-[var(--line)] bg-[var(--paper)] px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--main)] focus:ring-4 focus:ring-[var(--main)]/18 disabled:cursor-not-allowed disabled:bg-[var(--canvas)] disabled:text-[var(--muted)]";
+export const labelClass = "mb-1.5 block text-[13px] font-medium text-[var(--ink)]";
 export const linkClass =
   "px-4 py-2 border-l-1 rounded-xl border-[var(--muted)] underline-offset-4 hover:opacity-90 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50";
 /** The "← Voltar" links that sit at the top of most screens. */
@@ -228,6 +228,159 @@ export function PageHeading({
       </div>
       {action}
     </div>
+  );
+}
+
+/**
+ * One field: a label (optionally marked optional), an optional hint above the
+ * control, the control itself, and an inline error below. The single rhythm
+ * every form in the app uses — pass `label=""` for a control that carries its
+ * own labelling.
+ */
+export function Field({
+  label,
+  hint,
+  error,
+  optional,
+  htmlFor,
+  className,
+  children,
+}: {
+  label: string;
+  hint?: ReactNode;
+  error?: string | null;
+  optional?: boolean;
+  htmlFor?: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  const t = useTranslations("common");
+  return (
+    <div className={cx("flex flex-col gap-1.5", className)}>
+      {label ? (
+        <label className="text-[13px] font-medium text-[var(--ink)]" htmlFor={htmlFor}>
+          {label}{optional ? <span className="font-normal text-[var(--muted)]"> · {t("optional")}</span> : null}
+        </label>
+      ) : null}
+      {hint ? <p className="-mt-0.5 text-xs leading-5 text-[var(--muted)]">{hint}</p> : null}
+      {children}
+      {error ? (
+        <p className="flex items-center gap-1.5 text-xs text-[var(--danger-strong)]">
+          <CircleExclamationIcon className="h-3.5 w-3.5 flex-none" />
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/** A `role="switch"` toggle — a single on/off preference, with an optional label + hint beside it. */
+export function Toggle({
+  checked,
+  onChange,
+  label,
+  hint,
+  disabled,
+  className,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  label?: ReactNode;
+  hint?: ReactNode;
+  disabled?: boolean;
+  className?: string;
+}) {
+  const control = (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={cx(
+        "relative inline-flex h-6 w-11 flex-none cursor-pointer items-center rounded-full p-0.5 transition disabled:cursor-not-allowed disabled:opacity-40",
+        checked ? "bg-[var(--main)]" : "bg-[var(--wash-strong)]",
+      )}
+    >
+      <span className={cx("h-5 w-5 rounded-full bg-white shadow transition-transform", checked ? "translate-x-5" : "translate-x-0")} />
+    </button>
+  );
+  if (!label && !hint) return <span className={className}>{control}</span>;
+  return (
+    <div className={cx("flex items-start gap-3 rounded-xl border border-[var(--line)] px-4 py-3.5", className)}>
+      <span className="min-w-0 flex-1">
+        {label ? <strong className="block text-sm font-medium">{label}</strong> : null}
+        {hint ? <span className="mt-0.5 block text-xs leading-5 text-[var(--muted)]">{hint}</span> : null}
+      </span>
+      <span className="mt-0.5">{control}</span>
+    </div>
+  );
+}
+
+/** A "pick one" group of bordered cards — a friendlier radio for 2–4 choices. */
+export function SelectableCards<T extends string>({
+  value,
+  onChange,
+  options,
+  disabled,
+  columns = 2,
+}: {
+  value: T;
+  onChange: (next: T) => void;
+  options: Array<{ value: T; label: string; hint?: string }>;
+  disabled?: boolean;
+  columns?: 1 | 2 | 3;
+}) {
+  return (
+    <div className={cx("grid gap-2.5", columns === 1 ? "" : columns === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2")}>
+      {options.map((option) => {
+        const active = option.value === value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            disabled={disabled}
+            aria-pressed={active}
+            onClick={() => onChange(option.value)}
+            className={cx(
+              "flex flex-col gap-0.5 rounded-xl border px-4 py-3 text-left transition disabled:cursor-not-allowed disabled:opacity-60",
+              active
+                ? "border-[var(--main)] bg-[var(--main-soft)] ring-[3px] ring-[var(--main)]/12"
+                : "border-[var(--line)] hover:border-[var(--main-line)]",
+            )}
+          >
+            <strong className={cx("text-[13.5px] font-medium", active && "text-[var(--main-strong)]")}>{option.label}</strong>
+            {option.hint ? <span className="text-[11.5px] text-[var(--muted)]">{option.hint}</span> : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** A consistent "More options" disclosure: a chevron summary, an optional preview of the current value, a top border. */
+export function Disclosure({
+  summary,
+  preview,
+  defaultOpen = false,
+  children,
+}: {
+  summary: string;
+  preview?: ReactNode;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <details open={defaultOpen} className="group border-t border-[var(--line)]">
+      <summary className="flex cursor-pointer list-none items-center gap-2 py-3.5 text-[13px] font-medium text-[var(--muted)] [&::-webkit-details-marker]:hidden">
+        <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 flex-none transition-transform group-open:rotate-180" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+          <path d="M4 6l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        {summary}
+        {preview ? <span className="truncate font-normal text-[var(--muted)]/80">· {preview}</span> : null}
+      </summary>
+      <div className="pb-1 pt-1">{children}</div>
+    </details>
   );
 }
 
