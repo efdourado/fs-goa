@@ -75,6 +75,8 @@ import {
   publishResults,
   reorderResultBlocks,
   saveCheckpoints,
+  setChallengeOrder,
+  setChallengePref,
   setExpectationEnabled,
   setParticipantNameConsent,
   saveEntry,
@@ -401,6 +403,12 @@ export async function PATCH(request: Request): Promise<Response> {
     }
     if (path[0] === "challenges" && path[2] === "expectation" && path.length === 3) {
       return json(await setExpectationEnabled(session, path[1], body));
+    }
+    if (isPath(path, "challenges", "prefs", "order")) {
+      return json(await setChallengeOrder(session, body));
+    }
+    if (path[0] === "challenges" && path[2] === "prefs" && path[1] !== "prefs" && path.length === 3) {
+      return json(await setChallengePref(session, path[1], body));
     }
     if (path[0] === "challenges" && path[2] === "consent" && path.length === 3) {
       return json(await setParticipantNameConsent(session, path[1], body));

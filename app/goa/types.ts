@@ -395,7 +395,18 @@ export interface ChallengeSummary {
   viewerNameConsent?: boolean;
   completedCount?: number;
   totalCount?: number | null;
+  /** Per-viewer homepage organisation (private; see `challenge_user_prefs`). */
+  pinned?: boolean;
+  colorTag?: ChallengeColorTag | null;
+  sortIndex?: number | null;
 }
+
+/** The fixed set of homepage colour tags a viewer can assign to a challenge. */
+export type ChallengeColorTag = "green" | "blue" | "violet" | "coral" | "amber" | "rose";
+
+export const CHALLENGE_COLOR_TAGS: readonly ChallengeColorTag[] = [
+  "green", "blue", "violet", "coral", "amber", "rose",
+];
 
 export interface ChallengeDetail extends ChallengeSummary {
   fields: ChallengeField[];

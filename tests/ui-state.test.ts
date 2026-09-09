@@ -606,3 +606,31 @@ test("detalhe do modelo: a mesma tela do desafio, só leitura — cabeçalho, re
   assert.doesNotMatch(html, /<form/, "nenhum formulário de registro no preview");
   assert.doesNotMatch(html, />Hoje</, "a aba 'Hoje' some no preview");
 });
+
+test("dashboard: shelves split by pin, workspace and status; colour filter narrows", async () => {
+  const { splitShelves, sortByIndex, applyColorFilter } = await import("../app/goa/screens/dashboard");
+  const c = (over: Partial<import("../app/goa/types").ChallengeSummary>): import("../app/goa/types").ChallengeSummary => ({
+    id: over.id ?? "x", groupId: over.groupId ?? "g", title: over.title ?? "T", status: over.status ?? "active", ...over,
+  });
+  const challenges = [
+    c({ id: "pin", status: "active", pinned: true, colorTag: "green" }),
+    c({ id: "run", status: "active", colorTag: "green" }),
+    c({ id: "run2", status: "active" }),
+    c({ id: "old", status: "closed" }),
+    c({ id: "solo", groupId: "ws", scope: "personal", status: "active", colorTag: "blue" }),
+  ];
+
+  const shelves = splitShelves(challenges, "ws");
+  assert.deepEqual(shelves.pinned.map((x) => x.id), ["pin"]);
+  assert.deepEqual(shelves.running.map((x) => x.id), ["run", "run2"], "pinned + personal are pulled out of running");
+  assert.deepEqual(shelves.space.map((x) => x.id), ["solo"]);
+  assert.deepEqual(shelves.archive.map((x) => x.id), ["old"]);
+
+  assert.deepEqual(applyColorFilter(shelves.running, "green").map((x) => x.id), ["run"]);
+  assert.deepEqual(applyColorFilter(shelves.running, null).map((x) => x.id), ["run", "run2"]);
+
+  const sorted = sortByIndex([
+    c({ id: "b", sortIndex: 2 }), c({ id: "a", sortIndex: 0 }), c({ id: "n" }), c({ id: "c", sortIndex: 1 }),
+  ]);
+  assert.deepEqual(sorted.map((x) => x.id), ["a", "c", "b", "n"], "unset sortIndex falls to the end");
+});

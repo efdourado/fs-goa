@@ -1,258 +1,265 @@
 {
-  "version": "7",
-  "dialect": "postgresql",
-  "entries": [
-    {
-      "idx": 0,
-      "version": "7",
-      "when": 1787938025329,
-      "tag": "0000_overrated_malice",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1787964586073,
-      "tag": "0001_windy_chat",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1788009348953,
-      "tag": "0002_perpetual_gressill",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1788015326834,
-      "tag": "0003_robust_deathstrike",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1788024058850,
-      "tag": "0004_brainy_dust",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1788094258278,
-      "tag": "0005_long_puma",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1788096426032,
-      "tag": "0006_lazy_true_believers",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "7",
-      "when": 1788106403391,
-      "tag": "0007_fresh_invaders",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "7",
-      "when": 1788113752372,
-      "tag": "0008_easy_mercury",
-      "breakpoints": true
-    },
-    {
-      "idx": 9,
-      "version": "7",
-      "when": 1788207963732,
-      "tag": "0009_damp_shard",
-      "breakpoints": true
-    },
-    {
-      "idx": 10,
-      "version": "7",
-      "when": 1788219335690,
-      "tag": "0010_ambitious_mister_sinister",
-      "breakpoints": true
-    },
-    {
-      "idx": 11,
-      "version": "7",
-      "when": 1788224697741,
-      "tag": "0011_open_shape",
-      "breakpoints": true
-    },
-    {
-      "idx": 12,
-      "version": "7",
-      "when": 1788228470987,
-      "tag": "0012_loose_senator_kelly",
-      "breakpoints": true
-    },
-    {
-      "idx": 13,
-      "version": "7",
-      "when": 1788263528016,
-      "tag": "0013_numerous_sally_floyd",
-      "breakpoints": true
-    },
-    {
-      "idx": 14,
-      "version": "7",
-      "when": 1788265874888,
-      "tag": "0014_slow_sally_floyd",
-      "breakpoints": true
-    },
-    {
-      "idx": 15,
-      "version": "7",
-      "when": 1788267116197,
-      "tag": "0015_spooky_maverick",
-      "breakpoints": true
-    },
-    {
-      "idx": 16,
-      "version": "7",
-      "when": 1788271044024,
-      "tag": "0016_boring_ronan",
-      "breakpoints": true
-    },
-    {
-      "idx": 17,
-      "version": "7",
-      "when": 1788296279913,
-      "tag": "0017_strong_unus",
-      "breakpoints": true
-    },
-    {
-      "idx": 18,
-      "version": "7",
-      "when": 1788304989481,
-      "tag": "0018_confused_liz_osborn",
-      "breakpoints": true
-    },
-    {
-      "idx": 19,
-      "version": "7",
-      "when": 1788305089481,
-      "tag": "0019_catalog_identity",
-      "breakpoints": true
-    },
-    {
-      "idx": 20,
-      "version": "7",
-      "when": 1788305189481,
-      "tag": "0020_drop_target_date",
-      "breakpoints": true
-    },
-    {
-      "idx": 21,
-      "version": "7",
-      "when": 1788452366997,
-      "tag": "0021_recipe_key_bookshelf",
-      "breakpoints": true
-    },
-    {
-      "idx": 22,
-      "version": "7",
-      "when": 1788470000000,
-      "tag": "0022_personal_living_lists",
-      "breakpoints": true
-    },
-    {
-      "idx": 23,
-      "version": "7",
-      "when": 1788480000000,
-      "tag": "0023_challenge_kind",
-      "breakpoints": true
-    },
-    {
-      "idx": 24,
-      "version": "7",
-      "when": 1788490000000,
-      "tag": "0024_habit_recipe",
-      "breakpoints": true
-    },
-    {
-      "idx": 25,
-      "version": "7",
-      "when": 1788500000000,
-      "tag": "0025_catalog_attributes",
-      "breakpoints": true
-    },
-    {
-      "idx": 26,
-      "version": "7",
-      "when": 1788510000000,
-      "tag": "0026_catalog_grouped_metrics",
-      "breakpoints": true
-    },
-    {
-      "idx": 27,
-      "version": "7",
-      "when": 1788520000000,
-      "tag": "0027_catalog_runtime_minutes",
-      "breakpoints": true
-    },
-    {
-      "idx": 28,
-      "version": "7",
-      "when": 1788530000000,
-      "tag": "0028_drop_raw_share_token",
-      "breakpoints": true
-    },
-    {
-      "idx": 29,
-      "version": "7",
-      "when": 1788540000000,
-      "tag": "0029_entry_type_visibility",
-      "breakpoints": true
-    },
-    {
-      "idx": 30,
-      "version": "7",
-      "when": 1788550000000,
-      "tag": "0030_checkpoint_kind_item_origin",
-      "breakpoints": true
-    },
-    {
-      "idx": 31,
-      "version": "7",
-      "when": 1788560000000,
-      "tag": "0031_metrics_median_consensus_rankings",
-      "breakpoints": true
-    },
-    {
-      "idx": 32,
-      "version": "7",
-      "when": 1788570000000,
-      "tag": "0032_name_consent_anon_default",
-      "breakpoints": true
-    },
-    {
-      "idx": 33,
-      "version": "7",
-      "when": 1788580000000,
-      "tag": "0033_trash_registry_and_deactivation",
-      "breakpoints": true
-    },
-    {
-      "idx": 34,
-      "version": "7",
-      "when": 1788590000000,
-      "tag": "0034_backfill_trash_items",
-      "breakpoints": true
-    },
-    {
-      "idx": 35,
-      "version": "7",
-      "when": 1788788166551,
-      "tag": "0035_restore_result_share_token",
-      "breakpoints": true
-    }
-  ]
+	"version": "7",
+	"dialect": "postgresql",
+	"entries": [
+		{
+			"idx": 0,
+			"version": "7",
+			"when": 1787938025329,
+			"tag": "0000_overrated_malice",
+			"breakpoints": true
+		},
+		{
+			"idx": 1,
+			"version": "7",
+			"when": 1787964586073,
+			"tag": "0001_windy_chat",
+			"breakpoints": true
+		},
+		{
+			"idx": 2,
+			"version": "7",
+			"when": 1788009348953,
+			"tag": "0002_perpetual_gressill",
+			"breakpoints": true
+		},
+		{
+			"idx": 3,
+			"version": "7",
+			"when": 1788015326834,
+			"tag": "0003_robust_deathstrike",
+			"breakpoints": true
+		},
+		{
+			"idx": 4,
+			"version": "7",
+			"when": 1788024058850,
+			"tag": "0004_brainy_dust",
+			"breakpoints": true
+		},
+		{
+			"idx": 5,
+			"version": "7",
+			"when": 1788094258278,
+			"tag": "0005_long_puma",
+			"breakpoints": true
+		},
+		{
+			"idx": 6,
+			"version": "7",
+			"when": 1788096426032,
+			"tag": "0006_lazy_true_believers",
+			"breakpoints": true
+		},
+		{
+			"idx": 7,
+			"version": "7",
+			"when": 1788106403391,
+			"tag": "0007_fresh_invaders",
+			"breakpoints": true
+		},
+		{
+			"idx": 8,
+			"version": "7",
+			"when": 1788113752372,
+			"tag": "0008_easy_mercury",
+			"breakpoints": true
+		},
+		{
+			"idx": 9,
+			"version": "7",
+			"when": 1788207963732,
+			"tag": "0009_damp_shard",
+			"breakpoints": true
+		},
+		{
+			"idx": 10,
+			"version": "7",
+			"when": 1788219335690,
+			"tag": "0010_ambitious_mister_sinister",
+			"breakpoints": true
+		},
+		{
+			"idx": 11,
+			"version": "7",
+			"when": 1788224697741,
+			"tag": "0011_open_shape",
+			"breakpoints": true
+		},
+		{
+			"idx": 12,
+			"version": "7",
+			"when": 1788228470987,
+			"tag": "0012_loose_senator_kelly",
+			"breakpoints": true
+		},
+		{
+			"idx": 13,
+			"version": "7",
+			"when": 1788263528016,
+			"tag": "0013_numerous_sally_floyd",
+			"breakpoints": true
+		},
+		{
+			"idx": 14,
+			"version": "7",
+			"when": 1788265874888,
+			"tag": "0014_slow_sally_floyd",
+			"breakpoints": true
+		},
+		{
+			"idx": 15,
+			"version": "7",
+			"when": 1788267116197,
+			"tag": "0015_spooky_maverick",
+			"breakpoints": true
+		},
+		{
+			"idx": 16,
+			"version": "7",
+			"when": 1788271044024,
+			"tag": "0016_boring_ronan",
+			"breakpoints": true
+		},
+		{
+			"idx": 17,
+			"version": "7",
+			"when": 1788296279913,
+			"tag": "0017_strong_unus",
+			"breakpoints": true
+		},
+		{
+			"idx": 18,
+			"version": "7",
+			"when": 1788304989481,
+			"tag": "0018_confused_liz_osborn",
+			"breakpoints": true
+		},
+		{
+			"idx": 19,
+			"version": "7",
+			"when": 1788305089481,
+			"tag": "0019_catalog_identity",
+			"breakpoints": true
+		},
+		{
+			"idx": 20,
+			"version": "7",
+			"when": 1788305189481,
+			"tag": "0020_drop_target_date",
+			"breakpoints": true
+		},
+		{
+			"idx": 21,
+			"version": "7",
+			"when": 1788452366997,
+			"tag": "0021_recipe_key_bookshelf",
+			"breakpoints": true
+		},
+		{
+			"idx": 22,
+			"version": "7",
+			"when": 1788470000000,
+			"tag": "0022_personal_living_lists",
+			"breakpoints": true
+		},
+		{
+			"idx": 23,
+			"version": "7",
+			"when": 1788480000000,
+			"tag": "0023_challenge_kind",
+			"breakpoints": true
+		},
+		{
+			"idx": 24,
+			"version": "7",
+			"when": 1788490000000,
+			"tag": "0024_habit_recipe",
+			"breakpoints": true
+		},
+		{
+			"idx": 25,
+			"version": "7",
+			"when": 1788500000000,
+			"tag": "0025_catalog_attributes",
+			"breakpoints": true
+		},
+		{
+			"idx": 26,
+			"version": "7",
+			"when": 1788510000000,
+			"tag": "0026_catalog_grouped_metrics",
+			"breakpoints": true
+		},
+		{
+			"idx": 27,
+			"version": "7",
+			"when": 1788520000000,
+			"tag": "0027_catalog_runtime_minutes",
+			"breakpoints": true
+		},
+		{
+			"idx": 28,
+			"version": "7",
+			"when": 1788530000000,
+			"tag": "0028_drop_raw_share_token",
+			"breakpoints": true
+		},
+		{
+			"idx": 29,
+			"version": "7",
+			"when": 1788540000000,
+			"tag": "0029_entry_type_visibility",
+			"breakpoints": true
+		},
+		{
+			"idx": 30,
+			"version": "7",
+			"when": 1788550000000,
+			"tag": "0030_checkpoint_kind_item_origin",
+			"breakpoints": true
+		},
+		{
+			"idx": 31,
+			"version": "7",
+			"when": 1788560000000,
+			"tag": "0031_metrics_median_consensus_rankings",
+			"breakpoints": true
+		},
+		{
+			"idx": 32,
+			"version": "7",
+			"when": 1788570000000,
+			"tag": "0032_name_consent_anon_default",
+			"breakpoints": true
+		},
+		{
+			"idx": 33,
+			"version": "7",
+			"when": 1788580000000,
+			"tag": "0033_trash_registry_and_deactivation",
+			"breakpoints": true
+		},
+		{
+			"idx": 34,
+			"version": "7",
+			"when": 1788590000000,
+			"tag": "0034_backfill_trash_items",
+			"breakpoints": true
+		},
+		{
+			"idx": 35,
+			"version": "7",
+			"when": 1788788166551,
+			"tag": "0035_restore_result_share_token",
+			"breakpoints": true
+		},
+		{
+			"idx": 36,
+			"version": "7",
+			"when": 1788991043899,
+			"tag": "0036_challenge_user_prefs",
+			"breakpoints": true
+		}
+	]
 }

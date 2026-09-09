@@ -558,7 +558,7 @@ export default function GoaApp() {
   } else if (screen.kind === "admin" || screen.kind === "create-challenge") {
     content = <main className="mx-auto max-w-2xl px-5 py-16"><EmptyState title={t("adminUnavailableTitle")} description={t("adminUnavailableBody")} action={<Button onClick={() => setScreen({ kind: "dashboard" })}>{t("backToStart")}</Button>} /></main>;
   } else {
-    content = <DashboardScreen user={user} groups={bootstrap.groups} challenges={bootstrap.challenges} personalWorkspaceId={bootstrap.personalWorkspaceId} limits={bootstrap.limits} onOpenGroup={(groupId) => setScreen({ kind: "group", groupId })} onOpenChallenge={(id) => openParticipant(id)} onOpenAdmin={(id) => openAdmin(id)} onCreateGroup={createGroup} onOpenPersonalSpace={() => setScreen({ kind: "personal-space" })} onCreatePersonalChallenge={() => setScreen({ kind: "create-personal-challenge" })} />;
+    content = <DashboardScreen user={user} groups={bootstrap.groups} challenges={bootstrap.challenges} personalWorkspaceId={bootstrap.personalWorkspaceId} limits={bootstrap.limits} csrfToken={bootstrap.csrfToken} onOpenGroup={(groupId) => setScreen({ kind: "group", groupId })} onOpenChallenge={(id) => openParticipant(id)} onOpenAdmin={(id) => openAdmin(id)} onCreateGroup={createGroup} onOpenPersonalSpace={() => setScreen({ kind: "personal-space" })} onCreatePersonalChallenge={() => setScreen({ kind: "create-personal-challenge" })} onChanged={() => { void refreshBootstrap(); }} />;
   }
 
   return (

@@ -58,6 +58,14 @@
   --hover-strong: rgba(20, 24, 20, 0.06);
   --elevate-1: 0 1px 2px rgba(32, 36, 31, 0.06);
   --elevate-2: 0 12px 40px rgba(32, 36, 31, 0.16);
+
+  /* Homepage colour tags — a private per-viewer label on a challenge card. */
+  --tag-green: #2f8f63;
+  --tag-blue: #4372c4;
+  --tag-violet: #6758d8;
+  --tag-coral: #ec6b4e;
+  --tag-amber: #cf8a2f;
+  --tag-rose: #c65b7c;
 }
 
 /* Dark palette — block A: visitors on "system". Mirror of block B below. */
@@ -97,6 +105,13 @@
     --hover-strong: rgba(255, 255, 255, 0.09);
     --elevate-1: 0 1px 2px rgba(0, 0, 0, 0.5);
     --elevate-2: 0 16px 48px rgba(0, 0, 0, 0.6);
+
+    --tag-green: #3fa878;
+    --tag-blue: #6f9be8;
+    --tag-violet: #9d90f0;
+    --tag-coral: #f08a6e;
+    --tag-amber: #e0a860;
+    --tag-rose: #dd88a4;
   }
 }
 
@@ -136,6 +151,13 @@
   --hover-strong: rgba(255, 255, 255, 0.09);
   --elevate-1: 0 1px 2px rgba(0, 0, 0, 0.5);
   --elevate-2: 0 16px 48px rgba(0, 0, 0, 0.6);
+
+  --tag-green: #3fa878;
+  --tag-blue: #6f9be8;
+  --tag-violet: #9d90f0;
+  --tag-coral: #f08a6e;
+  --tag-amber: #e0a860;
+  --tag-rose: #dd88a4;
 }
 
 * { box-sizing: border-box; }

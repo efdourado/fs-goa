@@ -17,6 +17,11 @@
 # local scratch (spreadsheets, calculations, notes — never versioned)
 /.tmp/
 
+# design canvas working files (mockups drafted with the design skill)
+/*.dc.html
+/canvas.json
+/goa-homepage-redesign.html
+
 # debug
 npm-debug.log*
 yarn-debug.log*

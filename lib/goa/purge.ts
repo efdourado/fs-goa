@@ -36,6 +36,7 @@ export async function purgeChallengeRows(client: PoolClient, challengeId: string
     [challengeId],
   );
   await client.query("DELETE FROM audit_events WHERE challenge_id=$1", [challengeId]);
+  await client.query("DELETE FROM challenge_user_prefs WHERE challenge_id=$1", [challengeId]);
   await client.query("DELETE FROM trash_items WHERE entity_kind='challenge' AND entity_id=$1", [challengeId]);
   await client.query("DELETE FROM challenges WHERE id=$1", [challengeId]);
 }

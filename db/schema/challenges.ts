@@ -180,6 +180,41 @@ export const challengeParticipants = pgTable(
   ],
 );
 
+/**
+ * Per-person homepage organisation: a pin, a colour tag and a manual sort
+ * position, private to each user (challenge admins never see or set these).
+ * A missing row means "no preference"; `sort_index` null falls to the default
+ * order. Keyed by (user, challenge) like `challengeParticipants`.
+ */
+export const challengeUserPrefs = pgTable(
+  "challenge_user_prefs",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    challengeId: text("challenge_id")
+      .notNull()
+      .references(() => challenges.id, { onDelete: "cascade" }),
+    pinned: boolean("pinned").notNull().default(false),
+    colorTag: text("color_tag"),
+    sortIndex: integer("sort_index"),
+    updatedAt: timestamptz("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({
+      name: "challenge_user_prefs_pk",
+      columns: [table.userId, table.challengeId],
+    }),
+    index("challenge_user_prefs_pinned_idx")
+      .on(table.userId)
+      .where(sql`${table.pinned}`),
+    check(
+      "challenge_user_prefs_color_tag_check",
+      sql`${table.colorTag} is null or ${table.colorTag} in ('green', 'blue', 'violet', 'coral', 'amber', 'rose')`,
+    ),
+  ],
+);
+
 export const challengeCheckpoints = pgTable(
   "challenge_checkpoints",
   {

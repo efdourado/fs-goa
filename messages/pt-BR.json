@@ -277,7 +277,38 @@
     "groupsCount": "{count, plural, one {# grupo} other {# grupos}}",
     "peopleCount": "{count, plural, one {# pessoa} other {# pessoas}}",
     "createGroup": "Criar grupo",
-    "archiveTitle": "Rascunhos e memórias"
+    "archiveTitle": "Rascunhos e memórias",
+    "shelf": {
+      "pinned": "Fixados",
+      "running": "Desafios que você conduz"
+    },
+    "filter": {
+      "all": "Tudo",
+      "reorder": "Reorganizar",
+      "reorderDone": "Concluir",
+      "context": "Limpar ({count})",
+      "empty": "Nenhum desafio nesta cor."
+    },
+    "color": {
+      "none": "Sem cor",
+      "green": "Verde",
+      "blue": "Azul",
+      "violet": "Violeta",
+      "coral": "Coral",
+      "amber": "Âmbar",
+      "rose": "Rosa"
+    },
+    "card": {
+      "more": "Mais opções",
+      "pin": "Fixar no topo",
+      "unpin": "Desafixar",
+      "color": "Cor",
+      "moveUp": "Mover para cima",
+      "moveDown": "Mover para baixo",
+      "open": "Abrir",
+      "manage": "Gerenciar"
+    },
+    "prefError": "Não foi possível salvar sua preferência."
   },
   "group": {
     "emptyCreatePrompt": "Escolha um modelo e prepare a 1ª edição clicando <action>aqui</action>.",

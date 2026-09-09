@@ -277,7 +277,38 @@
     "groupsCount": "{count, plural, one {# group} other {# groups}}",
     "peopleCount": "{count, plural, one {# person} other {# people}}",
     "createGroup": "Create group",
-    "archiveTitle": "Drafts and memories"
+    "archiveTitle": "Drafts and memories",
+    "shelf": {
+      "pinned": "Pinned",
+      "running": "Challenges you run"
+    },
+    "filter": {
+      "all": "All",
+      "reorder": "Reorder",
+      "reorderDone": "Done",
+      "context": "Clear ({count})",
+      "empty": "No challenges in this colour."
+    },
+    "color": {
+      "none": "No colour",
+      "green": "Green",
+      "blue": "Blue",
+      "violet": "Violet",
+      "coral": "Coral",
+      "amber": "Amber",
+      "rose": "Rose"
+    },
+    "card": {
+      "more": "More options",
+      "pin": "Pin to top",
+      "unpin": "Unpin",
+      "color": "Colour",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "open": "Open",
+      "manage": "Manage"
+    },
+    "prefError": "Could not save your preference."
   },
   "group": {
     "emptyCreatePrompt": "Pick a preset and set up the 1st edition by clicking <action>here</action>.",

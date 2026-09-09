@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { useGoaFormat } from "./format";
-import { SettingsMenu } from "./SettingsMenu";
+import { MobileHeaderMenu, SettingsMenu } from "./SettingsMenu";
 import type { ChallengeStatus, Id, MemberRequest, SubmissionMode, User } from "./types";
 import {
   dateKeyInSaoPaulo,
@@ -85,11 +85,41 @@ function CircleExclamationIcon({ className }: { className?: string }) {
   );
 }
 
-function CircleMinusIcon({ className }: { className?: string }) {
+export function CircleMinusIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
       <circle cx="8" cy="8" r="6.3" />
       <path d="M5.2 8h5.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** Pin state as a circle — filled disc when pinned, plain ring when not. No pushpin. */
+export function CirclePinIcon({ className, filled = false }: { className?: string; filled?: boolean }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+      <circle cx="10" cy="10" r="6" fill={filled ? "currentColor" : "none"} />
+    </svg>
+  );
+}
+
+/** Circled chevron for "move up" / "move down". */
+export function CircleChevronIcon({ className, dir }: { className?: string; dir: "up" | "down" }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+      <circle cx="10" cy="10" r="7.5" />
+      <path d={dir === "up" ? "M7 11l3-3 3 3" : "M7 9l3 3 3-3"} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** A 2×3 dot grid — the drag handle shown in reorder mode. */
+export function DragDotsIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={className} fill="currentColor" aria-hidden="true">
+      <circle cx="6" cy="4" r="1.3" /><circle cx="10" cy="4" r="1.3" />
+      <circle cx="6" cy="8" r="1.3" /><circle cx="10" cy="8" r="1.3" />
+      <circle cx="6" cy="12" r="1.3" /><circle cx="10" cy="12" r="1.3" />
     </svg>
   );
 }
@@ -343,12 +373,19 @@ export function AppHeader({
               <span className="block text-xs text-[var(--muted)]">@{user.username}</span>
             </span>
           </button>
-          <NotificationsMenu
+          <div className="hidden items-center gap-0.5 sm:flex sm:gap-2">
+            <NotificationsMenu
+              notifications={notifications}
+              onAcceptRequest={onAcceptRequest}
+              onDeclineRequest={onDeclineRequest}
+            />
+            <SettingsMenu />
+          </div>
+          <MobileHeaderMenu
             notifications={notifications}
             onAcceptRequest={onAcceptRequest}
             onDeclineRequest={onDeclineRequest}
           />
-          <SettingsMenu />
           <button
             className={cx(navLink, "hidden shrink-0 disabled:opacity-50 sm:inline-flex sm:items-center")}
             type="button"
@@ -439,7 +476,25 @@ function HeaderOverflowMenu({
   );
 }
 
-function NotificationsMenu({
+/** Bell glyph with the unread badge — shared by the desktop dropdown and the phone sheet. */
+export function NotificationBell({ count }: { count: number }) {
+  return (
+    <>
+      <svg viewBox="0 0 16 16" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
+        <path d="M8 2a3.6 3.6 0 0 0-3.6 3.6c0 2.6-1 4-1.6 4.65h10.4C12.6 9.6 11.6 8.2 11.6 5.6A3.6 3.6 0 0 0 8 2Z" strokeLinejoin="round" />
+        <path d="M6.4 12.25a1.6 1.6 0 0 0 3.2 0" strokeLinecap="round" />
+      </svg>
+      {count ? (
+        <span className="absolute right-0.5 top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-[var(--main)] px-1 text-[10px] font-black leading-none text-white">
+          {count > 9 ? "9+" : count}
+        </span>
+      ) : null}
+    </>
+  );
+}
+
+/** The member-request inbox body: the list (with accept/decline) or an empty note. */
+export function NotificationList({
   notifications,
   onAcceptRequest,
   onDeclineRequest,
@@ -450,9 +505,65 @@ function NotificationsMenu({
 }) {
   const t = useTranslations("notifications");
   const f = useGoaFormat();
-  const [open, setOpen] = useState(false);
   const [pendingId, setPendingId] = useState<Id | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const inbox = notifications ?? [];
+
+  async function respond(id: Id, action: "accept" | "decline") {
+    setPendingId(id);
+    setError(null);
+    try {
+      await (action === "accept" ? onAcceptRequest(id) : onDeclineRequest(id));
+    } catch {
+      setError(t("error"));
+    } finally {
+      setPendingId(null);
+    }
+  }
+
+  if (!inbox.length) {
+    return <p className="px-4 py-6 text-center text-sm text-[var(--muted)]">{t("empty")}</p>;
+  }
+  return (
+    <>
+      {error ? <p className="border-b border-[var(--line)] bg-[var(--danger-soft)] px-4 py-2 text-xs text-[var(--danger)]">{error}</p> : null}
+      <ul className="divide-y divide-[var(--line)]">
+        {inbox.map((request) => (
+          <li className="px-4 py-3" key={request.id}>
+            <p className="text-sm leading-5">
+              {t.rich("invited", {
+                invitedBy: request.invitedBy ?? t("someone"),
+                groupName: request.groupName,
+                b: (chunks) => <strong>{chunks}</strong>,
+              })}
+            </p>
+            <p className="mt-0.5 text-xs text-[var(--muted)]">{f.dateTime(request.createdAt)}</p>
+            <div className="mt-2 flex gap-2">
+              <Button className="min-h-9 px-3 py-1 text-xs" disabled={pendingId === request.id} onClick={() => void respond(request.id, "accept")}>
+                {pendingId === request.id ? "…" : t("accept")}
+              </Button>
+              <Button className="min-h-9 px-3 py-1 text-xs" variant="ghost" disabled={pendingId === request.id} onClick={() => void respond(request.id, "decline")}>
+                {t("decline")}
+              </Button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
+function NotificationsMenu({
+  notifications,
+  onAcceptRequest,
+  onDeclineRequest,
+}: {
+  notifications: MemberRequest[];
+  onAcceptRequest: (id: Id) => Promise<void>;
+  onDeclineRequest: (id: Id) => Promise<void>;
+}) {
+  const t = useTranslations("notifications");
+  const [open, setOpen] = useState(false);
   const inbox = notifications ?? [];
   const count = inbox.length;
   const containerRef = useRef<HTMLDivElement>(null);
@@ -471,18 +582,6 @@ function NotificationsMenu({
     };
   }, [open]);
 
-  async function respond(id: Id, action: "accept" | "decline") {
-    setPendingId(id);
-    setError(null);
-    try {
-      await (action === "accept" ? onAcceptRequest(id) : onDeclineRequest(id));
-    } catch {
-      setError(t("error"));
-    } finally {
-      setPendingId(null);
-    }
-  }
-
   return (
     <div className="relative" ref={containerRef}>
       <button
@@ -492,15 +591,7 @@ function NotificationsMenu({
         aria-label={count ? t("labelCount", { count }) : t("label")}
         aria-expanded={open}
       >
-        <svg viewBox="0 0 16 16" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
-          <path d="M8 2a3.6 3.6 0 0 0-3.6 3.6c0 2.6-1 4-1.6 4.65h10.4C12.6 9.6 11.6 8.2 11.6 5.6A3.6 3.6 0 0 0 8 2Z" strokeLinejoin="round" />
-          <path d="M6.4 12.25a1.6 1.6 0 0 0 3.2 0" strokeLinecap="round" />
-        </svg>
-        {count ? (
-          <span className="absolute right-0.5 top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-[var(--main)] px-1 text-[10px] font-black leading-none text-white">
-            {count > 9 ? "9+" : count}
-          </span>
-        ) : null}
+        <NotificationBell count={count} />
       </button>
       {open ? (
         <div className="absolute right-0 z-50 mt-2 w-[min(92vw,22rem)] overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--paper)] shadow-[var(--elevate-2)]" role="dialog" aria-label={t("title")}>
@@ -508,33 +599,9 @@ function NotificationsMenu({
             <strong className="text-sm">{t("title")}</strong>
             {count ? <span className="text-xs text-[var(--muted)]">{t("pending", { count })}</span> : null}
           </div>
-          {error ? <p className="border-b border-[var(--line)] bg-[var(--danger-soft)] px-4 py-2 text-xs text-[var(--danger)]">{error}</p> : null}
-          {count ? (
-            <ul className="max-h-[70vh] divide-y divide-[var(--line)] overflow-y-auto">
-              {inbox.map((request) => (
-                <li className="px-4 py-3" key={request.id}>
-                  <p className="text-sm leading-5">
-                    {t.rich("invited", {
-                      invitedBy: request.invitedBy ?? t("someone"),
-                      groupName: request.groupName,
-                      b: (chunks) => <strong>{chunks}</strong>,
-                    })}
-                  </p>
-                  <p className="mt-0.5 text-xs text-[var(--muted)]">{f.dateTime(request.createdAt)}</p>
-                  <div className="mt-2 flex gap-2">
-                    <Button className="min-h-9 px-3 py-1 text-xs" disabled={pendingId === request.id} onClick={() => void respond(request.id, "accept")}>
-                      {pendingId === request.id ? "…" : t("accept")}
-                    </Button>
-                    <Button className="min-h-9 px-3 py-1 text-xs" variant="ghost" disabled={pendingId === request.id} onClick={() => void respond(request.id, "decline")}>
-                      {t("decline")}
-                    </Button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="px-4 py-6 text-center text-sm text-[var(--muted)]">{t("empty")}</p>
-          )}
+          <div className="max-h-[70vh] overflow-y-auto">
+            <NotificationList notifications={inbox} onAcceptRequest={onAcceptRequest} onDeclineRequest={onDeclineRequest} />
+          </div>
         </div>
       ) : null}
     </div>

@@ -277,7 +277,38 @@
     "groupsCount": "{count, plural, one {# grupo} other {# grupos}}",
     "peopleCount": "{count, plural, one {# persona} other {# personas}}",
     "createGroup": "Crear grupo",
-    "archiveTitle": "Borradores y recuerdos"
+    "archiveTitle": "Borradores y recuerdos",
+    "shelf": {
+      "pinned": "Fijados",
+      "running": "Desafíos que conduces"
+    },
+    "filter": {
+      "all": "Todo",
+      "reorder": "Reorganizar",
+      "reorderDone": "Listo",
+      "context": "Limpiar ({count})",
+      "empty": "Ningún desafío en este color."
+    },
+    "color": {
+      "none": "Sin color",
+      "green": "Verde",
+      "blue": "Azul",
+      "violet": "Violeta",
+      "coral": "Coral",
+      "amber": "Ámbar",
+      "rose": "Rosa"
+    },
+    "card": {
+      "more": "Más opciones",
+      "pin": "Fijar arriba",
+      "unpin": "Quitar fijado",
+      "color": "Color",
+      "moveUp": "Mover arriba",
+      "moveDown": "Mover abajo",
+      "open": "Abrir",
+      "manage": "Gestionar"
+    },
+    "prefError": "No se pudo guardar tu preferencia."
   },
   "group": {
     "emptyCreatePrompt": "Elige una plantilla y prepara la 1.ª edición haciendo clic <action>aquí</action>.",
