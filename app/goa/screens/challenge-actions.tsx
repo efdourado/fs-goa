@@ -25,7 +25,7 @@ function ChallengeStateDialog({ challenge, onTransition, onClose }: {
   const longDate: Intl.DateTimeFormatOptions = { day: "2-digit", month: "long", year: "numeric" };
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [confirm, setConfirm] = useState<"activate" | "close" | null>(null);
+  const [confirm, setConfirm] = useState(false);
   const [preflightReady, setPreflightReady] = useState(false);
   const scheduled = isChallengeScheduled(challenge.status, challenge.startsOn, challenge.submissionMode);
 
@@ -33,7 +33,7 @@ function ChallengeStateDialog({ challenge, onTransition, onClose }: {
     setBusy(true); setError(null);
     try {
       await onTransition(action === "close" ? "closed" : "active");
-      setConfirm(null);
+      setConfirm(false);
     } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
   }
 
@@ -42,15 +42,15 @@ function ChallengeStateDialog({ challenge, onTransition, onClose }: {
       <ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />
       <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{challenge.status === "draft" ? t("stateDraft") : scheduled ? t("stateScheduled", { date: f.date(challenge.startsOn, longDate) }) : challenge.status === "active" ? t("stateActive") : t("stateClosed")}</p>
       <div className="mt-4">
-        {challenge.status === "draft" ? <Button disabled={busy || !preflightReady || confirm !== null} onClick={() => setConfirm("activate")}>{t("activate")}</Button> : null}
-        {challenge.status === "active" ? <Button variant="danger" disabled={busy || confirm !== null} onClick={() => setConfirm("close")}>{t("close")}</Button> : null}
-        {challenge.status === "closed" ? <Button variant="secondary" disabled={busy || confirm !== null} onClick={() => void run("reopen")}>{busy ? tc("saving") : t("reopen")}</Button> : null}
+        {challenge.status === "draft" ? <Button disabled={busy || !preflightReady || confirm} onClick={() => setConfirm(true)}>{t("activate")}</Button> : null}
+        {challenge.status === "active" ? <Button variant="danger" disabled={busy} onClick={() => void run("close")}>{busy ? tc("saving") : t("close")}</Button> : null}
+        {challenge.status === "closed" ? <Button variant="secondary" disabled={busy} onClick={() => void run("reopen")}>{busy ? tc("saving") : t("reopen")}</Button> : null}
       </div>
       {confirm ? <div className="mt-4 space-y-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4">
-        <p className="text-sm leading-6">{confirm === "activate" ? t("activateConfirm") : t("closeConfirm")}</p>
+        <p className="text-sm leading-6">{t("activateConfirm")}</p>
         <div className="flex flex-wrap justify-end gap-2">
-          <Button variant="secondary" disabled={busy} onClick={() => setConfirm(null)}>{tc("cancel")}</Button>
-          <Button variant={confirm === "close" ? "danger" : "primary"} disabled={busy} onClick={() => void run(confirm)}>{busy ? tc("saving") : confirm === "activate" ? t("activate") : t("close")}</Button>
+          <Button variant="secondary" disabled={busy} onClick={() => setConfirm(false)}>{tc("cancel")}</Button>
+          <Button disabled={busy} onClick={() => void run("activate")}>{busy ? tc("saving") : t("activate")}</Button>
         </div>
       </div> : null}
     </div>
