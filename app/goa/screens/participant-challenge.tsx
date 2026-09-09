@@ -927,9 +927,8 @@ export function ParticipantChallengeScreen({
       ) : null}
 
       <div className="mt-5">
-        {activeTab === "today" ? (() => {
-          const todayEmpty = challenge.status === "closed" || (challenge.submissionMode !== "free" && !selectedItem && !undatedDaily);
-          return <div className={cx("grid gap-5", checkpointPicker ? "lg:grid-cols-[minmax(0,1.5fr)_minmax(270px,0.6fr)]" : todayEmpty ? "" : "mx-auto max-w-3xl")}>
+        {activeTab === "today" ? (
+          <div className={cx("grid gap-5", checkpointPicker ? "lg:grid-cols-[minmax(0,1.5fr)_minmax(270px,0.6fr)]" : "")}>
             <section className={cx(cardClass, "min-w-0 p-5 sm:p-7")}>
               {challenge.status === "closed" ? <EmptyState title={t("closedTitle")} description={t("closedBody")} action={<Button onClick={() => onTab("results")}>{t("seeResults")}</Button>} /> : challenge.submissionMode !== "free" && !selectedItem && !undatedDaily ? <EmptyState title={t("noCheckpointTitle")} description={t("noCheckpointBody")} /> : (
                 <>
@@ -952,8 +951,8 @@ export function ParticipantChallengeScreen({
               )}
             </section>
             {checkpointPicker ? <aside className="min-w-0">{checkpointPicker}</aside> : null}
-          </div>;
-        })() : null}
+          </div>
+        ) : null}
 
         {activeTab === "results" ? (
           <ResultView challenge={challenge} hideCompletionRate onBackToEntry={preview ? undefined : () => onTab("today")} />
