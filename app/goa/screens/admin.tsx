@@ -63,7 +63,7 @@ function ShowMoreList<T>({
       {items.length > preview ? (
         <button
           type="button"
-          className="mt-2 text-xs font-light text-[var(--muted)] transition hover:text-[var(--ink)]"
+          className="mt-2 cursor-pointer text-xs font-light text-[var(--muted)] transition hover:text-[var(--ink)]"
           onClick={() => setOpen((value) => !value)}
         >
           {open ? t("showLess") : t("showMoreItems", { count: items.length - preview })}
@@ -1146,8 +1146,8 @@ export function AdminScreen({
       <PageHeading title={challenge.title} description={t("subtitle")} action={<ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />} />
       <nav className="mb-8 border-b border-[var(--line)]" aria-label={t("tabsAria")}>
         <div className="flex flex-wrap items-center gap-1">
-          {navTabs.map((id) => <button key={id} type="button" aria-current={activeTab === id ? "page" : undefined} onClick={() => onTab(id)} className={cx("min-h-12 border-b-2 px-4 text-sm font-medium transition", activeTab === id ? "border-[var(--main-strong)] text-[var(--main-strong)]" : "border-transparent text-[var(--muted)] hover:text-[var(--ink)]")}>{t(`tabs.${id}`)}</button>)}
-          <button type="button" aria-expanded={technicalOpen} className="ml-1 min-h-11 px-3 text-sm text-[var(--muted)] hover:text-[var(--ink)]" onClick={() => { if (technicalTabs.includes(activeTab)) onTab("overview"); setShowTechnical(!technicalOpen); }}>{tx(technicalOpen ? "fewerOptions" : "moreOptions")}</button>
+          {navTabs.map((id) => <button key={id} type="button" aria-current={activeTab === id ? "page" : undefined} onClick={() => onTab(id)} className={cx("min-h-12 cursor-pointer border-b-2 px-4 text-sm font-medium transition", activeTab === id ? "border-[var(--main-strong)] text-[var(--main-strong)]" : "border-transparent text-[var(--muted)] hover:text-[var(--ink)]")}>{t(`tabs.${id}`)}</button>)}
+          <button type="button" aria-expanded={technicalOpen} className="ml-1 min-h-11 cursor-pointer px-3 text-sm text-[var(--muted)] hover:text-[var(--ink)]" onClick={() => { if (technicalTabs.includes(activeTab)) onTab("overview"); setShowTechnical(!technicalOpen); }}>{tx(technicalOpen ? "fewerOptions" : "moreOptions")}</button>
         </div>
       </nav>
       {activeTab === "overview" ? <div className="space-y-12"><AdminOverview challenge={challenge} onSave={onSaveBasics} />{!isPersonal ? <div className="border-t border-[var(--line)] pt-8"><AdminParticipants key={challenge.participants.map((p) => p.userId ?? p.id).join(",")} challenge={challenge} group={group} onSave={onSaveParticipants} /></div> : null}</div> : null}
