@@ -1155,6 +1155,39 @@ test("copiar um desafio carrega as semanas, a distribuição dos itens e a dura�
   assert.equal(tmpl.items.length, 3);
 });
 
+test("o cronograma pode ser escondido da página de resultado sem apagar os checkpoints", async () => {
+  const owner = await register("Dona Cronograma Oculto", "dona_crono_oculto");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Ciclo" } })).body as { id: string }).id;
+  const challengeId = ((await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "cinema", title: "Ciclo com semanas", startsOn: "2026-03-02", endsOn: "2026-03-22",
+      participantIds: [owner.user.id], items: [{ title: "Filme A", year: 2020 }, { title: "Filme B", year: 2021 }],
+    },
+  })).body as { id: string }).id;
+  await call("POST", `/api/challenges/${challengeId}/checkpoints`, {
+    session: owner,
+    body: { checkpoints: [
+      { title: "Semana 1", kind: "week", startsAt: "2026-03-02", dueAt: "2026-03-08" },
+      { title: "Semana 2", kind: "week", startsAt: "2026-03-09", dueAt: "2026-03-15" },
+    ] },
+  });
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "closed" } });
+
+  const before = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { showSchedule: boolean; checkpoints: unknown[] };
+  assert.equal(before.showSchedule, true, "mostra por padrão");
+  assert.equal(before.checkpoints.length, 2);
+
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/results`, { session: owner, body: { showSchedule: false } })).response.status, 200);
+  const hidden = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { showSchedule: boolean; checkpoints: unknown[] };
+  assert.equal(hidden.showSchedule, false, "escondido depois de desmarcar");
+  assert.equal(hidden.checkpoints.length, 2, "os checkpoints continuam existindo");
+
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/results`, { session: owner, body: { showSchedule: true } })).response.status, 200);
+  assert.equal(((await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { showSchedule: boolean }).showSchedule, true, "volta a mostrar");
+});
+
 test("aplica limites de criação por dono e por grupo", async () => {
   const owner = await register("Limite", "limite_dono");
 

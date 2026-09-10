@@ -387,6 +387,8 @@ export interface ChallengeSummary {
   template?: Template | null;
   recipeKey?: RecipeKey | null;
   resultsAnon?: boolean;
+  /** Cosmetic: false hides the read-only checkpoint grid on the challenge / result / template pages. */
+  showSchedule?: boolean;
   submissionMode?: SubmissionMode;
   completionEntryTypeId?: Id | null;
   viewerRole?: Role;

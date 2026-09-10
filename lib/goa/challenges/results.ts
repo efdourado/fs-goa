@@ -988,6 +988,13 @@ export async function curateResults(
         }
       }
     }
+    // Whether the read-only checkpoint grid shows on the challenge / result /
+    // template pages. Cosmetic — the frozen public snapshot never rendered it,
+    // and the template preview reads this live, so no republish is needed.
+    if (Object.hasOwn(body, "showSchedule")) {
+      await client.query("UPDATE challenges SET show_schedule = $2, updated_at = now() WHERE id = $1",
+        [challengeId, body.showSchedule === true]);
+    }
     const stillPublished = access.challenge.results_published_at !== null && !unpublishedForAnon;
     if (body.regenerate === true) {
       await generateShowcase(client, challengeId, session.user.id);

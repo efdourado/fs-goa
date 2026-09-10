@@ -771,6 +771,8 @@
     "draftSavedUnpublishedAnon": "Draft saved. Because anonymisation changed, the showcase was unpublished — the old link stopped working. Publish again when you're ready.",
     "anonymizeParticipants": "Anonymise participants on the public page",
     "anonymizeHint": "On the public showcase (/results) names become Participant 1, 2… — in the per-person and indicator-bias series too. In-group views keep real names. Changing this while a showcase is published takes the link down automatically.",
+    "showScheduleLabel": "Show the schedule",
+    "showScheduleHint": "The week/session grid stops appearing on the challenge, result and template pages. The checkpoints stay — metrics and the schedule editor are unaffected.",
     "showcaseRegenerated": "Draft rebuilt.",
     "publishTitle": "Publication",
     "publishSubtitle": "Freeze the current draft as the public showcase and share its link.",

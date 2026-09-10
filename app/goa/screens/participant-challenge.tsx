@@ -652,7 +652,7 @@ function CheckpointSchedule({ challenge }: { challenge: ChallengeDetail }) {
         .sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
     [challenge.checkpoints],
   );
-  if (planned.length === 0) return null;
+  if (planned.length === 0 || challenge.showSchedule === false) return null;
   const itemsByCheckpoint = new Map<Id, ChallengeItem[]>();
   for (const item of challenge.items) {
     if (!item.checkpointId) continue;

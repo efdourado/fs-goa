@@ -62,6 +62,11 @@ export const challenges = pgTable(
     // participant without `challenge_participants.name_consent` still shows
     // anonymised. In-group views always keep real names.
     resultsAnon: boolean("results_anon").notNull().default(true),
+    // Purely cosmetic: when false, the read-only checkpoint grid
+    // (`CheckpointSchedule`) is hidden on the challenge / result / template
+    // pages. The checkpoints themselves stay — they still drive metrics and the
+    // admin schedule editor.
+    showSchedule: boolean("show_schedule").notNull().default(true),
     publishedAsTemplateAt: timestamptz("published_as_template_at"),
     templateSummary: text("template_summary"),
     deletedAt: timestamptz("deleted_at"),

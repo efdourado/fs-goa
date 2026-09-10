@@ -943,6 +943,8 @@ function AdminResults({
   const [anonymize, setAnonymize] = useState(challenge.resultsAnon === true);
   const [includeRankings, setIncludeRankings] = useState((challenge.result?.personalRankings?.length ?? 0) > 0 || !challenge.result);
   const [includeAffinity, setIncludeAffinity] = useState(Boolean(challenge.result?.affinity?.pairs.length) || !challenge.result);
+  const [showSchedule, setShowSchedule] = useState(challenge.showSchedule !== false);
+  const hasSchedule = challenge.checkpoints.some((cp) => cp.kind && cp.kind !== "day");
   const savedOrderKey = (challenge.result?.blocks ?? []).map((b) => b.id).join(",");
   const [blockOrder, setBlockOrder] = useState(
     [...(challenge.result?.blocks ?? [])].sort((a, b) => a.position - b.position).map((block) => ({ id: block.id, visible: block.visible })),
@@ -1002,6 +1004,7 @@ function AdminResults({
         anonymizeParticipants: anonymize,
         includeRankings,
         includeAffinity,
+        ...(hasSchedule ? { showSchedule } : {}),
       });
       setSuccess(savedMessage(result, t("resultsSaved")));
     } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
@@ -1010,7 +1013,7 @@ function AdminResults({
   async function regenerate() {
     setBusy(true); setError(null); setSuccess(null);
     try {
-      const result = await onSave({ regenerate: true, anonymizeParticipants: anonymize });
+      const result = await onSave({ regenerate: true, anonymizeParticipants: anonymize, ...(hasSchedule ? { showSchedule } : {}) });
       setSuccess(savedMessage(result, t("showcaseRegenerated")));
     } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
   }
@@ -1037,6 +1040,7 @@ function AdminResults({
           </div>
         </fieldset>
         <label className="mt-6 flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4 text-sm"><input className="mt-0.5" type="checkbox" aria-label={t("anonymizeParticipants")} checked={anonymize} onChange={(event) => setAnonymize(event.target.checked)} /><span><strong className="block">{t("anonymizeParticipants")}</strong><small className="text-[var(--muted)]">{t("anonymizeHint")}</small></span></label>
+        {hasSchedule ? <label className="mt-3 flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4 text-sm"><input className="mt-0.5" type="checkbox" aria-label={t("showScheduleLabel")} checked={showSchedule} onChange={(event) => setShowSchedule(event.target.checked)} /><span><strong className="block">{t("showScheduleLabel")}</strong><small className="text-[var(--muted)]">{t("showScheduleHint")}</small></span></label> : null}
         <div className="mt-5"><StatusMessage error={error} success={success} /></div>
         <div className="mt-5 flex flex-col gap-2 sm:flex-row"><Button disabled={busy} onClick={() => void save()}>{busy ? tc("saving") : t("saveDraft")}</Button><Button variant="secondary" disabled={busy} onClick={() => void regenerate()}>{t("regenerateDraft")}</Button></div>
         <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{t("regenerateHint")}</p>

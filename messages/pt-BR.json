@@ -771,6 +771,8 @@
     "draftSavedUnpublishedAnon": "Rascunho salvo. Como a anonimização mudou, a vitrine foi despublicada — o link antigo parou de funcionar. Publique de novo quando estiver pronto.",
     "anonymizeParticipants": "Anonimizar participantes na página pública",
     "anonymizeHint": "Na vitrine pública (/results) os nomes viram Participante 1, 2… — inclusive nas séries por pessoa e de viés do indicador. As telas dentro do grupo mantêm os nomes reais. Mudar isto quando já há uma vitrine publicada tira o link do ar automaticamente.",
+    "showScheduleLabel": "Mostrar o cronograma",
+    "showScheduleHint": "O quadro de semanas/sessões deixa de aparecer na página do desafio, no resultado e no modelo. Os checkpoints continuam existindo — as métricas e o editor de cronograma não mudam.",
     "showcaseRegenerated": "Rascunho reconstruído.",
     "publishTitle": "Publicação",
     "publishSubtitle": "Congele o rascunho atual como a vitrine pública e compartilhe o link.",
