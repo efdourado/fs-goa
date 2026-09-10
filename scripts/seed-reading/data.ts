@@ -43,7 +43,7 @@ export const BOOKS: SeedBook[] = [
     binges: [6, 13],
     rating: 4.5,
     comment:
-      "Começou o desafio no melhor pé possível — li 130 páginas num domingo só. A ciência é levada a sério e ainda sobra humor. O 'astrophage' e o Rocky ficam com você.",
+      "Começou o desafio no melhor pé possível — passei de 150 páginas num domingo só. A ciência é levada a sério e ainda sobra humor. O 'astrophage' e o Rocky ficam com você.",
   },
   {
     title: "Klara and the Sun",
@@ -63,7 +63,7 @@ export const BOOKS: SeedBook[] = [
     year: 1969,
     pageCount: 304,
     mainGenre: "Ficção científica",
-    window: [30, 46],
+    window: [31, 46],
     binges: [],
     rating: 4,
     comment:
@@ -99,7 +99,7 @@ export const BOOKS: SeedBook[] = [
     year: 2018,
     pageCount: 502,
     mainGenre: "Ficção literária",
-    window: [71, 88],
+    window: [73, 88],
     binges: [80, 86],
     rating: 4.5,
     comment:
@@ -119,30 +119,35 @@ function mulberry32(seed: number): () => number {
 }
 
 /**
- * `[dayOffset, pages]` for one book. Weekends read heavier, ~1 day in 7 is a
- * rest day, the listed binge days get a big jump, and the final day is trued
- * up so the sum lands exactly on `pageCount`.
+ * `[dayOffset, pages]` for one book. Each day gets a *weight* — 0 on a rest day
+ * (~1 in 7), heavier on weekends, a big spike on the listed binge days — and the
+ * weights are then scaled to pages so the log sums to **exactly** `book.pageCount`
+ * (rounding drift is trued day by day, never dumped on the last day).
  */
 export function readingLog(book: SeedBook): Array<[day: number, pages: number]> {
   const [start, end] = book.window;
-  const span = end - start + 1;
   const rand = mulberry32((book.year * 1000 + book.pageCount) | 0);
-  const average = book.pageCount / span;
+  const MIN_PAGES = 6;
 
-  const draft: Array<[number, number]> = [];
+  const weighted: Array<[day: number, weight: number]> = [];
   for (let offset = start; offset <= end; offset += 1) {
-    const weekday = offset % 7; // 0 = the window's first weekday; treat 5,6 as weekend
-    const weekend = weekday === 5 || weekday === 6;
-    const isLast = offset === end;
-    const rest = !isLast && offset !== start && rand() < 0.14;
-    if (rest) { draft.push([offset, 0]); continue; }
-    let pages = average * (weekend ? 1.55 : 0.9) * (0.65 + 0.7 * rand());
-    if (book.binges.includes(offset)) pages += 55 + Math.round(30 * rand());
-    draft.push([offset, Math.max(8, Math.round(pages))]);
+    const weekend = offset % 7 === 5 || offset % 7 === 6;
+    const edge = offset === start || offset === end;
+    if (!edge && rand() < 0.14) { weighted.push([offset, 0]); continue; }
+    let weight = (weekend ? 1.55 : 0.9) * (0.65 + 0.7 * rand());
+    if (book.binges.includes(offset)) weight *= 2.6 + rand();
+    weighted.push([offset, weight]);
   }
 
-  const drafted = draft.reduce((sum, [, pages]) => sum + pages, 0);
-  const lastIndex = draft.length - 1;
-  draft[lastIndex] = [draft[lastIndex][0], Math.max(10, draft[lastIndex][1] + (book.pageCount - drafted))];
-  return draft.filter(([, pages]) => pages > 0);
+  const reading = weighted.filter(([, weight]) => weight > 0);
+  const totalWeight = reading.reduce((sum, [, weight]) => sum + weight, 0);
+  const pages = reading.map(([, weight]) => Math.max(MIN_PAGES, Math.round((book.pageCount * weight) / totalWeight)));
+
+  let drift = book.pageCount - pages.reduce((sum, n) => sum + n, 0);
+  for (let i = pages.length - 1; drift !== 0; i = i === 0 ? pages.length - 1 : i - 1) {
+    const step = drift > 0 ? 1 : -1;
+    if (pages[i] + step >= MIN_PAGES) { pages[i] += step; drift -= step; }
+  }
+
+  return reading.map(([day], i) => [day, pages[i]] as [day: number, pages: number]);
 }
