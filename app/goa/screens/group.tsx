@@ -12,8 +12,9 @@ import { Dialog } from "../dialog";
 import { useGoaFormat } from "../format";
 import type { CatalogItem, ChallengeSummary, GroupInviteResult, GroupSummary, Id, Member, PendingGroupRequest } from "../types";
 import { Segmented } from "../Segmented";
-import { backLinkClass, Button, challengeStatusTone, ChallengeStatusBadge, cx, EmptyState, EmptyStateAction, inputClass, labelClass, PageHeading, StatusMessage } from "../ui";
-import { canManage, formatRuntime, isChallengeScheduled } from "../utils";
+import { Button, cx, EmptyState, EmptyStateAction, Field, inputClass, StatusMessage } from "../ui";
+import { canManage, formatRuntime } from "../utils";
+import { ActiveChallengeCard } from "./dashboard";
 
 /** The group page shows only the head of the catalog; the rest is one tap away. */
 const CATALOG_PREVIEW_COUNT = 10;
@@ -253,29 +254,49 @@ export function GroupScreen({
   ) : undefined;
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
-      <button className={cx(backLinkClass, "mb-6")} type="button" onClick={onBack}>{tc("backHome")}</button>
-      <PageHeading
-        title={group.name}
-        description={groupHeaderDescription}
-        action={
-          canManage(group.role) ? (
-            <ActionMenu label={tx("groupActions")}>
-              <ActionMenuItem onClick={toggleGroupEdit}>{t("editToggleClosed")}</ActionMenuItem>
-              <ActionMenuItem onClick={() => setShowInvite(true)}>{t("inviteTitle")}</ActionMenuItem>
-            </ActionMenu>
-          ) : undefined
-        }
-      />
+    <main className="mx-auto max-w-3xl px-4 py-8 pb-24 sm:px-6 sm:py-10">
+      <button type="button" onClick={onBack} className="mb-6 inline-flex min-h-9 cursor-pointer items-center gap-1.5 text-sm text-[var(--muted)] transition hover:text-[var(--ink)]">
+        <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M10 3.5 5.5 8 10 12.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        {tc("home")}
+      </button>
+
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-3xl font-semibold tracking-[-0.03em] sm:text-[2rem]">{group.name}</h1>
+          {groupHeaderDescription ? <p className="mt-2 max-w-[52ch] text-sm leading-6 text-[var(--muted)]">{groupHeaderDescription}</p> : null}
+        </div>
+        {canManage(group.role) ? (
+          <ActionMenu label={tx("groupActions")} iconOnly>
+            <ActionMenuItem onClick={toggleGroupEdit}>{t("editToggleClosed")}</ActionMenuItem>
+            <ActionMenuItem onClick={() => setShowInvite(true)}>{t("inviteTitle")}</ActionMenuItem>
+          </ActionMenu>
+        ) : null}
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-3 border-b border-[var(--line)] pb-5">
+        <div className="flex">
+          {(group.members ?? []).slice(0, 5).map((member, index) => (
+            <span key={member.id} className={cx("grid h-7 w-7 place-items-center rounded-full border-2 border-[var(--paper)] bg-[var(--main-line)] text-[10px] font-black", index > 0 && "-ml-2")}>
+              {member.name.split(/\s+/).slice(0, 1).map((part) => part[0]).join("")}
+            </span>
+          ))}
+          {memberCount > 5 ? <span className="-ml-2 grid h-7 w-7 place-items-center rounded-full border-2 border-[var(--paper)] bg-[var(--wash-strong)] text-[10px] font-black text-[var(--muted)]">+{memberCount - 5}</span> : null}
+        </div>
+        <span className="text-xs text-[var(--muted)]">{t("peopleCount", { count: memberCount })} · {tr(group.role)}</span>
+        <span className="flex-1" />
+        {canManage(group.role) ? <Button variant="secondary" className="min-h-9" onClick={() => setShowInvite(true)}>{t("inviteTitle")}</Button> : null}
+      </div>
 
       {showGroupEdit ? (
         <Dialog title={t("editTitle")} onClose={() => setShowGroupEdit(false)} busy={groupBusy}>
-          <p className="mt-1 text-sm text-[var(--muted)]">{t("editBody")}</p>
-          <form className="mt-4 grid gap-4 sm:grid-cols-2" onSubmit={updateGroup}>
-            <label className="sm:col-span-2"><span className={labelClass}>{t("nameLabel")}</span><input className={inputClass} value={groupName} onChange={(event) => setGroupName(event.target.value)} required maxLength={120} /></label>
-            <label className="sm:col-span-2"><span className={labelClass}>{t("descriptionLabel")}</span><textarea className={inputClass} rows={3} value={groupDescription} onChange={(event) => setGroupDescription(event.target.value)} maxLength={1000} placeholder={t("descriptionPlaceholder")} /></label>
-            <div className="sm:col-span-2"><StatusMessage error={groupError} success={groupSuccess} /></div>
-            <div className="flex flex-wrap gap-2 sm:col-span-2"><Button type="submit" disabled={groupBusy}>{groupBusy ? tc("saving") : t("saveGroup")}</Button><Button variant="ghost" disabled={groupBusy} onClick={toggleGroupEdit}>{tc("cancel")}</Button></div>
+          <form className="space-y-5" onSubmit={updateGroup}>
+            <Field label={t("nameLabel")}><input className={inputClass} value={groupName} onChange={(event) => setGroupName(event.target.value)} required maxLength={120} /></Field>
+            <Field label={t("descriptionLabel")} optional><textarea className={inputClass} rows={3} value={groupDescription} onChange={(event) => setGroupDescription(event.target.value)} maxLength={1000} placeholder={t("descriptionPlaceholder")} /></Field>
+            <StatusMessage error={groupError} success={groupSuccess} />
+            <div className="flex justify-end gap-3 border-t border-[var(--line)] pt-4">
+              <Button variant="secondary" type="button" disabled={groupBusy} onClick={toggleGroupEdit}>{tc("cancel")}</Button>
+              <Button type="submit" disabled={groupBusy}>{groupBusy ? tc("saving") : t("saveGroup")}</Button>
+            </div>
           </form>
           {onDeleteGroup ? (
             <div className="mt-5 border-t border-[var(--line)] pt-4">
@@ -287,71 +308,53 @@ export function GroupScreen({
 
       {showInvite ? (
         <Dialog title={t("inviteTitle")} onClose={() => setShowInvite(false)} busy={busy || memberBusy}>
-          <p className="mt-1 text-sm text-[var(--muted)]">{t("inviteBody")}</p>
-
-          <form className="mt-4" onSubmit={inviteMember}>
-            <label><span className={labelClass}>{t("inviteUsernameLabel")}</span><input className={inputClass} name="username" placeholder={t("inviteUsernamePlaceholder")} required maxLength={33} disabled={memberBusy} spellCheck={false} /></label>
+          <p className="text-sm leading-6 text-[var(--muted)]">{t("inviteBody")}</p>
+          <form className="mt-4 space-y-3" onSubmit={inviteMember}>
+            <Field label={t("inviteUsernameLabel")}><input className={inputClass} name="username" placeholder={t("inviteUsernamePlaceholder")} required maxLength={33} disabled={memberBusy} spellCheck={false} /></Field>
             <Button type="submit" variant="secondary" disabled={memberBusy}>{memberBusy ? t("sendingInvite") : t("sendInvite")}</Button>
-            <div className="mt-3"><StatusMessage error={memberError} success={memberSuccess} /></div>
+            <StatusMessage error={memberError} success={memberSuccess} />
           </form>
-
-          <div className="mt-5 border-t border-[var(--line)] pt-5">
-            <span className={labelClass}>{t("inviteLinkLabel")}</span>
-            <p className="text-sm text-[var(--muted)]">{t("inviteLinkBody")}</p>
-            <form className="mt-3 grid gap-4 sm:grid-cols-2" onSubmit={createInvite}>
-              <label><span className={labelClass}>{t("destinationLabel")}</span><select className={inputClass} name="challengeId" defaultValue=""><option value="">{t("destinationGroupOnly")}</option>{challenges.filter((challenge) => challenge.status === "active").map((challenge) => <option value={challenge.id} key={challenge.id}>{t("destinationChallenge", { title: challenge.title })}</option>)}</select></label>
-              <label><span className={labelClass}>{t("expiresLabel")}</span><select className={inputClass} name="expiresInDays" defaultValue="7"><option value="1">{t("expires1")}</option><option value="7">{t("expires7")}</option><option value="30">{t("expires30")}</option></select></label>
-              <label><span className={labelClass}>{t("maxUsesLabel")}</span><input className={inputClass} name="maxUses" type="number" min={1} max={100} defaultValue={1} /></label>
-              <div className="flex items-end"><Button type="submit" disabled={busy}>{busy ? t("generating") : t("generateLink")}</Button></div>
+          <div className="mt-6 border-t border-[var(--line)] pt-5">
+            <p className="text-[13px] font-medium">{t("inviteLinkLabel")}</p>
+            <p className="mt-1 text-xs leading-5 text-[var(--muted)]">{t("inviteLinkBody")}</p>
+            <form className="mt-3 grid gap-3 sm:grid-cols-2" onSubmit={createInvite}>
+              <Field label={t("destinationLabel")} className="sm:col-span-2"><select className={inputClass} name="challengeId" defaultValue=""><option value="">{t("destinationGroupOnly")}</option>{challenges.filter((challenge) => challenge.status === "active").map((challenge) => <option value={challenge.id} key={challenge.id}>{t("destinationChallenge", { title: challenge.title })}</option>)}</select></Field>
+              <Field label={t("expiresLabel")}><select className={inputClass} name="expiresInDays" defaultValue="7"><option value="1">{t("expires1")}</option><option value="7">{t("expires7")}</option><option value="30">{t("expires30")}</option></select></Field>
+              <Field label={t("maxUsesLabel")}><input className={inputClass} name="maxUses" type="number" min={1} max={100} defaultValue={1} /></Field>
+              <div className="sm:col-span-2"><Button type="submit" disabled={busy}>{busy ? t("generating") : t("generateLink")}</Button></div>
             </form>
-            <div className="mt-4"><StatusMessage error={error} /></div>
+            <div className="mt-3"><StatusMessage error={error} /></div>
             {inviteUrl ? (
-              <div className="mt-4 flex flex-col gap-2 rounded-xl bg-[var(--main-soft)] p-3 sm:flex-row sm:items-center">
+              <div className="mt-3 flex flex-col gap-2 rounded-xl bg-[var(--main-soft)] p-3 sm:flex-row sm:items-center">
                 <input ref={inviteInputRef} className={cx(inputClass, "font-mono text-xs")} value={inviteUrl} readOnly aria-label={t("inviteUrlAria")} onFocus={(event) => event.currentTarget.select()} />
                 <Button variant="secondary" disabled={copyBusy} onClick={() => void copyInvite()}>{copyBusy ? t("copying") : copySuccess ? t("copied") : t("copy")}</Button>
               </div>
             ) : null}
             <div className="mt-3"><StatusMessage error={copyError} success={copySuccess} /></div>
           </div>
-          <div className="mt-5 flex justify-end"><Button variant="secondary" disabled={busy || memberBusy} onClick={() => setShowInvite(false)}>{tc("close")}</Button></div>
+          <div className="mt-6 flex justify-end border-t border-[var(--line)] pt-4"><Button variant="secondary" disabled={busy || memberBusy} onClick={() => setShowInvite(false)}>{tc("close")}</Button></div>
         </Dialog>
       ) : null}
 
-      <div className="grid gap-7">
+      <div className="mt-8 space-y-12">
         <section>
-          <h2 className="mb-4 text-xl font-light tracking-[-0.03em]">{t("challengesTitle")}</h2>
+          <div className="mb-4 flex items-baseline gap-2.5">
+            <h2 className="text-lg font-semibold tracking-[-0.02em]">{t("challengesTitle")}</h2>
+            <span className="text-xs text-[var(--muted)]">{challenges.length}</span>
+          </div>
           {challenges.length ? (
             <div className="grid gap-4 sm:grid-cols-2">
-              {challenges.map((challenge) => {
-                const tone = challengeStatusTone(challenge.status, challenge.startsOn, challenge.submissionMode);
-                const total = challenge.totalCount ?? 0;
-                const done = challenge.completedCount ?? 0;
-                return (
-                  <article className={cx("relative flex flex-col overflow-hidden rounded-[20px] border bg-[var(--paper)] shadow-[var(--elevate-1)] transition hover:-translate-y-0.5 has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-[var(--main)]/25", tone.border)} key={challenge.id}>
-                    <div className="flex flex-1 flex-col p-5">
-                      <div className="flex items-center justify-between gap-3"><ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} /><span className="text-xs text-[var(--muted)]">{isChallengeScheduled(challenge.status, challenge.startsOn, challenge.submissionMode) ? t("startsOn", { date: f.date(challenge.startsOn) }) : challenge.endsOn ? t("endsOn", { date: f.date(challenge.endsOn) }) : t("noDeadline")}</span></div>
-                      <h3 className="mt-5 text-2xl font-light tracking-[-0.04em]"><button type="button" onClick={() => onOpenChallenge(challenge.id)} className="cursor-pointer text-left after:absolute after:inset-0 after:content-[''] focus-visible:outline-none">{challenge.title}</button></h3>
-                      {challenge.description ? <p className="mt-2 line-clamp-2 text-sm leading-6 text-[var(--muted)]">{challenge.description}</p> : null}
-                      {total > 0 ? (
-                        <div className="mt-5">
-                          <div className="mb-2 flex justify-between text-xs text-[var(--muted)]"><span>{t("progress", { done, total })}</span><span>{Math.round((done / total) * 100)}%</span></div>
-                          <div className="h-2 overflow-hidden rounded-full bg-[var(--wash-strong)]"><span className="block h-full rounded-full bg-[var(--main-2)]" style={{ width: `${Math.min(100, (done / total) * 100)}%` }} /></div>
-                        </div>
-                      ) : null}
-                    </div>
-                    <span className={cx("block w-full px-5 py-3.5", tone.solid)} />
-                  </article>
-                );
-              })}
+              {challenges.map((challenge) => <ActiveChallengeCard key={challenge.id} challenge={challenge} onOpen={onOpenChallenge} />)}
               {canManage(group.role) && challenges.length < challengeLimit ? <AddTile label={t("createChallengeCta")} onClick={onCreateChallenge} /> : null}
             </div>
           ) : <EmptyState title={t("noChallengesTitle")} description={canManage(group.role) ? challenges.length < challengeLimit ? t.rich("emptyCreatePrompt", { action: (chunks) => <EmptyStateAction onClick={onCreateChallenge}>{chunks}</EmptyStateAction> }) : t("challengeLimitReached", { limit: challengeLimit }) : t("noChallengesMember")} />}
         </section>
+
         {sortedCatalog.length ? (
           <section>
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <h2 className="text-xl font-light tracking-[-0.03em]">{t("catalogTitle")}</h2>
+                <h2 className="text-lg font-semibold tracking-[-0.02em]">{t("catalogTitle")}</h2>
                 {bothCatalogKinds ? (
                   <Segmented
                     className="text-[11px]"
@@ -365,33 +368,27 @@ export function GroupScreen({
                   />
                 ) : null}
               </div>
-              <div className="relative">
-                <label htmlFor="catalog-sort" className="sr-only">{t("catalogSortLabel")}</label>
-                <select
-                  id="catalog-sort"
-                  className="min-h-9 cursor-pointer appearance-none rounded-full border border-[var(--line)] bg-[var(--paper)] py-1.5 pl-3.5 pr-9 text-xs text-[var(--ink)] outline-none transition hover:border-[var(--main-line)] focus:border-[var(--main)] focus:ring-4 focus:ring-[var(--main)]/15"
-                  value={catalogSort}
-                  onChange={(event) => setCatalogSort(event.target.value as "title" | "rating")}
-                >
-                  <option value="title">{t("catalogSortTitle")}</option>
-                  <option value="rating">{t("catalogSortRating")}</option>
-                </select>
-                <svg viewBox="0 0 16 16" aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 h-3 w-3 -translate-y-1/2 text-[var(--muted)]">
-                  <path d="M4 6.5 8 10l4-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
+              <select
+                aria-label={t("catalogSortLabel")}
+                className="min-h-9 cursor-pointer appearance-none rounded-full border border-[var(--line)] bg-[var(--paper)] py-1.5 pl-3.5 pr-9 text-xs text-[var(--ink)] outline-none transition hover:border-[var(--main-line)] focus:border-[var(--main)]"
+                value={catalogSort}
+                onChange={(event) => setCatalogSort(event.target.value as "title" | "rating")}
+              >
+                <option value="title">{t("catalogSortTitle")}</option>
+                <option value="rating">{t("catalogSortRating")}</option>
+              </select>
             </div>
-            <ul className="divide-y divide-[var(--line)] rounded-2xl border border-[var(--line)] bg-[var(--paper)]">
+            <ul className="divide-y divide-[var(--line)] overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--paper)]">
               {visibleCatalog.map((item) => (
                 <li key={item.id}>
                   <button
                     type="button"
                     onClick={() => onOpenCatalogItem(item.id)}
-                    className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-[var(--wash)]"
+                    className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-[var(--wash)]"
                   >
                     <span className="min-w-0">
-                      <strong className="block truncate text-sm font-light">{item.title}{item.year ? ` (${item.year})` : ""}</strong>
-                      <span className="text-xs text-[var(--muted)]">{[item.mainGenre, formatRuntime(item.runtimeMinutes), t("catalogRounds", { count: item.roundCount ?? 0 })].filter(Boolean).join(" · ")}</span>
+                      <strong className="block truncate text-sm font-medium">{item.title}{item.year ? ` (${item.year})` : ""}</strong>
+                      <span className="mt-0.5 block text-xs text-[var(--muted)]">{[item.mainGenre, formatRuntime(item.runtimeMinutes), t("catalogRounds", { count: item.roundCount ?? 0 })].filter(Boolean).join(" · ")}</span>
                     </span>
                     <span className="flex-none text-sm tabular-nums">
                       {item.ratingAvg === null || item.ratingAvg === undefined
@@ -414,51 +411,54 @@ export function GroupScreen({
             ) : null}
           </section>
         ) : null}
+
         <section>
-          <div className="flex items-baseline justify-between gap-3">
-            <h2 className="text-lg font-light">{t("peopleTitle")}</h2>
-            <span className="text-xs text-[var(--muted)]">{t("peopleCount", { count: memberCount })}</span>
+          <div className="mb-4 flex items-baseline gap-2.5">
+            <h2 className="text-lg font-semibold tracking-[-0.02em]">{t("peopleTitle")}</h2>
+            <span className="text-xs text-[var(--muted)]">{memberCount}</span>
           </div>
           {group.members?.length ? (
-            <ul className="mt-3 divide-y divide-[var(--line)]">
-              {group.members.map((member, index) =>
+            <ul className="divide-y divide-[var(--line)]">
+              {group.members.map((member) => (
                 <li className="flex items-center justify-between gap-3 py-3" key={member.id}>
                   <div className="flex items-center gap-3">
-                    <span className="rounded-full bg-[var(--wash)] px-2 py-1 text-[10px] font-light">{index + 1}</span>
-                    <span>
-                      <strong className="block text-sm">{member.name}</strong>
+                    <span className="grid h-8 w-8 flex-none place-items-center rounded-full bg-[var(--wash-strong)] text-[11px] font-bold text-[var(--muted)]">
+                      {member.name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("")}
+                    </span>
+                    <span className="min-w-0">
+                      <strong className="block truncate text-[13.5px] font-medium">{member.name}</strong>
                       <small className="text-[var(--muted)]">@{member.username}</small>
                     </span>
                   </div>
                   {onSetMemberRole && group.role === "owner" && member.role !== "owner" ? (
                     <button
                       type="button"
-                      className="min-h-8 rounded-full border border-[var(--line)] px-3 py-1 text-[10px] font-light transition hover:border-[var(--main-line)] disabled:opacity-50"
+                      className="min-h-8 flex-none rounded-full border border-[var(--line)] px-3 text-[11px] text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)] disabled:opacity-50"
                       disabled={roleBusyId === member.id}
                       onClick={() => void toggleRole(member)}
                     >
                       {roleBusyId === member.id ? tc("saving") : member.role === "admin" ? t("makeParticipant") : t("makeAdmin")}
                     </button>
                   ) : (
-                    <span className="rounded-full bg-[var(--wash)] px-2 py-1 text-[10px] font-light">{tr(member.role)}</span>
+                    <span className="flex-none rounded-full bg-[var(--wash)] px-2.5 py-1 text-[11px] text-[var(--muted)]">{tr(member.role)}</span>
                   )}
                 </li>
-              )}
+              ))}
             </ul>
-          ) : <p className="mt-3 text-sm leading-6 text-[var(--muted)]">{t("membersUnavailable")}</p>}
+          ) : <p className="text-sm leading-6 text-[var(--muted)]">{t("membersUnavailable")}</p>}
           {onSetMemberRole && group.role === "owner" ? <div className="mt-2"><StatusMessage error={roleError} /></div> : null}
 
           {canManage(group.role) && pendingRequests.length ? (
-            <div className="mt-5 border-t border-[var(--line)] pt-4">
-              <h3 className="text-sm font-medium text-[var(--ink)]">{t("pendingInvitesTitle")}</h3>
+            <div className="mt-6 border-t border-[var(--line)] pt-5">
+              <h3 className="text-sm font-semibold">{t("pendingInvitesTitle")}</h3>
               <ul className="mt-2 divide-y divide-[var(--line)]">
                 {pendingRequests.map((request) => (
                   <li className="flex items-center justify-between gap-3 py-3" key={request.id}>
-                    <span>
-                      <strong className="block text-sm">{request.name}</strong>
+                    <span className="min-w-0">
+                      <strong className="block truncate text-sm">{request.name}</strong>
                       <small className="text-[var(--muted)]">{t("pendingInviteMeta", { username: request.username, date: f.date(request.createdAt) })}</small>
                     </span>
-                    <Button className="min-h-9 px-3 py-1 text-xs" variant="ghost" onClick={() => void cancelRequest(request.id, request.name)}>{tc("cancel")}</Button>
+                    <Button className="min-h-9 flex-none px-3 py-1 text-xs" variant="ghost" onClick={() => void cancelRequest(request.id, request.name)}>{tc("cancel")}</Button>
                   </li>
                 ))}
               </ul>
@@ -467,7 +467,7 @@ export function GroupScreen({
           ) : null}
 
           {onLeaveGroup ? (
-            <div className="mt-5 border-t border-[var(--line)] pt-4">
+            <div className="mt-6 border-t border-[var(--line)] pt-5">
               <button type="button" className="min-h-9 text-xs font-light text-[var(--danger)] underline underline-offset-2 disabled:opacity-50" disabled={leaveBusy} onClick={() => void leave()}>{leaveBusy ? tc("saving") : t("leaveToggle")}</button>
               <div className="mt-2"><StatusMessage error={leaveError} /></div>
             </div>
