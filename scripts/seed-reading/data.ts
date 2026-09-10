@@ -16,7 +16,6 @@ export const SEED_TITLE = "90 dias de leitura";
 export const SEED_DESCRIPTION = "Um trimestre de leitura: páginas registradas todo dia, 6 livros terminados, cada um com nota e um comentário.";
 export const SEED_HEADLINE = "6 livros, 2.201 páginas, um trimestre de leitura.";
 export const SEED_SUMMARY = "Desafio pessoal de leitura: páginas por dia, um livro por vez, nota e comentário ao terminar. Métricas de ritmo semanal, páginas por gênero e ranking dos livros.";
-export const TEMPLATE_SUMMARY = "Desafio pessoal de leitura: páginas por dia, um livro por vez, nota e comentário ao terminar. Métricas de ritmo semanal, páginas por gênero e ranking dos livros.";
 
 export interface SeedBook {
   title: string;

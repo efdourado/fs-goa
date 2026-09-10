@@ -943,7 +943,8 @@ test("modelos públicos: publica, lista, detalha sem sessão e duplica para um g
   const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
     session: adminSession,
     body: {
-      title: "Cine clube do mês", startsOn: "2026-09-01", endsOn: "2026-09-30", submissionMode: "item",
+      title: "Cine clube do mês", description: "Um cine clube pronto para começar.",
+      startsOn: "2026-09-01", endsOn: "2026-09-30", submissionMode: "item",
       participantIds: [admin.user.id], items: [{ title: "Filme 1" }, { title: "Filme 2" }],
       fields: [{ key: "nota", label: "Nota", type: "rating", required: true }],
     },
@@ -969,7 +970,7 @@ test("modelos públicos: publica, lista, detalha sem sessão e duplica para um g
 
   const published = await call("POST", `/api/challenges/${challengeId}/template`, {
     session: adminSession,
-    body: { summary: "Um cine clube pronto para começar." },
+    body: {},
   });
   assert.equal(published.response.status, 200, JSON.stringify(published.body));
   assert.equal((published.body as { publishedAsTemplate: boolean }).publishedAsTemplate, true);
@@ -979,6 +980,7 @@ test("modelos públicos: publica, lista, detalha sem sessão e duplica para um g
   const listed = (gallery.body as { templates: Array<{ id: string; summary: string; itemCount: number }> }).templates;
   const mine = listed.find((entry) => entry.id === challengeId);
   assert.ok(mine, "o modelo publicado aparece na galeria pública");
+  // Sem vitrine ainda: a chamada da galeria cai na descrição do desafio.
   assert.equal(mine?.summary, "Um cine clube pronto para começar.");
   assert.equal(mine?.itemCount, 2);
 

@@ -423,8 +423,6 @@ export interface ChallengeDetail extends ChallengeSummary {
   collectsEntryDate?: boolean;
   /** This challenge is listed in the public template gallery (a platform admin put it there). */
   publishedAsTemplate?: boolean;
-  /** The gallery blurb (null = the card falls back to the showcase summary / description). */
-  templateSummary?: string | null;
 }
 
 export interface Limits {

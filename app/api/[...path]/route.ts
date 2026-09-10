@@ -349,7 +349,7 @@ export async function POST(request: Request): Promise<Response> {
       return json(await duplicateChallenge(session, path[1], body), 201);
     }
     if (path[0] === "challenges" && path[2] === "template" && path.length === 3) {
-      return json(await setChallengeTemplate(session, path[1], body));
+      return json(await setChallengeTemplate(session, path[1]));
     }
     if (path[0] === "templates" && path[2] === "duplicate" && path.length === 3) {
       return json(await duplicateTemplate(session, path[1], body), 201);

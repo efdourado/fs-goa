@@ -153,7 +153,6 @@ export interface DetailChallengeRow {
   results_anon: boolean;
   show_schedule?: boolean;
   published_as_template_at?: string | Date | null;
-  template_summary?: string | null;
 }
 
 type ParticipantRow = { id: string; display_name: string; username: string; name_consent: boolean };
@@ -247,7 +246,6 @@ export async function buildChallengeDetail(
     resultsAnon: ch.results_anon,
     showSchedule: ch.show_schedule ?? true,
     publishedAsTemplate: ch.published_as_template_at != null,
-    templateSummary: ch.template_summary ?? null,
     submissionMode,
     completionEntryTypeId,
     viewerRole: viewer.role,

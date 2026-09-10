@@ -64,13 +64,12 @@ function ChallengeStateDialog({ challenge, onTransition, onClose }: {
 
 function TemplatePublishSection({ challenge, onPublish, onUnpublish }: {
   challenge: ChallengeDetail;
-  onPublish: (summary: string) => Promise<void>;
+  onPublish: () => Promise<void>;
   onUnpublish: () => Promise<void>;
 }) {
   const t = useTranslations("adminChallenge");
   const tc = useTranslations("common");
   const f = useGoaFormat();
-  const [summary, setSummary] = useState(challenge.templateSummary ?? "");
   const [busy, setBusy] = useState<"publish" | "unpublish" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -97,18 +96,13 @@ function TemplatePublishSection({ challenge, onPublish, onUnpublish }: {
       {published ? (
         <div className="mt-4 grid gap-3 sm:max-w-xl">
           <p className="text-sm text-[var(--ok)]">{t("platformTemplateOn")}</p>
-          <label>
-            <span className={labelClass}>{t("summaryLabel")}</span>
-            <textarea className={inputClass} rows={2} value={summary} onChange={(event) => setSummary(event.target.value)} maxLength={280} placeholder={challenge.description ?? ""} />
-          </label>
-          <div className="flex flex-wrap gap-3">
-            <Button variant="secondary" disabled={busy !== null} onClick={() => void run("publish", () => onPublish(summary.trim()), t("platformTemplateSaved"))}>{busy === "publish" ? tc("saving") : tc("saveChanges")}</Button>
+          <div>
             <Button variant="danger" disabled={busy !== null} onClick={() => void run("unpublish", onUnpublish, t("platformTemplateRemoved"))}>{busy === "unpublish" ? tc("saving") : t("platformTemplateUnpublish")}</Button>
           </div>
         </div>
       ) : (
         <div className="mt-4">
-          <Button disabled={busy !== null} onClick={() => void run("publish", () => onPublish(summary.trim()), t("platformTemplatePublished"))}>{busy === "publish" ? tc("saving") : t("platformTemplatePublish")}</Button>
+          <Button disabled={busy !== null} onClick={() => void run("publish", onPublish, t("platformTemplatePublished"))}>{busy === "publish" ? tc("saving") : t("platformTemplatePublish")}</Button>
         </div>
       )}
       <StatusMessage error={error} success={success} />
@@ -190,7 +184,7 @@ export function ChallengeActions({ challenge, duplicateTargets, onDuplicate, onD
   onDelete?: () => Promise<void>;
   onTransition: (status: "active" | "closed") => Promise<void>;
   isPlatformAdmin: boolean;
-  onPublishTemplate: (summary: string) => Promise<void>;
+  onPublishTemplate: () => Promise<void>;
   onUnpublishTemplate: () => Promise<void>;
   onPublish: (payload: Record<string, unknown>) => Promise<{ url?: string | null } | undefined>;
   onUnpublish: () => Promise<void>;

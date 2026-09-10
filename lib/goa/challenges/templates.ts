@@ -39,15 +39,12 @@ export async function listTemplates() {
   return withClient(async (client) => {
     const rows = await client.query<TemplateRow>(
       // The gallery blurb is the showcase summary — the one the challenge admin
-      // curates below the headline in the Vitrine tab — falling back to any
-      // legacy publish-time note, then the plain description.
+      // curates below the headline in the Vitrine tab — falling back to the
+      // plain description (in JS below) when there is no showcase yet.
       `SELECT c.id, c.title, c.description,
-              COALESCE(
-                (SELECT rb.body_snapshot FROM result_blocks rb
-                  WHERE rb.challenge_id = c.id AND rb.kind = 'text' AND rb.heading = 'summary'
-                    AND rb.body_snapshot <> '' LIMIT 1),
-                c.template_summary
-              ) AS summary,
+              (SELECT rb.body_snapshot FROM result_blocks rb
+                WHERE rb.challenge_id = c.id AND rb.kind = 'text' AND rb.heading = 'summary'
+                  AND rb.body_snapshot <> '' LIMIT 1) AS summary,
               c.rules, c.rule_sections, c.start_date::text AS start_date,
               c.end_date::text AS end_date, c.published_as_template_at,
               (SELECT et.submission_mode FROM entry_types et
@@ -99,7 +96,7 @@ export async function getTemplatePreview(challengeId: string) {
       `SELECT c.id, c.group_id, c.title, c.description, c.rules, c.rule_sections,
               c.start_date::text AS start_date, c.end_date::text AS end_date,
               c.status, c.kind, c.recipe_key, g.kind AS group_kind, c.results_anon,
-              c.show_schedule, c.published_as_template_at, c.template_summary,
+              c.show_schedule, c.published_as_template_at,
               c.results_published_at, c.results_published_snapshot
          FROM challenges c
          JOIN groups g ON g.id = c.group_id AND g.deleted_at IS NULL AND g.archived_at IS NULL
@@ -120,19 +117,17 @@ export async function getTemplatePreview(challengeId: string) {
       { userId: null, role: null, isParticipant: false },
       { participants: [], result: publishedResult },
     );
-    return { ...detail, templateSummary: row.template_summary ?? null };
+    return detail;
   });
 }
 
 export async function setChallengeTemplate(
   session: SessionContext,
   challengeId: string,
-  body: Record<string, unknown>,
 ) {
   if (!session.user.platformAdmin) {
     throw new ApiError(403, "forbidden", "Somente a administração da plataforma publica modelos.");
   }
-  const summary = stringValue(body, "summary", { max: 280, optional: true }) ?? null;
   return inTransaction(async (client) => {
     const access = await challengeAccess(session.user.id, challengeId, client, true);
     if (!access.canManage) {
@@ -149,11 +144,10 @@ export async function setChallengeTemplate(
       client,
       `UPDATE challenges
           SET published_as_template_at = COALESCE(published_as_template_at, now()),
-              template_summary = $2,
               updated_at = now()
         WHERE id = $1
       RETURNING published_as_template_at`,
-      [challengeId, summary],
+      [challengeId],
     );
     await writeAudit(
       client,
@@ -164,12 +158,11 @@ export async function setChallengeTemplate(
       "challenge",
       challengeId,
       null,
-      { summary },
+      null,
     );
     return {
       id: challengeId,
       publishedAsTemplate: true,
-      summary,
       publishedAt: updated?.published_as_template_at?.toISOString() ?? null,
     };
   });
@@ -185,7 +178,7 @@ export async function unpublishChallengeTemplate(session: SessionContext, challe
       throw new ApiError(403, "forbidden", "Você precisa administrar este desafio.");
     }
     await client.query(
-      `UPDATE challenges SET published_as_template_at = NULL, template_summary = NULL, updated_at = now()
+      `UPDATE challenges SET published_as_template_at = NULL, updated_at = now()
         WHERE id = $1`,
       [challengeId],
     );

@@ -1133,7 +1133,7 @@ export function AdminScreen({
   onTransition: (status: "active" | "closed") => Promise<void>;
   onDuplicate: (payload: { title: string; targetGroupId: Id }) => Promise<void>;
   isPlatformAdmin?: boolean;
-  onPublishTemplate: (summary: string) => Promise<void>;
+  onPublishTemplate: () => Promise<void>;
   onUnpublishTemplate: () => Promise<void>;
   duplicateTargets: DuplicateTargetGroup[];
   onDelete?: () => Promise<void>;

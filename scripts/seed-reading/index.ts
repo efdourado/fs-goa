@@ -11,7 +11,7 @@ import { ApiError } from "../../lib/http";
 
 import {
   BOOKS, readingLog, SEED_DESCRIPTION, SEED_HEADLINE, SEED_SUMMARY, SEED_TITLE,
-  TEMPLATE_SUMMARY, WEEKS, WINDOW_DAYS,
+  WEEKS, WINDOW_DAYS,
 } from "./data";
 import {
   addDays, backdateLifecycle, confirmRemote, fail, findSeedChallenge, isSeedError,
@@ -212,7 +212,7 @@ async function main(): Promise<void> {
   let templatePath: string | null = null;
   if (account.platformAdmin) {
     console.log("publicando como modelo na galeria");
-    await setChallengeTemplate(session, challengeId, { summary: TEMPLATE_SUMMARY });
+    await setChallengeTemplate(session, challengeId);
     templatePath = `/modelos/${challengeId}`;
   }
 
