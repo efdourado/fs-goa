@@ -29,7 +29,6 @@ import type {
   Member,
 } from "../types";
 import {
-  backLinkClass,
   Button,
   ChallengeStatusBadge,
   cx,
@@ -1146,54 +1145,68 @@ export function AdminScreen({
   onArchiveChanged: () => void;
 }) {
   const t = useTranslations("adminChallenge");
-  const tx = useTranslations("managementUX");
-  const [showTechnical, setShowTechnical] = useState(false);
+  const tc = useTranslations("common");
   // The checkpoint planner is for round-item challenges organised into
   // weeks/sessions — a day-by-day round derives its checkpoints from the period.
   const showCheckpoints = challenge.submissionMode === "item";
-  // A personal challenge has exactly one participant (the owner) — there is
-  // nothing to manage on a "Pessoas" tab.
+  // A personal challenge has exactly one participant (the owner). "Participants"
+  // is folded into the overview tab, never its own tab.
   const isPersonal = challenge.scope === "personal";
   const tabs: AdminTab[] = [
     "overview",
-    ...(isPersonal ? [] : (["participants"] as const)),
     "fields", "items",
     ...(showCheckpoints ? (["checkpoints"] as const) : []),
     "review", "metrics", "results",
   ];
   const requestedTab = tab === "participants" ? "overview" : tab;
   const activeTab = tabs.includes(requestedTab) ? requestedTab : "overview";
-  // One row. Overview / Review / Showcase are always there; the edit tabs
-  // (Fields, Items, Schedule, Metrics) slot in between Review and Showcase when
-  // "More options" is open. Showcase (results) always stays last.
-  const technicalTabs: AdminTab[] = [
-    "fields", "items",
-    ...(showCheckpoints ? (["checkpoints"] as const) : []),
-    "metrics",
-  ];
-  const technicalOpen = showTechnical || technicalTabs.includes(activeTab);
-  const navTabs: AdminTab[] = [
-    "overview", "review",
-    ...(technicalOpen ? technicalTabs : []),
-    "results",
-  ];
+
   return (
-    <main className="mx-auto max-w-5xl px-4 py-6 pb-24 sm:px-6 sm:py-10">
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><button className={backLinkClass} type="button" onClick={onBack}>{t("back")}</button><div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={onViewParticipant}>{t("simulateAsParticipant")}</Button><ChallengeActions challenge={challenge} duplicateTargets={duplicateTargets} onDuplicate={onDuplicate} onDelete={onDelete} onTransition={onTransition} isPlatformAdmin={isPlatformAdmin} onPublishTemplate={onPublishTemplate} onUnpublishTemplate={onUnpublishTemplate} onPublish={onPublishResult} onUnpublish={onUnpublishResult} /></div></div>
-      <PageHeading title={challenge.title} description={t("subtitle")} action={<ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />} />
-      <nav className="mb-8 border-b border-[var(--line)]" aria-label={t("tabsAria")}>
-        <div className="flex flex-wrap items-center gap-1">
-          {navTabs.map((id) => <button key={id} type="button" aria-current={activeTab === id ? "page" : undefined} onClick={() => onTab(id)} className={cx("min-h-12 cursor-pointer border-b-2 px-4 text-sm font-medium transition", activeTab === id ? "border-[var(--main-strong)] text-[var(--main-strong)]" : "border-transparent text-[var(--muted)] hover:text-[var(--ink)]")}>{t(`tabs.${id}`)}</button>)}
-          <button type="button" aria-expanded={technicalOpen} className="ml-1 min-h-11 cursor-pointer px-3 text-sm text-[var(--muted)] hover:text-[var(--ink)]" onClick={() => { if (technicalTabs.includes(activeTab)) onTab("overview"); setShowTechnical(!technicalOpen); }}>{tx(technicalOpen ? "fewerOptions" : "moreOptions")}</button>
+    <main className="pb-24">
+      <div className="sticky top-0 z-20 border-b border-[var(--line)] bg-[color-mix(in_srgb,var(--canvas)_90%,transparent)] backdrop-blur-md">
+        <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-2.5 sm:px-6">
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex min-h-9 flex-none cursor-pointer items-center gap-1.5 rounded-lg px-1 text-sm text-[var(--muted)] transition hover:text-[var(--ink)]"
+          >
+            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M10 3.5 5.5 8 10 12.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            <span className="hidden sm:inline">{tc("back")}</span>
+          </button>
+          <span className="h-5 w-px flex-none bg-[var(--line)]" aria-hidden="true" />
+          <ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />
+          <h1 className="min-w-0 flex-1 truncate text-base font-semibold tracking-tight">{challenge.title}</h1>
+          <ChallengeActions challenge={challenge} duplicateTargets={duplicateTargets} onDuplicate={onDuplicate} onDelete={onDelete} onTransition={onTransition} onViewParticipant={onViewParticipant} isPlatformAdmin={isPlatformAdmin} onPublishTemplate={onPublishTemplate} onUnpublishTemplate={onUnpublishTemplate} onPublish={onPublishResult} onUnpublish={onUnpublishResult} />
         </div>
-      </nav>
-      {activeTab === "overview" ? <div className="space-y-12"><AdminOverview challenge={challenge} onSave={onSaveBasics} />{!isPersonal ? <div className="border-t border-[var(--line)] pt-8"><AdminParticipants key={challenge.participants.map((p) => p.userId ?? p.id).join(",")} challenge={challenge} group={group} onSave={onSaveParticipants} /></div> : null}</div> : null}
-      {activeTab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.visibilityPolicy}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} onSaveVisibility={onSaveEntryTypeVisibility} onSetExpectation={onSetExpectation} /> : null}
-      {activeTab === "items" ? <AdminItems challenge={challenge} group={group} entries={entries} onAdd={onAddItems} onUpdate={onUpdateItem} onArchive={onArchiveItem} onPreviewImport={onPreviewImport} /> : null}
-      {activeTab === "checkpoints" ? <CheckpointPlanner key={`${challenge.id}:${challenge.checkpoints.map((cp) => cp.id).join(",")}`} challenge={challenge} onSaveCheckpoints={onSaveCheckpoints} onAssign={onAssignCheckpointItems} /> : null}
-      {activeTab === "review" ? <AdminReview challenge={challenge} entries={entries} onPatch={onPatchEntry} onDelete={onDeleteEntry} /> : null}
-      {activeTab === "metrics" ? <AdminMetrics challenge={challenge} onAdd={onAddMetric} onUpdate={onUpdateMetric} onDelete={onDeleteMetric} /> : null}
-      {activeTab === "results" ? <AdminResults challenge={challenge} entries={entries} onSave={onSaveResult} onReorderBlocks={onReorderBlocks} /> : null}
+        <nav className="mx-auto max-w-5xl px-2 sm:px-5" aria-label={t("tabsAria")}>
+          <div className="flex gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {tabs.map((id) => (
+              <button
+                key={id}
+                type="button"
+                aria-current={activeTab === id ? "page" : undefined}
+                onClick={() => onTab(id)}
+                className={cx(
+                  "min-h-11 flex-none cursor-pointer whitespace-nowrap border-b-2 px-3.5 text-[13.5px] font-medium transition",
+                  activeTab === id ? "border-[var(--main-strong)] text-[var(--main-strong)]" : "border-transparent text-[var(--muted)] hover:text-[var(--ink)]",
+                )}
+              >
+                {t(`tabs.${id}`)}
+              </button>
+            ))}
+          </div>
+        </nav>
+      </div>
+
+      <div className="mx-auto max-w-5xl px-4 pt-8 sm:px-6 sm:pt-10">
+        {activeTab === "overview" ? <div className="mx-auto max-w-2xl space-y-10"><AdminOverview challenge={challenge} onSave={onSaveBasics} />{!isPersonal ? <div className="border-t border-[var(--line)] pt-8"><AdminParticipants key={challenge.participants.map((p) => p.userId ?? p.id).join(",")} challenge={challenge} group={group} onSave={onSaveParticipants} /></div> : null}</div> : null}
+        {activeTab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.visibilityPolicy}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} onSaveVisibility={onSaveEntryTypeVisibility} onSetExpectation={onSetExpectation} /> : null}
+        {activeTab === "items" ? <AdminItems challenge={challenge} group={group} entries={entries} onAdd={onAddItems} onUpdate={onUpdateItem} onArchive={onArchiveItem} onPreviewImport={onPreviewImport} /> : null}
+        {activeTab === "checkpoints" ? <CheckpointPlanner key={`${challenge.id}:${challenge.checkpoints.map((cp) => cp.id).join(",")}`} challenge={challenge} onSaveCheckpoints={onSaveCheckpoints} onAssign={onAssignCheckpointItems} /> : null}
+        {activeTab === "review" ? <AdminReview challenge={challenge} entries={entries} onPatch={onPatchEntry} onDelete={onDeleteEntry} /> : null}
+        {activeTab === "metrics" ? <AdminMetrics challenge={challenge} onAdd={onAddMetric} onUpdate={onUpdateMetric} onDelete={onDeleteMetric} /> : null}
+        {activeTab === "results" ? <AdminResults challenge={challenge} entries={entries} onSave={onSaveResult} onReorderBlocks={onReorderBlocks} /> : null}
+      </div>
     </main>
   );
 }
