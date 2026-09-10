@@ -25,16 +25,16 @@
     "noMatches": "Nenhum item corresponde aos filtros.",
     "contents": "Conteúdo removido",
     "restoreParent": "Restaure primeiro o item que contém este.",
-    "profileBack": "← Perfil",
+    "profileBack": "Perfil",
     "noChallenge": "Acervo do grupo",
     "trashCount": "{count, plural, one {# item} other {# itens}}"
   },
   "common": {
     "home": "Início",
-    "backHome": "← Início",
-    "back": "← Voltar",
-    "backToStart": "← Voltar ao início",
-    "backToLogin": "← Voltar ao login",
+    "backHome": "Início",
+    "back": "Voltar",
+    "backToStart": "Voltar ao início",
+    "backToLogin": "Voltar ao login",
     "cancel": "Cancelar",
     "close": "Fechar",
     "optional": "opcional",
@@ -390,7 +390,7 @@
     "trashLink": "Lixeira"
   },
   "catalog": {
-    "back": "← Voltar",
+    "back": "Voltar",
     "errorTitle": "Não foi possível abrir o item",
     "pages": "{count} páginas",
     "byAuthor": "por {name}",
@@ -409,7 +409,7 @@
   },
   "personalSpace": {
     "emptyCreatePrompt": "Escolha um modelo e crie seu primeiro desafio pessoal clicando <action>aqui</action>.",
-    "back": "← Voltar",
+    "back": "Voltar",
     "title": "Meu espaço",
     "subtitle": "Só seu — sem grupo, sem convites.",
     "catalog": "Meu acervo",
@@ -422,7 +422,7 @@
     "sectionArchive": "Encerrados e rascunhos"
   },
   "personalCatalog": {
-    "back": "← Voltar",
+    "back": "Voltar",
     "title": "Meu acervo",
     "subtitle": "Os filmes e livros dos seus desafios pessoais, com a nota que você deu.",
     "sortLabel": "Ordenar acervo",
@@ -511,7 +511,7 @@
       "checkpoints": "Checkpoints",
       "people": "Pessoas"
     },
-    "back": "← Voltar",
+    "back": "Voltar",
     "title": "Monte a próxima experiência",
     "subtitle": "Comece com um preset e ajuste somente o que seu grupo precisa.",
     "personalTitle": "Novo desafio pessoal",
@@ -571,7 +571,7 @@
     "summaryItems": "{count} itens",
     "summaryParticipants": "{count} participantes",
     "summaryNote": "O desafio será criado como rascunho. Revise tudo na administração antes de ativar.",
-    "backStep": "← Voltar",
+    "backStep": "Voltar",
     "next": "Continuar →",
     "creatingDraft": "Criando rascunho…",
     "createDraft": "Criar rascunho",
@@ -581,7 +581,7 @@
   "adminChallenge": {
     "fieldsEmptyCreatePrompt": "Adicione o primeiro campo deste formulário clicando <action>aqui</action>.",
     "itemsEmptyCreatePrompt": "Prepare os primeiros itens ou etapas clicando <action>aqui</action>.",
-    "back": "← Voltar",
+    "back": "Voltar",
     "simulateAsParticipant": "Simular como participante",
     "subtitle": "Configure, revise e apresente — controles administrativos continuam validados no servidor.",
     "tabsAria": "Áreas administrativas",
@@ -914,7 +914,7 @@
       "today": "Hoje",
       "results": "Resultado"
     },
-    "back": "← Voltar",
+    "back": "Voltar",
     "manage": "Gerenciar",
     "livingListMeta": "{count, plural, =0 {lista vazia} one {# título} other {# títulos}}",
     "recommendedBy": "Indicado por {name}",
@@ -1063,8 +1063,8 @@
   },
   "templates": {
     "signIn": "Entrar",
-    "back": "← Voltar",
-    "allTemplates": "← Todos os modelos",
+    "back": "Voltar",
+    "allTemplates": "Todos os modelos",
     "title": "Modelos prontos",
     "subtitle": "Desafios de exemplo para ver como o Goa funciona. Abra um para conhecer as regras, o formulário e as métricas — e duplique para um grupo seu quando quiser começar.",
     "loading": "Carregando modelos…",
@@ -1111,7 +1111,7 @@
     "accepting": "Aceitando…",
     "acceptAs": "Aceitar como {name}",
     "signInToAccept": "Entrar para aceitar",
-    "back": "← Voltar",
+    "back": "Voltar",
     "acceptedKicker": "Login feito · convite aceito",
     "acceptedTitle": "Tudo certo.",
     "acceptedBodyChallenge": "Você entrou no grupo <b>{groupName}</b> e agora participa do desafio <b>{challengeTitle}</b>.",
@@ -1123,7 +1123,7 @@
     "profileSaved": "Perfil atualizado.",
     "passwordsDontMatch": "As senhas não coincidem.",
     "passwordChanged": "Senha alterada. As outras sessões foram encerradas.",
-    "back": "← Voltar ao início",
+    "back": "Voltar ao início",
     "title": "Seu perfil",
     "subtitle": "Por enquanto só o nome de exibição é editável.",
     "profileTitle": "Perfil",
@@ -1179,7 +1179,7 @@
     "footer": "Memória publicada pelo grupo no Goa."
   },
   "about": {
-    "back": "← Voltar",
+    "back": "Voltar",
     "title": "Sobre o Goa",
     "lede": "O Goa nasceu de planilhas — as que um grupo de amigos mantinha para organizar um clube de cinema e um de leitura. Ele automatiza esse trabalho: o participante registra, o sistema calcula e o resultado vira memória.",
     "body": [
@@ -1361,7 +1361,7 @@
     "goToPage": "Ir para a página {n}"
   },
   "trash": {
-    "back": "← Voltar",
+    "back": "Voltar",
     "loading": "Carregando a lixeira…",
     "loadError": "Não foi possível abrir a lixeira.",
     "restoreError": "Não foi possível restaurar.",

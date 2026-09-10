@@ -9,7 +9,7 @@ import { cleanFields, FieldBuilder, presetFields } from "../fields";
 import { CineItemsEditor, type CineRow, cineRowsToInput } from "../cine-items";
 import { RuleSectionsEditor } from "../rules";
 import type { ChallengeCreationInput, ChallengeField, ChallengeRule, CreatableRecipeKey, GroupSummary, Id } from "../types";
-import { backLinkClass, Button, cardClass, cx, EmptyState, inputClass, labelClass, PageHeading, SchedulePeriodFields, StatusMessage } from "../ui";
+import { BackButton, backLinkClass, Button, cardClass, cx, EmptyState, inputClass, labelClass, PageHeading, SchedulePeriodFields, StatusMessage } from "../ui";
 
 const RECIPES: Array<{ key: CreatableRecipeKey; catalogKind: "film" | "book" | null; scheduleMode: "period" | "none"; glyph: string }> = [
   { key: "cinema", catalogKind: "film", scheduleMode: "none", glyph: "◉" },
@@ -157,7 +157,7 @@ export function CreateChallengeScreen({
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
-      <button className={cx(backLinkClass, "mb-6")} type="button" onClick={onBack}>{t("back")}</button>
+      <BackButton onClick={onBack} label={t("back")} className="mb-6" />
       <PageHeading title={personal ? t("personalTitle") : t("title")} description={personal ? t("personalSubtitle") : t("subtitle")} />
       <nav className={cx("mb-6 grid gap-1 rounded-2xl bg-[var(--wash-strong)]/70 p-1", navColsClass)} aria-label={t("stepsNav")}>
         {stepKeys.map((key, index) => <button className={cx("min-h-11 truncate rounded-xl px-2 text-xs font-light sm:text-sm", step === index + 1 ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : index + 1 < step ? "text-[var(--ink)]" : "text-[var(--muted)]")} type="button" onClick={() => index + 1 < step && setStep(index + 1)} disabled={index + 1 > step} key={key}><span className="hidden sm:inline">{index + 1}. </span>{t(`steps.${key}`)}</button>)}

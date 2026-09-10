@@ -25,16 +25,16 @@
     "noMatches": "Ningún elemento coincide con los filtros.",
     "contents": "Contenido eliminado",
     "restoreParent": "Restaura primero el elemento que lo contiene.",
-    "profileBack": "← Perfil",
+    "profileBack": "Perfil",
     "noChallenge": "Catálogo del grupo",
     "trashCount": "{count, plural, one {# elemento} other {# elementos}}"
   },
   "common": {
     "home": "Inicio",
-    "backHome": "← Inicio",
-    "back": "← Volver",
-    "backToStart": "← Volver al inicio",
-    "backToLogin": "← Volver al inicio de sesión",
+    "backHome": "Inicio",
+    "back": "Volver",
+    "backToStart": "Volver al inicio",
+    "backToLogin": "Volver al inicio de sesión",
     "cancel": "Cancelar",
     "close": "Cerrar",
     "optional": "opcional",
@@ -390,7 +390,7 @@
     "trashLink": "Papelera"
   },
   "catalog": {
-    "back": "← Volver",
+    "back": "Volver",
     "errorTitle": "No se pudo abrir el ítem",
     "pages": "{count} páginas",
     "byAuthor": "por {name}",
@@ -409,7 +409,7 @@
   },
   "personalSpace": {
     "emptyCreatePrompt": "Elige una plantilla y crea tu primer reto personal haciendo clic <action>aquí</action>.",
-    "back": "← Volver",
+    "back": "Volver",
     "title": "Mi espacio",
     "subtitle": "Solo tuyo — sin grupo, sin invitaciones.",
     "catalog": "Mi acervo",
@@ -422,7 +422,7 @@
     "sectionArchive": "Cerrados y borradores"
   },
   "personalCatalog": {
-    "back": "← Volver",
+    "back": "Volver",
     "title": "Mi acervo",
     "subtitle": "Las películas y los libros de tus desafíos personales, con la nota que les diste.",
     "sortLabel": "Ordenar acervo",
@@ -511,7 +511,7 @@
       "checkpoints": "Checkpoints",
       "people": "Personas"
     },
-    "back": "← Volver",
+    "back": "Volver",
     "title": "Arma la próxima experiencia",
     "subtitle": "Empieza con un preset y ajusta solo lo que tu grupo necesita.",
     "personalTitle": "Nuevo desafío personal",
@@ -571,7 +571,7 @@
     "summaryItems": "{count} ítems",
     "summaryParticipants": "{count} participantes",
     "summaryNote": "El desafío se creará como borrador. Revisa todo en la administración antes de activarlo.",
-    "backStep": "← Volver",
+    "backStep": "Volver",
     "next": "Continuar →",
     "creatingDraft": "Creando borrador…",
     "createDraft": "Crear borrador",
@@ -581,7 +581,7 @@
   "adminChallenge": {
     "fieldsEmptyCreatePrompt": "Añade el primer campo de este formulario haciendo clic <action>aquí</action>.",
     "itemsEmptyCreatePrompt": "Prepara los primeros elementos o etapas haciendo clic <action>aquí</action>.",
-    "back": "← Volver",
+    "back": "Volver",
     "simulateAsParticipant": "Simular como participante",
     "subtitle": "Configura, revisa y presenta — los controles de administración se siguen validando en el servidor.",
     "tabsAria": "Áreas de administración",
@@ -914,7 +914,7 @@
       "today": "Hoy",
       "results": "Resultado"
     },
-    "back": "← Volver",
+    "back": "Volver",
     "manage": "Gestionar",
     "livingListMeta": "{count, plural, =0 {lista vacía} one {# título} other {# títulos}}",
     "recommendedBy": "Recomendado por {name}",
@@ -1063,8 +1063,8 @@
   },
   "templates": {
     "signIn": "Entrar",
-    "back": "← Volver",
-    "allTemplates": "← Todas las plantillas",
+    "back": "Volver",
+    "allTemplates": "Todas las plantillas",
     "title": "Plantillas listas",
     "subtitle": "Desafíos de ejemplo para ver cómo funciona Goa. Abre uno para conocer las reglas, el formulario y las métricas — y duplícalo a un grupo tuyo cuando quieras empezar.",
     "loading": "Cargando plantillas…",
@@ -1111,7 +1111,7 @@
     "accepting": "Aceptando…",
     "acceptAs": "Aceptar como {name}",
     "signInToAccept": "Entrar para aceptar",
-    "back": "← Volver",
+    "back": "Volver",
     "acceptedKicker": "Sesión iniciada · invitación aceptada",
     "acceptedTitle": "Todo listo.",
     "acceptedBodyChallenge": "Entraste en el grupo <b>{groupName}</b> y ahora participas en el desafío <b>{challengeTitle}</b>.",
@@ -1123,7 +1123,7 @@
     "profileSaved": "Perfil actualizado.",
     "passwordsDontMatch": "Las contraseñas no coinciden.",
     "passwordChanged": "Contraseña cambiada. Las otras sesiones se cerraron.",
-    "back": "← Volver al inicio",
+    "back": "Volver al inicio",
     "title": "Tu perfil",
     "subtitle": "Por ahora solo el nombre para mostrar es editable.",
     "profileTitle": "Perfil",
@@ -1179,7 +1179,7 @@
     "footer": "Recuerdo publicado por el grupo en Goa."
   },
   "about": {
-    "back": "← Volver",
+    "back": "Volver",
     "title": "Acerca de Goa",
     "lede": "Goa nació de planillas — las que un grupo de amigos mantenía para organizar un club de cine y uno de lectura. Automatiza ese trabajo: el participante registra, el sistema calcula y el resultado se vuelve recuerdo.",
     "body": [
@@ -1361,7 +1361,7 @@
     "goToPage": "Ir a la página {n}"
   },
   "trash": {
-    "back": "← Volver",
+    "back": "Volver",
     "loading": "Cargando la papelera…",
     "loadError": "No se pudo abrir la papelera.",
     "restoreError": "No se pudo restaurar.",

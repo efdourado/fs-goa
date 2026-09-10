@@ -20,7 +20,7 @@ import type {
   User,
 } from "../types";
 import {
-  backLinkClass,
+  BackButton,
   Button,
   cardClass,
   ChallengeStatusBadge,
@@ -900,7 +900,7 @@ export function ParticipantChallengeScreen({
   return (
     <main className="mx-auto max-w-7xl overflow-x-clip px-4 py-6 pb-28 sm:px-6 sm:py-10">
       <div className="mb-5 flex items-center justify-between gap-3">
-        <button className={backLinkClass} type="button" onClick={onBack}>{t("back")}</button>
+        <BackButton onClick={onBack} label={t("back")} />
         <div className="flex items-center gap-2">
           {!preview && challenge.result?.shareToken && challenge.scope !== "personal" ? <SharePublicButton token={challenge.result.shareToken} /> : null}
           {previewActions ?? (onAdmin ? <Button variant="secondary" onClick={onAdmin}>{t("manage")}</Button> : null)}

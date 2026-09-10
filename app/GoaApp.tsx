@@ -43,7 +43,7 @@ import type {
   Screen,
 } from "./goa/types";
 import { CACHE_KEYS, clearCache, readCache, writeCache } from "./goa/cache";
-import { AppHeader, Brand, Button, cardClass, cx, EmptyState, LoadingView, PageHeading } from "./goa/ui";
+import { AppHeader, BackButton, Brand, Button, cardClass, cx, EmptyState, LoadingView, PageHeading } from "./goa/ui";
 import { canManage, isPersonalChallenge } from "./goa/utils";
 
 export default function GoaApp() {
@@ -122,7 +122,7 @@ export default function GoaApp() {
 
   // Keep the address bar in step with the current screen so every view is
   // shareable. A tab switch within the same view replaces the entry; a real
-  // navigation pushes one (and deepens the stack "← Back" can pop).
+  // navigation pushes one (and deepens the stack "Back" can pop).
   useEffect(() => {
     if (screen.kind === "loading") return;
     const url = urlForScreen(screen);
@@ -149,7 +149,7 @@ export default function GoaApp() {
   }, []);
 
   /**
-   * "← Back": step back through real history when there's an app entry to pop
+   * "Back": step back through real history when there's an app entry to pop
    * (so it lands exactly where the user came from), otherwise fall back to a
    * sensible parent screen — the case where the view was opened from a deep link.
    */
@@ -543,7 +543,7 @@ export default function GoaApp() {
   } else if (screen.kind === "group-trash" && selectedGroup && canManage(selectedGroup.role)) {
     content = (
       <main className="mx-auto max-w-4xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
-        <button className="mb-6 text-sm text-[var(--muted)] hover:text-[var(--ink)]" type="button" onClick={() => goBack({ kind: "group", groupId: selectedGroup.id })}>{t("backToStart")}</button>
+        <BackButton onClick={() => goBack({ kind: "group", groupId: selectedGroup.id })} label={tc("back")} className="mb-6" />
         <PageHeading title={tTrash("groupTitle")} description={tTrash("groupSubtitle")} />
         <TrashView scope={{ groupId: selectedGroup.id }} csrfToken={bootstrap.csrfToken} onChanged={() => { void refreshBootstrap(); }} />
       </main>

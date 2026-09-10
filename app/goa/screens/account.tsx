@@ -7,7 +7,7 @@ import { Dialog } from "../dialog";
 import { API_PATHS, apiRequest } from "../api";
 import { useGoaFormat } from "../format";
 import type { ChallengeSummary, User } from "../types";
-import { backLinkClass, Button, cardClass, cx, inputClass, labelClass, PageHeading, StatusMessage } from "../ui";
+import { BackButton, Button, cardClass, cx, inputClass, labelClass, PageHeading, StatusMessage } from "../ui";
 
 // Mirror of `PASSWORD_MIN_LENGTH` in lib/security — the server rejects shorter.
 const PASSWORD_MIN_LENGTH = 10;
@@ -175,7 +175,7 @@ export function AccountScreen({
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
-      <button className={cx(backLinkClass, "mb-6")} type="button" onClick={onBack}>{t("back")}</button>
+      <BackButton onClick={onBack} label={t("back")} className="mb-6" />
       <PageHeading title={t("title")} description={t("subtitle")} />
 
       <section className={cx(cardClass, "p-5 sm:p-7")}>

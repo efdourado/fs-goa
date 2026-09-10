@@ -29,6 +29,7 @@ import type {
   Member,
 } from "../types";
 import {
+  BackButton,
   Button,
   ChallengeStatusBadge,
   cx,
@@ -1165,14 +1166,7 @@ export function AdminScreen({
     <main className="pb-24">
       <div className="sticky top-0 z-20 border-b border-[var(--line)] bg-[color-mix(in_srgb,var(--canvas)_90%,transparent)] backdrop-blur-md">
         <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-2.5 sm:px-6">
-          <button
-            type="button"
-            onClick={onBack}
-            className="inline-flex min-h-9 flex-none cursor-pointer items-center gap-1.5 rounded-lg px-1 text-sm text-[var(--muted)] transition hover:text-[var(--ink)]"
-          >
-            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M10 3.5 5.5 8 10 12.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            <span className="hidden sm:inline">{tc("back")}</span>
-          </button>
+          <BackButton onClick={onBack} label={tc("back")} className="flex-none" />
           <span className="h-5 w-px flex-none bg-[var(--line)]" aria-hidden="true" />
           <ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />
           <h1 className="min-w-0 flex-1 truncate text-base font-semibold tracking-tight">{challenge.title}</h1>

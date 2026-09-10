@@ -21,12 +21,31 @@ export const inputClass =
 export const labelClass = "mb-1.5 block text-[13px] font-medium text-[var(--ink)]";
 export const linkClass =
   "px-4 py-2 border-l-1 rounded-xl border-[var(--muted)] underline-offset-4 hover:opacity-90 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50";
-/** The "← Voltar" links that sit at the top of most screens. */
+/** Legacy plain back-link style; new screens use `<BackButton>`. */
 export const backLinkClass =
   "min-h-11 cursor-pointer text-sm font-light text-[var(--muted)] hover:text-[var(--ink)]";
 
 export function cx(...classes: Array<string | false | null | undefined>): string {
   return classes.filter(Boolean).join(" ");
+}
+
+/** The one "← Back" control at the top of every screen — a chevron plus a label. */
+export function BackButton({ onClick, label, className }: { onClick: () => void; label: string; className?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cx(
+        "inline-flex min-h-9 cursor-pointer items-center gap-1.5 text-sm text-[var(--muted)] transition hover:text-[var(--ink)]",
+        className,
+      )}
+    >
+      <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 flex-none" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+        <path d="M10 3.5 5.5 8 10 12.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      {label}
+    </button>
+  );
 }
 
 export function Button({

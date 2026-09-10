@@ -89,7 +89,7 @@ export function screenFromUrl(pathname: string, search = ""): Screen | null {
 
 /**
  * True when `next` is the *same view* as `prev`, differing only by a tab (or
- * nothing). A tab switch should `replaceState` so the browser/app "← Back"
+ * nothing). A tab switch should `replaceState` so the browser/app "Back"
  * lands on the view the user came from, not the previous tab.
  */
 export function isSameView(prev: Screen | null | undefined, next: Screen): boolean {

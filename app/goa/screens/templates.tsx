@@ -13,7 +13,7 @@ import type {
   TemplateSummary,
   User,
 } from "../types";
-import { backLinkClass, Brand, Button, cardClass, cx, EmptyState, inputClass, labelClass, PageHeading, StatusMessage } from "../ui";
+import { BackButton, Brand, Button, cardClass, cx, EmptyState, inputClass, labelClass, PageHeading, StatusMessage } from "../ui";
 import { ParticipantChallengeScreen } from "./participant-challenge";
 
 function PublicChrome({ user, onSignIn, children }: { user: User | null; onSignIn: () => void; children: ReactNode }) {
@@ -64,7 +64,7 @@ export function TemplatesScreen({
 
   const body = (
     <main className="mx-auto max-w-7xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
-      <button className={cx(backLinkClass, "mb-6")} type="button" onClick={onBack}>{t("back")}</button>
+      <BackButton onClick={onBack} label={t("back")} className="mb-6" />
       <PageHeading title={t("title")} description={t("subtitle")} />
 
       <div className="mt-2"><StatusMessage error={error} /></div>
@@ -210,12 +210,12 @@ export function TemplateDetailScreen({
 
   const body = error ? (
     <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12">
-      <button className={cx(backLinkClass, "mb-6")} type="button" onClick={onBack}>{t("allTemplates")}</button>
+      <BackButton onClick={onBack} label={t("allTemplates")} className="mb-6" />
       <StatusMessage error={error} />
     </main>
   ) : !detail ? (
     <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12">
-      <button className={cx(backLinkClass, "mb-6")} type="button" onClick={onBack}>{t("allTemplates")}</button>
+      <BackButton onClick={onBack} label={t("allTemplates")} className="mb-6" />
       <p className="text-sm text-[var(--muted)]" role="status">{t("detailLoading")}</p>
     </main>
   ) : (

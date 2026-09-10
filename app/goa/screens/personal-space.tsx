@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 
 import { ActiveChallengeCard } from "./dashboard";
 import type { ChallengeSummary, Id } from "../types";
-import { Button, cx, EmptyState, EmptyStateAction, PageHeading } from "../ui";
+import { BackButton, Button, cx, EmptyState, EmptyStateAction, PageHeading } from "../ui";
 import { canManage } from "../utils";
 
 /** A quiet toolbar button — catalogue / bin / new. */
@@ -56,10 +56,7 @@ export function PersonalSpaceScreen({
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8 pb-24 sm:px-6 sm:py-10">
-      <button type="button" onClick={onBack} className="mb-6 inline-flex min-h-9 cursor-pointer items-center gap-1.5 text-sm text-[var(--muted)] transition hover:text-[var(--ink)]">
-        <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M10 3.5 5.5 8 10 12.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-        {tc("home")}
-      </button>
+      <BackButton onClick={onBack} label={tc("back")} className="mb-6" />
 
       <PageHeading title={t("title")} description={t("subtitle")} />
 

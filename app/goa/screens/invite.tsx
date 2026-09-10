@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { API_PATHS, apiRequest } from "../api";
 import { useGoaFormat } from "../format";
 import type { InviteAcceptance, InvitePreview, User } from "../types";
-import { backLinkClass, Button, cardClass, cx, StatusMessage } from "../ui";
+import { BackButton, Button, cardClass, cx, StatusMessage } from "../ui";
 
 export function InviteScreen({
   token,
@@ -84,7 +84,7 @@ export function InviteScreen({
           </>
         ) : null}
         <div className="mt-5"><StatusMessage error={error} /></div>
-        <button className={cx(backLinkClass, "mt-6")} type="button" onClick={onBack}>{t("back")}</button>
+        <BackButton onClick={onBack} label={t("back")} className="mt-6" />
       </section>
     </main>
   );

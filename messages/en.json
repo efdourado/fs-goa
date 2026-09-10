@@ -25,16 +25,16 @@
     "noMatches": "No items match these filters.",
     "contents": "Removed content",
     "restoreParent": "Restore the containing item first.",
-    "profileBack": "← Profile",
+    "profileBack": "Profile",
     "noChallenge": "Group catalogue",
     "trashCount": "{count, plural, one {# item} other {# items}}"
   },
   "common": {
     "home": "Home",
-    "backHome": "← Home",
-    "back": "← Back",
-    "backToStart": "← Back to home",
-    "backToLogin": "← Back to sign in",
+    "backHome": "Home",
+    "back": "Back",
+    "backToStart": "Back to home",
+    "backToLogin": "Back to sign in",
     "cancel": "Cancel",
     "close": "Close",
     "optional": "optional",
@@ -390,7 +390,7 @@
     "trashLink": "Bin"
   },
   "catalog": {
-    "back": "← Back",
+    "back": "Back",
     "errorTitle": "Couldn't open the item",
     "pages": "{count} pages",
     "byAuthor": "by {name}",
@@ -409,7 +409,7 @@
   },
   "personalSpace": {
     "emptyCreatePrompt": "Pick a preset and create your first personal challenge by clicking <action>here</action>.",
-    "back": "← Back",
+    "back": "Back",
     "title": "My space",
     "subtitle": "Just yours — no group, no invites.",
     "catalog": "My catalogue",
@@ -422,7 +422,7 @@
     "sectionArchive": "Closed & drafts"
   },
   "personalCatalog": {
-    "back": "← Back",
+    "back": "Back",
     "title": "My catalogue",
     "subtitle": "The films and books from your personal challenges, with the rating you gave.",
     "sortLabel": "Sort catalogue",
@@ -511,7 +511,7 @@
       "checkpoints": "Checkpoints",
       "people": "People"
     },
-    "back": "← Back",
+    "back": "Back",
     "title": "Build the next experience",
     "subtitle": "Start with a preset and adjust only what your group needs.",
     "personalTitle": "New personal challenge",
@@ -571,7 +571,7 @@
     "summaryItems": "{count} items",
     "summaryParticipants": "{count} participants",
     "summaryNote": "The challenge is created as a draft. Review everything in the admin area before activating.",
-    "backStep": "← Back",
+    "backStep": "Back",
     "next": "Continue →",
     "creatingDraft": "Creating draft…",
     "createDraft": "Create draft",
@@ -581,7 +581,7 @@
   "adminChallenge": {
     "fieldsEmptyCreatePrompt": "Add the first field to this form by clicking <action>here</action>.",
     "itemsEmptyCreatePrompt": "Set up the first items or checkpoints by clicking <action>here</action>.",
-    "back": "← Back",
+    "back": "Back",
     "simulateAsParticipant": "Simulate as participant",
     "subtitle": "Set it up, review it, and present it — admin controls stay validated on the server.",
     "tabsAria": "Admin areas",
@@ -914,7 +914,7 @@
       "today": "Today",
       "results": "Result"
     },
-    "back": "← Back",
+    "back": "Back",
     "manage": "Manage",
     "livingListMeta": "{count, plural, =0 {empty list} one {# title} other {# titles}}",
     "recommendedBy": "Recommended by {name}",
@@ -1063,8 +1063,8 @@
   },
   "templates": {
     "signIn": "Sign in",
-    "back": "← Back",
-    "allTemplates": "← All templates",
+    "back": "Back",
+    "allTemplates": "All templates",
     "title": "Ready-made templates",
     "subtitle": "Example challenges to see how Goa works. Open one to explore the rules, the form, and the metrics — and duplicate it to one of your groups whenever you want to start.",
     "loading": "Loading templates…",
@@ -1111,7 +1111,7 @@
     "accepting": "Accepting…",
     "acceptAs": "Accept as {name}",
     "signInToAccept": "Sign in to accept",
-    "back": "← Back",
+    "back": "Back",
     "acceptedKicker": "Signed in · invite accepted",
     "acceptedTitle": "All set.",
     "acceptedBodyChallenge": "You joined the group <b>{groupName}</b> and now take part in the challenge <b>{challengeTitle}</b>.",
@@ -1123,7 +1123,7 @@
     "profileSaved": "Profile updated.",
     "passwordsDontMatch": "The passwords don't match.",
     "passwordChanged": "Password changed. Your other sessions were ended.",
-    "back": "← Back to home",
+    "back": "Back to home",
     "title": "Your profile",
     "subtitle": "For now, only the display name is editable.",
     "profileTitle": "Profile",
@@ -1179,7 +1179,7 @@
     "footer": "Memory published by the group on Goa."
   },
   "about": {
-    "back": "← Back",
+    "back": "Back",
     "title": "About Goa",
     "lede": "Goa grew out of spreadsheets — the ones a group of friends kept to run a film club and a reading club. It automates that work: people log their progress, the system does the maths, and the result becomes a memory.",
     "body": [
@@ -1361,7 +1361,7 @@
     "goToPage": "Go to page {n}"
   },
   "trash": {
-    "back": "← Back",
+    "back": "Back",
     "loading": "Loading the bin…",
     "loadError": "Could not open the bin.",
     "restoreError": "Could not restore.",

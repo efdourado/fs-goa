@@ -7,7 +7,7 @@ import { API_PATHS, apiRequest } from "../api";
 import { byRatingDesc, bucketize, type CatalogBucket, decadeOf, highlights } from "../catalog-insights";
 import { Segmented } from "../Segmented";
 import type { CatalogItem, Id } from "../types";
-import { backLinkClass, cardClass, cx, EmptyState, PageHeading, StatusMessage } from "../ui";
+import { BackButton, cardClass, cx, EmptyState, PageHeading, StatusMessage } from "../ui";
 import { formatRuntime } from "../utils";
 
 type Kind = "film" | "book";
@@ -105,7 +105,7 @@ export function PersonalCatalogScreen({
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
-      <button className={cx(backLinkClass, "mb-6")} type="button" onClick={onBack}>{t("back")}</button>
+      <BackButton onClick={onBack} label={t("back")} className="mb-6" />
       <PageHeading
         title={t("title")}
         description={t("subtitle")}

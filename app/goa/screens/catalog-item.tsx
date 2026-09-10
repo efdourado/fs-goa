@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { apiRequest } from "../api";
 import { useGoaFormat } from "../format";
 import type { CatalogItemDetail, Id } from "../types";
-import { backLinkClass, Button, cardClass, cx, EmptyState, LoadingView, PageHeading } from "../ui";
+import { BackButton, Button, cardClass, cx, EmptyState, LoadingView, PageHeading } from "../ui";
 import { formatRuntime } from "../utils";
 
 export function CatalogItemScreen({
@@ -68,7 +68,7 @@ export function CatalogItemScreen({
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
-      <button className={cx(backLinkClass, "mb-6")} type="button" onClick={onBack}>{t("back")}</button>
+      <BackButton onClick={onBack} label={t("back")} className="mb-6" />
       <PageHeading
         title={titleWithYear}
         description={attrs.join(" · ")}

@@ -12,7 +12,7 @@ import { Dialog } from "../dialog";
 import { useGoaFormat } from "../format";
 import type { CatalogItem, ChallengeSummary, GroupInviteResult, GroupSummary, Id, Member, PendingGroupRequest } from "../types";
 import { Segmented } from "../Segmented";
-import { Button, cx, EmptyState, EmptyStateAction, Field, inputClass, StatusMessage } from "../ui";
+import { BackButton, Button, cx, EmptyState, EmptyStateAction, Field, inputClass, StatusMessage } from "../ui";
 import { canManage, formatRuntime } from "../utils";
 import { ActiveChallengeCard } from "./dashboard";
 
@@ -255,10 +255,7 @@ export function GroupScreen({
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8 pb-24 sm:px-6 sm:py-10">
-      <button type="button" onClick={onBack} className="mb-6 inline-flex min-h-9 cursor-pointer items-center gap-1.5 text-sm text-[var(--muted)] transition hover:text-[var(--ink)]">
-        <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M10 3.5 5.5 8 10 12.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-        {tc("home")}
-      </button>
+      <BackButton onClick={onBack} label={tc("back")} className="mb-6" />
 
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
