@@ -1,4 +1,7 @@
 import pg, { type PoolClient, type QueryResultRow } from "pg";
+import { Pool as NeonPool } from "@neondatabase/serverless";
+// Node 22+ (see package.json engines) exposes a global WebSocket, which
+// `@neondatabase/serverless` uses automatically — no `ws` shim needed.
 
 const pools = new Map<string, pg.Pool>();
 
@@ -12,17 +15,31 @@ function databaseUrl(): string {
   return url;
 }
 
+/**
+ * Neon is reached over its WebSocket proxy on 443 (`@neondatabase/serverless`,
+ * a documented drop-in for `pg`). That's what Neon recommends on Vercel, and it
+ * also means every DB-touching script works from networks that block 5432.
+ * A non-Neon host (local Docker, self-hosted) stays on plain `pg`/5432.
+ */
 export function getPool(): pg.Pool {
   const url = databaseUrl();
   const cached = pools.get(url);
   if (cached) return cached;
 
-  const pool = new pg.Pool({
-    connectionString: url,
-    max: 5,
-    idleTimeoutMillis: 20_000,
-    connectionTimeoutMillis: 10_000,
-  });
+  let host = "";
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    // A bare/socket connection string — treat as local.
+  }
+  const pool = host.endsWith(".neon.tech")
+    ? (new NeonPool({ connectionString: url }) as unknown as pg.Pool)
+    : new pg.Pool({
+        connectionString: url,
+        max: 5,
+        idleTimeoutMillis: 20_000,
+        connectionTimeoutMillis: 10_000,
+      });
   pools.set(url, pool);
   return pool;
 }
