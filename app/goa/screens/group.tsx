@@ -3,7 +3,6 @@
 import { useTranslations } from "next-intl";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 
-import { splitSyntheticMarker, stripSyntheticMarker } from "../../../lib/goa/synthetic";
 import { API_PATHS, apiRequest } from "../api";
 import { copyText } from "../clipboard";
 import { AddTile } from "../add-tile";
@@ -62,7 +61,7 @@ export function GroupScreen({
   const [showInvite, setShowInvite] = useState(false);
   const [showGroupEdit, setShowGroupEdit] = useState(false);
   const [groupName, setGroupName] = useState(group.name);
-  const [groupDescription, setGroupDescription] = useState(stripSyntheticMarker(group.description));
+  const [groupDescription, setGroupDescription] = useState(group.description ?? "");
   const [inviteUrl, setInviteUrl] = useState("");
   const inviteInputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -138,7 +137,7 @@ export function GroupScreen({
   function toggleGroupEdit() {
     if (!showGroupEdit) {
       setGroupName(group.name);
-      setGroupDescription(stripSyntheticMarker(group.description));
+      setGroupDescription(group.description ?? "");
       setGroupError(null);
       setGroupSuccess(null);
     }
@@ -244,14 +243,7 @@ export function GroupScreen({
     }
   }
 
-  const { visible: groupDescriptionVisible, marker: groupDescriptionMarker } = splitSyntheticMarker(group.description);
-  // The seed marker rides along in the DOM (select-all copies it) but never shows.
-  const groupHeaderDescription = groupDescriptionVisible || groupDescriptionMarker ? (
-    <>
-      {groupDescriptionVisible}
-      {groupDescriptionMarker ? <span className="select-text text-transparent"> {groupDescriptionMarker}</span> : null}
-    </>
-  ) : undefined;
+  const groupHeaderDescription = group.description || undefined;
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8 pb-24 sm:px-6 sm:py-10">

@@ -16,7 +16,6 @@ import {
 import {
   addDays, backdateLifecycle, confirmRemote, fail, findSeedChallenge, isSeedError,
   looksRemote, parseArgs, pastWindow, readShape, resolveAccount, sessionFor,
-  SYNTHETIC_MARKER,
 } from "./helpers";
 
 const ORIGIN = (process.env.APP_ORIGIN ?? "http://localhost:3000").replace(/\/$/, "");
@@ -58,13 +57,13 @@ async function main(): Promise<void> {
     console.log("  · métricas: páginas lidas, ritmo acumulado, páginas por semana, média por dia,");
     console.log("    páginas por gênero, ranking pelas minhas notas, nota média, taxa de conclusão.");
     console.log("  · encerra, gera o Wrapped, publica o resultado" + (account.platformAdmin ? " e publica como modelo." : "."));
-    if (existing) console.log(`\n(já existe um desafio marcado: "${existing.title}" — rode com --reset para recriá-lo.)`);
+    if (existing) console.log(`\n(já existe um desafio "${existing.title}" nesta conta — rode com --reset para recriá-lo.)`);
     await getPool().end();
     return;
   }
 
   if (existing && !options.reset) {
-    fail(`Já existe um desafio de leitura marcado ("${existing.title}", ${existing.status}). Rode com --reset para recriá-lo.`);
+    fail(`Já existe um desafio "${existing.title}" (${existing.status}) nesta conta. Rode com --reset para recriá-lo.`);
   }
 
   if (existing && options.reset) {
@@ -75,8 +74,8 @@ async function main(): Promise<void> {
       try {
         const guard = await oneOrNull<{ id: string }>(
           client,
-          "SELECT id FROM challenges WHERE id = $1 AND deleted_at IS NULL AND description LIKE $2 FOR UPDATE",
-          [existing.id, `%${SYNTHETIC_MARKER}%`],
+          "SELECT id FROM challenges WHERE id = $1 AND deleted_at IS NULL AND title = $2 FOR UPDATE",
+          [existing.id, existing.title],
         );
         if (!guard) fail("O desafio mudou entre a checagem e o reset. Rode de novo.");
         await purgeChallengeRows(client, existing.id);
@@ -96,7 +95,7 @@ async function main(): Promise<void> {
   const created = await createPersonalChallenge(session, {
     recipe: "library",
     title: SEED_TITLE,
-    description: `${SEED_DESCRIPTION} ${SYNTHETIC_MARKER}`,
+    description: SEED_DESCRIPTION,
     startsOn,
     endsOn,
     generateDaily: false,

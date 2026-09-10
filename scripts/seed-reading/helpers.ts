@@ -3,9 +3,8 @@ import process from "node:process";
 
 import type { SessionContext } from "../../lib/auth";
 import { oneOrNull, withClient } from "../../lib/db";
-import { SYNTHETIC_MARKER } from "../../lib/goa/synthetic";
 
-export { SYNTHETIC_MARKER };
+import { SEED_TITLE } from "./data";
 
 export const SEED_USERNAME = "dudupizzas";
 
@@ -161,7 +160,11 @@ export async function backdateLifecycle(challengeId: string, activatedOn: string
   );
 }
 
-/** The one seeded personal reading challenge — matched by the marker in its description. */
+/**
+ * The seeded personal reading challenge — a challenge in the account's personal
+ * workspace whose title matches the seed's. It's a plain challenge otherwise;
+ * `--reset` uses this only to find what to purge before recreating.
+ */
 export async function findSeedChallenge(ownerId: string): Promise<{ id: string; title: string; status: string } | null> {
   return withClient((client) =>
     oneOrNull<{ id: string; title: string; status: string }>(
@@ -170,10 +173,10 @@ export async function findSeedChallenge(ownerId: string): Promise<{ id: string; 
          FROM challenges c
          JOIN groups g ON g.id = c.group_id
         WHERE g.owner_user_id = $1 AND g.kind = 'personal' AND c.deleted_at IS NULL
-          AND c.description LIKE $2
+          AND c.title = $2
         ORDER BY c.created_at DESC
         LIMIT 1`,
-      [ownerId, `%${SYNTHETIC_MARKER}%`],
+      [ownerId, SEED_TITLE],
     ),
   );
 }

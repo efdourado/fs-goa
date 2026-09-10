@@ -6,7 +6,6 @@ import { ApiError, stringValue } from "../../http";
 import { assertUnder, LIMITS } from "../../limits";
 import { normalizeUsername } from "../../security";
 import { regeneratePublishedShowcases } from "../challenges/results";
-import { SYNTHETIC_MARKER, hasSyntheticMarker } from "../synthetic";
 import { moveToTrash } from "../trash";
 import { writeAudit } from "./audit";
 import { publicId } from "./shared";
@@ -514,14 +513,9 @@ export async function updateGroup(
     const name = body.name === undefined
       ? current.name
       : stringValue(body, "name", { min: 1, max: 120 })!;
-    let description = body.description === undefined
+    const description = body.description === undefined
       ? current.description
       : stringValue(body, "description", { max: 1_000, optional: true }) ?? null;
-    // The seed marker is rendered invisibly, so a well-meaning edit would drop it
-    // and strand `db:seed-demo`. If the group had it, keep it.
-    if (hasSyntheticMarker(current.description) && !hasSyntheticMarker(description)) {
-      description = `${description ? `${description} ` : ""}${SYNTHETIC_MARKER}`;
-    }
 
     await client.query(
       "UPDATE groups SET name = $2, description = $3, updated_at = now() WHERE id = $1",

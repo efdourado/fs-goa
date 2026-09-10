@@ -92,11 +92,12 @@ node --env-file=.env.production.local scripts/seed-admin.mjs   # depois do migra
 # dados de demonstração (um desafio pessoal de leitura rico: 90 dias, 6 livros, encerrado e publicado)
 npm run db:seed-reading -- --dry-run          # local: valida a conta/ambiente, não grava
 npm run db:seed-reading                       # local: cria o desafio para @dudupizzas
-npm run db:seed-reading -- --reset            # local: purga o desafio marcado e recria
+npm run db:seed-reading -- --reset            # local: purga o desafio e recria
 npm run db:seed-reading:prod -- --dry-run     # prod (Neon), via .env.production.local
 npm run db:seed-reading:prod                  # prod: pede a frase "seed reading" (ou SEED_READING_CONFIRM)
 #   Precisa da conta `dudupizzas` já criada (o script só a procura, nunca a cria).
-#   `--reset` remove só o desafio com o marcador ⟦seed-demo⟧ e recria. --dry-run nunca grava.
+#   `--reset` acha o desafio pelo título "90 dias de leitura" na área pessoal da conta,
+#   purga e recria. O desafio gerado é um desafio comum — sem marcação. --dry-run nunca grava.
 #   Atenção: em prod, se a conta for platform_admin o modelo entra na galeria pública /modelos
 #   e o link /results/<token> fica no ar.
 
