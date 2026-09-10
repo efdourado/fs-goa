@@ -173,7 +173,7 @@ function CardMenu({
   return (
     <details
       ref={ref}
-      className="absolute bottom-2.5 right-2.5"
+      className="relative flex-none"
       onToggle={(event) => {
         if (!(event.currentTarget as HTMLDetailsElement).open) return;
         const onOutside = (e: PointerEvent) => {
@@ -187,16 +187,13 @@ function CardMenu({
     >
       <summary
         aria-label={t("card.more")}
-        className="grid h-7 w-7 cursor-pointer list-none place-items-center rounded-full text-[var(--muted)] opacity-0 transition hover:bg-[var(--wash)] hover:text-[var(--ink)] focus-visible:opacity-100 group-hover:opacity-100 [&::-webkit-details-marker]:hidden"
+        title={t("card.more")}
+        className="grid h-7 w-7 cursor-pointer list-none place-items-center rounded-full text-[var(--muted)] opacity-60 transition hover:bg-[var(--wash)] hover:text-[var(--ink)] focus-visible:opacity-100 group-hover:opacity-100 [details[open]_&]:bg-[var(--wash)] [details[open]_&]:text-[var(--ink)] [details[open]_&]:opacity-100 [&::-webkit-details-marker]:hidden"
       >
         <svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor" aria-hidden="true"><circle cx="8" cy="3" r="1.4" /><circle cx="8" cy="8" r="1.4" /><circle cx="8" cy="13" r="1.4" /></svg>
       </summary>
-      <div className="absolute bottom-9 right-0 z-30 w-56 rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-1.5 text-sm shadow-[var(--elevate-2)]">
-        <button type="button" className="flex min-h-10 w-full items-center gap-2.5 rounded-xl px-3 hover:bg-[var(--wash)]" onClick={() => { onTogglePin(); close(); }}>
-          <CirclePinIcon className="h-[18px] w-[18px] text-[var(--muted)]" filled={challenge.pinned} />
-          {challenge.pinned ? t("card.unpin") : t("card.pin")}
-        </button>
-        <div className="mt-1 border-t border-[var(--line)] px-3 pb-1.5 pt-2">
+      <div className="absolute right-0 top-[calc(100%+4px)] z-30 w-60 rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-1.5 text-sm shadow-[var(--elevate-2)]">
+        <div className="px-3 pb-2 pt-1.5">
           <span className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--muted)]">{t("card.color")}</span>
           <div className="flex items-center gap-2">
             <ColorSwatch tag={null} label={t("color.none")} selected={!challenge.colorTag} onClick={() => { onSetColor(null); close(); }} />
@@ -205,7 +202,11 @@ function CardMenu({
             ))}
           </div>
         </div>
-        <div className="mt-1 border-t border-[var(--line)] pt-1">
+        <div className="border-t border-[var(--line)] pt-1">
+          <button type="button" className="flex min-h-10 w-full items-center gap-2.5 rounded-xl px-3 hover:bg-[var(--wash)]" onClick={() => { onTogglePin(); close(); }}>
+            <CirclePinIcon className="h-[18px] w-[18px] text-[var(--muted)]" filled={challenge.pinned} />
+            {challenge.pinned ? t("card.unpin") : t("card.pin")}
+          </button>
           <button type="button" className="flex min-h-10 w-full items-center gap-2.5 rounded-xl px-3 hover:bg-[var(--wash)]" onClick={() => { onMove(-1); close(); }}>
             <CircleChevronIcon className="h-[18px] w-[18px] text-[var(--muted)]" dir="up" />{t("card.moveUp")}
           </button>
@@ -213,7 +214,7 @@ function CardMenu({
             <CircleChevronIcon className="h-[18px] w-[18px] text-[var(--muted)]" dir="down" />{t("card.moveDown")}
           </button>
         </div>
-        <div className="mt-1 border-t border-[var(--line)] pt-1">
+        <div className="border-t border-[var(--line)] pt-1">
           <button type="button" className="flex min-h-10 w-full items-center rounded-xl px-3 hover:bg-[var(--wash)]" onClick={() => { onOpen(); close(); }}>{t("card.open")}</button>
           {canManageIt ? (
             <button type="button" className="flex min-h-10 w-full items-center rounded-xl px-3 hover:bg-[var(--wash)]" onClick={() => { onManage(); close(); }}>{t("card.manage")}</button>
@@ -291,21 +292,37 @@ export function ActiveChallengeCard({
                   ? t("endsOn", { date: f.date(challenge.endsOn) })
                   : t("noDeadline")}
           </span>
-          {onTogglePin && !reorderMode ? (
-            <button
-              type="button"
-              onClick={() => onTogglePin(challenge.id)}
-              aria-label={challenge.pinned ? t("card.unpin") : t("card.pin")}
-              aria-pressed={challenge.pinned}
-              className={cx(
-                "grid h-7 w-7 flex-none place-items-center rounded-full transition",
-                challenge.pinned
-                  ? "text-[var(--main)] opacity-100"
-                  : "text-[var(--muted)] opacity-0 hover:text-[var(--ink)] focus-visible:opacity-100 group-hover:opacity-100",
-              )}
-            >
-              <CirclePinIcon className="h-[18px] w-[18px]" filled={challenge.pinned} />
-            </button>
+          {interactive && !reorderMode ? (
+            <div className="relative z-10 flex flex-none items-center gap-0.5">
+              {onTogglePin ? (
+                <button
+                  type="button"
+                  onClick={() => onTogglePin(challenge.id)}
+                  aria-label={challenge.pinned ? t("card.unpin") : t("card.pin")}
+                  title={challenge.pinned ? t("card.unpin") : t("card.pin")}
+                  aria-pressed={challenge.pinned}
+                  className={cx(
+                    "grid h-7 w-7 place-items-center rounded-full transition",
+                    challenge.pinned
+                      ? "text-[var(--main)] opacity-100"
+                      : "text-[var(--muted)] opacity-0 hover:bg-[var(--wash)] hover:text-[var(--ink)] focus-visible:opacity-100 group-hover:opacity-100",
+                  )}
+                >
+                  <CirclePinIcon className="h-[18px] w-[18px]" filled={challenge.pinned} />
+                </button>
+              ) : null}
+              {interactive ? (
+                <CardMenu
+                  challenge={challenge}
+                  canManageIt={canManage(challenge.viewerRole)}
+                  onTogglePin={() => onTogglePin?.(challenge.id)}
+                  onSetColor={(tag) => onSetColor?.(challenge.id, tag)}
+                  onMove={(dir) => onMove?.(challenge.id, dir)}
+                  onOpen={() => onOpen(challenge.id)}
+                  onManage={() => onManage?.(challenge.id)}
+                />
+              ) : null}
+            </div>
           ) : null}
         </div>
 
@@ -324,18 +341,6 @@ export function ActiveChallengeCard({
         ) : null}
       </div>
       {!challenge.colorTag ? <span className={cx("block w-full px-5 py-2.5", livingList ? "bg-[var(--wash-strong)]" : tone.solid)} /> : null}
-
-      {interactive && !reorderMode ? (
-        <CardMenu
-          challenge={challenge}
-          canManageIt={canManage(challenge.viewerRole)}
-          onTogglePin={() => onTogglePin?.(challenge.id)}
-          onSetColor={(tag) => onSetColor?.(challenge.id, tag)}
-          onMove={(dir) => onMove?.(challenge.id, dir)}
-          onOpen={() => onOpen(challenge.id)}
-          onManage={() => onManage?.(challenge.id)}
-        />
-      ) : null}
     </article>
   );
 }
