@@ -1,15 +1,19 @@
 import type { PoolClient } from "pg";
 
-import { oneOrNull } from "../../db";
 import { publicId } from "../domain/shared";
 import { computeRankings } from "./rankings";
 import { metricsForChallenge } from "./results";
 
 /**
- * Builds the opinionated default showcase — a hero, the analysis metrics as
- * blocks (each with a frozen snapshot), and a handful of the best comments — from
- * whatever the challenge already holds. Called when a round closes and whenever
- * the admin hits "regenerate"; `curateResults` is the manual override on top.
+ * Rebuilds the *derived* showcase blocks — the analysis metrics (each with a
+ * frozen snapshot), personal rankings, and a handful of the best comments — from
+ * whatever the challenge holds now. Called when a round closes and whenever the
+ * admin hits "regenerate".
+ *
+ * The admin's own copy — any `text` block (headline, summary) — is carried
+ * through untouched: a reopen, a re-close, or a "regenerate" must never silently
+ * drop words the admin wrote, because nothing tells them it happened. There is no
+ * auto-generated summary sentence; the Vitrine tab is where that text comes from.
  *
  * `result_blocks.kind` stays `metric | entry_value | text`; a ranking or a
  * per-person profile is a `metric` block whose `value_snapshot` carries a
@@ -20,10 +24,13 @@ export async function generateShowcase(
   challengeId: string,
   userId: string,
 ): Promise<void> {
+  const kept = await client.query<{ heading: string | null; body_snapshot: string | null }>(
+    "SELECT heading, body_snapshot FROM result_blocks WHERE challenge_id=$1 AND kind='text' ORDER BY position",
+    [challengeId],
+  );
   await client.query("DELETE FROM result_blocks WHERE challenge_id=$1", [challengeId]);
 
   const metrics = await metricsForChallenge(client, challengeId);
-  const summary = await buildSummary(client, challengeId, metrics);
 
   let position = 0;
   const insertText = (heading: string, body: string) =>
@@ -34,11 +41,11 @@ export async function generateShowcase(
       [publicId(), challengeId, heading, body, position++, userId],
     );
 
-  // Deliberately no title-based headline: the cover above the showcase already
-  // shows the challenge title in full, and regenerating used to silently
-  // overwrite a headline the admin had cleared on purpose. The admin types one
-  // if they want one; the summary line still generates on its own.
-  if (summary) await insertText("summary", summary);
+  for (const block of kept.rows) {
+    if (block.body_snapshot && block.body_snapshot.trim()) {
+      await insertText(block.heading ?? "summary", block.body_snapshot);
+    }
+  }
 
   for (const metric of metrics) {
     if (metric.visibleInResults === false) continue;
@@ -94,44 +101,6 @@ function metricHasData(metric: Record<string, unknown>): boolean {
     return series.some((row) => (row as { value: number | null }).value !== null);
   }
   return metric.value !== null && metric.value !== undefined;
-}
-
-async function buildSummary(
-  client: PoolClient,
-  challengeId: string,
-  metrics: Array<Record<string, unknown>>,
-): Promise<string | null> {
-  const counts = await oneOrNull<{ participants: number; items: number; kind: string | null }>(
-    client,
-    `SELECT
-       (SELECT count(*)::int FROM challenge_participants WHERE challenge_id=$1 AND removed_at IS NULL) AS participants,
-       (SELECT count(*)::int FROM challenge_items WHERE challenge_id=$1 AND archived_at IS NULL) AS items,
-       (SELECT ci.kind FROM catalog_items ci
-          JOIN challenge_items it ON it.catalog_item_id = ci.id
-         WHERE it.challenge_id=$1 LIMIT 1) AS kind`,
-    [challengeId],
-  );
-  if (!counts) return null;
-  const noun = counts.items === 0 ? null : counts.kind === "book" ? "livros" : counts.kind === "film" ? "filmes" : "itens";
-  const parts: string[] = [];
-  if (noun) {
-    parts.push(`${counts.participants} pessoa(s) registraram ${counts.items} ${noun}.`);
-  } else {
-    parts.push(`${counts.participants} pessoa(s) participaram.`);
-  }
-
-  const average = metrics.find((m) => m.operation === "average" && !m.series && m.value !== null);
-  if (average) parts.push(`${average.label}: ${average.formattedValue}.`);
-
-  const ranking = metrics.find((m) => m.operation === "bayesian_average" && Array.isArray(m.series));
-  const top = (ranking?.series as Array<{ label: string; value: number | null }> | undefined)?.find((s) => s.value !== null);
-  if (top) parts.push(`No topo: ${top.label} (${top.value}).`);
-
-  const polar = metrics.find((m) => m.operation === "spread" && Array.isArray(m.series));
-  const mostDivisive = (polar?.series as Array<{ label: string; value: number | null }> | undefined)?.find((s) => s.value !== null);
-  if (mostDivisive) parts.push(`Mais dividiu o grupo: ${mostDivisive.label}.`);
-
-  return parts.join(" ");
 }
 
 interface PickedComment {

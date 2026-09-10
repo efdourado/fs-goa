@@ -2084,20 +2084,40 @@ test("motor de análise: ranking ajustado, surpresa, viés e vitrine automática
   const anaBias = bias.series!.find((s) => s.label === "Ana");
   assert.ok(anaBias && anaBias.value !== null, "viés do indicador calculado para quem indicou");
 
-  // a vitrine foi gerada sozinha ao encerrar — com resumo, mas sem repetir o
-  // título do desafio como manchete (o admin escreve uma se quiser).
+  // a vitrine foi gerada sozinha ao encerrar — só os blocos derivados (métricas,
+  // rankings, comentários). Nenhum texto é gerado: nem manchete, nem resumo.
   const blocks = await adminPool.query<{ kind: string; heading: string | null }>(
     "SELECT kind, heading FROM result_blocks WHERE challenge_id=$1 ORDER BY position",
     [challengeId],
   );
-  assert.ok(!blocks.rows.some((b) => b.heading === "headline"), "nenhuma manchete é gerada automaticamente");
-  assert.equal(blocks.rows[0].kind, "text");
-  assert.equal(blocks.rows[0].heading, "summary");
+  assert.ok(!blocks.rows.some((b) => b.kind === "text"), "nenhum texto (manchete/resumo) é gerado automaticamente");
   assert.ok(blocks.rows.some((b) => b.kind === "metric"), "vitrine automática tem blocos de métrica");
 
-  // regenerar substitui os blocos
+  // o admin escreve a manchete e o resumo na aba Vitrine
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/results`, {
+    session: owner, body: { headline: "O ano em que Solaris venceu", summary: "Três pessoas, dois filmes, muita conversa." },
+  })).response.status, 200);
+
+  // reabrir e fechar de novo NÃO apaga o texto do admin — só recalcula as métricas
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } })).response.status, 200);
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "closed" } })).response.status, 200);
+  const afterReopen = await adminPool.query<{ kind: string; heading: string | null; body_snapshot: string | null }>(
+    "SELECT kind, heading, body_snapshot FROM result_blocks WHERE challenge_id=$1 AND kind='text' ORDER BY position",
+    [challengeId],
+  );
+  assert.deepEqual(
+    afterReopen.rows.map((b) => [b.heading, b.body_snapshot]),
+    [["headline", "O ano em que Solaris venceu"], ["summary", "Três pessoas, dois filmes, muita conversa."]],
+    "manchete e resumo sobrevivem ao ciclo reabrir/fechar",
+  );
+
+  // "regenerar" também preserva o texto
   const regen = await call("POST", `/api/challenges/${challengeId}/results`, { session: owner, body: { regenerate: true } });
   assert.equal(regen.response.status, 200, JSON.stringify(regen.body));
+  const afterRegen = await adminPool.query<{ n: number }>(
+    "SELECT count(*)::int AS n FROM result_blocks WHERE challenge_id=$1 AND kind='text'", [challengeId],
+  );
+  assert.equal(afterRegen.rows[0].n, 2, "regenerar mantém a manchete e o resumo");
 });
 
 test("memória do acervo: um filme reconhecido em duas rodadas encerradas", async () => {
@@ -4146,6 +4166,8 @@ test("blocos organizáveis: o admin reordena e esconde blocos, e os valores fica
   }
   await call("POST", `/api/challenges/${challengeId}/metrics`, { session: owner, body: { label: "Média geral", operation: "average", fieldId: nota } });
   await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "closed" } });
+  // O admin escreve o resumo — é o bloco de texto que o teste vai esconder.
+  await call("POST", `/api/challenges/${challengeId}/results`, { session: owner, body: { summary: "Resumo do clube." } });
 
   const before = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
     result: { blocks: Array<{ id: string; kind: string; position: number; visible: boolean; metric?: { value: number | null } }> };
