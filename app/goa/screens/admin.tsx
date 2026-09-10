@@ -923,11 +923,13 @@ function AdminResults({
   challenge,
   entries,
   onSave,
+  onPublish,
   onReorderBlocks,
 }: {
   challenge: ChallengeDetail;
   entries: Entry[];
   onSave: (payload: Record<string, unknown>) => Promise<{ unpublished?: boolean } | undefined>;
+  onPublish: (payload: Record<string, unknown>) => Promise<{ url?: string | null; publishedAt?: string; anonymized?: boolean } | undefined>;
   onReorderBlocks: (blocks: Array<{ id: Id; visible: boolean }>) => Promise<void>;
 }) {
   const t = useTranslations("adminChallenge");
@@ -1018,6 +1020,14 @@ function AdminResults({
     } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
   }
 
+  async function republish() {
+    setBusy(true); setError(null); setSuccess(null);
+    try {
+      await onPublish({});
+      setSuccess(t("republished"));
+    } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
+  }
+
   return (
     <div className="mx-auto max-w-3xl">
       <div className="min-w-0 space-y-6">
@@ -1042,7 +1052,8 @@ function AdminResults({
         <label className="mt-6 flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4 text-sm"><input className="mt-0.5" type="checkbox" aria-label={t("anonymizeParticipants")} checked={anonymize} onChange={(event) => setAnonymize(event.target.checked)} /><span><strong className="block">{t("anonymizeParticipants")}</strong><small className="text-[var(--muted)]">{t("anonymizeHint")}</small></span></label>
         {hasSchedule ? <label className="mt-3 flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4 text-sm"><input className="mt-0.5" type="checkbox" aria-label={t("showScheduleLabel")} checked={showSchedule} onChange={(event) => setShowSchedule(event.target.checked)} /><span><strong className="block">{t("showScheduleLabel")}</strong><small className="text-[var(--muted)]">{t("showScheduleHint")}</small></span></label> : null}
         <div className="mt-5"><StatusMessage error={error} success={success} /></div>
-        <div className="mt-5 flex flex-col gap-2 sm:flex-row"><Button disabled={busy} onClick={() => void save()}>{busy ? tc("saving") : t("saveDraft")}</Button><Button variant="secondary" disabled={busy} onClick={() => void regenerate()}>{t("regenerateDraft")}</Button></div>
+        <div className="mt-5 flex flex-col gap-2 sm:flex-row"><Button disabled={busy} onClick={() => void save()}>{busy ? tc("saving") : t("saveDraft")}</Button><Button variant="secondary" disabled={busy} onClick={() => void regenerate()}>{t("regenerateDraft")}</Button>{isPublished ? <Button variant="secondary" disabled={busy} onClick={() => void republish()}>{t("republishNow")}</Button> : null}</div>
+        {isPublished ? <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{t("republishHint")}</p> : null}
         <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{t("regenerateHint")}</p>
       </div>
           </fieldset>
@@ -1205,7 +1216,7 @@ export function AdminScreen({
         {activeTab === "checkpoints" ? <CheckpointPlanner key={`${challenge.id}:${challenge.checkpoints.map((cp) => cp.id).join(",")}`} challenge={challenge} onSaveCheckpoints={onSaveCheckpoints} onAssign={onAssignCheckpointItems} /> : null}
         {activeTab === "review" ? <AdminReview challenge={challenge} entries={entries} onPatch={onPatchEntry} onDelete={onDeleteEntry} /> : null}
         {activeTab === "metrics" ? <AdminMetrics challenge={challenge} onAdd={onAddMetric} onUpdate={onUpdateMetric} onDelete={onDeleteMetric} /> : null}
-        {activeTab === "results" ? <AdminResults challenge={challenge} entries={entries} onSave={onSaveResult} onReorderBlocks={onReorderBlocks} /> : null}
+        {activeTab === "results" ? <AdminResults challenge={challenge} entries={entries} onSave={onSaveResult} onPublish={onPublishResult} onReorderBlocks={onReorderBlocks} /> : null}
       </div>
     </main>
   );
