@@ -121,7 +121,7 @@ async function buildSummary(
   }
 
   const average = metrics.find((m) => m.operation === "average" && !m.series && m.value !== null);
-  if (average) parts.push(`Nota média ${average.formattedValue}.`);
+  if (average) parts.push(`${average.label}: ${average.formattedValue}.`);
 
   const ranking = metrics.find((m) => m.operation === "bayesian_average" && Array.isArray(m.series));
   const top = (ranking?.series as Array<{ label: string; value: number | null }> | undefined)?.find((s) => s.value !== null);
