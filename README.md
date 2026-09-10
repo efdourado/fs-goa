@@ -83,7 +83,10 @@ npm run dev
 npm run db:migrate
 
 # migração — produção (Neon), da sua máquina
-node --env-file=.env.production.local scripts/migrate.mjs
+npm run db:migrate:prod          # = node --env-file=.env.production.local scripts/migrate.mjs
+#   migrate.mjs fala com o Neon por WSS/443, então funciona mesmo em redes que
+#   bloqueiam a 5432. Local (Docker) continua na 5432 via `pg`. Idempotente:
+#   sem nada a aplicar, só imprime "nada a fazer" e sai 0.
 
 # migração + conta de administração de uma vez
 npm run db:setup                                        # local
@@ -120,19 +123,24 @@ O banco de produção é o PostgreSQL do Neon (`sa-east-1`); nenhum banco local 
 exposto. `vercel.json` fixa as funções na região `gru1`, colada ao Neon, para
 cortar a latência de cada consulta.
 
-1. **Vercel → Project Settings**: Framework Preset = **Next.js**, Build Command e
-   Output padrão (não sobrescreva).
+1. **Vercel → Project Settings**: Framework Preset = **Next.js**, Output padrão.
+   O **Build Command** fica no `vercel-build` do `package.json`
+   (`bash scripts/deploy.sh`) — Vercel o usa automaticamente, não sobrescreva no
+   painel. `scripts/deploy.sh` aplica as migrações pendentes e então builda.
 2. **Environment Variables** (Production): `DATABASE_URL` (use a URL **pooled** do
    Neon — host com `-pooler` — com `sslmode=require`, para reaproveitar conexões
    entre invocações), `APP_ORIGIN` (origem pública exata, ex.: `https://goa.vercel.app`),
    `ADMIN_PASSWORD` (mínimo 10 caracteres). Opcional: `ADMIN_USERNAME`, `ADMIN_NAME`,
    `MAX_GROUPS_PER_OWNER` / `MAX_CHALLENGES_PER_GROUP` (padrão 6),
    `MAX_MEMBERS_PER_GROUP` (padrão 62).
-3. **`git push`** dispara o build e o deploy.
-4. **Migração** (a cada nova migração), da sua máquina contra o Neon:
+3. **`git push`** dispara o build e o deploy. No deploy de **produção**
+   (`VERCEL_ENV=production`) o `deploy.sh` roda `scripts/migrate.mjs` antes do
+   build; deploys de preview pulam a migração (defina `RUN_MIGRATIONS=1` na env
+   do preview para forçar). Sem migração pendente, o passo é um no-op.
+4. **Migração manual** (se quiser aplicar fora de um deploy), da sua máquina:
 
    ```bash
-   node --env-file=.env.production.local scripts/migrate.mjs
+   npm run db:migrate:prod
    ```
 
    A conta de administração já existe — só rode `scripts/seed-admin.mjs` do mesmo
