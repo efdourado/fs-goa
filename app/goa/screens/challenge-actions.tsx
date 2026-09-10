@@ -184,12 +184,11 @@ function CopyChallengeDialog({ challenge, duplicateTargets, onDuplicate, onClose
   </Dialog>;
 }
 
-export function ChallengeActions({ challenge, duplicateTargets, onDuplicate, onDelete, onTransition, onViewParticipant, isPlatformAdmin, onPublishTemplate, onUnpublishTemplate, onPublish, onUnpublish }: {
+export function ChallengeActions({ challenge, duplicateTargets, onDuplicate, onDelete, onTransition, isPlatformAdmin, onPublishTemplate, onUnpublishTemplate, onPublish, onUnpublish }: {
   challenge: ChallengeDetail; duplicateTargets: Target[];
   onDuplicate: (payload: { title: string; targetGroupId: Id }) => Promise<void>;
   onDelete?: () => Promise<void>;
   onTransition: (status: "active" | "closed") => Promise<void>;
-  onViewParticipant?: () => void;
   isPlatformAdmin: boolean;
   onPublishTemplate: (summary: string) => Promise<void>;
   onUnpublishTemplate: () => Promise<void>;
@@ -207,7 +206,6 @@ export function ChallengeActions({ challenge, duplicateTargets, onDuplicate, onD
   return <>
     {stateAction ? <Button variant={stateAction.variant} onClick={() => setPanel("state")}>{stateAction.label}</Button> : null}
     <ActionMenu label={tx("moreSettings")} iconOnly>
-      {onViewParticipant ? <ActionMenuItem onClick={onViewParticipant}>{t("simulateAsParticipant")}</ActionMenuItem> : null}
       <ActionMenuItem onClick={() => setPanel("publication")}>{tx("publication")}</ActionMenuItem>
       <ActionMenuItem onClick={() => setPanel("copy")}>{t("reuseTitle")}</ActionMenuItem>
       {isPlatformAdmin ? <ActionMenuItem onClick={() => setPanel("template")}>{t("platformTemplateTitle")}</ActionMenuItem> : null}

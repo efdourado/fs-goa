@@ -1080,7 +1080,6 @@ export function AdminScreen({
   tab,
   onTab,
   onBack,
-  onViewParticipant,
   onSaveBasics,
   onTransition,
   onDuplicate,
@@ -1115,7 +1114,6 @@ export function AdminScreen({
   tab: AdminTab;
   onTab: (tab: AdminTab) => void;
   onBack: () => void;
-  onViewParticipant: () => void;
   onSaveBasics: (payload: Partial<ChallengeSummary>) => Promise<void>;
   onTransition: (status: "active" | "closed") => Promise<void>;
   onDuplicate: (payload: { title: string; targetGroupId: Id }) => Promise<void>;
@@ -1174,7 +1172,7 @@ export function AdminScreen({
           <span className="h-5 w-px flex-none bg-[var(--line)]" aria-hidden="true" />
           <ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />
           <h1 className="min-w-0 flex-1 truncate text-base font-semibold tracking-tight">{challenge.title}</h1>
-          <ChallengeActions challenge={challenge} duplicateTargets={duplicateTargets} onDuplicate={onDuplicate} onDelete={onDelete} onTransition={onTransition} onViewParticipant={onViewParticipant} isPlatformAdmin={isPlatformAdmin} onPublishTemplate={onPublishTemplate} onUnpublishTemplate={onUnpublishTemplate} onPublish={onPublishResult} onUnpublish={onUnpublishResult} />
+          <ChallengeActions challenge={challenge} duplicateTargets={duplicateTargets} onDuplicate={onDuplicate} onDelete={onDelete} onTransition={onTransition} isPlatformAdmin={isPlatformAdmin} onPublishTemplate={onPublishTemplate} onUnpublishTemplate={onUnpublishTemplate} onPublish={onPublishResult} onUnpublish={onUnpublishResult} />
         </div>
         <nav className="mx-auto max-w-5xl px-2 sm:px-5" aria-label={t("tabsAria")}>
           <div className="flex gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">

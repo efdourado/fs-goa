@@ -570,7 +570,6 @@
   },
   "adminChallenge": {
     "back": "Back",
-    "simulateAsParticipant": "Simulate as participant",
     "subtitle": "Set it up, review it, and present it — admin controls stay validated on the server.",
     "tabsAria": "Admin areas",
     "tabs": {

@@ -570,7 +570,6 @@
   },
   "adminChallenge": {
     "back": "Voltar",
-    "simulateAsParticipant": "Simular como participante",
     "subtitle": "Configure, revise e apresente — controles administrativos continuam validados no servidor.",
     "tabsAria": "Áreas administrativas",
     "tabs": {
