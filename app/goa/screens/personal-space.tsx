@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 
 import { ActiveChallengeCard } from "./dashboard";
 import type { ChallengeSummary, Id } from "../types";
-import { BackButton, Button, cx, EmptyState, EmptyStateAction, PageHeading } from "../ui";
+import { BackButton, cx, EmptyState, PageHeading } from "../ui";
 import { canManage } from "../utils";
 
 /** A quiet toolbar button — catalogue / bin / new. */
@@ -97,7 +97,7 @@ export function PersonalSpaceScreen({
         </div>
       ) : (
         <div className="mt-8">
-          <EmptyState title={t("emptyTitle")} description={t.rich("emptyCreatePrompt", { action: (chunks) => <EmptyStateAction onClick={onCreateChallenge}>{chunks}</EmptyStateAction> })} action={<Button variant="secondary" onClick={onCreateChallenge}>{t("createShort")}</Button>} />
+          <EmptyState title={t("emptyTitle")} onClick={onCreateChallenge} />
         </div>
       )}
     </main>

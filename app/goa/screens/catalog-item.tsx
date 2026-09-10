@@ -43,7 +43,7 @@ export function CatalogItemScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detailPath, itemId]);
 
-  if (error) return <main className="mx-auto max-w-3xl px-4 py-10"><EmptyState title={t("errorTitle")} description={error} action={<Button variant="secondary" onClick={onBack}>{t("back")}</Button>} /></main>;
+  if (error) return <main className="mx-auto max-w-3xl px-4 py-10"><EmptyState title={t("errorTitle")} hint={error} action={<Button variant="secondary" onClick={onBack}>{t("back")}</Button>} /></main>;
   if (!item) return <LoadingView />;
 
   const titleWithYear = item.year ? `${item.title} (${item.year})` : item.title;

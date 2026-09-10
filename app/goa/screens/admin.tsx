@@ -34,7 +34,7 @@ import {
   ChallengeStatusBadge,
   cx,
   Disclosure,
-  EmptyState, EmptyStateAction,
+  EmptyState,
   Field,
   inputClass,
   PageHeading,
@@ -253,7 +253,7 @@ function AdminParticipants({
             );
           })}
         </ul>
-      ) : <EmptyState title={t("noMembersTitle")} description={t("noMembersBody")} />}
+      ) : <EmptyState title={t("noMembersTitle")} />}
       <div className="mt-5"><StatusMessage error={error} success={success} /></div>
       {challenge.status !== "closed" && group?.members?.length ? <Button className="mt-5 w-full" disabled={busy} onClick={() => { setBusy(true); setError(null); setSuccess(null); onSave(selected).then(() => setSuccess(t("participantsSaved"))).catch((cause: unknown) => setError(f.error(cause))).finally(() => setBusy(false)); }}>{busy ? tc("saving") : t("saveParticipants")}</Button> : null}
     </section>
@@ -378,7 +378,9 @@ function AdminFields({
             </li>
           ))}
         </ul>
-      ) : <EmptyState title={t("fieldsEmptyTitle")} description={locked ? t("fieldsEmptyBody") : t.rich("fieldsEmptyCreatePrompt", { action: (chunks) => <EmptyStateAction onClick={() => { setError(null); setEditing("new"); }}>{chunks}</EmptyStateAction> })} />}
+      ) : locked
+        ? <EmptyState title={t("fieldsEmptyTitle")} hint={t("fieldsEmptyBody")} />
+        : <EmptyState title={t("fieldsEmptyTitle")} onClick={() => { setError(null); setEditing("new"); }} />}
 
       {editing ? (
         <FieldEditorDialog
@@ -739,8 +741,10 @@ function AdminItems({
           ))}
         </ol>
       ) : undatedDaily
-        ? <EmptyState title={t("noItemsUndatedTitle")} description={t("noItemsUndatedBody")} />
-        : <EmptyState title={t("noItemsTitle")} description={canShowAdd && !showAdd ? t.rich("itemsEmptyCreatePrompt", { action: (chunks) => <EmptyStateAction onClick={() => { setError(null); setShowAdd(true); }}>{chunks}</EmptyStateAction> }) : t("noItemsBody")} />}
+        ? <EmptyState title={t("noItemsUndatedTitle")} />
+        : canShowAdd && !showAdd
+          ? <EmptyState title={t("noItemsTitle")} onClick={() => { setError(null); setShowAdd(true); }} />
+          : <EmptyState title={t("noItemsTitle")} hint={t("noItemsBody")} />}
 
       {editing ? (
         <ItemEditorDialog
@@ -826,7 +830,7 @@ function AdminReview({
               );
             }}
           />
-        ) : <EmptyState title={t("noEntriesTitle")} description={t("noEntriesEmpty")} />}
+        ) : <EmptyState title={t("noEntriesTitle")} />}
       </div>
 
 

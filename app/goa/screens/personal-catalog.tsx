@@ -154,7 +154,7 @@ export function PersonalCatalogScreen({
       {items === null ? (
         <p className="text-sm text-[var(--muted)]">{t("loading")}</p>
       ) : !items.length ? (
-        <EmptyState title={t("emptyTitle")} description={t("emptyBody")} />
+        <EmptyState title={t("emptyTitle")} />
       ) : view === "list" ? (
         sorted.length ? (
           <ul className={cx(cardClass, "divide-y divide-[var(--line)] overflow-hidden")}>
@@ -175,7 +175,7 @@ export function PersonalCatalogScreen({
             ))}
           </ul>
         ) : (
-          <EmptyState title={t("emptyTitle")} description={t("emptyBody")} />
+          <EmptyState title={t("emptyTitle")} />
         )
       ) : activeBuckets.length ? (
         <div className="space-y-4">
@@ -189,7 +189,7 @@ export function PersonalCatalogScreen({
           <BucketBars buckets={activeBuckets} emptyLabel={t("noGenre")} />
         </div>
       ) : (
-        <EmptyState title={t("bucketEmptyTitle")} description={t("bucketEmptyBody")} />
+        <EmptyState title={t("bucketEmptyTitle")} />
       )}
     </main>
   );

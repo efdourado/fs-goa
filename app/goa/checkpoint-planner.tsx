@@ -247,7 +247,7 @@ export function CheckpointPlanner({
                 })}
               </ol>
             ) : (
-              <EmptyState title={t("noCheckpointsTitle")} description={t("noCheckpointsBody")} />
+              <EmptyState title={t("noCheckpointsTitle")} />
             )}
             <div className="flex flex-wrap gap-2">
               <Button variant="secondary" onClick={addDraft}>{t("addCheckpoint")}</Button>

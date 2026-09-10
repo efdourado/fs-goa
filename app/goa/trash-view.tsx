@@ -24,7 +24,7 @@ export function TrashLoadState({ loading, error, onRetry }: {
   const tc = useTranslations("common");
   if (error) return <div className="space-y-3"><StatusMessage error={error} /><Button variant="secondary" onClick={onRetry}>{tc("retry")}</Button></div>;
   if (loading) return <LoadingView label={t("loading")} />;
-  return <EmptyState title={t("emptyTitle")} description={t("emptyBody")} />;
+  return <EmptyState title={t("emptyTitle")} />;
 }
 
 function scopeListPath(scope: Scope): string {

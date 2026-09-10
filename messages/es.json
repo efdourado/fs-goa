@@ -213,7 +213,6 @@
     "draftWithoutId": "El servidor creó el borrador sin devolver su identificador.",
     "detailError": "No se pudo abrir este desafío",
     "adminUnavailableTitle": "Acceso de administración no disponible",
-    "adminUnavailableBody": "No eres responsable ni administrador de este grupo. El servidor también valida cada operación.",
     "backToStart": "Volver al inicio"
   },
   "auth": {
@@ -255,7 +254,6 @@
   },
   "dashboard": {
     "emptyGroupsTitle": "Crea tu primer grupo",
-    "emptyGroupsCreatePrompt": "Crea un grupo y empieza retos en compañía haciendo clic <action>aquí</action>.",
     "greeting": "Hola, {name}.",
     "subtitle": "Lo que necesita tu atención hoy y tus grupos.",
     "groupLimitReached": "Alcanzaste el límite de {limit} grupos",
@@ -271,7 +269,6 @@
     "listMeta": "{count, plural, =0 {lista vacía} one {# título} other {# títulos}}",
     "progress": "{done} de {total}",
     "noChallengesTitle": "Nada pendiente por aquí",
-    "noChallengesBody": "Cuando un desafío esté activo o programado, aparecerá aquí con la fecha del próximo registro.",
     "groupsTitle": "Tus grupos",
     "groupsCount": "{count, plural, one {# grupo} other {# grupos}}",
     "peopleCount": "{count, plural, one {# persona} other {# personas}}",
@@ -286,7 +283,7 @@
       "reorder": "Reorganizar",
       "reorderDone": "Listo",
       "context": "Limpiar ({count})",
-      "empty": "Ningún desafío en este color."
+      "empty": "Nada en este color"
     },
     "color": {
       "none": "Sin color",
@@ -311,11 +308,9 @@
     "shelfAdd": {
       "personal": "Nuevo desafío",
       "group": "Nuevo grupo"
-    },
-    "emptyGroupsShort": "Aún no estás en ningún grupo."
+    }
   },
   "group": {
-    "emptyCreatePrompt": "Elige una plantilla y prepara la 1.ª edición haciendo clic <action>aquí</action>.",
     "updated": "Grupo actualizado.",
     "deleteConfirm": "¿Mover \"{name}\" a la papelera? Sus desafíos y registros desaparecen de la app.",
     "linkCopied": "Enlace copiado.",
@@ -408,14 +403,12 @@
     }
   },
   "personalSpace": {
-    "emptyCreatePrompt": "Elige una plantilla y crea tu primer reto personal haciendo clic <action>aquí</action>.",
     "back": "Volver",
     "title": "Mi espacio",
     "subtitle": "Solo tuyo — sin grupo, sin invitaciones.",
     "catalog": "Mi acervo",
     "create": "+ Desafío personal",
     "emptyTitle": "Empieza un desafío solo tuyo",
-    "emptyBody": "Los desafíos personales son solo tuyos — sin grupo, sin invitaciones. Ideal para una meta de lectura o un maratón de películas.",
     "trash": "Papelera",
     "createShort": "Nuevo desafío",
     "sectionActive": "En marcha",
@@ -432,7 +425,6 @@
     "loadError": "No se pudo cargar el acervo.",
     "rounds": "{count, plural, =0 {sin rondas} one {# ronda} other {# rondas}}",
     "emptyTitle": "Tu acervo está vacío",
-    "emptyBody": "Crea un desafío personal de Cine o Estantería — los títulos que agregues entran aquí.",
     "viewLabel": "Vista",
     "view": {
       "list": "Lista",
@@ -449,8 +441,7 @@
     "bestGenres": "Mejores géneros: {list}",
     "bestYears": "Mejores años: {list}",
     "noGenre": "Sin género",
-    "bucketEmptyTitle": "Aún no hay nada que cruzar",
-    "bucketEmptyBody": "Completa el género o el año de los ítems del acervo y esta vista se completa."
+    "bucketEmptyTitle": "Aún no hay nada que cruzar"
   },
   "cineItems": {
     "titleLabel": "Título de la película",
@@ -565,7 +556,6 @@
     "peopleLegend": "Participantes",
     "selectMember": "Seleccionar {name}",
     "noMembersTitle": "Miembros aún no cargados",
-    "noMembersBody": "Puedes guardar el desafío como borrador y agregar participantes en el área de administración.",
     "summaryTitle": "Resumen del borrador",
     "summaryFields": "{count} campos",
     "summaryItems": "{count} ítems",
@@ -579,8 +569,6 @@
     "expectationHint": "Los participantes dan una nota de cuánto esperan disfrutar cada título antes de verlo. Se bloquea cuando envían la valoración real. También puedes activarlo después."
   },
   "adminChallenge": {
-    "fieldsEmptyCreatePrompt": "Añade el primer campo de este formulario haciendo clic <action>aquí</action>.",
-    "itemsEmptyCreatePrompt": "Prepara los primeros elementos o etapas haciendo clic <action>aquí</action>.",
     "back": "Volver",
     "simulateAsParticipant": "Simular como participante",
     "subtitle": "Configura, revisa y presenta — los controles de administración se siguen validando en el servidor.",
@@ -669,7 +657,6 @@
     "selectMember": "Seleccionar {name}",
     "memberMeta": "@{username} · {role}",
     "noMembersTitle": "Lista de miembros no disponible",
-    "noMembersBody": "El bootstrap necesita incluir a los miembros del grupo para que la selección se edite aquí.",
     "participantsSaved": "Participantes actualizados.",
     "saveParticipants": "Guardar participantes",
     "fieldsTitle": "Campos del registro",
@@ -712,7 +699,6 @@
     "removing": "Quitando…",
     "remove": "Quitar",
     "noItemsUndatedTitle": "Check-ins bajo demanda",
-    "noItemsUndatedBody": "Nada que generar aquí. Los participantes pueden registrar hoy o recuperar una fecha pasada mientras el desafío esté activo.",
     "noItemsTitle": "Ningún checkpoint",
     "noItemsBody": "Agrega ítems o genera checkpoints diarios antes de activar el desafío.",
     "asideUndated": "Sin calendario fijo",
@@ -735,7 +721,6 @@
     "late": "atrasado",
     "inspect": "Inspeccionar y corregir",
     "noEntriesTitle": "Ningún registro encontrado",
-    "noEntriesEmpty": "Los envíos de los participantes aparecerán aquí.",
     "correctionKicker": "Corrección administrativa",
     "correctionHeading": "{name} · {item}",
     "entryFallback": "Registro",
@@ -751,7 +736,6 @@
     "metricInResults": "resultado",
     "metricGroupedBy": "por {groupBy}",
     "noMetricsTitle": "Ninguna métrica configurada",
-    "noMetricsBody": "Empieza con recuento, media o tasa de finalización. Las fórmulas arbitrarias quedan fuera del MVP.",
     "addMetric": "Agregar métrica",
     "editMetric": "Editar métrica",
     "cancelEditMetric": "Cancelar",
@@ -927,10 +911,8 @@
     "scheduledTitle": "Desafío programado para {date}",
     "scheduledBody": "Ya fue activado y puede consultarse, pero los registros solo se liberarán cuando empiece el primer checkpoint.",
     "closedTitle": "Este desafío fue cerrado",
-    "closedBody": "Los registros se preservaron. Abre el resultado para repasar la historia del grupo.",
     "seeResults": "Ver resultado",
     "noCheckpointTitle": "Ningún checkpoint disponible",
-    "noCheckpointBody": "El próximo ítem aparecerá aquí cuando el administrador lo libere.",
     "checkInOf": "Check-in del {date}",
     "newEntry": "Nuevo registro",
     "dueBy": "hasta {date}",
@@ -968,7 +950,6 @@
     "entryUpdated": "Registro actualizado.",
     "entrySaved": "Registro guardado.",
     "notConfiguredTitle": "Formulario aún no configurado",
-    "notConfiguredBody": "Un administrador debe agregar los campos antes de que el desafío reciba registros.",
     "required": "obligatorio",
     "optional": "opcional",
     "select": "Selecciona",
@@ -991,9 +972,7 @@
   },
   "resultView": {
     "emptyTitle": "La vitrina todavía se está preparando",
-    "emptyBody": "Los registros están preservados. Un administrador aún puede elegir métricas y comentarios para contar esta historia.",
     "liveEmptyTitle": "Todavía sin números",
-    "liveEmptyBody": "Cuando lleguen los registros, el marcador en vivo aparece aquí.",
     "backToEntry": "Hacer un registro",
     "shareCopy": "Copiar página pública",
     "shareCopied": "Copiado"
@@ -1052,7 +1031,6 @@
     "moveDown": "Mover hacia abajo",
     "remove": "Quitar",
     "noFieldsTitle": "Ningún campo configurado",
-    "noFieldsBody": "Agrega al menos un campo para que los participantes puedan registrar algo.",
     "addFieldTitle": "Agregar campo",
     "fieldNameSr": "Nombre del campo",
     "fieldNamePlaceholder": "Ej.: Páginas leídas",
@@ -1069,7 +1047,6 @@
     "subtitle": "Desafíos de ejemplo para ver cómo funciona Goa. Abre uno para conocer las reglas, el formulario y las métricas — y duplícalo a un grupo tuyo cuando quieras empezar.",
     "loading": "Cargando plantillas…",
     "emptyTitle": "Todavía no hay plantillas",
-    "emptyBody": "En cuanto se publique una plantilla, aparecerá aquí para cualquier persona.",
     "cardKicker": "Plantilla · {mode}",
     "cardMeta": "{rules, plural, one {# regla} other {# reglas}} · {fieldCount, plural, one {# campo} other {# campos}}",
     "cardItems": " · {count} ítems",
@@ -1249,7 +1226,6 @@
     "moveUp": "Subir",
     "moveDown": "Bajar",
     "noCheckpointsTitle": "Ningún checkpoint todavía",
-    "noCheckpointsBody": "Agrega un checkpoint para organizar la lista en semanas o sesiones.",
     "addCheckpoint": "Agregar checkpoint",
     "saveCheckpoints": "Guardar checkpoints",
     "saved": "Checkpoints guardados.",
@@ -1372,7 +1348,6 @@
     "groupTitle": "Papelera del grupo",
     "groupSubtitle": "Desafíos e ítems del acervo quitados. Restaura o elimina definitivamente — nada desaparece solo.",
     "emptyTitle": "La papelera está vacía",
-    "emptyBody": "Lo que quites aparece aquí y puede volver en cualquier momento.",
     "restore": "Restaurar",
     "purge": "Eliminar permanentemente",
     "purging": "Eliminando…",

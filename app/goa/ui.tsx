@@ -182,26 +182,44 @@ export function StatusMessage({
   );
 }
 
-export function EmptyStateAction({ children, onClick }: { children: ReactNode; onClick: () => void }) {
-  return <button type="button" onClick={onClick} className="cursor-pointer rounded text-inherit no-underline underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-current">{children}</button>;
-}
-
 export function EmptyState({
   title,
-  description,
+  onClick,
   action,
+  hint,
 }: {
   title: string;
-  description: ReactNode;
+  /** When set, the whole card is a button (e.g. tap to create). Mutually exclusive with `action`. */
+  onClick?: () => void;
+  /** A nested control for error/retry/back states. */
   action?: ReactNode;
+  /** One short line, only for context the title can't carry (a limit reached, an error message). */
+  hint?: ReactNode;
 }) {
-  return (
-    <div className="rounded-2xl border border-dashed border-[var(--line)] bg-[var(--wash)]/70 px-5 py-10 text-center">
+  const shell = "w-full rounded-2xl border border-dashed border-[var(--line)] bg-[var(--wash)]/70 px-5 py-10 text-center";
+  const body = (
+    <>
       <span className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-[var(--main-soft)] text-xl text-[var(--main-strong)]" aria-hidden="true">
         ᴖ̈
       </span>
       <h3 className="text-lg font-light tracking-[-0.02em]">{title}</h3>
-      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[var(--muted)]">{description}</p>
+      {hint ? <p className="mx-auto mt-1.5 max-w-md text-[13px] leading-5 text-[var(--muted)]">{hint}</p> : null}
+    </>
+  );
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={cx(shell, "block cursor-pointer transition hover:border-[var(--main-line)] hover:bg-[var(--main-soft)]/40 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/20")}
+      >
+        {body}
+      </button>
+    );
+  }
+  return (
+    <div className={shell}>
+      {body}
       {action ? <div className="mt-5">{action}</div> : null}
     </div>
   );

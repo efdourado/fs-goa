@@ -213,7 +213,6 @@
     "draftWithoutId": "The server created the draft without returning its identifier.",
     "detailError": "Couldn't open this challenge",
     "adminUnavailableTitle": "Admin access unavailable",
-    "adminUnavailableBody": "You aren't an owner or admin of this group. The server also validates every operation.",
     "backToStart": "Back to home"
   },
   "auth": {
@@ -255,7 +254,6 @@
   },
   "dashboard": {
     "emptyGroupsTitle": "Create your first group",
-    "emptyGroupsCreatePrompt": "Create a group and start challenges together by clicking <action>here</action>.",
     "greeting": "Hi, {name}.",
     "subtitle": "What needs your attention today, and your groups.",
     "groupLimitReached": "You've reached the limit of {limit} groups",
@@ -271,7 +269,6 @@
     "listMeta": "{count, plural, =0 {empty list} one {# title} other {# titles}}",
     "progress": "{done} of {total}",
     "noChallengesTitle": "Nothing pending here",
-    "noChallengesBody": "When a challenge is active or scheduled, it shows up here with the date of the next entry.",
     "groupsTitle": "Your groups",
     "groupsCount": "{count, plural, one {# group} other {# groups}}",
     "peopleCount": "{count, plural, one {# person} other {# people}}",
@@ -286,7 +283,7 @@
       "reorder": "Reorder",
       "reorderDone": "Done",
       "context": "Clear ({count})",
-      "empty": "No challenges in this colour."
+      "empty": "Nothing in this colour"
     },
     "color": {
       "none": "No colour",
@@ -311,11 +308,9 @@
     "shelfAdd": {
       "personal": "New challenge",
       "group": "New group"
-    },
-    "emptyGroupsShort": "You're not in any groups yet."
+    }
   },
   "group": {
-    "emptyCreatePrompt": "Pick a preset and set up the 1st edition by clicking <action>here</action>.",
     "updated": "Group updated.",
     "deleteConfirm": "Move \"{name}\" to the bin? Its challenges and entries disappear from the app.",
     "linkCopied": "Link copied.",
@@ -408,14 +403,12 @@
     }
   },
   "personalSpace": {
-    "emptyCreatePrompt": "Pick a preset and create your first personal challenge by clicking <action>here</action>.",
     "back": "Back",
     "title": "My space",
     "subtitle": "Just yours — no group, no invites.",
     "catalog": "My catalogue",
     "create": "+ Personal challenge",
     "emptyTitle": "Start a challenge of your own",
-    "emptyBody": "Personal challenges are just yours — no group, no invites. Great for a reading goal or a film marathon.",
     "trash": "Bin",
     "createShort": "New challenge",
     "sectionActive": "In progress",
@@ -432,7 +425,6 @@
     "loadError": "Couldn't load the catalogue.",
     "rounds": "{count, plural, =0 {no rounds} one {# round} other {# rounds}}",
     "emptyTitle": "Your catalogue is empty",
-    "emptyBody": "Start a personal Cinema or Bookshelf challenge — the titles you add land here.",
     "viewLabel": "View",
     "view": {
       "list": "List",
@@ -449,8 +441,7 @@
     "bestGenres": "Best genres: {list}",
     "bestYears": "Best years: {list}",
     "noGenre": "No genre",
-    "bucketEmptyTitle": "Nothing to break down yet",
-    "bucketEmptyBody": "Add a genre or year to your catalogue items and this view fills in."
+    "bucketEmptyTitle": "Nothing to break down yet"
   },
   "cineItems": {
     "titleLabel": "Film title",
@@ -565,7 +556,6 @@
     "peopleLegend": "Participants",
     "selectMember": "Select {name}",
     "noMembersTitle": "Members not loaded yet",
-    "noMembersBody": "You can save the challenge as a draft and add participants in the admin area.",
     "summaryTitle": "Draft summary",
     "summaryFields": "{count} fields",
     "summaryItems": "{count} items",
@@ -579,8 +569,6 @@
     "expectationHint": "Participants rate how much they expect to like each title before watching. It locks once they send the real rating. You can also toggle this later."
   },
   "adminChallenge": {
-    "fieldsEmptyCreatePrompt": "Add the first field to this form by clicking <action>here</action>.",
-    "itemsEmptyCreatePrompt": "Set up the first items or checkpoints by clicking <action>here</action>.",
     "back": "Back",
     "simulateAsParticipant": "Simulate as participant",
     "subtitle": "Set it up, review it, and present it — admin controls stay validated on the server.",
@@ -669,7 +657,6 @@
     "selectMember": "Select {name}",
     "memberMeta": "@{username} · {role}",
     "noMembersTitle": "Member list unavailable",
-    "noMembersBody": "The bootstrap needs to include the group's members for the selection to be edited here.",
     "participantsSaved": "Participants updated.",
     "saveParticipants": "Save participants",
     "fieldsTitle": "Entry fields",
@@ -712,7 +699,6 @@
     "removing": "Removing…",
     "remove": "Remove",
     "noItemsUndatedTitle": "Check-ins on demand",
-    "noItemsUndatedBody": "Nothing to generate here. Participants can log today or backfill a past date while the challenge is active.",
     "noItemsTitle": "No checkpoints",
     "noItemsBody": "Add items or generate daily checkpoints before activating the challenge.",
     "asideUndated": "No fixed calendar",
@@ -735,7 +721,6 @@
     "late": "late",
     "inspect": "Inspect and correct",
     "noEntriesTitle": "No entries found",
-    "noEntriesEmpty": "Participant submissions will show up here.",
     "correctionKicker": "Admin correction",
     "correctionHeading": "{name} · {item}",
     "entryFallback": "Entry",
@@ -751,7 +736,6 @@
     "metricInResults": "showcase",
     "metricGroupedBy": "by {groupBy}",
     "noMetricsTitle": "No metrics set up",
-    "noMetricsBody": "Start with a count, average, or completion rate. Arbitrary formulas are out of scope for the MVP.",
     "addMetric": "Add metric",
     "editMetric": "Edit metric",
     "cancelEditMetric": "Cancel",
@@ -927,10 +911,8 @@
     "scheduledTitle": "Challenge scheduled for {date}",
     "scheduledBody": "It's already active and can be viewed, but entries only open once the first checkpoint begins.",
     "closedTitle": "This challenge is closed",
-    "closedBody": "The entries were preserved. Open the result to revisit the group's story.",
     "seeResults": "See result",
     "noCheckpointTitle": "No checkpoint available",
-    "noCheckpointBody": "The next item will appear here once the admin opens it.",
     "checkInOf": "Check-in for {date}",
     "newEntry": "New entry",
     "dueBy": "by {date}",
@@ -968,7 +950,6 @@
     "entryUpdated": "Entry updated.",
     "entrySaved": "Entry saved.",
     "notConfiguredTitle": "Form not set up yet",
-    "notConfiguredBody": "An admin needs to add the fields before the challenge can receive entries.",
     "required": "required",
     "optional": "optional",
     "select": "Select",
@@ -991,9 +972,7 @@
   },
   "resultView": {
     "emptyTitle": "The showcase is still being prepared",
-    "emptyBody": "The entries are preserved. An admin can still choose metrics and comments to tell this story.",
     "liveEmptyTitle": "No numbers yet",
-    "liveEmptyBody": "Once entries come in, the live standings show up here.",
     "backToEntry": "Log an entry",
     "shareCopy": "Copy public page",
     "shareCopied": "Copied"
@@ -1052,7 +1031,6 @@
     "moveDown": "Move down",
     "remove": "Remove",
     "noFieldsTitle": "No fields set up",
-    "noFieldsBody": "Add at least one field so participants can log something.",
     "addFieldTitle": "Add field",
     "fieldNameSr": "Field name",
     "fieldNamePlaceholder": "e.g. Pages read",
@@ -1069,7 +1047,6 @@
     "subtitle": "Example challenges to see how Goa works. Open one to explore the rules, the form, and the metrics — and duplicate it to one of your groups whenever you want to start.",
     "loading": "Loading templates…",
     "emptyTitle": "No templates yet",
-    "emptyBody": "As soon as a template is published, it shows up here for anyone.",
     "cardKicker": "Template · {mode}",
     "cardMeta": "{rules, plural, one {# rule} other {# rules}} · {fieldCount, plural, one {# field} other {# fields}}",
     "cardItems": " · {count} items",
@@ -1249,7 +1226,6 @@
     "moveUp": "Move up",
     "moveDown": "Move down",
     "noCheckpointsTitle": "No checkpoints yet",
-    "noCheckpointsBody": "Add a checkpoint to organise the list into weeks or sessions.",
     "addCheckpoint": "Add checkpoint",
     "saveCheckpoints": "Save checkpoints",
     "saved": "Checkpoints saved.",
@@ -1372,7 +1348,6 @@
     "groupTitle": "Group bin",
     "groupSubtitle": "Removed challenges and catalogue items. Restore or delete for good — nothing disappears on its own.",
     "emptyTitle": "The bin is empty",
-    "emptyBody": "Anything you remove shows up here and can come back at any time.",
     "restore": "Restore",
     "purge": "Delete permanently",
     "purging": "Deleting…",

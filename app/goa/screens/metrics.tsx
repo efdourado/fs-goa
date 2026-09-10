@@ -39,7 +39,7 @@ export function AdminMetrics({ challenge, onAdd, onUpdate, onDelete }: Props) {
           </div>
           <MetricBlock metric={metric} />
         </div>
-      ))}</div> : <EmptyState title={t("noMetricsTitle")} description={t("noMetricsBody")} />}
+      ))}</div> : <EmptyState title={t("noMetricsTitle")} />}
       {editing ? <MetricEditor key={editing === "new" ? "new" : editing.id} challenge={challenge} metric={editing === "new" ? undefined : editing} onCancel={() => setEditing(null)} onSave={async (payload) => {
         if (editing === "new") await onAdd(payload); else await onUpdate(editing.id, payload);
         setSuccess(t(editing === "new" ? "metricAdded" : "metricUpdated")); setEditing(null);

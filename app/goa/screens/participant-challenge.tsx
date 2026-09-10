@@ -233,7 +233,7 @@ export function DynamicEntryForm({
   }
 
   if (!fields.length) {
-    return <EmptyState title={t("notConfiguredTitle")} description={t("notConfiguredBody")} />;
+    return <EmptyState title={t("notConfiguredTitle")} />;
   }
 
   if (entry && canEdit && !editing) {
@@ -338,8 +338,8 @@ export function ResultView({
 
   if (!hasShowcaseContent(blocks)) {
     return onBackToEntry
-      ? <EmptyState title={t("liveEmptyTitle")} description={t("liveEmptyBody")} action={<Button onClick={onBackToEntry}>{t("backToEntry")}</Button>} />
-      : <EmptyState title={t("emptyTitle")} description={t("emptyBody")} />;
+      ? <EmptyState title={t("liveEmptyTitle")} action={<Button onClick={onBackToEntry}>{t("backToEntry")}</Button>} />
+      : <EmptyState title={t("emptyTitle")} />;
   }
 
   return (
@@ -930,7 +930,7 @@ export function ParticipantChallengeScreen({
         {activeTab === "today" ? (
           <div className={cx("grid gap-5", checkpointPicker ? "lg:grid-cols-[minmax(0,1.5fr)_minmax(270px,0.6fr)]" : "")}>
             <section className={cx(cardClass, "min-w-0 p-5 sm:p-7")}>
-              {challenge.status === "closed" ? <EmptyState title={t("closedTitle")} description={t("closedBody")} action={<Button onClick={() => onTab("results")}>{t("seeResults")}</Button>} /> : challenge.submissionMode !== "free" && !selectedItem && !undatedDaily ? <EmptyState title={t("noCheckpointTitle")} description={t("noCheckpointBody")} /> : (
+              {challenge.status === "closed" ? <EmptyState title={t("closedTitle")} action={<Button onClick={() => onTab("results")}>{t("seeResults")}</Button>} /> : challenge.submissionMode !== "free" && !selectedItem && !undatedDaily ? <EmptyState title={t("noCheckpointTitle")} /> : (
                 <>
                   <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>

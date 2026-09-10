@@ -176,7 +176,7 @@ export function FieldBuilder({
             </li>
           ))}
         </ol>
-      ) : <EmptyState title={t("noFieldsTitle")} description={t("noFieldsBody")} />}
+      ) : <EmptyState title={t("noFieldsTitle")} />}
 
       <form className="rounded-2xl border border-dashed border-[var(--main-line)] bg-[var(--main-soft)]/60 p-4" onSubmit={addField}>
         <p className="mb-3 text-sm font-light text-[var(--main-strong)]">{t("addFieldTitle")}</p>

@@ -72,7 +72,7 @@ export function TemplatesScreen({
       {templates === null ? (
         <p className="mt-6 text-sm text-[var(--muted)]" role="status">{t("loading")}</p>
       ) : templates.length === 0 ? (
-        <EmptyState title={t("emptyTitle")} description={t("emptyBody")} />
+        <EmptyState title={t("emptyTitle")} />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {templates.map((template) => (

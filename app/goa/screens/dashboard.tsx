@@ -27,7 +27,6 @@ import {
   cx,
   DragDotsIcon,
   EmptyState,
-  EmptyStateAction,
   Field,
   inputClass,
   PageHeading,
@@ -585,11 +584,7 @@ export function DashboardScreen({
       <StatusMessage error={error} />
 
       {brandNew ? (
-        <EmptyState
-          title={t("emptyGroupsTitle")}
-          description={t.rich("emptyGroupsCreatePrompt", { action: (chunks) => <EmptyStateAction onClick={() => setShowGroupDialog(true)}>{chunks}</EmptyStateAction> })}
-          action={<Button variant="secondary" onClick={onCreatePersonalChallenge}>{tPersonal("create")}</Button>}
-        />
+        <EmptyState title={t("emptyGroupsTitle")} onClick={() => setShowGroupDialog(true)} />
       ) : null}
 
       {brandNew ? null : (
@@ -603,7 +598,7 @@ export function DashboardScreen({
           <Shelf title={t("shelf.running")} count={filtered.running.length}>
             {filtered.running.length
               ? renderRail("running", filtered.running)
-              : <div className="w-full max-w-xl"><EmptyState title={t("noChallengesTitle")} description={colorFilter ? t("filter.empty") : t("noChallengesBody")} /></div>}
+              : <div className="w-full max-w-xl"><EmptyState title={colorFilter ? t("filter.empty") : t("noChallengesTitle")} /></div>}
           </Shelf>
 
           <Shelf
@@ -614,7 +609,9 @@ export function DashboardScreen({
           >
             {filtered.space.length
               ? renderRail("space", filtered.space)
-              : <div className="w-full max-w-xl"><EmptyState title={tPersonal("emptyTitle")} description={colorFilter ? t("filter.empty") : tPersonal("emptyBody")} /></div>}
+              : colorFilter
+                ? <div className="w-full max-w-xl"><EmptyState title={t("filter.empty")} /></div>
+                : <div className="w-full max-w-xl"><EmptyState title={tPersonal("emptyTitle")} onClick={onCreatePersonalChallenge} /></div>}
           </Shelf>
 
           {colorFilter ? null : (
@@ -638,7 +635,7 @@ export function DashboardScreen({
                       </button>
                     );
                   })
-                : <div className="w-full max-w-xl"><EmptyState title={t("emptyGroupsTitle")} description={t("emptyGroupsShort")} /></div>}
+                : <div className="w-full max-w-xl"><EmptyState title={t("emptyGroupsTitle")} onClick={atGroupLimit ? undefined : () => setShowGroupDialog(true)} /></div>}
             </Shelf>
           )}
 

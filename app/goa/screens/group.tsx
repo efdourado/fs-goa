@@ -12,7 +12,7 @@ import { Dialog } from "../dialog";
 import { useGoaFormat } from "../format";
 import type { CatalogItem, ChallengeSummary, GroupInviteResult, GroupSummary, Id, Member, PendingGroupRequest } from "../types";
 import { Segmented } from "../Segmented";
-import { BackButton, Button, cx, EmptyState, EmptyStateAction, Field, inputClass, StatusMessage } from "../ui";
+import { BackButton, Button, cx, EmptyState, Field, inputClass, StatusMessage } from "../ui";
 import { canManage, formatRuntime } from "../utils";
 import { ActiveChallengeCard } from "./dashboard";
 
@@ -344,7 +344,9 @@ export function GroupScreen({
               {challenges.map((challenge) => <ActiveChallengeCard key={challenge.id} challenge={challenge} onOpen={onOpenChallenge} />)}
               {canManage(group.role) && challenges.length < challengeLimit ? <AddTile label={t("createChallengeCta")} onClick={onCreateChallenge} /> : null}
             </div>
-          ) : <EmptyState title={t("noChallengesTitle")} description={canManage(group.role) ? challenges.length < challengeLimit ? t.rich("emptyCreatePrompt", { action: (chunks) => <EmptyStateAction onClick={onCreateChallenge}>{chunks}</EmptyStateAction> }) : t("challengeLimitReached", { limit: challengeLimit }) : t("noChallengesMember")} />}
+          ) : canManage(group.role) && challenges.length < challengeLimit
+            ? <EmptyState title={t("noChallengesTitle")} onClick={onCreateChallenge} />
+            : <EmptyState title={t("noChallengesTitle")} hint={canManage(group.role) ? t("challengeLimitReached", { limit: challengeLimit }) : t("noChallengesMember")} />}
         </section>
 
         {sortedCatalog.length ? (
