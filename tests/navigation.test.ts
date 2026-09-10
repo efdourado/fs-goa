@@ -1,7 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { screenFromUrl, urlForScreen } from "../app/goa/navigation";
+import { isSameView, screenFromUrl, urlForScreen } from "../app/goa/navigation";
+
+test("isSameView: a tab switch is the same view; a real navigation isn't", () => {
+  const a = { kind: "admin", challengeId: "c-1", tab: "overview" } as const;
+  const b = { kind: "admin", challengeId: "c-1", tab: "metrics" } as const;
+  assert.equal(isSameView(a, b), true, "same challenge, different tab");
+  assert.equal(isSameView(a, { kind: "admin", challengeId: "c-2", tab: "overview" }), false, "different challenge");
+  assert.equal(isSameView(a, { kind: "challenge", challengeId: "c-1", tab: "results" }), false, "different kind");
+  assert.equal(isSameView({ kind: "group", groupId: "g-1" }, { kind: "group", groupId: "g-1" }), true);
+  assert.equal(isSameView(null, a), false);
+});
 
 test("resolve links canônicos e mantém compatibilidade com query de convite", () => {
   assert.deepEqual(screenFromUrl("/", "?invite=abc"), { kind: "invite", token: "abc" });

@@ -28,7 +28,7 @@ import { PersonalSpaceScreen } from "./goa/screens/personal-space";
 import { PersonalTrashScreen } from "./goa/screens/personal-trash";
 import { TrashView } from "./goa/trash-view";
 import { TemplateDetailScreen, TemplatesScreen } from "./goa/screens/templates";
-import { screenFromUrl, urlForScreen } from "./goa/navigation";
+import { isSameView, screenFromUrl, urlForScreen } from "./goa/navigation";
 import type {
   AdminTab,
   BootstrapData,
@@ -63,6 +63,10 @@ export default function GoaApp() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [bootError, setBootError] = useState<string | null>(null);
+  // How many app-internal history entries we can pop before leaving the app, and
+  // the last screen we synced to the URL (to tell a tab switch from a real nav).
+  const navDepth = useRef(0);
+  const syncedScreen = useRef<Screen | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -117,22 +121,42 @@ export default function GoaApp() {
   }, []);
 
   // Keep the address bar in step with the current screen so every view is
-  // shareable and the browser's back button lands where the user expects.
+  // shareable. A tab switch within the same view replaces the entry; a real
+  // navigation pushes one (and deepens the stack "← Back" can pop).
   useEffect(() => {
     if (screen.kind === "loading") return;
     const url = urlForScreen(screen);
-    if (!url || url === window.location.pathname + window.location.search) return;
-    window.history.pushState(null, "", url);
+    if (!url) return;
+    const previous = syncedScreen.current;
+    syncedScreen.current = screen;
+    if (url === window.location.pathname + window.location.search) return;
+    if (isSameView(previous, screen)) {
+      window.history.replaceState(null, "", url);
+    } else {
+      window.history.pushState(null, "", url);
+      navDepth.current += 1;
+    }
   }, [screen]);
 
   useEffect(() => {
     function onPopState() {
+      navDepth.current = Math.max(0, navDepth.current - 1);
       const routed = screenFromUrl(window.location.pathname, window.location.search);
       setScreen(routed ?? { kind: "dashboard" });
     }
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
+
+  /**
+   * "← Back": step back through real history when there's an app entry to pop
+   * (so it lands exactly where the user came from), otherwise fall back to a
+   * sensible parent screen — the case where the view was opened from a deep link.
+   */
+  function goBack(fallback: Screen) {
+    if (navDepth.current > 0) window.history.back();
+    else setScreen(fallback);
+  }
 
   // Deep links and history navigation set a challenge/admin screen without going
   // through openParticipant/openAdmin; load the detail once when that happens.
@@ -488,16 +512,16 @@ export default function GoaApp() {
 
   if (!bootstrap.user) {
     if (screen.kind === "invite") {
-      return <InviteScreen token={screen.token} user={null} csrfToken={bootstrap.csrfToken} onBack={() => setScreen({ kind: "auth", mode: "login" })} onNeedAuth={() => setScreen({ kind: "auth", mode: "login" })} onAccepted={async () => undefined} />;
+      return <InviteScreen token={screen.token} user={null} csrfToken={bootstrap.csrfToken} onBack={() => goBack({ kind: "auth", mode: "login" })} onNeedAuth={() => setScreen({ kind: "auth", mode: "login" })} onAccepted={async () => undefined} />;
     }
     if (screen.kind === "templates") {
-      return <TemplatesScreen user={null} onOpen={(id) => setScreen({ kind: "template", challengeId: id })} onBack={() => setScreen({ kind: "auth", mode: "login" })} onSignIn={() => goToAuthFrom(screen)} />;
+      return <TemplatesScreen user={null} onOpen={(id) => setScreen({ kind: "template", challengeId: id })} onBack={() => goBack({ kind: "auth", mode: "login" })} onSignIn={() => goToAuthFrom(screen)} />;
     }
     if (screen.kind === "template") {
-      return <TemplateDetailScreen user={null} challengeId={screen.challengeId} groups={[]} csrfToken={bootstrap.csrfToken} onBack={() => setScreen({ kind: "templates" })} onSignIn={() => goToAuthFrom(screen)} onDuplicated={() => undefined} />;
+      return <TemplateDetailScreen user={null} challengeId={screen.challengeId} groups={[]} csrfToken={bootstrap.csrfToken} onBack={() => goBack({ kind: "templates" })} onSignIn={() => goToAuthFrom(screen)} onDuplicated={() => undefined} />;
     }
     if (screen.kind === "about") {
-      return <AboutScreen onBack={() => setScreen({ kind: "auth", mode: "login" })} />;
+      return <AboutScreen onBack={() => goBack({ kind: "auth", mode: "login" })} />;
     }
     return <AuthScreen initialMode={screen.kind === "auth" ? screen.mode : "login"} invitePending={Boolean(pendingInviteToken)} onAuthenticated={authenticate} onShowInvite={pendingInviteToken ? () => setScreen({ kind: "invite", token: pendingInviteToken }) : undefined} onShowTemplates={() => setScreen({ kind: "templates" })} />;
   }
@@ -513,48 +537,48 @@ export default function GoaApp() {
   if (user.deactivated) {
     content = <AccountDeactivatedScreen onReactivate={reactivateAccount} onLogout={logout} />;
   } else if (screen.kind === "account") {
-    content = <AccountScreen user={user} challenges={bootstrap.challenges} onBack={() => setScreen({ kind: "dashboard" })} onSaveProfile={saveAccount} onChangePassword={saveAccount} onSetNameConsent={setNameConsent} onOpenTrash={() => setScreen({ kind: "personal-trash" })} onDeactivate={deactivateAccount} onDeletePermanently={deleteAccountPermanently} />;
+    content = <AccountScreen user={user} challenges={bootstrap.challenges} onBack={() => goBack({ kind: "dashboard" })} onSaveProfile={saveAccount} onChangePassword={saveAccount} onSetNameConsent={setNameConsent} onOpenTrash={() => setScreen({ kind: "personal-trash" })} onDeactivate={deactivateAccount} onDeletePermanently={deleteAccountPermanently} />;
   } else if (screen.kind === "personal-trash") {
-    content = <PersonalTrashScreen csrfToken={bootstrap.csrfToken} onBack={() => setScreen({ kind: "personal-space" })} onChanged={() => { void refreshBootstrap(); }} />;
+    content = <PersonalTrashScreen csrfToken={bootstrap.csrfToken} onBack={() => goBack({ kind: "personal-space" })} onChanged={() => { void refreshBootstrap(); }} />;
   } else if (screen.kind === "group-trash" && selectedGroup && canManage(selectedGroup.role)) {
     content = (
       <main className="mx-auto max-w-4xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
-        <button className="mb-6 text-sm text-[var(--muted)] hover:text-[var(--ink)]" type="button" onClick={() => setScreen({ kind: "group", groupId: selectedGroup.id })}>{t("backToStart")}</button>
+        <button className="mb-6 text-sm text-[var(--muted)] hover:text-[var(--ink)]" type="button" onClick={() => goBack({ kind: "group", groupId: selectedGroup.id })}>{t("backToStart")}</button>
         <PageHeading title={tTrash("groupTitle")} description={tTrash("groupSubtitle")} />
         <TrashView scope={{ groupId: selectedGroup.id }} csrfToken={bootstrap.csrfToken} onChanged={() => { void refreshBootstrap(); }} />
       </main>
     );
   } else if (screen.kind === "invite") {
-    content = <InviteScreen key={screen.token} token={screen.token} user={user} csrfToken={bootstrap.csrfToken} onBack={() => setScreen({ kind: "dashboard" })} onNeedAuth={() => undefined} onAccepted={async (invitation) => { setPendingInviteToken(null); await refreshBootstrap(); setScreen({ kind: "invite-success", invitation }); }} />;
+    content = <InviteScreen key={screen.token} token={screen.token} user={user} csrfToken={bootstrap.csrfToken} onBack={() => goBack({ kind: "dashboard" })} onNeedAuth={() => undefined} onAccepted={async (invitation) => { setPendingInviteToken(null); await refreshBootstrap(); setScreen({ kind: "invite-success", invitation }); }} />;
   } else if (screen.kind === "invite-success") {
     const invitation = screen.invitation;
     content = <InviteAcceptedScreen invitation={invitation} onContinue={() => { if (invitation.challengeId) openParticipant(invitation.challengeId); else setScreen({ kind: "group", groupId: invitation.groupId }); }} />;
   } else if (screen.kind === "templates") {
-    content = <TemplatesScreen user={user} onOpen={(id) => setScreen({ kind: "template", challengeId: id })} onBack={() => setScreen({ kind: "dashboard" })} onSignIn={() => undefined} />;
+    content = <TemplatesScreen user={user} onOpen={(id) => setScreen({ kind: "template", challengeId: id })} onBack={() => goBack({ kind: "dashboard" })} onSignIn={() => undefined} />;
   } else if (screen.kind === "template") {
-    content = <TemplateDetailScreen key={screen.challengeId} user={user} challengeId={screen.challengeId} groups={bootstrap.groups.filter((candidate) => candidate.kind !== "personal")} csrfToken={bootstrap.csrfToken} autoCopy={resumeTemplateCopy === screen.challengeId} onBack={() => { setResumeTemplateCopy(null); setScreen({ kind: "templates" }); }} onSignIn={() => undefined} onDuplicated={async (result) => { setResumeTemplateCopy(null); await refreshBootstrap(); openAdmin(result.challengeId); }} onUnpublished={async () => { await refreshBootstrap(); setScreen({ kind: "templates" }); }} />;
+    content = <TemplateDetailScreen key={screen.challengeId} user={user} challengeId={screen.challengeId} groups={bootstrap.groups.filter((candidate) => candidate.kind !== "personal")} csrfToken={bootstrap.csrfToken} autoCopy={resumeTemplateCopy === screen.challengeId} onBack={() => { setResumeTemplateCopy(null); goBack({ kind: "templates" }); }} onSignIn={() => undefined} onDuplicated={async (result) => { setResumeTemplateCopy(null); await refreshBootstrap(); openAdmin(result.challengeId); }} onUnpublished={async () => { await refreshBootstrap(); setScreen({ kind: "templates" }); }} />;
   } else if (screen.kind === "about") {
-    content = <AboutScreen onBack={() => setScreen({ kind: "dashboard" })} />;
+    content = <AboutScreen onBack={() => goBack({ kind: "dashboard" })} />;
   } else if (screen.kind === "group" && selectedGroup) {
-    content = <GroupScreen key={selectedGroup.id} group={selectedGroup} challenges={bootstrap.challenges.filter((challenge) => challenge.groupId === selectedGroup.id)} challengeLimit={bootstrap.limits.challengesPerGroup} pendingRequests={selectedGroup.pendingRequests ?? []} onBack={() => setScreen({ kind: "dashboard" })} onCreateChallenge={() => setScreen({ kind: "create-challenge", groupId: selectedGroup.id })} onOpenChallenge={(id) => openParticipant(id)} onOpenCatalogItem={(itemId) => setScreen({ kind: "catalog-item", groupId: selectedGroup.id, itemId })} onCreateInvite={async (payload) => apiRequest<{ token?: string; url?: string }>(API_PATHS.groupInvites(selectedGroup.id), { method: "POST", body: payload, csrfToken: bootstrap.csrfToken })} onInviteByUsername={(username) => apiRequest<GroupInviteResult>(API_PATHS.groupMembers(selectedGroup.id), { method: "POST", body: { username }, csrfToken: bootstrap.csrfToken })} onCancelRequest={cancelMemberRequest} onUpdateGroup={(payload) => updateGroup(selectedGroup.id, payload)} onDeleteGroup={selectedGroup.role === "owner" ? () => deleteGroup(selectedGroup.id) : undefined} onLeaveGroup={selectedGroup.role === "owner" ? undefined : () => leaveGroup(selectedGroup.id)} onSetMemberRole={selectedGroup.role === "owner" ? (userId, role) => setMemberRole(selectedGroup.id, userId, role) : undefined} />;
+    content = <GroupScreen key={selectedGroup.id} group={selectedGroup} challenges={bootstrap.challenges.filter((challenge) => challenge.groupId === selectedGroup.id)} challengeLimit={bootstrap.limits.challengesPerGroup} pendingRequests={selectedGroup.pendingRequests ?? []} onBack={() => goBack({ kind: "dashboard" })} onCreateChallenge={() => setScreen({ kind: "create-challenge", groupId: selectedGroup.id })} onOpenChallenge={(id) => openParticipant(id)} onOpenCatalogItem={(itemId) => setScreen({ kind: "catalog-item", groupId: selectedGroup.id, itemId })} onCreateInvite={async (payload) => apiRequest<{ token?: string; url?: string }>(API_PATHS.groupInvites(selectedGroup.id), { method: "POST", body: payload, csrfToken: bootstrap.csrfToken })} onInviteByUsername={(username) => apiRequest<GroupInviteResult>(API_PATHS.groupMembers(selectedGroup.id), { method: "POST", body: { username }, csrfToken: bootstrap.csrfToken })} onCancelRequest={cancelMemberRequest} onUpdateGroup={(payload) => updateGroup(selectedGroup.id, payload)} onDeleteGroup={selectedGroup.role === "owner" ? () => deleteGroup(selectedGroup.id) : undefined} onLeaveGroup={selectedGroup.role === "owner" ? undefined : () => leaveGroup(selectedGroup.id)} onSetMemberRole={selectedGroup.role === "owner" ? (userId, role) => setMemberRole(selectedGroup.id, userId, role) : undefined} />;
   } else if (screen.kind === "catalog-item" && selectedGroup) {
-    content = <CatalogItemScreen key={screen.itemId} detailPath={API_PATHS.groupCatalogItem(screen.groupId, screen.itemId)} itemId={screen.itemId} onBack={() => setScreen({ kind: "group", groupId: screen.groupId })} onOpenChallenge={(id) => openParticipant(id)} onDelete={canManage(selectedGroup.role) ? () => deleteCatalogItem(API_PATHS.catalogItem(screen.itemId), { kind: "group", groupId: screen.groupId }) : undefined} />;
+    content = <CatalogItemScreen key={screen.itemId} detailPath={API_PATHS.groupCatalogItem(screen.groupId, screen.itemId)} itemId={screen.itemId} onBack={() => goBack({ kind: "group", groupId: screen.groupId })} onOpenChallenge={(id) => openParticipant(id)} onDelete={canManage(selectedGroup.role) ? () => deleteCatalogItem(API_PATHS.catalogItem(screen.itemId), { kind: "group", groupId: screen.groupId }) : undefined} />;
   } else if (screen.kind === "personal-space") {
-    content = <PersonalSpaceScreen challenges={bootstrap.challenges.filter((challenge) => isPersonalChallenge(challenge, bootstrap.personalWorkspaceId))} onBack={() => setScreen({ kind: "dashboard" })} onOpenChallenge={(id) => openParticipant(id)} onOpenAdmin={(id) => openAdmin(id)} onCreateChallenge={() => setScreen({ kind: "create-personal-challenge" })} onOpenCatalog={() => setScreen({ kind: "personal-catalog" })} onOpenTrash={() => setScreen({ kind: "personal-trash" })} />;
+    content = <PersonalSpaceScreen challenges={bootstrap.challenges.filter((challenge) => isPersonalChallenge(challenge, bootstrap.personalWorkspaceId))} onBack={() => goBack({ kind: "dashboard" })} onOpenChallenge={(id) => openParticipant(id)} onOpenAdmin={(id) => openAdmin(id)} onCreateChallenge={() => setScreen({ kind: "create-personal-challenge" })} onOpenCatalog={() => setScreen({ kind: "personal-catalog" })} onOpenTrash={() => setScreen({ kind: "personal-trash" })} />;
   } else if (screen.kind === "personal-catalog") {
-    content = <PersonalCatalogScreen onBack={() => setScreen({ kind: "personal-space" })} onOpenItem={(itemId) => setScreen({ kind: "personal-catalog-item", itemId })} />;
+    content = <PersonalCatalogScreen onBack={() => goBack({ kind: "personal-space" })} onOpenItem={(itemId) => setScreen({ kind: "personal-catalog-item", itemId })} />;
   } else if (screen.kind === "personal-catalog-item") {
-    content = <CatalogItemScreen key={screen.itemId} detailPath={API_PATHS.personalCatalogItem(screen.itemId)} itemId={screen.itemId} onBack={() => setScreen({ kind: "personal-catalog" })} onOpenChallenge={(id) => openParticipant(id)} onDelete={() => deleteCatalogItem(API_PATHS.personalCatalogItem(screen.itemId), { kind: "personal-catalog" })} />;
+    content = <CatalogItemScreen key={screen.itemId} detailPath={API_PATHS.personalCatalogItem(screen.itemId)} itemId={screen.itemId} onBack={() => goBack({ kind: "personal-catalog" })} onOpenChallenge={(id) => openParticipant(id)} onDelete={() => deleteCatalogItem(API_PATHS.personalCatalogItem(screen.itemId), { kind: "personal-catalog" })} />;
   } else if (screen.kind === "create-challenge" && selectedGroup && canManage(selectedGroup.role)) {
-    content = <CreateChallengeScreen key={selectedGroup.id} group={selectedGroup} onBack={() => setScreen({ kind: "group", groupId: selectedGroup.id })} onCreate={(input) => createChallenge({ groupId: selectedGroup.id }, input)} />;
+    content = <CreateChallengeScreen key={selectedGroup.id} group={selectedGroup} onBack={() => goBack({ kind: "group", groupId: selectedGroup.id })} onCreate={(input) => createChallenge({ groupId: selectedGroup.id }, input)} />;
   } else if (screen.kind === "create-personal-challenge") {
-    content = <CreateChallengeScreen key="personal" personal onBack={() => setScreen({ kind: "personal-space" })} onCreate={(input) => createChallenge({ personal: true }, input)} />;
+    content = <CreateChallengeScreen key="personal" personal onBack={() => goBack({ kind: "personal-space" })} onCreate={(input) => createChallenge({ personal: true }, input)} />;
   } else if ((screen.kind === "challenge" || screen.kind === "admin") && (detailLoading || !selectedChallenge || selectedChallenge.id !== screen.challengeId)) {
     content = detailError ? <main className="mx-auto max-w-2xl px-5 py-16"><EmptyState title={t("detailError")} description={detailError} action={<Button onClick={() => retryDetail(screen.challengeId)}>{t("retry")}</Button>} /></main> : <LoadingView label={tc("loadingChallenge")} />;
   } else if (screen.kind === "challenge" && selectedChallenge) {
-    content = <ParticipantChallengeScreen key={selectedChallenge.id} challenge={selectedChallenge} entries={entries} user={user} tab={screen.tab} onTab={(tab) => setScreen({ ...screen, tab })} onBack={() => selectedGroup ? setScreen({ kind: "group", groupId: selectedGroup.id }) : isPersonalChallenge(selectedChallenge, bootstrap.personalWorkspaceId) ? setScreen({ kind: "personal-space" }) : setScreen({ kind: "dashboard" })} onAdmin={canManage(selectedRole) ? () => openAdmin(selectedChallenge.id) : undefined} onSaveEntry={saveEntry} onDeleteEntry={(entryId) => mutateChallenge(API_PATHS.entry(entryId), undefined, "DELETE")} />;
+    content = <ParticipantChallengeScreen key={selectedChallenge.id} challenge={selectedChallenge} entries={entries} user={user} tab={screen.tab} onTab={(tab) => setScreen({ ...screen, tab })} onBack={() => goBack(selectedGroup ? { kind: "group", groupId: selectedGroup.id } : isPersonalChallenge(selectedChallenge, bootstrap.personalWorkspaceId) ? { kind: "personal-space" } : { kind: "dashboard" })} onAdmin={canManage(selectedRole) ? () => openAdmin(selectedChallenge.id) : undefined} onSaveEntry={saveEntry} onDeleteEntry={(entryId) => mutateChallenge(API_PATHS.entry(entryId), undefined, "DELETE")} />;
   } else if (screen.kind === "admin" && selectedChallenge && canManage(selectedRole)) {
-    content = <AdminScreen key={selectedChallenge.id} challenge={selectedChallenge} entries={entries} group={selectedGroup} duplicateTargets={bootstrap.groups.filter((candidate) => candidate.id !== selectedChallenge.groupId && candidate.kind !== "personal" && canManage(candidate.role)).map((candidate) => ({ id: candidate.id, name: candidate.name, challengeCount: bootstrap.challenges.filter((item) => item.groupId === candidate.id).length, challengeLimit: bootstrap.limits.challengesPerGroup }))} tab={screen.tab} onTab={(tab) => setScreen({ ...screen, tab })} onBack={() => selectedGroup ? setScreen({ kind: "group", groupId: selectedGroup.id }) : isPersonalChallenge(selectedChallenge, bootstrap.personalWorkspaceId) ? setScreen({ kind: "personal-space" }) : setScreen({ kind: "dashboard" })} onViewParticipant={() => setScreen({ kind: "challenge", challengeId: selectedChallenge.id, tab: "results" })} onSaveBasics={(payload) => mutateChallenge(API_PATHS.challenge(selectedChallenge.id), payload, "PATCH")} onTransition={(status) => mutateChallenge(API_PATHS.transition(selectedChallenge.id), { status })} onDuplicate={duplicateChallenge} isPlatformAdmin={Boolean(user.platformAdmin)} onPublishTemplate={(summary) => mutateChallenge(API_PATHS.challengeTemplate(selectedChallenge.id), summary ? { summary } : {}, "POST")} onUnpublishTemplate={() => mutateChallenge(API_PATHS.challengeTemplate(selectedChallenge.id), undefined, "DELETE")} onDelete={canManage(selectedRole) ? () => deleteChallenge(selectedChallenge.id, selectedGroup?.id) : undefined} onSaveParticipants={(participantIds) => mutateChallenge(API_PATHS.participants(selectedChallenge.id), { replace: true, participantIds })} onSaveFields={(entryTypeId, fields) => mutateChallenge(API_PATHS.fields(selectedChallenge.id), { ...(entryTypeId ? { entryTypeId } : {}), replace: true, archiveMissing: true, fields })} onSaveEntryTypeVisibility={(entryTypeId, visibilityPolicy) => mutateChallenge(API_PATHS.entryType(selectedChallenge.id, entryTypeId), { visibilityPolicy }, "PATCH")} onSetExpectation={(enabled) => mutateChallenge(API_PATHS.expectation(selectedChallenge.id), { enabled }, "PATCH")} onAddItems={(payload) => mutateChallenge(API_PATHS.items(selectedChallenge.id), payload)} onUpdateItem={(itemId, payload) => mutateChallenge(API_PATHS.item(selectedChallenge.id, itemId), payload, "PATCH")} onArchiveItem={(itemId) => mutateChallenge(API_PATHS.item(selectedChallenge.id, itemId), undefined, "DELETE")} onPreviewImport={previewListImport} onSaveCheckpoints={(checkpoints) => mutateChallenge(API_PATHS.checkpoints(selectedChallenge.id), { checkpoints })} onAssignCheckpointItems={(assignments) => mutateChallenge(API_PATHS.itemsAssign(selectedChallenge.id), { assignments })} onPatchEntry={(entryId, values, reason) => mutateChallenge(API_PATHS.entry(entryId), { values, reason }, "PATCH")} onDeleteEntry={(entryId, reason) => mutateChallenge(API_PATHS.entry(entryId), { reason }, "DELETE")} onAddMetric={(payload) => mutateChallenge(API_PATHS.metrics(selectedChallenge.id), payload)} onUpdateMetric={(metricId, payload) => mutateChallenge(API_PATHS.metric(selectedChallenge.id, metricId), payload, "PATCH")} onDeleteMetric={(metricId) => mutateChallenge(API_PATHS.metric(selectedChallenge.id, metricId), undefined, "DELETE")} onSaveResult={(payload) => mutateChallengeReturning<{ unpublished?: boolean }>(API_PATHS.results(selectedChallenge.id), payload)} onPublishResult={(payload) => mutateChallengeReturning<{ url?: string | null; publishedAt?: string; anonymized?: boolean }>(API_PATHS.resultsPublish(selectedChallenge.id), payload)} onUnpublishResult={() => mutateChallenge(API_PATHS.results(selectedChallenge.id), undefined, "DELETE")} onReorderBlocks={(blocks) => mutateChallenge(API_PATHS.resultBlocks(selectedChallenge.id), { blocks }, "PATCH")} csrfToken={bootstrap.csrfToken} onArchiveChanged={() => { void reloadSelected(); void refreshBootstrap(); }} />;
+    content = <AdminScreen key={selectedChallenge.id} challenge={selectedChallenge} entries={entries} group={selectedGroup} duplicateTargets={bootstrap.groups.filter((candidate) => candidate.id !== selectedChallenge.groupId && candidate.kind !== "personal" && canManage(candidate.role)).map((candidate) => ({ id: candidate.id, name: candidate.name, challengeCount: bootstrap.challenges.filter((item) => item.groupId === candidate.id).length, challengeLimit: bootstrap.limits.challengesPerGroup }))} tab={screen.tab} onTab={(tab) => setScreen({ ...screen, tab })} onBack={() => goBack(selectedGroup ? { kind: "group", groupId: selectedGroup.id } : isPersonalChallenge(selectedChallenge, bootstrap.personalWorkspaceId) ? { kind: "personal-space" } : { kind: "dashboard" })} onViewParticipant={() => setScreen({ kind: "challenge", challengeId: selectedChallenge.id, tab: "results" })} onSaveBasics={(payload) => mutateChallenge(API_PATHS.challenge(selectedChallenge.id), payload, "PATCH")} onTransition={(status) => mutateChallenge(API_PATHS.transition(selectedChallenge.id), { status })} onDuplicate={duplicateChallenge} isPlatformAdmin={Boolean(user.platformAdmin)} onPublishTemplate={(summary) => mutateChallenge(API_PATHS.challengeTemplate(selectedChallenge.id), summary ? { summary } : {}, "POST")} onUnpublishTemplate={() => mutateChallenge(API_PATHS.challengeTemplate(selectedChallenge.id), undefined, "DELETE")} onDelete={canManage(selectedRole) ? () => deleteChallenge(selectedChallenge.id, selectedGroup?.id) : undefined} onSaveParticipants={(participantIds) => mutateChallenge(API_PATHS.participants(selectedChallenge.id), { replace: true, participantIds })} onSaveFields={(entryTypeId, fields) => mutateChallenge(API_PATHS.fields(selectedChallenge.id), { ...(entryTypeId ? { entryTypeId } : {}), replace: true, archiveMissing: true, fields })} onSaveEntryTypeVisibility={(entryTypeId, visibilityPolicy) => mutateChallenge(API_PATHS.entryType(selectedChallenge.id, entryTypeId), { visibilityPolicy }, "PATCH")} onSetExpectation={(enabled) => mutateChallenge(API_PATHS.expectation(selectedChallenge.id), { enabled }, "PATCH")} onAddItems={(payload) => mutateChallenge(API_PATHS.items(selectedChallenge.id), payload)} onUpdateItem={(itemId, payload) => mutateChallenge(API_PATHS.item(selectedChallenge.id, itemId), payload, "PATCH")} onArchiveItem={(itemId) => mutateChallenge(API_PATHS.item(selectedChallenge.id, itemId), undefined, "DELETE")} onPreviewImport={previewListImport} onSaveCheckpoints={(checkpoints) => mutateChallenge(API_PATHS.checkpoints(selectedChallenge.id), { checkpoints })} onAssignCheckpointItems={(assignments) => mutateChallenge(API_PATHS.itemsAssign(selectedChallenge.id), { assignments })} onPatchEntry={(entryId, values, reason) => mutateChallenge(API_PATHS.entry(entryId), { values, reason }, "PATCH")} onDeleteEntry={(entryId, reason) => mutateChallenge(API_PATHS.entry(entryId), { reason }, "DELETE")} onAddMetric={(payload) => mutateChallenge(API_PATHS.metrics(selectedChallenge.id), payload)} onUpdateMetric={(metricId, payload) => mutateChallenge(API_PATHS.metric(selectedChallenge.id, metricId), payload, "PATCH")} onDeleteMetric={(metricId) => mutateChallenge(API_PATHS.metric(selectedChallenge.id, metricId), undefined, "DELETE")} onSaveResult={(payload) => mutateChallengeReturning<{ unpublished?: boolean }>(API_PATHS.results(selectedChallenge.id), payload)} onPublishResult={(payload) => mutateChallengeReturning<{ url?: string | null; publishedAt?: string; anonymized?: boolean }>(API_PATHS.resultsPublish(selectedChallenge.id), payload)} onUnpublishResult={() => mutateChallenge(API_PATHS.results(selectedChallenge.id), undefined, "DELETE")} onReorderBlocks={(blocks) => mutateChallenge(API_PATHS.resultBlocks(selectedChallenge.id), { blocks }, "PATCH")} csrfToken={bootstrap.csrfToken} onArchiveChanged={() => { void reloadSelected(); void refreshBootstrap(); }} />;
   } else if (screen.kind === "admin" || screen.kind === "create-challenge") {
     content = <main className="mx-auto max-w-2xl px-5 py-16"><EmptyState title={t("adminUnavailableTitle")} description={t("adminUnavailableBody")} action={<Button onClick={() => setScreen({ kind: "dashboard" })}>{t("backToStart")}</Button>} /></main>;
   } else {

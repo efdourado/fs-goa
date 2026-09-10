@@ -87,6 +87,22 @@ export function screenFromUrl(pathname: string, search = ""): Screen | null {
   return null;
 }
 
+/**
+ * True when `next` is the *same view* as `prev`, differing only by a tab (or
+ * nothing). A tab switch should `replaceState` so the browser/app "← Back"
+ * lands on the view the user came from, not the previous tab.
+ */
+export function isSameView(prev: Screen | null | undefined, next: Screen): boolean {
+  if (!prev || prev.kind !== next.kind) return false;
+  const id = (screen: Screen): string | null =>
+    "challengeId" in screen ? screen.challengeId
+      : "groupId" in screen ? screen.groupId
+        : "itemId" in screen ? screen.itemId
+          : "token" in screen ? screen.token
+            : null;
+  return id(prev) === id(next);
+}
+
 export function urlForScreen(screen: Screen): string | null {
   switch (screen.kind) {
     case "dashboard":
