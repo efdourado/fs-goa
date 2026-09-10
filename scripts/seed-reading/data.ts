@@ -43,7 +43,7 @@ export const BOOKS: SeedBook[] = [
     binges: [6, 13],
     rating: 4.5,
     comment:
-      "Começou o desafio no melhor pé possível — passei de 150 páginas num domingo só. A ciência é levada a sério e ainda sobra humor. O 'astrophage' e o Rocky ficam com você.",
+      "Li mais de 150 páginas no domingo. Tem bastante ciência, mas não fica chato. E o Rocky é muito bom.",
   },
   {
     title: "Klara and the Sun",
@@ -55,7 +55,7 @@ export const BOOKS: SeedBook[] = [
     binges: [24],
     rating: 4.5,
     comment:
-      "Ishiguro de novo narrando por quem entende o mundo só pela metade — e é justamente essa metade que corta. Devagar de propósito; li menos páginas por dia e não quis correr.",
+      "Esse eu fui lendo mais devagar. A Klara vai contando as coisas e vc vai entendendo outras antes dela. Quando percebe, já tá triste.",
   },
   {
     title: "The Left Hand of Darkness",
@@ -67,7 +67,7 @@ export const BOOKS: SeedBook[] = [
     binges: [],
     rating: 4,
     comment:
-      "Pegou as duas semanas mais corridas do trimestre — foram vários dias de 15 páginas e um par de dias zerados. A travessia do gelo compensou a espera.",
+      "Peguei pra ler bem quando tava sem tempo pra nada. Teve dia de ler 15 páginas e teve dia que nem abri o livro. Demorei pra engatar, mas a parte da travessia no gelo valeu a pena",
   },
   {
     title: "Educated",
@@ -79,7 +79,7 @@ export const BOOKS: SeedBook[] = [
     binges: [52],
     rating: 4,
     comment:
-      "Primeira não-ficção do desafio e a que mais me tirou o sono. Voltei ao ritmo de sempre depois da leitura mais lenta da Le Guin.",
+      "Primeiro de não ficção do desafio. Tem umas coisas que vc lê e custa acreditar que aconteceram de verdade.",
   },
   {
     title: "Piranesi",
@@ -91,7 +91,7 @@ export const BOOKS: SeedBook[] = [
     binges: [70],
     rating: 5,
     comment:
-      "Dez dias, a leitura mais rápida do desafio. A Casa e as marés ficam martelando na cabeça. Nota máxima sem pensar duas vezes.",
+      "Meu favorito do desafio. No começo eu não estava entendendo nada, mas estava gostando mesmo assim.",
   },
   {
     title: "The Overstory",
@@ -103,7 +103,7 @@ export const BOOKS: SeedBook[] = [
     binges: [80, 86],
     rating: 4.5,
     comment:
-      "Fechamento à altura: o livro mais longo, lido nas últimas duas semanas e meia, com dois fins de semana de 90+ páginas. Sai daqui olhando árvore diferente.",
+      "Deixei o maior pro final e achei que não ia dar tempo.",
   },
 ];
 
