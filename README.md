@@ -89,15 +89,16 @@ node --env-file=.env.production.local scripts/migrate.mjs
 npm run db:setup                                        # local
 node --env-file=.env.production.local scripts/seed-admin.mjs   # depois do migrate, em prod
 
-# dados de demonstração (grupo sintético, desafios preenchidos e encerrados)
-npm run db:seed-demo -- --scenario=all --dry-run          # local: valida contas/ambiente, não grava
-npm run db:seed-demo -- --scenario=all --reset            # local: recria os 4 cenários no grupo de demo
-npm run db:seed-demo:prod -- --scenario=all --dry-run     # prod (Neon), via .env.production.local
-npm run db:seed-demo:prod -- --scenario=all               # prod: pede a frase "seed demo" (ou SEED_DEMO_CONFIRM)
-#   Cenários: cinema, library, bookshelf, habit — ou `all` para os quatro.
-#   Precisa das contas `dudupizzas`, `teste` e `admin` já criadas (admin com platform_admin).
-#   `--reset` remove só o grupo com o marcador ⟦seed-demo⟧ e recria. --dry-run nunca grava.
-#   Atenção: em prod o modelo entra na galeria pública /modelos e o link /results/<token> fica no ar.
+# dados de demonstração (um desafio pessoal de leitura rico: 90 dias, 6 livros, encerrado e publicado)
+npm run db:seed-reading -- --dry-run          # local: valida a conta/ambiente, não grava
+npm run db:seed-reading                       # local: cria o desafio para @dudupizzas
+npm run db:seed-reading -- --reset            # local: purga o desafio marcado e recria
+npm run db:seed-reading:prod -- --dry-run     # prod (Neon), via .env.production.local
+npm run db:seed-reading:prod                  # prod: pede a frase "seed reading" (ou SEED_READING_CONFIRM)
+#   Precisa da conta `dudupizzas` já criada (o script só a procura, nunca a cria).
+#   `--reset` remove só o desafio com o marcador ⟦seed-demo⟧ e recria. --dry-run nunca grava.
+#   Atenção: em prod, se a conta for platform_admin o modelo entra na galeria pública /modelos
+#   e o link /results/<token> fica no ar.
 
 # verificações
 npm run lint
@@ -151,7 +152,7 @@ app/        interface, API REST (app/api), vitrine (app/results), galeria de mod
 db/         schema Drizzle do PostgreSQL
 drizzle/    migrações versionadas
 lib/        autenticação, domínio, receitas, análise e validação
-scripts/    migração, seed da conta de administração e seed de demonstração (scripts/seed-demo)
+scripts/    migração, seed da conta de administração e seed de demonstração (scripts/seed-reading)
 tests/      unidade, smoke e integração
 docs/       arquitetura (docs/architecture.md) e endpoints (docs/api.md)
 ```
