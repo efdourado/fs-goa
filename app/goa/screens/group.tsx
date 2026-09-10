@@ -333,7 +333,7 @@ export function GroupScreen({
           </div>
           {challenges.length ? (
             <div className="grid gap-4 sm:grid-cols-2">
-              {challenges.map((challenge) => <ActiveChallengeCard key={challenge.id} challenge={challenge} onOpen={onOpenChallenge} />)}
+              {challenges.map((challenge) => <ActiveChallengeCard key={challenge.id} challenge={challenge} onOpen={onOpenChallenge} fluid />)}
               {canManage(group.role) && challenges.length < challengeLimit ? <AddTile label={t("createChallengeCta")} onClick={onCreateChallenge} /> : null}
             </div>
           ) : canManage(group.role) && challenges.length < challengeLimit

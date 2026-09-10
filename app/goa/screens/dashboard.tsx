@@ -289,6 +289,7 @@ export function ActiveChallengeCard({
   canMoveUp = true,
   canMoveDown = true,
   reorderMode = false,
+  fluid = false,
   dragHandlers,
 }: {
   challenge: ChallengeSummary;
@@ -300,6 +301,8 @@ export function ActiveChallengeCard({
   canMoveUp?: boolean;
   canMoveDown?: boolean;
   reorderMode?: boolean;
+  /** Fill the container instead of the fixed shelf width (grids on My space / a group). */
+  fluid?: boolean;
   dragHandlers?: {
     onDragStart: () => void;
     onDragOver: (event: DragEvent) => void;
@@ -323,7 +326,8 @@ export function ActiveChallengeCard({
       onDrop={dragHandlers?.onDrop}
       onDragEnd={dragHandlers?.onDragEnd}
       className={cx(
-        "group relative flex w-[78vw] max-w-[19rem] shrink-0 snap-start flex-col overflow-hidden rounded-[20px] border bg-[var(--paper)] shadow-[var(--elevate-1)] transition sm:w-[19rem]",
+        "group relative flex flex-col overflow-hidden rounded-[20px] border bg-[var(--paper)] shadow-[var(--elevate-1)] transition",
+        fluid ? "w-full" : "w-[78vw] max-w-[19rem] shrink-0 snap-start sm:w-[19rem]",
         reorderMode ? "cursor-grab active:cursor-grabbing" : "hover:-translate-y-0.5",
         challenge.pinned
           ? "border-[var(--main-line)] shadow-[0_0_0_3px_var(--main-soft),var(--elevate-1)]"

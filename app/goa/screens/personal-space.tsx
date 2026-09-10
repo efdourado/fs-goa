@@ -82,7 +82,7 @@ export function PersonalSpaceScreen({
             <section>
               <h2 className="mb-4 text-lg font-semibold tracking-[-0.02em]">{t("sectionActive")}</h2>
               <div className="grid gap-4 sm:grid-cols-2">
-                {active.map((challenge) => <ActiveChallengeCard key={challenge.id} challenge={challenge} onOpen={onOpenChallenge} />)}
+                {active.map((challenge) => <ActiveChallengeCard key={challenge.id} challenge={challenge} onOpen={onOpenChallenge} fluid />)}
               </div>
             </section>
           ) : null}
@@ -90,7 +90,7 @@ export function PersonalSpaceScreen({
             <section>
               <h2 className="mb-4 text-lg font-semibold tracking-[-0.02em]">{t("sectionArchive")}</h2>
               <div className="grid gap-4 sm:grid-cols-2">
-                {other.map((challenge) => <ActiveChallengeCard key={challenge.id} challenge={challenge} onOpen={() => open(challenge)} />)}
+                {other.map((challenge) => <ActiveChallengeCard key={challenge.id} challenge={challenge} onOpen={() => open(challenge)} fluid />)}
               </div>
             </section>
           ) : null}
