@@ -416,7 +416,10 @@
     "create": "+ Personal challenge",
     "emptyTitle": "Start a challenge of your own",
     "emptyBody": "Personal challenges are just yours — no group, no invites. Great for a reading goal or a film marathon.",
-    "trash": "Bin"
+    "trash": "Bin",
+    "createShort": "New challenge",
+    "sectionActive": "In progress",
+    "sectionArchive": "Closed & drafts"
   },
   "personalCatalog": {
     "back": "← Back",

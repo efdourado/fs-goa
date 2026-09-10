@@ -416,7 +416,10 @@
     "create": "+ Desafio pessoal",
     "emptyTitle": "Comece um desafio só seu",
     "emptyBody": "Desafios pessoais são só seus — sem grupo, sem convites. Ótimo para uma meta de leitura ou uma maratona de filmes.",
-    "trash": "Lixeira"
+    "trash": "Lixeira",
+    "createShort": "Novo desafio",
+    "sectionActive": "Em andamento",
+    "sectionArchive": "Encerrados e rascunhos"
   },
   "personalCatalog": {
     "back": "← Voltar",

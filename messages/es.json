@@ -416,7 +416,10 @@
     "create": "+ Desafío personal",
     "emptyTitle": "Empieza un desafío solo tuyo",
     "emptyBody": "Los desafíos personales son solo tuyos — sin grupo, sin invitaciones. Ideal para una meta de lectura o un maratón de películas.",
-    "trash": "Papelera"
+    "trash": "Papelera",
+    "createShort": "Nuevo desafío",
+    "sectionActive": "En marcha",
+    "sectionArchive": "Cerrados y borradores"
   },
   "personalCatalog": {
     "back": "← Volver",
