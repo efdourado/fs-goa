@@ -1,11 +1,14 @@
 "use client";
 
 import { type ReactNode, useEffect, useId, useRef } from "react";
+import { createPortal } from "react-dom";
 
 /**
  * A panel that slides up from the bottom edge — the phone-friendly stand-in for
  * a header dropdown. Backdrop tap and Escape close it; focus moves inside on
- * open and returns to the opener on close.
+ * open and returns to the opener on close. Rendered through a portal on
+ * `document.body` so a `backdrop-filter` on the header (which would otherwise
+ * become the containing block for `position: fixed`) can't trap or clip it.
  */
 export function BottomSheet({
   title,
@@ -35,12 +38,14 @@ export function BottomSheet({
     };
   }, [onClose]);
 
+  if (typeof document === "undefined") return null;
+
   // The backdrop closes on a tap that lands on itself; Escape is handled above,
   // so the keyboard path is covered.
   /* eslint-disable jsx-a11y/no-static-element-interactions */
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex flex-col justify-end bg-black/45"
+      className="fixed inset-0 z-[60] flex flex-col justify-end bg-black/45"
       onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}
     >
       <div
@@ -64,7 +69,8 @@ export function BottomSheet({
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
   /* eslint-enable jsx-a11y/no-static-element-interactions */
 }

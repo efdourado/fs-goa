@@ -518,6 +518,7 @@ function ItemEntryPanel({
           <div key={type.id || "registro"}>
             {stacked ? <h3 className="mb-3 text-sm font-medium text-[var(--muted)]">{type.name}</h3> : null}
             {/* Always spell out who will see this answer, before the first submit (V1 §8). */}
+            <p className="mb-3 rounded-lg bg-[var(--wash)] px-3 py-2 text-xs text-[var(--muted)]">{tv(`note.${type.visibilityPolicy ?? "group_realtime"}`)}</p>
             <DynamicEntryForm
               key={`${type.id}-${item.id}-${perDay ? occurredOn || today : "fixed"}-${entry?.id ?? "new"}`}
               fields={type.fields}
