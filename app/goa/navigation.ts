@@ -1,6 +1,6 @@
 import type { AdminTab, ParticipantTab, Screen } from "./types";
 
-const PARTICIPANT_TABS = new Set<ParticipantTab>(["today", "results"]);
+const PARTICIPANT_TABS = new Set<ParticipantTab>(["today", "grupo", "results"]);
 const ADMIN_TABS = new Set<AdminTab>([
   "overview",
   "participants",

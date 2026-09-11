@@ -28,7 +28,7 @@ export type AdminTab =
   | "review"
   | "metrics"
   | "results";
-export type ParticipantTab = "today" | "results";
+export type ParticipantTab = "today" | "grupo" | "results";
 
 export interface User {
   id: Id;

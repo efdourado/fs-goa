@@ -897,21 +897,19 @@
   "participant": {
     "tabs": {
       "today": "Hoy",
-      "results": "Resultado"
+      "results": "Resultado",
+      "grupo": "Grupo"
     },
     "back": "Volver",
     "manage": "Gestionar",
     "livingListMeta": "{count, plural, =0 {lista vacía} one {# título} other {# títulos}}",
     "recommendedBy": "Recomendado por {name}",
     "byAuthor": "por {name}",
-    "groupRatingsTitle": "Notas del grupo",
     "itemBoxTitle": "Elemento",
+    "groupActivityTitle": "Actividad del grupo",
+    "groupActivityRatingColumn": "Nota",
+    "youLabel": "Tú",
     "yourResponseTitle": "Tu respuesta",
-    "groupRatingsEmpty": "Nadie más ha valorado esto todavía.",
-    "groupRatingsValue": "Nota {value}",
-    "groupRatingsLayoutList": "Lista",
-    "groupRatingsLayoutGrid": "Cuadrícula",
-    "groupRatingsLayoutAria": "Cómo mostrar las notas del grupo",
     "navAria": "Navegación del desafío",
     "navMobileAria": "Navegación móvil del desafío",
     "entriesProgress": "<b>{done}</b> de {total} registros",

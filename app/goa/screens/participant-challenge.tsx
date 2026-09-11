@@ -7,7 +7,6 @@ import { copyText } from "../clipboard";
 import { useGoaFormat } from "../format";
 import { defaultShowcaseBlocks, hasShowcaseContent, ShowcaseView } from "../showcase-view";
 import { RuleSectionsView, visibleRuleSections } from "../rules";
-import { Segmented } from "../Segmented";
 import type {
   ChallengeDetail,
   ChallengeField,
@@ -40,6 +39,7 @@ import {
   isEmptySaveADelete,
   isLivingList,
   itemIdForEntry,
+  shiftDateKey,
   valuesAsRecord,
 } from "../utils";
 
@@ -441,58 +441,6 @@ export function itemEntryTypes(challenge: ChallengeDetail): EntryTypeView[] {
  * locks once the film is rated) above the "Avaliação"; a reading club stacks
  * progress / completion / rating. A plain Cine round renders a single form.
  */
-/**
- * Each row mirrors the account chip in `AppHeader` — same avatar, name and
- * caption sizing — just with the rating standing in for "@username". List and
- * Grid are two arrangements of the exact same row so they can sit side by
- * side while we settle on one. No title of its own — it lives inside a box
- * the caller has already titled "Notas do grupo".
- */
-function GroupRatings({ ratings }: { ratings: Array<{ id: Id; name: string; value: number }> }) {
-  const t = useTranslations("participant");
-  const nf = useFormatter();
-  const [layout, setLayout] = useState<"list" | "grid">("list");
-
-  return (
-    <div>
-      {ratings.length > 1 ? (
-        <div className="mb-3 flex justify-end">
-          <Segmented
-            options={[
-              { value: "list" as const, label: t("groupRatingsLayoutList") },
-              { value: "grid" as const, label: t("groupRatingsLayoutGrid") },
-            ]}
-            value={layout}
-            onChange={setLayout}
-            ariaLabel={t("groupRatingsLayoutAria")}
-            className="w-36"
-          />
-        </div>
-      ) : null}
-      {ratings.length ? (
-        <div className={layout === "grid" ? "grid grid-cols-1 gap-3 sm:grid-cols-2" : "divide-y divide-[var(--line)] rounded-2xl border border-[var(--line)] bg-[var(--paper)] px-4"}>
-          {ratings.map((rating) => {
-            const initial = rating.name.split(/\s+/).slice(0, 1).map((part) => part[0]).join("");
-            return (
-              <div
-                key={rating.id}
-                className={cx("flex items-center gap-2.5", layout === "grid" ? "rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-3" : "py-3")}
-              >
-                <span className="grid h-9 w-9 flex-none place-items-center rounded-full border-2 border-[var(--paper)] bg-[var(--main-line)] text-xs font-black" aria-hidden="true">{initial}</span>
-                <div className="min-w-0 leading-tight">
-                  <strong className="block truncate text-sm">{rating.name}</strong>
-                  <span className="block truncate text-xs text-[var(--muted)]">{t("groupRatingsValue", { value: nf.number(rating.value, { maximumFractionDigits: 1 }) })}</span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <p className="text-sm text-[var(--muted)]">{t("groupRatingsEmpty")}</p>
-      )}
-    </div>
-  );
-}
 
 function ItemEntryPanel({
   challenge,
@@ -785,6 +733,7 @@ export function ParticipantChallengeScreen({
   const t = useTranslations("participant");
   const trules = useTranslations("rules");
   const f = useGoaFormat();
+  const nf = useFormatter();
   const longDate: Intl.DateTimeFormatOptions = { day: "2-digit", month: "long", year: "numeric" };
   const ownEntries = entries.filter((entry) => !entry.userId || entry.userId === user?.id);
   // Progress counts only the "done" signal — an expectation or a mid-round
@@ -907,8 +856,7 @@ export function ParticipantChallengeScreen({
   const itemForms = itemEntryTypes(challenge);
   const useItemPanel = itemForms.length > 0 && !undatedDaily && Boolean(selectedItem);
   const perDayItem = itemForms.some((type) => type.cardinality === "once_per_item_day");
-  // Whether this challenge has any rating-purpose form at all — the "Notas do
-  // grupo" box only exists when there's something to rate.
+  // Whether this challenge has any rating-purpose form at all.
   const hasRatingType = itemForms.some((type) => type.purpose === "rating");
   // A retrospective list (Estante) has no "when" — its entry form skips the date.
   const collectsEntryDate = challenge.collectsEntryDate !== false;
@@ -917,9 +865,42 @@ export function ParticipantChallengeScreen({
   const dateRequired = undatedDaily || (useItemPanel && perDayItem);
   const canDeleteEntry = challenge.status === "active" ? onDeleteEntry : undefined;
   const doneCount = Math.min(doneEntries.length, sortedItems.length);
+  const hasGroup = challenge.participants.length > 1;
+
+  // The Grupo tab's activity table — one column per unit of progress. A
+  // day-keyed challenge (daily pages, a plain habit) tracks check-ins by
+  // calendar day, so the columns are the last 7 days; anything else (cinema,
+  // a book-at-a-time club) tracks by item/session, reusing the same picker
+  // data the sidebar already shows.
+  const activityDayMode = dateRequired;
+  const activityDays = useMemo(
+    () => (activityDayMode ? Array.from({ length: 7 }, (_, index) => shiftDateKey(today, { days: index - 6 })) : []),
+    [activityDayMode, today],
+  );
+  const activityColumns: Array<{ id: Id; label: string }> = activityDayMode
+    ? activityDays.map((day) => ({ id: day, label: f.date(day, { day: "2-digit", month: "2-digit" }) }))
+    : sessionMode
+      ? sortedSessions.map((session) => ({ id: session.id, label: session.title }))
+      : sortedItems.map((item) => ({ id: item.id, label: item.title }));
+  const checkedInOn = (participantUserId: Id | undefined, day: string) =>
+    entries.some((entry) => entry.userId === participantUserId && entry.occurredOn === day);
+  const doneForParticipant = (participantUserId: Id | undefined, itemId: Id) =>
+    entries.some((entry) =>
+      entry.userId === participantUserId
+      && itemIdForEntry(entry) === itemId
+      && (!challenge.completionEntryTypeId || entry.entryTypeId === challenge.completionEntryTypeId));
+  const ratingForParticipant = (participantUserId: Id | undefined, itemId: Id): number | null => {
+    if (participantUserId && participantUserId === user?.id) return ratingByItem.get(itemId) ?? null;
+    return groupRatingsByItem.get(itemId)?.find((rating) => rating.id === participantUserId)?.value ?? null;
+  };
+
   // A template preview has nothing to log — only the Results showcase.
   const activeTab: ParticipantTab = preview ? "results" : tab;
-  const tabs: Array<{ id: ParticipantTab }> = preview ? [{ id: "results" }] : [{ id: "today" }, { id: "results" }];
+  const tabs: Array<{ id: ParticipantTab }> = preview
+    ? [{ id: "results" }]
+    : hasGroup
+      ? [{ id: "today" }, { id: "grupo" }, { id: "results" }]
+      : [{ id: "today" }, { id: "results" }];
 
   // The picker on Today drives which checkpoint the form is filling; each row
   // ends with the rating this participant gave it.
@@ -989,46 +970,91 @@ export function ParticipantChallengeScreen({
               ) : challenge.submissionMode !== "free" && !selectedItem && !undatedDaily ? (
                 <EmptyState title={t("noCheckpointTitle")} />
               ) : (
-                <>
-                  <div>
-                    <p className={cx("mb-2", sectionLabelClass)}>{selectedItem ? t("itemBoxTitle") : t("tabs.today")}</p>
-                    <section className={cx(cardClass, "min-w-0 p-5 sm:p-7")}>
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div>
-                          <h2 className="text-2xl font-light tracking-[-0.04em]">
-                            {selectedItem
-                              ? `${selectedItem.title}${selectedItem.catalogItem?.year ? ` (${selectedItem.catalogItem.year})` : ""}`
-                              : (undatedDaily ? t("checkInOf", { date: f.date(effectiveOccurredOn, longDate) }) : t("newEntry"))}
-                          </h2>
-                          {selectedItem?.description ? <p className="mt-1 text-sm text-[var(--muted)]">{selectedItem.description}</p> : null}
-                          {selectedItem?.recommendedBy || selectedItem?.catalogItem?.author || selectedItem?.catalogItem?.mainGenre || selectedItem?.catalogItem?.runtimeMinutes ? <p className="mt-1 text-xs text-[var(--muted)]">{[selectedItem.catalogItem?.author ? t("byAuthor", { name: selectedItem.catalogItem.author }) : null, selectedItem.recommendedBy ? t("recommendedBy", { name: selectedItem.recommendedBy.name }) : null, selectedItem.catalogItem?.mainGenre || null, formatRuntime(selectedItem.catalogItem?.runtimeMinutes)].filter(Boolean).join(" · ")}</p> : null}
-                        </div>
-                        {selectedItem?.dueAt ? <span className="flex-none rounded-full bg-[var(--wash)] px-3 py-2 text-xs font-medium text-[var(--muted)]">{t("dueBy", { date: f.dateTime(selectedItem.dueAt) })}</span> : null}
+                <div>
+                  <p className={cx("mb-2", sectionLabelClass)}>{selectedItem ? t("itemBoxTitle") : t("tabs.today")}</p>
+                  <section className={cx(cardClass, "min-w-0 p-5 sm:p-7")}>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <h2 className="text-2xl font-light tracking-[-0.04em]">
+                          {selectedItem
+                            ? `${selectedItem.title}${selectedItem.catalogItem?.year ? ` (${selectedItem.catalogItem.year})` : ""}`
+                            : (undatedDaily ? t("checkInOf", { date: f.date(effectiveOccurredOn, longDate) }) : t("newEntry"))}
+                        </h2>
+                        {selectedItem?.description ? <p className="mt-1 text-sm text-[var(--muted)]">{selectedItem.description}</p> : null}
+                        {selectedItem?.recommendedBy || selectedItem?.catalogItem?.author || selectedItem?.catalogItem?.mainGenre || selectedItem?.catalogItem?.runtimeMinutes ? <p className="mt-1 text-xs text-[var(--muted)]">{[selectedItem.catalogItem?.author ? t("byAuthor", { name: selectedItem.catalogItem.author }) : null, selectedItem.recommendedBy ? t("recommendedBy", { name: selectedItem.recommendedBy.name }) : null, selectedItem.catalogItem?.mainGenre || null, formatRuntime(selectedItem.catalogItem?.runtimeMinutes)].filter(Boolean).join(" · ")}</p> : null}
                       </div>
-                      {dateRequired ? <label className="mt-5 block"><span className={labelClass}>{t("occurredOnLabel")}</span><input className={inputClass} type="date" max={today} value={effectiveOccurredOn} disabled={Boolean(unavailableMessage)} onChange={(event) => setOccurredOn(event.target.value || today)} /><small className="mt-1 block text-[var(--muted)]">{t("occurredOnHint")}</small></label> : !useItemPanel && currentEntry?.occurredOn ? <p className="mt-5 text-xs text-[var(--muted)]">{t("occurredOn", { date: f.date(currentEntry.occurredOn, longDate) })}</p> : null}
-                      <div className="mt-5 border-t border-[var(--line)] pt-5">
-                        <p className={cx("mb-3", sectionLabelClass)}>{t("yourResponseTitle")}</p>
-                        {useItemPanel && selectedItem ? (
-                          <ItemEntryPanel key={`${selectedItem.id}-${selectedSession?.id ?? "no-session"}`} challenge={challenge} item={selectedItem} ownEntries={ownEntries} occurredOn={occurredOn} onOccurredOnChange={setOccurredOn} offerOptionalDate={!perDayItem && !sessionMode && collectsEntryDate} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} checkpointId={selectedSession?.id ?? null} onSaveEntry={onSaveEntry!} onDeleteEntry={canDeleteEntry} />
-                        ) : (
-                          <DynamicEntryForm key={`${selectedItem?.id ?? "free"}-${undatedDaily ? effectiveOccurredOn : "fixed"}-${currentEntry?.id ?? "new"}`} fields={challenge.fields} item={selectedItem ?? null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry!(selectedItem?.id ?? null, values, entry, undatedDaily ? effectiveOccurredOn : undefined)} onDelete={currentEntry && canDeleteEntry ? () => canDeleteEntry(currentEntry.id) : undefined} />
-                        )}
-                      </div>
-                    </section>
-                  </div>
-
-                  {useItemPanel && selectedItem && hasRatingType && challenge.participants.length > 1 ? (
-                    <div>
-                      <p className={cx("mb-2", sectionLabelClass)}>{t("groupRatingsTitle")}</p>
-                      <section className={cx(cardClass, "min-w-0 p-5 sm:p-7")}>
-                        <GroupRatings ratings={groupRatingsByItem.get(selectedItem.id) ?? []} />
-                      </section>
+                      {selectedItem?.dueAt ? <span className="flex-none rounded-full bg-[var(--wash)] px-3 py-2 text-xs font-medium text-[var(--muted)]">{t("dueBy", { date: f.dateTime(selectedItem.dueAt) })}</span> : null}
                     </div>
-                  ) : null}
-                </>
+                    {dateRequired ? <label className="mt-5 block"><span className={labelClass}>{t("occurredOnLabel")}</span><input className={inputClass} type="date" max={today} value={effectiveOccurredOn} disabled={Boolean(unavailableMessage)} onChange={(event) => setOccurredOn(event.target.value || today)} /><small className="mt-1 block text-[var(--muted)]">{t("occurredOnHint")}</small></label> : !useItemPanel && currentEntry?.occurredOn ? <p className="mt-5 text-xs text-[var(--muted)]">{t("occurredOn", { date: f.date(currentEntry.occurredOn, longDate) })}</p> : null}
+                    <div className="mt-5 border-t border-[var(--line)] pt-5">
+                      <p className={cx("mb-3", sectionLabelClass)}>{t("yourResponseTitle")}</p>
+                      {useItemPanel && selectedItem ? (
+                        <ItemEntryPanel key={`${selectedItem.id}-${selectedSession?.id ?? "no-session"}`} challenge={challenge} item={selectedItem} ownEntries={ownEntries} occurredOn={occurredOn} onOccurredOnChange={setOccurredOn} offerOptionalDate={!perDayItem && !sessionMode && collectsEntryDate} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} checkpointId={selectedSession?.id ?? null} onSaveEntry={onSaveEntry!} onDeleteEntry={canDeleteEntry} />
+                      ) : (
+                        <DynamicEntryForm key={`${selectedItem?.id ?? "free"}-${undatedDaily ? effectiveOccurredOn : "fixed"}-${currentEntry?.id ?? "new"}`} fields={challenge.fields} item={selectedItem ?? null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry!(selectedItem?.id ?? null, values, entry, undatedDaily ? effectiveOccurredOn : undefined)} onDelete={currentEntry && canDeleteEntry ? () => canDeleteEntry(currentEntry.id) : undefined} />
+                      )}
+                    </div>
+                  </section>
+                </div>
               )}
             </div>
             {checkpointPicker ? <aside className="min-w-0">{checkpointPicker}</aside> : null}
+          </div>
+        ) : null}
+
+        {activeTab === "grupo" ? (
+          <div>
+            <p className={cx("mb-2", sectionLabelClass)}>{t("groupActivityTitle")}</p>
+            <section className={cx(cardClass, "min-w-0 overflow-x-auto p-5 sm:p-7")}>
+              <table className="w-full min-w-[420px] border-collapse text-sm">
+                <thead>
+                  <tr>
+                    <th className="w-40 pb-3 text-left text-xs font-medium text-[var(--muted)]"></th>
+                    {activityColumns.map((column) => <th key={column.id} className="min-w-11 pb-3 text-center text-xs font-medium text-[var(--muted)]">{column.label}</th>)}
+                    {activityDayMode && hasRatingType ? <th className="min-w-11 pb-3 text-center text-xs font-medium text-[var(--muted)]">{t("groupActivityRatingColumn")}</th> : null}
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...challenge.participants].sort((a, b) => Number(b.userId === user?.id) - Number(a.userId === user?.id)).map((participant) => {
+                    const isSelf = participant.userId === user?.id;
+                    const initial = participant.name.split(/\s+/).slice(0, 1).map((part) => part[0]).join("");
+                    return (
+                      <tr key={participant.id} className="border-t border-[var(--line)]">
+                        <td className="py-2.5 pr-3">
+                          <div className="flex items-center gap-2">
+                            <span className="grid h-9 w-9 flex-none place-items-center rounded-full border-2 border-[var(--paper)] bg-[var(--main-line)] text-xs font-black" aria-hidden="true">{initial}</span>
+                            <span className="truncate text-sm">{isSelf ? t("youLabel") : participant.name}</span>
+                          </div>
+                        </td>
+                        {activityColumns.map((column) => {
+                          const rating = !activityDayMode && hasRatingType ? ratingForParticipant(participant.userId, column.id) : null;
+                          const done = activityDayMode ? checkedInOn(participant.userId, column.id) : doneForParticipant(participant.userId, column.id);
+                          return (
+                            <td key={column.id} className="py-2.5 text-center">
+                              {rating !== null ? (
+                                <span className="font-medium tabular-nums">{nf.number(rating, { maximumFractionDigits: 1 })}</span>
+                              ) : done ? (
+                                <span className="inline-flex text-[var(--ok)]"><CheckGlyph /></span>
+                              ) : (
+                                <span className="text-[var(--muted)]">—</span>
+                              )}
+                            </td>
+                          );
+                        })}
+                        {activityDayMode && hasRatingType ? (
+                          <td className="py-2.5 text-center">
+                            {(() => {
+                              const rating = selectedItem ? ratingForParticipant(participant.userId, selectedItem.id) : null;
+                              return rating !== null ? <span className="font-medium tabular-nums">{nf.number(rating, { maximumFractionDigits: 1 })}</span> : <span className="text-[var(--muted)]">—</span>;
+                            })()}
+                          </td>
+                        ) : null}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </section>
           </div>
         ) : null}
 
@@ -1038,8 +1064,8 @@ export function ParticipantChallengeScreen({
       </div>
 
       {tabs.length > 1 ? (
-        <nav className="safe-area-bottom fixed inset-x-0 bottom-0 z-40 grid h-[72px] grid-cols-2 border-t border-[var(--line)] bg-[var(--paper)]/95 px-2 backdrop-blur-xl sm:hidden" aria-label={t("navMobileAria")}>
-          {tabs.map((item) => <button className={cx("flex min-h-12 flex-col items-center justify-center gap-1 text-[10px] font-light", activeTab === item.id ? "text-[var(--main-strong)]" : "text-[var(--muted)]")} type="button" onClick={() => onTab(item.id)} key={item.id}><span className="text-base" aria-hidden="true">{item.id === "today" ? "◉" : "〇"}</span>{t(`tabs.${item.id}`)}</button>)}
+        <nav className={cx("safe-area-bottom fixed inset-x-0 bottom-0 z-40 grid h-[72px] border-t border-[var(--line)] bg-[var(--paper)]/95 px-2 backdrop-blur-xl sm:hidden", tabs.length === 3 ? "grid-cols-3" : "grid-cols-2")} aria-label={t("navMobileAria")}>
+          {tabs.map((item) => <button className={cx("flex min-h-12 flex-col items-center justify-center gap-1 text-[10px] font-light", activeTab === item.id ? "text-[var(--main-strong)]" : "text-[var(--muted)]")} type="button" onClick={() => onTab(item.id)} key={item.id}><span className="text-base" aria-hidden="true">{item.id === "today" ? "◉" : item.id === "grupo" ? "◐" : "〇"}</span>{t(`tabs.${item.id}`)}</button>)}
         </nav>
       ) : null}
     </main>
