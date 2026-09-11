@@ -134,6 +134,7 @@ export function DynamicEntryForm({
   entry,
   canEdit,
   unavailableMessage,
+  readOnlyInline = false,
   dateField,
   onSave,
   onDelete,
@@ -144,6 +145,10 @@ export function DynamicEntryForm({
   entry?: Entry;
   canEdit: boolean;
   unavailableMessage?: string | null;
+  // A quiet "(read-only)" next to each field's own label instead of the usual
+  // sentence banner below the form — for a state the label already explains
+  // (the expectation locks once you rate; the label already says which field).
+  readOnlyInline?: boolean;
   // An "when did it happen" date that rides with the optional fields — blank
   // means the entry is saved without a date. Owned by the caller.
   dateField?: { label: string; hint: string; value: string; max: string; onChange: (value: string) => void };
@@ -269,7 +274,7 @@ export function DynamicEntryForm({
         const value = values[field.id];
         return (
           <div key={field.id}>
-            <label className={labelClass} htmlFor={field.type === "rating" || field.type === "boolean" ? undefined : id}>{field.label}{field.required ? <span className="ml-1 text-[var(--main-2)]" aria-label={t("required")}>*</span> : <small className="ml-2 font-light text-[var(--muted)]">{t("optional")}</small>}</label>
+            <label className={labelClass} htmlFor={field.type === "rating" || field.type === "boolean" ? undefined : id}>{field.label}{readOnlyInline ? <span className="ml-1 font-normal text-[var(--muted)]">{t("readOnlyInline")}</span> : null}{field.required ? <span className="ml-1 text-[var(--main-2)]" aria-label={t("required")}>*</span> : <small className="ml-2 font-light text-[var(--muted)]">{t("optional")}</small>}</label>
             {field.type === "text" && field.config?.multiline ? <textarea id={id} className={inputClass} rows={4} value={String(value ?? "")} maxLength={field.config.maxLength} disabled={!canEdit || busy} onChange={(event) => setValue(field, event.target.value)} /> : null}
             {field.type === "text" && !field.config?.multiline ? <input id={id} className={inputClass} value={String(value ?? "")} maxLength={field.config?.maxLength} disabled={!canEdit || busy} onChange={(event) => setValue(field, event.target.value)} /> : null}
             {field.type === "number" ? <input id={id} className={inputClass} type="number" inputMode="decimal" min={field.config?.min} max={field.config?.max} step={field.config?.step ?? "any"} value={typeof value === "number" || typeof value === "string" ? value : ""} disabled={!canEdit || busy} onChange={(event) => setValue(field, event.target.value === "" ? "" : Number(event.target.value))} /> : null}
@@ -299,7 +304,7 @@ export function DynamicEntryForm({
           <Button type="submit" className="w-full sm:flex-1" disabled={busy || deleting}>{deleting ? tp("deletingEntry") : busy ? tc("saving") : entry ? tc("saveChanges") : t("saveEntry")}<span aria-hidden="true">→</span></Button>
           {entry && !alwaysEditable ? <Button type="button" variant="secondary" className="w-full sm:flex-1" disabled={busy || deleting} onClick={() => setEditing(false)}>{tc("cancel")}</Button> : null}
         </div>
-      ) : <p className="rounded-xl border border-[var(--line)] bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{unavailableMessage ?? t("readOnly")}</p>}
+      ) : readOnlyInline ? null : <p className="rounded-xl border border-[var(--line)] bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{unavailableMessage ?? t("readOnly")}</p>}
       {item?.dueAt ? <p className="text-center text-xs text-[var(--muted)]">{t("dueAt", { date: f.dateTime(item.dueAt) })}</p> : null}
     </form>
   );
@@ -568,7 +573,8 @@ function ItemEntryPanel({
               item={item}
               entry={entry}
               canEdit={canEdit && !locked}
-              unavailableMessage={locked ? t("expectationLocked") : unavailableMessage}
+              unavailableMessage={unavailableMessage}
+              readOnlyInline={locked}
               dateField={offersDate ? { label: t("occurredOnLabel"), hint: t("occurredOnOptionalHint"), value: occurredOn, max: today, onChange: onOccurredOnChange } : undefined}
               onSave={(values, saved) => onSaveEntry(
                 item.id,
@@ -984,10 +990,7 @@ export function ParticipantChallengeScreen({
                 <>
                   <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                      {/* The page's own title — "Hoje" — comes first; the item below it is
-                          today's subject, not the page's name. */}
-                      <p className={sectionLabelClass}>{t("tabs.today")}</p>
-                      <h2 className="mt-1.5 text-2xl font-light tracking-[-0.04em]">
+                      <h2 className="mt-2 text-2xl font-light tracking-[-0.04em]">
                         {selectedItem
                           ? `${selectedItem.title}${selectedItem.catalogItem?.year ? ` (${selectedItem.catalogItem.year})` : ""}`
                           : (undatedDaily ? t("checkInOf", { date: f.date(effectiveOccurredOn, longDate) }) : t("newEntry"))}
