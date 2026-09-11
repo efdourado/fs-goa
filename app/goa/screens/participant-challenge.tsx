@@ -546,9 +546,14 @@ function ItemEntryPanel({
         // from the picker above, an expectation is pre-watch, and once an entry
         // exists the date is fixed.
         const offersDate = offerOptionalDate && !perDay && !entry && canEdit && !locked && type.purpose !== "expectation";
+        // A single-field type (Expectativa) whose one field is labelled the same
+        // as the type itself would show the same word twice in a row — once as
+        // the section heading, once as the field's own label. Skip the heading
+        // then; the field label (with its required marker) already says it.
+        const headingRedundant = type.fields.length === 1 && type.fields[0].label.trim().toLowerCase() === type.name.trim().toLowerCase();
         return (
           <div key={type.id || "registro"}>
-            {stacked ? <h3 className="mb-3 text-sm font-medium text-[var(--muted)]">{type.name}</h3> : null}
+            {stacked && !headingRedundant ? <h3 className="mb-3 text-sm font-medium text-[var(--muted)]">{type.name}</h3> : null}
             {/* Spell out who will see this answer before the first submit (V1 §8) — except
                 the two "the group sees it soon enough" cases, which don't need a sentence
                 of their own. The two that actually withhold the answer (only after close,
