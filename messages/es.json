@@ -860,8 +860,6 @@
       "author_only": "Tu respuesta nunca aparece de forma colectiva — solo las métricas agregadas pueden incluirla."
     },
     "note": {
-      "group_realtime": "El grupo ve tu respuesta al instante.",
-      "after_own": "El grupo ve tu respuesta cuando también responda.",
       "after_close": "Solo los administradores ven tu respuesta hasta que la ronda cierre.",
       "author_only": "Solo tú y los administradores ven esta respuesta."
     }

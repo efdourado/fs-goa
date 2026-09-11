@@ -517,8 +517,13 @@ function ItemEntryPanel({
         return (
           <div key={type.id || "registro"}>
             {stacked ? <h3 className="mb-3 text-sm font-medium text-[var(--muted)]">{type.name}</h3> : null}
-            {/* Always spell out who will see this answer, before the first submit (V1 §8). */}
-            <p className="mb-3 rounded-lg bg-[var(--wash)] px-3 py-2 text-xs text-[var(--muted)]">{tv(`note.${type.visibilityPolicy ?? "group_realtime"}`)}</p>
+            {/* Spell out who will see this answer before the first submit (V1 §8) — except
+                the two "the group sees it soon enough" cases, which don't need a sentence
+                of their own. The two that actually withhold the answer (only after close,
+                only you) still get one. */}
+            {type.visibilityPolicy === "after_close" || type.visibilityPolicy === "author_only" ? (
+              <p className="mb-3 rounded-lg bg-[var(--wash)] px-3 py-2 text-xs text-[var(--muted)]">{tv(`note.${type.visibilityPolicy}`)}</p>
+            ) : null}
             <DynamicEntryForm
               key={`${type.id}-${item.id}-${perDay ? occurredOn || today : "fixed"}-${entry?.id ?? "new"}`}
               fields={type.fields}

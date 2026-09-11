@@ -860,8 +860,6 @@
       "author_only": "Your answer never shows up collectively — only aggregate metrics can include it."
     },
     "note": {
-      "group_realtime": "The group sees your answer right away.",
-      "after_own": "The group sees your answer once they've answered too.",
       "after_close": "Only the admins see your answer until the round closes.",
       "author_only": "Only you and the admins see this answer."
     }
