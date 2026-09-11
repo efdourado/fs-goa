@@ -905,6 +905,8 @@
     "recommendedBy": "Indicado por {name}",
     "byAuthor": "por {name}",
     "groupRatingsTitle": "Notas do grupo",
+    "itemBoxTitle": "Item",
+    "yourResponseTitle": "Sua resposta",
     "groupRatingsEmpty": "Ninguém mais avaliou isso ainda.",
     "groupRatingsValue": "Nota {value}",
     "groupRatingsLayoutList": "Lista",

@@ -445,7 +445,8 @@ export function itemEntryTypes(challenge: ChallengeDetail): EntryTypeView[] {
  * Each row mirrors the account chip in `AppHeader` — same avatar, name and
  * caption sizing — just with the rating standing in for "@username". List and
  * Grid are two arrangements of the exact same row so they can sit side by
- * side while we settle on one.
+ * side while we settle on one. No title of its own — it lives inside a box
+ * the caller has already titled "Notas do grupo".
  */
 function GroupRatings({ ratings }: { ratings: Array<{ id: Id; name: string; value: number }> }) {
   const t = useTranslations("participant");
@@ -453,10 +454,9 @@ function GroupRatings({ ratings }: { ratings: Array<{ id: Id; name: string; valu
   const [layout, setLayout] = useState<"list" | "grid">("list");
 
   return (
-    <div className="mt-4">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <p className={sectionLabelClass}>{t("groupRatingsTitle")}</p>
-        {ratings.length > 1 ? (
+    <div>
+      {ratings.length > 1 ? (
+        <div className="mb-3 flex justify-end">
           <Segmented
             options={[
               { value: "list" as const, label: t("groupRatingsLayoutList") },
@@ -467,8 +467,8 @@ function GroupRatings({ ratings }: { ratings: Array<{ id: Id; name: string; valu
             ariaLabel={t("groupRatingsLayoutAria")}
             className="w-36"
           />
-        ) : null}
-      </div>
+        </div>
+      ) : null}
       {ratings.length ? (
         <div className={layout === "grid" ? "grid grid-cols-1 gap-3 sm:grid-cols-2" : "divide-y divide-[var(--line)] rounded-2xl border border-[var(--line)] bg-[var(--paper)] px-4"}>
           {ratings.map((rating) => {
@@ -498,7 +498,6 @@ function ItemEntryPanel({
   challenge,
   item,
   ownEntries,
-  groupRatings,
   occurredOn,
   onOccurredOnChange,
   offerOptionalDate,
@@ -512,9 +511,6 @@ function ItemEntryPanel({
   challenge: ChallengeDetail;
   item: ChallengeItem;
   ownEntries: Entry[];
-  // Other participants' ratings for this item — `null` on a solo challenge,
-  // where there is no group to compare against.
-  groupRatings: Array<{ id: Id; name: string; value: number }> | null;
   // "" when the participant left the (optional) date blank; `today` is the
   // fallback for the day-keyed forms that still require one.
   occurredOn: string;
@@ -586,7 +582,6 @@ function ItemEntryPanel({
               )}
               onDelete={entry && onDeleteEntry ? () => onDeleteEntry(entry.id) : undefined}
             />
-            {groupRatings && type.purpose === "rating" ? <GroupRatings ratings={groupRatings} /> : null}
           </div>
         );
       })}
@@ -912,6 +907,9 @@ export function ParticipantChallengeScreen({
   const itemForms = itemEntryTypes(challenge);
   const useItemPanel = itemForms.length > 0 && !undatedDaily && Boolean(selectedItem);
   const perDayItem = itemForms.some((type) => type.cardinality === "once_per_item_day");
+  // Whether this challenge has any rating-purpose form at all — the "Notas do
+  // grupo" box only exists when there's something to rate.
+  const hasRatingType = itemForms.some((type) => type.purpose === "rating");
   // A retrospective list (Estante) has no "when" — its entry form skips the date.
   const collectsEntryDate = challenge.collectsEntryDate !== false;
   // A daily / per-day round needs a concrete date, so it gets a prominent picker.
@@ -985,27 +983,51 @@ export function ParticipantChallengeScreen({
       <div className="mt-5">
         {activeTab === "today" ? (
           <div className={cx("grid gap-5", checkpointPicker ? "lg:grid-cols-[minmax(0,1.5fr)_minmax(270px,0.6fr)]" : "")}>
-            <section className={cx(cardClass, "min-w-0 p-5 sm:p-7")}>
-              {challenge.status === "closed" ? <EmptyState title={t("closedTitle")} action={<Button onClick={() => onTab("results")}>{t("seeResults")}</Button>} /> : challenge.submissionMode !== "free" && !selectedItem && !undatedDaily ? <EmptyState title={t("noCheckpointTitle")} /> : (
+            <div className="min-w-0 space-y-6">
+              {challenge.status === "closed" ? (
+                <EmptyState title={t("closedTitle")} action={<Button onClick={() => onTab("results")}>{t("seeResults")}</Button>} />
+              ) : challenge.submissionMode !== "free" && !selectedItem && !undatedDaily ? (
+                <EmptyState title={t("noCheckpointTitle")} />
+              ) : (
                 <>
-                  <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className={cx("mb-2", sectionLabelClass)}>{selectedItem ? t("itemBoxTitle") : t("tabs.today")}</p>
+                    <section className={cx(cardClass, "min-w-0 p-5 sm:p-7")}>
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <h2 className="text-2xl font-light tracking-[-0.04em]">
+                            {selectedItem
+                              ? `${selectedItem.title}${selectedItem.catalogItem?.year ? ` (${selectedItem.catalogItem.year})` : ""}`
+                              : (undatedDaily ? t("checkInOf", { date: f.date(effectiveOccurredOn, longDate) }) : t("newEntry"))}
+                          </h2>
+                          {selectedItem?.description ? <p className="mt-1 text-sm text-[var(--muted)]">{selectedItem.description}</p> : null}
+                          {selectedItem?.recommendedBy || selectedItem?.catalogItem?.author || selectedItem?.catalogItem?.mainGenre || selectedItem?.catalogItem?.runtimeMinutes ? <p className="mt-1 text-xs text-[var(--muted)]">{[selectedItem.catalogItem?.author ? t("byAuthor", { name: selectedItem.catalogItem.author }) : null, selectedItem.recommendedBy ? t("recommendedBy", { name: selectedItem.recommendedBy.name }) : null, selectedItem.catalogItem?.mainGenre || null, formatRuntime(selectedItem.catalogItem?.runtimeMinutes)].filter(Boolean).join(" · ")}</p> : null}
+                        </div>
+                        {selectedItem?.dueAt ? <span className="flex-none rounded-full bg-[var(--wash)] px-3 py-2 text-xs font-medium text-[var(--muted)]">{t("dueBy", { date: f.dateTime(selectedItem.dueAt) })}</span> : null}
+                      </div>
+                      {dateRequired ? <label className="mt-5 block"><span className={labelClass}>{t("occurredOnLabel")}</span><input className={inputClass} type="date" max={today} value={effectiveOccurredOn} disabled={Boolean(unavailableMessage)} onChange={(event) => setOccurredOn(event.target.value || today)} /><small className="mt-1 block text-[var(--muted)]">{t("occurredOnHint")}</small></label> : !useItemPanel && currentEntry?.occurredOn ? <p className="mt-5 text-xs text-[var(--muted)]">{t("occurredOn", { date: f.date(currentEntry.occurredOn, longDate) })}</p> : null}
+                      <div className="mt-5 border-t border-[var(--line)] pt-5">
+                        <p className={cx("mb-3", sectionLabelClass)}>{t("yourResponseTitle")}</p>
+                        {useItemPanel && selectedItem ? (
+                          <ItemEntryPanel key={`${selectedItem.id}-${selectedSession?.id ?? "no-session"}`} challenge={challenge} item={selectedItem} ownEntries={ownEntries} occurredOn={occurredOn} onOccurredOnChange={setOccurredOn} offerOptionalDate={!perDayItem && !sessionMode && collectsEntryDate} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} checkpointId={selectedSession?.id ?? null} onSaveEntry={onSaveEntry!} onDeleteEntry={canDeleteEntry} />
+                        ) : (
+                          <DynamicEntryForm key={`${selectedItem?.id ?? "free"}-${undatedDaily ? effectiveOccurredOn : "fixed"}-${currentEntry?.id ?? "new"}`} fields={challenge.fields} item={selectedItem ?? null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry!(selectedItem?.id ?? null, values, entry, undatedDaily ? effectiveOccurredOn : undefined)} onDelete={currentEntry && canDeleteEntry ? () => canDeleteEntry(currentEntry.id) : undefined} />
+                        )}
+                      </div>
+                    </section>
+                  </div>
+
+                  {useItemPanel && selectedItem && hasRatingType && challenge.participants.length > 1 ? (
                     <div>
-                      <h2 className="mt-2 text-2xl font-light tracking-[-0.04em]">
-                        {selectedItem
-                          ? `${selectedItem.title}${selectedItem.catalogItem?.year ? ` (${selectedItem.catalogItem.year})` : ""}`
-                          : (undatedDaily ? t("checkInOf", { date: f.date(effectiveOccurredOn, longDate) }) : t("newEntry"))}
-                      </h2>
-                      {selectedItem?.description ? <p className="mt-1 text-sm text-[var(--muted)]">{selectedItem.description}</p> : null}
-                      {selectedItem?.recommendedBy || selectedItem?.catalogItem?.author || selectedItem?.catalogItem?.mainGenre || selectedItem?.catalogItem?.runtimeMinutes ? <p className="mt-1 text-xs text-[var(--muted)]">{[selectedItem.catalogItem?.author ? t("byAuthor", { name: selectedItem.catalogItem.author }) : null, selectedItem.recommendedBy ? t("recommendedBy", { name: selectedItem.recommendedBy.name }) : null, selectedItem.catalogItem?.mainGenre || null, formatRuntime(selectedItem.catalogItem?.runtimeMinutes)].filter(Boolean).join(" · ")}</p> : null}</div>{selectedItem?.dueAt ? <span className="rounded-full bg-[var(--wash)] px-3 py-2 text-xs font-medium text-[var(--muted)]">{t("dueBy", { date: f.dateTime(selectedItem.dueAt) })}</span> : null}</div>
-                  {dateRequired ? <label className="mb-5 block"><span className={labelClass}>{t("occurredOnLabel")}</span><input className={inputClass} type="date" max={today} value={effectiveOccurredOn} disabled={Boolean(unavailableMessage)} onChange={(event) => setOccurredOn(event.target.value || today)} /><small className="mt-1 block text-[var(--muted)]">{t("occurredOnHint")}</small></label> : !useItemPanel && currentEntry?.occurredOn ? <p className="mb-5 text-xs text-[var(--muted)]">{t("occurredOn", { date: f.date(currentEntry.occurredOn, longDate) })}</p> : null}
-                  {useItemPanel && selectedItem ? (
-                    <ItemEntryPanel key={`${selectedItem.id}-${selectedSession?.id ?? "no-session"}`} challenge={challenge} item={selectedItem} ownEntries={ownEntries} groupRatings={challenge.participants.length > 1 ? groupRatingsByItem.get(selectedItem.id) ?? [] : null} occurredOn={occurredOn} onOccurredOnChange={setOccurredOn} offerOptionalDate={!perDayItem && !sessionMode && collectsEntryDate} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} checkpointId={selectedSession?.id ?? null} onSaveEntry={onSaveEntry!} onDeleteEntry={canDeleteEntry} />
-                  ) : (
-                    <DynamicEntryForm key={`${selectedItem?.id ?? "free"}-${undatedDaily ? effectiveOccurredOn : "fixed"}-${currentEntry?.id ?? "new"}`} fields={challenge.fields} item={selectedItem ?? null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry!(selectedItem?.id ?? null, values, entry, undatedDaily ? effectiveOccurredOn : undefined)} onDelete={currentEntry && canDeleteEntry ? () => canDeleteEntry(currentEntry.id) : undefined} />
-                  )}
+                      <p className={cx("mb-2", sectionLabelClass)}>{t("groupRatingsTitle")}</p>
+                      <section className={cx(cardClass, "min-w-0 p-5 sm:p-7")}>
+                        <GroupRatings ratings={groupRatingsByItem.get(selectedItem.id) ?? []} />
+                      </section>
+                    </div>
+                  ) : null}
                 </>
               )}
-            </section>
+            </div>
             {checkpointPicker ? <aside className="min-w-0">{checkpointPicker}</aside> : null}
           </div>
         ) : null}
