@@ -436,10 +436,10 @@ export function itemEntryTypes(challenge: ChallengeDetail): EntryTypeView[] {
  * progress / completion / rating. A plain Cine round renders a single form.
  */
 /**
- * Each row mirrors the identity block from the account page — same avatar,
- * name and caption sizing — just with the rating standing in for "@user ·
- * email". List and Grid are two arrangements of the exact same row so they
- * can sit side by side while we settle on one.
+ * Each row mirrors the account chip in `AppHeader` — same avatar, name and
+ * caption sizing — just with the rating standing in for "@username". List and
+ * Grid are two arrangements of the exact same row so they can sit side by
+ * side while we settle on one.
  */
 function GroupRatings({ ratings }: { ratings: Array<{ id: Id; name: string; value: number }> }) {
   const t = useTranslations("participant");
@@ -466,16 +466,16 @@ function GroupRatings({ ratings }: { ratings: Array<{ id: Id; name: string; valu
       {ratings.length ? (
         <div className={layout === "grid" ? "grid grid-cols-1 gap-3 sm:grid-cols-2" : "divide-y divide-[var(--line)] rounded-2xl border border-[var(--line)] bg-[var(--paper)] px-4"}>
           {ratings.map((rating) => {
-            const initials = rating.name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("");
+            const initial = rating.name.split(/\s+/).slice(0, 1).map((part) => part[0]).join("");
             return (
               <div
                 key={rating.id}
-                className={cx("flex items-center gap-4", layout === "grid" ? "rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-3" : "py-3")}
+                className={cx("flex items-center gap-2.5", layout === "grid" ? "rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-3" : "py-3")}
               >
-                <span className="grid h-14 w-14 flex-none place-items-center rounded-full bg-[var(--main-line)] text-lg font-black" aria-hidden="true">{initials}</span>
-                <div className="min-w-0">
-                  <strong className="block truncate text-base font-semibold">{rating.name}</strong>
-                  <span className="block truncate text-sm text-[var(--muted)]">{t("groupRatingsValue", { value: nf.number(rating.value, { maximumFractionDigits: 1 }) })}</span>
+                <span className="grid h-9 w-9 flex-none place-items-center rounded-full border-2 border-[var(--paper)] bg-[var(--main-line)] text-xs font-black" aria-hidden="true">{initial}</span>
+                <div className="min-w-0 leading-tight">
+                  <strong className="block truncate text-sm">{rating.name}</strong>
+                  <span className="block truncate text-xs text-[var(--muted)]">{t("groupRatingsValue", { value: nf.number(rating.value, { maximumFractionDigits: 1 }) })}</span>
                 </div>
               </div>
             );
