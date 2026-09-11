@@ -7,6 +7,7 @@ import { copyText } from "../clipboard";
 import { useGoaFormat } from "../format";
 import { defaultShowcaseBlocks, hasShowcaseContent, ShowcaseView } from "../showcase-view";
 import { RuleSectionsView, visibleRuleSections } from "../rules";
+import { Segmented } from "../Segmented";
 import type {
   ChallengeDetail,
   ChallengeField,
@@ -434,23 +435,54 @@ export function itemEntryTypes(challenge: ChallengeDetail): EntryTypeView[] {
  * locks once the film is rated) above the "Avaliação"; a reading club stacks
  * progress / completion / rating. A plain Cine round renders a single form.
  */
+/**
+ * Each row mirrors the identity block from the account page — same avatar,
+ * name and caption sizing — just with the rating standing in for "@user ·
+ * email". List and Grid are two arrangements of the exact same row so they
+ * can sit side by side while we settle on one.
+ */
 function GroupRatings({ ratings }: { ratings: Array<{ id: Id; name: string; value: number }> }) {
   const t = useTranslations("participant");
   const nf = useFormatter();
+  const [layout, setLayout] = useState<"list" | "grid">("list");
+
   return (
-    <div className="mt-4 rounded-xl border border-[var(--line)] bg-[var(--wash)]/50 p-3">
-      <p className="text-xs font-medium text-[var(--muted)]">{t("groupRatingsTitle")}</p>
+    <div className="mt-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <p className="text-xs font-medium text-[var(--muted)]">{t("groupRatingsTitle")}</p>
+        {ratings.length > 1 ? (
+          <Segmented
+            options={[
+              { value: "list" as const, label: t("groupRatingsLayoutList") },
+              { value: "grid" as const, label: t("groupRatingsLayoutGrid") },
+            ]}
+            value={layout}
+            onChange={setLayout}
+            ariaLabel={t("groupRatingsLayoutAria")}
+            className="w-36"
+          />
+        ) : null}
+      </div>
       {ratings.length ? (
-        <ul className="mt-2 space-y-1">
-          {ratings.map((rating) => (
-            <li className="flex items-center justify-between gap-3 text-sm" key={rating.id}>
-              <span className="truncate font-light">{rating.name}</span>
-              <span className="flex-none font-medium tabular-nums">{nf.number(rating.value, { maximumFractionDigits: 1 })}</span>
-            </li>
-          ))}
-        </ul>
+        <div className={layout === "grid" ? "grid grid-cols-1 gap-3 sm:grid-cols-2" : "divide-y divide-[var(--line)] rounded-2xl border border-[var(--line)] bg-[var(--paper)] px-4"}>
+          {ratings.map((rating) => {
+            const initials = rating.name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("");
+            return (
+              <div
+                key={rating.id}
+                className={cx("flex items-center gap-4", layout === "grid" ? "rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-3" : "py-3")}
+              >
+                <span className="grid h-14 w-14 flex-none place-items-center rounded-full bg-[var(--main-line)] text-lg font-black" aria-hidden="true">{initials}</span>
+                <div className="min-w-0">
+                  <strong className="block truncate text-base font-semibold">{rating.name}</strong>
+                  <span className="block truncate text-sm text-[var(--muted)]">{t("groupRatingsValue", { value: nf.number(rating.value, { maximumFractionDigits: 1 }) })}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       ) : (
-        <p className="mt-1 text-sm text-[var(--muted)]">{t("groupRatingsEmpty")}</p>
+        <p className="text-sm text-[var(--muted)]">{t("groupRatingsEmpty")}</p>
       )}
     </div>
   );
@@ -761,10 +793,15 @@ export function ParticipantChallengeScreen({
     [doneEntries],
   );
   // The rating this participant gave each item (from whichever entry carries the
-  // rating field) — shown at the end of every checkpoint row.
+  // rating field) — shown at the end of every checkpoint row. Only entry types
+  // whose *purpose* is "rating" count here — an expectation's field uses the
+  // same rating widget but is a different question, and mixing the two in with
+  // the real rating both overwrote it (self) and duplicated the person (group).
   const ratingByItem = useMemo(() => {
     const ratingFieldByType = new Map(
-      challenge.entryTypes.map((type) => [type.id, type.fields.find((field) => field.type === "rating")?.id ?? null]),
+      challenge.entryTypes
+        .filter((type) => type.purpose === "rating")
+        .map((type) => [type.id, type.fields.find((field) => field.type === "rating")?.id ?? null]),
     );
     const map = new Map<Id, number>();
     for (const entry of ownEntries) {
@@ -782,7 +819,9 @@ export function ParticipantChallengeScreen({
   // not just after the round closes.
   const groupRatingsByItem = useMemo(() => {
     const ratingFieldByType = new Map(
-      challenge.entryTypes.map((type) => [type.id, type.fields.find((field) => field.type === "rating")?.id ?? null]),
+      challenge.entryTypes
+        .filter((type) => type.purpose === "rating")
+        .map((type) => [type.id, type.fields.find((field) => field.type === "rating")?.id ?? null]),
     );
     const map = new Map<Id, Array<{ id: Id; name: string; value: number }>>();
     for (const entry of entries) {
