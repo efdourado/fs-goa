@@ -29,6 +29,7 @@ import {
   EmptyState,
   inputClass,
   labelClass,
+  sectionLabelClass,
   StatusMessage,
 } from "../ui";
 import {
@@ -449,7 +450,7 @@ function GroupRatings({ ratings }: { ratings: Array<{ id: Id; name: string; valu
   return (
     <div className="mt-4">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <p className="text-xs font-medium text-[var(--muted)]">{t("groupRatingsTitle")}</p>
+        <p className={sectionLabelClass}>{t("groupRatingsTitle")}</p>
         {ratings.length > 1 ? (
           <Segmented
             options={[
@@ -553,7 +554,7 @@ function ItemEntryPanel({
         const headingRedundant = type.fields.length === 1 && type.fields[0].label.trim().toLowerCase() === type.name.trim().toLowerCase();
         return (
           <div key={type.id || "registro"}>
-            {stacked && !headingRedundant ? <h3 className="mb-3 text-sm font-medium text-[var(--muted)]">{type.name}</h3> : null}
+            {stacked && !headingRedundant ? <h3 className={cx("mb-3", sectionLabelClass)}>{type.name}</h3> : null}
             {/* Spell out who will see this answer before the first submit (V1 §8) — except
                 the two "the group sees it soon enough" cases, which don't need a sentence
                 of their own. The two that actually withhold the answer (only after close,
@@ -627,7 +628,7 @@ function EntryPicker({
   return (
     <section className={cx(cardClass, "p-4 sm:p-5")}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h2 className="text-base font-light">{title}</h2>
+        <h2 className={sectionLabelClass}>{title}</h2>
         {tally ? <span className="text-xs text-[var(--muted)]">{tally}</span> : null}
       </div>
       <ol className="mt-3 max-h-[21rem] space-y-1.5 overflow-y-auto pr-0.5">
@@ -705,7 +706,7 @@ function CheckpointSchedule({ challenge }: { challenge: ChallengeDetail }) {
 
   return (
     <section className="mt-5">
-      <h2 className="mb-3 text-sm font-medium text-[var(--muted)]">{tp("title")}</h2>
+      <h2 className={cx("mb-3", sectionLabelClass)}>{tp("title")}</h2>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {planned.map((cp) => {
           const items = [...(itemsByCheckpoint.get(cp.id) ?? [])].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
@@ -983,7 +984,10 @@ export function ParticipantChallengeScreen({
                 <>
                   <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                      <h2 className="mt-2 text-2xl font-light tracking-[-0.04em]">
+                      {/* The page's own title — "Hoje" — comes first; the item below it is
+                          today's subject, not the page's name. */}
+                      <p className={sectionLabelClass}>{t("tabs.today")}</p>
+                      <h2 className="mt-1.5 text-2xl font-light tracking-[-0.04em]">
                         {selectedItem
                           ? `${selectedItem.title}${selectedItem.catalogItem?.year ? ` (${selectedItem.catalogItem.year})` : ""}`
                           : (undatedDaily ? t("checkInOf", { date: f.date(effectiveOccurredOn, longDate) }) : t("newEntry"))}
