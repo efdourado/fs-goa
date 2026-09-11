@@ -20,12 +20,13 @@ export const inputClass =
   "min-h-11 w-full rounded-xl border border-[var(--line)] bg-[var(--paper)] px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--main)] focus:ring-4 focus:ring-[var(--main)]/18 disabled:cursor-not-allowed disabled:bg-[var(--canvas)] disabled:text-[var(--muted)]";
 export const labelClass = "mb-1.5 block text-[13px] font-medium text-[var(--ink)]";
 /**
- * The small uppercase "what section is this" eyebrow — same rhythm as
- * `PageHeading`'s `<h1>` one level down. Already the de facto pattern in
- * `SettingsMenu` and the dashboard card menu; named and exported so every new
- * section label converges on it instead of a slightly different one-off.
+ * A section title one step down from `PageHeading`'s `<h1>` — sentence case,
+ * full-contrast ink, the same `font-light` voice as the rest of the app's
+ * headings (matches the admin tabs' fieldset legends). No uppercase/tracking
+ * treatment; named and exported so every new section title converges on it
+ * instead of a slightly different one-off.
  */
-export const sectionLabelClass = "text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--muted)]";
+export const sectionLabelClass = "text-base font-light";
 export const linkClass =
   "px-4 py-2 border-l-1 rounded-xl border-[var(--muted)] underline-offset-4 hover:opacity-90 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50";
 /** Legacy plain back-link style; new screens use `<BackButton>`. */
