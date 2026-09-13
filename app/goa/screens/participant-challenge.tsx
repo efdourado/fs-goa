@@ -544,15 +544,15 @@ function CheckGlyph() {
   );
 }
 
-/** A rating on a 0–5 scale as a small filled meter, the number below it. */
+/** A rating on a 0–5 scale as a small filled meter, the number beside it. */
 function RatingBar({ value }: { value: number }) {
   const nf = useFormatter();
   return (
-    <div className="mx-auto w-14">
-      <div className="h-1.5 overflow-hidden rounded-full bg-[var(--wash)]">
+    <div className="flex w-24 items-center justify-end gap-2">
+      <div className="h-1.5 w-14 overflow-hidden rounded-full bg-[var(--wash)]">
         <div className="h-full rounded-full bg-[var(--main)]" style={{ width: `${Math.min(100, Math.max(0, (value / 5) * 100))}%` }} />
       </div>
-      <span className="mt-1 block text-[11px] font-medium tabular-nums text-[var(--ink)]">{nf.number(value, { maximumFractionDigits: 1 })}</span>
+      <span className="flex-none text-[11px] font-medium tabular-nums text-[var(--ink)]">{nf.number(value, { maximumFractionDigits: 1 })}</span>
     </div>
   );
 }
@@ -568,6 +568,8 @@ interface PickerOption {
   done?: boolean;
   soon?: boolean;
   statusLabel?: string;
+  /** Extra detail (author, genre, runtime…) — room for it opens up on wider screens. */
+  meta?: string;
   /** The rating this participant gave the item, shown at the end of the row. */
   rating?: number | null;
 }
@@ -593,10 +595,11 @@ function EntryPicker({
         {tally ? <span className="text-xs text-[var(--muted)]">{tally}</span> : null}
       </div>
       <section className={cx(cardClass, "p-4 sm:p-5")}>
-      <ol className="max-h-[21rem] space-y-1.5 overflow-y-auto pr-0.5">
+      <ol className="max-h-60 space-y-1.5 overflow-y-auto pr-0.5 sm:max-h-72">
         {options.map((option, index) => {
           const active = option.id === selectedId;
           const rating = typeof option.rating === "number" ? option.rating : null;
+          const caption = [option.statusLabel, option.meta].filter(Boolean).join(" · ");
           return (
             <li key={option.id}>
               <button
@@ -627,7 +630,10 @@ function EntryPicker({
                 <span className="min-w-0 flex-1">
                   <span className={cx("block truncate text-sm", active ? "font-medium text-[var(--main-strong)]" : "font-light")}>{option.label}</span>
                   {option.statusLabel ? (
-                    <span className={cx("text-[11px]", option.done ? "text-[var(--ok)]" : "text-[var(--muted)]")}>{option.statusLabel}</span>
+                    <span className={cx("block truncate text-[11px] sm:hidden", option.done ? "text-[var(--ok)]" : "text-[var(--muted)]")}>{option.statusLabel}</span>
+                  ) : null}
+                  {caption ? (
+                    <span className={cx("hidden truncate text-[11px] sm:block", option.done ? "text-[var(--ok)]" : "text-[var(--muted)]")}>{caption}</span>
                   ) : null}
                 </span>
                 {rating !== null ? (
@@ -881,12 +887,8 @@ export function ParticipantChallengeScreen({
   const hasGroup = challenge.participants.length > 1;
 
   // The Grupo tab shows everyone's status for whichever item/session is
-  // currently selected in the shared "Checkpoints" picker — a day-keyed
-  // challenge (daily pages, a plain habit) also gets a "logged today" note,
-  // since the picker alone doesn't say whether today specifically is covered.
-  const activityDayMode = dateRequired;
-  const checkedInOn = (participantUserId: Id | undefined, day: string) =>
-    entries.some((entry) => entry.userId === participantUserId && entry.occurredOn === day);
+  // currently selected in the shared "Checkpoints" picker, plus two
+  // mode-independent stats: overall completion and freshness of their last entry.
   const doneForParticipant = (participantUserId: Id | undefined, itemId: Id) =>
     entries.some((entry) =>
       entry.userId === participantUserId
@@ -896,6 +898,22 @@ export function ParticipantChallengeScreen({
     if (participantUserId && participantUserId === user?.id) return ratingByItem.get(itemId) ?? null;
     return groupRatingsByItem.get(itemId)?.find((rating) => rating.id === participantUserId)?.value ?? null;
   };
+  const completedCountForParticipant = (participantUserId: Id | undefined): number =>
+    sortedItems.filter((item) => doneForParticipant(participantUserId, item.id)).length;
+  // An entry with no explicit date (a retrospective/undated form) still has a
+  // submission timestamp — fall back to that so "last register" always has an answer.
+  const dayKeyForEntry = (entry: Entry): string | null =>
+    entry.occurredOn ?? (entry.submittedAt ? dateKeyInSaoPaulo(new Date(entry.submittedAt)) : null);
+  const lastEntryDaysAgo = (participantUserId: Id | undefined): number | null => {
+    let latest: string | null = null;
+    for (const entry of entries) {
+      if (entry.userId !== participantUserId) continue;
+      const day = dayKeyForEntry(entry);
+      if (day && (!latest || day > latest)) latest = day;
+    }
+    if (!latest) return null;
+    return Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${latest}T00:00:00Z`)) / 86_400_000);
+  };
 
   // A template preview has nothing to log — only the Results showcase.
   const activeTab: ParticipantTab = preview ? "results" : tab;
@@ -904,6 +922,16 @@ export function ParticipantChallengeScreen({
     : hasGroup
       ? [{ id: "today" }, { id: "grupo" }, { id: "results" }]
       : [{ id: "today" }, { id: "results" }];
+
+  // Extra detail for a picker row — only worth showing where there's room
+  // for it (widened once the picker moved out of the narrow Today sidebar).
+  const metaForItem = (item: ChallengeItem): string | undefined =>
+    [
+      item.catalogItem?.author ? t("byAuthor", { name: item.catalogItem.author }) : null,
+      item.recommendedBy ? t("recommendedBy", { name: item.recommendedBy.name }) : null,
+      item.catalogItem?.mainGenre || null,
+      formatRuntime(item.catalogItem?.runtimeMinutes),
+    ].filter(Boolean).join(" · ") || undefined;
 
   // The picker on Today drives which checkpoint the form is filling; each row
   // ends with the rating this participant gave it.
@@ -916,7 +944,7 @@ export function ParticipantChallengeScreen({
         const boundItem = sortedItems.find((item) => item.checkpointId === session.id);
         const soon = session.status === "scheduled";
         const label = boundItem?.title ?? session.title;
-        return { id: session.id, label: boundItem?.catalogItem?.year ? `${label} (${boundItem.catalogItem.year})` : label, soon, statusLabel: soon ? t("checkpointSoonLabel") : undefined, rating: boundItem ? ratingByItem.get(boundItem.id) ?? null : null };
+        return { id: session.id, label: boundItem?.catalogItem?.year ? `${label} (${boundItem.catalogItem.year})` : label, soon, statusLabel: soon ? t("checkpointSoonLabel") : undefined, meta: boundItem ? metaForItem(boundItem) : undefined, rating: boundItem ? ratingByItem.get(boundItem.id) ?? null : null };
       })}
     />
   ) : sortedItems.length > 1 ? (
@@ -929,7 +957,7 @@ export function ParticipantChallengeScreen({
         const done = doneByItem.has(item.id);
         const soon = item.status === "scheduled" && !entriesByItem.has(item.id);
         const label = item.catalogItem?.year ? `${item.title} (${item.catalogItem.year})` : item.title;
-        return { id: item.id, label, done, soon, statusLabel: done ? t("checkpointDoneLabel") : soon ? t("checkpointSoonLabel") : undefined, rating: ratingByItem.get(item.id) ?? null };
+        return { id: item.id, label, done, soon, statusLabel: done ? t("checkpointDoneLabel") : soon ? t("checkpointSoonLabel") : undefined, meta: metaForItem(item), rating: ratingByItem.get(item.id) ?? null };
       })}
     />
   ) : null;
@@ -963,15 +991,16 @@ export function ParticipantChallengeScreen({
           table columns, and a real Results tab doesn't act on one at all. */}
       {activeTab === "today" || preview ? <CheckpointSchedule challenge={challenge} /> : null}
 
+      {/* Shared across Today and Grupo — whichever item/session is picked here
+          is what both tabs act on, so it lives above the tab selector itself,
+          not inside either tab's own body. */}
+      {checkpointPicker && activeTab !== "results" ? <div className="mt-5">{checkpointPicker}</div> : null}
+
       {tabs.length > 1 ? (
         <nav className="mt-5 hidden gap-1 rounded-2xl bg-[var(--wash-strong)]/70 p-1 sm:flex" aria-label={t("navAria")}>
           {tabs.map((item) => <button className={cx("min-h-11 flex-1 rounded-xl px-3 text-sm font-light", activeTab === item.id ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]")} type="button" onClick={() => onTab(item.id)} key={item.id}>{t(`tabs.${item.id}`)}</button>)}
         </nav>
       ) : null}
-
-      {/* Shared across Today and Grupo — whichever item/session is picked here
-          is what both tabs act on, so it lives outside either tab's own body. */}
-      {checkpointPicker && activeTab !== "results" ? <div className="mt-5">{checkpointPicker}</div> : null}
 
       <div className="mt-5">
         {activeTab === "today" ? (
@@ -1020,17 +1049,18 @@ export function ParticipantChallengeScreen({
                   const initial = participant.name.split(/\s+/).slice(0, 1).map((part) => part[0]).join("");
                   const rating = selectedItem && hasRatingType ? ratingForParticipant(participant.userId, selectedItem.id) : null;
                   const done = selectedItem ? doneForParticipant(participant.userId, selectedItem.id) : false;
-                  const loggedToday = activityDayMode ? checkedInOn(participant.userId, today) : false;
+                  const daysAgo = lastEntryDaysAgo(participant.userId);
+                  const completed = sortedItems.length > 1 ? completedCountForParticipant(participant.userId) : null;
+                  const caption = [
+                    completed !== null ? t("groupCompletion", { done: completed, total: sortedItems.length }) : null,
+                    daysAgo === null ? t("groupLastRegisterNone") : t("groupLastRegister", { days: daysAgo }),
+                  ].filter(Boolean).join(" · ");
                   return (
                     <div key={participant.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
                       <span className="grid h-9 w-9 flex-none place-items-center rounded-full border-2 border-[var(--paper)] bg-[var(--main-line)] text-xs font-black" aria-hidden="true">{initial}</span>
                       <div className="min-w-0 flex-1 leading-tight">
                         <span className="block truncate text-sm">{isSelf ? t("youLabel") : participant.name}</span>
-                        {activityDayMode ? (
-                          <span className={cx("block truncate text-xs", loggedToday ? "text-[var(--ok)]" : "text-[var(--muted)]")}>
-                            {loggedToday ? t("groupLoggedToday") : t("groupNotLoggedToday")}
-                          </span>
-                        ) : null}
+                        <span className="block truncate text-xs text-[var(--muted)]">{caption}</span>
                       </div>
                       <div className="flex-none">
                         {rating !== null ? (
