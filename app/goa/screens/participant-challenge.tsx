@@ -39,7 +39,6 @@ import {
   isEmptySaveADelete,
   isLivingList,
   itemIdForEntry,
-  shiftDateKey,
   valuesAsRecord,
 } from "../utils";
 
@@ -881,21 +880,11 @@ export function ParticipantChallengeScreen({
   const doneCount = Math.min(doneEntries.length, sortedItems.length);
   const hasGroup = challenge.participants.length > 1;
 
-  // The Grupo tab's activity table — one column per unit of progress. A
-  // day-keyed challenge (daily pages, a plain habit) tracks check-ins by
-  // calendar day, so the columns are the last 7 days; anything else (cinema,
-  // a book-at-a-time club) tracks by item/session, reusing the same picker
-  // data the sidebar already shows.
+  // The Grupo tab shows everyone's status for whichever item/session is
+  // currently selected in the shared "Checkpoints" picker — a day-keyed
+  // challenge (daily pages, a plain habit) also gets a "logged today" note,
+  // since the picker alone doesn't say whether today specifically is covered.
   const activityDayMode = dateRequired;
-  const activityDays = useMemo(
-    () => (activityDayMode ? Array.from({ length: 7 }, (_, index) => shiftDateKey(today, { days: index - 6 })) : []),
-    [activityDayMode, today],
-  );
-  const activityColumns: Array<{ id: Id; label: string }> = activityDayMode
-    ? activityDays.map((day) => ({ id: day, label: f.date(day, { day: "2-digit", month: "2-digit" }) }))
-    : sessionMode
-      ? sortedSessions.map((session) => ({ id: session.id, label: session.title }))
-      : sortedItems.map((item) => ({ id: item.id, label: item.title }));
   const checkedInOn = (participantUserId: Id | undefined, day: string) =>
     entries.some((entry) => entry.userId === participantUserId && entry.occurredOn === day);
   const doneForParticipant = (participantUserId: Id | undefined, itemId: Id) =>
@@ -980,99 +969,82 @@ export function ParticipantChallengeScreen({
         </nav>
       ) : null}
 
+      {/* Shared across Today and Grupo — whichever item/session is picked here
+          is what both tabs act on, so it lives outside either tab's own body. */}
+      {checkpointPicker && activeTab !== "results" ? <div className="mt-5">{checkpointPicker}</div> : null}
+
       <div className="mt-5">
         {activeTab === "today" ? (
-          <div className={cx("grid gap-5", checkpointPicker ? "lg:grid-cols-[minmax(0,1.5fr)_minmax(270px,0.6fr)]" : "")}>
-            <div className="min-w-0 space-y-6">
-              {challenge.status === "closed" ? (
-                <EmptyState title={t("closedTitle")} action={<Button onClick={() => onTab("results")}>{t("seeResults")}</Button>} />
-              ) : challenge.submissionMode !== "free" && !selectedItem && !undatedDaily ? (
-                <EmptyState title={t("noCheckpointTitle")} />
-              ) : (
-                <div>
-                  <p className={cx("mb-2", sectionLabelClass)}>{selectedItem ? t("itemBoxTitle") : t("tabs.today")}</p>
-                  <section className={cx(cardClass, "min-w-0 p-5 sm:p-7")}>
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <h2 className="text-2xl font-light tracking-[-0.04em]">
-                          {selectedItem
-                            ? `${selectedItem.title}${selectedItem.catalogItem?.year ? ` (${selectedItem.catalogItem.year})` : ""}`
-                            : (undatedDaily ? t("checkInOf", { date: f.date(effectiveOccurredOn, longDate) }) : t("newEntry"))}
-                        </h2>
-                        {selectedItem?.description ? <p className="mt-1 text-sm text-[var(--muted)]">{selectedItem.description}</p> : null}
-                        {selectedItem?.recommendedBy || selectedItem?.catalogItem?.author || selectedItem?.catalogItem?.mainGenre || selectedItem?.catalogItem?.runtimeMinutes ? <p className="mt-1 text-xs text-[var(--muted)]">{[selectedItem.catalogItem?.author ? t("byAuthor", { name: selectedItem.catalogItem.author }) : null, selectedItem.recommendedBy ? t("recommendedBy", { name: selectedItem.recommendedBy.name }) : null, selectedItem.catalogItem?.mainGenre || null, formatRuntime(selectedItem.catalogItem?.runtimeMinutes)].filter(Boolean).join(" · ")}</p> : null}
-                      </div>
-                      {selectedItem?.dueAt ? <span className="flex-none rounded-full bg-[var(--wash)] px-3 py-2 text-xs font-medium text-[var(--muted)]">{t("dueBy", { date: f.dateTime(selectedItem.dueAt) })}</span> : null}
-                    </div>
-                    {dateRequired ? <label className="mt-5 block"><span className={labelClass}>{t("occurredOnLabel")}</span><input className={inputClass} type="date" max={today} value={effectiveOccurredOn} disabled={Boolean(unavailableMessage)} onChange={(event) => setOccurredOn(event.target.value || today)} /><small className="mt-1 block text-[var(--muted)]">{t("occurredOnHint")}</small></label> : !useItemPanel && currentEntry?.occurredOn ? <p className="mt-5 text-xs text-[var(--muted)]">{t("occurredOn", { date: f.date(currentEntry.occurredOn, longDate) })}</p> : null}
-                    <div className="mt-5 border-t border-[var(--line)] pt-5">
-                      <p className={cx("mb-3", sectionLabelClass)}>{t("yourResponseTitle")}</p>
-                      {useItemPanel && selectedItem ? (
-                        <ItemEntryPanel key={`${selectedItem.id}-${selectedSession?.id ?? "no-session"}`} challenge={challenge} item={selectedItem} ownEntries={ownEntries} occurredOn={occurredOn} onOccurredOnChange={setOccurredOn} offerOptionalDate={!perDayItem && !sessionMode && collectsEntryDate} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} checkpointId={selectedSession?.id ?? null} onSaveEntry={onSaveEntry!} onDeleteEntry={canDeleteEntry} />
-                      ) : (
-                        <DynamicEntryForm key={`${selectedItem?.id ?? "free"}-${undatedDaily ? effectiveOccurredOn : "fixed"}-${currentEntry?.id ?? "new"}`} fields={challenge.fields} item={selectedItem ?? null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry!(selectedItem?.id ?? null, values, entry, undatedDaily ? effectiveOccurredOn : undefined)} onDelete={currentEntry && canDeleteEntry ? () => canDeleteEntry(currentEntry.id) : undefined} />
-                      )}
-                    </div>
-                  </section>
+          challenge.status === "closed" ? (
+            <EmptyState title={t("closedTitle")} action={<Button onClick={() => onTab("results")}>{t("seeResults")}</Button>} />
+          ) : challenge.submissionMode !== "free" && !selectedItem && !undatedDaily ? (
+            <EmptyState title={t("noCheckpointTitle")} />
+          ) : (
+            <div>
+              <p className={cx("mb-2", sectionLabelClass)}>{selectedItem ? t("itemBoxTitle") : t("tabs.today")}</p>
+              <section className={cx(cardClass, "min-w-0 p-5 sm:p-7")}>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h2 className="text-2xl font-light tracking-[-0.04em]">
+                      {selectedItem
+                        ? `${selectedItem.title}${selectedItem.catalogItem?.year ? ` (${selectedItem.catalogItem.year})` : ""}`
+                        : (undatedDaily ? t("checkInOf", { date: f.date(effectiveOccurredOn, longDate) }) : t("newEntry"))}
+                    </h2>
+                    {selectedItem?.description ? <p className="mt-1 text-sm text-[var(--muted)]">{selectedItem.description}</p> : null}
+                    {selectedItem?.recommendedBy || selectedItem?.catalogItem?.author || selectedItem?.catalogItem?.mainGenre || selectedItem?.catalogItem?.runtimeMinutes ? <p className="mt-1 text-xs text-[var(--muted)]">{[selectedItem.catalogItem?.author ? t("byAuthor", { name: selectedItem.catalogItem.author }) : null, selectedItem.recommendedBy ? t("recommendedBy", { name: selectedItem.recommendedBy.name }) : null, selectedItem.catalogItem?.mainGenre || null, formatRuntime(selectedItem.catalogItem?.runtimeMinutes)].filter(Boolean).join(" · ")}</p> : null}
+                  </div>
+                  {selectedItem?.dueAt ? <span className="flex-none rounded-full bg-[var(--wash)] px-3 py-2 text-xs font-medium text-[var(--muted)]">{t("dueBy", { date: f.dateTime(selectedItem.dueAt) })}</span> : null}
                 </div>
-              )}
+                {dateRequired ? <label className="mt-5 block"><span className={labelClass}>{t("occurredOnLabel")}</span><input className={inputClass} type="date" max={today} value={effectiveOccurredOn} disabled={Boolean(unavailableMessage)} onChange={(event) => setOccurredOn(event.target.value || today)} /><small className="mt-1 block text-[var(--muted)]">{t("occurredOnHint")}</small></label> : !useItemPanel && currentEntry?.occurredOn ? <p className="mt-5 text-xs text-[var(--muted)]">{t("occurredOn", { date: f.date(currentEntry.occurredOn, longDate) })}</p> : null}
+                <div className="mt-5 border-t border-[var(--line)] pt-5">
+                  <p className={cx("mb-3", sectionLabelClass)}>{t("yourResponseTitle")}</p>
+                  {useItemPanel && selectedItem ? (
+                    <ItemEntryPanel key={`${selectedItem.id}-${selectedSession?.id ?? "no-session"}`} challenge={challenge} item={selectedItem} ownEntries={ownEntries} occurredOn={occurredOn} onOccurredOnChange={setOccurredOn} offerOptionalDate={!perDayItem && !sessionMode && collectsEntryDate} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} checkpointId={selectedSession?.id ?? null} onSaveEntry={onSaveEntry!} onDeleteEntry={canDeleteEntry} />
+                  ) : (
+                    <DynamicEntryForm key={`${selectedItem?.id ?? "free"}-${undatedDaily ? effectiveOccurredOn : "fixed"}-${currentEntry?.id ?? "new"}`} fields={challenge.fields} item={selectedItem ?? null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry!(selectedItem?.id ?? null, values, entry, undatedDaily ? effectiveOccurredOn : undefined)} onDelete={currentEntry && canDeleteEntry ? () => canDeleteEntry(currentEntry.id) : undefined} />
+                  )}
+                </div>
+              </section>
             </div>
-            {checkpointPicker ? <aside className="min-w-0">{checkpointPicker}</aside> : null}
-          </div>
+          )
         ) : null}
 
         {activeTab === "grupo" ? (
           <div>
             <p className={cx("mb-2", sectionLabelClass)}>{t("groupActivityTitle")}</p>
-            <section className={cx(cardClass, "min-w-0 overflow-x-auto p-5 sm:p-7")}>
-              <table className="w-full min-w-[420px] border-collapse text-sm">
-                <thead>
-                  <tr>
-                    <th className="w-40 pb-3 text-left text-xs font-medium text-[var(--muted)]"></th>
-                    {activityColumns.map((column) => <th key={column.id} className={cx("pb-3 text-center text-xs font-medium text-[var(--muted)]", !activityDayMode && hasRatingType ? "min-w-16" : "min-w-11")}>{column.label}</th>)}
-                    {activityDayMode && hasRatingType ? <th className="min-w-16 pb-3 text-center text-xs font-medium text-[var(--muted)]">{t("groupActivityRatingColumn")}</th> : null}
-                  </tr>
-                </thead>
-                <tbody>
-                  {[...challenge.participants].sort((a, b) => Number(b.userId === user?.id) - Number(a.userId === user?.id)).map((participant) => {
-                    const isSelf = participant.userId === user?.id;
-                    const initial = participant.name.split(/\s+/).slice(0, 1).map((part) => part[0]).join("");
-                    return (
-                      <tr key={participant.id} className="border-t border-[var(--line)]">
-                        <td className="py-2.5 pr-3">
-                          <div className="flex items-center gap-2">
-                            <span className="grid h-9 w-9 flex-none place-items-center rounded-full border-2 border-[var(--paper)] bg-[var(--main-line)] text-xs font-black" aria-hidden="true">{initial}</span>
-                            <span className="truncate text-sm">{isSelf ? t("youLabel") : participant.name}</span>
-                          </div>
-                        </td>
-                        {activityColumns.map((column) => {
-                          const rating = !activityDayMode && hasRatingType ? ratingForParticipant(participant.userId, column.id) : null;
-                          const done = activityDayMode ? checkedInOn(participant.userId, column.id) : doneForParticipant(participant.userId, column.id);
-                          return (
-                            <td key={column.id} className="py-2.5 text-center">
-                              {rating !== null ? (
-                                <RatingBar value={rating} />
-                              ) : done ? (
-                                <span className="inline-flex text-[var(--ok)]"><CheckGlyph /></span>
-                              ) : (
-                                <span className="text-[var(--muted)]">—</span>
-                              )}
-                            </td>
-                          );
-                        })}
-                        {activityDayMode && hasRatingType ? (
-                          <td className="py-2.5 text-center">
-                            {(() => {
-                              const rating = selectedItem ? ratingForParticipant(participant.userId, selectedItem.id) : null;
-                              return rating !== null ? <RatingBar value={rating} /> : <span className="text-[var(--muted)]">—</span>;
-                            })()}
-                          </td>
+            <section className={cx(cardClass, "min-w-0 p-5 sm:p-7")}>
+              {selectedItem ? <h2 className="mb-4 text-lg font-light tracking-[-0.02em]">{selectedItem.title}{selectedItem.catalogItem?.year ? ` (${selectedItem.catalogItem.year})` : ""}</h2> : null}
+              <div className="divide-y divide-[var(--line)]">
+                {[...challenge.participants].sort((a, b) => Number(b.userId === user?.id) - Number(a.userId === user?.id)).map((participant) => {
+                  const isSelf = participant.userId === user?.id;
+                  const initial = participant.name.split(/\s+/).slice(0, 1).map((part) => part[0]).join("");
+                  const rating = selectedItem && hasRatingType ? ratingForParticipant(participant.userId, selectedItem.id) : null;
+                  const done = selectedItem ? doneForParticipant(participant.userId, selectedItem.id) : false;
+                  const loggedToday = activityDayMode ? checkedInOn(participant.userId, today) : false;
+                  return (
+                    <div key={participant.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+                      <span className="grid h-9 w-9 flex-none place-items-center rounded-full border-2 border-[var(--paper)] bg-[var(--main-line)] text-xs font-black" aria-hidden="true">{initial}</span>
+                      <div className="min-w-0 flex-1 leading-tight">
+                        <span className="block truncate text-sm">{isSelf ? t("youLabel") : participant.name}</span>
+                        {activityDayMode ? (
+                          <span className={cx("block truncate text-xs", loggedToday ? "text-[var(--ok)]" : "text-[var(--muted)]")}>
+                            {loggedToday ? t("groupLoggedToday") : t("groupNotLoggedToday")}
+                          </span>
                         ) : null}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                      </div>
+                      <div className="flex-none">
+                        {rating !== null ? (
+                          <RatingBar value={rating} />
+                        ) : done ? (
+                          <span className="inline-flex text-[var(--ok)]"><CheckGlyph /></span>
+                        ) : (
+                          <span className="text-sm text-[var(--muted)]">—</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </section>
           </div>
         ) : null}
