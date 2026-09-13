@@ -545,6 +545,19 @@ function CheckGlyph() {
   );
 }
 
+/** A rating on a 0–5 scale as a small filled meter, the number below it. */
+function RatingBar({ value }: { value: number }) {
+  const nf = useFormatter();
+  return (
+    <div className="mx-auto w-14">
+      <div className="h-1.5 overflow-hidden rounded-full bg-[var(--wash)]">
+        <div className="h-full rounded-full bg-[var(--main)]" style={{ width: `${Math.min(100, Math.max(0, (value / 5) * 100))}%` }} />
+      </div>
+      <span className="mt-1 block text-[11px] font-medium tabular-nums text-[var(--ink)]">{nf.number(value, { maximumFractionDigits: 1 })}</span>
+    </div>
+  );
+}
+
 /**
  * The "which one am I filling?" list in the sidebar — a stack of tappable rows
  * with a numbered chip that flips to a checkmark once the entry is in. Replaces a
@@ -575,12 +588,13 @@ function EntryPicker({
 }) {
   const nf = useFormatter();
   return (
-    <section className={cx(cardClass, "p-4 sm:p-5")}>
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h2 className={sectionLabelClass}>{title}</h2>
+    <div>
+      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <p className={sectionLabelClass}>{title}</p>
         {tally ? <span className="text-xs text-[var(--muted)]">{tally}</span> : null}
       </div>
-      <ol className="mt-3 max-h-[21rem] space-y-1.5 overflow-y-auto pr-0.5">
+      <section className={cx(cardClass, "p-4 sm:p-5")}>
+      <ol className="max-h-[21rem] space-y-1.5 overflow-y-auto pr-0.5">
         {options.map((option, index) => {
           const active = option.id === selectedId;
           const rating = typeof option.rating === "number" ? option.rating : null;
@@ -625,7 +639,8 @@ function EntryPicker({
           );
         })}
       </ol>
-    </section>
+      </section>
+    </div>
   );
 }
 
@@ -733,7 +748,6 @@ export function ParticipantChallengeScreen({
   const t = useTranslations("participant");
   const trules = useTranslations("rules");
   const f = useGoaFormat();
-  const nf = useFormatter();
   const longDate: Intl.DateTimeFormatOptions = { day: "2-digit", month: "long", year: "numeric" };
   const ownEntries = entries.filter((entry) => !entry.userId || entry.userId === user?.id);
   // Progress counts only the "done" signal — an expectation or a mid-round
@@ -953,7 +967,12 @@ export function ParticipantChallengeScreen({
 
       {scheduled ? <section className="mt-5 rounded-2xl border border-[var(--main-line)] bg-[var(--paper)] px-5 py-4"><strong className="text-[var(--main-strong)]">{t("scheduledTitle", { date: f.date(challenge.startsOn, longDate) })}</strong><p className="mt-1 text-sm leading-6 text-[var(--muted)]">{t("scheduledBody")}</p></section> : null}
       <RuleSectionsView rules={ruleSections} />
-      <CheckpointSchedule challenge={challenge} />
+      {/* The Cronograma grid only matters where a checkpoint drives what's on
+          screen — Today (picking one to log), or a template preview (which
+          collapses everything to "results" but still wants the schedule as
+          read-only context). Grupo already lists the same checkpoints as
+          table columns, and a real Results tab doesn't act on one at all. */}
+      {activeTab === "today" || preview ? <CheckpointSchedule challenge={challenge} /> : null}
 
       {tabs.length > 1 ? (
         <nav className="mt-5 hidden gap-1 rounded-2xl bg-[var(--wash-strong)]/70 p-1 sm:flex" aria-label={t("navAria")}>
@@ -1010,8 +1029,8 @@ export function ParticipantChallengeScreen({
                 <thead>
                   <tr>
                     <th className="w-40 pb-3 text-left text-xs font-medium text-[var(--muted)]"></th>
-                    {activityColumns.map((column) => <th key={column.id} className="min-w-11 pb-3 text-center text-xs font-medium text-[var(--muted)]">{column.label}</th>)}
-                    {activityDayMode && hasRatingType ? <th className="min-w-11 pb-3 text-center text-xs font-medium text-[var(--muted)]">{t("groupActivityRatingColumn")}</th> : null}
+                    {activityColumns.map((column) => <th key={column.id} className={cx("pb-3 text-center text-xs font-medium text-[var(--muted)]", !activityDayMode && hasRatingType ? "min-w-16" : "min-w-11")}>{column.label}</th>)}
+                    {activityDayMode && hasRatingType ? <th className="min-w-16 pb-3 text-center text-xs font-medium text-[var(--muted)]">{t("groupActivityRatingColumn")}</th> : null}
                   </tr>
                 </thead>
                 <tbody>
@@ -1032,7 +1051,7 @@ export function ParticipantChallengeScreen({
                           return (
                             <td key={column.id} className="py-2.5 text-center">
                               {rating !== null ? (
-                                <span className="font-medium tabular-nums">{nf.number(rating, { maximumFractionDigits: 1 })}</span>
+                                <RatingBar value={rating} />
                               ) : done ? (
                                 <span className="inline-flex text-[var(--ok)]"><CheckGlyph /></span>
                               ) : (
@@ -1045,7 +1064,7 @@ export function ParticipantChallengeScreen({
                           <td className="py-2.5 text-center">
                             {(() => {
                               const rating = selectedItem ? ratingForParticipant(participant.userId, selectedItem.id) : null;
-                              return rating !== null ? <span className="font-medium tabular-nums">{nf.number(rating, { maximumFractionDigits: 1 })}</span> : <span className="text-[var(--muted)]">—</span>;
+                              return rating !== null ? <RatingBar value={rating} /> : <span className="text-[var(--muted)]">—</span>;
                             })()}
                           </td>
                         ) : null}
