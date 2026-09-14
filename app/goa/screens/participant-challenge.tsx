@@ -194,18 +194,6 @@ export function DynamicEntryForm({
   // An already-answered checkpoint opens as a summary; editing is opt-in.
   const [editing, setEditing] = useState(alwaysEditable || !entry);
 
-  function formatFieldValue(field: ChallengeField, value: unknown): string {
-    if (value === undefined || value === null || value === "") return t("emptyValue");
-    if (field.type === "boolean") return value === true ? tc("yes") : value === false ? tc("no") : t("emptyValue");
-    if (field.type === "date" && typeof value === "string") return f.date(value);
-    if (field.type === "select") {
-      const option = field.config?.options?.find((candidate) => (candidate.id ?? candidate.value ?? candidate.label) === value);
-      return option?.label ?? String(value);
-    }
-    if (field.type === "rating" && typeof value === "number") return String(value).replace(".", ",");
-    return String(value);
-  }
-
   const optionalFields = fields.filter((field) => field.id && !field.required);
   const isBlank = (value: unknown) => value === undefined || value === null || value === "";
   const optionalCount = optionalFields.length + (dateField ? 1 : 0);
@@ -261,12 +249,15 @@ export function DynamicEntryForm({
     return <EmptyState title={t("notConfiguredTitle")} />;
   }
 
-  // A saved answer collapses to a quiet summary with a lock icon that reopens
-  // it — independent of `canEdit`, so a lock that engages AFTER the answer
-  // was given (e.g. an expectation once the rating comes in) still shows the
-  // summary instead of falling through to a disabled-but-open-looking form.
-  const showSummary = Boolean(entry) && !editing;
+  // A saved answer keeps showing the same fields (disabled), just with the
+  // Save/Cancel row swapped out for a lock icon next to the heading — no
+  // separate "summary" box. The icon is offered independent of `canEdit`'s
+  // effect on interactivity below, so a lock that engages AFTER the answer
+  // was given (e.g. an expectation once the rating comes in) still reads as
+  // a normal locked field, not a disabled-but-still-open-looking form.
   const canReopen = Boolean(entry) && canEdit && !editing;
+  const interactive = canEdit && editing;
+  const showsButtons = editing && canEdit;
   const sectioned = Boolean(heading);
 
   return (
@@ -287,67 +278,47 @@ export function DynamicEntryForm({
         </div>
       ) : null}
       {note}
-      {showSummary ? (
-        (() => {
-          const answered = fields.filter((field) => field.id && !isBlank(values[field.id]));
-          const shown = answered.length ? answered : fields.slice(0, 1);
+      <form className="space-y-5" onSubmit={submit} noValidate>
+        {fields.map((field) => {
+          if (!field.id) return null;
+          if (!field.required && !showOptional) return null;
+          const id = `entry-field-${field.id}`;
+          const value = values[field.id];
           return (
-            <div className="rounded-2xl bg-[var(--wash)] p-4 sm:p-5">
-              <dl className="space-y-3">
-                {shown.map((field) => (
-                  <div key={field.id}>
-                    <dt className="text-xs font-medium text-[var(--muted)]">{field.label}</dt>
-                    <dd className="mt-0.5 text-sm leading-6 whitespace-pre-wrap">{field.id ? formatFieldValue(field, values[field.id]) : t("emptyValue")}</dd>
-                  </div>
-                ))}
-              </dl>
-              {item?.dueAt ? <p className="mt-4 text-center text-xs text-[var(--muted)]">{t("dueAt", { date: f.dateTime(item.dueAt) })}</p> : null}
+            <div key={field.id}>
+              <label className={labelClass} htmlFor={field.type === "rating" || field.type === "boolean" ? undefined : id}>{field.label}{readOnlyInline ? <span className="ml-1 font-normal text-[var(--muted)]">{t("readOnlyInline")}</span> : null}{field.required ? <span className="ml-1 text-[var(--main-2)]" aria-label={t("required")}>*</span> : <small className="ml-2 font-light text-[var(--muted)]">{t("optional")}</small>}</label>
+              {field.type === "text" && field.config?.multiline ? <textarea id={id} className={inputClass} rows={4} value={String(value ?? "")} maxLength={field.config.maxLength} disabled={!interactive || busy} onChange={(event) => setValue(field, event.target.value)} /> : null}
+              {field.type === "text" && !field.config?.multiline ? <input id={id} className={inputClass} value={String(value ?? "")} maxLength={field.config?.maxLength} disabled={!interactive || busy} onChange={(event) => setValue(field, event.target.value)} /> : null}
+              {field.type === "number" ? <input id={id} className={inputClass} type="number" inputMode="decimal" min={field.config?.min} max={field.config?.max} step={field.config?.step ?? "any"} value={typeof value === "number" || typeof value === "string" ? value : ""} disabled={!interactive || busy} onChange={(event) => setValue(field, event.target.value === "" ? "" : Number(event.target.value))} /> : null}
+              {field.type === "date" ? <input id={id} className={inputClass} type="date" value={typeof value === "string" ? value : ""} disabled={!interactive || busy} onChange={(event) => setValue(field, event.target.value)} /> : null}
+              {field.type === "select" ? <select id={id} className={inputClass} value={typeof value === "string" ? value : ""} disabled={!interactive || busy} onChange={(event) => setValue(field, event.target.value)}><option value="">{t("select")}</option>{(field.config?.options ?? []).filter((option) => !option.archived || (option.id ?? option.value ?? option.label) === value).map((option) => <option value={option.id ?? option.value ?? option.label} key={option.id ?? option.value ?? option.label}>{option.label}{option.archived ? ` ${t("optionArchived")}` : ""}</option>)}</select> : null}
+              {field.type === "boolean" ? <div id={id} className="grid grid-cols-2 gap-2" tabIndex={-1}>{[{ label: tc("yes"), value: true }, { label: tc("no"), value: false }].map((option) => <button className={cx("min-h-12 rounded-xl border text-sm font-light", value === option.value ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] bg-[var(--paper)]")} type="button" aria-pressed={value === option.value} disabled={!interactive || busy} onClick={() => setValue(field, option.value)} key={option.label}>{option.label}</button>)}</div> : null}
+              {field.type === "rating" ? <RatingField id={id} field={field} value={value} disabled={!interactive || busy} ariaLabel={(rating) => t("ratingAria", { rating })} onPick={(rating) => setValue(field, rating)} /> : null}
             </div>
           );
-        })()
-      ) : (
-        <form className="space-y-5" onSubmit={submit} noValidate>
-          {fields.map((field) => {
-            if (!field.id) return null;
-            if (!field.required && !showOptional) return null;
-            const id = `entry-field-${field.id}`;
-            const value = values[field.id];
-            return (
-              <div key={field.id}>
-                <label className={labelClass} htmlFor={field.type === "rating" || field.type === "boolean" ? undefined : id}>{field.label}{readOnlyInline ? <span className="ml-1 font-normal text-[var(--muted)]">{t("readOnlyInline")}</span> : null}{field.required ? <span className="ml-1 text-[var(--main-2)]" aria-label={t("required")}>*</span> : <small className="ml-2 font-light text-[var(--muted)]">{t("optional")}</small>}</label>
-                {field.type === "text" && field.config?.multiline ? <textarea id={id} className={inputClass} rows={4} value={String(value ?? "")} maxLength={field.config.maxLength} disabled={!canEdit || busy} onChange={(event) => setValue(field, event.target.value)} /> : null}
-                {field.type === "text" && !field.config?.multiline ? <input id={id} className={inputClass} value={String(value ?? "")} maxLength={field.config?.maxLength} disabled={!canEdit || busy} onChange={(event) => setValue(field, event.target.value)} /> : null}
-                {field.type === "number" ? <input id={id} className={inputClass} type="number" inputMode="decimal" min={field.config?.min} max={field.config?.max} step={field.config?.step ?? "any"} value={typeof value === "number" || typeof value === "string" ? value : ""} disabled={!canEdit || busy} onChange={(event) => setValue(field, event.target.value === "" ? "" : Number(event.target.value))} /> : null}
-                {field.type === "date" ? <input id={id} className={inputClass} type="date" value={typeof value === "string" ? value : ""} disabled={!canEdit || busy} onChange={(event) => setValue(field, event.target.value)} /> : null}
-                {field.type === "select" ? <select id={id} className={inputClass} value={typeof value === "string" ? value : ""} disabled={!canEdit || busy} onChange={(event) => setValue(field, event.target.value)}><option value="">{t("select")}</option>{(field.config?.options ?? []).filter((option) => !option.archived || (option.id ?? option.value ?? option.label) === value).map((option) => <option value={option.id ?? option.value ?? option.label} key={option.id ?? option.value ?? option.label}>{option.label}{option.archived ? ` ${t("optionArchived")}` : ""}</option>)}</select> : null}
-                {field.type === "boolean" ? <div id={id} className="grid grid-cols-2 gap-2" tabIndex={-1}>{[{ label: tc("yes"), value: true }, { label: tc("no"), value: false }].map((option) => <button className={cx("min-h-12 rounded-xl border text-sm font-light", value === option.value ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] bg-[var(--paper)]")} type="button" aria-pressed={value === option.value} disabled={!canEdit || busy} onClick={() => setValue(field, option.value)} key={option.label}>{option.label}</button>)}</div> : null}
-                {field.type === "rating" ? <RatingField id={id} field={field} value={value} disabled={!canEdit || busy} ariaLabel={(rating) => t("ratingAria", { rating })} onPick={(rating) => setValue(field, rating)} /> : null}
-              </div>
-            );
-          })}
-          {dateField && showOptional ? (
-            <div>
-              <label className={labelClass} htmlFor="entry-occurred-on">{dateField.label}<small className="ml-2 font-light text-[var(--muted)]">{t("optional")}</small></label>
-              <input id="entry-occurred-on" className={inputClass} type="date" max={dateField.max} value={dateField.value} disabled={!canEdit || busy} onChange={(event) => dateField.onChange(event.target.value)} />
-              <small className="mt-1 block text-[var(--muted)]">{dateField.hint}</small>
-            </div>
-          ) : null}
-          {optionalCount && canEdit ? (
-            <button type="button" className={cx(actionChipClass, ghostChipClass)} onClick={() => setShowOptional((open) => !open)}>
-              <ChevronGlyph open={showOptional} />
-              {showOptional ? t("hideOptional") : t("showOptional", { count: optionalCount })}
-            </button>
-          ) : null}
-          <StatusMessage error={error} success={success} />
-          {canEdit ? (
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Button type="submit" className="w-full sm:flex-1" disabled={busy || deleting}>{deleting ? tp("deletingEntry") : busy ? tc("saving") : entry ? tc("saveChanges") : t("saveEntry")}<span aria-hidden="true">→</span></Button>
-              {entry && !alwaysEditable ? <Button type="button" variant="secondary" className="w-full sm:flex-1" disabled={busy || deleting} onClick={() => setEditing(false)}>{tc("cancel")}</Button> : null}
-            </div>
-          ) : readOnlyInline ? null : <p className="rounded-xl border border-[var(--line)] bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{unavailableMessage ?? t("readOnly")}</p>}
-          {item?.dueAt ? <p className="text-center text-xs text-[var(--muted)]">{t("dueAt", { date: f.dateTime(item.dueAt) })}</p> : null}
-        </form>
-      )}
+        })}
+        {dateField && showOptional ? (
+          <div>
+            <label className={labelClass} htmlFor="entry-occurred-on">{dateField.label}<small className="ml-2 font-light text-[var(--muted)]">{t("optional")}</small></label>
+            <input id="entry-occurred-on" className={inputClass} type="date" max={dateField.max} value={dateField.value} disabled={!interactive || busy} onChange={(event) => dateField.onChange(event.target.value)} />
+            <small className="mt-1 block text-[var(--muted)]">{dateField.hint}</small>
+          </div>
+        ) : null}
+        {optionalCount && interactive ? (
+          <button type="button" className={cx(actionChipClass, ghostChipClass)} onClick={() => setShowOptional((open) => !open)}>
+            <ChevronGlyph open={showOptional} />
+            {showOptional ? t("hideOptional") : t("showOptional", { count: optionalCount })}
+          </button>
+        ) : null}
+        <StatusMessage error={error} success={success} />
+        {showsButtons ? (
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button type="submit" className="w-full sm:flex-1" disabled={busy || deleting}>{deleting ? tp("deletingEntry") : busy ? tc("saving") : entry ? tc("saveChanges") : t("saveEntry")}<span aria-hidden="true">→</span></Button>
+            {entry && !alwaysEditable ? <Button type="button" variant="secondary" className="w-full sm:flex-1" disabled={busy || deleting} onClick={() => setEditing(false)}>{tc("cancel")}</Button> : null}
+          </div>
+        ) : !canEdit && !readOnlyInline ? <p className="rounded-xl border border-[var(--line)] bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{unavailableMessage ?? t("readOnly")}</p> : null}
+        {item?.dueAt ? <p className="text-center text-xs text-[var(--muted)]">{t("dueAt", { date: f.dateTime(item.dueAt) })}</p> : null}
+      </form>
     </div>
   );
 }
@@ -674,7 +645,7 @@ function EntryPicker({
                     <span className={cx("block truncate text-[11px] sm:hidden", option.done ? "text-[var(--ok)]" : "text-[var(--muted)]")}>{option.statusLabel}</span>
                   ) : null}
                   {caption ? (
-                    <span className={cx("hidden truncate text-[11px] sm:block", option.done ? "text-[var(--ok)]" : "text-[var(--muted)]")}>{caption}</span>
+                    <span className={cx("hidden truncate text-[11px] sm:block", "text-[var(--muted)]")}>{caption}</span>
                   ) : null}
                 </span>
                 {rating !== null ? (
@@ -1097,7 +1068,6 @@ export function ParticipantChallengeScreen({
                   const isSelf = participant.userId === user?.id;
                   const initial = participant.name.split(/\s+/).slice(0, 1).map((part) => part[0]).join("");
                   const rating = selectedItem && hasRatingType ? ratingForParticipant(participant.userId, selectedItem.id) : null;
-                  const done = selectedItem ? doneForParticipant(participant.userId, selectedItem.id) : false;
                   const daysAgo = lastEntryDaysAgo(participant.userId);
                   const completed = sortedItems.length > 1 ? completedCountForParticipant(participant.userId) : null;
                   const caption = [
@@ -1114,10 +1084,8 @@ export function ParticipantChallengeScreen({
                       <div className="flex-none">
                         {rating !== null ? (
                           <RatingBar value={rating} />
-                        ) : done ? (
-                          <span className="inline-flex text-[var(--ok)]"><CheckGlyph /></span>
                         ) : (
-                          <span className="text-sm text-[var(--muted)]">—</span>
+                          <span className="text-sm text-[var(--muted)]"></span>
                         )}
                       </div>
                     </div>
