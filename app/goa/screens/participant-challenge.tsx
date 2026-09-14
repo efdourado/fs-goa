@@ -127,6 +127,16 @@ const actionChipClass =
   "inline-flex min-h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-50";
 const ghostChipClass = "border-transparent bg-[var(--wash)] text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--ink)]";
 
+/** A closed padlock — the affordance next to an already-answered section's name that reopens it for editing. */
+function LockIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
+      <rect x="3.5" y="7" width="9" height="6.5" rx="1.5" />
+      <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
+    </svg>
+  );
+}
+
 export function DynamicEntryForm({
   fields,
   item,
@@ -134,6 +144,8 @@ export function DynamicEntryForm({
   canEdit,
   unavailableMessage,
   readOnlyInline = false,
+  heading,
+  note,
   dateField,
   onSave,
   onDelete,
@@ -148,6 +160,13 @@ export function DynamicEntryForm({
   // sentence banner below the form — for a state the label already explains
   // (the expectation locks once you rate; the label already says which field).
   readOnlyInline?: boolean;
+  // The section's own name (e.g. "Expectativa") — rendered with a lock icon
+  // that opens it back up for editing, and a left border to set it apart from
+  // sibling sections when a checkpoint has more than one entry type stacked.
+  heading?: string;
+  // A short note rendered under the heading, before the summary/form — e.g.
+  // the visibility policy sentence for this entry type.
+  note?: ReactNode;
   // An "when did it happen" date that rides with the optional fields — blank
   // means the entry is saved without a date. Owned by the caller.
   dateField?: { label: string; hint: string; value: string; max: string; onChange: (value: string) => void };
@@ -242,70 +261,94 @@ export function DynamicEntryForm({
     return <EmptyState title={t("notConfiguredTitle")} />;
   }
 
-  if (entry && canEdit && !editing) {
-    const answered = fields.filter((field) => field.id && !isBlank(values[field.id]));
-    const shown = answered.length ? answered : fields.slice(0, 1);
-    return (
-      <button
-        type="button"
-        className="w-full cursor-pointer rounded-2xl bg-[var(--wash)] p-4 text-left transition hover:bg-[var(--wash-strong)] sm:p-5"
-        onClick={() => setEditing(true)}
-      >
-        <dl className="space-y-3">
-          {shown.map((field) => (
-            <div key={field.id}>
-              <dt className="text-xs font-medium text-[var(--muted)]">{field.label}</dt>
-              <dd className="mt-0.5 text-sm leading-6 whitespace-pre-wrap">{field.id ? formatFieldValue(field, values[field.id]) : t("emptyValue")}</dd>
-            </div>
-          ))}
-        </dl>
-        {item?.dueAt ? <p className="mt-4 text-center text-xs text-[var(--muted)]">{t("dueAt", { date: f.dateTime(item.dueAt) })}</p> : null}
-      </button>
-    );
-  }
+  // A saved answer collapses to a quiet summary with a lock icon that reopens
+  // it — independent of `canEdit`, so a lock that engages AFTER the answer
+  // was given (e.g. an expectation once the rating comes in) still shows the
+  // summary instead of falling through to a disabled-but-open-looking form.
+  const showSummary = Boolean(entry) && !editing;
+  const canReopen = Boolean(entry) && canEdit && !editing;
+  const sectioned = Boolean(heading);
 
   return (
-    <form className="space-y-5" onSubmit={submit} noValidate>
-      {fields.map((field) => {
-        if (!field.id) return null;
-        if (!field.required && !showOptional) return null;
-        const id = `entry-field-${field.id}`;
-        const value = values[field.id];
-        return (
-          <div key={field.id}>
-            <label className={labelClass} htmlFor={field.type === "rating" || field.type === "boolean" ? undefined : id}>{field.label}{readOnlyInline ? <span className="ml-1 font-normal text-[var(--muted)]">{t("readOnlyInline")}</span> : null}{field.required ? <span className="ml-1 text-[var(--main-2)]" aria-label={t("required")}>*</span> : <small className="ml-2 font-light text-[var(--muted)]">{t("optional")}</small>}</label>
-            {field.type === "text" && field.config?.multiline ? <textarea id={id} className={inputClass} rows={4} value={String(value ?? "")} maxLength={field.config.maxLength} disabled={!canEdit || busy} onChange={(event) => setValue(field, event.target.value)} /> : null}
-            {field.type === "text" && !field.config?.multiline ? <input id={id} className={inputClass} value={String(value ?? "")} maxLength={field.config?.maxLength} disabled={!canEdit || busy} onChange={(event) => setValue(field, event.target.value)} /> : null}
-            {field.type === "number" ? <input id={id} className={inputClass} type="number" inputMode="decimal" min={field.config?.min} max={field.config?.max} step={field.config?.step ?? "any"} value={typeof value === "number" || typeof value === "string" ? value : ""} disabled={!canEdit || busy} onChange={(event) => setValue(field, event.target.value === "" ? "" : Number(event.target.value))} /> : null}
-            {field.type === "date" ? <input id={id} className={inputClass} type="date" value={typeof value === "string" ? value : ""} disabled={!canEdit || busy} onChange={(event) => setValue(field, event.target.value)} /> : null}
-            {field.type === "select" ? <select id={id} className={inputClass} value={typeof value === "string" ? value : ""} disabled={!canEdit || busy} onChange={(event) => setValue(field, event.target.value)}><option value="">{t("select")}</option>{(field.config?.options ?? []).filter((option) => !option.archived || (option.id ?? option.value ?? option.label) === value).map((option) => <option value={option.id ?? option.value ?? option.label} key={option.id ?? option.value ?? option.label}>{option.label}{option.archived ? ` ${t("optionArchived")}` : ""}</option>)}</select> : null}
-            {field.type === "boolean" ? <div id={id} className="grid grid-cols-2 gap-2" tabIndex={-1}>{[{ label: tc("yes"), value: true }, { label: tc("no"), value: false }].map((option) => <button className={cx("min-h-12 rounded-xl border text-sm font-light", value === option.value ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] bg-[var(--paper)]")} type="button" aria-pressed={value === option.value} disabled={!canEdit || busy} onClick={() => setValue(field, option.value)} key={option.label}>{option.label}</button>)}</div> : null}
-            {field.type === "rating" ? <RatingField id={id} field={field} value={value} disabled={!canEdit || busy} ariaLabel={(rating) => t("ratingAria", { rating })} onPick={(rating) => setValue(field, rating)} /> : null}
-          </div>
-        );
-      })}
-      {dateField && showOptional ? (
-        <div>
-          <label className={labelClass} htmlFor="entry-occurred-on">{dateField.label}<small className="ml-2 font-light text-[var(--muted)]">{t("optional")}</small></label>
-          <input id="entry-occurred-on" className={inputClass} type="date" max={dateField.max} value={dateField.value} disabled={!canEdit || busy} onChange={(event) => dateField.onChange(event.target.value)} />
-          <small className="mt-1 block text-[var(--muted)]">{dateField.hint}</small>
+    <div className={sectioned ? "border-l-[3px] border-[var(--line)] pl-4" : undefined}>
+      {heading || canReopen ? (
+        <div className="mb-3 flex items-center justify-between gap-2">
+          {heading ? <h3 className={sectionLabelClass}>{heading}</h3> : <span aria-hidden="true" />}
+          {canReopen ? (
+            <button
+              type="button"
+              className="flex-none rounded-full p-1.5 text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)]"
+              aria-label={t("editAnswer")}
+              onClick={() => setEditing(true)}
+            >
+              <LockIcon />
+            </button>
+          ) : null}
         </div>
       ) : null}
-      {optionalCount && canEdit ? (
-        <button type="button" className={cx(actionChipClass, ghostChipClass)} onClick={() => setShowOptional((open) => !open)}>
-          <ChevronGlyph open={showOptional} />
-          {showOptional ? t("hideOptional") : t("showOptional", { count: optionalCount })}
-        </button>
-      ) : null}
-      <StatusMessage error={error} success={success} />
-      {canEdit ? (
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Button type="submit" className="w-full sm:flex-1" disabled={busy || deleting}>{deleting ? tp("deletingEntry") : busy ? tc("saving") : entry ? tc("saveChanges") : t("saveEntry")}<span aria-hidden="true">→</span></Button>
-          {entry && !alwaysEditable ? <Button type="button" variant="secondary" className="w-full sm:flex-1" disabled={busy || deleting} onClick={() => setEditing(false)}>{tc("cancel")}</Button> : null}
-        </div>
-      ) : readOnlyInline ? null : <p className="rounded-xl border border-[var(--line)] bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{unavailableMessage ?? t("readOnly")}</p>}
-      {item?.dueAt ? <p className="text-center text-xs text-[var(--muted)]">{t("dueAt", { date: f.dateTime(item.dueAt) })}</p> : null}
-    </form>
+      {note}
+      {showSummary ? (
+        (() => {
+          const answered = fields.filter((field) => field.id && !isBlank(values[field.id]));
+          const shown = answered.length ? answered : fields.slice(0, 1);
+          return (
+            <div className="rounded-2xl bg-[var(--wash)] p-4 sm:p-5">
+              <dl className="space-y-3">
+                {shown.map((field) => (
+                  <div key={field.id}>
+                    <dt className="text-xs font-medium text-[var(--muted)]">{field.label}</dt>
+                    <dd className="mt-0.5 text-sm leading-6 whitespace-pre-wrap">{field.id ? formatFieldValue(field, values[field.id]) : t("emptyValue")}</dd>
+                  </div>
+                ))}
+              </dl>
+              {item?.dueAt ? <p className="mt-4 text-center text-xs text-[var(--muted)]">{t("dueAt", { date: f.dateTime(item.dueAt) })}</p> : null}
+            </div>
+          );
+        })()
+      ) : (
+        <form className="space-y-5" onSubmit={submit} noValidate>
+          {fields.map((field) => {
+            if (!field.id) return null;
+            if (!field.required && !showOptional) return null;
+            const id = `entry-field-${field.id}`;
+            const value = values[field.id];
+            return (
+              <div key={field.id}>
+                <label className={labelClass} htmlFor={field.type === "rating" || field.type === "boolean" ? undefined : id}>{field.label}{readOnlyInline ? <span className="ml-1 font-normal text-[var(--muted)]">{t("readOnlyInline")}</span> : null}{field.required ? <span className="ml-1 text-[var(--main-2)]" aria-label={t("required")}>*</span> : <small className="ml-2 font-light text-[var(--muted)]">{t("optional")}</small>}</label>
+                {field.type === "text" && field.config?.multiline ? <textarea id={id} className={inputClass} rows={4} value={String(value ?? "")} maxLength={field.config.maxLength} disabled={!canEdit || busy} onChange={(event) => setValue(field, event.target.value)} /> : null}
+                {field.type === "text" && !field.config?.multiline ? <input id={id} className={inputClass} value={String(value ?? "")} maxLength={field.config?.maxLength} disabled={!canEdit || busy} onChange={(event) => setValue(field, event.target.value)} /> : null}
+                {field.type === "number" ? <input id={id} className={inputClass} type="number" inputMode="decimal" min={field.config?.min} max={field.config?.max} step={field.config?.step ?? "any"} value={typeof value === "number" || typeof value === "string" ? value : ""} disabled={!canEdit || busy} onChange={(event) => setValue(field, event.target.value === "" ? "" : Number(event.target.value))} /> : null}
+                {field.type === "date" ? <input id={id} className={inputClass} type="date" value={typeof value === "string" ? value : ""} disabled={!canEdit || busy} onChange={(event) => setValue(field, event.target.value)} /> : null}
+                {field.type === "select" ? <select id={id} className={inputClass} value={typeof value === "string" ? value : ""} disabled={!canEdit || busy} onChange={(event) => setValue(field, event.target.value)}><option value="">{t("select")}</option>{(field.config?.options ?? []).filter((option) => !option.archived || (option.id ?? option.value ?? option.label) === value).map((option) => <option value={option.id ?? option.value ?? option.label} key={option.id ?? option.value ?? option.label}>{option.label}{option.archived ? ` ${t("optionArchived")}` : ""}</option>)}</select> : null}
+                {field.type === "boolean" ? <div id={id} className="grid grid-cols-2 gap-2" tabIndex={-1}>{[{ label: tc("yes"), value: true }, { label: tc("no"), value: false }].map((option) => <button className={cx("min-h-12 rounded-xl border text-sm font-light", value === option.value ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] bg-[var(--paper)]")} type="button" aria-pressed={value === option.value} disabled={!canEdit || busy} onClick={() => setValue(field, option.value)} key={option.label}>{option.label}</button>)}</div> : null}
+                {field.type === "rating" ? <RatingField id={id} field={field} value={value} disabled={!canEdit || busy} ariaLabel={(rating) => t("ratingAria", { rating })} onPick={(rating) => setValue(field, rating)} /> : null}
+              </div>
+            );
+          })}
+          {dateField && showOptional ? (
+            <div>
+              <label className={labelClass} htmlFor="entry-occurred-on">{dateField.label}<small className="ml-2 font-light text-[var(--muted)]">{t("optional")}</small></label>
+              <input id="entry-occurred-on" className={inputClass} type="date" max={dateField.max} value={dateField.value} disabled={!canEdit || busy} onChange={(event) => dateField.onChange(event.target.value)} />
+              <small className="mt-1 block text-[var(--muted)]">{dateField.hint}</small>
+            </div>
+          ) : null}
+          {optionalCount && canEdit ? (
+            <button type="button" className={cx(actionChipClass, ghostChipClass)} onClick={() => setShowOptional((open) => !open)}>
+              <ChevronGlyph open={showOptional} />
+              {showOptional ? t("hideOptional") : t("showOptional", { count: optionalCount })}
+            </button>
+          ) : null}
+          <StatusMessage error={error} success={success} />
+          {canEdit ? (
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button type="submit" className="w-full sm:flex-1" disabled={busy || deleting}>{deleting ? tp("deletingEntry") : busy ? tc("saving") : entry ? tc("saveChanges") : t("saveEntry")}<span aria-hidden="true">→</span></Button>
+              {entry && !alwaysEditable ? <Button type="button" variant="secondary" className="w-full sm:flex-1" disabled={busy || deleting} onClick={() => setEditing(false)}>{tc("cancel")}</Button> : null}
+            </div>
+          ) : readOnlyInline ? null : <p className="rounded-xl border border-[var(--line)] bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{unavailableMessage ?? t("readOnly")}</p>}
+          {item?.dueAt ? <p className="text-center text-xs text-[var(--muted)]">{t("dueAt", { date: f.dateTime(item.dueAt) })}</p> : null}
+        </form>
+      )}
+    </div>
   );
 }
 
@@ -500,18 +543,19 @@ function ItemEntryPanel({
         // the section heading, once as the field's own label. Skip the heading
         // then; the field label (with its required marker) already says it.
         const headingRedundant = type.fields.length === 1 && type.fields[0].label.trim().toLowerCase() === type.name.trim().toLowerCase();
+        // Spell out who will see this answer before the first submit (V1 §8) — except
+        // the two "the group sees it soon enough" cases, which don't need a sentence
+        // of their own. The two that actually withhold the answer (only after close,
+        // only you) still get one.
+        const note = type.visibilityPolicy === "after_close" || type.visibilityPolicy === "author_only"
+          ? <p className="mb-3 rounded-lg bg-[var(--wash)] px-3 py-2 text-xs text-[var(--muted)]">{tv(`note.${type.visibilityPolicy}`)}</p>
+          : undefined;
         return (
           <div key={type.id || "registro"}>
-            {stacked && !headingRedundant ? <h3 className={cx("mb-3", sectionLabelClass)}>{type.name}</h3> : null}
-            {/* Spell out who will see this answer before the first submit (V1 §8) — except
-                the two "the group sees it soon enough" cases, which don't need a sentence
-                of their own. The two that actually withhold the answer (only after close,
-                only you) still get one. */}
-            {type.visibilityPolicy === "after_close" || type.visibilityPolicy === "author_only" ? (
-              <p className="mb-3 rounded-lg bg-[var(--wash)] px-3 py-2 text-xs text-[var(--muted)]">{tv(`note.${type.visibilityPolicy}`)}</p>
-            ) : null}
             <DynamicEntryForm
               key={`${type.id}-${item.id}-${perDay ? occurredOn || today : "fixed"}-${entry?.id ?? "new"}`}
+              heading={stacked && !headingRedundant ? type.name : undefined}
+              note={note}
               fields={type.fields}
               item={item}
               entry={entry}
@@ -548,11 +592,8 @@ function CheckGlyph() {
 function RatingBar({ value }: { value: number }) {
   const nf = useFormatter();
   return (
-    <div className="flex w-24 items-center justify-end gap-2">
-      <div className="h-1.5 w-14 overflow-hidden rounded-full bg-[var(--wash)]">
-        <div className="h-full rounded-full bg-[var(--main)]" style={{ width: `${Math.min(100, Math.max(0, (value / 5) * 100))}%` }} />
-      </div>
-      <span className="flex-none text-[11px] font-medium tabular-nums text-[var(--ink)]">{nf.number(value, { maximumFractionDigits: 1 })}</span>
+    <div className="flex w-6 items-center justify-end gap-2">
+      <span className="flex-none text-sm font-medium tabular-nums text-[var(--ink)]">{nf.number(value, { maximumFractionDigits: 1 })}</span>
     </div>
   );
 }
@@ -595,7 +636,7 @@ function EntryPicker({
         {tally ? <span className="text-xs text-[var(--muted)]">{tally}</span> : null}
       </div>
       <section className={cx(cardClass, "p-4 sm:p-5")}>
-      <ol className="max-h-60 space-y-1.5 overflow-y-auto pr-0.5 sm:max-h-72">
+      <ol className="max-h-60 space-y-1.5 overflow-y-auto pr-0.5">
         {options.map((option, index) => {
           const active = option.id === selectedId;
           const rating = typeof option.rating === "number" ? option.rating : null;
@@ -944,7 +985,9 @@ export function ParticipantChallengeScreen({
         const boundItem = sortedItems.find((item) => item.checkpointId === session.id);
         const soon = session.status === "scheduled";
         const label = boundItem?.title ?? session.title;
-        return { id: session.id, label: boundItem?.catalogItem?.year ? `${label} (${boundItem.catalogItem.year})` : label, soon, statusLabel: soon ? t("checkpointSoonLabel") : undefined, meta: boundItem ? metaForItem(boundItem) : undefined, rating: boundItem ? ratingByItem.get(boundItem.id) ?? null : null };
+        return {
+          id: session.id,
+          label: boundItem?.catalogItem?.year ? `${label} (${boundItem.catalogItem.year})` : label, soon, statusLabel: soon ? t("checkpointSoonLabel") : undefined, meta: boundItem ? metaForItem(boundItem) : undefined, rating: boundItem ? ratingByItem.get(boundItem.id) ?? null : null };
       })}
     />
   ) : sortedItems.length > 1 ? (
@@ -957,7 +1000,7 @@ export function ParticipantChallengeScreen({
         const done = doneByItem.has(item.id);
         const soon = item.status === "scheduled" && !entriesByItem.has(item.id);
         const label = item.catalogItem?.year ? `${item.title} (${item.catalogItem.year})` : item.title;
-        return { id: item.id, label, done, soon, statusLabel: done ? t("checkpointDoneLabel") : soon ? t("checkpointSoonLabel") : undefined, meta: metaForItem(item), rating: ratingByItem.get(item.id) ?? null };
+        return { id: item.id, label, done, soon, statusLabel: done ? "" : soon ? t("checkpointSoonLabel") : undefined, meta: metaForItem(item), rating: ratingByItem.get(item.id) ?? null };
       })}
     />
   ) : null;
@@ -1010,29 +1053,29 @@ export function ParticipantChallengeScreen({
             <EmptyState title={t("noCheckpointTitle")} />
           ) : (
             <div>
-              <p className={cx("mb-2", sectionLabelClass)}>{selectedItem ? t("itemBoxTitle") : t("tabs.today")}</p>
               <section className={cx(cardClass, "min-w-0 p-5 sm:p-7")}>
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="mb-5 flex flex-col gap-3 border-b border-[var(--line)] pb-5 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <h2 className="text-2xl font-light tracking-[-0.04em]">
                       {selectedItem
                         ? `${selectedItem.title}${selectedItem.catalogItem?.year ? ` (${selectedItem.catalogItem.year})` : ""}`
                         : (undatedDaily ? t("checkInOf", { date: f.date(effectiveOccurredOn, longDate) }) : t("newEntry"))}
                     </h2>
-                    {selectedItem?.description ? <p className="mt-1 text-sm text-[var(--muted)]">{selectedItem.description}</p> : null}
-                    {selectedItem?.recommendedBy || selectedItem?.catalogItem?.author || selectedItem?.catalogItem?.mainGenre || selectedItem?.catalogItem?.runtimeMinutes ? <p className="mt-1 text-xs text-[var(--muted)]">{[selectedItem.catalogItem?.author ? t("byAuthor", { name: selectedItem.catalogItem.author }) : null, selectedItem.recommendedBy ? t("recommendedBy", { name: selectedItem.recommendedBy.name }) : null, selectedItem.catalogItem?.mainGenre || null, formatRuntime(selectedItem.catalogItem?.runtimeMinutes)].filter(Boolean).join(" · ")}</p> : null}
                   </div>
-                  {selectedItem?.dueAt ? <span className="flex-none rounded-full bg-[var(--wash)] px-3 py-2 text-xs font-medium text-[var(--muted)]">{t("dueBy", { date: f.dateTime(selectedItem.dueAt) })}</span> : null}
+                  {selectedItem?.dueAt
+                    ? <span className="flex-none rounded-full bg-[var(--wash)] px-3 py-2 text-xs font-medium text-[var(--muted)]">
+                        {t("dueBy", { date: f.dateTime(selectedItem.dueAt) })}
+                      </span>
+                    : null
+                  }
                 </div>
-                {dateRequired ? <label className="mt-5 block"><span className={labelClass}>{t("occurredOnLabel")}</span><input className={inputClass} type="date" max={today} value={effectiveOccurredOn} disabled={Boolean(unavailableMessage)} onChange={(event) => setOccurredOn(event.target.value || today)} /><small className="mt-1 block text-[var(--muted)]">{t("occurredOnHint")}</small></label> : !useItemPanel && currentEntry?.occurredOn ? <p className="mt-5 text-xs text-[var(--muted)]">{t("occurredOn", { date: f.date(currentEntry.occurredOn, longDate) })}</p> : null}
-                <div className="mt-5 border-t border-[var(--line)] pt-5">
-                  <p className={cx("mb-3", sectionLabelClass)}>{t("yourResponseTitle")}</p>
-                  {useItemPanel && selectedItem ? (
-                    <ItemEntryPanel key={`${selectedItem.id}-${selectedSession?.id ?? "no-session"}`} challenge={challenge} item={selectedItem} ownEntries={ownEntries} occurredOn={occurredOn} onOccurredOnChange={setOccurredOn} offerOptionalDate={!perDayItem && !sessionMode && collectsEntryDate} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} checkpointId={selectedSession?.id ?? null} onSaveEntry={onSaveEntry!} onDeleteEntry={canDeleteEntry} />
-                  ) : (
-                    <DynamicEntryForm key={`${selectedItem?.id ?? "free"}-${undatedDaily ? effectiveOccurredOn : "fixed"}-${currentEntry?.id ?? "new"}`} fields={challenge.fields} item={selectedItem ?? null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry!(selectedItem?.id ?? null, values, entry, undatedDaily ? effectiveOccurredOn : undefined)} onDelete={currentEntry && canDeleteEntry ? () => canDeleteEntry(currentEntry.id) : undefined} />
-                  )}
-                </div>
+                <p className={cx("mb-3", sectionLabelClass)}>{t("yourResponseTitle")}</p>
+                {dateRequired ? <label className="mb-5 block"><span className={labelClass}>{t("occurredOnLabel")}</span><input className={inputClass} type="date" max={today} value={effectiveOccurredOn} disabled={Boolean(unavailableMessage)} onChange={(event) => setOccurredOn(event.target.value || today)} /><small className="mt-1 block text-[var(--muted)]">{t("occurredOnHint")}</small></label> : !useItemPanel && currentEntry?.occurredOn ? <p className="mb-5 text-xs text-[var(--muted)]">{t("occurredOn", { date: f.date(currentEntry.occurredOn, longDate) })}</p> : null}
+                {useItemPanel && selectedItem ? (
+                  <ItemEntryPanel key={`${selectedItem.id}-${selectedSession?.id ?? "no-session"}`} challenge={challenge} item={selectedItem} ownEntries={ownEntries} occurredOn={occurredOn} onOccurredOnChange={setOccurredOn} offerOptionalDate={!perDayItem && !sessionMode && collectsEntryDate} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} checkpointId={selectedSession?.id ?? null} onSaveEntry={onSaveEntry!} onDeleteEntry={canDeleteEntry} />
+                ) : (
+                  <DynamicEntryForm key={`${selectedItem?.id ?? "free"}-${undatedDaily ? effectiveOccurredOn : "fixed"}-${currentEntry?.id ?? "new"}`} fields={challenge.fields} item={selectedItem ?? null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry!(selectedItem?.id ?? null, values, entry, undatedDaily ? effectiveOccurredOn : undefined)} onDelete={currentEntry && canDeleteEntry ? () => canDeleteEntry(currentEntry.id) : undefined} />
+                )}
               </section>
             </div>
           )
@@ -1040,9 +1083,15 @@ export function ParticipantChallengeScreen({
 
         {activeTab === "grupo" ? (
           <div>
-            <p className={cx("mb-2", sectionLabelClass)}>{t("groupActivityTitle")}</p>
             <section className={cx(cardClass, "min-w-0 p-5 sm:p-7")}>
-              {selectedItem ? <h2 className="mb-4 text-lg font-light tracking-[-0.02em]">{selectedItem.title}{selectedItem.catalogItem?.year ? ` (${selectedItem.catalogItem.year})` : ""}</h2> : null}
+              {selectedItem
+                ? <h2 className="text-2xl font-light tracking-[-0.04em] mb-5 pb-5 border-b border-[var(--line)]">
+                    {selectedItem.title}
+                    {selectedItem.catalogItem?.year ? ` (${selectedItem.catalogItem.year})` : ""}
+                  </h2>
+                : null
+              }
+              
               <div className="divide-y divide-[var(--line)]">
                 {[...challenge.participants].sort((a, b) => Number(b.userId === user?.id) - Number(a.userId === user?.id)).map((participant) => {
                   const isSelf = participant.userId === user?.id;
@@ -1059,7 +1108,7 @@ export function ParticipantChallengeScreen({
                     <div key={participant.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
                       <span className="grid h-9 w-9 flex-none place-items-center rounded-full border-2 border-[var(--paper)] bg-[var(--main-line)] text-xs font-black" aria-hidden="true">{initial}</span>
                       <div className="min-w-0 flex-1 leading-tight">
-                        <span className="block truncate text-sm">{isSelf ? t("youLabel") : participant.name}</span>
+                        <span className="block truncate text-sm">{participant.name} {isSelf && `(${t("youLabel")})`}</span>
                         <span className="block truncate text-xs text-[var(--muted)]">{caption}</span>
                       </div>
                       <div className="flex-none">
@@ -1086,7 +1135,7 @@ export function ParticipantChallengeScreen({
 
       {tabs.length > 1 ? (
         <nav className={cx("safe-area-bottom fixed inset-x-0 bottom-0 z-40 grid h-[72px] border-t border-[var(--line)] bg-[var(--paper)]/95 px-2 backdrop-blur-xl sm:hidden", tabs.length === 3 ? "grid-cols-3" : "grid-cols-2")} aria-label={t("navMobileAria")}>
-          {tabs.map((item) => <button className={cx("flex min-h-12 flex-col items-center justify-center gap-1 text-[10px] font-light", activeTab === item.id ? "text-[var(--main-strong)]" : "text-[var(--muted)]")} type="button" onClick={() => onTab(item.id)} key={item.id}><span className="text-base" aria-hidden="true">{item.id === "today" ? "◉" : item.id === "grupo" ? "◐" : "〇"}</span>{t(`tabs.${item.id}`)}</button>)}
+          {tabs.map((item) => <button className={cx("flex min-h-12 flex-col items-center justify-center gap-1 text-[10px] font-light", activeTab === item.id ? "text-[var(--main-strong)]" : "text-[var(--muted)]")} type="button" onClick={() => onTab(item.id)} key={item.id}><span className="text-base" aria-hidden="true">{item.id === "today" ? "◉" : item.id === "grupo" ? "◎" : "〇"}</span>{t(`tabs.${item.id}`)}</button>)}
         </nav>
       ) : null}
     </main>

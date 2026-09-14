@@ -964,6 +964,7 @@
     "hideOptional": "Hide optional fields",
     "showOptional": "Show optional fields ({count})",
     "saveEntry": "Save entry",
+    "editAnswer": "Edit answer",
     "readOnly": "This entry is read-only.",
     "dueAt": "Deadline: {date}",
     "emptyValue": "—",

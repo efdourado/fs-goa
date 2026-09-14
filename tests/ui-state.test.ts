@@ -167,7 +167,7 @@ test("formulário de registro esconde campos opcionais até a pessoa pedir", () 
   assert.match(form, /Mostrar campos opcionais \(1\)/);
 });
 
-test("uma resposta já salva vira um único cartão clicável — sem botão de editar separado", () => {
+test("uma resposta já salva vira um resumo não clicável com um ícone de cadeado para reabrir", () => {
   const answered = renderWithIntl(createElement(DynamicEntryForm, {
     fields: [{ id: "f1", key: "nota", label: "Nota", type: "rating", required: true, config: { min: 0, max: 5, step: 0.5 } }],
     item: null,
@@ -176,8 +176,9 @@ test("uma resposta já salva vira um único cartão clicável — sem botão de 
     onSave: async () => undefined,
     onDelete: async () => undefined,
   }));
-  assert.doesNotMatch(answered, />\s*Edit(ar)?\s*</i, "não sobra um rótulo de botão 'Editar' à parte");
-  assert.match(answered, /<button[^>]*>[\s\S]*Nota[\s\S]*4,5[\s\S]*<\/button>/, "os valores ficam dentro de um único botão clicável");
+  assert.match(answered, /Nota[\s\S]*4,5/, "os valores continuam visíveis no resumo");
+  assert.doesNotMatch(answered, /<button[^>]*>[\s\S]*Nota[\s\S]*4,5[\s\S]*<\/button>/, "os valores não ficam mais dentro de um botão clicável");
+  assert.match(answered, /aria-label="Editar resposta"/, "um ícone de cadeado reabre a resposta para edição");
 });
 
 test("limpar a nota não marca a nota 0 por engano (Number(null) e Number('') são 0 em JS)", () => {

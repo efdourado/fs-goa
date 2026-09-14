@@ -964,6 +964,7 @@
     "hideOptional": "Ocultar campos opcionales",
     "showOptional": "Mostrar campos opcionales ({count})",
     "saveEntry": "Guardar registro",
+    "editAnswer": "Editar respuesta",
     "readOnly": "Este registro está disponible solo para lectura.",
     "dueAt": "Plazo: {date}",
     "emptyValue": "—",
