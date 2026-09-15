@@ -638,6 +638,7 @@
     "reuseNoneBody": "Crea otro grupo o vuélvete responsable de un grupo para reutilizar esta plantilla.",
     "deleteTitle": "¿Eliminar desafío?",
     "deleteBody": "El desafío y sus registros van a la papelera.",
+    "deleteBodyTemplateWarning": "También está publicado como plantilla en la galería — eliminar el desafío también quita la plantilla de ahí.",
     "deleteConfirm": "¿Mover \"{title}\" a la papelera?",
     "deleteDone": "Desafío movido a la papelera.",
     "delete": "Eliminar desafío",

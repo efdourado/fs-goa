@@ -638,6 +638,7 @@
     "reuseNoneBody": "Crie outro grupo ou torne-se responsável de um grupo para reutilizar este modelo.",
     "deleteTitle": "Deletar desafio?",
     "deleteBody": "O desafio e seus registros vão para a lixeira.",
+    "deleteBodyTemplateWarning": "Ele também está publicado como modelo na galeria — apagar o desafio remove o modelo de lá também.",
     "deleteConfirm": "Mover \"{title}\" para a lixeira?",
     "deleteDone": "Desafio movido para a lixeira.",
     "delete": "Deletar desafio",

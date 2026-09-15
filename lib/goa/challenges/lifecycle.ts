@@ -76,7 +76,20 @@ export async function softDeleteChallenge(session: SessionContext, challengeId: 
     if (!access.canManage) {
       throw new ApiError(403, "forbidden", "Somente administradores podem apagar o desafio.");
     }
-    // Sets `deleted_at` + the explicit bin row (or 409s on a published template).
+    // A challenge published to the template gallery used to 409 here until the
+    // admin unpublished it by hand first — deleting it now just takes it off
+    // the gallery as part of the same action (the confirm dialog warns about
+    // this beforehand; no separate step to remember).
+    const wasTemplate = access.challenge.published_as_template_at !== null;
+    if (wasTemplate) {
+      await client.query(
+        "UPDATE challenges SET published_as_template_at = NULL, updated_at = now() WHERE id = $1",
+        [challengeId],
+      );
+      await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
+        "challenge.template_unpublished", "challenge", challengeId, null, null, { reason: "deleted" });
+    }
+    // Sets `deleted_at` + the explicit bin row.
     await moveToTrash(client, "challenge", challengeId, session.user.id);
     // Binning also takes the showcase offline for good: the snapshot may name
     // people, and clearing the token here means a later restore cannot silently

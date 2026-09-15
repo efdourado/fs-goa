@@ -209,7 +209,16 @@ export function ChallengeActions({ challenge, duplicateTargets, onDuplicate, onD
     {panel === "copy" ? <CopyChallengeDialog challenge={challenge} duplicateTargets={duplicateTargets} onDuplicate={onDuplicate} onClose={() => setPanel(null)} /> : null}
     {panel === "publication" ? <PublicationDialog challenge={challenge} onPublish={onPublish} onUnpublish={onUnpublish} onClose={() => setPanel(null)} /> : null}
     {panel === "template" && isPlatformAdmin ? <Dialog title={t("platformTemplateTitle")} onClose={() => setPanel(null)}><TemplatePublishSection challenge={challenge} onPublish={onPublishTemplate} onUnpublish={onUnpublishTemplate} /><div className="mt-5 flex justify-end"><Button variant="secondary" onClick={() => setPanel(null)}>{tc("close")}</Button></div></Dialog> : null}
-    {panel === "delete" && onDelete ? <ConfirmDialog title={t("deleteTitle")} body={t("deleteBody")} confirmLabel={t("delete")} danger onClose={() => setPanel(null)} onConfirm={async () => { await onDelete(); setPanel(null); }} /> : null}
+    {panel === "delete" && onDelete ? (
+      <ConfirmDialog
+        title={t("deleteTitle")}
+        body={challenge.publishedAsTemplate ? <>{t("deleteBody")} {t("deleteBodyTemplateWarning")}</> : t("deleteBody")}
+        confirmLabel={t("delete")}
+        danger
+        onClose={() => setPanel(null)}
+        onConfirm={async () => { await onDelete(); setPanel(null); }}
+      />
+    ) : null}
   </>;
 }
 

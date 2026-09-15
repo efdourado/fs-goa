@@ -1034,6 +1034,46 @@ test("modelos públicos: publica, lista, detalha sem sessão e duplica para um g
   assert.equal((await call("GET", `/api/templates/${challengeId}`)).response.status, 404);
 });
 
+test("apagar um desafio publicado como modelo despublica o modelo junto, sem bloquear a exclusão", async () => {
+  const admin = await register("Curador Exclusão", "curador_exclusao_modelo");
+  await adminPool.query("UPDATE users SET platform_admin = true WHERE id = $1", [admin.user.id]);
+  const adminSession = await login("curador_exclusao_modelo");
+  const groupId = ((await call("POST", "/api/groups", { session: adminSession, body: { name: "Sala do modelo" } })).body as { id: string }).id;
+
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: adminSession,
+    body: {
+      title: "Modelo a ser apagado", startsOn: "2026-09-01", endsOn: "2026-09-30", submissionMode: "item",
+      participantIds: [admin.user.id], items: [{ title: "Filme 1" }],
+      fields: [{ key: "nota", label: "Nota", type: "rating", required: true }],
+    },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/template`, { session: adminSession, body: {} })).response.status, 200);
+
+  const deleted = await call("DELETE", `/api/challenges/${challengeId}`, { session: adminSession });
+  assert.equal(deleted.response.status, 200, JSON.stringify(deleted.body));
+
+  const gallery = await call("GET", "/api/templates");
+  assert.ok(
+    !(gallery.body as { templates: Array<{ id: string }> }).templates.some((entry) => entry.id === challengeId),
+    "o modelo some da galeria junto com a exclusão do desafio",
+  );
+
+  const row = await adminPool.query<{ published_as_template_at: Date | null; deleted_at: Date | null }>(
+    "SELECT published_as_template_at, deleted_at FROM challenges WHERE id = $1", [challengeId],
+  );
+  assert.equal(row.rows[0]?.published_as_template_at, null, "a flag de modelo foi limpa");
+  assert.ok(row.rows[0]?.deleted_at, "o desafio foi mesmo para a lixeira");
+
+  const audit = await adminPool.query<{ action: string }>(
+    "SELECT action FROM audit_events WHERE entity_type='challenge' AND entity_id=$1 ORDER BY created_at", [challengeId],
+  );
+  const actions = audit.rows.map((r) => r.action);
+  assert.ok(actions.includes("challenge.template_unpublished"), "a despublicação automática fica na auditoria");
+  assert.ok(actions.includes("challenge.deleted"), "a exclusão fica na auditoria");
+});
+
 test("modelo com vitrine publicada: o Resultado do preview traz a retrospectiva congelada, sem nomes reais", async () => {
   const admin = await register("Curador Vitrine", "curador_vitrine_modelo");
   await adminPool.query("UPDATE users SET platform_admin = true WHERE id = $1", [admin.user.id]);

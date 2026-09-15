@@ -638,6 +638,7 @@
     "reuseNoneBody": "Create another group or become an owner/admin of one to reuse this template.",
     "deleteTitle": "Delete challenge?",
     "deleteBody": "Moves the challenge and its entries to the bin.",
+    "deleteBodyTemplateWarning": "It's also published as a template in the gallery — deleting the challenge removes the template too.",
     "deleteConfirm": "Move \"{title}\" to the bin?",
     "deleteDone": "Challenge moved to the bin.",
     "delete": "Delete challenge",
