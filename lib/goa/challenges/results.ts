@@ -970,37 +970,28 @@ export async function curateResults(
     if (access.challenge.status !== "closed") {
       throw new ApiError(409, "challenge_not_closed", "A vitrine só pode ser organizada depois que o desafio é encerrado.");
     }
-    // Changing the anonymisation setting is a privacy decision: a snapshot that
-    // is already public would keep serving the *previous* setting until someone
-    // remembers to republish. Take it down automatically instead — the admin
-    // publishes again when the new draft is ready (ROADMAP §12).
-    let unpublishedForAnon = false;
+    // Anonymisation is a privacy setting read live by whoever's results are
+    // already public (the share link, the template preview) — changing it
+    // here takes effect on their very next visit, nothing to republish.
     if (Object.hasOwn(body, "anonymizeParticipants")) {
       const nextAnon = body.anonymizeParticipants === true;
       if (nextAnon !== access.challenge.results_anon) {
         await client.query("UPDATE challenges SET results_anon = $2, updated_at = now() WHERE id = $1",
           [challengeId, nextAnon]);
-        if (access.challenge.results_published_at !== null) {
-          await unpublishResults(client, challengeId);
-          await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
-            "results.unpublished", "challenge", challengeId, null, null, { reason: "anonymization_changed" });
-          unpublishedForAnon = true;
-        }
       }
     }
     // Whether the read-only checkpoint grid shows on the challenge / result /
-    // template pages. Cosmetic — the frozen public snapshot never rendered it,
-    // and the template preview reads this live, so no republish is needed.
+    // template pages. Cosmetic, and read live wherever it shows.
     if (Object.hasOwn(body, "showSchedule")) {
       await client.query("UPDATE challenges SET show_schedule = $2, updated_at = now() WHERE id = $1",
         [challengeId, body.showSchedule === true]);
     }
-    const stillPublished = access.challenge.results_published_at !== null && !unpublishedForAnon;
+    const published = access.challenge.results_published_at !== null;
     if (body.regenerate === true) {
       await generateShowcase(client, challengeId, session.user.id);
       await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
         "results.regenerated", "challenge", challengeId, null, null);
-      return { challengeId, published: stillPublished, unpublished: unpublishedForAnon };
+      return { challengeId, published };
     }
     await client.query("DELETE FROM result_blocks WHERE challenge_id=$1", [challengeId]);
     let position = 0;
@@ -1074,9 +1065,9 @@ export async function curateResults(
       );
     }
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
-      "results.draft_saved", "challenge", challengeId, null, null,
+      "results.saved", "challenge", challengeId, null, null,
       { metricCount: availableMetrics.rows.length, commentCount: comments.length });
-    return { challengeId, published: stillPublished, unpublished: unpublishedForAnon };
+    return { challengeId, published };
   });
 }
 
@@ -1130,78 +1121,34 @@ export async function reorderResultBlocks(
 }
 
 /**
- * A member left the group (or a challenge): every published showcase there is
- * pulled offline and its blocks regenerated without them (V1 §12 "publicações
- * existentes regeneradas anonimamente; link temporariamente despublicado até a
- * regeneração"). The admin republishes when ready.
- */
-export async function regeneratePublishedShowcases(
-  client: PoolClient,
-  groupId: string,
-  actorUserId: string,
-  options: { challengeId?: string } = {},
-): Promise<void> {
-  const published = await client.query<{ id: string }>(
-    `SELECT id FROM challenges
-      WHERE group_id = $1 AND deleted_at IS NULL AND results_published_at IS NOT NULL
-        AND ($2::text IS NULL OR id = $2)`,
-    [groupId, options.challengeId ?? null],
-  );
-  for (const row of published.rows) {
-    await unpublishResults(client, row.id);
-    await client.query("UPDATE challenges SET results_anon = true, updated_at = now() WHERE id = $1", [row.id]);
-    await generateShowcase(client, row.id, actorUserId);
-    await writeAudit(client, groupId, row.id, actorUserId,
-      "results.unpublished", "challenge", row.id, null, null, { reason: "member_left" });
-  }
-}
-
-interface SnapshotChallenge {
-  id: string;
-  title: string;
-  description: string | null;
-  start_date: string | null;
-  end_date: string | null;
-}
-
-export interface PublishedShowcase {
-  id: string;
-  title: string;
-  description: string | null;
-  startsOn: string | null;
-  endsOn: string | null;
-  participants: string[];
-  result: {
-    headline: string | null;
-    summary: string | null;
-    metrics: Array<Record<string, unknown>>;
-    comments: Array<{ id: string; text: string; itemTitle: string | null }>;
-    personalRankings: unknown;
-    affinity: unknown;
-    blocks: unknown;
-    totalEntries: number;
-    publishedAt: string;
-  };
-}
-
-/**
- * Freezes the current draft into the document served at `/results/<token>`.
+ * Masks participant identities in an already-computed result — the results
+ * share link and the template gallery/preview both funnel through this, so
+ * the same rule applies everywhere a challenge's results reach someone
+ * outside the group.
  *
- * Every participant-grouped series, the personal rankings and the affinity pairs
- * lose the real name of anyone who is masked. Who is masked (V1 §12): when
- * `anonymized`, everyone; otherwise only participants without `name_consent`.
- * Item-grouped series keep film / book titles by design.
+ * Computed fresh from the CURRENT roster on every call — never from anything
+ * frozen — so leaving, being removed, or withdrawing name consent hides a
+ * person's identity the moment either surface is next read, with no admin
+ * action needed, and a rejoin (a fresh `name_consent=false` row) never
+ * restores it. Only identity/attribution fields change here — the caller's
+ * `result` already carries the curated text and frozen scores from
+ * `resultForChallenge`, untouched.
+ *
+ * Every participant-grouped series, the personal rankings and the affinity
+ * pairs lose the real name of anyone who is masked. Who is masked (V1 §12):
+ * when `anonymized`, everyone; otherwise only participants without
+ * `name_consent`. Item-grouped series keep film / book titles by design.
  */
-async function buildPublishedSnapshot(
+export async function maskShowcaseIdentities(
   client: PoolClient,
-  challenge: SnapshotChallenge,
+  challengeId: string,
+  result: Awaited<ReturnType<typeof resultForChallenge>>,
   anonymized: boolean,
-) {
-  const result = await resultForChallenge(client, challenge.id, undefined, { liveRankings: true });
+): Promise<{ participantNames: string[]; result: Awaited<ReturnType<typeof resultForChallenge>> }> {
   const participants = await client.query<{ id: string; display_name: string; name_consent: boolean }>(
     `SELECT u.id, u.display_name, cp.name_consent FROM challenge_participants cp JOIN users u ON u.id=cp.user_id
       WHERE cp.challenge_id=$1 AND cp.removed_at IS NULL ORDER BY u.display_name`,
-    [challenge.id],
+    [challengeId],
   );
   const metricList = result.metrics as Array<Record<string, unknown>>;
   let personalRankings = result.personalRankings;
@@ -1216,7 +1163,7 @@ async function buildPublishedSnapshot(
   const recommenderByItem = new Map<string, string>(
     (await client.query<{ id: string; recommended_by_user_id: string | null }>(
       "SELECT id, recommended_by_user_id FROM challenge_items WHERE challenge_id = $1 AND recommended_by_user_id IS NOT NULL",
-      [challenge.id],
+      [challengeId],
     )).rows.map((row) => [row.id, row.recommended_by_user_id as string]),
   );
 
@@ -1258,7 +1205,7 @@ async function buildPublishedSnapshot(
   const publicKey = async (id: string): Promise<string> => {
     const cached = publicKeyCache.get(id);
     if (cached) return cached;
-    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${challenge.id}:${id}`));
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${challengeId}:${id}`));
     const token = "p_" + Array.from(new Uint8Array(digest)).slice(0, 6).map((b) => b.toString(16).padStart(2, "0")).join("");
     publicKeyCache.set(id, token);
     return token;
@@ -1320,30 +1267,17 @@ async function buildPublishedSnapshot(
   });
 
   return {
-    id: challenge.id,
-    title: challenge.title,
-    description: challenge.description,
-    startsOn: challenge.start_date,
-    endsOn: challenge.end_date,
-    participants: participantNames,
-    result: {
-      headline: result.headline,
-      summary: result.summary,
-      metrics,
-      comments: result.comments,
-      personalRankings,
-      affinity,
-      blocks,
-      totalEntries: result.totalEntries,
-      publishedAt: new Date().toISOString(),
-    },
+    participantNames,
+    result: { ...result, metrics, personalRankings, affinity, blocks } as typeof result,
   };
 }
 
 /**
- * Publishes the frozen snapshot. Mints the share token on the first publish and,
- * with `rotateLink`, replaces it (invalidating the old URL). Never changes the
- * draft blocks — the admin publishes only what they have reviewed.
+ * Turns the results share link on. Mints the token on the first publish and,
+ * with `rotateLink`, replaces it (invalidating the old URL). This only ever
+ * grants or rotates PUBLIC ACCESS — the content shown through the link is
+ * always computed live (`publicResults`), so there is nothing here to freeze
+ * or keep in sync afterward.
  */
 export async function publishResults(
   session: SessionContext,
@@ -1356,8 +1290,6 @@ export async function publishResults(
     if (access.challenge.status !== "closed") {
       throw new ApiError(409, "challenge_not_closed", "A vitrine só pode ser publicada depois que o desafio é encerrado.");
     }
-    const anonymized = access.challenge.results_anon === true;
-    const snapshot = await buildPublishedSnapshot(client, access.challenge, anonymized);
     const existing = await oneOrNull<{ hash: string | null; token: string | null }>(
       client,
       "SELECT result_share_token_hash AS hash, result_share_token AS token FROM challenges WHERE id=$1",
@@ -1375,18 +1307,18 @@ export async function publishResults(
     }
     await client.query(
       `UPDATE challenges
-          SET results_published_snapshot=$2::jsonb, results_published_at=now(),
-              result_share_token_hash=$3, result_share_token=$4, updated_at=now()
+          SET results_published_at=now(), result_share_token_hash=$2, result_share_token=$3, updated_at=now()
         WHERE id=$1`,
-      [challengeId, JSON.stringify(snapshot), shareHash, shareToken],
+      [challengeId, shareHash, shareToken],
     );
+    const anonymized = access.challenge.results_anon === true;
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
       "results.published", "challenge", challengeId, null, null, { rotated: rotate, anonymized });
     return { challengeId, publishedAt: new Date().toISOString(), anonymized, shareToken };
   });
 }
 
-/** Clears publication + token + frozen snapshot. Shared by the route and reopen. */
+/** Turns the results share link off. Shared by the route and reopen. */
 export async function unpublishResults(client: PoolClient, challengeId: string): Promise<void> {
   await client.query(
     `UPDATE challenges
@@ -1411,21 +1343,53 @@ export async function unpublishChallengeResults(session: SessionContext, challen
   });
 }
 
+/**
+ * The public `/results/<token>` page. Computed live on every request — the
+ * curated headline/summary/metric values come from `resultForChallenge`
+ * (frozen at whatever point the admin last saved the showcase), and identity
+ * masking comes from `maskShowcaseIdentities` (always the CURRENT roster) —
+ * so a save propagates immediately, and so does a leave/removal/consent
+ * change, with no separate publish step for either. Fails closed: if the
+ * masking pass cannot be completed for any reason, this serves a 404 rather
+ * than risk falling through to unmasked data.
+ */
 export async function publicResults(token: string) {
   let hash: string;
   try { hash = await hashToken(token); } catch { throw new ApiError(404, "not_found", "Resultados não encontrados."); }
   return withClient(async (client) => {
-    const row = await oneOrNull<{ snapshot: unknown }>(
+    const row = await oneOrNull<{
+      id: string; title: string; description: string | null;
+      start_date: string | null; end_date: string | null; results_anon: boolean;
+    }>(
       client,
       // The parent group's state also gates the public link: a binned group
       // takes its challenges' showcases offline with it (ROADMAP §13).
-      `SELECT c.results_published_snapshot AS snapshot FROM challenges c
+      `SELECT c.id, c.title, c.description, c.start_date::text AS start_date,
+              c.end_date::text AS end_date, c.results_anon
+         FROM challenges c
          JOIN groups g ON g.id = c.group_id AND g.deleted_at IS NULL
         WHERE c.result_share_token_hash=$1 AND c.results_published_at IS NOT NULL
           AND c.status='closed' AND c.deleted_at IS NULL`,
       [hash],
     );
-    if (!row || !row.snapshot) throw new ApiError(404, "not_found", "Resultados não encontrados.");
-    return { challenge: row.snapshot as PublishedShowcase };
+    if (!row) throw new ApiError(404, "not_found", "Resultados não encontrados.");
+    try {
+      const result = await resultForChallenge(client, row.id, undefined, { liveRankings: true });
+      const masked = await maskShowcaseIdentities(client, row.id, result, row.results_anon === true);
+      return {
+        challenge: {
+          id: row.id,
+          title: row.title,
+          description: row.description,
+          startsOn: row.start_date,
+          endsOn: row.end_date,
+          participants: masked.participantNames,
+          result: masked.result,
+        },
+      };
+    } catch (cause) {
+      if (cause instanceof ApiError) throw cause;
+      throw new ApiError(404, "not_found", "Resultados não encontrados.");
+    }
   });
 }

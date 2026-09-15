@@ -5,7 +5,6 @@ import { inTransaction, oneOrNull } from "../../db";
 import { ApiError, stringValue } from "../../http";
 import { assertUnder, LIMITS } from "../../limits";
 import { normalizeUsername } from "../../security";
-import { regeneratePublishedShowcases } from "../challenges/results";
 import { moveToTrash } from "../trash";
 import { writeAudit } from "./audit";
 import { publicId } from "./shared";
@@ -381,15 +380,16 @@ export async function leaveGroup(session: SessionContext, groupId: string) {
       "UPDATE group_members SET removed_at = now() WHERE group_id = $1 AND user_id = $2 AND removed_at IS NULL",
       [groupId, session.user.id],
     );
+    // Clearing `name_consent` here (and never restoring it on a later rejoin)
+    // is what actually protects them: any already-public showcase reads this
+    // live, so their identity masks on its very next view — no need to take
+    // the showcase itself offline (V1 §12).
     await client.query(
       `UPDATE challenge_participants SET removed_at = now(), name_consent = false
         WHERE user_id = $2 AND removed_at IS NULL
           AND challenge_id IN (SELECT id FROM challenges WHERE group_id = $1)`,
       [groupId, session.user.id],
     );
-    // Any published showcase in the group goes offline and is regenerated
-    // without the departed member; the admin republishes when ready (V1 §12).
-    await regeneratePublishedShowcases(client, groupId, session.user.id);
 
     await writeAudit(
       client,

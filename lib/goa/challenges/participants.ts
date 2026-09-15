@@ -4,7 +4,6 @@ import { challengeAccess } from "../domain/access";
 import { writeAudit } from "../domain/audit";
 import { ApiError } from "../../http";
 import { assertArrayWithin, LIMITS } from "../../limits";
-import { regeneratePublishedShowcases } from "./results";
 
 export async function setChallengeParticipants(
   session: SessionContext,
@@ -37,22 +36,17 @@ export async function setChallengeParticipants(
     if (members.rows.length !== requestedIds.length) {
       throw new ApiError(400, "invalid_participant", "Todos os participantes precisam ser membros ativos do grupo.");
     }
-    let removed = 0;
     if (body.replace === true) {
-      const result = await client.query(
-        // Consent is per-round and does not survive removal — a re-added person
-        // opts in again (ROADMAP §12).
+      // Consent is per-round and does not survive removal — a re-added person
+      // opts in again (ROADMAP §12). Clearing it here is what protects a
+      // dropped participant: any already-public showcase reads consent live,
+      // so their identity masks on its very next view.
+      await client.query(
         `UPDATE challenge_participants SET removed_at=now(), name_consent=false
           WHERE challenge_id=$1 AND removed_at IS NULL
             AND NOT (user_id=ANY($2::text[]))`,
         [challengeId, requestedIds],
       );
-      removed = result.rowCount ?? 0;
-    }
-    // Someone dropped from a challenge with a live showcase — pull it offline and
-    // regenerate without them (V1 §12).
-    if (removed > 0) {
-      await regeneratePublishedShowcases(client, access.challenge.group_id, session.user.id, { challengeId });
     }
     for (const member of members.rows) {
       await client.query(
@@ -99,12 +93,8 @@ export async function setParticipantNameConsent(
       await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
         "participant.name_consent_changed", "challenge_participant", session.user.id,
         null, null, { nameConsent: body.nameConsent });
-      // A published showcase is a frozen snapshot — a consent change would leave
-      // the public link stale. Pull it offline; the admin republishes when ready
-      // (same rule as someone leaving, ROADMAP §12).
-      if (access.challenge.results_published_at !== null) {
-        await regeneratePublishedShowcases(client, access.challenge.group_id, session.user.id, { challengeId });
-      }
+      // A published showcase reads consent live, so this takes effect on its
+      // very next view — nothing to republish (ROADMAP §12).
     }
     return { challengeId, nameConsent: body.nameConsent };
   });

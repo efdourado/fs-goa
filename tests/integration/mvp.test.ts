@@ -415,14 +415,15 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
   const detailWithToken = await call("GET", `/api/challenges/${challengeId}`, { session: owner });
   assert.equal((detailWithToken.body as { result: { shareToken?: string } }).result.shareToken, shareToken, "o token volta no detalhe");
 
-  // Snapshot congelado: salvar rascunho de novo não muda a vitrine pública.
+  // Sem snapshot congelado: salvar de novo já aparece no link publicado, sem
+  // precisar republicar.
   await call("POST", `/api/challenges/${challengeId}/results`, {
     session: owner,
-    body: { headline: "Manchete só no rascunho", summary: "x", metricIds: [], comments: [] },
+    body: { headline: "Manchete atualizada ao vivo", summary: "x", metricIds: [], comments: [] },
   });
-  const stillFrozen = await call("GET", `/api/results/${shareToken}`);
-  assert.match(JSON.stringify(stillFrozen.body), /Duas histórias na tela/, "o link publicado não segue o rascunho");
-  assert.doesNotMatch(JSON.stringify(stillFrozen.body), /Manchete só no rascunho/);
+  const live = await call("GET", `/api/results/${shareToken}`);
+  assert.match(JSON.stringify(live.body), /Manchete atualizada ao vivo/, "o link publicado segue o que foi salvo, sem republicar");
+  assert.doesNotMatch(JSON.stringify(live.body), /Duas histórias na tela/, "o texto antigo não fica preso num snapshot");
 
   // Re-publicar sem rotacionar mantém o mesmo link e devolve o mesmo token.
   const republishSame = await call("POST", `/api/challenges/${challengeId}/results/publish`, { session: owner, body: {} });
@@ -1032,6 +1033,63 @@ test("modelos públicos: publica, lista, detalha sem sessão e duplica para um g
     "modelo despublicado sai da galeria",
   );
   assert.equal((await call("GET", `/api/templates/${challengeId}`)).response.status, 404);
+});
+
+test("modelo mostra a vitrine curada ao vivo, mesmo sem nunca ligar a publicação de resultados", async () => {
+  const admin = await register("Curadora Vitrine Modelo", "curadora_vitrine_modelo_live");
+  await adminPool.query("UPDATE users SET platform_admin = true WHERE id = $1", [admin.user.id]);
+  const adminSession = await login("curadora_vitrine_modelo_live");
+  const groupId = ((await call("POST", "/api/groups", { session: adminSession, body: { name: "Sala do modelo ao vivo" } })).body as { id: string }).id;
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: adminSession,
+    body: {
+      recipe: "cinema", title: "Modelo ao vivo", startsOn: "2026-01-01", endsOn: "2026-01-31", submissionMode: "item",
+      participantIds: [admin.user.id], items: [{ title: "Filme Único" }],
+      fields: [{ key: "nota", label: "Nota", type: "rating", required: true }],
+    },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  assert.equal((await call("POST", `/api/challenges/${challengeId}/template`, { session: adminSession, body: {} })).response.status, 200);
+
+  // Nada foi curado ainda, e a publicação de resultados nunca foi ligada.
+  const beforeClose = (await call("GET", `/api/templates/${challengeId}`)).body as { status: string; result: unknown };
+  assert.equal(beforeClose.result, null, "sem desafio encerrado, ainda não há vitrine");
+
+  const detail = (await call("GET", `/api/challenges/${challengeId}`, { session: adminSession })).body as {
+    entryTypes: Array<{ id: string; purpose: string; fields: Array<{ id: string; key: string }> }>; items: Array<{ id: string }>;
+  };
+  const rating = detail.entryTypes.find((t) => t.purpose === "rating")!;
+  const nota = rating.fields.find((f) => f.key === "nota")!.id;
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: adminSession, body: { status: "active" } });
+  await call("POST", `/api/challenges/${challengeId}/entries`, { session: adminSession, body: { itemId: detail.items[0].id, entryTypeId: rating.id, values: { [nota]: 5 } } });
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: adminSession, body: { status: "closed" } });
+
+  // Curou a vitrine (sem nunca chamar /results/publish) — o modelo já mostra.
+  await call("POST", `/api/challenges/${challengeId}/results`, {
+    session: adminSession, body: { headline: "Uma retrospectiva e tanto", regenerate: true },
+  });
+  const afterFirstSave = (await call("GET", `/api/templates/${challengeId}`)).body as { result: { headline: string | null } };
+  assert.equal(afterFirstSave.result?.headline, null, "regenerate não define manchete própria ainda");
+
+  const withHeadline = await call("POST", `/api/challenges/${challengeId}/results`, {
+    session: adminSession, body: { headline: "Uma retrospectiva e tanto", summary: "x", metricIds: [], comments: [] },
+  });
+  assert.equal(withHeadline.response.status, 200, JSON.stringify(withHeadline.body));
+  const afterSave = (await call("GET", `/api/templates/${challengeId}`)).body as { result: { headline: string | null } };
+  assert.equal(afterSave.result?.headline, "Uma retrospectiva e tanto", "o modelo mostra a curadoria imediatamente, sem publicar resultados");
+
+  // Editar de novo atualiza o modelo de novo, sem nenhum passo extra.
+  await call("POST", `/api/challenges/${challengeId}/results`, {
+    session: adminSession, body: { headline: "Segunda versão da manchete", summary: "x", metricIds: [], comments: [] },
+  });
+  const afterSecondSave = (await call("GET", `/api/templates/${challengeId}`)).body as { result: { headline: string | null } };
+  assert.equal(afterSecondSave.result?.headline, "Segunda versão da manchete", "a segunda edição também aparece imediatamente");
+
+  // O gabarito de resultados (results_published_at) nunca foi ligado.
+  const row = await adminPool.query<{ results_published_at: Date | null }>(
+    "SELECT results_published_at FROM challenges WHERE id = $1", [challengeId],
+  );
+  assert.equal(row.rows[0]?.results_published_at, null, "a publicação de resultados nunca precisou ser ligada");
 });
 
 test("apagar um desafio publicado como modelo despublica o modelo junto, sem bloquear a exclusão", async () => {
@@ -3997,7 +4055,7 @@ test("rankings pessoais e afinidade direta com três contas; afinidade composta 
   assert.ok(shared.challenge.result.affinity.pairs.every((pair) => /^Participante \d+$/.test(pair.a.name)), "afinidades anônimas");
 });
 
-test("mudar a anonimização derruba a vitrine já publicada — o link antigo não serve a config antiga", async () => {
+test("mudar a anonimização atualiza a vitrine já publicada ao vivo, sem tirar o link do ar", async () => {
   const owner = await register("Dona Anon", "dona_anon_flip");
   const b = await register("Bento Anon", "bento_anon_flip");
   const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube Anon" } })).body as { id: string }).id;
@@ -4023,20 +4081,18 @@ test("mudar a anonimização derruba a vitrine já publicada — o link antigo n
   await call("POST", `/api/challenges/${challengeId}/results`, { session: owner, body: { regenerate: true, anonymizeParticipants: false } });
   const pub = await call("POST", `/api/challenges/${challengeId}/results/publish`, { session: owner, body: {} });
   const token = (pub.body as { url: string }).url.split("/results/")[1];
-  assert.equal((await call("GET", `/api/results/${token}`)).response.status, 200);
+  const named = await call("GET", `/api/results/${token}`);
+  assert.equal(named.response.status, 200);
+  assert.ok((named.body as { challenge: { participants: string[] } }).challenge.participants.includes("Bento Anon"), "com nomes, o nome real aparece");
 
-  // Salvar o rascunho com a anonimização invertida despublica sozinho.
+  // Salvar com a anonimização invertida NÃO derruba o link — a próxima leitura já reflete a mudança.
   const flipped = await call("POST", `/api/challenges/${challengeId}/results`, { session: owner, body: { anonymizeParticipants: true } });
   assert.equal(flipped.response.status, 200, JSON.stringify(flipped.body));
-  assert.equal((flipped.body as { unpublished?: boolean }).unpublished, true, "a resposta avisa que despublicou");
-  assert.equal((await call("GET", `/api/results/${token}`)).response.status, 404, "o link antigo para de funcionar");
-
-  // Salvar de novo sem mexer na anonimização NÃO mexe na publicação.
-  await call("POST", `/api/challenges/${challengeId}/results/publish`, { session: owner, body: {} });
-  const again = await call("POST", `/api/challenges/${challengeId}/results`, { session: owner, body: { headline: "Só um ajuste", anonymizeParticipants: true } });
-  assert.equal((again.body as { unpublished?: boolean }).unpublished ?? false, false, "sem mudança de anonimização, a vitrine fica de pé");
-  const token2 = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { result?: { publishedAt?: string | null } };
-  assert.ok(token2.result?.publishedAt, "segue publicada");
+  const anon = await call("GET", `/api/results/${token}`);
+  assert.equal(anon.response.status, 200, "o mesmo link continua funcionando, sem precisar republicar");
+  const anonNames = (anon.body as { challenge: { participants: string[] } }).challenge.participants;
+  assert.ok(!anonNames.includes("Bento Anon"), "agora todo mundo aparece anonimizado, imediatamente");
+  assert.ok(anonNames.every((name) => /^Participante \d+$/.test(name)));
 });
 
 test("publicação anônima mascara o nome de quem indicou o filme no ranking, não só os participantes", async () => {
@@ -4204,7 +4260,7 @@ test("blocos organizáveis: o admin reordena e esconde blocos, e os valores fica
   assert.equal((await call("PATCH", `/api/challenges/${challengeId}/results/blocks`, { session: owner, body: { blocks: [{ id: "nao-existe", visible: true }] } })).response.status, 404);
 });
 
-test("quem sai do grupo despublica e regenera a vitrine; resultado público e template são conceitos separados", async () => {
+test("quem sai do grupo tem a identidade mascarada ao vivo, sem tirar a vitrine do ar; resultado público e template são conceitos separados", async () => {
   const owner = await register("Dona Saída", "dona_saida_wrapped");
   const leaver = await register("Vai Embora", "vai_embora_wrapped");
   const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube Saída" } })).body as { id: string }).id;
@@ -4224,29 +4280,28 @@ test("quem sai do grupo despublica e regenera a vitrine; resultado público e te
   await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });
   await call("POST", `/api/challenges/${challengeId}/entries`, { session: owner, body: { itemId: detail.items[0].id, entryTypeId: rating.id, values: { [nota]: 4 } } });
   await call("POST", `/api/challenges/${challengeId}/entries`, { session: leaver, body: { itemId: detail.items[0].id, entryTypeId: rating.id, values: { [nota]: 2 } } });
+  // Both consent to a named publication before the leaver ever leaves.
+  await call("PATCH", `/api/challenges/${challengeId}/consent`, { session: owner, body: { nameConsent: true } });
+  await call("PATCH", `/api/challenges/${challengeId}/consent`, { session: leaver, body: { nameConsent: true } });
   await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "closed" } });
-  await call("POST", `/api/challenges/${challengeId}/results`, { session: owner, body: { regenerate: true } });
+  await call("POST", `/api/challenges/${challengeId}/results`, { session: owner, body: { regenerate: true, anonymizeParticipants: false } });
   const pub = await call("POST", `/api/challenges/${challengeId}/results/publish`, { session: owner, body: {} });
   const token = (pub.body as { url: string }).url.split("/results/")[1];
-  assert.equal((await call("GET", `/api/results/${token}`)).response.status, 200);
+  const before = await call("GET", `/api/results/${token}`);
+  assert.equal(before.response.status, 200);
+  assert.ok((before.body as { challenge: { participants: string[] } }).challenge.participants.includes("Vai Embora"), "antes de sair, o nome real aparece (consentiu)");
 
   // O template é outro conceito: publicar um não publica o outro.
   const detailAfterPublish = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { publishedAsTemplate?: boolean };
   assert.notEqual(detailAfterPublish.publishedAsTemplate, true, "publicar a vitrine não cria template");
 
-  // Vai Embora sai do grupo → o link cai e a vitrine é regenerada.
+  // Vai Embora sai do grupo → o link continua no ar, mas o nome dele some.
   assert.equal((await call("POST", `/api/groups/${groupId}/leave`, { session: leaver, body: {} })).response.status, 200);
-  assert.equal((await call("GET", `/api/results/${token}`)).response.status, 404, "o link publicado para de funcionar quando alguém sai");
-  const reopened = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
-    result: { publishedAt: string | null; shareToken?: string | null };
-  };
-  assert.equal(reopened.result.publishedAt, null, "a publicação foi retirada até a regeneração");
-
-  // O admin republica; um link novo é gerado.
-  const republish = await call("POST", `/api/challenges/${challengeId}/results/publish`, { session: owner, body: {} });
-  const newToken = (republish.body as { url: string }).url.split("/results/")[1];
-  assert.notEqual(newToken, token);
-  assert.equal((await call("GET", `/api/results/${newToken}`)).response.status, 200);
+  const after = await call("GET", `/api/results/${token}`);
+  assert.equal(after.response.status, 200, "o link publicado continua funcionando depois que alguém sai");
+  const afterNames = (after.body as { challenge: { participants: string[] } }).challenge.participants;
+  assert.ok(!afterNames.includes("Vai Embora"), "o nome de quem saiu some imediatamente, sem precisar republicar");
+  assert.ok(afterNames.includes("Dona Saída"), "quem ficou continua visível normalmente");
 });
 
 // ── ROADMAP §13/§14 — recoverable deletion ────────────────────────────────
@@ -4624,14 +4679,18 @@ test("cenário de aceitação V1: grupo de 6, Cinema com semanas, JSON, expectat
   assert.equal((await call("DELETE", `/api/challenges/${challengeId}/results`, { session: owner })).response.status, 200);
   assert.equal((await call("GET", `/api/results/${token2}`)).response.status, 404, "despublicar tira o link do ar");
 
-  // 21. Anonimizar quem sai do grupo (a publicação existente é regenerada anonimamente).
+  // 21. Sair do grupo não derruba o link publicado — a identidade de quem saiu
+  // já estava mascarada (vitrine anônima) e continua assim ao vivo, sem
+  // precisar republicar.
   const pub3 = await call("POST", `/api/challenges/${challengeId}/results/publish`, { session: owner, body: {} });
   const token3 = (pub3.body as { shareToken: string }).shareToken;
   assert.equal((await call("POST", `/api/groups/${groupId}/leave`, { session: members[0], body: {} })).response.status, 200);
-  assert.equal((await call("GET", `/api/results/${token3}`)).response.status, 404, "sair do grupo despublica até a regeneração");
-  const pub4 = await call("POST", `/api/challenges/${challengeId}/results/publish`, { session: owner, body: {} });
-  const afterLeave = (await call("GET", `/api/results/${(pub4.body as { shareToken: string }).shareToken}`)).body as { challenge: { participants: string[] } };
-  assert.ok(!afterLeave.challenge.participants.includes("Aceite B"), "o nome de quem saiu não volta na republicação");
+  const afterLeave = await call("GET", `/api/results/${token3}`);
+  assert.equal(afterLeave.response.status, 200, "o link publicado continua funcionando depois que alguém sai");
+  assert.ok(
+    (afterLeave.body as { challenge: { participants: string[] } }).challenge.participants.every((name) => /^Participante \d+$/.test(name)),
+    "segue anônima",
+  );
 
   // 22. Excluir e restaurar um objeto pela lixeira.
   await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });
@@ -4730,7 +4789,7 @@ test("P0: apagar o grupo tira do ar a vitrine publicada dos seus desafios", asyn
   assert.equal((await call("GET", `/api/results/${token}`)).response.status, 404, "restaurar não republica");
 });
 
-test("P0: revogar consentimento nominal invalida a vitrine publicada; sair reinicia o consentimento", async () => {
+test("P0: revogar consentimento nominal mascara a pessoa ao vivo sem tirar a vitrine do ar; sair reinicia o consentimento", async () => {
   const owner = await register("P0 Consent", "p0_consent");
   const b = await register("P0 Bela", "p0_bela");
   const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube Consent" } })).body as { id: string }).id;
@@ -4754,9 +4813,13 @@ test("P0: revogar consentimento nominal invalida a vitrine publicada; sair reini
   const token = (pub.body as { shareToken: string }).shareToken;
   assert.ok(((await call("GET", `/api/results/${token}`)).body as { challenge: { participants: string[] } }).challenge.participants.includes("P0 Bela"));
 
-  // Bela revoga → o link cai.
+  // Bela revoga → o link continua no ar, e o nome dela é mascarado na próxima leitura.
   assert.equal((await call("PATCH", `/api/challenges/${challengeId}/consent`, { session: b, body: { nameConsent: false } })).response.status, 200);
-  assert.equal((await call("GET", `/api/results/${token}`)).response.status, 404, "revogar consentimento tira o link do ar");
+  const afterRevoke = await call("GET", `/api/results/${token}`);
+  assert.equal(afterRevoke.response.status, 200, "revogar consentimento não tira o link do ar");
+  const afterRevokeNames = (afterRevoke.body as { challenge: { participants: string[] } }).challenge.participants;
+  assert.ok(!afterRevokeNames.includes("P0 Bela"), "o nome de quem revogou some imediatamente, sem precisar republicar");
+  assert.ok(afterRevokeNames.some((name) => /^Participante \d+$/.test(name)), "e vira um rótulo genérico");
 
   // Bela sai e volta: o consentimento não reaparece.
   await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });

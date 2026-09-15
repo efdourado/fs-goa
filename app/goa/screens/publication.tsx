@@ -62,9 +62,6 @@ export function PublicationDialog({ challenge, onPublish, onUnpublish, onClose }
             <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M20 7h-9M17 4l3 3-3 3M4 17h9M7 14l-3 3 3 3" /></svg>
           </button>
         </div>
-        <button type="button" disabled={busy || confirm !== null} onClick={() => setConfirm("publish")} className="text-xs font-light text-[var(--muted)] underline-offset-4 transition hover:text-[var(--ink)] hover:underline disabled:opacity-40">
-          {tx("updatePublication")}
-        </button>
       </div>
     ) : null}
     <p className="mt-4 text-xs leading-6 text-[var(--muted)]">{tx("savedVersionOnly")}</p>
@@ -72,7 +69,7 @@ export function PublicationDialog({ challenge, onPublish, onUnpublish, onClose }
     {confirm ? (
       <div className="mt-5 space-y-3 rounded-xl border border-[var(--line)] bg-[var(--wash)] p-4">
         <p className="text-sm leading-6">{confirm === "rotate" ? t("rotateLinkConfirm") : confirm === "unpublish" ? t("unpublishConfirm") : t(challenge.resultsAnon ? "publishConfirmAnon" : "publishConfirmNoAnon")}</p>
-        <div className="flex flex-wrap justify-end gap-2"><Button variant="secondary" disabled={busy} onClick={() => setConfirm(null)}>{tc("cancel")}</Button><Button variant={confirm === "publish" ? "primary" : "danger"} disabled={busy} onClick={() => void apply()}>{busy ? tc("saving") : t(confirm === "rotate" ? "rotateLink" : confirm === "unpublish" ? "unpublish" : published ? "republishShowcase" : "publishShowcase")}</Button></div>
+        <div className="flex flex-wrap justify-end gap-2"><Button variant="secondary" disabled={busy} onClick={() => setConfirm(null)}>{tc("cancel")}</Button><Button variant={confirm === "publish" ? "primary" : "danger"} disabled={busy} onClick={() => void apply()}>{busy ? tc("saving") : t(confirm === "rotate" ? "rotateLink" : confirm === "unpublish" ? "unpublish" : "publishShowcase")}</Button></div>
       </div>
     ) : null}
     <StatusMessage error={error} success={success} />

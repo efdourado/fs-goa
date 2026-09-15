@@ -7,6 +7,7 @@ import { parseRuleSections } from "../domain/rules";
 import { copyChallengeStructure } from "./copy";
 import { buildChallengeDetail, type DetailChallengeRow } from "./detail";
 import { isRecipeKey } from "./recipes";
+import { maskShowcaseIdentities, resultForChallenge } from "./results";
 
 /**
  * Templates are ordinary challenges that a platform admin has flagged for the
@@ -82,22 +83,21 @@ export async function listTemplates() {
  * A published template rendered as the same read-only `ChallengeDetail` the
  * in-app challenge screen consumes — spotlight header, rules, schedule, and the
  * Results tab. Public: no session. Privacy — never the origin group's members
- * (`participants: []`); the Results showcase is only the frozen
- * `results_published_snapshot` (already anonymised + admin-published), never the
- * live in-group result.
+ * (`participants: []`); the Results showcase is computed live from the
+ * curated `result_blocks` and masked the same way as the `/results/<token>`
+ * link (`maskShowcaseIdentities`) — a template being public doesn't need its
+ * own separate "publish results" step, since being listed in the gallery is
+ * already the deliberate public act. Fails closed: if the masking pass can't
+ * be completed, this serves 404 rather than risk unmasked data.
  */
 export async function getTemplatePreview(challengeId: string) {
   return withClient(async (client) => {
-    const row = await oneOrNull<DetailChallengeRow & {
-      results_published_at: Date | null;
-      results_published_snapshot: { result?: unknown } | null;
-    }>(
+    const row = await oneOrNull<DetailChallengeRow>(
       client,
       `SELECT c.id, c.group_id, c.title, c.description, c.rules, c.rule_sections,
               c.start_date::text AS start_date, c.end_date::text AS end_date,
               c.status, c.kind, c.recipe_key, g.kind AS group_kind, c.results_anon,
-              c.show_schedule, c.published_as_template_at,
-              c.results_published_at, c.results_published_snapshot
+              c.show_schedule, c.published_as_template_at
          FROM challenges c
          JOIN groups g ON g.id = c.group_id AND g.deleted_at IS NULL AND g.archived_at IS NULL
         WHERE c.id = $1 AND c.published_as_template_at IS NOT NULL AND c.deleted_at IS NULL
@@ -106,10 +106,15 @@ export async function getTemplatePreview(challengeId: string) {
     );
     if (!row) throw new ApiError(404, "not_found", "Modelo não encontrado.");
 
-    // Same gate as the public /results/<token> page.
-    const publishedResult = row.results_published_at !== null && row.status === "closed"
-      ? row.results_published_snapshot?.result ?? null
-      : null;
+    let publishedResult: unknown = null;
+    if (row.status === "closed") {
+      try {
+        const result = await resultForChallenge(client, row.id, undefined, { liveRankings: true });
+        publishedResult = (await maskShowcaseIdentities(client, row.id, result, row.results_anon === true)).result;
+      } catch {
+        publishedResult = null;
+      }
+    }
 
     const detail = await buildChallengeDetail(
       client,
