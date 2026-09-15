@@ -18,11 +18,17 @@ import { metricsForChallenge } from "./results";
  * `result_blocks.kind` stays `metric | entry_value | text`; a ranking or a
  * per-person profile is a `metric` block whose `value_snapshot` carries a
  * `series` — the renderer decides card vs. list.
+ *
+ * `live` (a personal list, which never closes) skips freezing metric values:
+ * each metric block keeps a null `value_snapshot`, so `resultForChallenge`
+ * recomputes it from current data on every read instead of showing a stale
+ * number from whenever this last ran.
  */
 export async function generateShowcase(
   client: PoolClient,
   challengeId: string,
   userId: string,
+  live = false,
 ): Promise<void> {
   const kept = await client.query<{ heading: string | null; body_snapshot: string | null }>(
     "SELECT heading, body_snapshot FROM result_blocks WHERE challenge_id=$1 AND kind='text' ORDER BY position",
@@ -55,7 +61,7 @@ export async function generateShowcase(
         (id,challenge_id,kind,metric_id,heading,value_snapshot,position,visible,created_by_user_id,created_at,updated_at)
        VALUES ($1,$2,'metric',$3,$4,$5::jsonb,$6,true,$7,now(),now())`,
       [publicId(), challengeId, metric.id as string, metric.label as string,
-        JSON.stringify(metric), position++, userId],
+        live ? null : JSON.stringify(metric), position++, userId],
     );
   }
 

@@ -853,7 +853,9 @@ function AdminResults({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [challenge.items, entries, textFields]);
 
-  const isClosed = challenge.status === "closed";
+  // A list has no round to close, so it can be curated (and published) any
+  // time — its showcase reflects current data live instead of a frozen close.
+  const canCurate = challenge.status === "closed" || isLivingList(challenge);
   const isPublished = Boolean(challenge.result?.publishedAt);
 
   async function save() {
@@ -884,10 +886,10 @@ function AdminResults({
   return (
     <div className="mx-auto max-w-3xl">
       <div className="min-w-0 space-y-6">
-        {!isClosed ? <p className="rounded-xl bg-[var(--wash)] p-4 text-sm leading-6 text-[var(--muted)]">{tx("curationAfterClose")}</p> : null}
+        {!canCurate ? <p className="rounded-xl bg-[var(--wash)] p-4 text-sm leading-6 text-[var(--muted)]">{tx("curationAfterClose")}</p> : null}
         <details open className="group border-b border-[var(--line)] pb-6">
           <summary className="cursor-pointer list-none py-3 text-xl font-medium tracking-tight [&::-webkit-details-marker]:hidden">{tx("curation")}</summary>
-          <fieldset disabled={!isClosed || busy} className="min-w-0 space-y-4">
+          <fieldset disabled={!canCurate || busy} className="min-w-0 space-y-4">
       <div>
         <p className="mb-5 text-sm leading-6 text-[var(--muted)]">{t("resultsSubtitle")}</p>
         <div className="space-y-5">
@@ -916,7 +918,7 @@ function AdminResults({
         <details className="border-b border-[var(--line)] pb-6">
           <summary className="cursor-pointer list-none py-3 text-xl font-medium tracking-tight [&::-webkit-details-marker]:hidden">{tx("order")}</summary>
           <p className="mb-4 text-sm leading-6 text-[var(--muted)]">{t("blockOrderSubtitle")}</p>
-          <fieldset disabled={!isClosed || busy || orderBusy} className="min-w-0">
+          <fieldset disabled={!canCurate || busy || orderBusy} className="min-w-0">
           <ShowMoreList
             items={blockOrder}
             preview={8}

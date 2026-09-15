@@ -124,7 +124,9 @@ export const challenges = pgTable(
     ),
     check(
       "challenges_results_publication_check",
-      sql`${table.resultsPublishedAt} is null or (${table.status} = 'closed' and ${table.resultsPublishedAt} >= ${table.closedAt})`,
+      sql`${table.resultsPublishedAt} is null
+        or (${table.kind} = 'list' and ${table.status} = 'active')
+        or (${table.status} = 'closed' and ${table.resultsPublishedAt} >= ${table.closedAt})`,
     ),
     check(
       "challenges_share_token_check",

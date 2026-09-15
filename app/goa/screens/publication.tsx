@@ -7,6 +7,7 @@ import { Dialog } from "../dialog";
 import { useGoaFormat } from "../format";
 import type { ChallengeDetail } from "../types";
 import { Button, StatusMessage, Toggle } from "../ui";
+import { isLivingList } from "../utils";
 
 export function PublicationDialog({ challenge, onPublish, onUnpublish, onClose }: {
   challenge: ChallengeDetail;
@@ -24,6 +25,8 @@ export function PublicationDialog({ challenge, onPublish, onUnpublish, onClose }
   const [confirm, setConfirm] = useState<"publish" | "rotate" | "unpublish" | null>(null);
   const [newUrl, setNewUrl] = useState<string | null>(null);
   const published = Boolean(challenge.result?.publishedAt);
+  // A list has no round to close — it can be published any time, live.
+  const canPublish = challenge.status === "closed" || isLivingList(challenge);
   const token = challenge.result?.shareToken;
   const publicUrl = newUrl ?? (token && typeof window !== "undefined" ? `${window.location.origin}/results/${encodeURIComponent(token)}` : null);
   async function apply() {
@@ -40,13 +43,13 @@ export function PublicationDialog({ challenge, onPublish, onUnpublish, onClose }
     <div className="mt-5">
       <Toggle
         checked={published}
-        disabled={busy || challenge.status !== "closed" || confirm !== null}
+        disabled={busy || !canPublish || confirm !== null}
         onChange={() => setConfirm(published ? "unpublish" : "publish")}
         label={tx(published ? "publicOn" : "publicOff")}
         hint={published ? t(challenge.resultsAnon ? "publishStateAnon" : "publishStateNamed") : tx("privateUntilPublished")}
       />
     </div>
-    {challenge.status !== "closed" ? <p className="mt-2 text-xs text-[var(--muted)]">{t("publishNeedsClose")}</p> : null}
+    {!canPublish ? <p className="mt-2 text-xs text-[var(--muted)]">{t("publishNeedsClose")}</p> : null}
 
     {published ? (
       <div className="mt-4 space-y-2">

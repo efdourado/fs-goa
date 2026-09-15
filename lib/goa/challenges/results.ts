@@ -628,16 +628,19 @@ export async function resultForChallenge(
   options: { liveRankings?: boolean } = {},
 ) {
   const challenge = await oneOrNull<{
-    results_published_at: Date | null; result_share_token: string | null; status: string;
+    results_published_at: Date | null; result_share_token: string | null; status: string; kind: "round" | "list";
   }>(
     client,
-    "SELECT results_published_at, result_share_token, status FROM challenges WHERE id = $1",
+    "SELECT results_published_at, result_share_token, status, kind FROM challenges WHERE id = $1",
     [challengeId],
   );
-  // Frozen blocks only stand once the round is closed (`generateShowcase` fills
-  // them then). While it is still open the internal result is always live — a
-  // draft curated too early must never override the running numbers.
-  const useFrozenBlocks = challenge?.status === "closed";
+  // Frozen blocks only stand once a round closes (`generateShowcase` fills them
+  // then) — while it is still open the internal result is always live, so a
+  // draft curated too early never overrides the running numbers. A list has no
+  // "closed" to wait for, so its curation (if any) stands as soon as it is
+  // saved; its metric blocks carry a null `value_snapshot` precisely so the
+  // fallback below keeps recomputing them live instead of freezing a number.
+  const useFrozenBlocks = challenge?.status === "closed" || challenge?.kind === "list";
   const blocksResult = useFrozenBlocks
     ? await client.query<{
         id: string;
@@ -964,10 +967,12 @@ export async function curateResults(
   return inTransaction(async (client) => {
     const access = await challengeAccess(session.user.id, challengeId, client, true);
     if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores podem editar a vitrine.");
-    // The Wrapped is curated *after* the round closes — while it is open the
-    // internal result is always live, and closing regenerates the blocks anyway
-    // (ROADMAP §11).
-    if (access.challenge.status !== "closed") {
+    // A round's Wrapped is curated *after* it closes — while open, the internal
+    // result is always live, and closing regenerates the blocks anyway (ROADMAP
+    // §11). A list never closes, so it skips this gate entirely: it can be
+    // curated (and published) at any time, live, from day one.
+    const isList = access.challenge.kind === "list";
+    if (access.challenge.status !== "closed" && !isList) {
       throw new ApiError(409, "challenge_not_closed", "A vitrine só pode ser organizada depois que o desafio é encerrado.");
     }
     // Anonymisation is a privacy setting read live by whoever's results are
@@ -988,7 +993,7 @@ export async function curateResults(
     }
     const published = access.challenge.results_published_at !== null;
     if (body.regenerate === true) {
-      await generateShowcase(client, challengeId, session.user.id);
+      await generateShowcase(client, challengeId, session.user.id, isList);
       await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
         "results.regenerated", "challenge", challengeId, null, null);
       return { challengeId, published };
@@ -1012,12 +1017,15 @@ export async function curateResults(
       [challengeId, metricIds],
     );
     for (const metric of availableMetrics.rows) {
-      const snapshot = await calculateMetricRow(client, metric);
+      // A list's metric blocks never freeze a value — `resultForChallenge`
+      // recomputes them live off a null `value_snapshot`, so the showcase
+      // always reflects today's entries with no regenerate step needed.
+      const snapshot = isList ? null : JSON.stringify(await calculateMetricRow(client, metric));
       await client.query(
         `INSERT INTO result_blocks
           (id,challenge_id,kind,metric_id,heading,value_snapshot,position,visible,created_by_user_id,created_at,updated_at)
          VALUES ($1,$2,'metric',$3,$4,$5::jsonb,$6,true,$7,now(),now())`,
-        [publicId(), challengeId, metric.id, metric.label, JSON.stringify(snapshot), position++, session.user.id],
+        [publicId(), challengeId, metric.id, metric.label, snapshot, position++, session.user.id],
       );
     }
     // Personal rankings + affinity: on by default, dropped only when the admin
@@ -1287,7 +1295,9 @@ export async function publishResults(
   return inTransaction(async (client) => {
     const access = await challengeAccess(session.user.id, challengeId, client, true);
     if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores podem publicar a vitrine.");
-    if (access.challenge.status !== "closed") {
+    // A list never closes, so it publishes straight from `active` — the DB
+    // check constraint mirrors this (`kind = 'list' and status = 'active'`).
+    if (access.challenge.status !== "closed" && access.challenge.kind !== "list") {
       throw new ApiError(409, "challenge_not_closed", "A vitrine só pode ser publicada depois que o desafio é encerrado.");
     }
     const existing = await oneOrNull<{ hash: string | null; token: string | null }>(
@@ -1369,7 +1379,7 @@ export async function publicResults(token: string) {
          FROM challenges c
          JOIN groups g ON g.id = c.group_id AND g.deleted_at IS NULL
         WHERE c.result_share_token_hash=$1 AND c.results_published_at IS NOT NULL
-          AND c.status='closed' AND c.deleted_at IS NULL`,
+          AND (c.status='closed' OR c.kind='list') AND c.deleted_at IS NULL`,
       [hash],
     );
     if (!row) throw new ApiError(404, "not_found", "Resultados não encontrados.");

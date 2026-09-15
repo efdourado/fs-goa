@@ -5198,6 +5198,69 @@ test("C: organizar a vitrine só é permitido depois de encerrar", async () => {
   assert.equal((early.body as { error: string }).error, "challenge_not_closed");
 });
 
+test("C: uma lista pessoal viva cura e publica a vitrine sem nunca fechar, e a métrica publicada segue ao vivo depois de publicada", async () => {
+  const owner = await register("C Lista Viva", "c_lista_viva_vitrine");
+  const created = await call("POST", "/api/personal/challenges", {
+    session: owner,
+    body: { recipe: "bookshelf", title: "Já li (vitrine)", items: [{ title: "Livro A", author: "Autora A" }, { title: "Livro B", author: "Autora B" }, { title: "Livro C", author: "Autora C" }] },
+  });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const challengeId = (created.body as { id: string }).id;
+  assert.equal((created.body as { status: string }).status, "active");
+  assert.equal((created.body as { kind: string }).kind, "list");
+
+  const detail = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    entryTypes: Array<{ id: string; purpose: string; fields: Array<{ id: string; key: string }> }>;
+    items: Array<{ id: string }>;
+  };
+  const ratingType = detail.entryTypes.find((type) => type.purpose === "rating")!;
+  const notaField = ratingType.fields.find((field) => field.key === "nota")!.id;
+
+  for (const [item, nota] of [[detail.items[0], 5], [detail.items[1], 3]] as const) {
+    const entry = await call("POST", `/api/challenges/${challengeId}/entries`, {
+      session: owner, body: { itemId: item.id, entryTypeId: ratingType.id, values: { [notaField]: nota } },
+    });
+    assert.equal(entry.response.status, 201, JSON.stringify(entry.body));
+  }
+
+  const metric = await call("POST", `/api/challenges/${challengeId}/metrics`, {
+    session: owner, body: { label: "Média das notas", operation: "average", fieldId: notaField, groupBy: "none" },
+  });
+  assert.equal(metric.response.status, 201, JSON.stringify(metric.body));
+  const metricId = (metric.body as { id: string }).id;
+
+  // Curar e publicar não exigem fechar — uma lista não tem "fechado".
+  const curated = await call("POST", `/api/challenges/${challengeId}/results`, {
+    session: owner,
+    body: { headline: "O que já li", summary: "Minhas notas até agora", metricIds: [metricId], comments: [] },
+  });
+  assert.equal(curated.response.status, 200, JSON.stringify(curated.body));
+
+  const publish = await call("POST", `/api/challenges/${challengeId}/results/publish`, { session: owner, body: {} });
+  assert.equal(publish.response.status, 200, JSON.stringify(publish.body));
+  const token = (publish.body as { url: string }).url!.split("/results/")[1];
+
+  const stillActive = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { status: string };
+  assert.equal(stillActive.status, "active", "publicar a vitrine de uma lista não fecha nem transiciona o estado");
+
+  const first = (await call("GET", `/api/results/${token}`)).body as {
+    challenge: { result: { headline: string | null; metrics: ApiMetric[] } };
+  };
+  assert.equal(first.challenge.result.headline, "O que já li");
+  assert.equal(first.challenge.result.metrics.find((row) => row.id === metricId)!.value, 4, "média de 5 e 3");
+
+  // Um novo registro depois de publicar — sem regenerar nem salvar a curadoria de novo.
+  await call("POST", `/api/challenges/${challengeId}/entries`, {
+    session: owner, body: { itemId: detail.items[2].id, entryTypeId: ratingType.id, values: { [notaField]: 3 } },
+  });
+
+  const second = (await call("GET", `/api/results/${token}`)).body as {
+    challenge: { result: { metrics: ApiMetric[] } };
+  };
+  const liveValue = second.challenge.result.metrics.find((row) => row.id === metricId)!.value ?? 0;
+  assert.ok(Math.abs(liveValue - 11 / 3) < 0.01, `a vitrine publicada devia acompanhar o novo registro ao vivo, veio ${liveValue}`);
+});
+
 // ── Onda D — lixeira e ciclo de vida ────────────────────────────────────
 
 test("D: registro binado num desafio ativo não pode ser restaurado nem apagado após encerrar", async () => {
