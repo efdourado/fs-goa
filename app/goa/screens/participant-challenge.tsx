@@ -267,7 +267,7 @@ export function DynamicEntryForm({
   const sectioned = sectionedProp ?? Boolean(heading);
 
   return (
-    <div className={cx(sectioned ? "border-l-[3px] border-[var(--line)] pl-4" : undefined, !heading && canReopen ? "relative pr-8" : undefined)}>
+    <div className={cx(sectioned ? "border-l-[3px] border-[var(--line)] pl-4" : undefined, !heading && canReopen ? "relative" : undefined)}>
       {heading ? (
         <div className="mb-3 flex items-center justify-between gap-2">
           <h3 className={sectionLabelClass}>{heading}</h3>
