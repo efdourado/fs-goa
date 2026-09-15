@@ -7,7 +7,6 @@ const ADMIN_TABS = new Set<AdminTab>([
   "fields",
   "items",
   "checkpoints",
-  "review",
   "metrics",
   "results",
 ]);

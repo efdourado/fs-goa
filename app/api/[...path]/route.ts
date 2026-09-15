@@ -117,7 +117,6 @@ import {
   json,
   notFound,
   readJsonObject,
-  readOptionalJsonObject,
   requireMutationOrigin,
 } from "@/lib/http";
 
@@ -458,7 +457,7 @@ export async function DELETE(request: Request): Promise<Response> {
       return json(await archiveMetric(session, path[1], path[3]));
     }
     if (path[0] === "entries" && path.length === 2) {
-      return json(await deleteEntry(session, path[1], await readOptionalJsonObject(request)));
+      return json(await deleteEntry(session, path[1]));
     }
     if (path[0] === "challenges" && path[2] === "template" && path.length === 3) {
       return json(await unpublishChallengeTemplate(session, path[1]));

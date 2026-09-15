@@ -1719,7 +1719,7 @@ test("data do registro é opcional: uma rodada aceita registro sem data, mas o d
   assert.equal((dailyEntry.body as { occurredOn: string }).occurredOn, today);
 });
 
-test("registros podem ser excluídos: pelo autor ou pelo admin, só com o desafio ativo", async () => {
+test("registros podem ser excluídos apenas pelo próprio autor, só com o desafio ativo", async () => {
   const owner = await register("Bea", "bea_entrydel");
   const author = await register("Caio", "caio_entrydel");
   const other = await register("Dora", "dora_entrydel");
@@ -1768,31 +1768,6 @@ test("registros podem ser excluídos: pelo autor ou pelo admin, só com o desafi
     0,
     "some das listagens após a exclusão",
   );
-
-  // admin manda o registro de um participante para a lixeira — exige motivo,
-  // igual à correção e à exclusão permanente, e o motivo fica registrado
-  const ownerEntry = await call("POST", `/api/challenges/${challengeId}/entries`, {
-    session: owner, body: { participantId: author.user.id, itemId: items[1].id, values: { nota: 5 } },
-  });
-  const ownerEntryId = (ownerEntry.body as { id: string }).id;
-  const noReason = await call("DELETE", `/api/entries/${ownerEntryId}`, { session: owner });
-  assert.equal(noReason.response.status, 400, "sem motivo o admin não exclui registro alheio");
-  assert.equal((noReason.body as { error: string }).error, "reason_required");
-  assert.equal(
-    (await call("DELETE", `/api/entries/${ownerEntryId}`, { session: owner, body: { reason: "duplicado com o registro do Filme A" } })).response.status,
-    200,
-  );
-  const audited = await adminPool.query<{ action: string; metadata: { reason?: string } }>(
-    "SELECT action, metadata FROM audit_events WHERE entity_type='entry' AND entity_id=$1 AND action='entry.deleted'",
-    [ownerEntryId],
-  );
-  assert.equal(audited.rows.length, 1, "a exclusão administrativa fica na auditoria");
-  assert.equal(audited.rows[0]?.metadata?.reason, "duplicado com o registro do Filme A", "com o motivo");
-  const trashed = await adminPool.query<{ reason: string | null }>(
-    "SELECT reason FROM trash_items WHERE entity_kind='entry' AND entity_id=$1",
-    [ownerEntryId],
-  );
-  assert.equal(trashed.rows[0]?.reason, "duplicado com o registro do Filme A", "e também no registro da lixeira");
 
   // desafio encerrado não aceita exclusão
   const late = await call("POST", `/api/challenges/${challengeId}/entries`, {
@@ -2383,48 +2358,6 @@ test("item + checkpoint são ortogonais: um registro carrega filme e sessão", a
     "SELECT item_id, checkpoint_id FROM entries WHERE challenge_id=$1 AND deleted_at IS NULL", [challengeId]);
   assert.equal(entryRow.rows[0].item_id, itemId, "item_id persistido");
   assert.equal(entryRow.rows[0].checkpoint_id, sessionId, "checkpoint_id persistido, sem exclusão mútua");
-});
-
-test("auditoria de correção de registro guarda só metadados", async () => {
-  const owner = await register("Nara", "nara_audit");
-  const member = await register("Bruno", "bruno_audit");
-  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Auditoria" } })).body as { id: string }).id;
-  const inv = (await call("POST", `/api/groups/${gid}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
-  await call("POST", `/api/invites/${inv.token}`, { session: member, body: {} });
-
-  const created = await call("POST", `/api/groups/${gid}/challenges`, {
-    session: owner,
-    body: {
-      recipe: "cinema", title: "Auditável", startsOn: "2026-08-01", endsOn: "2026-12-31",
-      participantIds: [owner.user.id, member.user.id], items: [{ title: "Blow-Up" }],
-    },
-  });
-  const challengeId = (created.body as { id: string }).id;
-  assert.equal((await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } })).response.status, 200);
-  const detail = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
-    fields: Array<{ id: string; type: string }>; items: Array<{ id: string }>;
-  };
-  const ratingField = detail.fields.find((entry) => entry.type === "rating")!.id;
-  const commentField = detail.fields.find((entry) => entry.type === "text")!.id;
-  const itemId = detail.items[0].id;
-
-  const entry = await call("POST", `/api/challenges/${challengeId}/entries`, {
-    session: member, body: { itemId, values: { [ratingField]: 3, [commentField]: "texto secreto do participante" } },
-  });
-  const entryId = (entry.body as { id: string }).id;
-
-  const corrected = await call("PATCH", `/api/entries/${entryId}`, {
-    session: owner, body: { values: { [ratingField]: 5, [commentField]: "outro texto secreto" }, reason: "ajuste combinado" },
-  });
-  assert.equal(corrected.response.status, 200, JSON.stringify(corrected.body));
-
-  const audit = await adminPool.query<{ before: unknown; after: unknown; metadata: { fields?: string[]; reason?: string } }>(
-    "SELECT before, after, metadata FROM audit_events WHERE challenge_id=$1 AND action='entry.corrected'", [challengeId]);
-  assert.equal(audit.rows[0].before, null, "sem before/after com valores");
-  assert.equal(audit.rows[0].after, null);
-  assert.deepEqual([...(audit.rows[0].metadata.fields ?? [])].sort(), [commentField, ratingField].sort());
-  assert.equal(audit.rows[0].metadata.reason, "ajuste combinado");
-  assert.doesNotMatch(JSON.stringify(audit.rows[0]), /texto secreto/, "nenhum conteúdo do participante na auditoria");
 });
 
 test("o console da plataforma não vê texto privado: auditoria redigida e nada de conteúdo pessoal", async () => {

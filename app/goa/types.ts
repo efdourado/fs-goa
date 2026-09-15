@@ -25,7 +25,6 @@ export type AdminTab =
   | "fields"
   | "items"
   | "checkpoints"
-  | "review"
   | "metrics"
   | "results";
 export type ParticipantTab = "today" | "grupo" | "results";

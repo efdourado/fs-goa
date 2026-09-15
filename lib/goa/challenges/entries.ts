@@ -7,9 +7,8 @@ import {
   dateKeyInTimeZone,
   dateString,
   publicId,
-  writeAudit,
 } from "../../goa-domain";
-import { ApiError, stringValue } from "../../http";
+import { ApiError } from "../../http";
 import {
   type FieldDefinition,
   validateFieldValue,
@@ -228,7 +227,7 @@ export async function saveEntry(
   return inTransaction(async (client) => {
     const access = await challengeAccess(session.user.id, challengeId, client, true);
     if (access.challenge.status !== "active") throw new ApiError(409, "challenge_not_active", "Registros só podem ser enviados durante o desafio ativo.");
-    const participantId = access.canManage && typeof body.participantId === "string" ? body.participantId : session.user.id;
+    const participantId = session.user.id;
     const participant = await oneOrNull<{ user_id: string }>(client,
       "SELECT user_id FROM challenge_participants WHERE challenge_id=$1 AND user_id=$2 AND removed_at IS NULL",
       [challengeId, participantId]);
@@ -369,13 +368,6 @@ export async function saveEntry(
       );
     }
     const normalized = await writeEntryValues(client, entryId, challengeId, entryType.id, fields, body.values);
-    if (access.canManage && participantId !== session.user.id) {
-      // Audit rows are metadata-only — the platform console reads them, so a
-      // participant's ratings and comments never land there. Field ids only.
-      await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
-        existing ? "entry.corrected" : "entry.created_by_admin", "entry", entryId, null, null,
-        { participantId, fields: Object.keys(normalized) });
-    }
     return { id: entryId, itemId, checkpointId, participantId, occurredOn, values: normalized, updated: Boolean(existing) };
   });
 }
@@ -396,9 +388,9 @@ export async function updateEntry(
          JOIN entry_types t ON t.id=e.entry_type_id
         WHERE e.id=$1 AND e.deleted_at IS NULL AND c.deleted_at IS NULL FOR UPDATE`, [entryId]);
     if (!entry) throw new ApiError(404, "not_found", "Registro não encontrado.");
-    const role = await requireGroupRole(session.user.id, entry.group_id, ["owner", "admin", "participant"], client);
-    const canManage = role === "owner" || role === "admin";
-    if (!canManage && entry.participant_user_id !== session.user.id) throw new ApiError(404, "not_found", "Registro não encontrado.");
+    // Only the author may edit their own entry — no admin correction path.
+    await requireGroupRole(session.user.id, entry.group_id, ["owner", "admin", "participant"], client);
+    if (entry.participant_user_id !== session.user.id) throw new ApiError(404, "not_found", "Registro não encontrado.");
     if (entry.status !== "active") throw new ApiError(409, "challenge_not_active", "O desafio não aceita correções agora.");
     if (entry.purpose === "expectation" && entry.item_id) {
       const rated = await oneOrNull<{ id: string }>(client,
@@ -410,20 +402,10 @@ export async function updateEntry(
         throw new ApiError(409, "expectation_locked", "A expectativa trava depois que você avalia o filme.");
       }
     }
-    const reason = stringValue(body, "reason", { max: 500, optional: true }) ?? null;
     const fields = await storageFields(client, entry.challenge_id, entry.entry_type_id);
-    const before = (await entryValues(client, [entryId])).get(entryId) ?? {};
     await client.query("DELETE FROM entry_values WHERE entry_id=$1", [entryId]);
     const values = await writeEntryValues(client, entryId, entry.challenge_id, entry.entry_type_id, fields, body.values);
     await client.query("UPDATE entries SET last_edited_by_user_id=$2,updated_at=now() WHERE id=$1", [entryId, session.user.id]);
-    if (canManage) {
-      // Metadata only — which fields changed and why, never the values. The
-      // platform audit console must not surface participant content.
-      const changed = [...new Set([...Object.keys(before), ...Object.keys(values)])];
-      await writeAudit(client, entry.group_id, entry.challenge_id, session.user.id,
-        "entry.corrected", "entry", entryId, null, null,
-        { fields: changed, ...(reason ? { reason } : {}) });
-    }
     return { id: entryId, values };
   });
 }
@@ -431,7 +413,6 @@ export async function updateEntry(
 export async function deleteEntry(
   session: SessionContext,
   entryId: string,
-  body: Record<string, unknown> = {},
 ) {
   return inTransaction(async (client) => {
     const entry = await oneOrNull<{
@@ -442,37 +423,16 @@ export async function deleteEntry(
          FROM entries e JOIN challenges c ON c.id=e.challenge_id
         WHERE e.id=$1 AND e.deleted_at IS NULL AND c.deleted_at IS NULL FOR UPDATE`, [entryId]);
     if (!entry) throw new ApiError(404, "not_found", "Registro não encontrado.");
-    const role = await requireGroupRole(session.user.id, entry.group_id, ["owner", "admin", "participant"], client);
-    const canManage = role === "owner" || role === "admin";
-    const isOwnEntry = entry.participant_user_id === session.user.id;
-    if (!canManage && !isOwnEntry) {
-      throw new ApiError(404, "not_found", "Registro não encontrado.");
-    }
+    // Only the author may delete their own entry — no admin correction path.
+    await requireGroupRole(session.user.id, entry.group_id, ["owner", "admin", "participant"], client);
+    if (entry.participant_user_id !== session.user.id) throw new ApiError(404, "not_found", "Registro não encontrado.");
     if (entry.status !== "active") {
-      // A closed round's records are frozen — changing one needs a reopen or an
-      // audited admin correction, not a quiet delete (ROADMAP §13).
       throw new ApiError(409, "challenge_not_active", "Registros só podem ser excluídos com o desafio ativo.");
-    }
-    // Sending someone else's entry to the bin is an administrative act and needs a
-    // stated reason, the same as correcting or permanently deleting one — it is
-    // recorded on the `trash_items` row and in the audit trail. Deleting your own
-    // entry needs nothing.
-    const reason = stringValue(body, "reason", { min: 1, max: 500, optional: true }) ?? null;
-    if (canManage && !isOwnEntry && !reason) {
-      throw new ApiError(400, "reason_required", "Informe o motivo da exclusão administrativa.");
     }
     // Moves the entry to the bin: `deleted_at` (so it leaves listings, metrics
     // and the showcase, and frees the partial unique indexes) plus the explicit
     // `trash_items` row. The participant restores it from the challenge screen.
-    await moveToTrash(client, "entry", entryId, session.user.id, {
-      skipMarker: false,
-      reason: isOwnEntry ? null : reason,
-    });
-    if (canManage) {
-      await writeAudit(client, entry.group_id, entry.challenge_id, session.user.id,
-        "entry.deleted", "entry", entryId, null, null,
-        { participantId: entry.participant_user_id, ...(reason ? { reason } : {}) });
-    }
+    await moveToTrash(client, "entry", entryId, session.user.id, { skipMarker: false, reason: null });
     return { id: entryId, deleted: true };
   });
 }

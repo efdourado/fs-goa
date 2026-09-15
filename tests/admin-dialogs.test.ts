@@ -3,8 +3,8 @@ import { createElement } from "react";
 import test from "node:test";
 
 import { ConfirmDialog } from "../app/goa/dialog";
-import { CorrectionDialog, FieldEditorDialog, ItemEditorDialog } from "../app/goa/screens/admin";
-import type { ChallengeDetail, ChallengeItem, Entry } from "../app/goa/types";
+import { FieldEditorDialog, ItemEditorDialog } from "../app/goa/screens/admin";
+import type { ChallengeDetail, ChallengeItem } from "../app/goa/types";
 import { renderWithIntl } from "./helpers/intl";
 
 const noop = async () => undefined;
@@ -76,20 +76,4 @@ test("ItemEditorDialog folds the catalogue facts behind a details, author for bo
   assert.match(html, /<details/, "catalogue facts sit in a details");
   assert.match(html, /Dados do acervo/);
   assert.match(html, /value="Itamar"/);
-});
-
-test("CorrectionDialog carries the mandatory reason field and the entry form", () => {
-  const entry = { id: "e1", participantName: "Ana", values: {} } as unknown as Entry;
-  const html = renderWithIntl(createElement(CorrectionDialog, {
-    entry,
-    challenge: { status: "active", participants: [], items: [], entryTypes: [], fields: [{ id: "nota", key: "nota", label: "Nota", type: "rating", required: true }] } as unknown as ChallengeDetail,
-    item: null,
-    fields: [{ id: "nota", key: "nota", label: "Nota", type: "rating", required: true }],
-    onClose: () => undefined,
-    onPatch: noop,
-    onDelete: noop,
-  }));
-  assert.match(html, /Correção administrativa/);
-  assert.match(html, /Motivo/);
-  assert.match(html, /Excluir registro|Enviar.*lixeira|deleteEntry/i);
 });

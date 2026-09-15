@@ -9,7 +9,7 @@ import { CheckpointPlanner } from "../checkpoint-planner";
 import { Segmented } from "../Segmented";
 import { useGoaFormat } from "../format";
 import { CineItemsEditor, type CineRow, cineRowsToInput } from "../cine-items";
-import { ConfirmDialog, Dialog, FormDialog } from "../dialog";
+import { ConfirmDialog, FormDialog } from "../dialog";
 import { cleanFields, FIELD_TYPES, FieldConfigInputs, newFieldConfig, uniqueFieldKey } from "../fields";
 import { ListImportPanel } from "../list-import-panel";
 import { RuleSectionsEditor, visibleRuleSections } from "../rules";
@@ -45,7 +45,6 @@ import {
 } from "../ui";
 import { formatRuntime, isLivingList, itemIdForEntry, recipeCatalogKind, valuesAsRecord } from "../utils";
 import { AdminMetrics } from "./metrics";
-import { DynamicEntryForm } from "./participant-challenge";
 
 /** A curation list that shows its first `preview` rows, the rest behind a toggle. */
 function ShowMoreList<T>({
@@ -778,138 +777,6 @@ function AdminItems({
   );
 }
 
-function AdminReview({
-  challenge,
-  entries,
-  onPatch,
-  onDelete,
-}: {
-  challenge: ChallengeDetail;
-  entries: Entry[];
-  onPatch: (entryId: Id, values: Record<Id, unknown>, reason: string) => Promise<void>;
-  onDelete: (entryId: Id, reason: string) => Promise<void>;
-}) {
-  const t = useTranslations("adminChallenge");
-  const f = useGoaFormat();
-  const [selectedId, setSelectedId] = useState<Id | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const selected = entries.find((entry) => entry.id === selectedId);
-  const selectedItem = challenge.items.find((item) => item.id === (selected ? itemIdForEntry(selected) : null)) ?? null;
-  const selectedFields = (selected?.entryTypeId
-    && challenge.entryTypes.find((type) => type.id === selected.entryTypeId)?.fields)
-    || challenge.fields;
-  const expected = challenge.items.length * challenge.participants.length;
-  const doneCount = challenge.completionEntryTypeId
-    ? entries.filter((entry) => entry.entryTypeId === challenge.completionEntryTypeId).length
-    : entries.length;
-
-  return (
-    <section className="mx-auto max-w-5xl space-y-12">
-      <div>
-        <PageHeading title={t("reviewTitle")} description={t("reviewSummary", { sent: entries.length, pending: Math.max(0, expected - doneCount), late: entries.filter((entry) => entry.isLate).length })} />
-        <div className="mb-5"><StatusMessage success={success} /></div>
-        {entries.length ? (
-          <ShowMoreList
-            items={entries}
-            preview={12}
-            className="divide-y divide-[var(--line)]"
-            render={(entry) => {
-              const item = challenge.items.find((candidate) => candidate.id === itemIdForEntry(entry));
-              const type = challenge.entryTypes.find((candidate) => candidate.id === entry.entryTypeId);
-              return (
-                <div className="flex items-start justify-between gap-4 py-4" key={entry.id}>
-                  <div className="min-w-0">
-                    <strong className="block text-base font-medium">{entry.participantName ?? entry.participantUsername ?? t("participantFallback")}</strong>
-                    <span className="mt-1 block text-xs text-[var(--muted)]">{[item?.title ?? t("freeEntry"), type && challenge.entryTypes.length > 1 ? type.name : null, f.dateTime(entry.submittedAt ?? entry.updatedAt)].filter(Boolean).join(" · ")}</span>
-                  </div>
-                  <div className="flex flex-none items-center gap-2">
-                    {entry.isLate ? <span className="rounded-full bg-[var(--warn-soft)] px-2 py-1 text-[10px] font-light text-[var(--warn)]">{t("late")}</span> : null}
-                    <Button variant="secondary" className="min-h-9 px-3 py-1 text-xs" onClick={() => setSelectedId(entry.id)}>{t("inspect")}</Button>
-                  </div>
-                </div>
-              );
-            }}
-          />
-        ) : <EmptyState title={t("noEntriesTitle")} />}
-      </div>
-
-
-      {selected ? (
-        <CorrectionDialog
-          entry={selected}
-          challenge={challenge}
-          item={selectedItem}
-          fields={selectedFields}
-          onClose={() => setSelectedId(null)}
-          onPatch={async (values, reason) => { await onPatch(selected.id, values, reason); setSuccess(t("entryCorrected")); }}
-          onDelete={async (reason) => { await onDelete(selected.id, reason); setSelectedId(null); setSuccess(t("entryDeleted")); }}
-        />
-      ) : null}
-    </section>
-  );
-}
-
-export function CorrectionDialog({
-  entry,
-  challenge,
-  item,
-  fields,
-  onClose,
-  onPatch,
-  onDelete,
-}: {
-  entry: Entry;
-  challenge: ChallengeDetail;
-  item: ChallengeItem | null;
-  fields: ChallengeField[];
-  onClose: () => void;
-  onPatch: (values: Record<Id, unknown>, reason: string) => Promise<void>;
-  onDelete: (reason: string) => Promise<void>;
-}) {
-  const t = useTranslations("adminChallenge");
-  const f = useGoaFormat();
-  const [reason, setReason] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const closed = challenge.status === "closed";
-
-  return (
-    <Dialog title={t("correctionHeading", { name: entry.participantName ?? t("participantFallback"), item: item?.title ?? t("entryFallback") })} onClose={onClose}>
-      <p className="text-xs text-[var(--muted)]">{t("correctionKicker")}</p>
-      <div className="mt-4">
-        <Field label={`${t("reasonLabel")} *`}>
-          <textarea className={inputClass} rows={3} value={reason} onChange={(event) => setReason(event.target.value)} placeholder={t("reasonPlaceholder")} maxLength={500} disabled={closed} />
-        </Field>
-      </div>
-      <div className="mt-5">
-        <DynamicEntryForm
-          key={`${entry.id}-${entry.updatedAt ?? ""}`}
-          fields={fields}
-          item={item}
-          entry={entry}
-          canEdit={!closed}
-          unavailableMessage={closed ? f.entryUnavailableMessage({ challengeStatus: "closed" }) : null}
-          onSave={async (values) => { if (!reason.trim()) throw new Error(t("reasonRequired")); await onPatch(values, reason.trim()); onClose(); }}
-          alwaysEditable
-        />
-      </div>
-      {!closed ? (
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--line)] pt-4">
-          <p className="text-sm text-[var(--muted)]">{t("deleteEntryHint")}</p>
-          <Button variant="danger" onClick={() => { if (!reason.trim()) { setError(t("deleteEntryReasonRequired")); return; } setError(null); setConfirmDelete(true); }}>{t("deleteEntry")}</Button>
-        </div>
-      ) : null}
-      <div className="mt-4"><StatusMessage error={error} /></div>
-
-      {confirmDelete ? (
-        <ConfirmDialog title={t("deleteEntry")} body={t("deleteEntryConfirm")} confirmLabel={t("deleteEntry")} busyLabel={t("deletingEntry")} danger
-          onClose={() => setConfirmDelete(false)}
-          onConfirm={() => onDelete(reason.trim())} />
-      ) : null}
-    </Dialog>
-  );
-}
-
 interface CuratedCommentCandidate {
   key: string;
   entryId: Id;
@@ -1113,8 +980,6 @@ export function AdminScreen({
   onPreviewImport,
   onSaveCheckpoints,
   onAssignCheckpointItems,
-  onPatchEntry,
-  onDeleteEntry,
   onAddMetric,
   onUpdateMetric,
   onDeleteMetric,
@@ -1150,8 +1015,6 @@ export function AdminScreen({
   onPreviewImport: (body: { json: string; mapping?: Record<string, string> }) => Promise<ImportPreview>;
   onSaveCheckpoints: (checkpoints: CheckpointInput[]) => Promise<void>;
   onAssignCheckpointItems: (assignments: Array<{ itemId: Id; checkpointId: Id | null; position?: number }>) => Promise<void>;
-  onPatchEntry: (entryId: Id, values: Record<Id, unknown>, reason: string) => Promise<void>;
-  onDeleteEntry: (entryId: Id, reason: string) => Promise<void>;
   onAddMetric: (payload: Record<string, unknown>) => Promise<void>;
   onUpdateMetric: (metricId: Id, payload: Record<string, unknown>) => Promise<void>;
   onDeleteMetric: (metricId: Id) => Promise<void>;
@@ -1174,7 +1037,7 @@ export function AdminScreen({
     "overview",
     "fields", "items",
     ...(showCheckpoints ? (["checkpoints"] as const) : []),
-    "review", "metrics", "results",
+    "metrics", "results",
   ];
   const requestedTab = tab === "participants" ? "overview" : tab;
   const activeTab = tabs.includes(requestedTab) ? requestedTab : "overview";
@@ -1214,7 +1077,6 @@ export function AdminScreen({
         {activeTab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.visibilityPolicy}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} onSaveVisibility={onSaveEntryTypeVisibility} onSetExpectation={onSetExpectation} /> : null}
         {activeTab === "items" ? <AdminItems challenge={challenge} group={group} entries={entries} onAdd={onAddItems} onUpdate={onUpdateItem} onArchive={onArchiveItem} onPreviewImport={onPreviewImport} /> : null}
         {activeTab === "checkpoints" ? <CheckpointPlanner key={`${challenge.id}:${challenge.checkpoints.map((cp) => cp.id).join(",")}`} challenge={challenge} onSaveCheckpoints={onSaveCheckpoints} onAssign={onAssignCheckpointItems} /> : null}
-        {activeTab === "review" ? <AdminReview challenge={challenge} entries={entries} onPatch={onPatchEntry} onDelete={onDeleteEntry} /> : null}
         {activeTab === "metrics" ? <AdminMetrics challenge={challenge} onAdd={onAddMetric} onUpdate={onUpdateMetric} onDelete={onDeleteMetric} /> : null}
         {activeTab === "results" ? <AdminResults challenge={challenge} entries={entries} onSave={onSaveResult} onPublish={onPublishResult} onReorderBlocks={onReorderBlocks} /> : null}
       </div>
