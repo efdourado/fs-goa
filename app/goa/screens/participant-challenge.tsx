@@ -267,10 +267,10 @@ export function DynamicEntryForm({
   const sectioned = sectionedProp ?? Boolean(heading);
 
   return (
-    <div className={sectioned ? "border-l-[3px] border-[var(--line)] pl-4" : undefined}>
-      {heading || canReopen ? (
+    <div className={cx(sectioned ? "border-l-[3px] border-[var(--line)] pl-4" : undefined, !heading && canReopen ? "relative pr-8" : undefined)}>
+      {heading ? (
         <div className="mb-3 flex items-center justify-between gap-2">
-          {heading ? <h3 className={sectionLabelClass}>{heading}</h3> : <span aria-hidden="true" />}
+          <h3 className={sectionLabelClass}>{heading}</h3>
           {canReopen ? (
             <button
               type="button"
@@ -282,6 +282,19 @@ export function DynamicEntryForm({
             </button>
           ) : null}
         </div>
+      ) : canReopen ? (
+        // No heading text here (the field's own label already says what this
+        // is) — a dedicated row for nothing but the icon would just be a gap
+        // with a floating button, so it sits over the top-right corner
+        // instead, taking no space of its own.
+        <button
+          type="button"
+          className="absolute -top-1 right-0 z-10 flex-none rounded-full p-1.5 text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)]"
+          aria-label={t("editAnswer")}
+          onClick={() => setEditing(true)}
+        >
+          <LockIcon />
+        </button>
       ) : null}
       {note}
       <form className="space-y-5" onSubmit={submit} noValidate>
@@ -524,11 +537,16 @@ function ItemEntryPanel({
         // nothing to lock — it stays always open, and needs its own heading
         // since there's no required-field label to lean on.
         const hasRequiredField = type.fields.some((field) => field.required);
-        const heading = hasRequiredField
-          ? undefined
-          : type.purpose === "completion"
-            ? t("completionHeading")
-            : type.name;
+        // Solo (not stacked) always takes "Sua resposta" as its heading —
+        // there's only one form, so the icon shares its row instead of
+        // floating alone below the label with a visible gap between them.
+        const heading = !stacked
+          ? t("yourResponseTitle")
+          : hasRequiredField
+            ? undefined
+            : type.purpose === "completion"
+              ? t("completionHeading")
+              : type.name;
         // Spell out who will see this answer before the first submit (V1 §8) — except
         // the two "the group sees it soon enough" cases, which don't need a sentence
         // of their own. The two that actually withhold the answer (only after close,
@@ -540,7 +558,7 @@ function ItemEntryPanel({
           <div key={type.id || "registro"}>
             <DynamicEntryForm
               key={`${type.id}-${item.id}-${perDay ? occurredOn || today : "fixed"}-${entry?.id ?? "new"}`}
-              heading={stacked ? heading : undefined}
+              heading={heading}
               sectioned={stacked && hasRequiredField}
               alwaysEditable={!hasRequiredField}
               note={note}
@@ -1057,12 +1075,18 @@ export function ParticipantChallengeScreen({
                     : null
                   }
                 </div>
-                <p className={cx("mb-3", sectionLabelClass)}>{t("yourResponseTitle")}</p>
+                {/* When more than one form is stacked (ItemEntryPanel), "Sua
+                    resposta" introduces the whole group and each form gets
+                    its own heading below. A single form instead takes the
+                    label itself, in the same row as its own lock icon —
+                    otherwise the icon sits in its own row with nothing next
+                    to it, an orphaned control with a visible gap above it. */}
+                {useItemPanel && itemForms.length > 1 ? <p className={cx("mb-3", sectionLabelClass)}>{t("yourResponseTitle")}</p> : null}
                 {dateRequired ? <label className="mb-5 block"><span className={labelClass}>{t("occurredOnLabel")}</span><input className={inputClass} type="date" max={today} value={effectiveOccurredOn} disabled={Boolean(unavailableMessage)} onChange={(event) => setOccurredOn(event.target.value || today)} /><small className="mt-1 block text-[var(--muted)]">{t("occurredOnHint")}</small></label> : !useItemPanel && currentEntry?.occurredOn ? <p className="mb-5 text-xs text-[var(--muted)]">{t("occurredOn", { date: f.date(currentEntry.occurredOn, longDate) })}</p> : null}
                 {useItemPanel && selectedItem ? (
                   <ItemEntryPanel key={`${selectedItem.id}-${selectedSession?.id ?? "no-session"}`} challenge={challenge} item={selectedItem} ownEntries={ownEntries} occurredOn={occurredOn} onOccurredOnChange={setOccurredOn} offerOptionalDate={!perDayItem && !sessionMode && collectsEntryDate} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} checkpointId={selectedSession?.id ?? null} onSaveEntry={onSaveEntry!} onDeleteEntry={canDeleteEntry} />
                 ) : (
-                  <DynamicEntryForm key={`${selectedItem?.id ?? "free"}-${undatedDaily ? effectiveOccurredOn : "fixed"}-${currentEntry?.id ?? "new"}`} fields={challenge.fields} item={selectedItem ?? null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry!(selectedItem?.id ?? null, values, entry, undatedDaily ? effectiveOccurredOn : undefined)} onDelete={currentEntry && canDeleteEntry ? () => canDeleteEntry(currentEntry.id) : undefined} />
+                  <DynamicEntryForm key={`${selectedItem?.id ?? "free"}-${undatedDaily ? effectiveOccurredOn : "fixed"}-${currentEntry?.id ?? "new"}`} heading={t("yourResponseTitle")} sectioned={false} alwaysEditable={!challenge.fields.some((field) => field.required)} fields={challenge.fields} item={selectedItem ?? null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry!(selectedItem?.id ?? null, values, entry, undatedDaily ? effectiveOccurredOn : undefined)} onDelete={currentEntry && canDeleteEntry ? () => canDeleteEntry(currentEntry.id) : undefined} />
                 )}
               </section>
             </div>
