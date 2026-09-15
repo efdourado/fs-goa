@@ -920,7 +920,6 @@
     "scheduledTitle": "Challenge scheduled for {date}",
     "scheduledBody": "It's already active and can be viewed, but entries only open once the first checkpoint begins.",
     "closedTitle": "This challenge is closed",
-    "seeResults": "See result",
     "noCheckpointTitle": "No checkpoint available",
     "checkInOf": "Check-in for {date}",
     "newEntry": "New entry",

@@ -920,7 +920,6 @@
     "scheduledTitle": "Desafio agendado para {date}",
     "scheduledBody": "Ele já foi ativado e pode ser consultado, mas os registros só serão liberados quando o primeiro checkpoint começar.",
     "closedTitle": "Este desafio foi encerrado",
-    "seeResults": "Ver resultado",
     "noCheckpointTitle": "Nenhum checkpoint disponível",
     "checkInOf": "Check-in de {date}",
     "newEntry": "Novo registro",

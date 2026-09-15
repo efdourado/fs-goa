@@ -1137,7 +1137,7 @@ export function ParticipantChallengeScreen({
       <div className="mt-5">
         {activeTab === "today" ? (
           challenge.status === "closed" ? (
-            <EmptyState title={t("closedTitle")} action={<Button onClick={() => onTab("results")}>{t("seeResults")}</Button>} />
+            <EmptyState title={t("closedTitle")} />
           ) : challenge.submissionMode !== "free" && !selectedItem && !undatedDaily ? (
             <EmptyState title={t("noCheckpointTitle")} />
           ) : (
