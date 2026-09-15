@@ -913,6 +913,7 @@
     "youLabel": "You",
     "yourResponseTitle": "Your response",
     "completionHeading": "If I finished...",
+    "saveAllButton": "Save answers",
     "navAria": "Challenge navigation",
     "navMobileAria": "Mobile challenge navigation",
     "entriesProgress": "<b>{done}</b> of {total} entries",

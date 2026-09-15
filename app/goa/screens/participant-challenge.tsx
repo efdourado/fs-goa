@@ -1,7 +1,7 @@
 "use client";
 
 import { useFormatter, useTranslations } from "next-intl";
-import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type FormEvent, forwardRef, type ReactNode, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 
 import { copyText } from "../clipboard";
 import { useGoaFormat } from "../format";
@@ -137,21 +137,13 @@ function LockIcon() {
   );
 }
 
-export function DynamicEntryForm({
-  fields,
-  item,
-  entry,
-  canEdit,
-  unavailableMessage,
-  readOnlyInline = false,
-  heading,
-  sectioned: sectionedProp,
-  note,
-  dateField,
-  onSave,
-  onDelete,
-  alwaysEditable = false,
-}: {
+/** Imperative handle for a combined "save everything" button above several stacked sections. */
+export interface DynamicEntryFormHandle {
+  /** Saves this section if it's currently open for editing; a no-op (resolves `ok: true`) when it's collapsed/locked, since there's nothing to save. */
+  submitIfEditing: () => Promise<{ ok: boolean }>;
+}
+
+export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
   fields: ChallengeField[];
   item: ChallengeItem | null;
   entry?: Entry;
@@ -187,7 +179,31 @@ export function DynamicEntryForm({
   // false: an already-answered checkpoint shows a quiet summary instead of a
   // save button and a delete link sitting there forever.
   alwaysEditable?: boolean;
-}) {
+  // When several required-field sections are stacked, a single button below
+  // the whole group saves all of them — each section's own Save button would
+  // just be redundant then (Cancel, and the section's own validation/error
+  // message, still show normally).
+  hideOwnSaveButton?: boolean;
+  // Reports every change of the open/collapsed state — the combined button
+  // above uses this to know whether any section actually needs saving.
+  onEditingChange?: (editing: boolean) => void;
+}>(function DynamicEntryForm({
+  fields,
+  item,
+  entry,
+  canEdit,
+  unavailableMessage,
+  readOnlyInline = false,
+  heading,
+  sectioned: sectionedProp,
+  note,
+  dateField,
+  onSave,
+  onDelete,
+  alwaysEditable = false,
+  hideOwnSaveButton = false,
+  onEditingChange,
+}, ref) {
   const t = useTranslations("entryForm");
   const tp = useTranslations("participant");
   const tc = useTranslations("common");
@@ -199,6 +215,7 @@ export function DynamicEntryForm({
   const [success, setSuccess] = useState<string | null>(null);
   // An already-answered checkpoint opens as a summary; editing is opt-in.
   const [editing, setEditing] = useState(alwaysEditable || !entry);
+  useEffect(() => { onEditingChange?.(editing); }, [editing, onEditingChange]);
 
   const optionalFields = fields.filter((field) => field.id && !field.required);
   const isBlank = (value: unknown) => value === undefined || value === null || value === "";
@@ -215,8 +232,11 @@ export function DynamicEntryForm({
     setSuccess(null);
   }
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  // Returns whether it saved cleanly (or had nothing to save) — used both by
+  // this form's own submit and by a combined "save everything" button above
+  // several stacked sections, which calls every open section's version of
+  // this in one go instead of each showing its own Save button.
+  async function performSubmit(): Promise<boolean> {
     const missing = findMissingRequiredField(fields, values);
     if (missing) {
       // No separate delete button: clearing the required answer (e.g. tapping
@@ -227,15 +247,16 @@ export function DynamicEntryForm({
         setError(null);
         try {
           await onDelete!();
+          return true;
         } catch (cause) {
           setError(f.error(cause));
           setDeleting(false);
+          return false;
         }
-        return;
       }
       setError(t("fillField", { label: missing.label }));
       document.getElementById(`entry-field-${missing.id}`)?.focus();
-      return;
+      return false;
     }
     setBusy(true);
     setError(null);
@@ -244,12 +265,23 @@ export function DynamicEntryForm({
       await onSave(values, entry);
       setSuccess(entry ? t("entryUpdated") : t("entrySaved"));
       if (!alwaysEditable) setEditing(false);
+      return true;
     } catch (cause) {
       setError(f.error(cause));
+      return false;
     } finally {
       setBusy(false);
     }
   }
+
+  async function handleFormSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await performSubmit();
+  }
+
+  useImperativeHandle(ref, () => ({
+    submitIfEditing: async () => (editing ? { ok: await performSubmit() } : { ok: true }),
+  }));
 
   if (!fields.length) {
     return <EmptyState title={t("notConfiguredTitle")} />;
@@ -297,7 +329,7 @@ export function DynamicEntryForm({
         </button>
       ) : null}
       {note}
-      <form className="space-y-5" onSubmit={submit} noValidate>
+      <form className="space-y-5" onSubmit={handleFormSubmit} noValidate>
         {fields.map((field) => {
           if (!field.id) return null;
           if (!field.required && !showOptional) return null;
@@ -332,7 +364,7 @@ export function DynamicEntryForm({
         <StatusMessage error={error} success={success} />
         {showsButtons ? (
           <div className="flex flex-col gap-2 sm:flex-row">
-            <Button type="submit" className="w-full sm:flex-1" disabled={busy || deleting}>{deleting ? tp("deletingEntry") : busy ? tc("saving") : entry ? tc("saveChanges") : t("saveEntry")}<span aria-hidden="true">→</span></Button>
+            {!hideOwnSaveButton ? <Button type="submit" className="w-full sm:flex-1" disabled={busy || deleting}>{deleting ? tp("deletingEntry") : busy ? tc("saving") : entry ? tc("saveChanges") : t("saveEntry")}<span aria-hidden="true">→</span></Button> : null}
             {entry && !alwaysEditable ? <Button type="button" variant="secondary" className="w-full sm:flex-1" disabled={busy || deleting} onClick={() => setEditing(false)}>{tc("cancel")}</Button> : null}
           </div>
         ) : !canEdit && !readOnlyInline ? <p className="rounded-xl border border-[var(--line)] bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{unavailableMessage ?? t("readOnly")}</p> : null}
@@ -340,7 +372,7 @@ export function DynamicEntryForm({
       </form>
     </div>
   );
-}
+});
 
 export function ResultView({
   challenge,
@@ -508,18 +540,60 @@ function ItemEntryPanel({
   onDeleteEntry?: (entryId: Id) => Promise<void>;
 }) {
   const t = useTranslations("participant");
+  const tc = useTranslations("common");
   const tv = useTranslations("visibility");
   const types = itemEntryTypes(challenge);
   const ratingTypeId = types.find((type) => type.purpose === "rating")?.id;
   const stacked = types.length > 1;
+  // Looked up once (both to build the JSX below and to seed the shared
+  // button's initial open/closed state) — a type is unanswered exactly when
+  // it has no matching entry yet.
+  const entryForType = (type: EntryTypeView) => {
+    const perDay = type.cardinality === "once_per_item_day";
+    return ownEntries.find((candidate) =>
+      itemIdForEntry(candidate) === item.id
+      && (candidate.entryTypeId ?? "") === type.id
+      && (!perDay || candidate.occurredOn === (occurredOn || today)));
+  };
+  // Required-field sections (Expectativa, Avaliação, Progresso do dia) each
+  // answer-once-then-lock — when there's more than one stacked, they share
+  // one Save button at the bottom instead of each carrying its own. An
+  // all-optional section (Terminei) is a standalone action you can take any
+  // time, not a fact you fill in once, so it always keeps its own button.
+  const combinableTypeIds = stacked
+    ? types.filter((type) => type.fields.some((field) => field.required)).map((type) => type.id)
+    : [];
+  const useSharedButton = combinableTypeIds.length > 1;
+  const formRefs = useRef(new Map<Id, DynamicEntryFormHandle | null>());
+  // Seeded from each combinable type's OWN initial `editing` rule
+  // (`alwaysEditable || !entry` — always `!entry` here, since a combinable
+  // type by definition has a required field and so is never `alwaysEditable`)
+  // so the button is correctly visible/hidden on the very first render, not
+  // only after a section's effect reports in.
+  const [openTypeIds, setOpenTypeIds] = useState<Set<Id>>(() => new Set(
+    types.filter((type) => combinableTypeIds.includes(type.id) && !entryForType(type)).map((type) => type.id),
+  ));
+  const [savingAll, setSavingAll] = useState(false);
+  const markOpen = (typeId: Id, open: boolean) => setOpenTypeIds((current) => {
+    if (current.has(typeId) === open) return current;
+    const next = new Set(current);
+    if (open) next.add(typeId); else next.delete(typeId);
+    return next;
+  });
+  const anyOpenToSave = combinableTypeIds.some((typeId) => openTypeIds.has(typeId));
+  async function saveAll() {
+    setSavingAll(true);
+    try {
+      await Promise.all(combinableTypeIds.map((typeId) => formRefs.current.get(typeId)?.submitIfEditing()));
+    } finally {
+      setSavingAll(false);
+    }
+  }
   return (
     <div className={stacked ? "space-y-8" : undefined}>
       {types.map((type) => {
         const perDay = type.cardinality === "once_per_item_day";
-        const entry = ownEntries.find((candidate) =>
-          itemIdForEntry(candidate) === item.id
-          && (candidate.entryTypeId ?? "") === type.id
-          && (!perDay || candidate.occurredOn === (occurredOn || today)));
+        const entry = entryForType(type);
         const rated = ratingTypeId
           ? ownEntries.some((candidate) => itemIdForEntry(candidate) === item.id && candidate.entryTypeId === ratingTypeId)
           : false;
@@ -554,13 +628,17 @@ function ItemEntryPanel({
         const note = type.visibilityPolicy === "after_close" || type.visibilityPolicy === "author_only"
           ? <p className="mb-3 rounded-lg bg-[var(--wash)] px-3 py-2 text-xs text-[var(--muted)]">{tv(`note.${type.visibilityPolicy}`)}</p>
           : undefined;
+        const combinable = stacked && hasRequiredField && useSharedButton;
         return (
           <div key={type.id || "registro"}>
             <DynamicEntryForm
               key={`${type.id}-${item.id}-${perDay ? occurredOn || today : "fixed"}-${entry?.id ?? "new"}`}
+              ref={(handle) => { formRefs.current.set(type.id, handle); }}
               heading={heading}
               sectioned={stacked && hasRequiredField}
               alwaysEditable={!hasRequiredField}
+              hideOwnSaveButton={combinable}
+              onEditingChange={combinable ? (open) => markOpen(type.id, open) : undefined}
               note={note}
               fields={type.fields}
               item={item}
@@ -582,6 +660,11 @@ function ItemEntryPanel({
           </div>
         );
       })}
+      {useSharedButton && anyOpenToSave ? (
+        <Button type="button" className="w-full" disabled={savingAll} onClick={saveAll}>
+          {savingAll ? tc("saving") : t("saveAllButton")}<span aria-hidden="true">→</span>
+        </Button>
+      ) : null}
     </div>
   );
 }

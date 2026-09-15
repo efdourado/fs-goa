@@ -481,6 +481,46 @@ test("expectativa vem antes da avaliação no formulário do item, independente 
   assert.deepEqual(itemEntryTypes(noExpectation).map((type) => type.id), ["progress", "done"], "sem expectativa, a ordem de criação vale");
 });
 
+test("Hoje: duas seções obrigatórias empilhadas (Expectativa+Avaliação) dividem um único botão de salvar", () => {
+  const challenge = {
+    id: "t2",
+    title: "Cine Curadoria",
+    description: "",
+    status: "active",
+    scope: "group",
+    kind: "round",
+    startsOn: "2026-01-01",
+    endsOn: "2026-06-01",
+    submissionMode: "item",
+    collectsEntryDate: true,
+    participants: [],
+    entryTypes: [
+      { id: "exp", name: "Expectativa", purpose: "expectation", targetPolicy: "required", cardinality: "once_per_item", schedulePolicy: "while_active", isPrimary: false, fields: [{ id: "f-exp", key: "expectativa", label: "Expectativa", type: "rating", required: true, config: { min: 0, max: 5, step: 0.5 } }] },
+      { id: "rating", name: "Avaliação", purpose: "rating", targetPolicy: "required", cardinality: "once_per_item", schedulePolicy: "while_active", isPrimary: true, fields: [{ id: "f-nota", key: "nota", label: "Nota", type: "rating", required: true, config: { min: 0, max: 5, step: 0.5 } }] },
+    ],
+    fields: [],
+    items: [{ id: "i1", title: "Parasita", position: 0, catalogItem: { year: 2019 } }],
+    checkpoints: [],
+    metrics: [],
+    ruleSections: [],
+    result: null,
+  } as unknown as ChallengeDetail;
+
+  const html = renderWithIntl(createElement(ParticipantChallengeScreen, {
+    preview: false,
+    user: null,
+    challenge,
+    entries: [],
+    tab: "today",
+    onTab: () => undefined,
+    onBack: () => undefined,
+    onSaveEntry: async () => undefined,
+  }));
+
+  assert.match(html, /Salvar respostas/, "um único botão salva as duas seções obrigatórias de uma vez");
+  assert.doesNotMatch(html, /Salvar registro/, "cada seção não carrega mais o próprio botão de salvar");
+});
+
 test("Wrapped: quando há blocos, o Resultado os renderiza na ordem gravada e pula os escondidos", () => {
   const challenge = {
     title: "Retrospectiva",
