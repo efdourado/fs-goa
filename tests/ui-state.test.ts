@@ -212,6 +212,37 @@ test("sem botão de excluir: o rótulo 'Excluir registro' não aparece mais em l
   assert.match(editing, /Salvar alterações/, "salvar continua presente");
 });
 
+test("Terminei (alwaysEditable, só campos opcionais): fica recolhido num botão até o participante abrir", () => {
+  const fields = [
+    { id: "f-nota", key: "nota", label: "Nota", type: "rating", required: false, config: { min: 0, max: 5, step: 0.5 } },
+    { id: "f-com", key: "comentario", label: "Comentário", type: "text", required: false },
+  ] as ChallengeField[];
+
+  const collapsed = renderWithIntl(createElement(DynamicEntryForm, {
+    fields,
+    item: null,
+    heading: "Se terminei...",
+    alwaysEditable: true,
+    canEdit: true,
+    onSave: async () => undefined,
+  }));
+  assert.match(collapsed, /Se terminei\.\.\./, "o botão recolhido usa o próprio heading como rótulo");
+  assert.doesNotMatch(collapsed, /<form/, "os campos ficam escondidos até abrir");
+  assert.doesNotMatch(collapsed, /Salvar (registro|alterações)/, "o botão de salvar só aparece depois de abrir");
+
+  const filled = renderWithIntl(createElement(DynamicEntryForm, {
+    fields,
+    item: null,
+    heading: "Se terminei...",
+    alwaysEditable: true,
+    canEdit: true,
+    entry: { id: "e1", values: { "f-com": "Ótimo livro" } },
+    onSave: async () => undefined,
+  }));
+  assert.match(filled, /<form/, "já tendo algo preenchido, abre direto");
+  assert.match(filled, /Salvar alterações/, "o botão de salvar aparece junto com os campos");
+});
+
 test("limpar o campo obrigatório e salvar apaga o registro, em vez de bloquear com um erro", () => {
   const fields = [{ id: "f1", key: "nota", label: "Nota", required: true }] as ChallengeField[];
   assert.equal(findMissingRequiredField(fields, { f1: 4.5 }), undefined, "preenchido não falta nada");

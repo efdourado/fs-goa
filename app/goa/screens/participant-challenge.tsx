@@ -297,6 +297,23 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
   const interactive = canEdit && editing;
   const showsButtons = editing && canEdit;
   const sectioned = sectionedProp ?? Boolean(heading);
+  // An all-optional section (Terminei) has nothing to show until you opt in —
+  // no required field ever appears on its own, so with nothing filled yet it
+  // collapses to a single control; clicking it reveals the heading, the
+  // fields, and the Save button together, instead of a heading (and a Save
+  // button that saves nothing yet) sitting above an empty "show optional
+  // fields" toggle.
+  const collapsedOptional = alwaysEditable && !showOptional && optionalCount > 0;
+  if (collapsedOptional) {
+    // Same chip as the "hide optional fields" one below (just closed rather
+    // than open) — not a visually different button for opening vs. closing.
+    return (
+      <button type="button" className={cx(actionChipClass, ghostChipClass)} onClick={() => setShowOptional(true)}>
+        <ChevronGlyph open={false} />
+        {heading ?? t("showOptional", { count: optionalCount })}
+      </button>
+    );
+  }
 
   return (
     <div className={cx(sectioned ? "border-l-[3px] border-[var(--line)] pl-4" : undefined, !heading && canReopen ? "relative" : undefined)}>
