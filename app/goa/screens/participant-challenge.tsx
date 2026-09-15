@@ -145,6 +145,7 @@ export function DynamicEntryForm({
   unavailableMessage,
   readOnlyInline = false,
   heading,
+  sectioned: sectionedProp,
   note,
   dateField,
   onSave,
@@ -160,10 +161,15 @@ export function DynamicEntryForm({
   // sentence banner below the form — for a state the label already explains
   // (the expectation locks once you rate; the label already says which field).
   readOnlyInline?: boolean;
-  // The section's own name (e.g. "Expectativa") — rendered with a lock icon
-  // that opens it back up for editing, and a left border to set it apart from
-  // sibling sections when a checkpoint has more than one entry type stacked.
+  // The section's own name (e.g. "Se terminei...") — shown next to the lock
+  // icon that reopens it for editing. Omit it (leaving the icon row unlabeled)
+  // for a type whose own required field's label already says what it is.
   heading?: string;
+  // Left border + lock-icon treatment. Defaults to whether `heading` is set;
+  // pass it explicitly to decouple the two — a required-field type keeps the
+  // border with no heading text, an all-optional type gets a heading with no
+  // border at all (nothing there to lock, see `alwaysEditable`).
+  sectioned?: boolean;
   // A short note rendered under the heading, before the summary/form — e.g.
   // the visibility policy sentence for this entry type.
   note?: ReactNode;
@@ -258,7 +264,7 @@ export function DynamicEntryForm({
   const canReopen = Boolean(entry) && canEdit && !editing;
   const interactive = canEdit && editing;
   const showsButtons = editing && canEdit;
-  const sectioned = Boolean(heading);
+  const sectioned = sectionedProp ?? Boolean(heading);
 
   return (
     <div className={sectioned ? "border-l-[3px] border-[var(--line)] pl-4" : undefined}>
@@ -509,11 +515,20 @@ function ItemEntryPanel({
         // from the picker above, an expectation is pre-watch, and once an entry
         // exists the date is fixed.
         const offersDate = offerOptionalDate && !perDay && !entry && canEdit && !locked && type.purpose !== "expectation";
-        // A single-field type (Expectativa) whose one field is labelled the same
-        // as the type itself would show the same word twice in a row — once as
-        // the section heading, once as the field's own label. Skip the heading
-        // then; the field label (with its required marker) already says it.
-        const headingRedundant = type.fields.length === 1 && type.fields[0].label.trim().toLowerCase() === type.name.trim().toLowerCase();
+        // A type with a required field (Expectativa, Avaliação, Progresso do
+        // dia) is a fact you answer once and then lock away — its required
+        // field's own label already says what it is, so the section name on
+        // top would just be noise; it keeps the bordered/lockable treatment
+        // instead. A type with only optional fields (Terminei: nota and
+        // comentário both come later, "the entry existing means done") has
+        // nothing to lock — it stays always open, and needs its own heading
+        // since there's no required-field label to lean on.
+        const hasRequiredField = type.fields.some((field) => field.required);
+        const heading = hasRequiredField
+          ? undefined
+          : type.purpose === "completion"
+            ? t("completionHeading")
+            : type.name;
         // Spell out who will see this answer before the first submit (V1 §8) — except
         // the two "the group sees it soon enough" cases, which don't need a sentence
         // of their own. The two that actually withhold the answer (only after close,
@@ -525,7 +540,9 @@ function ItemEntryPanel({
           <div key={type.id || "registro"}>
             <DynamicEntryForm
               key={`${type.id}-${item.id}-${perDay ? occurredOn || today : "fixed"}-${entry?.id ?? "new"}`}
-              heading={stacked && !headingRedundant ? type.name : undefined}
+              heading={stacked ? heading : undefined}
+              sectioned={stacked && hasRequiredField}
+              alwaysEditable={!hasRequiredField}
               note={note}
               fields={type.fields}
               item={item}

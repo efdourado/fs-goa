@@ -178,8 +178,8 @@ test("uma resposta já salva mantém os mesmos campos (desabilitados) e troca os
   }));
   assert.match(answered, /aria-label="Editar resposta"/, "um ícone de cadeado reabre a resposta para edição");
   assert.match(answered, /aria-pressed="true" aria-label="Nota 4,5" disabled/, "o campo continua com o mesmo controle, só que desabilitado");
-  assert.doesNotMatch(answered, /Salvar alterações/, "sem a resposta aberta, os botões salvar\/cancelar não aparecem");
-  assert.doesNotMatch(answered, />Cancelar</, "sem a resposta aberta, os botões salvar\/cancelar não aparecem");
+  assert.doesNotMatch(answered, /Salvar alterações/, "sem a resposta aberta, os botões salvar/cancelar não aparecem");
+  assert.doesNotMatch(answered, />Cancelar</, "sem a resposta aberta, os botões salvar/cancelar não aparecem");
 });
 
 test("limpar a nota não marca a nota 0 por engano (Number(null) e Number('') são 0 em JS)", () => {

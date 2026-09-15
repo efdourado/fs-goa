@@ -912,6 +912,7 @@
     "groupLastRegisterNone": "Sin registros todavía",
     "youLabel": "Tú",
     "yourResponseTitle": "Tu respuesta",
+    "completionHeading": "Si terminé...",
     "navAria": "Navegación del desafío",
     "navMobileAria": "Navegación móvil del desafío",
     "entriesProgress": "<b>{done}</b> de {total} registros",
