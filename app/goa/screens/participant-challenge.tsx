@@ -24,6 +24,7 @@ import {
   Button,
   cardClass,
   ChallengeStatusBadge,
+  CommentText,
   cx,
   EmptyState,
   inputClass,
@@ -126,6 +127,24 @@ function ChevronGlyph({ open, className }: { open: boolean; className?: string }
 const actionChipClass =
   "inline-flex min-h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-50";
 const ghostChipClass = "border-transparent bg-[var(--wash)] text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--ink)]";
+
+/** Two hanging quote marks — the "insert a quote line" affordance under a comment field. */
+function QuoteGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-3 w-3" fill="currentColor" aria-hidden="true">
+      <path d="M3.5 5.5c-1.1 0-2 .9-2 2v3h3v-3H3.5c0-.55.45-1 1-1v-1zM10 5.5c-1.1 0-2 .9-2 2v3h3v-3H10c0-.55.45-1 1-1v-1z" />
+    </svg>
+  );
+}
+
+/** A short rule — the "insert a divider line" affordance under a comment field. */
+function DividerGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+      <path d="M2.5 8h11" />
+    </svg>
+  );
+}
 
 /** A closed padlock — the affordance next to an already-answered section's name that reopens it for editing. */
 function LockIcon() {
@@ -230,6 +249,29 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
     if (!field.id) return;
     setValues((current) => ({ ...current, [field.id as Id]: value }));
     setSuccess(null);
+  }
+
+  // Keyed by field id so an "insert marker" button can reach the exact
+  // textarea it belongs to and drop the marker at the cursor, not the end.
+  const textareaRefs = useRef<Record<Id, HTMLTextAreaElement | null>>({});
+  // `marker` always starts its own fresh line — "> " for a quote line, or
+  // "---\n" for a standalone divider line (see `parseCommentBlocks`).
+  function insertLineMarker(field: ChallengeField, marker: string) {
+    if (!field.id) return;
+    const current = String(values[field.id] ?? "");
+    const el = textareaRefs.current[field.id];
+    const start = el?.selectionStart ?? current.length;
+    const end = el?.selectionEnd ?? current.length;
+    const before = current.slice(0, start);
+    const after = current.slice(end);
+    const insertion = (before.length > 0 && !before.endsWith("\n") ? "\n" : "") + marker;
+    const next = before + insertion + after;
+    if (field.config?.maxLength && next.length > field.config.maxLength) return;
+    setValue(field, next);
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(before.length + insertion.length, before.length + insertion.length);
+    });
   }
 
   // Returns whether it saved cleanly (or had nothing to save) — used both by
@@ -352,10 +394,43 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
           if (!field.required && !showOptional) return null;
           const id = `entry-field-${field.id}`;
           const value = values[field.id];
+          const fieldId = field.id;
           return (
             <div key={field.id}>
               <label className={labelClass} htmlFor={field.type === "rating" || field.type === "boolean" ? undefined : id}>{field.label}{readOnlyInline ? <span className="ml-1 font-normal text-[var(--muted)]">{t("readOnlyInline")}</span> : null}{field.required ? <span className="ml-1 text-[var(--main-2)]" aria-label={t("required")}>*</span> : <small className="ml-2 font-light text-[var(--muted)]">{t("optional")}</small>}</label>
-              {field.type === "text" && field.config?.multiline ? <textarea id={id} className={inputClass} rows={4} value={String(value ?? "")} maxLength={field.config.maxLength} disabled={!interactive || busy} onChange={(event) => setValue(field, event.target.value)} /> : null}
+              {field.type === "text" && field.config?.multiline ? (
+                interactive ? (
+                  <div>
+                    <textarea
+                      ref={(el) => { textareaRefs.current[fieldId] = el; }}
+                      id={id}
+                      className={inputClass}
+                      rows={4}
+                      value={String(value ?? "")}
+                      maxLength={field.config.maxLength}
+                      disabled={busy}
+                      onChange={(event) => setValue(field, event.target.value)}
+                    />
+                    <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
+                      <small className="text-[var(--muted)]">{t("quoteHint")}</small>
+                      <div className="flex flex-none gap-1.5">
+                        <button type="button" className={cx(actionChipClass, ghostChipClass, "min-h-7 px-2.5 text-[11px]")} disabled={busy} onClick={() => insertLineMarker(field, "> ")}>
+                          <QuoteGlyph />
+                          {t("insertQuote")}
+                        </button>
+                        <button type="button" className={cx(actionChipClass, ghostChipClass, "min-h-7 px-2.5 text-[11px]")} disabled={busy} onClick={() => insertLineMarker(field, "---\n")}>
+                          <DividerGlyph />
+                          {t("insertDivider")}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div id={id} className={cx(inputClass, "min-h-11 py-2.5")}>
+                    <CommentText text={String(value ?? "")} />
+                  </div>
+                )
+              ) : null}
               {field.type === "text" && !field.config?.multiline ? <input id={id} className={inputClass} value={String(value ?? "")} maxLength={field.config?.maxLength} disabled={!interactive || busy} onChange={(event) => setValue(field, event.target.value)} /> : null}
               {field.type === "number" ? <input id={id} className={inputClass} type="number" inputMode="decimal" min={field.config?.min} max={field.config?.max} step={field.config?.step ?? "any"} value={typeof value === "number" || typeof value === "string" ? value : ""} disabled={!interactive || busy} onChange={(event) => setValue(field, event.target.value === "" ? "" : Number(event.target.value))} /> : null}
               {field.type === "date" ? <input id={id} className={inputClass} type="date" value={typeof value === "string" ? value : ""} disabled={!interactive || busy} onChange={(event) => setValue(field, event.target.value)} /> : null}

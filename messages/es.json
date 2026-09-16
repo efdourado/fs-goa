@@ -895,7 +895,7 @@
     "entriesProgress": "<b>{done}</b> de {total} registros",
     "scheduledTitle": "Desafío programado para {date}",
     "scheduledBody": "Ya fue activado y puede consultarse, pero los registros solo se liberarán cuando empiece el primer checkpoint.",
-    "closedTitle": "Este desafío fue cerrado",
+    "closedTitle": "Este desafío fue cerrado...",
     "noCheckpointTitle": "Ningún checkpoint disponible",
     "checkInOf": "Check-in del {date}",
     "newEntry": "Nuevo registro",
@@ -945,6 +945,9 @@
     "readOnly": "Este registro está disponible solo para lectura.",
     "dueAt": "Plazo: {date}",
     "emptyValue": "—",
+    "quoteHint": "Empieza una línea con > para una cita, o usa --- para separar ideas",
+    "insertQuote": "Cita",
+    "insertDivider": "Separador",
     "unavailable": {
       "closed": "Este desafío fue cerrado. El registro está disponible solo para lectura.",
       "draft": "Este desafío aún es un borrador. Actívalo para liberar los registros.",

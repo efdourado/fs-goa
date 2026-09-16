@@ -895,7 +895,7 @@
     "entriesProgress": "<b>{done}</b> of {total} entries",
     "scheduledTitle": "Challenge scheduled for {date}",
     "scheduledBody": "It's already active and can be viewed, but entries only open once the first checkpoint begins.",
-    "closedTitle": "This challenge is closed",
+    "closedTitle": "This challenge is closed...",
     "noCheckpointTitle": "No checkpoint available",
     "checkInOf": "Check-in for {date}",
     "newEntry": "New entry",
@@ -945,6 +945,9 @@
     "readOnly": "This entry is read-only.",
     "dueAt": "Deadline: {date}",
     "emptyValue": "—",
+    "quoteHint": "Start a line with > for a quote, or use --- to separate ideas",
+    "insertQuote": "Quote",
+    "insertDivider": "Divider",
     "unavailable": {
       "closed": "This challenge is closed. Logging is read-only.",
       "draft": "This challenge is still a draft. Activate it to open logging.",

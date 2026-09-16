@@ -16,6 +16,7 @@ import {
   isEmptySaveADelete,
   isLivingList,
   isPersonalChallenge,
+  parseCommentBlocks,
   shiftDateKey,
 } from "../app/goa/utils";
 import { ptFormat, renderWithIntl } from "./helpers/intl";
@@ -35,6 +36,44 @@ test("desafio agendado existe só no diário com início futuro", () => {
   assert.equal(isChallengeScheduled("active", null, "daily", now), false);
   // Cine (item) com início futuro não é "agendado" — é ativo, aceita avaliação.
   assert.equal(isChallengeScheduled("active", "2026-08-30", "item", now), false);
+});
+
+test("citação vs opinião: uma linha começando com '> ' vira bloco de citação; linhas seguidas do mesmo tipo ficam juntas", () => {
+  assert.deepEqual(parseCommentBlocks("Só uma opinião comum."), [{ kind: "text", text: "Só uma opinião comum." }]);
+  assert.deepEqual(
+    parseCommentBlocks("Achei incrível.\n> Uma frase perfeita.\n> Segunda linha da citação.\nRecomendo demais."),
+    [
+      { kind: "text", text: "Achei incrível." },
+      { kind: "quote", text: "Uma frase perfeita.\nSegunda linha da citação." },
+      { kind: "text", text: "Recomendo demais." },
+    ],
+  );
+  assert.deepEqual(parseCommentBlocks("  \n> só citação\n  "), [{ kind: "quote", text: "só citação" }], "linhas em branco nas pontas somem");
+});
+
+test("citação tolera até 3 espaços de indentação antes do '>' (igual ao Markdown); com 4+ deixa de contar", () => {
+  assert.deepEqual(parseCommentBlocks("  > indentada com 2 espaços"), [{ kind: "quote", text: "indentada com 2 espaços" }]);
+  assert.deepEqual(parseCommentBlocks("   > indentada com 3 espaços"), [{ kind: "quote", text: "indentada com 3 espaços" }]);
+  // A linha do meio preserva a própria indentação (só as pontas do texto
+  // inteiro são cortadas), então 4 espaços aqui realmente testam o limite.
+  assert.deepEqual(
+    parseCommentBlocks("Opinião normal.\n    > 4 espaços não conta mais como citação"),
+    [{ kind: "text", text: "Opinião normal.\n    > 4 espaços não conta mais como citação" }],
+    "com 4+ espaços a linha deixa de ser reconhecida como citação e vira parte do texto comum",
+  );
+});
+
+test("três traços sozinhos numa linha viram um divisor, separando ideias dentro do mesmo comentário", () => {
+  assert.deepEqual(
+    parseCommentBlocks("Primeira ideia.\n---\nSegunda ideia, sem relação com a primeira."),
+    [
+      { kind: "text", text: "Primeira ideia." },
+      { kind: "divider", text: "" },
+      { kind: "text", text: "Segunda ideia, sem relação com a primeira." },
+    ],
+  );
+  assert.deepEqual(parseCommentBlocks("-- não é divisor (só 2 traços)"), [{ kind: "text", text: "-- não é divisor (só 2 traços)" }]);
+  assert.deepEqual(parseCommentBlocks("-----"), [{ kind: "divider", text: "" }], "mais de 3 traços também conta");
 });
 
 test("lista viva = pessoal sem datas e não encerrada", () => {
@@ -180,6 +219,32 @@ test("uma resposta já salva mantém os mesmos campos (desabilitados) e troca os
   assert.match(answered, /aria-pressed="true" aria-label="Nota 4,5" disabled/, "o campo continua com o mesmo controle, só que desabilitado");
   assert.doesNotMatch(answered, /Salvar alterações/, "sem a resposta aberta, os botões salvar/cancelar não aparecem");
   assert.doesNotMatch(answered, />Cancelar</, "sem a resposta aberta, os botões salvar/cancelar não aparecem");
+});
+
+test("comentário: editando mostra a dica de citação e o botão de inserir; já salvo, a citação vira bloco com borda e o resto vira parágrafo", () => {
+  const commentField = { id: "f1", key: "comentario", label: "Comentário", type: "text", required: true, config: { multiline: true, maxLength: 500 } } as ChallengeField;
+
+  const editing = renderWithIntl(createElement(DynamicEntryForm, {
+    fields: [commentField],
+    item: null,
+    canEdit: true,
+    onSave: async () => undefined,
+  }));
+  assert.match(editing, /<textarea/, "ainda editando, o campo real continua sendo o textarea");
+  assert.match(editing, /Comece uma linha com/, "a dica do atalho de citação aparece perto do campo");
+  assert.match(editing, /Citação/, "o botão que insere \"> \" no cursor aparece");
+
+  const answered = renderWithIntl(createElement(DynamicEntryForm, {
+    fields: [commentField],
+    item: null,
+    entry: { id: "e1", values: { f1: "Achei ótimo.\n> Uma frase marcante do livro." } },
+    canEdit: true,
+    onSave: async () => undefined,
+    onDelete: async () => undefined,
+  }));
+  assert.doesNotMatch(answered, /<textarea/, "campo respondido não mostra mais o textarea, e sim o texto renderizado");
+  assert.match(answered, /<p[^>]*>Achei ótimo\.<\/p>/, "a linha comum vira parágrafo normal");
+  assert.match(answered, /<blockquote[^>]*>Uma frase marcante do livro\.<\/blockquote>/, "a linha marcada com > vira um bloco de citação");
 });
 
 test("limpar a nota não marca a nota 0 por engano (Number(null) e Number('') são 0 em JS)", () => {

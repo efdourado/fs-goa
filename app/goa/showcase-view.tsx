@@ -7,7 +7,7 @@ import { MetricBlock } from "./metrics-view";
 import { PagedView } from "./paged-view";
 import { AffinityBlockView, PersonalRankingsBlock } from "./rankings-view";
 import type { AffinityBlock, Metric, PersonalRanking, WrappedBlock } from "./types";
-import { cx } from "./ui";
+import { CommentText, cx } from "./ui";
 import { metricHasData, metricTheme } from "./utils";
 
 type Translator = ReturnType<typeof useTranslations>;
@@ -169,10 +169,10 @@ function PageBody({ page, hideThinLabel }: { page: Page; hideThinLabel: boolean 
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       {page.comments.map((comment) => (
-        <blockquote className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-5" key={comment.id}>
-          <p className="text-base leading-7">“{comment.text}”</p>
-          {comment.itemTitle ? <footer className="mt-3 text-xs font-light text-[var(--muted)]">{comment.itemTitle}</footer> : null}
-        </blockquote>
+        <figure className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-5" key={comment.id}>
+          <CommentText text={comment.text} className="text-base" />
+          {comment.itemTitle ? <figcaption className="mt-3 text-xs font-light text-[var(--muted)]">{comment.itemTitle}</figcaption> : null}
+        </figure>
       ))}
     </div>
   );

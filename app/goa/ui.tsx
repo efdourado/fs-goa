@@ -11,6 +11,7 @@ import {
   dateKeyInSaoPaulo,
   inclusiveDayCount,
   isChallengeScheduled,
+  parseCommentBlocks,
   shiftDateKey,
 } from "./utils";
 
@@ -318,6 +319,31 @@ export function Field({
         </span>
       ) : null}
     </Wrapper>
+  );
+}
+
+/**
+ * Renders a comment as quote/opinion/divider blocks instead of one flat
+ * paragraph — a line starting with "> " (see `parseCommentBlocks`) gets a
+ * left border, Notion-style, so a quoted line and the person's own opinion
+ * read as visibly different things with no extra label needed; a "---" line
+ * becomes a plain horizontal rule, for separating distinct thoughts.
+ */
+export function CommentText({ text, className }: { text: string; className?: string }) {
+  const blocks = parseCommentBlocks(text);
+  if (!blocks.length) return null;
+  return (
+    <div className={cx("space-y-2.5", className)}>
+      {blocks.map((block, index) => block.kind === "divider" ? (
+        <hr key={index} className="border-t border-[var(--line)]" />
+      ) : block.kind === "quote" ? (
+        <blockquote key={index} className="whitespace-pre-wrap border-l-[3px] border-[var(--main-line)] pl-3 leading-6 text-[var(--muted)]">
+          {block.text}
+        </blockquote>
+      ) : (
+        <p key={index} className="whitespace-pre-wrap leading-6">{block.text}</p>
+      ))}
+    </div>
   );
 }
 

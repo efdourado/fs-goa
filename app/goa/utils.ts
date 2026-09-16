@@ -248,3 +248,35 @@ export function valuesAsRecord(values: Entry["values"]): Record<Id, unknown> {
 export function itemIdForEntry(entry: Entry): Id | null {
   return entry.itemId ?? entry.checkpointId ?? null;
 }
+
+export type CommentBlock = { kind: "quote" | "text" | "divider"; text: string };
+
+/**
+ * Splits a comment into quote/opinion/divider blocks — both markers are
+ * Markdown/Notion conventions, chosen so nobody has to be taught a new
+ * gesture: a line starting with "> " (up to 3 leading spaces tolerated, same
+ * leeway CommonMark gives a blockquote marker) is a quote; a line that is
+ * just "---" (three or more dashes, nothing else) is a divider, for
+ * separating distinct thoughts inside one comment; everything else is plain
+ * opinion text. Consecutive lines of the same kind merge into one block, so a
+ * paragraph or a multi-line quote stays together instead of splitting per
+ * line — a divider never merges, since each one is its own break. Leading/
+ * trailing blank lines are dropped; a blank line in the middle survives as
+ * paragraph spacing.
+ */
+export function parseCommentBlocks(value: string): CommentBlock[] {
+  const blocks: CommentBlock[] = [];
+  for (const rawLine of value.trim().split("\n")) {
+    if (/^-{3,}$/.test(rawLine.trim())) {
+      blocks.push({ kind: "divider", text: "" });
+      continue;
+    }
+    const match = /^\s{0,3}>\s?(.*)$/.exec(rawLine);
+    const kind: CommentBlock["kind"] = match ? "quote" : "text";
+    const line = match ? match[1] : rawLine;
+    const last = blocks.at(-1);
+    if (last?.kind === kind) last.text += `\n${line}`;
+    else blocks.push({ kind, text: line });
+  }
+  return blocks;
+}
