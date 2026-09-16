@@ -5261,6 +5261,85 @@ test("C: uma lista pessoal viva cura e publica a vitrine sem nunca fechar, e a m
   assert.ok(Math.abs(liveValue - 11 / 3) < 0.01, `a vitrine publicada devia acompanhar o novo registro ao vivo, veio ${liveValue}`);
 });
 
+test("editar um registro cujo comentário já foi curado na vitrine não apaga-e-recria a linha à toa (evitava violar result_blocks_entry_value_challenge_fk)", async () => {
+  const owner = await register("Klara Fix", "klara_fix_test");
+  const created = await call("POST", "/api/personal/challenges", {
+    session: owner,
+    body: { recipe: "bookshelf", title: "Estante viva", items: [{ title: "Klara and the Sun", author: "Ishiguro" }] },
+  });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const challengeId = (created.body as { id: string }).id;
+
+  const detail = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    entryTypes: Array<{ id: string; purpose: string; fields: Array<{ id: string; key: string }> }>;
+    items: Array<{ id: string }>;
+  };
+  const ratingType = detail.entryTypes.find((type) => type.purpose === "rating")!;
+  const notaField = ratingType.fields.find((field) => field.key === "nota")!.id;
+  const comentarioField = ratingType.fields.find((field) => field.key === "comentario")!.id;
+  const itemId = detail.items[0].id;
+
+  const entry = await call("POST", `/api/challenges/${challengeId}/entries`, {
+    session: owner,
+    body: { itemId, entryTypeId: ratingType.id, values: { [notaField]: 5, [comentarioField]: "Um comentário bonito." } },
+  });
+  assert.equal(entry.response.status, 201, JSON.stringify(entry.body));
+  const entryId = (entry.body as { id: string }).id;
+
+  // Cura a vitrine selecionando este comentário — cria o result_blocks que
+  // referencia (entryId, comentarioField), com ON DELETE RESTRICT.
+  const curated = await call("POST", `/api/challenges/${challengeId}/results`, {
+    session: owner,
+    body: { headline: "", summary: "", metricIds: [], comments: [{ entryId, fieldId: comentarioField }] },
+  });
+  assert.equal(curated.response.status, 200, JSON.stringify(curated.body));
+  assert.equal(
+    (await adminPool.query("SELECT count(*)::int AS n FROM result_blocks WHERE source_entry_id=$1", [entryId])).rows[0].n,
+    1,
+    "o comentário foi curado num bloco",
+  );
+
+  // Editar QUALQUER campo do mesmo registro (aqui, a nota) não pode mais
+  // violar a FK só porque o comentário passou a ser referenciado.
+  const editedRating = await call("PATCH", `/api/entries/${entryId}`, {
+    session: owner,
+    body: { values: { [notaField]: 4, [comentarioField]: "Um comentário bonito." } },
+  });
+  assert.equal(editedRating.response.status, 200, JSON.stringify(editedRating.body));
+
+  // Editar o próprio texto do comentário curado também deve funcionar.
+  const editedComment = await call("PATCH", `/api/entries/${entryId}`, {
+    session: owner,
+    body: { values: { [notaField]: 4, [comentarioField]: "Texto revisado depois da curadoria." } },
+  });
+  assert.equal(editedComment.response.status, 200, JSON.stringify(editedComment.body));
+  assert.equal(
+    (await adminPool.query("SELECT count(*)::int AS n FROM result_blocks WHERE source_entry_id=$1", [entryId])).rows[0].n,
+    1,
+    "o bloco curado sobrevive a duas edições",
+  );
+
+  // Remover o comentário de verdade (omitindo o campo opcional) apaga sua
+  // referência no resultado antes de apagar a resposta, sem violar a FK — e
+  // preserva a nota, que não foi tocada.
+  const removedComment = await call("PATCH", `/api/entries/${entryId}`, {
+    session: owner,
+    body: { values: { [notaField]: 4 } },
+  });
+  assert.equal(removedComment.response.status, 200, JSON.stringify(removedComment.body));
+  assert.equal(
+    (await adminPool.query("SELECT count(*)::int AS n FROM result_blocks WHERE source_entry_id=$1", [entryId])).rows[0].n,
+    0,
+    "remover o comentário remove o bloco curado junto",
+  );
+  const afterRemoval = (await call("GET", `/api/challenges/${challengeId}/entries`, { session: owner })).body as {
+    entries: Array<{ id: string; values: Record<string, unknown> }>;
+  };
+  const thisEntry = afterRemoval.entries.find((row) => row.id === entryId)!;
+  assert.equal(thisEntry.values[notaField], 4, "a nota permanece intacta depois de remover só o comentário");
+  assert.equal(Object.hasOwn(thisEntry.values, comentarioField), false, "o comentário removido não aparece mais no registro");
+});
+
 // ── Onda D — lixeira e ciclo de vida ────────────────────────────────────
 
 test("D: registro binado num desafio ativo não pode ser restaurado nem apagado após encerrar", async () => {

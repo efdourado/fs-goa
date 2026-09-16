@@ -433,6 +433,10 @@ async function applyPurge(client: PoolClient, row: RowContext): Promise<Record<s
       await client.query("DELETE FROM catalog_items WHERE id=$1", [row.id]);
       break;
     case "entry":
+      // A comment picked into the Vitrine is a `result_blocks` row that
+      // references this entry's values with ON DELETE RESTRICT — purging the
+      // entry for good means that curated card goes with it.
+      await client.query("DELETE FROM result_blocks WHERE source_entry_id=$1", [row.id]);
       await client.query("DELETE FROM entry_values WHERE entry_id=$1", [row.id]);
       await client.query("DELETE FROM trash_items WHERE entity_kind='entry' AND entity_id=$1", [row.id]);
       await client.query("DELETE FROM entries WHERE id=$1", [row.id]);

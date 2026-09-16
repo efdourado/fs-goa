@@ -72,6 +72,18 @@ function fieldDefinition(field: StorageField): FieldDefinition {
   return { type: "date", required: field.required };
 }
 
+/**
+ * Writes an entry's field values as an upsert, one row per field, instead of
+ * wiping the entry's `entry_values` and reinserting them from scratch. A
+ * curated Vitrine comment is a `result_blocks` row that references a specific
+ * (entry, field) pair with `ON DELETE RESTRICT` — deleting-then-recreating
+ * that row on every save (even to edit an unrelated field, like the rating)
+ * used to hit that restriction and fail the whole save with a raw constraint
+ * violation. Upserting keeps an edited field's row (and its identity) intact;
+ * only a field that genuinely drops out of this submission — cleared, or its
+ * definition archived — has its row removed, and only after any Vitrine
+ * reference to it is cleared first, so that removal itself never 23503s.
+ */
 async function writeEntryValues(
   client: PoolClient,
   entryId: string,
@@ -86,6 +98,7 @@ async function writeEntryValues(
   if (unknown.length) throw new ApiError(400, "unknown_field", "O registro contém campos desconhecidos.", unknown);
   const normalized: Record<string, unknown> = {};
   const inserts: EntryValueInsert[] = [];
+  const presentFieldIds: string[] = [];
   for (const field of fields) {
     const candidate = Object.hasOwn(values, field.id) ? values[field.id] : values[field.semantic_key];
     const validation = validateFieldValue(fieldDefinition(field), candidate);
@@ -93,6 +106,7 @@ async function writeEntryValues(
       throw new ApiError(400, "invalid_entry_value", `${field.label}: ${validation.message}`, { fieldId: field.id, code: validation.code });
     }
     if (validation.value === null) continue;
+    presentFieldIds.push(field.id);
     const columns: [string | null, number | null, boolean | null, string | null, string | null] = [null, null, null, null, null];
     if (field.kind === "text") columns[0] = validation.value as string;
     else if (field.kind === "number" || field.kind === "rating") {
@@ -110,6 +124,27 @@ async function writeEntryValues(
     });
     normalized[field.id] = validation.value;
   }
+
+  // A field this submission no longer answers (blanked to null, or archived
+  // out of `fields` since the last save) loses its row. Its Vitrine reference,
+  // if any, is removed first — a comment being genuinely dropped means its
+  // curated card goes with it, rather than blocking the whole save.
+  const stale = await client.query<{ field_id: string }>(
+    "SELECT field_id FROM entry_values WHERE entry_id=$1 AND field_id <> ALL($2::text[])",
+    [entryId, presentFieldIds],
+  );
+  if (stale.rows.length) {
+    const staleFieldIds = stale.rows.map((row) => row.field_id);
+    await client.query(
+      "DELETE FROM result_blocks WHERE source_entry_id=$1 AND challenge_id=$2 AND source_field_id=ANY($3::text[])",
+      [entryId, challengeId, staleFieldIds],
+    );
+    await client.query(
+      "DELETE FROM entry_values WHERE entry_id=$1 AND field_id=ANY($2::text[])",
+      [entryId, staleFieldIds],
+    );
+  }
+
   if (inserts.length) {
     await client.query(
       `INSERT INTO entry_values
@@ -119,7 +154,14 @@ async function writeEntryValues(
          FROM jsonb_to_recordset($4::jsonb) AS value(
            field_id text,text_value text,number_scaled bigint,boolean_value boolean,
            date_value date,option_id text
-         )`,
+         )
+       ON CONFLICT (entry_id, field_id) DO UPDATE SET
+         text_value = EXCLUDED.text_value,
+         number_scaled = EXCLUDED.number_scaled,
+         boolean_value = EXCLUDED.boolean_value,
+         date_value = EXCLUDED.date_value,
+         option_id = EXCLUDED.option_id,
+         updated_at = now()`,
       [entryId, challengeId, entryTypeId, JSON.stringify(inserts)],
     );
   }
@@ -356,7 +398,6 @@ export async function saveEntry(
       await client.query(
         "UPDATE entries SET occurred_on=$2,item_id=$3,checkpoint_id=$4,last_edited_by_user_id=$5,updated_at=now(),submitted_at=now() WHERE id=$1",
         [entryId, occurredOn, itemId, checkpointId, session.user.id]);
-      await client.query("DELETE FROM entry_values WHERE entry_id=$1", [entryId]);
     } else {
       await client.query(
         `INSERT INTO entries
@@ -403,7 +444,6 @@ export async function updateEntry(
       }
     }
     const fields = await storageFields(client, entry.challenge_id, entry.entry_type_id);
-    await client.query("DELETE FROM entry_values WHERE entry_id=$1", [entryId]);
     const values = await writeEntryValues(client, entryId, entry.challenge_id, entry.entry_type_id, fields, body.values);
     await client.query("UPDATE entries SET last_edited_by_user_id=$2,updated_at=now() WHERE id=$1", [entryId, session.user.id]);
     return { id: entryId, values };
