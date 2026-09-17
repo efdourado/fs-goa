@@ -197,7 +197,9 @@ const cineMetrics: RecipeMetric[] = [
     operation: "bayesian_average",
     fieldKey: "nota",
     groupBy: "item",
-    settings: { minSample: 3, bayesPriorWeight: 4 },
+    // 2, not 3: a club of exactly two people (a common size) would never see a
+    // single film ranked otherwise, since no film ever gets a third rating.
+    settings: { minSample: 2, bayesPriorWeight: 4 },
   },
   { key: "polarizacao", label: "Polarização por filme", operation: "spread", fieldKey: "nota", groupBy: "item", needsGroup: true, settings: { minSample: 2 } },
   {

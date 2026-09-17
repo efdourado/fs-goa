@@ -2175,7 +2175,7 @@ test("motor de análise: ranking ajustado, surpresa, viés e vitrine automática
   assert.ok(Array.isArray(ranking.series), "ranking traz série");
   assert.equal(ranking.series![0].label, "Solaris", "Solaris no topo do ranking ajustado");
   const personaRow = ranking.series!.find((s) => s.label === "Persona")!;
-  assert.equal(personaRow.value, null, "Persona abaixo do mínimo de amostra (minSample 3) fica sem valor");
+  assert.equal(personaRow.value, null, "Persona abaixo do mínimo de amostra (minSample 2) fica sem valor");
   assert.equal(personaRow.sampleSize, 1);
 
   const surprise = metrics.find((m) => m.operation === "surprise")!;
@@ -3337,7 +3337,7 @@ test("um ranking por item traz quem indicou, o ano do catálogo e a média crua 
   await call("POST", `/api/challenges/${challengeId}/entries`, { session: owner, body: { itemId: itemByTitle.get("Filme Contraponto"), entryTypeId: typeId, values: { [notaField]: 1 } } });
 
   // A custom metric with minSample:1 — the recipe's own "Ranking dos filmes"
-  // defaults to minSample:3, which would null out both numbers with just one
+  // defaults to minSample:2, which would null out both numbers with just one
   // vote per item and hide the shrinkage this test is actually after.
   const customRanking = await call("POST", `/api/challenges/${challengeId}/metrics`, {
     session: owner,
