@@ -255,44 +255,80 @@ const OPENS_QUOTE = /^['‘]/;
 const CLOSES_QUOTE = /['’]$/;
 
 /**
- * Splits a comment into quote/opinion/divider blocks. A *paragraph* — a run
- * of non-blank lines, however many, however it wraps or gets pasted in — is a
- * quote when it starts and ends with a single-quote mark ('like this'; a
- * curly ‘…’ from autocorrect counts too), no matter how many quote marks sit
- * inside it: only the outermost pair is read, so a nested 'aside' or an
- * ordinary "double-quoted" word stays plain inside it, not re-parsed. A
- * paragraph not fully wrapped that way is opinion text, quote characters and
- * all, exactly as typed — a stray apostrophe or a "quoted" word can never
- * misfire, since the check is on the whole paragraph's own edges, not on
- * finding some matching mark anywhere in the text. A line that is just "---"
- * (three or more dashes, nothing else) is its own divider, for separating
- * distinct thoughts, and never joins a paragraph on either side.
+ * Splits a comment into quote/opinion/divider blocks. A quote is marked by a
+ * single-quote mark ('like this'; a curly ‘…’ from autocorrect counts too)
+ * at the very start of a line and another at the very end of a line, however
+ * many lines — and however many blank lines — sit between them; a pasted
+ * multi-paragraph quote stays one block, blank lines and all. Only the two
+ * boundary marks are read: a nested 'aside', an ordinary "double-quoted"
+ * word, or a mid-sentence contraction never counts, because they're never
+ * examined — just the first character of a line (for an opener) and the last
+ * (for a closer). That's also why a quote mark buried mid-line, like
+ * `Rick: "you're a 'legend'"`, never misfires: that line doesn't start or end
+ * with the mark, so it's read as plain opinion text, exactly as typed. A
+ * quote opened but never closed falls back to being plain text too — marker
+ * included — rather than swallowing the rest of the comment. A line that is
+ * just "---" (three or more dashes) is its own divider, read only outside a
+ * quote — inside one it's just literal content.
  */
 export function parseCommentBlocks(value: string): CommentBlock[] {
   const blocks: CommentBlock[] = [];
-  let paragraph: string[] = [];
-  const flush = () => {
-    if (!paragraph.length) return;
-    const text = paragraph.join("\n");
-    const trimmed = text.trim();
-    if (trimmed.length > 1 && OPENS_QUOTE.test(trimmed) && CLOSES_QUOTE.test(trimmed)) {
-      blocks.push({ kind: "quote", text: trimmed.slice(1, -1) });
-    } else {
-      blocks.push({ kind: "text", text });
-    }
-    paragraph = [];
+  let textLines: string[] = [];
+  let quoteLines: string[] = [];
+  let openerRawLines: string[] = [];
+  let inQuote = false;
+
+  const flushText = () => {
+    if (!textLines.length) return;
+    blocks.push({ kind: "text", text: textLines.join("\n") });
+    textLines = [];
   };
+
   for (const rawLine of value.trim().split("\n")) {
     const line = rawLine.trim();
-    if (/^-{3,}$/.test(line)) {
-      flush();
-      blocks.push({ kind: "divider", text: "" });
-    } else if (line === "") {
-      flush();
+    if (!inQuote) {
+      if (/^-{3,}$/.test(line)) {
+        flushText();
+        blocks.push({ kind: "divider", text: "" });
+        continue;
+      }
+      if (line === "") {
+        flushText();
+        continue;
+      }
+      if (OPENS_QUOTE.test(line)) {
+        const rest = line.slice(1);
+        if (rest.length > 0 && CLOSES_QUOTE.test(rest)) {
+          // Opens and closes on the very same line — a short quote.
+          flushText();
+          blocks.push({ kind: "quote", text: rest.slice(0, -1).trim() });
+          continue;
+        }
+        flushText();
+        inQuote = true;
+        quoteLines = [rest];
+        openerRawLines = [rawLine];
+        continue;
+      }
+      textLines.push(rawLine);
     } else {
-      paragraph.push(rawLine);
+      openerRawLines.push(rawLine);
+      if (CLOSES_QUOTE.test(line)) {
+        quoteLines.push(line.slice(0, -1));
+        blocks.push({ kind: "quote", text: quoteLines.join("\n").trim() });
+        inQuote = false;
+        quoteLines = [];
+        openerRawLines = [];
+      } else {
+        quoteLines.push(rawLine);
+      }
     }
   }
-  flush();
+  if (inQuote) {
+    // Never closed — put it back as plain text, opening mark included,
+    // instead of losing the rest of the comment to a broken quote.
+    textLines.push(...openerRawLines);
+  }
+  flushText();
   return blocks;
 }

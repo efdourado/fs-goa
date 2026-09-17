@@ -80,6 +80,41 @@ test("citação aceita aspas curvas do autocorretor do celular (‘…’), reta
   assert.deepEqual(parseCommentBlocks("'Aberta reta, fechada curva.’"), [{ kind: "quote", text: "Aberta reta, fechada curva." }]);
 });
 
+test("citação pode ter parágrafos (linhas em branco) dentro dela, contanto que abra e feche nas próprias pontas de linha", () => {
+  assert.deepEqual(
+    parseCommentBlocks(
+      "'Rick: \"É engraçado.\"\n\nPhoenixperson: \"Você sempre foi um péssimo amigo.\"'",
+    ),
+    [{ kind: "quote", text: "Rick: \"É engraçado.\"\n\nPhoenixperson: \"Você sempre foi um péssimo amigo.\"" }],
+  );
+
+  // A marca sozinha numa linha (abrindo/fechando) também funciona como um
+  // "fence" — e um apóstrofo de contração solto no meio (aqui, 'cause) nunca
+  // fecha nada, porque só a ÚLTIMA letra da linha é olhada, nunca o meio.
+  const fenced = parseCommentBlocks(
+    "'\nPrimeiro parágrafo.\n\nSegundo parágrafo, com um 'cause solto no meio, sem fechar nada.\n\n— Autor\n'",
+  );
+  assert.deepEqual(fenced, [
+    { kind: "quote", text: "Primeiro parágrafo.\n\nSegundo parágrafo, com um 'cause solto no meio, sem fechar nada.\n\n— Autor" },
+  ]);
+});
+
+test("duas citações no mesmo comentário, separadas por um divisor", () => {
+  const value = "'Primeira fala.'\n\n---\n\n'\nSegunda fala,\nem duas linhas.\n'";
+  assert.deepEqual(parseCommentBlocks(value), [
+    { kind: "quote", text: "Primeira fala." },
+    { kind: "divider", text: "" },
+    { kind: "quote", text: "Segunda fala,\nem duas linhas." },
+  ]);
+});
+
+test("uma citação aberta mas nunca fechada some — volta a ser texto comum (com a marca de abertura), em vez de engolir o resto do comentário", () => {
+  const value = "'Comecei uma citação\nmas esqueci de fechar.\n\nEsse pedaço seria uma opinião separada.";
+  assert.deepEqual(parseCommentBlocks(value), [
+    { kind: "text", text: "'Comecei uma citação\nmas esqueci de fechar.\n\nEsse pedaço seria uma opinião separada." },
+  ]);
+});
+
 test("três traços sozinhos numa linha viram um divisor, separando ideias dentro do mesmo comentário", () => {
   assert.deepEqual(
     parseCommentBlocks("Primeira ideia.\n---\nSegunda ideia, sem relação com a primeira."),
