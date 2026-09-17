@@ -27,7 +27,6 @@ import type {
   Id,
   ImportPreview,
   Member,
-  WrappedBlock,
 } from "../types";
 import {
   BackButton,
@@ -792,12 +791,10 @@ function AdminResults({
   challenge,
   entries,
   onSave,
-  onReorderBlocks,
 }: {
   challenge: ChallengeDetail;
   entries: Entry[];
   onSave: (payload: Record<string, unknown>) => Promise<{ published?: boolean } | undefined>;
-  onReorderBlocks: (blocks: Array<{ id: Id; visible: boolean }>) => Promise<void>;
 }) {
   const t = useTranslations("adminChallenge");
   const tx = useTranslations("managementUX");
@@ -815,37 +812,9 @@ function AdminResults({
   const [includeAffinity, setIncludeAffinity] = useState(Boolean(challenge.result?.affinity?.pairs.length) || !challenge.result);
   const [showSchedule, setShowSchedule] = useState(challenge.showSchedule !== false);
   const hasSchedule = challenge.checkpoints.some((cp) => cp.kind && cp.kind !== "day");
-  // Auto-comments are computed fresh on every read, not stored `result_blocks`
-  // rows — there is nothing behind their id for a reorder save to touch, so
-  // they never enter the manually-ordered list (see `resultsAllComments`).
-  const orderableBlocks = (blocks: WrappedBlock[]) =>
-    allComments ? blocks.filter((block) => block.kind !== "entry_value") : blocks;
-  const savedOrderKey = orderableBlocks(challenge.result?.blocks ?? []).map((b) => b.id).join(",");
-  const [blockOrder, setBlockOrder] = useState(
-    [...orderableBlocks(challenge.result?.blocks ?? [])].sort((a, b) => a.position - b.position).map((block) => ({ id: block.id, visible: block.visible })),
-  );
-  const [previousOrderKey, setPreviousOrderKey] = useState(savedOrderKey);
-  if (previousOrderKey !== savedOrderKey) {
-    setPreviousOrderKey(savedOrderKey);
-    setBlockOrder([...orderableBlocks(challenge.result?.blocks ?? [])].sort((a, b) => a.position - b.position).map((b) => ({ id: b.id, visible: b.visible })));
-  }
-  const [orderBusy, setOrderBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const blockLabelById = useMemo(() => {
-    const map = new Map<Id, string>();
-    for (const block of challenge.result?.blocks ?? []) {
-      map.set(block.id,
-        block.kind === "text" ? (block.heading === "headline" ? t("blockHeadline") : t("blockSummary"))
-        : block.kind === "metric" ? (block.metric?.label ?? t("blockMetric"))
-        : block.kind === "ranking" ? t("includeRankings")
-        : block.kind === "affinity" ? t("includeAffinity")
-        : block.kind === "entry_value" ? t("blockComment")
-        : block.kind);
-    }
-    return map;
-  }, [challenge.result?.blocks, t]);
   const textFields = useMemo(() => [...new Map([...challenge.fields, ...challenge.entryTypes.flatMap((type) => type.fields)].filter((field) => field.id && field.type === "text").map((field) => [field.id, field])).values()], [challenge.fields, challenge.entryTypes]);
   const candidates = useMemo(() => {
     const result: CuratedCommentCandidate[] = [];
@@ -930,31 +899,6 @@ function AdminResults({
       </div>
           </fieldset>
         </details>
-
-      {blockOrder.length ? (
-        <details className="border-b border-[var(--line)] pb-6">
-          <summary className="cursor-pointer list-none py-3 text-xl font-medium tracking-tight [&::-webkit-details-marker]:hidden">{tx("order")}</summary>
-          <p className="mb-4 text-sm leading-6 text-[var(--muted)]">{t("blockOrderSubtitle")}</p>
-          <fieldset disabled={!canCurate || busy || orderBusy} className="min-w-0">
-          <ShowMoreList
-            items={blockOrder}
-            preview={8}
-            className="space-y-2"
-            render={(entry, index) => (
-              <div className="flex items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] px-3 py-2 text-sm" key={entry.id}>
-                <span className="w-5 flex-none tabular-nums text-[var(--muted)]">{index + 1}</span>
-                <span className={cx("min-w-0 flex-1 truncate", !entry.visible && "text-[var(--muted)] line-through")}>{blockLabelById.get(entry.id) ?? entry.id}</span>
-                <label className="flex flex-none items-center gap-1.5 text-xs"><input type="checkbox" aria-label={t("blockVisible")} checked={entry.visible} onChange={(event) => setBlockOrder((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, visible: event.target.checked } : item))} />{t("blockVisible")}</label>
-                <Button variant="ghost" className="px-2" disabled={index === 0} onClick={() => setBlockOrder((current) => { const next = [...current]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; return next; })}>↑<span className="sr-only">{t("blockUp")}</span></Button>
-                <Button variant="ghost" className="px-2" disabled={index === blockOrder.length - 1} onClick={() => setBlockOrder((current) => { const next = [...current]; [next[index + 1], next[index]] = [next[index], next[index + 1]]; return next; })}>↓<span className="sr-only">{t("blockDown")}</span></Button>
-              </div>
-            )}
-          />
-          <Button className="mt-4" disabled={orderBusy} onClick={() => { setOrderBusy(true); setError(null); onReorderBlocks(blockOrder).then(() => setSuccess(t("blockOrderSaved"))).catch((cause: unknown) => setError(f.error(cause))).finally(() => setOrderBusy(false)); }}>{orderBusy ? tc("saving") : t("blockOrderSave")}</Button>
-          </fieldset>
-        </details>
-      ) : <p className="text-sm text-[var(--muted)]">{tx("orderAfterSave")}</p>}
-
       </div>
     </div>
   );
@@ -991,7 +935,6 @@ export function AdminScreen({
   onSaveResult,
   onPublishResult,
   onUnpublishResult,
-  onReorderBlocks,
 }: {
   challenge: ChallengeDetail;
   entries: Entry[];
@@ -1026,7 +969,6 @@ export function AdminScreen({
   onSaveResult: (payload: Record<string, unknown>) => Promise<{ published?: boolean } | undefined>;
   onPublishResult: (payload: Record<string, unknown>) => Promise<{ url?: string | null; publishedAt?: string; anonymized?: boolean } | undefined>;
   onUnpublishResult: () => Promise<void>;
-  onReorderBlocks: (blocks: Array<{ id: Id; visible: boolean }>) => Promise<void>;
   csrfToken: string;
   onArchiveChanged: () => void;
 }) {
@@ -1083,7 +1025,7 @@ export function AdminScreen({
         {activeTab === "items" ? <AdminItems challenge={challenge} group={group} entries={entries} onAdd={onAddItems} onUpdate={onUpdateItem} onArchive={onArchiveItem} onPreviewImport={onPreviewImport} /> : null}
         {activeTab === "checkpoints" ? <CheckpointPlanner key={`${challenge.id}:${challenge.checkpoints.map((cp) => cp.id).join(",")}`} challenge={challenge} onSaveCheckpoints={onSaveCheckpoints} onAssign={onAssignCheckpointItems} /> : null}
         {activeTab === "metrics" ? <AdminMetrics challenge={challenge} onAdd={onAddMetric} onUpdate={onUpdateMetric} onDelete={onDeleteMetric} /> : null}
-        {activeTab === "results" ? <AdminResults challenge={challenge} entries={entries} onSave={onSaveResult} onReorderBlocks={onReorderBlocks} /> : null}
+        {activeTab === "results" ? <AdminResults challenge={challenge} entries={entries} onSave={onSaveResult} /> : null}
       </div>
     </main>
   );
