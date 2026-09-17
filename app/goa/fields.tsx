@@ -112,7 +112,7 @@ export function FieldConfigInputs({
     return (
       <div className="space-y-3">
         <Toggle checked={field.config?.multiline ?? false} onChange={(next) => patchConfig({ multiline: next })} label={t("multiline")} />
-        <Field label={t("maxLength")}><input className={inputClass} type="number" min={1} max={5000} value={field.config?.maxLength ?? 280} onChange={(event) => patchConfig({ maxLength: Number(event.target.value) || 280 })} /></Field>
+        <Field label={t("maxLength")}><input className={inputClass} type="number" min={1} max={6160} value={field.config?.maxLength ?? 280} onChange={(event) => patchConfig({ maxLength: Number(event.target.value) || 280 })} /></Field>
       </div>
     );
   }

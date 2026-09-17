@@ -335,9 +335,9 @@ export function CommentText({ text, className }: { text: string; className?: str
   return (
     <div className={cx("space-y-2.5", className)}>
       {blocks.map((block, index) => block.kind === "divider" ? (
-        <hr key={index} className="border-t border-[var(--line)]" />
+        <hr key={index} className="border-t border-[var(--line)] mt-6 pb-3" />
       ) : block.kind === "quote" ? (
-        <blockquote key={index} className="whitespace-pre-wrap border-l-[3px] border-[var(--main-line)] pl-3 leading-6 text-[var(--muted)]">
+        <blockquote key={index} className="whitespace-pre-wrap border-l-[3px] border-[var(--line)] pl-3 leading-6 text-[var(--muted)]">
           {block.text}
         </blockquote>
       ) : (
