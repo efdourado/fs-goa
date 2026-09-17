@@ -1,0 +1,1 @@
+ALTER TABLE "challenges" ADD COLUMN "results_all_comments" boolean DEFAULT false NOT NULL;

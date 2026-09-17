@@ -742,6 +742,8 @@
     "metricNoValue": "sin valor",
     "createMetricsFirst": "Crea métricas antes de seleccionarlas.",
     "selectedComments": "Comentarios seleccionados",
+    "allCommentsLabel": "Mostrar todos los comentarios automáticamente",
+    "allCommentsHint": "En vez de elegir uno por uno, la vitrina muestra todo comentario completado — incluso uno nuevo, apenas se registre, sin necesidad de guardar la curaduría de nuevo.",
     "selectCommentAria": "Seleccionar comentario de {author}",
     "noTextFields": "Ningún campo de texto completado está disponible para la curaduría.",
     "saveDraft": "Guardar vitrina",

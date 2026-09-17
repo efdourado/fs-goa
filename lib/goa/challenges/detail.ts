@@ -152,6 +152,7 @@ export interface DetailChallengeRow {
   group_kind: string | null;
   results_anon: boolean;
   show_schedule?: boolean;
+  results_all_comments?: boolean;
   published_as_template_at?: string | Date | null;
 }
 
@@ -245,6 +246,7 @@ export async function buildChallengeDetail(
     collectsEntryDate: recipeCollectsEntryDate(ch.recipe_key),
     resultsAnon: ch.results_anon,
     showSchedule: ch.show_schedule ?? true,
+    resultsAllComments: ch.results_all_comments === true,
     publishedAsTemplate: ch.published_as_template_at != null,
     submissionMode,
     completionEntryTypeId,

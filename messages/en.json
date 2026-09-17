@@ -742,6 +742,8 @@
     "metricNoValue": "no value",
     "createMetricsFirst": "Create metrics before selecting them.",
     "selectedComments": "Selected comments",
+    "allCommentsLabel": "Show every comment automatically",
+    "allCommentsHint": "Instead of picking one by one, the showcase shows every comment that's filled in — including a new one, as soon as it's logged, with nothing to resave.",
     "selectCommentAria": "Select comment from {author}",
     "noTextFields": "No filled-in text field is available for curation.",
     "saveDraft": "Save showcase",

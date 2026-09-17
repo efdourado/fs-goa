@@ -27,6 +27,7 @@ import type {
   Id,
   ImportPreview,
   Member,
+  WrappedBlock,
 } from "../types";
 import {
   BackButton,
@@ -808,19 +809,25 @@ function AdminResults({
   const [commentKeys, setCommentKeys] = useState<string[]>(
     challenge.result?.comments?.flatMap((comment) => comment.entryId && comment.fieldId ? [`${comment.entryId}:${comment.fieldId}`] : []) ?? [],
   );
+  const [allComments, setAllComments] = useState(challenge.resultsAllComments === true);
   const [anonymize, setAnonymize] = useState(challenge.resultsAnon === true);
   const [includeRankings, setIncludeRankings] = useState((challenge.result?.personalRankings?.length ?? 0) > 0 || !challenge.result);
   const [includeAffinity, setIncludeAffinity] = useState(Boolean(challenge.result?.affinity?.pairs.length) || !challenge.result);
   const [showSchedule, setShowSchedule] = useState(challenge.showSchedule !== false);
   const hasSchedule = challenge.checkpoints.some((cp) => cp.kind && cp.kind !== "day");
-  const savedOrderKey = (challenge.result?.blocks ?? []).map((b) => b.id).join(",");
+  // Auto-comments are computed fresh on every read, not stored `result_blocks`
+  // rows — there is nothing behind their id for a reorder save to touch, so
+  // they never enter the manually-ordered list (see `resultsAllComments`).
+  const orderableBlocks = (blocks: WrappedBlock[]) =>
+    allComments ? blocks.filter((block) => block.kind !== "entry_value") : blocks;
+  const savedOrderKey = orderableBlocks(challenge.result?.blocks ?? []).map((b) => b.id).join(",");
   const [blockOrder, setBlockOrder] = useState(
-    [...(challenge.result?.blocks ?? [])].sort((a, b) => a.position - b.position).map((block) => ({ id: block.id, visible: block.visible })),
+    [...orderableBlocks(challenge.result?.blocks ?? [])].sort((a, b) => a.position - b.position).map((block) => ({ id: block.id, visible: block.visible })),
   );
   const [previousOrderKey, setPreviousOrderKey] = useState(savedOrderKey);
   if (previousOrderKey !== savedOrderKey) {
     setPreviousOrderKey(savedOrderKey);
-    setBlockOrder([...(challenge.result?.blocks ?? [])].sort((a, b) => a.position - b.position).map((b) => ({ id: b.id, visible: b.visible })));
+    setBlockOrder([...orderableBlocks(challenge.result?.blocks ?? [])].sort((a, b) => a.position - b.position).map((b) => ({ id: b.id, visible: b.visible })));
   }
   const [orderBusy, setOrderBusy] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -867,6 +874,7 @@ function AdminResults({
         summary: summary.trim(),
         metricIds,
         comments: candidates.filter((candidate) => commentKeys.includes(candidate.key)).map(({ entryId, fieldId }) => ({ entryId, fieldId })),
+        allComments,
         anonymizeParticipants: anonymize,
         includeRankings,
         includeAffinity,
@@ -898,7 +906,15 @@ function AdminResults({
           <Field label={t("summaryLabel")}><textarea className={inputClass} rows={4} value={summary} onChange={(event) => setSummary(event.target.value)} maxLength={1500} /></Field>
         </div>
         <fieldset className="mt-6"><legend className="text-base font-light">{t("highlightMetrics")}</legend>{challenge.metrics.length ? <div className="mt-3"><ShowMoreList items={challenge.metrics} preview={6} className="grid gap-2" render={(metric) => <label className="flex min-h-12 items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4 text-sm" key={metric.id}><input type="checkbox" aria-label={t("highlightMetricAria", { label: metric.label })} checked={metricIds.includes(metric.id)} onChange={(event) => setMetricIds((current) => event.target.checked ? [...current, metric.id] : current.filter((id) => id !== metric.id))} /><span><strong className="block">{metric.label}</strong><small className="text-[var(--muted)]">{metric.formattedValue ?? metric.value ?? t("metricNoValue")}</small></span></label>} /></div> : <p className="mt-2 text-sm text-[var(--muted)]">{t("createMetricsFirst")}</p>}</fieldset>
-        <fieldset className="mt-6"><legend className="text-base font-light">{t("selectedComments")}</legend><p className="mt-2 rounded-xl border border-[var(--warn-line)] bg-[var(--warn-soft)] px-3 py-2 text-sm text-[var(--warn)]">{t("commentPrivacyWarning")}</p>{candidates.length ? <div className="mt-3"><ShowMoreList items={candidates} preview={4} className="grid gap-2 sm:grid-cols-2" render={(candidate) => <label className="flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4 text-sm" key={candidate.key}><input className="mt-1" type="checkbox" aria-label={t("selectCommentAria", { author: candidate.authorName })} checked={commentKeys.includes(candidate.key)} onChange={(event) => setCommentKeys((current) => event.target.checked ? [...current, candidate.key] : current.filter((key) => key !== candidate.key))} /><span><span className="line-clamp-3 leading-6"><CommentText text={candidate.text} className="space-y-1" /></span><small className="mt-2 block font-light text-[var(--muted)]">{candidate.authorName} · {candidate.itemTitle}</small></span></label>} /></div> : <p className="mt-2 text-sm text-[var(--muted)]">{t("noTextFields")}</p>}</fieldset>
+        <fieldset className="mt-6">
+          <legend className="text-base font-light">{t("selectedComments")}</legend>
+          <label className="mt-2 flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4 text-sm">
+            <input className="mt-0.5" type="checkbox" aria-label={t("allCommentsLabel")} checked={allComments} onChange={(event) => setAllComments(event.target.checked)} />
+            <span><strong className="block">{t("allCommentsLabel")}</strong><small className="text-[var(--muted)]">{t("allCommentsHint")}</small></span>
+          </label>
+          <p className="mt-3 rounded-xl border border-[var(--warn-line)] bg-[var(--warn-soft)] px-3 py-2 text-sm text-[var(--warn)]">{t("commentPrivacyWarning")}</p>
+          {allComments ? null : candidates.length ? <div className="mt-3"><ShowMoreList items={candidates} preview={4} className="grid gap-2 sm:grid-cols-2" render={(candidate) => <label className="flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4 text-sm" key={candidate.key}><input className="mt-1" type="checkbox" aria-label={t("selectCommentAria", { author: candidate.authorName })} checked={commentKeys.includes(candidate.key)} onChange={(event) => setCommentKeys((current) => event.target.checked ? [...current, candidate.key] : current.filter((key) => key !== candidate.key))} /><span><span className="line-clamp-3 leading-6"><CommentText text={candidate.text} className="space-y-1" /></span><small className="mt-2 block font-light text-[var(--muted)]">{candidate.authorName} · {candidate.itemTitle}</small></span></label>} /></div> : <p className="mt-2 text-sm text-[var(--muted)]">{t("noTextFields")}</p>}
+        </fieldset>
         <fieldset className="mt-6"><legend className="text-base font-light">{t("wrappedBlocks")}</legend>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             <label className="flex min-h-12 items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4 text-sm"><input type="checkbox" aria-label={t("includeRankings")} checked={includeRankings} onChange={(event) => setIncludeRankings(event.target.checked)} /><span>{t("includeRankings")}</span></label>

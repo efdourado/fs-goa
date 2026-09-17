@@ -67,6 +67,11 @@ export const challenges = pgTable(
     // pages. The checkpoints themselves stay — they still drive metrics and the
     // admin schedule editor.
     showSchedule: boolean("show_schedule").notNull().default(true),
+    // When true, the Vitrine's comments section is every current text-field
+    // answer with content, computed live at read time — a new comment shows
+    // up with no curation step. When false (the default), only the comments
+    // explicitly picked in `curateResults` (frozen into `result_blocks`) show.
+    resultsAllComments: boolean("results_all_comments").notNull().default(false),
     publishedAsTemplateAt: timestamptz("published_as_template_at"),
     deletedAt: timestamptz("deleted_at"),
     deletedByUserId: text("deleted_by_user_id").references(() => users.id, {

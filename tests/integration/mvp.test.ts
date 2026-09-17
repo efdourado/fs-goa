@@ -5385,6 +5385,67 @@ test("um comentário curado na vitrine acompanha uma edição ao vivo — sem pr
   assert.equal(after.result.comments[0]?.text, "Texto corrigido depois.", "a vitrine acompanha a edição sem precisar de um passo extra de republicação");
 });
 
+test("mostrar todos os comentários automaticamente: um comentário novo aparece na vitrine sem nunca curar de novo", async () => {
+  const owner = await register("Auto Comentario", "auto_comentario_test");
+  const created = await call("POST", "/api/personal/challenges", {
+    session: owner,
+    body: {
+      recipe: "bookshelf",
+      title: "Estante com tudo",
+      items: [{ title: "Klara and the Sun", author: "Ishiguro" }, { title: "Duna", author: "Herbert" }],
+    },
+  });
+  const challengeId = (created.body as { id: string }).id;
+  const detail = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    entryTypes: Array<{ id: string; purpose: string; fields: Array<{ id: string; key: string }> }>;
+    items: Array<{ id: string; title: string }>;
+  };
+  const ratingType = detail.entryTypes.find((type) => type.purpose === "rating")!;
+  const notaField = ratingType.fields.find((field) => field.key === "nota")!.id;
+  const comentarioField = ratingType.fields.find((field) => field.key === "comentario")!.id;
+  const [bookA, bookB] = detail.items;
+
+  await call("POST", `/api/challenges/${challengeId}/entries`, {
+    session: owner,
+    body: { itemId: bookA.id, entryTypeId: ratingType.id, values: { [notaField]: 5, [comentarioField]: "Comentário do primeiro livro." } },
+  });
+
+  // Liga "mostrar todos" sem selecionar nada manualmente.
+  const curated = await call("POST", `/api/challenges/${challengeId}/results`, {
+    session: owner,
+    body: { headline: "", summary: "", metricIds: [], comments: [], allComments: true },
+  });
+  assert.equal(curated.response.status, 200, JSON.stringify(curated.body));
+
+  const first = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    result: { comments: Array<{ text: string }> };
+  };
+  assert.deepEqual(first.result.comments.map((c) => c.text), ["Comentário do primeiro livro."]);
+
+  // Um comentário novo, num livro que nem existia quando o toggle foi salvo —
+  // nunca mais chama /results.
+  await call("POST", `/api/challenges/${challengeId}/entries`, {
+    session: owner,
+    body: { itemId: bookB.id, entryTypeId: ratingType.id, values: { [notaField]: 4, [comentarioField]: "Comentário do segundo livro." } },
+  });
+
+  const second = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    result: { comments: Array<{ text: string }> };
+  };
+  assert.equal(second.result.comments.length, 2, "o novo comentário entrou sozinho, sem curadoria manual");
+  assert.ok(second.result.comments.some((c) => c.text === "Comentário do segundo livro."));
+
+  // Desligar volta a exigir seleção manual — nenhuma sobrevive à toa.
+  await call("POST", `/api/challenges/${challengeId}/results`, {
+    session: owner,
+    body: { headline: "", summary: "", metricIds: [], comments: [], allComments: false },
+  });
+  const third = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    result: { comments: Array<{ text: string }> };
+  };
+  assert.deepEqual(third.result.comments, [], "desligado, volta a ser só o que foi selecionado manualmente (nada, aqui)");
+});
+
 // ── Onda D — lixeira e ciclo de vida ────────────────────────────────────
 
 test("D: registro binado num desafio ativo não pode ser restaurado nem apagado após encerrar", async () => {

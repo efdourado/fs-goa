@@ -618,6 +618,37 @@ export async function metricsForChallenge(client: PoolClient, challengeId: strin
   return calculated;
 }
 
+/**
+ * Every current text-field answer with content, newest first — backs
+ * `challenges.results_all_comments` ("show every comment automatically").
+ * No length filter and no one-per-item cap, unlike `pickComments` in
+ * `showcase.ts` (that one is the curated handful `generateShowcase` freezes);
+ * this one is meant to be exhaustive and pick up a brand new comment on its
+ * own, with nothing for the admin to resave.
+ */
+async function liveAllComments(client: PoolClient, challengeId: string) {
+  const rows = await client.query<{ entry_id: string; field_id: string; item_title: string | null; text: string }>(
+    `SELECT ev.entry_id, ev.field_id, coalesce(ci.title, cc.title) AS item_title,
+            btrim(ev.text_value) AS text
+       FROM entry_values ev
+       JOIN entries e ON e.id = ev.entry_id
+       JOIN challenge_fields f ON f.id = ev.field_id AND f.kind = 'text'
+       LEFT JOIN challenge_items ci ON ci.id = e.item_id
+       LEFT JOIN challenge_checkpoints cc ON cc.challenge_id = e.challenge_id
+        AND (cc.starts_at AT TIME ZONE 'America/Sao_Paulo')::date = e.occurred_on
+        AND cc.archived_at IS NULL
+      WHERE e.challenge_id = $1 AND e.deleted_at IS NULL
+        AND ev.text_value IS NOT NULL AND btrim(ev.text_value) <> ''
+      ORDER BY e.submitted_at DESC`,
+    [challengeId],
+  );
+  return rows.rows.map((row) => ({
+    id: `live:${row.entry_id}:${row.field_id}`,
+    text: row.text,
+    itemTitle: row.item_title,
+  }));
+}
+
 export async function resultForChallenge(
   client: PoolClient,
   challengeId: string,
@@ -629,9 +660,10 @@ export async function resultForChallenge(
 ) {
   const challenge = await oneOrNull<{
     results_published_at: Date | null; result_share_token: string | null; status: string; kind: "round" | "list";
+    results_all_comments: boolean;
   }>(
     client,
-    "SELECT results_published_at, result_share_token, status, kind FROM challenges WHERE id = $1",
+    "SELECT results_published_at, result_share_token, status, kind, results_all_comments FROM challenges WHERE id = $1",
     [challengeId],
   );
   // Frozen blocks only stand once a round closes (`generateShowcase` fills them
@@ -740,6 +772,29 @@ export async function resultForChallenge(
     ...(block.kind === "affinity" ? { affinity: block.value_snapshot } : {}),
   }));
 
+  // "Show every comment automatically" bypasses the picked-one-by-one list
+  // entirely: it replaces whatever's curated with every current comment,
+  // computed fresh on every read, so a new one needs no resave to appear.
+  const autoComments = useFrozenBlocks && challenge?.results_all_comments === true
+    ? await liveAllComments(client, challengeId)
+    : null;
+  const comments = autoComments ?? blocks.rows
+    .filter((block) => block.kind === "entry_value")
+    .map((block) => ({ id: block.id, text: commentText(block), itemTitle: block.heading }));
+  const finalBlocks = autoComments
+    ? [
+        ...orderedBlocks.filter((block) => block.kind !== "entry_value"),
+        ...autoComments.map((comment, index) => ({
+          id: comment.id,
+          kind: "entry_value" as const,
+          position: orderedBlocks.length + index,
+          visible: true,
+          heading: comment.itemTitle,
+          comment,
+        })),
+      ]
+    : orderedBlocks;
+
   return {
     headline: textBlocks.find((block) => block.heading === "headline")?.body_snapshot ?? null,
     summary: textBlocks.find((block) => block.heading === "summary")?.body_snapshot ?? null,
@@ -747,12 +802,10 @@ export async function resultForChallenge(
       .filter((block) => block.kind === "metric")
       .map((block) => block.value_snapshot ?? (block.metric_id ? metricById.get(block.metric_id) : null))
       .filter(Boolean),
-    comments: blocks.rows
-      .filter((block) => block.kind === "entry_value")
-      .map((block) => ({ id: block.id, text: commentText(block), itemTitle: block.heading })),
+    comments,
     personalRankings,
     affinity,
-    blocks: orderedBlocks,
+    blocks: finalBlocks,
     totalEntries,
     publishedAt: challenge?.results_published_at?.toISOString() ?? null,
     // The raw share token, so the /results/<token> link can be shown again in the
@@ -1021,6 +1074,14 @@ export async function curateResults(
     if (Object.hasOwn(body, "showSchedule")) {
       await client.query("UPDATE challenges SET show_schedule = $2, updated_at = now() WHERE id = $1",
         [challengeId, body.showSchedule === true]);
+    }
+    // Auto-comments bypasses the picked-one-by-one list entirely — read live
+    // by `resultForChallenge`, so a new comment shows up with nothing to
+    // resave here. The manual selection below still gets stored regardless,
+    // so turning this back off falls back to whatever was last curated.
+    if (Object.hasOwn(body, "allComments")) {
+      await client.query("UPDATE challenges SET results_all_comments = $2, updated_at = now() WHERE id = $1",
+        [challengeId, body.allComments === true]);
     }
     const published = access.challenge.results_published_at !== null;
     if (body.regenerate === true) {

@@ -388,6 +388,8 @@ export interface ChallengeSummary {
   resultsAnon?: boolean;
   /** Cosmetic: false hides the read-only checkpoint grid on the challenge / result / template pages. */
   showSchedule?: boolean;
+  /** When true, the Vitrine's comments section is every current comment, live — no picking one by one. */
+  resultsAllComments?: boolean;
   submissionMode?: SubmissionMode;
   completionEntryTypeId?: Id | null;
   viewerRole?: Role;
