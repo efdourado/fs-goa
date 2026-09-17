@@ -67,6 +67,15 @@ export default function GoaApp() {
   // the last screen we synced to the URL (to tell a tab switch from a real nav).
   const navDepth = useRef(0);
   const syncedScreen = useRef<Screen | null>(null);
+  // Whether the screen on screen right now actually owns a pushed history
+  // entry `history.back()` could pop. A screen with no URL (account, auth,
+  // loading) never gets one — the address bar just keeps showing whatever it
+  // showed before. Calling `history.back()` for one of those anyway pops the
+  // entry belonging to the screen the user *actually* came from (since the
+  // browser never moved off it), skipping past where "Back" should land —
+  // and if that landing screen's own Back does the same thing, it can bounce
+  // between two views instead of ever reaching the one the user expects.
+  const currentEntryPushed = useRef(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -126,21 +135,27 @@ export default function GoaApp() {
   useEffect(() => {
     if (screen.kind === "loading") return;
     const url = urlForScreen(screen);
-    if (!url) return;
     const previous = syncedScreen.current;
     syncedScreen.current = screen;
+    if (!url) {
+      // Nothing to address this screen with — see `currentEntryPushed`.
+      currentEntryPushed.current = false;
+      return;
+    }
     if (url === window.location.pathname + window.location.search) return;
     if (isSameView(previous, screen)) {
       window.history.replaceState(null, "", url);
     } else {
       window.history.pushState(null, "", url);
       navDepth.current += 1;
+      currentEntryPushed.current = true;
     }
   }, [screen]);
 
   useEffect(() => {
     function onPopState() {
       navDepth.current = Math.max(0, navDepth.current - 1);
+      currentEntryPushed.current = navDepth.current > 0;
       const routed = screenFromUrl(window.location.pathname, window.location.search);
       setScreen(routed ?? { kind: "dashboard" });
     }
@@ -149,12 +164,15 @@ export default function GoaApp() {
   }, []);
 
   /**
-   * "Back": step back through real history when there's an app entry to pop
-   * (so it lands exactly where the user came from), otherwise fall back to a
-   * sensible parent screen — the case where the view was opened from a deep link.
+   * "Back": step back through real history when the screen we're actually on
+   * owns a pushed entry (so it lands exactly where the user came from),
+   * otherwise fall back to a sensible parent screen directly — either the
+   * view was opened from a deep link (nothing to pop at all), or it's a
+   * no-URL screen like account/auth (see `currentEntryPushed`) whose
+   * "before" was never actually left, so there's no real entry to rewind.
    */
   function goBack(fallback: Screen) {
-    if (navDepth.current > 0) window.history.back();
+    if (currentEntryPushed.current && navDepth.current > 0) window.history.back();
     else setScreen(fallback);
   }
 
@@ -578,7 +596,7 @@ export default function GoaApp() {
   } else if (screen.kind === "challenge" && selectedChallenge) {
     content = <ParticipantChallengeScreen key={selectedChallenge.id} challenge={selectedChallenge} entries={entries} user={user} tab={screen.tab} onTab={(tab) => setScreen({ ...screen, tab })} onBack={() => goBack(selectedGroup ? { kind: "group", groupId: selectedGroup.id } : isPersonalChallenge(selectedChallenge, bootstrap.personalWorkspaceId) ? { kind: "personal-space" } : { kind: "dashboard" })} onAdmin={canManage(selectedRole) ? () => openAdmin(selectedChallenge.id) : undefined} onSaveEntry={saveEntry} onDeleteEntry={(entryId) => mutateChallenge(API_PATHS.entry(entryId), undefined, "DELETE")} />;
   } else if (screen.kind === "admin" && selectedChallenge && canManage(selectedRole)) {
-    content = <AdminScreen key={selectedChallenge.id} challenge={selectedChallenge} entries={entries} group={selectedGroup} duplicateTargets={bootstrap.groups.filter((candidate) => candidate.id !== selectedChallenge.groupId && candidate.kind !== "personal" && canManage(candidate.role)).map((candidate) => ({ id: candidate.id, name: candidate.name, challengeCount: bootstrap.challenges.filter((item) => item.groupId === candidate.id).length, challengeLimit: bootstrap.limits.challengesPerGroup }))} tab={screen.tab} onTab={(tab) => setScreen({ ...screen, tab })} onBack={() => goBack(selectedGroup ? { kind: "group", groupId: selectedGroup.id } : isPersonalChallenge(selectedChallenge, bootstrap.personalWorkspaceId) ? { kind: "personal-space" } : { kind: "dashboard" })} onSaveBasics={(payload) => mutateChallenge(API_PATHS.challenge(selectedChallenge.id), payload, "PATCH")} onTransition={(status) => mutateChallenge(API_PATHS.transition(selectedChallenge.id), { status })} onDuplicate={duplicateChallenge} isPlatformAdmin={Boolean(user.platformAdmin)} onPublishTemplate={() => mutateChallenge(API_PATHS.challengeTemplate(selectedChallenge.id), {}, "POST")} onUnpublishTemplate={() => mutateChallenge(API_PATHS.challengeTemplate(selectedChallenge.id), undefined, "DELETE")} onDelete={canManage(selectedRole) ? () => deleteChallenge(selectedChallenge.id, selectedGroup?.id) : undefined} onSaveParticipants={(participantIds) => mutateChallenge(API_PATHS.participants(selectedChallenge.id), { replace: true, participantIds })} onSaveFields={(entryTypeId, fields) => mutateChallenge(API_PATHS.fields(selectedChallenge.id), { ...(entryTypeId ? { entryTypeId } : {}), replace: true, archiveMissing: true, fields })} onSaveEntryTypeVisibility={(entryTypeId, visibilityPolicy) => mutateChallenge(API_PATHS.entryType(selectedChallenge.id, entryTypeId), { visibilityPolicy }, "PATCH")} onSetExpectation={(enabled) => mutateChallenge(API_PATHS.expectation(selectedChallenge.id), { enabled }, "PATCH")} onAddItems={(payload) => mutateChallenge(API_PATHS.items(selectedChallenge.id), payload)} onUpdateItem={(itemId, payload) => mutateChallenge(API_PATHS.item(selectedChallenge.id, itemId), payload, "PATCH")} onArchiveItem={(itemId) => mutateChallenge(API_PATHS.item(selectedChallenge.id, itemId), undefined, "DELETE")} onPreviewImport={previewListImport} onSaveCheckpoints={(checkpoints) => mutateChallenge(API_PATHS.checkpoints(selectedChallenge.id), { checkpoints })} onAssignCheckpointItems={(assignments) => mutateChallenge(API_PATHS.itemsAssign(selectedChallenge.id), { assignments })} onAddMetric={(payload) => mutateChallenge(API_PATHS.metrics(selectedChallenge.id), payload)} onUpdateMetric={(metricId, payload) => mutateChallenge(API_PATHS.metric(selectedChallenge.id, metricId), payload, "PATCH")} onDeleteMetric={(metricId) => mutateChallenge(API_PATHS.metric(selectedChallenge.id, metricId), undefined, "DELETE")} onSaveResult={(payload) => mutateChallengeReturning<{ published?: boolean }>(API_PATHS.results(selectedChallenge.id), payload)} onPublishResult={(payload) => mutateChallengeReturning<{ url?: string | null; publishedAt?: string; anonymized?: boolean }>(API_PATHS.resultsPublish(selectedChallenge.id), payload)} onUnpublishResult={() => mutateChallenge(API_PATHS.results(selectedChallenge.id), undefined, "DELETE")} onReorderBlocks={(blocks) => mutateChallenge(API_PATHS.resultBlocks(selectedChallenge.id), { blocks }, "PATCH")} csrfToken={bootstrap.csrfToken} onArchiveChanged={() => { void reloadSelected(); void refreshBootstrap(); }} />;
+    content = <AdminScreen key={selectedChallenge.id} challenge={selectedChallenge} entries={entries} group={selectedGroup} duplicateTargets={bootstrap.groups.filter((candidate) => candidate.id !== selectedChallenge.groupId && candidate.kind !== "personal" && canManage(candidate.role)).map((candidate) => ({ id: candidate.id, name: candidate.name, challengeCount: bootstrap.challenges.filter((item) => item.groupId === candidate.id).length, challengeLimit: bootstrap.limits.challengesPerGroup }))} tab={screen.tab} onTab={(tab) => setScreen({ ...screen, tab })} onBack={() => goBack(selectedGroup ? { kind: "group", groupId: selectedGroup.id } : isPersonalChallenge(selectedChallenge, bootstrap.personalWorkspaceId) ? { kind: "personal-space" } : { kind: "dashboard" })} onSaveBasics={(payload) => mutateChallenge(API_PATHS.challenge(selectedChallenge.id), payload, "PATCH")} onTransition={(status) => mutateChallenge(API_PATHS.transition(selectedChallenge.id), { status })} onDuplicate={duplicateChallenge} isPlatformAdmin={Boolean(user.platformAdmin)} onPublishTemplate={() => mutateChallenge(API_PATHS.challengeTemplate(selectedChallenge.id), {}, "POST")} onUnpublishTemplate={() => mutateChallenge(API_PATHS.challengeTemplate(selectedChallenge.id), undefined, "DELETE")} onDelete={canManage(selectedRole) ? () => deleteChallenge(selectedChallenge.id, selectedGroup?.id) : undefined} onSaveParticipants={(participantIds) => mutateChallenge(API_PATHS.participants(selectedChallenge.id), { replace: true, participantIds })} onSaveFields={(entryTypeId, fields) => mutateChallenge(API_PATHS.fields(selectedChallenge.id), { ...(entryTypeId ? { entryTypeId } : {}), replace: true, archiveMissing: true, fields })} onSaveEntryTypeVisibility={(entryTypeId, visibilityPolicy) => mutateChallenge(API_PATHS.entryType(selectedChallenge.id, entryTypeId), { visibilityPolicy }, "PATCH")} onSetExpectation={(enabled) => mutateChallenge(API_PATHS.expectation(selectedChallenge.id), { enabled }, "PATCH")} onAddItems={(payload) => mutateChallenge(API_PATHS.items(selectedChallenge.id), payload)} onUpdateItem={(itemId, payload) => mutateChallenge(API_PATHS.item(selectedChallenge.id, itemId), payload, "PATCH")} onArchiveItem={(itemId) => mutateChallenge(API_PATHS.item(selectedChallenge.id, itemId), undefined, "DELETE")} onPreviewImport={previewListImport} onSaveCheckpoints={(checkpoints) => mutateChallenge(API_PATHS.checkpoints(selectedChallenge.id), { checkpoints })} onAssignCheckpointItems={(assignments) => mutateChallenge(API_PATHS.itemsAssign(selectedChallenge.id), { assignments })} onAddMetric={(payload) => mutateChallenge(API_PATHS.metrics(selectedChallenge.id), payload)} onUpdateMetric={(metricId, payload) => mutateChallenge(API_PATHS.metric(selectedChallenge.id, metricId), payload, "PATCH")} onDeleteMetric={(metricId) => mutateChallenge(API_PATHS.metric(selectedChallenge.id, metricId), undefined, "DELETE")} onSaveResult={(payload) => mutateChallengeReturning<{ published?: boolean }>(API_PATHS.results(selectedChallenge.id), payload)} onPublishResult={(payload) => mutateChallengeReturning<{ url?: string | null; publishedAt?: string; anonymized?: boolean }>(API_PATHS.resultsPublish(selectedChallenge.id), payload)} onUnpublishResult={() => mutateChallenge(API_PATHS.results(selectedChallenge.id), undefined, "DELETE")} csrfToken={bootstrap.csrfToken} onArchiveChanged={() => { void reloadSelected(); void refreshBootstrap(); }} />;
   } else if (screen.kind === "admin" || screen.kind === "create-challenge") {
     content = <main className="mx-auto max-w-2xl px-5 py-16"><EmptyState title={t("adminUnavailableTitle")} action={<Button onClick={() => setScreen({ kind: "dashboard" })}>{t("backToStart")}</Button>} /></main>;
   } else {
