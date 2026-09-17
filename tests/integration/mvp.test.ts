@@ -5171,7 +5171,7 @@ test("C: rankings e afinidade aparecem ao vivo no detalhe do desafio ativo", asy
   );
 });
 
-test("C: organizar a vitrine só é permitido depois de encerrar", async () => {
+test("C: organizar a vitrine vale a qualquer momento; só publicar o link público exige encerrar", async () => {
   const owner = await register("C Curad", "c_curadoria");
   const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube C3" } })).body as { id: string }).id;
   const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
@@ -5179,9 +5179,18 @@ test("C: organizar a vitrine só é permitido depois de encerrar", async () => {
   });
   const challengeId = (challenge.body as { id: string }).id;
   await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });
-  const early = await call("POST", `/api/challenges/${challengeId}/results`, { session: owner, body: { headline: "Cedo demais", summary: "x", metricIds: [], comments: [] } });
-  assert.equal(early.response.status, 409, JSON.stringify(early.body));
-  assert.equal((early.body as { error: string }).error, "challenge_not_closed");
+  // "Fechado" só é uma etiqueta de ciclo de vida (não aceita mais registros) —
+  // organizar a vitrine (manchete, métricas em destaque etc.) não depende dela.
+  const early = await call("POST", `/api/challenges/${challengeId}/results`, { session: owner, body: { headline: "Ainda em andamento", summary: "x", metricIds: [], comments: [] } });
+  assert.equal(early.response.status, 200, JSON.stringify(early.body));
+
+  const detail = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { result: { headline: string | null } };
+  assert.equal(detail.result.headline, "Ainda em andamento", "a curadoria aparece na hora, sem precisar encerrar o desafio");
+
+  // Publicar o link público continua exigindo o encerramento.
+  const publishEarly = await call("POST", `/api/challenges/${challengeId}/results/publish`, { session: owner, body: {} });
+  assert.equal(publishEarly.response.status, 409, JSON.stringify(publishEarly.body));
+  assert.equal((publishEarly.body as { error: string }).error, "challenge_not_closed");
 });
 
 test("C: uma lista pessoal viva cura e publica a vitrine sem nunca fechar, e a métrica publicada segue ao vivo depois de publicada", async () => {

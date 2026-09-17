@@ -798,7 +798,6 @@ function AdminResults({
   onSave: (payload: Record<string, unknown>) => Promise<{ published?: boolean } | undefined>;
 }) {
   const t = useTranslations("adminChallenge");
-  const tx = useTranslations("managementUX");
   const tc = useTranslations("common");
   const f = useGoaFormat();
   const [headline, setHeadline] = useState(challenge.result?.headline ?? "");
@@ -831,9 +830,6 @@ function AdminResults({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [challenge.items, entries, textFields]);
 
-  // A list has no round to close, so it can be curated (and published) any
-  // time — its showcase reflects current data live instead of a frozen close.
-  const canCurate = challenge.status === "closed" || isLivingList(challenge);
   const isPublished = Boolean(challenge.result?.publishedAt);
 
   async function save() {
@@ -857,8 +853,7 @@ function AdminResults({
   return (
     <section className="mx-auto max-w-3xl">
       <PageHeading title={t("resultsTitle")} description={t("resultsSubtitle")} />
-      {!canCurate ? <p className="mb-7 rounded-xl bg-[var(--wash)] p-4 text-sm leading-6 text-[var(--muted)]">{tx("curationAfterClose")}</p> : null}
-      <fieldset disabled={!canCurate || busy} className="min-w-0 divide-y divide-[var(--line)]">
+      <fieldset disabled={busy} className="min-w-0 divide-y divide-[var(--line)]">
         <div className="space-y-5 pb-7">
           <Field label={t("headlineLabel")}><input className={inputClass} value={headline} onChange={(event) => setHeadline(event.target.value)} maxLength={160} placeholder={challenge.title} /></Field>
           <Field label={t("summaryLabel")}><textarea className={inputClass} rows={4} value={summary} onChange={(event) => setSummary(event.target.value)} maxLength={1500} /></Field>

@@ -652,49 +652,41 @@ export async function resultForChallenge(
   client: PoolClient,
   challengeId: string,
   calculatedMetrics?: Array<Record<string, unknown>>,
-  // Personal rankings + affinity are O(participants²) to compute. `getChallengeDetail`
-  // (a very hot path) skips them — during an active round the Wrapped shows them
-  // only once frozen. `generateShowcase` / `curateResults` freeze them on close.
+  // Personal rankings + affinity are O(participants²) to compute — callers that
+  // want them opt in explicitly. Every current caller does; this only stays an
+  // opt-in for whoever calls `resultForChallenge` without needing them.
   options: { liveRankings?: boolean } = {},
 ) {
   const challenge = await oneOrNull<{
-    results_published_at: Date | null; result_share_token: string | null; status: string; kind: "round" | "list";
+    results_published_at: Date | null; result_share_token: string | null;
     results_all_comments: boolean;
   }>(
     client,
-    "SELECT results_published_at, result_share_token, status, kind, results_all_comments FROM challenges WHERE id = $1",
+    "SELECT results_published_at, result_share_token, results_all_comments FROM challenges WHERE id = $1",
     [challengeId],
   );
-  // Frozen blocks only stand once a round closes (`generateShowcase` fills them
-  // then) — while it is still open the internal result is always live, so a
-  // draft curated too early never overrides the running numbers. A list has no
-  // "closed" to wait for, so its curation (if any) stands as soon as it is
-  // saved; its metric blocks carry a null `value_snapshot` precisely so the
-  // fallback below keeps recomputing them live instead of freezing a number.
-  const useFrozenBlocks = challenge?.status === "closed" || challenge?.kind === "list";
-  const blocksResult = useFrozenBlocks
-    ? await client.query<{
-        id: string;
-        kind: "metric" | "entry_value" | "text" | "ranking" | "affinity";
-        metric_id: string | null;
-        source_entry_id: string | null;
-        source_field_id: string | null;
-        heading: string | null;
-        body_snapshot: string | null;
-        value_snapshot: unknown;
-        position: number;
-        visible: boolean;
-      }>(
-        `SELECT id, kind, metric_id, source_entry_id, source_field_id, heading, body_snapshot, value_snapshot, position, visible
-           FROM result_blocks WHERE challenge_id = $1 ORDER BY position`,
-        [challengeId],
-      )
-    : { rows: [] as Array<{
-        id: string; kind: "metric" | "entry_value" | "text" | "ranking" | "affinity";
-        metric_id: string | null; source_entry_id: string | null; source_field_id: string | null;
-        heading: string | null; body_snapshot: string | null;
-        value_snapshot: unknown; position: number; visible: boolean;
-      }> };
+  // Curated blocks are read regardless of round status — curating the showcase
+  // (which metrics/comments/rankings to feature, the headline/summary text) is
+  // available to the admin any time, open or closed; "closed" only gates
+  // publishing the *public* link (`publishResults`). A block's own null
+  // `value_snapshot` (metric/ranking/affinity) means "recompute this live" —
+  // that's what keeps it current whether curated mid-round or after close.
+  const blocksResult = await client.query<{
+    id: string;
+    kind: "metric" | "entry_value" | "text" | "ranking" | "affinity";
+    metric_id: string | null;
+    source_entry_id: string | null;
+    source_field_id: string | null;
+    heading: string | null;
+    body_snapshot: string | null;
+    value_snapshot: unknown;
+    position: number;
+    visible: boolean;
+  }>(
+    `SELECT id, kind, metric_id, source_entry_id, source_field_id, heading, body_snapshot, value_snapshot, position, visible
+       FROM result_blocks WHERE challenge_id = $1 ORDER BY position`,
+    [challengeId],
+  );
   const blocks = { rows: blocksResult.rows.filter((block) => block.visible) };
   const needsMetricFallback = blocks.rows.some(
     (block) => block.kind === "metric" && block.value_snapshot === null && block.metric_id !== null,
@@ -786,7 +778,7 @@ export async function resultForChallenge(
   // "Show every comment automatically" bypasses the picked-one-by-one list
   // entirely: it replaces whatever's curated with every current comment,
   // computed fresh on every read, so a new one needs no resave to appear.
-  const autoComments = useFrozenBlocks && challenge?.results_all_comments === true
+  const autoComments = challenge?.results_all_comments === true
     ? await liveAllComments(client, challengeId)
     : null;
   const comments = autoComments ?? blocks.rows
@@ -1071,13 +1063,10 @@ export async function curateResults(
   return inTransaction(async (client) => {
     const access = await challengeAccess(session.user.id, challengeId, client, true);
     if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores podem editar a vitrine.");
-    // A round's Wrapped is curated *after* it closes — while open, the internal
-    // result is always live. A list never closes, so it skips this gate
-    // entirely: it can be curated (and published) at any time, live, from day one.
-    const isList = access.challenge.kind === "list";
-    if (access.challenge.status !== "closed" && !isList) {
-      throw new ApiError(409, "challenge_not_closed", "A vitrine só pode ser organizada depois que o desafio é encerrado.");
-    }
+    // "Closed" is only a lifecycle tag (no more entries accepted) — curating the
+    // showcase (headline, summary, which metrics/comments/rankings to feature)
+    // never touches entries, so it's available from day one, open or closed.
+    // Publishing the *public* link is the separate, gated step (`publishResults`).
     // Anonymisation is a privacy setting read live by whoever's results are
     // already public (the share link, the template preview) — changing it
     // here takes effect on their very next visit, nothing to republish.
