@@ -646,19 +646,22 @@ export async function resultForChallenge(
         id: string;
         kind: "metric" | "entry_value" | "text" | "ranking" | "affinity";
         metric_id: string | null;
+        source_entry_id: string | null;
+        source_field_id: string | null;
         heading: string | null;
         body_snapshot: string | null;
         value_snapshot: unknown;
         position: number;
         visible: boolean;
       }>(
-        `SELECT id, kind, metric_id, heading, body_snapshot, value_snapshot, position, visible
+        `SELECT id, kind, metric_id, source_entry_id, source_field_id, heading, body_snapshot, value_snapshot, position, visible
            FROM result_blocks WHERE challenge_id = $1 ORDER BY position`,
         [challengeId],
       )
     : { rows: [] as Array<{
         id: string; kind: "metric" | "entry_value" | "text" | "ranking" | "affinity";
-        metric_id: string | null; heading: string | null; body_snapshot: string | null;
+        metric_id: string | null; source_entry_id: string | null; source_field_id: string | null;
+        heading: string | null; body_snapshot: string | null;
         value_snapshot: unknown; position: number; visible: boolean;
       }> };
   const blocks = { rows: blocksResult.rows.filter((block) => block.visible) };
@@ -670,6 +673,34 @@ export async function resultForChallenge(
     : [];
   const metricById = new Map(currentMetrics.map((metric) => [metric.id, metric]));
   const textBlocks = blocks.rows.filter((block) => block.kind === "text");
+
+  // A curated comment references a specific (entry, field) — the same pair a
+  // participant can still edit at any time on a list, or that a correction
+  // could touch. Reading its current text live (rather than trusting
+  // `body_snapshot`, frozen at curation time) means an edit shows up on the
+  // Vitrine immediately, with no "regenerate" step. Harmless for a closed
+  // round too: entries can't be edited once closed, so live and frozen agree.
+  const commentEntryFieldPairs = blocks.rows
+    .filter((block): block is typeof block & { source_entry_id: string; source_field_id: string } =>
+      block.kind === "entry_value" && block.source_entry_id !== null && block.source_field_id !== null)
+    .map((block) => ({ entry_id: block.source_entry_id, field_id: block.source_field_id }));
+  const liveCommentText = new Map<string, string>();
+  if (commentEntryFieldPairs.length) {
+    const rows = await client.query<{ entry_id: string; field_id: string; text_value: string | null }>(
+      `SELECT ev.entry_id, ev.field_id, ev.text_value
+         FROM entry_values ev
+         JOIN jsonb_to_recordset($1::jsonb) AS pair(entry_id text, field_id text)
+           ON pair.entry_id = ev.entry_id AND pair.field_id = ev.field_id`,
+      [JSON.stringify(commentEntryFieldPairs)],
+    );
+    for (const row of rows.rows) {
+      if (row.text_value !== null) liveCommentText.set(`${row.entry_id}:${row.field_id}`, row.text_value);
+    }
+  }
+  const commentText = (block: { source_entry_id: string | null; source_field_id: string | null; body_snapshot: string | null }) =>
+    (block.source_entry_id && block.source_field_id
+      ? liveCommentText.get(`${block.source_entry_id}:${block.source_field_id}`)
+      : undefined) ?? block.body_snapshot ?? "";
 
   const totalEntries = (await oneOrNull<{ count: number }>(
     client,
@@ -704,7 +735,7 @@ export async function resultForChallenge(
     ...(block.kind === "metric"
       ? { metric: block.value_snapshot ?? (block.metric_id ? metricById.get(block.metric_id) : null) }
       : {}),
-    ...(block.kind === "entry_value" ? { comment: { id: block.id, text: block.body_snapshot ?? "", itemTitle: block.heading } } : {}),
+    ...(block.kind === "entry_value" ? { comment: { id: block.id, text: commentText(block), itemTitle: block.heading } } : {}),
     ...(block.kind === "ranking" ? { ranking: (block.value_snapshot as { personal?: unknown })?.personal ?? [] } : {}),
     ...(block.kind === "affinity" ? { affinity: block.value_snapshot } : {}),
   }));
@@ -718,7 +749,7 @@ export async function resultForChallenge(
       .filter(Boolean),
     comments: blocks.rows
       .filter((block) => block.kind === "entry_value")
-      .map((block) => ({ id: block.id, text: block.body_snapshot ?? "", itemTitle: block.heading })),
+      .map((block) => ({ id: block.id, text: commentText(block), itemTitle: block.heading })),
     personalRankings,
     affinity,
     blocks: orderedBlocks,

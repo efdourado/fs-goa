@@ -5340,6 +5340,51 @@ test("editar um registro cujo comentário já foi curado na vitrine não apaga-e
   assert.equal(Object.hasOwn(thisEntry.values, comentarioField), false, "o comentário removido não aparece mais no registro");
 });
 
+test("um comentário curado na vitrine acompanha uma edição ao vivo — sem precisar salvar a curadoria de novo", async () => {
+  const owner = await register("Vitrine Live", "vitrine_live_test");
+  const created = await call("POST", "/api/personal/challenges", {
+    session: owner,
+    body: { recipe: "bookshelf", title: "Estante ao vivo", items: [{ title: "Klara and the Sun", author: "Ishiguro" }] },
+  });
+  const challengeId = (created.body as { id: string }).id;
+  const detail = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    entryTypes: Array<{ id: string; purpose: string; fields: Array<{ id: string; key: string }> }>;
+    items: Array<{ id: string }>;
+  };
+  const ratingType = detail.entryTypes.find((type) => type.purpose === "rating")!;
+  const notaField = ratingType.fields.find((field) => field.key === "nota")!.id;
+  const comentarioField = ratingType.fields.find((field) => field.key === "comentario")!.id;
+  const itemId = detail.items[0].id;
+
+  const entry = await call("POST", `/api/challenges/${challengeId}/entries`, {
+    session: owner,
+    body: { itemId, entryTypeId: ratingType.id, values: { [notaField]: 5, [comentarioField]: "Texto original." } },
+  });
+  const entryId = (entry.body as { id: string }).id;
+
+  await call("POST", `/api/challenges/${challengeId}/results`, {
+    session: owner,
+    body: { headline: "", summary: "", metricIds: [], comments: [{ entryId, fieldId: comentarioField }] },
+  });
+
+  const before = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    result: { comments: Array<{ text: string }> };
+  };
+  assert.equal(before.result.comments[0]?.text, "Texto original.");
+
+  // Só edita o registro — nunca chama /results de novo (nada de "regenerar"
+  // ou resalvar a curadoria).
+  await call("PATCH", `/api/entries/${entryId}`, {
+    session: owner,
+    body: { values: { [notaField]: 5, [comentarioField]: "Texto corrigido depois." } },
+  });
+
+  const after = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    result: { comments: Array<{ text: string }> };
+  };
+  assert.equal(after.result.comments[0]?.text, "Texto corrigido depois.", "a vitrine acompanha a edição sem precisar de um passo extra de republicação");
+});
+
 // ── Onda D — lixeira e ciclo de vida ────────────────────────────────────
 
 test("D: registro binado num desafio ativo não pode ser restaurado nem apagado após encerrar", async () => {
