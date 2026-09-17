@@ -254,8 +254,9 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
   // Keyed by field id so an "insert marker" button can reach the exact
   // textarea it belongs to and drop the marker at the cursor, not the end.
   const textareaRefs = useRef<Record<Id, HTMLTextAreaElement | null>>({});
-  // `marker` always starts its own fresh line — "> " for a quote line, or
-  // "---\n" for a standalone divider line (see `parseCommentBlocks`).
+  // A standalone "---" line never needs blank-line isolation — it's read per
+  // exact line regardless of what's around it (see `parseCommentBlocks`) — so
+  // this just drops the marker on its own fresh line at the cursor.
   function insertLineMarker(field: ChallengeField, marker: string) {
     if (!field.id) return;
     const current = String(values[field.id] ?? "");
@@ -271,6 +272,32 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
     requestAnimationFrame(() => {
       el?.focus();
       el?.setSelectionRange(before.length + insertion.length, before.length + insertion.length);
+    });
+  }
+
+  // A quote has to be its own paragraph (blank line on each side) for
+  // `parseCommentBlocks` to read it — this wraps the current selection (or
+  // just drops an empty '' to type into) and pads with blank lines only where
+  // one isn't already there, so it never merges with text before or after.
+  function insertQuoteWrap(field: ChallengeField) {
+    if (!field.id) return;
+    const current = String(values[field.id] ?? "");
+    const el = textareaRefs.current[field.id];
+    const start = el?.selectionStart ?? current.length;
+    const end = el?.selectionEnd ?? current.length;
+    const before = current.slice(0, start);
+    const selected = current.slice(start, end);
+    const after = current.slice(end);
+    const gapBefore = before === "" || before.endsWith("\n\n") ? "" : before.endsWith("\n") ? "\n" : "\n\n";
+    const gapAfter = after === "" || after.startsWith("\n\n") ? "" : after.startsWith("\n") ? "\n" : "\n\n";
+    const insertion = `${gapBefore}'${selected}'${gapAfter}`;
+    const next = before + insertion + after;
+    if (field.config?.maxLength && next.length > field.config.maxLength) return;
+    setValue(field, next);
+    requestAnimationFrame(() => {
+      el?.focus();
+      const cursor = before.length + gapBefore.length + 1 + selected.length;
+      el?.setSelectionRange(cursor, cursor);
     });
   }
 
@@ -414,7 +441,7 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
                     <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
                       <small className="text-[var(--muted)]">{t("quoteHint")}</small>
                       <div className="flex flex-none gap-1.5">
-                        <button type="button" className={cx(actionChipClass, ghostChipClass, "min-h-7 px-2.5 text-[11px]")} disabled={busy} onClick={() => insertLineMarker(field, "> ")}>
+                        <button type="button" className={cx(actionChipClass, ghostChipClass, "min-h-7 px-2.5 text-[11px]")} disabled={busy} onClick={() => insertQuoteWrap(field)}>
                           <QuoteGlyph />
                           {t("insertQuote")}
                         </button>

@@ -38,29 +38,46 @@ test("desafio agendado existe só no diário com início futuro", () => {
   assert.equal(isChallengeScheduled("active", "2026-08-30", "item", now), false);
 });
 
-test("citação vs opinião: uma linha começando com '> ' vira bloco de citação; linhas seguidas do mesmo tipo ficam juntas", () => {
+test("citação vs opinião: um trecho todo entre aspas simples vira bloco de citação; sem aspas nas duas pontas fica texto comum", () => {
   assert.deepEqual(parseCommentBlocks("Só uma opinião comum."), [{ kind: "text", text: "Só uma opinião comum." }]);
+
+  // Colada de uma vez, com quebras de linha no meio — continua UM bloco só,
+  // exatamente o problema que o "> " por linha obrigava a repetir.
   assert.deepEqual(
-    parseCommentBlocks("Achei incrível.\n> Uma frase perfeita.\n> Segunda linha da citação.\nRecomendo demais."),
+    parseCommentBlocks("'Foi aqui que percebi\nque nada mais importava\nalém daquele momento.'"),
+    [{ kind: "quote", text: "Foi aqui que percebi\nque nada mais importava\nalém daquele momento." }],
+  );
+
+  // Opinião antes/depois, cada trecho separado por linha em branco.
+  assert.deepEqual(
+    parseCommentBlocks("Achei incrível.\n\n'Uma frase perfeita.'\n\nRecomendo demais."),
     [
       { kind: "text", text: "Achei incrível." },
-      { kind: "quote", text: "Uma frase perfeita.\nSegunda linha da citação." },
+      { kind: "quote", text: "Uma frase perfeita." },
       { kind: "text", text: "Recomendo demais." },
     ],
   );
-  assert.deepEqual(parseCommentBlocks("  \n> só citação\n  "), [{ kind: "quote", text: "só citação" }], "linhas em branco nas pontas somem");
+
+  // Aspas que não envolvem o trecho inteiro (aqui, soltas no meio de uma
+  // fala) não disparam nada — o texto sai exatamente como foi digitado.
+  assert.deepEqual(
+    parseCommentBlocks(`Rick: "vc é um 'cara' esquisito"`),
+    [{ kind: "text", text: `Rick: "vc é um 'cara' esquisito"` }],
+    "aspas soltas no meio do texto continuam texto normal, sem risco de pegar errado",
+  );
+
+  // Aspas aninhadas dentro de um trecho já totalmente envolto não reabrem uma
+  // citação própria — só o par mais externo conta, o resto é conteúdo comum.
+  assert.deepEqual(
+    parseCommentBlocks(`'Rick: "vc é um 'cara' esquisito"'`),
+    [{ kind: "quote", text: `Rick: "vc é um 'cara' esquisito"` }],
+    "só a borda externa conta; aspas dentro dela ficam como texto normal da própria citação",
+  );
 });
 
-test("citação tolera até 3 espaços de indentação antes do '>' (igual ao Markdown); com 4+ deixa de contar", () => {
-  assert.deepEqual(parseCommentBlocks("  > indentada com 2 espaços"), [{ kind: "quote", text: "indentada com 2 espaços" }]);
-  assert.deepEqual(parseCommentBlocks("   > indentada com 3 espaços"), [{ kind: "quote", text: "indentada com 3 espaços" }]);
-  // A linha do meio preserva a própria indentação (só as pontas do texto
-  // inteiro são cortadas), então 4 espaços aqui realmente testam o limite.
-  assert.deepEqual(
-    parseCommentBlocks("Opinião normal.\n    > 4 espaços não conta mais como citação"),
-    [{ kind: "text", text: "Opinião normal.\n    > 4 espaços não conta mais como citação" }],
-    "com 4+ espaços a linha deixa de ser reconhecida como citação e vira parte do texto comum",
-  );
+test("citação aceita aspas curvas do autocorretor do celular (‘…’), retas ou misturadas", () => {
+  assert.deepEqual(parseCommentBlocks("‘Frase inteira com aspas curvas.’"), [{ kind: "quote", text: "Frase inteira com aspas curvas." }]);
+  assert.deepEqual(parseCommentBlocks("'Aberta reta, fechada curva.’"), [{ kind: "quote", text: "Aberta reta, fechada curva." }]);
 });
 
 test("três traços sozinhos numa linha viram um divisor, separando ideias dentro do mesmo comentário", () => {
@@ -231,20 +248,20 @@ test("comentário: editando mostra a dica de citação e o botão de inserir; j�
     onSave: async () => undefined,
   }));
   assert.match(editing, /<textarea/, "ainda editando, o campo real continua sendo o textarea");
-  assert.match(editing, /Comece uma linha com/, "a dica do atalho de citação aparece perto do campo");
-  assert.match(editing, /Citação/, "o botão que insere \"> \" no cursor aparece");
+  assert.match(editing, /aspas simples/, "a dica do atalho de citação aparece perto do campo");
+  assert.match(editing, /Citação/, "o botão que envolve o trecho selecionado em aspas aparece");
 
   const answered = renderWithIntl(createElement(DynamicEntryForm, {
     fields: [commentField],
     item: null,
-    entry: { id: "e1", values: { f1: "Achei ótimo.\n> Uma frase marcante do livro." } },
+    entry: { id: "e1", values: { f1: "Achei ótimo.\n\n'Uma frase marcante do livro.'" } },
     canEdit: true,
     onSave: async () => undefined,
     onDelete: async () => undefined,
   }));
   assert.doesNotMatch(answered, /<textarea/, "campo respondido não mostra mais o textarea, e sim o texto renderizado");
-  assert.match(answered, /<p[^>]*>Achei ótimo\.<\/p>/, "a linha comum vira parágrafo normal");
-  assert.match(answered, /<blockquote[^>]*>Uma frase marcante do livro\.<\/blockquote>/, "a linha marcada com > vira um bloco de citação");
+  assert.match(answered, /<p[^>]*>Achei ótimo\.<\/p>/, "o trecho comum vira parágrafo normal");
+  assert.match(answered, /<blockquote[^>]*>Uma frase marcante do livro\.<\/blockquote>/, "o trecho entre aspas vira um bloco de citação");
 });
 
 test("limpar a nota não marca a nota 0 por engano (Number(null) e Number('') são 0 em JS)", () => {

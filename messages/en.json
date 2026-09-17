@@ -945,7 +945,7 @@
     "readOnly": "This entry is read-only.",
     "dueAt": "Deadline: {date}",
     "emptyValue": "—",
-    "quoteHint": "Start a line with > for a quote, or use --- to separate ideas",
+    "quoteHint": "Wrap a whole passage in single quotes ('like this') to make it a quote, or use --- to separate ideas",
     "insertQuote": "Quote",
     "insertDivider": "Divider",
     "unavailable": {

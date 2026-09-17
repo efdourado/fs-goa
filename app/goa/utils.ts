@@ -251,32 +251,48 @@ export function itemIdForEntry(entry: Entry): Id | null {
 
 export type CommentBlock = { kind: "quote" | "text" | "divider"; text: string };
 
+const OPENS_QUOTE = /^['‘]/;
+const CLOSES_QUOTE = /['’]$/;
+
 /**
- * Splits a comment into quote/opinion/divider blocks — both markers are
- * Markdown/Notion conventions, chosen so nobody has to be taught a new
- * gesture: a line starting with "> " (up to 3 leading spaces tolerated, same
- * leeway CommonMark gives a blockquote marker) is a quote; a line that is
- * just "---" (three or more dashes, nothing else) is a divider, for
- * separating distinct thoughts inside one comment; everything else is plain
- * opinion text. Consecutive lines of the same kind merge into one block, so a
- * paragraph or a multi-line quote stays together instead of splitting per
- * line — a divider never merges, since each one is its own break. Leading/
- * trailing blank lines are dropped; a blank line in the middle survives as
- * paragraph spacing.
+ * Splits a comment into quote/opinion/divider blocks. A *paragraph* — a run
+ * of non-blank lines, however many, however it wraps or gets pasted in — is a
+ * quote when it starts and ends with a single-quote mark ('like this'; a
+ * curly ‘…’ from autocorrect counts too), no matter how many quote marks sit
+ * inside it: only the outermost pair is read, so a nested 'aside' or an
+ * ordinary "double-quoted" word stays plain inside it, not re-parsed. A
+ * paragraph not fully wrapped that way is opinion text, quote characters and
+ * all, exactly as typed — a stray apostrophe or a "quoted" word can never
+ * misfire, since the check is on the whole paragraph's own edges, not on
+ * finding some matching mark anywhere in the text. A line that is just "---"
+ * (three or more dashes, nothing else) is its own divider, for separating
+ * distinct thoughts, and never joins a paragraph on either side.
  */
 export function parseCommentBlocks(value: string): CommentBlock[] {
   const blocks: CommentBlock[] = [];
-  for (const rawLine of value.trim().split("\n")) {
-    if (/^-{3,}$/.test(rawLine.trim())) {
-      blocks.push({ kind: "divider", text: "" });
-      continue;
+  let paragraph: string[] = [];
+  const flush = () => {
+    if (!paragraph.length) return;
+    const text = paragraph.join("\n");
+    const trimmed = text.trim();
+    if (trimmed.length > 1 && OPENS_QUOTE.test(trimmed) && CLOSES_QUOTE.test(trimmed)) {
+      blocks.push({ kind: "quote", text: trimmed.slice(1, -1) });
+    } else {
+      blocks.push({ kind: "text", text });
     }
-    const match = /^\s{0,3}>\s?(.*)$/.exec(rawLine);
-    const kind: CommentBlock["kind"] = match ? "quote" : "text";
-    const line = match ? match[1] : rawLine;
-    const last = blocks.at(-1);
-    if (last?.kind === kind) last.text += `\n${line}`;
-    else blocks.push({ kind, text: line });
+    paragraph = [];
+  };
+  for (const rawLine of value.trim().split("\n")) {
+    const line = rawLine.trim();
+    if (/^-{3,}$/.test(line)) {
+      flush();
+      blocks.push({ kind: "divider", text: "" });
+    } else if (line === "") {
+      flush();
+    } else {
+      paragraph.push(rawLine);
+    }
   }
+  flush();
   return blocks;
 }

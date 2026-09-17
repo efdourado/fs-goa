@@ -945,7 +945,7 @@
     "readOnly": "Este registro está disponível somente para leitura.",
     "dueAt": "Prazo: {date}",
     "emptyValue": "—",
-    "quoteHint": "Comece uma linha com > para uma citação, ou use --- para separar ideias",
+    "quoteHint": "Coloque um trecho inteiro entre aspas simples ('assim') para virar citação, ou use --- para separar ideias",
     "insertQuote": "Citação",
     "insertDivider": "Divisória",
     "unavailable": {
