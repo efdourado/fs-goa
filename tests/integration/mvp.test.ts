@@ -1065,12 +1065,6 @@ test("modelo mostra a vitrine curada ao vivo, mesmo sem nunca ligar a publicaç�
   await call("POST", `/api/challenges/${challengeId}/transition`, { session: adminSession, body: { status: "closed" } });
 
   // Curou a vitrine (sem nunca chamar /results/publish) — o modelo já mostra.
-  await call("POST", `/api/challenges/${challengeId}/results`, {
-    session: adminSession, body: { headline: "Uma retrospectiva e tanto", regenerate: true },
-  });
-  const afterFirstSave = (await call("GET", `/api/templates/${challengeId}`)).body as { result: { headline: string | null } };
-  assert.equal(afterFirstSave.result?.headline, null, "regenerate não define manchete própria ainda");
-
   const withHeadline = await call("POST", `/api/challenges/${challengeId}/results`, {
     session: adminSession, body: { headline: "Uma retrospectiva e tanto", summary: "x", metricIds: [], comments: [] },
   });
@@ -1163,7 +1157,7 @@ test("modelo com vitrine publicada: o Resultado do preview traz a retrospectiva 
   }
   await call("POST", `/api/challenges/${challengeId}/transition`, { session: adminSession, body: { status: "closed" } });
   await call("POST", `/api/challenges/${challengeId}/results`, {
-    session: adminSession, body: { regenerate: true, anonymizeParticipants: true },
+    session: adminSession, body: { metricIds: [], comments: [], anonymizeParticipants: true },
   });
   await call("POST", `/api/challenges/${challengeId}/results/publish`, { session: adminSession, body: {} });
   await call("POST", `/api/challenges/${challengeId}/template`, { session: adminSession, body: { summary: "Pronto." } });
@@ -2219,13 +2213,6 @@ test("motor de análise: ranking ajustado, surpresa, viés e vitrine automática
     "manchete e resumo sobrevivem ao ciclo reabrir/fechar",
   );
 
-  // "regenerar" também preserva o texto
-  const regen = await call("POST", `/api/challenges/${challengeId}/results`, { session: owner, body: { regenerate: true } });
-  assert.equal(regen.response.status, 200, JSON.stringify(regen.body));
-  const afterRegen = await adminPool.query<{ n: number }>(
-    "SELECT count(*)::int AS n FROM result_blocks WHERE challenge_id=$1 AND kind='text'", [challengeId],
-  );
-  assert.equal(afterRegen.rows[0].n, 2, "regenerar mantém a manchete e o resumo");
 });
 
 test("memória do acervo: um filme reconhecido em duas rodadas encerradas", async () => {
@@ -4078,7 +4065,7 @@ test("mudar a anonimização atualiza a vitrine já publicada ao vivo, sem tirar
   await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "closed" } });
 
   // Publica COM nomes.
-  await call("POST", `/api/challenges/${challengeId}/results`, { session: owner, body: { regenerate: true, anonymizeParticipants: false } });
+  await call("POST", `/api/challenges/${challengeId}/results`, { session: owner, body: { metricIds: [], comments: [], anonymizeParticipants: false } });
   const pub = await call("POST", `/api/challenges/${challengeId}/results/publish`, { session: owner, body: {} });
   const token = (pub.body as { url: string }).url.split("/results/")[1];
   const named = await call("GET", `/api/results/${token}`);
@@ -4129,7 +4116,7 @@ test("publicação anônima mascara o nome de quem indicou o filme no ranking, n
     }
   }
   await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "closed" } });
-  await call("POST", `/api/challenges/${challengeId}/results`, { session: owner, body: { regenerate: true, anonymizeParticipants: true } });
+  await call("POST", `/api/challenges/${challengeId}/results`, { session: owner, body: { metricIds: [], comments: [], anonymizeParticipants: true } });
   const pub = await call("POST", `/api/challenges/${challengeId}/results/publish`, { session: owner, body: {} });
   const token = (pub.body as { url: string }).url.split("/results/")[1];
   const dump = JSON.stringify((await call("GET", `/api/results/${token}`)).body);
@@ -4188,7 +4175,6 @@ test("vitrine é anônima por padrão, e consentimento nominal libera o nome só
     201,
   );
   await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "closed" } });
-  await call("POST", `/api/challenges/${challengeId}/results`, { session: owner, body: { regenerate: true } });
 
   // Publicação COM nomes: anonimiza só quem não autorizou.
   await call("POST", `/api/challenges/${challengeId}/results`, { session: owner, body: { anonymizeParticipants: false } });
@@ -4206,7 +4192,7 @@ test("vitrine é anônima por padrão, e consentimento nominal libera o nome só
   assert.ok(!labels.includes("Caio Wrapped"));
 });
 
-test("blocos organizáveis: o admin reordena e esconde blocos, e os valores ficam congelados", async () => {
+test("blocos organizáveis: o admin reordena e esconde blocos, e o valor recalculado ao vivo se mantém coerente", async () => {
   const owner = await register("Dona Blocos", "dona_blocos_v1");
   const b = await register("Beto Blocos", "beto_blocos_v1");
   const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube Blocos" } })).body as { id: string }).id;
@@ -4238,7 +4224,7 @@ test("blocos organizáveis: o admin reordena e esconde blocos, e os valores fica
   };
   assert.ok(before.result.blocks.length >= 2, "a vitrine gerada tem blocos");
   const metricBlock = before.result.blocks.find((block) => block.kind === "metric")!;
-  const frozenValue = metricBlock.metric?.value ?? null;
+  const metricValue = metricBlock.metric?.value ?? null;
 
   // Inverte a ordem e esconde um bloco.
   const reversed = [...before.result.blocks].reverse().map((block) => ({ id: block.id, visible: block.kind !== "text" }));
@@ -4254,7 +4240,7 @@ test("blocos organizáveis: o admin reordena e esconde blocos, e os valores fica
     "a nova ordem persiste",
   );
   assert.equal(after.result.blocks.find((block) => block.kind === "text")?.visible, false, "o bloco de texto foi escondido");
-  assert.equal(after.result.blocks.find((block) => block.kind === "metric")?.metric?.value, frozenValue, "o valor da métrica não mudou");
+  assert.equal(after.result.blocks.find((block) => block.kind === "metric")?.metric?.value, metricValue, "o valor recalculado ao vivo continua o mesmo, pois nenhum novo registro foi lançado");
 
   // Bloco de outra vitrine é recusado.
   assert.equal((await call("PATCH", `/api/challenges/${challengeId}/results/blocks`, { session: owner, body: { blocks: [{ id: "nao-existe", visible: true }] } })).response.status, 404);
@@ -4284,7 +4270,7 @@ test("quem sai do grupo tem a identidade mascarada ao vivo, sem tirar a vitrine 
   await call("PATCH", `/api/challenges/${challengeId}/consent`, { session: owner, body: { nameConsent: true } });
   await call("PATCH", `/api/challenges/${challengeId}/consent`, { session: leaver, body: { nameConsent: true } });
   await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "closed" } });
-  await call("POST", `/api/challenges/${challengeId}/results`, { session: owner, body: { regenerate: true, anonymizeParticipants: false } });
+  await call("POST", `/api/challenges/${challengeId}/results`, { session: owner, body: { metricIds: [], comments: [], anonymizeParticipants: false } });
   const pub = await call("POST", `/api/challenges/${challengeId}/results/publish`, { session: owner, body: {} });
   const token = (pub.body as { url: string }).url.split("/results/")[1];
   const before = await call("GET", `/api/results/${token}`);

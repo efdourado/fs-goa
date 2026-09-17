@@ -853,19 +853,11 @@ function AdminResults({
     } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
   }
 
-  async function regenerate() {
-    setBusy(true); setError(null); setSuccess(null);
-    try {
-      await onSave({ regenerate: true, anonymizeParticipants: anonymize, ...(hasSchedule ? { showSchedule } : {}) });
-      setSuccess(t("showcaseRegenerated"));
-    } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
-  }
-
   return (
     <div className="mx-auto max-w-3xl">
       <div className="min-w-0 space-y-6">
         {!canCurate ? <p className="rounded-xl bg-[var(--wash)] p-4 text-sm leading-6 text-[var(--muted)]">{tx("curationAfterClose")}</p> : null}
-        <details open className="group border-b border-[var(--line)] pb-6">
+        <details open className="group">
           <summary className="cursor-pointer list-none py-3 text-xl font-medium tracking-tight [&::-webkit-details-marker]:hidden">{tx("curation")}</summary>
           <fieldset disabled={!canCurate || busy} className="min-w-0 space-y-4">
       <div>
@@ -893,9 +885,8 @@ function AdminResults({
         <label className="mt-6 flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4 text-sm"><input className="mt-0.5" type="checkbox" aria-label={t("anonymizeParticipants")} checked={anonymize} onChange={(event) => setAnonymize(event.target.checked)} /><span><strong className="block">{t("anonymizeParticipants")}</strong><small className="text-[var(--muted)]">{t("anonymizeHint")}</small></span></label>
         {hasSchedule ? <label className="mt-3 flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4 text-sm"><input className="mt-0.5" type="checkbox" aria-label={t("showScheduleLabel")} checked={showSchedule} onChange={(event) => setShowSchedule(event.target.checked)} /><span><strong className="block">{t("showScheduleLabel")}</strong><small className="text-[var(--muted)]">{t("showScheduleHint")}</small></span></label> : null}
         <div className="mt-5"><StatusMessage error={error} success={success} /></div>
-        <div className="mt-5 flex flex-col gap-2 sm:flex-row"><Button disabled={busy} onClick={() => void save()}>{busy ? tc("saving") : t("saveDraft")}</Button><Button variant="secondary" disabled={busy} onClick={() => void regenerate()}>{t("regenerateDraft")}</Button></div>
+        <div className="mt-5"><Button disabled={busy} onClick={() => void save()}>{busy ? tc("saving") : t("saveResults")}</Button></div>
         {isPublished ? <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{t("alreadyPublicHint")}</p> : null}
-        <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{t("regenerateHint")}</p>
       </div>
           </fieldset>
         </details>

@@ -288,6 +288,13 @@
       "when": 1789652446576,
       "tag": "0040_remarkable_champions",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1789657998830,
+      "tag": "0041_useful_captain_cross",
+      "breakpoints": true
     }
   ]
 }

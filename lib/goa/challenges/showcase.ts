@@ -5,30 +5,32 @@ import { computeRankings } from "./rankings";
 import { metricsForChallenge } from "./results";
 
 /**
- * Rebuilds the *derived* showcase blocks — the analysis metrics (each with a
- * frozen snapshot), personal rankings, and a handful of the best comments — from
- * whatever the challenge holds now. Called when a round closes and whenever the
- * admin hits "regenerate".
+ * Builds the *derived* showcase blocks — every metric with data, personal
+ * rankings, affinity, and a handful of the best comments — from whatever the
+ * challenge holds right now. Called once, when a round closes, to give the
+ * Vitrine a sensible starting shape instead of an empty one.
  *
  * The admin's own copy — any `text` block (headline, summary) — is carried
- * through untouched: a reopen, a re-close, or a "regenerate" must never silently
- * drop words the admin wrote, because nothing tells them it happened. There is no
+ * through untouched: a reopen followed by a re-close must never silently drop
+ * words the admin wrote, because nothing tells them it happened. There is no
  * auto-generated summary sentence; the Vitrine tab is where that text comes from.
  *
  * `result_blocks.kind` stays `metric | entry_value | text`; a ranking or a
  * per-person profile is a `metric` block whose `value_snapshot` carries a
  * `series` — the renderer decides card vs. list.
  *
- * `live` (a personal list, which never closes) skips freezing metric values:
- * each metric block keeps a null `value_snapshot`, so `resultForChallenge`
- * recomputes it from current data on every read instead of showing a stale
- * number from whenever this last ran.
+ * Metric, ranking, and affinity blocks all carry a null `value_snapshot` on
+ * purpose — nothing here is ever frozen, so `resultForChallenge` recomputes
+ * each one from current data on every read (see `curateResults`, which does
+ * the same). A comment block's `body_snapshot` is required by the schema and
+ * kept as a fallback, but `resultForChallenge` already prefers the live
+ * `entry_values` text for the same (entry, field) pair — editing a picked
+ * comment afterward shows up without rerunning this.
  */
 export async function generateShowcase(
   client: PoolClient,
   challengeId: string,
   userId: string,
-  live = false,
 ): Promise<void> {
   const kept = await client.query<{ heading: string | null; body_snapshot: string | null }>(
     "SELECT heading, body_snapshot FROM result_blocks WHERE challenge_id=$1 AND kind='text' ORDER BY position",
@@ -59,29 +61,29 @@ export async function generateShowcase(
     await client.query(
       `INSERT INTO result_blocks
         (id,challenge_id,kind,metric_id,heading,value_snapshot,position,visible,created_by_user_id,created_at,updated_at)
-       VALUES ($1,$2,'metric',$3,$4,$5::jsonb,$6,true,$7,now(),now())`,
-      [publicId(), challengeId, metric.id as string, metric.label as string,
-        live ? null : JSON.stringify(metric), position++, userId],
+       VALUES ($1,$2,'metric',$3,$4,NULL,$5,true,$6,now(),now())`,
+      [publicId(), challengeId, metric.id as string, metric.label as string, position++, userId],
     );
   }
 
-  // Personal rankings + affinity (V1 §9–11). Frozen here like every other block;
-  // an empty result (solo round, no shared items) simply isn't inserted.
+  // Personal rankings + affinity (V1 §9–11) — computed once here only to
+  // decide whether there's anything worth a block (a solo round has no
+  // ranking to show); the block itself carries no frozen value.
   const { personal, affinity } = await computeRankings(client, challengeId);
   if (personal.length > 1) {
     await client.query(
       `INSERT INTO result_blocks
         (id,challenge_id,kind,heading,value_snapshot,position,visible,created_by_user_id,created_at,updated_at)
-       VALUES ($1,$2,'ranking',$3,$4::jsonb,$5,true,$6,now(),now())`,
-      [publicId(), challengeId, "Rankings pessoais", JSON.stringify({ personal }), position++, userId],
+       VALUES ($1,$2,'ranking',$3,NULL,$4,true,$5,now(),now())`,
+      [publicId(), challengeId, "Rankings pessoais", position++, userId],
     );
   }
   if (affinity && affinity.pairs.length > 0) {
     await client.query(
       `INSERT INTO result_blocks
         (id,challenge_id,kind,heading,value_snapshot,position,visible,created_by_user_id,created_at,updated_at)
-       VALUES ($1,$2,'affinity',$3,$4::jsonb,$5,true,$6,now(),now())`,
-      [publicId(), challengeId, "Afinidades", JSON.stringify(affinity), position++, userId],
+       VALUES ($1,$2,'affinity',$3,NULL,$4,true,$5,now(),now())`,
+      [publicId(), challengeId, "Afinidades", position++, userId],
     );
   }
 

@@ -13,7 +13,6 @@ import { calculateMetric } from "../../metrics";
 import { generateOpaqueToken, hashToken } from "../../security";
 import { primaryEntryType } from "./entry-types";
 import { computeRankings } from "./rankings";
-import { generateShowcase } from "./showcase";
 import type { MetricRow } from "./types";
 
 interface SeriesEntry {
@@ -742,16 +741,26 @@ export async function resultForChallenge(
 
   const rankingBlock = blocksResult.rows.find((block) => block.kind === "ranking");
   const affinityBlock = blocksResult.rows.find((block) => block.kind === "affinity");
-  // Frozen when present; computed live only when the caller asks (never for an
-  // empty challenge).
-  const live = options.liveRankings && !rankingBlock && !affinityBlock && totalEntries > 0
+  // A curated ranking/affinity block never freezes a value (same reasoning as
+  // metrics) — a null `value_snapshot` on a visible block means "recompute
+  // this live", same as no block existing at all (the caller-gated case,
+  // e.g. skipped on `getChallengeDetail`'s hot path while nothing's curated
+  // yet). Never for an empty challenge either way.
+  const needsRankingFallback =
+    (rankingBlock?.visible && rankingBlock.value_snapshot === null)
+    || (affinityBlock?.visible && affinityBlock.value_snapshot === null);
+  const live = ((options.liveRankings && !rankingBlock && !affinityBlock) || needsRankingFallback) && totalEntries > 0
     ? await computeRankings(client, challengeId)
     : { personal: [], affinity: null };
   const personalRankings = rankingBlock
-    ? (rankingBlock.visible ? (rankingBlock.value_snapshot as { personal: unknown }).personal ?? [] : [])
+    ? (rankingBlock.visible
+      ? (rankingBlock.value_snapshot === null ? live.personal : (rankingBlock.value_snapshot as { personal: unknown }).personal ?? [])
+      : [])
     : live.personal;
   const affinity = affinityBlock
-    ? (affinityBlock.visible ? affinityBlock.value_snapshot : null)
+    ? (affinityBlock.visible
+      ? (affinityBlock.value_snapshot === null ? live.affinity : affinityBlock.value_snapshot)
+      : null)
     : live.affinity;
 
   // The ordered, admin-arranged Wrapped — every stored block with its position
@@ -768,8 +777,10 @@ export async function resultForChallenge(
       ? { metric: block.value_snapshot ?? (block.metric_id ? metricById.get(block.metric_id) : null) }
       : {}),
     ...(block.kind === "entry_value" ? { comment: { id: block.id, text: commentText(block), itemTitle: block.heading } } : {}),
-    ...(block.kind === "ranking" ? { ranking: (block.value_snapshot as { personal?: unknown })?.personal ?? [] } : {}),
-    ...(block.kind === "affinity" ? { affinity: block.value_snapshot } : {}),
+    // Resolved above (live when the block's own snapshot is null), not read
+    // straight off `value_snapshot` — that'd skip the live fallback here.
+    ...(block.kind === "ranking" ? { ranking: personalRankings } : {}),
+    ...(block.kind === "affinity" ? { affinity } : {}),
   }));
 
   // "Show every comment automatically" bypasses the picked-one-by-one list
@@ -1033,9 +1044,18 @@ export async function archiveMetric(session: SessionContext, challengeId: string
 }
 
 /**
- * Saves the showcase **draft** — the `result_blocks` the admin curates and the
- * in-app preview renders. Never publishes: `results_published_at` and the share
- * token are only touched by `publishResults` / `unpublishChallengeResults`.
+ * Saves the showcase's curated shape — which metrics to feature, which
+ * comments (or "all of them"), whether to include rankings/affinity, plus the
+ * admin's own headline/summary text. Never publishes:
+ * `results_published_at` and the share token are only touched by
+ * `publishResults` / `unpublishChallengeResults`.
+ *
+ * Nothing computed here is ever frozen: a metric, ranking, or affinity block
+ * carries a null `value_snapshot` on purpose, so `resultForChallenge` always
+ * recomputes it from current data on read — there is no "stale until you
+ * resave" state to manage, and so no separate regenerate/refresh action
+ * either. Only the *choices* (which metrics, which comments, the written
+ * text) are actually saved here.
  */
 export async function curateResults(
   session: SessionContext,
@@ -1052,9 +1072,8 @@ export async function curateResults(
     const access = await challengeAccess(session.user.id, challengeId, client, true);
     if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores podem editar a vitrine.");
     // A round's Wrapped is curated *after* it closes — while open, the internal
-    // result is always live, and closing regenerates the blocks anyway (ROADMAP
-    // §11). A list never closes, so it skips this gate entirely: it can be
-    // curated (and published) at any time, live, from day one.
+    // result is always live. A list never closes, so it skips this gate
+    // entirely: it can be curated (and published) at any time, live, from day one.
     const isList = access.challenge.kind === "list";
     if (access.challenge.status !== "closed" && !isList) {
       throw new ApiError(409, "challenge_not_closed", "A vitrine só pode ser organizada depois que o desafio é encerrado.");
@@ -1084,12 +1103,6 @@ export async function curateResults(
         [challengeId, body.allComments === true]);
     }
     const published = access.challenge.results_published_at !== null;
-    if (body.regenerate === true) {
-      await generateShowcase(client, challengeId, session.user.id, isList);
-      await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
-        "results.regenerated", "challenge", challengeId, null, null);
-      return { challengeId, published };
-    }
     await client.query("DELETE FROM result_blocks WHERE challenge_id=$1", [challengeId]);
     let position = 0;
     for (const [heading, text] of [["headline", headline], ["summary", summary]] as const) {
@@ -1109,35 +1122,34 @@ export async function curateResults(
       [challengeId, metricIds],
     );
     for (const metric of availableMetrics.rows) {
-      // A list's metric blocks never freeze a value — `resultForChallenge`
-      // recomputes them live off a null `value_snapshot`, so the showcase
-      // always reflects today's entries with no regenerate step needed.
-      const snapshot = isList ? null : JSON.stringify(await calculateMetricRow(client, metric));
+      // Never frozen — see the doc comment above.
       await client.query(
         `INSERT INTO result_blocks
           (id,challenge_id,kind,metric_id,heading,value_snapshot,position,visible,created_by_user_id,created_at,updated_at)
-         VALUES ($1,$2,'metric',$3,$4,$5::jsonb,$6,true,$7,now(),now())`,
-        [publicId(), challengeId, metric.id, metric.label, snapshot, position++, session.user.id],
+         VALUES ($1,$2,'metric',$3,$4,NULL,$5,true,$6,now(),now())`,
+        [publicId(), challengeId, metric.id, metric.label, position++, session.user.id],
       );
     }
     // Personal rankings + affinity: on by default, dropped only when the admin
-    // clears their checkbox. Frozen from the same live computation.
+    // clears their checkbox. Computed once here only to decide whether
+    // there's anything worth a block at all (a solo round has no ranking to
+    // show) — the block itself carries no frozen value, same as metrics.
     if (body.includeRankings !== false || body.includeAffinity !== false) {
       const { personal, affinity } = await computeRankings(client, challengeId);
       if (body.includeRankings !== false && personal.length > 1) {
         await client.query(
           `INSERT INTO result_blocks
             (id,challenge_id,kind,heading,value_snapshot,position,visible,created_by_user_id,created_at,updated_at)
-           VALUES ($1,$2,'ranking',$3,$4::jsonb,$5,true,$6,now(),now())`,
-          [publicId(), challengeId, "Rankings pessoais", JSON.stringify({ personal }), position++, session.user.id],
+           VALUES ($1,$2,'ranking',$3,NULL,$4,true,$5,now(),now())`,
+          [publicId(), challengeId, "Rankings pessoais", position++, session.user.id],
         );
       }
       if (body.includeAffinity !== false && affinity && affinity.pairs.length > 0) {
         await client.query(
           `INSERT INTO result_blocks
             (id,challenge_id,kind,heading,value_snapshot,position,visible,created_by_user_id,created_at,updated_at)
-           VALUES ($1,$2,'affinity',$3,$4::jsonb,$5,true,$6,now(),now())`,
-          [publicId(), challengeId, "Afinidades", JSON.stringify(affinity), position++, session.user.id],
+           VALUES ($1,$2,'affinity',$3,NULL,$4,true,$5,now(),now())`,
+          [publicId(), challengeId, "Afinidades", position++, session.user.id],
         );
       }
     }

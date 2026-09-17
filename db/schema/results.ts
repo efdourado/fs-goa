@@ -148,7 +148,6 @@ export const resultBlocks = pgTable(
           and ${table.metricId} is null
           and ${table.sourceEntryId} is null
           and ${table.sourceFieldId} is null
-          and ${table.valueSnapshot} is not null
         )`,
     ),
   ],
