@@ -40,6 +40,7 @@ import {
   inputClass,
   PageHeading,
   SchedulePeriodFields,
+  sectionLabelClass,
   SelectableCards,
   StatusMessage,
   Toggle,
@@ -854,44 +855,47 @@ function AdminResults({
   }
 
   return (
-    <div className="mx-auto max-w-3xl">
-      <div className="min-w-0 space-y-6">
-        {!canCurate ? <p className="rounded-xl bg-[var(--wash)] p-4 text-sm leading-6 text-[var(--muted)]">{tx("curationAfterClose")}</p> : null}
-        <details open className="group">
-          <summary className="cursor-pointer list-none py-3 text-xl font-medium tracking-tight [&::-webkit-details-marker]:hidden">{tx("curation")}</summary>
-          <fieldset disabled={!canCurate || busy} className="min-w-0 space-y-4">
-      <div>
-        <p className="mb-5 text-sm leading-6 text-[var(--muted)]">{t("resultsSubtitle")}</p>
-        <div className="space-y-5">
+    <section className="mx-auto max-w-3xl">
+      <PageHeading title={t("resultsTitle")} description={t("resultsSubtitle")} />
+      {!canCurate ? <p className="mb-7 rounded-xl bg-[var(--wash)] p-4 text-sm leading-6 text-[var(--muted)]">{tx("curationAfterClose")}</p> : null}
+      <fieldset disabled={!canCurate || busy} className="min-w-0 divide-y divide-[var(--line)]">
+        <div className="space-y-5 pb-7">
           <Field label={t("headlineLabel")}><input className={inputClass} value={headline} onChange={(event) => setHeadline(event.target.value)} maxLength={160} placeholder={challenge.title} /></Field>
           <Field label={t("summaryLabel")}><textarea className={inputClass} rows={4} value={summary} onChange={(event) => setSummary(event.target.value)} maxLength={1500} /></Field>
         </div>
-        <fieldset className="mt-6"><legend className="text-base font-light">{t("highlightMetrics")}</legend>{challenge.metrics.length ? <div className="mt-3"><ShowMoreList items={challenge.metrics} preview={6} className="grid gap-2" render={(metric) => <label className="flex min-h-12 items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4 text-sm" key={metric.id}><input type="checkbox" aria-label={t("highlightMetricAria", { label: metric.label })} checked={metricIds.includes(metric.id)} onChange={(event) => setMetricIds((current) => event.target.checked ? [...current, metric.id] : current.filter((id) => id !== metric.id))} /><span><strong className="block">{metric.label}</strong><small className="text-[var(--muted)]">{metric.formattedValue ?? metric.value ?? t("metricNoValue")}</small></span></label>} /></div> : <p className="mt-2 text-sm text-[var(--muted)]">{t("createMetricsFirst")}</p>}</fieldset>
-        <fieldset className="mt-6">
-          <legend className="text-base font-light">{t("selectedComments")}</legend>
-          <label className="mt-2 flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4 text-sm">
-            <input className="mt-0.5" type="checkbox" aria-label={t("allCommentsLabel")} checked={allComments} onChange={(event) => setAllComments(event.target.checked)} />
-            <span><strong className="block">{t("allCommentsLabel")}</strong><small className="text-[var(--muted)]">{t("allCommentsHint")}</small></span>
-          </label>
+
+        <fieldset className="py-7">
+          <legend className={sectionLabelClass}>{t("highlightMetrics")}</legend>
+          {challenge.metrics.length ? <div className="mt-3"><ShowMoreList items={challenge.metrics} preview={6} className="grid gap-2" render={(metric) => <label className="flex min-h-12 items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4 text-sm" key={metric.id}><input type="checkbox" aria-label={t("highlightMetricAria", { label: metric.label })} checked={metricIds.includes(metric.id)} onChange={(event) => setMetricIds((current) => event.target.checked ? [...current, metric.id] : current.filter((id) => id !== metric.id))} /><span><strong className="block">{metric.label}</strong><small className="text-[var(--muted)]">{metric.formattedValue ?? metric.value ?? t("metricNoValue")}</small></span></label>} /></div> : <p className="mt-2 text-sm text-[var(--muted)]">{t("createMetricsFirst")}</p>}
+        </fieldset>
+
+        <fieldset className="py-7">
+          <legend className={sectionLabelClass}>{t("selectedComments")}</legend>
+          <Toggle className="mt-3" checked={allComments} onChange={setAllComments} label={t("allCommentsLabel")} hint={t("allCommentsHint")} />
           <p className="mt-3 rounded-xl border border-[var(--warn-line)] bg-[var(--warn-soft)] px-3 py-2 text-sm text-[var(--warn)]">{t("commentPrivacyWarning")}</p>
           {allComments ? null : candidates.length ? <div className="mt-3"><ShowMoreList items={candidates} preview={4} className="grid gap-2 sm:grid-cols-2" render={(candidate) => <label className="flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4 text-sm" key={candidate.key}><input className="mt-1" type="checkbox" aria-label={t("selectCommentAria", { author: candidate.authorName })} checked={commentKeys.includes(candidate.key)} onChange={(event) => setCommentKeys((current) => event.target.checked ? [...current, candidate.key] : current.filter((key) => key !== candidate.key))} /><span><span className="line-clamp-3 leading-6"><CommentText text={candidate.text} className="space-y-1" /></span><small className="mt-2 block font-light text-[var(--muted)]">{candidate.authorName} · {candidate.itemTitle}</small></span></label>} /></div> : <p className="mt-2 text-sm text-[var(--muted)]">{t("noTextFields")}</p>}
         </fieldset>
-        <fieldset className="mt-6"><legend className="text-base font-light">{t("wrappedBlocks")}</legend>
+
+        <fieldset className="py-7">
+          <legend className={sectionLabelClass}>{t("wrappedBlocks")}</legend>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            <label className="flex min-h-12 items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4 text-sm"><input type="checkbox" aria-label={t("includeRankings")} checked={includeRankings} onChange={(event) => setIncludeRankings(event.target.checked)} /><span>{t("includeRankings")}</span></label>
-            <label className="flex min-h-12 items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4 text-sm"><input type="checkbox" aria-label={t("includeAffinity")} checked={includeAffinity} onChange={(event) => setIncludeAffinity(event.target.checked)} /><span>{t("includeAffinity")}</span></label>
+            <Toggle checked={includeRankings} onChange={setIncludeRankings} label={t("includeRankings")} />
+            <Toggle checked={includeAffinity} onChange={setIncludeAffinity} label={t("includeAffinity")} />
           </div>
         </fieldset>
-        <label className="mt-6 flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4 text-sm"><input className="mt-0.5" type="checkbox" aria-label={t("anonymizeParticipants")} checked={anonymize} onChange={(event) => setAnonymize(event.target.checked)} /><span><strong className="block">{t("anonymizeParticipants")}</strong><small className="text-[var(--muted)]">{t("anonymizeHint")}</small></span></label>
-        {hasSchedule ? <label className="mt-3 flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4 text-sm"><input className="mt-0.5" type="checkbox" aria-label={t("showScheduleLabel")} checked={showSchedule} onChange={(event) => setShowSchedule(event.target.checked)} /><span><strong className="block">{t("showScheduleLabel")}</strong><small className="text-[var(--muted)]">{t("showScheduleHint")}</small></span></label> : null}
-        <div className="mt-5"><StatusMessage error={error} success={success} /></div>
-        <div className="mt-5"><Button disabled={busy} onClick={() => void save()}>{busy ? tc("saving") : t("saveResults")}</Button></div>
-        {isPublished ? <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{t("alreadyPublicHint")}</p> : null}
-      </div>
-          </fieldset>
-        </details>
-      </div>
-    </div>
+
+        <div className="space-y-3 py-7">
+          <Toggle checked={anonymize} onChange={setAnonymize} label={t("anonymizeParticipants")} hint={t("anonymizeHint")} />
+          {hasSchedule ? <Toggle checked={showSchedule} onChange={setShowSchedule} label={t("showScheduleLabel")} hint={t("showScheduleHint")} /> : null}
+        </div>
+
+        <div className="pt-7">
+          <StatusMessage error={error} success={success} />
+          <Button className="mt-5 w-full" disabled={busy} onClick={() => void save()}>{busy ? tc("saving") : t("saveResults")}</Button>
+          {isPublished ? <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{t("alreadyPublicHint")}</p> : null}
+        </div>
+      </fieldset>
+    </section>
   );
 }
 
