@@ -39,6 +39,28 @@ async function personalWorkspaceId(client: PoolClient, userId: string): Promise<
   return workspace?.id ?? null;
 }
 
+// Duplicated (not imported) from `catalog.ts` for the same reason as
+// `requireStandardWorkspace`/`personalWorkspaceId` above: no runtime import
+// cycle. See `catalog.ts` for the full rationale — every
+// `catalog_attribute_defs` row needs a backing `catalog_libraries` row now.
+function sourceForKind(kind: CatalogKind): "screens" | "pages" | "custom" {
+  return kind === "film" ? "screens" : kind === "book" ? "pages" : "custom";
+}
+
+async function ensureCatalogLibrary(
+  client: PoolClient,
+  groupId: string,
+  kind: CatalogKind,
+  actorUserId: string,
+): Promise<void> {
+  await client.query(
+    `INSERT INTO catalog_libraries (id, group_id, kind, source, created_by_user_id)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (group_id, kind) DO NOTHING`,
+    [publicId(), groupId, kind, sourceForKind(kind), actorUserId],
+  );
+}
+
 /**
  * A group (or personal workspace) can name and type its own catalog
  * attributes instead of being stuck with the fixed year/genre/author/pages
@@ -97,6 +119,7 @@ async function insertDef(
   const type = typeof body.type === "string" ? body.type : "text";
   if (!ATTRIBUTE_TYPES.has(type)) throw new ApiError(400, "invalid_type", "Tipo de atributo inválido.");
 
+  await ensureCatalogLibrary(client, groupId, kind, actorUserId);
   const existing = await client.query<{ semantic_key: string }>(
     "SELECT semantic_key FROM catalog_attribute_defs WHERE group_id = $1 AND kind = $2",
     [groupId, kind],

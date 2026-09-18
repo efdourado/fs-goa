@@ -19,6 +19,93 @@ import { timestamptz } from "./columns";
 import { groups } from "./groups";
 
 /**
+ * A workspace-defined library within the catalog: Screens/Pages are the
+ * evolution of the original film/book catalog (`kind` stays exactly `'film'`/
+ * `'book'` — nothing about their identity changes), Tables and further
+ * libraries are created from now on with an opaque generated `kind`. `kind` is
+ * the stable internal identity `catalog_items.kind` / `catalog_attribute_defs.kind`
+ * point at; `label` is the user-facing, renamable display name. Renaming never
+ * touches `kind`, so it never affects identity, metrics, or another
+ * workspace's library of the same starting kind.
+ */
+export const catalogLibraries = pgTable(
+  "catalog_libraries",
+  {
+    id: text("id").primaryKey(),
+    groupId: text("group_id")
+      .notNull()
+      .references(() => groups.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    // Which starting configuration this library began as. Presentation/defaults
+    // only (About page copy, which properties get seeded at creation, the
+    // locale-aware default label) — never used to gate behavior. Behavior
+    // gates on `kind === 'film' | 'book'` or on actual property capability,
+    // never on `source` or `label`.
+    source: text("source").notNull(),
+    // `null` = show the locale-aware default name for `source` (so a freshly
+    // migrated or freshly created library reads correctly in every language
+    // without a stored, frozen-in-one-language string). Set only once someone
+    // actually renames it.
+    label: text("label"),
+    position: integer("position").notNull().default(0),
+    createdByUserId: text("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    archivedAt: timestamptz("archived_at"),
+    createdAt: timestamptz("created_at").defaultNow().notNull(),
+    updatedAt: timestamptz("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    unique("catalog_libraries_group_kind_unique").on(table.groupId, table.kind),
+    index("catalog_libraries_group_position_idx").on(table.groupId, table.position),
+    check("catalog_libraries_source_check", sql`${table.source} in ('screens', 'pages', 'tables', 'custom')`),
+    check("catalog_libraries_kind_check", sql`${table.kind} ~ '^[a-z][a-z0-9_]{0,63}$'`),
+    check(
+      "catalog_libraries_label_check",
+      sql`${table.label} is null or char_length(btrim(${table.label})) between 1 and 80`,
+    ),
+    check("catalog_libraries_position_check", sql`${table.position} >= 0`),
+  ],
+);
+
+/**
+ * Overrides a native `catalog_items` column's label/visibility for one library
+ * without moving its value: renaming or hiding `year` through the same editor
+ * as a custom attribute never touches the `year` column itself. A property
+ * with no row here uses its hardcoded i18n default label, is visible, and
+ * sorts by the hardcoded default order — this table holds only overrides, so
+ * migration creates zero rows. `title` can never be hidden (checked below):
+ * every item needs a name, even if its label is customized.
+ */
+export const catalogNativePropertyConfigs = pgTable(
+  "catalog_native_property_configs",
+  {
+    id: text("id").primaryKey(),
+    libraryId: text("library_id")
+      .notNull()
+      .references(() => catalogLibraries.id, { onDelete: "cascade" }),
+    propertyKey: text("property_key").notNull(),
+    label: text("label"),
+    hidden: boolean("hidden").notNull().default(false),
+    position: integer("position"),
+    createdAt: timestamptz("created_at").defaultNow().notNull(),
+    updatedAt: timestamptz("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    unique("catalog_native_property_configs_library_key_unique").on(table.libraryId, table.propertyKey),
+    check(
+      "catalog_native_property_configs_key_check",
+      sql`${table.propertyKey} in ('title', 'year', 'main_genre', 'runtime_minutes', 'author', 'page_count')`,
+    ),
+    check(
+      "catalog_native_property_configs_label_check",
+      sql`${table.label} is null or char_length(btrim(${table.label})) between 1 and 80`,
+    ),
+    check("catalog_native_property_configs_title_visible_check", sql`${table.propertyKey} <> 'title' or ${table.hidden} = false`),
+  ],
+);
+
+/**
  * The group's living catalog: a film or book has ONE identity that survives
  * across challenge rounds. `challenge_items` (the per-round row) points here via
  * `catalog_item_id`. `normalized_title` is the human-insensitive match key so two
@@ -66,16 +153,18 @@ export const catalogItems = pgTable(
         sql`lower(regexp_replace(btrim(coalesce(${table.author}, '')), '\s+', ' ', 'g'))`,
       )
       .where(sql`${table.kind} = 'book' and ${table.archivedAt} is null`),
-    // `other` is retained for legacy/custom structures and keeps the old year
-    // disambiguation because no domain-specific identity is available for it.
-    uniqueIndex("catalog_items_group_other_title_year_uidx").on(
-      table.groupId,
-      table.normalizedTitle,
-      sql`coalesce(${table.year}, -1)`,
-    ).where(sql`${table.kind} = 'other' and ${table.archivedAt} is null`),
+    // Every other kind (including the legacy `other`, now a library like any
+    // other) has no title-based identity: a title match is only ever a
+    // suggestion the person explicitly accepts or declines (see
+    // `findPossibleCatalogItemMatches`/`createCatalogItem` in
+    // `lib/goa/catalog.ts`), never a merge key enforced here.
     unique("catalog_items_id_group_unique").on(table.id, table.groupId),
     index("catalog_items_group_kind_idx").on(table.groupId, table.kind),
-    check("catalog_items_kind_check", sql`${table.kind} in ('film', 'book', 'other')`),
+    foreignKey({
+      name: "catalog_items_library_fk",
+      columns: [table.groupId, table.kind],
+      foreignColumns: [catalogLibraries.groupId, catalogLibraries.kind],
+    }).onDelete("restrict"),
     check("catalog_items_title_check", sql`char_length(btrim(${table.title})) between 1 and 300`),
     check(
       "catalog_items_author_check",
@@ -123,7 +212,11 @@ export const catalogAttributeDefs = pgTable(
     unique("catalog_attribute_defs_group_kind_key_unique").on(table.groupId, table.kind, table.semanticKey),
     unique("catalog_attribute_defs_id_group_unique").on(table.id, table.groupId),
     index("catalog_attribute_defs_order_idx").on(table.groupId, table.kind, table.position),
-    check("catalog_attribute_defs_kind_check", sql`${table.kind} in ('film', 'book', 'other')`),
+    foreignKey({
+      name: "catalog_attribute_defs_library_fk",
+      columns: [table.groupId, table.kind],
+      foreignColumns: [catalogLibraries.groupId, catalogLibraries.kind],
+    }).onDelete("restrict"),
     check("catalog_attribute_defs_type_check", sql`${table.type} in ('text', 'number', 'date', 'boolean')`),
     check("catalog_attribute_defs_key_check", sql`${table.semanticKey} ~ '^[a-z][a-z0-9_]{0,63}$'`),
     check("catalog_attribute_defs_label_check", sql`char_length(btrim(${table.label})) between 1 and 80`),

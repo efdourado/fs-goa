@@ -295,6 +295,13 @@
       "when": 1789657998830,
       "tag": "0041_useful_captain_cross",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1789740790837,
+      "tag": "0042_blushing_cerise",
+      "breakpoints": true
     }
   ]
 }

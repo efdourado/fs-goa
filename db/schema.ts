@@ -29,6 +29,8 @@ export { auditEvents } from "./schema/audit";
 export { trashItems, systemAuditEvents } from "./schema/trash";
 export { feedback } from "./schema/feedback";
 export {
+  catalogLibraries,
+  catalogNativePropertyConfigs,
   catalogItems,
   catalogAttributeDefs,
   catalogAttributeValues,

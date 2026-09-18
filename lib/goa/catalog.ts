@@ -5,12 +5,40 @@ import { inTransaction, oneOrNull, withClient } from "../db";
 import { ApiError, stringValue } from "../http";
 import { attributeValuesForItems, setCatalogItemAttributeValues } from "./catalog-attributes";
 import { writeAudit } from "./domain/audit";
+import { ensurePersonalWorkspace } from "./domain/challenges";
 import { normalizeTitle, publicId } from "./domain/shared";
 import { moveToTrash } from "./trash";
 
 export type CatalogKind = "film" | "book" | "other";
 
 export { normalizeTitle } from "./domain/shared";
+
+function sourceForKind(kind: CatalogKind): "screens" | "pages" | "custom" {
+  return kind === "film" ? "screens" : kind === "book" ? "pages" : "custom";
+}
+
+/**
+ * Every `catalog_items`/`catalog_attribute_defs` row needs a backing
+ * `catalog_libraries` row (`catalog_items_library_fk`/
+ * `catalog_attribute_defs_library_fk`). This lazily materializes one the
+ * first time a group actually uses a kind, so an existing group's first
+ * film/book/other item never has to know libraries exist as a separate step.
+ * Idempotent (`ON CONFLICT DO NOTHING`); cheap enough to call before every
+ * insert rather than branch on whether one might already exist.
+ */
+async function ensureCatalogLibrary(
+  client: PoolClient,
+  groupId: string,
+  kind: CatalogKind,
+  actorUserId: string,
+): Promise<void> {
+  await client.query(
+    `INSERT INTO catalog_libraries (id, group_id, kind, source, created_by_user_id)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (group_id, kind) DO NOTHING`,
+    [publicId(), groupId, kind, sourceForKind(kind), actorUserId],
+  );
+}
 
 export function normalizeLabel(value: string): string {
   return normalizeTitle(value).slice(0, 80);
@@ -62,15 +90,21 @@ function readAttributes(input: CatalogAttributes) {
 }
 
 /**
- * Find-or-create a catalog item by normalized title within the group. When it
+ * Find-or-create a film/book by normalized title within the group. When it
  * already exists, fills in any attribute that was still empty (so a later, richer
  * entry enriches the shared row) but never overwrites a set value.
+ *
+ * Film/book only, deliberately: their title(+author)-based identity and this
+ * auto-match behavior are frozen exactly as they were before libraries
+ * existed. Every other kind goes through `createCatalogItem`/`addCatalogItem`
+ * instead, which never merge on a title match — only an explicit "use
+ * existing" choice reuses a row (see `findPossibleCatalogItemMatches`).
  */
 export async function upsertCatalogItem(
   client: PoolClient,
   groupId: string,
   userId: string,
-  input: { kind: CatalogKind; title: string; attributes?: unknown } & CatalogAttributes,
+  input: { kind: "film" | "book"; title: string; attributes?: unknown } & CatalogAttributes,
 ): Promise<string> {
   const title = input.title.trim();
   if (title.length < 1 || title.length > 300) {
@@ -78,11 +112,11 @@ export async function upsertCatalogItem(
   }
   const normalized = normalizeTitle(title);
   const attributes = readAttributes(input);
+  await ensureCatalogLibrary(client, groupId, input.kind, userId);
 
-  // Film identity is title-only: `year` is the latest installment/season and may
-  // advance over time. Books additionally use the author, so equal titles by
-  // different people remain separate works. `other` keeps year as a legacy
-  // disambiguator because it has no stronger domain identity.
+  // Film identity is title-only: `year` is the latest installment/season and
+  // may advance over time. Books additionally use the author, so equal
+  // titles by different people remain separate works.
   type Row = {
     id: string; author: string | null; year: number | null;
     main_genre: string | null; page_count: number | null; runtime_minutes: number | null;
@@ -95,11 +129,9 @@ export async function upsertCatalogItem(
   );
   const existing: Row | null = input.kind === "film"
     ? sameTitle.rows[0] ?? null
-    : input.kind === "book"
-      ? sameTitle.rows.find(
-          (row) => normalizeAuthor(row.author ?? "") === normalizeAuthor(attributes.author ?? ""),
-        ) ?? null
-      : sameTitle.rows.find((row) => (row.year ?? -1) === (attributes.year ?? -1)) ?? null;
+    : sameTitle.rows.find(
+        (row) => normalizeAuthor(row.author ?? "") === normalizeAuthor(attributes.author ?? ""),
+      ) ?? null;
   if (existing) {
     const sets: string[] = [];
     const params: unknown[] = [existing.id];
@@ -133,13 +165,75 @@ export async function upsertCatalogItem(
     return existing.id;
   }
 
+  const id = await insertCatalogItemRow(client, groupId, userId, input.kind, title, normalized, attributes);
+  if (input.attributes) await setCatalogItemAttributeValues(client, id, groupId, input.kind, input.attributes);
+  return id;
+}
+
+async function insertCatalogItemRow(
+  client: PoolClient,
+  groupId: string,
+  userId: string,
+  kind: CatalogKind,
+  title: string,
+  normalized: string,
+  attributes: ReturnType<typeof readAttributes>,
+): Promise<string> {
   const id = publicId();
   await client.query(
     `INSERT INTO catalog_items
       (id, group_id, kind, title, normalized_title, author, year, main_genre, page_count, runtime_minutes, created_by_user_id, created_at, updated_at)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,now(),now())`,
-    [id, groupId, input.kind, title, normalized, attributes.author, attributes.year, attributes.mainGenre, attributes.pageCount, attributes.runtimeMinutes, userId],
+    [id, groupId, kind, title, normalized, attributes.author, attributes.year, attributes.mainGenre, attributes.pageCount, attributes.runtimeMinutes, userId],
   );
+  return id;
+}
+
+/**
+ * Possible existing items for a title someone just typed, before they add a
+ * new one. Only meaningful for kinds without a title-based identity — every
+ * kind except film/book, whose existing single-step auto-match this does not
+ * change. Basic normalized-title substring match; fuzzy matching is not a
+ * requirement here, only an honest "here's what's close" suggestion list the
+ * person explicitly accepts or ignores.
+ */
+export async function findPossibleCatalogItemMatches(
+  client: PoolClient,
+  groupId: string,
+  kind: CatalogKind,
+  title: string,
+): Promise<Array<{ id: string; title: string; year: number | null; author: string | null }>> {
+  const normalized = normalizeTitle(title);
+  if (!normalized) return [];
+  const rows = await client.query<{ id: string; title: string; year: number | null; author: string | null }>(
+    `SELECT id, title, year, author FROM catalog_items
+      WHERE group_id = $1 AND kind = $2 AND archived_at IS NULL AND strpos(normalized_title, $3) > 0
+      ORDER BY title LIMIT 10`,
+    [groupId, kind, normalized],
+  );
+  return rows.rows;
+}
+
+/**
+ * Always inserts a new catalog item — no find-or-create, no merge. A title
+ * matching an existing item is never identity here (see
+ * `findPossibleCatalogItemMatches`): only an explicit "use existing" choice
+ * reuses a row. film/book never call this — see `upsertCatalogItem`.
+ */
+export async function createCatalogItem(
+  client: PoolClient,
+  groupId: string,
+  userId: string,
+  input: { kind: CatalogKind; title: string; attributes?: unknown } & CatalogAttributes,
+): Promise<string> {
+  const title = input.title.trim();
+  if (title.length < 1 || title.length > 300) {
+    throw new ApiError(400, "invalid_catalog_title", "O título do item do acervo é inválido.");
+  }
+  const normalized = normalizeTitle(title);
+  const attributes = readAttributes(input);
+  await ensureCatalogLibrary(client, groupId, input.kind, userId);
+  const id = await insertCatalogItemRow(client, groupId, userId, input.kind, title, normalized, attributes);
   if (input.attributes) await setCatalogItemAttributeValues(client, id, groupId, input.kind, input.attributes);
   return id;
 }
@@ -159,6 +253,36 @@ export async function assertCatalogItemInGroup(
   if (!row || (kind && row.kind !== kind)) {
     throw new ApiError(400, "invalid_catalog_item", "Item do acervo não pertence a este grupo.");
   }
+}
+
+/**
+ * The catalog page's own "add an item" flow, independent of any challenge.
+ * film/book keep their existing single-step auto-match unchanged. Every
+ * other kind requires an explicit choice: pass `useExistingId` (an id from
+ * `findPossibleCatalogItemMatches`) to reuse that row as-is, or omit it to
+ * always create a new one — a matching title is never a silent merge here.
+ */
+export async function addCatalogItem(
+  client: PoolClient,
+  groupId: string,
+  userId: string,
+  input: { kind: CatalogKind; title: string; useExistingId?: string; attributes?: unknown } & CatalogAttributes,
+): Promise<{ id: string }> {
+  if (input.kind === "film" || input.kind === "book") {
+    return { id: await upsertCatalogItem(client, groupId, userId, { ...input, kind: input.kind }) };
+  }
+  if (input.useExistingId) {
+    await assertCatalogItemInGroup(client, input.useExistingId, groupId, input.kind);
+    return { id: input.useExistingId };
+  }
+  return { id: await createCatalogItem(client, groupId, userId, input) };
+}
+
+function readCatalogKind(value: unknown): CatalogKind {
+  if (value !== "film" && value !== "book" && value !== "other") {
+    throw new ApiError(400, "invalid_kind", "Escolha um tipo de item válido.");
+  }
+  return value;
 }
 
 async function listCatalogWithClient(client: PoolClient, workspaceId: string) {
@@ -352,6 +476,53 @@ export async function personalCatalogItemDetail(session: SessionContext, catalog
     const workspaceId = await personalWorkspaceId(client, session.user.id);
     if (!workspaceId) throw new ApiError(404, "not_found", "Item do acervo não encontrado.");
     return catalogItemDetailWithClient(client, workspaceId, catalogItemId);
+  });
+}
+
+function catalogItemInput(body: Record<string, unknown>) {
+  return {
+    kind: readCatalogKind(body.kind),
+    title: stringValue(body, "title", { min: 1, max: 300 })!,
+    useExistingId: typeof body.useExistingId === "string" ? body.useExistingId : undefined,
+    author: body.author,
+    year: body.year,
+    mainGenre: body.mainGenre,
+    pageCount: body.pageCount,
+    runtimeMinutes: body.runtimeMinutes,
+    attributes: body.attributes,
+  };
+}
+
+/**
+ * Adds an item straight to the group's catalog — no challenge involved. The
+ * catalog page's own "add an item" action; see `addCatalogItem` for the
+ * film/book-vs-everything-else behavior.
+ */
+export async function addGroupCatalogItem(session: SessionContext, groupId: string, body: Record<string, unknown>) {
+  return inTransaction(async (client) => {
+    await requireStandardWorkspace(client, session.user.id, groupId, ["owner", "admin"]);
+    return addCatalogItem(client, groupId, session.user.id, catalogItemInput(body));
+  });
+}
+
+export async function addPersonalCatalogItem(session: SessionContext, body: Record<string, unknown>) {
+  const workspaceId = await ensurePersonalWorkspace(session.user.id);
+  return inTransaction((client) => addCatalogItem(client, workspaceId, session.user.id, catalogItemInput(body)));
+}
+
+/** Suggestions for the add-item flow's explicit "use existing?" step; see `findPossibleCatalogItemMatches`. */
+export async function searchGroupCatalogItems(session: SessionContext, groupId: string, kind: unknown, title: unknown) {
+  return withClient(async (client) => {
+    await requireStandardWorkspace(client, session.user.id, groupId, ["owner", "admin", "participant"]);
+    return { items: await findPossibleCatalogItemMatches(client, groupId, readCatalogKind(kind), typeof title === "string" ? title : "") };
+  });
+}
+
+export async function searchPersonalCatalogItems(session: SessionContext, kind: unknown, title: unknown) {
+  return withClient(async (client) => {
+    const workspaceId = await personalWorkspaceId(client, session.user.id);
+    if (!workspaceId) return { items: [] };
+    return { items: await findPossibleCatalogItemMatches(client, workspaceId, readCatalogKind(kind), typeof title === "string" ? title : "") };
   });
 }
 
