@@ -33,12 +33,16 @@ import {
 } from "@/lib/goa/trash";
 import { adminFeedback, submitFeedback } from "@/lib/feedback";
 import {
+  addGroupCatalogItem,
+  addPersonalCatalogItem,
   archiveCatalogItem,
   archivePersonalCatalogItem,
   catalogItemDetail,
   listGroupCatalog,
   listPersonalCatalog,
   personalCatalogItemDetail,
+  searchGroupCatalogItems,
+  searchPersonalCatalogItems,
   updateCatalogItem,
   updatePersonalCatalogItem,
 } from "@/lib/goa/catalog";
@@ -157,11 +161,21 @@ export async function GET(request: Request): Promise<Response> {
     if (path[0] === "groups" && path[2] === "catalog" && path.length === 3) {
       return json(await listGroupCatalog(await requireSession(request), path[1]));
     }
+    // Ahead of the item-detail route below on purpose — both match length 4,
+    // and "search" is never a real item id.
+    if (path[0] === "groups" && path[2] === "catalog" && path[3] === "search" && path.length === 4) {
+      const params = new URL(request.url).searchParams;
+      return json(await searchGroupCatalogItems(await requireSession(request), path[1], params.get("kind"), params.get("title")));
+    }
     if (path[0] === "groups" && path[2] === "catalog" && path.length === 4) {
       return json(await catalogItemDetail(await requireSession(request), path[1], path[3]));
     }
     if (isPath(path, "personal", "catalog")) {
       return json(await listPersonalCatalog(await requireSession(request)));
+    }
+    if (path[0] === "personal" && path[1] === "catalog" && path[2] === "search" && path.length === 3) {
+      const params = new URL(request.url).searchParams;
+      return json(await searchPersonalCatalogItems(await requireSession(request), params.get("kind"), params.get("title")));
     }
     if (path[0] === "personal" && path[1] === "catalog" && path.length === 3) {
       return json(await personalCatalogItemDetail(await requireSession(request), path[2]));
@@ -292,6 +306,12 @@ export async function POST(request: Request): Promise<Response> {
     }
     if (isPath(path, "personal", "catalog-attributes")) {
       return json(await createPersonalCatalogAttribute(session, body), 201);
+    }
+    if (path[0] === "groups" && path[2] === "catalog" && path[3] === "items" && path.length === 4) {
+      return json(await addGroupCatalogItem(session, path[1], body), 201);
+    }
+    if (path[0] === "personal" && path[1] === "catalog" && path[2] === "items" && path.length === 3) {
+      return json(await addPersonalCatalogItem(session, body), 201);
     }
     if (path[0] === "groups" && path[2] === "leave" && path.length === 3) {
       return json(await leaveGroup(session, path[1]));

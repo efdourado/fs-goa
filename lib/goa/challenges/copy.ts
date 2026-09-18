@@ -1,7 +1,7 @@
 import type { PoolClient } from "pg";
 
 import { publicId } from "../../goa-domain";
-import { upsertCatalogItem } from "../catalog";
+import { addCatalogItem } from "../catalog";
 import type { FieldRow, MetricRow } from "./types";
 
 /**
@@ -125,11 +125,15 @@ export async function copyChallengeStructure(
        LEFT JOIN catalog_items ci ON ci.id = i.catalog_item_id
       WHERE i.challenge_id=$1 AND i.archived_at IS NULL ORDER BY i.position`, [sourceChallengeId]);
   for (const source of sourceItems.rows) {
-    // Re-resolve the film/book against the target group's own catalog — the
+    // Re-resolve the item against the target group's own catalog — the
     // source catalog id belongs to another group. Recommenders don't carry.
+    // film/book keep their existing auto-match; every other kind always
+    // becomes a new item in the target's catalog, never merged onto
+    // something already there by title (Phase 2: a title match is never
+    // silent identity outside film/book).
     let catalogItemId: string | null = null;
     if (source.catalog_item_id && source.catalog_kind) {
-      catalogItemId = await upsertCatalogItem(client, targetGroupId, createdByUserId, {
+      catalogItemId = (await addCatalogItem(client, targetGroupId, createdByUserId, {
         kind: source.catalog_kind as "film" | "book" | "other",
         title: source.catalog_title ?? source.title,
         author: source.catalog_author,
@@ -137,7 +141,7 @@ export async function copyChallengeStructure(
         mainGenre: source.catalog_main_genre,
         pageCount: source.catalog_pages,
         runtimeMinutes: source.catalog_runtime,
-      });
+      })).id;
     }
     await client.query(
       `INSERT INTO challenge_items

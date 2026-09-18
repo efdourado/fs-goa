@@ -1651,6 +1651,60 @@ test("fase 1a: acervo do grupo, identidade do filme entre rodadas e indicador", 
   assert.equal(badRecommender.response.status, 400);
 });
 
+test("acervo: adicionar item direto no catálogo (sem desafio) preserva o casamento de filme/livro e nunca funde 'other' por título", async () => {
+  const owner = await register("Léo", "leo_acervo");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Acervo direto" } })).body as { id: string }).id;
+
+  // film: comportamento existente preservado — mesmo título reusa a identidade
+  const film1 = await call("POST", `/api/groups/${gid}/catalog/items`, { session: owner, body: { kind: "film", title: "Aftersun", year: 2022 } });
+  assert.equal(film1.response.status, 201, JSON.stringify(film1.body));
+  const film2 = await call("POST", `/api/groups/${gid}/catalog/items`, { session: owner, body: { kind: "film", title: "AFTERSUN" } });
+  assert.equal(film2.response.status, 201, JSON.stringify(film2.body));
+  assert.equal((film2.body as { id: string }).id, (film1.body as { id: string }).id, "mesmo título, mesma identidade — comportamento preservado");
+
+  // other: título (e até ano) iguais nunca fundem sozinhos — dois jogos distintos
+  const matchA = await call("POST", `/api/groups/${gid}/catalog/items`, { session: owner, body: { kind: "other", title: "Barcelona x Real Madrid", year: 2026 } });
+  assert.equal(matchA.response.status, 201, JSON.stringify(matchA.body));
+  const matchB = await call("POST", `/api/groups/${gid}/catalog/items`, { session: owner, body: { kind: "other", title: "Barcelona x Real Madrid", year: 2026 } });
+  assert.equal(matchB.response.status, 201, JSON.stringify(matchB.body));
+  assert.notEqual((matchB.body as { id: string }).id, (matchA.body as { id: string }).id, "dois jogos, duas identidades, mesmo com título e ano iguais");
+
+  const search = await call("GET", `/api/groups/${gid}/catalog/search?kind=other&title=barcelona`, { session: owner });
+  assert.equal(search.response.status, 200, JSON.stringify(search.body));
+  assert.equal((search.body as { items: unknown[] }).items.length, 2, "a busca sugere os dois jogos existentes, sem decidir por conta própria");
+
+  // "usar existente" explícito: nenhuma linha nova é criada
+  const reused = await call("POST", `/api/groups/${gid}/catalog/items`, {
+    session: owner, body: { kind: "other", title: "Barcelona x Real Madrid", useExistingId: (matchA.body as { id: string }).id },
+  });
+  assert.equal(reused.response.status, 201, JSON.stringify(reused.body));
+  assert.equal((reused.body as { id: string }).id, (matchA.body as { id: string }).id);
+
+  const catalog = await call("GET", `/api/groups/${gid}/catalog`, { session: owner });
+  assert.equal((catalog.body as { items: unknown[] }).items.length, 3, "1 filme + 2 jogos — 'usar existente' não criou um terceiro");
+
+  // só owner/admin adiciona direto no acervo
+  const member = await register("Bia", "bia_acervo");
+  const invite = await call("POST", `/api/groups/${gid}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } });
+  await call("POST", `/api/invites/${(invite.body as { token: string }).token}`, { session: member, body: {} });
+  const forbidden = await call("POST", `/api/groups/${gid}/catalog/items`, { session: member, body: { kind: "other", title: "Não deveria existir" } });
+  assert.equal(forbidden.response.status, 403);
+});
+
+test("acervo pessoal: adicionar item direto materializa a biblioteca sob demanda e escapa entre contas", async () => {
+  const owner = await register("Rui", "rui_pessoal");
+  const other = await register("Ana", "ana_pessoal");
+
+  const created = await call("POST", "/api/personal/catalog/items", { session: owner, body: { kind: "other", title: "Corrida 10km" } });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const again = await call("POST", "/api/personal/catalog/items", { session: owner, body: { kind: "other", title: "Corrida 10km" } });
+  assert.notEqual((again.body as { id: string }).id, (created.body as { id: string }).id, "acervo pessoal também não funde 'other' por título");
+
+  const otherSearch = await call("GET", "/api/personal/catalog/search?kind=other&title=corrida", { session: other });
+  assert.equal(otherSearch.response.status, 200);
+  assert.equal((otherSearch.body as { items: unknown[] }).items.length, 0, "o acervo pessoal de uma conta nunca aparece na busca de outra");
+});
+
 test("modelo de registros: um filme aceita mais de um tipo de registro por pessoa", async () => {
   const owner = await register("Íris", "iris_rec");
   const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube do modelo" } })).body as { id: string }).id;
