@@ -11,7 +11,7 @@ export {
   updateEntry,
 } from "./goa/challenges/entries";
 export { addChallengeField, saveChallengeFields } from "./goa/challenges/fields";
-export { setExpectationEnabled, updateEntryTypeVisibility } from "./goa/challenges/entry-types";
+export { addSharedResponseType, setExpectationEnabled, updateEntryTypeVisibility } from "./goa/challenges/entry-types";
 export { VISIBILITY_POLICIES } from "./goa/challenges/entry-types";
 export type { VisibilityPolicy } from "./goa/challenges/entry-types";
 export {

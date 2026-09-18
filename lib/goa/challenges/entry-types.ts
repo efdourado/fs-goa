@@ -6,7 +6,7 @@ import { inTransaction, oneOrNull } from "../../db";
 // `createChallenge`, which imports this file — going through it would form a cycle.
 import { challengeAccess } from "../domain/access";
 import { writeAudit } from "../domain/audit";
-import { publicId } from "../domain/shared";
+import { publicId, semanticKey } from "../domain/shared";
 import { insertField } from "../domain/fields";
 import { ApiError } from "../../http";
 
@@ -20,6 +20,8 @@ export type Cardinality =
   | "once_per_day";
 export type SchedulePolicy = "free" | "while_active" | "checkpoint";
 export type VisibilityPolicy = "group_realtime" | "after_own" | "after_close" | "author_only";
+export type AnswerScope = "individual" | "shared";
+export type SharedEditPolicy = "members_fill_admin_corrects" | "members_can_edit";
 
 export const VISIBILITY_POLICIES: readonly VisibilityPolicy[] = [
   "group_realtime", "after_own", "after_close", "author_only",
@@ -41,10 +43,13 @@ export interface EntryTypeRow {
   schedule_policy: SchedulePolicy | null;
   is_primary: boolean;
   visibility_policy: VisibilityPolicy;
+  answer_scope: AnswerScope;
+  shared_edit_policy: SharedEditPolicy | null;
 }
 
 const SELECT_COLUMNS = `id, challenge_id, semantic_key, name, submission_mode,
-  purpose, target_policy, cardinality, schedule_policy, is_primary, visibility_policy`;
+  purpose, target_policy, cardinality, schedule_policy, is_primary, visibility_policy,
+  answer_scope, shared_edit_policy`;
 
 /**
  * The four orthogonal axes are nullable until every legacy row is backfilled, so
@@ -284,6 +289,58 @@ export async function setExpectationEnabled(
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
       "entry_type.archived", "entry_type", active.id, null, { purpose: "expectation" });
     return { enabled: false, entryTypeId: null };
+  });
+}
+
+/**
+ * Adds a new shared-scope response: one field with a single value for the
+ * whole item, not one per participant (Phase 4 of docs/flexible-catalogs.md —
+ * "Final score: shared", say, kept separate from an individual "Comment"
+ * type). Additive and non-destructive, so it's allowed any time the
+ * challenge isn't closed, same as other structural additions.
+ */
+export async function addSharedResponseType(
+  session: SessionContext,
+  challengeId: string,
+  body: Record<string, unknown>,
+) {
+  const editPolicy = body.sharedEditPolicy;
+  if (editPolicy !== "members_fill_admin_corrects" && editPolicy !== "members_can_edit") {
+    throw new ApiError(400, "invalid_shared_edit_policy", "Escolha quem pode preencher ou corrigir a resposta compartilhada.");
+  }
+  return inTransaction(async (client) => {
+    const access = await challengeAccess(session.user.id, challengeId, client, true);
+    if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores adicionam tipos de registro.");
+    if (access.challenge.status === "closed") {
+      throw new ApiError(409, "challenge_locked", "Um desafio encerrado fica congelado.");
+    }
+    const types = await entryTypesForChallenge(client, challengeId);
+    if (!usesRoundItems(types)) {
+      throw new ApiError(409, "shared_unsupported", "Uma resposta compartilhada precisa de um desafio com itens.");
+    }
+    const name = typeof body.name === "string" && body.name.trim() ? body.name.trim().slice(0, 120) : "Resposta compartilhada";
+    const used = new Set(types.map((type) => type.semantic_key));
+    const base = semanticKey(body.key ?? name, "compartilhado");
+    let key = base;
+    for (let suffix = 2; used.has(key); suffix += 1) key = `${base}_${suffix}`.slice(0, 64);
+
+    const typeId = publicId();
+    await client.query(
+      `INSERT INTO entry_types
+         (id, challenge_id, semantic_key, name, submission_mode, purpose, target_policy,
+          cardinality, schedule_policy, is_primary, visibility_policy, answer_scope, shared_edit_policy,
+          created_at, updated_at)
+       VALUES ($1,$2,$3,$4,'item','rating','required','once_per_item','while_active',false,'group_realtime','shared',$5,now(),now())`,
+      [typeId, challengeId, key, name, editPolicy],
+    );
+    const field = await insertField(
+      client, challengeId, typeId,
+      (body.field && typeof body.field === "object" ? body.field : { key: "valor", label: name, type: "number" }) as Record<string, unknown>,
+      0,
+    );
+    await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
+      "entry_type.created", "entry_type", typeId, null, { name, answerScope: "shared", sharedEditPolicy: editPolicy });
+    return { id: typeId, name, sharedEditPolicy: editPolicy, fieldId: field.id };
   });
 }
 

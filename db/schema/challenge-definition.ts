@@ -45,6 +45,16 @@ export const entryTypes = pgTable(
     //   after_close    — only the author + admins until the round closes
     //   author_only    — only the author + admins, ever (aggregate metrics aside)
     visibilityPolicy: text("visibility_policy").notNull().default("group_realtime"),
+    // individual — each participant supplies their own value (default, unchanged
+    // behavior). shared — the challenge item has one value for the whole group;
+    // only valid for a single item-targeted value (`cardinality = 'once_per_item'`,
+    // `target_policy <> 'none'`), never a per-day or repeatable stream.
+    answerScope: text("answer_scope").notNull().default("individual"),
+    // Who may fill/change a shared answer. Null unless `answer_scope = 'shared'`.
+    //   members_fill_admin_corrects — a member may fill it once; only an admin
+    //     may change or clear it after that.
+    //   members_can_edit — any eligible member may fill, change, or clear it.
+    sharedEditPolicy: text("shared_edit_policy"),
     archivedAt: timestamptz("archived_at"),
     createdAt: timestamptz("created_at").defaultNow().notNull(),
     updatedAt: timestamptz("updated_at").defaultNow().notNull(),
@@ -85,6 +95,19 @@ export const entryTypes = pgTable(
     check(
       "entry_types_visibility_policy_check",
       sql`${table.visibilityPolicy} in ('group_realtime', 'after_own', 'after_close', 'author_only')`,
+    ),
+    check("entry_types_answer_scope_check", sql`${table.answerScope} in ('individual', 'shared')`),
+    check(
+      "entry_types_shared_edit_policy_check",
+      sql`${table.sharedEditPolicy} is null or ${table.sharedEditPolicy} in ('members_fill_admin_corrects', 'members_can_edit')`,
+    ),
+    check(
+      "entry_types_shared_edit_policy_presence_check",
+      sql`(${table.answerScope} = 'shared') = (${table.sharedEditPolicy} is not null)`,
+    ),
+    check(
+      "entry_types_shared_scope_check",
+      sql`${table.answerScope} = 'individual' or (${table.cardinality} = 'once_per_item' and ${table.targetPolicy} <> 'none')`,
     ),
   ],
 );

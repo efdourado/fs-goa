@@ -309,6 +309,13 @@
       "when": 1789742565921,
       "tag": "0043_blue_black_bolt",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1789743036959,
+      "tag": "0044_happy_scarlet_spider",
+      "breakpoints": true
     }
   ]
 }

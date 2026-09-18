@@ -1762,6 +1762,100 @@ test("desafio personalizado (fase 3): usa uma biblioteca própria do grupo, sem 
   assert.equal(forbidden.response.status, 403);
 });
 
+test("resposta compartilhada (fase 4): uma vez só, admin corrige, sem duplicar por participante, e conflito de concorrência", async () => {
+  const owner = await register("Iris", "iris_shared");
+  const friend = await register("Caio", "caio_shared");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Copa" } })).body as { id: string }).id;
+  const invite = await call("POST", `/api/groups/${gid}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } });
+  await call("POST", `/api/invites/${(invite.body as { token: string }).token}`, { session: friend, body: {} });
+
+  const created = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "cinema", title: "Fase de grupos", participantIds: [owner.user.id, friend.user.id],
+      items: [{ title: "Aftersun" }],
+    },
+  });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const cid = (created.body as { id: string }).id;
+  const itemId = ((await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { items: Array<{ id: string }> }).items[0].id;
+  await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } });
+
+  const sharedType = await call("POST", `/api/challenges/${cid}/entry-types`, {
+    session: owner,
+    body: {
+      name: "Placar final", sharedEditPolicy: "members_fill_admin_corrects",
+      field: { key: "placar", label: "Placar final", type: "number", required: true, config: { min: 0, max: 20, step: 1 } },
+    },
+  });
+  assert.equal(sharedType.response.status, 201, JSON.stringify(sharedType.body));
+  const typeId = (sharedType.body as { id: string }).id;
+
+  // primeiro preenchimento: qualquer participante pode
+  const first = await call("POST", `/api/challenges/${cid}/entries`, {
+    session: friend, body: { entryTypeId: typeId, itemId, values: { placar: 2 } },
+  });
+  assert.equal(first.response.status, 201, JSON.stringify(first.body));
+  assert.equal((first.body as { answerScope: string }).answerScope, "shared");
+  const entryId = (first.body as { id: string }).id;
+
+  // já preenchida: outro membro comum não pode corrigir
+  const blocked = await call("POST", `/api/challenges/${cid}/entries`, {
+    session: friend, body: { entryTypeId: typeId, itemId, values: { placar: 3 } },
+  });
+  assert.equal(blocked.response.status, 403, JSON.stringify(blocked.body));
+  assert.equal((blocked.body as { error: string }).error, "shared_locked");
+
+  // um único registro aparece pros dois, não duplicado por participante
+  const listedAsOwner = await call("GET", `/api/challenges/${cid}/entries`, { session: owner });
+  const listedAsFriend = await call("GET", `/api/challenges/${cid}/entries`, { session: friend });
+  const sharedRowsOwner = (listedAsOwner.body as { entries: Array<{ id: string; entryTypeId: string; participantId: string | null }> }).entries
+    .filter((entry) => entry.entryTypeId === typeId);
+  assert.equal(sharedRowsOwner.length, 1, "uma única linha, não uma por participante");
+  assert.equal(sharedRowsOwner[0].participantId, null, "resposta compartilhada não pertence a uma pessoa");
+  assert.equal(
+    (listedAsFriend.body as { entries: unknown[] }).entries.filter((e) => (e as { entryTypeId: string }).entryTypeId === typeId).length,
+    1, "o outro participante vê a mesma linha, também sem duplicar",
+  );
+  // admin corrige
+  const corrected = await call("PATCH", `/api/entries/${entryId}`, { session: owner, body: { values: { placar: 3 } } });
+  assert.equal(corrected.response.status, 200, JSON.stringify(corrected.body));
+
+  // conflito de concorrência: quem tenta salvar com um "visto por último" desatualizado recebe 409, não uma sobrescrita silenciosa
+  const stale = await call("POST", `/api/challenges/${cid}/entries`, {
+    session: owner, body: { entryTypeId: typeId, itemId, values: { placar: 5 }, expectedUpdatedAt: new Date(0).toISOString() },
+  });
+  assert.equal(stale.response.status, 409, JSON.stringify(stale.body));
+  assert.equal((stale.body as { error: string }).error, "conflict");
+
+  // "members_can_edit": qualquer membro elegível preenche e corrige livremente
+  const openType = await call("POST", `/api/challenges/${cid}/entry-types`, {
+    session: owner,
+    body: {
+      name: "Clima do jogo", sharedEditPolicy: "members_can_edit",
+      field: { key: "clima", label: "Clima do jogo", type: "text", required: false },
+    },
+  });
+  assert.equal(openType.response.status, 201, JSON.stringify(openType.body));
+  const openTypeId = (openType.body as { id: string }).id;
+  const openFirst = await call("POST", `/api/challenges/${cid}/entries`, {
+    session: friend, body: { entryTypeId: openTypeId, itemId, values: { clima: "chuvoso" } },
+  });
+  assert.equal(openFirst.response.status, 201, JSON.stringify(openFirst.body));
+  const openSecond = await call("POST", `/api/challenges/${cid}/entries`, {
+    session: friend, body: { entryTypeId: openTypeId, itemId, values: { clima: "ensolarado" } },
+  });
+  assert.equal(openSecond.response.status, 201, JSON.stringify(openSecond.body));
+  assert.equal((openSecond.body as { id: string }).id, (openFirst.body as { id: string }).id, "mesma linha compartilhada, atualizada, não duplicada");
+
+  // avaliação individual do mesmo item continua uma linha por pessoa, sem interferência
+  const ratingA = await call("POST", `/api/challenges/${cid}/entries`, { session: owner, body: { itemId, values: { nota: 4, comentario: "" } } });
+  const ratingB = await call("POST", `/api/challenges/${cid}/entries`, { session: friend, body: { itemId, values: { nota: 5, comentario: "" } } });
+  assert.equal(ratingA.response.status, 201);
+  assert.equal(ratingB.response.status, 201);
+  assert.notEqual((ratingA.body as { id: string }).id, (ratingB.body as { id: string }).id, "avaliação individual continua uma linha por participante");
+});
+
 test("modelo de registros: um filme aceita mais de um tipo de registro por pessoa", async () => {
   const owner = await register("Íris", "iris_rec");
   const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube do modelo" } })).body as { id: string }).id;

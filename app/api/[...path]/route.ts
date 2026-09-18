@@ -67,6 +67,7 @@ function catalogKindParam(request: Request): CatalogKind | undefined {
 }
 import {
   addMetric,
+  addSharedResponseType,
   archiveChallengeItem,
   archiveMetric,
   assignCheckpointItems,
@@ -365,6 +366,9 @@ export async function POST(request: Request): Promise<Response> {
     }
     if (path[0] === "challenges" && path[2] === "fields" && path.length === 3) {
       return json(await saveChallengeFields(session, path[1], body), 201);
+    }
+    if (path[0] === "challenges" && path[2] === "entry-types" && path.length === 3) {
+      return json(await addSharedResponseType(session, path[1], body), 201);
     }
     if (path[0] === "challenges" && path[2] === "items" && path[3] === "preview" && path.length === 4) {
       return json(await previewListImport(session, path[1], body));

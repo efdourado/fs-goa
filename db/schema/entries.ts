@@ -35,7 +35,10 @@ export const entries = pgTable(
     cardinality: text("cardinality"),
     itemId: text("item_id"),
     checkpointId: text("checkpoint_id"),
-    participantUserId: text("participant_user_id").notNull(),
+    // Denormalized from the entry type, like `submission_mode`/`cardinality`.
+    // Null iff shared: a shared answer belongs to the item, not a person.
+    answerScope: text("answer_scope").notNull().default("individual"),
+    participantUserId: text("participant_user_id"),
     // Nullable: a plain round entry ("I watched it, no date in mind") can skip
     // the date. Day-keyed cardinalities (`once_per_day`, `once_per_item_day`)
     // still always carry one — the entry API fills today when it's omitted.
@@ -80,12 +83,12 @@ export const entries = pgTable(
     uniqueIndex("entries_one_active_item_response_uidx")
       .on(table.itemId, table.entryTypeId, table.participantUserId)
       .where(
-        sql`${table.cardinality} = 'once_per_item' and ${table.itemId} is not null and ${table.deletedAt} is null`,
+        sql`${table.cardinality} = 'once_per_item' and ${table.answerScope} = 'individual' and ${table.itemId} is not null and ${table.deletedAt} is null`,
       ),
     uniqueIndex("entries_one_active_item_day_uidx")
       .on(table.itemId, table.entryTypeId, table.participantUserId, table.occurredOn)
       .where(
-        sql`${table.cardinality} = 'once_per_item_day' and ${table.itemId} is not null and ${table.deletedAt} is null`,
+        sql`${table.cardinality} = 'once_per_item_day' and ${table.answerScope} = 'individual' and ${table.itemId} is not null and ${table.deletedAt} is null`,
       ),
     uniqueIndex("entries_one_active_daily_response_uidx")
       .on(
@@ -94,7 +97,12 @@ export const entries = pgTable(
         table.participantUserId,
         table.occurredOn,
       )
-      .where(sql`${table.cardinality} = 'once_per_day' and ${table.deletedAt} is null`),
+      .where(sql`${table.cardinality} = 'once_per_day' and ${table.answerScope} = 'individual' and ${table.deletedAt} is null`),
+    // A shared answer has exactly one active row per (item, type) — never keyed
+    // by participant, since it isn't any one person's value.
+    uniqueIndex("entries_one_active_shared_item_response_uidx")
+      .on(table.itemId, table.entryTypeId)
+      .where(sql`${table.answerScope} = 'shared' and ${table.itemId} is not null and ${table.deletedAt} is null`),
     index("entries_participant_history_idx").on(
       table.challengeId,
       table.participantUserId,
@@ -105,6 +113,11 @@ export const entries = pgTable(
     check(
       "entries_item_target_check",
       sql`${table.submissionMode} <> 'item' or ${table.itemId} is not null`,
+    ),
+    check(
+      "entries_answer_scope_participant_check",
+      sql`(${table.answerScope} = 'shared' and ${table.participantUserId} is null)
+          or (${table.answerScope} = 'individual' and ${table.participantUserId} is not null)`,
     ),
     check(
       "entries_deleted_at_check",

@@ -201,14 +201,16 @@ export async function listEntries(session: SessionContext, challengeId: string) 
     const closed = access.challenge.status === "closed";
     const result = await client.query<{
       id: string; item_id: string | null; checkpoint_id: string | null; entry_type_id: string;
-      participant_user_id: string; display_name: string; visibility_policy: string;
-      username: string; occurred_on: string | null; submitted_at: Date; updated_at: Date;
+      participant_user_id: string | null; display_name: string | null; visibility_policy: string;
+      answer_scope: "individual" | "shared";
+      username: string | null; occurred_on: string | null; submitted_at: Date; updated_at: Date;
     }>(
       `SELECT e.id,e.item_id,e.checkpoint_id,e.entry_type_id,e.participant_user_id,u.display_name,u.username,
+              e.answer_scope,
               coalesce(et.visibility_policy, 'group_realtime') AS visibility_policy,
               e.occurred_on::text AS occurred_on,e.submitted_at,e.updated_at
          FROM entries e
-         JOIN users u ON u.id=e.participant_user_id
+         LEFT JOIN users u ON u.id=e.participant_user_id
          LEFT JOIN entry_types et ON et.id = e.entry_type_id
         WHERE e.challenge_id=$1 AND e.deleted_at IS NULL
         ORDER BY e.occurred_on DESC NULLS LAST,e.created_at DESC`,
@@ -220,13 +222,15 @@ export async function listEntries(session: SessionContext, challengeId: string) 
     //   after_own — needs an entry of the same (item, type) from the viewer
     //   after_close — hidden until the round closes
     //   author_only — never surfaced here (aggregate metrics aside)
+    // A shared answer has no single author to gate by — it's the group's, so
+    // it's always visible to every participant regardless of policy.
     const ownItemType = new Set(
       result.rows
         .filter((entry) => entry.participant_user_id === session.user.id)
         .map((entry) => `${entry.entry_type_id}:${entry.item_id ?? entry.checkpoint_id ?? "-"}`),
     );
     const visibleRows = result.rows.filter((entry) => {
-      if (access.canManage || entry.participant_user_id === session.user.id) return true;
+      if (access.canManage || entry.participant_user_id === session.user.id || entry.answer_scope === "shared") return true;
       switch (entry.visibility_policy) {
         case "author_only": return false;
         case "after_close": return closed;
@@ -249,6 +253,8 @@ export async function listEntries(session: SessionContext, challengeId: string) 
       itemId: entry.item_id ?? null,
       checkpointId: entry.checkpoint_id ?? checkpointByDay.get(entry.occurred_on ?? "") ?? null,
       entryTypeId: entry.entry_type_id,
+      answerScope: entry.answer_scope,
+      // Null for a shared answer — it belongs to the item, not a person.
       participantId: entry.participant_user_id,
       userId: entry.participant_user_id,
       participantName: entry.display_name,
@@ -378,21 +384,46 @@ export async function saveEntry(
     }
 
     const fields = await storageFields(client, challengeId, entryType.id);
-    const existing = cardinality === "once_per_item" && itemId
-      ? await oneOrNull<{ id: string }>(client,
-          "SELECT id FROM entries WHERE item_id=$1 AND entry_type_id=$2 AND participant_user_id=$3 AND deleted_at IS NULL FOR UPDATE",
-          [itemId, entryType.id, participantId])
-      : cardinality === "once_per_item_day" && itemId
-        ? await oneOrNull<{ id: string }>(client,
-            `SELECT id FROM entries WHERE item_id=$1 AND entry_type_id=$2
-              AND participant_user_id=$3 AND occurred_on=$4 AND deleted_at IS NULL FOR UPDATE`,
-            [itemId, entryType.id, participantId, occurredOn])
-        : cardinality === "once_per_day"
-          ? await oneOrNull<{ id: string }>(client,
-              `SELECT id FROM entries WHERE challenge_id=$1 AND entry_type_id=$2
+    const answerScope = entryType.answer_scope;
+    // Shared: one row per (item, type) — no participant — with its own
+    // permission and concurrency rules (Phase 4). Individual: unchanged.
+    const existing = answerScope === "shared"
+      ? await oneOrNull<{ id: string; updated_at: Date }>(client,
+          `SELECT id, updated_at FROM entries
+            WHERE item_id=$1 AND entry_type_id=$2 AND answer_scope='shared' AND deleted_at IS NULL FOR UPDATE`,
+          [itemId, entryType.id])
+      : cardinality === "once_per_item" && itemId
+        ? await oneOrNull<{ id: string; updated_at: Date }>(client,
+            "SELECT id, updated_at FROM entries WHERE item_id=$1 AND entry_type_id=$2 AND participant_user_id=$3 AND deleted_at IS NULL FOR UPDATE",
+            [itemId, entryType.id, participantId])
+        : cardinality === "once_per_item_day" && itemId
+          ? await oneOrNull<{ id: string; updated_at: Date }>(client,
+              `SELECT id, updated_at FROM entries WHERE item_id=$1 AND entry_type_id=$2
                 AND participant_user_id=$3 AND occurred_on=$4 AND deleted_at IS NULL FOR UPDATE`,
-              [challengeId, entryType.id, participantId, occurredOn])
-          : null;
+              [itemId, entryType.id, participantId, occurredOn])
+          : cardinality === "once_per_day"
+            ? await oneOrNull<{ id: string; updated_at: Date }>(client,
+                `SELECT id, updated_at FROM entries WHERE challenge_id=$1 AND entry_type_id=$2
+                  AND participant_user_id=$3 AND occurred_on=$4 AND deleted_at IS NULL FOR UPDATE`,
+                [challengeId, entryType.id, participantId, occurredOn])
+            : null;
+
+    if (answerScope === "shared" && existing) {
+      if (entryType.shared_edit_policy === "members_fill_admin_corrects" && !access.canManage) {
+        throw new ApiError(403, "shared_locked", "Essa resposta já foi preenchida — só um administrador pode corrigi-la.");
+      }
+      if (typeof body.expectedUpdatedAt === "string") {
+        const expected = new Date(body.expectedUpdatedAt).getTime();
+        if (Number.isNaN(expected) || expected !== existing.updated_at.getTime()) {
+          throw new ApiError(
+            409, "conflict",
+            "Alguém já mudou essa resposta compartilhada. Veja o valor atual antes de salvar de novo.",
+            { currentUpdatedAt: existing.updated_at.toISOString() },
+          );
+        }
+      }
+    }
+
     const entryId = existing?.id ?? publicId();
     if (existing) {
       await client.query(
@@ -401,15 +432,18 @@ export async function saveEntry(
     } else {
       await client.query(
         `INSERT INTO entries
-          (id,challenge_id,entry_type_id,submission_mode,cardinality,item_id,checkpoint_id,participant_user_id,occurred_on,
+          (id,challenge_id,entry_type_id,submission_mode,cardinality,item_id,checkpoint_id,participant_user_id,answer_scope,occurred_on,
            submitted_at,created_by_user_id,last_edited_by_user_id,created_at,updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,now(),$10,$10,now(),now())`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now(),$11,$11,now(),now())`,
         [entryId, challengeId, entryType.id, entryType.submission_mode, cardinality, itemId, checkpointId,
-          participantId, occurredOn, session.user.id],
+          answerScope === "shared" ? null : participantId, answerScope, occurredOn, session.user.id],
       );
     }
     const normalized = await writeEntryValues(client, entryId, challengeId, entryType.id, fields, body.values);
-    return { id: entryId, itemId, checkpointId, participantId, occurredOn, values: normalized, updated: Boolean(existing) };
+    return {
+      id: entryId, itemId, checkpointId, participantId, occurredOn, values: normalized,
+      updated: Boolean(existing), answerScope,
+    };
   });
 }
 
@@ -420,20 +454,48 @@ export async function updateEntry(
 ) {
   return inTransaction(async (client) => {
     const entry = await oneOrNull<{
-      id: string; challenge_id: string; entry_type_id: string; participant_user_id: string;
-      item_id: string | null; purpose: string | null;
-      group_id: string; status: "draft" | "active" | "closed";
+      id: string; challenge_id: string; entry_type_id: string; participant_user_id: string | null;
+      item_id: string | null; purpose: string | null; answer_scope: "individual" | "shared";
+      shared_edit_policy: "members_fill_admin_corrects" | "members_can_edit" | null;
+      updated_at: Date; group_id: string; status: "draft" | "active" | "closed";
     }>(client,
-      `SELECT e.id,e.challenge_id,e.entry_type_id,e.participant_user_id,e.item_id,t.purpose,c.group_id,c.status
+      `SELECT e.id,e.challenge_id,e.entry_type_id,e.participant_user_id,e.item_id,t.purpose,
+              e.answer_scope,t.shared_edit_policy,e.updated_at,c.group_id,c.status
          FROM entries e JOIN challenges c ON c.id=e.challenge_id
          JOIN entry_types t ON t.id=e.entry_type_id
         WHERE e.id=$1 AND e.deleted_at IS NULL AND c.deleted_at IS NULL FOR UPDATE`, [entryId]);
     if (!entry) throw new ApiError(404, "not_found", "Registro não encontrado.");
-    // Only the author may edit their own entry — no admin correction path.
-    await requireGroupRole(session.user.id, entry.group_id, ["owner", "admin", "participant"], client);
-    if (entry.participant_user_id !== session.user.id) throw new ApiError(404, "not_found", "Registro não encontrado.");
+    const role = await requireGroupRole(session.user.id, entry.group_id, ["owner", "admin", "participant"], client);
+    const canManage = role === "owner" || role === "admin";
+    if (entry.answer_scope === "shared") {
+      // Members_fill_admin_corrects: once filled, only an admin may change it.
+      // Members_can_edit: any eligible member may — same participant check as
+      // below, just without the "only the original author" restriction.
+      if (entry.shared_edit_policy === "members_fill_admin_corrects" && !canManage) {
+        throw new ApiError(403, "shared_locked", "Essa resposta já foi preenchida — só um administrador pode corrigi-la.");
+      }
+      if (!canManage) {
+        const participant = await oneOrNull<{ user_id: string }>(client,
+          "SELECT user_id FROM challenge_participants WHERE challenge_id=$1 AND user_id=$2 AND removed_at IS NULL",
+          [entry.challenge_id, session.user.id]);
+        if (!participant) throw new ApiError(404, "not_found", "Registro não encontrado.");
+      }
+      if (typeof body.expectedUpdatedAt === "string") {
+        const expected = new Date(body.expectedUpdatedAt).getTime();
+        if (Number.isNaN(expected) || expected !== entry.updated_at.getTime()) {
+          throw new ApiError(
+            409, "conflict",
+            "Alguém já mudou essa resposta compartilhada. Veja o valor atual antes de salvar de novo.",
+            { currentUpdatedAt: entry.updated_at.toISOString() },
+          );
+        }
+      }
+    } else {
+      // Individual: only the author may edit their own entry — no admin correction path.
+      if (entry.participant_user_id !== session.user.id) throw new ApiError(404, "not_found", "Registro não encontrado.");
+    }
     if (entry.status !== "active") throw new ApiError(409, "challenge_not_active", "O desafio não aceita correções agora.");
-    if (entry.purpose === "expectation" && entry.item_id) {
+    if (entry.purpose === "expectation" && entry.item_id && entry.participant_user_id) {
       const rated = await oneOrNull<{ id: string }>(client,
         `SELECT e.id FROM entries e JOIN entry_types t ON t.id = e.entry_type_id
           WHERE e.item_id=$1 AND e.participant_user_id=$2 AND e.deleted_at IS NULL
@@ -456,16 +518,32 @@ export async function deleteEntry(
 ) {
   return inTransaction(async (client) => {
     const entry = await oneOrNull<{
-      id: string; challenge_id: string; participant_user_id: string;
+      id: string; challenge_id: string; participant_user_id: string | null;
+      answer_scope: "individual" | "shared";
+      shared_edit_policy: "members_fill_admin_corrects" | "members_can_edit" | null;
       group_id: string; status: "draft" | "active" | "closed";
     }>(client,
-      `SELECT e.id,e.challenge_id,e.participant_user_id,c.group_id,c.status
+      `SELECT e.id,e.challenge_id,e.participant_user_id,e.answer_scope,t.shared_edit_policy,c.group_id,c.status
          FROM entries e JOIN challenges c ON c.id=e.challenge_id
+         JOIN entry_types t ON t.id=e.entry_type_id
         WHERE e.id=$1 AND e.deleted_at IS NULL AND c.deleted_at IS NULL FOR UPDATE`, [entryId]);
     if (!entry) throw new ApiError(404, "not_found", "Registro não encontrado.");
-    // Only the author may delete their own entry — no admin correction path.
-    await requireGroupRole(session.user.id, entry.group_id, ["owner", "admin", "participant"], client);
-    if (entry.participant_user_id !== session.user.id) throw new ApiError(404, "not_found", "Registro não encontrado.");
+    const role = await requireGroupRole(session.user.id, entry.group_id, ["owner", "admin", "participant"], client);
+    const canManage = role === "owner" || role === "admin";
+    if (entry.answer_scope === "shared") {
+      if (entry.shared_edit_policy === "members_fill_admin_corrects" && !canManage) {
+        throw new ApiError(403, "shared_locked", "Essa resposta compartilhada só pode ser apagada por um administrador.");
+      }
+      if (!canManage) {
+        const participant = await oneOrNull<{ user_id: string }>(client,
+          "SELECT user_id FROM challenge_participants WHERE challenge_id=$1 AND user_id=$2 AND removed_at IS NULL",
+          [entry.challenge_id, session.user.id]);
+        if (!participant) throw new ApiError(404, "not_found", "Registro não encontrado.");
+      }
+    } else {
+      // Individual: only the author may delete their own entry — no admin correction path.
+      if (entry.participant_user_id !== session.user.id) throw new ApiError(404, "not_found", "Registro não encontrado.");
+    }
     if (entry.status !== "active") {
       throw new ApiError(409, "challenge_not_active", "Registros só podem ser excluídos com o desafio ativo.");
     }
