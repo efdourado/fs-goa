@@ -10,11 +10,13 @@ export type RecipeKey =
   | "library"
   | "bookshelf"
   | "habit"
+  | "tables"
+  | "custom"
   | "cine_free"
   | "cine_curated"
   | "reading_club"
   | "reading_daily";
-export type CreatableRecipeKey = "cinema" | "library" | "bookshelf" | "habit";
+export type CreatableRecipeKey = "cinema" | "library" | "bookshelf" | "habit" | "tables" | "custom";
 export type EntryPurpose = "progress" | "completion" | "expectation" | "rating" | "checkin";
 export type TargetPolicy = "required" | "optional" | "none";
 export type Cardinality = "once_per_item" | "once_per_item_day" | "repeatable" | "once_per_day";
@@ -91,6 +93,8 @@ export interface GroupSummary {
   members?: Member[];
   /** Outgoing @-invites still awaiting the invitee's approval (only for owners/admins). */
   pendingRequests?: PendingGroupRequest[];
+  /** When off, "who recommended it" is hidden and never asked for in this group. */
+  recommendationsEnabled?: boolean;
 }
 
 interface FieldOption {
@@ -120,15 +124,53 @@ export interface ChallengeField {
   config?: FieldConfig;
 }
 
-/** A group- or personal-workspace-defined catalog column ("diretor" on films…). */
+/** A workspace-defined catalog property ("diretor" on films, "cozinha" on tables…). */
 export interface CatalogAttributeDef {
   id: Id;
-  kind: "film" | "book" | "other";
+  /** The owning library's opaque kind — `film`/`book` for the two built-in ones. */
+  kind: string;
   key: string;
   label: string;
   type: "text" | "number" | "date" | "boolean";
   position: number;
+  hidden?: boolean;
 }
+
+/** A workspace's list of things it tracks — Screens, Pages, Tables, or one it made itself. */
+export interface CatalogLibrary {
+  id: Id;
+  /** `film` / `book` for the built-in ones, an opaque `lib_…` key for the rest. Never a label. */
+  kind: string;
+  source: "screens" | "pages" | "tables" | "custom";
+  /** `null` means "show the locale-aware default name for `source`". */
+  label: string | null;
+  position: number;
+}
+
+/** One property of a library — a native column or a custom attribute, edited the same way. */
+export interface LibraryProperty {
+  /** The native key (`year`, `title`…) or the attribute definition's id — never a label. */
+  key: string;
+  storage: "native" | "attribute";
+  label: string | null;
+  type: "text" | "number" | "date" | "boolean";
+  hidden: boolean;
+  position: number;
+  canHide: boolean;
+  /** Custom properties only: the key an item's saved value is stored under. */
+  attributeKey?: string;
+}
+
+/** A person who recommends things but isn't in the workspace — saved by name, private to it. */
+export interface CatalogRecommender {
+  id: Id;
+  displayName: string;
+}
+
+/** Where an item came from: a member, a saved outside name, or nobody in particular. */
+export type RecommenderRef =
+  | { kind: "member"; id: Id; name: string }
+  | { kind: "external"; id: Id; name: string };
 
 export interface CatalogAttributeValue {
   key: string;
@@ -139,7 +181,8 @@ export interface CatalogAttributeValue {
 
 export interface CatalogItem {
   id: Id;
-  kind: "film" | "book" | "other";
+  /** The library's kind: `film` / `book`, or an opaque `lib_…` key. */
+  kind: string;
   title: string;
   author?: string | null;
   year?: number | null;
@@ -152,6 +195,8 @@ export interface CatalogItem {
   ratingCount?: number;
   /** Custom attributes this group/person defined for this kind — never global. */
   attributes?: CatalogAttributeValue[];
+  recommendedBy?: RecommenderRef | null;
+  originNote?: string | null;
 }
 
 export interface CatalogRoundHistory {
@@ -178,10 +223,12 @@ export interface ChallengeItem {
   position?: number;
   opensAt?: string | null;
   dueAt?: string | null;
+  /** Whether the item's window was set as whole days or as a date and time. */
+  schedulePrecision?: "date" | "datetime";
   date?: string | null;
   status?: "scheduled" | "open" | "past_due" | "closed";
   catalogItem?: Pick<CatalogItem, "id" | "title" | "author" | "year" | "pageCount" | "runtimeMinutes" | "mainGenre"> | null;
-  recommendedBy?: { id: Id; name: string } | null;
+  recommendedBy?: RecommenderRef | null;
   /** Free-text provenance for an item nobody in the group recommended. */
   originNote?: string | null;
   /** On checkpoint rows: how it's presented, plus roll-ups over its items. */
@@ -214,10 +261,15 @@ export interface EntryTypeView {
   countsCompletion?: boolean;
   /** Who sees another participant's answer of this type, and when. */
   visibilityPolicy?: VisibilityPolicy;
+  /** `shared`: one answer per item for the whole group; `individual`: one per participant. */
+  answerScope?: AnswerScope;
+  sharedEditPolicy?: SharedEditPolicy | null;
   fields: ChallengeField[];
 }
 
 export type VisibilityPolicy = "group_realtime" | "after_own" | "after_close" | "author_only";
+export type AnswerScope = "individual" | "shared";
+export type SharedEditPolicy = "members_fill_admin_corrects" | "members_can_edit";
 
 interface EntryValueItem {
   fieldId: Id;
@@ -229,9 +281,13 @@ export interface Entry {
   itemId?: Id | null;
   checkpointId?: Id | null;
   entryTypeId?: Id;
-  participantId?: Id;
-  userId?: Id;
-  participantName?: string;
+  /** `shared` answers belong to the item, not a person — `userId` is null. */
+  answerScope?: AnswerScope;
+  /** Who last touched a shared answer. */
+  lastEditedByName?: string | null;
+  participantId?: Id | null;
+  userId?: Id | null;
+  participantName?: string | null;
   participantUsername?: string;
   occurredOn?: string | null;
   submittedAt?: string;
@@ -380,6 +436,8 @@ export interface ChallengeSummary {
   ruleSections?: ChallengeRule[];
   startsOn?: string | null;
   endsOn?: string | null;
+  /** IANA zone the challenge's dates and item schedules are read in. */
+  timeZone?: string;
   status: ChallengeStatus;
   /** `list` is a first-class category (see `isLivingList`), decided once at creation. */
   kind?: "round" | "list";
@@ -411,8 +469,19 @@ export const CHALLENGE_COLOR_TAGS: readonly ChallengeColorTag[] = [
   "green", "blue", "violet", "coral", "amber", "rose",
 ];
 
+/** The library a challenge draws its items from. `id` is null for a built-in one that has never held an item. */
+export interface ChallengeLibraryRef {
+  id: Id | null;
+  kind: string;
+  source: CatalogLibrary["source"];
+  label: string | null;
+}
+
 export interface ChallengeDetail extends ChallengeSummary {
   fields: ChallengeField[];
+  library?: ChallengeLibraryRef | null;
+  /** False when the group switched recommendations off — `recommendedBy` / `originNote` then arrive empty. */
+  recommendationsEnabled?: boolean;
   entryTypes: EntryTypeView[];
   items: ChallengeItem[];
   /** Dated sessions, always present (empty for undated rounds), independent of `items`. */
@@ -504,6 +573,7 @@ export interface ApiErrorBody {
   message?: string;
   error?: string;
   errors?: Record<string, string[]>;
+  details?: unknown;
 }
 
 export type Screen =
@@ -512,6 +582,7 @@ export type Screen =
   | { kind: "dashboard" }
   | { kind: "account" }
   | { kind: "group"; groupId: Id }
+  | { kind: "group-catalog"; groupId: Id }
   | { kind: "catalog-item"; groupId: Id; itemId: Id }
   | { kind: "personal-space" }
   | { kind: "personal-catalog" }
@@ -531,6 +602,10 @@ export type Screen =
 
 export interface ChallengeCreationInput {
   recipe: CreatableRecipeKey;
+  /** `custom` only: which library the items come from. `tables` falls back to the workspace's Tables library. */
+  libraryId?: Id;
+  /** `custom` only, for a built-in library (`film` / `book`) that has no id yet. */
+  libraryKind?: string;
   title: string;
   description: string;
   ruleSections: ChallengeRule[];
@@ -551,6 +626,10 @@ export interface ChallengeItemInput {
   recommendedByUserId?: Id;
   /** Free-text provenance when no participant recommended it. */
   originNote?: string;
+  /** A saved outside recommender (mutually exclusive with `recommendedByUserId` / `originNote`). */
+  recommendedByExternalId?: Id;
+  /** Values for the library's custom properties, keyed by their attribute key. */
+  attributes?: Record<string, string | number | boolean>;
   /** Checkpoint (week/session) this item is organised under. */
   checkpointId?: Id | null;
   author?: string;

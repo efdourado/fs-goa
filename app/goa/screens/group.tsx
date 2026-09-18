@@ -9,9 +9,10 @@ import { AddTile } from "../add-tile";
 import { ActionMenu, ActionMenuItem } from "../action-menu";
 import { Dialog } from "../dialog";
 import { useGoaFormat } from "../format";
+import { useCatalogLibraries, useLibraryName } from "../libraries";
 import type { CatalogItem, ChallengeSummary, GroupInviteResult, GroupSummary, Id, Member, PendingGroupRequest } from "../types";
 import { Segmented } from "../Segmented";
-import { BackButton, Button, cx, EmptyState, Field, inputClass, StatusMessage } from "../ui";
+import { BackButton, Button, cx, EmptyState, Field, inputClass, StatusMessage, Toggle } from "../ui";
 import { canManage, formatRuntime } from "../utils";
 import { ActiveChallengeCard } from "./dashboard";
 
@@ -26,6 +27,7 @@ export function GroupScreen({
   onCreateChallenge,
   onOpenChallenge,
   onOpenCatalogItem,
+  onOpenCatalog,
   onCreateInvite,
   onInviteByUsername,
   onCancelRequest,
@@ -43,10 +45,11 @@ export function GroupScreen({
   onCreateChallenge: () => void;
   onOpenChallenge: (id: Id) => void;
   onOpenCatalogItem: (itemId: Id) => void;
+  onOpenCatalog: () => void;
   onCreateInvite: (payload: { expiresInDays: number; maxUses: number; challengeId?: Id }) => Promise<{ token?: string; url?: string }>;
   onInviteByUsername: (username: string) => Promise<GroupInviteResult>;
   onCancelRequest: (id: Id) => Promise<void>;
-  onUpdateGroup: (payload: { name: string; description: string }) => Promise<void>;
+  onUpdateGroup: (payload: { name: string; description: string; recommendationsEnabled: boolean }) => Promise<void>;
   onDeleteGroup?: () => Promise<void>;
   /** Present for non-owners: leave the group. */
   onLeaveGroup?: () => Promise<void>;
@@ -62,6 +65,7 @@ export function GroupScreen({
   const [showGroupEdit, setShowGroupEdit] = useState(false);
   const [groupName, setGroupName] = useState(group.name);
   const [groupDescription, setGroupDescription] = useState(group.description ?? "");
+  const [groupRecommendations, setGroupRecommendations] = useState(group.recommendationsEnabled !== false);
   const [inviteUrl, setInviteUrl] = useState("");
   const inviteInputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -74,7 +78,9 @@ export function GroupScreen({
   const [memberSuccess, setMemberSuccess] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<CatalogItem[] | null>(null);
   const [catalogSort, setCatalogSort] = useState<"title" | "rating">("title");
-  const [catalogKind, setCatalogKind] = useState<"film" | "book" | null>(null);
+  const [catalogKind, setCatalogKind] = useState<string | null>(null);
+  const { data: libraries } = useCatalogLibraries({ groupId: group.id });
+  const libraryName = useLibraryName();
   const [catalogExpanded, setCatalogExpanded] = useState(false);
 
   useEffect(() => {
@@ -85,11 +91,12 @@ export function GroupScreen({
     return () => controller.abort();
   }, [group.id]);
 
-  const catalogFilms = (catalog ?? []).filter((item) => item.kind === "film").length;
-  const catalogBooks = (catalog ?? []).filter((item) => item.kind === "book").length;
-  // Film and book are separate shelves — one sorted list never mixes the two.
-  const bothCatalogKinds = catalogFilms > 0 && catalogBooks > 0;
-  const activeCatalogKind: "film" | "book" = catalogKind ?? (catalogBooks > catalogFilms ? "book" : "film");
+  // Each library is its own shelf — one sorted list never mixes them.
+  const catalogLibraries = (libraries ?? []).filter((library) => (catalog ?? []).some((item) => item.kind === library.kind));
+  const bothCatalogKinds = catalogLibraries.length > 1;
+  const activeCatalogKind = catalogKind && catalogLibraries.some((library) => library.kind === catalogKind)
+    ? catalogKind
+    : catalogLibraries[0]?.kind ?? null;
   const sortedCatalog = [...(catalog ?? [])]
     .filter((item) => !bothCatalogKinds || item.kind === activeCatalogKind)
     .sort((a, b) =>
@@ -138,6 +145,7 @@ export function GroupScreen({
     if (!showGroupEdit) {
       setGroupName(group.name);
       setGroupDescription(group.description ?? "");
+      setGroupRecommendations(group.recommendationsEnabled !== false);
       setGroupError(null);
       setGroupSuccess(null);
     }
@@ -150,7 +158,7 @@ export function GroupScreen({
     setGroupError(null);
     setGroupSuccess(null);
     try {
-      await onUpdateGroup({ name: groupName.trim(), description: groupDescription.trim() });
+      await onUpdateGroup({ name: groupName.trim(), description: groupDescription.trim(), recommendationsEnabled: groupRecommendations });
       setGroupSuccess(t("updated"));
     } catch (cause) {
       setGroupError(f.error(cause));
@@ -281,6 +289,7 @@ export function GroupScreen({
           <form className="space-y-5" onSubmit={updateGroup}>
             <Field label={t("nameLabel")}><input className={inputClass} value={groupName} onChange={(event) => setGroupName(event.target.value)} required maxLength={120} /></Field>
             <Field label={t("descriptionLabel")} optional><textarea className={inputClass} rows={3} value={groupDescription} onChange={(event) => setGroupDescription(event.target.value)} maxLength={1000} placeholder={t("descriptionPlaceholder")} /></Field>
+            <Toggle checked={groupRecommendations} onChange={setGroupRecommendations} label={t("recommendationsLabel")} hint={t("recommendationsHint")} />
             <StatusMessage error={groupError} success={groupSuccess} />
             <div className="flex justify-end gap-3 border-t border-[var(--line)] pt-4">
               <Button variant="secondary" type="button" disabled={groupBusy} onClick={toggleGroupEdit}>{tc("cancel")}</Button>
@@ -341,65 +350,73 @@ export function GroupScreen({
             : <EmptyState title={t("noChallengesTitle")} hint={canManage(group.role) ? t("challengeLimitReached", { limit: challengeLimit }) : t("noChallengesMember")} />}
         </section>
 
-        {sortedCatalog.length ? (
+        {sortedCatalog.length || canManage(group.role) ? (
           <section>
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <h2 className="text-lg font-semibold tracking-[-0.02em]">{t("catalogTitle")}</h2>
-                {bothCatalogKinds ? (
+                {bothCatalogKinds && activeCatalogKind ? (
                   <Segmented
                     className="text-[11px]"
                     ariaLabel={t("catalogKindLabel")}
                     value={activeCatalogKind}
                     onChange={setCatalogKind}
-                    options={[
-                      { value: "film", label: t("catalogKindFilm") },
-                      { value: "book", label: t("catalogKindBook") },
-                    ]}
+                    options={catalogLibraries.map((library) => ({ value: library.kind, label: libraryName(library) }))}
                   />
                 ) : null}
               </div>
-              <select
-                aria-label={t("catalogSortLabel")}
-                className="min-h-9 cursor-pointer appearance-none rounded-full border border-[var(--line)] bg-[var(--paper)] py-1.5 pl-3.5 pr-9 text-xs text-[var(--ink)] outline-none transition hover:border-[var(--main-line)] focus:border-[var(--main)]"
-                value={catalogSort}
-                onChange={(event) => setCatalogSort(event.target.value as "title" | "rating")}
-              >
-                <option value="title">{t("catalogSortTitle")}</option>
-                <option value="rating">{t("catalogSortRating")}</option>
-              </select>
+              <div className="flex items-center gap-2">
+                {sortedCatalog.length ? (
+                  <select
+                    aria-label={t("catalogSortLabel")}
+                    className="min-h-9 cursor-pointer appearance-none rounded-full border border-[var(--line)] bg-[var(--paper)] py-1.5 pl-3.5 pr-9 text-xs text-[var(--ink)] outline-none transition hover:border-[var(--main-line)] focus:border-[var(--main)]"
+                    value={catalogSort}
+                    onChange={(event) => setCatalogSort(event.target.value as "title" | "rating")}
+                  >
+                    <option value="title">{t("catalogSortTitle")}</option>
+                    <option value="rating">{t("catalogSortRating")}</option>
+                  </select>
+                ) : null}
+                <Button variant="secondary" className="min-h-9 px-3.5 text-xs" onClick={onOpenCatalog}>{canManage(group.role) ? t("catalogManage") : t("catalogOpen")}</Button>
+              </div>
             </div>
-            <ul className="divide-y divide-[var(--line)] overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--paper)]">
-              {visibleCatalog.map((item) => (
-                <li key={item.id}>
+            {sortedCatalog.length ? (
+              <>
+                <ul className="divide-y divide-[var(--line)] overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--paper)]">
+                  {visibleCatalog.map((item) => (
+                    <li key={item.id}>
+                      <button
+                        type="button"
+                        onClick={() => onOpenCatalogItem(item.id)}
+                        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-[var(--wash)]"
+                      >
+                        <span className="min-w-0">
+                          <strong className="block truncate text-sm font-medium">{item.title}{item.year ? ` (${item.year})` : ""}</strong>
+                          <span className="mt-0.5 block text-xs text-[var(--muted)]">{[item.mainGenre, formatRuntime(item.runtimeMinutes), ...(item.attributes ?? []).slice(0, 2).map((attribute) => `${attribute.label}: ${String(attribute.value)}`), t("catalogRounds", { count: item.roundCount ?? 0 })].filter(Boolean).join(" · ")}</span>
+                        </span>
+                        <span className="flex-none text-sm tabular-nums">
+                          {item.ratingAvg === null || item.ratingAvg === undefined
+                            ? <span className="text-[var(--muted)]">—</span>
+                            : <>{item.ratingAvg}<span className="ml-1.5 text-[10px] font-light text-[var(--muted)]">n={item.ratingCount ?? 0}</span></>}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                {sortedCatalog.length > CATALOG_PREVIEW_COUNT ? (
                   <button
                     type="button"
-                    onClick={() => onOpenCatalogItem(item.id)}
-                    className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-[var(--wash)]"
+                    onClick={() => setCatalogExpanded((value) => !value)}
+                    aria-expanded={catalogExpanded}
+                    className="mt-3 min-h-10 w-full rounded-xl border border-[var(--line)] text-xs font-light text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)]"
                   >
-                    <span className="min-w-0">
-                      <strong className="block truncate text-sm font-medium">{item.title}{item.year ? ` (${item.year})` : ""}</strong>
-                      <span className="mt-0.5 block text-xs text-[var(--muted)]">{[item.mainGenre, formatRuntime(item.runtimeMinutes), t("catalogRounds", { count: item.roundCount ?? 0 })].filter(Boolean).join(" · ")}</span>
-                    </span>
-                    <span className="flex-none text-sm tabular-nums">
-                      {item.ratingAvg === null || item.ratingAvg === undefined
-                        ? <span className="text-[var(--muted)]">—</span>
-                        : <>{item.ratingAvg}<span className="ml-1.5 text-[10px] font-light text-[var(--muted)]">n={item.ratingCount ?? 0}</span></>}
-                    </span>
+                    {catalogExpanded ? t("catalogShowLess") : t("catalogShowAll", { count: sortedCatalog.length })}
                   </button>
-                </li>
-              ))}
-            </ul>
-            {sortedCatalog.length > CATALOG_PREVIEW_COUNT ? (
-              <button
-                type="button"
-                onClick={() => setCatalogExpanded((value) => !value)}
-                aria-expanded={catalogExpanded}
-                className="mt-3 min-h-10 w-full rounded-xl border border-[var(--line)] text-xs font-light text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)]"
-              >
-                {catalogExpanded ? t("catalogShowLess") : t("catalogShowAll", { count: sortedCatalog.length })}
-              </button>
-            ) : null}
+                ) : null}
+              </>
+            ) : (
+              <EmptyState title={t("catalogEmptyTitle")} onClick={onOpenCatalog} />
+            )}
           </section>
         ) : null}
 

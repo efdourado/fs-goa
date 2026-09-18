@@ -4,22 +4,25 @@ import { useTranslations } from "next-intl";
 import { type FormEvent, type ReactNode, useMemo, useState } from "react";
 
 import { ActionMenu, ActionMenuItem } from "../action-menu";
-import { API_PATHS } from "../api";
 import { CheckpointPlanner } from "../checkpoint-planner";
-import { Segmented } from "../Segmented";
 import { useGoaFormat } from "../format";
 import { CineItemsEditor, type CineRow, cineRowsToInput } from "../cine-items";
 import { ConfirmDialog, FormDialog } from "../dialog";
+import { AddSharedResponseDialog, RemoveResponseDialog, SharedGlyph, SharedResponsePanel } from "../shared-responses";
 import { cleanFields, FIELD_TYPES, FieldConfigInputs, newFieldConfig, uniqueFieldKey } from "../fields";
+import { ItemScheduleFields, sameSchedule, scheduleBody, scheduleProblem, type ScheduleValue, scheduleValueOf } from "../item-schedule";
+import { type CatalogScope, LibraryPills, libraryChoices, useCatalogLibraries } from "../libraries";
 import { ListImportPanel } from "../list-import-panel";
+import { recommenderBody, recommenderLine, RecommenderPicker, recommenderFromItem, type RecommenderValue, sameRecommender, useRecommenderSource } from "../recommender-picker";
 import { RuleSectionsEditor, visibleRuleSections } from "../rules";
-import { ChallengeActions } from "./challenge-actions";
+import { ChallengeActions, type CopyMode } from "./challenge-actions";
 import type {
   AdminTab,
   ChallengeDetail,
   ChallengeField,
   ChallengeItem,
   ChallengeItemInput,
+  ChallengeLibraryRef,
   ChallengeSummary,
   CheckpointInput,
   Entry,
@@ -27,6 +30,7 @@ import type {
   Id,
   ImportPreview,
   Member,
+  SharedEditPolicy,
 } from "../types";
 import {
   BackButton,
@@ -268,15 +272,22 @@ function AdminFields({
   onSave,
   onSaveVisibility,
   onSetExpectation,
+  onAddShared,
+  onRemoveType,
+  onSavePolicy,
 }: {
   challenge: ChallengeDetail;
   onSave: (entryTypeId: Id, fields: ChallengeField[]) => Promise<void>;
   onSaveVisibility: (entryTypeId: Id, visibilityPolicy: string) => Promise<void>;
   onSetExpectation: (enabled: boolean) => Promise<void>;
+  onAddShared: (payload: { name: string; sharedEditPolicy: SharedEditPolicy; field: ChallengeField }) => Promise<void>;
+  onRemoveType: (entryTypeId: Id, archiveMetrics: boolean) => Promise<void>;
+  onSavePolicy: (entryTypeId: Id, policy: SharedEditPolicy) => Promise<void>;
 }) {
   const t = useTranslations("adminChallenge");
   const tf = useTranslations("fields");
   const tv = useTranslations("visibility");
+  const tSr = useTranslations("sharedResponses");
   const f = useGoaFormat();
   const hasExpectation = challenge.entryTypes.some((type) => type.purpose === "expectation");
   const canToggleExpectation =
@@ -299,7 +310,13 @@ function AdminFields({
   const [success, setSuccess] = useState<string | null>(null);
 
   const [editing, setEditing] = useState<ChallengeField | "new" | null>(null);
+  const [addingShared, setAddingShared] = useState(false);
+  const [removingType, setRemovingType] = useState<ChallengeDetail["entryTypes"][number] | null>(null);
   const locked = challenge.status === "closed";
+  const isShared = activeType?.answerScope === "shared";
+  const otherResponseCount = types.filter((type) => type.id !== activeType?.id && type.purpose !== "expectation").length;
+  const removable = otherResponseCount > 0 && activeType?.purpose !== "expectation";
+  const canAddShared = challenge.submissionMode === "item" && !locked && challenge.entryTypes.length > 0;
 
   function pickType(id: Id) {
     setSelectedTypeId(id);
@@ -340,14 +357,37 @@ function AdminFields({
         description={challenge.status === "draft" ? t("fieldsHintDraft") : challenge.status === "active" ? t("fieldsHintActive") : t("fieldsHintClosed")}
         action={!locked ? <Button onClick={() => { setError(null); setEditing("new"); }}>＋ {t("addField")}</Button> : undefined}
       />
-      {types.length > 1 ? (
-        <Segmented
-          className="mb-6 max-w-md"
-          ariaLabel={t("fieldsTypeLegend")}
-          value={selectedTypeId}
-          onChange={pickType}
-          options={types.map((type) => ({ value: type.id, label: type.name }))}
-        />
+      {types.length > 1 || canAddShared ? (
+        <div className="mb-6 flex flex-wrap items-center gap-2" role="group" aria-label={t("fieldsTypeLegend")}>
+          {types.map((type) => {
+            const active = type.id === selectedTypeId;
+            return (
+              <button
+                key={type.id}
+                type="button"
+                aria-pressed={active}
+                onClick={() => pickType(type.id)}
+                className={cx(
+                  "inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border px-4 text-sm transition",
+                  active ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] hover:border-[var(--main-line)]",
+                )}
+              >
+                {type.answerScope === "shared" ? <SharedGlyph /> : null}
+                {type.name}
+                {type.answerScope === "shared" ? <span className="rounded-full bg-[var(--main)]/10 px-2 py-0.5 text-[10px] font-medium">{tSr("badge")}</span> : null}
+              </button>
+            );
+          })}
+          {canAddShared ? (
+            <button
+              type="button"
+              onClick={() => { setError(null); setAddingShared(true); }}
+              className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-full border border-dashed border-[var(--line)] px-4 text-sm text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)]"
+            >
+              ＋ {tSr("addShort")}
+            </button>
+          ) : null}
+        </div>
       ) : null}
       <div className="mb-4"><StatusMessage error={error} success={success} /></div>
       {fields.length ? (
@@ -396,6 +436,36 @@ function AdminFields({
             await commit(next, editing === "new" ? t("fieldAdded") : t("fieldsSaved"));
             setEditing(null);
           }}
+        />
+      ) : null}
+
+      {isShared && activeType ? (
+        <SharedResponsePanel
+          key={activeType.id}
+          type={activeType}
+          locked={locked}
+          removable={removable}
+          onChangePolicy={(policy) => onSavePolicy(activeType.id, policy)}
+          onRemove={() => setRemovingType(activeType)}
+        />
+      ) : !locked && removable && activeType ? (
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--line)] px-5 py-4">
+          <p className="max-w-md text-xs leading-5 text-[var(--muted)]">{tSr("removeHintIndividual")}</p>
+          <button type="button" onClick={() => setRemovingType(activeType)} className="min-h-10 cursor-pointer rounded-xl border border-[var(--danger-line)] px-4 text-sm text-[var(--danger)] transition hover:bg-[var(--danger-soft)]">{tSr("remove")}</button>
+        </div>
+      ) : null}
+
+      {addingShared ? (
+        <AddSharedResponseDialog
+          onCancel={() => setAddingShared(false)}
+          onAdd={async (payload) => { await onAddShared(payload); setAddingShared(false); }}
+        />
+      ) : null}
+      {removingType ? (
+        <RemoveResponseDialog
+          type={removingType}
+          onClose={() => setRemovingType(null)}
+          onRemove={async (archiveMetrics) => { await onRemoveType(removingType.id, archiveMetrics); setRemovingType(null); }}
         />
       ) : null}
 
@@ -508,23 +578,24 @@ export function FieldEditorDialog({
   );
 }
 
-type ItemUpdatePayload = {
-  title: string; description: string; recommendedByUserId?: string | null;
-  author?: string; year?: number | null; mainGenre?: string; pageCount?: number | null; runtimeMinutes?: number | null;
-};
+export type ItemUpdatePayload = { title: string; description: string } & Record<string, unknown>;
 
 export function ItemEditorDialog({
   item,
   challenge,
   members,
-  catalogKind,
+  library,
+  scope,
+  recommendationsEnabled,
   onCancel,
   onSave,
 }: {
   item: ChallengeItem;
   challenge: ChallengeDetail;
   members: Member[];
-  catalogKind: "film" | "book";
+  library: Pick<ChallengeLibraryRef, "kind"> | null;
+  scope: CatalogScope;
+  recommendationsEnabled: boolean;
   onCancel: () => void;
   onSave: (payload: ItemUpdatePayload) => Promise<void>;
 }) {
@@ -532,11 +603,15 @@ export function ItemEditorDialog({
   const tCine = useTranslations("cineItems");
   const tc = useTranslations("common");
   const f = useGoaFormat();
+  const catalogKind = library?.kind === "book" ? "book" : library?.kind === "film" ? "film" : null;
   const hasCatalog = Boolean(item.catalogItem);
+  const timeZone = challenge.timeZone ?? "America/Sao_Paulo";
+  const isItem = challenge.submissionMode === "item";
+  const initialRecommender = recommenderFromItem(item.recommendedBy, item.originNote);
+  const initialSchedule = scheduleValueOf(item, timeZone);
   const initial = {
     title: item.title,
     description: item.description ?? "",
-    recommendedBy: item.recommendedBy?.id ?? "",
     author: item.catalogItem?.author ?? "",
     year: item.catalogItem?.year ? String(item.catalogItem.year) : "",
     pages: item.catalogItem?.pageCount ? String(item.catalogItem.pageCount) : "",
@@ -544,14 +619,20 @@ export function ItemEditorDialog({
     genre: item.catalogItem?.mainGenre ?? "",
   };
   const [draft, setDraft] = useState(initial);
+  const [recommender, setRecommender] = useState<RecommenderValue>(initialRecommender);
+  const [schedule, setSchedule] = useState<ScheduleValue>(initialSchedule);
+  const source = useRecommenderSource(scope, recommendationsEnabled && isItem);
   const set = (patch: Partial<typeof draft>) => setDraft((current) => ({ ...current, ...patch }));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
+  const recommenderChanged = !sameRecommender(recommender, initialRecommender);
+  const scheduleChanged = !sameSchedule(schedule, initialSchedule);
+  const dirty = JSON.stringify(draft) !== JSON.stringify(initial) || recommenderChanged || scheduleChanged;
   const catalogPreview = [draft.year, draft.genre, catalogKind === "book" ? (draft.pages && `${draft.pages} p.`) : (draft.runtime && `${draft.runtime} min`)].filter(Boolean).join(" · ");
 
   async function submit() {
     if (hasCatalog && catalogKind === "book" && !draft.author.trim()) { setError(tCine("authorRequired")); return; }
+    if (scheduleProblem(schedule)) { setError(t("itemWindowOrder")); return; }
     setBusy(true);
     setError(null);
     try {
@@ -561,8 +642,9 @@ export function ItemEditorDialog({
       await onSave({
         title: draft.title.trim(),
         description: draft.description.trim(),
-        ...(challenge.submissionMode === "item" ? { recommendedByUserId: draft.recommendedBy || null } : {}),
-        ...(hasCatalog ? {
+        ...(isItem && recommendationsEnabled && recommenderChanged ? recommenderBody(recommender, "item", true) : {}),
+        ...(isItem && scheduleChanged ? scheduleBody(schedule, timeZone) : {}),
+        ...(hasCatalog && catalogKind ? {
           year: Number.isInteger(year) && year > 0 ? year : null,
           mainGenre: draft.genre.trim(),
           ...(catalogKind === "book"
@@ -589,12 +671,11 @@ export function ItemEditorDialog({
       <Field label={t("itemDescriptionLabel")} optional>
         <textarea className={inputClass} rows={3} value={draft.description} onChange={(event) => set({ description: event.target.value })} maxLength={2000} placeholder={t("itemDescriptionPlaceholder")} />
       </Field>
-      {challenge.submissionMode === "item" && members.length ? (
-        <Field label={t("itemRecommendedBy")}>
-          <select className={inputClass} value={draft.recommendedBy} onChange={(event) => set({ recommendedBy: event.target.value })}><option value="">{t("itemRecommendedByNone")}</option>{members.map((member) => <option value={member.id} key={member.id}>{member.name}</option>)}</select>
-        </Field>
+      {isItem && recommendationsEnabled ? (
+        <RecommenderPicker value={recommender} onChange={setRecommender} members={members} source={source} />
       ) : null}
-      {hasCatalog ? (
+      {isItem ? <ItemScheduleFields value={schedule} onChange={setSchedule} timeZone={timeZone} /> : null}
+      {hasCatalog && catalogKind ? (
         <Disclosure summary={tCine("catalogFacts")} preview={catalogPreview || undefined} defaultOpen={catalogKind === "book" && !draft.author.trim()}>
           <div className="space-y-4 pt-2">
             {catalogKind === "book" ? (
@@ -642,7 +723,19 @@ function AdminItems({
   const tc = useTranslations("common");
   const f = useGoaFormat();
   const members = group?.members ?? [];
-  const catalogKind = recipeCatalogKind(challenge.recipeKey) === "book" ? "book" : "film";
+  const scope: CatalogScope = group ? { groupId: group.id } : "personal";
+  const recommendationsEnabled = group ? group.recommendationsEnabled !== false : true;
+  const timeZone = challenge.timeZone ?? "America/Sao_Paulo";
+  // The library items come from: the challenge's own, or — for a custom challenge that has
+  // no items left to tell — whichever the admin picks here.
+  const { data: libraries } = useCatalogLibraries(scope);
+  const [pickedKind, setPickedKind] = useState<string | null>(null);
+  const choices = libraryChoices(libraries ?? []);
+  const needsPick = !challenge.library && challenge.recipeKey === "custom";
+  const pickedChoice = choices.find((choice) => choice.kind === pickedKind) ?? null;
+  const library: Pick<ChallengeLibraryRef, "id" | "kind"> | null = challenge.library
+    ?? (needsPick ? (pickedChoice ? { id: pickedChoice.id, kind: pickedChoice.kind } : null) : { id: null, kind: recipeCatalogKind(challenge.recipeKey) ?? "film" });
+  const isBookLibrary = library?.kind === "book";
   const [newItemRows, setNewItemRows] = useState<CineRow[]>([]);
   const startsOn = challenge.startsOn ?? "";
   const endsOn = challenge.endsOn ?? "";
@@ -680,10 +773,14 @@ function AdminItems({
       } else {
         const items = cineRowsToInput(newItemRows);
         if (!items.length) { setError(t("errNoItem")); setBusy(false); return; }
-        if (catalogKind === "book" && newItemRows.some((row) => row.title.trim() && !row.author.trim())) {
+        if (isBookLibrary && newItemRows.some((row) => row.title.trim() && !row.author.trim())) {
           setError(tCine("authorRequired")); setBusy(false); return;
         }
-        await onAdd({ items });
+        if (needsPick && !pickedChoice) { setError(t("errPickLibrary")); setBusy(false); return; }
+        await onAdd({
+          items,
+          ...(needsPick && pickedChoice ? (pickedChoice.id ? { libraryId: pickedChoice.id } : { libraryKind: pickedChoice.kind }) : {}),
+        });
         setNewItemRows([]);
         setSuccess(t("itemsAdded"));
         setShowAdd(false);
@@ -705,7 +802,17 @@ function AdminItems({
           <form className="space-y-5" onSubmit={submit}>
             {challenge.submissionMode === "daily"
               ? <><p className="text-xs leading-5 text-[var(--muted)]">{t("dailyGenNote")}</p><Field label={t("firstDay")}><input className={inputClass} type="date" value={startsOn} readOnly required /></Field><Field label={t("lastDay")}><input className={inputClass} type="date" min={startsOn} value={endsOn} readOnly required /></Field></>
-              : <><CineItemsEditor value={newItemRows} onChange={setNewItemRows} members={members} catalogPath={group ? API_PATHS.groupCatalog(group.id) : API_PATHS.personalCatalog} kind={catalogKind} />{challenge.status === "active" ? <p className="text-xs leading-5 text-[var(--muted)]">{t("activeItemsNote")}</p> : null}</>}
+              : <>
+                  {needsPick ? (
+                    <Field label={t("libraryLabel")} hint={t("libraryHint")} plain>
+                      <LibraryPills choices={choices} kind={pickedKind} label={t("libraryLabel")} onPick={(choice) => { setPickedKind(choice.kind); setNewItemRows([]); }} />
+                    </Field>
+                  ) : null}
+                  {library ? (
+                    <CineItemsEditor key={library.kind} value={newItemRows} onChange={setNewItemRows} members={members} scope={scope} library={library} recommendationsEnabled={recommendationsEnabled} />
+                  ) : null}
+                  {challenge.status === "active" ? <p className="text-xs leading-5 text-[var(--muted)]">{t("activeItemsNote")}</p> : null}
+                </>}
             <Button type="submit" disabled={busy || (challenge.submissionMode === "daily" ? challenge.status !== "draft" : !canAddItems || !newItemRows.length)}>{busy ? tc("saving") : challenge.submissionMode === "daily" ? t("generateCheckpoints") : t("add")}</Button>
           </form>
           {challenge.submissionMode === "item" ? (
@@ -725,8 +832,8 @@ function AdminItems({
                 <span className="min-w-0">
                   <strong className="block text-base font-medium">{item.title}{item.catalogItem?.year ? ` (${item.catalogItem.year})` : ""}</strong>
                   {item.description ? <span className="mt-1 block text-sm leading-6 text-[var(--muted)]">{item.description}</span> : null}
-                  {item.recommendedBy || item.catalogItem?.author || item.catalogItem?.mainGenre || item.catalogItem?.runtimeMinutes ? <small className="mt-1 block text-[var(--muted)]">{[item.catalogItem?.author ? tCine("byAuthor", { name: item.catalogItem.author }) : null, item.recommendedBy ? t("itemRecommendedByLine", { name: item.recommendedBy.name }) : null, item.catalogItem?.mainGenre || null, formatRuntime(item.catalogItem?.runtimeMinutes)].filter(Boolean).join(" · ")}</small> : null}
-                  {item.date || item.opensAt || item.dueAt ? <small className="mt-1 block text-[var(--muted)]">{item.date ? f.date(item.date) : t("itemWindow", { opens: f.date(item.opensAt), due: f.date(item.dueAt) })}</small> : null}
+                  {(recommendationsEnabled && (item.recommendedBy || item.originNote)) || item.catalogItem?.author || item.catalogItem?.mainGenre || item.catalogItem?.runtimeMinutes ? <small className="mt-1 block text-[var(--muted)]">{[item.catalogItem?.author ? tCine("byAuthor", { name: item.catalogItem.author }) : null, recommendationsEnabled ? recommenderLine(item.recommendedBy, item.originNote, (name) => t("itemRecommendedByLine", { name }), (text) => t("itemOriginLine", { text })) : null, item.catalogItem?.mainGenre || null, formatRuntime(item.catalogItem?.runtimeMinutes)].filter(Boolean).join(" · ")}</small> : null}
+                  {item.date ? <small className="mt-1 block text-[var(--muted)]">{f.date(item.date)}</small> : f.itemWindow(item, timeZone) ? <small className="mt-1 inline-flex items-center gap-1.5 text-[var(--muted)]"><svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><circle cx="8" cy="8" r="5.8" /><path d="M8 5v3.2l2 1.2" strokeLinecap="round" /></svg>{f.itemWindow(item, timeZone)}</small> : null}
                 </span>
               </div>
               <div className="flex flex-none items-center gap-2">
@@ -752,7 +859,9 @@ function AdminItems({
           item={editing}
           challenge={challenge}
           members={members}
-          catalogKind={catalogKind}
+          library={challenge.library ?? library}
+          scope={scope}
+          recommendationsEnabled={recommendationsEnabled}
           onCancel={() => setEditing(null)}
           onSave={async (payload) => {
             await onUpdate(editing.id, payload);
@@ -913,6 +1022,9 @@ export function AdminScreen({
   onSaveFields,
   onSaveEntryTypeVisibility,
   onSetExpectation,
+  onAddSharedResponse,
+  onRemoveEntryType,
+  onSaveSharedPolicy,
   onAddItems,
   onUpdateItem,
   onArchiveItem,
@@ -934,7 +1046,7 @@ export function AdminScreen({
   onBack: () => void;
   onSaveBasics: (payload: Partial<ChallengeSummary>) => Promise<void>;
   onTransition: (status: "active" | "closed") => Promise<void>;
-  onDuplicate: (payload: { title: string; targetGroupId: Id }) => Promise<void>;
+  onDuplicate: (payload: { title: string; targetGroupId: Id; mode: CopyMode }) => Promise<void>;
   isPlatformAdmin?: boolean;
   onPublishTemplate: () => Promise<void>;
   onUnpublishTemplate: () => Promise<void>;
@@ -944,11 +1056,11 @@ export function AdminScreen({
   onSaveFields: (entryTypeId: Id, fields: ChallengeField[]) => Promise<void>;
   onSaveEntryTypeVisibility: (entryTypeId: Id, visibilityPolicy: string) => Promise<void>;
   onSetExpectation: (enabled: boolean) => Promise<void>;
+  onAddSharedResponse: (payload: { name: string; sharedEditPolicy: SharedEditPolicy; field: ChallengeField }) => Promise<void>;
+  onRemoveEntryType: (entryTypeId: Id, archiveMetrics: boolean) => Promise<void>;
+  onSaveSharedPolicy: (entryTypeId: Id, policy: SharedEditPolicy) => Promise<void>;
   onAddItems: (payload: Record<string, unknown>) => Promise<void>;
-  onUpdateItem: (itemId: Id, payload: {
-    title: string; description: string; recommendedByUserId?: string | null;
-    author?: string; year?: number | null; mainGenre?: string; pageCount?: number | null; runtimeMinutes?: number | null;
-  }) => Promise<void>;
+  onUpdateItem: (itemId: Id, payload: ItemUpdatePayload) => Promise<void>;
   onArchiveItem: (itemId: Id) => Promise<void>;
   onPreviewImport: (body: { json: string; mapping?: Record<string, string> }) => Promise<ImportPreview>;
   onSaveCheckpoints: (checkpoints: CheckpointInput[]) => Promise<void>;
@@ -1011,7 +1123,7 @@ export function AdminScreen({
 
       <div className="mx-auto max-w-5xl px-4 pt-8 sm:px-6 sm:pt-10">
         {activeTab === "overview" ? <div className="mx-auto max-w-2xl space-y-10"><AdminOverview challenge={challenge} onSave={onSaveBasics} />{!isPersonal ? <div className="border-t border-[var(--line)] pt-8"><AdminParticipants key={challenge.participants.map((p) => p.userId ?? p.id).join(",")} challenge={challenge} group={group} onSave={onSaveParticipants} /></div> : null}</div> : null}
-        {activeTab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.visibilityPolicy}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} onSaveVisibility={onSaveEntryTypeVisibility} onSetExpectation={onSetExpectation} /> : null}
+        {activeTab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.visibilityPolicy}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} onSaveVisibility={onSaveEntryTypeVisibility} onSetExpectation={onSetExpectation} onAddShared={onAddSharedResponse} onRemoveType={onRemoveEntryType} onSavePolicy={onSaveSharedPolicy} /> : null}
         {activeTab === "items" ? <AdminItems challenge={challenge} group={group} entries={entries} onAdd={onAddItems} onUpdate={onUpdateItem} onArchive={onArchiveItem} onPreviewImport={onPreviewImport} /> : null}
         {activeTab === "checkpoints" ? <CheckpointPlanner key={`${challenge.id}:${challenge.checkpoints.map((cp) => cp.id).join(",")}`} challenge={challenge} onSaveCheckpoints={onSaveCheckpoints} onAssign={onAssignCheckpointItems} /> : null}
         {activeTab === "metrics" ? <AdminMetrics challenge={challenge} onAdd={onAddMetric} onUpdate={onUpdateMetric} onDelete={onDeleteMetric} /> : null}

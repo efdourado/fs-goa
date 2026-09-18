@@ -4,18 +4,25 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { useGoaFormat } from "../format";
-import { API_PATHS } from "../api";
 import { cleanFields, FieldBuilder, presetFields } from "../fields";
 import { CineItemsEditor, type CineRow, cineRowsToInput } from "../cine-items";
+import { NewLibraryDialog } from "../library-dialogs";
+import { type CatalogScope, LibraryGlyph, LibraryPills, libraryChoices, useCatalogLibraries } from "../libraries";
+import { tablesStarterProperties } from "../property-inputs";
 import { RuleSectionsEditor } from "../rules";
 import type { ChallengeCreationInput, ChallengeField, ChallengeRule, CreatableRecipeKey, GroupSummary, Id } from "../types";
-import { BackButton, backLinkClass, Button, cardClass, cx, EmptyState, inputClass, labelClass, PageHeading, SchedulePeriodFields, StatusMessage } from "../ui";
+import { BackButton, backLinkClass, Button, cardClass, cx, EmptyState, Field, inputClass, labelClass, PageHeading, SchedulePeriodFields, StatusMessage } from "../ui";
 
-const RECIPES: Array<{ key: CreatableRecipeKey; catalogKind: "film" | "book" | null; scheduleMode: "period" | "none"; glyph: string }> = [
-  { key: "cinema", catalogKind: "film", scheduleMode: "none", glyph: "◉" },
-  { key: "bookshelf", catalogKind: "book", scheduleMode: "none", glyph: "〇" },
-  { key: "library", catalogKind: "book", scheduleMode: "period", glyph: "◎" },
-  { key: "habit", catalogKind: null, scheduleMode: "none", glyph: "𖣐" },
+/** Where a recipe's items come from: a fixed built-in library, the workspace's Tables library, one the creator picks, or none at all. */
+type LibraryMode = "film" | "book" | "tables" | "pick" | null;
+
+const RECIPES: Array<{ key: CreatableRecipeKey; library: LibraryMode; scheduleMode: "period" | "none"; glyph: string; icon?: "tables" | "custom" }> = [
+  { key: "cinema", library: "film", scheduleMode: "none", glyph: "◉" },
+  { key: "bookshelf", library: "book", scheduleMode: "none", glyph: "〇" },
+  { key: "library", library: "book", scheduleMode: "period", glyph: "◎" },
+  { key: "tables", library: "tables", scheduleMode: "none", glyph: "", icon: "tables" },
+  { key: "custom", library: "pick", scheduleMode: "none", glyph: "", icon: "custom" },
+  { key: "habit", library: null, scheduleMode: "none", glyph: "𖣐" },
 ];
 
 type StepKey = "base" | "fields" | "checkpoints" | "people";
@@ -35,6 +42,7 @@ export function CreateChallengeScreen({
   const t = useTranslations("createChallenge");
   const tc = useTranslations("common");
   const tp = useTranslations("fields.preset");
+  const tl = useTranslations("libraries");
   const f = useGoaFormat();
   const [step, setStep] = useState(1);
   const [recipe, setRecipe] = useState<CreatableRecipeKey | null>(null);
@@ -51,9 +59,27 @@ export function CreateChallengeScreen({
   const [participantIds, setParticipantIds] = useState<Id[]>(group?.members?.map((member) => member.id) ?? []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pickedKind, setPickedKind] = useState<string | null>(null);
+  const [newLibrary, setNewLibrary] = useState(false);
+  const scope: CatalogScope = personal || !group ? "personal" : { groupId: group.id };
+  const { data: libraries, reload: reloadLibraries } = useCatalogLibraries(scope);
+  const recommendationsEnabled = personal || group?.recommendationsEnabled !== false;
   const itemInputs = cineRowsToInput(cineItems);
   const recipeMeta = RECIPES.find((entry) => entry.key === recipe) ?? null;
-  const tracksCatalog = recipeMeta?.catalogKind ?? null;
+  const libraryMode = recipeMeta?.library ?? null;
+  const tracksCatalog = libraryMode !== null;
+  const choices = libraryChoices(libraries ?? []);
+  // The library the items belong to: fixed for Cinema/Bookshelf/Library, the workspace's Tables for
+  // Tables, and whichever the creator picks for a custom challenge (none yet until they do).
+  const itemLibrary = libraryMode === "film" || libraryMode === "book"
+    ? { id: libraries?.find((library) => library.kind === libraryMode)?.id ?? null, kind: libraryMode }
+    : libraryMode === "tables"
+      ? (() => { const tables = libraries?.find((library) => library.source === "tables"); return { id: tables?.id ?? null, kind: tables?.kind ?? "tables" }; })()
+      : libraryMode === "pick"
+        ? (() => { const picked = choices.find((choice) => choice.kind === pickedKind); return picked ? { id: picked.id, kind: picked.kind } : null; })()
+        : null;
+  const isBookLibrary = itemLibrary?.kind === "book";
+  const tablesFallback = libraryMode === "tables" ? tablesStarterProperties((key) => tl(`tablesStarter.${key}`)) : undefined;
   // Expectation is the pre-watch rating for the two "rate each title" recipes.
   const canOfferExpectation = recipe === "cinema" || recipe === "bookshelf";
   // A no-catalog recipe (Hábito) has nothing to list, so the checkpoints step
@@ -77,6 +103,7 @@ export function CreateChallengeScreen({
     setTitle(t(`recipes.${next}.title`));
     setScheduleMode(meta.scheduleMode);
     setCineItems([]);
+    setPickedKind(null);
   }
 
   function nextStep() {
@@ -104,11 +131,15 @@ export function CreateChallengeScreen({
       setError(t("errNoFields"));
       return;
     }
-    if (step === checkpointsStep && tracksCatalog && !itemInputs.length) {
-      setError(tracksCatalog === "book" ? t("errNoBooks") : t("errNoItems"));
+    if (step === checkpointsStep && libraryMode === "pick" && !itemLibrary) {
+      setError(t("errPickLibrary"));
       return;
     }
-    if (step === checkpointsStep && tracksCatalog === "book"
+    if (step === checkpointsStep && tracksCatalog && !itemInputs.length) {
+      setError(isBookLibrary ? t("errNoBooks") : t("errNoItems"));
+      return;
+    }
+    if (step === checkpointsStep && isBookLibrary
       && cineItems.some((row) => row.title.trim() && !row.author.trim())) {
       setError(t("errNoAuthor"));
       return;
@@ -118,11 +149,15 @@ export function CreateChallengeScreen({
 
   async function submit() {
     if (!recipe) return;
-    if (tracksCatalog && !itemInputs.length) {
-      setError(tracksCatalog === "book" ? t("errNoBooks") : t("errNoItems"));
+    if (libraryMode === "pick" && !itemLibrary) {
+      setError(t("errPickLibrary"));
       return;
     }
-    if (tracksCatalog === "book" && cineItems.some((row) => row.title.trim() && !row.author.trim())) {
+    if (tracksCatalog && !itemInputs.length) {
+      setError(isBookLibrary ? t("errNoBooks") : t("errNoItems"));
+      return;
+    }
+    if (isBookLibrary && cineItems.some((row) => row.title.trim() && !row.author.trim())) {
       setError(t("errNoAuthor"));
       return;
     }
@@ -131,6 +166,9 @@ export function CreateChallengeScreen({
     try {
       await onCreate({
         recipe,
+        ...(libraryMode === "pick" && itemLibrary
+          ? (itemLibrary.id ? { libraryId: itemLibrary.id } : { libraryKind: itemLibrary.kind })
+          : {}),
         title: title.trim(),
         description: description.trim(),
         ruleSections: ruleSections.map((rule) => ({
@@ -160,17 +198,17 @@ export function CreateChallengeScreen({
       <BackButton onClick={onBack} label={t("back")} className="mb-6" />
       <PageHeading title={personal ? t("personalTitle") : t("title")} description={personal ? t("personalSubtitle") : t("subtitle")} />
       <nav className={cx("mb-6 grid gap-1 rounded-2xl bg-[var(--wash-strong)]/70 p-1", navColsClass)} aria-label={t("stepsNav")}>
-        {stepKeys.map((key, index) => <button className={cx("min-h-11 truncate rounded-xl px-2 text-xs font-light sm:text-sm", step === index + 1 ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : index + 1 < step ? "text-[var(--ink)]" : "text-[var(--muted)]")} type="button" onClick={() => index + 1 < step && setStep(index + 1)} disabled={index + 1 > step} key={key}><span className="hidden sm:inline">{index + 1}. </span>{t(`steps.${key}`)}</button>)}
+        {stepKeys.map((key, index) => <button className={cx("min-h-11 truncate rounded-xl px-2 text-xs font-light sm:text-sm", step === index + 1 ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : index + 1 < step ? "text-[var(--ink)]" : "text-[var(--muted)]")} type="button" onClick={() => index + 1 < step && setStep(index + 1)} disabled={index + 1 > step} key={key}><span className="hidden sm:inline">{index + 1}. </span>{key === "checkpoints" && (libraryMode === "tables" || libraryMode === "pick") ? t("steps.items") : t(`steps.${key}`)}</button>)}
       </nav>
 
       <section className={cx(cardClass, "p-5 sm:p-7")}>
         {step === 1 ? (
           <div>
             <h2 className="text-xl font-light">{t("startTitle")}</h2>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {RECIPES.map((entry) => (
                 <button className={cx("rounded-2xl border p-5 text-left transition", recipe === entry.key ? "border-[var(--main)] bg-[var(--main-soft)] ring-2 ring-[var(--main)]/25" : "border-[var(--line)] bg-[var(--paper)] hover:border-[var(--main-line)]")} type="button" aria-pressed={recipe === entry.key} onClick={() => chooseRecipe(entry.key)} key={entry.key}>
-                  <span className="text-2xl" aria-hidden="true">{entry.glyph}</span>
+                  <span className="flex h-8 items-center" aria-hidden="true">{entry.icon ? <LibraryGlyph source={entry.icon} className="h-7 w-7" /> : <span className="text-2xl leading-none">{entry.glyph}</span>}</span>
                   <strong className="mt-3 block text-lg">{t(`recipes.${entry.key}.name`)}</strong>
                   <span className="mt-1 block text-sm leading-6 text-[var(--muted)]">{t(`recipes.${entry.key}.body`)}</span>
                 </button>
@@ -210,8 +248,30 @@ export function CreateChallengeScreen({
         {step === checkpointsStep && tracksCatalog ? (
           <div>
             <h2 className="text-xl font-light">{t("checkpointsTitle")}</h2>
-            <p className="mt-1 mb-4 text-sm leading-6 text-[var(--muted)]">{recipe === "bookshelf" ? t("bookshelfItemsHint") : tracksCatalog === "book" ? t("bookItemsHint") : t("cineItemsHint")}</p>
-            <CineItemsEditor value={cineItems} onChange={setCineItems} members={personal ? [] : group?.members ?? []} catalogPath={personal ? API_PATHS.personalCatalog : API_PATHS.groupCatalog(group!.id)} kind={tracksCatalog === "book" ? "book" : "film"} />
+            <p className="mt-1 mb-4 text-sm leading-6 text-[var(--muted)]">{recipe === "bookshelf" ? t("bookshelfItemsHint") : libraryMode === "tables" ? t("tablesItemsHint") : libraryMode === "pick" ? t("customItemsHint") : isBookLibrary ? t("bookItemsHint") : t("cineItemsHint")}</p>
+            {libraryMode === "pick" ? (
+              <Field label={t("libraryLabel")} hint={t("libraryHint")} plain className="mb-5">
+                <LibraryPills
+                  choices={choices}
+                  kind={pickedKind}
+                  label={t("libraryLabel")}
+                  onPick={(choice) => { if (choice.kind !== pickedKind) { setPickedKind(choice.kind); setCineItems([]); } }}
+                  onNew={() => setNewLibrary(true)}
+                />
+              </Field>
+            ) : null}
+            {itemLibrary ? (
+              <CineItemsEditor
+                key={itemLibrary.kind}
+                value={cineItems}
+                onChange={setCineItems}
+                members={personal ? [] : group?.members ?? []}
+                scope={scope}
+                library={itemLibrary}
+                recommendationsEnabled={recommendationsEnabled}
+                fallbackProperties={tablesFallback}
+              />
+            ) : <EmptyState title={t("pickLibraryFirst")} />}
             <p className="mt-3 text-xs font-medium text-[var(--muted)]">{t("itemsCount", { count: itemInputs.length })}</p>
           </div>
         ) : null}
@@ -236,6 +296,13 @@ export function CreateChallengeScreen({
           {step < lastStep ? <Button onClick={nextStep}>{t("next")}</Button> : <Button disabled={busy} onClick={() => void submit()}>{busy ? t("creatingDraft") : t("createDraft")}</Button>}
         </div>
       </section>
+      {newLibrary ? (
+        <NewLibraryDialog
+          scope={scope}
+          onCancel={() => setNewLibrary(false)}
+          onCreated={(made) => { setNewLibrary(false); reloadLibraries(); setPickedKind(made.kind); setCineItems([]); }}
+        />
+      ) : null}
     </main>
   );
 }

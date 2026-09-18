@@ -3,8 +3,18 @@
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
 
-import { apiRequest } from "./api";
-import type { CatalogItem, ChallengeItemInput, Id, Member } from "./types";
+import { API_PATHS, apiRequest } from "./api";
+import { type CatalogScope } from "./libraries";
+import { bodyFromValues, PropertyInputs, type PropertyValues, useLibraryProperties } from "./property-inputs";
+import {
+  NO_RECOMMENDER,
+  recommenderBody,
+  RecommenderPicker,
+  type RecommenderSource,
+  type RecommenderValue,
+  useRecommenderSource,
+} from "./recommender-picker";
+import type { CatalogItem, ChallengeItemInput, ChallengeLibraryRef, Id, LibraryProperty, Member } from "./types";
 import { Button, cx, inputClass, labelClass, StatusMessage } from "./ui";
 import { formatRuntime } from "./utils";
 
@@ -12,25 +22,32 @@ export interface CineRow {
   key: string;
   title: string;
   catalogItemId?: Id;
-  recommendedByUserId: string;
+  /** A member, a saved outside name or a note — one at most. */
+  recommender: RecommenderValue;
   author: string;
   year: string;
   pages: string;
   /** Films/series only, in minutes. */
   runtimeMinutes: string;
   mainGenre: string;
+  /** What was typed into a custom library's own properties, by `LibraryProperty.key`. */
+  extra: PropertyValues;
+  /** The same values as the request wants them, by the property's storage key — kept in step with `extra` by the editor. */
+  attributes: Record<string, string | number | boolean>;
 }
 
 export function newCineRow(title = "", extra: Partial<CineRow> = {}): CineRow {
   return {
     key: crypto.randomUUID(),
     title,
-    recommendedByUserId: "",
+    recommender: NO_RECOMMENDER,
     author: "",
     year: "",
     pages: "",
     runtimeMinutes: "",
     mainGenre: "",
+    extra: {},
+    attributes: {},
     ...extra,
   };
 }
@@ -149,12 +166,13 @@ export function cineRowsToInput(rows: CineRow[]): ChallengeItemInput[] {
         title: row.title.trim(),
         position: index,
         ...(row.catalogItemId ? { catalogItemId: row.catalogItemId } : {}),
-        ...(row.recommendedByUserId ? { recommendedByUserId: row.recommendedByUserId } : {}),
+        ...recommenderBody(row.recommender, "item", false),
         ...(row.author.trim() ? { author: row.author.trim() } : {}),
         ...(Number.isInteger(year) && year > 1800 ? { year } : {}),
         ...(Number.isInteger(pages) && pages > 0 ? { pageCount: pages } : {}),
         ...(Number.isInteger(runtimeMinutes) && runtimeMinutes > 0 ? { runtimeMinutes } : {}),
         ...(row.mainGenre.trim() ? { mainGenre: row.mainGenre.trim() } : {}),
+        ...(Object.keys(row.attributes).length ? { attributes: row.attributes } : {}),
       };
     });
 }
@@ -163,18 +181,26 @@ export function CineItemsEditor({
   value,
   onChange,
   members,
-  catalogPath,
-  kind = "film",
+  scope,
+  library,
+  recommendationsEnabled = true,
+  fallbackProperties,
 }: {
   value: CineRow[];
   onChange: (rows: CineRow[]) => void;
   members: Member[];
-  /** Group and personal catalogs have different public routes. */
-  catalogPath: string;
-  /** Filters the "from catalog" picker and shows attributes relevant to the medium. */
-  kind?: "film" | "book";
+  /** Whose catalogue the "from catalogue" picker reads — a group's or the caller's own. */
+  scope: CatalogScope;
+  /** Which library the items belong to; decides the fields each row offers. */
+  library: Pick<ChallengeLibraryRef, "id" | "kind">;
+  recommendationsEnabled?: boolean;
+  /** Properties to offer while the library has no row to read yet (a Tables library nobody has created). */
+  fallbackProperties?: LibraryProperty[];
 }) {
   const t = useTranslations("cineItems");
+  const kind = library.kind;
+  const isFilm = kind === "film";
+  const isBook = kind === "book";
   const [paste, setPaste] = useState("");
   const [pasteMode, setPasteMode] = useState<"simple" | "json">("simple");
   const [pasteError, setPasteError] = useState<string | null>(null);
@@ -182,15 +208,22 @@ export function CineItemsEditor({
   const [catalog, setCatalog] = useState<CatalogItem[] | null>(null);
   const [showCatalog, setShowCatalog] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const source: RecommenderSource = useRecommenderSource(scope, recommendationsEnabled);
+  // A custom library's own properties (cuisine, neighbourhood…) — film/book keep their fixed columns.
+  const { properties } = useLibraryProperties(isFilm || isBook || !library.id ? null : { id: library.id, kind });
+  const customProperties = useMemo(
+    () => (properties ?? fallbackProperties ?? []).filter((property) => property.storage === "attribute" && !property.hidden),
+    [properties, fallbackProperties],
+  );
 
   useEffect(() => {
     if (!showCatalog || catalog) return;
     const controller = new AbortController();
-    apiRequest<{ items: CatalogItem[] }>(catalogPath, { signal: controller.signal })
+    apiRequest<{ items: CatalogItem[] }>(API_PATHS.catalogWorkspace(scope).list, { signal: controller.signal })
       .then((response) => setCatalog(response.items.filter((item) => item.kind === kind)))
       .catch(() => setCatalog([]));
     return () => controller.abort();
-  }, [showCatalog, catalog, catalogPath, kind]);
+  }, [showCatalog, catalog, scope, kind]);
 
   const usedCatalogIds = useMemo(
     () => new Set(value.map((row) => row.catalogItemId).filter(Boolean)),
@@ -249,6 +282,14 @@ export function CineItemsEditor({
         <ol className="space-y-2">
           {value.map((row, index) => {
             const open = expanded.has(row.key);
+            const topRight = isBook ? (
+              <label>
+                <span className="sr-only">{t("author")}</span>
+                <input className={cx(inputClass, row.title.trim() && !row.author.trim() ? "border-[var(--danger)]" : "")} value={row.author} maxLength={200} placeholder={t("authorPlaceholder")} onChange={(event) => update(row.key, { author: event.target.value })} />
+              </label>
+            ) : recommendationsEnabled ? (
+              <RecommenderPicker compact value={row.recommender} onChange={(recommender) => update(row.key, { recommender })} members={members} source={source} />
+            ) : <span />;
             return (
               <li className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-3" key={row.key}>
                 <div className="grid gap-2 sm:grid-cols-[1.6fr_1fr_auto]">
@@ -256,20 +297,7 @@ export function CineItemsEditor({
                     <span className="sr-only">{t("titleLabel")}</span>
                     <input className={inputClass} value={row.title} maxLength={200} placeholder={t("titlePlaceholder")} onChange={(event) => update(row.key, { title: event.target.value, catalogItemId: undefined })} />
                   </label>
-                  {kind === "book" ? (
-                    <label>
-                      <span className="sr-only">{t("author")}</span>
-                      <input className={cx(inputClass, row.title.trim() && !row.author.trim() ? "border-[var(--danger)]" : "")} value={row.author} maxLength={200} placeholder={t("authorPlaceholder")} onChange={(event) => update(row.key, { author: event.target.value })} />
-                    </label>
-                  ) : (
-                    <label>
-                      <span className="sr-only">{t("recommendedBy")}</span>
-                      <select className={inputClass} value={row.recommendedByUserId} onChange={(event) => update(row.key, { recommendedByUserId: event.target.value })}>
-                        <option value="">{t("recommendedByNone")}</option>
-                        {members.map((member) => <option value={member.id} key={member.id}>{member.name}</option>)}
-                      </select>
-                    </label>
-                  )}
+                  {topRight}
                   <div className="flex items-start gap-1">
                     <button type="button" className="min-h-11 rounded-lg px-2 text-xs text-[var(--muted)] hover:text-[var(--ink)]" aria-expanded={open} onClick={() => setExpanded((current) => { const next = new Set(current); if (next.has(row.key)) next.delete(row.key); else next.add(row.key); return next; })}>
                       {open ? t("hideDetails") : t("details")}
@@ -278,16 +306,27 @@ export function CineItemsEditor({
                   </div>
                 </div>
                 {open ? (
-                  <div className="mt-2 space-y-2">
-                    <div className="grid gap-2 sm:grid-cols-3">
-                      <label><span className={labelClass}>{t(kind === "film" ? "latestYear" : "year")}</span><input className={inputClass} type="number" inputMode="numeric" min={1870} max={2200} value={row.year} onChange={(event) => update(row.key, { year: event.target.value })} /></label>
-                      {kind === "book"
-                        ? <label><span className={labelClass}>{t("pages")}</span><input className={inputClass} type="number" inputMode="numeric" min={1} max={100000} value={row.pages} onChange={(event) => update(row.key, { pages: event.target.value })} /></label>
-                        : <label><span className={labelClass}>{t("runtimeMinutes")}</span><input className={inputClass} type="number" inputMode="numeric" min={1} max={2000} value={row.runtimeMinutes} placeholder={t("runtimeMinutesPlaceholder")} onChange={(event) => update(row.key, { runtimeMinutes: event.target.value })} /></label>}
-                      <label><span className={labelClass}>{t("mainGenre")}</span><input className={inputClass} value={row.mainGenre} maxLength={80} placeholder={t("mainGenrePlaceholder")} onChange={(event) => update(row.key, { mainGenre: event.target.value })} /></label>
-                    </div>
-                    {kind === "book" && members.length ? (
-                      <label className="block"><span className={labelClass}>{t("recommendedBy")}</span><select className={inputClass} value={row.recommendedByUserId} onChange={(event) => update(row.key, { recommendedByUserId: event.target.value })}><option value="">{t("recommendedByNone")}</option>{members.map((member) => <option value={member.id} key={member.id}>{member.name}</option>)}</select></label>
+                  <div className="mt-2 space-y-3">
+                    {isFilm || isBook ? (
+                      <div className="grid gap-2 sm:grid-cols-3">
+                        <label><span className={labelClass}>{t(isFilm ? "latestYear" : "year")}</span><input className={inputClass} type="number" inputMode="numeric" min={1870} max={2200} value={row.year} onChange={(event) => update(row.key, { year: event.target.value })} /></label>
+                        {isBook
+                          ? <label><span className={labelClass}>{t("pages")}</span><input className={inputClass} type="number" inputMode="numeric" min={1} max={100000} value={row.pages} onChange={(event) => update(row.key, { pages: event.target.value })} /></label>
+                          : <label><span className={labelClass}>{t("runtimeMinutes")}</span><input className={inputClass} type="number" inputMode="numeric" min={1} max={2000} value={row.runtimeMinutes} placeholder={t("runtimeMinutesPlaceholder")} onChange={(event) => update(row.key, { runtimeMinutes: event.target.value })} /></label>}
+                        <label><span className={labelClass}>{t("mainGenre")}</span><input className={inputClass} value={row.mainGenre} maxLength={80} placeholder={t("mainGenrePlaceholder")} onChange={(event) => update(row.key, { mainGenre: event.target.value })} /></label>
+                      </div>
+                    ) : customProperties.length ? (
+                      <PropertyInputs
+                        properties={customProperties}
+                        values={row.extra}
+                        onChange={(propertyKey, propertyValue) => {
+                          const extra = { ...row.extra, [propertyKey]: propertyValue };
+                          update(row.key, { extra, attributes: bodyFromValues(customProperties, extra, "create").attributes as CineRow["attributes"] });
+                        }}
+                      />
+                    ) : null}
+                    {isBook && recommendationsEnabled ? (
+                      <RecommenderPicker value={row.recommender} onChange={(recommender) => update(row.key, { recommender })} members={members} source={source} />
                     ) : null}
                   </div>
                 ) : null}
@@ -299,7 +338,7 @@ export function CineItemsEditor({
       ) : null}
 
       <div className="rounded-2xl border border-dashed border-[var(--main-line)] bg-[var(--main-soft)]/50 p-3">
-        <div className="mb-2 flex gap-1 rounded-full bg-[var(--paper)] p-1 text-xs" role="tablist" aria-label={t("pasteModeAria")}>
+        {isFilm || isBook ? <div className="mb-2 flex gap-1 rounded-full bg-[var(--paper)] p-1 text-xs" role="tablist" aria-label={t("pasteModeAria")}>
           {(["simple", "json"] as const).map((mode) => (
             <button
               type="button"
@@ -312,9 +351,9 @@ export function CineItemsEditor({
               {mode === "simple" ? t("pasteModeSimple") : t("pasteModeJson")}
             </button>
           ))}
-        </div>
+        </div> : null}
         <label className="block"><span className={labelClass}>{pasteMode === "json" ? t("pasteJsonLabel") : t("pasteLabel")}</span>
-          <textarea className={cx(inputClass, pasteMode === "json" ? "font-mono text-xs" : "")} rows={pasteMode === "json" ? 8 : 4} value={paste} onChange={(event) => setPaste(event.target.value)} placeholder={pasteMode === "json" ? t(kind === "book" ? "pasteJsonPlaceholderBook" : "pasteJsonPlaceholderFilm") : t("pastePlaceholder")} />
+          <textarea className={cx(inputClass, pasteMode === "json" ? "font-mono text-xs" : "")} rows={pasteMode === "json" ? 8 : 4} value={paste} onChange={(event) => setPaste(event.target.value)} placeholder={pasteMode === "json" ? t(isBook ? "pasteJsonPlaceholderBook" : "pasteJsonPlaceholderFilm") : t("pastePlaceholder")} />
         </label>
         {pasteMode === "json" ? <p className="mb-2 text-xs leading-5 text-[var(--muted)]">{t("pasteJsonHint")}</p> : null}
         <StatusMessage error={pasteError} />

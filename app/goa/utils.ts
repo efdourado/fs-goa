@@ -1,4 +1,4 @@
-import type { ChallengeField, ChallengeItem, ChallengeStatus, Entry, Id, Metric, MetricOperation, RecipeKey, Role, SubmissionMode } from "./types";
+import type { ChallengeDetail, ChallengeField, ChallengeItem, ChallengeStatus, Entry, Id, Metric, MetricOperation, RecipeKey, Role, SubmissionMode } from "./types";
 
 export function canManage(role?: Role): boolean {
   return role === "owner" || role === "admin";
@@ -331,4 +331,42 @@ export function parseCommentBlocks(value: string): CommentBlock[] {
   }
   flushText();
   return blocks;
+}
+
+
+/**
+ * Whether one item is *done* for one person — the same rule the server counts
+ * with. The completion answer has to be in (their own, or the group's one shared
+ * answer when that type is shared), and so does every *other* shared answer that
+ * has a required field: an item isn't done while the group still owes its final
+ * score. With no shared answers this reduces to "you recorded it".
+ */
+export function isItemDone(
+  challenge: Pick<ChallengeDetail, "entryTypes" | "completionEntryTypeId">,
+  entries: Entry[],
+  userId: Id | undefined | null,
+  itemId: Id,
+): boolean {
+  const forItem = entries.filter((entry) => itemIdForEntry(entry) === itemId);
+  const mine = (entry: Entry) => entry.answerScope === "shared" || (userId != null && entry.userId === userId);
+  const completionId = challenge.completionEntryTypeId;
+  const completionMet = completionId
+    ? forItem.some((entry) => entry.entryTypeId === completionId && mine(entry))
+    : forItem.some(mine);
+  if (!completionMet) return false;
+  return challenge.entryTypes
+    .filter((type) => type.answerScope === "shared" && type.id !== completionId && type.fields.some((field) => field.required))
+    .every((type) => forItem.some((entry) => entry.entryTypeId === type.id));
+}
+
+/** A saved answer as text, in the field's own terms — a select shows its option's label, a yes/no its word. */
+export function displayAnswer(field: ChallengeField, raw: unknown, words: { yes: string; no: string }): string {
+  if (raw === null || raw === undefined || raw === "") return "";
+  if (field.type === "boolean") return raw === true || raw === "true" ? words.yes : words.no;
+  if (field.type === "select") {
+    const option = (field.config?.options ?? []).find((candidate) => (candidate.id ?? candidate.value ?? candidate.label) === raw);
+    return option?.label ?? String(raw);
+  }
+  if (field.type === "rating") return String(raw).replace(".", ",");
+  return String(raw);
 }

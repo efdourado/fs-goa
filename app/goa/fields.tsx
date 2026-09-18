@@ -24,6 +24,15 @@ export function presetFields(recipe: CreatableRecipeKey, label: PresetLabels): C
       { key: "paginas", label: label("paginasLidas"), type: "number", required: true, config: { min: 0, step: 1 } },
     ];
   }
+  if (recipe === "tables") {
+    // Three separate 0–5 ratings, no combined score — the recipe's metrics read these keys.
+    return [
+      { key: "comida", label: label("comida"), type: "rating", required: true, config: { min: 0, max: 5, step: 0.5 } },
+      { key: "ambiente_atendimento", label: label("ambienteAtendimento"), type: "rating", required: true, config: { min: 0, max: 5, step: 0.5 } },
+      { key: "custo_beneficio", label: label("custoBeneficio"), type: "rating", required: true, config: { min: 0, max: 5, step: 0.5 } },
+      { key: "comentario", label: label("comentario"), type: "text", required: false, config: { multiline: true, maxLength: 500 } },
+    ];
+  }
   if (recipe === "habit") {
     // Deliberately just a note — no rating, no preset numeric field. Add
     // whatever the habit actually needs (minutes, a subject, a mood scale) and

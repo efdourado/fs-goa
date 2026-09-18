@@ -3,8 +3,13 @@
 import { useFormatter, useTranslations } from "next-intl";
 import { type FormEvent, forwardRef, type ReactNode, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 
+import { ApiError } from "../api";
 import { copyText } from "../clipboard";
 import { useGoaFormat } from "../format";
+import { ItemAgenda } from "../item-agenda";
+import { useDoneItems } from "../use-done-items";
+import { recommenderLine } from "../recommender-picker";
+import { SharedGlyph } from "../shared-responses";
 import { defaultShowcaseBlocks, hasShowcaseContent, ShowcaseView } from "../showcase-view";
 import { RuleSectionsView, visibleRuleSections } from "../rules";
 import type {
@@ -33,7 +38,9 @@ import {
   StatusMessage,
 } from "../ui";
 import {
+  canManage,
   dateKeyInSaoPaulo,
+  displayAnswer,
   findMissingRequiredField,
   formatRuntime,
   isChallengeScheduled,
@@ -188,6 +195,8 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
   // means the entry is saved without a date. Owned by the caller.
   dateField?: { label: string; hint: string; value: string; max: string; onChange: (value: string) => void };
   onSave: (values: Record<Id, unknown>, entry?: Entry) => Promise<void>;
+  // The challenge's own zone, for reading the item's due date the way its admin set it.
+  timeZone?: string;
   // Present only when this form is editing a saved entry the viewer may
   // remove. There is no delete button: clearing a required field (e.g.
   // tapping the already-picked rating again) and submitting calls this
@@ -217,6 +226,7 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
   sectioned: sectionedProp,
   note,
   dateField,
+  timeZone,
   onSave,
   onDelete,
   alwaysEditable = false,
@@ -487,7 +497,7 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
             {entry && !alwaysEditable ? <Button type="button" variant="secondary" className="w-full sm:flex-1" disabled={busy || deleting} onClick={() => setEditing(false)}>{tc("cancel")}</Button> : null}
           </div>
         ) : !canEdit && !readOnlyInline ? <p className="rounded-xl border border-[var(--line)] bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{unavailableMessage ?? t("readOnly")}</p> : null}
-        {item?.dueAt ? <p className="text-center text-xs text-[var(--muted)]">{t("dueAt", { date: f.dateTime(item.dueAt) })}</p> : null}
+        {item?.dueAt ? <p className="text-center text-xs text-[var(--muted)]">{t("dueAt", { date: timeZone ? f.itemDeadline(item, timeZone) ?? "" : f.dateTime(item.dueAt) })}</p> : null}
       </form>
     </div>
   );
@@ -620,6 +630,104 @@ export function itemEntryTypes(challenge: ChallengeDetail): EntryTypeView[] {
 }
 
 /**
+ * One answer for the whole group on one item — a final score, an agreed verdict.
+ * Nobody owns it: everyone sees the same current value and who last changed it.
+ * Saving sends the version this person last saw, so two people editing at once
+ * never silently overwrite each other — the second one is told, shown the latest
+ * value, and can decide whether their change still applies.
+ */
+function SharedAnswerSection({
+  challenge,
+  item,
+  type,
+  entries,
+  timeZone,
+  unavailableMessage,
+  onSaveEntry,
+  onDeleteEntry,
+  onReload,
+}: {
+  challenge: ChallengeDetail;
+  item: ChallengeItem;
+  type: EntryTypeView;
+  entries: Entry[];
+  timeZone: string;
+  /** Why this item can't take answers at all (closed round, not a participant…), before any sharing rule. */
+  unavailableMessage: string | null;
+  onSaveEntry: (itemId: Id | null, values: Record<Id, unknown>, entry?: Entry, occurredOn?: string | null, entryTypeId?: Id, checkpointId?: Id | null, options?: { expectedUpdatedAt?: string | null }) => Promise<void>;
+  onDeleteEntry?: (entryId: Id) => Promise<void>;
+  onReload?: () => Promise<void>;
+}) {
+  const t = useTranslations("sharedAnswers");
+  const f = useGoaFormat();
+  const admin = canManage(challenge.viewerRole);
+  const policy = type.sharedEditPolicy ?? "members_fill_admin_corrects";
+  const entry = entries.find((candidate) => candidate.entryTypeId === type.id && itemIdForEntry(candidate) === item.id && candidate.answerScope === "shared");
+  const [conflict, setConflict] = useState(false);
+  const hasRequiredField = type.fields.some((field) => field.required);
+  // Anyone taking part can fill it the first time; who may change it afterwards is the admin's setting.
+  const lockedByPolicy = Boolean(entry) && policy === "members_fill_admin_corrects" && !admin;
+  // An admin who isn't taking part can still correct an answer that exists, just not start one.
+  const blocked = admin && entry && challenge.isParticipant === false
+    ? f.entryUnavailableMessage({ challengeStatus: challenge.status, isParticipant: true, itemStatus: item.status, opensAt: item.opensAt, schedulePrecision: item.schedulePrecision, timeZone })
+    : unavailableMessage;
+  const message = blocked ?? (lockedByPolicy ? t("lockedByPolicy") : null);
+  const canEdit = !message;
+
+  async function save(values: Record<Id, unknown>, saved?: Entry) {
+    try {
+      await onSaveEntry(item.id, values, saved, undefined, type.id, undefined, { expectedUpdatedAt: saved?.updatedAt ?? null });
+      setConflict(false);
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.code === "shared_conflict") {
+        // Show the latest value (the reload swaps the form's entry) and say why the save didn't go through.
+        await onReload?.();
+        setConflict(true);
+        throw new Error(t("conflictShort"));
+      }
+      throw cause;
+    }
+  }
+
+  const who = entry?.lastEditedByName?.trim() || null;
+  return (
+    <section className="rounded-2xl border border-[var(--main-line)] bg-[var(--main-soft)]/25 p-4 sm:p-5" aria-label={type.name}>
+      <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--main-soft)] px-2.5 py-1 text-[11px] font-medium text-[var(--main-strong)]">
+          <SharedGlyph />{t("badge")}
+        </span>
+        <span className="text-[11px] text-[var(--muted)]">{t(`policy.${policy}`)}</span>
+      </div>
+      {conflict ? (
+        <div role="alert" className="mb-4 flex items-start gap-3 rounded-xl border border-[var(--warn-line)] bg-[var(--warn-soft)] px-4 py-3 text-sm text-[var(--warn)]">
+          <span className="flex-1 leading-6">{t("conflictBody", { name: who ?? t("someone") })}</span>
+          <button type="button" className="flex-none cursor-pointer text-xs underline underline-offset-2" onClick={() => setConflict(false)}>{t("dismiss")}</button>
+        </div>
+      ) : null}
+      <DynamicEntryForm
+        key={`${type.id}-${item.id}-${entry?.id ?? "new"}-${entry?.updatedAt ?? ""}`}
+        heading={type.name}
+        sectioned={false}
+        alwaysEditable={!hasRequiredField}
+        fields={type.fields}
+        item={null}
+        entry={entry}
+        canEdit={canEdit}
+        unavailableMessage={message}
+        timeZone={timeZone}
+        onSave={save}
+        onDelete={entry && canEdit && onDeleteEntry ? () => onDeleteEntry(entry.id) : undefined}
+      />
+      <p className="mt-4 border-t border-[var(--main-line)]/60 pt-3 text-[11px] leading-5 text-[var(--muted)]">
+        {entry
+          ? (who ? t("lastEdited", { name: who, when: f.dateTime(entry.updatedAt) }) : t("lastEditedAnon", { when: f.dateTime(entry.updatedAt) }))
+          : t("notFilled")}
+      </p>
+    </section>
+  );
+}
+
+/**
  * One item, one or more forms. Cine Curadoria stacks an "Expectativa" form (which
  * locks once the film is rated) above the "Avaliação"; a reading club stacks
  * progress / completion / rating. A plain Cine round renders a single form.
@@ -628,7 +736,10 @@ export function itemEntryTypes(challenge: ChallengeDetail): EntryTypeView[] {
 function ItemEntryPanel({
   challenge,
   item,
+  entries,
   ownEntries,
+  timeZone,
+  onReload,
   occurredOn,
   onOccurredOnChange,
   offerOptionalDate,
@@ -641,7 +752,10 @@ function ItemEntryPanel({
 }: {
   challenge: ChallengeDetail;
   item: ChallengeItem;
+  entries: Entry[];
   ownEntries: Entry[];
+  timeZone: string;
+  onReload?: () => Promise<void>;
   // "" when the participant left the (optional) date blank; `today` is the
   // fallback for the day-keyed forms that still require one.
   occurredOn: string;
@@ -654,14 +768,17 @@ function ItemEntryPanel({
   canEdit: boolean;
   // The session this item is being logged against — "filme X na sessão Y".
   checkpointId?: Id | null;
-  onSaveEntry: (itemId: Id | null, values: Record<Id, unknown>, entry?: Entry, occurredOn?: string | null, entryTypeId?: Id, checkpointId?: Id | null) => Promise<void>;
+  onSaveEntry: (itemId: Id | null, values: Record<Id, unknown>, entry?: Entry, occurredOn?: string | null, entryTypeId?: Id, checkpointId?: Id | null, options?: { expectedUpdatedAt?: string | null }) => Promise<void>;
   // Present only while the round is active and the viewer may remove entries.
   onDeleteEntry?: (entryId: Id) => Promise<void>;
 }) {
   const t = useTranslations("participant");
   const tc = useTranslations("common");
   const tv = useTranslations("visibility");
-  const types = itemEntryTypes(challenge);
+  // Individual answers first, each person's own; the group's shared ones follow.
+  const allTypes = itemEntryTypes(challenge);
+  const types = allTypes.filter((type) => type.answerScope !== "shared");
+  const sharedTypes = allTypes.filter((type) => type.answerScope === "shared");
   const ratingTypeId = types.find((type) => type.purpose === "rating")?.id;
   const stacked = types.length > 1;
   // Looked up once (both to build the JSX below and to seed the shared
@@ -709,7 +826,7 @@ function ItemEntryPanel({
     }
   }
   return (
-    <div className={stacked ? "space-y-8" : undefined}>
+    <div className={stacked || sharedTypes.length ? "space-y-8" : undefined}>
       {types.map((type) => {
         const perDay = type.cardinality === "once_per_item_day";
         const entry = entryForType(type);
@@ -766,6 +883,7 @@ function ItemEntryPanel({
               unavailableMessage={unavailableMessage}
               readOnlyInline={locked}
               dateField={offersDate ? { label: t("occurredOnLabel"), hint: t("occurredOnOptionalHint"), value: occurredOn, max: today, onChange: onOccurredOnChange } : undefined}
+              timeZone={timeZone}
               onSave={(values, saved) => onSaveEntry(
                 item.id,
                 values,
@@ -784,6 +902,20 @@ function ItemEntryPanel({
           {savingAll ? tc("saving") : t("saveAllButton")}<span aria-hidden="true">→</span>
         </Button>
       ) : null}
+      {sharedTypes.map((type) => (
+        <SharedAnswerSection
+          key={type.id}
+          challenge={challenge}
+          item={item}
+          type={type}
+          entries={entries}
+          timeZone={timeZone}
+          unavailableMessage={unavailableMessage}
+          onSaveEntry={onSaveEntry}
+          onDeleteEntry={onDeleteEntry}
+          onReload={onReload}
+        />
+      ))}
     </div>
   );
 }
@@ -971,6 +1103,42 @@ function CheckpointSchedule({ challenge }: { challenge: ChallengeDetail }) {
 }
 
 
+/** The group's shared answers for one item, read-only, with who last changed each — shown on the Grupo tab. */
+function SharedAnswersSummary({ types, entries, itemId }: { types: EntryTypeView[]; entries: Entry[]; itemId: Id }) {
+  const tSa = useTranslations("sharedAnswers");
+  const tc = useTranslations("common");
+  const f = useGoaFormat();
+  const words = { yes: tc("yes"), no: tc("no") };
+  return (
+    <div className="mb-5 space-y-3 border-b border-[var(--line)] pb-5">
+      {types.map((type) => {
+        const shared = entries.find((entry) => entry.entryTypeId === type.id && itemIdForEntry(entry) === itemId && entry.answerScope === "shared");
+        const values = shared ? valuesAsRecord(shared.values) : {};
+        const shown = type.fields.filter((field) => field.id && displayAnswer(field, values[field.id], words));
+        return (
+          <div key={type.id} className="rounded-xl border border-[var(--main-line)] bg-[var(--main-soft)]/25 px-4 py-3.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--main-soft)] px-2.5 py-1 text-[11px] font-medium text-[var(--main-strong)]"><SharedGlyph />{tSa("badge")}</span>
+              <strong className="text-sm font-medium">{type.name}</strong>
+            </div>
+            {shared ? (
+              <dl className="mt-2 space-y-1">
+                {shown.map((field) => (
+                  <div key={field.id} className="flex flex-wrap items-baseline gap-x-2">
+                    <dt className="text-xs text-[var(--muted)]">{field.label}</dt>
+                    <dd className="text-base font-light">{displayAnswer(field, values[field.id as Id], words)}</dd>
+                  </div>
+                ))}
+              </dl>
+            ) : <p className="mt-2 text-sm text-[var(--muted)]">{tSa("notFilled")}</p>}
+            {shared?.lastEditedByName ? <p className="mt-2 text-[11px] text-[var(--muted)]">{tSa("lastEdited", { name: shared.lastEditedByName, when: f.dateTime(shared.updatedAt) })}</p> : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function ParticipantChallengeScreen({
   challenge,
   entries,
@@ -981,6 +1149,7 @@ export function ParticipantChallengeScreen({
   onAdmin,
   onSaveEntry,
   onDeleteEntry,
+  onReload,
   preview = false,
   previewActions,
 }: {
@@ -991,8 +1160,10 @@ export function ParticipantChallengeScreen({
   onTab: (tab: ParticipantTab) => void;
   onBack: () => void;
   onAdmin?: () => void;
-  onSaveEntry?: (itemId: Id | null, values: Record<Id, unknown>, entry?: Entry, occurredOn?: string | null, entryTypeId?: Id, checkpointId?: Id | null) => Promise<void>;
+  onSaveEntry?: (itemId: Id | null, values: Record<Id, unknown>, entry?: Entry, occurredOn?: string | null, entryTypeId?: Id, checkpointId?: Id | null, options?: { expectedUpdatedAt?: string | null }) => Promise<void>;
   onDeleteEntry?: (entryId: Id) => Promise<void>;
+  /** Re-reads the challenge and its entries — used to show the latest shared answer after a clash. */
+  onReload?: () => Promise<void>;
   /** Read-only public view (a published template): drops the Today tab and every
    *  entry form, keeps the header + rules + schedule + the Results showcase. */
   preview?: boolean;
@@ -1003,19 +1174,31 @@ export function ParticipantChallengeScreen({
   const trules = useTranslations("rules");
   const f = useGoaFormat();
   const longDate: Intl.DateTimeFormatOptions = { day: "2-digit", month: "long", year: "numeric" };
+  const timeZone = challenge.timeZone ?? "America/Sao_Paulo";
+  const showRecommenders = challenge.recommendationsEnabled !== false;
+  // A shared answer has no author (`userId` is null), so it rides along with every person's own.
   const ownEntries = entries.filter((entry) => !entry.userId || entry.userId === user?.id);
+  const sharedTypes = challenge.entryTypes.filter((type) => type.answerScope === "shared");
+  const hasShared = sharedTypes.length > 0;
   // Progress counts only the "done" signal — an expectation or a mid-round
   // progress note isn't a completion.
   const doneEntries = challenge.completionEntryTypeId
     ? ownEntries.filter((entry) => entry.entryTypeId === challenge.completionEntryTypeId)
     : ownEntries;
-  const entriesByItem = useMemo(() => new Map(ownEntries.map((entry) => [itemIdForEntry(entry), entry])), [ownEntries]);
+  const entriesByItem = useMemo(() => {
+    const map = new Map<Id | null, Entry>();
+    for (const entry of ownEntries) {
+      if (entry.answerScope !== "shared") map.set(itemIdForEntry(entry), entry);
+    }
+    return map;
+  }, [ownEntries]);
   // The "done" tick tracks completion only — any other entry (an expectation, a
-  // half-read progress note) leaves the item still pending.
-  const doneByItem = useMemo(
-    () => new Set(doneEntries.map((entry) => itemIdForEntry(entry))),
-    [doneEntries],
-  );
+  // half-read progress note) leaves the item still pending. With shared answers
+  // in play it also waits for the group's required ones (see `isItemDone`).
+  const doneItems = useDoneItems(challenge, entries, user?.id);
+  const doneByItem: Set<Id | null> = hasShared
+    ? doneItems.forViewer
+    : new Set(doneEntries.map((entry) => itemIdForEntry(entry)));
   // The rating this participant gave each item (from whichever entry carries the
   // rating field) — shown at the end of every checkpoint row. Only entry types
   // whose *purpose* is "rating" count here — an expectation's field uses the
@@ -1024,7 +1207,7 @@ export function ParticipantChallengeScreen({
   const ratingByItem = useMemo(() => {
     const ratingFieldByType = new Map(
       challenge.entryTypes
-        .filter((type) => type.purpose === "rating")
+        .filter((type) => type.purpose === "rating" && type.answerScope !== "shared")
         .map((type) => [type.id, type.fields.find((field) => field.type === "rating")?.id ?? null]),
     );
     const map = new Map<Id, number>();
@@ -1044,7 +1227,7 @@ export function ParticipantChallengeScreen({
   const groupRatingsByItem = useMemo(() => {
     const ratingFieldByType = new Map(
       challenge.entryTypes
-        .filter((type) => type.purpose === "rating")
+        .filter((type) => type.purpose === "rating" && type.answerScope !== "shared")
         .map((type) => [type.id, type.fields.find((field) => field.type === "rating")?.id ?? null]),
     );
     const map = new Map<Id, Array<{ id: Id; name: string; value: number }>>();
@@ -1108,7 +1291,8 @@ export function ParticipantChallengeScreen({
     : selectedItem
       ? entriesByItem.get(selectedItem.id)
       : ownEntries.find((entry) => !itemIdForEntry(entry));
-  const completion = sortedItems.length ? Math.min(100, Math.round((doneEntries.length / sortedItems.length) * 100)) : 0;
+  const doneCount = hasShared ? doneByItem.size : Math.min(doneEntries.length, sortedItems.length);
+  const completion = sortedItems.length ? Math.min(100, Math.round((doneCount / sortedItems.length) * 100)) : 0;
   const scheduled = isChallengeScheduled(challenge.status, challenge.startsOn, challenge.submissionMode);
   const livingList = isLivingList(challenge);
   const ruleSections = useMemo(
@@ -1120,29 +1304,33 @@ export function ParticipantChallengeScreen({
     isParticipant: challenge.isParticipant,
     itemStatus: selectedItem?.status,
     opensAt: selectedItem?.opensAt,
+    schedulePrecision: selectedItem?.schedulePrecision,
+    timeZone,
   });
   const itemForms = itemEntryTypes(challenge);
   const useItemPanel = itemForms.length > 0 && !undatedDaily && Boolean(selectedItem);
   const perDayItem = itemForms.some((type) => type.cardinality === "once_per_item_day");
+  const individualFormCount = itemForms.filter((type) => type.answerScope !== "shared").length;
   // Whether this challenge has any rating-purpose form at all.
-  const hasRatingType = itemForms.some((type) => type.purpose === "rating");
+  const hasRatingType = itemForms.some((type) => type.purpose === "rating" && type.answerScope !== "shared");
   // A retrospective list (Estante) has no "when" — its entry form skips the date.
   const collectsEntryDate = challenge.collectsEntryDate !== false;
   // A daily / per-day round needs a concrete date, so it gets a prominent picker.
   // A plain round instead offers the date among the entry form's optional fields.
   const dateRequired = undatedDaily || (useItemPanel && perDayItem);
   const canDeleteEntry = challenge.status === "active" ? onDeleteEntry : undefined;
-  const doneCount = Math.min(doneEntries.length, sortedItems.length);
   const hasGroup = challenge.participants.length > 1;
 
   // The Grupo tab shows everyone's status for whichever item/session is
   // currently selected in the shared "Checkpoints" picker, plus two
   // mode-independent stats: overall completion and freshness of their last entry.
   const doneForParticipant = (participantUserId: Id | undefined, itemId: Id) =>
-    entries.some((entry) =>
-      entry.userId === participantUserId
-      && itemIdForEntry(entry) === itemId
-      && (!challenge.completionEntryTypeId || entry.entryTypeId === challenge.completionEntryTypeId));
+    hasShared
+      ? doneItems.isDone(participantUserId, itemId)
+      : entries.some((entry) =>
+          entry.userId === participantUserId
+          && itemIdForEntry(entry) === itemId
+          && (!challenge.completionEntryTypeId || entry.entryTypeId === challenge.completionEntryTypeId));
   const ratingForParticipant = (participantUserId: Id | undefined, itemId: Id): number | null => {
     if (participantUserId && participantUserId === user?.id) return ratingByItem.get(itemId) ?? null;
     return groupRatingsByItem.get(itemId)?.find((rating) => rating.id === participantUserId)?.value ?? null;
@@ -1177,7 +1365,7 @@ export function ParticipantChallengeScreen({
   const metaForItem = (item: ChallengeItem): string | undefined =>
     [
       item.catalogItem?.author ? t("byAuthor", { name: item.catalogItem.author }) : null,
-      item.recommendedBy ? t("recommendedBy", { name: item.recommendedBy.name }) : null,
+      showRecommenders ? recommenderLine(item.recommendedBy, item.originNote, (name) => t("recommendedBy", { name }), (text) => t("origin", { text })) : null,
       item.catalogItem?.mainGenre || null,
       formatRuntime(item.catalogItem?.runtimeMinutes),
     ].filter(Boolean).join(" · ") || undefined;
@@ -1228,7 +1416,7 @@ export function ParticipantChallengeScreen({
           <div className="flex flex-wrap items-center justify-between gap-3">{livingList ? <span /> : <ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />}<span className="text-xs text-white/65">{livingList ? t("livingListMeta", { count: sortedItems.length }) : f.dateRange(challenge.startsOn, challenge.endsOn)}</span></div>
           <h1 className="mt-10 max-w-3xl text-4xl font-medium leading-none tracking-[-0.055em] sm:text-6xl">{challenge.title}</h1>
           {challenge.description ? <p className="mt-4 max-w-2xl text-sm leading-6 text-white/70">{challenge.description}</p> : null}
-          {!preview && sortedItems.length ? <div className="mt-8 max-w-2xl"><div className="mb-2 flex justify-between text-xs text-white/70"><span>{t.rich("entriesProgress", { done: Math.min(doneEntries.length, sortedItems.length), total: sortedItems.length, b: (chunks) => <strong className="text-white">{chunks}</strong> })}</span><span>{completion}%</span></div><div className="h-2 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-[var(--main-2)]" style={{ width: `${Math.min(100, completion)}%` }} /></div></div> : null}
+          {!preview && sortedItems.length ? <div className="mt-8 max-w-2xl"><div className="mb-2 flex justify-between text-xs text-white/70"><span>{t.rich("entriesProgress", { done: doneCount, total: sortedItems.length, b: (chunks) => <strong className="text-white">{chunks}</strong> })}</span><span>{completion}%</span></div><div className="h-2 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-[var(--main-2)]" style={{ width: `${Math.min(100, completion)}%` }} /></div></div> : null}
         </div>
         <span className="absolute -right-28 -top-36 h-96 w-96 rounded-full border border-white/10" aria-hidden="true" />
       </section>
@@ -1245,6 +1433,9 @@ export function ParticipantChallengeScreen({
       {/* Shared across Today and Grupo — whichever item/session is picked here
           is what both tabs act on, so it lives above the tab selector itself,
           not inside either tab's own body. */}
+      {activeTab === "today" && !preview && !sessionMode ? (
+        <div className="mt-5"><ItemAgenda items={sortedItems} timeZone={timeZone} selectedId={selectedItem?.id ?? null} doneIds={doneByItem as Set<Id>} onSelect={setSelectedItemId} /></div>
+      ) : null}
       {checkpointPicker && activeTab !== "results" ? <div className="mt-5">{checkpointPicker}</div> : null}
 
       {tabs.length > 1 ? (
@@ -1271,8 +1462,8 @@ export function ParticipantChallengeScreen({
                     </h2>
                   </div>
                   {selectedItem?.dueAt
-                    ? <span className="flex-none rounded-full bg-[var(--wash)] px-3 py-2 text-xs font-medium text-[var(--muted)]">
-                        {t("dueBy", { date: f.dateTime(selectedItem.dueAt) })}
+                    ? <span className={cx("flex-none rounded-full px-3 py-2 text-xs font-medium", selectedItem.status === "past_due" ? "bg-[var(--warn-soft)] text-[var(--warn)]" : "bg-[var(--wash)] text-[var(--muted)]")}>
+                        {t("dueBy", { date: f.itemDeadline(selectedItem, timeZone) ?? "" })}
                       </span>
                     : null
                   }
@@ -1283,12 +1474,12 @@ export function ParticipantChallengeScreen({
                     label itself, in the same row as its own lock icon —
                     otherwise the icon sits in its own row with nothing next
                     to it, an orphaned control with a visible gap above it. */}
-                {useItemPanel && itemForms.length > 1 ? <p className={cx("mb-3", sectionLabelClass)}>{t("yourResponseTitle")}</p> : null}
+                {useItemPanel && individualFormCount > 1 ? <p className={cx("mb-3", sectionLabelClass)}>{t("yourResponseTitle")}</p> : null}
                 {dateRequired ? <label className="mb-5 block"><span className={labelClass}>{t("occurredOnLabel")}</span><input className={inputClass} type="date" max={today} value={effectiveOccurredOn} disabled={Boolean(unavailableMessage)} onChange={(event) => setOccurredOn(event.target.value || today)} /><small className="mt-1 block text-[var(--muted)]">{t("occurredOnHint")}</small></label> : !useItemPanel && currentEntry?.occurredOn ? <p className="mb-5 text-xs text-[var(--muted)]">{t("occurredOn", { date: f.date(currentEntry.occurredOn, longDate) })}</p> : null}
                 {useItemPanel && selectedItem ? (
-                  <ItemEntryPanel key={`${selectedItem.id}-${selectedSession?.id ?? "no-session"}`} challenge={challenge} item={selectedItem} ownEntries={ownEntries} occurredOn={occurredOn} onOccurredOnChange={setOccurredOn} offerOptionalDate={!perDayItem && !sessionMode && collectsEntryDate} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} checkpointId={selectedSession?.id ?? null} onSaveEntry={onSaveEntry!} onDeleteEntry={canDeleteEntry} />
+                  <ItemEntryPanel key={`${selectedItem.id}-${selectedSession?.id ?? "no-session"}`} challenge={challenge} item={selectedItem} entries={entries} ownEntries={ownEntries} timeZone={timeZone} onReload={onReload} occurredOn={occurredOn} onOccurredOnChange={setOccurredOn} offerOptionalDate={!perDayItem && !sessionMode && collectsEntryDate} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} checkpointId={selectedSession?.id ?? null} onSaveEntry={onSaveEntry!} onDeleteEntry={canDeleteEntry} />
                 ) : (
-                  <DynamicEntryForm key={`${selectedItem?.id ?? "free"}-${undatedDaily ? effectiveOccurredOn : "fixed"}-${currentEntry?.id ?? "new"}`} heading={t("yourResponseTitle")} sectioned={false} alwaysEditable={!challenge.fields.some((field) => field.required)} fields={challenge.fields} item={selectedItem ?? null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry!(selectedItem?.id ?? null, values, entry, undatedDaily ? effectiveOccurredOn : undefined)} onDelete={currentEntry && canDeleteEntry ? () => canDeleteEntry(currentEntry.id) : undefined} />
+                  <DynamicEntryForm key={`${selectedItem?.id ?? "free"}-${undatedDaily ? effectiveOccurredOn : "fixed"}-${currentEntry?.id ?? "new"}`} timeZone={timeZone} heading={t("yourResponseTitle")} sectioned={false} alwaysEditable={!challenge.fields.some((field) => field.required)} fields={challenge.fields} item={selectedItem ?? null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry!(selectedItem?.id ?? null, values, entry, undatedDaily ? effectiveOccurredOn : undefined)} onDelete={currentEntry && canDeleteEntry ? () => canDeleteEntry(currentEntry.id) : undefined} />
                 )}
               </section>
             </div>
@@ -1306,6 +1497,7 @@ export function ParticipantChallengeScreen({
                 : null
               }
               
+              {selectedItem && sharedTypes.length ? <SharedAnswersSummary types={sharedTypes} entries={entries} itemId={selectedItem.id} /> : null}
               <div className="divide-y divide-[var(--line)]">
                 {[...challenge.participants].sort((a, b) => Number(b.userId === user?.id) - Number(a.userId === user?.id)).map((participant) => {
                   const isSelf = participant.userId === user?.id;

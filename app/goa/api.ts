@@ -12,6 +12,12 @@ import {
   type Participant,
 } from "./types";
 
+function searchParams(query: Record<string, string | undefined>): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) if (value) params.set(key, value);
+  return params.toString();
+}
+
 /*
  * Este é o único mapa que conhece os caminhos REST. Se o backend mudar uma URL,
  * a adaptação fica concentrada aqui, sem espalhar strings pelos componentes.
@@ -65,6 +71,23 @@ export const API_PATHS = {
   personalCatalog: "/api/personal/catalog",
   personalCatalogItem: (itemId: Id) => `/api/personal/catalog/${encodeURIComponent(itemId)}`,
   catalogItem: (itemId: Id) => `/api/catalog/${encodeURIComponent(itemId)}`,
+  catalogLibrary: (libraryId: Id) => `/api/catalog/libraries/${encodeURIComponent(libraryId)}`,
+  libraryProperties: (libraryId: Id) => `/api/catalog/libraries/${encodeURIComponent(libraryId)}/properties`,
+  libraryProperty: (libraryId: Id, key: string) =>
+    `/api/catalog/libraries/${encodeURIComponent(libraryId)}/properties/${encodeURIComponent(key)}`,
+  catalogRecommender: (recommenderId: Id) => `/api/catalog/recommenders/${encodeURIComponent(recommenderId)}`,
+  catalogWorkspace: (scope: "personal" | { groupId: Id }) => ({
+    items: scope === "personal" ? "/api/personal/catalog/items" : `/api/groups/${encodeURIComponent(scope.groupId)}/catalog/items`,
+    list: scope === "personal" ? "/api/personal/catalog" : `/api/groups/${encodeURIComponent(scope.groupId)}/catalog`,
+    libraries: scope === "personal" ? "/api/personal/catalog/libraries" : `/api/groups/${encodeURIComponent(scope.groupId)}/catalog/libraries`,
+    recommenders: scope === "personal" ? "/api/personal/catalog/recommenders" : `/api/groups/${encodeURIComponent(scope.groupId)}/catalog/recommenders`,
+    attributes: scope === "personal" ? "/api/personal/catalog-attributes" : `/api/groups/${encodeURIComponent(scope.groupId)}/catalog-attributes`,
+    search: (query: { libraryId?: Id; kind?: string; title: string }) =>
+      scope === "personal"
+        ? `/api/personal/catalog/search?${searchParams(query)}`
+        : `/api/groups/${encodeURIComponent(scope.groupId)}/catalog/search?${searchParams(query)}`,
+    item: (itemId: Id) => scope === "personal" ? `/api/personal/catalog/${encodeURIComponent(itemId)}` : `/api/catalog/${encodeURIComponent(itemId)}`,
+  }),
   groupCatalogAttributes: (groupId: Id) => `/api/groups/${encodeURIComponent(groupId)}/catalog-attributes`,
   groupCatalogAttribute: (groupId: Id, attributeId: Id) =>
     `/api/groups/${encodeURIComponent(groupId)}/catalog-attributes/${encodeURIComponent(attributeId)}`,
@@ -85,6 +108,7 @@ export const API_PATHS = {
   participants: (challengeId: Id) =>
     `/api/challenges/${encodeURIComponent(challengeId)}/participants`,
   fields: (challengeId: Id) => `/api/challenges/${encodeURIComponent(challengeId)}/fields`,
+  entryTypes: (challengeId: Id) => `/api/challenges/${encodeURIComponent(challengeId)}/entry-types`,
   entryType: (challengeId: Id, entryTypeId: Id) =>
     `/api/challenges/${encodeURIComponent(challengeId)}/entry-types/${encodeURIComponent(entryTypeId)}`,
   expectation: (challengeId: Id) =>
@@ -125,13 +149,16 @@ export class ApiError extends Error {
   status: number;
   code?: string;
   fieldErrors?: Record<string, string[]>;
+  /** Extra structured facts the server attached — e.g. which metrics block removing a response type. */
+  details?: unknown;
 
-  constructor(message: string, status: number, code?: string, fieldErrors?: Record<string, string[]>) {
+  constructor(message: string, status: number, code?: string, fieldErrors?: Record<string, string[]>, details?: unknown) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
     this.fieldErrors = fieldErrors;
+    this.details = details;
   }
 }
 
@@ -168,6 +195,7 @@ export async function apiRequest<T>(
       response.status,
       errorBody?.error,
       errorBody?.errors,
+      errorBody?.details,
     );
   }
 

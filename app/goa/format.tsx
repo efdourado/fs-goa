@@ -3,12 +3,20 @@ import { useMemo } from "react";
 
 import { ApiError } from "./api";
 import type { ChallengeItem, ChallengeStatus, SubmissionMode } from "./types";
+import { instantToDateKey } from "./schedule";
 import { isChallengeScheduled } from "./utils";
 
 export type Translator = ((key: string, values?: Record<string, string | number | Date>) => string) & {
   has?: (key: string) => boolean;
 };
 export type Formatter = Pick<ReturnType<typeof useFormatter>, "dateTime">;
+
+/** The two ends of an item's window, plus whether they were entered as whole days or as a date and time. */
+export interface ItemWindow {
+  opensAt?: string | null;
+  dueAt?: string | null;
+  schedulePrecision?: "date" | "datetime";
+}
 
 const DAY_KEY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -34,6 +42,29 @@ export function makeGoaFormat(t: Translator, format: Formatter) {
     return date(value, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
   }
 
+  /** One end of an item's window, in the challenge's own zone: a bare day for a date-only schedule, day and time for a precise one. */
+  function windowEnd(value: string, precision: ItemWindow["schedulePrecision"], timeZone: string): string {
+    if (precision === "datetime") {
+      return format.dateTime(new Date(value), { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", timeZone } as never);
+    }
+    return date(instantToDateKey(value, timeZone));
+  }
+
+  /** "Opens 12 Mar · due 19 Mar" — or `null` for an item with no schedule. */
+  function itemWindow(item: ItemWindow, timeZone: string): string | null {
+    if (!item.opensAt && !item.dueAt) return null;
+    const opens = item.opensAt ? windowEnd(item.opensAt, item.schedulePrecision, timeZone) : null;
+    const due = item.dueAt ? windowEnd(item.dueAt, item.schedulePrecision, timeZone) : null;
+    if (opens && due) return t("itemWindow.both", { opens, due });
+    if (opens) return t("itemWindow.opens", { opens });
+    return t("itemWindow.due", { due: due ?? "" });
+  }
+
+  /** Just the due end, in the same style — "19 Mar" or "19 Mar, 20:00". */
+  function itemDeadline(item: ItemWindow, timeZone: string): string | null {
+    return item.dueAt ? windowEnd(item.dueAt, item.schedulePrecision, timeZone) : null;
+  }
+
   function dateRange(startsOn?: string | null, endsOn?: string | null): string {
     if (startsOn && endsOn) return t("dates.range", { start: date(startsOn), end: date(endsOn) });
     if (startsOn) return t("dates.since", { date: date(startsOn) });
@@ -54,13 +85,17 @@ export function makeGoaFormat(t: Translator, format: Formatter) {
     isParticipant?: boolean;
     itemStatus?: ChallengeItem["status"];
     opensAt?: string | null;
+    schedulePrecision?: ItemWindow["schedulePrecision"];
+    timeZone?: string;
   }): string | null {
     if (input.challengeStatus === "closed") return t("entryForm.unavailable.closed");
     if (input.challengeStatus === "draft") return t("entryForm.unavailable.draft");
     if (input.isParticipant === false) return t("entryForm.unavailable.notParticipant");
     if (input.itemStatus === "scheduled") {
       return input.opensAt
-        ? t("entryForm.unavailable.scheduledWithDate", { date: dateTime(input.opensAt) })
+        ? t("entryForm.unavailable.scheduledWithDate", {
+            date: input.timeZone ? windowEnd(input.opensAt, input.schedulePrecision, input.timeZone) : dateTime(input.opensAt),
+          })
         : t("entryForm.unavailable.scheduled");
     }
     if (input.itemStatus === "closed") return t("entryForm.unavailable.itemClosed");
@@ -93,7 +128,7 @@ export function makeGoaFormat(t: Translator, format: Formatter) {
     return t("errors.generic");
   }
 
-  return { date, dateTime, dateRange, itemStatusLabel, challengeStatusLabel, entryUnavailableMessage, error };
+  return { date, dateTime, dateRange, itemWindow, itemDeadline, itemStatusLabel, challengeStatusLabel, entryUnavailableMessage, error };
 }
 
 export type GoaFormat = ReturnType<typeof makeGoaFormat>;

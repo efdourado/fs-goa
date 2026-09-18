@@ -61,6 +61,7 @@ test("toda tela roteável volta de urlForScreen → screenFromUrl com o mesmo ti
   const screens = [
     { kind: "dashboard" },
     { kind: "group", groupId: "g1" },
+    { kind: "group-catalog", groupId: "g1" },
     { kind: "catalog-item", groupId: "g1", itemId: "i1" },
     { kind: "personal-space" },
     { kind: "personal-catalog" },
@@ -88,7 +89,7 @@ test("todo deep-link tem um page.tsx no disco", async () => {
   const { existsSync } = await import("node:fs");
   const pages = [
     "app/page.tsx", "app/groups/[groupId]/page.tsx", "app/groups/[groupId]/trash/page.tsx",
-    "app/groups/[groupId]/catalog/[itemId]/page.tsx", "app/personal/page.tsx", "app/personal/trash/page.tsx",
+    "app/groups/[groupId]/catalog/page.tsx", "app/groups/[groupId]/catalog/[itemId]/page.tsx", "app/personal/page.tsx", "app/personal/trash/page.tsx",
     "app/catalog/page.tsx", "app/catalog/[itemId]/page.tsx", "app/challenges/[challengeId]/page.tsx",
     "app/challenges/[challengeId]/manage/page.tsx", "app/challenges/new/page.tsx",
     "app/modelos/page.tsx", "app/modelos/[challengeId]/page.tsx", "app/sobre/page.tsx",

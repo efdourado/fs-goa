@@ -7,7 +7,7 @@ import { ConfirmDialog, Dialog } from "../dialog";
 import { useGoaFormat } from "../format";
 import { PreflightPanel } from "../preflight-panel";
 import type { ChallengeDetail, Id } from "../types";
-import { Button, ChallengeStatusBadge, inputClass, labelClass, StatusMessage } from "../ui";
+import { Button, ChallengeStatusBadge, inputClass, labelClass, SelectableCards, StatusMessage } from "../ui";
 import { isChallengeScheduled, isLivingList } from "../utils";
 import { PublicationDialog } from "./publication";
 
@@ -111,14 +111,18 @@ function TemplatePublishSection({ challenge, onPublish, onUnpublish }: {
 }
 
 
+export type CopyMode = "structure" | "structure_and_items";
+
 function CopyChallengeDialog({ challenge, duplicateTargets, onDuplicate, onClose }: {
   challenge: ChallengeDetail; duplicateTargets: Target[];
-  onDuplicate: (payload: { title: string; targetGroupId: Id }) => Promise<void>;
+  onDuplicate: (payload: { title: string; targetGroupId: Id; mode: CopyMode }) => Promise<void>;
   onClose: () => void;
 }) {
   const t = useTranslations("adminChallenge");
+  const tt = useTranslations("templates");
   const tc = useTranslations("common");
   const f = useGoaFormat();
+  const [mode, setMode] = useState<CopyMode>("structure_and_items");
   const [duplicateTitle, setDuplicateTitle] = useState(challenge.title);
   const availableTargets = duplicateTargets.filter((target) => target.challengeCount < target.challengeLimit);
   const [duplicateTargetGroupId, setDuplicateTargetGroupId] = useState<Id>(availableTargets[0]?.id ?? "");
@@ -126,7 +130,7 @@ function CopyChallengeDialog({ challenge, duplicateTargets, onDuplicate, onClose
   const [error, setError] = useState<string | null>(null);
   async function copy() {
     setBusy("duplicate"); setError(null);
-    try { await onDuplicate({ title: duplicateTitle.trim(), targetGroupId: duplicateTargetGroupId }); onClose(); }
+    try { await onDuplicate({ title: duplicateTitle.trim(), targetGroupId: duplicateTargetGroupId, mode }); onClose(); }
     catch (cause) { setError(f.error(cause)); } finally { setBusy(null); }
   }
   return <Dialog title={t("reuseTitle")} onClose={onClose} busy={Boolean(busy)}>
@@ -170,7 +174,19 @@ function CopyChallengeDialog({ challenge, duplicateTargets, onDuplicate, onClose
             </select>
           </label>
             
-          <div className="mb-1"><Button type="submit" variant="secondary" disabled={busy === "duplicate" || !duplicateTargetGroupId || !availableTargets.length}>{busy === "duplicate" ? t("reuseCreating") : t("reuseSubmit")}</Button></div>
+          <div className="sm:col-span-2">
+            <span className={labelClass}>{tt("copyModeLabel")}</span>
+            <SelectableCards
+              value={mode}
+              onChange={setMode}
+              options={[
+                { value: "structure_and_items", label: tt("copyModeItems"), hint: tt("copyModeItemsHint") },
+                { value: "structure", label: tt("copyModeStructure"), hint: tt("copyModeStructureHint") },
+              ]}
+            />
+            <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{tt("copyModeHint")}</p>
+          </div>
+          <div className="mb-1 sm:col-span-2"><Button type="submit" variant="secondary" disabled={busy === "duplicate" || !duplicateTargetGroupId || !availableTargets.length}>{busy === "duplicate" ? t("reuseCreating") : t("reuseSubmit")}</Button></div>
         </form> : <div className="mt-5 rounded-2xl border border-dashed border-[var(--line)] bg-[var(--wash)]/60 p-5"><strong className="text-sm">{t("reuseNoneTitle")}</strong><p className="mt-1 text-sm leading-6 text-[var(--muted)]">{t("reuseNoneBody")}</p></div>}
 
     <StatusMessage error={error} />
@@ -180,7 +196,7 @@ function CopyChallengeDialog({ challenge, duplicateTargets, onDuplicate, onClose
 
 export function ChallengeActions({ challenge, duplicateTargets, onDuplicate, onDelete, onTransition, isPlatformAdmin, onPublishTemplate, onUnpublishTemplate, onPublish, onUnpublish }: {
   challenge: ChallengeDetail; duplicateTargets: Target[];
-  onDuplicate: (payload: { title: string; targetGroupId: Id }) => Promise<void>;
+  onDuplicate: (payload: { title: string; targetGroupId: Id; mode: CopyMode }) => Promise<void>;
   onDelete?: () => Promise<void>;
   onTransition: (status: "active" | "closed") => Promise<void>;
   isPlatformAdmin: boolean;
