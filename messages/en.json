@@ -165,7 +165,21 @@
       "invalid_json": "The data you sent is invalid.",
       "invalid_relation": "The operation breaks a domain rule.",
       "internal_error": "We couldn't complete that.",
-      "rate_limited": "Too many attempts in a short time. Wait a moment."
+      "rate_limited": "Too many attempts in a short time. Wait a moment.",
+      "shared_conflict": "Someone changed this shared answer first. Look at the latest value before saving again.",
+      "shared_locked": "That answer is already filled in — only an admin can correct it.",
+      "entry_type_has_entries": "This response already has answers, so it can't be removed.",
+      "entry_type_has_metrics": "Some metrics read this response. Confirm to remove them together.",
+      "last_entry_type": "A challenge needs at least one response.",
+      "recommendations_disabled": "This group turned recommendations off. Turn them on in the group settings to record who recommended something.",
+      "invalid_recommender": "Choose one source: a member, a saved name, or a note — not more than one.",
+      "invalid_library": "That library wasn't found.",
+      "invalid_schedule": "Check the item's dates — due can't be before it opens, and days and times can't be mixed.",
+      "not_shared": "Only a shared response has a rule for who can fill it in.",
+      "attribute_has_data": "That property already has values on items, so it can't be removed — hide it instead.",
+      "title_required": "An item always needs a name, so its title can't be hidden.",
+      "catalog_item_in_use": "That item is in a challenge that's still running. Take it out of the challenge first.",
+      "shared_unsupported": "A shared response needs a challenge with items."
     },
     "byStatus": {
       "401": "Your session expired. Sign in again.",
@@ -208,7 +222,9 @@
     "draftWithoutId": "The server created the draft without returning its identifier.",
     "detailError": "Couldn't open this challenge",
     "adminUnavailableTitle": "Admin access unavailable",
-    "backToStart": "Back to home"
+    "backToStart": "Back to home",
+    "groupCatalogTitle": "{name} · catalogue",
+    "groupCatalogSubtitle": "Everything this group tracks, organised in libraries. Admins can add items and shape each library."
   },
   "auth": {
     "heroKicker": "Private challenges, lasting stories",
@@ -377,7 +393,12 @@
     "cancel": "Cancel",
     "leaveToggle": "Leave group",
     "leaveConfirm": "Leave this group? You stop seeing it and its challenges. Your entries stay (the group's history stays intact) but show as \"left the group\" instead of your name.",
-    "trashLink": "Bin"
+    "trashLink": "Bin",
+    "recommendationsLabel": "Recommendations",
+    "recommendationsHint": "Ask who recommended each item and show it. Turn off to hide it everywhere in this group — what's already recorded is kept.",
+    "catalogManage": "Open & manage",
+    "catalogOpen": "Open catalogue",
+    "catalogEmptyTitle": "Start the catalogue"
   },
   "catalog": {
     "back": "Back",
@@ -395,7 +416,10 @@
       "draft": "draft",
       "active": "in progress",
       "closed": "closed"
-    }
+    },
+    "edit": "Edit",
+    "editHint": "Change the title, its properties or who recommended it.",
+    "origin": "via {text}"
   },
   "personalSpace": {
     "back": "Back",
@@ -412,7 +436,7 @@
   "personalCatalog": {
     "back": "Back",
     "title": "My catalogue",
-    "subtitle": "The films and books from your personal challenges, with the rating you gave.",
+    "subtitle": "Everything you track, organised in libraries — with the rating you gave.",
     "sortLabel": "Sort catalogue",
     "sortTitle": "By title",
     "sortRating": "By rating",
@@ -436,7 +460,19 @@
     "bestGenres": "Best genres: {list}",
     "bestYears": "Best years: {list}",
     "noGenre": "No genre",
-    "bucketEmptyTitle": "Nothing to break down yet"
+    "bucketEmptyTitle": "Nothing to break down yet",
+    "addItem": "Add item",
+    "recommendedBy": "recommended by {name}",
+    "origin": "via {text}",
+    "libraryStats": "{count, plural, =0 {No items yet} one {# item} other {# items}}",
+    "averageRating": "average {value}",
+    "reusedNotice": "Using the item that was already there.",
+    "addedNotice": "Item added.",
+    "emptyHint": "Add your first item — Screens for films and series, Pages for books, or make a library of your own.",
+    "recommenderFilterLabel": "Filter by recommender",
+    "recommenderAll": "Everyone",
+    "recommenderNone": "No recommender",
+    "noMatches": "Nothing matches that filter"
   },
   "cineItems": {
     "titleLabel": "Film title",
@@ -495,7 +531,8 @@
       "base": "Basics",
       "fields": "Fields",
       "checkpoints": "Checkpoints",
-      "people": "People"
+      "people": "People",
+      "items": "Items"
     },
     "back": "Back",
     "title": "Build the next experience",
@@ -523,6 +560,16 @@
         "name": "Habit",
         "body": "No film, no book — just a daily check-in. Add whatever fields the habit needs and build your own metrics on them.",
         "title": "New habit"
+      },
+      "tables": {
+        "name": "Tables",
+        "body": "Rate restaurants, bars and cafés on food, atmosphere and value — one rating each, no combined score.",
+        "title": "Where should we eat?"
+      },
+      "custom": {
+        "name": "Custom",
+        "body": "Pick any library — matches, games, anything — and decide exactly what everyone records.",
+        "title": "Custom challenge"
       }
     },
     "titleLabel": "Title",
@@ -561,7 +608,13 @@
     "creatingDraft": "Creating draft…",
     "createDraft": "Create draft",
     "expectationLabel": "Collect an expectation rating",
-    "expectationHint": "Participants rate how much they expect to like each title before watching. It locks once they send the real rating. You can also toggle this later."
+    "expectationHint": "Participants rate how much they expect to like each title before watching. It locks once they send the real rating. You can also toggle this later.",
+    "errPickLibrary": "Choose the library the items come from.",
+    "tablesItemsHint": "Add the places to rate — one per line. Cuisine, neighbourhood and address are optional details on each.",
+    "customItemsHint": "Add the items to track — one per line. Each item becomes something everyone can record.",
+    "libraryLabel": "Library",
+    "libraryHint": "Which list of things this challenge draws from.",
+    "pickLibraryFirst": "Choose a library to start adding items"
   },
   "adminChallenge": {
     "back": "Back",
@@ -798,7 +851,12 @@
     "fieldsEmptyBody": "Add a field for the participant to fill in on every entry.",
     "descRulesTitle": "Description & rules",
     "moreActions": "More actions",
-    "alreadyPublicHint": "This showcase is already public — any change you save here appears on the link and the template immediately."
+    "alreadyPublicHint": "This showcase is already public — any change you save here appears on the link and the template immediately.",
+    "itemOriginLine": "via {text}",
+    "itemWindowOrder": "Due can't be before it opens.",
+    "errPickLibrary": "Choose the library the items come from.",
+    "libraryLabel": "Library",
+    "libraryHint": "Which list of things this challenge draws from."
   },
   "visibility": {
     "title": "Who sees these answers",
@@ -907,7 +965,8 @@
     "storyOngoingTitle": "The story is still unfolding",
     "storyOngoingBody": "The final result opens when the challenge is closed.",
     "backToEntry": "Back to logging",
-    "checkpointEmpty": "No items yet."
+    "checkpointEmpty": "No items yet.",
+    "origin": "via {text}"
   },
   "entryForm": {
     "fillField": "Fill in the “{label}” field.",
@@ -982,7 +1041,10 @@
       "paginasLidas": "Pages read",
       "livroConcluido": "Book finished?",
       "notaDoLivro": "Book rating",
-      "comoFoi": "How did it go?"
+      "comoFoi": "How did it go?",
+      "comida": "Food",
+      "ambienteAtendimento": "Atmosphere & service",
+      "custoBeneficio": "Value for money"
     },
     "labelLabel": "Label",
     "labelRequired": "Give the field a label.",
@@ -1042,7 +1104,9 @@
       "item": "by item",
       "daily": "daily",
       "free": "free"
-    }
+    },
+    "copyModeItemsHint": "The round's items come along, ready to use.",
+    "copyModeStructureHint": "Fields, rules and metrics only — you add your own items."
   },
   "invite": {
     "verifying": "Checking the invite…",
@@ -1139,9 +1203,10 @@
     ],
     "librariesTitle": "How Goa organises what you track",
     "libraries": [
-      "Each personal space and each group keeps its own libraries — the lists of things you track. Screens is the broader evolution of Movies: films, series, seasons, episodes, documentaries, or whatever unit you choose. Pages is the broader evolution of Books, and also holds articles and other reading. Tables is a configurable starting point for places like restaurants, bars and cafés. You can create more specific libraries of your own, such as Matches or TV Shows.",
+      "Each personal space and each group keeps its own libraries — the lists of things you track. Screens is the broader evolution of Movies: films, series, seasons, episodes, documentaries, or whatever unit you choose. Pages is the broader evolution of Books, and also holds articles and other reading. Tables is a configurable starting point for places like restaurants, bars and cafés. You can create more specific libraries of your own, such as Matches or TV Shows — and rename, hide or reorder every property of any of them.",
       "You decide what one item represents. A trilogy can be one item or three; a season can be one item or every episode. Goa doesn't guess: fill in duration, pages or year only when you know them. An average episode duration and a total runtime are different numbers, and mixing them would make time totals wrong.",
-      "Done means the item's required answers are in — nothing more. For a football match it can simply mean “I tracked this one”; you don't have to have watched it. An answer everyone shares, like a final score, is recorded once for the group, while ratings and comments stay individual."
+      "Done means the item's required answers are in — nothing more. For a football match it can simply mean “I tracked this one”; you don't have to have watched it. An answer everyone shares, like a final score, is recorded once for the group, while ratings and comments stay individual. If two people edit a shared answer at once, the second is told and shown the latest value instead of overwriting it.",
+      "Recommendations say where an item came from: a member, someone outside the group you've saved by name, or a short note. Groups can switch them off entirely. Items can also carry an optional schedule — whole days or an exact time — that feeds an agenda. A due date is only a reminder: it never stops anyone from answering."
     ],
     "feedbackNudge": "Have an idea, or did something bug you?",
     "feedbackLink": "Tell us."
@@ -1381,5 +1446,194 @@
     "reactivate": "Reactivate account",
     "reactivating": "Reactivating…",
     "logout": "Log out"
+  },
+  "libraries": {
+    "tabsLabel": "Libraries",
+    "newLibrary": "New library",
+    "libraryActions": "Library options",
+    "editProperties": "Edit properties",
+    "viewProperties": "View properties",
+    "renameLibrary": "Rename library",
+    "emptyLibrary": "{name} is empty",
+    "source": {
+      "screens": "Screens",
+      "pages": "Pages",
+      "tables": "Tables",
+      "custom": "Library"
+    },
+    "newTitle": "New library",
+    "newBody": "A library is a list of things you track together — places, matches, games, anything. Start from a preset or from a blank page.",
+    "startFrom": "Start from",
+    "blank": "Blank library",
+    "blankHint": "Just a name. Add the properties you want.",
+    "tablesPreset": "Tables",
+    "tablesPresetHint": "For restaurants, bars and cafés — cuisine, neighbourhood and address to start.",
+    "nameLabel": "Name",
+    "nameHint": "What you'll call this library.",
+    "namePlaceholder": "e.g. Matches",
+    "nameRequired": "Give the library a name.",
+    "create": "Create library",
+    "renameTitle": "Rename library",
+    "renameHint": "Only the name changes — its items and properties stay as they are.",
+    "rename": "Rename",
+    "propertiesTitle": "{name} · properties",
+    "propertiesBody": "Rename, hide or reorder what each item in this library can hold. Hiding a property keeps what's already saved — it just stops appearing.",
+    "propertiesReadOnly": "What each item in this library can hold.",
+    "loading": "Loading…",
+    "noProperties": "No properties yet",
+    "propertyNameAria": "Name of {name}",
+    "type": {
+      "text": "Text",
+      "number": "Number",
+      "date": "Date",
+      "boolean": "Yes or no"
+    },
+    "builtIn": "built in",
+    "hidden": "hidden",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "moreActions": "More actions",
+    "removeProperty": "Remove property",
+    "propertySaved": "Saved.",
+    "propertyShown": "Property shown again.",
+    "propertyHiddenSaved": "Property hidden. Saved values are kept.",
+    "propertyRemoved": "Property removed.",
+    "propertyAdded": "Property added.",
+    "propertyNameRequired": "Give the property a name.",
+    "addPropertyTitle": "Add a property",
+    "addPropertyHint": "For example Cuisine, Score or Kick-off date.",
+    "propertyNamePlaceholder": "Property name",
+    "propertyNameLabel": "Property name",
+    "propertyTypeLabel": "Type",
+    "addProperty": "Add",
+    "native": {
+      "title": "Name",
+      "year": "Year",
+      "author": "Author",
+      "main_genre": "Main genre",
+      "runtime_minutes": "Runtime (minutes)",
+      "page_count": "Pages"
+    },
+    "tablesStarter": {
+      "cozinha": "Cuisine",
+      "bairro": "Neighbourhood",
+      "endereco": "Address"
+    }
+  },
+  "recommenders": {
+    "label": "Recommended by",
+    "none": "Nobody in particular",
+    "members": "Members",
+    "saved": "Saved names",
+    "addOutside": "Someone outside the group…",
+    "writeNote": "Write a note…",
+    "outsideHint": "Save their name so you can pick it again. It stays private to this space and never appears on a public link.",
+    "namePlaceholder": "Their name",
+    "nameLabel": "Their name",
+    "nameRequired": "Type a name.",
+    "saveName": "Save name",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "notePlaceholder": "e.g. a blog, a podcast, a friend of a friend"
+  },
+  "catalogAdd": {
+    "title": "Add an item",
+    "add": "Add item",
+    "libraryLabel": "Library",
+    "titleLabel": "Title",
+    "titlePlaceholder": "What are you adding?",
+    "titleRequired": "Type a title.",
+    "matchesTitle": "Already in this library?",
+    "matchesBody": "These have a similar title. Use one to avoid a duplicate — or keep going to create a new item.",
+    "matchesAutoTitle": "Looks familiar",
+    "matchesAutoBody": "Screens and Pages match a repeated title on their own, so adding it again just reuses — and fills in — the one already there.",
+    "useThis": "Use this one",
+    "orCreateNew": "Otherwise, fill in the rest and add it as a new item.",
+    "loadingProperties": "Loading the fields…",
+    "editTitle": "Edit item",
+    "saveChanges": "Save changes"
+  },
+  "sharedResponses": {
+    "badge": "Shared",
+    "addShort": "Shared response",
+    "addTitle": "Add a shared response",
+    "addBody": "One answer for the whole group on each item — a final score, an agreed verdict. Ratings and comments stay individual.",
+    "nameLabel": "Response name",
+    "nameHint": "How it appears on each item, e.g. Final score.",
+    "namePlaceholder": "Final score",
+    "nameRequired": "Give the response a name.",
+    "policyLabel": "Who can fill it in",
+    "policy": {
+      "members_fill_admin_corrects": "Members fill it, admins correct",
+      "members_can_edit": "Any participant can edit"
+    },
+    "policyHint": {
+      "members_fill_admin_corrects": "Anyone taking part can enter it once; after that only an admin changes it.",
+      "members_can_edit": "Anyone taking part can enter or change it. If two people save at once, the second is told and shown the latest value."
+    },
+    "fieldLabel": "What is recorded",
+    "fieldHint": "The label of the value, e.g. Score.",
+    "fieldPlaceholder": "Score",
+    "requiredLabel": "Required",
+    "requiredHint": "An item isn't done until this is filled in.",
+    "add": "Add response",
+    "removeTitle": "Remove \"{name}\"",
+    "removeBody": "This response goes away from every item. It can only be removed while nobody has answered it.",
+    "removeMetricsBody": "These metrics read this response and will be removed with it:",
+    "removeMetricsPrompt": "Some metrics read this response. Confirm again to remove them too.",
+    "removeWithMetrics": "Remove response and metrics",
+    "remove": "Remove response",
+    "panelTitle": "Shared with the group",
+    "panelBody": "There is a single answer per item, shown to everyone along with who last changed it.",
+    "policySaved": "Saved.",
+    "removeHint": "Removing only works while nobody has answered it.",
+    "removeLastHint": "A challenge needs at least one response, so this one can't be removed.",
+    "removeHintIndividual": "Take this response out of the challenge. Only possible while nobody has answered it."
+  },
+  "sharedAnswers": {
+    "badge": "Shared with the group",
+    "policy": {
+      "members_fill_admin_corrects": "Anyone fills it once · admins correct it",
+      "members_can_edit": "Anyone taking part can edit it"
+    },
+    "lockedByPolicy": "This answer is already filled in — only an admin can correct it.",
+    "conflictShort": "Someone changed this answer while you were editing. The latest version is showing — nothing of yours was saved.",
+    "conflictBody": "{name} changed this answer while you were editing, so your change wasn't saved. The latest version is shown — review it and edit again if you still need to.",
+    "someone": "Someone",
+    "dismiss": "Dismiss",
+    "lastEdited": "Last changed by {name} · {when}",
+    "lastEditedAnon": "Last changed {when}",
+    "notFilled": "Nobody has filled this in yet."
+  },
+  "itemSchedule": {
+    "label": "Schedule",
+    "hint": "Optional. Shows up in the agenda and as a reminder.",
+    "none": "None",
+    "noneHint": "No dates",
+    "date": "Days",
+    "dateHint": "Just dates",
+    "datetime": "Date & time",
+    "datetimeHint": "Exact moments",
+    "opens": "Opens",
+    "due": "Due",
+    "errOrder": "Due can't be before it opens.",
+    "neverBlocks": "A due date never stops anyone from answering — it's a reminder.",
+    "zoneNote": "Times are in {zone}."
+  },
+  "agenda": {
+    "title": "Agenda",
+    "tally": "{count, plural, one {# item with a date} other {# items with dates}}",
+    "bucket": {
+      "open": "Open now",
+      "scheduled": "Coming up",
+      "past_due": "Past due"
+    },
+    "done": "Done",
+    "pastDue": "Past due"
+  },
+  "itemWindow": {
+    "both": "Opens {opens} · due {due}",
+    "opens": "Opens {opens}",
+    "due": "Due {due}"
   }
 }

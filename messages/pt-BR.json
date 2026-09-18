@@ -165,7 +165,21 @@
       "invalid_json": "Os dados enviados são inválidos.",
       "invalid_relation": "A operação viola uma regra do domínio.",
       "internal_error": "Não foi possível concluir a operação.",
-      "rate_limited": "Muitas tentativas em pouco tempo. Espere um instante."
+      "rate_limited": "Muitas tentativas em pouco tempo. Espere um instante.",
+      "shared_conflict": "Alguém mudou esta resposta compartilhada antes. Veja o valor mais recente antes de salvar de novo.",
+      "shared_locked": "Essa resposta já foi preenchida — só um admin pode corrigi-la.",
+      "entry_type_has_entries": "Esta resposta já tem registros, então não pode ser removida.",
+      "entry_type_has_metrics": "Algumas métricas leem esta resposta. Confirme para removê-las junto.",
+      "last_entry_type": "Um desafio precisa de pelo menos uma resposta.",
+      "recommendations_disabled": "Este grupo desligou as indicações. Ligue-as nas configurações do grupo para registrar quem indicou.",
+      "invalid_recommender": "Escolha uma só origem: um membro, um nome salvo ou uma nota — não mais de uma.",
+      "invalid_library": "Essa biblioteca não foi encontrada.",
+      "invalid_schedule": "Confira as datas do item — o prazo não pode ser antes da abertura, e dias e horários não podem se misturar.",
+      "not_shared": "Só uma resposta compartilhada tem regra de quem pode preencher.",
+      "attribute_has_data": "Essa propriedade já tem valores em itens e não pode ser removida — oculte-a.",
+      "title_required": "Todo item precisa de um nome, então o título não pode ser ocultado.",
+      "catalog_item_in_use": "Esse item está num desafio em andamento. Tire-o do desafio primeiro.",
+      "shared_unsupported": "Uma resposta compartilhada precisa de um desafio com itens."
     },
     "byStatus": {
       "401": "Sua sessão expirou. Entre novamente.",
@@ -208,7 +222,9 @@
     "draftWithoutId": "O servidor criou o rascunho sem retornar seu identificador.",
     "detailError": "Não foi possível abrir este desafio",
     "adminUnavailableTitle": "Acesso administrativo indisponível",
-    "backToStart": "Voltar ao início"
+    "backToStart": "Voltar ao início",
+    "groupCatalogTitle": "{name} · acervo",
+    "groupCatalogSubtitle": "Tudo o que este grupo acompanha, organizado em bibliotecas. Admins adicionam itens e moldam cada biblioteca."
   },
   "auth": {
     "heroKicker": "Desafios privados, histórias duradouras",
@@ -377,7 +393,12 @@
     "cancel": "Cancelar",
     "leaveToggle": "Sair do grupo",
     "leaveConfirm": "Sair deste grupo? Você deixa de vê-lo e a seus desafios. Seus registros continuam (a história do grupo fica intacta), mas passam a mostrar \"saiu do grupo\" no lugar do seu nome.",
-    "trashLink": "Lixeira"
+    "trashLink": "Lixeira",
+    "recommendationsLabel": "Indicações",
+    "recommendationsHint": "Pergunta quem indicou cada item e mostra isso. Desligue para esconder em todo o grupo — o que já foi registrado fica guardado.",
+    "catalogManage": "Abrir e gerenciar",
+    "catalogOpen": "Abrir acervo",
+    "catalogEmptyTitle": "Comece o acervo"
   },
   "catalog": {
     "back": "Voltar",
@@ -395,7 +416,10 @@
       "draft": "rascunho",
       "active": "em andamento",
       "closed": "encerrada"
-    }
+    },
+    "edit": "Editar",
+    "editHint": "Mude o título, as propriedades ou quem indicou.",
+    "origin": "via {text}"
   },
   "personalSpace": {
     "back": "Voltar",
@@ -412,7 +436,7 @@
   "personalCatalog": {
     "back": "Voltar",
     "title": "Meu acervo",
-    "subtitle": "Os filmes e livros dos seus desafios pessoais, com a nota que você deu.",
+    "subtitle": "Tudo o que você acompanha, organizado em bibliotecas — com a nota que você deu.",
     "sortLabel": "Ordenar acervo",
     "sortTitle": "Por título",
     "sortRating": "Por nota",
@@ -436,7 +460,19 @@
     "bestGenres": "Melhores gêneros: {list}",
     "bestYears": "Melhores anos: {list}",
     "noGenre": "Sem gênero",
-    "bucketEmptyTitle": "Ainda não há o que cruzar"
+    "bucketEmptyTitle": "Ainda não há o que cruzar",
+    "addItem": "Adicionar item",
+    "recommendedBy": "indicado por {name}",
+    "origin": "via {text}",
+    "libraryStats": "{count, plural, =0 {Nenhum item ainda} one {# item} other {# itens}}",
+    "averageRating": "média {value}",
+    "reusedNotice": "Usando o item que já estava lá.",
+    "addedNotice": "Item adicionado.",
+    "emptyHint": "Adicione o primeiro item — Screens para filmes e séries, Pages para livros, ou crie uma biblioteca sua.",
+    "recommenderFilterLabel": "Filtrar por quem indicou",
+    "recommenderAll": "Todo mundo",
+    "recommenderNone": "Sem indicação",
+    "noMatches": "Nada corresponde a esse filtro"
   },
   "cineItems": {
     "titleLabel": "Título do filme",
@@ -495,7 +531,8 @@
       "base": "Base",
       "fields": "Campos",
       "checkpoints": "Checkpoints",
-      "people": "Pessoas"
+      "people": "Pessoas",
+      "items": "Itens"
     },
     "back": "Voltar",
     "title": "Monte a próxima experiência",
@@ -523,6 +560,16 @@
         "name": "Hábito",
         "body": "Sem filme, sem livro — só um registro diário. Adicione os campos que o hábito precisar e crie suas próprias métricas a partir deles.",
         "title": "Novo hábito"
+      },
+      "tables": {
+        "name": "Tables",
+        "body": "Avalie restaurantes, bares e cafés em comida, ambiente e custo-benefício — uma nota para cada, sem nota geral.",
+        "title": "Onde vamos comer?"
+      },
+      "custom": {
+        "name": "Personalizado",
+        "body": "Escolha qualquer biblioteca — jogos, partidas, o que for — e decida exatamente o que cada pessoa registra.",
+        "title": "Desafio personalizado"
       }
     },
     "titleLabel": "Título",
@@ -561,7 +608,13 @@
     "creatingDraft": "Criando rascunho…",
     "createDraft": "Criar rascunho",
     "expectationLabel": "Coletar uma nota de expectativa",
-    "expectationHint": "Os participantes dão uma nota de quanto esperam gostar de cada título antes de assistir. Ela trava quando enviam a avaliação real. Dá para ligar isso depois também."
+    "expectationHint": "Os participantes dão uma nota de quanto esperam gostar de cada título antes de assistir. Ela trava quando enviam a avaliação real. Dá para ligar isso depois também.",
+    "errPickLibrary": "Escolha a biblioteca de onde vêm os itens.",
+    "tablesItemsHint": "Adicione os lugares para avaliar — um por linha. Cozinha, bairro e endereço são detalhes opcionais de cada um.",
+    "customItemsHint": "Adicione os itens a acompanhar — um por linha. Cada item vira algo que todos podem registrar.",
+    "libraryLabel": "Biblioteca",
+    "libraryHint": "De qual lista de coisas este desafio parte.",
+    "pickLibraryFirst": "Escolha uma biblioteca para começar a adicionar itens"
   },
   "adminChallenge": {
     "back": "Voltar",
@@ -798,7 +851,12 @@
     "fieldsEmptyBody": "Adicione um campo para o participante preencher a cada registro.",
     "descRulesTitle": "Descrição e regras",
     "moreActions": "Mais ações",
-    "alreadyPublicHint": "Esta vitrine já está pública — qualquer alteração salva aqui aparece no link e no modelo imediatamente."
+    "alreadyPublicHint": "Esta vitrine já está pública — qualquer alteração salva aqui aparece no link e no modelo imediatamente.",
+    "itemOriginLine": "via {text}",
+    "itemWindowOrder": "O prazo não pode ser antes da abertura.",
+    "errPickLibrary": "Escolha a biblioteca de onde vêm os itens.",
+    "libraryLabel": "Biblioteca",
+    "libraryHint": "De qual lista de coisas este desafio parte."
   },
   "visibility": {
     "title": "Quem vê estas respostas",
@@ -907,7 +965,8 @@
     "storyOngoingTitle": "A história ainda está acontecendo",
     "storyOngoingBody": "O resultado final será liberado quando o desafio for encerrado.",
     "backToEntry": "Voltar ao registro",
-    "checkpointEmpty": "Nada ainda."
+    "checkpointEmpty": "Nada ainda.",
+    "origin": "via {text}"
   },
   "entryForm": {
     "fillField": "Preencha o campo “{label}”.",
@@ -982,7 +1041,10 @@
       "paginasLidas": "Páginas lidas",
       "livroConcluido": "Livro concluído?",
       "notaDoLivro": "Nota do livro",
-      "comoFoi": "Como foi?"
+      "comoFoi": "Como foi?",
+      "comida": "Comida",
+      "ambienteAtendimento": "Ambiente e atendimento",
+      "custoBeneficio": "Custo-benefício"
     },
     "labelLabel": "Rótulo",
     "labelRequired": "Dê um rótulo ao campo.",
@@ -1042,7 +1104,9 @@
       "item": "por item",
       "daily": "diário",
       "free": "livre"
-    }
+    },
+    "copyModeItemsHint": "Os itens da rodada vão junto, prontos para usar.",
+    "copyModeStructureHint": "Só campos, regras e métricas — você adiciona os seus itens."
   },
   "invite": {
     "verifying": "Verificando convite…",
@@ -1139,9 +1203,10 @@
     ],
     "librariesTitle": "Como o Goa organiza o que você acompanha",
     "libraries": [
-      "Cada espaço pessoal e cada grupo tem as suas próprias bibliotecas — as listas das coisas que você acompanha. Screens é a evolução mais ampla de Filmes: filmes, séries, temporadas, episódios, documentários ou a unidade que você escolher. Pages é a evolução mais ampla de Livros, e também serve para artigos e outras leituras. Tables é um ponto de partida configurável para lugares como restaurantes, bares e cafés. Você pode criar bibliotecas mais específicas, como Jogos ou Séries.",
+      "Cada espaço pessoal e cada grupo tem as suas próprias bibliotecas — as listas das coisas que você acompanha. Screens é a evolução mais ampla de Filmes: filmes, séries, temporadas, episódios, documentários ou a unidade que você escolher. Pages é a evolução mais ampla de Livros, e também serve para artigos e outras leituras. Tables é um ponto de partida configurável para lugares como restaurantes, bares e cafés. Você pode criar bibliotecas mais específicas, como Jogos ou Séries — e renomear, ocultar ou reordenar cada propriedade de qualquer uma delas.",
       "Quem cria decide o que um item representa. Uma trilogia pode ser um item ou três; uma temporada pode ser um item ou cada episódio. O Goa não adivinha: preencha duração, páginas ou ano só quando souber. A duração média de um episódio e a duração total são números diferentes, e misturá-los deixaria os totais de tempo errados.",
-      "Concluído significa que as respostas obrigatórias do item estão registradas — nada além disso. Num jogo de futebol, pode ser só “acompanhei este”; não é preciso tê-lo assistido. Uma resposta que todos compartilham, como o placar final, é registrada uma vez para o grupo, enquanto notas e comentários continuam individuais."
+      "Concluído significa que as respostas obrigatórias do item estão registradas — nada além disso. Num jogo de futebol, pode ser só “acompanhei este”; não é preciso tê-lo assistido. Uma resposta que todos compartilham, como o placar final, é registrada uma vez para o grupo, enquanto notas e comentários continuam individuais. Se duas pessoas editarem uma resposta compartilhada ao mesmo tempo, a segunda é avisada e vê o valor mais recente em vez de sobrescrevê-lo.",
+      "As indicações dizem de onde veio um item: um membro, alguém de fora do grupo salvo pelo nome, ou uma nota curta. Cada grupo pode desligá-las por completo. Os itens também podem ter uma agenda opcional — dias inteiros ou um horário exato — que alimenta uma agenda. Um prazo é só um lembrete: nunca impede ninguém de responder."
     ],
     "feedbackNudge": "Tem uma ideia ou algo te incomodou?",
     "feedbackLink": "Conte pra gente."
@@ -1381,5 +1446,194 @@
     "reactivate": "Reativar conta",
     "reactivating": "Reativando…",
     "logout": "Sair"
+  },
+  "libraries": {
+    "tabsLabel": "Bibliotecas",
+    "newLibrary": "Nova biblioteca",
+    "libraryActions": "Opções da biblioteca",
+    "editProperties": "Editar propriedades",
+    "viewProperties": "Ver propriedades",
+    "renameLibrary": "Renomear biblioteca",
+    "emptyLibrary": "{name} está vazia",
+    "source": {
+      "screens": "Screens",
+      "pages": "Pages",
+      "tables": "Tables",
+      "custom": "Biblioteca"
+    },
+    "newTitle": "Nova biblioteca",
+    "newBody": "Uma biblioteca é uma lista de coisas que vocês acompanham juntos — lugares, jogos, partidas, o que quiser. Comece por um modelo ou por uma página em branco.",
+    "startFrom": "Começar de",
+    "blank": "Biblioteca em branco",
+    "blankHint": "Só um nome. Adicione as propriedades que quiser.",
+    "tablesPreset": "Tables",
+    "tablesPresetHint": "Para restaurantes, bares e cafés — já vem com tipo de cozinha, bairro e endereço.",
+    "nameLabel": "Nome",
+    "nameHint": "Como você vai chamar esta biblioteca.",
+    "namePlaceholder": "ex.: Jogos",
+    "nameRequired": "Dê um nome à biblioteca.",
+    "create": "Criar biblioteca",
+    "renameTitle": "Renomear biblioteca",
+    "renameHint": "Só o nome muda — os itens e as propriedades continuam como estão.",
+    "rename": "Renomear",
+    "propertiesTitle": "{name} · propriedades",
+    "propertiesBody": "Renomeie, oculte ou reordene o que cada item desta biblioteca pode guardar. Ocultar uma propriedade mantém o que já foi salvo — ela só deixa de aparecer.",
+    "propertiesReadOnly": "O que cada item desta biblioteca pode guardar.",
+    "loading": "Carregando…",
+    "noProperties": "Ainda sem propriedades",
+    "propertyNameAria": "Nome de {name}",
+    "type": {
+      "text": "Texto",
+      "number": "Número",
+      "date": "Data",
+      "boolean": "Sim ou não"
+    },
+    "builtIn": "padrão",
+    "hidden": "oculta",
+    "moveUp": "Subir",
+    "moveDown": "Descer",
+    "moreActions": "Mais ações",
+    "removeProperty": "Remover propriedade",
+    "propertySaved": "Salvo.",
+    "propertyShown": "Propriedade visível de novo.",
+    "propertyHiddenSaved": "Propriedade oculta. Os valores salvos foram mantidos.",
+    "propertyRemoved": "Propriedade removida.",
+    "propertyAdded": "Propriedade adicionada.",
+    "propertyNameRequired": "Dê um nome à propriedade.",
+    "addPropertyTitle": "Adicionar uma propriedade",
+    "addPropertyHint": "Por exemplo: Cozinha, Placar ou Data do jogo.",
+    "propertyNamePlaceholder": "Nome da propriedade",
+    "propertyNameLabel": "Nome da propriedade",
+    "propertyTypeLabel": "Tipo",
+    "addProperty": "Adicionar",
+    "native": {
+      "title": "Nome",
+      "year": "Ano",
+      "author": "Autor",
+      "main_genre": "Gênero principal",
+      "runtime_minutes": "Duração (minutos)",
+      "page_count": "Páginas"
+    },
+    "tablesStarter": {
+      "cozinha": "Tipo de cozinha",
+      "bairro": "Bairro",
+      "endereco": "Endereço"
+    }
+  },
+  "recommenders": {
+    "label": "Indicado por",
+    "none": "Ninguém em especial",
+    "members": "Membros",
+    "saved": "Nomes salvos",
+    "addOutside": "Alguém de fora do grupo…",
+    "writeNote": "Escrever uma nota…",
+    "outsideHint": "Salve o nome para poder escolher de novo. Ele fica privado a este espaço e nunca aparece num link público.",
+    "namePlaceholder": "Nome da pessoa",
+    "nameLabel": "Nome da pessoa",
+    "nameRequired": "Digite um nome.",
+    "saveName": "Salvar nome",
+    "saving": "Salvando…",
+    "cancel": "Cancelar",
+    "notePlaceholder": "ex.: um blog, um podcast, um amigo de um amigo"
+  },
+  "catalogAdd": {
+    "title": "Adicionar um item",
+    "add": "Adicionar item",
+    "libraryLabel": "Biblioteca",
+    "titleLabel": "Título",
+    "titlePlaceholder": "O que você está adicionando?",
+    "titleRequired": "Digite um título.",
+    "matchesTitle": "Já está nesta biblioteca?",
+    "matchesBody": "Estes têm um título parecido. Use um deles para evitar duplicar — ou continue para criar um item novo.",
+    "matchesAutoTitle": "Parece familiar",
+    "matchesAutoBody": "Screens e Pages reconhecem um título repetido sozinhas, então adicionar de novo só reaproveita — e completa — o que já existe.",
+    "useThis": "Usar este",
+    "orCreateNew": "Se não, preencha o resto e adicione como um item novo.",
+    "loadingProperties": "Carregando os campos…",
+    "editTitle": "Editar item",
+    "saveChanges": "Salvar alterações"
+  },
+  "sharedResponses": {
+    "badge": "Compartilhada",
+    "addShort": "Resposta compartilhada",
+    "addTitle": "Adicionar uma resposta compartilhada",
+    "addBody": "Uma resposta para o grupo inteiro em cada item — um placar final, um veredito combinado. Notas e comentários continuam individuais.",
+    "nameLabel": "Nome da resposta",
+    "nameHint": "Como aparece em cada item, ex.: Placar final.",
+    "namePlaceholder": "Placar final",
+    "nameRequired": "Dê um nome à resposta.",
+    "policyLabel": "Quem pode preencher",
+    "policy": {
+      "members_fill_admin_corrects": "Membros preenchem, admins corrigem",
+      "members_can_edit": "Qualquer participante pode editar"
+    },
+    "policyHint": {
+      "members_fill_admin_corrects": "Quem participa pode preencher uma vez; depois só um admin muda.",
+      "members_can_edit": "Quem participa pode preencher ou mudar. Se duas pessoas salvarem ao mesmo tempo, a segunda é avisada e vê o valor mais recente."
+    },
+    "fieldLabel": "O que é registrado",
+    "fieldHint": "O nome do valor, ex.: Placar.",
+    "fieldPlaceholder": "Placar",
+    "requiredLabel": "Obrigatório",
+    "requiredHint": "Um item não fica concluído até isto ser preenchido.",
+    "add": "Adicionar resposta",
+    "removeTitle": "Remover \"{name}\"",
+    "removeBody": "Esta resposta sai de todos os itens. Só dá para remover enquanto ninguém tiver respondido.",
+    "removeMetricsBody": "Estas métricas leem esta resposta e serão removidas junto:",
+    "removeMetricsPrompt": "Algumas métricas leem esta resposta. Confirme de novo para removê-las também.",
+    "removeWithMetrics": "Remover resposta e métricas",
+    "remove": "Remover resposta",
+    "panelTitle": "Compartilhada com o grupo",
+    "panelBody": "Existe uma única resposta por item, mostrada a todos junto com quem mudou por último.",
+    "policySaved": "Salvo.",
+    "removeHint": "Só dá para remover enquanto ninguém tiver respondido.",
+    "removeLastHint": "Um desafio precisa de pelo menos uma resposta, então esta não pode ser removida.",
+    "removeHintIndividual": "Tire esta resposta do desafio. Só é possível enquanto ninguém tiver respondido."
+  },
+  "sharedAnswers": {
+    "badge": "Compartilhada com o grupo",
+    "policy": {
+      "members_fill_admin_corrects": "Qualquer um preenche uma vez · admins corrigem",
+      "members_can_edit": "Quem participa pode editar"
+    },
+    "lockedByPolicy": "Esta resposta já foi preenchida — só um admin pode corrigi-la.",
+    "conflictShort": "Alguém mudou esta resposta enquanto você editava. A versão mais recente está aparecendo — nada seu foi salvo.",
+    "conflictBody": "{name} mudou esta resposta enquanto você editava, então a sua alteração não foi salva. A versão mais recente está aí — confira e edite de novo se ainda precisar.",
+    "someone": "Alguém",
+    "dismiss": "Dispensar",
+    "lastEdited": "Última alteração de {name} · {when}",
+    "lastEditedAnon": "Última alteração {when}",
+    "notFilled": "Ninguém preencheu isto ainda."
+  },
+  "itemSchedule": {
+    "label": "Agenda",
+    "hint": "Opcional. Aparece na agenda e como lembrete.",
+    "none": "Nenhuma",
+    "noneHint": "Sem datas",
+    "date": "Dias",
+    "dateHint": "Só datas",
+    "datetime": "Data e hora",
+    "datetimeHint": "Momentos exatos",
+    "opens": "Abre",
+    "due": "Prazo",
+    "errOrder": "O prazo não pode ser antes da abertura.",
+    "neverBlocks": "Um prazo nunca impede ninguém de responder — é um lembrete.",
+    "zoneNote": "Horários em {zone}."
+  },
+  "agenda": {
+    "title": "Agenda",
+    "tally": "{count, plural, one {# item com data} other {# itens com datas}}",
+    "bucket": {
+      "open": "Abertos agora",
+      "scheduled": "Em breve",
+      "past_due": "Prazo vencido"
+    },
+    "done": "Concluído",
+    "pastDue": "Vencido"
+  },
+  "itemWindow": {
+    "both": "Abre {opens} · prazo {due}",
+    "opens": "Abre {opens}",
+    "due": "Prazo {due}"
   }
 }
