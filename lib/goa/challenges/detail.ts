@@ -10,6 +10,7 @@ import {
   entryTypesForChallenge,
   primaryEntryType,
   purposeOf,
+  recipeCatalogKind,
   schedulePolicyOf,
   targetPolicyOf,
   usesRoundItems,
@@ -19,6 +20,38 @@ import { generateDailyCheckpoints } from "./items";
 import { recipeCollectsEntryDate } from "./recipes";
 import { metricsForChallenge, resultForChallenge } from "./results";
 import { parseRuleSections, rulesCompatibilityText } from "../domain/rules";
+
+/**
+ * The library this challenge draws its items from: the fixed one for
+ * Cinema/Estante/Library, otherwise whichever its items already belong to.
+ * `null` for a challenge with no library (a habit, or a custom one still empty
+ * of items). A built-in library nobody has saved an item in yet has no row, so
+ * its `id` is null and the client offers it by kind.
+ */
+async function challengeLibrary(
+  client: PoolClient,
+  challengeId: string,
+  groupId: string,
+  recipeKey: string | null,
+) {
+  const kind = recipeCatalogKind(recipeKey)
+    ?? (await oneOrNull<{ kind: string }>(
+      client,
+      `SELECT ci.kind FROM challenge_items it JOIN catalog_items ci ON ci.id = it.catalog_item_id
+        WHERE it.challenge_id = $1 AND it.archived_at IS NULL ORDER BY it.position LIMIT 1`,
+      [challengeId],
+    ))?.kind
+    ?? null;
+  if (!kind) return null;
+  const library = await oneOrNull<{ id: string; kind: string; source: string; label: string | null }>(
+    client,
+    `SELECT id, kind, source, label FROM catalog_libraries
+      WHERE group_id = $1 AND kind = $2 AND archived_at IS NULL`,
+    [groupId, kind],
+  );
+  if (library) return library;
+  return { id: null, kind, source: kind === "book" ? "pages" : "screens", label: null };
+}
 
 function windowStatus(
   challengeStatus: "draft" | "active" | "closed",
@@ -45,6 +78,7 @@ export async function detailItems(
   groupId: string,
   status: ChallengeStatus,
   isPublic = false,
+  recommendationsEnabled = true,
 ) {
   const result = await client.query<{
     id: string; title: string; description: string | null;
@@ -82,7 +116,9 @@ export async function detailItems(
     id: item.id, title: item.title,
     description: item.description, position: item.position,
     checkpointId: item.checkpoint_id ?? null,
-    originNote: item.origin_note ?? null,
+    // A group that turned recommendations off never shows who suggested what —
+    // whatever was recorded before stays stored, just unseen.
+    originNote: recommendationsEnabled ? item.origin_note ?? null : null,
     opensAt: item.opens_at?.toISOString() ?? null, dueAt: item.due_at?.toISOString() ?? null,
     schedulePrecision: item.schedule_precision,
     status: windowStatus(status, item.opens_at, item.due_at),
@@ -97,7 +133,7 @@ export async function detailItems(
           runtimeMinutes: item.catalog_runtime_minutes,
         }
       : null,
-    recommendedBy: item.recommended_by_id
+    recommendedBy: !recommendationsEnabled ? null : item.recommended_by_id
       ? { kind: "member" as const, id: item.recommended_by_id, name: item.recommended_by_name ?? "" }
       : item.recommended_by_external_id && !isPublic
         ? { kind: "external" as const, id: item.recommended_by_external_id, name: item.recommended_by_external_name ?? "" }
@@ -236,7 +272,11 @@ export async function buildChallengeDetail(
   // whether the round also has items. `items` stays overloaded for the
   // single-axis screens: a pure daily round still gets its checkpoints here.
   const checkpoints = await detailCheckpoints(client, challengeId, ch.status);
-  const roundItems = await detailItems(client, challengeId, ch.group_id, ch.status, viewer.userId === null);
+  const library = viewer.userId === null ? null : await challengeLibrary(client, challengeId, ch.group_id, ch.recipe_key);
+  const recommendationsEnabled = (await oneOrNull<{ recommendations_enabled: boolean }>(
+    client, "SELECT recommendations_enabled FROM groups WHERE id = $1", [ch.group_id],
+  ))?.recommendations_enabled ?? true;
+  const roundItems = await detailItems(client, challengeId, ch.group_id, ch.status, viewer.userId === null, recommendationsEnabled);
   const items = submissionMode === "daily" && ch.start_date === null
     ? []
     : roundItems.length
@@ -268,6 +308,8 @@ export async function buildChallengeDetail(
     // The viewer's own name-in-publication consent for this challenge (V1 §12).
     viewerNameConsent: participants.find((row) => row.id === viewer.userId)?.name_consent ?? false,
     fields: primaryFields,
+    library,
+    recommendationsEnabled,
     entryTypes,
     items,
     checkpoints,

@@ -12,6 +12,7 @@ import {
 } from "../catalog";
 import { syncDailyCheckpoints } from "../daily-checkpoints";
 import { seedExpectationType } from "../challenges/entry-types";
+import { resolveItemRecommender } from "../challenges/recommender";
 import { resolveRecipe } from "../challenges/recipes";
 import { writeAudit } from "./audit";
 import { insertField, type ClientField } from "./fields";
@@ -160,7 +161,7 @@ export async function createChallenge(
       const catalogKind = recipe.catalogKindFromBody
         ? typeof body.libraryId !== "string" && recipe.defaultLibrarySource
           ? await findOrCreateLibraryBySource(client, groupId, session.user.id, recipe.defaultLibrarySource)
-          : await resolveItemKind(client, groupId, { libraryId: body.libraryId })
+          : await resolveItemKind(client, groupId, { libraryId: body.libraryId, kind: body.libraryKind })
         : recipe.catalogKind ?? "film";
       const usedKeys = new Set<string>();
       for (let index = 0; index < items.length; index += 1) {
@@ -208,17 +209,8 @@ export async function createChallenge(
           });
         }
 
-        let recommendedBy: string | null = null;
-        if (typeof item.recommendedByUserId === "string" && item.recommendedByUserId) {
-          if (!memberIds.has(item.recommendedByUserId)) {
-            throw new ApiError(400, "invalid_recommender", "Quem indicou precisa ser um membro do grupo.");
-          }
-          recommendedBy = item.recommendedByUserId;
-        }
-        // Free-text provenance for an item nobody in the group recommended.
-        const originNote = typeof item.originNote === "string" && item.originNote.trim()
-          ? item.originNote.trim().slice(0, 200)
-          : null;
+        // A member, a saved outside name or a free-text note — at most one.
+        const recommender = await resolveItemRecommender(client, groupId, item, memberIds);
 
         let itemKey = semanticKey(itemTitle, `item_${index + 1}`);
         for (let suffix = 2; usedKeys.has(itemKey); suffix += 1) {
@@ -228,9 +220,9 @@ export async function createChallenge(
 
         await client.query(
           `INSERT INTO challenge_items
-            (id, challenge_id, entry_type_id, catalog_item_id, recommended_by_user_id, origin_note, semantic_key, title, position, metadata, created_at, updated_at)
-           VALUES ($1,$2,NULL,$3,$4,$5,$6,$7,$8,'{}'::jsonb,now(),now())`,
-          [publicId(), id, catalogItemId, recommendedBy, originNote, itemKey, itemTitle, index],
+            (id, challenge_id, entry_type_id, catalog_item_id, recommended_by_user_id, recommended_by_external_id, origin_note, semantic_key, title, position, metadata, created_at, updated_at)
+           VALUES ($1,$2,NULL,$3,$4,$9,$5,$6,$7,$8,'{}'::jsonb,now(),now())`,
+          [publicId(), id, catalogItemId, recommender.userId, recommender.note, itemKey, itemTitle, index, recommender.externalId],
         );
       }
     }

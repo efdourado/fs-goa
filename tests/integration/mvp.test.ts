@@ -1888,7 +1888,7 @@ test("resposta compartilhada: Done, conclusão e métricas respeitam o escopo, e
     [["individual", null], ["shared", "members_can_edit"]],
     "o detalhe expõe o escopo e a política",
   );
-  const [item1, item2] = before.items.map((item) => item.id);
+  const [item1] = before.items.map((item) => item.id);
   const completed = async (session: typeof owner) =>
     ((await call("GET", "/api/bootstrap", { session })).body as { challenges: Array<{ id: string; completedCount: number; totalCount: number }> })
       .challenges.find((challenge) => challenge.id === cid)!.completedCount;
@@ -2098,10 +2098,35 @@ test("indicação por nome externo (fase 6): reutilizável, exclusiva, isolada p
   const disabled = await call("PATCH", `/api/groups/${gid}`, { session: owner, body: { recommendationsEnabled: false } });
   assert.equal(disabled.response.status, 200, JSON.stringify(disabled.body));
   assert.equal((disabled.body as { recommendationsEnabled: boolean }).recommendationsEnabled, false);
-  const stillThere = await call("GET", `/api/challenges/${cid}`, { session: owner });
+  // …a atribuição continua guardada, só deixa de ser mostrada a qualquer pessoa do grupo
+  const stored = await adminPool.query<{ recommended_by_external_id: string | null }>(
+    "SELECT recommended_by_external_id FROM challenge_items WHERE id = $1", [itemId],
+  );
+  assert.equal(stored.rows[0].recommended_by_external_id, anaId, "a atribuição continua guardada");
+  const hidden = await call("GET", `/api/challenges/${cid}`, { session: owner });
+  assert.equal((hidden.body as { recommendationsEnabled: boolean }).recommendationsEnabled, false);
+  assert.equal((hidden.body as { items: Array<{ recommendedBy: unknown }> }).items[0].recommendedBy, null, "desligado, o nome não é mais mostrado");
+  const hiddenCatalog = await call("GET", `/api/groups/${gid}/catalog`, { session: owner });
   assert.equal(
-    (stillThere.body as { items: Array<{ recommendedBy: { name: string } | null }> }).items[0].recommendedBy?.name, "Ana (RH)",
-    "a atribuição continua guardada",
+    (hiddenCatalog.body as { items: Array<{ title: string; recommendedBy: unknown }> }).items.find((item) => item.title === "Documentário X")?.recommendedBy,
+    null, "nem no acervo",
+  );
+  // e enquanto estiver desligado, também não dá para registrar uma nova indicação
+  const refused = await call("PATCH", `/api/challenges/${cid}/items/${itemId}`, { session: owner, body: { recommendedByExternalId: anaId } });
+  assert.equal(refused.response.status, 409, JSON.stringify(refused.body));
+  assert.equal((refused.body as { error: string }).error, "recommendations_disabled");
+  const refusedNew = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner, body: { recipe: "cinema", title: "Sem indicação", participantIds: [owner.user.id], items: [{ title: "Solaris", originNote: "um blog" }] },
+  });
+  assert.equal(refusedNew.response.status, 409, JSON.stringify(refusedNew.body));
+  // limpar continua permitido, e religar traz tudo de volta
+  const cleared = await call("PATCH", `/api/challenges/${cid}/items/${itemId}`, { session: owner, body: { recommendedByExternalId: "", originNote: "" } });
+  assert.equal(cleared.response.status, 200, JSON.stringify(cleared.body));
+  await call("PATCH", `/api/groups/${gid}`, { session: owner, body: { recommendationsEnabled: true } });
+  const catalogBack = await call("GET", `/api/groups/${gid}/catalog`, { session: owner });
+  assert.equal(
+    (catalogBack.body as { items: Array<{ title: string; recommendedBy: { name: string } | null }> }).items.find((item) => item.title === "Documentário X")?.recommendedBy?.name,
+    "Ana (RH)", "religado, a indicação do acervo volta",
   );
 });
 
@@ -6589,4 +6614,142 @@ test("lixeira pessoal: mostra o desafio pessoal binado e um fantasma pré-regist
     session: owner, body: { recipe: "cinema", title: "Maratona C", startsOn: null, endsOn: null, items: [{ title: "F3" }] },
   });
   assert.equal(stillWorks.response.status, 201, "o fantasma não conta para o limite do espaço pessoal");
+});
+
+test("indicações em itens novos: nome salvo na criação e na adição, isolado por espaço, e o acervo de filme guarda a primeira indicação", async () => {
+  const owner = await register("Dora", "dora_indica");
+  const other = await register("Enzo", "enzo_indica");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Sessão da Tarde" } })).body as { id: string }).id;
+  const otherGid = ((await call("POST", "/api/groups", { session: other, body: { name: "Outro" } })).body as { id: string }).id;
+  const ana = ((await call("POST", `/api/groups/${gid}/catalog/recommenders`, { session: owner, body: { displayName: "Ana" } })).body as { id: string }).id;
+  const foreign = ((await call("POST", `/api/groups/${otherGid}/catalog/recommenders`, { session: other, body: { displayName: "Alheia" } })).body as { id: string }).id;
+
+  const boot = await call("GET", "/api/bootstrap", { session: owner });
+  assert.equal(
+    (boot.body as { groups: Array<{ id: string; recommendationsEnabled: boolean }> }).groups.find((group) => group.id === gid)?.recommendationsEnabled,
+    true, "o bootstrap diz se o grupo usa indicações",
+  );
+
+  // na criação: um nome salvo por item, no mesmo lugar em que um membro ou uma nota já cabiam
+  const created = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "cinema", title: "Indicados", participantIds: [owner.user.id],
+      items: [{ title: "Aftersun", recommendedByExternalId: ana }, { title: "Solaris", originNote: "um blog" }, { title: "Stalker" }],
+    },
+  });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const cid = (created.body as { id: string }).id;
+  const detail = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as {
+    items: Array<{ title: string; recommendedBy: { kind: string; name: string } | null; originNote: string | null }>;
+  };
+  const byTitle = new Map(detail.items.map((item) => [item.title, item]));
+  assert.deepEqual(byTitle.get("Aftersun")?.recommendedBy, { kind: "external", id: ana, name: "Ana" });
+  assert.equal(byTitle.get("Solaris")?.originNote, "um blog");
+  assert.equal(byTitle.get("Stalker")?.recommendedBy, null);
+
+  // nome de outro espaço, ou duas origens de uma vez: recusado, e nada é criado pela metade
+  const crossWorkspace = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner, body: { recipe: "cinema", title: "Alheio", participantIds: [owner.user.id], items: [{ title: "X", recommendedByExternalId: foreign }] },
+  });
+  assert.equal(crossWorkspace.response.status, 400, JSON.stringify(crossWorkspace.body));
+  const both = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner, body: { recipe: "cinema", title: "Duas", participantIds: [owner.user.id], items: [{ title: "X", recommendedByExternalId: ana, originNote: "e um blog" }] },
+  });
+  assert.equal(both.response.status, 400, JSON.stringify(both.body));
+
+  // adicionando depois, em lote e um a um
+  const batch = await call("POST", `/api/challenges/${cid}/items`, { session: owner, body: { items: [{ title: "Nostalgia", recommendedByExternalId: ana }] } });
+  assert.equal(batch.response.status, 201, JSON.stringify(batch.body));
+  const single = await call("POST", `/api/challenges/${cid}/items`, { session: owner, body: { title: "Espelho", recommendedByExternalId: ana } });
+  assert.equal(single.response.status, 201, JSON.stringify(single.body));
+  const later = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { items: Array<{ title: string; recommendedBy: { name: string } | null }> };
+  assert.equal(later.items.find((item) => item.title === "Nostalgia")?.recommendedBy?.name, "Ana");
+  assert.equal(later.items.find((item) => item.title === "Espelho")?.recommendedBy?.name, "Ana");
+
+  // acervo de filme: a primeira indicação fica; uma segunda adição do mesmo título não a sobrescreve
+  const first = await call("POST", `/api/groups/${gid}/catalog/items`, {
+    session: owner, body: { kind: "film", title: "Persona", catalogRecommendedByUserId: owner.user.id },
+  });
+  assert.equal(first.response.status, 201, JSON.stringify(first.body));
+  const again = await call("POST", `/api/groups/${gid}/catalog/items`, {
+    session: owner, body: { kind: "film", title: "Persona", catalogRecommendedByExternalId: ana },
+  });
+  assert.equal(again.response.status, 201, JSON.stringify(again.body));
+  assert.equal((again.body as { id: string }).id, (first.body as { id: string }).id, "filme repetido reaproveita o mesmo item");
+  const personaId = (first.body as { id: string }).id;
+  const item = (await call("GET", `/api/groups/${gid}/catalog/${personaId}`, { session: owner })).body as {
+    recommendedBy: { kind: string; name: string } | null; originNote: string | null;
+  };
+  assert.equal(item.recommendedBy?.kind, "member", "o detalhe do item do acervo mostra quem indicou");
+  assert.equal(item.recommendedBy?.name, "Dora");
+});
+
+test("desafio traz a biblioteca de onde vêm os itens, e a regra de preenchimento de uma resposta compartilhada muda depois", async () => {
+  const owner = await register("Fábio", "fabio_biblio");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Rolê" } })).body as { id: string }).id;
+
+  const cinema = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner, body: { recipe: "cinema", title: "Filmes", participantIds: [owner.user.id], items: [{ title: "Aftersun" }] },
+  });
+  const cinemaId = (cinema.body as { id: string }).id;
+  const cinemaDetail = (await call("GET", `/api/challenges/${cinemaId}`, { session: owner })).body as {
+    library: { id: string | null; kind: string; source: string } | null; recommendationsEnabled: boolean;
+  };
+  assert.equal(cinemaDetail.library?.kind, "film");
+  assert.equal(cinemaDetail.library?.source, "screens");
+  assert.equal(cinemaDetail.recommendationsEnabled, true);
+
+  const tables = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner, body: { recipe: "tables", title: "Onde comer", participantIds: [owner.user.id], items: [{ title: "Cantina do Zé" }] },
+  });
+  const tablesId = (tables.body as { id: string }).id;
+  const tablesDetail = (await call("GET", `/api/challenges/${tablesId}`, { session: owner })).body as { library: { id: string; source: string; kind: string } | null };
+  assert.equal(tablesDetail.library?.source, "tables");
+  assert.ok(tablesDetail.library?.id, "a biblioteca Tables nasceu junto com o desafio");
+
+  // um hábito não tem biblioteca nenhuma
+  const habit = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner, body: { recipe: "habit", title: "Estudo", participantIds: [owner.user.id] },
+  });
+  const habitDetail = (await call("GET", `/api/challenges/${(habit.body as { id: string }).id}`, { session: owner })).body as { library: unknown };
+  assert.equal(habitDetail.library, null);
+
+  // o modelo público nunca expõe a biblioteca do grupo de origem
+  const admin = await register("Curador", "curador_biblio");
+  await adminPool.query("UPDATE users SET platform_admin = true WHERE id = $1", [admin.user.id]);
+  const platform = await login("curador_biblio");
+  const pgid = ((await call("POST", "/api/groups", { session: platform, body: { name: "Modelos" } })).body as { id: string }).id;
+  const source = await call("POST", `/api/groups/${pgid}/challenges`, {
+    session: platform, body: { recipe: "cinema", title: "Modelo", participantIds: [platform.user.id], items: [{ title: "Solaris" }] },
+  });
+  const sourceId = (source.body as { id: string }).id;
+  assert.equal((await call("POST", `/api/challenges/${sourceId}/template`, { session: platform, body: {} })).response.status, 200);
+  const preview = (await call("GET", `/api/templates/${sourceId}`)).body as { library: unknown };
+  assert.equal(preview.library, null);
+
+  // a regra de quem preenche muda depois de criada — só numa resposta compartilhada
+  const shared = await call("POST", `/api/challenges/${cinemaId}/entry-types`, {
+    session: owner, body: { name: "Placar", sharedEditPolicy: "members_fill_admin_corrects", field: { key: "placar", label: "Placar", type: "number", required: true } },
+  });
+  assert.equal(shared.response.status, 201, JSON.stringify(shared.body));
+  const sharedId = (shared.body as { id: string }).id;
+  const changed = await call("PATCH", `/api/challenges/${cinemaId}/entry-types/${sharedId}`, { session: owner, body: { sharedEditPolicy: "members_can_edit" } });
+  assert.equal(changed.response.status, 200, JSON.stringify(changed.body));
+  assert.equal((changed.body as { sharedEditPolicy: string }).sharedEditPolicy, "members_can_edit");
+  const after = (await call("GET", `/api/challenges/${cinemaId}`, { session: owner })).body as { entryTypes: Array<{ id: string; sharedEditPolicy: string | null }> };
+  assert.equal(after.entryTypes.find((type) => type.id === sharedId)?.sharedEditPolicy, "members_can_edit");
+  const audit = await adminPool.query("SELECT 1 FROM audit_events WHERE action = 'entry_type.shared_edit_policy_changed' AND entity_id = $1", [sharedId]);
+  assert.equal(audit.rowCount, 1, "a mudança de regra fica no histórico");
+
+  assert.equal((await call("PATCH", `/api/challenges/${cinemaId}/entry-types/${sharedId}`, { session: owner, body: { sharedEditPolicy: "qualquer" } })).response.status, 400);
+  const typesNow = (await call("GET", `/api/challenges/${cinemaId}`, { session: owner })).body as { entryTypes: Array<{ id: string; answerScope: string }> };
+  const individual = typesNow.entryTypes.find((type) => type.answerScope === "individual")!;
+  const notShared = await call("PATCH", `/api/challenges/${cinemaId}/entry-types/${individual.id}`, { session: owner, body: { sharedEditPolicy: "members_can_edit" } });
+  assert.equal(notShared.response.status, 409, JSON.stringify(notShared.body));
+  assert.equal((notShared.body as { error: string }).error, "not_shared");
+  // a visibilidade continua funcionando sozinha, como antes
+  const visibility = await call("PATCH", `/api/challenges/${cinemaId}/entry-types/${individual.id}`, { session: owner, body: { visibilityPolicy: "after_own" } });
+  assert.equal(visibility.response.status, 200, JSON.stringify(visibility.body));
+  assert.deepEqual(visibility.body, { id: individual.id, visibilityPolicy: "after_own" });
 });

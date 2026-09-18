@@ -148,9 +148,11 @@ export async function entryTypeById(
 }
 
 /**
- * Owner/admin sets who sees other participants' answers of one entry type.
- * A safe, non-destructive change — allowed while the round is active — but
- * blocked once it is closed and frozen.
+ * Owner/admin changes how one entry type behaves once it exists: who sees other
+ * participants' answers (`visibilityPolicy`) and, for a shared answer, who may
+ * fill or correct it (`sharedEditPolicy`). Either or both in one call. Safe and
+ * non-destructive — allowed while the round is active — but blocked once it is
+ * closed and frozen.
  */
 export async function updateEntryTypeVisibility(
   session: SessionContext,
@@ -158,8 +160,16 @@ export async function updateEntryTypeVisibility(
   entryTypeId: string,
   body: Record<string, unknown>,
 ) {
-  if (!isVisibilityPolicy(body.visibilityPolicy)) {
+  const wantsVisibility = body.visibilityPolicy !== undefined;
+  const wantsEditPolicy = body.sharedEditPolicy !== undefined;
+  if (!wantsVisibility && !wantsEditPolicy) {
     throw new ApiError(400, "invalid_visibility", "Política de visibilidade inválida.");
+  }
+  if (wantsVisibility && !isVisibilityPolicy(body.visibilityPolicy)) {
+    throw new ApiError(400, "invalid_visibility", "Política de visibilidade inválida.");
+  }
+  if (wantsEditPolicy && body.sharedEditPolicy !== "members_fill_admin_corrects" && body.sharedEditPolicy !== "members_can_edit") {
+    throw new ApiError(400, "invalid_shared_edit_policy", "Escolha quem pode preencher ou corrigir a resposta compartilhada.");
   }
   return inTransaction(async (client) => {
     const access = await challengeAccess(session.user.id, challengeId, client, true);
@@ -167,24 +177,43 @@ export async function updateEntryTypeVisibility(
     if (access.challenge.status === "closed") {
       throw new ApiError(409, "challenge_closed", "Um desafio encerrado fica congelado.");
     }
-    const type = await oneOrNull<{ visibility_policy: string; name: string }>(
+    const type = await oneOrNull<{
+      visibility_policy: string; name: string; answer_scope: AnswerScope; shared_edit_policy: SharedEditPolicy | null;
+    }>(
       client,
-      "SELECT visibility_policy, name FROM entry_types WHERE id = $1 AND challenge_id = $2 AND archived_at IS NULL FOR UPDATE",
+      `SELECT visibility_policy, name, answer_scope, shared_edit_policy
+         FROM entry_types WHERE id = $1 AND challenge_id = $2 AND archived_at IS NULL FOR UPDATE`,
       [entryTypeId, challengeId],
     );
     if (!type) throw new ApiError(404, "not_found", "Tipo de registro não encontrado.");
-    if (type.visibility_policy !== body.visibilityPolicy) {
+    if (wantsEditPolicy && type.answer_scope !== "shared") {
+      throw new ApiError(409, "not_shared", "Só uma resposta compartilhada tem regra de quem pode preencher ou corrigir.");
+    }
+    const visibilityPolicy = wantsVisibility ? (body.visibilityPolicy as VisibilityPolicy) : (type.visibility_policy as VisibilityPolicy);
+    const sharedEditPolicy = wantsEditPolicy ? (body.sharedEditPolicy as SharedEditPolicy) : type.shared_edit_policy;
+    if (visibilityPolicy !== type.visibility_policy) {
       await client.query(
         "UPDATE entry_types SET visibility_policy = $3, updated_at = now() WHERE id = $1 AND challenge_id = $2",
-        [entryTypeId, challengeId, body.visibilityPolicy],
+        [entryTypeId, challengeId, visibilityPolicy],
       );
       await writeAudit(
         client, access.challenge.group_id, challengeId, session.user.id,
         "entry_type.visibility_changed", "entry_type", entryTypeId,
-        { visibilityPolicy: type.visibility_policy }, { visibilityPolicy: body.visibilityPolicy },
+        { visibilityPolicy: type.visibility_policy }, { visibilityPolicy },
       );
     }
-    return { id: entryTypeId, visibilityPolicy: body.visibilityPolicy };
+    if (sharedEditPolicy !== type.shared_edit_policy) {
+      await client.query(
+        "UPDATE entry_types SET shared_edit_policy = $3, updated_at = now() WHERE id = $1 AND challenge_id = $2",
+        [entryTypeId, challengeId, sharedEditPolicy],
+      );
+      await writeAudit(
+        client, access.challenge.group_id, challengeId, session.user.id,
+        "entry_type.shared_edit_policy_changed", "entry_type", entryTypeId,
+        { sharedEditPolicy: type.shared_edit_policy }, { sharedEditPolicy },
+      );
+    }
+    return { id: entryTypeId, visibilityPolicy, ...(type.answer_scope === "shared" ? { sharedEditPolicy } : {}) };
   });
 }
 
@@ -294,9 +323,9 @@ export async function setExpectationEnabled(
 
 /**
  * Adds a new shared-scope response: one field with a single value for the
- * whole item, not one per participant (Phase 4 of docs/flexible-catalogs.md —
- * "Final score: shared", say, kept separate from an individual "Comment"
- * type). Additive and non-destructive, so it's allowed any time the
+ * whole item, not one per participant ("Final score: shared", say, kept
+ * separate from an individual "Comment" type). Additive and non-destructive,
+ * so it's allowed any time the
  * challenge isn't closed, same as other structural additions.
  */
 export async function addSharedResponseType(

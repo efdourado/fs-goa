@@ -286,10 +286,33 @@ export async function addCatalogItem(
   client: PoolClient,
   groupId: string,
   userId: string,
-  input: { kind: string; title: string; useExistingId?: string; attributes?: unknown } & CatalogAttributes,
+  input: {
+    kind: string; title: string; useExistingId?: string; attributes?: unknown;
+    catalogRecommendedByUserId?: unknown; catalogRecommendedByExternalId?: unknown; catalogOriginNote?: unknown;
+  } & CatalogAttributes,
 ): Promise<{ id: string }> {
   if (input.kind === "film" || input.kind === "book") {
-    return { id: await upsertCatalogItem(client, groupId, userId, { ...input, kind: input.kind }) };
+    const id = await upsertCatalogItem(client, groupId, userId, { ...input, kind: input.kind });
+    const named = input.catalogRecommendedByUserId !== undefined || input.catalogRecommendedByExternalId !== undefined
+      || input.catalogOriginNote !== undefined;
+    if (named) {
+      // Same "never overwrite what's already set" rule the auto-match applies to
+      // every other attribute: a title that already has a recommender keeps it.
+      const current = await oneOrNull<{ set: boolean }>(
+        client,
+        `SELECT (recommended_by_user_id IS NOT NULL OR recommended_by_external_id IS NOT NULL OR origin_note IS NOT NULL) AS set
+           FROM catalog_items WHERE id = $1`,
+        [id],
+      );
+      if (!current?.set) {
+        await applyCatalogItemUpdate(client, id, groupId, {
+          catalogRecommendedByUserId: input.catalogRecommendedByUserId,
+          catalogRecommendedByExternalId: input.catalogRecommendedByExternalId,
+          catalogOriginNote: input.catalogOriginNote,
+        });
+      }
+    }
+    return { id };
   }
   if (input.useExistingId) {
     await assertCatalogItemInGroup(client, input.useExistingId, groupId, input.kind);
@@ -351,11 +374,14 @@ async function listCatalogWithClient(client: PoolClient, workspaceId: string) {
     `SELECT ci.id, ci.kind, ci.title, ci.author, ci.year, ci.main_genre, ci.page_count, ci.runtime_minutes,
               (SELECT count(DISTINCT it.challenge_id)::int FROM challenge_items it WHERE it.catalog_item_id = ci.id) AS round_count,
               agg.rating_avg, coalesce(agg.rating_count, 0)::int AS rating_count,
-              ci.recommended_by_user_id, ru.display_name AS recommended_by_user_name,
+              CASE WHEN active_rec.user_id IS NOT NULL THEN ci.recommended_by_user_id END AS recommended_by_user_id,
+              CASE WHEN active_rec.user_id IS NOT NULL THEN ru.display_name END AS recommended_by_user_name,
               ci.recommended_by_external_id, cr.display_name AS recommended_by_external_name,
               ci.origin_note
          FROM catalog_items ci
          LEFT JOIN users ru ON ru.id = ci.recommended_by_user_id
+         LEFT JOIN group_members active_rec ON active_rec.group_id = ci.group_id
+          AND active_rec.user_id = ci.recommended_by_user_id AND active_rec.removed_at IS NULL
          LEFT JOIN catalog_recommenders cr ON cr.id = ci.recommended_by_external_id
          LEFT JOIN LATERAL (
            SELECT avg(ev.number_scaled::float8 / (10 ^ f.number_scale)) AS rating_avg,
@@ -373,6 +399,7 @@ async function listCatalogWithClient(client: PoolClient, workspaceId: string) {
     [workspaceId],
   );
   const attributesByItem = await attributeValuesForItems(client, items.rows.map((item) => item.id));
+  const showRecommenders = await recommendationsVisible(client, workspaceId);
   return {
     items: items.rows.map((item) => ({
       id: item.id,
@@ -384,12 +411,12 @@ async function listCatalogWithClient(client: PoolClient, workspaceId: string) {
       pageCount: item.page_count,
       runtimeMinutes: item.runtime_minutes,
       roundCount: item.round_count,
-      recommendedBy: item.recommended_by_user_id
+      recommendedBy: !showRecommenders ? null : item.recommended_by_user_id
         ? { kind: "member" as const, id: item.recommended_by_user_id, name: item.recommended_by_user_name ?? "" }
         : item.recommended_by_external_id
           ? { kind: "external" as const, id: item.recommended_by_external_id, name: item.recommended_by_external_name ?? "" }
           : null,
-      originNote: item.origin_note,
+      originNote: showRecommenders ? item.origin_note : null,
       ratingAvg: item.rating_avg === null ? null : Number(item.rating_avg.toFixed(2)),
       ratingCount: item.rating_count,
       attributes: attributesByItem.get(item.id) ?? [],
@@ -410,10 +437,20 @@ async function catalogItemDetailWithClient(
   const item = await oneOrNull<{
     id: string; kind: string; title: string; author: string | null;
     year: number | null; main_genre: string | null; page_count: number | null; runtime_minutes: number | null;
+    recommended_by_user_id: string | null; recommended_by_user_name: string | null;
+    recommended_by_external_id: string | null; recommended_by_external_name: string | null; origin_note: string | null;
   }>(
     client,
-    `SELECT id, kind, title, author, year, main_genre, page_count, runtime_minutes
-         FROM catalog_items WHERE id = $1 AND group_id = $2 AND archived_at IS NULL`,
+    `SELECT ci.id, ci.kind, ci.title, ci.author, ci.year, ci.main_genre, ci.page_count, ci.runtime_minutes,
+            CASE WHEN active_rec.user_id IS NOT NULL THEN ci.recommended_by_user_id END AS recommended_by_user_id,
+            CASE WHEN active_rec.user_id IS NOT NULL THEN ru.display_name END AS recommended_by_user_name,
+            ci.recommended_by_external_id, cr.display_name AS recommended_by_external_name, ci.origin_note
+         FROM catalog_items ci
+         LEFT JOIN users ru ON ru.id = ci.recommended_by_user_id
+         LEFT JOIN group_members active_rec ON active_rec.group_id = ci.group_id
+          AND active_rec.user_id = ci.recommended_by_user_id AND active_rec.removed_at IS NULL
+         LEFT JOIN catalog_recommenders cr ON cr.id = ci.recommended_by_external_id
+        WHERE ci.id = $1 AND ci.group_id = $2 AND ci.archived_at IS NULL`,
     [catalogItemId, workspaceId],
   );
   if (!item) throw new ApiError(404, "not_found", "Item do acervo não encontrado.");
@@ -448,6 +485,7 @@ async function catalogItemDetailWithClient(
   );
 
   const attributes = (await attributeValuesForItems(client, [item.id])).get(item.id) ?? [];
+  const showRecommenders = await recommendationsVisible(client, workspaceId);
   // The group's overall rating for this item, across every round — a true
   // weighted average (avg*count sums back to each round's total, so summing
   // those and dividing by the total count is exact, not an average of averages).
@@ -465,6 +503,12 @@ async function catalogItemDetailWithClient(
     mainGenre: item.main_genre,
     pageCount: item.page_count,
     runtimeMinutes: item.runtime_minutes,
+    recommendedBy: !showRecommenders ? null : item.recommended_by_user_id
+      ? { kind: "member" as const, id: item.recommended_by_user_id, name: item.recommended_by_user_name ?? "" }
+      : item.recommended_by_external_id
+        ? { kind: "external" as const, id: item.recommended_by_external_id, name: item.recommended_by_external_name ?? "" }
+        : null,
+    originNote: showRecommenders ? item.origin_note : null,
     ratingAvg,
     ratingCount: totalRatings,
     attributes,
@@ -807,6 +851,8 @@ export interface LibraryProperty {
   hidden: boolean;
   position: number;
   canHide: boolean;
+  /** Custom properties only: the stable key an item's saved value is stored under. */
+  attributeKey?: string;
 }
 
 async function listLibraryPropertiesWithClient(
@@ -834,7 +880,7 @@ async function listLibraryPropertiesWithClient(
     }),
     ...defs.map((def) => ({
       key: def.id, storage: "attribute" as const, label: def.label, type: def.type,
-      hidden: def.hidden, position: def.position + 10, canHide: true, sort: def.position + 10,
+      hidden: def.hidden, position: def.position + 10, canHide: true, sort: def.position + 10, attributeKey: def.key,
     })),
   ];
   return properties.sort((a, b) => a.sort - b.sort).map(({ sort, ...property }) => { void sort; return property; });
@@ -1049,10 +1095,32 @@ export async function renameCatalogRecommender(session: SessionContext, recommen
 
 /**
  * Validates an external recommender id against the workspace — the same
- * scoping guarantee `resolveRecommender` (items.ts) gives a member id, so a
+ * scoping guarantee `resolveItemRecommender` (challenges/recommender.ts) gives a member id, so a
  * challenge item or catalog item can never point at another workspace's
  * saved name.
  */
+/** Whether "who recommended it" may be shown for this workspace — false once its group switched recommendations off. */
+async function recommendationsVisible(client: PoolClient, workspaceId: string): Promise<boolean> {
+  const group = await oneOrNull<{ recommendations_enabled: boolean }>(
+    client, "SELECT recommendations_enabled FROM groups WHERE id = $1", [workspaceId],
+  );
+  return group?.recommendations_enabled ?? true;
+}
+
+/**
+ * A group can switch recommendations off ("who suggested this?" is then never
+ * asked or shown). Turning an existing recommender back to "nobody" is always
+ * allowed; only *setting* one is refused while the switch is off.
+ */
+export async function assertRecommendationsAllowed(client: PoolClient, groupId: string): Promise<void> {
+  const group = await oneOrNull<{ recommendations_enabled: boolean }>(
+    client, "SELECT recommendations_enabled FROM groups WHERE id = $1", [groupId],
+  );
+  if (group && !group.recommendations_enabled) {
+    throw new ApiError(409, "recommendations_disabled", "Este grupo desativou as indicações — ative-as nas configurações do grupo para registrar quem indicou.");
+  }
+}
+
 export async function assertRecommenderInGroup(client: PoolClient, recommenderId: string, groupId: string): Promise<void> {
   const row = await oneOrNull<{ id: string }>(
     client,
@@ -1109,6 +1177,7 @@ export async function applyCatalogItemUpdate(
     if ([wantedUser, wantedExternal, wantedNote].filter(Boolean).length > 1) {
       throw new ApiError(400, "invalid_recommender", "Escolha apenas uma origem: membro, nome salvo ou nota — não mais de uma.");
     }
+    if (wantedUser || wantedExternal || wantedNote) await assertRecommendationsAllowed(client, groupId);
     let recommendedByUserId: string | null = null;
     let recommendedByExternalId: string | null = null;
     let originNote: string | null = null;

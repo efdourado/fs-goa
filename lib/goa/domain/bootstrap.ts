@@ -38,8 +38,9 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
       kind: "standard" | "personal";
       role: GroupRole;
       member_count: number;
+      recommendations_enabled: boolean;
     }>(
-      `SELECT g.id, g.name, g.description, g.kind, gm.role,
+      `SELECT g.id, g.name, g.description, g.kind, g.recommendations_enabled, gm.role,
               count(active_members.user_id)::int AS member_count
          FROM groups g
          JOIN group_members gm ON gm.group_id = g.id
@@ -228,6 +229,7 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
         kind: group.kind,
         role: group.role,
         memberCount: group.member_count,
+        recommendationsEnabled: group.recommendations_enabled,
         members: membersByGroup.get(group.id) ?? [],
         pendingRequests: pendingByGroup.get(group.id) ?? [],
       })),

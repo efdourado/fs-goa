@@ -14,12 +14,14 @@ import { ApiError, stringValue } from "../../http";
 import {
   applyCatalogItemUpdate,
   assertCatalogItemInGroup,
+  assertRecommendationsAllowed,
   assertRecommenderInGroup,
   createCatalogItem,
   resolveItemKind,
   upsertCatalogItem,
 } from "../catalog";
 import { midnightInTimeZone } from "../domain/shared";
+import { resolveItemRecommender } from "./recommender";
 import { isRecipeKey, RECIPES } from "./recipes";
 import { syncDailyCheckpoints } from "../daily-checkpoints";
 import {
@@ -193,7 +195,7 @@ export async function addChallengeItem(
     }
     const position = integerValue(body.position, 0, 0, 10_000);
     const checkpointId = await resolveCheckpointId(client, challengeId, body.checkpointId);
-    const recommendedBy = await resolveRecommender(client, access.challenge.group_id, body.recommendedByUserId);
+    const recommender = await resolveItemRecommender(client, access.challenge.group_id, { ...body, originNote });
     const id = publicId();
     let catalogItemId: string;
     if (typeof body.catalogItemId === "string" && body.catalogItemId) {
@@ -207,34 +209,15 @@ export async function addChallengeItem(
     }
     await client.query(
       `INSERT INTO challenge_items
-        (id, challenge_id, entry_type_id, catalog_item_id, recommended_by_user_id, checkpoint_id, origin_note, semantic_key, title, description, position, metadata, created_at, updated_at)
-       VALUES ($1,$2,NULL,$3,$4,$5,$6,$7,$8,$9,$10,'{}'::jsonb,now(),now())`,
-      [id, challengeId, catalogItemId, recommendedBy, checkpointId, originNote,
-        await uniqueItemKey(client, challengeId, body.key ?? title, position), title, description, position],
+        (id, challenge_id, entry_type_id, catalog_item_id, recommended_by_user_id, recommended_by_external_id, checkpoint_id, origin_note, semantic_key, title, description, position, metadata, created_at, updated_at)
+       VALUES ($1,$2,NULL,$3,$4,$11,$5,$6,$7,$8,$9,$10,'{}'::jsonb,now(),now())`,
+      [id, challengeId, catalogItemId, recommender.userId, checkpointId, recommender.note,
+        await uniqueItemKey(client, challengeId, body.key ?? title, position), title, description, position, recommender.externalId],
     );
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
       "item.created", "challenge_item", id, null, { title });
     return { id, title, position };
   });
-}
-
-/** Validates a recommender id against the group's active membership. */
-async function resolveRecommender(
-  client: PoolClient,
-  groupId: string,
-  raw: unknown,
-): Promise<string | null> {
-  if (typeof raw !== "string" || !raw) return null;
-  const row = await oneOrNull<{ user_id: string }>(
-    client,
-    `SELECT gm.user_id
-       FROM group_members gm JOIN groups g ON g.id = gm.group_id
-      WHERE gm.group_id = $1 AND gm.user_id = $2 AND gm.removed_at IS NULL
-        AND (g.kind = 'standard' OR gm.user_id = g.owner_user_id)`,
-    [groupId, raw],
-  );
-  if (!row) throw new ApiError(400, "invalid_recommender", "Quem indicou precisa ser um membro do grupo.");
-  return row.user_id;
 }
 
 export async function saveChallengeItems(
@@ -319,18 +302,9 @@ export async function saveChallengeItems(
           pageCount: item.pageCount, runtimeMinutes: item.runtimeMinutes, attributes: item.attributes,
         });
       }
-      let recommendedBy: string | null = null;
-      if (typeof item.recommendedByUserId === "string" && item.recommendedByUserId) {
-        if (!memberIds.has(item.recommendedByUserId)) {
-          throw new ApiError(400, "invalid_recommender", "Quem indicou precisa ser um membro do grupo.");
-        }
-        recommendedBy = item.recommendedByUserId;
-      }
-      // An item can carry a participant recommender OR a free-text origin, never
-      // a fake participant. Both may be absent.
-      const originNote = typeof item.originNote === "string" && item.originNote.trim()
-        ? item.originNote.trim().slice(0, 200)
-        : null;
+      // A member, a saved outside name, or a free-text note — never a made-up
+      // participant, never more than one. All may be absent.
+      const recommender = await resolveItemRecommender(client, access.challenge.group_id, item, memberIds);
       let checkpointId: string | null = null;
       if (typeof item.checkpointId === "string" && item.checkpointId) {
         if (!validCheckpointIds.has(item.checkpointId)) {
@@ -341,11 +315,11 @@ export async function saveChallengeItems(
 
       await client.query(
         `INSERT INTO challenge_items
-          (id,challenge_id,entry_type_id,catalog_item_id,recommended_by_user_id,checkpoint_id,origin_note,semantic_key,title,description,position,metadata,created_at,updated_at)
-         VALUES ($1,$2,NULL,$3,$4,$5,$6,$7,$8,$9,$10,'{}'::jsonb,now(),now())`,
-        [id, challengeId, catalogItemId, recommendedBy, checkpointId, originNote,
+          (id,challenge_id,entry_type_id,catalog_item_id,recommended_by_user_id,recommended_by_external_id,checkpoint_id,origin_note,semantic_key,title,description,position,metadata,created_at,updated_at)
+         VALUES ($1,$2,NULL,$3,$4,$11,$5,$6,$7,$8,$9,$10,'{}'::jsonb,now(),now())`,
+        [id, challengeId, catalogItemId, recommender.userId, checkpointId, recommender.note,
           await uniqueItemKey(client, challengeId, item.key ?? title, position), title,
-          typeof item.description === "string" ? item.description.trim() || null : null, position],
+          typeof item.description === "string" ? item.description.trim() || null : null, position, recommender.externalId],
       );
       ids.push(id);
     }
@@ -461,6 +435,7 @@ export async function updateChallengeItem(
         if ([wantedUser, wantedExternal, wantedNote].filter(Boolean).length > 1) {
           throw new ApiError(400, "invalid_recommender", "Escolha apenas uma origem: um membro, um nome salvo ou uma nota — não mais de uma.");
         }
+        if (wantedUser || wantedExternal || wantedNote) await assertRecommendationsAllowed(client, access.challenge.group_id);
         recommendedBy = null;
         recommendedByExternal = null;
         originNote = null;
