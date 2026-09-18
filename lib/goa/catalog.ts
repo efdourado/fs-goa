@@ -651,6 +651,44 @@ async function insertLibrary(
   return { id, kind, source: source as CatalogLibrary["source"], label, position };
 }
 
+/**
+ * The workspace's library of a given starting config, created on first use — so
+ * a preset (Tables) works from a blank workspace without a separate "create the
+ * library" step. Returns its opaque `kind`. Never touches an existing library's
+ * name or properties.
+ */
+export async function findOrCreateLibraryBySource(
+  client: PoolClient,
+  groupId: string,
+  userId: string,
+  source: "tables",
+): Promise<string> {
+  const existing = await oneOrNull<{ kind: string }>(
+    client,
+    `SELECT kind FROM catalog_libraries
+      WHERE group_id = $1 AND source = $2 AND archived_at IS NULL
+      ORDER BY position, created_at LIMIT 1`,
+    [groupId, source],
+  );
+  if (existing) return existing.kind;
+  // No stored label: the app shows the locale-aware default for `source` until
+  // someone renames it (same as the migrated Screens/Pages libraries).
+  const kind = `lib_${crypto.randomUUID().replace(/-/g, "")}`;
+  const positionRow = await oneOrNull<{ position: number }>(
+    client,
+    "SELECT coalesce(max(position), -1)::int + 1 AS position FROM catalog_libraries WHERE group_id = $1",
+    [groupId],
+  );
+  const id = publicId();
+  await client.query(
+    `INSERT INTO catalog_libraries (id, group_id, kind, source, label, position, created_by_user_id, created_at, updated_at)
+     VALUES ($1,$2,$3,$4,NULL,$5,$6,now(),now())`,
+    [id, groupId, kind, source, positionRow?.position ?? 0, userId],
+  );
+  await writeAudit(client, groupId, null, userId, "catalog.library_created", "catalog_library", id, null, { label: null, source });
+  return kind;
+}
+
 async function renameLibraryWithClient(
   client: PoolClient,
   actorUserId: string,

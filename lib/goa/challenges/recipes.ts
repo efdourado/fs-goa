@@ -63,6 +63,12 @@ export interface Recipe {
    * other recipe keeps drawing from its fixed `catalogKind` exactly as before.
    */
   catalogKindFromBody?: boolean;
+  /**
+   * With `catalogKindFromBody`, a request that names no `libraryId` gets the
+   * workspace's library of this starting config instead — created on first use
+   * — so a preset like Tables works from a blank workspace.
+   */
+  defaultLibrarySource?: "tables";
   scheduleMode: "none" | "period";
   /**
    * Whether a participant's entry form offers the optional "when did it happen"
@@ -75,7 +81,7 @@ export interface Recipe {
 }
 
 /** Recipes offered for new challenges. Historical rows keep their frozen shape. */
-export type RecipeKey = "cinema" | "library" | "bookshelf" | "habit" | "custom";
+export type RecipeKey = "cinema" | "library" | "bookshelf" | "habit" | "custom" | "tables";
 
 /**
  * Stored by challenges created before the two-template consolidation. These keys
@@ -102,7 +108,7 @@ export function isLegacyRecipeKey(value: unknown): value is LegacyRecipeKey {
 }
 
 export function isRecipeKey(value: unknown): value is RecipeKey {
-  return value === "cinema" || value === "library" || value === "bookshelf" || value === "habit" || value === "custom";
+  return value === "cinema" || value === "library" || value === "bookshelf" || value === "habit" || value === "custom" || value === "tables";
 }
 
 /**
@@ -202,6 +208,26 @@ const customEntry: RecipeEntryType = {
   cardinality: "once_per_item",
   schedulePolicy: "while_active",
   fields: ratingFields(500),
+  primary: true,
+};
+
+// Tables (restaurants, bars, cafés): three 0–5 ratings and an optional
+// comment. Deliberately no address, visit date, price, overall rating or
+// "would return" — the creator adds those as fields if they want them.
+const tablesEntry: RecipeEntryType = {
+  semanticKey: "avaliacao",
+  name: "Avaliação",
+  purpose: "rating",
+  submissionMode: "item",
+  targetPolicy: "required",
+  cardinality: "once_per_item",
+  schedulePolicy: "while_active",
+  fields: [
+    { key: "comida", label: "Comida", type: "rating", required: true },
+    { key: "ambiente_atendimento", label: "Ambiente e atendimento", type: "rating", required: true },
+    { key: "custo_beneficio", label: "Custo-benefício", type: "rating", required: true },
+    { key: "comentario", label: "Comentário", type: "text", required: false, config: { multiline: true, maxLength: 500 } },
+  ],
   primary: true,
 };
 
@@ -327,6 +353,25 @@ export const RECIPES: Record<RecipeKey, Recipe> = {
     entryTypes: [customEntry],
     metrics: [completionMetric],
   },
+  // A ready-made challenge on a Tables library: rate each place on food,
+  // atmosphere/service and value. Per-place averages of each rating, no
+  // combined score.
+  tables: {
+    key: "tables",
+    version: 1,
+    catalogKind: null,
+    catalogKindFromBody: true,
+    defaultLibrarySource: "tables",
+    scheduleMode: "none",
+    collectsEntryDate: false,
+    entryTypes: [tablesEntry],
+    metrics: [
+      { key: "media_comida", label: "Comida (média por lugar)", operation: "average", fieldKey: "comida", groupBy: "item" },
+      { key: "media_ambiente_atendimento", label: "Ambiente e atendimento (média por lugar)", operation: "average", fieldKey: "ambiente_atendimento", groupBy: "item" },
+      { key: "media_custo_beneficio", label: "Custo-benefício (média por lugar)", operation: "average", fieldKey: "custo_beneficio", groupBy: "item" },
+      completionMetric,
+    ],
+  },
 };
 
 const TEMPLATE_ALIAS: Record<string, RecipeKey> = {
@@ -345,13 +390,13 @@ const TEMPLATE_ALIAS: Record<string, RecipeKey> = {
 export function resolveRecipe(body: Record<string, unknown>): Recipe {
   if (Object.hasOwn(body, "recipe")) {
     if (!isRecipeKey(body.recipe)) {
-      throw new ApiError(400, "invalid_recipe", "Escolha o modelo Cinema, Estante, Clube de leitura, Hábito ou Personalizado.");
+      throw new ApiError(400, "invalid_recipe", "Escolha o modelo Cinema, Estante, Clube de leitura, Hábito, Tables ou Personalizado.");
     }
     return RECIPES[body.recipe];
   }
   if (Object.hasOwn(body, "template")) {
     if (typeof body.template !== "string" || !Object.hasOwn(TEMPLATE_ALIAS, body.template)) {
-      throw new ApiError(400, "invalid_recipe", "Escolha o modelo Cinema, Estante, Clube de leitura, Hábito ou Personalizado.");
+      throw new ApiError(400, "invalid_recipe", "Escolha o modelo Cinema, Estante, Clube de leitura, Hábito, Tables ou Personalizado.");
     }
     return RECIPES[TEMPLATE_ALIAS[body.template]];
   }

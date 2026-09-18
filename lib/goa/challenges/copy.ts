@@ -1,8 +1,22 @@
 import type { PoolClient } from "pg";
 
 import { publicId } from "../../goa-domain";
+import { ApiError } from "../../http";
 import { addCatalogItem } from "../catalog";
 import type { FieldRow, MetricRow } from "./types";
+
+/**
+ * "Structure only" leaves the copy without items — the admin adds their own
+ * (Phase 7); "structure + items" also carries the round's items. Copying items
+ * stays the default so existing callers keep their behavior.
+ */
+export function readCopyMode(body: Record<string, unknown>): { copyItems: boolean; mode: "structure" | "structure_and_items" } {
+  const mode = body.mode ?? "structure_and_items";
+  if (mode !== "structure" && mode !== "structure_and_items") {
+    throw new ApiError(400, "invalid_copy_mode", "Escolha copiar só a estrutura ou a estrutura com os itens.");
+  }
+  return { copyItems: mode === "structure_and_items", mode };
+}
 
 /**
  * Copies a challenge's structure — rules, entry types, fields and their options,
@@ -10,9 +24,11 @@ import type { FieldRow, MetricRow } from "./types";
  * checkpoint layout, and metric definitions — into `targetGroupId` as a fresh
  * `draft`. The recipe carries over; **dates** do not (the copy starts undated, so
  * the admin picks new ones), and round items re-resolve against the target
- * group's catalog. Day-by-day checkpoints are left out — those regenerate from
- * the period. No entries, participants, results, share tokens, or recommenders
- * come across.
+ * group's catalog (skipped entirely for a "structure only" copy). Day-by-day
+ * checkpoints are left out — those regenerate from the period. No entries,
+ * participants, results, share tokens, or recommenders (member, saved name, or
+ * note) come across, and an entry type keeps its answer scope, so a shared
+ * answer stays shared in the copy.
  *
  * Shared by "duplicate this challenge" and "duplicate this template". Callers own
  * every access check and their own audit/bookkeeping rows; this function only
@@ -24,7 +40,9 @@ export async function copyChallengeStructure(
   targetGroupId: string,
   createdByUserId: string,
   title: string,
+  options: { copyItems?: boolean } = {},
 ): Promise<string> {
+  const copyItems = options.copyItems !== false;
   const targetId = publicId();
   await client.query(
     `INSERT INTO challenges
@@ -40,9 +58,10 @@ export async function copyChallengeStructure(
   const sourceTypes = await client.query<{
     id: string; semantic_key: string; name: string; description: string | null; submission_mode: string;
     purpose: string | null; target_policy: string | null; cardinality: string | null; schedule_policy: string | null;
-    is_primary: boolean;
+    is_primary: boolean; answer_scope: string; shared_edit_policy: string | null;
   }>(
-    `SELECT id,semantic_key,name,description,submission_mode,purpose,target_policy,cardinality,schedule_policy,is_primary
+    `SELECT id,semantic_key,name,description,submission_mode,purpose,target_policy,cardinality,schedule_policy,is_primary,
+            answer_scope,shared_edit_policy
        FROM entry_types WHERE challenge_id=$1 AND archived_at IS NULL ORDER BY created_at`,
     [sourceChallengeId]);
   for (const source of sourceTypes.rows) {
@@ -50,10 +69,12 @@ export async function copyChallengeStructure(
     typeMap.set(source.id, id);
     await client.query(
       `INSERT INTO entry_types
-        (id,challenge_id,semantic_key,name,description,submission_mode,purpose,target_policy,cardinality,schedule_policy,is_primary,created_at,updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,now(),now())`,
+        (id,challenge_id,semantic_key,name,description,submission_mode,purpose,target_policy,cardinality,schedule_policy,is_primary,
+         answer_scope,shared_edit_policy,created_at,updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,now(),now())`,
       [id, targetId, source.semantic_key, source.name, source.description, source.submission_mode,
-        source.purpose, source.target_policy, source.cardinality, source.schedule_policy, source.is_primary],
+        source.purpose, source.target_policy, source.cardinality, source.schedule_policy, source.is_primary,
+        source.answer_scope, source.shared_edit_policy],
     );
   }
 
@@ -111,50 +132,72 @@ export async function copyChallengeStructure(
     );
   }
 
-  const sourceItems = await client.query<{
-    entry_type_id: string | null; checkpoint_id: string | null; semantic_key: string; title: string;
-    description: string | null; position: number; metadata: unknown;
-    catalog_kind: string | null; catalog_title: string | null; catalog_author: string | null;
-    catalog_year: number | null; catalog_main_genre: string | null; catalog_pages: number | null;
-    catalog_runtime: number | null; catalog_item_id: string | null;
-  }>(
-    `SELECT i.entry_type_id,i.checkpoint_id,i.semantic_key,i.title,i.description,i.position,i.metadata,i.catalog_item_id,
-            ci.kind AS catalog_kind, ci.title AS catalog_title, ci.author AS catalog_author, ci.year AS catalog_year,
-            ci.main_genre AS catalog_main_genre, ci.page_count AS catalog_pages, ci.runtime_minutes AS catalog_runtime
-       FROM challenge_items i
-       LEFT JOIN catalog_items ci ON ci.id = i.catalog_item_id
-      WHERE i.challenge_id=$1 AND i.archived_at IS NULL ORDER BY i.position`, [sourceChallengeId]);
-  for (const source of sourceItems.rows) {
-    // Re-resolve the item against the target group's own catalog — the
-    // source catalog id belongs to another group. Recommenders don't carry.
-    // film/book keep their existing auto-match; every other kind always
-    // becomes a new item in the target's catalog, never merged onto
-    // something already there by title (Phase 2: a title match is never
-    // silent identity outside film/book).
-    let catalogItemId: string | null = null;
-    if (source.catalog_item_id && source.catalog_kind) {
-      catalogItemId = (await addCatalogItem(client, targetGroupId, createdByUserId, {
-        kind: source.catalog_kind as "film" | "book" | "other",
-        title: source.catalog_title ?? source.title,
-        author: source.catalog_author,
-        year: source.catalog_year,
-        mainGenre: source.catalog_main_genre,
-        pageCount: source.catalog_pages,
-        runtimeMinutes: source.catalog_runtime,
-      })).id;
+  if (copyItems) {
+    const sourceItems = await client.query<{
+      entry_type_id: string | null; checkpoint_id: string | null; semantic_key: string; title: string;
+      description: string | null; position: number; metadata: unknown;
+      catalog_kind: string | null; catalog_title: string | null; catalog_author: string | null;
+      catalog_year: number | null; catalog_main_genre: string | null; catalog_pages: number | null;
+      catalog_runtime: number | null; catalog_item_id: string | null;
+    }>(
+      `SELECT i.entry_type_id,i.checkpoint_id,i.semantic_key,i.title,i.description,i.position,i.metadata,i.catalog_item_id,
+              ci.kind AS catalog_kind, ci.title AS catalog_title, ci.author AS catalog_author, ci.year AS catalog_year,
+              ci.main_genre AS catalog_main_genre, ci.page_count AS catalog_pages, ci.runtime_minutes AS catalog_runtime
+         FROM challenge_items i
+         LEFT JOIN catalog_items ci ON ci.id = i.catalog_item_id
+        WHERE i.challenge_id=$1 AND i.archived_at IS NULL ORDER BY i.position`, [sourceChallengeId]);
+
+    // A user-created library (Matches, Tables…) has an opaque kind that only
+    // exists in the source workspace — recreate it in the target with the same
+    // starting config and name, so the copy doesn't quietly come back as an
+    // unnamed "Custom". film/book libraries materialize on their own. The copy
+    // is a separate row: renaming either side never touches the other.
+    const customKinds = [...new Set(
+      sourceItems.rows.map((row) => row.catalog_kind).filter((kind): kind is string => !!kind && kind !== "film" && kind !== "book"),
+    )];
+    if (customKinds.length) {
+      await client.query(
+        `INSERT INTO catalog_libraries (id, group_id, kind, source, label, position, created_by_user_id, created_at, updated_at)
+         SELECT gen_random_uuid()::text, $2, cl.kind, cl.source, cl.label, cl.position, $3, now(), now()
+           FROM catalog_libraries cl
+           JOIN challenges c ON c.group_id = cl.group_id AND c.id = $1
+          WHERE cl.kind = ANY($4::text[])
+         ON CONFLICT (group_id, kind) DO NOTHING`,
+        [sourceChallengeId, targetGroupId, createdByUserId, customKinds],
+      );
     }
-    await client.query(
-      `INSERT INTO challenge_items
-        (id,challenge_id,entry_type_id,checkpoint_id,catalog_item_id,semantic_key,title,description,position,
-         metadata,created_at,updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,now(),now())`,
-      [publicId(), targetId,
-        source.entry_type_id ? typeMap.get(source.entry_type_id) : null,
-        source.checkpoint_id ? checkpointMap.get(source.checkpoint_id) ?? null : null,
-        catalogItemId,
-        source.semantic_key, source.title, source.description,
-        source.position, JSON.stringify(source.metadata ?? {})],
-    );
+    for (const source of sourceItems.rows) {
+      // Re-resolve the item against the target group's own catalog — the
+      // source catalog id belongs to another group. Recommenders don't carry.
+      // film/book keep their existing auto-match; every other kind always
+      // becomes a new item in the target's catalog, never merged onto
+      // something already there by title (Phase 2: a title match is never
+      // silent identity outside film/book).
+      let catalogItemId: string | null = null;
+      if (source.catalog_item_id && source.catalog_kind) {
+        catalogItemId = (await addCatalogItem(client, targetGroupId, createdByUserId, {
+          kind: source.catalog_kind,
+          title: source.catalog_title ?? source.title,
+          author: source.catalog_author,
+          year: source.catalog_year,
+          mainGenre: source.catalog_main_genre,
+          pageCount: source.catalog_pages,
+          runtimeMinutes: source.catalog_runtime,
+        })).id;
+      }
+      await client.query(
+        `INSERT INTO challenge_items
+          (id,challenge_id,entry_type_id,checkpoint_id,catalog_item_id,semantic_key,title,description,position,
+           metadata,created_at,updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,now(),now())`,
+        [publicId(), targetId,
+          source.entry_type_id ? typeMap.get(source.entry_type_id) : null,
+          source.checkpoint_id ? checkpointMap.get(source.checkpoint_id) ?? null : null,
+          catalogItemId,
+          source.semantic_key, source.title, source.description,
+          source.position, JSON.stringify(source.metadata ?? {})],
+      );
+    }
   }
 
   const metrics = await client.query<MetricRow>(

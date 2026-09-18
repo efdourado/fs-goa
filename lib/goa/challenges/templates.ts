@@ -4,9 +4,9 @@ import { challengeAccess, writeAudit } from "../../goa-domain";
 import { ApiError, stringValue } from "../../http";
 import { assertUnder, LIMITS } from "../../limits";
 import { parseRuleSections } from "../domain/rules";
-import { copyChallengeStructure } from "./copy";
+import { copyChallengeStructure, readCopyMode } from "./copy";
 import { buildChallengeDetail, type DetailChallengeRow } from "./detail";
-import { isRecipeKey } from "./recipes";
+import { isRecipeKey, RECIPES } from "./recipes";
 import { maskShowcaseIdentities, resultForChallenge } from "./results";
 
 /**
@@ -60,8 +60,9 @@ export async function listTemplates() {
          FROM challenges c
          JOIN groups g ON g.id = c.group_id AND g.deleted_at IS NULL AND g.archived_at IS NULL
         WHERE c.published_as_template_at IS NOT NULL AND c.deleted_at IS NULL
-          AND c.recipe_key IN ('cinema', 'library', 'bookshelf', 'habit')
+          AND c.recipe_key = ANY($1::text[])
         ORDER BY c.published_as_template_at DESC`,
+      [Object.keys(RECIPES)],
     );
     return {
       templates: rows.rows.map((row) => ({
@@ -101,8 +102,8 @@ export async function getTemplatePreview(challengeId: string) {
          FROM challenges c
          JOIN groups g ON g.id = c.group_id AND g.deleted_at IS NULL AND g.archived_at IS NULL
         WHERE c.id = $1 AND c.published_as_template_at IS NOT NULL AND c.deleted_at IS NULL
-          AND c.recipe_key IN ('cinema', 'library', 'bookshelf', 'habit')`,
-      [challengeId],
+          AND c.recipe_key = ANY($2::text[])`,
+      [challengeId, Object.keys(RECIPES)],
     );
     if (!row) throw new ApiError(404, "not_found", "Modelo não encontrado.");
 
@@ -242,12 +243,14 @@ export async function duplicateTemplate(
     );
 
     const title = stringValue(body, "title", { max: 160, optional: true }) ?? template.title;
+    const { copyItems, mode } = readCopyMode(body);
     const targetId = await copyChallengeStructure(
       client,
       template.id,
       targetGroupId,
       session.user.id,
       title,
+      { copyItems },
     );
     await client.query(
       `INSERT INTO challenge_duplications
@@ -264,7 +267,7 @@ export async function duplicateTemplate(
       "challenge",
       targetId,
       null,
-      { sourceChallengeId: template.id, fromTemplate: true, targetGroupId },
+      { sourceChallengeId: template.id, fromTemplate: true, targetGroupId, mode },
     );
     return { id: targetId, challengeId: targetId, groupId: targetGroupId, status: "draft" };
   });

@@ -6,6 +6,7 @@ import {
   applyCatalogItemUpdate,
   assertCatalogItemInGroup,
   createCatalogItem,
+  findOrCreateLibraryBySource,
   resolveItemKind,
   upsertCatalogItem,
 } from "../catalog";
@@ -153,9 +154,13 @@ export async function createChallenge(
             ).rows.map((row) => row.user_id),
           );
       // `custom` doesn't fix a kind: it comes from the caller's own library
-      // (any workspace library, built-in or user-created) instead.
+      // (any workspace library, built-in or user-created) instead. A preset
+      // with a default library (Tables) falls back to the workspace's own
+      // library of that config, created on first use, when none is named.
       const catalogKind = recipe.catalogKindFromBody
-        ? await resolveItemKind(client, groupId, { libraryId: body.libraryId })
+        ? typeof body.libraryId !== "string" && recipe.defaultLibrarySource
+          ? await findOrCreateLibraryBySource(client, groupId, session.user.id, recipe.defaultLibrarySource)
+          : await resolveItemKind(client, groupId, { libraryId: body.libraryId })
         : recipe.catalogKind ?? "film";
       const usedKeys = new Set<string>();
       for (let index = 0; index < items.length; index += 1) {

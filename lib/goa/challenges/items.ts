@@ -20,6 +20,7 @@ import {
   upsertCatalogItem,
 } from "../catalog";
 import { midnightInTimeZone } from "../domain/shared";
+import { isRecipeKey, RECIPES } from "./recipes";
 import { syncDailyCheckpoints } from "../daily-checkpoints";
 import {
   entryTypesForChallenge,
@@ -79,7 +80,7 @@ export async function resolveChallengeCatalogKind(
 ): Promise<string> {
   const fixed = recipeCatalogKind(challenge.recipe_key);
   if (fixed) return fixed;
-  if (challenge.recipe_key === "custom") {
+  if (isRecipeKey(challenge.recipe_key) && RECIPES[challenge.recipe_key].catalogKindFromBody) {
     const existing = await oneOrNull<{ kind: string }>(
       client,
       `SELECT ci.kind FROM challenge_items it JOIN catalog_items ci ON ci.id = it.catalog_item_id

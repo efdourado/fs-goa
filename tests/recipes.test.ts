@@ -86,6 +86,24 @@ describe("current challenge recipes", () => {
     assert.deepEqual(recipe.metrics.map((metric) => metric.operation), ["completion_rate"]);
   });
 
+  test("Tables rates a place on three 0-5 dimensions with an optional comment and nothing else", () => {
+    const recipe = resolveRecipe({ recipe: "tables" });
+
+    assert.equal(recipe.key, "tables");
+    assert.equal(recipe.catalogKind, null);
+    assert.equal(recipe.catalogKindFromBody, true);
+    assert.equal(recipe.defaultLibrarySource, "tables");
+    const fields = recipe.entryTypes[0].fields;
+    assert.deepEqual(fields.map((field) => field.key), ["comida", "ambiente_atendimento", "custo_beneficio", "comentario"]);
+    assert.deepEqual(fields.map((field) => field.type), ["rating", "rating", "rating", "text"]);
+    assert.deepEqual(fields.map((field) => field.required), [true, true, true, false]);
+    // No forced address, visit date, price, overall rating or "would return".
+    assert.equal(recipe.collectsEntryDate, false);
+    assert.equal(fields.some((field) => /endere|pre[cç]o|geral|voltar/i.test(String(field.label))), false);
+    // Only the three dimensions' per-place averages (no combined score) + completion.
+    assert.deepEqual(recipe.metrics.map((metric) => metric.fieldKey), ["comida", "ambiente_atendimento", "custo_beneficio", undefined]);
+  });
+
   test("legacy keys remain identifiable but cannot seed a new challenge", () => {
     for (const key of ["cine_free", "cine_curated", "reading_club", "reading_daily"] as const) {
       assert.equal(isLegacyRecipeKey(key), true);

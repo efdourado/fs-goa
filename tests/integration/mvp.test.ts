@@ -1987,6 +1987,129 @@ test("indicação por nome externo (fase 6): reutilizável, exclusiva, isolada p
   );
 });
 
+test("Tables (fase 7): a biblioteca nasce sozinha, três notas 0–5 e comentário opcional, sem campos forçados", async () => {
+  const owner = await register("Bruna", "bruna_tables");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Rolês" } })).body as { id: string }).id;
+
+  // workspace em branco: nenhuma biblioteca Tables ainda
+  const before = await call("GET", `/api/groups/${gid}/catalog/libraries`, { session: owner });
+  assert.equal((before.body as { libraries: Array<{ source: string }> }).libraries.some((lib) => lib.source === "tables"), false);
+
+  const created = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: { recipe: "tables", title: "Onde comer", participantIds: [owner.user.id], items: [{ title: "Cantina do Zé" }, { title: "Cantina do Zé" }] },
+  });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const cid = (created.body as { id: string }).id;
+
+  const libs = (await call("GET", `/api/groups/${gid}/catalog/libraries`, { session: owner })).body as {
+    libraries: Array<{ source: string; label: string | null; kind: string }>;
+  };
+  const tablesLibs = libs.libraries.filter((lib) => lib.source === "tables");
+  assert.equal(tablesLibs.length, 1, "uma biblioteca Tables criada sob demanda");
+  assert.equal(tablesLibs[0].label, null, "o nome padrão fica por conta do idioma, não gravado");
+
+  // um segundo desafio reaproveita a mesma biblioteca em vez de criar outra
+  const second = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner, body: { recipe: "tables", title: "Cafés", participantIds: [owner.user.id], items: [{ title: "Café da esquina" }] },
+  });
+  assert.equal(second.response.status, 201, JSON.stringify(second.body));
+  const libsAfter = (await call("GET", `/api/groups/${gid}/catalog/libraries`, { session: owner })).body as { libraries: Array<{ source: string }> };
+  assert.equal(libsAfter.libraries.filter((lib) => lib.source === "tables").length, 1);
+
+  // títulos iguais são lugares distintos, nunca fundidos
+  const catalog = (await call("GET", `/api/groups/${gid}/catalog`, { session: owner })).body as { items: Array<{ kind: string; title: string }> };
+  assert.equal(catalog.items.filter((item) => item.kind === tablesLibs[0].kind && item.title === "Cantina do Zé").length, 2);
+
+  const detail = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { fields: Array<{ key: string; type: string; required: boolean }> };
+  assert.deepEqual(
+    detail.fields.map((field) => [field.key, field.type, field.required]),
+    [["comida", "rating", true], ["ambiente_atendimento", "rating", true], ["custo_beneficio", "rating", true], ["comentario", "text", false]],
+  );
+
+  await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } });
+  const itemId = ((await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { items: Array<{ id: string }> }).items[0].id;
+  const incomplete = await call("POST", `/api/challenges/${cid}/entries`, { session: owner, body: { itemId, values: { comida: 4 } } });
+  assert.equal(incomplete.response.status, 400, "as três notas são obrigatórias");
+  const complete = await call("POST", `/api/challenges/${cid}/entries`, {
+    session: owner, body: { itemId, values: { comida: 4.5, ambiente_atendimento: 3, custo_beneficio: 5 } },
+  });
+  assert.equal(complete.response.status, 201, JSON.stringify(complete.body));
+});
+
+test("cópia de modelo (fase 7): só a estrutura ou com itens, o escopo compartilhado fica, nada privado atravessa", async () => {
+  const admin = await register("Curador", "curador_copia");
+  await adminPool.query("UPDATE users SET platform_admin = true WHERE id = $1", [admin.user.id]);
+  const owner = await login("curador_copia");
+  const srcGid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Origem" } })).body as { id: string }).id;
+  const dstGid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Destino" } })).body as { id: string }).id;
+
+  const library = (await call("POST", `/api/groups/${srcGid}/catalog/libraries`, { session: owner, body: { label: "Futebol" } })).body as { id: string; kind: string };
+  const ana = (await call("POST", `/api/groups/${srcGid}/catalog/recommenders`, { session: owner, body: { displayName: "Ana do trabalho" } })).body as { id: string };
+  const created = await call("POST", `/api/groups/${srcGid}/challenges`, {
+    session: owner,
+    body: { recipe: "custom", title: "Copa", libraryId: library.id, participantIds: [owner.user.id], items: [{ title: "Brasil x Argentina" }] },
+  });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const cid = (created.body as { id: string }).id;
+  const itemId = ((await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { items: Array<{ id: string }> }).items[0].id;
+  await call("PATCH", `/api/challenges/${cid}/items/${itemId}`, { session: owner, body: { recommendedByExternalId: ana.id } });
+  const shared = await call("POST", `/api/challenges/${cid}/entry-types`, {
+    session: owner,
+    body: { name: "Placar", sharedEditPolicy: "members_can_edit", field: { key: "placar", label: "Placar", type: "number", required: true } },
+  });
+  assert.equal(shared.response.status, 201, JSON.stringify(shared.body));
+  await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } });
+  await call("POST", `/api/challenges/${cid}/entries`, { session: owner, body: { itemId, values: { nota: 4, comentario: "segredo do grupo" } } });
+  await call("POST", `/api/challenges/${cid}/entries`, { session: owner, body: { entryTypeId: (shared.body as { id: string }).id, itemId, values: { placar: 2 } } });
+
+  // um desafio personalizado também pode virar modelo público
+  const published = await call("POST", `/api/challenges/${cid}/template`, { session: owner, body: {} });
+  assert.equal(published.response.status, 200, JSON.stringify(published.body));
+  const gallery = (await call("GET", "/api/templates")).body as { templates: Array<{ id: string }> };
+  assert.ok(gallery.templates.some((template) => template.id === cid), "o modelo personalizado aparece na galeria");
+
+  const bad = await call("POST", `/api/templates/${cid}/duplicate`, { session: owner, body: { targetGroupId: dstGid, mode: "tudo" } });
+  assert.equal(bad.response.status, 400);
+
+  const structureOnly = await call("POST", `/api/templates/${cid}/duplicate`, { session: owner, body: { targetGroupId: dstGid, mode: "structure" } });
+  assert.equal(structureOnly.response.status, 201, JSON.stringify(structureOnly.body));
+  const soId = (structureOnly.body as { id: string }).id;
+
+  const withItems = await call("POST", `/api/templates/${cid}/duplicate`, { session: owner, body: { targetGroupId: dstGid, mode: "structure_and_items" } });
+  assert.equal(withItems.response.status, 201, JSON.stringify(withItems.body));
+  const wiId = (withItems.body as { id: string }).id;
+
+  const count = async (sql: string, id: string) => Number((await adminPool.query<{ n: string }>(sql, [id])).rows[0].n);
+  assert.equal(await count("SELECT count(*) AS n FROM challenge_items WHERE challenge_id = $1", soId), 0, "só a estrutura: nenhum item");
+  assert.equal(await count("SELECT count(*) AS n FROM challenge_items WHERE challenge_id = $1", wiId), 1, "estrutura + itens: o item veio");
+  for (const id of [soId, wiId]) {
+    assert.equal(await count("SELECT count(*) AS n FROM entries WHERE challenge_id = $1", id), 0, "nenhuma resposta atravessa");
+    assert.equal(await count("SELECT count(*) AS n FROM challenge_participants WHERE challenge_id = $1", id), 0, "nenhum participante atravessa");
+    assert.equal(
+      await count("SELECT count(*) AS n FROM entry_types WHERE challenge_id = $1 AND answer_scope = 'shared' AND shared_edit_policy = 'members_can_edit'", id),
+      1, "a resposta compartilhada continua compartilhada, com a mesma política",
+    );
+    assert.equal(await count("SELECT count(*) AS n FROM challenge_items WHERE challenge_id = $1 AND (recommended_by_user_id IS NOT NULL OR recommended_by_external_id IS NOT NULL OR origin_note IS NOT NULL)", id), 0, "nenhuma indicação atravessa");
+  }
+  // o nome externo e as recomendações não vazam para o espaço de destino
+  assert.equal(await count("SELECT count(*) AS n FROM catalog_recommenders WHERE group_id = $1", dstGid), 0);
+  assert.equal(await count("SELECT count(*) AS n FROM catalog_items WHERE group_id = $1 AND (recommended_by_user_id IS NOT NULL OR recommended_by_external_id IS NOT NULL OR origin_note IS NOT NULL)", dstGid), 0);
+  // a biblioteca própria vai junto, com o mesmo nome — separada da original
+  const dstLibs = (await call("GET", `/api/groups/${dstGid}/catalog/libraries`, { session: owner })).body as { libraries: Array<{ label: string | null; kind: string }> };
+  const copied = dstLibs.libraries.find((lib) => lib.kind === library.kind);
+  assert.equal(copied?.label, "Futebol");
+  const renamedCopy = await call("PATCH", `/api/catalog/libraries/${(await adminPool.query<{ id: string }>("SELECT id FROM catalog_libraries WHERE group_id = $1 AND kind = $2", [dstGid, library.kind])).rows[0].id}`, { session: owner, body: { label: "Só no destino" } });
+  assert.equal(renamedCopy.response.status, 200);
+  const srcLibs = (await call("GET", `/api/groups/${srcGid}/catalog/libraries`, { session: owner })).body as { libraries: Array<{ label: string | null; kind: string }> };
+  assert.equal(srcLibs.libraries.find((lib) => lib.kind === library.kind)?.label, "Futebol", "renomear a cópia não mexe na original");
+
+  // duplicar um desafio comum aceita o mesmo modo
+  const plain = await call("POST", `/api/challenges/${cid}/duplicate`, { session: owner, body: { targetGroupId: dstGid, mode: "structure" } });
+  assert.equal(plain.response.status, 201, JSON.stringify(plain.body));
+  assert.equal(await count("SELECT count(*) AS n FROM challenge_items WHERE challenge_id = $1", (plain.body as { id: string }).id), 0);
+});
+
 test("modelo de registros: um filme aceita mais de um tipo de registro por pessoa", async () => {
   const owner = await register("Íris", "iris_rec");
   const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube do modelo" } })).body as { id: string }).id;
