@@ -125,6 +125,7 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
     id: groupId,
     name: "Clube do Sofá Editado",
     description: "Cinema, conversa e bons hábitos.",
+    recommendationsEnabled: true,
   });
 
   await adminPool.query(
@@ -1902,6 +1903,88 @@ test("agenda do item (fase 5): data só ou data e hora, nunca um prazo que bloqu
     session: owner, body: { itemId, values: { nota: 4, comentario: "" } },
   });
   assert.equal(scored.response.status, 201, JSON.stringify(scored.body));
+});
+
+test("indicação por nome externo (fase 6): reutilizável, exclusiva, isolada por espaço e fora dos modelos públicos", async () => {
+  const admin = await register("Curadora", "curadora_indica");
+  await adminPool.query("UPDATE users SET platform_admin = true WHERE id = $1", [admin.user.id]);
+  const owner = await login("curadora_indica");
+  const other = await register("Outra", "outra_indica");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Cine" } })).body as { id: string }).id;
+  const otherGid = ((await call("POST", "/api/groups", { session: other, body: { name: "Outro grupo" } })).body as { id: string }).id;
+
+  const saved = await call("POST", `/api/groups/${gid}/catalog/recommenders`, { session: owner, body: { displayName: "Ana do trabalho" } });
+  assert.equal(saved.response.status, 201, JSON.stringify(saved.body));
+  const anaId = (saved.body as { id: string }).id;
+  const foreign = await call("POST", `/api/groups/${otherGid}/catalog/recommenders`, { session: other, body: { displayName: "Gente de outro grupo" } });
+  const foreignId = (foreign.body as { id: string }).id;
+
+  const listed = await call("GET", `/api/groups/${gid}/catalog/recommenders`, { session: owner });
+  assert.deepEqual((listed.body as { recommenders: Array<{ displayName: string }> }).recommenders.map((r) => r.displayName), ["Ana do trabalho"]);
+
+  const created = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner, body: { recipe: "cinema", title: "Indicados", participantIds: [owner.user.id], items: [{ title: "Aftersun" }] },
+  });
+  const cid = (created.body as { id: string }).id;
+  const itemId = ((await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { items: Array<{ id: string }> }).items[0].id;
+
+  // atribui pela escolha "nome salvo"
+  const assigned = await call("PATCH", `/api/challenges/${cid}/items/${itemId}`, { session: owner, body: { recommendedByExternalId: anaId } });
+  assert.equal(assigned.response.status, 200, JSON.stringify(assigned.body));
+  const inGroup = await call("GET", `/api/challenges/${cid}`, { session: owner });
+  assert.deepEqual(
+    (inGroup.body as { items: Array<{ recommendedBy: unknown }> }).items[0].recommendedBy,
+    { kind: "external", id: anaId, name: "Ana do trabalho" },
+  );
+
+  // um nome de outro espaço nunca pode ser atribuído, e as escolhas são exclusivas
+  const crossWorkspace = await call("PATCH", `/api/challenges/${cid}/items/${itemId}`, { session: owner, body: { recommendedByExternalId: foreignId } });
+  assert.equal(crossWorkspace.response.status, 400, JSON.stringify(crossWorkspace.body));
+  const both = await call("PATCH", `/api/challenges/${cid}/items/${itemId}`, {
+    session: owner, body: { recommendedByExternalId: anaId, originNote: "achei num artigo" },
+  });
+  assert.equal(both.response.status, 400, JSON.stringify(both.body));
+
+  // renomear a pessoa não muda a atribuição — só o rótulo
+  const renamed = await call("PATCH", `/api/catalog/recommenders/${anaId}`, { session: owner, body: { displayName: "Ana (RH)" } });
+  assert.equal(renamed.response.status, 200, JSON.stringify(renamed.body));
+  const afterRename = await call("GET", `/api/challenges/${cid}`, { session: owner });
+  assert.deepEqual(
+    (afterRename.body as { items: Array<{ recommendedBy: { id: string; name: string } | null }> }).items[0].recommendedBy,
+    { kind: "external", id: anaId, name: "Ana (RH)" },
+  );
+
+  // a recomendação do item do desafio e a do acervo são atribuições independentes
+  const catalogItem = await call("POST", `/api/groups/${gid}/catalog/items`, {
+    session: owner, body: { kind: "other", title: "Documentário X", catalogRecommendedByExternalId: anaId },
+  });
+  assert.equal(catalogItem.response.status, 201, JSON.stringify(catalogItem.body));
+  const catalog = await call("GET", `/api/groups/${gid}/catalog`, { session: owner });
+  const docs = (catalog.body as { items: Array<{ title: string; recommendedBy: { name: string } | null }> }).items.find((item) => item.title === "Documentário X");
+  assert.equal(docs?.recommendedBy?.name, "Ana (RH)");
+  const aftersunEntry = (catalog.body as { items: Array<{ title: string; recommendedBy: unknown }> }).items.find((item) => item.title === "Aftersun");
+  assert.equal(aftersunEntry?.recommendedBy, null, "o item do desafio recomendado por Ana não vira a recomendação do acervo");
+
+  // fora dos modelos públicos: o nome externo nunca aparece
+  const published = await call("POST", `/api/challenges/${cid}/template`, { session: owner, body: {} });
+  assert.equal(published.response.status, 200, JSON.stringify(published.body));
+  const publicDetail = await call("GET", `/api/templates/${cid}`);
+  assert.equal(publicDetail.response.status, 200, JSON.stringify(publicDetail.body));
+  assert.equal(
+    (publicDetail.body as { items: Array<{ recommendedBy: unknown }> }).items[0].recommendedBy, null,
+    "o modelo público não expõe o nome externo",
+  );
+  assert.equal(JSON.stringify(publicDetail.body).includes("Ana"), false, "o nome não vaza em nenhum outro campo do modelo público");
+
+  // desligar a indicação esconde a capacidade, sem apagar o dado
+  const disabled = await call("PATCH", `/api/groups/${gid}`, { session: owner, body: { recommendationsEnabled: false } });
+  assert.equal(disabled.response.status, 200, JSON.stringify(disabled.body));
+  assert.equal((disabled.body as { recommendationsEnabled: boolean }).recommendationsEnabled, false);
+  const stillThere = await call("GET", `/api/challenges/${cid}`, { session: owner });
+  assert.equal(
+    (stillThere.body as { items: Array<{ recommendedBy: { name: string } | null }> }).items[0].recommendedBy?.name, "Ana (RH)",
+    "a atribuição continua guardada",
+  );
 });
 
 test("modelo de registros: um filme aceita mais de um tipo de registro por pessoa", async () => {

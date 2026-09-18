@@ -39,13 +39,18 @@ import {
   archivePersonalCatalogItem,
   catalogItemDetail,
   createGroupLibrary,
+  createGroupRecommender,
   createPersonalLibrary,
+  createPersonalRecommender,
   listGroupCatalog,
   listGroupLibraries,
+  listGroupRecommenders,
   listPersonalCatalog,
   listPersonalLibraries,
+  listPersonalRecommenders,
   personalCatalogItemDetail,
   renameCatalogLibrary,
+  renameCatalogRecommender,
   searchGroupCatalogItems,
   searchPersonalCatalogItems,
   updateCatalogItem,
@@ -179,6 +184,9 @@ export async function GET(request: Request): Promise<Response> {
     if (path[0] === "groups" && path[2] === "catalog" && path[3] === "libraries" && path.length === 4) {
       return json(await listGroupLibraries(await requireSession(request), path[1]));
     }
+    if (path[0] === "groups" && path[2] === "catalog" && path[3] === "recommenders" && path.length === 4) {
+      return json(await listGroupRecommenders(await requireSession(request), path[1]));
+    }
     if (path[0] === "groups" && path[2] === "catalog" && path.length === 4) {
       return json(await catalogItemDetail(await requireSession(request), path[1], path[3]));
     }
@@ -194,6 +202,9 @@ export async function GET(request: Request): Promise<Response> {
     }
     if (path[0] === "personal" && path[1] === "catalog" && path[2] === "libraries" && path.length === 3) {
       return json(await listPersonalLibraries(await requireSession(request)));
+    }
+    if (path[0] === "personal" && path[1] === "catalog" && path[2] === "recommenders" && path.length === 3) {
+      return json(await listPersonalRecommenders(await requireSession(request)));
     }
     if (path[0] === "personal" && path[1] === "catalog" && path.length === 3) {
       return json(await personalCatalogItemDetail(await requireSession(request), path[2]));
@@ -337,6 +348,12 @@ export async function POST(request: Request): Promise<Response> {
     if (path[0] === "personal" && path[1] === "catalog" && path[2] === "libraries" && path.length === 3) {
       return json(await createPersonalLibrary(session, body), 201);
     }
+    if (path[0] === "groups" && path[2] === "catalog" && path[3] === "recommenders" && path.length === 4) {
+      return json(await createGroupRecommender(session, path[1], body), 201);
+    }
+    if (path[0] === "personal" && path[1] === "catalog" && path[2] === "recommenders" && path.length === 3) {
+      return json(await createPersonalRecommender(session, body), 201);
+    }
     if (path[0] === "groups" && path[2] === "leave" && path.length === 3) {
       return json(await leaveGroup(session, path[1]));
     }
@@ -434,6 +451,9 @@ export async function PATCH(request: Request): Promise<Response> {
     }
     if (path[0] === "catalog" && path[1] === "libraries" && path.length === 3) {
       return json(await renameCatalogLibrary(session, path[2], body));
+    }
+    if (path[0] === "catalog" && path[1] === "recommenders" && path.length === 3) {
+      return json(await renameCatalogRecommender(session, path[2], body));
     }
     if (path[0] === "personal" && path[1] === "catalog" && path.length === 3) {
       return json(await updatePersonalCatalogItem(session, path[2], body));

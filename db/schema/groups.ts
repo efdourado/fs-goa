@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   check,
   index,
   integer,
@@ -25,6 +26,11 @@ export const groups = pgTable(
     ownerUserId: text("owner_user_id")
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
+    // Hides the recommender picker/display in challenge forms and catalog
+    // views for this workspace, without deleting any already-stored
+    // recommendation (Phase 6 — "disabling hides the capability while
+    // preserving data").
+    recommendationsEnabled: boolean("recommendations_enabled").notNull().default(true),
     archivedAt: timestamptz("archived_at"),
     deletedAt: timestamptz("deleted_at"),
     deletedByUserId: text("deleted_by_user_id").references(() => users.id, {

@@ -499,9 +499,9 @@ export async function updateGroup(
 ) {
   return inTransaction(async (client) => {
     await requireGroupRole(session.user.id, groupId, ["owner", "admin"], client);
-    const current = await oneOrNull<{ name: string; description: string | null }>(
+    const current = await oneOrNull<{ name: string; description: string | null; recommendations_enabled: boolean }>(
       client,
-      `SELECT name, description
+      `SELECT name, description, recommendations_enabled
          FROM groups
         WHERE id = $1 AND kind = 'standard'
           AND archived_at IS NULL AND deleted_at IS NULL
@@ -516,10 +516,15 @@ export async function updateGroup(
     const description = body.description === undefined
       ? current.description
       : stringValue(body, "description", { max: 1_000, optional: true }) ?? null;
+    // Hides the picker/display in challenge forms and catalog views; already
+    // stored recommendations (member, external, or note) are untouched.
+    const recommendationsEnabled = body.recommendationsEnabled === undefined
+      ? current.recommendations_enabled
+      : body.recommendationsEnabled === true;
 
     await client.query(
-      "UPDATE groups SET name = $2, description = $3, updated_at = now() WHERE id = $1",
-      [groupId, name, description],
+      "UPDATE groups SET name = $2, description = $3, recommendations_enabled = $4, updated_at = now() WHERE id = $1",
+      [groupId, name, description, recommendationsEnabled],
     );
     await writeAudit(
       client,
@@ -530,9 +535,9 @@ export async function updateGroup(
       "group",
       groupId,
       current,
-      { name, description },
+      { name, description, recommendationsEnabled },
     );
-    return { id: groupId, name, description };
+    return { id: groupId, name, description, recommendationsEnabled };
   });
 }
 

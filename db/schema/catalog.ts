@@ -106,6 +106,35 @@ export const catalogNativePropertyConfigs = pgTable(
 );
 
 /**
+ * A reusable, non-account name for someone outside Goa who recommended an
+ * item — "Ana from work". Scoped per workspace like `catalog_libraries`: a
+ * name saved in one personal space or group never appears in another, and it
+ * never auto-links to a real account even if a name matches (Phase 6 of
+ * docs/flexible-catalogs.md).
+ */
+export const catalogRecommenders = pgTable(
+  "catalog_recommenders",
+  {
+    id: text("id").primaryKey(),
+    groupId: text("group_id")
+      .notNull()
+      .references(() => groups.id, { onDelete: "cascade" }),
+    displayName: text("display_name").notNull(),
+    createdByUserId: text("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    archivedAt: timestamptz("archived_at"),
+    createdAt: timestamptz("created_at").defaultNow().notNull(),
+    updatedAt: timestamptz("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    unique("catalog_recommenders_id_group_unique").on(table.id, table.groupId),
+    index("catalog_recommenders_group_idx").on(table.groupId),
+    check("catalog_recommenders_name_check", sql`char_length(btrim(${table.displayName})) between 1 and 80`),
+  ],
+);
+
+/**
  * The group's living catalog: a film or book has ONE identity that survives
  * across challenge rounds. `challenge_items` (the per-round row) points here via
  * `catalog_item_id`. `normalized_title` is the human-insensitive match key so two
@@ -131,6 +160,13 @@ export const catalogItems = pgTable(
     pageCount: integer("page_count"),
     // Films/series only — books use `pageCount` instead.
     runtimeMinutes: integer("runtime_minutes"),
+    // How this item entered the library — independent of any challenge-
+    // specific recommendation on `challenge_items` (Phase 6): a catalog-level
+    // pick and a round's own pick are different assignments, and setting one
+    // never silently overwrites the other. At most one of the three is set.
+    recommendedByUserId: text("recommended_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    recommendedByExternalId: text("recommended_by_external_id"),
+    originNote: text("origin_note"),
     createdByUserId: text("created_by_user_id")
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
@@ -165,6 +201,19 @@ export const catalogItems = pgTable(
       columns: [table.groupId, table.kind],
       foreignColumns: [catalogLibraries.groupId, catalogLibraries.kind],
     }).onDelete("restrict"),
+    foreignKey({
+      name: "catalog_items_recommender_scope_fk",
+      columns: [table.recommendedByExternalId, table.groupId],
+      foreignColumns: [catalogRecommenders.id, catalogRecommenders.groupId],
+    }).onDelete("set null"),
+    check(
+      "catalog_items_recommender_exclusive_check",
+      sql`num_nonnulls(${table.recommendedByUserId}, ${table.recommendedByExternalId}, ${table.originNote}) <= 1`,
+    ),
+    check(
+      "catalog_items_origin_note_check",
+      sql`${table.originNote} is null or char_length(btrim(${table.originNote})) between 1 and 200`,
+    ),
     check("catalog_items_title_check", sql`char_length(btrim(${table.title})) between 1 and 300`),
     check(
       "catalog_items_author_check",

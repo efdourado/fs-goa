@@ -44,6 +44,7 @@ export async function detailItems(
   challengeId: string,
   groupId: string,
   status: ChallengeStatus,
+  isPublic = false,
 ) {
   const result = await client.query<{
     id: string; title: string; description: string | null;
@@ -53,18 +54,23 @@ export async function detailItems(
     catalog_author: string | null; catalog_year: number | null;
     catalog_main_genre: string | null; catalog_pages: number | null; catalog_runtime_minutes: number | null;
     recommended_by_id: string | null; recommended_by_name: string | null;
+    recommended_by_external_id: string | null; recommended_by_external_name: string | null;
   }>(
     // A recommender who left the group (or whose account is gone) never shows
     // their name to the group again — `recommended_by_id` goes null right
     // along with it, same as a deleted account already reads "Conta removida".
+    // An external name has no membership to lose, so it always shows here —
+    // it's excluded only from the *public* rendering (Phase 6), below.
     `SELECT i.id, i.title, i.description, i.position, i.opens_at, i.due_at, i.schedule_precision, i.checkpoint_id, i.origin_note,
             i.catalog_item_id, ci.title AS catalog_title, ci.author AS catalog_author, ci.year AS catalog_year,
             ci.main_genre AS catalog_main_genre, ci.page_count AS catalog_pages, ci.runtime_minutes AS catalog_runtime_minutes,
             CASE WHEN active_recommender.user_id IS NOT NULL THEN i.recommended_by_user_id END AS recommended_by_id,
-            CASE WHEN active_recommender.user_id IS NOT NULL THEN ru.display_name END AS recommended_by_name
+            CASE WHEN active_recommender.user_id IS NOT NULL THEN ru.display_name END AS recommended_by_name,
+            i.recommended_by_external_id, cr.display_name AS recommended_by_external_name
        FROM challenge_items i
        LEFT JOIN catalog_items ci ON ci.id = i.catalog_item_id
        LEFT JOIN users ru ON ru.id = i.recommended_by_user_id
+       LEFT JOIN catalog_recommenders cr ON cr.id = i.recommended_by_external_id
        LEFT JOIN group_members active_recommender
          ON active_recommender.group_id = $2
         AND active_recommender.user_id = i.recommended_by_user_id
@@ -92,8 +98,10 @@ export async function detailItems(
         }
       : null,
     recommendedBy: item.recommended_by_id
-      ? { id: item.recommended_by_id, name: item.recommended_by_name ?? "" }
-      : null,
+      ? { kind: "member" as const, id: item.recommended_by_id, name: item.recommended_by_name ?? "" }
+      : item.recommended_by_external_id && !isPublic
+        ? { kind: "external" as const, id: item.recommended_by_external_id, name: item.recommended_by_external_name ?? "" }
+        : null,
   }));
 }
 
@@ -226,7 +234,7 @@ export async function buildChallengeDetail(
   // whether the round also has items. `items` stays overloaded for the
   // single-axis screens: a pure daily round still gets its checkpoints here.
   const checkpoints = await detailCheckpoints(client, challengeId, ch.status);
-  const roundItems = await detailItems(client, challengeId, ch.group_id, ch.status);
+  const roundItems = await detailItems(client, challengeId, ch.group_id, ch.status, viewer.userId === null);
   const items = submissionMode === "daily" && ch.start_date === null
     ? []
     : roundItems.length

@@ -31,6 +31,7 @@ export { feedback } from "./schema/feedback";
 export {
   catalogLibraries,
   catalogNativePropertyConfigs,
+  catalogRecommenders,
   catalogItems,
   catalogAttributeDefs,
   catalogAttributeValues,

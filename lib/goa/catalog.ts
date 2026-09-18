@@ -227,7 +227,10 @@ export async function createCatalogItem(
   client: PoolClient,
   groupId: string,
   userId: string,
-  input: { kind: string; title: string; attributes?: unknown } & CatalogAttributes,
+  input: {
+    kind: string; title: string; attributes?: unknown;
+    catalogRecommendedByUserId?: unknown; catalogRecommendedByExternalId?: unknown; catalogOriginNote?: unknown;
+  } & CatalogAttributes,
 ): Promise<string> {
   const title = input.title.trim();
   if (title.length < 1 || title.length > 300) {
@@ -238,6 +241,13 @@ export async function createCatalogItem(
   await ensureCatalogLibrary(client, groupId, input.kind, userId);
   const id = await insertCatalogItemRow(client, groupId, userId, input.kind, title, normalized, attributes);
   if (input.attributes) await setCatalogItemAttributeValues(client, id, groupId, input.kind, input.attributes);
+  if (input.catalogRecommendedByUserId !== undefined || input.catalogRecommendedByExternalId !== undefined || input.catalogOriginNote !== undefined) {
+    await applyCatalogItemUpdate(client, id, groupId, {
+      catalogRecommendedByUserId: input.catalogRecommendedByUserId,
+      catalogRecommendedByExternalId: input.catalogRecommendedByExternalId,
+      catalogOriginNote: input.catalogOriginNote,
+    });
+  }
   return id;
 }
 
@@ -325,11 +335,21 @@ async function listCatalogWithClient(client: PoolClient, workspaceId: string) {
     round_count: number;
     rating_avg: number | null;
     rating_count: number;
+    recommended_by_user_id: string | null;
+    recommended_by_user_name: string | null;
+    recommended_by_external_id: string | null;
+    recommended_by_external_name: string | null;
+    origin_note: string | null;
   }>(
     `SELECT ci.id, ci.kind, ci.title, ci.author, ci.year, ci.main_genre, ci.page_count, ci.runtime_minutes,
               (SELECT count(DISTINCT it.challenge_id)::int FROM challenge_items it WHERE it.catalog_item_id = ci.id) AS round_count,
-              agg.rating_avg, coalesce(agg.rating_count, 0)::int AS rating_count
+              agg.rating_avg, coalesce(agg.rating_count, 0)::int AS rating_count,
+              ci.recommended_by_user_id, ru.display_name AS recommended_by_user_name,
+              ci.recommended_by_external_id, cr.display_name AS recommended_by_external_name,
+              ci.origin_note
          FROM catalog_items ci
+         LEFT JOIN users ru ON ru.id = ci.recommended_by_user_id
+         LEFT JOIN catalog_recommenders cr ON cr.id = ci.recommended_by_external_id
          LEFT JOIN LATERAL (
            SELECT avg(ev.number_scaled::float8 / (10 ^ f.number_scale)) AS rating_avg,
                   count(ev.entry_id) AS rating_count
@@ -357,6 +377,12 @@ async function listCatalogWithClient(client: PoolClient, workspaceId: string) {
       pageCount: item.page_count,
       runtimeMinutes: item.runtime_minutes,
       roundCount: item.round_count,
+      recommendedBy: item.recommended_by_user_id
+        ? { kind: "member" as const, id: item.recommended_by_user_id, name: item.recommended_by_user_name ?? "" }
+        : item.recommended_by_external_id
+          ? { kind: "external" as const, id: item.recommended_by_external_id, name: item.recommended_by_external_name ?? "" }
+          : null,
+      originNote: item.origin_note,
       ratingAvg: item.rating_avg === null ? null : Number(item.rating_avg.toFixed(2)),
       ratingCount: item.rating_count,
       attributes: attributesByItem.get(item.id) ?? [],
@@ -517,6 +543,9 @@ async function catalogItemInput(client: PoolClient, groupId: string, body: Recor
     pageCount: body.pageCount,
     runtimeMinutes: body.runtimeMinutes,
     attributes: body.attributes,
+    catalogRecommendedByUserId: body.catalogRecommendedByUserId,
+    catalogRecommendedByExternalId: body.catalogRecommendedByExternalId,
+    catalogOriginNote: body.catalogOriginNote,
   };
 }
 
@@ -687,6 +716,122 @@ export async function renameCatalogLibrary(session: SessionContext, libraryId: s
   });
 }
 
+// --- External recommenders ----------------------------------------------
+
+export interface CatalogRecommender {
+  id: string;
+  displayName: string;
+}
+
+function mapRecommender(row: { id: string; display_name: string }): CatalogRecommender {
+  return { id: row.id, displayName: row.display_name };
+}
+
+async function listRecommendersWithClient(client: PoolClient, groupId: string): Promise<CatalogRecommender[]> {
+  const rows = await client.query<{ id: string; display_name: string }>(
+    "SELECT id, display_name FROM catalog_recommenders WHERE group_id = $1 AND archived_at IS NULL ORDER BY display_name",
+    [groupId],
+  );
+  return rows.rows.map(mapRecommender);
+}
+
+async function insertRecommender(
+  client: PoolClient,
+  groupId: string,
+  userId: string,
+  body: Record<string, unknown>,
+): Promise<CatalogRecommender> {
+  const displayName = stringValue(body, "displayName", { min: 1, max: 80 })!;
+  const id = publicId();
+  await client.query(
+    `INSERT INTO catalog_recommenders (id, group_id, display_name, created_by_user_id, created_at, updated_at)
+     VALUES ($1,$2,$3,$4,now(),now())`,
+    [id, groupId, displayName, userId],
+  );
+  await writeAudit(client, groupId, null, userId, "catalog.recommender_created", "catalog_recommender", id, null, { displayName });
+  return { id, displayName };
+}
+
+async function renameRecommenderWithClient(
+  client: PoolClient,
+  actorUserId: string,
+  groupId: string,
+  recommenderId: string,
+  displayName: string,
+): Promise<void> {
+  const result = await client.query(
+    "UPDATE catalog_recommenders SET display_name = $1, updated_at = now() WHERE id = $2 AND group_id = $3 AND archived_at IS NULL",
+    [displayName, recommenderId, groupId],
+  );
+  if (result.rowCount === 0) throw new ApiError(404, "not_found", "Pessoa indicadora não encontrada.");
+  await writeAudit(client, groupId, null, actorUserId, "catalog.recommender_renamed", "catalog_recommender", recommenderId, null, { displayName });
+}
+
+export async function listGroupRecommenders(session: SessionContext, groupId: string) {
+  return withClient(async (client) => {
+    await requireStandardWorkspace(client, session.user.id, groupId, ["owner", "admin", "participant"]);
+    return { recommenders: await listRecommendersWithClient(client, groupId) };
+  });
+}
+
+export async function createGroupRecommender(session: SessionContext, groupId: string, body: Record<string, unknown>) {
+  return inTransaction(async (client) => {
+    await requireStandardWorkspace(client, session.user.id, groupId, ["owner", "admin"]);
+    return insertRecommender(client, groupId, session.user.id, body);
+  });
+}
+
+export async function listPersonalRecommenders(session: SessionContext) {
+  return withClient(async (client) => {
+    const workspaceId = await personalWorkspaceId(client, session.user.id);
+    return { recommenders: workspaceId ? await listRecommendersWithClient(client, workspaceId) : [] };
+  });
+}
+
+export async function createPersonalRecommender(session: SessionContext, body: Record<string, unknown>) {
+  const workspaceId = await ensurePersonalWorkspace(session.user.id);
+  return inTransaction((client) => insertRecommender(client, workspaceId, session.user.id, body));
+}
+
+/** Renames any of the caller's saved external names by id — same group-agnostic shape as `renameCatalogLibrary`. */
+export async function renameCatalogRecommender(session: SessionContext, recommenderId: string, body: Record<string, unknown>) {
+  return inTransaction(async (client) => {
+    const recommender = await oneOrNull<{ group_id: string; group_kind: "standard" | "personal"; owner_user_id: string }>(
+      client,
+      `SELECT cr.group_id, g.kind AS group_kind, g.owner_user_id
+         FROM catalog_recommenders cr JOIN groups g ON g.id = cr.group_id
+        WHERE cr.id = $1 AND cr.archived_at IS NULL AND g.archived_at IS NULL AND g.deleted_at IS NULL`,
+      [recommenderId],
+    );
+    if (!recommender) throw new ApiError(404, "not_found", "Pessoa indicadora não encontrada.");
+    if (recommender.group_kind === "personal") {
+      if (recommender.owner_user_id !== session.user.id) {
+        throw new ApiError(403, "forbidden", "Este nome não pertence ao seu acervo pessoal.");
+      }
+    } else {
+      await requireGroupRole(session.user.id, recommender.group_id, ["owner", "admin"], client);
+    }
+    const displayName = stringValue(body, "displayName", { min: 1, max: 80 })!;
+    await renameRecommenderWithClient(client, session.user.id, recommender.group_id, recommenderId, displayName);
+    return { id: recommenderId, displayName };
+  });
+}
+
+/**
+ * Validates an external recommender id against the workspace — the same
+ * scoping guarantee `resolveRecommender` (items.ts) gives a member id, so a
+ * challenge item or catalog item can never point at another workspace's
+ * saved name.
+ */
+export async function assertRecommenderInGroup(client: PoolClient, recommenderId: string, groupId: string): Promise<void> {
+  const row = await oneOrNull<{ id: string }>(
+    client,
+    "SELECT id FROM catalog_recommenders WHERE id = $1 AND group_id = $2 AND archived_at IS NULL",
+    [recommenderId, groupId],
+  );
+  if (!row) throw new ApiError(400, "invalid_recommender", "Pessoa indicadora não encontrada neste espaço.");
+}
+
 /**
  * Applies whichever of title/author/year/main genre/pages the body actually sets,
  * leaving the rest untouched. Shared by the catalog item's own PATCH route and
@@ -718,6 +863,44 @@ export async function applyCatalogItemUpdate(
       params.push(value);
       sets.push(`${column} = $${params.length}`);
     }
+  }
+  // Catalog-level provenance — "how this item entered the library" — is a
+  // separate assignment from any one challenge round's own recommender
+  // (`challenge_items.recommended_by_*`, set through items.ts). Distinct body
+  // keys on purpose: an edit that touches a round's recommender must never
+  // fall through and silently overwrite this one (Phase 6).
+  const touchesCatalogRecommender = Object.hasOwn(body, "catalogRecommendedByUserId")
+    || Object.hasOwn(body, "catalogRecommendedByExternalId")
+    || Object.hasOwn(body, "catalogOriginNote");
+  if (touchesCatalogRecommender) {
+    const wantedUser = typeof body.catalogRecommendedByUserId === "string" ? body.catalogRecommendedByUserId : "";
+    const wantedExternal = typeof body.catalogRecommendedByExternalId === "string" ? body.catalogRecommendedByExternalId : "";
+    const wantedNote = typeof body.catalogOriginNote === "string" ? body.catalogOriginNote.trim() : "";
+    if ([wantedUser, wantedExternal, wantedNote].filter(Boolean).length > 1) {
+      throw new ApiError(400, "invalid_recommender", "Escolha apenas uma origem: membro, nome salvo ou nota — não mais de uma.");
+    }
+    let recommendedByUserId: string | null = null;
+    let recommendedByExternalId: string | null = null;
+    let originNote: string | null = null;
+    if (wantedUser) {
+      const member = await oneOrNull<{ user_id: string }>(client,
+        "SELECT user_id FROM group_members WHERE group_id=$1 AND user_id=$2 AND removed_at IS NULL",
+        [groupId, wantedUser]);
+      if (!member) throw new ApiError(400, "invalid_recommender", "Quem indicou precisa ser um membro do espaço.");
+      recommendedByUserId = wantedUser;
+    } else if (wantedExternal) {
+      await assertRecommenderInGroup(client, wantedExternal, groupId);
+      recommendedByExternalId = wantedExternal;
+    } else if (wantedNote) {
+      if (wantedNote.length > 200) throw new ApiError(400, "invalid_text", "Nota de origem pode ter no máximo 200 caracteres.");
+      originNote = wantedNote;
+    }
+    params.push(recommendedByUserId, recommendedByExternalId, originNote);
+    sets.push(
+      `recommended_by_user_id = $${params.length - 2}`,
+      `recommended_by_external_id = $${params.length - 1}`,
+      `origin_note = $${params.length}`,
+    );
   }
   if (sets.length) {
     await client.query(

@@ -15,7 +15,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { users } from "./accounts";
-import { catalogItems } from "./catalog";
+import { catalogItems, catalogRecommenders } from "./catalog";
 import { challengeCheckpoints, challenges } from "./challenges";
 import { timestamptz } from "./columns";
 
@@ -124,9 +124,14 @@ export const challengeItems = pgTable(
     entryTypeId: text("entry_type_id"),
     catalogItemId: text("catalog_item_id").references(() => catalogItems.id, { onDelete: "restrict" }),
     recommendedByUserId: text("recommended_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    // A saved external name (Phase 6) — the group-scoping check is app-level
+    // (`resolveRecommender` in items.ts), same as `recommended_by_user_id`'s
+    // membership check; `challenge_items` has no direct `group_id` column to
+    // hang a composite FK off, unlike `catalog_items`.
+    recommendedByExternalId: text("recommended_by_external_id").references(() => catalogRecommenders.id, { onDelete: "set null" }),
     // Free-text provenance for an item nobody in the group recommended
-    // ("list found online"). Mutually informational with `recommended_by_user_id`
-    // — never a stand-in for a real participant.
+    // ("list found online"). Mutually exclusive with both recommender fields
+    // above — never a stand-in for a real participant or a saved name.
     originNote: text("origin_note"),
     semanticKey: text("semantic_key").notNull(),
     title: text("title").notNull(),
@@ -169,6 +174,10 @@ export const challengeItems = pgTable(
     check(
       "challenge_items_origin_note_check",
       sql`${table.originNote} is null or char_length(btrim(${table.originNote})) between 1 and 200`,
+    ),
+    check(
+      "challenge_items_recommender_exclusive_check",
+      sql`num_nonnulls(${table.recommendedByUserId}, ${table.recommendedByExternalId}, ${table.originNote}) <= 1`,
     ),
     check("challenge_items_position_check", sql`${table.position} >= 0`),
     check(

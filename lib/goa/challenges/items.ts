@@ -14,6 +14,7 @@ import { ApiError, stringValue } from "../../http";
 import {
   applyCatalogItemUpdate,
   assertCatalogItemInGroup,
+  assertRecommenderInGroup,
   createCatalogItem,
   resolveItemKind,
   upsertCatalogItem,
@@ -407,11 +408,12 @@ export async function updateChallengeItem(
 
     const current = await oneOrNull<{
       title: string; description: string | null; recommended_by_user_id: string | null;
+      recommended_by_external_id: string | null;
       catalog_item_id: string | null; origin_note: string | null; checkpoint_id: string | null;
       opens_at: Date | null; due_at: Date | null; schedule_precision: "date" | "datetime";
     }>(
       client,
-      `SELECT title, description, recommended_by_user_id, catalog_item_id, origin_note, checkpoint_id,
+      `SELECT title, description, recommended_by_user_id, recommended_by_external_id, catalog_item_id, origin_note, checkpoint_id,
               opens_at, due_at, schedule_precision
          FROM challenge_items
         WHERE id = $1 AND challenge_id = $2 AND archived_at IS NULL
@@ -425,9 +427,6 @@ export async function updateChallengeItem(
       const description = body.description === undefined
         ? current.description
         : stringValue(body, "description", { max: 2_000, optional: true }) ?? null;
-      const originNote = Object.hasOwn(body, "originNote")
-        ? stringValue(body, "originNote", { max: 200, optional: true }) ?? null
-        : current.origin_note;
       let checkpointId = current.checkpoint_id;
       if (Object.hasOwn(body, "checkpointId")) {
         const wanted = typeof body.checkpointId === "string" ? body.checkpointId : "";
@@ -446,18 +445,35 @@ export async function updateChallengeItem(
         && !(typeof body.author === "string" && body.author.trim())) {
         throw new ApiError(400, "invalid_item", "Informe o autor de cada livro.");
       }
-      const touchesRecommender = Object.hasOwn(body, "recommendedByUserId");
+      // A member, a saved external name, or a free-text note — never more
+      // than one (Phase 6: `challenge_items_recommender_exclusive_check`).
+      const touchesRecommender = Object.hasOwn(body, "recommendedByUserId")
+        || Object.hasOwn(body, "recommendedByExternalId")
+        || Object.hasOwn(body, "originNote");
       let recommendedBy = current.recommended_by_user_id;
+      let recommendedByExternal = current.recommended_by_external_id;
+      let originNote = current.origin_note;
       if (touchesRecommender) {
-        const wanted = typeof body.recommendedByUserId === "string" ? body.recommendedByUserId : "";
-        if (!wanted) {
-          recommendedBy = null;
-        } else {
+        const wantedUser = typeof body.recommendedByUserId === "string" ? body.recommendedByUserId : "";
+        const wantedExternal = typeof body.recommendedByExternalId === "string" ? body.recommendedByExternalId : "";
+        const wantedNote = typeof body.originNote === "string" ? body.originNote.trim() : "";
+        if ([wantedUser, wantedExternal, wantedNote].filter(Boolean).length > 1) {
+          throw new ApiError(400, "invalid_recommender", "Escolha apenas uma origem: um membro, um nome salvo ou uma nota — não mais de uma.");
+        }
+        recommendedBy = null;
+        recommendedByExternal = null;
+        originNote = null;
+        if (wantedUser) {
           const member = await oneOrNull<{ user_id: string }>(client,
             "SELECT user_id FROM group_members WHERE group_id=$1 AND user_id=$2 AND removed_at IS NULL",
-            [access.challenge.group_id, wanted]);
+            [access.challenge.group_id, wantedUser]);
           if (!member) throw new ApiError(400, "invalid_recommender", "Quem indicou precisa ser um membro do grupo.");
-          recommendedBy = wanted;
+          recommendedBy = wantedUser;
+        } else if (wantedExternal) {
+          await assertRecommenderInGroup(client, wantedExternal, access.challenge.group_id);
+          recommendedByExternal = wantedExternal;
+        } else if (wantedNote) {
+          originNote = stringValue({ originNote: wantedNote }, "originNote", { max: 200, optional: true }) ?? null;
         }
       }
       const schedule = resolveItemSchedule(body, access.challenge.time_zone, {
@@ -467,10 +483,10 @@ export async function updateChallengeItem(
         `UPDATE challenge_items
             SET title = $3, description = $4, recommended_by_user_id = $5,
                 origin_note = $6, checkpoint_id = $7, opens_at = $8, due_at = $9,
-                schedule_precision = $10, updated_at = now()
+                schedule_precision = $10, recommended_by_external_id = $11, updated_at = now()
           WHERE id = $1 AND challenge_id = $2`,
         [itemId, challengeId, title, description, recommendedBy, originNote, checkpointId,
-          schedule.opensAt, schedule.dueAt, schedule.schedulePrecision],
+          schedule.opensAt, schedule.dueAt, schedule.schedulePrecision, recommendedByExternal],
       );
       // Autor, ano, gênero principal, páginas e duração vivem no item do acervo
       // compartilhado, não no item do desafio — atualizá-los aqui é o que deixa
@@ -491,12 +507,14 @@ export async function updateChallengeItem(
         itemId,
         { title: current.title, description: current.description },
         {
-          title, description, ...(touchesRecommender ? { recommendedByUserId: recommendedBy } : {}),
+          title, description,
+          ...(touchesRecommender ? { recommendedByUserId: recommendedBy, recommendedByExternalId: recommendedByExternal, originNote } : {}),
           ...(schedule.touched ? { opensAt: schedule.opensAt, dueAt: schedule.dueAt, schedulePrecision: schedule.schedulePrecision } : {}),
         },
       );
       return {
-        id: itemId, title, description, ...(touchesRecommender ? { recommendedByUserId: recommendedBy } : {}),
+        id: itemId, title, description,
+        ...(touchesRecommender ? { recommendedByUserId: recommendedBy, recommendedByExternalId: recommendedByExternal, originNote } : {}),
         opensAt: schedule.opensAt?.toISOString() ?? null,
         dueAt: schedule.dueAt?.toISOString() ?? null,
         schedulePrecision: schedule.schedulePrecision,
