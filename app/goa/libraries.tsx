@@ -123,12 +123,16 @@ export function useCatalogRecommenders(scope: CatalogScope, enabled = true): Loa
 export function LibraryPills({
   choices,
   kind,
+  selectedKinds,
   onPick,
   onNew,
   label,
 }: {
   choices: LibraryChoice[];
-  kind: string | null;
+  /** The one chosen library, for a single-choice picker… */
+  kind?: string | null;
+  /** …or every chosen one, for a picker that combines several. */
+  selectedKinds?: readonly string[];
   onPick: (choice: LibraryChoice) => void;
   onNew?: () => void;
   label: string;
@@ -138,7 +142,7 @@ export function LibraryPills({
   return (
     <div className="flex flex-wrap gap-2" role="group" aria-label={label}>
       {choices.map((choice) => {
-        const active = choice.kind === kind;
+        const active = selectedKinds ? selectedKinds.includes(choice.kind) : choice.kind === kind;
         return (
           <button
             key={choice.kind}

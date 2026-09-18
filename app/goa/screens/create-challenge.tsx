@@ -6,6 +6,8 @@ import { useState } from "react";
 import { useGoaFormat } from "../format";
 import { cleanFields, FieldBuilder, presetFields } from "../fields";
 import { CineItemsEditor, type CineRow, cineRowsToInput } from "../cine-items";
+import { API_PATHS, apiRequest } from "../api";
+import { useCsrf } from "../csrf";
 import { NewLibraryDialog } from "../library-dialogs";
 import { type CatalogScope, LibraryGlyph, LibraryPills, libraryChoices, useCatalogLibraries } from "../libraries";
 import { tablesStarterProperties } from "../property-inputs";
@@ -14,6 +16,11 @@ import type { ChallengeCreationInput, ChallengeField, ChallengeRule, CreatableRe
 import { BackButton, backLinkClass, Button, cardClass, cx, EmptyState, Field, inputClass, labelClass, PageHeading, SchedulePeriodFields, StatusMessage } from "../ui";
 
 /** Where a recipe's items come from: a fixed built-in library, the workspace's Tables library, one the creator picks, or none at all. */
+/** Stands in for the workspace's Tables library until it exists (it is created when the challenge is). */
+const TABLES_PLACEHOLDER = "tables";
+
+type EditorLibrary = { id: Id | null; kind: string; source: "screens" | "pages" | "tables" | "custom"; label: string | null };
+
 type LibraryMode = "film" | "book" | "tables" | "pick" | null;
 
 const RECIPES: Array<{ key: CreatableRecipeKey; library: LibraryMode; scheduleMode: "period" | "none"; glyph: string; icon?: "tables" | "custom" }> = [
@@ -59,8 +66,11 @@ export function CreateChallengeScreen({
   const [participantIds, setParticipantIds] = useState<Id[]>(group?.members?.map((member) => member.id) ?? []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pickedKind, setPickedKind] = useState<string | null>(null);
+  // Libraries beyond the recipe's own that the items also come from, by kind (Movies and TV Shows in one list).
+  const [extraKinds, setExtraKinds] = useState<string[]>([]);
+  const [itemProblem, setItemProblem] = useState<"author" | null>(null);
   const [newLibrary, setNewLibrary] = useState(false);
+  const csrf = useCsrf();
   const scope: CatalogScope = personal || !group ? "personal" : { groupId: group.id };
   const { data: libraries, reload: reloadLibraries } = useCatalogLibraries(scope);
   const recommendationsEnabled = personal || group?.recommendationsEnabled !== false;
@@ -69,17 +79,25 @@ export function CreateChallengeScreen({
   const libraryMode = recipeMeta?.library ?? null;
   const tracksCatalog = libraryMode !== null;
   const choices = libraryChoices(libraries ?? []);
-  // The library the items belong to: fixed for Cinema/Bookshelf/Library, the workspace's Tables for
-  // Tables, and whichever the creator picks for a custom challenge (none yet until they do).
-  const itemLibrary = libraryMode === "film" || libraryMode === "book"
-    ? { id: libraries?.find((library) => library.kind === libraryMode)?.id ?? null, kind: libraryMode }
+  // The recipe's own library — Screens for Cinema, Pages for the book recipes, the workspace's Tables for
+  // Tables — plus whichever others the creator ticks. `custom` has none of its own: everything is ticked.
+  const tablesLibrary = libraries?.find((library) => library.source === "tables");
+  const ownLibrary: EditorLibrary | null = libraryMode === "film" || libraryMode === "book"
+    ? {
+        id: libraries?.find((library) => library.kind === libraryMode)?.id ?? null,
+        kind: libraryMode, source: libraryMode === "film" ? "screens" : "pages",
+        label: libraries?.find((library) => library.kind === libraryMode)?.label ?? null,
+      }
     : libraryMode === "tables"
-      ? (() => { const tables = libraries?.find((library) => library.source === "tables"); return { id: tables?.id ?? null, kind: tables?.kind ?? "tables" }; })()
-      : libraryMode === "pick"
-        ? (() => { const picked = choices.find((choice) => choice.kind === pickedKind); return picked ? { id: picked.id, kind: picked.kind } : null; })()
-        : null;
-  const isBookLibrary = itemLibrary?.kind === "book";
-  const tablesFallback = libraryMode === "tables" ? tablesStarterProperties((key) => tl(`tablesStarter.${key}`)) : undefined;
+      ? { id: tablesLibrary?.id ?? null, kind: tablesLibrary?.kind ?? TABLES_PLACEHOLDER, source: "tables", label: tablesLibrary?.label ?? null }
+      : null;
+  const extraChoices = choices.filter((choice) => choice.kind !== ownLibrary?.kind && !(libraryMode === "tables" && choice.source === "tables"));
+  const extraLibraries = extraKinds.flatMap((kind) => extraChoices.filter((choice) => choice.kind === kind));
+  const itemLibraries: EditorLibrary[] = [...(ownLibrary ? [ownLibrary] : []), ...extraLibraries];
+  const allBooks = itemLibraries.length > 0 && itemLibraries.every((library) => library.kind === "book");
+  const tablesFallback = ownLibrary && !ownLibrary.id && libraryMode === "tables"
+    ? { [ownLibrary.kind]: tablesStarterProperties((key) => tl(`tablesStarter.${key}`)) }
+    : undefined;
   // Expectation is the pre-watch rating for the two "rate each title" recipes.
   const canOfferExpectation = recipe === "cinema" || recipe === "bookshelf";
   // A no-catalog recipe (Hábito) has nothing to list, so the checkpoints step
@@ -103,7 +121,17 @@ export function CreateChallengeScreen({
     setTitle(t(`recipes.${next}.title`));
     setScheduleMode(meta.scheduleMode);
     setCineItems([]);
-    setPickedKind(null);
+    setExtraKinds([]);
+  }
+
+  function toggleExtraLibrary(kind: string) {
+    if (extraKinds.includes(kind)) {
+      // Items already listed for a library that's being taken out go with it.
+      setCineItems((rows) => rows.filter((row) => row.libraryKind !== kind));
+      setExtraKinds((current) => current.filter((entry) => entry !== kind));
+    } else {
+      setExtraKinds((current) => [...current, kind]);
+    }
   }
 
   function nextStep() {
@@ -131,16 +159,15 @@ export function CreateChallengeScreen({
       setError(t("errNoFields"));
       return;
     }
-    if (step === checkpointsStep && libraryMode === "pick" && !itemLibrary) {
+    if (step === checkpointsStep && !itemLibraries.length) {
       setError(t("errPickLibrary"));
       return;
     }
     if (step === checkpointsStep && tracksCatalog && !itemInputs.length) {
-      setError(isBookLibrary ? t("errNoBooks") : t("errNoItems"));
+      setError(allBooks ? t("errNoBooks") : t("errNoItems"));
       return;
     }
-    if (step === checkpointsStep && isBookLibrary
-      && cineItems.some((row) => row.title.trim() && !row.author.trim())) {
+    if (step === checkpointsStep && itemProblem === "author") {
       setError(t("errNoAuthor"));
       return;
     }
@@ -149,25 +176,33 @@ export function CreateChallengeScreen({
 
   async function submit() {
     if (!recipe) return;
-    if (libraryMode === "pick" && !itemLibrary) {
+    if (tracksCatalog && !itemLibraries.length) {
       setError(t("errPickLibrary"));
       return;
     }
     if (tracksCatalog && !itemInputs.length) {
-      setError(isBookLibrary ? t("errNoBooks") : t("errNoItems"));
+      setError(allBooks ? t("errNoBooks") : t("errNoItems"));
       return;
     }
-    if (isBookLibrary && cineItems.some((row) => row.title.trim() && !row.author.trim())) {
+    if (itemProblem === "author") {
       setError(t("errNoAuthor"));
       return;
     }
     setBusy(true);
     setError(null);
     try {
+      // The Tables preset's library is created the moment it is first needed, so its items can name it.
+      let items = itemInputs;
+      if (libraryMode === "tables" && ownLibrary && !ownLibrary.id) {
+        const made = await apiRequest<{ id: Id }>(API_PATHS.catalogWorkspace(scope).libraries, {
+          method: "POST", body: { source: "tables" }, csrfToken: csrf,
+        });
+        items = itemInputs.map(({ libraryKind, ...item }) => (libraryKind === ownLibrary.kind ? { ...item, libraryId: made.id } : { ...item, ...(libraryKind ? { libraryKind } : {}) }));
+      }
       await onCreate({
         recipe,
-        ...(libraryMode === "pick" && itemLibrary
-          ? (itemLibrary.id ? { libraryId: itemLibrary.id } : { libraryKind: itemLibrary.kind })
+        ...(extraLibraries.length
+          ? { libraries: extraLibraries.map((library) => (library.id ? { libraryId: library.id } : { libraryKind: library.kind })) }
           : {}),
         title: title.trim(),
         description: description.trim(),
@@ -181,7 +216,7 @@ export function CreateChallengeScreen({
         startsOn: scheduleMode === "period" ? startsOn : null,
         endsOn: scheduleMode === "period" ? endsOn : null,
         fields: cleanFields(fields),
-        items: tracksCatalog ? itemInputs : [],
+        items: tracksCatalog ? items : [],
         generateDaily: false,
         expectation: canOfferExpectation && expectation,
         participantIds,
@@ -248,28 +283,26 @@ export function CreateChallengeScreen({
         {step === checkpointsStep && tracksCatalog ? (
           <div>
             <h2 className="text-xl font-light">{t("checkpointsTitle")}</h2>
-            <p className="mt-1 mb-4 text-sm leading-6 text-[var(--muted)]">{recipe === "bookshelf" ? t("bookshelfItemsHint") : libraryMode === "tables" ? t("tablesItemsHint") : libraryMode === "pick" ? t("customItemsHint") : isBookLibrary ? t("bookItemsHint") : t("cineItemsHint")}</p>
-            {libraryMode === "pick" ? (
-              <Field label={t("libraryLabel")} hint={t("libraryHint")} plain className="mb-5">
-                <LibraryPills
-                  choices={choices}
-                  kind={pickedKind}
-                  label={t("libraryLabel")}
-                  onPick={(choice) => { if (choice.kind !== pickedKind) { setPickedKind(choice.kind); setCineItems([]); } }}
-                  onNew={() => setNewLibrary(true)}
-                />
-              </Field>
-            ) : null}
-            {itemLibrary ? (
+            <p className="mt-1 mb-4 text-sm leading-6 text-[var(--muted)]">{recipe === "bookshelf" ? t("bookshelfItemsHint") : libraryMode === "tables" ? t("tablesItemsHint") : libraryMode === "pick" ? t("customItemsHint") : allBooks ? t("bookItemsHint") : t("cineItemsHint")}</p>
+            <Field label={libraryMode === "pick" ? t("libraryLabel") : t("moreLibrariesLabel")} hint={libraryMode === "pick" ? t("libraryHint") : t("moreLibrariesHint")} plain className="mb-5">
+              <LibraryPills
+                choices={extraChoices}
+                selectedKinds={extraKinds}
+                label={libraryMode === "pick" ? t("libraryLabel") : t("moreLibrariesLabel")}
+                onPick={(choice) => toggleExtraLibrary(choice.kind)}
+                onNew={() => setNewLibrary(true)}
+              />
+            </Field>
+            {itemLibraries.length ? (
               <CineItemsEditor
-                key={itemLibrary.kind}
                 value={cineItems}
                 onChange={setCineItems}
                 members={personal ? [] : group?.members ?? []}
                 scope={scope}
-                library={itemLibrary}
+                libraries={itemLibraries}
                 recommendationsEnabled={recommendationsEnabled}
                 fallbackProperties={tablesFallback}
+                onProblem={setItemProblem}
               />
             ) : <EmptyState title={t("pickLibraryFirst")} />}
             <p className="mt-3 text-xs font-medium text-[var(--muted)]">{t("itemsCount", { count: itemInputs.length })}</p>
@@ -300,7 +333,7 @@ export function CreateChallengeScreen({
         <NewLibraryDialog
           scope={scope}
           onCancel={() => setNewLibrary(false)}
-          onCreated={(made) => { setNewLibrary(false); reloadLibraries(); setPickedKind(made.kind); setCineItems([]); }}
+          onCreated={(made) => { setNewLibrary(false); reloadLibraries(); setExtraKinds((current) => [...current, made.kind]); }}
         />
       ) : null}
     </main>

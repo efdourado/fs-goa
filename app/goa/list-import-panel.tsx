@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { useGoaFormat } from "./format";
-import type { ChallengeItemInput, ImportPreview } from "./types";
+import type { ChallengeItemInput, Id, ImportPreview } from "./types";
 import { Button, cx, inputClass, StatusMessage } from "./ui";
 
 const MAPPABLE = ["", "title", "year", "author", "pageCount", "runtimeMinutes", "mainGenre", "recommendedBy", "origin"] as const;
@@ -15,12 +15,16 @@ const PLACEHOLDER = `[
 ]`;
 
 export function ListImportPanel({
+  library,
   onPreview,
   onCommit,
 }: {
-  onPreview: (body: { json: string; mapping?: Record<string, string> }) => Promise<ImportPreview>;
+  /** Which of the challenge's libraries the imported items go to — needed once it has more than one. */
+  library?: { id: Id | null; kind: string } | null;
+  onPreview: (body: { json: string; mapping?: Record<string, string>; libraryId?: Id; libraryKind?: string }) => Promise<ImportPreview>;
   onCommit: (items: ChallengeItemInput[]) => Promise<void>;
 }) {
+  const target = library ? (library.id ? { libraryId: library.id } : { libraryKind: library.kind }) : {};
   const t = useTranslations("listImport");
   const tc = useTranslations("common");
   const f = useGoaFormat();
@@ -38,7 +42,7 @@ export function ListImportPanel({
     setDone(null);
     try {
       const cleanMapping = Object.fromEntries(Object.entries(mapping).filter(([, value]) => value));
-      const result = await onPreview({ json, ...(Object.keys(cleanMapping).length ? { mapping: cleanMapping } : {}) });
+      const result = await onPreview({ json, ...target, ...(Object.keys(cleanMapping).length ? { mapping: cleanMapping } : {}) });
       setPreview(result);
       // Default: drop invalid rows and ones already in the challenge.
       setExcluded(new Set(result.rows.filter((row) => !row.valid || row.duplicateInChallenge).map((row) => row.index)));
@@ -72,6 +76,7 @@ export function ListImportPanel({
       const items: ChallengeItemInput[] = rows.map((row, position) => ({
         title: row.title,
         position,
+        ...target,
         ...(row.existingCatalogItemId ? { catalogItemId: row.existingCatalogItemId } : {}),
         ...(row.mapped.author ? { author: row.mapped.author } : {}),
         ...(row.mapped.year ? { year: row.mapped.year } : {}),

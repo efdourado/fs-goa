@@ -227,7 +227,7 @@ export interface ChallengeItem {
   schedulePrecision?: "date" | "datetime";
   date?: string | null;
   status?: "scheduled" | "open" | "past_due" | "closed";
-  catalogItem?: Pick<CatalogItem, "id" | "title" | "author" | "year" | "pageCount" | "runtimeMinutes" | "mainGenre"> | null;
+  catalogItem?: Pick<CatalogItem, "id" | "kind" | "title" | "author" | "year" | "pageCount" | "runtimeMinutes" | "mainGenre" | "attributes"> | null;
   recommendedBy?: RecommenderRef | null;
   /** Free-text provenance for an item nobody in the group recommended. */
   originNote?: string | null;
@@ -469,7 +469,7 @@ export const CHALLENGE_COLOR_TAGS: readonly ChallengeColorTag[] = [
   "green", "blue", "violet", "coral", "amber", "rose",
 ];
 
-/** The library a challenge draws its items from. `id` is null for a built-in one that has never held an item. */
+/** A library a challenge draws items from. `id` is null for a built-in one that has never held an item. */
 export interface ChallengeLibraryRef {
   id: Id | null;
   kind: string;
@@ -479,7 +479,8 @@ export interface ChallengeLibraryRef {
 
 export interface ChallengeDetail extends ChallengeSummary {
   fields: ChallengeField[];
-  library?: ChallengeLibraryRef | null;
+  /** Every library the challenge draws items from, in the order they were linked. */
+  libraries?: ChallengeLibraryRef[];
   /** False when the group switched recommendations off — `recommendedBy` / `originNote` then arrive empty. */
   recommendationsEnabled?: boolean;
   entryTypes: EntryTypeView[];
@@ -602,10 +603,12 @@ export type Screen =
 
 export interface ChallengeCreationInput {
   recipe: CreatableRecipeKey;
-  /** `custom` only: which library the items come from. `tables` falls back to the workspace's Tables library. */
-  libraryId?: Id;
-  /** `custom` only, for a built-in library (`film` / `book`) that has no id yet. */
-  libraryKind?: string;
+  /**
+   * Libraries to draw items from *in addition to* the recipe's own (Cinema → Screens, Tables → the
+   * workspace's Tables). `custom` has no library of its own, so this is where it gets all of them.
+   * A built-in library that has never held an item has no id yet, so it goes by `libraryKind`.
+   */
+  libraries?: Array<{ libraryId?: Id; libraryKind?: string }>;
   title: string;
   description: string;
   ruleSections: ChallengeRule[];
@@ -626,6 +629,9 @@ export interface ChallengeItemInput {
   recommendedByUserId?: Id;
   /** Free-text provenance when no participant recommended it. */
   originNote?: string;
+  /** Which of the challenge's libraries this item belongs to (`libraryKind` for a built-in with no id yet). */
+  libraryId?: Id;
+  libraryKind?: string;
   /** A saved outside recommender (mutually exclusive with `recommendedByUserId` / `originNote`). */
   recommendedByExternalId?: Id;
   /** Values for the library's custom properties, keyed by their attribute key. */

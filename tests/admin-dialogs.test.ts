@@ -69,7 +69,7 @@ const catalogChallenge = {
 test("ItemEditorDialog folds the catalogue facts behind a details, author for books", () => {
   const item = { id: "i1", title: "Torto Arado", catalogItem: { id: "c1", title: "Torto Arado", author: "Itamar", year: 2019 } } as unknown as ChallengeItem;
   const html = renderWithIntl(createElement(ItemEditorDialog, {
-    item, challenge: catalogChallenge, members: [], library: { kind: "book" }, scope: "personal", recommendationsEnabled: false,
+    item, challenge: catalogChallenge, members: [], library: { id: null, kind: "book" }, scope: "personal", recommendationsEnabled: false,
     onCancel: () => undefined, onSave: noop,
   }));
   assert.match(html, /value="Torto Arado"/);

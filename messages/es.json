@@ -179,7 +179,10 @@
       "attribute_has_data": "Esa propiedad ya tiene valores en ítems y no se puede quitar — ocúltala.",
       "title_required": "Todo ítem necesita un nombre, así que el título no se puede ocultar.",
       "catalog_item_in_use": "Ese ítem está en un desafío en curso. Sácalo del desafío primero.",
-      "shared_unsupported": "Una respuesta compartida necesita un desafío con ítems."
+      "shared_unsupported": "Una respuesta compartida necesita un desafío con ítems.",
+      "library_required": "Este desafío usa más de una biblioteca — elige de cuál viene cada ítem.",
+      "library_not_linked": "Esa biblioteca no forma parte de este desafío. Añádela primero al desafío.",
+      "library_in_use": "Hay ítems de este desafío que vienen de esa biblioteca. Quítalos antes de sacar la biblioteca."
     },
     "byStatus": {
       "401": "Tu sesión expiró. Vuelve a entrar.",
@@ -515,7 +518,8 @@
     "jsonNoItems": "La lista está vacía — pega al menos un objeto con \"title\".",
     "pasteSummary": "{total} entradas leídas · {added} agregadas · {invalid} sin título o fuera de formato · {duplicates} ya en la lista.",
     "pasteSummaryNone": "No se agregó ninguna entrada: todas estaban repetidas, sin \"title\" o fuera del formato de objeto.",
-    "pasteUnknownKeys": "Claves ignoradas por no tener correspondencia: {keys}. Completa esos datos en los campos de cada ítem."
+    "pasteUnknownKeys": "Claves ignoradas por no tener correspondencia: {keys}. Completa esos datos en los campos de cada ítem.",
+    "addTo": "Añadir en"
   },
   "createChallenge": {
     "errPickTemplate": "Elige una plantilla y completa el título.",
@@ -614,7 +618,9 @@
     "customItemsHint": "Añade los ítems a seguir — uno por línea. Cada ítem se convierte en algo que todos pueden registrar.",
     "libraryLabel": "Biblioteca",
     "libraryHint": "De qué lista de cosas parte este desafío.",
-    "pickLibraryFirst": "Elige una biblioteca para empezar a añadir ítems"
+    "pickLibraryFirst": "Elige una biblioteca para empezar a añadir ítems",
+    "moreLibrariesLabel": "Buscar ítems también en",
+    "moreLibrariesHint": "Opcional. Combina bibliotecas en un solo desafío — Películas y Series, por ejemplo. Cada ítem sigue perteneciendo a una sola."
   },
   "adminChallenge": {
     "back": "Volver",
@@ -856,7 +862,12 @@
     "itemWindowOrder": "El plazo no puede ser antes de la apertura.",
     "errPickLibrary": "Elige la biblioteca de la que vienen los ítems.",
     "libraryLabel": "Biblioteca",
-    "libraryHint": "De qué lista de cosas parte este desafío."
+    "libraryHint": "De qué lista de cosas parte este desafío.",
+    "librariesLabel": "Bibliotecas",
+    "unlinkLibrary": "Quitar {name} de este desafío",
+    "linkLibrary": "Añadir biblioteca",
+    "librariesHint": "De dónde vienen los ítems de este desafío. Puedes añadir más bibliotecas en cualquier momento.",
+    "librariesCombined": "Los ítems pueden venir de cualquiera de ellas. Una biblioteca solo se puede quitar cuando ningún ítem suyo está en el desafío."
   },
   "visibility": {
     "title": "Quién ve estas respuestas",
@@ -1203,7 +1214,7 @@
     ],
     "librariesTitle": "Cómo organiza Goa lo que sigues",
     "libraries": [
-      "Cada espacio personal y cada grupo tiene sus propias bibliotecas: las listas de las cosas que sigues. Screens es la evolución más amplia de Películas: películas, series, temporadas, episodios, documentales o la unidad que elijas. Pages es la evolución más amplia de Libros, y también sirve para artículos y otras lecturas. Tables es un punto de partida configurable para lugares como restaurantes, bares y cafés. Puedes crear bibliotecas más específicas, como Partidos o Series — y renombrar, ocultar o reordenar cada propiedad de cualquiera de ellas.",
+      "Cada espacio personal y cada grupo tiene sus propias bibliotecas: las listas de las cosas que sigues. Screens es la evolución más amplia de Películas: películas, series, temporadas, episodios, documentales o la unidad que elijas. Pages es la evolución más amplia de Libros, y también sirve para artículos y otras lecturas. Tables es un punto de partida configurable para lugares como restaurantes, bares y cafés. Puedes crear bibliotecas más específicas, como Partidos o Series — y renombrar, ocultar o reordenar cada propiedad de cualquiera de ellas. Un mismo desafío puede buscar ítems en varias bibliotecas a la vez — Películas y Series en una sola lista.",
       "Quien crea decide qué representa un ítem. Una trilogía puede ser un ítem o tres; una temporada puede ser un ítem o cada episodio. Goa no adivina: completa duración, páginas o año solo cuando los sepas. La duración media de un episodio y la duración total son números distintos, y mezclarlos dejaría mal los totales de tiempo.",
       "Completado significa que las respuestas obligatorias del ítem están registradas, nada más. En un partido de fútbol puede ser solo “lo seguí”; no hace falta haberlo visto. Una respuesta que todos comparten, como el marcador final, se registra una vez para el grupo, mientras que las notas y los comentarios siguen siendo individuales. Si dos personas editan una respuesta compartida a la vez, a la segunda se le avisa y ve el valor más reciente en lugar de sobrescribirlo.",
       "Las recomendaciones dicen de dónde vino un ítem: un miembro, alguien de fuera del grupo guardado por nombre, o una nota corta. Cada grupo puede desactivarlas por completo. Los ítems también pueden tener una agenda opcional — días enteros o una hora exacta — que alimenta una agenda. Un plazo es solo un recordatorio: nunca impide que alguien responda."

@@ -71,6 +71,37 @@ export function useLibraryProperties(choice: { id: Id | null; kind: string } | n
   return loaded?.id === id ? { properties: loaded.properties, error: loaded.error } : { properties: null, error: null };
 }
 
+/**
+ * The properties of several libraries at once, by library kind — what a challenge
+ * that combines libraries needs so each row can offer its own library's fields. A
+ * library with no row yet (a built-in nobody has used) gets its known columns; one
+ * still loading is simply absent from the map.
+ */
+export function useLibrariesProperties(
+  libraries: ReadonlyArray<{ id: Id | null; kind: string }>,
+  refreshKey = 0,
+): Map<string, LibraryProperty[]> {
+  const [loaded, setLoaded] = useState<{ refreshKey: number; byId: Record<Id, LibraryProperty[]> }>({ refreshKey, byId: {} });
+  const ids = libraries.flatMap((library) => (library.id ? [library.id] : [])).join(",");
+  useEffect(() => {
+    const controller = new AbortController();
+    for (const id of ids ? ids.split(",") : []) {
+      apiRequest<{ properties: LibraryProperty[] }>(API_PATHS.libraryProperties(id), { signal: controller.signal })
+        .then((response) => setLoaded((current) => ({
+          refreshKey, byId: { ...(current.refreshKey === refreshKey ? current.byId : {}), [id]: response.properties },
+        })))
+        .catch(() => undefined);
+    }
+    return () => controller.abort();
+  }, [ids, refreshKey]);
+  const map = new Map<string, LibraryProperty[]>();
+  for (const library of libraries) {
+    if (!library.id) map.set(library.kind, builtInProperties(library.kind));
+    else if (loaded.byId[library.id]) map.set(library.kind, loaded.byId[library.id]);
+  }
+  return map;
+}
+
 /** A property's name as shown: whatever the library renamed it to, else its default. */
 export function useNativePropertyName(): (property: Pick<LibraryProperty, "key" | "label" | "storage">) => string {
   const t = useTranslations("libraries");

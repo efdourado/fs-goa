@@ -11,7 +11,8 @@ import { ConfirmDialog, FormDialog } from "../dialog";
 import { AddSharedResponseDialog, RemoveResponseDialog, SharedGlyph, SharedResponsePanel } from "../shared-responses";
 import { cleanFields, FIELD_TYPES, FieldConfigInputs, newFieldConfig, uniqueFieldKey } from "../fields";
 import { ItemScheduleFields, sameSchedule, scheduleBody, scheduleProblem, type ScheduleValue, scheduleValueOf } from "../item-schedule";
-import { type CatalogScope, LibraryPills, libraryChoices, useCatalogLibraries } from "../libraries";
+import { type CatalogScope, LibraryGlyph, LibraryPills, libraryChoices, useCatalogLibraries, useLibraryName } from "../libraries";
+import { bodyFromValues, editableProperties, PropertyInputs, type PropertyValues, useLibraryProperties, valuesFromItem } from "../property-inputs";
 import { ListImportPanel } from "../list-import-panel";
 import { recommenderBody, recommenderLine, RecommenderPicker, recommenderFromItem, type RecommenderValue, sameRecommender, useRecommenderSource } from "../recommender-picker";
 import { RuleSectionsEditor, visibleRuleSections } from "../rules";
@@ -49,7 +50,7 @@ import {
   StatusMessage,
   Toggle,
 } from "../ui";
-import { formatRuntime, isLivingList, itemIdForEntry, recipeCatalogKind, valuesAsRecord } from "../utils";
+import { formatRuntime, isLivingList, itemIdForEntry, valuesAsRecord } from "../utils";
 import { AdminMetrics } from "./metrics";
 
 /** A curation list that shows its first `preview` rows, the rest behind a toggle. */
@@ -593,7 +594,8 @@ export function ItemEditorDialog({
   item: ChallengeItem;
   challenge: ChallengeDetail;
   members: Member[];
-  library: Pick<ChallengeLibraryRef, "kind"> | null;
+  /** The library this item's catalogue entry belongs to — decides which properties it can hold. */
+  library: Pick<ChallengeLibraryRef, "id" | "kind"> | null;
   scope: CatalogScope;
   recommendationsEnabled: boolean;
   onCancel: () => void;
@@ -603,54 +605,45 @@ export function ItemEditorDialog({
   const tCine = useTranslations("cineItems");
   const tc = useTranslations("common");
   const f = useGoaFormat();
-  const catalogKind = library?.kind === "book" ? "book" : library?.kind === "film" ? "film" : null;
-  const hasCatalog = Boolean(item.catalogItem);
+  const catalogItem = item.catalogItem ?? null;
   const timeZone = challenge.timeZone ?? "America/Sao_Paulo";
   const isItem = challenge.submissionMode === "item";
   const initialRecommender = recommenderFromItem(item.recommendedBy, item.originNote);
   const initialSchedule = scheduleValueOf(item, timeZone);
-  const initial = {
-    title: item.title,
-    description: item.description ?? "",
-    author: item.catalogItem?.author ?? "",
-    year: item.catalogItem?.year ? String(item.catalogItem.year) : "",
-    pages: item.catalogItem?.pageCount ? String(item.catalogItem.pageCount) : "",
-    runtime: item.catalogItem?.runtimeMinutes ? String(item.catalogItem.runtimeMinutes) : "",
-    genre: item.catalogItem?.mainGenre ?? "",
-  };
+  const initial = { title: item.title, description: item.description ?? "" };
   const [draft, setDraft] = useState(initial);
   const [recommender, setRecommender] = useState<RecommenderValue>(initialRecommender);
   const [schedule, setSchedule] = useState<ScheduleValue>(initialSchedule);
+  // The library's own properties — renamed, hidden or added by its owners — not a fixed set of columns.
+  const { properties } = useLibraryProperties(catalogItem && library ? library : null);
+  const initialValues = useMemo(() => (catalogItem && properties ? valuesFromItem(properties, catalogItem) : {}), [catalogItem, properties]);
+  const [editedValues, setEditedValues] = useState<PropertyValues | null>(null);
+  const values = editedValues ?? initialValues;
   const source = useRecommenderSource(scope, recommendationsEnabled && isItem);
   const set = (patch: Partial<typeof draft>) => setDraft((current) => ({ ...current, ...patch }));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const recommenderChanged = !sameRecommender(recommender, initialRecommender);
   const scheduleChanged = !sameSchedule(schedule, initialSchedule);
-  const dirty = JSON.stringify(draft) !== JSON.stringify(initial) || recommenderChanged || scheduleChanged;
-  const catalogPreview = [draft.year, draft.genre, catalogKind === "book" ? (draft.pages && `${draft.pages} p.`) : (draft.runtime && `${draft.runtime} min`)].filter(Boolean).join(" · ");
+  const dirty = JSON.stringify(draft) !== JSON.stringify(initial) || recommenderChanged || scheduleChanged || editedValues !== null;
+  const authorNeeded = library?.kind === "book" && properties?.find((property) => property.key === "author")?.hidden !== true;
+  const factsPreview = properties
+    ? editableProperties(properties).map((property) => values[property.key]).filter(Boolean).slice(0, 3).join(" · ")
+    : "";
 
   async function submit() {
-    if (hasCatalog && catalogKind === "book" && !draft.author.trim()) { setError(tCine("authorRequired")); return; }
+    if (catalogItem && authorNeeded && !(values.author ?? "").trim()) { setError(tCine("authorRequired")); return; }
     if (scheduleProblem(schedule)) { setError(t("itemWindowOrder")); return; }
     setBusy(true);
     setError(null);
     try {
-      const year = Number(draft.year);
-      const pages = Number(draft.pages);
-      const runtime = Number(draft.runtime);
+      const facts = catalogItem && properties && editedValues ? bodyFromValues(properties, editedValues, "update") : null;
       await onSave({
         title: draft.title.trim(),
         description: draft.description.trim(),
         ...(isItem && recommendationsEnabled && recommenderChanged ? recommenderBody(recommender, "item", true) : {}),
         ...(isItem && scheduleChanged ? scheduleBody(schedule, timeZone) : {}),
-        ...(hasCatalog && catalogKind ? {
-          year: Number.isInteger(year) && year > 0 ? year : null,
-          mainGenre: draft.genre.trim(),
-          ...(catalogKind === "book"
-            ? { author: draft.author.trim(), pageCount: Number.isInteger(pages) && pages > 0 ? pages : null }
-            : { runtimeMinutes: Number.isInteger(runtime) && runtime > 0 ? runtime : null }),
-        } : {}),
+        ...(facts ? { ...facts.native, ...(Object.keys(facts.attributes).length ? { attributes: facts.attributes } : {}) } : {}),
       });
     } catch (cause) { setError(f.error(cause)); setBusy(false); }
   }
@@ -675,29 +668,89 @@ export function ItemEditorDialog({
         <RecommenderPicker value={recommender} onChange={setRecommender} members={members} source={source} />
       ) : null}
       {isItem ? <ItemScheduleFields value={schedule} onChange={setSchedule} timeZone={timeZone} /> : null}
-      {hasCatalog && catalogKind ? (
-        <Disclosure summary={tCine("catalogFacts")} preview={catalogPreview || undefined} defaultOpen={catalogKind === "book" && !draft.author.trim()}>
-          <div className="space-y-4 pt-2">
-            {catalogKind === "book" ? (
-              <Field label={tCine("author")} error={draft.author.trim() ? null : tCine("authorRequired")}>
-                <input className={cx(inputClass, draft.author.trim() ? "" : "border-[var(--danger)]")} value={draft.author} maxLength={200} placeholder={tCine("authorPlaceholder")} onChange={(event) => set({ author: event.target.value })} />
-              </Field>
-            ) : null}
-            <div className="grid gap-3 sm:grid-cols-3">
-              <Field label={tCine(catalogKind === "film" ? "latestYear" : "year")}>
-                <input className={inputClass} type="number" inputMode="numeric" min={1870} max={2200} value={draft.year} onChange={(event) => set({ year: event.target.value })} />
-              </Field>
-              {catalogKind === "book" ? (
-                <Field label={tCine("pages")}><input className={inputClass} type="number" inputMode="numeric" min={1} max={100000} value={draft.pages} onChange={(event) => set({ pages: event.target.value })} /></Field>
-              ) : (
-                <Field label={tCine("runtimeMinutes")}><input className={inputClass} type="number" inputMode="numeric" min={1} max={2000} value={draft.runtime} placeholder={tCine("runtimeMinutesPlaceholder")} onChange={(event) => set({ runtime: event.target.value })} /></Field>
-              )}
-              <Field label={tCine("mainGenre")}><input className={inputClass} value={draft.genre} maxLength={80} placeholder={tCine("mainGenrePlaceholder")} onChange={(event) => set({ genre: event.target.value })} /></Field>
-            </div>
+      {catalogItem && properties && editableProperties(properties).length ? (
+        <Disclosure summary={tCine("catalogFacts")} preview={factsPreview || undefined} defaultOpen={authorNeeded && !(values.author ?? "").trim()}>
+          <div className="pt-2">
+            <PropertyInputs properties={properties} values={values} onChange={(key, value) => setEditedValues({ ...values, [key]: value })} />
           </div>
         </Disclosure>
       ) : null}
     </FormDialog>
+  );
+}
+
+/**
+ * The libraries this challenge draws its items from. Each can be dropped while none of
+ * its items are in the challenge, and any workspace library can be linked — that is
+ * how one challenge combines Movies and TV Shows.
+ */
+function ChallengeLibrariesBar({
+  challenge,
+  scope,
+  onLink,
+  onUnlink,
+}: {
+  challenge: ChallengeDetail;
+  scope: CatalogScope;
+  onLink: (spec: { libraryId?: Id; libraryKind?: string }) => Promise<void>;
+  onUnlink: (libraryId: Id) => Promise<void>;
+}) {
+  const t = useTranslations("adminChallenge");
+  const f = useGoaFormat();
+  const libraryName = useLibraryName();
+  const { data: workspaceLibraries } = useCatalogLibraries(scope);
+  const linked = challenge.libraries ?? [];
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const locked = challenge.status === "closed";
+  const available = libraryChoices(workspaceLibraries ?? []).filter((choice) => !linked.some((library) => library.kind === choice.kind));
+  const itemsIn = (kind: string) => challenge.items.filter((item) => item.catalogItem?.kind === kind).length;
+
+  async function run(work: () => Promise<void>) {
+    setBusy(true);
+    setError(null);
+    try { await work(); } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="mb-6">
+      <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t("librariesLabel")}>
+        <span className="mr-1 text-[13px] font-medium">{t("librariesLabel")}</span>
+        {linked.map((library) => {
+          const removable = !locked && library.id !== null && itemsIn(library.kind) === 0;
+          return (
+            <span key={library.kind} className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-[var(--main-line)] bg-[var(--main-soft)] pl-3 pr-1 text-sm text-[var(--main-strong)]">
+              <LibraryGlyph source={library.source} />
+              {libraryName(library)}
+              <span className="text-[11px] text-[var(--muted)]">{itemsIn(library.kind)}</span>
+              {removable ? (
+                <button
+                  type="button"
+                  disabled={busy}
+                  aria-label={t("unlinkLibrary", { name: libraryName(library) })}
+                  title={t("unlinkLibrary", { name: libraryName(library) })}
+                  className="ml-0.5 grid h-6 w-6 cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--main)]/15 hover:text-[var(--ink)] disabled:opacity-50"
+                  onClick={() => void run(() => onUnlink(library.id!))}
+                >
+                  <svg viewBox="0 0 16 16" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" strokeLinecap="round" /></svg>
+                </button>
+              ) : <span className="w-2" />}
+            </span>
+          );
+        })}
+        {!locked && available.length ? (
+          <ActionMenu label={t("linkLibrary")}>
+            {available.map((choice) => (
+              <ActionMenuItem key={choice.kind} disabled={busy} onClick={() => void run(() => onLink(choice.id ? { libraryId: choice.id } : { libraryKind: choice.kind }))}>
+                <span className="inline-flex items-center gap-2"><LibraryGlyph source={choice.source} />{libraryName(choice)}</span>
+              </ActionMenuItem>
+            ))}
+          </ActionMenu>
+        ) : null}
+      </div>
+      <p className="mt-1.5 text-xs leading-5 text-[var(--muted)]">{linked.length > 1 ? t("librariesCombined") : t("librariesHint")}</p>
+      {error ? <div className="mt-2"><StatusMessage error={error} /></div> : null}
+    </div>
   );
 }
 
@@ -709,6 +762,8 @@ function AdminItems({
   onUpdate,
   onArchive,
   onPreviewImport,
+  onLinkLibrary,
+  onUnlinkLibrary,
 }: {
   challenge: ChallengeDetail;
   group?: GroupSummary;
@@ -717,26 +772,26 @@ function AdminItems({
   onUpdate: (itemId: Id, payload: ItemUpdatePayload) => Promise<void>;
   onArchive: (itemId: Id) => Promise<void>;
   onPreviewImport: (body: { json: string; mapping?: Record<string, string> }) => Promise<ImportPreview>;
+  onLinkLibrary: (spec: { libraryId?: Id; libraryKind?: string }) => Promise<void>;
+  onUnlinkLibrary: (libraryId: Id) => Promise<void>;
 }) {
   const t = useTranslations("adminChallenge");
   const tCine = useTranslations("cineItems");
   const tc = useTranslations("common");
   const f = useGoaFormat();
+  const libraryName = useLibraryName();
   const members = group?.members ?? [];
   const scope: CatalogScope = group ? { groupId: group.id } : "personal";
   const recommendationsEnabled = group ? group.recommendationsEnabled !== false : true;
   const timeZone = challenge.timeZone ?? "America/Sao_Paulo";
-  // The library items come from: the challenge's own, or — for a custom challenge that has
-  // no items left to tell — whichever the admin picks here.
-  const { data: libraries } = useCatalogLibraries(scope);
-  const [pickedKind, setPickedKind] = useState<string | null>(null);
-  const choices = libraryChoices(libraries ?? []);
-  const needsPick = !challenge.library && challenge.recipeKey === "custom";
-  const pickedChoice = choices.find((choice) => choice.kind === pickedKind) ?? null;
-  const library: Pick<ChallengeLibraryRef, "id" | "kind"> | null = challenge.library
-    ?? (needsPick ? (pickedChoice ? { id: pickedChoice.id, kind: pickedChoice.kind } : null) : { id: null, kind: recipeCatalogKind(challenge.recipeKey) ?? "film" });
-  const isBookLibrary = library?.kind === "book";
+  // The libraries the challenge is linked to, stored on the challenge. One with none yet (a custom
+  // challenge, or one whose libraries were all unlinked) links its first here, below.
+  const { data: workspaceLibraries } = useCatalogLibraries(scope);
+  const linked = challenge.libraries ?? [];
+  const itemLibrary = (item: ChallengeItem) => linked.find((library) => library.kind === item.catalogItem?.kind) ?? null;
   const [newItemRows, setNewItemRows] = useState<CineRow[]>([]);
+  const [itemProblem, setItemProblem] = useState<"author" | null>(null);
+  const [importTarget, setImportTarget] = useState<Pick<ChallengeLibraryRef, "id" | "kind"> | null>(null);
   const startsOn = challenge.startsOn ?? "";
   const endsOn = challenge.endsOn ?? "";
   const undatedDaily = challenge.submissionMode === "daily" && !challenge.startsOn && !challenge.endsOn;
@@ -773,14 +828,8 @@ function AdminItems({
       } else {
         const items = cineRowsToInput(newItemRows);
         if (!items.length) { setError(t("errNoItem")); setBusy(false); return; }
-        if (isBookLibrary && newItemRows.some((row) => row.title.trim() && !row.author.trim())) {
-          setError(tCine("authorRequired")); setBusy(false); return;
-        }
-        if (needsPick && !pickedChoice) { setError(t("errPickLibrary")); setBusy(false); return; }
-        await onAdd({
-          items,
-          ...(needsPick && pickedChoice ? (pickedChoice.id ? { libraryId: pickedChoice.id } : { libraryKind: pickedChoice.kind }) : {}),
-        });
+        if (itemProblem === "author") { setError(tCine("authorRequired")); setBusy(false); return; }
+        await onAdd({ items });
         setNewItemRows([]);
         setSuccess(t("itemsAdded"));
         setShowAdd(false);
@@ -795,6 +844,7 @@ function AdminItems({
         description={undatedDaily ? t("itemsHintUndatedDaily") : datedDaily ? t("itemsHintDatedDaily") : challenge.status === "closed" ? t("itemsHintClosed") : t("itemsHintDefault")}
         action={canShowAdd ? <Button variant={showAdd ? "secondary" : "primary"} onClick={() => setShowAdd((open) => !open)}>{showAdd ? tc("close") : challenge.submissionMode === "daily" ? t("generateCheckpoints") : `＋ ${t("add")}`}</Button> : undefined}
       />
+      {challenge.submissionMode === "item" ? <ChallengeLibrariesBar challenge={challenge} scope={scope} onLink={onLinkLibrary} onUnlink={onUnlinkLibrary} /> : null}
       <div className="mb-5"><StatusMessage error={error} success={success} /></div>
 
       {showAdd && canShowAdd ? (
@@ -803,21 +853,32 @@ function AdminItems({
             {challenge.submissionMode === "daily"
               ? <><p className="text-xs leading-5 text-[var(--muted)]">{t("dailyGenNote")}</p><Field label={t("firstDay")}><input className={inputClass} type="date" value={startsOn} readOnly required /></Field><Field label={t("lastDay")}><input className={inputClass} type="date" min={startsOn} value={endsOn} readOnly required /></Field></>
               : <>
-                  {needsPick ? (
+                  {linked.length ? (
+                    <CineItemsEditor value={newItemRows} onChange={setNewItemRows} members={members} scope={scope} libraries={linked} recommendationsEnabled={recommendationsEnabled} onProblem={setItemProblem} onTargetChange={setImportTarget} />
+                  ) : (
                     <Field label={t("libraryLabel")} hint={t("libraryHint")} plain>
-                      <LibraryPills choices={choices} kind={pickedKind} label={t("libraryLabel")} onPick={(choice) => { setPickedKind(choice.kind); setNewItemRows([]); }} />
+                      <LibraryPills
+                        choices={libraryChoices(workspaceLibraries ?? [])}
+                        selectedKinds={[]}
+                        label={t("libraryLabel")}
+                        onPick={(choice) => {
+                          setError(null);
+                          void onLinkLibrary(choice.id ? { libraryId: choice.id } : { libraryKind: choice.kind }).catch((cause: unknown) => setError(f.error(cause)));
+                        }}
+                      />
                     </Field>
-                  ) : null}
-                  {library ? (
-                    <CineItemsEditor key={library.kind} value={newItemRows} onChange={setNewItemRows} members={members} scope={scope} library={library} recommendationsEnabled={recommendationsEnabled} />
-                  ) : null}
+                  )}
                   {challenge.status === "active" ? <p className="text-xs leading-5 text-[var(--muted)]">{t("activeItemsNote")}</p> : null}
                 </>}
             <Button type="submit" disabled={busy || (challenge.submissionMode === "daily" ? challenge.status !== "draft" : !canAddItems || !newItemRows.length)}>{busy ? tc("saving") : challenge.submissionMode === "daily" ? t("generateCheckpoints") : t("add")}</Button>
           </form>
-          {challenge.submissionMode === "item" ? (
+          {challenge.submissionMode === "item" && linked.length ? (
             <div className="mt-5 border-t border-[var(--line)] pt-5">
-              <ListImportPanel onPreview={onPreviewImport} onCommit={(items: ChallengeItemInput[]) => onAdd({ items })} />
+              <ListImportPanel
+                library={importTarget}
+                onPreview={onPreviewImport}
+                onCommit={(items: ChallengeItemInput[]) => onAdd({ items })}
+              />
             </div>
           ) : null}
         </div>
@@ -831,6 +892,7 @@ function AdminItems({
                 <span className="w-6 shrink-0 pt-0.5 text-sm tabular-nums text-[var(--muted)]">{String(index + 1).padStart(2, "0")}</span>
                 <span className="min-w-0">
                   <strong className="block text-base font-medium">{item.title}{item.catalogItem?.year ? ` (${item.catalogItem.year})` : ""}</strong>
+                  {linked.length > 1 && itemLibrary(item) ? <small className="mt-1 inline-flex items-center gap-1.5 text-[var(--muted)]"><LibraryGlyph source={itemLibrary(item)!.source} className="h-3 w-3" />{libraryName(itemLibrary(item)!)}</small> : null}
                   {item.description ? <span className="mt-1 block text-sm leading-6 text-[var(--muted)]">{item.description}</span> : null}
                   {(recommendationsEnabled && (item.recommendedBy || item.originNote)) || item.catalogItem?.author || item.catalogItem?.mainGenre || item.catalogItem?.runtimeMinutes ? <small className="mt-1 block text-[var(--muted)]">{[item.catalogItem?.author ? tCine("byAuthor", { name: item.catalogItem.author }) : null, recommendationsEnabled ? recommenderLine(item.recommendedBy, item.originNote, (name) => t("itemRecommendedByLine", { name }), (text) => t("itemOriginLine", { text })) : null, item.catalogItem?.mainGenre || null, formatRuntime(item.catalogItem?.runtimeMinutes)].filter(Boolean).join(" · ")}</small> : null}
                   {item.date ? <small className="mt-1 block text-[var(--muted)]">{f.date(item.date)}</small> : f.itemWindow(item, timeZone) ? <small className="mt-1 inline-flex items-center gap-1.5 text-[var(--muted)]"><svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><circle cx="8" cy="8" r="5.8" /><path d="M8 5v3.2l2 1.2" strokeLinecap="round" /></svg>{f.itemWindow(item, timeZone)}</small> : null}
@@ -859,7 +921,7 @@ function AdminItems({
           item={editing}
           challenge={challenge}
           members={members}
-          library={challenge.library ?? library}
+          library={itemLibrary(editing)}
           scope={scope}
           recommendationsEnabled={recommendationsEnabled}
           onCancel={() => setEditing(null)}
@@ -1026,6 +1088,8 @@ export function AdminScreen({
   onRemoveEntryType,
   onSaveSharedPolicy,
   onAddItems,
+  onLinkLibrary,
+  onUnlinkLibrary,
   onUpdateItem,
   onArchiveItem,
   onPreviewImport,
@@ -1060,6 +1124,8 @@ export function AdminScreen({
   onRemoveEntryType: (entryTypeId: Id, archiveMetrics: boolean) => Promise<void>;
   onSaveSharedPolicy: (entryTypeId: Id, policy: SharedEditPolicy) => Promise<void>;
   onAddItems: (payload: Record<string, unknown>) => Promise<void>;
+  onLinkLibrary: (spec: { libraryId?: Id; libraryKind?: string }) => Promise<void>;
+  onUnlinkLibrary: (libraryId: Id) => Promise<void>;
   onUpdateItem: (itemId: Id, payload: ItemUpdatePayload) => Promise<void>;
   onArchiveItem: (itemId: Id) => Promise<void>;
   onPreviewImport: (body: { json: string; mapping?: Record<string, string> }) => Promise<ImportPreview>;
@@ -1124,7 +1190,7 @@ export function AdminScreen({
       <div className="mx-auto max-w-5xl px-4 pt-8 sm:px-6 sm:pt-10">
         {activeTab === "overview" ? <div className="mx-auto max-w-2xl space-y-10"><AdminOverview challenge={challenge} onSave={onSaveBasics} />{!isPersonal ? <div className="border-t border-[var(--line)] pt-8"><AdminParticipants key={challenge.participants.map((p) => p.userId ?? p.id).join(",")} challenge={challenge} group={group} onSave={onSaveParticipants} /></div> : null}</div> : null}
         {activeTab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.visibilityPolicy}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} onSaveVisibility={onSaveEntryTypeVisibility} onSetExpectation={onSetExpectation} onAddShared={onAddSharedResponse} onRemoveType={onRemoveEntryType} onSavePolicy={onSaveSharedPolicy} /> : null}
-        {activeTab === "items" ? <AdminItems challenge={challenge} group={group} entries={entries} onAdd={onAddItems} onUpdate={onUpdateItem} onArchive={onArchiveItem} onPreviewImport={onPreviewImport} /> : null}
+        {activeTab === "items" ? <AdminItems challenge={challenge} group={group} entries={entries} onAdd={onAddItems} onUpdate={onUpdateItem} onArchive={onArchiveItem} onPreviewImport={onPreviewImport} onLinkLibrary={onLinkLibrary} onUnlinkLibrary={onUnlinkLibrary} /> : null}
         {activeTab === "checkpoints" ? <CheckpointPlanner key={`${challenge.id}:${challenge.checkpoints.map((cp) => cp.id).join(",")}`} challenge={challenge} onSaveCheckpoints={onSaveCheckpoints} onAssign={onAssignCheckpointItems} /> : null}
         {activeTab === "metrics" ? <AdminMetrics challenge={challenge} onAdd={onAddMetric} onUpdate={onUpdateMetric} onDelete={onDeleteMetric} /> : null}
         {activeTab === "results" ? <AdminResults challenge={challenge} entries={entries} onSave={onSaveResult} /> : null}
