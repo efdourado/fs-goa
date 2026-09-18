@@ -250,6 +250,11 @@ export const catalogAttributeDefs = pgTable(
     label: text("label").notNull(),
     type: text("type").notNull(),
     position: integer("position").notNull().default(0),
+    // Hides the property from normal item forms and displays while keeping
+    // every stored value — same meaning as
+    // `catalog_native_property_configs.hidden`. Archiving, by contrast, is
+    // refused once a value exists.
+    hidden: boolean("hidden").notNull().default(false),
     createdByUserId: text("created_by_user_id")
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),

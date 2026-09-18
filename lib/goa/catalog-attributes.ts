@@ -43,14 +43,14 @@ async function personalWorkspaceId(client: PoolClient, userId: string): Promise<
 // `requireStandardWorkspace`/`personalWorkspaceId` above: no runtime import
 // cycle. See `catalog.ts` for the full rationale — every
 // `catalog_attribute_defs` row needs a backing `catalog_libraries` row now.
-function sourceForKind(kind: CatalogKind): "screens" | "pages" | "custom" {
+function sourceForKind(kind: string): "screens" | "pages" | "custom" {
   return kind === "film" ? "screens" : kind === "book" ? "pages" : "custom";
 }
 
 async function ensureCatalogLibrary(
   client: PoolClient,
   groupId: string,
-  kind: CatalogKind,
+  kind: string,
   actorUserId: string,
 ): Promise<void> {
   await client.query(
@@ -75,11 +75,12 @@ const ATTRIBUTE_TYPES = new Set<string>(["text", "number", "date", "boolean"]);
 
 export interface CatalogAttributeDef {
   id: string;
-  kind: CatalogKind;
+  kind: string;
   key: string;
   label: string;
   type: CatalogAttributeType;
   position: number;
+  hidden: boolean;
 }
 
 export interface CatalogAttributeValue {
@@ -89,20 +90,93 @@ export interface CatalogAttributeValue {
   value: string | number | boolean;
 }
 
-function mapDef(row: { id: string; kind: string; semantic_key: string; label: string; type: string; position: number }): CatalogAttributeDef {
-  return { id: row.id, kind: row.kind as CatalogKind, key: row.semantic_key, label: row.label, type: row.type as CatalogAttributeType, position: row.position };
+function mapDef(row: { id: string; kind: string; semantic_key: string; label: string; type: string; position: number; hidden: boolean }): CatalogAttributeDef {
+  return { id: row.id, kind: row.kind, key: row.semantic_key, label: row.label, type: row.type as CatalogAttributeType, position: row.position, hidden: row.hidden };
 }
 
-async function listDefsWithClient(client: PoolClient, groupId: string, kind?: string): Promise<CatalogAttributeDef[]> {
-  const rows = await client.query<{ id: string; kind: string; semantic_key: string; label: string; type: string; position: number }>(
+/**
+ * The library's live attribute definitions. Hidden ones are left out by
+ * default — "hidden" means out of normal item forms and displays, values kept
+ * — so only the property editor asks for `includeHidden`.
+ */
+export async function listDefsWithClient(
+  client: PoolClient,
+  groupId: string,
+  kind?: string,
+  includeHidden = false,
+): Promise<CatalogAttributeDef[]> {
+  const rows = await client.query<{ id: string; kind: string; semantic_key: string; label: string; type: string; position: number; hidden: boolean }>(
     kind
-      ? `SELECT id, kind, semantic_key, label, type, position FROM catalog_attribute_defs
-          WHERE group_id = $1 AND kind = $2 AND archived_at IS NULL ORDER BY position`
-      : `SELECT id, kind, semantic_key, label, type, position FROM catalog_attribute_defs
-          WHERE group_id = $1 AND archived_at IS NULL ORDER BY kind, position`,
-    kind ? [groupId, kind] : [groupId],
+      ? `SELECT id, kind, semantic_key, label, type, position, hidden FROM catalog_attribute_defs
+          WHERE group_id = $1 AND kind = $2 AND archived_at IS NULL AND ($3::boolean OR NOT hidden) ORDER BY position`
+      : `SELECT id, kind, semantic_key, label, type, position, hidden FROM catalog_attribute_defs
+          WHERE group_id = $1 AND archived_at IS NULL AND ($2::boolean OR NOT hidden) ORDER BY kind, position`,
+    kind ? [groupId, kind, includeHidden] : [groupId, includeHidden],
   );
   return rows.rows.map(mapDef);
+}
+
+/** A library (by id, any workspace library) or one of the frozen film/book/other kinds. */
+async function resolveDefKind(client: PoolClient, groupId: string, input: { kind?: unknown; libraryId?: unknown }): Promise<string> {
+  if (typeof input.libraryId === "string" && input.libraryId) {
+    const row = await oneOrNull<{ kind: string }>(
+      client,
+      "SELECT kind FROM catalog_libraries WHERE id = $1 AND group_id = $2 AND archived_at IS NULL",
+      [input.libraryId, groupId],
+    );
+    if (!row) throw new ApiError(400, "invalid_library", "Biblioteca não encontrada.");
+    return row.kind;
+  }
+  if (input.kind !== "film" && input.kind !== "book" && input.kind !== "other") {
+    throw new ApiError(400, "invalid_kind", "Escolha uma biblioteca.");
+  }
+  return input.kind;
+}
+
+/** Starter properties a new library begins with (e.g. Tables). Each one is an ordinary def: renamable, hideable, archivable. */
+export async function seedAttributeDefs(
+  client: PoolClient,
+  groupId: string,
+  kind: string,
+  actorUserId: string,
+  defs: Array<{ key: string; label: string; type: CatalogAttributeType }>,
+): Promise<void> {
+  for (let index = 0; index < defs.length; index += 1) {
+    await client.query(
+      `INSERT INTO catalog_attribute_defs
+        (id, group_id, kind, semantic_key, label, type, position, created_by_user_id, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,now(),now())
+       ON CONFLICT (group_id, kind, semantic_key) DO NOTHING`,
+      [publicId(), groupId, kind, defs[index].key, defs[index].label, defs[index].type, index, actorUserId],
+    );
+  }
+}
+
+/** Renames, hides/shows, or reorders one attribute definition. Values and metrics that read it are untouched. */
+export async function updateAttributeDef(
+  client: PoolClient,
+  actorUserId: string,
+  groupId: string,
+  defId: string,
+  patch: { label?: string; hidden?: boolean; position?: number },
+): Promise<void> {
+  const def = await oneOrNull<{ label: string }>(
+    client,
+    "SELECT label FROM catalog_attribute_defs WHERE id = $1 AND group_id = $2 AND archived_at IS NULL FOR UPDATE",
+    [defId, groupId],
+  );
+  if (!def) throw new ApiError(404, "not_found", "Propriedade não encontrada.");
+  const sets: string[] = [];
+  const params: unknown[] = [defId];
+  for (const [column, value] of [["label", patch.label], ["hidden", patch.hidden], ["position", patch.position]] as const) {
+    if (value !== undefined) {
+      params.push(value);
+      sets.push(`${column} = $${params.length}`);
+    }
+  }
+  if (!sets.length) return;
+  await client.query(`UPDATE catalog_attribute_defs SET ${sets.join(", ")}, updated_at = now() WHERE id = $1`, params);
+  await writeAudit(client, groupId, null, actorUserId, "catalog.property_updated", "catalog_attribute_def", defId, { label: def.label }, patch);
 }
 
 async function insertDef(
@@ -111,10 +185,7 @@ async function insertDef(
   groupId: string,
   body: Record<string, unknown>,
 ): Promise<CatalogAttributeDef> {
-  const kind = body.kind;
-  if (kind !== "film" && kind !== "book" && kind !== "other") {
-    throw new ApiError(400, "invalid_kind", "Escolha filme ou livro.");
-  }
+  const kind = await resolveDefKind(client, groupId, body);
   const label = stringValue(body, "label", { min: 1, max: 80 })!;
   const type = typeof body.type === "string" ? body.type : "text";
   if (!ATTRIBUTE_TYPES.has(type)) throw new ApiError(400, "invalid_type", "Tipo de atributo inválido.");
@@ -143,7 +214,7 @@ async function insertDef(
     [id, groupId, kind, key, label, type, position, actorUserId],
   );
   await writeAudit(client, groupId, null, actorUserId, "catalog.attribute_created", "catalog_attribute_def", id, null, { kind, label, type });
-  return { id, kind, key, label, type: type as CatalogAttributeType, position };
+  return { id, kind, key, label, type: type as CatalogAttributeType, position, hidden: false };
 }
 
 async function archiveDefWithClient(client: PoolClient, actorUserId: string, groupId: string, defId: string): Promise<void> {
@@ -243,10 +314,13 @@ export async function attributeValuesForItems(
     catalog_item_id: string; key: string; label: string; type: string;
     text_value: string | null; number_value: number | null; date_value: string | null; boolean_value: boolean | null;
   }>(
+    // `date_value::text`: a plain date must stay the calendar day that was
+    // stored — the driver would otherwise hand back a Date at local midnight,
+    // which serializes as a different instant depending on the server's zone.
     `SELECT v.catalog_item_id, d.semantic_key AS key, d.label, d.type,
-            v.text_value, v.number_value, v.date_value, v.boolean_value
+            v.text_value, v.number_value, v.date_value::text AS date_value, v.boolean_value
        FROM catalog_attribute_values v
-       JOIN catalog_attribute_defs d ON d.id = v.attribute_def_id AND d.archived_at IS NULL
+       JOIN catalog_attribute_defs d ON d.id = v.attribute_def_id AND d.archived_at IS NULL AND NOT d.hidden
       WHERE v.catalog_item_id = ANY($1::text[])
       ORDER BY d.position`,
     [catalogItemIds],
@@ -266,10 +340,20 @@ export async function attributeValuesForItems(
 
 // --- Group-scoped endpoints -------------------------------------------------
 
-export async function listGroupCatalogAttributes(session: SessionContext, groupId: string, kind?: CatalogKind) {
+/** `filter.libraryId` picks any workspace library; `filter.kind` still works for the frozen film/book/other kinds. */
+async function filterKind(client: PoolClient, groupId: string, filter: { kind?: CatalogKind; libraryId?: string | null }): Promise<string | undefined> {
+  if (filter.libraryId) return resolveDefKind(client, groupId, { libraryId: filter.libraryId });
+  return filter.kind;
+}
+
+export async function listGroupCatalogAttributes(
+  session: SessionContext,
+  groupId: string,
+  filter: { kind?: CatalogKind; libraryId?: string | null } = {},
+) {
   return withClient(async (client) => {
     await requireStandardWorkspace(client, session.user.id, groupId, ["owner", "admin", "participant"]);
-    return { attributes: await listDefsWithClient(client, groupId, kind) };
+    return { attributes: await listDefsWithClient(client, groupId, await filterKind(client, groupId, filter)) };
   });
 }
 
@@ -290,10 +374,17 @@ export async function archiveGroupCatalogAttribute(session: SessionContext, grou
 
 // --- Personal-workspace endpoints -------------------------------------------
 
-export async function listPersonalCatalogAttributes(session: SessionContext, kind?: CatalogKind) {
+export async function listPersonalCatalogAttributes(
+  session: SessionContext,
+  filter: { kind?: CatalogKind; libraryId?: string | null } = {},
+) {
   return withClient(async (client) => {
     const workspaceId = await personalWorkspaceId(client, session.user.id);
-    return { attributes: workspaceId ? await listDefsWithClient(client, workspaceId, kind) : [] };
+    return {
+      attributes: workspaceId
+        ? await listDefsWithClient(client, workspaceId, await filterKind(client, workspaceId, filter))
+        : [],
+    };
   });
 }
 

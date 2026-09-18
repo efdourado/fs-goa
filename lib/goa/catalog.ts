@@ -3,7 +3,14 @@ import type { PoolClient } from "pg";
 import { requireGroupRole, type SessionContext } from "../auth";
 import { inTransaction, oneOrNull, withClient } from "../db";
 import { ApiError, stringValue } from "../http";
-import { attributeValuesForItems, setCatalogItemAttributeValues } from "./catalog-attributes";
+import {
+  attributeValuesForItems,
+  listDefsWithClient,
+  seedAttributeDefs,
+  setCatalogItemAttributeValues,
+  updateAttributeDef,
+  type CatalogAttributeType,
+} from "./catalog-attributes";
 import { writeAudit } from "./domain/audit";
 import { ensurePersonalWorkspace } from "./domain/challenges";
 import { normalizeTitle, publicId } from "./domain/shared";
@@ -618,6 +625,17 @@ async function listLibrariesWithClient(client: PoolClient, groupId: string): Pro
   return rows.rows.map(mapLibrary);
 }
 
+/**
+ * What a Tables library starts with — optional catalog facts about a place,
+ * not challenge answers (no rating, price or "would return"). Ordinary
+ * attribute definitions: rename, hide or archive any of them.
+ */
+const TABLES_STARTER_PROPERTIES: Array<{ key: string; label: string; type: CatalogAttributeType }> = [
+  { key: "cozinha", label: "Tipo de cozinha", type: "text" },
+  { key: "bairro", label: "Bairro", type: "text" },
+  { key: "endereco", label: "Endereço", type: "text" },
+];
+
 // Sources a person can pick when creating a new library. `screens`/`pages`
 // only ever come from the film/book evolution (`ensureCatalogLibrary`),
 // never from this endpoint.
@@ -647,6 +665,7 @@ async function insertLibrary(
      VALUES ($1,$2,$3,$4,$5,$6,$7,now(),now())`,
     [id, groupId, kind, source, label, position, userId],
   );
+  if (source === "tables") await seedAttributeDefs(client, groupId, kind, userId, TABLES_STARTER_PROPERTIES);
   await writeAudit(client, groupId, null, userId, "catalog.library_created", "catalog_library", id, null, { label, source });
   return { id, kind, source: source as CatalogLibrary["source"], label, position };
 }
@@ -685,6 +704,7 @@ export async function findOrCreateLibraryBySource(
      VALUES ($1,$2,$3,$4,NULL,$5,$6,now(),now())`,
     [id, groupId, kind, source, positionRow?.position ?? 0, userId],
   );
+  if (source === "tables") await seedAttributeDefs(client, groupId, kind, userId, TABLES_STARTER_PROPERTIES);
   await writeAudit(client, groupId, null, userId, "catalog.library_created", "catalog_library", id, null, { label: null, source });
   return kind;
 }
@@ -751,6 +771,178 @@ export async function renameCatalogLibrary(session: SessionContext, libraryId: s
     const label = stringValue(body, "label", { min: 1, max: 80 })!;
     await renameLibraryWithClient(client, session.user.id, library.group_id, libraryId, label);
     return { id: libraryId, label };
+  });
+}
+
+// --- Library properties: one editor for native columns and attribute defs --
+
+/**
+ * The built-in properties a library can customize. film/book keep their
+ * existing columns (no data moves); every other library's only built-in is
+ * the title — the rest of its properties are attribute definitions. Keys are
+ * stable: metrics and storage key off these, never off a label.
+ */
+const NATIVE_PROPERTIES: Record<string, Array<{ key: string; type: CatalogAttributeType }>> = {
+  film: [
+    { key: "title", type: "text" }, { key: "year", type: "number" },
+    { key: "main_genre", type: "text" }, { key: "runtime_minutes", type: "number" },
+  ],
+  book: [
+    { key: "title", type: "text" }, { key: "author", type: "text" }, { key: "year", type: "number" },
+    { key: "main_genre", type: "text" }, { key: "page_count", type: "number" },
+  ],
+};
+const TITLE_ONLY = [{ key: "title", type: "text" as CatalogAttributeType }];
+function nativePropertiesFor(kind: string) {
+  return NATIVE_PROPERTIES[kind] ?? TITLE_ONLY;
+}
+
+export interface LibraryProperty {
+  /** The native key (`year`, `title`…) or the attribute definition's id — never a label. */
+  key: string;
+  storage: "native" | "attribute";
+  /** `null` on a native property means "use the locale-aware default name". */
+  label: string | null;
+  type: CatalogAttributeType;
+  hidden: boolean;
+  position: number;
+  canHide: boolean;
+}
+
+async function listLibraryPropertiesWithClient(
+  client: PoolClient,
+  groupId: string,
+  library: { id: string; kind: string },
+): Promise<LibraryProperty[]> {
+  const configs = await client.query<{ property_key: string; label: string | null; hidden: boolean; position: number | null }>(
+    "SELECT property_key, label, hidden, position FROM catalog_native_property_configs WHERE library_id = $1",
+    [library.id],
+  );
+  const byKey = new Map(configs.rows.map((row) => [row.property_key, row]));
+  const defs = await listDefsWithClient(client, groupId, library.kind, true);
+  // Natives default to their built-in order; attribute defs follow them
+  // (their own `position` offset past the natives) unless someone gives a
+  // native an explicit position to interleave.
+  const properties: Array<LibraryProperty & { sort: number }> = [
+    ...nativePropertiesFor(library.kind).map((native, index) => {
+      const config = byKey.get(native.key);
+      const position = config?.position ?? index;
+      return {
+        key: native.key, storage: "native" as const, label: config?.label ?? null, type: native.type,
+        hidden: config?.hidden ?? false, position, canHide: native.key !== "title", sort: position,
+      };
+    }),
+    ...defs.map((def) => ({
+      key: def.id, storage: "attribute" as const, label: def.label, type: def.type,
+      hidden: def.hidden, position: def.position + 10, canHide: true, sort: def.position + 10,
+    })),
+  ];
+  return properties.sort((a, b) => a.sort - b.sort).map(({ sort, ...property }) => { void sort; return property; });
+}
+
+async function libraryAccess(
+  client: PoolClient,
+  session: SessionContext,
+  libraryId: string,
+  roles: Array<"owner" | "admin" | "participant">,
+) {
+  const library = await oneOrNull<{ id: string; kind: string; group_id: string; group_kind: "standard" | "personal"; owner_user_id: string }>(
+    client,
+    `SELECT cl.id, cl.kind, cl.group_id, g.kind AS group_kind, g.owner_user_id
+       FROM catalog_libraries cl JOIN groups g ON g.id = cl.group_id
+      WHERE cl.id = $1 AND cl.archived_at IS NULL AND g.archived_at IS NULL AND g.deleted_at IS NULL`,
+    [libraryId],
+  );
+  if (!library) throw new ApiError(404, "not_found", "Biblioteca não encontrada.");
+  if (library.group_kind === "personal") {
+    if (library.owner_user_id !== session.user.id) {
+      throw new ApiError(403, "forbidden", "Esta biblioteca não pertence ao seu acervo pessoal.");
+    }
+  } else {
+    await requireGroupRole(session.user.id, library.group_id, roles, client);
+  }
+  return library;
+}
+
+/** Every property of one library — built-in and custom in one merged, ordered list. */
+export async function listCatalogLibraryProperties(session: SessionContext, libraryId: string) {
+  return withClient(async (client) => {
+    const library = await libraryAccess(client, session, libraryId, ["owner", "admin", "participant"]);
+    return { properties: await listLibraryPropertiesWithClient(client, library.group_id, library) };
+  });
+}
+
+/**
+ * Renames, hides/shows, or reorders one property — the same call whether it
+ * lives in a native column or an attribute definition, so no one has to know
+ * which. Nothing here moves or deletes a value, and metrics keep reading the
+ * same storage. The title can be renamed but never hidden: every item needs a
+ * name.
+ */
+export async function updateCatalogLibraryProperty(
+  session: SessionContext,
+  libraryId: string,
+  propertyKey: string,
+  body: Record<string, unknown>,
+) {
+  return inTransaction(async (client) => {
+    const library = await libraryAccess(client, session, libraryId, ["owner", "admin"]);
+    const isNative = nativePropertiesFor(library.kind).some((native) => native.key === propertyKey);
+
+    let label: string | null | undefined;
+    if (Object.hasOwn(body, "label")) {
+      if (body.label === null) label = null;
+      else label = stringValue(body, "label", { min: 1, max: 80 })!;
+    }
+    const hidden = Object.hasOwn(body, "hidden")
+      ? body.hidden === true || (body.hidden === false ? false : (() => { throw new ApiError(400, "invalid_property", "Informe se a propriedade fica oculta."); })())
+      : undefined;
+    let position: number | null | undefined;
+    if (Object.hasOwn(body, "position")) {
+      if (body.position === null) position = null;
+      else if (Number.isInteger(body.position) && (body.position as number) >= 0) position = body.position as number;
+      else throw new ApiError(400, "invalid_property", "A posição precisa ser um inteiro a partir de zero.");
+    }
+
+    if (isNative) {
+      if (propertyKey === "title" && hidden === true) {
+        throw new ApiError(400, "title_required", "O nome do item não pode ser ocultado — todo item precisa de um nome.");
+      }
+      const current = await oneOrNull<{ label: string | null; hidden: boolean; position: number | null }>(
+        client,
+        "SELECT label, hidden, position FROM catalog_native_property_configs WHERE library_id = $1 AND property_key = $2 FOR UPDATE",
+        [library.id, propertyKey],
+      );
+      const next = {
+        label: label === undefined ? current?.label ?? null : label,
+        hidden: hidden === undefined ? current?.hidden ?? false : hidden,
+        position: position === undefined ? current?.position ?? null : position,
+      };
+      if (next.label === null && !next.hidden && next.position === null) {
+        // Back to the defaults: no override to keep.
+        await client.query("DELETE FROM catalog_native_property_configs WHERE library_id = $1 AND property_key = $2", [library.id, propertyKey]);
+      } else {
+        await client.query(
+          `INSERT INTO catalog_native_property_configs (id, library_id, property_key, label, hidden, position, created_at, updated_at)
+           VALUES ($1,$2,$3,$4,$5,$6,now(),now())
+           ON CONFLICT (library_id, property_key) DO UPDATE SET
+             label = excluded.label, hidden = excluded.hidden, position = excluded.position, updated_at = now()`,
+          [publicId(), library.id, propertyKey, next.label, next.hidden, next.position],
+        );
+      }
+      await writeAudit(client, library.group_id, null, session.user.id, "catalog.property_updated", "catalog_library", library.id, null, { propertyKey, ...next });
+    } else {
+      // An attribute definition, addressed by its id.
+      if (label === null || position === null) {
+        throw new ApiError(400, "invalid_property", "Uma propriedade personalizada precisa de um nome e de uma posição.");
+      }
+      await updateAttributeDef(client, session.user.id, library.group_id, propertyKey, { label, hidden, position: position === undefined ? undefined : position });
+    }
+
+    const properties = await listLibraryPropertiesWithClient(client, library.group_id, library);
+    const property = properties.find((entry) => entry.key === propertyKey);
+    if (!property) throw new ApiError(404, "not_found", "Propriedade não encontrada.");
+    return { property };
   });
 }
 

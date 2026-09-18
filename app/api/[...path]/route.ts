@@ -45,6 +45,7 @@ import {
   createPersonalRecommender,
   listGroupCatalog,
   listGroupLibraries,
+  listCatalogLibraryProperties,
   listGroupRecommenders,
   listPersonalCatalog,
   listPersonalLibraries,
@@ -52,6 +53,7 @@ import {
   personalCatalogItemDetail,
   renameCatalogLibrary,
   renameCatalogRecommender,
+  updateCatalogLibraryProperty,
   searchGroupCatalogItems,
   searchPersonalCatalogItems,
   updateCatalogItem,
@@ -70,6 +72,11 @@ import type { CatalogKind } from "@/lib/goa/catalog";
 function catalogKindParam(request: Request): CatalogKind | undefined {
   const raw = new URL(request.url).searchParams.get("kind");
   return raw === "film" || raw === "book" || raw === "other" ? raw : undefined;
+}
+
+/** `?libraryId=` picks any workspace library; `?kind=` keeps working for film/book/other. */
+function catalogAttributeFilter(request: Request) {
+  return { kind: catalogKindParam(request), libraryId: new URL(request.url).searchParams.get("libraryId") };
 }
 import {
   addMetric,
@@ -211,11 +218,14 @@ export async function GET(request: Request): Promise<Response> {
     if (path[0] === "personal" && path[1] === "catalog" && path.length === 3) {
       return json(await personalCatalogItemDetail(await requireSession(request), path[2]));
     }
+    if (path[0] === "catalog" && path[1] === "libraries" && path[3] === "properties" && path.length === 4) {
+      return json(await listCatalogLibraryProperties(await requireSession(request), path[2]));
+    }
     if (path[0] === "groups" && path[2] === "catalog-attributes" && path.length === 3) {
-      return json(await listGroupCatalogAttributes(await requireSession(request), path[1], catalogKindParam(request)));
+      return json(await listGroupCatalogAttributes(await requireSession(request), path[1], catalogAttributeFilter(request)));
     }
     if (isPath(path, "personal", "catalog-attributes")) {
-      return json(await listPersonalCatalogAttributes(await requireSession(request), catalogKindParam(request)));
+      return json(await listPersonalCatalogAttributes(await requireSession(request), catalogAttributeFilter(request)));
     }
     if (path[0] === "challenges" && path.length === 2) {
       return json(await getChallengeDetail(await requireSession(request), path[1]));
@@ -453,6 +463,9 @@ export async function PATCH(request: Request): Promise<Response> {
     }
     if (path[0] === "catalog" && path[1] === "libraries" && path.length === 3) {
       return json(await renameCatalogLibrary(session, path[2], body));
+    }
+    if (path[0] === "catalog" && path[1] === "libraries" && path[3] === "properties" && path.length === 5) {
+      return json(await updateCatalogLibraryProperty(session, path[2], path[4], body));
     }
     if (path[0] === "catalog" && path[1] === "recommenders" && path.length === 3) {
       return json(await renameCatalogRecommender(session, path[2], body));

@@ -2174,6 +2174,129 @@ test("insights da administração (fase 8): só contagens confirmadas, sem a equ
   }
 });
 
+test("propriedades da biblioteca: renomear e ocultar, nativa ou personalizada, pela mesma interface — sem perder dado nem métrica", async () => {
+  const owner = await register("Paula", "paula_props");
+  const member = await register("Davi", "davi_props");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Cineclube" } })).body as { id: string }).id;
+  const invite = await call("POST", `/api/groups/${gid}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } });
+  await call("POST", `/api/invites/${(invite.body as { token: string }).token}`, { session: member, body: {} });
+
+  const challenge = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "cinema", title: "Por ano", participantIds: [owner.user.id],
+      items: [{ title: "Filme A 2026", year: 2026, mainGenre: "drama" }, { title: "Filme B 2025", year: 2025 }],
+    },
+  });
+  const cid = (challenge.body as { id: string }).id;
+  await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } });
+  const detail = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as {
+    entryTypes: Array<{ id: string; fields: Array<{ id: string; key: string }> }>; items: Array<{ id: string; title: string }>;
+  };
+  const notaField = detail.entryTypes[0].fields.find((field) => field.key === "nota")!.id;
+  for (const item of detail.items) {
+    await call("POST", `/api/challenges/${cid}/entries`, { session: owner, body: { itemId: item.id, entryTypeId: detail.entryTypes[0].id, values: { [notaField]: 4 } } });
+  }
+  const metric = await call("POST", `/api/challenges/${cid}/metrics`, {
+    session: owner, body: { label: "Nota por ano", operation: "average", fieldId: notaField, groupBy: "catalog_year" },
+  });
+  assert.equal(metric.response.status, 201, JSON.stringify(metric.body));
+  const metricId = (metric.body as { id: string }).id;
+  const seriesKeys = async () =>
+    ((await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { metrics: Array<{ id: string; series?: Array<{ key: string }> }> })
+      .metrics.find((entry) => entry.id === metricId)!.series!.map((row) => row.key).sort();
+  assert.deepEqual(await seriesKeys(), ["2025", "2026"]);
+
+  const libraries = (await call("GET", `/api/groups/${gid}/catalog/libraries`, { session: owner })).body as { libraries: Array<{ id: string; kind: string; source: string }> };
+  const screens = libraries.libraries.find((library) => library.kind === "film")!;
+  const props = async (libraryId: string) =>
+    (await call("GET", `/api/catalog/libraries/${libraryId}/properties`, { session: owner })).body as {
+      properties: Array<{ key: string; storage: string; label: string | null; hidden: boolean; canHide: boolean }>;
+    };
+
+  const initial = await props(screens.id);
+  assert.deepEqual(initial.properties.map((property) => property.key), ["title", "year", "main_genre", "runtime_minutes"]);
+  assert.equal(initial.properties.every((property) => property.storage === "native" && property.label === null && !property.hidden), true);
+  assert.equal(initial.properties[0].canHide, false, "o nome do item nunca fica oculto");
+
+  // renomear e ocultar uma propriedade nativa — dado e métrica seguem intactos
+  const renamed = await call("PATCH", `/api/catalog/libraries/${screens.id}/properties/year`, { session: owner, body: { label: "Ano de estreia" } });
+  assert.equal(renamed.response.status, 200, JSON.stringify(renamed.body));
+  const hiddenYear = await call("PATCH", `/api/catalog/libraries/${screens.id}/properties/year`, { session: owner, body: { hidden: true } });
+  assert.deepEqual(
+    (hiddenYear.body as { property: { label: string; hidden: boolean } }).property,
+    { key: "year", storage: "native", label: "Ano de estreia", type: "number", hidden: true, position: 1, canHide: true },
+  );
+  const catalog = (await call("GET", `/api/groups/${gid}/catalog`, { session: owner })).body as { items: Array<{ title: string; year: number | null; mainGenre: string | null }> };
+  assert.equal(catalog.items.find((item) => item.title === "Filme A 2026")?.year, 2026, "ocultar não apaga o valor");
+  assert.deepEqual(await seriesKeys(), ["2025", "2026"], "a métrica por ano continua funcionando com a propriedade oculta");
+
+  // o título: pode ganhar outro rótulo, nunca pode sumir
+  assert.equal((await call("PATCH", `/api/catalog/libraries/${screens.id}/properties/title`, { session: owner, body: { hidden: true } })).response.status, 400);
+  assert.equal((await call("PATCH", `/api/catalog/libraries/${screens.id}/properties/title`, { session: owner, body: { label: "Filme" } })).response.status, 200);
+
+  // voltar ao padrão remove a sobrescrita em vez de guardar uma linha vazia
+  await call("PATCH", `/api/catalog/libraries/${screens.id}/properties/year`, { session: owner, body: { label: null, hidden: false } });
+  const overrides = await adminPool.query<{ property_key: string }>("SELECT property_key FROM catalog_native_property_configs WHERE library_id = $1", [screens.id]);
+  assert.deepEqual(overrides.rows.map((row) => row.property_key), ["title"]);
+
+  // uma propriedade personalizada usa exatamente a mesma chamada
+  const def = await call("POST", `/api/groups/${gid}/catalog-attributes`, { session: owner, body: { kind: "film", label: "Diretor" } });
+  assert.equal(def.response.status, 201, JSON.stringify(def.body));
+  const defId = (def.body as { id: string; key: string }).id;
+  const defKey = (def.body as { id: string; key: string }).key;
+  const filmId = catalog.items.length && ((await adminPool.query<{ id: string }>("SELECT id FROM catalog_items WHERE group_id = $1 AND title = 'Filme A 2026'", [gid])).rows[0].id);
+  await call("PATCH", `/api/catalog/${filmId}`, { session: owner, body: { attributes: { [defKey]: "Sofia Coppola" } } });
+  const withDef = await props(screens.id);
+  assert.equal(withDef.properties.find((property) => property.key === defId)?.storage, "attribute");
+  await call("PATCH", `/api/catalog/libraries/${screens.id}/properties/${defId}`, { session: owner, body: { label: "Direção", hidden: true } });
+  const afterHide = (await props(screens.id)).properties.find((property) => property.key === defId)!;
+  assert.deepEqual([afterHide.label, afterHide.hidden], ["Direção", true]);
+  const formAttrs = (await call("GET", `/api/groups/${gid}/catalog-attributes?kind=film`, { session: owner })).body as { attributes: unknown[] };
+  assert.equal(formAttrs.attributes.length, 0, "oculta: fora dos formulários do dia a dia");
+  const valueCount = await adminPool.query<{ n: string }>("SELECT count(*) AS n FROM catalog_attribute_values WHERE attribute_def_id = $1", [defId]);
+  assert.equal(Number(valueCount.rows[0].n), 1, "o valor continua guardado");
+
+  // só administrador personaliza; qualquer membro consulta
+  assert.equal((await call("PATCH", `/api/catalog/libraries/${screens.id}/properties/year`, { session: member, body: { label: "Não" } })).response.status, 403);
+  assert.equal((await call("GET", `/api/catalog/libraries/${screens.id}/properties`, { session: member })).response.status, 200);
+});
+
+test("propriedades da biblioteca: Tables já nasce com propriedades úteis e cada biblioteca tem as suas", async () => {
+  const owner = await register("Tiago", "tiago_props");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Rolês" } })).body as { id: string }).id;
+
+  await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner, body: { recipe: "tables", title: "Onde comer", participantIds: [owner.user.id], items: [{ title: "Cantina" }] },
+  });
+  const matches = (await call("POST", `/api/groups/${gid}/catalog/libraries`, { session: owner, body: { label: "Matches" } })).body as { id: string };
+  const libs = (await call("GET", `/api/groups/${gid}/catalog/libraries`, { session: owner })).body as { libraries: Array<{ id: string; source: string }> };
+  const tables = libs.libraries.find((library) => library.source === "tables")!;
+  const list = async (libraryId: string) =>
+    (await call("GET", `/api/catalog/libraries/${libraryId}/properties`, { session: owner })).body as { properties: Array<{ key: string; storage: string; label: string | null }> };
+
+  const starter = await list(tables.id);
+  assert.deepEqual(starter.properties.filter((p) => p.storage === "attribute").map((p) => p.label), ["Tipo de cozinha", "Bairro", "Endereço"]);
+  assert.deepEqual(starter.properties.filter((p) => p.storage === "native").map((p) => p.key), ["title"], "fora film/book só o título é nativo");
+
+  // "Kickoff" numa biblioteca Matches não aparece em Tables
+  const kickoff = await call("POST", `/api/groups/${gid}/catalog-attributes`, { session: owner, body: { libraryId: matches.id, label: "Kickoff", type: "date" } });
+  assert.equal(kickoff.response.status, 201, JSON.stringify(kickoff.body));
+  const kickoffKey = (kickoff.body as { key: string }).key;
+  assert.equal((await list(tables.id)).properties.some((p) => p.label === "Kickoff"), false);
+  assert.deepEqual((await list(matches.id)).properties.filter((p) => p.storage === "attribute").map((p) => p.label), ["Kickoff"]);
+  const forms = (await call("GET", `/api/groups/${gid}/catalog-attributes?libraryId=${matches.id}`, { session: owner })).body as { attributes: Array<{ label: string }> };
+  assert.deepEqual(forms.attributes.map((a) => a.label), ["Kickoff"]);
+
+  // e o valor entra ao criar o item da biblioteca
+  const item = await call("POST", `/api/groups/${gid}/catalog/items`, {
+    session: owner, body: { libraryId: matches.id, title: "Brasil x Argentina", attributes: { [kickoffKey]: "2026-06-15" } },
+  });
+  assert.equal(item.response.status, 201, JSON.stringify(item.body));
+  const catalog = (await call("GET", `/api/groups/${gid}/catalog`, { session: owner })).body as { items: Array<{ title: string; attributes: Array<{ label: string; value: unknown }> }> };
+  assert.deepEqual(catalog.items.find((entry) => entry.title === "Brasil x Argentina")?.attributes.map((a) => [a.label, a.value]), [["Kickoff", "2026-06-15"]]);
+});
+
 test("modelo de registros: um filme aceita mais de um tipo de registro por pessoa", async () => {
   const owner = await register("Íris", "iris_rec");
   const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube do modelo" } })).body as { id: string }).id;
