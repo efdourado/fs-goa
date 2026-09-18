@@ -93,7 +93,7 @@ function mapDef(row: { id: string; kind: string; semantic_key: string; label: st
   return { id: row.id, kind: row.kind as CatalogKind, key: row.semantic_key, label: row.label, type: row.type as CatalogAttributeType, position: row.position };
 }
 
-async function listDefsWithClient(client: PoolClient, groupId: string, kind?: CatalogKind): Promise<CatalogAttributeDef[]> {
+async function listDefsWithClient(client: PoolClient, groupId: string, kind?: string): Promise<CatalogAttributeDef[]> {
   const rows = await client.query<{ id: string; kind: string; semantic_key: string; label: string; type: string; position: number }>(
     kind
       ? `SELECT id, kind, semantic_key, label, type, position FROM catalog_attribute_defs
@@ -180,7 +180,7 @@ export async function setCatalogItemAttributeValues(
   client: PoolClient,
   catalogItemId: string,
   groupId: string,
-  kind: CatalogKind,
+  kind: string,
   values: unknown,
 ): Promise<void> {
   if (!values || typeof values !== "object") return;

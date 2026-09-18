@@ -13,7 +13,7 @@ export type CatalogKind = "film" | "book" | "other";
 
 export { normalizeTitle } from "./domain/shared";
 
-function sourceForKind(kind: CatalogKind): "screens" | "pages" | "custom" {
+function sourceForKind(kind: string): "screens" | "pages" | "custom" {
   return kind === "film" ? "screens" : kind === "book" ? "pages" : "custom";
 }
 
@@ -24,12 +24,14 @@ function sourceForKind(kind: CatalogKind): "screens" | "pages" | "custom" {
  * first time a group actually uses a kind, so an existing group's first
  * film/book/other item never has to know libraries exist as a separate step.
  * Idempotent (`ON CONFLICT DO NOTHING`); cheap enough to call before every
- * insert rather than branch on whether one might already exist.
+ * insert rather than branch on whether one might already exist. A no-op when
+ * `kind` came from an already-resolved library id (`resolveItemKind`) since
+ * that row already exists.
  */
 async function ensureCatalogLibrary(
   client: PoolClient,
   groupId: string,
-  kind: CatalogKind,
+  kind: string,
   actorUserId: string,
 ): Promise<void> {
   await client.query(
@@ -174,7 +176,7 @@ async function insertCatalogItemRow(
   client: PoolClient,
   groupId: string,
   userId: string,
-  kind: CatalogKind,
+  kind: string,
   title: string,
   normalized: string,
   attributes: ReturnType<typeof readAttributes>,
@@ -195,12 +197,13 @@ async function insertCatalogItemRow(
  * kind except film/book, whose existing single-step auto-match this does not
  * change. Basic normalized-title substring match; fuzzy matching is not a
  * requirement here, only an honest "here's what's close" suggestion list the
- * person explicitly accepts or ignores.
+ * person explicitly accepts or ignores. `kind` is a plain string, not just
+ * `CatalogKind`: it may be an opaque, user-created library's kind too.
  */
 export async function findPossibleCatalogItemMatches(
   client: PoolClient,
   groupId: string,
-  kind: CatalogKind,
+  kind: string,
   title: string,
 ): Promise<Array<{ id: string; title: string; year: number | null; author: string | null }>> {
   const normalized = normalizeTitle(title);
@@ -224,7 +227,7 @@ export async function createCatalogItem(
   client: PoolClient,
   groupId: string,
   userId: string,
-  input: { kind: CatalogKind; title: string; attributes?: unknown } & CatalogAttributes,
+  input: { kind: string; title: string; attributes?: unknown } & CatalogAttributes,
 ): Promise<string> {
   const title = input.title.trim();
   if (title.length < 1 || title.length > 300) {
@@ -243,7 +246,7 @@ export async function assertCatalogItemInGroup(
   client: PoolClient,
   catalogItemId: string,
   groupId: string,
-  kind?: CatalogKind,
+  kind?: string,
 ): Promise<void> {
   const row = await oneOrNull<{ kind: string }>(
     client,
@@ -266,7 +269,7 @@ export async function addCatalogItem(
   client: PoolClient,
   groupId: string,
   userId: string,
-  input: { kind: CatalogKind; title: string; useExistingId?: string; attributes?: unknown } & CatalogAttributes,
+  input: { kind: string; title: string; useExistingId?: string; attributes?: unknown } & CatalogAttributes,
 ): Promise<{ id: string }> {
   if (input.kind === "film" || input.kind === "book") {
     return { id: await upsertCatalogItem(client, groupId, userId, { ...input, kind: input.kind }) };
@@ -283,6 +286,30 @@ function readCatalogKind(value: unknown): CatalogKind {
     throw new ApiError(400, "invalid_kind", "Escolha um tipo de item válido.");
   }
   return value;
+}
+
+/**
+ * A caller picks a library by id (any workspace library, built-in or
+ * user-created) rather than typing a raw kind string — this is the only place
+ * an opaque library kind is trusted, and only after confirming the library is
+ * actually this workspace's own. `kind` alone still works for the frozen
+ * film/book/other vocabulary (existing clients, existing behavior).
+ */
+export async function resolveItemKind(
+  client: PoolClient,
+  groupId: string,
+  input: { kind?: unknown; libraryId?: unknown },
+): Promise<string> {
+  if (typeof input.libraryId === "string" && input.libraryId) {
+    const row = await oneOrNull<{ kind: string }>(
+      client,
+      "SELECT kind FROM catalog_libraries WHERE id = $1 AND group_id = $2 AND archived_at IS NULL",
+      [input.libraryId, groupId],
+    );
+    if (!row) throw new ApiError(400, "invalid_library", "Biblioteca não encontrada.");
+    return row.kind;
+  }
+  return readCatalogKind(input.kind);
 }
 
 async function listCatalogWithClient(client: PoolClient, workspaceId: string) {
@@ -479,9 +506,9 @@ export async function personalCatalogItemDetail(session: SessionContext, catalog
   });
 }
 
-function catalogItemInput(body: Record<string, unknown>) {
+async function catalogItemInput(client: PoolClient, groupId: string, body: Record<string, unknown>) {
   return {
-    kind: readCatalogKind(body.kind),
+    kind: await resolveItemKind(client, groupId, body),
     title: stringValue(body, "title", { min: 1, max: 300 })!,
     useExistingId: typeof body.useExistingId === "string" ? body.useExistingId : undefined,
     author: body.author,
@@ -496,33 +523,167 @@ function catalogItemInput(body: Record<string, unknown>) {
 /**
  * Adds an item straight to the group's catalog — no challenge involved. The
  * catalog page's own "add an item" action; see `addCatalogItem` for the
- * film/book-vs-everything-else behavior.
+ * film/book-vs-everything-else behavior. `body.libraryId` picks any workspace
+ * library (including a user-created one); `body.kind` still works for the
+ * frozen film/book/other vocabulary.
  */
 export async function addGroupCatalogItem(session: SessionContext, groupId: string, body: Record<string, unknown>) {
   return inTransaction(async (client) => {
     await requireStandardWorkspace(client, session.user.id, groupId, ["owner", "admin"]);
-    return addCatalogItem(client, groupId, session.user.id, catalogItemInput(body));
+    return addCatalogItem(client, groupId, session.user.id, await catalogItemInput(client, groupId, body));
   });
 }
 
 export async function addPersonalCatalogItem(session: SessionContext, body: Record<string, unknown>) {
   const workspaceId = await ensurePersonalWorkspace(session.user.id);
-  return inTransaction((client) => addCatalogItem(client, workspaceId, session.user.id, catalogItemInput(body)));
+  return inTransaction(async (client) => addCatalogItem(client, workspaceId, session.user.id, await catalogItemInput(client, workspaceId, body)));
 }
 
 /** Suggestions for the add-item flow's explicit "use existing?" step; see `findPossibleCatalogItemMatches`. */
-export async function searchGroupCatalogItems(session: SessionContext, groupId: string, kind: unknown, title: unknown) {
+export async function searchGroupCatalogItems(
+  session: SessionContext,
+  groupId: string,
+  kindOrLibrary: { kind?: unknown; libraryId?: unknown },
+  title: unknown,
+) {
   return withClient(async (client) => {
     await requireStandardWorkspace(client, session.user.id, groupId, ["owner", "admin", "participant"]);
-    return { items: await findPossibleCatalogItemMatches(client, groupId, readCatalogKind(kind), typeof title === "string" ? title : "") };
+    const kind = await resolveItemKind(client, groupId, kindOrLibrary);
+    return { items: await findPossibleCatalogItemMatches(client, groupId, kind, typeof title === "string" ? title : "") };
   });
 }
 
-export async function searchPersonalCatalogItems(session: SessionContext, kind: unknown, title: unknown) {
+export async function searchPersonalCatalogItems(
+  session: SessionContext,
+  kindOrLibrary: { kind?: unknown; libraryId?: unknown },
+  title: unknown,
+) {
   return withClient(async (client) => {
     const workspaceId = await personalWorkspaceId(client, session.user.id);
     if (!workspaceId) return { items: [] };
-    return { items: await findPossibleCatalogItemMatches(client, workspaceId, readCatalogKind(kind), typeof title === "string" ? title : "") };
+    const kind = await resolveItemKind(client, workspaceId, kindOrLibrary);
+    return { items: await findPossibleCatalogItemMatches(client, workspaceId, kind, typeof title === "string" ? title : "") };
+  });
+}
+
+// --- Libraries ---------------------------------------------------------
+
+export interface CatalogLibrary {
+  id: string;
+  kind: string;
+  source: "screens" | "pages" | "tables" | "custom";
+  label: string | null;
+  position: number;
+}
+
+function mapLibrary(row: { id: string; kind: string; source: string; label: string | null; position: number }): CatalogLibrary {
+  return { id: row.id, kind: row.kind, source: row.source as CatalogLibrary["source"], label: row.label, position: row.position };
+}
+
+async function listLibrariesWithClient(client: PoolClient, groupId: string): Promise<CatalogLibrary[]> {
+  const rows = await client.query<{ id: string; kind: string; source: string; label: string | null; position: number }>(
+    `SELECT id, kind, source, label, position FROM catalog_libraries
+      WHERE group_id = $1 AND archived_at IS NULL ORDER BY position, created_at`,
+    [groupId],
+  );
+  return rows.rows.map(mapLibrary);
+}
+
+// Sources a person can pick when creating a new library. `screens`/`pages`
+// only ever come from the film/book evolution (`ensureCatalogLibrary`),
+// never from this endpoint.
+const CREATABLE_LIBRARY_SOURCES = new Set(["tables", "custom"]);
+
+async function insertLibrary(
+  client: PoolClient,
+  groupId: string,
+  userId: string,
+  body: Record<string, unknown>,
+): Promise<CatalogLibrary> {
+  const label = stringValue(body, "label", { min: 1, max: 80 })!;
+  const source = typeof body.source === "string" && CREATABLE_LIBRARY_SOURCES.has(body.source) ? body.source : "custom";
+  // Opaque and stable: never derived from `label`, so a rename never touches
+  // it, and it never collides with another workspace's library of the same
+  // starting kind (each gets its own generated key, not a shared literal).
+  const kind = `lib_${crypto.randomUUID().replace(/-/g, "")}`;
+  const positionRow = await oneOrNull<{ position: number }>(
+    client,
+    "SELECT coalesce(max(position), -1)::int + 1 AS position FROM catalog_libraries WHERE group_id = $1",
+    [groupId],
+  );
+  const position = positionRow?.position ?? 0;
+  const id = publicId();
+  await client.query(
+    `INSERT INTO catalog_libraries (id, group_id, kind, source, label, position, created_by_user_id, created_at, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,now(),now())`,
+    [id, groupId, kind, source, label, position, userId],
+  );
+  await writeAudit(client, groupId, null, userId, "catalog.library_created", "catalog_library", id, null, { label, source });
+  return { id, kind, source: source as CatalogLibrary["source"], label, position };
+}
+
+async function renameLibraryWithClient(
+  client: PoolClient,
+  actorUserId: string,
+  groupId: string,
+  libraryId: string,
+  label: string,
+): Promise<void> {
+  const result = await client.query(
+    "UPDATE catalog_libraries SET label = $1, updated_at = now() WHERE id = $2 AND group_id = $3 AND archived_at IS NULL",
+    [label, libraryId, groupId],
+  );
+  if (result.rowCount === 0) throw new ApiError(404, "not_found", "Biblioteca não encontrada.");
+  await writeAudit(client, groupId, null, actorUserId, "catalog.library_renamed", "catalog_library", libraryId, null, { label });
+}
+
+export async function listGroupLibraries(session: SessionContext, groupId: string) {
+  return withClient(async (client) => {
+    await requireStandardWorkspace(client, session.user.id, groupId, ["owner", "admin", "participant"]);
+    return { libraries: await listLibrariesWithClient(client, groupId) };
+  });
+}
+
+export async function createGroupLibrary(session: SessionContext, groupId: string, body: Record<string, unknown>) {
+  return inTransaction(async (client) => {
+    await requireStandardWorkspace(client, session.user.id, groupId, ["owner", "admin"]);
+    return insertLibrary(client, groupId, session.user.id, body);
+  });
+}
+
+export async function listPersonalLibraries(session: SessionContext) {
+  return withClient(async (client) => {
+    const workspaceId = await personalWorkspaceId(client, session.user.id);
+    return { libraries: workspaceId ? await listLibrariesWithClient(client, workspaceId) : [] };
+  });
+}
+
+export async function createPersonalLibrary(session: SessionContext, body: Record<string, unknown>) {
+  const workspaceId = await ensurePersonalWorkspace(session.user.id);
+  return inTransaction((client) => insertLibrary(client, workspaceId, session.user.id, body));
+}
+
+/** Renames any of the caller's libraries (built-in or user-created) by id — mirrors `updateCatalogItem`'s group-agnostic shape. */
+export async function renameCatalogLibrary(session: SessionContext, libraryId: string, body: Record<string, unknown>) {
+  return inTransaction(async (client) => {
+    const library = await oneOrNull<{ group_id: string; group_kind: "standard" | "personal"; owner_user_id: string }>(
+      client,
+      `SELECT cl.group_id, g.kind AS group_kind, g.owner_user_id
+         FROM catalog_libraries cl JOIN groups g ON g.id = cl.group_id
+        WHERE cl.id = $1 AND cl.archived_at IS NULL AND g.archived_at IS NULL AND g.deleted_at IS NULL`,
+      [libraryId],
+    );
+    if (!library) throw new ApiError(404, "not_found", "Biblioteca não encontrada.");
+    if (library.group_kind === "personal") {
+      if (library.owner_user_id !== session.user.id) {
+        throw new ApiError(403, "forbidden", "Esta biblioteca não pertence ao seu acervo pessoal.");
+      }
+    } else {
+      await requireGroupRole(session.user.id, library.group_id, ["owner", "admin"], client);
+    }
+    const label = stringValue(body, "label", { min: 1, max: 80 })!;
+    await renameLibraryWithClient(client, session.user.id, library.group_id, libraryId, label);
+    return { id: libraryId, label };
   });
 }
 
@@ -536,7 +697,7 @@ export async function applyCatalogItemUpdate(
   catalogItemId: string,
   groupId: string,
   body: Record<string, unknown>,
-  kind?: CatalogKind,
+  kind?: string,
 ): Promise<void> {
   const title = body.title === undefined ? undefined : stringValue(body, "title", { min: 1, max: 300 })!;
   const attributes = readAttributes(body as CatalogAttributes);
