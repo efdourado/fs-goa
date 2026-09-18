@@ -72,6 +72,20 @@ describe("current challenge recipes", () => {
     assert.deepEqual(recipe.metrics.map((metric) => metric.operation), ["completion_rate"]);
   });
 
+  test("Custom draws its catalog kind from the request, not a fixed value", () => {
+    const recipe = resolveRecipe({ recipe: "custom" });
+
+    assert.equal(recipe.key, "custom");
+    assert.equal(recipe.catalogKind, null);
+    assert.equal(recipe.catalogKindFromBody, true);
+    assert.deepEqual(recipe.entryTypes.map((type) => type.purpose), ["rating"]);
+    assert.equal(recipe.entryTypes[0].submissionMode, "item");
+    assert.deepEqual(recipe.entryTypes[0].fields.map((field) => field.key), ["nota", "comentario"]);
+    // Only completion is seeded — a "nota"-keyed metric would be wrong the
+    // moment the wizard's Fields step replaces the default fields.
+    assert.deepEqual(recipe.metrics.map((metric) => metric.operation), ["completion_rate"]);
+  });
+
   test("legacy keys remain identifiable but cannot seed a new challenge", () => {
     for (const key of ["cine_free", "cine_curated", "reading_club", "reading_daily"] as const) {
       assert.equal(isLegacyRecipeKey(key), true);

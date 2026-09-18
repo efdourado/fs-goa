@@ -5,6 +5,8 @@ import { assertArrayWithin, assertUnder, LIMITS } from "../../limits";
 import {
   applyCatalogItemUpdate,
   assertCatalogItemInGroup,
+  createCatalogItem,
+  resolveItemKind,
   upsertCatalogItem,
 } from "../catalog";
 import { syncDailyCheckpoints } from "../daily-checkpoints";
@@ -36,7 +38,8 @@ export async function createChallenge(
   const livingList = options.personal === true && !startDate && !endDate;
   const wizardFields = Array.isArray(body.fields) && body.fields.length ? (body.fields as ClientField[]) : null;
   if (wizardFields && wizardFields.length > 30) throw new ApiError(400, "field_limit", "Use no máximo 30 campos.");
-  const wantsItems = recipe.catalogKind !== null && recipe.entryTypes.some((type) => type.submissionMode === "item");
+  const wantsItems = (recipe.catalogKind !== null || recipe.catalogKindFromBody === true)
+    && recipe.entryTypes.some((type) => type.submissionMode === "item");
   const wantsCheckpoints = recipe.entryTypes.some((type) => type.schedulePolicy === "checkpoint");
   const items = Array.isArray(body.items) ? body.items : [];
   assertArrayWithin(body.items, 200, "Adicione no máximo 200 itens.");
@@ -148,7 +151,11 @@ export async function createChallenge(
               )
             ).rows.map((row) => row.user_id),
           );
-      const catalogKind = recipe.catalogKind ?? "film";
+      // `custom` doesn't fix a kind: it comes from the caller's own library
+      // (any workspace library, built-in or user-created) instead.
+      const catalogKind = recipe.catalogKindFromBody
+        ? await resolveItemKind(client, groupId, { libraryId: body.libraryId })
+        : recipe.catalogKind ?? "film";
       const usedKeys = new Set<string>();
       for (let index = 0; index < items.length; index += 1) {
         const item = asRecord(items[index]);
@@ -172,7 +179,7 @@ export async function createChallenge(
               catalogKind,
             );
           }
-        } else {
+        } else if (catalogKind === "film" || catalogKind === "book") {
           catalogItemId = await upsertCatalogItem(client, groupId, session.user.id, {
             kind: catalogKind,
             title: itemTitle,
@@ -181,6 +188,16 @@ export async function createChallenge(
             mainGenre: item.mainGenre,
             pageCount: item.pageCount,
             runtimeMinutes: item.runtimeMinutes,
+            attributes: item.attributes,
+          });
+        } else {
+          // Every other kind never merges on a title match (Phase 2) — each
+          // row the caller didn't explicitly reuse via `catalogItemId` above
+          // becomes its own new item, even if an earlier row in this same
+          // batch used the same title.
+          catalogItemId = await createCatalogItem(client, groupId, session.user.id, {
+            kind: catalogKind,
+            title: itemTitle,
             attributes: item.attributes,
           });
         }

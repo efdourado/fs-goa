@@ -1705,6 +1705,63 @@ test("acervo pessoal: adicionar item direto materializa a biblioteca sob demanda
   assert.equal((otherSearch.body as { items: unknown[] }).items.length, 0, "o acervo pessoal de uma conta nunca aparece na busca de outra");
 });
 
+test("desafio personalizado (fase 3): usa uma biblioteca própria do grupo, sem fundir itens por título", async () => {
+  const owner = await register("Marta", "marta_matches");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Copa do Mundo" } })).body as { id: string }).id;
+
+  const created = await call("POST", `/api/groups/${gid}/catalog/libraries`, { session: owner, body: { label: "Matches" } });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const library = created.body as { id: string; kind: string; source: string; label: string | null };
+  assert.equal(library.source, "custom");
+  assert.equal(library.label, "Matches");
+  assert.match(library.kind, /^lib_[a-z0-9]+$/, "kind é opaco, nunca derivado do rótulo");
+
+  const listed = await call("GET", `/api/groups/${gid}/catalog/libraries`, { session: owner });
+  assert.equal(listed.response.status, 200);
+  assert.ok((listed.body as { libraries: Array<{ id: string }> }).libraries.some((lib) => lib.id === library.id));
+
+  const renamed = await call("PATCH", `/api/catalog/libraries/${library.id}`, { session: owner, body: { label: "Futebol" } });
+  assert.equal(renamed.response.status, 200, JSON.stringify(renamed.body));
+  assert.equal((renamed.body as { label: string }).label, "Futebol");
+
+  // dois jogos com o mesmo título e a mesma "biblioteca": nunca é o mesmo item
+  const challenge = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "custom", title: "Fase de grupos", libraryId: library.id,
+      participantIds: [owner.user.id],
+      items: [{ title: "Barcelona x Real Madrid" }, { title: "Barcelona x Real Madrid" }],
+    },
+  });
+  assert.equal(challenge.response.status, 201, JSON.stringify(challenge.body));
+  const cid = (challenge.body as { id: string }).id;
+
+  const detail = await call("GET", `/api/challenges/${cid}`, { session: owner });
+  const items = (detail.body as { items: Array<{ catalogItem: { id: string } | null }> }).items;
+  assert.equal(items.length, 2);
+  assert.notEqual(items[0].catalogItem?.id, items[1].catalogItem?.id, "mesmo título, dois jogos distintos");
+
+  // adicionar um terceiro item depois, com o mesmo título, ainda não funde —
+  // e usa a biblioteca já estabelecida, não "film" por padrão
+  const third = await call("POST", `/api/challenges/${cid}/items`, {
+    session: owner, body: { title: "Barcelona x Real Madrid" },
+  });
+  assert.equal(third.response.status, 201, JSON.stringify(third.body));
+
+  const catalog = await call("GET", `/api/groups/${gid}/catalog`, { session: owner });
+  const matches = (catalog.body as { items: Array<{ kind: string; title: string }> }).items
+    .filter((item) => item.kind === library.kind);
+  assert.equal(matches.length, 3, "três jogos distintos na biblioteca, nenhum fundido por título");
+  assert.equal(matches.every((item) => item.title === "Barcelona x Real Madrid"), true);
+
+  // só owner/admin cria uma biblioteca
+  const member = await register("Zeca", "zeca_matches");
+  const invite = await call("POST", `/api/groups/${gid}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } });
+  await call("POST", `/api/invites/${(invite.body as { token: string }).token}`, { session: member, body: {} });
+  const forbidden = await call("POST", `/api/groups/${gid}/catalog/libraries`, { session: member, body: { label: "Não deveria" } });
+  assert.equal(forbidden.response.status, 403);
+});
+
 test("modelo de registros: um filme aceita mais de um tipo de registro por pessoa", async () => {
   const owner = await register("Íris", "iris_rec");
   const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube do modelo" } })).body as { id: string }).id;

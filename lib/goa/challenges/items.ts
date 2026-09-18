@@ -14,6 +14,8 @@ import { ApiError, stringValue } from "../../http";
 import {
   applyCatalogItemUpdate,
   assertCatalogItemInGroup,
+  createCatalogItem,
+  resolveItemKind,
   upsertCatalogItem,
 } from "../catalog";
 import { syncDailyCheckpoints } from "../daily-checkpoints";
@@ -60,6 +62,48 @@ async function uniqueItemKey(
   return `${base}_${publicId().slice(0, 8)}`.slice(0, 64);
 }
 
+/**
+ * The catalog kind THIS challenge actually uses. `cinema`/`library`/`bookshelf`
+ * resolve it from the recipe key alone, unchanged. `custom` doesn't fix
+ * one — every item-wanting challenge is created with at least one item (see
+ * `createChallenge`), so its established kind is read off an existing item;
+ * only if none remain does it fall back to an explicit `libraryId`.
+ */
+export async function resolveChallengeCatalogKind(
+  client: PoolClient,
+  challengeId: string,
+  challenge: { recipe_key: string | null; group_id: string },
+  libraryId?: unknown,
+): Promise<string> {
+  const fixed = recipeCatalogKind(challenge.recipe_key);
+  if (fixed) return fixed;
+  if (challenge.recipe_key === "custom") {
+    const existing = await oneOrNull<{ kind: string }>(
+      client,
+      `SELECT ci.kind FROM challenge_items it JOIN catalog_items ci ON ci.id = it.catalog_item_id
+        WHERE it.challenge_id = $1 AND it.archived_at IS NULL LIMIT 1`,
+      [challengeId],
+    );
+    if (existing) return existing.kind;
+    return resolveItemKind(client, challenge.group_id, { libraryId });
+  }
+  return "film";
+}
+
+/** Creates a new catalog item for `kind` — film/book keep their existing auto-match, every other kind never merges (Phase 2). */
+async function createChallengeCatalogItem(
+  client: PoolClient,
+  groupId: string,
+  userId: string,
+  kind: string,
+  title: string,
+  extra: { author?: unknown; year?: unknown; mainGenre?: unknown; pageCount?: unknown; runtimeMinutes?: unknown; attributes?: unknown } = {},
+): Promise<string> {
+  return kind === "film" || kind === "book"
+    ? upsertCatalogItem(client, groupId, userId, { kind, title, ...extra })
+    : createCatalogItem(client, groupId, userId, { kind, title, attributes: extra.attributes });
+}
+
 /** Validates that a checkpoint id (or null) belongs to this challenge. */
 async function resolveCheckpointId(
   client: PoolClient,
@@ -92,7 +136,7 @@ export async function addChallengeItem(
     if (access.challenge.status === "closed") throw new ApiError(409, "challenge_locked", "Itens não podem ser criados depois do encerramento.");
     const types = await entryTypesForChallenge(client, challengeId);
     if (!usesRoundItems(types)) throw new ApiError(409, "invalid_mode", "Este desafio não usa itens.");
-    const catalogKind = recipeCatalogKind(access.challenge.recipe_key) ?? "film";
+    const catalogKind = await resolveChallengeCatalogKind(client, challengeId, access.challenge, body.libraryId);
     if (catalogKind === "book" && !author) {
       throw new ApiError(400, "invalid_item", "Informe o autor de cada livro.");
     }
@@ -108,7 +152,7 @@ export async function addChallengeItem(
         await applyCatalogItemUpdate(client, catalogItemId, access.challenge.group_id, { author });
       }
     } else {
-      catalogItemId = await upsertCatalogItem(client, access.challenge.group_id, session.user.id, { kind: catalogKind, title, author });
+      catalogItemId = await createChallengeCatalogItem(client, access.challenge.group_id, session.user.id, catalogKind, title, { author });
     }
     await client.query(
       `INSERT INTO challenge_items
@@ -178,7 +222,7 @@ export async function saveChallengeItems(
     if (access.challenge.status === "closed") throw new ApiError(409, "challenge_locked", "Itens não podem ser editados depois do encerramento.");
     const types = await entryTypesForChallenge(client, challengeId);
     if (!usesRoundItems(types)) throw new ApiError(409, "invalid_mode", "Este desafio não usa itens.");
-    const catalogKind = recipeCatalogKind(access.challenge.recipe_key) ?? "film";
+    const catalogKind = await resolveChallengeCatalogKind(client, challengeId, access.challenge, body.libraryId);
     // This branch only ever appends. Land new items after whatever already
     // exists so adding a batch mid-challenge keeps a stable reading order.
     const base = await oneOrNull<{ position: number }>(client,
@@ -219,9 +263,9 @@ export async function saveChallengeItems(
           await applyCatalogItemUpdate(client, catalogItemId, access.challenge.group_id, { author });
         }
       } else {
-        catalogItemId = await upsertCatalogItem(client, access.challenge.group_id, session.user.id, {
-          kind: catalogKind, title, author: item.author, year: item.year, mainGenre: item.mainGenre,
-          pageCount: item.pageCount, runtimeMinutes: item.runtimeMinutes,
+        catalogItemId = await createChallengeCatalogItem(client, access.challenge.group_id, session.user.id, catalogKind, title, {
+          author: item.author, year: item.year, mainGenre: item.mainGenre,
+          pageCount: item.pageCount, runtimeMinutes: item.runtimeMinutes, attributes: item.attributes,
         });
       }
       let recommendedBy: string | null = null;

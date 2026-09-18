@@ -302,6 +302,13 @@
       "when": 1789740790837,
       "tag": "0042_blushing_cerise",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1789742565921,
+      "tag": "0043_blue_black_bolt",
+      "breakpoints": true
     }
   ]
 }

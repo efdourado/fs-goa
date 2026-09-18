@@ -3,7 +3,8 @@ import { withClient } from "../../db";
 import { challengeAccess } from "../../goa-domain";
 import { ApiError } from "../../http";
 import { normalizeTitle } from "../catalog";
-import { entryTypesForChallenge, recipeCatalogKind, usesRoundItems } from "./entry-types";
+import { entryTypesForChallenge, usesRoundItems } from "./entry-types";
+import { resolveChallengeCatalogKind } from "./items";
 
 /** The item fields a pasted JSON row is allowed to fill. Everything else is "unknown". */
 export type MappableField =
@@ -89,7 +90,7 @@ function keyForField(
 function extractRow(
   raw: unknown,
   index: number,
-  kind: "film" | "book",
+  kind: string,
   mapping: Record<string, MappableField>,
 ): RowExtraction {
   const errors: string[] = [];
@@ -159,7 +160,7 @@ export interface ImportPreview {
     unknownKeys: string[];
   };
   limit: number;
-  catalogKind: "film" | "book";
+  catalogKind: string;
 }
 
 /**
@@ -203,7 +204,7 @@ export async function previewListImport(
     if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores importam listas.");
     const types = await entryTypesForChallenge(client, challengeId);
     if (!usesRoundItems(types)) throw new ApiError(409, "invalid_mode", "Este desafio não usa itens.");
-    const catalogKind = recipeCatalogKind(access.challenge.recipe_key) ?? "film";
+    const catalogKind = await resolveChallengeCatalogKind(client, challengeId, access.challenge, body.libraryId);
 
     const participants = (
       await client.query<{ id: string; display_name: string; username: string }>(

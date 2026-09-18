@@ -56,6 +56,13 @@ export interface Recipe {
   key: RecipeKey;
   version: number;
   catalogKind: "film" | "book" | null;
+  /**
+   * When true, the actual catalog kind isn't fixed here — it comes from the
+   * request's `libraryId` (any workspace library, built-in or user-created;
+   * see `resolveItemKind` in `../catalog`). Only `custom` sets this; every
+   * other recipe keeps drawing from its fixed `catalogKind` exactly as before.
+   */
+  catalogKindFromBody?: boolean;
   scheduleMode: "none" | "period";
   /**
    * Whether a participant's entry form offers the optional "when did it happen"
@@ -68,7 +75,7 @@ export interface Recipe {
 }
 
 /** Recipes offered for new challenges. Historical rows keep their frozen shape. */
-export type RecipeKey = "cinema" | "library" | "bookshelf" | "habit";
+export type RecipeKey = "cinema" | "library" | "bookshelf" | "habit" | "custom";
 
 /**
  * Stored by challenges created before the two-template consolidation. These keys
@@ -95,7 +102,7 @@ export function isLegacyRecipeKey(value: unknown): value is LegacyRecipeKey {
 }
 
 export function isRecipeKey(value: unknown): value is RecipeKey {
-  return value === "cinema" || value === "library" || value === "bookshelf" || value === "habit";
+  return value === "cinema" || value === "library" || value === "bookshelf" || value === "habit" || value === "custom";
 }
 
 /**
@@ -178,6 +185,23 @@ const habitCheckin: RecipeEntryType = {
   fields: [
     { key: "nota_dia", label: "Como foi?", type: "text", required: false, config: { multiline: true, maxLength: 500 } },
   ],
+  primary: true,
+};
+
+// A generic item-targeted response for a workspace's own library (Matches,
+// Tables, anything user-defined) — same shape as `avaliacao`, just not tied
+// to a fixed catalog kind. `wizardFields` fully replaces these defaults, same
+// as every other recipe's primary type, so "what participants record" stays
+// a real configuration step, not a hardcoded score+comment pair.
+const customEntry: RecipeEntryType = {
+  semanticKey: "registro",
+  name: "Registro",
+  purpose: "rating",
+  submissionMode: "item",
+  targetPolicy: "required",
+  cardinality: "once_per_item",
+  schedulePolicy: "while_active",
+  fields: ratingFields(500),
   primary: true,
 };
 
@@ -290,6 +314,19 @@ export const RECIPES: Record<RecipeKey, Recipe> = {
     entryTypes: [habitCheckin],
     metrics: [completionMetric],
   },
+  // A challenge built on one of the workspace's own libraries (Matches,
+  // Tables, or any other) instead of the fixed film/book catalog. `catalogKind`
+  // stays null here — `catalogKindFromBody` sends `createChallenge` to
+  // `body.libraryId` instead, resolved against this group's own libraries.
+  custom: {
+    key: "custom",
+    version: 1,
+    catalogKind: null,
+    catalogKindFromBody: true,
+    scheduleMode: "none",
+    entryTypes: [customEntry],
+    metrics: [completionMetric],
+  },
 };
 
 const TEMPLATE_ALIAS: Record<string, RecipeKey> = {
@@ -308,13 +345,13 @@ const TEMPLATE_ALIAS: Record<string, RecipeKey> = {
 export function resolveRecipe(body: Record<string, unknown>): Recipe {
   if (Object.hasOwn(body, "recipe")) {
     if (!isRecipeKey(body.recipe)) {
-      throw new ApiError(400, "invalid_recipe", "Escolha o modelo Cinema, Estante, Clube de leitura ou Hábito.");
+      throw new ApiError(400, "invalid_recipe", "Escolha o modelo Cinema, Estante, Clube de leitura, Hábito ou Personalizado.");
     }
     return RECIPES[body.recipe];
   }
   if (Object.hasOwn(body, "template")) {
     if (typeof body.template !== "string" || !Object.hasOwn(TEMPLATE_ALIAS, body.template)) {
-      throw new ApiError(400, "invalid_recipe", "Escolha o modelo Cinema, Estante, Clube de leitura ou Hábito.");
+      throw new ApiError(400, "invalid_recipe", "Escolha o modelo Cinema, Estante, Clube de leitura, Hábito ou Personalizado.");
     }
     return RECIPES[TEMPLATE_ALIAS[body.template]];
   }
