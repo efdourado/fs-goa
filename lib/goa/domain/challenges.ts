@@ -184,10 +184,20 @@ export async function createChallenge(
       };
       const named = namedLibraries(body);
       if (recipe.catalogKind) await link(recipe.catalogKind);
-      if (recipe.defaultLibrarySource && !named.length) {
-        await link(await findOrCreateLibraryBySource(client, groupId, session.user.id, recipe.defaultLibrarySource));
+      const namedKinds: string[] = [];
+      for (const spec of named) namedKinds.push(await resolveItemKind(client, groupId, spec));
+      if (recipe.defaultLibrarySource) {
+        // The preset's own library — unless the caller already picked one of that kind themselves.
+        const picked = namedKinds.length
+          ? await oneOrNull<{ id: string }>(
+              client,
+              "SELECT id FROM catalog_libraries WHERE group_id = $1 AND kind = ANY($2::text[]) AND source = $3 LIMIT 1",
+              [groupId, namedKinds, recipe.defaultLibrarySource],
+            )
+          : null;
+        if (!picked) await link(await findOrCreateLibraryBySource(client, groupId, session.user.id, recipe.defaultLibrarySource));
       }
-      for (const spec of named) await link(await resolveItemKind(client, groupId, spec));
+      for (const kind of namedKinds) await link(kind);
       if (!linkedKinds.length) throw new ApiError(400, "invalid_library", "Escolha a biblioteca de onde vêm os itens.");
       const linkedRows = linkedKinds.map((kind, position) => ({ id: null, kind, source: "", label: null, position }));
       const usedKeys = new Set<string>();

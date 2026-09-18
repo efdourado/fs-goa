@@ -7028,3 +7028,70 @@ test("esconder o autor na biblioteca de livros tira a exigência do autor nos it
   });
   assert.equal(other.response.status, 201, JSON.stringify(other.body));
 });
+
+test("qualquer receita aceita bibliotecas a mais na criação; Tables não se duplica; o item do desafio edita as propriedades da sua biblioteca", async () => {
+  const owner = await register("Lia", "lia_extras");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Sala" } })).body as { id: string }).id;
+  const shows = (await call("POST", `/api/groups/${gid}/catalog/libraries`, { session: owner, body: { label: "Séries" } })).body as { id: string; kind: string };
+  const network = (await call("POST", `/api/groups/${gid}/catalog-attributes`, { session: owner, body: { libraryId: shows.id, label: "Canal", type: "text" } })).body as { id: string; key: string };
+
+  // Cinema + Séries na mesma lista: a biblioteca própria da receita (Screens) e mais uma
+  const created = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "cinema", title: "Telas", participantIds: [owner.user.id], libraries: [{ libraryId: shows.id }],
+      items: [{ title: "Aftersun", libraryKind: "film" }, { title: "Severance", libraryId: shows.id, attributes: { [network.key]: "Apple TV+" } }],
+    },
+  });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const cid = (created.body as { id: string }).id;
+  const detail = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as {
+    libraries: Array<{ kind: string; label: string | null }>;
+    items: Array<{ id: string; title: string; catalogItem: { kind: string; attributes: Array<{ label: string; value: string }> } }>;
+  };
+  assert.deepEqual(detail.libraries.map((library) => library.kind), ["film", shows.kind]);
+  const severance = detail.items.find((item) => item.title === "Severance")!;
+  assert.equal(severance.catalogItem.kind, shows.kind);
+  assert.deepEqual(severance.catalogItem.attributes.map((a) => [a.label, a.value]), [["Canal", "Apple TV+"]]);
+
+  // o item do desafio edita as propriedades da biblioteca dele (nativas e personalizadas)
+  const edited = await call("PATCH", `/api/challenges/${cid}/items/${severance.id}`, { session: owner, body: { attributes: { [network.key]: "Apple TV" } } });
+  assert.equal(edited.response.status, 200, JSON.stringify(edited.body));
+  const again = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { items: Array<{ title: string; catalogItem: { attributes: Array<{ value: string }> } }> };
+  assert.equal(again.items.find((item) => item.title === "Severance")?.catalogItem.attributes[0].value, "Apple TV");
+
+  // um item sem biblioteca, com duas ligadas: precisa escolher
+  const ambiguous = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner, body: { recipe: "cinema", title: "Sem escolha", participantIds: [owner.user.id], libraries: [{ libraryId: shows.id }], items: [{ title: "Sem biblioteca" }] },
+  });
+  assert.equal(ambiguous.response.status, 400, JSON.stringify(ambiguous.body));
+  assert.equal((ambiguous.body as { error: string }).error, "library_required");
+
+  // Tables + uma biblioteca a mais: a Tables da receita é ligada uma vez só
+  const tables = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: { recipe: "tables", title: "Comer e ver", participantIds: [owner.user.id], libraries: [{ libraryId: shows.id }], items: [{ title: "Sem biblioteca" }] },
+  });
+  assert.equal(tables.response.status, 400, "com duas bibliotecas, o item de Tables também precisa dizer de onde vem");
+  assert.equal((tables.body as { error: string }).error, "library_required");
+  const tablesLib = (await call("POST", `/api/groups/${gid}/catalog/libraries`, { session: owner, body: { source: "tables" } }));
+  assert.equal(tablesLib.response.status, 201, JSON.stringify(tablesLib.body));
+  assert.equal((tablesLib.body as { label: string | null }).label, null, "Tables sem nome guardado mostra o nome padrão");
+  const withTables = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "tables", title: "Comer e ver", participantIds: [owner.user.id], libraries: [{ libraryId: shows.id }],
+      items: [{ title: "Cantina", libraryId: (tablesLib.body as { id: string }).id }, { title: "Serial", libraryId: shows.id }],
+    },
+  });
+  assert.equal(withTables.response.status, 201, JSON.stringify(withTables.body));
+  const twoLibs = (await call("GET", `/api/challenges/${(withTables.body as { id: string }).id}`, { session: owner })).body as { libraries: Array<{ source: string }> };
+  assert.deepEqual(twoLibs.libraries.map((library) => library.source).sort(), ["custom", "tables"], "uma Tables e a outra — sem Tables duplicada");
+
+  // o modelo público não expõe valores de propriedades personalizadas
+  await adminPool.query("UPDATE users SET platform_admin = true WHERE id = $1", [owner.user.id]);
+  const platform = await login("lia_extras");
+  assert.equal((await call("POST", `/api/challenges/${cid}/template`, { session: platform, body: {} })).response.status, 200);
+  const preview = await call("GET", `/api/templates/${cid}`);
+  assert.equal(JSON.stringify(preview.body).includes("Apple TV"), false, "valores personalizados não vazam no modelo público");
+});

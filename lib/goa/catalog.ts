@@ -709,8 +709,12 @@ async function insertLibrary(
   userId: string,
   body: Record<string, unknown>,
 ): Promise<CatalogLibrary> {
-  const label = stringValue(body, "label", { min: 1, max: 80 })!;
   const source = typeof body.source === "string" && CREATABLE_LIBRARY_SOURCES.has(body.source) ? body.source : "custom";
+  // A Tables library can go without a stored name — it then shows the locale-aware
+  // default until someone renames it, like the ones a challenge creates itself.
+  const label = source === "tables" && (body.label === undefined || body.label === null || body.label === "")
+    ? null
+    : stringValue(body, "label", { min: 1, max: 80 })!;
   // Opaque and stable: never derived from `label`, so a rename never touches
   // it, and it never collides with another workspace's library of the same
   // starting kind (each gets its own generated key, not a shared literal).

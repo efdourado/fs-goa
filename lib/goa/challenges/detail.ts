@@ -15,6 +15,7 @@ import {
   usesRoundItems,
 } from "./entry-types";
 import { fieldsForChallenge } from "./fields";
+import { attributeValuesForItems } from "../catalog-attributes";
 import { readChallengeLibraries } from "./libraries";
 import { generateDailyCheckpoints } from "./items";
 import { recipeCollectsEntryDate } from "./recipes";
@@ -52,7 +53,7 @@ export async function detailItems(
     id: string; title: string; description: string | null;
     position: number; opens_at: Date | null; due_at: Date | null; schedule_precision: "date" | "datetime";
     checkpoint_id: string | null; origin_note: string | null;
-    catalog_item_id: string | null; catalog_title: string | null;
+    catalog_item_id: string | null; catalog_kind: string | null; catalog_title: string | null;
     catalog_author: string | null; catalog_year: number | null;
     catalog_main_genre: string | null; catalog_pages: number | null; catalog_runtime_minutes: number | null;
     recommended_by_id: string | null; recommended_by_name: string | null;
@@ -64,7 +65,7 @@ export async function detailItems(
     // An external name has no membership to lose, so it always shows here —
     // it's excluded only from the *public* rendering (Phase 6), below.
     `SELECT i.id, i.title, i.description, i.position, i.opens_at, i.due_at, i.schedule_precision, i.checkpoint_id, i.origin_note,
-            i.catalog_item_id, ci.title AS catalog_title, ci.author AS catalog_author, ci.year AS catalog_year,
+            i.catalog_item_id, ci.kind AS catalog_kind, ci.title AS catalog_title, ci.author AS catalog_author, ci.year AS catalog_year,
             ci.main_genre AS catalog_main_genre, ci.page_count AS catalog_pages, ci.runtime_minutes AS catalog_runtime_minutes,
             CASE WHEN active_recommender.user_id IS NOT NULL THEN i.recommended_by_user_id END AS recommended_by_id,
             CASE WHEN active_recommender.user_id IS NOT NULL THEN ru.display_name END AS recommended_by_name,
@@ -80,6 +81,11 @@ export async function detailItems(
       WHERE i.challenge_id = $1 AND i.archived_at IS NULL ORDER BY i.position`,
     [challengeId, groupId],
   );
+  // Custom property values of each item's catalog entry — the item editor shows them in the
+  // library's own terms. Never part of a public preview.
+  const attributes = isPublic
+    ? new Map<string, never[]>()
+    : await attributeValuesForItems(client, result.rows.flatMap((row) => (row.catalog_item_id ? [row.catalog_item_id] : [])));
   return result.rows.map((item) => ({
     id: item.id, title: item.title,
     description: item.description, position: item.position,
@@ -93,12 +99,14 @@ export async function detailItems(
     catalogItem: item.catalog_item_id
       ? {
           id: item.catalog_item_id,
+          kind: item.catalog_kind,
           title: item.catalog_title ?? item.title,
           author: item.catalog_author,
           year: item.catalog_year,
           mainGenre: item.catalog_main_genre,
           pageCount: item.catalog_pages,
           runtimeMinutes: item.catalog_runtime_minutes,
+          attributes: attributes.get(item.catalog_item_id) ?? [],
         }
       : null,
     recommendedBy: !recommendationsEnabled ? null : item.recommended_by_id

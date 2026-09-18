@@ -451,8 +451,12 @@ export async function updateChallengeItem(
       // lógica de `updateCatalogItem`.
       if (current.catalog_item_id
         && (Object.hasOwn(body, "author") || Object.hasOwn(body, "year") || Object.hasOwn(body, "mainGenre")
-          || Object.hasOwn(body, "pageCount") || Object.hasOwn(body, "runtimeMinutes"))) {
-        await applyCatalogItemUpdate(client, current.catalog_item_id, access.challenge.group_id, body);
+          || Object.hasOwn(body, "pageCount") || Object.hasOwn(body, "runtimeMinutes") || Object.hasOwn(body, "attributes"))) {
+        // The item's library decides which custom properties `attributes` may set.
+        const catalogKind = (await oneOrNull<{ kind: string }>(
+          client, "SELECT kind FROM catalog_items WHERE id = $1", [current.catalog_item_id],
+        ))?.kind;
+        await applyCatalogItemUpdate(client, current.catalog_item_id, access.challenge.group_id, body, catalogKind);
       }
       await writeAudit(
         client,
