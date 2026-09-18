@@ -16,6 +16,7 @@ export { inviteChallengeTargets } from "./schema/invites";
 export {
   challengeFields,
   challengeItems,
+  challengeLibraries,
   entryTypes,
   fieldOptions,
 } from "./schema/challenge-definition";

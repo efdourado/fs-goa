@@ -21,6 +21,7 @@ export {
   updateChallengeItem,
 } from "./goa/challenges/items";
 export { softDeleteChallenge, transitionChallenge } from "./goa/challenges/lifecycle";
+export { addChallengeLibrary, removeChallengeLibrary } from "./goa/challenges/libraries";
 export { challengePreflight } from "./goa/challenges/preflight";
 export type { PreflightIssue, PreflightReport } from "./goa/challenges/preflight";
 export { setChallengeParticipants, setParticipantNameConsent } from "./goa/challenges/participants";

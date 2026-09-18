@@ -80,9 +80,11 @@ function catalogAttributeFilter(request: Request) {
 }
 import {
   addMetric,
+  addChallengeLibrary,
   addSharedResponseType,
   archiveChallengeItem,
   archiveEntryType,
+  removeChallengeLibrary,
   archiveMetric,
   assignCheckpointItems,
   challengePreflight,
@@ -400,6 +402,9 @@ export async function POST(request: Request): Promise<Response> {
     if (path[0] === "challenges" && path[2] === "entry-types" && path.length === 3) {
       return json(await addSharedResponseType(session, path[1], body), 201);
     }
+    if (path[0] === "challenges" && path[2] === "libraries" && path.length === 3) {
+      return json(await addChallengeLibrary(session, path[1], body), 201);
+    }
     if (path[0] === "challenges" && path[2] === "items" && path[3] === "preview" && path.length === 4) {
       return json(await previewListImport(session, path[1], body));
     }
@@ -540,6 +545,9 @@ export async function DELETE(request: Request): Promise<Response> {
       return json(await archiveEntryType(session, path[1], path[3], {
         archiveMetrics: new URL(request.url).searchParams.get("archiveMetrics") === "1",
       }));
+    }
+    if (path[0] === "challenges" && path[2] === "libraries" && path.length === 4) {
+      return json(await removeChallengeLibrary(session, path[1], path[3]));
     }
     if (path[0] === "challenges" && path[2] === "items" && path.length === 4) {
       return json(await archiveChallengeItem(session, path[1], path[3]));

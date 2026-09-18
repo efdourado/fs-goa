@@ -344,6 +344,13 @@
       "when": 1789753067926,
       "tag": "0048_lethal_storm",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1789773907192,
+      "tag": "0049_flimsy_tigra",
+      "breakpoints": true
     }
   ]
 }

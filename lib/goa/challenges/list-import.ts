@@ -4,7 +4,7 @@ import { challengeAccess } from "../../goa-domain";
 import { ApiError } from "../../http";
 import { normalizeTitle } from "../catalog";
 import { entryTypesForChallenge, usesRoundItems } from "./entry-types";
-import { resolveChallengeCatalogKind } from "./items";
+import { readChallengeLibraries, resolveItemLibrary } from "./libraries";
 
 /** The item fields a pasted JSON row is allowed to fill. Everything else is "unknown". */
 export type MappableField =
@@ -204,7 +204,8 @@ export async function previewListImport(
     if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores importam listas.");
     const types = await entryTypesForChallenge(client, challengeId);
     if (!usesRoundItems(types)) throw new ApiError(409, "invalid_mode", "Este desafio não usa itens.");
-    const catalogKind = await resolveChallengeCatalogKind(client, challengeId, access.challenge, body.libraryId);
+    const linked = await readChallengeLibraries(client, challengeId, access.challenge.group_id, access.challenge.recipe_key);
+    const catalogKind = await resolveItemLibrary(client, access.challenge, linked, body);
 
     const participants = (
       await client.query<{ id: string; display_name: string; username: string }>(

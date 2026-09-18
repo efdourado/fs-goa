@@ -35,7 +35,7 @@ function sourceForKind(kind: string): "screens" | "pages" | "custom" {
  * `kind` came from an already-resolved library id (`resolveItemKind`) since
  * that row already exists.
  */
-async function ensureCatalogLibrary(
+export async function ensureCatalogLibrary(
   client: PoolClient,
   groupId: string,
   kind: string,
@@ -350,6 +350,24 @@ export async function resolveItemKind(
     return row.kind;
   }
   return readCatalogKind(input.kind);
+}
+
+/**
+ * Whether a book needs its author to be told apart. The author is half of a
+ * book's identity (two works can share a title), so it is asked for — unless the
+ * library hid the Author property, in which case people were told they don't
+ * need to fill it in and the requirement goes with it.
+ */
+export async function authorRequired(client: PoolClient, groupId: string, kind: string): Promise<boolean> {
+  if (kind !== "book") return false;
+  const hidden = await oneOrNull<{ hidden: boolean }>(
+    client,
+    `SELECT n.hidden FROM catalog_native_property_configs n
+       JOIN catalog_libraries l ON l.id = n.library_id
+      WHERE l.group_id = $1 AND l.kind = 'book' AND n.property_key = 'author'`,
+    [groupId],
+  );
+  return hidden?.hidden !== true;
 }
 
 async function listCatalogWithClient(client: PoolClient, workspaceId: string) {

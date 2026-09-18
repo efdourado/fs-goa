@@ -6694,26 +6694,25 @@ test("desafio traz a biblioteca de onde vêm os itens, e a regra de preenchiment
   });
   const cinemaId = (cinema.body as { id: string }).id;
   const cinemaDetail = (await call("GET", `/api/challenges/${cinemaId}`, { session: owner })).body as {
-    library: { id: string | null; kind: string; source: string } | null; recommendationsEnabled: boolean;
+    libraries: Array<{ id: string | null; kind: string; source: string }>; recommendationsEnabled: boolean;
   };
-  assert.equal(cinemaDetail.library?.kind, "film");
-  assert.equal(cinemaDetail.library?.source, "screens");
+  assert.deepEqual(cinemaDetail.libraries.map((library) => [library.kind, library.source]), [["film", "screens"]]);
   assert.equal(cinemaDetail.recommendationsEnabled, true);
 
   const tables = await call("POST", `/api/groups/${gid}/challenges`, {
     session: owner, body: { recipe: "tables", title: "Onde comer", participantIds: [owner.user.id], items: [{ title: "Cantina do Zé" }] },
   });
   const tablesId = (tables.body as { id: string }).id;
-  const tablesDetail = (await call("GET", `/api/challenges/${tablesId}`, { session: owner })).body as { library: { id: string; source: string; kind: string } | null };
-  assert.equal(tablesDetail.library?.source, "tables");
-  assert.ok(tablesDetail.library?.id, "a biblioteca Tables nasceu junto com o desafio");
+  const tablesDetail = (await call("GET", `/api/challenges/${tablesId}`, { session: owner })).body as { libraries: Array<{ id: string; source: string; kind: string }> };
+  assert.deepEqual(tablesDetail.libraries.map((library) => library.source), ["tables"]);
+  assert.ok(tablesDetail.libraries[0].id, "a biblioteca Tables nasceu junto com o desafio");
 
   // um hábito não tem biblioteca nenhuma
   const habit = await call("POST", `/api/groups/${gid}/challenges`, {
     session: owner, body: { recipe: "habit", title: "Estudo", participantIds: [owner.user.id] },
   });
-  const habitDetail = (await call("GET", `/api/challenges/${(habit.body as { id: string }).id}`, { session: owner })).body as { library: unknown };
-  assert.equal(habitDetail.library, null);
+  const habitDetail = (await call("GET", `/api/challenges/${(habit.body as { id: string }).id}`, { session: owner })).body as { libraries: unknown[] };
+  assert.deepEqual(habitDetail.libraries, []);
 
   // o modelo público nunca expõe a biblioteca do grupo de origem
   const admin = await register("Curador", "curador_biblio");
@@ -6725,8 +6724,8 @@ test("desafio traz a biblioteca de onde vêm os itens, e a regra de preenchiment
   });
   const sourceId = (source.body as { id: string }).id;
   assert.equal((await call("POST", `/api/challenges/${sourceId}/template`, { session: platform, body: {} })).response.status, 200);
-  const preview = (await call("GET", `/api/templates/${sourceId}`)).body as { library: unknown };
-  assert.equal(preview.library, null);
+  const preview = (await call("GET", `/api/templates/${sourceId}`)).body as { libraries: unknown[] };
+  assert.deepEqual(preview.libraries, []);
 
   // a regra de quem preenche muda depois de criada — só numa resposta compartilhada
   const shared = await call("POST", `/api/challenges/${cinemaId}/entry-types`, {
@@ -6752,4 +6751,280 @@ test("desafio traz a biblioteca de onde vêm os itens, e a regra de preenchiment
   const visibility = await call("PATCH", `/api/challenges/${cinemaId}/entry-types/${individual.id}`, { session: owner, body: { visibilityPolicy: "after_own" } });
   assert.equal(visibility.response.status, 200, JSON.stringify(visibility.body));
   assert.deepEqual(visibility.body, { id: individual.id, visibilityPolicy: "after_own" });
+});
+
+test("duplicar preserva a privacidade de cada resposta: quem vê e quem preenche", async () => {
+  const owner = await register("Gabi", "gabi_privada");
+  const srcGid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Origem" } })).body as { id: string }).id;
+  const dstGid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Destino" } })).body as { id: string }).id;
+  const created = await call("POST", `/api/groups/${srcGid}/challenges`, {
+    session: owner, body: { recipe: "cinema", title: "Privado", participantIds: [owner.user.id], items: [{ title: "Aftersun" }] },
+  });
+  const cid = (created.body as { id: string }).id;
+  const shared = (await call("POST", `/api/challenges/${cid}/entry-types`, {
+    session: owner, body: { name: "Veredito", sharedEditPolicy: "members_fill_admin_corrects", field: { label: "Veredito", type: "text", required: false } },
+  })).body as { id: string };
+  const types = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { entryTypes: Array<{ id: string; answerScope: string }> };
+  const individual = types.entryTypes.find((type) => type.answerScope === "individual")!;
+  assert.equal((await call("PATCH", `/api/challenges/${cid}/entry-types/${individual.id}`, { session: owner, body: { visibilityPolicy: "author_only" } })).response.status, 200);
+  assert.equal((await call("PATCH", `/api/challenges/${cid}/entry-types/${shared.id}`, { session: owner, body: { visibilityPolicy: "after_close" } })).response.status, 200);
+
+  const copy = await call("POST", `/api/challenges/${cid}/duplicate`, { session: owner, body: { targetGroupId: dstGid, mode: "structure" } });
+  assert.equal(copy.response.status, 201, JSON.stringify(copy.body));
+  const copied = (await call("GET", `/api/challenges/${(copy.body as { id: string }).id}`, { session: owner })).body as {
+    entryTypes: Array<{ semanticKey: string; answerScope: string; visibilityPolicy: string; sharedEditPolicy: string | null }>;
+  };
+  const byScope = new Map(copied.entryTypes.map((type) => [type.answerScope, type]));
+  assert.equal(byScope.get("individual")?.visibilityPolicy, "author_only", "o que era só do autor continua só do autor");
+  assert.equal(byScope.get("shared")?.visibilityPolicy, "after_close", "o que abria só depois de encerrar continua assim");
+  assert.equal(byScope.get("shared")?.sharedEditPolicy, "members_fill_admin_corrects");
+
+  // e o modelo público, que usa a mesma cópia
+  await adminPool.query("UPDATE users SET platform_admin = true WHERE id = $1", [owner.user.id]);
+  const platform = await login("gabi_privada");
+  assert.equal((await call("POST", `/api/challenges/${cid}/template`, { session: platform, body: {} })).response.status, 200);
+  const fromTemplate = await call("POST", `/api/templates/${cid}/duplicate`, { session: platform, body: { targetGroupId: dstGid } });
+  assert.equal(fromTemplate.response.status, 201, JSON.stringify(fromTemplate.body));
+  const tpl = await adminPool.query<{ visibility_policy: string }>(
+    "SELECT visibility_policy FROM entry_types WHERE challenge_id = $1 AND archived_at IS NULL ORDER BY visibility_policy", [(fromTemplate.body as { id: string }).id],
+  );
+  assert.deepEqual(tpl.rows.map((row) => row.visibility_policy), ["after_close", "author_only"]);
+});
+
+test("duplicar leva a biblioteca com propriedades, valores e agenda dos itens — e nunca sobrescreve o que o destino já tinha", async () => {
+  const owner = await register("Hugo", "hugo_copa");
+  const srcGid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Copa 2026" } })).body as { id: string }).id;
+  const dstGid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Outro bolão" } })).body as { id: string }).id;
+
+  const matches = (await call("POST", `/api/groups/${srcGid}/catalog/libraries`, { session: owner, body: { label: "Jogos" } })).body as { id: string; kind: string };
+  const attr = async (label: string, type: string) =>
+    (await call("POST", `/api/groups/${srcGid}/catalog-attributes`, { session: owner, body: { libraryId: matches.id, label, type } })).body as { id: string; key: string };
+  const stage = await attr("Fase", "text");
+  const secret = await attr("Estádio", "text");
+
+  const created = await call("POST", `/api/groups/${srcGid}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "custom", title: "Copa", libraryId: matches.id, participantIds: [owner.user.id],
+      items: [
+        { title: "Brasil x Argentina", attributes: { [stage.key]: "Grupos", [secret.key]: "Maracanã" } },
+        { title: "França x Alemanha", attributes: { [stage.key]: "Oitavas" } },
+      ],
+    },
+  });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const cid = (created.body as { id: string }).id;
+  const items = ((await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { items: Array<{ id: string; title: string }> }).items;
+  // ocultar uma propriedade guarda o valor; a cópia leva também o que está oculto
+  await call("PATCH", `/api/catalog/libraries/${matches.id}/properties/${secret.id}`, { session: owner, body: { hidden: true } });
+  const kickoff = "2026-06-15T19:00:00.000Z";
+  const day = await call("PATCH", `/api/challenges/${cid}/items/${items[1].id}`, { session: owner, body: { opensOn: "2026-06-20", dueOn: "2026-06-21" } });
+  assert.equal(day.response.status, 200, JSON.stringify(day.body));
+  assert.equal((await call("PATCH", `/api/challenges/${cid}/items/${items[0].id}`, { session: owner, body: { opensAt: kickoff, dueAt: "2026-06-15T21:00:00.000Z" } })).response.status, 200);
+
+  const withItems = await call("POST", `/api/challenges/${cid}/duplicate`, { session: owner, body: { targetGroupId: dstGid, mode: "structure_and_items" } });
+  assert.equal(withItems.response.status, 201, JSON.stringify(withItems.body));
+  const copyId = (withItems.body as { id: string }).id;
+
+  // a biblioteca, com o nome e as duas propriedades (inclusive a oculta), já existe no destino
+  const dstLib = (await adminPool.query<{ id: string; label: string }>("SELECT id, label FROM catalog_libraries WHERE group_id = $1 AND kind = $2", [dstGid, matches.kind])).rows[0];
+  assert.equal(dstLib.label, "Jogos");
+  const dstProps = (await call("GET", `/api/catalog/libraries/${dstLib.id}/properties`, { session: owner })).body as {
+    properties: Array<{ storage: string; label: string | null; hidden: boolean; attributeKey?: string }>;
+  };
+  assert.deepEqual(
+    dstProps.properties.filter((property) => property.storage === "attribute").map((property) => [property.label, property.hidden]),
+    [["Fase", false], ["Estádio", true]],
+    "as propriedades personalizadas e o estado oculto vêm junto",
+  );
+  // …e os valores de cada item, inclusive o da propriedade oculta
+  const values = await adminPool.query<{ title: string; label: string; text_value: string }>(
+    `SELECT ci.title, d.label, v.text_value FROM catalog_attribute_values v
+       JOIN catalog_items ci ON ci.id = v.catalog_item_id JOIN catalog_attribute_defs d ON d.id = v.attribute_def_id
+      WHERE ci.group_id = $1 ORDER BY ci.title, d.label`, [dstGid],
+  );
+  assert.deepEqual(values.rows.map((row) => [row.title, row.label, row.text_value]), [
+    ["Brasil x Argentina", "Estádio", "Maracanã"], ["Brasil x Argentina", "Fase", "Grupos"], ["França x Alemanha", "Fase", "Oitavas"],
+  ]);
+  // a agenda de cada jogo atravessa: o horário exato, a data só, e como foram informados
+  const copyDetail = (await call("GET", `/api/challenges/${copyId}`, { session: owner })).body as {
+    items: Array<{ title: string; opensAt: string | null; dueAt: string | null; schedulePrecision: string }>;
+    libraries: Array<{ kind: string; label: string | null }>; startsOn: string | null;
+  };
+  const brasil = copyDetail.items.find((item) => item.title === "Brasil x Argentina")!;
+  assert.equal(brasil.opensAt, kickoff);
+  assert.equal(brasil.schedulePrecision, "datetime");
+  const franca = copyDetail.items.find((item) => item.title === "França x Alemanha")!;
+  assert.equal(franca.schedulePrecision, "date");
+  assert.ok(franca.opensAt && franca.dueAt, "a data-só também");
+  assert.equal(copyDetail.startsOn, null, "o período de participação continua zerado");
+  assert.deepEqual(copyDetail.libraries.map((library) => [library.kind, library.label]), [[matches.kind, "Jogos"]]);
+
+  // só a estrutura: sem itens, mas a biblioteca e suas propriedades existem e ficam vinculadas
+  const dst2 = ((await call("POST", "/api/groups", { session: owner, body: { name: "Só a estrutura" } })).body as { id: string }).id;
+  const structure = await call("POST", `/api/challenges/${cid}/duplicate`, { session: owner, body: { targetGroupId: dst2, mode: "structure" } });
+  assert.equal(structure.response.status, 201, JSON.stringify(structure.body));
+  const structureId = (structure.body as { id: string }).id;
+  const structureDetail = (await call("GET", `/api/challenges/${structureId}`, { session: owner })).body as { items: unknown[]; libraries: Array<{ kind: string; id: string }> };
+  assert.equal(structureDetail.items.length, 0);
+  assert.deepEqual(structureDetail.libraries.map((library) => library.kind), [matches.kind], "a cópia só da estrutura continua ligada à biblioteca");
+  const structureProps = (await call("GET", `/api/catalog/libraries/${structureDetail.libraries[0].id}/properties`, { session: owner })).body as { properties: Array<{ storage: string }> };
+  assert.equal(structureProps.properties.filter((property) => property.storage === "attribute").length, 2);
+  const added = await call("POST", `/api/challenges/${structureId}/items`, { session: owner, body: { title: "Espanha x Itália" } });
+  assert.equal(added.response.status, 201, `dá para adicionar itens à cópia sem escolher biblioteca: ${JSON.stringify(added.body)}`);
+
+  // um destino que já customizou a biblioteca e já tinha um item: o que é dele fica
+  const dst3 = ((await call("POST", "/api/groups", { session: owner, body: { name: "Já tinha" } })).body as { id: string }).id;
+  await adminPool.query(
+    "INSERT INTO catalog_libraries (id, group_id, kind, source, label, position, created_by_user_id) VALUES ('lib-ja-tinha', $1, $2, 'custom', 'Partidas', 0, $3)",
+    [dst3, matches.kind, owner.user.id],
+  );
+  await adminPool.query(
+    `INSERT INTO catalog_attribute_defs (id, group_id, kind, semantic_key, label, type, position, created_by_user_id)
+     VALUES ('def-ja-tinha', $1, $2, $3, 'Etapa', 'text', 0, $4)`, [dst3, matches.kind, stage.key, owner.user.id],
+  );
+  const merged = await call("POST", `/api/challenges/${cid}/duplicate`, { session: owner, body: { targetGroupId: dst3, mode: "structure" } });
+  assert.equal(merged.response.status, 201, JSON.stringify(merged.body));
+  const mergedLib = (await adminPool.query<{ label: string }>("SELECT label FROM catalog_libraries WHERE group_id = $1 AND kind = $2", [dst3, matches.kind])).rows[0];
+  assert.equal(mergedLib.label, "Partidas", "o nome que o destino deu à biblioteca não é sobrescrito");
+  const mergedDefs = await adminPool.query<{ label: string }>("SELECT label FROM catalog_attribute_defs WHERE group_id = $1 AND kind = $2 AND archived_at IS NULL ORDER BY label", [dst3, matches.kind]);
+  assert.deepEqual(mergedDefs.rows.map((row) => row.label), ["Estádio", "Etapa"], "a propriedade que o destino tinha fica como está; só falta a que ele não tinha");
+});
+
+test("um desafio combina bibliotecas: vínculo guardado à parte, escolha por item, e a biblioteca não some quando os itens saem", async () => {
+  const owner = await register("Iara", "iara_combina");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Maratona" } })).body as { id: string }).id;
+  const make = async (label: string) => (await call("POST", `/api/groups/${gid}/catalog/libraries`, { session: owner, body: { label } })).body as { id: string; kind: string };
+  const movies = await make("Filmes");
+  const shows = await make("Séries");
+  const podcasts = await make("Podcasts");
+
+  const created = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "custom", title: "Tudo junto", participantIds: [owner.user.id],
+      libraries: [{ libraryId: movies.id }, { libraryId: shows.id }],
+      items: [{ title: "Aftersun", libraryId: movies.id }, { title: "Severance", libraryId: shows.id }],
+    },
+  });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const cid = (created.body as { id: string }).id;
+  const detail = async () => (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as {
+    libraries: Array<{ id: string; kind: string; label: string | null }>; items: Array<{ id: string; title: string }>;
+  };
+  assert.deepEqual((await detail()).libraries.map((library) => library.label), ["Filmes", "Séries"], "as duas bibliotecas, na ordem em que foram vinculadas");
+  const kinds = await adminPool.query<{ title: string; kind: string }>(
+    `SELECT it.title, ci.kind FROM challenge_items it JOIN catalog_items ci ON ci.id = it.catalog_item_id WHERE it.challenge_id = $1 ORDER BY it.position`, [cid],
+  );
+  assert.deepEqual(kinds.rows.map((row) => [row.title, row.kind]), [["Aftersun", movies.kind], ["Severance", shows.kind]], "cada item veio da sua biblioteca");
+
+  // com duas bibliotecas, é preciso dizer de qual; uma que o desafio não usa é recusada
+  const ambiguous = await call("POST", `/api/challenges/${cid}/items`, { session: owner, body: { title: "Solaris" } });
+  assert.equal(ambiguous.response.status, 400, JSON.stringify(ambiguous.body));
+  assert.equal((ambiguous.body as { error: string }).error, "library_required");
+  const foreign = await call("POST", `/api/challenges/${cid}/items`, { session: owner, body: { title: "Serial", libraryId: podcasts.id } });
+  assert.equal(foreign.response.status, 400);
+  assert.equal((foreign.body as { error: string }).error, "library_not_linked");
+  const batch = await call("POST", `/api/challenges/${cid}/items`, {
+    session: owner, body: { items: [{ title: "Solaris", libraryId: movies.id }, { title: "Andor", libraryId: shows.id }] },
+  });
+  assert.equal(batch.response.status, 201, JSON.stringify(batch.body));
+
+  // vincular outra biblioteca é uma ação própria, e passa a valer
+  const linked = await call("POST", `/api/challenges/${cid}/libraries`, { session: owner, body: { libraryId: podcasts.id } });
+  assert.equal(linked.response.status, 201, JSON.stringify(linked.body));
+  assert.equal((await detail()).libraries.length, 3);
+  assert.equal((await call("POST", `/api/challenges/${cid}/items`, { session: owner, body: { title: "Serial", libraryId: podcasts.id } })).response.status, 201);
+  // não vincula biblioteca de outro espaço
+  const otherGid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Outro" } })).body as { id: string }).id;
+  const stranger = (await call("POST", `/api/groups/${otherGid}/catalog/libraries`, { session: owner, body: { label: "Alheia" } })).body as { id: string };
+  assert.equal((await call("POST", `/api/challenges/${cid}/libraries`, { session: owner, body: { libraryId: stranger.id } })).response.status, 400);
+
+  // desvincular: recusado enquanto houver itens dela; liberado depois — e o vínculo não vem dos itens
+  const inUse = await call("DELETE", `/api/challenges/${cid}/libraries/${podcasts.id}`, { session: owner });
+  assert.equal(inUse.response.status, 409, JSON.stringify(inUse.body));
+  assert.equal((inUse.body as { error: string }).error, "library_in_use");
+  const serial = (await detail()).items.find((item) => item.title === "Serial")!;
+  assert.equal((await call("DELETE", `/api/challenges/${cid}/items/${serial.id}`, { session: owner })).response.status, 200);
+  const stillLinked = await detail();
+  assert.ok(stillLinked.libraries.some((library) => library.id === podcasts.id), "tirar os itens não desvincula a biblioteca");
+  assert.equal((await call("DELETE", `/api/challenges/${cid}/libraries/${podcasts.id}`, { session: owner })).response.status, 200);
+  assert.equal((await detail()).libraries.length, 2);
+
+  // a cópia leva as duas bibliotecas, cada item na sua
+  const dst = ((await call("POST", "/api/groups", { session: owner, body: { name: "Cópia" } })).body as { id: string }).id;
+  const copy = await call("POST", `/api/challenges/${cid}/duplicate`, { session: owner, body: { targetGroupId: dst, mode: "structure_and_items" } });
+  assert.equal(copy.response.status, 201, JSON.stringify(copy.body));
+  const copyDetail = (await call("GET", `/api/challenges/${(copy.body as { id: string }).id}`, { session: owner })).body as { libraries: Array<{ label: string | null }> };
+  assert.deepEqual(copyDetail.libraries.map((library) => library.label), ["Filmes", "Séries"]);
+
+  // um desafio anterior à tabela (sem vínculos guardados) continua funcionando e se conserta na primeira escrita
+  await adminPool.query("DELETE FROM challenge_libraries WHERE challenge_id = $1", [cid]);
+  assert.deepEqual((await detail()).libraries.map((library) => library.label), ["Filmes", "Séries"], "o que os itens implicam continua valendo na leitura");
+  assert.equal((await call("POST", `/api/challenges/${cid}/items`, { session: owner, body: { title: "Perfect Days", libraryId: movies.id } })).response.status, 201);
+  const healed = await adminPool.query("SELECT kind FROM challenge_libraries WHERE challenge_id = $1", [cid]);
+  assert.equal(healed.rowCount, 2, "os vínculos foram gravados");
+
+  // o desafio fechado não muda de bibliotecas
+  assert.equal((await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } })).response.status, 200);
+  assert.equal((await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "closed" } })).response.status, 200);
+  assert.equal((await call("POST", `/api/challenges/${cid}/libraries`, { session: owner, body: { libraryId: podcasts.id } })).response.status, 409);
+});
+
+test("a migração 0049 liga desafios antigos às bibliotecas dos seus itens e da sua receita", async () => {
+  const { readdirSync, readFileSync } = await import("node:fs");
+  const file = readdirSync(new URL("../../drizzle/", import.meta.url)).find((name) => name.startsWith("0049_"))!;
+  const backfill = readFileSync(new URL(`../../drizzle/${file}`, import.meta.url), "utf8")
+    .split("--> statement-breakpoint").map((part) => part.trim()).filter((part) => /(^|\n)INSERT INTO "challenge_libraries"/.test(part));
+  assert.equal(backfill.length, 2, "os dois preenchimentos estão na migração");
+
+  const owner = await register("Jana", "jana_migra");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Antigo" } })).body as { id: string }).id;
+  const cinema = await call("POST", `/api/groups/${gid}/challenges`, { session: owner, body: { recipe: "cinema", title: "Filmes", participantIds: [owner.user.id], items: [{ title: "Aftersun" }] } });
+  const books = await call("POST", `/api/groups/${gid}/challenges`, { session: owner, body: { recipe: "bookshelf", title: "Livros", participantIds: [owner.user.id], items: [{ title: "Ficciones", author: "Borges" }] } });
+  const cinemaId = (cinema.body as { id: string }).id;
+  const booksId = (books.body as { id: string }).id;
+  // estado de antes da tabela: nada guardado — numa transação que nunca é confirmada, para não mexer nos outros testes
+  const client = await adminPool.connect();
+  let rows: { rows: Array<{ challenge_id: string; kind: string }> };
+  try {
+    await client.query("BEGIN");
+    await client.query("DELETE FROM challenge_libraries");
+    for (const statement of backfill) await client.query(statement);
+    rows = await client.query<{ challenge_id: string; kind: string }>(
+      "SELECT challenge_id, kind FROM challenge_libraries WHERE challenge_id = ANY($1::text[]) ORDER BY challenge_id, kind", [[cinemaId, booksId]],
+    );
+  } finally {
+    await client.query("ROLLBACK");
+    client.release();
+  }
+  const byChallenge = new Map<string, string[]>();
+  for (const row of rows.rows) byChallenge.set(row.challenge_id, [...(byChallenge.get(row.challenge_id) ?? []), row.kind]);
+  assert.deepEqual(byChallenge.get(cinemaId), ["film"]);
+  assert.deepEqual(byChallenge.get(booksId), ["book"]);
+});
+
+test("esconder o autor na biblioteca de livros tira a exigência do autor nos itens do desafio", async () => {
+  const owner = await register("Kaio", "kaio_autor");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Leitores" } })).body as { id: string }).id;
+  const first = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner, body: { recipe: "bookshelf", title: "Livros", participantIds: [owner.user.id], items: [{ title: "Ficciones", author: "Borges" }] },
+  });
+  assert.equal(first.response.status, 201, JSON.stringify(first.body));
+  const cid = (first.body as { id: string }).id;
+  const pages = (await adminPool.query<{ id: string }>("SELECT id FROM catalog_libraries WHERE group_id = $1 AND kind = 'book'", [gid])).rows[0].id;
+
+  const needsAuthor = await call("POST", `/api/challenges/${cid}/items`, { session: owner, body: { title: "Sem autor" } });
+  assert.equal(needsAuthor.response.status, 400, "com o autor visível, ele continua obrigatório");
+  assert.equal((await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner, body: { recipe: "bookshelf", title: "Outra", participantIds: [owner.user.id], items: [{ title: "Sem autor" }] },
+  })).response.status, 400);
+
+  assert.equal((await call("PATCH", `/api/catalog/libraries/${pages}/properties/author`, { session: owner, body: { hidden: true } })).response.status, 200);
+  const hidden = await call("POST", `/api/challenges/${cid}/items`, { session: owner, body: { title: "Sem autor" } });
+  assert.equal(hidden.response.status, 201, JSON.stringify(hidden.body));
+  const other = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner, body: { recipe: "bookshelf", title: "Outra", participantIds: [owner.user.id], items: [{ title: "Outro sem autor" }] },
+  });
+  assert.equal(other.response.status, 201, JSON.stringify(other.body));
 });

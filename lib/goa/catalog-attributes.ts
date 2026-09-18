@@ -253,9 +253,12 @@ export async function setCatalogItemAttributeValues(
   groupId: string,
   kind: string,
   values: unknown,
+  options: { includeHidden?: boolean } = {},
 ): Promise<void> {
   if (!values || typeof values !== "object") return;
-  const defs = await listDefsWithClient(client, groupId, kind);
+  // Hidden properties stay out of normal forms; only a copy that carries every
+  // saved value across asks for them too.
+  const defs = await listDefsWithClient(client, groupId, kind, options.includeHidden === true);
   if (!defs.length) return;
   const byIdOrKey = new Map<string, CatalogAttributeDef>();
   for (const def of defs) {

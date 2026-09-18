@@ -8,6 +8,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   smallint,
   text,
   unique,
@@ -15,7 +16,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { users } from "./accounts";
-import { catalogItems, catalogRecommenders } from "./catalog";
+import { catalogItems, catalogLibraries, catalogRecommenders } from "./catalog";
 import { challengeCheckpoints, challenges } from "./challenges";
 import { timestamptz } from "./columns";
 
@@ -109,6 +110,40 @@ export const entryTypes = pgTable(
       "entry_types_shared_scope_check",
       sql`${table.answerScope} = 'individual' or (${table.cardinality} = 'once_per_item' and ${table.targetPolicy} <> 'none')`,
     ),
+  ],
+);
+
+/**
+ * The libraries a challenge draws its items from — retained on their own, not
+ * inferred from whichever items happen to exist. A challenge can combine several
+ * (Movies and TV Shows in one list); each item still belongs to exactly one, via
+ * its catalog item's `kind`. Keyed by the library's `(group_id, kind)` — the same
+ * identity `catalog_items` uses — so a link can never point at another
+ * workspace's library. `position` is the order libraries were linked in.
+ */
+export const challengeLibraries = pgTable(
+  "challenge_libraries",
+  {
+    challengeId: text("challenge_id").notNull(),
+    groupId: text("group_id").notNull(),
+    kind: text("kind").notNull(),
+    position: integer("position").notNull().default(0),
+    createdAt: timestamptz("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ name: "challenge_libraries_pk", columns: [table.challengeId, table.kind] }),
+    foreignKey({
+      name: "challenge_libraries_challenge_fk",
+      columns: [table.challengeId, table.groupId],
+      foreignColumns: [challenges.id, challenges.groupId],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "challenge_libraries_library_fk",
+      columns: [table.groupId, table.kind],
+      foreignColumns: [catalogLibraries.groupId, catalogLibraries.kind],
+    }).onDelete("cascade"),
+    index("challenge_libraries_library_idx").on(table.groupId, table.kind),
+    check("challenge_libraries_position_check", sql`${table.position} >= 0`),
   ],
 );
 

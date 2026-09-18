@@ -5,6 +5,7 @@ import { assertArrayWithin, assertUnder, LIMITS } from "../../limits";
 import {
   applyCatalogItemUpdate,
   assertCatalogItemInGroup,
+  authorRequired,
   createCatalogItem,
   findOrCreateLibraryBySource,
   resolveItemKind,
@@ -12,12 +13,28 @@ import {
 } from "../catalog";
 import { syncDailyCheckpoints } from "../daily-checkpoints";
 import { seedExpectationType } from "../challenges/entry-types";
+import { linkChallengeLibrary, resolveItemLibrary } from "../challenges/libraries";
 import { resolveItemRecommender } from "../challenges/recommender";
 import { resolveRecipe } from "../challenges/recipes";
 import { writeAudit } from "./audit";
 import { insertField, type ClientField } from "./fields";
 import { parseRuleSections, rulesCompatibilityText } from "./rules";
 import { asRecord, dateRange, publicId, semanticKey, timeZoneValue } from "./shared";
+
+/** The libraries a create request names: `libraryIds` (+ optional matching `libraryKinds`), or the older single `libraryId` / `libraryKind`. */
+function namedLibraries(body: Record<string, unknown>): Array<{ libraryId?: string; libraryKind?: string }> {
+  const specs: Array<{ libraryId?: string; libraryKind?: string }> = [];
+  const push = (spec: { libraryId?: unknown; libraryKind?: unknown }) => {
+    if (typeof spec.libraryId === "string" && spec.libraryId) specs.push({ libraryId: spec.libraryId });
+    else if (typeof spec.libraryKind === "string" && spec.libraryKind) specs.push({ libraryKind: spec.libraryKind });
+  };
+  if (Array.isArray(body.libraries)) {
+    assertArrayWithin(body.libraries, 12, "Use no máximo 12 bibliotecas.");
+    for (const entry of body.libraries) push(asRecord(entry));
+  }
+  push(body);
+  return specs;
+}
 
 export async function createChallenge(
   session: SessionContext,
@@ -154,22 +171,34 @@ export async function createChallenge(
               )
             ).rows.map((row) => row.user_id),
           );
-      // `custom` doesn't fix a kind: it comes from the caller's own library
-      // (any workspace library, built-in or user-created) instead. A preset
-      // with a default library (Tables) falls back to the workspace's own
-      // library of that config, created on first use, when none is named.
-      const catalogKind = recipe.catalogKindFromBody
-        ? typeof body.libraryId !== "string" && recipe.defaultLibrarySource
-          ? await findOrCreateLibraryBySource(client, groupId, session.user.id, recipe.defaultLibrarySource)
-          : await resolveItemKind(client, groupId, { libraryId: body.libraryId, kind: body.libraryKind })
-        : recipe.catalogKind ?? "film";
+      // The libraries this challenge draws from, stored on the challenge itself.
+      // Cinema/Estante/Library track their fixed one; Tables the workspace's own
+      // Tables library (created on first use); `custom` only what the caller
+      // names. Any recipe can also be given more libraries — Movies and TV Shows
+      // in one list — via `libraryIds` (or the older single `libraryId`).
+      const linkedKinds: string[] = [];
+      const link = async (kind: string) => {
+        if (linkedKinds.includes(kind)) return;
+        await linkChallengeLibrary(client, id, groupId, kind, session.user.id);
+        linkedKinds.push(kind);
+      };
+      const named = namedLibraries(body);
+      if (recipe.catalogKind) await link(recipe.catalogKind);
+      if (recipe.defaultLibrarySource && !named.length) {
+        await link(await findOrCreateLibraryBySource(client, groupId, session.user.id, recipe.defaultLibrarySource));
+      }
+      for (const spec of named) await link(await resolveItemKind(client, groupId, spec));
+      if (!linkedKinds.length) throw new ApiError(400, "invalid_library", "Escolha a biblioteca de onde vêm os itens.");
+      const linkedRows = linkedKinds.map((kind, position) => ({ id: null, kind, source: "", label: null, position }));
       const usedKeys = new Set<string>();
       for (let index = 0; index < items.length; index += 1) {
         const item = asRecord(items[index]);
         const itemTitle = typeof item.title === "string" ? item.title.trim() : "";
         if (!itemTitle) throw new ApiError(400, "invalid_item", "Item sem título.");
         const itemAuthor = typeof item.author === "string" ? item.author.trim() : "";
-        if (catalogKind === "book" && !itemAuthor) {
+        // Each item names its library, or takes the challenge's only one.
+        const catalogKind = await resolveItemLibrary(client, { id, group_id: groupId }, linkedRows, item, item.catalogItemId);
+        if (!itemAuthor && await authorRequired(client, groupId, catalogKind)) {
           throw new ApiError(400, "invalid_item", "Informe o autor de cada livro.");
         }
 

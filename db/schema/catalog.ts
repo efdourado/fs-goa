@@ -109,8 +109,7 @@ export const catalogNativePropertyConfigs = pgTable(
  * A reusable, non-account name for someone outside Goa who recommended an
  * item — "Ana from work". Scoped per workspace like `catalog_libraries`: a
  * name saved in one personal space or group never appears in another, and it
- * never auto-links to a real account even if a name matches (Phase 6 of
- * docs/flexible-catalogs.md).
+ * never auto-links to a real account even if a name matches.
  */
 export const catalogRecommenders = pgTable(
   "catalog_recommenders",
