@@ -47,7 +47,7 @@ export async function detailItems(
 ) {
   const result = await client.query<{
     id: string; title: string; description: string | null;
-    position: number; opens_at: Date | null; due_at: Date | null;
+    position: number; opens_at: Date | null; due_at: Date | null; schedule_precision: "date" | "datetime";
     checkpoint_id: string | null; origin_note: string | null;
     catalog_item_id: string | null; catalog_title: string | null;
     catalog_author: string | null; catalog_year: number | null;
@@ -57,7 +57,7 @@ export async function detailItems(
     // A recommender who left the group (or whose account is gone) never shows
     // their name to the group again — `recommended_by_id` goes null right
     // along with it, same as a deleted account already reads "Conta removida".
-    `SELECT i.id, i.title, i.description, i.position, i.opens_at, i.due_at, i.checkpoint_id, i.origin_note,
+    `SELECT i.id, i.title, i.description, i.position, i.opens_at, i.due_at, i.schedule_precision, i.checkpoint_id, i.origin_note,
             i.catalog_item_id, ci.title AS catalog_title, ci.author AS catalog_author, ci.year AS catalog_year,
             ci.main_genre AS catalog_main_genre, ci.page_count AS catalog_pages, ci.runtime_minutes AS catalog_runtime_minutes,
             CASE WHEN active_recommender.user_id IS NOT NULL THEN i.recommended_by_user_id END AS recommended_by_id,
@@ -78,6 +78,7 @@ export async function detailItems(
     checkpointId: item.checkpoint_id ?? null,
     originNote: item.origin_note ?? null,
     opensAt: item.opens_at?.toISOString() ?? null, dueAt: item.due_at?.toISOString() ?? null,
+    schedulePrecision: item.schedule_precision,
     status: windowStatus(status, item.opens_at, item.due_at),
     catalogItem: item.catalog_item_id
       ? {
@@ -154,6 +155,7 @@ export interface DetailChallengeRow {
   show_schedule?: boolean;
   results_all_comments?: boolean;
   published_as_template_at?: string | Date | null;
+  time_zone?: string;
 }
 
 type ParticipantRow = { id: string; display_name: string; username: string; name_consent: boolean };
@@ -239,6 +241,7 @@ export async function buildChallengeDetail(
     ruleSections: parseRuleSections(ch.rule_sections, ch.rules),
     startsOn: ch.start_date,
     endsOn: ch.end_date,
+    timeZone: ch.time_zone ?? "UTC",
     status: ch.status,
     kind: ch.kind,
     recipeKey: ch.recipe_key ?? null,

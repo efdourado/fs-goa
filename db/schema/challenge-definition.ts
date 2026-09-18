@@ -134,6 +134,11 @@ export const challengeItems = pgTable(
     position: integer("position").notNull().default(0),
     opensAt: timestamptz("opens_at"),
     dueAt: timestamptz("due_at"),
+    // Whether `opens_at`/`due_at` are a real clock time or just a calendar date
+    // (stored as local midnight in the challenge's timezone, per
+    // `midnightInTimeZone`) — display-only: it changes how the client renders
+    // the instant, never whether entries can still be recorded (Phase 5).
+    schedulePrecision: text("schedule_precision").notNull().default("datetime"),
     metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
     archivedAt: timestamptz("archived_at"),
     createdAt: timestamptz("created_at").defaultNow().notNull(),
@@ -169,6 +174,10 @@ export const challengeItems = pgTable(
     check(
       "challenge_items_schedule_check",
       sql`${table.opensAt} is null or ${table.dueAt} is null or ${table.dueAt} >= ${table.opensAt}`,
+    ),
+    check(
+      "challenge_items_schedule_precision_check",
+      sql`${table.schedulePrecision} in ('date', 'datetime')`,
     ),
     check("challenge_items_metadata_object_check", sql`jsonb_typeof(${table.metadata}) = 'object'`),
   ],

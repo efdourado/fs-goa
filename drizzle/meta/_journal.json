@@ -316,6 +316,13 @@
       "when": 1789743036959,
       "tag": "0044_happy_scarlet_spider",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1789743948827,
+      "tag": "0045_striped_masked_marvel",
+      "breakpoints": true
     }
   ]
 }

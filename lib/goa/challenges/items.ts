@@ -18,6 +18,7 @@ import {
   resolveItemKind,
   upsertCatalogItem,
 } from "../catalog";
+import { midnightInTimeZone } from "../domain/shared";
 import { syncDailyCheckpoints } from "../daily-checkpoints";
 import {
   entryTypesForChallenge,
@@ -102,6 +103,54 @@ async function createChallengeCatalogItem(
   return kind === "film" || kind === "book"
     ? upsertCatalogItem(client, groupId, userId, { kind, title, ...extra })
     : createCatalogItem(client, groupId, userId, { kind, title, attributes: extra.attributes });
+}
+
+/**
+ * An item's schedule (Phase 5): no schedule, a date only, or a date and
+ * time — never a deadline that blocks recording a score (nothing in
+ * `saveEntry` ever reads `challenge_items.due_at`). `opensOn`/`dueOn`
+ * (YYYY-MM-DD) and `opensAt`/`dueAt` (a precise instant) are mutually
+ * exclusive per call — mixing them in one request is rejected rather than
+ * guessed. Like `dateRange`, touching the schedule at all replaces both
+ * boundaries together; untouched, both boundaries and the precision stay
+ * exactly as they were.
+ */
+function resolveItemSchedule(
+  body: Record<string, unknown>,
+  timeZone: string,
+  current: { opensAt: Date | null; dueAt: Date | null; schedulePrecision: "date" | "datetime" },
+): { opensAt: Date | null; dueAt: Date | null; schedulePrecision: "date" | "datetime"; touched: boolean } {
+  const hasDatetime = Object.hasOwn(body, "opensAt") || Object.hasOwn(body, "dueAt");
+  const hasDateOnly = Object.hasOwn(body, "opensOn") || Object.hasOwn(body, "dueOn");
+  if (hasDatetime && hasDateOnly) {
+    throw new ApiError(400, "invalid_schedule", "Use data e hora ou só a data para os dois limites do item, não uma mistura.");
+  }
+  if (!hasDatetime && !hasDateOnly) return { ...current, touched: false };
+
+  let opensAt: Date | null;
+  let dueAt: Date | null;
+  if (hasDateOnly) {
+    const opensOn = body.opensOn === undefined || body.opensOn === null || body.opensOn === ""
+      ? null : dateString(body.opensOn, "Data de abertura");
+    const dueOn = body.dueOn === undefined || body.dueOn === null || body.dueOn === ""
+      ? null : dateString(body.dueOn, "Data de prazo");
+    opensAt = opensOn ? midnightInTimeZone(opensOn, timeZone) : null;
+    dueAt = dueOn ? midnightInTimeZone(dueOn, timeZone) : null;
+  } else {
+    const parseInstant = (value: unknown, name: string): Date | null => {
+      if (value === undefined || value === null || value === "") return null;
+      if (typeof value !== "string") throw new ApiError(400, "invalid_schedule", `${name} inválida.`);
+      const parsed = new Date(value);
+      if (Number.isNaN(parsed.getTime())) throw new ApiError(400, "invalid_schedule", `${name} inválida.`);
+      return parsed;
+    };
+    opensAt = parseInstant(body.opensAt, "Abertura");
+    dueAt = parseInstant(body.dueAt, "Prazo");
+  }
+  if (opensAt && dueAt && dueAt.getTime() < opensAt.getTime()) {
+    throw new ApiError(400, "invalid_schedule", "O prazo precisa ser igual ou posterior à abertura.");
+  }
+  return { opensAt, dueAt, schedulePrecision: hasDateOnly ? "date" : "datetime", touched: true };
 }
 
 /** Validates that a checkpoint id (or null) belongs to this challenge. */
@@ -359,9 +408,11 @@ export async function updateChallengeItem(
     const current = await oneOrNull<{
       title: string; description: string | null; recommended_by_user_id: string | null;
       catalog_item_id: string | null; origin_note: string | null; checkpoint_id: string | null;
+      opens_at: Date | null; due_at: Date | null; schedule_precision: "date" | "datetime";
     }>(
       client,
-      `SELECT title, description, recommended_by_user_id, catalog_item_id, origin_note, checkpoint_id
+      `SELECT title, description, recommended_by_user_id, catalog_item_id, origin_note, checkpoint_id,
+              opens_at, due_at, schedule_precision
          FROM challenge_items
         WHERE id = $1 AND challenge_id = $2 AND archived_at IS NULL
         FOR UPDATE`,
@@ -409,12 +460,17 @@ export async function updateChallengeItem(
           recommendedBy = wanted;
         }
       }
+      const schedule = resolveItemSchedule(body, access.challenge.time_zone, {
+        opensAt: current.opens_at, dueAt: current.due_at, schedulePrecision: current.schedule_precision,
+      });
       await client.query(
         `UPDATE challenge_items
             SET title = $3, description = $4, recommended_by_user_id = $5,
-                origin_note = $6, checkpoint_id = $7, updated_at = now()
+                origin_note = $6, checkpoint_id = $7, opens_at = $8, due_at = $9,
+                schedule_precision = $10, updated_at = now()
           WHERE id = $1 AND challenge_id = $2`,
-        [itemId, challengeId, title, description, recommendedBy, originNote, checkpointId],
+        [itemId, challengeId, title, description, recommendedBy, originNote, checkpointId,
+          schedule.opensAt, schedule.dueAt, schedule.schedulePrecision],
       );
       // Autor, ano, gênero principal, páginas e duração vivem no item do acervo
       // compartilhado, não no item do desafio — atualizá-los aqui é o que deixa
@@ -434,9 +490,17 @@ export async function updateChallengeItem(
         "challenge_item",
         itemId,
         { title: current.title, description: current.description },
-        { title, description, ...(touchesRecommender ? { recommendedByUserId: recommendedBy } : {}) },
+        {
+          title, description, ...(touchesRecommender ? { recommendedByUserId: recommendedBy } : {}),
+          ...(schedule.touched ? { opensAt: schedule.opensAt, dueAt: schedule.dueAt, schedulePrecision: schedule.schedulePrecision } : {}),
+        },
       );
-      return { id: itemId, title, description, ...(touchesRecommender ? { recommendedByUserId: recommendedBy } : {}) };
+      return {
+        id: itemId, title, description, ...(touchesRecommender ? { recommendedByUserId: recommendedBy } : {}),
+        opensAt: schedule.opensAt?.toISOString() ?? null,
+        dueAt: schedule.dueAt?.toISOString() ?? null,
+        schedulePrecision: schedule.schedulePrecision,
+      };
     }
 
     throw new ApiError(404, "not_found", "Item ou checkpoint não encontrado.");

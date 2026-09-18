@@ -15,7 +15,7 @@ import { resolveRecipe } from "../challenges/recipes";
 import { writeAudit } from "./audit";
 import { insertField, type ClientField } from "./fields";
 import { parseRuleSections, rulesCompatibilityText } from "./rules";
-import { asRecord, dateRange, publicId, semanticKey } from "./shared";
+import { asRecord, dateRange, publicId, semanticKey, timeZoneValue } from "./shared";
 
 export async function createChallenge(
   session: SessionContext,
@@ -31,6 +31,7 @@ export async function createChallenge(
     Object.hasOwn(body, "startsOn") ? body.startsOn : body.startDate,
     Object.hasOwn(body, "endsOn") ? body.endsOn : body.endDate,
   );
+  const timeZone = timeZoneValue(body.timeZone, "America/Sao_Paulo");
   const recipe = resolveRecipe(body);
   // A personal challenge with no start/end is a living list ("films I've seen",
   // "books I've read") — it has no round to open or close, so it is born active
@@ -95,7 +96,7 @@ export async function createChallenge(
        VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11,$12,$13,$14,
                CASE WHEN $14 = 'active' THEN now() END, now(), now())`,
       [id, groupId, session.user.id, title, description, rules, JSON.stringify(ruleSections),
-        recipe.key, recipe.version, startDate, endDate, "America/Sao_Paulo", kind, status],
+        recipe.key, recipe.version, startDate, endDate, timeZone, kind, status],
     );
 
     let primaryTypeId = "";

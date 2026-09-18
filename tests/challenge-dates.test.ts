@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
 import { ApiError } from "../lib/http";
-import { dateKeyInTimeZone, dateRange } from "../lib/goa/domain/shared";
+import { dateKeyInTimeZone, dateRange, midnightInTimeZone } from "../lib/goa/domain/shared";
 
 function assertRejected(work: () => unknown): void {
   assert.throws(work, (error: unknown) => {
@@ -72,4 +72,24 @@ describe("date key in an IANA time zone", () => {
       "2026-08-30",
     );
   });
+});
+
+describe("midnight in an IANA time zone", () => {
+  test("is the exact inverse of dateKeyInTimeZone, in a zone with a fixed UTC offset", () => {
+    // America/Sao_Paulo has been UTC-3 year-round since Brazil dropped DST —
+    // midnight local is always 03:00 UTC.
+    const instant = midnightInTimeZone("2026-06-15", "America/Sao_Paulo");
+    assert.equal(instant.toISOString(), "2026-06-15T03:00:00.000Z");
+    assert.equal(dateKeyInTimeZone(instant, "America/Sao_Paulo"), "2026-06-15");
+  });
+
+  test("round-trips through dateKeyInTimeZone across a DST-observing zone too", () => {
+    // A zone that still observes DST (unlike Sao Paulo) is exactly the case
+    // that would break a single-shot offset correction near a transition.
+    for (const dateKey of ["2026-01-15", "2026-06-15", "2026-03-08", "2026-11-01"]) {
+      const instant = midnightInTimeZone(dateKey, "America/New_York");
+      assert.equal(dateKeyInTimeZone(instant, "America/New_York"), dateKey);
+    }
+  });
+
 });

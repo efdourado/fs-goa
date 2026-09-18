@@ -97,7 +97,7 @@ export async function getTemplatePreview(challengeId: string) {
       `SELECT c.id, c.group_id, c.title, c.description, c.rules, c.rule_sections,
               c.start_date::text AS start_date, c.end_date::text AS end_date,
               c.status, c.kind, c.recipe_key, g.kind AS group_kind, c.results_anon,
-              c.show_schedule, c.published_as_template_at
+              c.show_schedule, c.published_as_template_at, c.time_zone
          FROM challenges c
          JOIN groups g ON g.id = c.group_id AND g.deleted_at IS NULL AND g.archived_at IS NULL
         WHERE c.id = $1 AND c.published_as_template_at IS NOT NULL AND c.deleted_at IS NULL

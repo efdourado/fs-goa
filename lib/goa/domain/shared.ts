@@ -71,6 +71,48 @@ export function dateKeyInTimeZone(date: Date, timeZone: string): string {
   return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
+/**
+ * The instant of local midnight on `dateKey` (YYYY-MM-DD) in `timeZone` — the
+ * inverse of `dateKeyInTimeZone`. Used to store a date-only schedule (Phase 5)
+ * as a real instant without guessing a UTC offset by hand: format a first
+ * guess in the target zone, then correct by however far its wall clock reads
+ * from `dateKey T00:00:00`. One correction is exact for every real-world
+ * zone; a second guards the rare case where that correction crosses a DST
+ * boundary.
+ */
+export function midnightInTimeZone(dateKey: string, timeZone: string): Date {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  if (!year || !month || !day) throw new RangeError("Data inválida.");
+  // The desired wall clock, expressed as if it were already UTC — fixed for
+  // the whole search, so each step corrects toward it instead of re-deriving
+  // a fresh (and, the second time, wrong) offset from whatever the previous
+  // guess happened to be.
+  const target = Date.UTC(year, month - 1, day, 0, 0, 0);
+  let instant = target;
+  for (let i = 0; i < 2; i += 1) {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone, hourCycle: "h23",
+      year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", second: "2-digit",
+    }).formatToParts(new Date(instant));
+    const get = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+    const wallClockAsUtc = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
+    const error = wallClockAsUtc - target;
+    if (error === 0) break;
+    instant -= error;
+  }
+  return new Date(instant);
+}
+
+/** A named IANA timezone is just a non-empty, reasonably short string here — the same shape `challenges_time_zone_check` allows. */
+export function timeZoneValue(value: unknown, fallback: string): string {
+  if (value === undefined || value === null || value === "") return fallback;
+  if (typeof value !== "string" || value.length < 1 || value.length > 100) {
+    throw new ApiError(400, "invalid_timezone", "Fuso horário inválido.");
+  }
+  return value;
+}
+
 export function integerValue(value: unknown, fallback: number, min: number, max: number): number {
   const number = value === undefined ? fallback : Number(value);
   if (!Number.isSafeInteger(number) || number < min || number > max) {

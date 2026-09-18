@@ -210,6 +210,9 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
     id: originalItemIds[0],
     title: "Aftersun — seleção do clube",
     description: "Primeiro filme da rodada.",
+    opensAt: null,
+    dueAt: null,
+    schedulePrecision: "datetime",
   });
   const updatedRules = [
     {
@@ -1854,6 +1857,51 @@ test("resposta compartilhada (fase 4): uma vez só, admin corrige, sem duplicar 
   assert.equal(ratingA.response.status, 201);
   assert.equal(ratingB.response.status, 201);
   assert.notEqual((ratingA.body as { id: string }).id, (ratingB.body as { id: string }).id, "avaliação individual continua uma linha por participante");
+});
+
+test("agenda do item (fase 5): data só ou data e hora, nunca um prazo que bloqueia o registro", async () => {
+  const owner = await register("Noa", "noa_agenda");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Copa" } })).body as { id: string }).id;
+
+  const created = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: { recipe: "cinema", title: "Fase de grupos", timeZone: "America/Sao_Paulo", participantIds: [owner.user.id], items: [{ title: "Aftersun" }] },
+  });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const cid = (created.body as { id: string }).id;
+  const detail0 = await call("GET", `/api/challenges/${cid}`, { session: owner });
+  assert.equal((detail0.body as { timeZone: string }).timeZone, "America/Sao_Paulo");
+  const itemId = (detail0.body as { items: Array<{ id: string }> }).items[0].id;
+
+  // só a data: guarda um instante real, mas com precisão de dia
+  const dateOnly = await call("PATCH", `/api/challenges/${cid}/items/${itemId}`, {
+    session: owner, body: { opensOn: "2026-06-15" },
+  });
+  assert.equal(dateOnly.response.status, 200, JSON.stringify(dateOnly.body));
+  assert.equal((dateOnly.body as { schedulePrecision: string }).schedulePrecision, "date");
+  const storedOpensAt = new Date((dateOnly.body as { opensAt: string }).opensAt);
+  // meia-noite em America/Sao_Paulo (UTC-3) é 03:00 UTC
+  assert.equal(storedOpensAt.toISOString(), "2026-06-15T03:00:00.000Z");
+
+  // misturar data-só com data-e-hora no mesmo pedido é rejeitado, não adivinhado
+  const mixed = await call("PATCH", `/api/challenges/${cid}/items/${itemId}`, {
+    session: owner, body: { opensAt: "2026-06-15T15:00:00Z", dueOn: "2026-06-15" },
+  });
+  assert.equal(mixed.response.status, 400, JSON.stringify(mixed.body));
+
+  // data e hora precisas: passam a valer, sem herdar a data-só anterior
+  const dated = await call("PATCH", `/api/challenges/${cid}/items/${itemId}`, {
+    session: owner, body: { opensAt: "2026-06-15T18:00:00Z", dueAt: new Date(Date.now() - 60_000).toISOString() },
+  });
+  assert.equal(dated.response.status, 200, JSON.stringify(dated.body));
+  assert.equal((dated.body as { schedulePrecision: string }).schedulePrecision, "datetime");
+
+  await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } });
+  // o prazo já passou (due_at no passado) — registrar a nota continua funcionando
+  const scored = await call("POST", `/api/challenges/${cid}/entries`, {
+    session: owner, body: { itemId, values: { nota: 4, comentario: "" } },
+  });
+  assert.equal(scored.response.status, 201, JSON.stringify(scored.body));
 });
 
 test("modelo de registros: um filme aceita mais de um tipo de registro por pessoa", async () => {
