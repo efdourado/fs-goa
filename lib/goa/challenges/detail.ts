@@ -210,6 +210,8 @@ export async function buildChallengeDetail(
     isPrimary: type.is_primary || type.id === primaryType?.id,
     countsCompletion: type.id === completionType?.id,
     visibilityPolicy: type.visibility_policy,
+    answerScope: type.answer_scope,
+    sharedEditPolicy: type.shared_edit_policy,
     fields: fieldsByType.get(type.id) ?? [],
   }));
   const primaryEntryTypeId = primaryType?.id ?? null;

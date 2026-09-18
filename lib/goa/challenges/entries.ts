@@ -202,15 +202,16 @@ export async function listEntries(session: SessionContext, challengeId: string) 
     const result = await client.query<{
       id: string; item_id: string | null; checkpoint_id: string | null; entry_type_id: string;
       participant_user_id: string | null; display_name: string | null; visibility_policy: string;
-      answer_scope: "individual" | "shared";
+      answer_scope: "individual" | "shared"; last_editor_name: string | null;
       username: string | null; occurred_on: string | null; submitted_at: Date; updated_at: Date;
     }>(
       `SELECT e.id,e.item_id,e.checkpoint_id,e.entry_type_id,e.participant_user_id,u.display_name,u.username,
-              e.answer_scope,
+              e.answer_scope, CASE WHEN e.answer_scope = 'shared' THEN le.display_name END AS last_editor_name,
               coalesce(et.visibility_policy, 'group_realtime') AS visibility_policy,
               e.occurred_on::text AS occurred_on,e.submitted_at,e.updated_at
          FROM entries e
          LEFT JOIN users u ON u.id=e.participant_user_id
+         LEFT JOIN users le ON le.id=e.last_edited_by_user_id
          LEFT JOIN entry_types et ON et.id = e.entry_type_id
         WHERE e.challenge_id=$1 AND e.deleted_at IS NULL
         ORDER BY e.occurred_on DESC NULLS LAST,e.created_at DESC`,
@@ -254,6 +255,8 @@ export async function listEntries(session: SessionContext, challengeId: string) 
       checkpointId: entry.checkpoint_id ?? checkpointByDay.get(entry.occurred_on ?? "") ?? null,
       entryTypeId: entry.entry_type_id,
       answerScope: entry.answer_scope,
+      // Who last touched a shared answer — it has no author, only editors.
+      lastEditedByName: entry.last_editor_name,
       // Null for a shared answer — it belongs to the item, not a person.
       participantId: entry.participant_user_id,
       userId: entry.participant_user_id,
@@ -265,6 +268,27 @@ export async function listEntries(session: SessionContext, challengeId: string) 
       values: values.get(entry.id) ?? {},
     }));
   });
+}
+
+/**
+ * Optimistic concurrency for a shared answer: the client says which version it
+ * last saw (`expectedUpdatedAt`) — or `null` when it saw none and is creating
+ * the first one — and a save against anything newer is refused with the
+ * current version instead of silently replacing someone else's edit. Omitted
+ * entirely, no check runs (the API stays usable without it).
+ */
+function assertSharedNotChanged(body: Record<string, unknown>, currentUpdatedAt: Date): void {
+  if (!Object.hasOwn(body, "expectedUpdatedAt")) return;
+  const expected = body.expectedUpdatedAt === null
+    ? null
+    : typeof body.expectedUpdatedAt === "string" ? new Date(body.expectedUpdatedAt).getTime() : Number.NaN;
+  if (expected === null || Number.isNaN(expected) || expected !== currentUpdatedAt.getTime()) {
+    throw new ApiError(
+      409, "shared_conflict",
+      "Alguém já mudou essa resposta compartilhada. Veja o valor atual antes de salvar de novo.",
+      { currentUpdatedAt: currentUpdatedAt.toISOString() },
+    );
+  }
 }
 
 export async function saveEntry(
@@ -412,16 +436,7 @@ export async function saveEntry(
       if (entryType.shared_edit_policy === "members_fill_admin_corrects" && !access.canManage) {
         throw new ApiError(403, "shared_locked", "Essa resposta já foi preenchida — só um administrador pode corrigi-la.");
       }
-      if (typeof body.expectedUpdatedAt === "string") {
-        const expected = new Date(body.expectedUpdatedAt).getTime();
-        if (Number.isNaN(expected) || expected !== existing.updated_at.getTime()) {
-          throw new ApiError(
-            409, "conflict",
-            "Alguém já mudou essa resposta compartilhada. Veja o valor atual antes de salvar de novo.",
-            { currentUpdatedAt: existing.updated_at.toISOString() },
-          );
-        }
-      }
+      assertSharedNotChanged(body, existing.updated_at);
     }
 
     const entryId = existing?.id ?? publicId();
@@ -480,16 +495,7 @@ export async function updateEntry(
           [entry.challenge_id, session.user.id]);
         if (!participant) throw new ApiError(404, "not_found", "Registro não encontrado.");
       }
-      if (typeof body.expectedUpdatedAt === "string") {
-        const expected = new Date(body.expectedUpdatedAt).getTime();
-        if (Number.isNaN(expected) || expected !== entry.updated_at.getTime()) {
-          throw new ApiError(
-            409, "conflict",
-            "Alguém já mudou essa resposta compartilhada. Veja o valor atual antes de salvar de novo.",
-            { currentUpdatedAt: entry.updated_at.toISOString() },
-          );
-        }
-      }
+      assertSharedNotChanged(body, entry.updated_at);
     } else {
       // Individual: only the author may edit their own entry — no admin correction path.
       if (entry.participant_user_id !== session.user.id) throw new ApiError(404, "not_found", "Registro não encontrado.");

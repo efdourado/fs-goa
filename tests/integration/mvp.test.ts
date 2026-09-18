@@ -1830,7 +1830,7 @@ test("resposta compartilhada (fase 4): uma vez só, admin corrige, sem duplicar 
     session: owner, body: { entryTypeId: typeId, itemId, values: { placar: 5 }, expectedUpdatedAt: new Date(0).toISOString() },
   });
   assert.equal(stale.response.status, 409, JSON.stringify(stale.body));
-  assert.equal((stale.body as { error: string }).error, "conflict");
+  assert.equal((stale.body as { error: string }).error, "shared_conflict");
 
   // "members_can_edit": qualquer membro elegível preenche e corrige livremente
   const openType = await call("POST", `/api/challenges/${cid}/entry-types`, {
@@ -1858,6 +1858,124 @@ test("resposta compartilhada (fase 4): uma vez só, admin corrige, sem duplicar 
   assert.equal(ratingA.response.status, 201);
   assert.equal(ratingB.response.status, 201);
   assert.notEqual((ratingA.body as { id: string }).id, (ratingB.body as { id: string }).id, "avaliação individual continua uma linha por participante");
+});
+
+test("resposta compartilhada: Done, conclusão e métricas respeitam o escopo, e dá para ter só respostas compartilhadas", async () => {
+  const owner = await register("Nina", "nina_done");
+  const friend = await register("Ivo", "ivo_done");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Casal" } })).body as { id: string }).id;
+  const invite = await call("POST", `/api/groups/${gid}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } });
+  await call("POST", `/api/invites/${(invite.body as { token: string }).token}`, { session: friend, body: {} });
+
+  const created = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: { recipe: "cinema", title: "Jogos", participantIds: [owner.user.id, friend.user.id], items: [{ title: "Jogo 1" }, { title: "Jogo 2" }] },
+  });
+  const cid = (created.body as { id: string }).id;
+  const shared = await call("POST", `/api/challenges/${cid}/entry-types`, {
+    session: owner,
+    body: { name: "Placar", sharedEditPolicy: "members_can_edit", field: { key: "placar", label: "Placar", type: "number", required: true } },
+  });
+  const sharedTypeId = (shared.body as { id: string }).id;
+  await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } });
+  const detail = () => call("GET", `/api/challenges/${cid}`, { session: owner }).then((r) => r.body as {
+    entryTypes: Array<{ id: string; answerScope: string; sharedEditPolicy: string | null; countsCompletion: boolean; fields: Array<{ id: string; key: string }> }>;
+    items: Array<{ id: string }>; metrics: Array<{ key: string; value: number | string | null }>;
+  });
+  const before = await detail();
+  assert.deepEqual(
+    before.entryTypes.map((type) => [type.answerScope, type.sharedEditPolicy]).sort(),
+    [["individual", null], ["shared", "members_can_edit"]],
+    "o detalhe expõe o escopo e a política",
+  );
+  const [item1, item2] = before.items.map((item) => item.id);
+  const completed = async (session: typeof owner) =>
+    ((await call("GET", "/api/bootstrap", { session })).body as { challenges: Array<{ id: string; completedCount: number; totalCount: number }> })
+      .challenges.find((challenge) => challenge.id === cid)!.completedCount;
+
+  // avaliação individual sozinha não basta: falta a resposta compartilhada obrigatória
+  await call("POST", `/api/challenges/${cid}/entries`, { session: friend, body: { itemId: item1, values: { nota: 4 } } });
+  assert.equal(await completed(friend), 0);
+  // quando o grupo registra o placar, quem já avaliou fica Done — e quem não avaliou continua não
+  const first = await call("POST", `/api/challenges/${cid}/entries`, { session: owner, body: { entryTypeId: sharedTypeId, itemId: item1, values: { placar: 2 }, expectedUpdatedAt: null } });
+  assert.equal(first.response.status, 201, JSON.stringify(first.body));
+  assert.equal(await completed(friend), 1, "resposta individual + compartilhada");
+  assert.equal(await completed(owner), 0, "o placar sozinho não conclui para quem não avaliou");
+
+  // criar "do zero" sabendo que já existe é um conflito, não uma sobrescrita silenciosa
+  const race = await call("POST", `/api/challenges/${cid}/entries`, { session: friend, body: { entryTypeId: sharedTypeId, itemId: item1, values: { placar: 9 }, expectedUpdatedAt: null } });
+  assert.equal(race.response.status, 409);
+  assert.equal((race.body as { error: string }).error, "shared_conflict");
+  const listed = (await call("GET", `/api/challenges/${cid}/entries`, { session: friend })).body as { entries: Array<{ answerScope: string; lastEditedByName: string | null }> };
+  assert.equal(listed.entries.find((entry) => entry.answerScope === "shared")?.lastEditedByName, "Nina", "quem mexeu por último aparece");
+
+  // métricas: uma resposta compartilhada não entra em análise por pessoa
+  const placarField = before.entryTypes.find((type) => type.id === sharedTypeId)!.fields[0].id;
+  const perPerson = await call("POST", `/api/challenges/${cid}/metrics`, { session: owner, body: { label: "Por pessoa", operation: "average", fieldId: placarField, groupBy: "participant" } });
+  assert.equal(perPerson.response.status, 400);
+  assert.equal((perPerson.body as { error: string }).error, "shared_metric_unsupported");
+  const perItem = await call("POST", `/api/challenges/${cid}/metrics`, { session: owner, body: { label: "Placar por jogo", operation: "average", fieldId: placarField, groupBy: "item" } });
+  assert.equal(perItem.response.status, 201, JSON.stringify(perItem.body));
+
+  // só respostas compartilhadas: o tipo individual sai (antes de ter respostas nele não dá, depois de tê-las também não)
+  const blocked = await call("DELETE", `/api/challenges/${cid}/entry-types/${before.entryTypes.find((type) => type.answerScope === "individual")!.id}`, { session: owner });
+  assert.equal(blocked.response.status, 409, "já há avaliações nesse tipo");
+
+  // remover um tipo com métricas por cima pede confirmação, e leva as métricas junto
+  const draftGid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Rascunho" } })).body as { id: string }).id;
+  const draftChallenge = await call("POST", `/api/groups/${draftGid}/challenges`, {
+    session: owner, body: { recipe: "cinema", title: "Rascunho", participantIds: [owner.user.id], items: [{ title: "A" }] },
+  });
+  const did = (draftChallenge.body as { id: string }).id;
+  await call("POST", `/api/challenges/${did}/entry-types`, {
+    session: owner, body: { name: "Placar", sharedEditPolicy: "members_can_edit", field: { key: "placar", label: "Placar", type: "number", required: true } },
+  });
+  const draftIndividual = ((await call("GET", `/api/challenges/${did}`, { session: owner })).body as { entryTypes: Array<{ id: string; answerScope: string }> })
+    .entryTypes.find((type) => type.answerScope === "individual")!.id;
+  const needsConfirm = await call("DELETE", `/api/challenges/${did}/entry-types/${draftIndividual}`, { session: owner });
+  assert.equal(needsConfirm.response.status, 409);
+  assert.equal((needsConfirm.body as { error: string }).error, "entry_type_has_metrics");
+  assert.ok(((needsConfirm.body as { details: { metrics: string[] } }).details.metrics).includes("Nota média"), "lista as métricas que iriam junto");
+  assert.equal((await call("DELETE", `/api/challenges/${did}/entry-types/${draftIndividual}?archiveMetrics=1`, { session: owner })).response.status, 200);
+
+  // desafio personalizado só com respostas compartilhadas (as suas escolhas, não as da receita)
+  const soloOwner = await register("Ana", "ana_done_solo");
+  const soloGid = ((await call("POST", "/api/groups", { session: soloOwner, body: { name: "Só placar" } })).body as { id: string }).id;
+  const library = (await call("POST", `/api/groups/${soloGid}/catalog/libraries`, { session: soloOwner, body: { label: "Jogos" } })).body as { id: string };
+  const soloChallenge = await call("POST", `/api/groups/${soloGid}/challenges`, {
+    session: soloOwner, body: { recipe: "custom", libraryId: library.id, title: "Só compartilhado", participantIds: [soloOwner.user.id], items: [{ title: "A" }, { title: "B" }] },
+  });
+  const sid = (soloChallenge.body as { id: string }).id;
+  const soloShared = await call("POST", `/api/challenges/${sid}/entry-types`, {
+    session: soloOwner, body: { name: "Placar", sharedEditPolicy: "members_can_edit", field: { key: "placar", label: "Placar", type: "number", required: true } },
+  });
+  const soloSharedId = (soloShared.body as { id: string }).id;
+  const soloDetail = (await call("GET", `/api/challenges/${sid}`, { session: soloOwner })).body as { entryTypes: Array<{ id: string; answerScope: string }> };
+  const individualId = soloDetail.entryTypes.find((type) => type.answerScope === "individual")!.id;
+  assert.equal((await call("DELETE", `/api/challenges/${sid}/entry-types/${individualId}`, { session: soloOwner })).response.status, 200);
+  // recriar um tipo com o mesmo nome depois de remover outro não pode colidir com a chave arquivada
+  const again = await call("POST", `/api/challenges/${sid}/entry-types`, {
+    session: soloOwner, body: { name: "Placar", sharedEditPolicy: "members_fill_admin_corrects", field: { key: "placar", label: "Placar", type: "number", required: false } },
+  });
+  assert.equal(again.response.status, 201, JSON.stringify(again.body));
+  assert.equal((await call("DELETE", `/api/challenges/${sid}/entry-types/${(again.body as { id: string }).id}`, { session: soloOwner })).response.status, 200);
+  assert.equal((await call("DELETE", `/api/challenges/${sid}/entry-types/${soloSharedId}`, { session: soloOwner })).response.status, 409, "o último tipo não sai");
+
+  const soloAfter = (await call("GET", `/api/challenges/${sid}`, { session: soloOwner })).body as {
+    entryTypes: Array<{ id: string; answerScope: string; isPrimary: boolean; countsCompletion: boolean; fields: Array<{ id: string }> }>;
+  };
+  assert.deepEqual(soloAfter.entryTypes.map((type) => [type.answerScope, type.isPrimary, type.countsCompletion]), [["shared", true, true]]);
+  const activated = await call("POST", `/api/challenges/${sid}/transition`, { session: soloOwner, body: { status: "active" } });
+  assert.equal(activated.response.status, 200, JSON.stringify(activated.body));
+  const soloItems = (await call("GET", `/api/challenges/${sid}`, { session: soloOwner })).body as { items: Array<{ id: string }> };
+  const soloEntry = await call("POST", `/api/challenges/${sid}/entries`, {
+    session: soloOwner, body: { entryTypeId: soloSharedId, itemId: soloItems.items[0].id, values: { [soloAfter.entryTypes[0].fields[0].id]: 3 } },
+  });
+  assert.equal(soloEntry.response.status, 201, JSON.stringify(soloEntry.body));
+  const boot = ((await call("GET", "/api/bootstrap", { session: soloOwner })).body as { challenges: Array<{ id: string; completedCount: number; totalCount: number }> }).challenges.find((c) => c.id === sid)!;
+  assert.deepEqual([boot.completedCount, boot.totalCount], [1, 2], "um item concluído pelo placar compartilhado, de dois");
+  const rate = ((await call("GET", `/api/challenges/${sid}`, { session: soloOwner })).body as { metrics: Array<{ operation: string; value?: number | string | null }> }).metrics.find((m) => m.operation === "completion_rate");
+  assert.equal(Number(rate?.value), 50, "a taxa conta uma resposta compartilhada por item, não uma por pessoa");
 });
 
 test("agenda do item (fase 5): data só ou data e hora, nunca um prazo que bloqueia o registro", async () => {

@@ -69,6 +69,12 @@ export interface Recipe {
    * — so a preset like Tables works from a blank workspace.
    */
   defaultLibrarySource?: "tables";
+  /**
+   * The creator decides what participants record, so the recipe's default
+   * fields are only a starting point: preflight does not insist the primary
+   * type keeps them (a rating, say). Only `custom` sets this.
+   */
+  userDefinedFields?: boolean;
   scheduleMode: "none" | "period";
   /**
    * Whether a participant's entry form offers the optional "when did it happen"
@@ -349,6 +355,7 @@ export const RECIPES: Record<RecipeKey, Recipe> = {
     version: 1,
     catalogKind: null,
     catalogKindFromBody: true,
+    userDefinedFields: true,
     scheduleMode: "none",
     entryTypes: [customEntry],
     metrics: [completionMetric],

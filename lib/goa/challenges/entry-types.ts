@@ -319,7 +319,13 @@ export async function addSharedResponseType(
       throw new ApiError(409, "shared_unsupported", "Uma resposta compartilhada precisa de um desafio com itens.");
     }
     const name = typeof body.name === "string" && body.name.trim() ? body.name.trim().slice(0, 120) : "Resposta compartilhada";
-    const used = new Set(types.map((type) => type.semantic_key));
+    // `(challenge_id, semantic_key)` is unique across archived types too, so a
+    // name reused after a removal must still get a fresh key.
+    const used = new Set(
+      (await client.query<{ semantic_key: string }>(
+        "SELECT semantic_key FROM entry_types WHERE challenge_id = $1", [challengeId],
+      )).rows.map((row) => row.semantic_key),
+    );
     const base = semanticKey(body.key ?? name, "compartilhado");
     let key = base;
     for (let suffix = 2; used.has(key); suffix += 1) key = `${base}_${suffix}`.slice(0, 64);
@@ -341,6 +347,82 @@ export async function addSharedResponseType(
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
       "entry_type.created", "entry_type", typeId, null, { name, answerScope: "shared", sharedEditPolicy: editPolicy });
     return { id: typeId, name, sharedEditPolicy: editPolicy, fieldId: field.id };
+  });
+}
+
+/**
+ * Removes a response type from a challenge — how a challenge ends up with only
+ * shared answers (or only individual ones) even though a recipe always seeds an
+ * individual one. Non-destructive by construction: refused while the type has
+ * answers and never leaves a challenge with no response type at all. Metrics that read
+ * its fields are listed in the refusal and removed with it once the caller
+ * confirms (`archiveMetrics`); a completion-rate metric moves to the type that
+ * takes over instead.
+ */
+export async function archiveEntryType(
+  session: SessionContext,
+  challengeId: string,
+  entryTypeId: string,
+  options: { archiveMetrics?: boolean } = {},
+) {
+  return inTransaction(async (client) => {
+    const access = await challengeAccess(session.user.id, challengeId, client, true);
+    if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores removem tipos de registro.");
+    if (access.challenge.status === "closed") {
+      throw new ApiError(409, "challenge_locked", "Um desafio encerrado fica congelado.");
+    }
+    const types = await entryTypesForChallenge(client, challengeId);
+    const type = types.find((candidate) => candidate.id === entryTypeId);
+    if (!type) throw new ApiError(404, "not_found", "Tipo de registro não encontrado.");
+    const remaining = types.filter((candidate) => candidate.id !== entryTypeId);
+    if (!remaining.some((candidate) => purposeOf(candidate) !== "expectation")) {
+      throw new ApiError(409, "last_entry_type", "O desafio precisa de pelo menos um tipo de registro.");
+    }
+    const withEntries = await oneOrNull<{ count: number }>(
+      client,
+      "SELECT count(*)::int AS count FROM entries WHERE entry_type_id=$1 AND deleted_at IS NULL",
+      [entryTypeId],
+    );
+    if ((withEntries?.count ?? 0) > 0) {
+      throw new ApiError(409, "entry_type_has_entries", "Já há respostas nesse tipo de registro — não dá para removê-lo.");
+    }
+    // Metrics are derived views (no answers live in them), so with no answers in
+    // the type they can go with it — but only after the caller has seen which.
+    const readByMetric = await client.query<{ id: string; label: string }>(
+      `SELECT id, label FROM challenge_metrics
+        WHERE challenge_id=$1 AND entry_type_id=$2 AND archived_at IS NULL AND operation <> 'completion_rate'
+        ORDER BY position`,
+      [challengeId, entryTypeId],
+    );
+    if (readByMetric.rows.length && !options.archiveMetrics) {
+      throw new ApiError(
+        409, "entry_type_has_metrics",
+        "Métricas leem os campos desse tipo. Confirme para removê-las junto.",
+        { metrics: readByMetric.rows.map((row) => row.label) },
+      );
+    }
+    if (readByMetric.rows.length) {
+      await client.query(
+        "UPDATE challenge_metrics SET archived_at=now(), updated_at=now() WHERE id = ANY($1::text[])",
+        [readByMetric.rows.map((row) => row.id)],
+      );
+    }
+
+    await client.query("UPDATE challenge_fields SET archived_at=now(), updated_at=now() WHERE entry_type_id=$1 AND archived_at IS NULL", [entryTypeId]);
+    await client.query("UPDATE entry_types SET archived_at=now(), is_primary=false, updated_at=now() WHERE id=$1", [entryTypeId]);
+    // Hand the primary role and any completion-rate metric to whichever type stays.
+    const successor = remaining.find((candidate) => purposeOf(candidate) !== "expectation") ?? remaining[0];
+    if (type.is_primary || !remaining.some((candidate) => candidate.is_primary)) {
+      await client.query("UPDATE entry_types SET is_primary=true, updated_at=now() WHERE id=$1", [successor.id]);
+    }
+    await client.query(
+      `UPDATE challenge_metrics SET entry_type_id=$3, updated_at=now()
+        WHERE challenge_id=$1 AND entry_type_id=$2 AND operation='completion_rate' AND archived_at IS NULL`,
+      [challengeId, entryTypeId, successor.id],
+    );
+    await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
+      "entry_type.archived", "entry_type", entryTypeId, null, { name: type.name, answerScope: type.answer_scope });
+    return { id: entryTypeId, archived: true as const };
   });
 }
 

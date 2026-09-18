@@ -43,7 +43,7 @@ async function ratingField(client: PoolClient, challengeId: string): Promise<{ f
     `SELECT f.id, f.min_scaled, f.max_scaled, f.number_scale
        FROM challenge_fields f JOIN entry_types t ON t.id = f.entry_type_id
       WHERE f.challenge_id = $1 AND f.archived_at IS NULL AND f.kind = 'rating'
-        AND coalesce(t.purpose, 'rating') = 'rating'
+        AND coalesce(t.purpose, 'rating') = 'rating' AND t.answer_scope = 'individual'
       ORDER BY (f.semantic_key = 'nota') DESC, f.position
       LIMIT 1`,
     [challengeId],

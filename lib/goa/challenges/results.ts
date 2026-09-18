@@ -223,6 +223,7 @@ export async function calculateMetricRow(
   if (metric.operation === "completion_rate") {
     const context = await oneOrNull<{
       submission_mode: "item" | "daily" | "free";
+      answer_scope: "individual" | "shared";
       target_policy: string | null;
       schedule_policy: string | null;
       start_date: string | null;
@@ -234,12 +235,22 @@ export async function calculateMetricRow(
       active_days: number;
     }>(
       client,
-      `SELECT et.submission_mode, et.target_policy, et.schedule_policy,
+      `SELECT et.submission_mode, et.answer_scope, et.target_policy, et.schedule_policy,
               c.start_date::text AS start_date, c.end_date::text AS end_date,
               (SELECT count(*)::int FROM challenge_participants cp
                 WHERE cp.challenge_id = c.id AND cp.removed_at IS NULL) AS participants,
+              -- Same rule as the dashboard's "done": the completion answer plus every
+              -- other shared type with a required field, per item.
               (SELECT count(*)::int FROM entries e
-                WHERE e.challenge_id = c.id AND e.entry_type_id = et.id AND e.deleted_at IS NULL) AS completed,
+                WHERE e.challenge_id = c.id AND e.entry_type_id = et.id AND e.deleted_at IS NULL
+                  AND (e.item_id IS NULL OR NOT EXISTS (
+                    SELECT 1 FROM entry_types st
+                     WHERE st.challenge_id = c.id AND st.archived_at IS NULL AND st.answer_scope = 'shared'
+                       AND st.id <> et.id
+                       AND EXISTS (SELECT 1 FROM challenge_fields sf
+                                    WHERE sf.entry_type_id = st.id AND sf.archived_at IS NULL AND sf.required)
+                       AND NOT EXISTS (SELECT 1 FROM entries se
+                                        WHERE se.entry_type_id = st.id AND se.item_id = e.item_id AND se.deleted_at IS NULL)))) AS completed,
               (SELECT count(*)::int FROM challenge_items ci
                 WHERE ci.challenge_id = c.id AND ci.archived_at IS NULL) AS item_count,
               (SELECT count(*)::int FROM challenge_checkpoints cc
@@ -254,7 +265,10 @@ export async function calculateMetricRow(
         WHERE et.id = $1 AND c.id = $2 AND c.deleted_at IS NULL`,
       [metric.entry_type_id, metric.challenge_id],
     );
-    const expected = !context ? 0 : context.participants * expectedPerParticipant(context);
+    // A shared completion answer exists once per item, not once per person.
+    const expected = !context ? 0
+      : context.answer_scope === "shared" ? context.item_count
+      : context.participants * expectedPerParticipant(context);
     result = calculateMetric({
       operation: "completion_rate",
       completed: context?.completed ?? 0,
@@ -272,7 +286,9 @@ export async function calculateMetricRow(
             : "1 registro";
       explainExtra = {
         expected,
-        expectedNote: `${context.participants} participante(s) × ${per} = ${unit} por pessoa`,
+        expectedNote: context.answer_scope === "shared"
+          ? `uma resposta compartilhada por item — ${unit}`
+          : `${context.participants} participante(s) × ${per} = ${unit} por pessoa`,
       };
     }
   } else if (metric.operation === "count") {
@@ -830,6 +846,8 @@ const NUMERIC_FIELD_OPS = new Set([
 const GROUP_BY_VALUES = new Set([
   "none", "participant", "item", "checkpoint", "catalog_year", "catalog_author", "catalog_genre",
 ]);
+// Analyses that compare people — meaningless for a value the whole group shares.
+const SHARED_UNSUPPORTED_OPS = new Set(["spread", "consensus", "surprise", "indicator_bias", "bayesian_average"]);
 // Which groupings each analysis op accepts — the rest are refused as incoherent
 // combinations (V1 §9 "recusa combinações inválidas").
 const GROUP_BY_BY_OP: Record<string, Set<string>> = {
@@ -923,6 +941,7 @@ async function resolveMetricField(
   challengeId: string,
   operation: string,
   fieldId: string | null,
+  groupBy = "none",
 ): Promise<{ entryTypeId: string; fieldId: string | null }> {
   if (fieldId) {
     const field = await oneOrNull<{ entry_type_id: string; kind: string }>(client,
@@ -931,6 +950,16 @@ async function resolveMetricField(
     if (!field) throw new ApiError(400, "invalid_field", "Campo não pertence ao desafio.");
     if (NUMERIC_FIELD_OPS.has(operation) && !["number", "rating"].includes(field.kind)) {
       throw new ApiError(400, "invalid_metric", "Essa operação exige campo numérico ou nota.");
+    }
+    if (SHARED_UNSUPPORTED_OPS.has(operation) || groupBy === "participant") {
+      const shared = await oneOrNull<{ id: string }>(client,
+        "SELECT id FROM entry_types WHERE id=$1 AND answer_scope='shared'", [field.entry_type_id]);
+      if (shared) {
+        throw new ApiError(
+          400, "shared_metric_unsupported",
+          "Uma resposta compartilhada não pertence a uma pessoa: ela não entra em métricas por participante nem em análises entre pessoas (divergência, consenso, surpresa, viés).",
+        );
+      }
     }
     return { entryTypeId: field.entry_type_id, fieldId };
   }
@@ -963,7 +992,7 @@ export async function addMetric(
     if (access.challenge.status === "closed") throw new ApiError(409, "challenge_closed", "O desafio está encerrado.");
     await assertMetricCoherent(client, challengeId, parsed);
     const requestedFieldId = typeof body.fieldId === "string" ? body.fieldId : null;
-    const { entryTypeId, fieldId } = await resolveMetricField(client, challengeId, parsed.operation, requestedFieldId);
+    const { entryTypeId, fieldId } = await resolveMetricField(client, challengeId, parsed.operation, requestedFieldId, parsed.groupBy);
     const id = publicId();
     const positionRow = await oneOrNull<{ position: number }>(client,
       "SELECT coalesce(max(position),-1)::int + 1 AS position FROM challenge_metrics WHERE challenge_id=$1", [challengeId]);
@@ -1004,7 +1033,7 @@ export async function updateMetric(
     if (!existing) throw new ApiError(404, "not_found", "Métrica não encontrada.");
     await assertMetricCoherent(client, challengeId, parsed);
     const requestedFieldId = typeof body.fieldId === "string" ? body.fieldId : null;
-    const { entryTypeId, fieldId } = await resolveMetricField(client, challengeId, parsed.operation, requestedFieldId);
+    const { entryTypeId, fieldId } = await resolveMetricField(client, challengeId, parsed.operation, requestedFieldId, parsed.groupBy);
     await client.query(
       `UPDATE challenge_metrics
           SET entry_type_id=$3, field_id=$4, label=$5, operation=$6, group_by=$7,

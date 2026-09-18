@@ -116,7 +116,7 @@ export async function computePreflight(
   // rating, Clube de Leitura keeps a numeric progress field. Removing it would
   // leave the round with no valid way to record the thing it exists to record.
   const recipeKey = challenge.rows[0].recipe_key;
-  if (primaryType && isRecipeKey(recipeKey)) {
+  if (primaryType && isRecipeKey(recipeKey) && !RECIPES[recipeKey].userDefinedFields) {
     const recipePrimary = RECIPES[recipeKey].entryTypes.find((type) => type.primary);
     const essentialKinds = new Set(
       (recipePrimary?.fields ?? [])

@@ -159,9 +159,22 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
               (SELECT cp.name_consent FROM challenge_participants cp
                  WHERE cp.challenge_id = c.id AND cp.user_id = $1 AND cp.removed_at IS NULL)
                 AS name_consent,
+              -- An item is done for this viewer when the completion answer is in
+              -- (theirs, or the group's one shared answer) and every *other*
+              -- shared type with a required field has its shared answer too.
+              -- Individual-only challenges reduce to the old "my entries" count.
               (SELECT count(*)::int FROM entries e
-                WHERE e.challenge_id = c.id AND e.participant_user_id = $1 AND e.deleted_at IS NULL
-                  AND (ct.id IS NULL OR e.entry_type_id = ct.id))
+                WHERE e.challenge_id = c.id AND e.deleted_at IS NULL
+                  AND (ct.id IS NULL OR e.entry_type_id = ct.id)
+                  AND (e.participant_user_id = $1 OR (e.answer_scope = 'shared' AND ct.id IS NOT NULL))
+                  AND (e.item_id IS NULL OR NOT EXISTS (
+                    SELECT 1 FROM entry_types st
+                     WHERE st.challenge_id = c.id AND st.archived_at IS NULL AND st.answer_scope = 'shared'
+                       AND st.id <> e.entry_type_id
+                       AND EXISTS (SELECT 1 FROM challenge_fields sf
+                                    WHERE sf.entry_type_id = st.id AND sf.archived_at IS NULL AND sf.required)
+                       AND NOT EXISTS (SELECT 1 FROM entries se
+                                        WHERE se.entry_type_id = st.id AND se.item_id = e.item_id AND se.deleted_at IS NULL))))
                 AS completed_count,
               CASE
                 WHEN ct.target_policy IN ('required', 'optional')

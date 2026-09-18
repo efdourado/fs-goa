@@ -54,7 +54,17 @@ export async function insertField(
   const config = asRecord(field.config);
   const scale = clientKind === "rating" ? 1 : clientKind === "number" ? 3 : null;
   const id = publicId();
-  const key = semanticKey(field.key, `campo_${position + 1}`);
+  // `(challenge_id, semantic_key)` is unique across archived fields too, so a
+  // field re-added after one with the same name was removed needs a fresh key
+  // instead of failing on the constraint.
+  const base = semanticKey(field.key, `campo_${position + 1}`);
+  const taken = new Set(
+    (await client.query<{ semantic_key: string }>(
+      "SELECT semantic_key FROM challenge_fields WHERE challenge_id = $1", [challengeId],
+    )).rows.map((row) => row.semantic_key),
+  );
+  let key = base;
+  for (let suffix = 2; taken.has(key); suffix += 1) key = `${base}_${suffix}`.slice(0, 64);
   const min = clientKind === "rating" ? 0 : scale === null ? null : scaled(config.min, scale);
   const max = clientKind === "rating" ? 50 : scale === null ? null : scaled(config.max, scale);
   const step = clientKind === "rating" ? 5 : scale === null ? null : scaled(config.step, scale);

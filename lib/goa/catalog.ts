@@ -363,7 +363,7 @@ async function listCatalogWithClient(client: PoolClient, workspaceId: string) {
              FROM challenge_items it
              JOIN challenges c ON c.id = it.challenge_id AND c.deleted_at IS NULL AND c.status <> 'draft'
              JOIN entries e ON e.item_id = it.id AND e.deleted_at IS NULL
-              AND e.entry_type_id IN (SELECT id FROM entry_types WHERE challenge_id = c.id AND purpose IN ('rating', 'completion'))
+              AND e.entry_type_id IN (SELECT id FROM entry_types WHERE challenge_id = c.id AND purpose IN ('rating', 'completion') AND answer_scope = 'individual')
              JOIN entry_values ev ON ev.entry_id = e.id AND ev.number_scaled IS NOT NULL
              JOIN challenge_fields f ON f.id = ev.field_id AND f.kind = 'rating'
             WHERE it.catalog_item_id = ci.id AND it.archived_at IS NULL
@@ -438,7 +438,7 @@ async function catalogItemDetailWithClient(
           AND active_recommender.user_id = it.recommended_by_user_id
           AND active_recommender.removed_at IS NULL
          LEFT JOIN entries e ON e.item_id = it.id AND e.deleted_at IS NULL
-          AND e.entry_type_id IN (SELECT id FROM entry_types WHERE challenge_id = c.id AND purpose IN ('rating', 'completion'))
+          AND e.entry_type_id IN (SELECT id FROM entry_types WHERE challenge_id = c.id AND purpose IN ('rating', 'completion') AND answer_scope = 'individual')
          LEFT JOIN entry_values ev ON ev.entry_id = e.id AND ev.number_scaled IS NOT NULL
          LEFT JOIN challenge_fields f ON f.id = ev.field_id AND f.kind = 'rating'
         WHERE it.catalog_item_id = $1 AND it.archived_at IS NULL
