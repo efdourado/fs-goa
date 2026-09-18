@@ -15,6 +15,10 @@ export function AboutScreen({ onBack }: { onBack: () => void }) {
       <div className="mt-8 space-y-5 text-base leading-8">
         {paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}
       </div>
+      <h2 className="mt-12 text-xl font-light">{t("librariesTitle")}</h2>
+      <div className="mt-4 space-y-5 text-base leading-8">
+        {(t.raw("libraries") as string[]).map((paragraph, index) => <p key={index}>{paragraph}</p>)}
+      </div>
       <p className="mt-10 text-sm text-[var(--muted)]">
         {t("feedbackNudge")}{" "}
         <Link href="/feedback" className="underline underline-offset-4 hover:text-[var(--ink)]">

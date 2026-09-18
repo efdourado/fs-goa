@@ -1028,6 +1028,10 @@
     "errNameGroup": "Ponle un nombre al nuevo grupo.",
     "errPickGroup": "Elige un grupo de destino.",
     "duplicateBody": "Se crea una copia en borrador en el grupo elegido. Ajustas todo antes de activarla.",
+    "copyModeLabel": "Qué copiar",
+    "copyModeItems": "Estructura + ítems",
+    "copyModeStructure": "Solo la estructura",
+    "copyModeHint": "En ambos casos, no pasan respuestas, marcas de completado, comentarios privados, miembros ni invitaciones, y los nombres de quien recomendó nunca se copian. Empiezas desde cero, y los cambios posteriores en el original no tocan tu copia.",
     "targetGroupLabel": "Grupo de destino",
     "newGroupOption": "+ Crear un grupo nuevo",
     "newGroupNameLabel": "Nombre del nuevo grupo (si vas a crear uno)",
@@ -1132,6 +1136,12 @@
       "La idea es simple. Un grupo elige un desafío — ver una lista de películas, leer durante 90 días, mantener un hábito — y cada persona registra su progreso. Goa se encarga del resto: sigue quién está al día, calcula medias y rankings, y al final arma una vitrina que cuenta la historia de esa ronda.",
       "Nada es público por defecto. Cada grupo es privado, el acceso viene siempre de pertenecer a él, y los registros ya enviados se preservan — solo la curaduría y la presentación siguen siendo editables.",
       "Goa es un proyecto personal en evolución, hecho por Eduardo Dourado. Las planillas originales se volvieron la especificación del dominio; la app poco a poco alcanza todo lo que ellas hacían, con mucho menos trabajo manual."
+    ],
+    "librariesTitle": "Cómo organiza Goa lo que sigues",
+    "libraries": [
+      "Cada espacio personal y cada grupo tiene sus propias bibliotecas: las listas de las cosas que sigues. Screens es la evolución más amplia de Películas: películas, series, temporadas, episodios, documentales o la unidad que elijas. Pages es la evolución más amplia de Libros, y también sirve para artículos y otras lecturas. Tables es un punto de partida configurable para lugares como restaurantes, bares y cafés. Puedes crear bibliotecas más específicas, como Partidos o Series.",
+      "Quien crea decide qué representa un ítem. Una trilogía puede ser un ítem o tres; una temporada puede ser un ítem o cada episodio. Goa no adivina: completa duración, páginas o año solo cuando los sepas. La duración media de un episodio y la duración total son números distintos, y mezclarlos dejaría mal los totales de tiempo.",
+      "Completado significa que las respuestas obligatorias del ítem están registradas, nada más. En un partido de fútbol puede ser solo “lo seguí”; no hace falta haberlo visto. Una respuesta que todos comparten, como el marcador final, se registra una vez para el grupo, mientras que las notas y los comentarios siguen siendo individuales."
     ],
     "feedbackNudge": "¿Tienes una idea o algo te molestó?",
     "feedbackLink": "Cuéntanos."

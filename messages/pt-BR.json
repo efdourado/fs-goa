@@ -1028,6 +1028,10 @@
     "errNameGroup": "Dê um nome ao novo grupo.",
     "errPickGroup": "Escolha um grupo de destino.",
     "duplicateBody": "Uma cópia em rascunho é criada no grupo escolhido. Você ajusta tudo antes de ativar.",
+    "copyModeLabel": "O que copiar",
+    "copyModeItems": "Estrutura + itens",
+    "copyModeStructure": "Só a estrutura",
+    "copyModeHint": "Nos dois casos, nenhuma resposta, marca de concluído, comentário privado, membro ou convite vem junto, e os nomes de quem indicou nunca são copiados. Você começa do zero, e mudanças futuras no original não alteram a sua cópia.",
     "targetGroupLabel": "Grupo de destino",
     "newGroupOption": "+ Criar um grupo novo",
     "newGroupNameLabel": "Nome do novo grupo (se for criar um)",
@@ -1132,6 +1136,12 @@
       "A ideia é simples. Um grupo escolhe um desafio — assistir a uma lista de filmes, ler por 90 dias, manter um hábito — e cada pessoa registra seu progresso. O Goa cuida do resto: acompanha quem está em dia, calcula médias e rankings, e no fim monta uma vitrine que conta a história daquela rodada.",
       "Nada é público por padrão. Cada grupo é privado, o acesso vem sempre da associação a ele, e registros já enviados são preservados — só a curadoria e a apresentação continuam editáveis.",
       "O Goa é um projeto pessoal em evolução, feito por Eduardo Dourado. As planilhas originais viraram a especificação do domínio; o app está aos poucos alcançando tudo o que elas faziam, com muito menos trabalho manual."
+    ],
+    "librariesTitle": "Como o Goa organiza o que você acompanha",
+    "libraries": [
+      "Cada espaço pessoal e cada grupo tem as suas próprias bibliotecas — as listas das coisas que você acompanha. Screens é a evolução mais ampla de Filmes: filmes, séries, temporadas, episódios, documentários ou a unidade que você escolher. Pages é a evolução mais ampla de Livros, e também serve para artigos e outras leituras. Tables é um ponto de partida configurável para lugares como restaurantes, bares e cafés. Você pode criar bibliotecas mais específicas, como Jogos ou Séries.",
+      "Quem cria decide o que um item representa. Uma trilogia pode ser um item ou três; uma temporada pode ser um item ou cada episódio. O Goa não adivinha: preencha duração, páginas ou ano só quando souber. A duração média de um episódio e a duração total são números diferentes, e misturá-los deixaria os totais de tempo errados.",
+      "Concluído significa que as respostas obrigatórias do item estão registradas — nada além disso. Num jogo de futebol, pode ser só “acompanhei este”; não é preciso tê-lo assistido. Uma resposta que todos compartilham, como o placar final, é registrada uma vez para o grupo, enquanto notas e comentários continuam individuais."
     ],
     "feedbackNudge": "Tem uma ideia ou algo te incomodou?",
     "feedbackLink": "Conte pra gente."

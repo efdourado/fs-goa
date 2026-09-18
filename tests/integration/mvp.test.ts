@@ -2110,6 +2110,70 @@ test("cópia de modelo (fase 7): só a estrutura ou com itens, o escopo comparti
   assert.equal(await count("SELECT count(*) AS n FROM challenge_items WHERE challenge_id = $1", (plain.body as { id: string }).id), 0);
 });
 
+test("insights da administração (fase 8): só contagens confirmadas, sem a equipe e sem conteúdo privado", async () => {
+  const admin = await register("Equipe", "equipe_insights");
+  await adminPool.query("UPDATE users SET platform_admin = true WHERE id = $1", [admin.user.id]);
+  const staff = await login("equipe_insights");
+  type Insights = {
+    includesStaff: boolean;
+    definitions: Record<string, string>;
+    overview: { challengesInProgress: number; accountsNewInWindow: number; weekly: unknown[] };
+    creation: {
+      challengesCreated: number; copiedFromChallenge: number; byRecipe: Array<{ recipe: string; count: number }>;
+      firstRecord: { challengesCreated: number; withFirstRecord: number };
+    };
+  };
+  const insights = async (query = "") => {
+    const result = await call("GET", `/api/admin/insights${query}`, { session: staff });
+    assert.equal(result.response.status, 200, JSON.stringify(result.body));
+    return result.body as Insights;
+  };
+  const cinema = (body: Insights) => body.creation.byRecipe.find((row) => row.recipe === "cinema")?.count ?? 0;
+  const before = await insights();
+
+  const person = await register("Pessoa Comum", "pessoa_insights");
+  const denied = await call("GET", "/api/admin/insights", { session: person });
+  assert.equal(denied.response.status, 404, "quem não é da administração não vê os insights");
+
+  const gid = ((await call("POST", "/api/groups", { session: person, body: { name: "Grupo Confidencial" } })).body as { id: string }).id;
+  const otherGid = ((await call("POST", "/api/groups", { session: person, body: { name: "Outro Grupo" } })).body as { id: string }).id;
+  const created = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: person, body: { recipe: "cinema", title: "Título Secreto", participantIds: [person.user.id], items: [{ title: "Filme Secreto" }] },
+  });
+  const cid = (created.body as { id: string }).id;
+  await call("POST", `/api/challenges/${cid}/transition`, { session: person, body: { status: "active" } });
+  const itemId = ((await call("GET", `/api/challenges/${cid}`, { session: person })).body as { items: Array<{ id: string }> }).items[0].id;
+  await call("POST", `/api/challenges/${cid}/entries`, { session: person, body: { itemId, values: { nota: 5, comentario: "Comentário Secreto" } } });
+  await call("POST", `/api/challenges/${cid}/duplicate`, { session: person, body: { targetGroupId: otherGid } });
+
+  // atividade da própria equipe não entra por padrão
+  const staffGid = ((await call("POST", "/api/groups", { session: staff, body: { name: "Teste da equipe" } })).body as { id: string }).id;
+  await call("POST", `/api/groups/${staffGid}/challenges`, {
+    session: staff, body: { recipe: "cinema", title: "Demo", participantIds: [staff.user.id], items: [{ title: "F" }] },
+  });
+
+  const after = await insights();
+  assert.equal(after.creation.challengesCreated - before.creation.challengesCreated, 1, "conta o desafio da pessoa, não o da equipe");
+  assert.equal(after.creation.copiedFromChallenge - before.creation.copiedFromChallenge, 1);
+  assert.equal(cinema(after) - cinema(before), 2, "o original e a cópia entram por modelo; o da equipe não");
+  assert.equal(after.creation.firstRecord.challengesCreated - before.creation.firstRecord.challengesCreated, 2);
+  assert.equal(after.creation.firstRecord.withFirstRecord - before.creation.firstRecord.withFirstRecord, 1, "só o original recebeu o primeiro registro");
+  assert.equal(after.overview.challengesInProgress - before.overview.challengesInProgress, 1);
+  assert.equal(after.overview.accountsNewInWindow - before.overview.accountsNewInWindow, 1);
+  assert.equal(after.overview.weekly.length, 8);
+  assert.equal(after.includesStaff, false);
+  assert.ok(after.definitions.confirmed.includes("Tentativas"), "explica que só ações confirmadas são contadas");
+
+  const withStaff = await insights("?includeStaff=1");
+  assert.equal(withStaff.includesStaff, true);
+  assert.ok(withStaff.creation.challengesCreated >= after.creation.challengesCreated + 1, "incluindo a equipe, o desafio de teste aparece");
+
+  const serialized = JSON.stringify(after);
+  for (const secret of ["Título Secreto", "Filme Secreto", "Comentário Secreto", "Grupo Confidencial", "pessoa_insights", "Pessoa Comum"]) {
+    assert.equal(serialized.includes(secret), false, `"${secret}" não pode vazar para os insights`);
+  }
+});
+
 test("modelo de registros: um filme aceita mais de um tipo de registro por pessoa", async () => {
   const owner = await register("Íris", "iris_rec");
   const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube do modelo" } })).body as { id: string }).id;

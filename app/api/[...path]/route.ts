@@ -15,6 +15,7 @@ import {
 } from "@/lib/auth";
 import {
   adminAudit,
+  adminInsights,
   adminOverview,
   adminSystemAudit,
   adminUsers,
@@ -157,6 +158,7 @@ export async function GET(request: Request): Promise<Response> {
     if (path[0] === "admin") {
       await requirePlatformAdminSession(request);
       if (isPath(path, "admin", "overview")) return json(await adminOverview());
+      if (isPath(path, "admin", "insights")) return json(await adminInsights(new URL(request.url).searchParams));
       if (isPath(path, "admin", "users")) return json(await adminUsers());
       if (isPath(path, "admin", "feedback")) return json(await adminFeedback());
       if (isPath(path, "admin", "audit")) return json(await adminAudit(new URL(request.url).searchParams));

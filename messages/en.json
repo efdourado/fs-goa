@@ -1028,6 +1028,10 @@
     "errNameGroup": "Give the new group a name.",
     "errPickGroup": "Choose a destination group.",
     "duplicateBody": "A draft copy is created in the chosen group. You adjust everything before activating.",
+    "copyModeLabel": "What to copy",
+    "copyModeItems": "Structure + items",
+    "copyModeStructure": "Structure only",
+    "copyModeHint": "Either way, no one's answers, Done state, private comments, members or invitations come across, and recommendation names are never copied. You start uncompleted, and later changes to the original never touch your copy.",
     "targetGroupLabel": "Destination group",
     "newGroupOption": "+ Create a new group",
     "newGroupNameLabel": "New group name (if you're creating one)",
@@ -1132,6 +1136,12 @@
       "The idea is simple. A group picks a challenge — watch a list of films, read for 90 days, keep a habit — and each person logs their progress. Goa handles the rest: it tracks who's on schedule, computes averages and rankings, and at the end builds a showcase that tells the story of that round.",
       "Nothing is public by default. Every group is private, access always comes from belonging to it, and submitted entries are preserved — only the curation and presentation stay editable.",
       "Goa is a personal project in progress, built by Eduardo Dourado. The original spreadsheets became the domain spec; the app is gradually catching up to everything they did, with far less manual work."
+    ],
+    "librariesTitle": "How Goa organises what you track",
+    "libraries": [
+      "Each personal space and each group keeps its own libraries — the lists of things you track. Screens is the broader evolution of Movies: films, series, seasons, episodes, documentaries, or whatever unit you choose. Pages is the broader evolution of Books, and also holds articles and other reading. Tables is a configurable starting point for places like restaurants, bars and cafés. You can create more specific libraries of your own, such as Matches or TV Shows.",
+      "You decide what one item represents. A trilogy can be one item or three; a season can be one item or every episode. Goa doesn't guess: fill in duration, pages or year only when you know them. An average episode duration and a total runtime are different numbers, and mixing them would make time totals wrong.",
+      "Done means the item's required answers are in — nothing more. For a football match it can simply mean “I tracked this one”; you don't have to have watched it. An answer everyone shares, like a final score, is recorded once for the group, while ratings and comments stay individual."
     ],
     "feedbackNudge": "Have an idea, or did something bug you?",
     "feedbackLink": "Tell us."

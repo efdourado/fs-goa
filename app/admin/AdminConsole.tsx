@@ -5,15 +5,36 @@ import { type ReactNode, useCallback, useEffect, useState } from "react";
 
 import { Brand } from "../goa/ui";
 
-type Tab = "usage" | "audit" | "accounts" | "feedback";
+type Tab = "usage" | "insights" | "feedback" | "accounts";
 
 interface Overview {
   users: { total: number; newThisWeek: number; disabled: number };
-  groups: { active: number; trashed: number };
-  challenges: { active: number; trashed: number };
+  groups: { active: number; activeLast30Days: number; trashed: number };
+  challenges: { active: number; inProgress: number; usedLast30Days: number; trashed: number };
   entries: { active: number; trashed: number };
   auditEvents: number;
   storage: { databaseBytes: number; tables: Array<{ name: string; bytes: number }> };
+}
+interface Insights {
+  windowDays: number;
+  includesStaff: boolean;
+  definitions: Record<string, string>;
+  overview: {
+    challengesTotal: number; challengesInProgress: number; challengesUsedInWindow: number;
+    groupsTotal: number; groupsUsedInWindow: number; accountsNewInWindow: number; accountsWithEntryInWindow: number;
+    weekly: Array<{ week: string; accountsCreated: number; challengesCreated: number; entriesRecorded: number }>;
+  };
+  creation: {
+    challengesCreated: number; copiedFromTemplate: number; copiedFromChallenge: number;
+    byRecipe: Array<{ recipe: string; count: number }>;
+    customization: { librariesCreated: number; sharedResponseTypesCreated: number; externalRecommendersSaved: number; itemsScheduled: number };
+    firstRecord: { challengesCreated: number; withFirstRecord: number; medianHoursToFirstRecord: number | null };
+    returnUsage: { peopleWithRecords: number; peopleOnMultipleDays: number };
+  };
+  problems: {
+    feedbackCount: number; blocked: number; didNotWork: number; averageEase: number | null;
+    byImpact: Array<{ impact: string; count: number }>;
+  };
 }
 interface AuditEvent {
   id: string;
@@ -125,6 +146,9 @@ export default function AdminConsole({ viewerId, viewerName, csrfToken }: { view
   const [busy, setBusy] = useState(false);
 
   const [overview, setOverview] = useState<Overview | null>(null);
+  const [insights, setInsights] = useState<Insights | null>(null);
+  const [insightDays, setInsightDays] = useState(30);
+  const [insightStaff, setInsightStaff] = useState(false);
   const [audit, setAudit] = useState<AuditEvent[] | null>(null);
   const [users, setUsers] = useState<AdminUser[] | null>(null);
   const [feedback, setFeedback] = useState<FeedbackItem[] | null>(null);
@@ -146,6 +170,10 @@ export default function AdminConsole({ viewerId, viewerName, csrfToken }: { view
   );
 
   const loadOverview = useCallback(() => apiGet<Overview>("/api/admin/overview").then(setOverview), []);
+  const loadInsights = useCallback(
+    () => apiGet<Insights>(`/api/admin/insights?days=${insightDays}${insightStaff ? "&includeStaff=1" : ""}`).then(setInsights),
+    [insightDays, insightStaff],
+  );
   const loadUsers = useCallback(
     () => apiGet<{ users: AdminUser[] }>("/api/admin/users").then((data) => setUsers(data.users)),
     [],
@@ -164,15 +192,15 @@ export default function AdminConsole({ viewerId, viewerName, csrfToken }: { view
   useEffect(() => {
     let cancelled = false;
     const loader =
-      tab === "usage" ? loadOverview
-      : tab === "audit" ? () => loadAudit()
-      : tab === "feedback" ? loadFeedback
-      : loadUsers;
+      tab === "usage" ? () => Promise.all([loadOverview(), loadInsights()])
+      : tab === "insights" ? loadInsights
+      : tab === "feedback" ? () => Promise.all([loadFeedback(), loadInsights()])
+      : () => Promise.all([loadUsers(), loadAudit(), loadOverview()]);
     loader()
       .then(() => { if (!cancelled) setError(null); })
       .catch((cause: unknown) => { if (!cancelled) setError(cause instanceof Error ? cause.message : "Falha ao carregar."); });
     return () => { cancelled = true; };
-  }, [tab, loadOverview, loadAudit, loadUsers, loadFeedback]);
+  }, [tab, loadOverview, loadInsights, loadAudit, loadUsers, loadFeedback]);
 
   async function run(action: () => Promise<unknown>, reload: () => Promise<unknown>) {
     setBusy(true);
@@ -188,10 +216,10 @@ export default function AdminConsole({ viewerId, viewerName, csrfToken }: { view
   }
 
   const tabs: Array<{ id: Tab; label: string }> = [
-    { id: "usage", label: "Uso" },
-    { id: "audit", label: "Auditoria" },
-    { id: "accounts", label: "Contas" },
-    { id: "feedback", label: "Feedback" },
+    { id: "usage", label: "Visão geral" },
+    { id: "insights", label: "Criação e uso" },
+    { id: "feedback", label: "Problemas e feedback" },
+    { id: "accounts", label: "Contas e operação" },
   ];
 
   return (
@@ -231,30 +259,40 @@ export default function AdminConsole({ viewerId, viewerName, csrfToken }: { view
         <div className="mb-5 rounded-xl border border-[var(--danger-line)] bg-[var(--danger-soft)] px-4 py-3 text-sm text-[var(--danger-strong)]" role="alert">{error}</div>
       ) : null}
 
-      {tab === "usage" ? <UsageTab overview={overview} /> : null}
-      {tab === "audit" ? (
-        <AuditTab
-          events={audit}
-          entity={auditEntity}
-          onEntity={(value) => { setAuditEntity(value); loadAudit(value || undefined); }}
+      {tab === "usage" ? <UsageTab overview={overview} insights={insights} /> : null}
+      {tab === "insights" ? (
+        <InsightsTab
+          insights={insights}
+          days={insightDays}
+          includeStaff={insightStaff}
+          onDays={setInsightDays}
+          onIncludeStaff={setInsightStaff}
         />
       ) : null}
-      {tab === "feedback" ? <FeedbackTab items={feedback} /> : null}
+      {tab === "feedback" ? <FeedbackTab items={feedback} problems={insights?.problems ?? null} /> : null}
       {tab === "accounts" ? (
-        <AccountsTab
-          users={users}
-          viewerId={viewerId}
-          busy={busy}
-          onDisable={(user, disabled) =>
-            run(() => post("/api/admin/users/disable", { userId: user.id, disabled }), loadUsers)
-          }
-          onSetAdmin={(user, platformAdmin) =>
-            run(() => post("/api/admin/users/set-admin", { userId: user.id, platformAdmin }), loadUsers)
-          }
-          onRevoke={(user) =>
-            run(() => post("/api/admin/users/revoke-sessions", { userId: user.id }), loadUsers)
-          }
-        />
+        <div className="space-y-10">
+          <AccountsTab
+            users={users}
+            viewerId={viewerId}
+            busy={busy}
+            onDisable={(user, disabled) =>
+              run(() => post("/api/admin/users/disable", { userId: user.id, disabled }), loadUsers)
+            }
+            onSetAdmin={(user, platformAdmin) =>
+              run(() => post("/api/admin/users/set-admin", { userId: user.id, platformAdmin }), loadUsers)
+            }
+            onRevoke={(user) =>
+              run(() => post("/api/admin/users/revoke-sessions", { userId: user.id }), loadUsers)
+            }
+          />
+          <AuditTab
+            events={audit}
+            entity={auditEntity}
+            onEntity={(value) => { setAuditEntity(value); loadAudit(value || undefined); }}
+          />
+          <StorageSection overview={overview} />
+        </div>
       ) : null}
       </main>
     </>
@@ -271,36 +309,176 @@ function Stat({ label, value, hint }: { label: string; value: ReactNode; hint?: 
   );
 }
 
-function UsageTab({ overview }: { overview: Overview | null }) {
+function UsageTab({ overview, insights }: { overview: Overview | null; insights: Insights | null }) {
   if (!overview) return <p className={cx("text-sm", muted)}>Carregando…</p>;
-  const maxBytes = Math.max(1, ...overview.storage.tables.map((table) => table.bytes));
+  const window = insights?.windowDays ?? 30;
   return (
     <div className="space-y-6">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="Usuários" value={overview.users.total} hint={`+${overview.users.newThisWeek} nos últimos 7 dias · ${overview.users.disabled} desativados`} />
-        <Stat label="Grupos ativos" value={overview.groups.active} hint={`${overview.groups.trashed} na lixeira`} />
-        <Stat label="Desafios ativos" value={overview.challenges.active} hint={`${overview.challenges.trashed} na lixeira`} />
-        <Stat label="Registros" value={overview.entries.active} hint={`${overview.entries.trashed} na lixeira · ${overview.auditEvents} eventos de auditoria`} />
+        <Stat label="Grupos" value={overview.groups.active} hint={`${overview.groups.activeLast30Days} com registro nos últimos 30 dias · ${overview.groups.trashed} na lixeira`} />
+        <Stat
+          label="Desafios (não excluídos)"
+          value={overview.challenges.active}
+          hint={`${overview.challenges.inProgress} em andamento · ${overview.challenges.usedLast30Days} com registro nos últimos 30 dias · ${overview.challenges.trashed} na lixeira`}
+        />
+        <Stat label="Registros" value={overview.entries.active} hint={`${overview.entries.trashed} na lixeira`} />
       </div>
-      <section className={cx(card, "p-5 sm:p-6")}>
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-lg font-light">Armazenamento</h2>
-          <span className="text-sm font-light">{formatBytes(overview.storage.databaseBytes)}</span>
-        </div>
-        <ul className="mt-4 space-y-2">
-          {overview.storage.tables.map((table) => (
-            <li key={table.name} className="grid grid-cols-[1fr_auto] items-center gap-3">
-              <div>
-                <div className="flex justify-between text-xs">
-                  <span className="font-medium">{table.name}</span>
-                  <span className={muted}>{formatBytes(table.bytes)}</span>
-                </div>
-                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-black/[0.06]">
-                  <span className="block h-full rounded-full bg-[var(--main)]" style={{ width: `${(table.bytes / maxBytes) * 100}%` }} />
-                </div>
+      <p className={cx("text-xs", muted)}>
+        Um desafio não excluído pode ser rascunho, encerrado ou parado há meses — “em andamento” e “com registro recente” dizem mais sobre uso de verdade.
+      </p>
+      {insights ? (
+        <section className={cx(card, "p-5 sm:p-6")}>
+          <h2 className="text-lg font-light">Últimas 8 semanas</h2>
+          <p className={cx("mt-1 text-xs", muted)}>
+            Ações confirmadas pelo servidor{insights.includesStaff ? "" : ", sem contas da equipe"}. Janela dos números acima: {window} dias.
+          </p>
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full min-w-[420px] text-sm">
+              <thead>
+                <tr className={cx("text-left text-xs", muted)}>
+                  <th className="py-2 font-light">Semana de</th>
+                  <th className="py-2 text-right font-light">Contas novas</th>
+                  <th className="py-2 text-right font-light">Desafios criados</th>
+                  <th className="py-2 text-right font-light">Registros</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--line)]">
+                {insights.overview.weekly.map((row) => (
+                  <tr key={row.week}>
+                    <td className="py-2">{row.week}</td>
+                    <td className="py-2 text-right tabular-nums">{row.accountsCreated}</td>
+                    <td className="py-2 text-right tabular-nums">{row.challengesCreated}</td>
+                    <td className="py-2 text-right tabular-nums">{row.entriesRecorded}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
+    </div>
+  );
+}
+
+function StorageSection({ overview }: { overview: Overview | null }) {
+  if (!overview) return null;
+  const maxBytes = Math.max(1, ...overview.storage.tables.map((table) => table.bytes));
+  return (
+    <section className={cx(card, "p-5 sm:p-6")}>
+      <div className="flex items-baseline justify-between">
+        <h2 className="text-lg font-light">Armazenamento</h2>
+        <span className="text-sm font-light">{formatBytes(overview.storage.databaseBytes)}</span>
+      </div>
+      <p className={cx("mt-1 text-xs", muted)}>{overview.auditEvents} eventos de auditoria.</p>
+      <ul className="mt-4 space-y-2">
+        {overview.storage.tables.map((table) => (
+          <li key={table.name} className="grid grid-cols-[1fr_auto] items-center gap-3">
+            <div>
+              <div className="flex justify-between text-xs">
+                <span className="font-medium">{table.name}</span>
+                <span className={muted}>{formatBytes(table.bytes)}</span>
               </div>
-            </li>
-          ))}
+              <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-black/[0.06]">
+                <span className="block h-full rounded-full bg-[var(--main)]" style={{ width: `${(table.bytes / maxBytes) * 100}%` }} />
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function InsightRow({ label, value, hint }: { label: string; value: ReactNode; hint?: string }) {
+  return (
+    <li className="flex items-baseline justify-between gap-4 py-2.5">
+      <span className="min-w-0">
+        <span className="text-sm">{label}</span>
+        {hint ? <span className={cx("block text-xs", muted)}>{hint}</span> : null}
+      </span>
+      <strong className="flex-none text-base font-normal tabular-nums">{value}</strong>
+    </li>
+  );
+}
+
+function InsightsTab({
+  insights, days, includeStaff, onDays, onIncludeStaff,
+}: {
+  insights: Insights | null;
+  days: number;
+  includeStaff: boolean;
+  onDays: (value: number) => void;
+  onIncludeStaff: (value: boolean) => void;
+}) {
+  const controls = (
+    <div className="flex flex-wrap items-center gap-4 text-sm">
+      <label className="flex items-center gap-2">
+        <span className={muted}>Janela</span>
+        <select className="min-h-10 rounded-full border border-[var(--line)] bg-[var(--paper)] px-4" value={days} onChange={(event) => onDays(Number(event.target.value))}>
+          <option value={7}>7 dias</option>
+          <option value={30}>30 dias</option>
+          <option value={90}>90 dias</option>
+        </select>
+      </label>
+      <label className="flex items-center gap-2">
+        <input type="checkbox" checked={includeStaff} onChange={(event) => onIncludeStaff(event.target.checked)} />
+        <span className={muted}>Incluir contas da equipe (seeds e testes)</span>
+      </label>
+    </div>
+  );
+  if (!insights) return <div className="space-y-4">{controls}<p className={cx("text-sm", muted)}>Carregando…</p></div>;
+  const { creation, definitions } = insights;
+  const fromScratch = Math.max(0, creation.challengesCreated - creation.copiedFromTemplate - creation.copiedFromChallenge);
+  const hours = creation.firstRecord.medianHoursToFirstRecord;
+  return (
+    <div className="space-y-6">
+      {controls}
+      <p className={cx("text-xs", muted)}>{definitions.confirmed} {definitions.privacy}</p>
+
+      <section className={cx(card, "p-5 sm:p-6")}>
+        <h2 className="text-lg font-light">Criar ou copiar</h2>
+        <ul className="mt-2 divide-y divide-[var(--line)]">
+          <InsightRow label="Desafios criados" value={creation.challengesCreated} hint={definitions.created} />
+          <InsightRow label="Do zero" value={fromScratch} />
+          <InsightRow label="Copiados de um modelo público" value={creation.copiedFromTemplate} hint={definitions.copied} />
+          <InsightRow label="Copiados de outro desafio" value={creation.copiedFromChallenge} />
+        </ul>
+        {creation.byRecipe.length ? (
+          <>
+            <h3 className={cx("mt-4 text-xs font-light", muted)}>Por modelo</h3>
+            <ul className="mt-1 divide-y divide-[var(--line)]">
+              {creation.byRecipe.map((row) => <InsightRow key={row.recipe} label={row.recipe} value={row.count} />)}
+            </ul>
+          </>
+        ) : null}
+      </section>
+
+      <section className={cx(card, "p-5 sm:p-6")}>
+        <h2 className="text-lg font-light">Personalização</h2>
+        <p className={cx("mt-1 text-xs", muted)}>{definitions.customization}</p>
+        <ul className="mt-2 divide-y divide-[var(--line)]">
+          <InsightRow label="Bibliotecas criadas" value={creation.customization.librariesCreated} />
+          <InsightRow label="Respostas compartilhadas criadas" value={creation.customization.sharedResponseTypesCreated} />
+          <InsightRow label="Indicadores externos salvos" value={creation.customization.externalRecommendersSaved} />
+          <InsightRow label="Itens com agenda definida" value={creation.customization.itemsScheduled} />
+        </ul>
+      </section>
+
+      <section className={cx(card, "p-5 sm:p-6")}>
+        <h2 className="text-lg font-light">Primeiro registro e retorno</h2>
+        <ul className="mt-2 divide-y divide-[var(--line)]">
+          <InsightRow
+            label="Desafios criados que já têm registro"
+            value={`${creation.firstRecord.withFirstRecord} de ${creation.firstRecord.challengesCreated}`}
+            hint={definitions.firstRecord}
+          />
+          <InsightRow label="Mediana até o primeiro registro" value={hours === null ? "—" : `${hours} h`} />
+          <InsightRow
+            label="Pessoas com registro em 2+ dias"
+            value={`${creation.returnUsage.peopleOnMultipleDays} de ${creation.returnUsage.peopleWithRecords}`}
+            hint={definitions.returnUsage}
+          />
         </ul>
       </section>
     </div>
@@ -363,10 +541,27 @@ const IMPACT_LABEL: Record<string, string> = {
   idea: "ideia futura",
 };
 
-function FeedbackTab({ items }: { items: FeedbackItem[] | null }) {
+function FeedbackTab({ items, problems }: { items: FeedbackItem[] | null; problems: Insights["problems"] | null }) {
   if (!items) return <p className={cx("text-sm", muted)}>Carregando…</p>;
-  if (!items.length) return <div className={cx(card, "p-8 text-center text-sm", muted)}>Nenhum feedback ainda.</div>;
+  const summary = problems ? (
+    <section className={cx(card, "mb-4 p-5 sm:p-6")}>
+      <h2 className="text-lg font-light">Dificuldades relatadas</h2>
+      <p className={cx("mt-1 text-xs", muted)}>
+        Só o que as pessoas contaram no feedback: mostra atrito, não prova se gostam do produto. Operações que falharam não são
+        registradas — este painel ainda não mostra erros do servidor.
+      </p>
+      <ul className="mt-2 divide-y divide-[var(--line)]">
+        <InsightRow label="Feedbacks na janela" value={problems.feedbackCount} />
+        <InsightRow label="Bloqueou de vez" value={problems.blocked} />
+        <InsightRow label="Não conseguiu fazer o que queria" value={problems.didNotWork} />
+        <InsightRow label="Facilidade média (1–5)" value={problems.averageEase ?? "—"} />
+      </ul>
+    </section>
+  ) : null;
+  if (!items.length) return <>{summary}<div className={cx(card, "p-8 text-center text-sm", muted)}>Nenhum feedback ainda.</div></>;
   return (
+    <>
+    {summary}
     <ul className="space-y-2">
       {items.map((item) => (
         <li key={item.id} className={cx(card, "p-4 text-sm")}>
@@ -388,6 +583,7 @@ function FeedbackTab({ items }: { items: FeedbackItem[] | null }) {
         </li>
       ))}
     </ul>
+    </>
   );
 }
 

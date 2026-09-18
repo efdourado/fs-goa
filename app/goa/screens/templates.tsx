@@ -172,7 +172,7 @@ export function TemplateDetailScreen({
       if (!targetGroupId) throw new Error(t("errPickGroup"));
       const result = await apiRequest<{ challengeId: Id }>(API_PATHS.templateDuplicate(challengeId), {
         method: "POST",
-        body: { targetGroupId },
+        body: { targetGroupId, mode: data.get("mode") === "structure" ? "structure" : "structure_and_items" },
         csrfToken,
       });
       onDuplicated(result);
@@ -247,6 +247,13 @@ export function TemplateDetailScreen({
               <label><span className={labelClass}>{t("newGroupNameLabel")}</span>
                 <input className={inputClass} name="newGroupName" maxLength={120} placeholder={detail.title} />
               </label>
+              <label><span className={labelClass}>{t("copyModeLabel")}</span>
+                <select className={inputClass} name="mode" defaultValue="structure_and_items">
+                  <option value="structure_and_items">{t("copyModeItems")}</option>
+                  <option value="structure">{t("copyModeStructure")}</option>
+                </select>
+              </label>
+              <p className="text-xs text-[var(--muted)]">{t("copyModeHint")}</p>
               <div><Button type="submit" disabled={busy}>{busy ? t("duplicating") : t("duplicateSubmit")}</Button></div>
               <StatusMessage error={copyError} />
             </form>
