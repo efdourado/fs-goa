@@ -7,9 +7,11 @@ import { type EventForm, eventFormProblem, knownTimeZones } from "./schedule";
 import { Field, inputClass, Toggle } from "./ui";
 
 /**
- * An item's own date — a match's day, a screening. "Add date" opens a full-width Date; "End date" is
- * an optional extra row; the "Include time" switch puts a Time beside each date and only then asks
- * for a time zone. It is information about the item: it never opens or closes anything for answering.
+ * An item's own date — a match's day, a screening. "Add date" opens a full-width date; "End date" is
+ * an optional extra row; the "Include time" switch puts a time beside each date and only then asks
+ * for a time zone. The inputs carry no visible captions — a date picker, a time picker and a zone
+ * list explain themselves — but each keeps an accessible name. It is information about the item: it
+ * never opens or closes anything for answering.
  */
 export function EventScheduleInput({
   label,
@@ -52,77 +54,75 @@ export function EventScheduleInput({
   }
 
   return (
-    <Field label={label} optional plain>
-      <div className="space-y-3 rounded-xl border border-[var(--line)] p-3.5">
+    <div role="group" aria-label={label} className="space-y-3 rounded-xl border border-[var(--line)] p-3.5">
+      <div className={rowClass}>
+        <Field label="">
+          <input className={inputClass} type="date" aria-label={t("date")} value={value.date} disabled={disabled} onChange={(event) => onChange({ ...value, date: event.target.value })} />
+        </Field>
+        {value.withTime ? (
+          <Field label="" error={problem === "time" ? t("errTime") : null}>
+            <input className={inputClass} type="time" aria-label={t("time")} value={value.time} disabled={disabled} onChange={(event) => onChange({ ...value, time: event.target.value })} />
+          </Field>
+        ) : null}
+      </div>
+
+      {showEnd ? (
         <div className={rowClass}>
-          <Field label={t("date")}>
-            <input className={inputClass} type="date" value={value.date} disabled={disabled} onChange={(event) => onChange({ ...value, date: event.target.value })} />
+          <Field label="" error={problem === "endOrder" ? t("errEndOrder") : null}>
+            <input className={inputClass} type="date" aria-label={t("endDate")} value={value.endDate} min={value.date || undefined} disabled={disabled} onChange={(event) => onChange({ ...value, endDate: event.target.value })} />
           </Field>
           {value.withTime ? (
-            <Field label={t("time")} error={problem === "time" ? t("errTime") : null}>
-              <input className={inputClass} type="time" value={value.time} disabled={disabled} onChange={(event) => onChange({ ...value, time: event.target.value })} />
+            <Field label="">
+              <input className={inputClass} type="time" aria-label={t("endTime")} value={value.endTime} disabled={disabled} onChange={(event) => onChange({ ...value, endTime: event.target.value })} />
             </Field>
           ) : null}
         </div>
+      ) : null}
 
-        {showEnd ? (
-          <div className={rowClass}>
-            <Field label={t("endDate")} error={problem === "endOrder" ? t("errEndOrder") : null}>
-              <input className={inputClass} type="date" value={value.endDate} min={value.date || undefined} disabled={disabled} onChange={(event) => onChange({ ...value, endDate: event.target.value })} />
-            </Field>
-            {value.withTime ? (
-              <Field label={t("endTime")} optional>
-                <input className={inputClass} type="time" value={value.endTime} disabled={disabled} onChange={(event) => onChange({ ...value, endTime: event.target.value })} />
-              </Field>
-            ) : null}
-          </div>
-        ) : null}
-
-        {!disabled ? (
-          showEnd ? (
-            <button
-              type="button"
-              className="min-h-9 rounded-lg px-1 text-xs text-[var(--muted)] transition hover:text-[var(--ink)]"
-              onClick={() => { setEndOpen(false); onChange({ ...value, endDate: "", endTime: "" }); }}
-            >
-              {t("removeEnd")}
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="min-h-9 rounded-lg px-1 text-sm font-light text-[var(--muted)] transition hover:text-[var(--ink)]"
-              // Starts on the start date, so a same-day end (16:00–18:00) is just an end time away.
-              onClick={() => { setEndOpen(true); onChange({ ...value, endDate: value.date }); }}
-            >
-              ＋ {t("addEnd")}
-            </button>
-          )
-        ) : null}
-
-        <Toggle checked={value.withTime} disabled={disabled} label={t("includeTime")} onChange={(withTime) => onChange({ ...value, withTime })} />
-
-        {value.withTime ? (
-          <Field label={t("zone")} error={problem === "zone" ? t("errZone") : null}>
-            {zones.length ? (
-              <select className={inputClass} value={value.timeZone} disabled={disabled} onChange={(event) => onChange({ ...value, timeZone: event.target.value })}>
-                {zones.map((zone) => <option key={zone} value={zone}>{zone}</option>)}
-              </select>
-            ) : (
-              <input className={inputClass} value={value.timeZone} disabled={disabled} autoCapitalize="off" spellCheck={false} maxLength={100} onChange={(event) => onChange({ ...value, timeZone: event.target.value.trim() })} />
-            )}
-          </Field>
-        ) : null}
-
-        {!disabled ? (
+      {!disabled ? (
+        showEnd ? (
           <button
             type="button"
             className="min-h-9 rounded-lg px-1 text-xs text-[var(--muted)] transition hover:text-[var(--ink)]"
-            onClick={() => { setAdding(false); setEndOpen(false); onChange({ date: "", endDate: "", withTime: false, time: "", endTime: "", timeZone: value.timeZone }); }}
+            onClick={() => { setEndOpen(false); onChange({ ...value, endDate: "", endTime: "" }); }}
           >
-            {t("clear")}
+            {t("removeEnd")}
           </button>
-        ) : null}
-      </div>
-    </Field>
+        ) : (
+          <button
+            type="button"
+            className="min-h-9 rounded-lg px-1 text-sm font-light text-[var(--muted)] transition hover:text-[var(--ink)]"
+            // Starts on the start date, so a same-day end (16:00–18:00) is just an end time away.
+            onClick={() => { setEndOpen(true); onChange({ ...value, endDate: value.date }); }}
+          >
+            ＋ {t("addEnd")}
+          </button>
+        )
+      ) : null}
+
+      <Toggle checked={value.withTime} disabled={disabled} label={t("includeTime")} onChange={(withTime) => onChange({ ...value, withTime })} />
+
+      {value.withTime ? (
+        <Field label="" error={problem === "zone" ? t("errZone") : null}>
+          {zones.length ? (
+            <select className={inputClass} aria-label={t("zone")} value={value.timeZone} disabled={disabled} onChange={(event) => onChange({ ...value, timeZone: event.target.value })}>
+              {zones.map((zone) => <option key={zone} value={zone}>{zone}</option>)}
+            </select>
+          ) : (
+            <input className={inputClass} aria-label={t("zone")} value={value.timeZone} disabled={disabled} autoCapitalize="off" spellCheck={false} maxLength={100} onChange={(event) => onChange({ ...value, timeZone: event.target.value.trim() })} />
+          )}
+        </Field>
+      ) : null}
+
+      {!disabled ? (
+        <button
+          type="button"
+          className="min-h-9 rounded-lg px-1 text-xs text-[var(--muted)] transition hover:text-[var(--ink)]"
+          onClick={() => { setAdding(false); setEndOpen(false); onChange({ date: "", endDate: "", withTime: false, time: "", endTime: "", timeZone: value.timeZone }); }}
+        >
+          {t("clear")}
+        </button>
+      ) : null}
+    </div>
   );
 }
