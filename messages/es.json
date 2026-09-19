@@ -1630,8 +1630,7 @@
     "nameHint": "Cómo aparece en cada ítem, p. ej.: Marcador final.",
     "namePlaceholder": "Marcador final",
     "nameRequired": "Ponle un nombre a la respuesta.",
-    "fieldLabel": "Qué se registra",
-    "fieldHint": "El nombre del valor, p. ej.: Marcador.",
+    "fieldLabel": "Etiqueta",
     "fieldPlaceholder": "Marcador",
     "policyLabel": "Quién puede rellenarla",
     "policy": {

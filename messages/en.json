@@ -1630,8 +1630,7 @@
     "nameHint": "How it appears on each item, e.g. Final score.",
     "namePlaceholder": "Final score",
     "nameRequired": "Give the response a name.",
-    "fieldLabel": "What is recorded",
-    "fieldHint": "The label of the value, e.g. Score.",
+    "fieldLabel": "Label",
     "fieldPlaceholder": "Score",
     "policyLabel": "Who can fill it in",
     "policy": {

@@ -82,7 +82,7 @@ export function AddSharedResponseDialog({
         />
       </Field>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label={t("fieldLabel")} hint={t("fieldHint")}>
+        <Field label={t("fieldLabel")}>
           <input className={inputClass} value={field.label} maxLength={100} placeholder={name.trim() || t("fieldPlaceholder")} onChange={(event) => setField((current) => ({ ...current, label: event.target.value }))} />
         </Field>
         <Field label={tf("typeLabel")}>
