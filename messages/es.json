@@ -1694,12 +1694,13 @@
     "time": "Hora",
     "endTime": "Hora de fin",
     "zone": "Zona horaria",
-    "zoneHint": "La zona horaria de esa hora — las 19:00 en Río no son las 19:00 en Lisboa.",
     "errZone": "Esa zona horaria no se reconoce — usa un nombre como America/Sao_Paulo.",
     "errEndOrder": "El final no puede ser antes del inicio.",
     "errTime": "Añade una hora o desactiva la hora.",
     "clear": "Quitar la fecha",
-    "invalid": "Revisa la fecha — el final, la hora o la zona horaria no parecen correctos."
+    "invalid": "Revisa la fecha — el final, la hora o la zona horaria no parecen correctos.",
+    "addEnd": "Fecha final",
+    "removeEnd": "Quitar fecha final"
   },
   "eventWhen": {
     "timed": "{day} · {time} ({zone})",

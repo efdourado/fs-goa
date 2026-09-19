@@ -1694,12 +1694,13 @@
     "time": "Hora",
     "endTime": "Hora de término",
     "zone": "Fuso horário",
-    "zoneHint": "O fuso em que a hora está — 19:00 no Rio não é 19:00 em Lisboa.",
     "errZone": "Esse fuso horário não foi reconhecido — use um nome como America/Sao_Paulo.",
     "errEndOrder": "O fim não pode vir antes do início.",
     "errTime": "Informe a hora ou desligue o horário.",
     "clear": "Remover a data",
-    "invalid": "Confira a data — o fim, a hora ou o fuso horário não parecem certos."
+    "invalid": "Confira a data — o fim, a hora ou o fuso horário não parecem certos.",
+    "addEnd": "Data final",
+    "removeEnd": "Remover data final"
   },
   "eventWhen": {
     "timed": "{day} · {time} ({zone})",

@@ -1694,12 +1694,13 @@
     "time": "Time",
     "endTime": "End time",
     "zone": "Time zone",
-    "zoneHint": "The time zone the time is in — 19:00 in Rio isn't 19:00 in Lisbon.",
     "errZone": "That time zone isn't recognised — use a name like America/Sao_Paulo.",
     "errEndOrder": "The end can't be before the start.",
     "errTime": "Add a time, or switch the time off.",
     "clear": "Remove the date",
-    "invalid": "Check the date — the end, the time or the time zone doesn't look right."
+    "invalid": "Check the date — the end, the time or the time zone doesn't look right.",
+    "addEnd": "End date",
+    "removeEnd": "Remove end date"
   },
   "eventWhen": {
     "timed": "{day} · {time} ({zone})",
