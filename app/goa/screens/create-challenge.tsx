@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { useGoaFormat } from "../format";
-import { cleanFields, FieldBuilder, presetFields } from "../fields";
+import { cleanFields, FieldBuilder, presetFields, sharedPresetFields } from "../fields";
 import { CineItemsEditor, type CineRow, cineRowsToInput } from "../cine-items";
 import { API_PATHS, apiRequest } from "../api";
 import { useCsrf } from "../csrf";
@@ -12,8 +12,8 @@ import { NewLibraryDialog } from "../library-dialogs";
 import { type CatalogScope, LibraryGlyph, LibraryPills, libraryChoices, useCatalogLibraries } from "../libraries";
 import { tablesStarterProperties } from "../property-inputs";
 import { RuleSectionsEditor } from "../rules";
-import type { ChallengeCreationInput, ChallengeField, ChallengeRule, CreatableRecipeKey, GroupSummary, Id } from "../types";
-import { BackButton, backLinkClass, Button, cardClass, cx, EmptyState, Field, inputClass, labelClass, PageHeading, SchedulePeriodFields, StatusMessage } from "../ui";
+import type { ChallengeCreationInput, ChallengeField, ChallengeRule, CreatableRecipeKey, GroupSummary, Id, SharedEditPolicy } from "../types";
+import { BackButton, backLinkClass, Button, cardClass, cx, EmptyState, Field, inputClass, labelClass, PageHeading, SchedulePeriodFields, SelectableCards, StatusMessage, Toggle } from "../ui";
 
 /** Where a recipe's items come from: a fixed built-in library, the workspace's Tables library, one the creator picks, or none at all. */
 /** Stands in for the workspace's Tables library until it exists (it is created when the challenge is). */
@@ -50,6 +50,7 @@ export function CreateChallengeScreen({
   const tc = useTranslations("common");
   const tp = useTranslations("fields.preset");
   const tl = useTranslations("libraries");
+  const tSr = useTranslations("sharedResponses");
   const f = useGoaFormat();
   const [step, setStep] = useState(1);
   const [recipe, setRecipe] = useState<CreatableRecipeKey | null>(null);
@@ -61,6 +62,14 @@ export function CreateChallengeScreen({
   const [startsOn, setStartsOn] = useState("");
   const [endsOn, setEndsOn] = useState("");
   const [fields, setFields] = useState<ChallengeField[]>([]);
+  // Custom only: who fills the main response in — every participant, or once for the whole group.
+  const [answerScope, setAnswerScope] = useState<"individual" | "shared">("individual");
+  const [sharedEditPolicy, setSharedEditPolicy] = useState<SharedEditPolicy>("members_fill_admin_corrects");
+  const [fieldsTouched, setFieldsTouched] = useState(false);
+  // Custom starts without "when did it happen" — that date belongs to the response, not to the match.
+  const [collectsEntryDate, setCollectsEntryDate] = useState(false);
+  // Each item carries its own date and time (a match's kickoff), kept on the library's items.
+  const [itemDates, setItemDates] = useState(false);
   const [expectation, setExpectation] = useState(false);
   const [cineItems, setCineItems] = useState<CineRow[]>([]);
   const [participantIds, setParticipantIds] = useState<Id[]>(group?.members?.map((member) => member.id) ?? []);
@@ -68,7 +77,7 @@ export function CreateChallengeScreen({
   const [error, setError] = useState<string | null>(null);
   // Libraries beyond the recipe's own that the items also come from, by kind (Movies and TV Shows in one list).
   const [extraKinds, setExtraKinds] = useState<string[]>([]);
-  const [itemProblem, setItemProblem] = useState<"author" | null>(null);
+  const [itemProblem, setItemProblem] = useState<"author" | "schedule" | null>(null);
   const [newLibrary, setNewLibrary] = useState(false);
   const csrf = useCsrf();
   const scope: CatalogScope = personal || !group ? "personal" : { groupId: group.id };
@@ -118,10 +127,21 @@ export function CreateChallengeScreen({
     const meta = RECIPES.find((entry) => entry.key === next)!;
     setRecipe(next);
     setFields(presetFields(next, (key) => tp(key)));
+    setAnswerScope("individual");
+    setSharedEditPolicy("members_fill_admin_corrects");
+    setFieldsTouched(false);
+    setCollectsEntryDate(false);
+    setItemDates(false);
     setTitle(t(`recipes.${next}.title`));
     setScheduleMode(meta.scheduleMode);
     setCineItems([]);
     setExtraKinds([]);
+  }
+
+  function chooseScope(next: "individual" | "shared") {
+    setAnswerScope(next);
+    // A group result isn't a 0–5 rating: swap the starting field, but never one the creator already edited.
+    if (!fieldsTouched) setFields(next === "shared" ? sharedPresetFields((key) => tp(key)) : presetFields("custom", (key) => tp(key)));
   }
 
   function toggleExtraLibrary(kind: string) {
@@ -171,6 +191,10 @@ export function CreateChallengeScreen({
       setError(t("errNoAuthor"));
       return;
     }
+    if (step === checkpointsStep && itemProblem === "schedule") {
+      setError(t("errItemSchedule"));
+      return;
+    }
     setStep((current) => Math.min(lastStep, current + 1));
   }
 
@@ -186,6 +210,10 @@ export function CreateChallengeScreen({
     }
     if (itemProblem === "author") {
       setError(t("errNoAuthor"));
+      return;
+    }
+    if (itemProblem === "schedule") {
+      setError(t("errItemSchedule"));
       return;
     }
     setBusy(true);
@@ -219,6 +247,8 @@ export function CreateChallengeScreen({
         items: tracksCatalog ? items : [],
         generateDaily: false,
         expectation: canOfferExpectation && expectation,
+        ...(recipe === "custom" ? { collectsEntryDate, answerScope, ...(answerScope === "shared" ? { sharedEditPolicy } : {}) } : {}),
+        ...(tracksCatalog && itemDates ? { itemDates: true } : {}),
         participantIds,
       });
     } catch (cause) {
@@ -278,7 +308,30 @@ export function CreateChallengeScreen({
           </div>
         ) : null}
 
-        {step === 2 ? <div><h2 className="text-xl font-light">{t("fieldsTitle")}</h2><p className="mb-5 mt-1 text-sm text-[var(--muted)]">{t("fieldsSubtitle")}</p><FieldBuilder fields={fields} onChange={setFields} />{canOfferExpectation ? <label className="mt-5 flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4 text-sm"><input type="checkbox" className="mt-0.5" aria-label={t("expectationLabel")} checked={expectation} onChange={(event) => setExpectation(event.target.checked)} /><span><strong className="block">{t("expectationLabel")}</strong><span className="mt-0.5 block text-xs text-[var(--muted)]">{t("expectationHint")}</span></span></label> : null}</div> : null}
+        {step === 2 ? <div><h2 className="text-xl font-light">{t("fieldsTitle")}</h2><p className="mb-5 mt-1 text-sm text-[var(--muted)]">{t("fieldsSubtitle")}</p>{recipe === "custom" ? <div className="mb-6 space-y-5">
+              <Field label={t("scopeLabel")} hint={t("scopeHint")} plain>
+                <SelectableCards
+                  value={answerScope}
+                  onChange={chooseScope}
+                  options={[
+                    { value: "individual", label: t("scopeIndividual"), hint: t("scopeIndividualHint") },
+                    { value: "shared", label: t("scopeShared"), hint: t("scopeSharedHint") },
+                  ]}
+                />
+              </Field>
+              {answerScope === "shared" ? (
+                <Field label={tSr("policyLabel")} hint={tSr(`policyHint.${sharedEditPolicy}`)} plain>
+                  <SelectableCards
+                    value={sharedEditPolicy}
+                    onChange={setSharedEditPolicy}
+                    options={[
+                      { value: "members_fill_admin_corrects", label: tSr("policy.members_fill_admin_corrects") },
+                      { value: "members_can_edit", label: tSr("policy.members_can_edit") },
+                    ]}
+                  />
+                </Field>
+              ) : null}
+            </div> : null}<FieldBuilder fields={fields} onChange={(next) => { setFields(next); setFieldsTouched(true); }} />{recipe === "custom" ? <div className="mt-5 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4"><Toggle checked={collectsEntryDate} onChange={setCollectsEntryDate} label={t("entryDateLabel")} hint={t("entryDateHint")} /></div> : null}{canOfferExpectation ? <label className="mt-5 flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4 text-sm"><input type="checkbox" className="mt-0.5" aria-label={t("expectationLabel")} checked={expectation} onChange={(event) => setExpectation(event.target.checked)} /><span><strong className="block">{t("expectationLabel")}</strong><span className="mt-0.5 block text-xs text-[var(--muted)]">{t("expectationHint")}</span></span></label> : null}</div> : null}
 
         {step === checkpointsStep && tracksCatalog ? (
           <div>
@@ -293,6 +346,9 @@ export function CreateChallengeScreen({
                 onNew={() => setNewLibrary(true)}
               />
             </Field>
+            <div className="mb-5 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4">
+              <Toggle checked={itemDates} onChange={setItemDates} label={t("itemDatesLabel")} hint={t("itemDatesHint")} />
+            </div>
             {itemLibraries.length ? (
               <CineItemsEditor
                 value={cineItems}
@@ -302,6 +358,7 @@ export function CreateChallengeScreen({
                 libraries={itemLibraries}
                 recommendationsEnabled={recommendationsEnabled}
                 fallbackProperties={tablesFallback}
+                showSchedule={itemDates}
                 onProblem={setItemProblem}
               />
             ) : <EmptyState title={t("pickLibraryFirst")} />}
