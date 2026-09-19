@@ -329,9 +329,7 @@ export function ActiveChallengeCard({
         "group relative flex flex-col overflow-hidden rounded-[20px] border bg-[var(--paper)] shadow-[var(--elevate-1)] transition",
         fluid ? "w-full" : "w-[78vw] max-w-[19rem] shrink-0 snap-start sm:w-[19rem]",
         reorderMode ? "cursor-grab active:cursor-grabbing" : "hover:-translate-y-0.5",
-        challenge.pinned
-          ? "border-[var(--main-line)] shadow-[0_0_0_3px_var(--main-soft),var(--elevate-1)]"
-          : livingList ? "border-[var(--line)]" : tone.border,
+        livingList ? "border-[var(--line)]" : tone.border,
         "has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-[var(--main)]/25",
       )}
     >
@@ -404,7 +402,7 @@ export function ActiveChallengeCard({
           </div>
         ) : null}
       </div>
-      {!challenge.colorTag ? <span className={cx("block w-full px-5 py-2.5", livingList ? "bg-[var(--wash-strong)]" : tone.solid)} /> : null}
+      {!challenge.colorTag ? <span className={cx("block w-full px-5 py-2.5", livingList ? "bg-[var(--line)]" : tone.solid)} /> : null}
     </article>
   );
 }
