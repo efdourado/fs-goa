@@ -104,31 +104,45 @@ export function RemoveResponseDialog({
 }: {
   type: EntryTypeView;
   onClose: () => void;
-  onRemove: (archiveMetrics: boolean) => Promise<void>;
+  onRemove: (confirmed: { archiveMetrics: boolean; deleteAnswers: boolean }) => Promise<void>;
 }) {
   const t = useTranslations("sharedResponses");
-  const [metrics, setMetrics] = useState<string[] | null>(null);
+  // Filled in once the server says what else would go: answers already given, and metrics that read them.
+  const [warning, setWarning] = useState<{ answers: number; metrics: string[] } | null>(null);
+  const names = (details: unknown): string[] => {
+    const listed = (details as { metrics?: unknown } | undefined)?.metrics;
+    return Array.isArray(listed) ? listed.filter((label): label is string => typeof label === "string") : [];
+  };
 
   return (
     <ConfirmDialog
       title={t("removeTitle", { name: type.name })}
-      body={metrics ? (
+      body={warning ? (
         <>
-          {t("removeMetricsBody")}
-          <ul className="mt-3 list-disc space-y-1 pl-5">{metrics.map((label) => <li key={label}>{label}</li>)}</ul>
+          {warning.answers ? <p className="font-medium text-[var(--danger)]">{t("removeAnswersBody", { count: warning.answers })}</p> : null}
+          {warning.metrics.length ? (
+            <>
+              <p className={warning.answers ? "mt-3" : undefined}>{t("removeMetricsBody")}</p>
+              <ul className="mt-2 list-disc space-y-1 pl-5">{warning.metrics.map((label) => <li key={label}>{label}</li>)}</ul>
+            </>
+          ) : null}
         </>
       ) : t("removeBody")}
-      confirmLabel={metrics ? t("removeWithMetrics") : t("remove")}
+      confirmLabel={warning ? (warning.answers ? t("removeWithAnswers") : t("removeWithMetrics")) : t("remove")}
       danger
       onClose={onClose}
       onConfirm={async () => {
         try {
-          await onRemove(Boolean(metrics));
+          await onRemove({ archiveMetrics: Boolean(warning?.metrics.length), deleteAnswers: Boolean(warning?.answers) });
         } catch (cause) {
-          // The server lists the metrics that read this response; ask again with them named.
+          // The server says what would be deleted with it; show that and ask again.
+          if (cause instanceof ApiError && cause.code === "entry_type_has_entries") {
+            const count = (cause.details as { count?: unknown } | undefined)?.count;
+            setWarning({ answers: typeof count === "number" ? count : 1, metrics: names(cause.details) });
+            throw new Error(t("removeAnswersPrompt"));
+          }
           if (cause instanceof ApiError && cause.code === "entry_type_has_metrics") {
-            const listed = (cause.details as { metrics?: unknown } | undefined)?.metrics;
-            setMetrics(Array.isArray(listed) ? listed.filter((label): label is string => typeof label === "string") : []);
+            setWarning({ answers: warning?.answers ?? 0, metrics: names(cause.details) });
             throw new Error(t("removeMetricsPrompt"));
           }
           throw cause;

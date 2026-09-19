@@ -542,8 +542,10 @@ export async function DELETE(request: Request): Promise<Response> {
       return json(await archivePersonalCatalogAttribute(session, path[2]));
     }
     if (path[0] === "challenges" && path[2] === "entry-types" && path.length === 4) {
+      const params = new URL(request.url).searchParams;
       return json(await archiveEntryType(session, path[1], path[3], {
-        archiveMetrics: new URL(request.url).searchParams.get("archiveMetrics") === "1",
+        archiveMetrics: params.get("archiveMetrics") === "1",
+        deleteAnswers: params.get("deleteAnswers") === "1",
       }));
     }
     if (path[0] === "challenges" && path[2] === "libraries" && path.length === 4) {

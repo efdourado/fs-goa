@@ -382,17 +382,18 @@ export async function addSharedResponseType(
 /**
  * Removes a response type from a challenge — how a challenge ends up with only
  * shared answers (or only individual ones) even though a recipe always seeds an
- * individual one. Non-destructive by construction: refused while the type has
- * answers and never leaves a challenge with no response type at all. Metrics that read
- * its fields are listed in the refusal and removed with it once the caller
- * confirms (`archiveMetrics`); a completion-rate metric moves to the type that
+ * individual one. Never leaves a challenge with no response type at all. A type
+ * that already has answers is refused with their count (and the metrics that read it)
+ * until the caller confirms with `deleteAnswers`, which deletes those answers with it;
+ * metrics that read its fields are listed in the refusal and removed once the caller
+ * confirms too (`archiveMetrics`). A completion-rate metric moves to the type that
  * takes over instead.
  */
 export async function archiveEntryType(
   session: SessionContext,
   challengeId: string,
   entryTypeId: string,
-  options: { archiveMetrics?: boolean } = {},
+  options: { archiveMetrics?: boolean; deleteAnswers?: boolean } = {},
 ) {
   return inTransaction(async (client) => {
     const access = await challengeAccess(session.user.id, challengeId, client, true);
@@ -412,17 +413,22 @@ export async function archiveEntryType(
       "SELECT count(*)::int AS count FROM entries WHERE entry_type_id=$1 AND deleted_at IS NULL",
       [entryTypeId],
     );
-    if ((withEntries?.count ?? 0) > 0) {
-      throw new ApiError(409, "entry_type_has_entries", "Já há respostas nesse tipo de registro — não dá para removê-lo.");
-    }
-    // Metrics are derived views (no answers live in them), so with no answers in
-    // the type they can go with it — but only after the caller has seen which.
+    const answerCount = withEntries?.count ?? 0;
+    // Metrics are derived views (no answers live in them), so they can go with the
+    // type — but only after the caller has seen which.
     const readByMetric = await client.query<{ id: string; label: string }>(
       `SELECT id, label FROM challenge_metrics
         WHERE challenge_id=$1 AND entry_type_id=$2 AND archived_at IS NULL AND operation <> 'completion_rate'
         ORDER BY position`,
       [challengeId, entryTypeId],
     );
+    if (answerCount > 0 && !options.deleteAnswers) {
+      throw new ApiError(
+        409, "entry_type_has_entries",
+        "Já há respostas nesse tipo de registro. Confirme para apagá-las junto.",
+        { count: answerCount, metrics: readByMetric.rows.map((row) => row.label) },
+      );
+    }
     if (readByMetric.rows.length && !options.archiveMetrics) {
       throw new ApiError(
         409, "entry_type_has_metrics",
@@ -437,6 +443,14 @@ export async function archiveEntryType(
       );
     }
 
+    // The answers go with the type, out of metrics, history and the showcase (soft-deleted, like an
+    // item's answers when the item is removed).
+    if (answerCount > 0) {
+      await client.query(
+        "UPDATE entries SET deleted_at=now(), last_edited_by_user_id=$3, updated_at=now() WHERE entry_type_id=$1 AND challenge_id=$2 AND deleted_at IS NULL",
+        [entryTypeId, challengeId, session.user.id],
+      );
+    }
     await client.query("UPDATE challenge_fields SET archived_at=now(), updated_at=now() WHERE entry_type_id=$1 AND archived_at IS NULL", [entryTypeId]);
     await client.query("UPDATE entry_types SET archived_at=now(), is_primary=false, updated_at=now() WHERE id=$1", [entryTypeId]);
     // Hand the primary role and any completion-rate metric to whichever type stays.
@@ -450,8 +464,8 @@ export async function archiveEntryType(
       [challengeId, entryTypeId, successor.id],
     );
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
-      "entry_type.archived", "entry_type", entryTypeId, null, { name: type.name, answerScope: type.answer_scope });
-    return { id: entryTypeId, archived: true as const };
+      "entry_type.archived", "entry_type", entryTypeId, null, { name: type.name, answerScope: type.answer_scope, answersDeleted: answerCount });
+    return { id: entryTypeId, archived: true as const, answersDeleted: answerCount };
   });
 }
 

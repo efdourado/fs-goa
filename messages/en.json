@@ -168,7 +168,7 @@
       "rate_limited": "Too many attempts in a short time. Wait a moment.",
       "shared_conflict": "Someone changed this shared answer first. Look at the latest value before saving again.",
       "shared_locked": "That answer is already filled in — only an admin can correct it.",
-      "entry_type_has_entries": "This response already has answers, so it can't be removed.",
+      "entry_type_has_entries": "This response has answers. Confirm to delete them together with it.",
       "entry_type_has_metrics": "Some metrics read this response. Confirm to remove them together.",
       "last_entry_type": "A challenge needs at least one response.",
       "recommendations_disabled": "This group turned recommendations off. Turn them on in the group settings to record who recommended something.",
@@ -1643,7 +1643,7 @@
     "requiredHint": "An item isn't done until this is filled in.",
     "add": "Add response",
     "removeTitle": "Remove \"{name}\"",
-    "removeBody": "This response goes away from every item. It can only be removed while nobody has answered it.",
+    "removeBody": "This response goes away from every item.",
     "removeMetricsBody": "These metrics read this response and will be removed with it:",
     "removeMetricsPrompt": "Some metrics read this response. Confirm again to remove them too.",
     "removeWithMetrics": "Remove response and metrics",
@@ -1651,9 +1651,12 @@
     "panelTitle": "Shared with the group",
     "panelBody": "There is a single answer per item, shown to everyone along with who last changed it.",
     "policySaved": "Saved.",
-    "removeHint": "Removing only works while nobody has answered it.",
+    "removeHint": "Removing it also deletes any answers already given.",
     "removeLastHint": "A challenge needs at least one response, so this one can't be removed.",
-    "removeHintIndividual": "Take this response out of the challenge. Only possible while nobody has answered it."
+    "removeHintIndividual": "Take this response out of the challenge. Any answers already given to it are deleted with it.",
+    "removeAnswersBody": "{count, plural, one {# answer has} other {# answers have}} already been given to this response. They will be deleted along with it, and that can't be undone.",
+    "removeAnswersPrompt": "Confirm again to delete the answers and remove the response.",
+    "removeWithAnswers": "Delete answers and remove response"
   },
   "sharedAnswers": {
     "badge": "Shared with the group",

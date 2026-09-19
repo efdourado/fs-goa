@@ -285,7 +285,7 @@ function AdminFields({
   onSetExpectation: (enabled: boolean) => Promise<void>;
   onSaveEntryDate: (enabled: boolean) => Promise<void>;
   onAddShared: (payload: { name: string; sharedEditPolicy: SharedEditPolicy; field: ChallengeField }) => Promise<void>;
-  onRemoveType: (entryTypeId: Id, archiveMetrics: boolean) => Promise<void>;
+  onRemoveType: (entryTypeId: Id, confirmed: { archiveMetrics: boolean; deleteAnswers: boolean }) => Promise<void>;
   onSavePolicy: (entryTypeId: Id, policy: SharedEditPolicy) => Promise<void>;
 }) {
   const t = useTranslations("adminChallenge");
@@ -473,7 +473,7 @@ function AdminFields({
         <RemoveResponseDialog
           type={removingType}
           onClose={() => setRemovingType(null)}
-          onRemove={async (archiveMetrics) => { await onRemoveType(removingType.id, archiveMetrics); setRemovingType(null); }}
+          onRemove={async (confirmed) => { await onRemoveType(removingType.id, confirmed); setRemovingType(null); }}
         />
       ) : null}
 
@@ -1170,7 +1170,7 @@ export function AdminScreen({
   onSetExpectation: (enabled: boolean) => Promise<void>;
   onSaveEntryDate: (enabled: boolean) => Promise<void>;
   onAddSharedResponse: (payload: { name: string; sharedEditPolicy: SharedEditPolicy; field: ChallengeField }) => Promise<void>;
-  onRemoveEntryType: (entryTypeId: Id, archiveMetrics: boolean) => Promise<void>;
+  onRemoveEntryType: (entryTypeId: Id, confirmed: { archiveMetrics: boolean; deleteAnswers: boolean }) => Promise<void>;
   onSaveSharedPolicy: (entryTypeId: Id, policy: SharedEditPolicy) => Promise<void>;
   onAddItems: (payload: Record<string, unknown>) => Promise<void>;
   onLinkLibrary: (spec: { libraryId?: Id; libraryKind?: string }) => Promise<void>;

@@ -168,7 +168,7 @@
       "rate_limited": "Demasiados intentos en poco tiempo. Espera un momento.",
       "shared_conflict": "Alguien cambió antes esta respuesta compartida. Mira el valor más reciente antes de guardar otra vez.",
       "shared_locked": "Esa respuesta ya está rellenada — solo un admin puede corregirla.",
-      "entry_type_has_entries": "Esta respuesta ya tiene registros, así que no se puede quitar.",
+      "entry_type_has_entries": "Esta respuesta ya tiene respuestas dadas. Confirma para eliminarlas junto con ella.",
       "entry_type_has_metrics": "Algunas métricas leen esta respuesta. Confirma para quitarlas juntas.",
       "last_entry_type": "Un desafío necesita al menos una respuesta.",
       "recommendations_disabled": "Este grupo desactivó las recomendaciones. Actívalas en los ajustes del grupo para registrar quién recomendó algo.",
@@ -1643,7 +1643,7 @@
     "requiredHint": "Un ítem no queda completado hasta que esto se rellene.",
     "add": "Añadir respuesta",
     "removeTitle": "Quitar \"{name}\"",
-    "removeBody": "Esta respuesta desaparece de todos los ítems. Solo se puede quitar mientras nadie la haya respondido.",
+    "removeBody": "Esta respuesta desaparece de todos los ítems.",
     "removeMetricsBody": "Estas métricas leen esta respuesta y se quitarán con ella:",
     "removeMetricsPrompt": "Algunas métricas leen esta respuesta. Confirma otra vez para quitarlas también.",
     "removeWithMetrics": "Quitar respuesta y métricas",
@@ -1651,9 +1651,12 @@
     "panelTitle": "Compartida con el grupo",
     "panelBody": "Hay una única respuesta por ítem, visible para todos junto con quién la cambió por última vez.",
     "policySaved": "Guardado.",
-    "removeHint": "Solo se puede quitar mientras nadie la haya respondido.",
+    "removeHint": "Quitarla también elimina las respuestas ya dadas.",
     "removeLastHint": "Un desafío necesita al menos una respuesta, así que esta no se puede quitar.",
-    "removeHintIndividual": "Saca esta respuesta del desafío. Solo es posible mientras nadie la haya respondido."
+    "removeHintIndividual": "Saca esta respuesta del desafío. Las respuestas ya dadas se eliminan con ella.",
+    "removeAnswersBody": "{count, plural, one {Ya se dio # respuesta} other {Ya se dieron # respuestas}} a este registro. Se eliminarán junto con él, y no se puede deshacer.",
+    "removeAnswersPrompt": "Confirma de nuevo para eliminar las respuestas y quitar el registro.",
+    "removeWithAnswers": "Eliminar respuestas y quitar"
   },
   "sharedAnswers": {
     "badge": "Compartida con el grupo",

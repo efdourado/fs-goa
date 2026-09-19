@@ -7405,3 +7405,37 @@ test("criar o desafio com \"cada item tem data e hora\" liga a propriedade nas b
   const book = (await call("GET", `/api/groups/${gid}/catalog/libraries`, { session: owner })).body as { libraries: Array<{ id: string; kind: string }> };
   assert.equal((await scheduleOf(book.libraries.find((library) => library.kind === "book")!.id)).hidden, true);
 });
+
+test("remover um tipo de resposta que já tem respostas: avisa quantas, e só com a confirmação apaga as respostas junto", async () => {
+  const owner = await register("Tais", "tais_apaga");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Copa" } })).body as { id: string }).id;
+  const created = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner, body: { recipe: "cinema", title: "Copa", participantIds: [owner.user.id], items: [{ title: "A" }, { title: "B" }] },
+  });
+  const cid = (created.body as { id: string }).id;
+  const items = ((await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { items: Array<{ id: string }> }).items;
+  await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } });
+  const shared = await call("POST", `/api/challenges/${cid}/entry-types`, {
+    session: owner, body: { name: "Placar", sharedEditPolicy: "members_can_edit", field: { key: "placar", label: "Placar", type: "number", required: true } },
+  });
+  const typeId = (shared.body as { id: string }).id;
+  for (const item of items) {
+    const saved = await call("POST", `/api/challenges/${cid}/entries`, { session: owner, body: { entryTypeId: typeId, itemId: item.id, values: { placar: 2 } } });
+    assert.equal(saved.response.status, 201, JSON.stringify(saved.body));
+  }
+
+  const refused = await call("DELETE", `/api/challenges/${cid}/entry-types/${typeId}`, { session: owner });
+  assert.equal(refused.response.status, 409);
+  assert.equal((refused.body as { error: string }).error, "entry_type_has_entries");
+  assert.equal((refused.body as { details: { count: number } }).details.count, 2, "diz quantas respostas iriam junto");
+  const still = await adminPool.query("SELECT 1 FROM entries WHERE entry_type_id = $1 AND deleted_at IS NULL", [typeId]);
+  assert.equal(still.rowCount, 2, "sem confirmar, nada é apagado");
+
+  const removed = await call("DELETE", `/api/challenges/${cid}/entry-types/${typeId}?deleteAnswers=1`, { session: owner });
+  assert.equal(removed.response.status, 200, JSON.stringify(removed.body));
+  assert.equal((removed.body as { answersDeleted: number }).answersDeleted, 2);
+  const gone = await adminPool.query("SELECT 1 FROM entries WHERE entry_type_id = $1 AND deleted_at IS NULL", [typeId]);
+  assert.equal(gone.rowCount, 0, "as respostas foram apagadas com o tipo");
+  const detail = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { entryTypes: Array<{ id: string }> };
+  assert.equal(detail.entryTypes.some((type) => type.id === typeId), false);
+});

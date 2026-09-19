@@ -168,7 +168,7 @@
       "rate_limited": "Muitas tentativas em pouco tempo. Espere um instante.",
       "shared_conflict": "Alguém mudou esta resposta compartilhada antes. Veja o valor mais recente antes de salvar de novo.",
       "shared_locked": "Essa resposta já foi preenchida — só um admin pode corrigi-la.",
-      "entry_type_has_entries": "Esta resposta já tem registros, então não pode ser removida.",
+      "entry_type_has_entries": "Esta resposta já tem respostas dadas. Confirme para apagá-las junto.",
       "entry_type_has_metrics": "Algumas métricas leem esta resposta. Confirme para removê-las junto.",
       "last_entry_type": "Um desafio precisa de pelo menos uma resposta.",
       "recommendations_disabled": "Este grupo desligou as indicações. Ligue-as nas configurações do grupo para registrar quem indicou.",
@@ -1643,7 +1643,7 @@
     "requiredHint": "Um item não fica concluído até isto ser preenchido.",
     "add": "Adicionar resposta",
     "removeTitle": "Remover \"{name}\"",
-    "removeBody": "Esta resposta sai de todos os itens. Só dá para remover enquanto ninguém tiver respondido.",
+    "removeBody": "Esta resposta sai de todos os itens.",
     "removeMetricsBody": "Estas métricas leem esta resposta e serão removidas junto:",
     "removeMetricsPrompt": "Algumas métricas leem esta resposta. Confirme de novo para removê-las também.",
     "removeWithMetrics": "Remover resposta e métricas",
@@ -1651,9 +1651,12 @@
     "panelTitle": "Compartilhada com o grupo",
     "panelBody": "Existe uma única resposta por item, mostrada a todos junto com quem mudou por último.",
     "policySaved": "Salvo.",
-    "removeHint": "Só dá para remover enquanto ninguém tiver respondido.",
+    "removeHint": "Remover também apaga as respostas já dadas.",
     "removeLastHint": "Um desafio precisa de pelo menos uma resposta, então esta não pode ser removida.",
-    "removeHintIndividual": "Tire esta resposta do desafio. Só é possível enquanto ninguém tiver respondido."
+    "removeHintIndividual": "Tire esta resposta do desafio. As respostas já dadas a ela são apagadas junto.",
+    "removeAnswersBody": "{count, plural, one {# resposta já foi dada} other {# respostas já foram dadas}} a este registro. Elas serão apagadas junto, e isso não pode ser desfeito.",
+    "removeAnswersPrompt": "Confirme de novo para apagar as respostas e remover o registro.",
+    "removeWithAnswers": "Apagar respostas e remover"
   },
   "sharedAnswers": {
     "badge": "Compartilhada com o grupo",
