@@ -70,6 +70,7 @@
   },
   "nav": {
     "home": "Home",
+    "mySpace": "My space",
     "templates": "Templates",
     "about": "About",
     "admin": "Console",
@@ -329,7 +330,6 @@
     },
     "prefError": "Could not save your preference.",
     "shelfAdd": {
-      "personal": "New challenge",
       "group": "New group"
     }
   },

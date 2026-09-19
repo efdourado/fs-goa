@@ -634,7 +634,7 @@ export default function GoaApp() {
   } else if (screen.kind === "catalog-item" && selectedGroup) {
     content = <CatalogItemScreen key={screen.itemId} scope={{ groupId: selectedGroup.id }} recommendationsEnabled={selectedGroup.recommendationsEnabled !== false} detailPath={API_PATHS.groupCatalogItem(screen.groupId, screen.itemId)} itemId={screen.itemId} onBack={goUp} backLabel={backLabel} onOpenChallenge={(id) => openParticipant(id)} editing={canManage(selectedGroup.role) ? { members: selectedGroup.members ?? [] } : undefined} onDelete={canManage(selectedGroup.role) ? () => deleteCatalogItem(API_PATHS.catalogItem(screen.itemId), { kind: "group-catalog", groupId: screen.groupId }) : undefined} />;
   } else if (screen.kind === "personal-space") {
-    content = <PersonalSpaceScreen challenges={bootstrap.challenges.filter((challenge) => isPersonalChallenge(challenge, bootstrap.personalWorkspaceId))} onBack={goUp} backLabel={backLabel} onOpenChallenge={(id) => openParticipant(id)} onOpenAdmin={(id) => openAdmin(id)} onCreateChallenge={() => setScreen({ kind: "create-personal-challenge" })} onOpenCatalog={() => setScreen({ kind: "personal-catalog" })} onOpenTrash={() => setScreen({ kind: "personal-trash" })} />;
+    content = <PersonalSpaceScreen challenges={bootstrap.challenges.filter((challenge) => isPersonalChallenge(challenge, bootstrap.personalWorkspaceId))} onBack={goUp} backLabel={backLabel} onOpenChallenge={(id) => openParticipant(id)} onOpenAdmin={(id) => openAdmin(id)} onCreateChallenge={() => setScreen({ kind: "create-personal-challenge" })} onOpenCatalog={() => setScreen({ kind: "personal-catalog" })} onOpenTrash={() => setScreen({ kind: "personal-trash" })} onChanged={() => { void refreshBootstrap(); }} />;
   } else if (screen.kind === "personal-catalog") {
     content = <CatalogWorkspaceScreen key="personal" scope="personal" title={tPersonalCatalog("title")} subtitle={tPersonalCatalog("subtitle")} canManage members={[]} recommendationsEnabled onBack={goUp} backLabel={backLabel} onOpenItem={(itemId) => setScreen({ kind: "personal-catalog-item", itemId })} />;
   } else if (screen.kind === "personal-catalog-item") {
@@ -652,13 +652,13 @@ export default function GoaApp() {
   } else if (screen.kind === "admin" || screen.kind === "create-challenge") {
     content = <main className="mx-auto max-w-2xl px-5 py-16"><EmptyState title={t("adminUnavailableTitle")} action={<Button onClick={() => setScreen({ kind: "dashboard" })}>{t("backToStart")}</Button>} /></main>;
   } else {
-    content = <DashboardScreen user={user} groups={bootstrap.groups} challenges={bootstrap.challenges} personalWorkspaceId={bootstrap.personalWorkspaceId} limits={bootstrap.limits} csrfToken={bootstrap.csrfToken} onOpenGroup={(groupId) => setScreen({ kind: "group", groupId })} onOpenChallenge={(id) => openParticipant(id)} onOpenAdmin={(id) => openAdmin(id)} onCreateGroup={createGroup} onOpenPersonalSpace={() => setScreen({ kind: "personal-space" })} onCreatePersonalChallenge={() => setScreen({ kind: "create-personal-challenge" })} onChanged={() => { void refreshBootstrap(); }} />;
+    content = <DashboardScreen user={user} groups={bootstrap.groups} challenges={bootstrap.challenges} personalWorkspaceId={bootstrap.personalWorkspaceId} limits={bootstrap.limits} csrfToken={bootstrap.csrfToken} onOpenGroup={(groupId) => setScreen({ kind: "group", groupId })} onOpenChallenge={(id) => openParticipant(id)} onOpenAdmin={(id) => openAdmin(id)} onCreateGroup={createGroup} onChanged={() => { void refreshBootstrap(); }} />;
   }
 
   return (
     <CsrfProvider token={bootstrap.csrfToken}>
     <div className="flex min-h-screen flex-col bg-[var(--canvas)] text-[var(--ink)]">
-      <AppHeader user={user} notifications={bootstrap.memberRequests} onHome={() => setScreen({ kind: "dashboard" })} onAccount={() => setScreen({ kind: "account" })} onOpenTemplates={() => setScreen({ kind: "templates" })} onOpenAbout={() => setScreen({ kind: "about" })} onLogout={logout} onAcceptRequest={(id) => respondToMemberRequest(id, "accept")} onDeclineRequest={(id) => respondToMemberRequest(id, "decline")} />
+      <AppHeader user={user} notifications={bootstrap.memberRequests} onHome={() => setScreen({ kind: "dashboard" })} onAccount={() => setScreen({ kind: "account" })} onOpenPersonalSpace={() => setScreen({ kind: "personal-space" })} onOpenTemplates={() => setScreen({ kind: "templates" })} onOpenAbout={() => setScreen({ kind: "about" })} onLogout={logout} onAcceptRequest={(id) => respondToMemberRequest(id, "accept")} onDeclineRequest={(id) => respondToMemberRequest(id, "decline")} />
       <div className="flex-1">{content}</div>
     </div>
     </CsrfProvider>

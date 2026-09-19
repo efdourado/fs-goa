@@ -12,13 +12,11 @@ import { cx } from "./ui";
 export function Shelf({
   title,
   count,
-  onTitleClick,
   actions,
   children,
 }: {
   title: string;
   count?: number;
-  onTitleClick?: () => void;
   actions?: ReactNode;
   children: ReactNode;
 }) {
@@ -53,11 +51,7 @@ export function Shelf({
     <section className="mt-8 first:mt-0">
       <div className="mb-3 flex items-end justify-between gap-3 pr-1">
         <div className="flex items-baseline gap-2.5">
-          {onTitleClick ? (
-            <button type="button" onClick={onTitleClick} className="cursor-pointer underline-offset-4 hover:underline">
-              {heading}
-            </button>
-          ) : heading}
+          {heading}
           {count != null ? <span className="text-xs font-medium text-[var(--muted)]">{count}</span> : null}
         </div>
         <div className="flex items-center gap-2">

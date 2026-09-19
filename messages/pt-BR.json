@@ -70,6 +70,7 @@
   },
   "nav": {
     "home": "Início",
+    "mySpace": "Meu espaço",
     "templates": "Modelos",
     "about": "Sobre",
     "admin": "Gestão",
@@ -329,7 +330,6 @@
     },
     "prefError": "Não foi possível salvar sua preferência.",
     "shelfAdd": {
-      "personal": "Novo desafio",
       "group": "Novo grupo"
     }
   },

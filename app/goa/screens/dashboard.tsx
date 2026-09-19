@@ -440,8 +440,6 @@ export function DashboardScreen({
   onOpenChallenge,
   onOpenAdmin,
   onCreateGroup,
-  onOpenPersonalSpace,
-  onCreatePersonalChallenge,
   onChanged,
 }: {
   user: User;
@@ -454,13 +452,10 @@ export function DashboardScreen({
   onOpenChallenge: (id: Id) => void;
   onOpenAdmin: (id: Id) => void;
   onCreateGroup: (name: string) => Promise<void>;
-  onOpenPersonalSpace: () => void;
-  onCreatePersonalChallenge: () => void;
   onChanged?: () => void;
 }) {
   const t = useTranslations("dashboard");
   const tr = useTranslations("roles");
-  const tPersonal = useTranslations("personalSpace");
 
   const [showGroupDialog, setShowGroupDialog] = useState(false);
   const [colorFilter, setColorFilter] = useState<ChallengeColorTag | null>(null);
@@ -570,11 +565,11 @@ export function DashboardScreen({
   const filtered = {
     pinned: applyColorFilter(shelves.pinned, colorFilter),
     running: applyColorFilter(shelves.running, colorFilter),
-    space: applyColorFilter(shelves.space, colorFilter),
     archive: applyColorFilter(shelves.archive, colorFilter),
   };
-  const filteredCount = filtered.pinned.length + filtered.running.length + filtered.space.length + filtered.archive.length;
-  const hasAnyChallenge = challenges.length > 0;
+  const filteredCount = filtered.pinned.length + filtered.running.length + filtered.archive.length;
+  // Personal challenges live on their own page (My space); only a pinned one shows here.
+  const hasAnyChallenge = shelves.pinned.length + shelves.running.length + shelves.archive.length > 0;
   const brandNew = !hasAnyChallenge && !standardGroups.length;
 
   function renderRail(shelfKey: ShelfKey, list: ChallengeSummary[]): ReactNode {
@@ -675,19 +670,6 @@ export function DashboardScreen({
             {filtered.running.length
               ? renderRail("running", filtered.running)
               : <div className="w-full max-w-xl"><EmptyState title={colorFilter ? t("filter.empty") : t("noChallengesTitle")} /></div>}
-          </Shelf>
-
-          <Shelf
-            title={tPersonal("title")}
-            count={filtered.space.length}
-            onTitleClick={onOpenPersonalSpace}
-            actions={colorFilter ? undefined : <ShelfAddButton label={t("shelfAdd.personal")} onClick={onCreatePersonalChallenge} />}
-          >
-            {filtered.space.length
-              ? renderRail("space", filtered.space)
-              : colorFilter
-                ? <div className="w-full max-w-xl"><EmptyState title={t("filter.empty")} /></div>
-                : <div className="w-full max-w-xl"><EmptyState title={tPersonal("emptyTitle")} onClick={onCreatePersonalChallenge} /></div>}
           </Shelf>
 
           {colorFilter ? null : (

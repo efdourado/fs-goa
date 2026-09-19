@@ -523,6 +523,7 @@ test("header sinaliza logo, perfil e sair como clicáveis", () => {
     notifications: [],
     onHome: () => undefined,
     onAccount: () => undefined,
+    onOpenPersonalSpace: () => undefined,
     onOpenTemplates: () => undefined,
     onOpenAbout: () => undefined,
     onLogout: async () => undefined,
@@ -535,6 +536,7 @@ test("header sinaliza logo, perfil e sair como clicáveis", () => {
   assert.match(header, /aria-label="Novidades"/);
   assert.match(header, />Sair<\/button>/);
   assert.match(header, />Início<\/button>/, "há um link 'Início' explícito, não só o logo");
+  assert.match(header, />Meu espaço<\/button>/, "Meu espaço tem página própria, com link no cabeçalho");
 });
 
 test("planejador de etapas: mostra as etapas sem escolha de tipo, o total de duração e a distribuição", () => {
@@ -720,6 +722,7 @@ test("header lista convites de grupo pendentes no menu de novidades", () => {
     ],
     onHome: () => undefined,
     onAccount: () => undefined,
+    onOpenPersonalSpace: () => undefined,
     onOpenTemplates: () => undefined,
     onOpenAbout: () => undefined,
     onLogout: async () => undefined,
