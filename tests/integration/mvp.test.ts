@@ -7439,3 +7439,68 @@ test("remover um tipo de resposta que já tem respostas: avisa quantas, e só co
   const detail = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { entryTypes: Array<{ id: string }> };
   assert.equal(detail.entryTypes.some((type) => type.id === typeId), false);
 });
+
+test("a migração 0051 tira dos Screens os livros que uma versão antiga guardou como filme — e deixa em paz o que é ambíguo", async () => {
+  const { readdirSync, readFileSync } = await import("node:fs");
+  const file = readdirSync(new URL("../../drizzle/", import.meta.url)).find((name) => name.startsWith("0051_"))!;
+  const statements = readFileSync(new URL(`../../drizzle/${file}`, import.meta.url), "utf8")
+    .split("--> statement-breakpoint").map((part) => part.trim()).filter(Boolean);
+
+  const owner = await register("Nilo", "nilo_livros");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Estante velha" } })).body as { id: string }).id;
+  const make = async (recipe: string, title: string, items: Array<Record<string, unknown>>) => {
+    const created = await call("POST", `/api/groups/${gid}/challenges`, { session: owner, body: { recipe, title, participantIds: [owner.user.id], items } });
+    assert.equal(created.response.status, 201, JSON.stringify(created.body));
+    return (created.body as { id: string }).id;
+  };
+  const shelf = await make("bookshelf", "Estante", [{ title: "Ficciones", author: "Borges" }, { title: "Perfume", author: "Süskind" }, { title: "Repetido", author: "Autor" }]);
+  const club = await make("library", "Clube", [{ title: "Dom Casmurro", author: "Machado" }]);
+  const cinema = await make("cinema", "Filmes", [{ title: "Aftersun" }]);
+  const both = await make("bookshelf", "Outra estante", [{ title: "Solaris", author: "Lem" }]);
+
+  // o estado de antes: livros guardados como filme, com o vínculo de Screens ao lado do de Pages
+  const ids = new Map<string, string>();
+  for (const title of ["Ficciones", "Perfume", "Dom Casmurro", "Repetido", "Solaris"]) {
+    ids.set(title, (await adminPool.query<{ id: string }>("SELECT id FROM catalog_items WHERE group_id = $1 AND title = $2", [gid, title])).rows[0].id);
+  }
+  const item = (title: string) => ids.get(title)!;
+  // (o pool do teste é pequeno: nada de consultar por fora enquanto a transação segura a conexão)
+  const client = await adminPool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("INSERT INTO catalog_libraries (id, group_id, kind, source, created_by_user_id) VALUES (gen_random_uuid()::text, $1, 'film', 'screens', $2) ON CONFLICT DO NOTHING", [gid, owner.user.id]);
+    for (const title of ["Ficciones", "Perfume", "Dom Casmurro", "Repetido", "Solaris"]) {
+      await client.query("UPDATE catalog_items SET kind = 'film' WHERE id = $1", [item(title)]);
+    }
+    await client.query("INSERT INTO challenge_libraries (challenge_id, group_id, kind, position) SELECT $1, $2, 'film', 1 ON CONFLICT DO NOTHING", [shelf, gid]);
+    // já existe um livro com o mesmo título e autor: mexer no filme colidiria com ele
+    await client.query(
+      `INSERT INTO catalog_items (id, group_id, kind, title, normalized_title, author, created_by_user_id)
+       VALUES (gen_random_uuid()::text, $1, 'book', 'Repetido', 'repetido', 'Autor', $2)`, [gid, owner.user.id],
+    );
+    // "Solaris" também é usado por um desafio de cinema: ambíguo
+    await client.query("INSERT INTO challenge_items (id, challenge_id, catalog_item_id, semantic_key, title, position, metadata) VALUES (gen_random_uuid()::text, $1, $2, 'solaris_filme', 'Solaris', 5, '{}'::jsonb)", [cinema, item("Solaris")]);
+    await client.query("DELETE FROM challenge_libraries WHERE challenge_id = $1 AND kind = 'book'", [both]);
+    await client.query("INSERT INTO challenge_libraries (challenge_id, group_id, kind, position) VALUES ($1, $2, 'film', 0) ON CONFLICT DO NOTHING", [both, gid]);
+
+    for (const statement of statements) await client.query(statement);
+
+    const kinds = new Map((await client.query<{ title: string; kind: string }>("SELECT title, kind FROM catalog_items WHERE group_id = $1 AND archived_at IS NULL AND title <> 'Repetido' OR (title = 'Repetido' AND kind = 'film' AND group_id = $1)", [gid])).rows.map((row) => [row.title, row.kind]));
+    assert.equal(kinds.get("Ficciones"), "book");
+    assert.equal(kinds.get("Perfume"), "book");
+    assert.equal(kinds.get("Dom Casmurro"), "book");
+    assert.equal(kinds.get("Repetido"), "film", "o que colidiria com um livro que já existe fica como está");
+    assert.equal(kinds.get("Solaris"), "film", "o que também é usado por um desafio de cinema fica como está");
+    assert.equal(kinds.get("Aftersun"), "film", "filmes de verdade não mudam");
+
+    const links = async (id: string) => (await client.query<{ kind: string }>("SELECT kind FROM challenge_libraries WHERE challenge_id = $1 ORDER BY position", [id])).rows.map((row) => row.kind);
+    // Repetido ainda é um filme nesta estante, então o vínculo com Screens continua fazendo sentido
+    assert.deepEqual((await links(shelf)).sort(), ["book", "film"]);
+    assert.deepEqual(await links(club), ["book"]);
+    assert.deepEqual(await links(cinema), ["film"], "desafio de cinema não é tocado");
+    assert.deepEqual(await links(both), ["film"], "sem livros movidos, o vínculo não muda");
+  } finally {
+    await client.query("ROLLBACK");
+    client.release();
+  }
+});
