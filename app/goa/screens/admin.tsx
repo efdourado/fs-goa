@@ -1129,6 +1129,7 @@ export function AdminScreen({
   tab,
   onTab,
   onBack,
+  backLabel,
   onSaveBasics,
   onTransition,
   onDuplicate,
@@ -1168,6 +1169,8 @@ export function AdminScreen({
   tab: AdminTab;
   onTab: (tab: AdminTab) => void;
   onBack: () => void;
+  /** What the button says — the parent screen's name; falls back to plain "Back". */
+  backLabel?: string;
   onSaveBasics: (payload: Partial<ChallengeSummary>) => Promise<void>;
   onTransition: (status: "active" | "closed") => Promise<void>;
   onDuplicate: (payload: { title: string; targetGroupId: Id; mode: CopyMode }) => Promise<CopyResult>;
@@ -1223,7 +1226,7 @@ export function AdminScreen({
     <main className="pb-24">
       <div className="sticky top-0 z-20 border-b border-[var(--line)] bg-[color-mix(in_srgb,var(--canvas)_90%,transparent)] backdrop-blur-md">
         <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-2.5 sm:px-6">
-          <BackButton onClick={onBack} label={tc("back")} className="flex-none" />
+          <BackButton onClick={onBack} label={backLabel ?? tc("back")} className="flex-none" labelClassName="sr-only sm:not-sr-only" />
           <span className="h-5 w-px flex-none bg-[var(--line)]" aria-hidden="true" />
           <ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />
           <h1 className="min-w-0 flex-1 truncate text-base font-semibold tracking-tight">{challenge.title}</h1>

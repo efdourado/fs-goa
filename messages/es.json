@@ -1721,5 +1721,14 @@
     "typeMismatch": "«{property}» en {library} es {type} aquí, pero {existing} en el destino.",
     "archived": "«{property}» en {library} se quitó en el destino.",
     "open": "Abrir la copia"
+  },
+  "backTo": {
+    "home": "Inicio",
+    "signIn": "Entrar",
+    "templates": "Plantillas",
+    "mySpace": "Mi espacio",
+    "myCatalogue": "Mi acervo",
+    "catalogue": "Acervo",
+    "challenge": "Desafío"
   }
 }

@@ -1146,6 +1146,7 @@ export function ParticipantChallengeScreen({
   tab,
   onTab,
   onBack,
+  backLabel,
   onAdmin,
   onSaveEntry,
   onDeleteEntry,
@@ -1159,6 +1160,8 @@ export function ParticipantChallengeScreen({
   tab: ParticipantTab;
   onTab: (tab: ParticipantTab) => void;
   onBack: () => void;
+  /** What the button says — the parent screen's name; falls back to plain "Back". */
+  backLabel?: string;
   onAdmin?: () => void;
   onSaveEntry?: (itemId: Id | null, values: Record<Id, unknown>, entry?: Entry, occurredOn?: string | null, entryTypeId?: Id, checkpointId?: Id | null, options?: { expectedUpdatedAt?: string | null }) => Promise<void>;
   onDeleteEntry?: (entryId: Id) => Promise<void>;
@@ -1405,7 +1408,7 @@ export function ParticipantChallengeScreen({
   return (
     <main className="mx-auto max-w-7xl overflow-x-clip px-4 py-6 pb-28 sm:px-6 sm:py-10">
       <div className="mb-5 flex items-center justify-between gap-3">
-        <BackButton onClick={onBack} label={t("back")} />
+        <BackButton onClick={onBack} label={backLabel ?? t("back")} />
         <div className="flex items-center gap-2">
           {!preview && challenge.result?.shareToken && challenge.scope !== "personal" ? <SharePublicButton token={challenge.result.shareToken} /> : null}
           {previewActions ?? (onAdmin ? <Button variant="secondary" onClick={onAdmin}>{t("manage")}</Button> : null)}

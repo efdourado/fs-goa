@@ -5,12 +5,12 @@ import { useTranslations } from "next-intl";
 
 import { BackButton, PageHeading } from "../ui";
 
-export function AboutScreen({ onBack }: { onBack: () => void }) {
+export function AboutScreen({ onBack, backLabel }: { onBack: () => void; backLabel?: string }) {
   const t = useTranslations("about");
   const paragraphs = t.raw("body") as string[];
   return (
     <main className="mx-auto max-w-3xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
-      <BackButton onClick={onBack} label={t("back")} className="mb-6" />
+      <BackButton onClick={onBack} label={backLabel ?? t("back")} className="mb-6" />
       <PageHeading title={t("title")} description={t("lede")} />
       <div className="mt-8 space-y-5 text-base leading-8">
         {paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}

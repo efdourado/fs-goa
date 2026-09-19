@@ -39,7 +39,7 @@ export function cx(...classes: Array<string | false | null | undefined>): string
 }
 
 /** The one "← Back" control at the top of every screen — a chevron plus a label. */
-export function BackButton({ onClick, label, className }: { onClick: () => void; label: string; className?: string }) {
+export function BackButton({ onClick, label, className, labelClassName }: { onClick: () => void; label: string; className?: string; labelClassName?: string }) {
   return (
     <button
       type="button"
@@ -52,7 +52,8 @@ export function BackButton({ onClick, label, className }: { onClick: () => void;
       <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 flex-none" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
         <path d="M10 3.5 5.5 8 10 12.5" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
-      {label}
+      {/* The label names the parent screen — a group or challenge title can be long. */}
+      <span className={cx("min-w-0 max-w-[12rem] truncate sm:max-w-xs", labelClassName)}>{label}</span>
     </button>
   );
 }

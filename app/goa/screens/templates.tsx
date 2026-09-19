@@ -42,11 +42,14 @@ export function TemplatesScreen({
   user,
   onOpen,
   onBack,
+  backLabel,
   onSignIn,
 }: {
   user: User | null;
   onOpen: (challengeId: Id) => void;
   onBack: () => void;
+  /** What the button says — the parent screen's name; falls back to plain "Back". */
+  backLabel?: string;
   onSignIn: () => void;
 }) {
   const t = useTranslations("templates");
@@ -67,7 +70,7 @@ export function TemplatesScreen({
 
   const body = (
     <main className="mx-auto max-w-7xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
-      <BackButton onClick={onBack} label={t("back")} className="mb-6" />
+      <BackButton onClick={onBack} label={backLabel ?? t("back")} className="mb-6" />
       <PageHeading title={t("title")} description={t("subtitle")} />
 
       <div className="mt-2"><StatusMessage error={error} /></div>
@@ -114,6 +117,7 @@ export function TemplateDetailScreen({
   challengeId,
   groups,
   onBack,
+  backLabel,
   onSignIn,
   onDuplicated,
   onUnpublished,
@@ -124,6 +128,8 @@ export function TemplateDetailScreen({
   challengeId: Id;
   groups: GroupSummary[];
   onBack: () => void;
+  /** What the button says — the parent screen's name; falls back to plain "Back". */
+  backLabel?: string;
   onSignIn: () => void;
   onDuplicated: (result: { challengeId: Id }) => void;
   onUnpublished?: () => void;
@@ -216,12 +222,12 @@ export function TemplateDetailScreen({
 
   const body = error ? (
     <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12">
-      <BackButton onClick={onBack} label={t("allTemplates")} className="mb-6" />
+      <BackButton onClick={onBack} label={backLabel ?? t("allTemplates")} className="mb-6" />
       <StatusMessage error={error} />
     </main>
   ) : !detail ? (
     <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12">
-      <BackButton onClick={onBack} label={t("allTemplates")} className="mb-6" />
+      <BackButton onClick={onBack} label={backLabel ?? t("allTemplates")} className="mb-6" />
       <p className="text-sm text-[var(--muted)]" role="status">{t("detailLoading")}</p>
     </main>
   ) : (
@@ -234,6 +240,7 @@ export function TemplateDetailScreen({
         tab="results"
         onTab={() => undefined}
         onBack={onBack}
+        backLabel={backLabel}
         previewActions={headerActions}
       />
       {unpublishError ? (

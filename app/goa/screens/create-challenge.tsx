@@ -39,12 +39,15 @@ export function CreateChallengeScreen({
   group,
   personal = false,
   onBack,
+  backLabel,
   onCreate,
 }: {
   group?: GroupSummary;
   /** Solo mode: no "people" step, no group chrome, submits to the personal workspace. */
   personal?: boolean;
   onBack: () => void;
+  /** What the button says — the parent screen's name; falls back to plain "Back". */
+  backLabel?: string;
   onCreate: (input: ChallengeCreationInput) => Promise<void>;
 }) {
   const t = useTranslations("createChallenge");
@@ -261,7 +264,7 @@ export function CreateChallengeScreen({
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
-      <BackButton onClick={onBack} label={t("back")} className="mb-6" />
+      <BackButton onClick={onBack} label={backLabel ?? t("back")} className="mb-6" />
       <PageHeading title={personal ? t("personalTitle") : t("title")} description={personal ? t("personalSubtitle") : t("subtitle")} />
       <nav className={cx("mb-6 grid gap-1 rounded-2xl bg-[var(--wash-strong)]/70 p-1", navColsClass)} aria-label={t("stepsNav")}>
         {stepKeys.map((key, index) => <button className={cx("min-h-11 truncate rounded-xl px-2 text-xs font-light sm:text-sm", step === index + 1 ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : index + 1 < step ? "text-[var(--ink)]" : "text-[var(--muted)]")} type="button" onClick={() => index + 1 < step && setStep(index + 1)} disabled={index + 1 > step} key={key}><span className="hidden sm:inline">{index + 1}. </span>{key === "checkpoints" && (libraryMode === "tables" || libraryMode === "pick") ? t("steps.items") : t(`steps.${key}`)}</button>)}

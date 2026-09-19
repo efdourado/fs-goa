@@ -24,6 +24,7 @@ export function GroupScreen({
   challenges,
   pendingRequests,
   onBack,
+  backLabel,
   onCreateChallenge,
   onOpenChallenge,
   onOpenCatalogItem,
@@ -42,6 +43,8 @@ export function GroupScreen({
   challengeLimit: number;
   pendingRequests: PendingGroupRequest[];
   onBack: () => void;
+  /** What the button says — the parent screen's name; falls back to plain "Back". */
+  backLabel?: string;
   onCreateChallenge: () => void;
   onOpenChallenge: (id: Id) => void;
   onOpenCatalogItem: (itemId: Id) => void;
@@ -255,7 +258,7 @@ export function GroupScreen({
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8 pb-24 sm:px-6 sm:py-10">
-      <BackButton onClick={onBack} label={tc("back")} className="mb-6" />
+      <BackButton onClick={onBack} label={backLabel ?? tc("back")} className="mb-6" />
 
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">

@@ -155,3 +155,76 @@ export function urlForScreen(screen: Screen): string | null {
       return null;
   }
 }
+
+// --- "Back" is "up": every screen has one parent, and its button says which -------------------------
+
+/** What a Back button reads: a fixed name, or the name of the group / challenge it leads to. */
+export type BackLabel =
+  | { kind: "home" | "signIn" | "templates" | "mySpace" | "myCatalogue" | "catalogue" | "challenge" }
+  | { kind: "named"; name: string };
+
+export interface BackTarget {
+  screen: Screen;
+  label: BackLabel;
+}
+
+/** What `backTargetFor` needs to know about the viewer's data to name and reach a screen's parent. */
+export interface BackLookup {
+  loggedIn: boolean;
+  groupName(groupId: string): string | null;
+  /** `personal` challenges live in the viewer's own space rather than a group. */
+  challenge(challengeId: string): { groupId: string | null; personal: boolean } | null;
+}
+
+const HOME: BackTarget = { screen: { kind: "dashboard" }, label: { kind: "home" } };
+
+/**
+ * The screen "Back" leads to — always the parent in the app's hierarchy, never "wherever you were":
+ * Manage → its challenge → its group (or My space) → Home. Going Back therefore can't bounce between
+ * two screens that link to each other. `null` for a screen with nowhere to go up to.
+ */
+export function backTargetFor(screen: Screen, lookup: BackLookup): BackTarget | null {
+  const toGroup = (groupId: string): BackTarget => {
+    const name = lookup.groupName(groupId);
+    return name ? { screen: { kind: "group", groupId }, label: { kind: "named", name } } : HOME;
+  };
+  const signedOut: BackTarget = { screen: { kind: "auth", mode: "login" }, label: { kind: "signIn" } };
+  switch (screen.kind) {
+    case "loading":
+    case "dashboard":
+    case "auth":
+    case "account-deactivated":
+    case "invite-success":
+      return null;
+    case "account":
+    case "group":
+    case "personal-space":
+      return HOME;
+    case "about":
+    case "templates":
+    case "invite":
+      return lookup.loggedIn ? HOME : signedOut;
+    case "template":
+      return { screen: { kind: "templates" }, label: { kind: "templates" } };
+    case "group-catalog":
+    case "group-trash":
+    case "create-challenge":
+      return toGroup(screen.groupId);
+    case "catalog-item":
+      return { screen: { kind: "group-catalog", groupId: screen.groupId }, label: { kind: "catalogue" } };
+    case "personal-catalog":
+    case "personal-trash":
+    case "create-personal-challenge":
+      return { screen: { kind: "personal-space" }, label: { kind: "mySpace" } };
+    case "personal-catalog-item":
+      return { screen: { kind: "personal-catalog" }, label: { kind: "myCatalogue" } };
+    case "challenge": {
+      const challenge = lookup.challenge(screen.challengeId);
+      if (challenge?.groupId) return toGroup(challenge.groupId);
+      if (challenge?.personal) return { screen: { kind: "personal-space" }, label: { kind: "mySpace" } };
+      return HOME;
+    }
+    case "admin":
+      return { screen: { kind: "challenge", challengeId: screen.challengeId, tab: "results" }, label: { kind: "challenge" } };
+  }
+}

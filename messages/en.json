@@ -1721,5 +1721,14 @@
     "typeMismatch": "“{property}” in {library} is {type} here, but {existing} in the destination.",
     "archived": "“{property}” in {library} was removed in the destination.",
     "open": "Open the copy"
+  },
+  "backTo": {
+    "home": "Home",
+    "signIn": "Sign in",
+    "templates": "Templates",
+    "mySpace": "My space",
+    "myCatalogue": "My catalogue",
+    "catalogue": "Catalogue",
+    "challenge": "Challenge"
   }
 }

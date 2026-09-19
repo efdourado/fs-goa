@@ -22,6 +22,7 @@ export function AccountScreen({
   user,
   challenges,
   onBack,
+  backLabel,
   onSaveProfile,
   onChangePassword,
   onSetNameConsent,
@@ -32,6 +33,8 @@ export function AccountScreen({
   user: User;
   challenges: ChallengeSummary[];
   onBack: () => void;
+  /** What the button says — the parent screen's name; falls back to plain "Back". */
+  backLabel?: string;
   onSaveProfile: (payload: { name: string }) => Promise<void>;
   onChangePassword: (payload: { currentPassword: string; newPassword: string }) => Promise<void>;
   onSetNameConsent: (challengeId: string, consent: boolean) => Promise<void>;
@@ -177,7 +180,7 @@ export function AccountScreen({
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-8 pb-24 sm:px-6 sm:py-10">
-      <BackButton onClick={onBack} label={t("back")} className="mb-6" />
+      <BackButton onClick={onBack} label={backLabel ?? t("back")} className="mb-6" />
       <PageHeading title={t("title")} description={t("subtitle")} />
 
       {/* identity + editable name */}

@@ -30,6 +30,7 @@ function ToolButton({ children, onClick, primary = false }: { children: ReactNod
 export function PersonalSpaceScreen({
   challenges,
   onBack,
+  backLabel,
   onOpenChallenge,
   onOpenAdmin,
   onCreateChallenge,
@@ -38,6 +39,8 @@ export function PersonalSpaceScreen({
 }: {
   challenges: ChallengeSummary[];
   onBack: () => void;
+  /** What the button says — the parent screen's name; falls back to plain "Back". */
+  backLabel?: string;
   onOpenChallenge: (id: Id) => void;
   onOpenAdmin: (id: Id) => void;
   onCreateChallenge: () => void;
@@ -56,7 +59,7 @@ export function PersonalSpaceScreen({
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8 pb-24 sm:px-6 sm:py-10">
-      <BackButton onClick={onBack} label={tc("back")} className="mb-6" />
+      <BackButton onClick={onBack} label={backLabel ?? tc("back")} className="mb-6" />
 
       <PageHeading title={t("title")} description={t("subtitle")} />
 

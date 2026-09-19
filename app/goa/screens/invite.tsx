@@ -12,6 +12,7 @@ export function InviteScreen({
   token,
   user,
   onBack,
+  backLabel,
   onNeedAuth,
   onAccepted,
   csrfToken,
@@ -19,6 +20,8 @@ export function InviteScreen({
   token: string;
   user: User | null;
   onBack: () => void;
+  /** What the button says — the parent screen's name; falls back to plain "Back". */
+  backLabel?: string;
   onNeedAuth: () => void;
   onAccepted: (invitation: InviteAcceptance) => Promise<void>;
   csrfToken: string;
@@ -84,7 +87,7 @@ export function InviteScreen({
           </>
         ) : null}
         <div className="mt-5"><StatusMessage error={error} /></div>
-        <BackButton onClick={onBack} label={t("back")} className="mt-6" />
+        <BackButton onClick={onBack} label={backLabel ?? t("back")} className="mt-6" />
       </section>
     </main>
   );

@@ -47,6 +47,7 @@ export function CatalogItemScreen({
   detailPath,
   itemId,
   onBack,
+  backLabel,
   onOpenChallenge,
   onDelete,
   editing,
@@ -56,6 +57,8 @@ export function CatalogItemScreen({
   detailPath: string;
   itemId: Id;
   onBack: () => void;
+  /** What the button says — the parent screen's name; falls back to plain "Back". */
+  backLabel?: string;
   onOpenChallenge: (id: Id) => void;
   /** Present only when the viewer may remove the item from the catalog. */
   onDelete?: () => Promise<void>;
@@ -86,7 +89,7 @@ export function CatalogItemScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detailPath, itemId, nonce]);
 
-  if (error) return <main className="mx-auto max-w-3xl px-4 py-10"><EmptyState title={t("errorTitle")} hint={error} action={<Button variant="secondary" onClick={onBack}>{t("back")}</Button>} /></main>;
+  if (error) return <main className="mx-auto max-w-3xl px-4 py-10"><EmptyState title={t("errorTitle")} hint={error} action={<Button variant="secondary" onClick={onBack}>{backLabel ?? t("back")}</Button>} /></main>;
   if (!item) return <LoadingView />;
 
   const titleWithYear = item.year ? `${item.title} (${item.year})` : item.title;
@@ -119,7 +122,7 @@ export function CatalogItemScreen({
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
-      <BackButton onClick={onBack} label={t("back")} className="mb-6" />
+      <BackButton onClick={onBack} label={backLabel ?? t("back")} className="mb-6" />
       {library ? (
         <p className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-[var(--wash)] px-3 py-1 text-xs text-[var(--muted)]">
           <LibraryGlyph source={library.source} />{libraryName(library)}
