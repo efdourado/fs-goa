@@ -505,12 +505,12 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
 
 export function ResultView({
   challenge,
-  onBackToEntry,
+  live = false,
   hideCompletionRate = false,
 }: {
   challenge: ChallengeDetail;
-  /** When the round is still open with nothing to show yet, offer a way back to logging. */
-  onBackToEntry?: () => void;
+  /** Seen by a participant of a running round (not a preview): an empty result reads "No numbers yet". */
+  live?: boolean;
   /** The participant tab shows a dedicated "completed" card, so the completion-rate metric is redundant there. */
   hideCompletionRate?: boolean;
 }) {
@@ -537,9 +537,7 @@ export function ResultView({
       });
 
   if (!hasShowcaseContent(blocks)) {
-    return onBackToEntry
-      ? <EmptyState title={t("liveEmptyTitle")} action={<Button onClick={onBackToEntry}>{t("backToEntry")}</Button>} />
-      : <EmptyState title={t("emptyTitle")} />;
+    return <EmptyState title={live ? t("liveEmptyTitle") : t("emptyTitle")} />;
   }
 
   return (
@@ -1536,7 +1534,7 @@ export function ParticipantChallengeScreen({
         ) : null}
 
         {activeTab === "results" ? (
-          <ResultView challenge={challenge} hideCompletionRate onBackToEntry={preview ? undefined : () => onTab("today")} />
+          <ResultView challenge={challenge} hideCompletionRate live={!preview} />
         ) : null}
       </div>
 

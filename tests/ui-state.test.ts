@@ -394,7 +394,7 @@ test("aba Resultados ao vivo: sem herói repetido, sem pílulas de nome, sem 'sm
     ],
   } as unknown as ChallengeDetail;
 
-  const html = renderWithIntl(createElement(ResultView, { challenge, onBackToEntry: () => undefined }));
+  const html = renderWithIntl(createElement(ResultView, { challenge, live: true }));
   assert.match(html, /Ranking dos livros/);
   assert.match(html, /Pedro Páramo/);
   assert.doesNotMatch(html, /var\(--spotlight\)/, "não repete o herói da capa");
@@ -502,7 +502,7 @@ test("aba Resultados: um resultado sem manchete curada não cai de volta no tít
   assert.doesNotMatch(html, /Retrospectiva 2026/, "sem headline curada, não mostra o título");
 });
 
-test("aba Resultados sem números ainda oferece um caminho de volta ao registro", () => {
+test("aba Resultados sem números ainda só informa — sem botão de registrar", () => {
   const challenge = {
     title: "Ciclo novo",
     scope: "group",
@@ -511,9 +511,10 @@ test("aba Resultados sem números ainda oferece um caminho de volta ao registro"
     metrics: [{ id: "m1", label: "Nota média", operation: "average", value: null, visibleInResults: true }],
   } as unknown as ChallengeDetail;
 
-  const html = renderWithIntl(createElement(ResultView, { challenge, onBackToEntry: () => undefined }));
+  const html = renderWithIntl(createElement(ResultView, { challenge, live: true }));
   assert.match(html, /Ainda sem números/);
-  assert.match(html, /Fazer um registro/);
+  assert.doesNotMatch(html, /Fazer um registro/);
+  assert.doesNotMatch(html, /<button/);
 });
 
 test("header sinaliza logo, perfil e sair como clicáveis", () => {
