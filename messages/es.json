@@ -1630,6 +1630,9 @@
     "nameHint": "Cómo aparece en cada ítem, p. ej.: Marcador final.",
     "namePlaceholder": "Marcador final",
     "nameRequired": "Ponle un nombre a la respuesta.",
+    "fieldLabel": "Qué se registra",
+    "fieldHint": "El nombre del valor, p. ej.: Marcador.",
+    "fieldPlaceholder": "Marcador",
     "policyLabel": "Quién puede rellenarla",
     "policy": {
       "members_fill_admin_corrects": "Los miembros la rellenan, los admins corrigen",

@@ -1630,6 +1630,9 @@
     "nameHint": "Como aparece em cada item, ex.: Placar final.",
     "namePlaceholder": "Placar final",
     "nameRequired": "Dê um nome à resposta.",
+    "fieldLabel": "O que é registrado",
+    "fieldHint": "O nome do valor, ex.: Placar.",
+    "fieldPlaceholder": "Placar",
     "policyLabel": "Quem pode preencher",
     "policy": {
       "members_fill_admin_corrects": "Membros preenchem, admins corrigem",

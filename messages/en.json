@@ -1630,6 +1630,9 @@
     "nameHint": "How it appears on each item, e.g. Final score.",
     "namePlaceholder": "Final score",
     "nameRequired": "Give the response a name.",
+    "fieldLabel": "What is recorded",
+    "fieldHint": "The label of the value, e.g. Score.",
+    "fieldPlaceholder": "Score",
     "policyLabel": "Who can fill it in",
     "policy": {
       "members_fill_admin_corrects": "Members fill it, admins correct",
