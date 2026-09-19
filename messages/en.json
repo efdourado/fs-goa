@@ -1031,8 +1031,8 @@
       "closed": "This challenge is closed. Logging is read-only.",
       "draft": "This challenge is still a draft. Activate it to open logging.",
       "notParticipant": "You can follow this challenge, but you're not among the people selected to log entries.",
-      "scheduledWithDate": "This checkpoint hasn't started yet. Logging opens on {date}.",
-      "scheduled": "This checkpoint hasn't started yet. Logging opens on the scheduled date.",
+      "scheduledWithDate": "Answers for this item haven't opened yet. They open on {date}.",
+      "scheduled": "Answers for this item haven't opened yet. They open on the scheduled date.",
       "itemClosed": "This checkpoint is closed. Logging is read-only."
     },
     "optionArchived": "(removed)"

@@ -1031,8 +1031,8 @@
       "closed": "Este desafio foi encerrado. O registro está disponível somente para leitura.",
       "draft": "Este desafio ainda é um rascunho. Ative-o para liberar os registros.",
       "notParticipant": "Você pode acompanhar este desafio, mas não está entre as pessoas selecionadas para registrar.",
-      "scheduledWithDate": "Este checkpoint ainda não começou. O registro será liberado em {date}.",
-      "scheduled": "Este checkpoint ainda não começou. O registro será liberado na data programada.",
+      "scheduledWithDate": "As respostas para este item ainda não abriram. Elas abrem em {date}.",
+      "scheduled": "As respostas para este item ainda não abriram. Elas abrem na data programada.",
       "itemClosed": "Este checkpoint foi encerrado. O registro está disponível somente para leitura."
     },
     "optionArchived": "(removida)"

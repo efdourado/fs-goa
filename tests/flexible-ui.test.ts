@@ -268,6 +268,9 @@ describe("an item's own date and time in property forms", () => {
     assert.equal(propertiesHaveProblem([scheduleOn], { scheduled_at: backwards }), true);
     assert.equal(propertiesHaveProblem([scheduleOn], { scheduled_at: "" }), false);
     assert.equal(eventFormProblem({ date: "2026-06-15", time: "", endTime: "10:00", timeZone: zone }), "endWithoutTime");
+    // a half-typed zone is a problem, never a crash
+    assert.doesNotThrow(() => bodyFromValues([scheduleOn], { scheduled_at: badZone }, "create"));
+    assert.deepEqual(bodyFromValues([scheduleOn], { scheduled_at: badZone }, "create").native, {});
   });
 });
 

@@ -372,8 +372,11 @@ export function CineItemsEditor({
             const rowLibrary = libraryOf(row) ?? target;
             const properties = propertiesFor(rowLibrary);
             const authorInline = row.libraryKind === "book" && properties?.find((property) => property.key === "author")?.hidden !== true;
-            const detailProperties = editableProperties(properties ?? []).filter((property) => !(authorInline && property.key === "author"));
+            // An item's own date is what most of these rows are about — asked inline, not behind "details".
+            const scheduleProperty = editableProperties(properties ?? []).find((property) => property.type === "schedule") ?? null;
+            const detailProperties = editableProperties(properties ?? []).filter((property) => property.type !== "schedule" && !(authorInline && property.key === "author"));
             const recommenderInline = !authorInline && recommendationsEnabled;
+            const hasDetails = detailProperties.length > 0 || (authorInline && recommendationsEnabled);
             const topRight = authorInline ? (
               <label>
                 <span className="sr-only">{t("author")}</span>
@@ -391,9 +394,9 @@ export function CineItemsEditor({
                   </label>
                   {topRight}
                   <div className="flex items-start gap-1">
-                    <button type="button" className="min-h-11 rounded-lg px-2 text-xs text-[var(--muted)] hover:text-[var(--ink)]" aria-expanded={open} onClick={() => setExpanded((current) => { const next = new Set(current); if (next.has(row.key)) next.delete(row.key); else next.add(row.key); return next; })}>
+                    {hasDetails ? <button type="button" className="min-h-11 rounded-lg px-2 text-xs text-[var(--muted)] hover:text-[var(--ink)]" aria-expanded={open} onClick={() => setExpanded((current) => { const next = new Set(current); if (next.has(row.key)) next.delete(row.key); else next.add(row.key); return next; })}>
                       {open ? t("hideDetails") : t("details")}
-                    </button>
+                    </button> : null}
                     <button type="button" className="min-h-11 cursor-pointer rounded-lg px-2 text-xs text-[var(--danger)] hover:underline" onClick={() => remove(row.key)}>{t("remove")}</button>
                   </div>
                 </div>
@@ -401,6 +404,11 @@ export function CineItemsEditor({
                   <span className="mt-1 inline-flex items-center gap-1.5 text-[11px] text-[var(--muted)]">
                     <LibraryGlyph source={rowLibrary.source} className="h-3 w-3" />{libraryName(rowLibrary)}
                   </span>
+                ) : null}
+                {scheduleProperty ? (
+                  <div className="mt-3">
+                    <PropertyInputs properties={[scheduleProperty]} values={rowValues(row)} timeZone={timeZone} onChange={(propertyKey, propertyValue) => setRowProperty(row, propertyKey, propertyValue)} />
+                  </div>
                 ) : null}
                 {open ? (
                   <div className="mt-2 space-y-3">

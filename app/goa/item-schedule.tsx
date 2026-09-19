@@ -74,7 +74,8 @@ export function ItemScheduleFields({
   }
 
   return (
-    <Field label={t("label")} hint={t("hint")} plain>
+    // No label of its own: the disclosure it sits in is already called "Answer window".
+    <Field label="" hint={t("hint")} plain>
       <SelectableCards
         value={value.mode}
         onChange={switchMode}

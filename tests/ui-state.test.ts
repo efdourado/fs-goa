@@ -188,7 +188,7 @@ test("explica por que um registro está indisponível sem chamar futuro de encer
     itemStatus: "scheduled",
     opensAt: "2099-01-01T03:00:00.000Z",
   });
-  assert.match(scheduled ?? "", /ainda não começou/i);
+  assert.match(scheduled ?? "", /ainda não abriram/i);
   assert.doesNotMatch(scheduled ?? "", /desafio.*encerrado/i);
   assert.match(ptFormat.entryUnavailableMessage({ challengeStatus: "draft", isParticipant: true }) ?? "", /rascunho/i);
   assert.match(ptFormat.entryUnavailableMessage({ challengeStatus: "active", isParticipant: false }) ?? "", /não está entre/i);

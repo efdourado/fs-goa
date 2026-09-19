@@ -122,7 +122,8 @@ export function eventFormProblem(form: EventForm): "zone" | "endOrder" | "endWit
 }
 
 export function eventBodyOf(form: EventForm): EventBody | null {
-  if (!form.date) return null;
+  // A zone still being typed ("Mars/Oly…") must never reach `Intl`, which throws on it.
+  if (!form.date || !isKnownTimeZone(form.timeZone)) return null;
   if (!form.time) return { startsOn: form.date, timeZone: form.timeZone };
   const startsAt = wallClockToInstant(`${form.date}T${form.time}`, form.timeZone);
   if (!startsAt) return null;

@@ -430,6 +430,10 @@ export default function GoaApp() {
       items: input.items,
       generateDaily: input.generateDaily,
       expectation: input.expectation === true,
+      ...(input.collectsEntryDate !== undefined ? { collectsEntryDate: input.collectsEntryDate } : {}),
+      ...(input.answerScope ? { answerScope: input.answerScope } : {}),
+      ...(input.sharedEditPolicy ? { sharedEditPolicy: input.sharedEditPolicy } : {}),
+      ...(input.itemDates ? { itemDates: true } : {}),
       participantIds: input.participantIds,
     };
     const created = await apiRequest<unknown>(
