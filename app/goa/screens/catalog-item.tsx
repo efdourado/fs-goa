@@ -96,6 +96,7 @@ export function CatalogItemScreen({
     ? null
     : recommenderLine(item.recommendedBy, item.originNote, (name) => t("recommendedBy", { name }), (text) => t("origin", { text }));
   const attrs = [
+    item.scheduledAt ? f.eventWhen(item.scheduledAt) : null,
     item.author ? t("byAuthor", { name: item.author }) : null,
     item.pageCount ? t("pages", { count: item.pageCount }) : null,
     formatRuntime(item.runtimeMinutes),

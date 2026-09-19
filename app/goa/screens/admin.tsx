@@ -10,9 +10,11 @@ import { CineItemsEditor, type CineRow, cineRowsToInput } from "../cine-items";
 import { ConfirmDialog, FormDialog } from "../dialog";
 import { AddSharedResponseDialog, RemoveResponseDialog, SharedGlyph, SharedResponsePanel } from "../shared-responses";
 import { cleanFields, FIELD_TYPES, FieldConfigInputs, newFieldConfig, uniqueFieldKey } from "../fields";
+import { LibraryPropertiesDialog } from "../library-dialogs";
 import { ItemScheduleFields, sameSchedule, scheduleBody, scheduleProblem, type ScheduleValue, scheduleValueOf } from "../item-schedule";
 import { type CatalogScope, LibraryGlyph, LibraryPills, libraryChoices, useCatalogLibraries, useLibraryName } from "../libraries";
-import { bodyFromValues, editableProperties, PropertyInputs, type PropertyValues, useLibraryProperties, valuesFromItem } from "../property-inputs";
+import { bodyFromValues, editableProperties, PropertyInputs, type PropertyValues, propertiesHaveProblem, useLibraryProperties, valuesFromItem } from "../property-inputs";
+import { scheduleModeOf } from "../schedule";
 import { ListImportPanel } from "../list-import-panel";
 import { recommenderBody, recommenderLine, RecommenderPicker, recommenderFromItem, type RecommenderValue, sameRecommender, useRecommenderSource } from "../recommender-picker";
 import { RuleSectionsEditor, visibleRuleSections } from "../rules";
@@ -23,9 +25,11 @@ import type {
   ChallengeField,
   ChallengeItem,
   ChallengeItemInput,
+  CatalogLibrary,
   ChallengeLibraryRef,
   ChallengeSummary,
   CheckpointInput,
+  CopyResult,
   Entry,
   GroupSummary,
   Id,
@@ -273,6 +277,7 @@ function AdminFields({
   onSave,
   onSaveVisibility,
   onSetExpectation,
+  onSaveEntryDate,
   onAddShared,
   onRemoveType,
   onSavePolicy,
@@ -281,6 +286,7 @@ function AdminFields({
   onSave: (entryTypeId: Id, fields: ChallengeField[]) => Promise<void>;
   onSaveVisibility: (entryTypeId: Id, visibilityPolicy: string) => Promise<void>;
   onSetExpectation: (enabled: boolean) => Promise<void>;
+  onSaveEntryDate: (enabled: boolean) => Promise<void>;
   onAddShared: (payload: { name: string; sharedEditPolicy: SharedEditPolicy; field: ChallengeField }) => Promise<void>;
   onRemoveType: (entryTypeId: Id, archiveMetrics: boolean) => Promise<void>;
   onSavePolicy: (entryTypeId: Id, policy: SharedEditPolicy) => Promise<void>;
@@ -296,6 +302,10 @@ function AdminFields({
     && challenge.submissionMode === "item"
     && challenge.entryTypes.some((type) => type.purpose === "rating");
   const [expectationBusy, setExpectationBusy] = useState(false);
+  // A day-by-day response always needs its day, so the choice only exists for the other kinds.
+  const canToggleEntryDate = challenge.status !== "closed"
+    && !challenge.entryTypes.some((type) => type.cardinality === "once_per_day" || type.cardinality === "once_per_item_day");
+  const [entryDateBusy, setEntryDateBusy] = useState(false);
   const types = challenge.entryTypes.length
     ? challenge.entryTypes
     : [{ id: "", name: "", fields: challenge.fields } as ChallengeDetail["entryTypes"][number]];
@@ -470,7 +480,7 @@ function AdminFields({
         />
       ) : null}
 
-      {(selectedTypeId && challenge.status !== "closed") || canToggleExpectation || hasExpectation ? (
+      {(selectedTypeId && challenge.status !== "closed") || canToggleExpectation || hasExpectation || canToggleEntryDate ? (
         <div className="mt-8 divide-y divide-[var(--line)] overflow-hidden rounded-2xl border border-[var(--line)]">
           {selectedTypeId && challenge.status !== "closed" ? (
             <div className="p-5">
@@ -497,6 +507,24 @@ function AdminFields({
                 ))}
               </select>
               <p className="mt-2 text-xs text-[var(--muted)]">{tv(`explain.${visibility}`)}</p>
+            </div>
+          ) : null}
+          {canToggleEntryDate ? (
+            <div className="p-5">
+              <Toggle
+                checked={challenge.collectsEntryDate !== false}
+                disabled={entryDateBusy}
+                onChange={(next) => {
+                  setEntryDateBusy(true);
+                  setError(null);
+                  onSaveEntryDate(next)
+                    .then(() => setSuccess(next ? t("entryDateOn") : t("entryDateOff")))
+                    .catch((cause: unknown) => setError(f.error(cause)))
+                    .finally(() => setEntryDateBusy(false));
+                }}
+                label={t("entryDateTitle")}
+                hint={t("entryDateHint")}
+              />
             </div>
           ) : null}
           {canToggleExpectation || hasExpectation ? (
@@ -627,13 +655,15 @@ export function ItemEditorDialog({
   const scheduleChanged = !sameSchedule(schedule, initialSchedule);
   const dirty = JSON.stringify(draft) !== JSON.stringify(initial) || recommenderChanged || scheduleChanged || editedValues !== null;
   const authorNeeded = library?.kind === "book" && properties?.find((property) => property.key === "author")?.hidden !== true;
-  const factsPreview = properties
-    ? editableProperties(properties).map((property) => values[property.key]).filter(Boolean).slice(0, 3).join(" · ")
-    : "";
+  // The event's own date and time is asked up front; the rest of the library's facts sit in a disclosure.
+  const scheduleProperty = properties?.find((property) => property.type === "schedule" && !property.hidden) ?? null;
+  const factProperties = (properties ?? []).filter((property) => property.type !== "schedule");
+  const factsPreview = editableProperties(factProperties).map((property) => values[property.key]).filter(Boolean).slice(0, 3).join(" · ");
 
   async function submit() {
     if (catalogItem && authorNeeded && !(values.author ?? "").trim()) { setError(tCine("authorRequired")); return; }
     if (scheduleProblem(schedule)) { setError(t("itemWindowOrder")); return; }
+    if (properties && propertiesHaveProblem(properties, values)) { setError(t("eventScheduleInvalid")); return; }
     setBusy(true);
     setError(null);
     try {
@@ -667,12 +697,19 @@ export function ItemEditorDialog({
       {isItem && recommendationsEnabled ? (
         <RecommenderPicker value={recommender} onChange={setRecommender} members={members} source={source} />
       ) : null}
-      {isItem ? <ItemScheduleFields value={schedule} onChange={setSchedule} timeZone={timeZone} /> : null}
-      {catalogItem && properties && editableProperties(properties).length ? (
+      {catalogItem && scheduleProperty ? (
+        <PropertyInputs properties={[scheduleProperty]} values={values} onChange={(key, value) => setEditedValues({ ...values, [key]: value })} />
+      ) : null}
+      {catalogItem && properties && editableProperties(factProperties).length ? (
         <Disclosure summary={tCine("catalogFacts")} preview={factsPreview || undefined} defaultOpen={authorNeeded && !(values.author ?? "").trim()}>
           <div className="pt-2">
-            <PropertyInputs properties={properties} values={values} onChange={(key, value) => setEditedValues({ ...values, [key]: value })} />
+            <PropertyInputs properties={factProperties} values={values} onChange={(key, value) => setEditedValues({ ...values, [key]: value })} />
           </div>
+        </Disclosure>
+      ) : null}
+      {isItem ? (
+        <Disclosure summary={t("answerWindowTitle")} preview={f.itemWindow(item, timeZone) ?? t("answerWindowNone")} defaultOpen={scheduleModeOf(item) !== "none"}>
+          <div className="pt-2"><ItemScheduleFields value={schedule} onChange={setSchedule} timeZone={timeZone} /></div>
         </Disclosure>
       ) : null}
     </FormDialog>
@@ -689,11 +726,14 @@ function ChallengeLibrariesBar({
   scope,
   onLink,
   onUnlink,
+  onChanged,
 }: {
   challenge: ChallengeDetail;
   scope: CatalogScope;
   onLink: (spec: { libraryId?: Id; libraryKind?: string }) => Promise<void>;
   onUnlink: (libraryId: Id) => Promise<void>;
+  /** A library's properties changed (say, the event date was switched on) — reload what depends on them. */
+  onChanged: () => void;
 }) {
   const t = useTranslations("adminChallenge");
   const f = useGoaFormat();
@@ -702,6 +742,7 @@ function ChallengeLibrariesBar({
   const linked = challenge.libraries ?? [];
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [propertiesOf, setPropertiesOf] = useState<CatalogLibrary | null>(null);
   const locked = challenge.status === "closed";
   const available = libraryChoices(workspaceLibraries ?? []).filter((choice) => !linked.some((library) => library.kind === choice.kind));
   const itemsIn = (kind: string) => challenge.items.filter((item) => item.catalogItem?.kind === kind).length;
@@ -723,6 +764,17 @@ function ChallengeLibrariesBar({
               <LibraryGlyph source={library.source} />
               {libraryName(library)}
               <span className="text-[11px] text-[var(--muted)]">{itemsIn(library.kind)}</span>
+              {library.id !== null ? (
+                <button
+                  type="button"
+                  aria-label={t("libraryProperties", { name: libraryName(library) })}
+                  title={t("libraryProperties", { name: libraryName(library) })}
+                  className="ml-0.5 grid h-6 w-6 cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--main)]/15 hover:text-[var(--ink)]"
+                  onClick={() => setPropertiesOf({ id: library.id!, kind: library.kind, source: library.source, label: library.label, position: 0 })}
+                >
+                  <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M2.5 4.5h7M12.5 4.5h1M2.5 11.5h1M6.5 11.5h7" strokeLinecap="round" /><circle cx="11" cy="4.5" r="1.5" /><circle cx="5" cy="11.5" r="1.5" /></svg>
+                </button>
+              ) : null}
               {removable ? (
                 <button
                   type="button"
@@ -750,6 +802,7 @@ function ChallengeLibrariesBar({
       </div>
       <p className="mt-1.5 text-xs leading-5 text-[var(--muted)]">{linked.length > 1 ? t("librariesCombined") : t("librariesHint")}</p>
       {error ? <div className="mt-2"><StatusMessage error={error} /></div> : null}
+      {propertiesOf ? <LibraryPropertiesDialog scope={scope} library={propertiesOf} canEdit={!locked} onClose={() => setPropertiesOf(null)} onChanged={onChanged} /> : null}
     </div>
   );
 }
@@ -764,6 +817,7 @@ function AdminItems({
   onPreviewImport,
   onLinkLibrary,
   onUnlinkLibrary,
+  onLibraryChanged,
 }: {
   challenge: ChallengeDetail;
   group?: GroupSummary;
@@ -774,6 +828,7 @@ function AdminItems({
   onPreviewImport: (body: { json: string; mapping?: Record<string, string> }) => Promise<ImportPreview>;
   onLinkLibrary: (spec: { libraryId?: Id; libraryKind?: string }) => Promise<void>;
   onUnlinkLibrary: (libraryId: Id) => Promise<void>;
+  onLibraryChanged: () => void;
 }) {
   const t = useTranslations("adminChallenge");
   const tCine = useTranslations("cineItems");
@@ -790,7 +845,7 @@ function AdminItems({
   const linked = challenge.libraries ?? [];
   const itemLibrary = (item: ChallengeItem) => linked.find((library) => library.kind === item.catalogItem?.kind) ?? null;
   const [newItemRows, setNewItemRows] = useState<CineRow[]>([]);
-  const [itemProblem, setItemProblem] = useState<"author" | null>(null);
+  const [itemProblem, setItemProblem] = useState<"author" | "schedule" | null>(null);
   const [importTarget, setImportTarget] = useState<Pick<ChallengeLibraryRef, "id" | "kind"> | null>(null);
   const startsOn = challenge.startsOn ?? "";
   const endsOn = challenge.endsOn ?? "";
@@ -829,6 +884,7 @@ function AdminItems({
         const items = cineRowsToInput(newItemRows);
         if (!items.length) { setError(t("errNoItem")); setBusy(false); return; }
         if (itemProblem === "author") { setError(tCine("authorRequired")); setBusy(false); return; }
+        if (itemProblem === "schedule") { setError(t("eventScheduleInvalid")); setBusy(false); return; }
         await onAdd({ items });
         setNewItemRows([]);
         setSuccess(t("itemsAdded"));
@@ -844,7 +900,7 @@ function AdminItems({
         description={undatedDaily ? t("itemsHintUndatedDaily") : datedDaily ? t("itemsHintDatedDaily") : challenge.status === "closed" ? t("itemsHintClosed") : t("itemsHintDefault")}
         action={canShowAdd ? <Button variant={showAdd ? "secondary" : "primary"} onClick={() => setShowAdd((open) => !open)}>{showAdd ? tc("close") : challenge.submissionMode === "daily" ? t("generateCheckpoints") : `＋ ${t("add")}`}</Button> : undefined}
       />
-      {challenge.submissionMode === "item" ? <ChallengeLibrariesBar challenge={challenge} scope={scope} onLink={onLinkLibrary} onUnlink={onUnlinkLibrary} /> : null}
+      {challenge.submissionMode === "item" ? <ChallengeLibrariesBar challenge={challenge} scope={scope} onLink={onLinkLibrary} onUnlink={onUnlinkLibrary} onChanged={onLibraryChanged} /> : null}
       <div className="mb-5"><StatusMessage error={error} success={success} /></div>
 
       {showAdd && canShowAdd ? (
@@ -895,6 +951,7 @@ function AdminItems({
                   {linked.length > 1 && itemLibrary(item) ? <small className="mt-1 inline-flex items-center gap-1.5 text-[var(--muted)]"><LibraryGlyph source={itemLibrary(item)!.source} className="h-3 w-3" />{libraryName(itemLibrary(item)!)}</small> : null}
                   {item.description ? <span className="mt-1 block text-sm leading-6 text-[var(--muted)]">{item.description}</span> : null}
                   {(recommendationsEnabled && (item.recommendedBy || item.originNote)) || item.catalogItem?.author || item.catalogItem?.mainGenre || item.catalogItem?.runtimeMinutes ? <small className="mt-1 block text-[var(--muted)]">{[item.catalogItem?.author ? tCine("byAuthor", { name: item.catalogItem.author }) : null, recommendationsEnabled ? recommenderLine(item.recommendedBy, item.originNote, (name) => t("itemRecommendedByLine", { name }), (text) => t("itemOriginLine", { text })) : null, item.catalogItem?.mainGenre || null, formatRuntime(item.catalogItem?.runtimeMinutes)].filter(Boolean).join(" · ")}</small> : null}
+                  {item.catalogItem?.scheduledAt ? <small className="mt-1 inline-flex items-center gap-1.5 text-[var(--ink)]"><svg viewBox="0 0 16 16" className="h-3.5 w-3.5 flex-none text-[var(--muted)]" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><rect x="2.2" y="3.2" width="11.6" height="10.6" rx="2" /><path d="M2.2 6.6h11.6M5.4 1.9v2.6M10.6 1.9v2.6" strokeLinecap="round" /></svg>{f.eventWhen(item.catalogItem.scheduledAt)}</small> : null}
                   {item.date ? <small className="mt-1 block text-[var(--muted)]">{f.date(item.date)}</small> : f.itemWindow(item, timeZone) ? <small className="mt-1 inline-flex items-center gap-1.5 text-[var(--muted)]"><svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><circle cx="8" cy="8" r="5.8" /><path d="M8 5v3.2l2 1.2" strokeLinecap="round" /></svg>{f.itemWindow(item, timeZone)}</small> : null}
                 </span>
               </div>
@@ -1075,6 +1132,7 @@ export function AdminScreen({
   onSaveBasics,
   onTransition,
   onDuplicate,
+  onOpenCopy,
   isPlatformAdmin = false,
   onPublishTemplate,
   onUnpublishTemplate,
@@ -1084,6 +1142,7 @@ export function AdminScreen({
   onSaveFields,
   onSaveEntryTypeVisibility,
   onSetExpectation,
+  onSaveEntryDate,
   onAddSharedResponse,
   onRemoveEntryType,
   onSaveSharedPolicy,
@@ -1101,6 +1160,7 @@ export function AdminScreen({
   onSaveResult,
   onPublishResult,
   onUnpublishResult,
+  onArchiveChanged,
 }: {
   challenge: ChallengeDetail;
   entries: Entry[];
@@ -1110,7 +1170,8 @@ export function AdminScreen({
   onBack: () => void;
   onSaveBasics: (payload: Partial<ChallengeSummary>) => Promise<void>;
   onTransition: (status: "active" | "closed") => Promise<void>;
-  onDuplicate: (payload: { title: string; targetGroupId: Id; mode: CopyMode }) => Promise<void>;
+  onDuplicate: (payload: { title: string; targetGroupId: Id; mode: CopyMode }) => Promise<CopyResult>;
+  onOpenCopy: (challengeId: Id) => void;
   isPlatformAdmin?: boolean;
   onPublishTemplate: () => Promise<void>;
   onUnpublishTemplate: () => Promise<void>;
@@ -1120,6 +1181,7 @@ export function AdminScreen({
   onSaveFields: (entryTypeId: Id, fields: ChallengeField[]) => Promise<void>;
   onSaveEntryTypeVisibility: (entryTypeId: Id, visibilityPolicy: string) => Promise<void>;
   onSetExpectation: (enabled: boolean) => Promise<void>;
+  onSaveEntryDate: (enabled: boolean) => Promise<void>;
   onAddSharedResponse: (payload: { name: string; sharedEditPolicy: SharedEditPolicy; field: ChallengeField }) => Promise<void>;
   onRemoveEntryType: (entryTypeId: Id, archiveMetrics: boolean) => Promise<void>;
   onSaveSharedPolicy: (entryTypeId: Id, policy: SharedEditPolicy) => Promise<void>;
@@ -1165,7 +1227,7 @@ export function AdminScreen({
           <span className="h-5 w-px flex-none bg-[var(--line)]" aria-hidden="true" />
           <ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />
           <h1 className="min-w-0 flex-1 truncate text-base font-semibold tracking-tight">{challenge.title}</h1>
-          <ChallengeActions challenge={challenge} duplicateTargets={duplicateTargets} onDuplicate={onDuplicate} onDelete={onDelete} onTransition={onTransition} isPlatformAdmin={isPlatformAdmin} onPublishTemplate={onPublishTemplate} onUnpublishTemplate={onUnpublishTemplate} onPublish={onPublishResult} onUnpublish={onUnpublishResult} />
+          <ChallengeActions challenge={challenge} duplicateTargets={duplicateTargets} onDuplicate={onDuplicate} onOpenCopy={onOpenCopy} onDelete={onDelete} onTransition={onTransition} isPlatformAdmin={isPlatformAdmin} onPublishTemplate={onPublishTemplate} onUnpublishTemplate={onUnpublishTemplate} onPublish={onPublishResult} onUnpublish={onUnpublishResult} />
         </div>
         <nav className="mx-auto max-w-5xl px-2 sm:px-5" aria-label={t("tabsAria")}>
           <div className="flex gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -1189,8 +1251,8 @@ export function AdminScreen({
 
       <div className="mx-auto max-w-5xl px-4 pt-8 sm:px-6 sm:pt-10">
         {activeTab === "overview" ? <div className="mx-auto max-w-2xl space-y-10"><AdminOverview challenge={challenge} onSave={onSaveBasics} />{!isPersonal ? <div className="border-t border-[var(--line)] pt-8"><AdminParticipants key={challenge.participants.map((p) => p.userId ?? p.id).join(",")} challenge={challenge} group={group} onSave={onSaveParticipants} /></div> : null}</div> : null}
-        {activeTab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.visibilityPolicy}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} onSaveVisibility={onSaveEntryTypeVisibility} onSetExpectation={onSetExpectation} onAddShared={onAddSharedResponse} onRemoveType={onRemoveEntryType} onSavePolicy={onSaveSharedPolicy} /> : null}
-        {activeTab === "items" ? <AdminItems challenge={challenge} group={group} entries={entries} onAdd={onAddItems} onUpdate={onUpdateItem} onArchive={onArchiveItem} onPreviewImport={onPreviewImport} onLinkLibrary={onLinkLibrary} onUnlinkLibrary={onUnlinkLibrary} /> : null}
+        {activeTab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.visibilityPolicy}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} onSaveVisibility={onSaveEntryTypeVisibility} onSetExpectation={onSetExpectation} onSaveEntryDate={onSaveEntryDate} onAddShared={onAddSharedResponse} onRemoveType={onRemoveEntryType} onSavePolicy={onSaveSharedPolicy} /> : null}
+        {activeTab === "items" ? <AdminItems challenge={challenge} group={group} entries={entries} onAdd={onAddItems} onUpdate={onUpdateItem} onArchive={onArchiveItem} onPreviewImport={onPreviewImport} onLinkLibrary={onLinkLibrary} onUnlinkLibrary={onUnlinkLibrary} onLibraryChanged={onArchiveChanged} /> : null}
         {activeTab === "checkpoints" ? <CheckpointPlanner key={`${challenge.id}:${challenge.checkpoints.map((cp) => cp.id).join(",")}`} challenge={challenge} onSaveCheckpoints={onSaveCheckpoints} onAssign={onAssignCheckpointItems} /> : null}
         {activeTab === "metrics" ? <AdminMetrics challenge={challenge} onAdd={onAddMetric} onUpdate={onUpdateMetric} onDelete={onDeleteMetric} /> : null}
         {activeTab === "results" ? <AdminResults challenge={challenge} entries={entries} onSave={onSaveResult} /> : null}

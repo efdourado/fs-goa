@@ -88,7 +88,7 @@ export function CatalogWorkspaceScreen({
   const [itemsError, setItemsError] = useState<string | null>(null);
   const [itemsNonce, setItemsNonce] = useState(0);
   const [activeKind, setActiveKind] = useState<string | null>(null);
-  const [sort, setSort] = useState<"title" | "rating">("title");
+  const [sort, setSort] = useState<"title" | "rating" | "date">("title");
   const [recommenderFilter, setRecommenderFilter] = useState("");
   const [view, setView] = useState<View>("list");
   const [dialog, setDialog] = useState<"add" | "new" | "rename" | "properties" | null>(null);
@@ -142,11 +142,16 @@ export function CatalogWorkspaceScreen({
     if (activeFilter === "none") return !item.recommendedBy && !item.originNote;
     return item.recommendedBy ? `${item.recommendedBy.kind}:${item.recommendedBy.id}` === activeFilter : false;
   }), [scoped, activeFilter]);
+  // Only offered where the library keeps an event date (a match's kickoff) on its items.
+  const hasDates = scoped.some((item) => item.scheduledAt);
+  const startOf = (item: CatalogItem) => (item.scheduledAt ? new Date(item.scheduledAt.startsAt).getTime() : Infinity);
   const sorted = useMemo(() => [...filtered].sort((left, right) =>
     sort === "rating"
       ? (right.ratingAvg ?? -1) - (left.ratingAvg ?? -1)
-      : left.title.localeCompare(right.title),
-  ), [filtered, sort]);
+      : sort === "date" && hasDates
+        ? startOf(left) - startOf(right) || left.title.localeCompare(right.title)
+        : left.title.localeCompare(right.title),
+  ), [filtered, sort, hasDates]);
 
   const genreBuckets = useMemo(
     () => bucketize(scoped, (item) => ({ key: (item.mainGenre ?? "").toLowerCase() || "__none__", label: item.mainGenre?.trim() ?? "" })),
@@ -172,6 +177,7 @@ export function CatalogWorkspaceScreen({
     const custom = (item.attributes ?? []).map((attribute) =>
       attribute.type === "boolean" ? `${attribute.label}: ${attribute.value ? tc("yes") : tc("no")}` : `${attribute.label}: ${String(attribute.value)}`);
     return [
+      item.scheduledAt ? f.eventWhen(item.scheduledAt) : null,
       hidden.has("author") ? null : item.author,
       hidden.has("main_genre") ? null : item.mainGenre,
       hidden.has("runtime_minutes") ? null : formatRuntime(item.runtimeMinutes),
@@ -278,9 +284,10 @@ export function CatalogWorkspaceScreen({
               {scoped.length ? (
                 <label className="text-xs text-[var(--muted)]">
                   <span className="sr-only">{t("sortLabel")}</span>
-                  <select className="min-h-10 rounded-full border border-[var(--line)] bg-[var(--paper)] px-4 text-sm text-[var(--ink)]" value={sort} onChange={(event) => setSort(event.target.value as "title" | "rating")}>
+                  <select className="min-h-10 rounded-full border border-[var(--line)] bg-[var(--paper)] px-4 text-sm text-[var(--ink)]" value={sort} onChange={(event) => setSort(event.target.value as "title" | "rating" | "date")}>
                     <option value="title">{t("sortTitle")}</option>
                     <option value="rating">{t("sortRating")}</option>
+                    {hasDates ? <option value="date">{t("sortDate")}</option> : null}
                   </select>
                 </label>
               ) : null}

@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { API_PATHS, apiRequest } from "./api";
 import { type CatalogScope, LibraryGlyph, LibraryPills, useLibraryName } from "./libraries";
-import { bodyFromValues, editableProperties, PropertyInputs, type PropertyValues, useLibrariesProperties } from "./property-inputs";
+import { bodyFromValues, editableProperties, PropertyInputs, type PropertyValues, propertiesHaveProblem, useLibrariesProperties } from "./property-inputs";
 import {
   NO_RECOMMENDER,
   recommenderBody,
@@ -14,6 +14,7 @@ import {
   type RecommenderValue,
   useRecommenderSource,
 } from "./recommender-picker";
+import { decodeEventForm, encodeEventForm, eventBodyOf, eventFormOf } from "./schedule";
 import type { CatalogItem, ChallengeItemInput, ChallengeLibraryRef, Id, LibraryProperty, Member } from "./types";
 import { Button, cx, inputClass, labelClass, StatusMessage } from "./ui";
 import { formatRuntime } from "./utils";
@@ -33,6 +34,8 @@ export interface CineRow {
   /** Films/series only, in minutes. */
   runtimeMinutes: string;
   mainGenre: string;
+  /** The item's own date and time (a match's kickoff), as the event inputs hold it — blank when it has none. */
+  scheduled: string;
   /** What was typed into a custom library's own properties, by `LibraryProperty.key`. */
   extra: PropertyValues;
   /** The same values as the request wants them, by the property's storage key — kept in step with `extra` by the editor. */
@@ -51,6 +54,7 @@ export function newCineRow(title = "", extra: Partial<CineRow> = {}): CineRow {
     pages: "",
     runtimeMinutes: "",
     mainGenre: "",
+    scheduled: "",
     extra: {},
     attributes: {},
     ...extra,
@@ -167,6 +171,7 @@ export function cineRowsToInput(rows: CineRow[]): ChallengeItemInput[] {
       const year = Number(row.year);
       const pages = Number(row.pages);
       const runtimeMinutes = Number(row.runtimeMinutes);
+      const scheduledAt = eventBodyOf(decodeEventForm(row.scheduled, ""));
       return {
         title: row.title.trim(),
         position: index,
@@ -178,6 +183,7 @@ export function cineRowsToInput(rows: CineRow[]): ChallengeItemInput[] {
         ...(Number.isInteger(pages) && pages > 0 ? { pageCount: pages } : {}),
         ...(Number.isInteger(runtimeMinutes) && runtimeMinutes > 0 ? { runtimeMinutes } : {}),
         ...(row.mainGenre.trim() ? { mainGenre: row.mainGenre.trim() } : {}),
+        ...(scheduledAt ? { scheduledAt } : {}),
         ...(Object.keys(row.attributes).length ? { attributes: row.attributes } : {}),
       };
     });
@@ -185,12 +191,13 @@ export function cineRowsToInput(rows: CineRow[]): ChallengeItemInput[] {
 
 /** The row fields that back a library's built-in properties, by the property's key. */
 const NATIVE_ROW_FIELD = {
-  author: "author", year: "year", main_genre: "mainGenre", page_count: "pages", runtime_minutes: "runtimeMinutes",
+  author: "author", year: "year", main_genre: "mainGenre", page_count: "pages", runtime_minutes: "runtimeMinutes", scheduled_at: "scheduled",
 } as const;
 
 function rowValues(row: CineRow): PropertyValues {
   return {
     author: row.author, year: row.year, main_genre: row.mainGenre, page_count: row.pages, runtime_minutes: row.runtimeMinutes,
+    scheduled_at: row.scheduled,
     ...row.extra,
   };
 }
@@ -221,6 +228,8 @@ export function CineItemsEditor({
   refreshKey = 0,
   onProblem,
   onTargetChange,
+  timeZone,
+  showSchedule = false,
 }: {
   value: CineRow[];
   onChange: (rows: CineRow[]) => void;
@@ -234,8 +243,12 @@ export function CineItemsEditor({
   fallbackProperties?: Record<string, LibraryProperty[]>;
   /** Bump to re-read the libraries' properties after they were edited elsewhere. */
   refreshKey?: number;
-  /** Reports what would block saving these rows — today only a missing book author. */
-  onProblem?: (problem: "author" | null) => void;
+  /** Reports what would block saving these rows: a missing book author, or an event date that can't be saved. */
+  onProblem?: (problem: "author" | "schedule" | null) => void;
+  /** The zone a new event date starts in — the browser's when left out. */
+  timeZone?: string;
+  /** Ask for each item's own date and time even where the library hasn't switched that property on yet (a challenge being created). */
+  showSchedule?: boolean;
   /** Reports which library new rows are going to (for a caller that shows it, e.g. the list import). */
   onTargetChange?: (library: EditorLibrary) => void;
 }) {
@@ -255,11 +268,20 @@ export function CineItemsEditor({
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const source: RecommenderSource = useRecommenderSource(scope, recommendationsEnabled);
   const loaded = useLibrariesProperties(libraries, refreshKey);
+  const scheduleOn = (properties: LibraryProperty[] | undefined): LibraryProperty[] | undefined => {
+    if (!showSchedule || !properties) return properties;
+    // Switched on for the challenge being made: the library's own (hidden) property, or a stand-in where it has none yet.
+    return properties.some((property) => property.type === "schedule")
+      ? properties.map((property) => (property.type === "schedule" ? { ...property, hidden: false } : property))
+      : [...properties, { key: "scheduled_at", storage: "native", label: null, type: "schedule", hidden: false, position: 999, canHide: true }];
+  };
   const propertiesFor = (library: Pick<EditorLibrary, "id" | "kind">): LibraryProperty[] | undefined =>
-    library.id ? loaded.get(library.kind) : fallbackProperties?.[library.kind] ?? loaded.get(library.kind);
+    scheduleOn(library.id ? loaded.get(library.kind) : fallbackProperties?.[library.kind] ?? loaded.get(library.kind));
   const libraryOf = (row: CineRow) => libraries.find((library) => library.kind === row.libraryKind);
 
-  const problem = value.some((row) => authorMissing(row, loaded.get(row.libraryKind))) ? "author" : null;
+  const problem = value.some((row) => authorMissing(row, loaded.get(row.libraryKind))) ? "author"
+    : value.some((row) => propertiesHaveProblem(propertiesFor({ id: row.libraryId, kind: row.libraryKind }) ?? [], rowValues(row))) ? "schedule"
+      : null;
   useEffect(() => { onProblem?.(problem); }, [problem, onProblem]);
   useEffect(() => { if (target) onTargetChange?.(target); }, [target, onTargetChange]);
 
@@ -383,7 +405,7 @@ export function CineItemsEditor({
                 {open ? (
                   <div className="mt-2 space-y-3">
                     {detailProperties.length ? (
-                      <PropertyInputs properties={detailProperties} values={rowValues(row)} onChange={(propertyKey, propertyValue) => setRowProperty(row, propertyKey, propertyValue)} />
+                      <PropertyInputs properties={detailProperties} values={rowValues(row)} timeZone={timeZone} onChange={(propertyKey, propertyValue) => setRowProperty(row, propertyKey, propertyValue)} />
                     ) : null}
                     {authorInline && recommendationsEnabled ? (
                       <RecommenderPicker value={row.recommender} onChange={(recommender) => update(row.key, { recommender })} members={members} source={source} />
@@ -461,7 +483,7 @@ export function CineItemsEditor({
                   key={item.id}
                   type="button"
                   disabled={usedCatalogIds.has(item.id)}
-                  onClick={() => onChange([...value, ...stamp([newCineRow(item.title, { catalogItemId: item.id, author: item.author ?? "", year: item.year ? String(item.year) : "", pages: item.pageCount ? String(item.pageCount) : "", runtimeMinutes: item.runtimeMinutes ? String(item.runtimeMinutes) : "", mainGenre: item.mainGenre ?? "" })])])}
+                  onClick={() => onChange([...value, ...stamp([newCineRow(item.title, { catalogItemId: item.id, author: item.author ?? "", year: item.year ? String(item.year) : "", pages: item.pageCount ? String(item.pageCount) : "", runtimeMinutes: item.runtimeMinutes ? String(item.runtimeMinutes) : "", mainGenre: item.mainGenre ?? "", scheduled: encodeEventForm(eventFormOf(item.scheduledAt, timeZone ?? ""), timeZone ?? "") })])])}
                   className={cx("flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-[var(--wash)] disabled:opacity-40", "")}
                 >
                   <span>{item.title}{item.year ? ` (${item.year})` : ""}{item.author ? <span className="text-[var(--muted)]"> · {item.author}</span> : null}{item.mainGenre ? <span className="text-[var(--muted)]"> · {item.mainGenre}</span> : null}{formatRuntime(item.runtimeMinutes) ? <span className="text-[var(--muted)]"> · {formatRuntime(item.runtimeMinutes)}</span> : null}</span>

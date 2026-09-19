@@ -4,7 +4,17 @@ import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 
 import { API_PATHS, apiRequest } from "./api";
+import { EventScheduleInput } from "./event-schedule-input";
 import { useGoaFormat } from "./format";
+import {
+  browserTimeZone,
+  decodeEventForm,
+  encodeEventForm,
+  type EventBody,
+  eventBodyOf,
+  eventFormOf,
+  eventFormProblem,
+} from "./schedule";
 import type { CatalogItem, Id, LibraryProperty } from "./types";
 import { Field, inputClass } from "./ui";
 
@@ -26,8 +36,10 @@ export function builtInProperties(kind: string): LibraryProperty[] {
     : kind === "book"
       ? [["title", "text"], ["author", "text"], ["year", "number"], ["main_genre", "text"], ["page_count", "number"]]
       : [["title", "text"]];
-  return keys.map(([key, type], position) => ({
-    key, type: type as LibraryProperty["type"], storage: "native" as const, label: null, hidden: false, position, canHide: key !== "title",
+  return [...keys, ["scheduled_at", "schedule"]].map(([key, type], position) => ({
+    key, type: type as LibraryProperty["type"], storage: "native" as const, label: null,
+    // The event date is opt-in: a library has to switch it on before its items ask for one.
+    hidden: key === "scheduled_at", position, canHide: key !== "title",
   }));
 }
 
@@ -113,10 +125,16 @@ export function editableProperties(properties: LibraryProperty[]): LibraryProper
   return properties.filter((property) => !property.hidden && property.key !== "title");
 }
 
-export function valuesFromItem(properties: LibraryProperty[], item: Pick<CatalogItem, "author" | "year" | "mainGenre" | "pageCount" | "runtimeMinutes" | "attributes">): PropertyValues {
+export function valuesFromItem(
+  properties: LibraryProperty[],
+  item: Pick<CatalogItem, "author" | "year" | "mainGenre" | "pageCount" | "runtimeMinutes" | "attributes"> & { scheduledAt?: CatalogItem["scheduledAt"] },
+  defaultTimeZone: string = browserTimeZone(),
+): PropertyValues {
   const values: PropertyValues = {};
   for (const property of properties) {
-    if (property.storage === "native") {
+    if (property.type === "schedule") {
+      values[property.key] = encodeEventForm(eventFormOf(item.scheduledAt, defaultTimeZone), defaultTimeZone);
+    } else if (property.storage === "native") {
       const native = NATIVE_FIELD[property.key];
       const raw = native ? item[native.field as "year"] : undefined;
       values[property.key] = raw === null || raw === undefined ? "" : String(raw);
@@ -137,12 +155,19 @@ export function bodyFromValues(
   properties: LibraryProperty[],
   values: PropertyValues,
   mode: "create" | "update",
-): { native: Record<string, string | number | null>; attributes: Record<string, string | number | boolean | null> } {
-  const native: Record<string, string | number | null> = {};
+): { native: Record<string, string | number | EventBody | null>; attributes: Record<string, string | number | boolean | null> } {
+  const native: Record<string, string | number | EventBody | null> = {};
   const attributes: Record<string, string | number | boolean | null> = {};
   for (const property of properties) {
     if (property.hidden || property.key === "title") continue;
     const raw = (values[property.key] ?? "").trim();
+    if (property.type === "schedule") {
+      // A missing key means "leave it alone", so an edit that emptied the date says `null` explicitly.
+      const body = eventBodyOf(decodeEventForm(raw, ""));
+      if (body) native.scheduledAt = body;
+      else if (mode === "update") native.scheduledAt = null;
+      continue;
+    }
     if (property.storage === "native") {
       const spec = NATIVE_FIELD[property.key];
       if (!spec) continue;
@@ -157,26 +182,49 @@ export function bodyFromValues(
   return { native, attributes };
 }
 
+/** Whether any visible schedule property holds something that can't be saved (an unknown zone, an end before its start). */
+export function propertiesHaveProblem(properties: LibraryProperty[], values: PropertyValues): boolean {
+  return properties.some((property) => property.type === "schedule" && !property.hidden
+    && eventFormProblem(decodeEventForm(values[property.key], "")) !== null);
+}
+
 export function PropertyInputs({
   properties,
   values,
   onChange,
   disabled = false,
+  timeZone,
 }: {
   properties: LibraryProperty[];
   values: PropertyValues;
   onChange: (key: string, value: string) => void;
   disabled?: boolean;
+  /** The zone a new date starts in — the challenge's own, else this browser's. */
+  timeZone?: string;
 }) {
   const tc = useTranslations("common");
   const name = useNativePropertyName();
   const visible = editableProperties(properties);
+  const [browserZone] = useState(browserTimeZone);
+  const defaultZone = timeZone ?? browserZone;
   if (!visible.length) return null;
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       {visible.map((property) => {
         const value = values[property.key] ?? "";
         const label = name(property);
+        if (property.type === "schedule") {
+          return (
+            <div key={property.key} className="sm:col-span-2">
+              <EventScheduleInput
+                label={label}
+                value={decodeEventForm(value, defaultZone)}
+                disabled={disabled}
+                onChange={(next) => onChange(property.key, encodeEventForm(next, defaultZone))}
+              />
+            </div>
+          );
+        }
         return (
           <Field key={property.key} label={label} optional>
             {property.type === "boolean" ? (

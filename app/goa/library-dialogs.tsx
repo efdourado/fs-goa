@@ -314,7 +314,11 @@ export function LibraryPropertiesDialog({
                 title={t(`type.${property.type}`)}
                 aria-hidden="true"
               >
-                {property.type === "number" ? "123" : property.type === "date" ? "31" : property.type === "boolean" ? "✓" : "Aa"}
+                {property.type === "schedule" ? (
+                  <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.4">
+                    <rect x="2.2" y="3.2" width="11.6" height="10.6" rx="2" /><path d="M2.2 6.6h11.6M5.4 1.9v2.6M10.6 1.9v2.6" strokeLinecap="round" />
+                  </svg>
+                ) : property.type === "number" ? "123" : property.type === "date" ? "31" : property.type === "boolean" ? "✓" : "Aa"}
               </span>
               <div className="min-w-0 flex-1">
                 {canEdit ? (
@@ -337,6 +341,7 @@ export function LibraryPropertiesDialog({
                   {property.storage === "native" ? ` · ${t("builtIn")}` : ""}
                   {property.hidden ? ` · ${t("hidden")}` : ""}
                 </span>
+                {property.type === "schedule" ? <span className="mt-1 block px-2 text-[11px] leading-4 text-[var(--muted)]">{t("scheduleHint")}</span> : null}
               </div>
               {canEdit ? (
                 <div className="flex flex-none items-center gap-1">

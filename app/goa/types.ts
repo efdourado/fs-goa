@@ -153,7 +153,8 @@ export interface LibraryProperty {
   key: string;
   storage: "native" | "attribute";
   label: string | null;
-  type: "text" | "number" | "date" | "boolean";
+  /** `schedule` is the built-in "Scheduled date and time" of the thing itself (a match's kickoff). */
+  type: "text" | "number" | "date" | "boolean" | "schedule";
   hidden: boolean;
   position: number;
   canHide: boolean;
@@ -179,6 +180,23 @@ export interface CatalogAttributeValue {
   value: string | number | boolean;
 }
 
+/**
+ * When the thing itself happens — set once on the catalog item and read by every
+ * challenge that uses it. A whole day (`precision: "date"`) or a clock time, in the
+ * time zone it was entered in; the end is optional.
+ */
+export interface EventSchedule {
+  startsAt: string;
+  endsAt: string | null;
+  precision: "date" | "datetime";
+  timeZone: string;
+}
+
+/** What the API takes for an item's date: a whole day, or a clock time with an optional end. */
+export type EventBody =
+  | { startsOn: string; timeZone: string }
+  | { startsAt: string; endsAt: string | null; timeZone: string };
+
 export interface CatalogItem {
   id: Id;
   /** The library's kind: `film` / `book`, or an opaque `lib_…` key. */
@@ -190,6 +208,8 @@ export interface CatalogItem {
   /** Films/series only. */
   runtimeMinutes?: number | null;
   mainGenre?: string | null;
+  /** Present only while the library's "Scheduled date and time" property is switched on. */
+  scheduledAt?: EventSchedule | null;
   roundCount?: number;
   ratingAvg?: number | null;
   ratingCount?: number;
@@ -227,7 +247,7 @@ export interface ChallengeItem {
   schedulePrecision?: "date" | "datetime";
   date?: string | null;
   status?: "scheduled" | "open" | "past_due" | "closed";
-  catalogItem?: Pick<CatalogItem, "id" | "kind" | "title" | "author" | "year" | "pageCount" | "runtimeMinutes" | "mainGenre" | "attributes"> | null;
+  catalogItem?: Pick<CatalogItem, "id" | "kind" | "title" | "author" | "year" | "pageCount" | "runtimeMinutes" | "mainGenre" | "scheduledAt" | "attributes"> | null;
   recommendedBy?: RecommenderRef | null;
   /** Free-text provenance for an item nobody in the group recommended. */
   originNote?: string | null;
@@ -601,6 +621,23 @@ export type Screen =
   | { kind: "template"; challengeId: Id }
   | { kind: "about" };
 
+/** A library property a copy had to leave out — the destination defines the same key differently (or removed it). */
+export interface SkippedProperty {
+  library: { kind: string; label: string | null; source: "screens" | "pages" | "tables" | "custom" };
+  key: string;
+  label: string;
+  type: string;
+  reason: "type_mismatch" | "archived";
+  /** `type_mismatch` only: the type the destination's property of that key has. */
+  existingType: string | null;
+}
+
+/** What duplicating a challenge (or a template) hands back. */
+export interface CopyResult {
+  challengeId: Id | null;
+  skippedProperties: SkippedProperty[];
+}
+
 export interface ChallengeCreationInput {
   recipe: CreatableRecipeKey;
   /**
@@ -619,6 +656,13 @@ export interface ChallengeCreationInput {
   generateDaily: boolean;
   /** Cinema/Estante: also open the optional pre-watch "Expectativa" rating. */
   expectation?: boolean;
+  /** Custom only: ask "when did it happen" on each response. Left out, the recipe's default applies. */
+  collectsEntryDate?: boolean;
+  /** Custom only: who fills the main response in — each participant, or once for the whole group. */
+  answerScope?: "individual" | "shared";
+  sharedEditPolicy?: SharedEditPolicy;
+  /** Each item of the chosen libraries has its own scheduled date and time (a match's kickoff). */
+  itemDates?: boolean;
   participantIds: Id[];
 }
 
@@ -643,6 +687,8 @@ export interface ChallengeItemInput {
   pageCount?: number;
   runtimeMinutes?: number;
   mainGenre?: string;
+  /** The item's own scheduled date (and time) — a match's kickoff. */
+  scheduledAt?: EventBody;
 }
 
 export type CheckpointKind = "day" | "week" | "session" | "milestone";

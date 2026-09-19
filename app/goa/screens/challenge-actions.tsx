@@ -3,10 +3,11 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { ActionMenu, ActionMenuItem } from "../action-menu";
+import { SkippedPropertiesNotice } from "../copy-notice";
 import { ConfirmDialog, Dialog } from "../dialog";
 import { useGoaFormat } from "../format";
 import { PreflightPanel } from "../preflight-panel";
-import type { ChallengeDetail, Id } from "../types";
+import type { ChallengeDetail, CopyResult, Id } from "../types";
 import { Button, ChallengeStatusBadge, inputClass, labelClass, SelectableCards, StatusMessage } from "../ui";
 import { isChallengeScheduled, isLivingList } from "../utils";
 import { PublicationDialog } from "./publication";
@@ -113,9 +114,10 @@ function TemplatePublishSection({ challenge, onPublish, onUnpublish }: {
 
 export type CopyMode = "structure" | "structure_and_items";
 
-function CopyChallengeDialog({ challenge, duplicateTargets, onDuplicate, onClose }: {
+function CopyChallengeDialog({ challenge, duplicateTargets, onDuplicate, onOpenCopy, onClose }: {
   challenge: ChallengeDetail; duplicateTargets: Target[];
-  onDuplicate: (payload: { title: string; targetGroupId: Id; mode: CopyMode }) => Promise<void>;
+  onDuplicate: (payload: { title: string; targetGroupId: Id; mode: CopyMode }) => Promise<CopyResult>;
+  onOpenCopy: (challengeId: Id) => void;
   onClose: () => void;
 }) {
   const t = useTranslations("adminChallenge");
@@ -128,10 +130,23 @@ function CopyChallengeDialog({ challenge, duplicateTargets, onDuplicate, onClose
   const [duplicateTargetGroupId, setDuplicateTargetGroupId] = useState<Id>(availableTargets[0]?.id ?? "");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Set when the copy worked but had to leave properties out — shown before going to the copy.
+  const [copied, setCopied] = useState<CopyResult | null>(null);
   async function copy() {
     setBusy("duplicate"); setError(null);
-    try { await onDuplicate({ title: duplicateTitle.trim(), targetGroupId: duplicateTargetGroupId, mode }); onClose(); }
+    try {
+      const result = await onDuplicate({ title: duplicateTitle.trim(), targetGroupId: duplicateTargetGroupId, mode });
+      if (result.skippedProperties.length) { setCopied(result); return; }
+      if (result.challengeId) onOpenCopy(result.challengeId);
+      onClose();
+    }
     catch (cause) { setError(f.error(cause)); } finally { setBusy(null); }
+  }
+  if (copied) {
+    return <Dialog title={t("reuseDoneTitle")} onClose={() => { if (copied.challengeId) onOpenCopy(copied.challengeId); onClose(); }}>
+      <p className="text-sm leading-6 text-[var(--muted)]">{t("reuseDoneBody")}</p>
+      <SkippedPropertiesNotice skipped={copied.skippedProperties} onOpen={() => { if (copied.challengeId) onOpenCopy(copied.challengeId); onClose(); }} />
+    </Dialog>;
   }
   return <Dialog title={t("reuseTitle")} onClose={onClose} busy={Boolean(busy)}>
     <p className="text-sm leading-6 text-[var(--muted)]">{t("reuseBody")}</p>
@@ -194,9 +209,10 @@ function CopyChallengeDialog({ challenge, duplicateTargets, onDuplicate, onClose
   </Dialog>;
 }
 
-export function ChallengeActions({ challenge, duplicateTargets, onDuplicate, onDelete, onTransition, isPlatformAdmin, onPublishTemplate, onUnpublishTemplate, onPublish, onUnpublish }: {
+export function ChallengeActions({ challenge, duplicateTargets, onDuplicate, onOpenCopy, onDelete, onTransition, isPlatformAdmin, onPublishTemplate, onUnpublishTemplate, onPublish, onUnpublish }: {
   challenge: ChallengeDetail; duplicateTargets: Target[];
-  onDuplicate: (payload: { title: string; targetGroupId: Id; mode: CopyMode }) => Promise<void>;
+  onDuplicate: (payload: { title: string; targetGroupId: Id; mode: CopyMode }) => Promise<CopyResult>;
+  onOpenCopy: (challengeId: Id) => void;
   onDelete?: () => Promise<void>;
   onTransition: (status: "active" | "closed") => Promise<void>;
   isPlatformAdmin: boolean;
@@ -222,7 +238,7 @@ export function ChallengeActions({ challenge, duplicateTargets, onDuplicate, onD
       {onDelete ? <div className="mt-1 border-t border-[var(--line)] pt-1"><ActionMenuItem danger onClick={() => setPanel("delete")}>{t("delete")}</ActionMenuItem></div> : null}
     </ActionMenu>
     {panel === "state" ? <ChallengeStateDialog challenge={challenge} onTransition={onTransition} onClose={() => setPanel(null)} /> : null}
-    {panel === "copy" ? <CopyChallengeDialog challenge={challenge} duplicateTargets={duplicateTargets} onDuplicate={onDuplicate} onClose={() => setPanel(null)} /> : null}
+    {panel === "copy" ? <CopyChallengeDialog challenge={challenge} duplicateTargets={duplicateTargets} onDuplicate={onDuplicate} onOpenCopy={onOpenCopy} onClose={() => setPanel(null)} /> : null}
     {panel === "publication" ? <PublicationDialog challenge={challenge} onPublish={onPublish} onUnpublish={onUnpublish} onClose={() => setPanel(null)} /> : null}
     {panel === "template" && isPlatformAdmin ? <Dialog title={t("platformTemplateTitle")} onClose={() => setPanel(null)}><TemplatePublishSection challenge={challenge} onPublish={onPublishTemplate} onUnpublish={onUnpublishTemplate} /><div className="mt-5 flex justify-end"><Button variant="secondary" onClick={() => setPanel(null)}>{tc("close")}</Button></div></Dialog> : null}
     {panel === "delete" && onDelete ? (

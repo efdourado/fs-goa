@@ -4,12 +4,15 @@ import { useTranslations } from "next-intl";
 import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 
 import { API_PATHS, apiRequest } from "../api";
+import { SkippedPropertiesNotice } from "../copy-notice";
 import { useGoaFormat } from "../format";
 import { SettingsMenu } from "../SettingsMenu";
 import type {
   ChallengeDetail,
+  CopyResult,
   GroupSummary,
   Id,
+  SkippedProperty,
   TemplateSummary,
   User,
 } from "../types";
@@ -135,6 +138,8 @@ export function TemplateDetailScreen({
   const [showCopy, setShowCopy] = useState(Boolean(autoCopy && user));
   const [busy, setBusy] = useState(false);
   const [copyError, setCopyError] = useState<string | null>(null);
+  // Set when the copy worked but had to leave properties out — shown before opening the copy.
+  const [copied, setCopied] = useState<CopyResult | null>(null);
   const [unpublishing, setUnpublishing] = useState(false);
   const [unpublishError, setUnpublishError] = useState<string | null>(null);
 
@@ -170,12 +175,13 @@ export function TemplateDetailScreen({
         targetGroupId = created.id;
       }
       if (!targetGroupId) throw new Error(t("errPickGroup"));
-      const result = await apiRequest<{ challengeId: Id }>(API_PATHS.templateDuplicate(challengeId), {
+      const result = await apiRequest<{ challengeId: Id; skippedProperties?: SkippedProperty[] }>(API_PATHS.templateDuplicate(challengeId), {
         method: "POST",
         body: { targetGroupId, mode: data.get("mode") === "structure" ? "structure" : "structure_and_items" },
         csrfToken,
       });
-      onDuplicated(result);
+      if (result.skippedProperties?.length) setCopied({ challengeId: result.challengeId, skippedProperties: result.skippedProperties });
+      else onDuplicated(result);
     } catch (cause) {
       setCopyError(f.error(cause));
     } finally {
@@ -237,7 +243,8 @@ export function TemplateDetailScreen({
         <div className="mx-auto max-w-7xl px-4 pb-24 sm:px-6">
           <section className={cx(cardClass, "p-5")} aria-label={t("duplicateAria")}>
             <p className="text-sm text-[var(--muted)]">{t("duplicateBody")}</p>
-            <form className="mt-4 grid gap-3" onSubmit={duplicate}>
+            {copied ? <SkippedPropertiesNotice skipped={copied.skippedProperties} onOpen={() => { if (copied.challengeId) onDuplicated({ challengeId: copied.challengeId }); }} /> : null}
+            <form className="mt-4 grid gap-3" onSubmit={duplicate} hidden={Boolean(copied)}>
               <label><span className={labelClass}>{t("targetGroupLabel")}</span>
                 <select className={inputClass} name="target" defaultValue={manageable[0]?.id ?? "__new__"}>
                   {manageable.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}

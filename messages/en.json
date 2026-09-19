@@ -174,7 +174,7 @@
       "recommendations_disabled": "This group turned recommendations off. Turn them on in the group settings to record who recommended something.",
       "invalid_recommender": "Choose one source: a member, a saved name, or a note — not more than one.",
       "invalid_library": "That library wasn't found.",
-      "invalid_schedule": "Check the item's dates — due can't be before it opens, and days and times can't be mixed.",
+      "invalid_schedule": "Check the dates — an end can't be before its start, and days and times can't be mixed.",
       "not_shared": "Only a shared response has a rule for who can fill it in.",
       "attribute_has_data": "That property already has values on items, so it can't be removed — hide it instead.",
       "title_required": "An item always needs a name, so its title can't be hidden.",
@@ -182,7 +182,13 @@
       "shared_unsupported": "A shared response needs a challenge with items.",
       "library_required": "This challenge draws from more than one library — choose which one each item comes from.",
       "library_not_linked": "That library isn't part of this challenge. Add it to the challenge first.",
-      "library_in_use": "Some items in this challenge come from that library. Remove them before taking the library out."
+      "library_in_use": "Some items in this challenge come from that library. Remove them before taking the library out.",
+      "item_not_open": "Answers for this item haven't opened yet.",
+      "invalid_timezone": "That time zone isn't recognised — pick one from the list, like America/Sao_Paulo.",
+      "invalid_answer_scope": "Choose who fills in the response: each participant or once for the group.",
+      "invalid_setting": "Choose whether the form asks when each response happened.",
+      "invalid_shared_edit_policy": "Choose who can fill in or correct the shared response.",
+      "shared_custom_only": "Only a custom challenge can have its main response shared."
     },
     "byStatus": {
       "401": "Your session expired. Sign in again.",
@@ -475,7 +481,8 @@
     "recommenderFilterLabel": "Filter by recommender",
     "recommenderAll": "Everyone",
     "recommenderNone": "No recommender",
-    "noMatches": "Nothing matches that filter"
+    "noMatches": "Nothing matches that filter",
+    "sortDate": "By date"
   },
   "cineItems": {
     "titleLabel": "Film title",
@@ -620,7 +627,18 @@
     "libraryHint": "Which list of things this challenge draws from.",
     "pickLibraryFirst": "Choose a library to start adding items",
     "moreLibrariesLabel": "Also draw items from",
-    "moreLibrariesHint": "Optional. Combine libraries in one challenge — Movies and TV Shows, say. Each item still belongs to exactly one."
+    "moreLibrariesHint": "Optional. Combine libraries in one challenge — Movies and TV Shows, say. Each item still belongs to exactly one.",
+    "scopeLabel": "Who fills in this response?",
+    "scopeHint": "This is the main thing people record on each item.",
+    "scopeIndividual": "Each participant",
+    "scopeIndividualHint": "Everyone answers for themselves — a rating, a guess, a note.",
+    "scopeShared": "Once for the group",
+    "scopeSharedHint": "One answer per item that everyone sees — a final score, an agreed verdict.",
+    "entryDateLabel": "Ask when each response happened",
+    "entryDateHint": "Adds an optional “When did it happen?” date to the form. Leave it off when the date belongs to the item itself, like a match's kick-off.",
+    "itemDatesLabel": "Each item has its own date and time",
+    "itemDatesHint": "Like a match's kick-off or a screening. It's kept on the item, so every challenge that uses it shows the same date.",
+    "errItemSchedule": "Check the items' dates and times — a time zone or an end time doesn't look right."
   },
   "adminChallenge": {
     "back": "Back",
@@ -859,7 +877,7 @@
     "moreActions": "More actions",
     "alreadyPublicHint": "This showcase is already public — any change you save here appears on the link and the template immediately.",
     "itemOriginLine": "via {text}",
-    "itemWindowOrder": "Due can't be before it opens.",
+    "itemWindowOrder": "“Answer by” can't be before answers open.",
     "errPickLibrary": "Choose the library the items come from.",
     "libraryLabel": "Library",
     "libraryHint": "Which list of things this challenge draws from.",
@@ -867,7 +885,17 @@
     "unlinkLibrary": "Remove {name} from this challenge",
     "linkLibrary": "Add a library",
     "librariesHint": "Where this challenge's items come from. You can add more libraries at any time.",
-    "librariesCombined": "Items can come from any of these. A library can be removed once none of its items are in the challenge."
+    "librariesCombined": "Items can come from any of these. A library can be removed once none of its items are in the challenge.",
+    "entryDateTitle": "Ask when each response happened",
+    "entryDateHint": "Adds an optional “When did it happen?” date to the response form. Off, the form only asks for what you set up — every response is still timestamped when it's saved.",
+    "entryDateOn": "The form now asks when each response happened.",
+    "entryDateOff": "The form no longer asks for a date.",
+    "answerWindowTitle": "Answer window",
+    "answerWindowNone": "No limits",
+    "eventScheduleInvalid": "Check the scheduled date and time — the time zone or the end time doesn't look right.",
+    "libraryProperties": "Properties of {name}",
+    "reuseDoneTitle": "Copy created",
+    "reuseDoneBody": "The copy is ready, but some properties couldn't come across."
   },
   "visibility": {
     "title": "Who sees these answers",
@@ -1055,7 +1083,8 @@
       "comoFoi": "How did it go?",
       "comida": "Food",
       "ambienteAtendimento": "Atmosphere & service",
-      "custoBeneficio": "Value for money"
+      "custoBeneficio": "Value for money",
+      "resultado": "Result"
     },
     "labelLabel": "Label",
     "labelRequired": "Give the field a label.",
@@ -1512,7 +1541,8 @@
       "text": "Text",
       "number": "Number",
       "date": "Date",
-      "boolean": "Yes or no"
+      "boolean": "Yes or no",
+      "schedule": "Date and time"
     },
     "builtIn": "built in",
     "hidden": "hidden",
@@ -1527,7 +1557,7 @@
     "propertyAdded": "Property added.",
     "propertyNameRequired": "Give the property a name.",
     "addPropertyTitle": "Add a property",
-    "addPropertyHint": "For example Cuisine, Score or Kick-off date.",
+    "addPropertyHint": "For example Cuisine, Score or Stage.",
     "propertyNamePlaceholder": "Property name",
     "propertyNameLabel": "Property name",
     "propertyTypeLabel": "Type",
@@ -1538,13 +1568,15 @@
       "author": "Author",
       "main_genre": "Main genre",
       "runtime_minutes": "Runtime (minutes)",
-      "page_count": "Pages"
+      "page_count": "Pages",
+      "scheduled_at": "Scheduled date and time"
     },
     "tablesStarter": {
       "cozinha": "Cuisine",
       "bairro": "Neighbourhood",
       "endereco": "Address"
-    }
+    },
+    "scheduleHint": "When the item itself happens — a match's kick-off. Switch it on and every challenge using these items reads the same date. It's separate from when answers may be given."
   },
   "recommenders": {
     "label": "Recommended by",
@@ -1632,34 +1664,62 @@
     "notFilled": "Nobody has filled this in yet."
   },
   "itemSchedule": {
-    "label": "Schedule",
-    "hint": "Optional. Shows up in the agenda and as a reminder.",
-    "none": "None",
-    "noneHint": "No dates",
+    "label": "Answer window",
+    "hint": "Optional. Limits when people can answer this item — it isn't the date of the thing itself.",
+    "none": "No limits",
+    "noneHint": "Answer any time",
     "date": "Days",
     "dateHint": "Just dates",
     "datetime": "Date & time",
     "datetimeHint": "Exact moments",
-    "opens": "Opens",
-    "due": "Due",
-    "errOrder": "Due can't be before it opens.",
-    "neverBlocks": "A due date never stops anyone from answering — it's a reminder.",
+    "opens": "Answers open from",
+    "due": "Answer by",
+    "errOrder": "“Answer by” can't be before answers open.",
+    "neverBlocks": "“Answers open from” keeps the form closed until then. “Answer by” never stops anyone from answering — it's a reminder.",
     "zoneNote": "Times are in {zone}."
   },
   "agenda": {
     "title": "Agenda",
     "tally": "{count, plural, one {# item with a date} other {# items with dates}}",
     "bucket": {
-      "open": "Open now",
-      "scheduled": "Coming up",
-      "past_due": "Past due"
+      "open": "Answers open",
+      "scheduled": "Answers open later",
+      "past_due": "Past the answer-by date",
+      "now": "Happening now",
+      "upcoming": "Coming up",
+      "happened": "Already happened"
     },
     "done": "Done",
-    "pastDue": "Past due"
+    "pastDue": "Late"
   },
   "itemWindow": {
-    "both": "Opens {opens} · due {due}",
-    "opens": "Opens {opens}",
-    "due": "Due {due}"
+    "both": "Answers open {opens} · answer by {due}",
+    "opens": "Answers open {opens}",
+    "due": "Answer by {due}"
+  },
+  "eventSchedule": {
+    "hint": "When this item itself happens, like a match's kick-off. Leave the time empty if only the day is known. It never opens or closes anything for answering.",
+    "date": "Date",
+    "time": "Time",
+    "endTime": "End time",
+    "zone": "Time zone",
+    "zoneHint": "The time zone the time is in — 19:00 in Rio isn't 19:00 in Lisbon.",
+    "errZone": "That time zone isn't recognised — use a name like America/Sao_Paulo.",
+    "errEndOrder": "The end time must be after the start time.",
+    "errEndWithoutTime": "Add a start time before an end time.",
+    "clear": "Remove the date",
+    "invalid": "Check the scheduled date and time — the time zone or the end time doesn't look right."
+  },
+  "eventWhen": {
+    "timed": "{day} · {time} ({zone})",
+    "timedRange": "{day} · {start}–{end} ({zone})",
+    "range": "{start} – {end}"
+  },
+  "copyNotice": {
+    "title": "{count, plural, one {One property was left out} other {# properties were left out}}",
+    "body": "Your copy is ready. These properties already exist in the destination as something else, so the copy kept the destination's version and didn't bring their values across.",
+    "typeMismatch": "“{property}” in {library} is {type} here, but {existing} in the destination.",
+    "archived": "“{property}” in {library} was removed in the destination.",
+    "open": "Open the copy"
   }
 }

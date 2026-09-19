@@ -2,7 +2,7 @@ import { useFormatter, useTranslations } from "next-intl";
 import { useMemo } from "react";
 
 import { ApiError } from "./api";
-import type { ChallengeItem, ChallengeStatus, SubmissionMode } from "./types";
+import type { ChallengeItem, ChallengeStatus, EventSchedule, SubmissionMode } from "./types";
 import { instantToDateKey } from "./schedule";
 import { isChallengeScheduled } from "./utils";
 
@@ -63,6 +63,24 @@ export function makeGoaFormat(t: Translator, format: Formatter) {
   /** Just the due end, in the same style — "19 Mar" or "19 Mar, 20:00". */
   function itemDeadline(item: ItemWindow, timeZone: string): string | null {
     return item.dueAt ? windowEnd(item.dueAt, item.schedulePrecision, timeZone) : null;
+  }
+
+  /** "Mon, 15 Jun · 19:00–21:00 (GMT-3)" — when the thing itself happens, in the zone it was entered in. */
+  function eventWhen(schedule: EventSchedule): string {
+    const zone = schedule.timeZone;
+    const dayOnly = (iso: string) => date(instantToDateKey(iso, zone), { weekday: "short", day: "2-digit", month: "short" });
+    if (schedule.precision === "date") {
+      const start = dayOnly(schedule.startsAt);
+      const end = schedule.endsAt ? dayOnly(schedule.endsAt) : null;
+      return end && end !== start ? t("eventWhen.range", { start, end }) : start;
+    }
+    const clock = (iso: string) => format.dateTime(new Date(iso), { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: zone } as never);
+    const day = format.dateTime(new Date(schedule.startsAt), { weekday: "short", day: "2-digit", month: "short", timeZone: zone } as never);
+    const zoneName = new Intl.DateTimeFormat("en", { timeZone: zone, timeZoneName: "short" })
+      .formatToParts(new Date(schedule.startsAt)).find((part) => part.type === "timeZoneName")?.value ?? zone;
+    const sameDay = schedule.endsAt ? instantToDateKey(schedule.endsAt, zone) === instantToDateKey(schedule.startsAt, zone) : true;
+    if (schedule.endsAt && sameDay) return t("eventWhen.timedRange", { day, start: clock(schedule.startsAt), end: clock(schedule.endsAt), zone: zoneName });
+    return t("eventWhen.timed", { day, time: clock(schedule.startsAt), zone: zoneName });
   }
 
   function dateRange(startsOn?: string | null, endsOn?: string | null): string {
@@ -128,7 +146,7 @@ export function makeGoaFormat(t: Translator, format: Formatter) {
     return t("errors.generic");
   }
 
-  return { date, dateTime, dateRange, itemWindow, itemDeadline, itemStatusLabel, challengeStatusLabel, entryUnavailableMessage, error };
+  return { date, dateTime, dateRange, eventWhen, itemWindow, itemDeadline, itemStatusLabel, challengeStatusLabel, entryUnavailableMessage, error };
 }
 
 export type GoaFormat = ReturnType<typeof makeGoaFormat>;

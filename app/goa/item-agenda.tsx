@@ -1,22 +1,33 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import { useGoaFormat } from "./format";
-import { instantToDateKey } from "./schedule";
+import { eventPhase, instantToDateKey } from "./schedule";
 import type { ChallengeItem, Id } from "./types";
 import { cardClass, cx, sectionLabelClass } from "./ui";
 
-type Bucket = "open" | "scheduled" | "past_due";
+/**
+ * Items with their own date (a match's kickoff) sort by *when they happen*; items
+ * with only an answer window sort by that window. The two never mix on one item —
+ * the event's own date wins, the window is just a second line under it.
+ */
+type Bucket = "now" | "upcoming" | "open" | "scheduled" | "happened" | "past_due";
+
+const ORDER: Bucket[] = ["now", "upcoming", "open", "scheduled", "happened", "past_due"];
 
 /** The end of an item's window that says "when" for its bucket: what it's due by, or when it opens. */
 function keyInstant(item: ChallengeItem, bucket: Bucket): string | null {
+  const event = item.catalogItem?.scheduledAt;
+  if (event && (bucket === "now" || bucket === "upcoming" || bucket === "happened")) return event.startsAt;
   if (bucket === "scheduled") return item.opensAt ?? item.dueAt ?? null;
   return item.dueAt ?? item.opensAt ?? null;
 }
 
-function bucketOf(item: ChallengeItem): Bucket | null {
+function bucketOf(item: ChallengeItem, nowMs: number): Bucket | null {
+  const event = item.catalogItem?.scheduledAt;
+  if (event) return eventPhase(event, nowMs);
   if (!item.opensAt && !item.dueAt) return null;
   if (item.status === "scheduled") return "scheduled";
   if (item.status === "past_due") return "past_due";
@@ -24,8 +35,8 @@ function bucketOf(item: ChallengeItem): Bucket | null {
 }
 
 /**
- * Everything with a schedule, ordered by when it matters: what's open now (soonest
- * due first), what's coming, what has slipped past its date. A date here is a
+ * Everything with a date, ordered by when it matters: what's under way or coming up, what's
+ * open for answers (soonest due first), what has already happened. A date here is a
  * reminder, never a lock — a past-due item can still be answered.
  */
 export function ItemAgenda({
@@ -43,26 +54,33 @@ export function ItemAgenda({
 }) {
   const t = useTranslations("agenda");
   const f = useGoaFormat();
+  // A snapshot taken when the agenda mounts — "happened" vs "coming up" needn't tick by the second.
+  const [nowMs] = useState(() => Date.now());
   const groups = useMemo(() => {
-    const result: Record<Bucket, ChallengeItem[]> = { open: [], scheduled: [], past_due: [] };
+    const result: Record<Bucket, ChallengeItem[]> = { now: [], upcoming: [], open: [], scheduled: [], happened: [], past_due: [] };
     for (const item of items) {
-      const bucket = bucketOf(item);
+      const bucket = bucketOf(item, nowMs);
       if (bucket) result[bucket].push(item);
     }
     const time = (item: ChallengeItem, bucket: Bucket) => new Date(keyInstant(item, bucket) ?? 0).getTime();
+    result.now.sort((a, b) => time(a, "now") - time(b, "now"));
+    result.upcoming.sort((a, b) => time(a, "upcoming") - time(b, "upcoming"));
     result.open.sort((a, b) => (a.dueAt ? time(a, "open") : Infinity) - (b.dueAt ? time(b, "open") : Infinity));
     result.scheduled.sort((a, b) => time(a, "scheduled") - time(b, "scheduled"));
+    result.happened.sort((a, b) => time(b, "happened") - time(a, "happened"));
     result.past_due.sort((a, b) => time(b, "past_due") - time(a, "past_due"));
     return result;
-  }, [items]);
+  }, [items, nowMs]);
 
-  const total = groups.open.length + groups.scheduled.length + groups.past_due.length;
+  const total = ORDER.reduce((sum, bucket) => sum + groups[bucket].length, 0);
   if (!total) return null;
 
-  const order: Bucket[] = ["open", "scheduled", "past_due"];
   const tone: Record<Bucket, string> = {
+    now: "bg-[var(--main-soft)] text-[var(--main-strong)]",
+    upcoming: "bg-[var(--wash)] text-[var(--ink)]",
     open: "bg-[var(--main-soft)] text-[var(--main-strong)]",
     scheduled: "bg-[var(--wash)] text-[var(--muted)]",
+    happened: "bg-[var(--wash)] text-[var(--muted)]",
     past_due: "bg-[var(--warn-soft)] text-[var(--warn)]",
   };
 
@@ -78,16 +96,18 @@ export function ItemAgenda({
         <span className="text-xs text-[var(--muted)]">{t("tally", { count: total })}</span>
       </summary>
       <div className={cx(cardClass, "divide-y divide-[var(--line)] overflow-hidden")}>
-        {order.filter((bucket) => groups[bucket].length).map((bucket) => (
+        {ORDER.filter((bucket) => groups[bucket].length).map((bucket) => (
           <div key={bucket} className="p-2">
             <h3 className="px-3 pb-1 pt-2 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--muted)]">{t(`bucket.${bucket}`)}</h3>
             <ul>
               {groups[bucket].map((item) => {
+                const event = item.catalogItem?.scheduledAt ?? null;
                 const instant = keyInstant(item, bucket);
-                const dayKey = instant ? instantToDateKey(instant, timeZone) : null;
+                const dayKey = instant ? instantToDateKey(instant, event?.timeZone ?? timeZone) : null;
                 const day = dayKey ? new Date(`${dayKey}T12:00:00Z`) : null;
                 const active = item.id === selectedId;
                 const done = doneIds.has(item.id);
+                const detail = [event ? f.eventWhen(event) : null, f.itemWindow(item, timeZone)].filter(Boolean).join(" · ");
                 return (
                   <li key={item.id}>
                     <button
@@ -109,7 +129,7 @@ export function ItemAgenda({
                         <span className={cx("block truncate text-sm", active ? "font-medium text-[var(--main-strong)]" : "font-light")}>
                           {item.title}{item.catalogItem?.year ? ` (${item.catalogItem.year})` : ""}
                         </span>
-                        <span className="block truncate text-[11px] text-[var(--muted)]">{f.itemWindow(item, timeZone)}</span>
+                        <span className="block truncate text-[11px] text-[var(--muted)]">{detail}</span>
                       </span>
                       {done ? (
                         <span className="flex-none rounded-full bg-[var(--ok-soft)] px-2 py-0.5 text-[10px] font-medium text-[var(--ok)]">{t("done")}</span>

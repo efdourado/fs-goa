@@ -1,3 +1,7 @@
+import type { EventBody, EventSchedule } from "./types";
+
+export type { EventBody };
+
 /**
  * Item schedules are stored as instants but *entered and read* in the
  * challenge's own time zone — a due date of "Friday" means Friday there, not in
@@ -51,4 +55,118 @@ export type ScheduleMode = "none" | "date" | "datetime";
 export function scheduleModeOf(item: { opensAt?: string | null; dueAt?: string | null; schedulePrecision?: "date" | "datetime" }): ScheduleMode {
   if (!item.opensAt && !item.dueAt) return "none";
   return item.schedulePrecision === "datetime" ? "datetime" : "date";
+}
+
+// --- An item's own date and time (a match's kickoff): Date · Time · Time zone · optional end time ---------
+
+/** What the event inputs hold. A blank `time` means "the day is known, the hour isn't". */
+export interface EventForm {
+  date: string;
+  time: string;
+  endTime: string;
+  timeZone: string;
+}
+
+export function browserTimeZone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
+}
+
+export function isKnownTimeZone(zone: string): boolean {
+  if (!zone.trim()) return false;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: zone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Every zone this browser knows, for the zone field's suggestions (empty where `Intl.supportedValuesOf` is missing). */
+export function knownTimeZones(): string[] {
+  const intl = Intl as unknown as { supportedValuesOf?: (key: string) => string[] };
+  try {
+    return intl.supportedValuesOf?.("timeZone") ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export function emptyEventForm(timeZone: string): EventForm {
+  return { date: "", time: "", endTime: "", timeZone };
+}
+
+export function eventFormOf(schedule: EventSchedule | null | undefined, fallbackTimeZone: string): EventForm {
+  if (!schedule) return emptyEventForm(fallbackTimeZone);
+  const zone = schedule.timeZone || fallbackTimeZone;
+  const date = instantToDateKey(schedule.startsAt, zone);
+  if (schedule.precision === "date") return { date, time: "", endTime: "", timeZone: zone };
+  return {
+    date,
+    time: instantToWallClock(schedule.startsAt, zone).slice(11),
+    endTime: schedule.endsAt ? instantToWallClock(schedule.endsAt, zone).slice(11) : "",
+    timeZone: zone,
+  };
+}
+
+/** `null` when the form reads fine; otherwise which problem to show. */
+export function eventFormProblem(form: EventForm): "zone" | "endOrder" | "endWithoutTime" | null {
+  if (!form.date) return null;
+  if (!isKnownTimeZone(form.timeZone)) return "zone";
+  if (form.endTime && !form.time) return "endWithoutTime";
+  if (form.endTime && form.endTime <= form.time) return "endOrder";
+  return null;
+}
+
+export function eventBodyOf(form: EventForm): EventBody | null {
+  if (!form.date) return null;
+  if (!form.time) return { startsOn: form.date, timeZone: form.timeZone };
+  const startsAt = wallClockToInstant(`${form.date}T${form.time}`, form.timeZone);
+  if (!startsAt) return null;
+  const endsAt = form.endTime ? wallClockToInstant(`${form.date}T${form.endTime}`, form.timeZone) : null;
+  return { startsAt, endsAt, timeZone: form.timeZone };
+}
+
+/**
+ * The form as one string, so it can sit among the other property values (which are all text).
+ * Blank only while nothing was entered and the zone is still the default — a zone picked before
+ * the date must survive the round trip, or the field would snap back as the person types.
+ */
+export function encodeEventForm(form: EventForm, defaultTimeZone: string): string {
+  const untouched = !form.date && !form.time && !form.endTime && form.timeZone === defaultTimeZone;
+  return untouched ? "" : JSON.stringify(form);
+}
+
+export function decodeEventForm(text: string | undefined, fallbackTimeZone: string): EventForm {
+  if (!text) return emptyEventForm(fallbackTimeZone);
+  try {
+    const parsed = JSON.parse(text) as Partial<EventForm>;
+    return {
+      date: typeof parsed.date === "string" ? parsed.date : "",
+      time: typeof parsed.time === "string" ? parsed.time : "",
+      endTime: typeof parsed.endTime === "string" ? parsed.endTime : "",
+      timeZone: typeof parsed.timeZone === "string" && parsed.timeZone ? parsed.timeZone : fallbackTimeZone,
+    };
+  } catch {
+    return emptyEventForm(fallbackTimeZone);
+  }
+}
+
+/** Where an event sits relative to `nowMs`: still ahead, under way (has an end and we're inside it, or it's today), or over. */
+export function eventPhase(schedule: EventSchedule, nowMs: number): "upcoming" | "now" | "happened" {
+  const zone = schedule.timeZone;
+  if (schedule.precision === "date") {
+    const today = instantToDateKey(new Date(nowMs).toISOString(), zone);
+    const first = instantToDateKey(schedule.startsAt, zone);
+    const last = schedule.endsAt ? instantToDateKey(schedule.endsAt, zone) : first;
+    if (today < first) return "upcoming";
+    return today > last ? "happened" : "now";
+  }
+  const start = new Date(schedule.startsAt).getTime();
+  if (nowMs < start) return "upcoming";
+  if (schedule.endsAt && nowMs <= new Date(schedule.endsAt).getTime()) return "now";
+  return "happened";
 }

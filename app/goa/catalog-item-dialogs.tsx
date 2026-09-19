@@ -11,6 +11,7 @@ import { type CatalogScope, LibraryPills, libraryChoices } from "./libraries";
 import {
   bodyFromValues,
   PropertyInputs,
+  propertiesHaveProblem,
   type PropertyValues,
   useLibraryProperties,
   valuesFromItem,
@@ -63,6 +64,7 @@ export function AddCatalogItemDialog({
   onAdded: (result: { id: Id; reused: boolean }) => void;
 }) {
   const t = useTranslations("catalogAdd");
+  const tEvent = useTranslations("eventSchedule");
   const f = useGoaFormat();
   const csrf = useCsrf();
   const choices = useMemo(() => libraryChoices(libraries), [libraries]);
@@ -100,6 +102,7 @@ export function AddCatalogItemDialog({
     const name = title.trim();
     if (!name && !useExistingId) { setError(t("titleRequired")); return; }
     if (!choice) return;
+    if (!useExistingId && properties && propertiesHaveProblem(properties, values)) { setError(tEvent("invalid")); return; }
     setBusy(true);
     setError(null);
     try {
@@ -202,6 +205,7 @@ export function EditCatalogItemDialog({
   onSaved: () => void;
 }) {
   const t = useTranslations("catalogAdd");
+  const tEvent = useTranslations("eventSchedule");
   const f = useGoaFormat();
   const csrf = useCsrf();
   const choice = libraryChoices(libraries).find((entry) => entry.kind === item.kind) ?? null;
@@ -219,6 +223,7 @@ export function EditCatalogItemDialog({
   async function submit() {
     const name = title.trim();
     if (!name) { setError(t("titleRequired")); return; }
+    if (properties && propertiesHaveProblem(properties, values)) { setError(tEvent("invalid")); return; }
     setBusy(true);
     setError(null);
     try {

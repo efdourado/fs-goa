@@ -1460,6 +1460,7 @@ export function ParticipantChallengeScreen({
                         ? `${selectedItem.title}${selectedItem.catalogItem?.year ? ` (${selectedItem.catalogItem.year})` : ""}`
                         : (undatedDaily ? t("checkInOf", { date: f.date(effectiveOccurredOn, longDate) }) : t("newEntry"))}
                     </h2>
+                    {selectedItem?.catalogItem?.scheduledAt ? <p className="mt-1.5 text-sm font-light text-[var(--muted)]">{f.eventWhen(selectedItem.catalogItem.scheduledAt)}</p> : null}
                   </div>
                   {selectedItem?.dueAt
                     ? <span className={cx("flex-none rounded-full px-3 py-2 text-xs font-medium", selectedItem.status === "past_due" ? "bg-[var(--warn-soft)] text-[var(--warn)]" : "bg-[var(--wash)] text-[var(--muted)]")}>

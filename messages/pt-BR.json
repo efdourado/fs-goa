@@ -174,7 +174,7 @@
       "recommendations_disabled": "Este grupo desligou as indicações. Ligue-as nas configurações do grupo para registrar quem indicou.",
       "invalid_recommender": "Escolha uma só origem: um membro, um nome salvo ou uma nota — não mais de uma.",
       "invalid_library": "Essa biblioteca não foi encontrada.",
-      "invalid_schedule": "Confira as datas do item — o prazo não pode ser antes da abertura, e dias e horários não podem se misturar.",
+      "invalid_schedule": "Confira as datas — o fim não pode vir antes do início, e não dá para misturar dias com horários.",
       "not_shared": "Só uma resposta compartilhada tem regra de quem pode preencher.",
       "attribute_has_data": "Essa propriedade já tem valores em itens e não pode ser removida — oculte-a.",
       "title_required": "Todo item precisa de um nome, então o título não pode ser ocultado.",
@@ -182,7 +182,13 @@
       "shared_unsupported": "Uma resposta compartilhada precisa de um desafio com itens.",
       "library_required": "Este desafio usa mais de uma biblioteca — escolha de qual vem cada item.",
       "library_not_linked": "Essa biblioteca não faz parte deste desafio. Adicione-a ao desafio primeiro.",
-      "library_in_use": "Há itens deste desafio que vêm dessa biblioteca. Remova-os antes de tirar a biblioteca."
+      "library_in_use": "Há itens deste desafio que vêm dessa biblioteca. Remova-os antes de tirar a biblioteca.",
+      "item_not_open": "As respostas para este item ainda não abriram.",
+      "invalid_timezone": "Esse fuso horário não foi reconhecido — escolha um da lista, como America/Sao_Paulo.",
+      "invalid_answer_scope": "Escolha quem preenche o registro: cada participante ou uma vez para o grupo.",
+      "invalid_setting": "Escolha se o formulário pergunta quando cada registro aconteceu.",
+      "invalid_shared_edit_policy": "Escolha quem pode preencher ou corrigir a resposta compartilhada.",
+      "shared_custom_only": "Só um desafio personalizado pode ter o registro principal compartilhado."
     },
     "byStatus": {
       "401": "Sua sessão expirou. Entre novamente.",
@@ -475,7 +481,8 @@
     "recommenderFilterLabel": "Filtrar por quem indicou",
     "recommenderAll": "Todo mundo",
     "recommenderNone": "Sem indicação",
-    "noMatches": "Nada corresponde a esse filtro"
+    "noMatches": "Nada corresponde a esse filtro",
+    "sortDate": "Por data"
   },
   "cineItems": {
     "titleLabel": "Título do filme",
@@ -620,7 +627,18 @@
     "libraryHint": "De qual lista de coisas este desafio parte.",
     "pickLibraryFirst": "Escolha uma biblioteca para começar a adicionar itens",
     "moreLibrariesLabel": "Buscar itens também em",
-    "moreLibrariesHint": "Opcional. Combine bibliotecas num só desafio — Filmes e Séries, por exemplo. Cada item continua pertencendo a uma só."
+    "moreLibrariesHint": "Opcional. Combine bibliotecas num só desafio — Filmes e Séries, por exemplo. Cada item continua pertencendo a uma só.",
+    "scopeLabel": "Quem preenche este registro?",
+    "scopeHint": "É o principal que as pessoas registram em cada item.",
+    "scopeIndividual": "Cada participante",
+    "scopeIndividualHint": "Cada pessoa responde por si — uma nota, um palpite, um comentário.",
+    "scopeShared": "Uma vez para o grupo",
+    "scopeSharedHint": "Uma resposta por item que todo mundo vê — um placar final, um veredito combinado.",
+    "entryDateLabel": "Perguntar quando cada registro aconteceu",
+    "entryDateHint": "Adiciona ao formulário uma data opcional “Quando aconteceu?”. Deixe desligado quando a data pertence ao próprio item, como o início de uma partida.",
+    "itemDatesLabel": "Cada item tem data e hora próprias",
+    "itemDatesHint": "Como o início de uma partida ou uma sessão. Fica guardada no item, então todo desafio que o usa mostra a mesma data.",
+    "errItemSchedule": "Confira as datas e horas dos itens — um fuso horário ou uma hora de término não parecem certos."
   },
   "adminChallenge": {
     "back": "Voltar",
@@ -859,7 +877,7 @@
     "moreActions": "Mais ações",
     "alreadyPublicHint": "Esta vitrine já está pública — qualquer alteração salva aqui aparece no link e no modelo imediatamente.",
     "itemOriginLine": "via {text}",
-    "itemWindowOrder": "O prazo não pode ser antes da abertura.",
+    "itemWindowOrder": "“Responder até” não pode vir antes de as respostas abrirem.",
     "errPickLibrary": "Escolha a biblioteca de onde vêm os itens.",
     "libraryLabel": "Biblioteca",
     "libraryHint": "De qual lista de coisas este desafio parte.",
@@ -867,7 +885,17 @@
     "unlinkLibrary": "Tirar {name} deste desafio",
     "linkLibrary": "Adicionar biblioteca",
     "librariesHint": "De onde vêm os itens deste desafio. Você pode incluir mais bibliotecas a qualquer momento.",
-    "librariesCombined": "Os itens podem vir de qualquer uma delas. Uma biblioteca só pode ser retirada quando nenhum item dela estiver no desafio."
+    "librariesCombined": "Os itens podem vir de qualquer uma delas. Uma biblioteca só pode ser retirada quando nenhum item dela estiver no desafio.",
+    "entryDateTitle": "Perguntar quando cada registro aconteceu",
+    "entryDateHint": "Adiciona ao formulário uma data opcional “Quando aconteceu?”. Desligado, o formulário só pergunta o que você configurou — cada registro continua com o horário em que foi salvo.",
+    "entryDateOn": "O formulário agora pergunta quando cada registro aconteceu.",
+    "entryDateOff": "O formulário não pergunta mais uma data.",
+    "answerWindowTitle": "Janela de respostas",
+    "answerWindowNone": "Sem limites",
+    "eventScheduleInvalid": "Confira a data e a hora programadas — o fuso horário ou a hora de término não parecem certos.",
+    "libraryProperties": "Propriedades de {name}",
+    "reuseDoneTitle": "Cópia criada",
+    "reuseDoneBody": "A cópia está pronta, mas algumas propriedades não puderam vir junto."
   },
   "visibility": {
     "title": "Quem vê estas respostas",
@@ -1055,7 +1083,8 @@
       "comoFoi": "Como foi?",
       "comida": "Comida",
       "ambienteAtendimento": "Ambiente e atendimento",
-      "custoBeneficio": "Custo-benefício"
+      "custoBeneficio": "Custo-benefício",
+      "resultado": "Resultado"
     },
     "labelLabel": "Rótulo",
     "labelRequired": "Dê um rótulo ao campo.",
@@ -1512,7 +1541,8 @@
       "text": "Texto",
       "number": "Número",
       "date": "Data",
-      "boolean": "Sim ou não"
+      "boolean": "Sim ou não",
+      "schedule": "Data e hora"
     },
     "builtIn": "padrão",
     "hidden": "oculta",
@@ -1527,7 +1557,7 @@
     "propertyAdded": "Propriedade adicionada.",
     "propertyNameRequired": "Dê um nome à propriedade.",
     "addPropertyTitle": "Adicionar uma propriedade",
-    "addPropertyHint": "Por exemplo: Cozinha, Placar ou Data do jogo.",
+    "addPropertyHint": "Por exemplo Cozinha, Placar ou Fase.",
     "propertyNamePlaceholder": "Nome da propriedade",
     "propertyNameLabel": "Nome da propriedade",
     "propertyTypeLabel": "Tipo",
@@ -1538,13 +1568,15 @@
       "author": "Autor",
       "main_genre": "Gênero principal",
       "runtime_minutes": "Duração (minutos)",
-      "page_count": "Páginas"
+      "page_count": "Páginas",
+      "scheduled_at": "Data e hora programadas"
     },
     "tablesStarter": {
       "cozinha": "Tipo de cozinha",
       "bairro": "Bairro",
       "endereco": "Endereço"
-    }
+    },
+    "scheduleHint": "Quando o item em si acontece — o início de uma partida. Ligue e todo desafio que usa esses itens lê a mesma data. É separado de quando as respostas podem ser dadas."
   },
   "recommenders": {
     "label": "Indicado por",
@@ -1632,34 +1664,62 @@
     "notFilled": "Ninguém preencheu isto ainda."
   },
   "itemSchedule": {
-    "label": "Agenda",
-    "hint": "Opcional. Aparece na agenda e como lembrete.",
-    "none": "Nenhuma",
-    "noneHint": "Sem datas",
+    "label": "Janela de respostas",
+    "hint": "Opcional. Limita quando as pessoas podem responder este item — não é a data do próprio evento.",
+    "none": "Sem limites",
+    "noneHint": "Responder a qualquer momento",
     "date": "Dias",
     "dateHint": "Só datas",
     "datetime": "Data e hora",
     "datetimeHint": "Momentos exatos",
-    "opens": "Abre",
-    "due": "Prazo",
-    "errOrder": "O prazo não pode ser antes da abertura.",
-    "neverBlocks": "Um prazo nunca impede ninguém de responder — é um lembrete.",
-    "zoneNote": "Horários em {zone}."
+    "opens": "Respostas abrem em",
+    "due": "Responder até",
+    "errOrder": "“Responder até” não pode vir antes de as respostas abrirem.",
+    "neverBlocks": "“Respostas abrem em” mantém o formulário fechado até lá. “Responder até” nunca impede ninguém de responder — é só um lembrete.",
+    "zoneNote": "Os horários estão em {zone}."
   },
   "agenda": {
     "title": "Agenda",
     "tally": "{count, plural, one {# item com data} other {# itens com datas}}",
     "bucket": {
-      "open": "Abertos agora",
-      "scheduled": "Em breve",
-      "past_due": "Prazo vencido"
+      "open": "Respostas abertas",
+      "scheduled": "Respostas abrem depois",
+      "past_due": "Passou do prazo de resposta",
+      "now": "Acontecendo agora",
+      "upcoming": "Em breve",
+      "happened": "Já aconteceu"
     },
     "done": "Concluído",
-    "pastDue": "Vencido"
+    "pastDue": "Atrasado"
   },
   "itemWindow": {
-    "both": "Abre {opens} · prazo {due}",
-    "opens": "Abre {opens}",
-    "due": "Prazo {due}"
+    "both": "Respostas abrem {opens} · responder até {due}",
+    "opens": "Respostas abrem {opens}",
+    "due": "Responder até {due}"
+  },
+  "eventSchedule": {
+    "hint": "Quando o item em si acontece, como o início de uma partida. Deixe a hora vazia se só o dia for conhecido. Isso nunca abre nem fecha nada para responder.",
+    "date": "Data",
+    "time": "Hora",
+    "endTime": "Hora de término",
+    "zone": "Fuso horário",
+    "zoneHint": "O fuso em que a hora está — 19:00 no Rio não é 19:00 em Lisboa.",
+    "errZone": "Esse fuso horário não foi reconhecido — use um nome como America/Sao_Paulo.",
+    "errEndOrder": "A hora de término precisa ser depois da hora de início.",
+    "errEndWithoutTime": "Informe a hora de início antes da de término.",
+    "clear": "Remover a data",
+    "invalid": "Confira a data e a hora programadas — o fuso horário ou a hora de término não parecem certos."
+  },
+  "eventWhen": {
+    "timed": "{day} · {time} ({zone})",
+    "timedRange": "{day} · {start}–{end} ({zone})",
+    "range": "{start} – {end}"
+  },
+  "copyNotice": {
+    "title": "{count, plural, one {Uma propriedade ficou de fora} other {# propriedades ficaram de fora}}",
+    "body": "Sua cópia está pronta. Estas propriedades já existem no destino como outra coisa, então a cópia manteve a versão do destino e não trouxe os valores delas.",
+    "typeMismatch": "“{property}” em {library} é {type} aqui, mas {existing} no destino.",
+    "archived": "“{property}” em {library} foi removida no destino.",
+    "open": "Abrir a cópia"
   }
 }
