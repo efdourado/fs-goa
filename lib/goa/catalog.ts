@@ -907,6 +907,75 @@ export async function renameCatalogLibrary(session: SessionContext, libraryId: s
   });
 }
 
+/**
+ * Deletes a library someone made: it is archived (gone from every list) and the items in it go to the
+ * bin like any other removal, so nothing is lost for good. Screens and Pages come with the app and stay.
+ * A library with items only goes once the caller says so, and never while a running challenge holds one
+ * of them; links from other challenges are simply dropped.
+ */
+export async function deleteCatalogLibrary(session: SessionContext, libraryId: string, options: { deleteItems: boolean }) {
+  return inTransaction(async (client) => {
+    const library = await oneOrNull<{ group_id: string; kind: string; source: string; label: string | null; group_kind: "standard" | "personal"; owner_user_id: string }>(
+      client,
+      `SELECT cl.group_id, cl.kind, cl.source, cl.label, g.kind AS group_kind, g.owner_user_id
+         FROM catalog_libraries cl JOIN groups g ON g.id = cl.group_id
+        WHERE cl.id = $1 AND cl.archived_at IS NULL AND g.archived_at IS NULL AND g.deleted_at IS NULL`,
+      [libraryId],
+    );
+    if (!library) throw new ApiError(404, "not_found", "Biblioteca não encontrada.");
+    if (library.group_kind === "personal") {
+      if (library.owner_user_id !== session.user.id) {
+        throw new ApiError(403, "forbidden", "Esta biblioteca não pertence ao seu acervo pessoal.");
+      }
+    } else {
+      await requireGroupRole(session.user.id, library.group_id, ["owner", "admin"], client);
+    }
+    if (library.source === "screens" || library.source === "pages") {
+      throw new ApiError(409, "library_builtin", "Screens e Pages vêm com o app e não podem ser excluídas.");
+    }
+
+    const items = await client.query<{ id: string }>(
+      "SELECT id FROM catalog_items WHERE group_id = $1 AND kind = $2 AND archived_at IS NULL ORDER BY title",
+      [library.group_id, library.kind],
+    );
+    if (items.rows.length && !options.deleteItems) {
+      throw new ApiError(
+        409, "library_has_items",
+        `Esta biblioteca tem ${items.rows.length} item(ns). Confirme para excluí-la junto com eles.`,
+        { count: items.rows.length },
+      );
+    }
+    // Same rule as removing one item: a running challenge holds its items.
+    const busy = await client.query<{ title: string }>(
+      `SELECT DISTINCT c.title
+         FROM challenge_items it
+         JOIN catalog_items ci ON ci.id = it.catalog_item_id
+         JOIN challenges c ON c.id = it.challenge_id
+         JOIN groups g ON g.id = c.group_id
+        WHERE ci.group_id = $1 AND ci.kind = $2 AND ci.archived_at IS NULL AND it.archived_at IS NULL
+          AND c.deleted_at IS NULL AND c.status IN ('draft', 'active')
+          AND NOT (g.kind = 'personal' AND c.start_date IS NULL AND c.end_date IS NULL)
+        ORDER BY c.title`,
+      [library.group_id, library.kind],
+    );
+    if (busy.rows.length) {
+      const titles = busy.rows.map((row) => row.title);
+      throw new ApiError(
+        409, "library_busy",
+        `Há itens desta biblioteca em desafios em andamento: ${titles.join(", ")}. Tire-os de lá antes de excluí-la.`,
+        { challenges: titles },
+      );
+    }
+
+    for (const item of items.rows) await archiveCatalogItemWithClient(client, session.user.id, library.group_id, item.id);
+    await client.query("DELETE FROM challenge_libraries WHERE group_id = $1 AND kind = $2", [library.group_id, library.kind]);
+    await client.query("UPDATE catalog_libraries SET archived_at = now(), updated_at = now() WHERE id = $1", [libraryId]);
+    await writeAudit(client, library.group_id, null, session.user.id, "catalog.library_deleted", "catalog_library", libraryId, null,
+      { label: library.label, source: library.source, items: items.rows.length });
+    return { id: libraryId, deleted: true, items: items.rows.length };
+  });
+}
+
 // --- Library properties: one editor for native columns and attribute defs --
 
 /**

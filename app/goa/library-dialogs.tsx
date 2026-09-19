@@ -3,10 +3,10 @@
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 
-import { API_PATHS, apiRequest } from "./api";
+import { API_PATHS, ApiError, apiRequest } from "./api";
 import { ActionMenu, ActionMenuItem } from "./action-menu";
 import { useCsrf } from "./csrf";
-import { Dialog, FormDialog } from "./dialog";
+import { ConfirmDialog, Dialog, FormDialog } from "./dialog";
 import { useGoaFormat } from "./format";
 import { type CatalogScope, LibraryGlyph, useLibraryName } from "./libraries";
 import type { CatalogAttributeDef, CatalogLibrary, LibraryProperty } from "./types";
@@ -82,6 +82,45 @@ export function NewLibraryDialog({
         />
       </Field>
     </FormDialog>
+  );
+}
+
+/** Delete a library. Its items go to the bin with it; a running challenge that still holds one stops it. */
+export function DeleteLibraryDialog({
+  library,
+  itemCount,
+  onCancel,
+  onDeleted,
+}: {
+  library: CatalogLibrary;
+  itemCount: number;
+  onCancel: () => void;
+  onDeleted: (name: string) => void;
+}) {
+  const t = useTranslations("libraries");
+  const csrf = useCsrf();
+  const name = useLibraryName()(library);
+  return (
+    <ConfirmDialog
+      title={t("deleteTitle", { name })}
+      body={itemCount ? t("deleteBodyItems", { count: itemCount }) : t("deleteBodyEmpty")}
+      confirmLabel={itemCount ? t("deleteWithItems", { count: itemCount }) : t("deleteConfirm")}
+      danger
+      onClose={onCancel}
+      onConfirm={async () => {
+        try {
+          await apiRequest(`${API_PATHS.catalogLibrary(library.id)}?deleteItems=1`, { method: "DELETE", csrfToken: csrf });
+        } catch (cause) {
+          if (cause instanceof ApiError && cause.code === "library_busy") {
+            const listed = (cause.details as { challenges?: unknown } | undefined)?.challenges;
+            const names = Array.isArray(listed) ? listed.filter((title): title is string => typeof title === "string") : [];
+            if (names.length) throw new Error(t("deleteBusy", { names: names.join(", ") }));
+          }
+          throw cause;
+        }
+        onDeleted(name);
+      }}
+    />
   );
 }
 

@@ -44,6 +44,7 @@ import {
   createGroupLibrary,
   createGroupRecommender,
   createPersonalLibrary,
+  deleteCatalogLibrary,
   createPersonalRecommender,
   listGroupCatalog,
   listGroupLibraries,
@@ -542,6 +543,9 @@ export async function DELETE(request: Request): Promise<Response> {
     }
     if (path[0] === "personal" && path[1] === "catalog" && path.length === 3) {
       return json(await archivePersonalCatalogItem(session, path[2]));
+    }
+    if (path[0] === "catalog" && path[1] === "libraries" && path.length === 3) {
+      return json(await deleteCatalogLibrary(session, path[2], { deleteItems: new URL(request.url).searchParams.get("deleteItems") === "1" }));
     }
     if (path[0] === "groups" && path[2] === "catalog-attributes" && path.length === 4) {
       return json(await archiveGroupCatalogAttribute(session, path[1], path[3]));

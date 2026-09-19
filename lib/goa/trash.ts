@@ -733,6 +733,13 @@ export async function restoreTrashItem(session: SessionContext, body: Record<str
             AND id NOT IN (SELECT entity_id FROM trash_items WHERE entity_kind='entry')`, [id]);
     }
     if (kind === "catalog_item") {
+      // An item binned along with its (deleted) library would come back into a library nobody can see.
+      await client.query(
+        `UPDATE catalog_libraries cl SET archived_at=NULL, updated_at=now()
+           FROM catalog_items ci
+          WHERE ci.id=$1 AND cl.group_id=ci.group_id AND cl.kind=ci.kind AND cl.archived_at IS NOT NULL`,
+        [id],
+      );
       // In a living list the catalogue identity and the list row are one and the
       // same — restoring the item brings its list row and history back too
       // (mirror of the cascade in archiveCatalogItemWithClient).

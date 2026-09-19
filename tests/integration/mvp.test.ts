@@ -7551,3 +7551,72 @@ test("o acervo diz em quantos desafios cada item está e remove em lote os que e
   const empty = await call("POST", `/api/groups/${gid}/catalog/remove`, { session: owner, body: { itemIds: [] } });
   assert.equal(empty.response.status, 400, "sem itens não há o que remover");
 });
+
+test("excluir uma biblioteca: pede confirmação se tem itens, respeita desafio em andamento, manda os itens para a lixeira e restaurar um deles traz a biblioteca de volta", async () => {
+  const owner = await register("Lia", "lia_biblioteca");
+  const member = await register("Rui", "rui_biblioteca");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Estantes" } })).body as { id: string }).id;
+  const inv = (await call("POST", `/api/groups/${gid}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
+  await call("POST", `/api/invites/${inv.token}`, { session: member, body: {} });
+
+  const libraries = async () => ((await call("GET", `/api/groups/${gid}/catalog/libraries`, { session: owner })).body as { libraries: Array<{ id: string; kind: string; source: string }> }).libraries;
+  const shelf = (await call("POST", `/api/groups/${gid}/catalog/libraries`, { session: owner, body: { label: "Estante extra" } })).body as { id: string; kind: string };
+  const empty = (await call("POST", `/api/groups/${gid}/catalog/libraries`, { session: owner, body: { label: "Vazia" } })).body as { id: string };
+  for (const title of ["Item 1", "Item 2"]) {
+    const made = await call("POST", `/api/groups/${gid}/catalog/items`, { session: owner, body: { libraryId: shelf.id, title } });
+    assert.equal(made.response.status, 201, JSON.stringify(made.body));
+  }
+
+  assert.equal((await call("DELETE", `/api/catalog/libraries/${shelf.id}?deleteItems=1`, { session: member })).response.status, 403, "participante comum não exclui biblioteca");
+
+  const removedEmpty = await call("DELETE", `/api/catalog/libraries/${empty.id}`, { session: owner });
+  assert.equal(removedEmpty.response.status, 200, JSON.stringify(removedEmpty.body));
+  assert.equal((await libraries()).some((library) => library.id === empty.id), false, "a vazia some da lista");
+
+  const needsOk = await call("DELETE", `/api/catalog/libraries/${shelf.id}`, { session: owner });
+  assert.equal(needsOk.response.status, 409);
+  assert.equal((needsOk.body as { error: string }).error, "library_has_items");
+  assert.equal((needsOk.body as { details: { count: number } }).details.count, 2, "diz quantos itens iriam junto");
+  assert.equal((await libraries()).some((library) => library.id === shelf.id), true, "sem confirmar, nada muda");
+
+  await call("POST", `/api/groups/${gid}/catalog/items`, { session: owner, body: { kind: "film", title: "Aftersun" } });
+  const screens = (await libraries()).find((library) => library.source === "screens")!;
+  const builtIn = await call("DELETE", `/api/catalog/libraries/${screens.id}?deleteItems=1`, { session: owner });
+  assert.equal(builtIn.response.status, 409);
+  assert.equal((builtIn.body as { error: string }).error, "library_builtin", "Screens e Pages ficam");
+
+  const created = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner, body: { recipe: "custom", title: "Ciclo", libraryId: shelf.id, participantIds: [owner.user.id], items: [{ title: "Item 3" }] },
+  });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const cid = (created.body as { id: string }).id;
+  assert.equal((await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } })).response.status, 200);
+  const busy = await call("DELETE", `/api/catalog/libraries/${shelf.id}?deleteItems=1`, { session: owner });
+  assert.equal(busy.response.status, 409, JSON.stringify(busy.body));
+  assert.equal((busy.body as { error: string }).error, "library_busy");
+  assert.deepEqual((busy.body as { details: { challenges: string[] } }).details.challenges, ["Ciclo"], "diz quais desafios seguram");
+  assert.equal((await libraries()).some((library) => library.id === shelf.id), true);
+
+  assert.equal((await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "closed" } })).response.status, 200);
+  const itemIds = ((await call("GET", `/api/groups/${gid}/catalog`, { session: owner })).body as { items: Array<{ id: string; kind: string; title: string }> })
+    .items.filter((item) => item.kind === shelf.kind).map((item) => item.id);
+  assert.equal(itemIds.length, 3);
+  const gone = await call("DELETE", `/api/catalog/libraries/${shelf.id}?deleteItems=1`, { session: owner });
+  assert.equal(gone.response.status, 200, JSON.stringify(gone.body));
+  assert.equal((gone.body as { items: number }).items, 3);
+  assert.equal((await libraries()).some((library) => library.id === shelf.id), false, "a biblioteca sai da lista");
+  const catalog = ((await call("GET", `/api/groups/${gid}/catalog`, { session: owner })).body as { items: Array<{ id: string }> }).items;
+  assert.equal(catalog.some((item) => itemIds.includes(item.id)), false, "os itens saem do acervo");
+  const binned = await adminPool.query("SELECT 1 FROM trash_items WHERE entity_kind = 'catalog_item' AND entity_id = ANY($1::text[])", [itemIds]);
+  assert.equal(binned.rowCount, 3, "e vão para a lixeira");
+  const links = await adminPool.query("SELECT 1 FROM challenge_libraries WHERE challenge_id = $1 AND kind = $2", [cid, shelf.kind]);
+  assert.equal(links.rowCount, 0, "o vínculo do desafio encerrado com a biblioteca cai");
+
+  const restored = await call("POST", `/api/groups/${gid}/trash/restore`, { session: owner, body: { kind: "catalog_item", id: itemIds[0] } });
+  assert.equal(restored.response.status, 200, JSON.stringify(restored.body));
+  assert.equal((await libraries()).some((library) => library.id === shelf.id), true, "restaurar um item traz a biblioteca de volta");
+
+  const personal = (await call("POST", "/api/personal/catalog/libraries", { session: owner, body: { label: "Minha" } })).body as { id: string };
+  assert.equal((await call("DELETE", `/api/catalog/libraries/${personal.id}`, { session: member })).response.status, 403, "biblioteca pessoal só o dono exclui");
+  assert.equal((await call("DELETE", `/api/catalog/libraries/${personal.id}`, { session: owner })).response.status, 200);
+});

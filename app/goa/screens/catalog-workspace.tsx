@@ -10,7 +10,7 @@ import { AddCatalogItemDialog } from "../catalog-item-dialogs";
 import { useCsrf } from "../csrf";
 import { ConfirmDialog } from "../dialog";
 import { useGoaFormat } from "../format";
-import { NewLibraryDialog, LibraryPropertiesDialog, RenameLibraryDialog } from "../library-dialogs";
+import { DeleteLibraryDialog, NewLibraryDialog, LibraryPropertiesDialog, RenameLibraryDialog } from "../library-dialogs";
 import {
   type CatalogScope,
   LibraryGlyph,
@@ -93,7 +93,7 @@ export function CatalogWorkspaceScreen({
   const [sort, setSort] = useState<"title" | "rating" | "date">("title");
   const [recommenderFilter, setRecommenderFilter] = useState("");
   const [view, setView] = useState<View>("list");
-  const [dialog, setDialog] = useState<"add" | "new" | "rename" | "properties" | null>(null);
+  const [dialog, setDialog] = useState<"add" | "new" | "rename" | "delete" | "properties" | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   // Tidying up: show only what no challenge holds, tick items, remove them together.
   const [unusedOnly, setUnusedOnly] = useState(false);
@@ -357,6 +357,7 @@ export function CatalogWorkspaceScreen({
               <ActionMenu label={tl("libraryActions")} iconOnly>
                 <ActionMenuItem onClick={() => setDialog("properties")}>{canManage ? tl("editProperties") : tl("viewProperties")}</ActionMenuItem>
                 {canManage ? <ActionMenuItem onClick={() => setDialog("rename")}>{tl("renameLibrary")}</ActionMenuItem> : null}
+                {canManage && library && library.source !== "screens" && library.source !== "pages" ? <ActionMenuItem onClick={() => setDialog("delete")}>{tl("deleteLibrary")}</ActionMenuItem> : null}
               </ActionMenu>
             </div>
           </div>
@@ -465,6 +466,14 @@ export function CatalogWorkspaceScreen({
       ) : null}
       {dialog === "rename" && library ? (
         <RenameLibraryDialog library={library} onCancel={() => setDialog(null)} onRenamed={() => { setDialog(null); reloadLibraries(); }} />
+      ) : null}
+      {dialog === "delete" && library ? (
+        <DeleteLibraryDialog
+          library={library}
+          itemCount={scoped.length}
+          onCancel={() => setDialog(null)}
+          onDeleted={(name) => { setDialog(null); setActiveKind(null); setView("list"); setUnusedOnly(false); stopSelecting(); setNotice(tl("deleted", { name })); reloadAll(); }}
+        />
       ) : null}
       {dialog === "properties" && library ? (
         <LibraryPropertiesDialog scope={scope} library={library} canEdit={canManage} onClose={() => setDialog(null)} onChanged={reloadAll} />
