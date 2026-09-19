@@ -14,7 +14,6 @@ import {
   encodeEventForm,
   type EventForm,
   eventFormProblem,
-  eventPhase,
   instantToDateKey,
   instantToWallClock,
   wallClockToInstant,
@@ -273,33 +272,5 @@ describe("an item's own date in property forms", () => {
     assert.doesNotThrow(() => bodyFromValues([scheduleOn], { scheduled_at: badZone }, "create"));
     assert.deepEqual(bodyFromValues([scheduleOn], { scheduled_at: badZone }, "create").native, {});
     assert.equal(eventFormProblem(form({ date: "2026-06-15", timeZone: "Nowhere/Land" })), null);
-  });
-});
-
-describe("where an event sits in time", () => {
-  const zone = "America/Sao_Paulo";
-  const kickoff = { startsAt: "2026-06-15T19:00:00.000Z", endsAt: "2026-06-15T21:00:00.000Z", precision: "datetime" as const, timeZone: zone };
-  const at = (iso: string) => new Date(iso).getTime();
-
-  test("a timed event is upcoming, under way while it has an end, then over", () => {
-    assert.equal(eventPhase(kickoff, at("2026-06-15T18:59:00Z")), "upcoming");
-    assert.equal(eventPhase(kickoff, at("2026-06-15T20:00:00Z")), "now");
-    assert.equal(eventPhase(kickoff, at("2026-06-15T21:01:00Z")), "happened");
-    // without an end there is no "under way": it's over once it starts
-    assert.equal(eventPhase({ ...kickoff, endsAt: null }, at("2026-06-15T19:30:00Z")), "happened");
-  });
-
-  test("a whole-day event is 'now' all day in its own zone, not the viewer's", () => {
-    const day = { startsAt: "2026-06-20T03:00:00.000Z", endsAt: null, precision: "date" as const, timeZone: zone };
-    assert.equal(eventPhase(day, at("2026-06-20T02:59:00Z")), "upcoming");
-    assert.equal(eventPhase(day, at("2026-06-20T03:00:00Z")), "now");
-    assert.equal(eventPhase(day, at("2026-06-21T02:59:00Z")), "now");
-    assert.equal(eventPhase(day, at("2026-06-21T03:00:00Z")), "happened");
-  });
-
-  test("a multi-day range stays 'now' through its last day", () => {
-    const range = { startsAt: "2026-06-20T03:00:00.000Z", endsAt: "2026-06-22T03:00:00.000Z", precision: "date" as const, timeZone: zone };
-    assert.equal(eventPhase(range, at("2026-06-22T20:00:00Z")), "now");
-    assert.equal(eventPhase(range, at("2026-06-23T03:00:00Z")), "happened");
   });
 });

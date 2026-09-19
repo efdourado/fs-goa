@@ -6,7 +6,6 @@ import { type FormEvent, forwardRef, type ReactNode, useEffect, useImperativeHan
 import { ApiError } from "../api";
 import { copyText } from "../clipboard";
 import { useGoaFormat } from "../format";
-import { ItemAgenda } from "../item-agenda";
 import { useDoneItems } from "../use-done-items";
 import { recommenderLine } from "../recommender-picker";
 import { SharedGlyph } from "../shared-responses";
@@ -1073,6 +1072,7 @@ function CheckpointSchedule({ challenge }: { challenge: ChallengeDetail }) {
 function StageCard({ stage, items }: { stage: ChallengeItem; items: ChallengeItem[] }) {
   const t = useTranslations("participant");
   const tp = useTranslations("checkpointPlanner");
+  const f = useGoaFormat();
   const [open, setOpen] = useState(false);
   const runtime = formatRuntime(stage.totalRuntimeMinutes ?? items.reduce((sum, item) => sum + (item.catalogItem?.runtimeMinutes ?? 0), 0));
   const shown = open ? items : items.slice(0, STAGE_PREVIEW);
@@ -1100,9 +1100,12 @@ function StageCard({ stage, items }: { stage: ChallengeItem; items: ChallengeIte
         <>
           <ul className="mt-2 space-y-1 text-sm">
             {shown.map((item) => (
-              <li className="truncate" key={item.id}>
-                {item.title}
-                {item.catalogItem?.year ? ` (${item.catalogItem.year})` : ""}
+              <li key={item.id}>
+                <span className="block truncate">
+                  {item.title}
+                  {item.catalogItem?.year ? ` (${item.catalogItem.year})` : ""}
+                </span>
+                {item.catalogItem?.scheduledAt ? <small className="block truncate text-xs text-[var(--muted)]">{f.eventWhen(item.catalogItem.scheduledAt)}</small> : null}
               </li>
             ))}
           </ul>
@@ -1389,6 +1392,7 @@ export function ParticipantChallengeScreen({
   // for it (widened once the picker moved out of the narrow Today sidebar).
   const metaForItem = (item: ChallengeItem): string | undefined =>
     [
+      item.catalogItem?.scheduledAt ? f.eventWhen(item.catalogItem.scheduledAt) : null,
       item.catalogItem?.author ? t("byAuthor", { name: item.catalogItem.author }) : null,
       showRecommenders ? recommenderLine(item.recommendedBy, item.originNote, (name) => t("recommendedBy", { name }), (text) => t("origin", { text })) : null,
       item.catalogItem?.mainGenre || null,
@@ -1458,9 +1462,6 @@ export function ParticipantChallengeScreen({
       {/* Shared across Today and Grupo — whichever item/session is picked here
           is what both tabs act on, so it lives above the tab selector itself,
           not inside either tab's own body. */}
-      {activeTab === "today" && !preview && !sessionMode ? (
-        <div className="mt-5"><ItemAgenda items={sortedItems} timeZone={timeZone} selectedId={selectedItem?.id ?? null} doneIds={doneByItem as Set<Id>} onSelect={setSelectedItemId} /></div>
-      ) : null}
       {checkpointPicker && activeTab !== "results" ? <div className="mt-5">{checkpointPicker}</div> : null}
 
       {tabs.length > 1 ? (

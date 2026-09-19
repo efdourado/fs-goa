@@ -988,7 +988,7 @@
     "occurredOnHint": "Use hoje ou recupere um registro do passado.",
     "occurredOnOptionalHint": "Deixe em branco para salvar o registro sem data.",
     "occurredOn": "Aconteceu em {date}.",
-    "checkpointsTitle": "Etapas",
+    "checkpointsTitle": "Itens",
     "sessionsTitle": "Sessões",
     "checkpointDoneLabel": "concluído",
     "checkpointSoonLabel": "em breve",
@@ -1253,7 +1253,7 @@
       "Cada espaço pessoal e cada grupo tem as suas próprias bibliotecas — as listas das coisas que você acompanha. Screens é a evolução mais ampla de Filmes: filmes, séries, temporadas, episódios, documentários ou a unidade que você escolher. Pages é a evolução mais ampla de Livros, e também serve para artigos e outras leituras. Tables é um ponto de partida configurável para lugares como restaurantes, bares e cafés. Você pode criar bibliotecas mais específicas, como Jogos ou Séries — e renomear, ocultar ou reordenar cada propriedade de qualquer uma delas. Um mesmo desafio pode buscar itens em várias bibliotecas ao mesmo tempo — Filmes e Séries numa só lista.",
       "Quem cria decide o que um item representa. Uma trilogia pode ser um item ou três; uma temporada pode ser um item ou cada episódio. O Goa não adivinha: preencha duração, páginas ou ano só quando souber. A duração média de um episódio e a duração total são números diferentes, e misturá-los deixaria os totais de tempo errados.",
       "Concluído significa que as respostas obrigatórias do item estão registradas — nada além disso. Num jogo de futebol, pode ser só “acompanhei este”; não é preciso tê-lo assistido. Uma resposta que todos compartilham, como o placar final, é registrada uma vez para o grupo, enquanto notas e comentários continuam individuais. Se duas pessoas editarem uma resposta compartilhada ao mesmo tempo, a segunda é avisada e vê o valor mais recente em vez de sobrescrevê-lo.",
-      "As indicações dizem de onde veio um item: um membro, alguém de fora do grupo salvo pelo nome, ou uma nota curta. Cada grupo pode desligá-las por completo. Os itens também podem ter uma agenda opcional — dias inteiros ou um horário exato — que alimenta uma agenda. Um prazo é só um lembrete: nunca impede ninguém de responder."
+      "As indicações dizem de onde veio um item: um membro, alguém de fora do grupo salvo pelo nome, ou uma nota curta. Cada grupo pode desligá-las por completo. Os itens também podem ter uma data opcional — um dia inteiro, um intervalo ou um horário exato — mostrada logo abaixo do nome do item."
     ],
     "feedbackNudge": "Tem uma ideia ou algo te incomodou?",
     "feedbackLink": "Conte pra gente."
@@ -1669,20 +1669,6 @@
     "lastEdited": "Última alteração de {name} · {when}",
     "lastEditedAnon": "Última alteração {when}",
     "notFilled": "Ninguém preencheu isto ainda."
-  },
-  "agenda": {
-    "title": "Agenda",
-    "tally": "{count, plural, one {# item com data} other {# itens com datas}}",
-    "bucket": {
-      "open": "Respostas abertas",
-      "scheduled": "Respostas abrem depois",
-      "past_due": "Passou do prazo de resposta",
-      "now": "Acontecendo agora",
-      "upcoming": "Em breve",
-      "happened": "Já aconteceu"
-    },
-    "done": "Concluído",
-    "pastDue": "Atrasado"
   },
   "itemWindow": {
     "both": "Respostas abrem {opens} · responder até {due}",

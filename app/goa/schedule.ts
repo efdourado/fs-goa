@@ -177,19 +177,3 @@ export function decodeEventForm(text: string | undefined, fallbackTimeZone: stri
     return emptyEventForm(fallbackTimeZone);
   }
 }
-
-/** Where an event sits relative to `nowMs`: still ahead, under way (has an end and we're inside it, or it's today), or over. */
-export function eventPhase(schedule: EventSchedule, nowMs: number): "upcoming" | "now" | "happened" {
-  const zone = schedule.timeZone;
-  if (schedule.precision === "date") {
-    const today = instantToDateKey(new Date(nowMs).toISOString(), zone);
-    const first = instantToDateKey(schedule.startsAt, zone);
-    const last = schedule.endsAt ? instantToDateKey(schedule.endsAt, zone) : first;
-    if (today < first) return "upcoming";
-    return today > last ? "happened" : "now";
-  }
-  const start = new Date(schedule.startsAt).getTime();
-  if (nowMs < start) return "upcoming";
-  if (schedule.endsAt && nowMs <= new Date(schedule.endsAt).getTime()) return "now";
-  return "happened";
-}

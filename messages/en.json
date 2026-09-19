@@ -988,7 +988,7 @@
     "occurredOnHint": "Use today or backfill an entry from the past.",
     "occurredOnOptionalHint": "Leave it blank to save the entry without a date.",
     "occurredOn": "Happened on {date}.",
-    "checkpointsTitle": "Stages",
+    "checkpointsTitle": "Items",
     "sessionsTitle": "Sessions",
     "checkpointDoneLabel": "done",
     "checkpointSoonLabel": "soon",
@@ -1253,7 +1253,7 @@
       "Each personal space and each group keeps its own libraries — the lists of things you track. Screens is the broader evolution of Movies: films, series, seasons, episodes, documentaries, or whatever unit you choose. Pages is the broader evolution of Books, and also holds articles and other reading. Tables is a configurable starting point for places like restaurants, bars and cafés. You can create more specific libraries of your own, such as Matches or TV Shows — and rename, hide or reorder every property of any of them. A single challenge can draw from several libraries at once — Movies and TV Shows in one list.",
       "You decide what one item represents. A trilogy can be one item or three; a season can be one item or every episode. Goa doesn't guess: fill in duration, pages or year only when you know them. An average episode duration and a total runtime are different numbers, and mixing them would make time totals wrong.",
       "Done means the item's required answers are in — nothing more. For a football match it can simply mean “I tracked this one”; you don't have to have watched it. An answer everyone shares, like a final score, is recorded once for the group, while ratings and comments stay individual. If two people edit a shared answer at once, the second is told and shown the latest value instead of overwriting it.",
-      "Recommendations say where an item came from: a member, someone outside the group you've saved by name, or a short note. Groups can switch them off entirely. Items can also carry an optional schedule — whole days or an exact time — that feeds an agenda. A due date is only a reminder: it never stops anyone from answering."
+      "Recommendations say where an item came from: a member, someone outside the group you've saved by name, or a short note. Groups can switch them off entirely. Items can also carry an optional date — a whole day, a range, or an exact time — shown right under the item's name."
     ],
     "feedbackNudge": "Have an idea, or did something bug you?",
     "feedbackLink": "Tell us."
@@ -1669,20 +1669,6 @@
     "lastEdited": "Last changed by {name} · {when}",
     "lastEditedAnon": "Last changed {when}",
     "notFilled": "Nobody has filled this in yet."
-  },
-  "agenda": {
-    "title": "Agenda",
-    "tally": "{count, plural, one {# item with a date} other {# items with dates}}",
-    "bucket": {
-      "open": "Answers open",
-      "scheduled": "Answers open later",
-      "past_due": "Past the answer-by date",
-      "now": "Happening now",
-      "upcoming": "Coming up",
-      "happened": "Already happened"
-    },
-    "done": "Done",
-    "pastDue": "Late"
   },
   "itemWindow": {
     "both": "Answers open {opens} · answer by {due}",

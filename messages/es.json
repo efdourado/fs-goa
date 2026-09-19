@@ -988,7 +988,7 @@
     "occurredOnHint": "Usa hoy o recupera un registro del pasado.",
     "occurredOnOptionalHint": "Déjalo en blanco para guardar el registro sin fecha.",
     "occurredOn": "Ocurrió el {date}.",
-    "checkpointsTitle": "Etapas",
+    "checkpointsTitle": "Ítems",
     "sessionsTitle": "Sesiones",
     "checkpointDoneLabel": "completado",
     "checkpointSoonLabel": "pronto",
@@ -1253,7 +1253,7 @@
       "Cada espacio personal y cada grupo tiene sus propias bibliotecas: las listas de las cosas que sigues. Screens es la evolución más amplia de Películas: películas, series, temporadas, episodios, documentales o la unidad que elijas. Pages es la evolución más amplia de Libros, y también sirve para artículos y otras lecturas. Tables es un punto de partida configurable para lugares como restaurantes, bares y cafés. Puedes crear bibliotecas más específicas, como Partidos o Series — y renombrar, ocultar o reordenar cada propiedad de cualquiera de ellas. Un mismo desafío puede buscar ítems en varias bibliotecas a la vez — Películas y Series en una sola lista.",
       "Quien crea decide qué representa un ítem. Una trilogía puede ser un ítem o tres; una temporada puede ser un ítem o cada episodio. Goa no adivina: completa duración, páginas o año solo cuando los sepas. La duración media de un episodio y la duración total son números distintos, y mezclarlos dejaría mal los totales de tiempo.",
       "Completado significa que las respuestas obligatorias del ítem están registradas, nada más. En un partido de fútbol puede ser solo “lo seguí”; no hace falta haberlo visto. Una respuesta que todos comparten, como el marcador final, se registra una vez para el grupo, mientras que las notas y los comentarios siguen siendo individuales. Si dos personas editan una respuesta compartida a la vez, a la segunda se le avisa y ve el valor más reciente en lugar de sobrescribirlo.",
-      "Las recomendaciones dicen de dónde vino un ítem: un miembro, alguien de fuera del grupo guardado por nombre, o una nota corta. Cada grupo puede desactivarlas por completo. Los ítems también pueden tener una agenda opcional — días enteros o una hora exacta — que alimenta una agenda. Un plazo es solo un recordatorio: nunca impide que alguien responda."
+      "Las recomendaciones dicen de dónde vino un ítem: un miembro, alguien de fuera del grupo guardado por nombre, o una nota corta. Cada grupo puede desactivarlas por completo. Los ítems también pueden tener una fecha opcional — un día entero, un intervalo o una hora exacta — que se muestra justo debajo del nombre del ítem."
     ],
     "feedbackNudge": "¿Tienes una idea o algo te molestó?",
     "feedbackLink": "Cuéntanos."
@@ -1669,20 +1669,6 @@
     "lastEdited": "Último cambio de {name} · {when}",
     "lastEditedAnon": "Último cambio {when}",
     "notFilled": "Nadie ha rellenado esto todavía."
-  },
-  "agenda": {
-    "title": "Agenda",
-    "tally": "{count, plural, one {# ítem con fecha} other {# ítems con fechas}}",
-    "bucket": {
-      "open": "Respuestas abiertas",
-      "scheduled": "Respuestas abren más tarde",
-      "past_due": "Pasó el plazo de respuesta",
-      "now": "Ocurriendo ahora",
-      "upcoming": "Próximamente",
-      "happened": "Ya ocurrió"
-    },
-    "done": "Completado",
-    "pastDue": "Tarde"
   },
   "itemWindow": {
     "both": "Respuestas abren {opens} · responder hasta {due}",
