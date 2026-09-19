@@ -898,7 +898,10 @@
     "libraryProperties": "Propriedades de {name}",
     "reuseDoneTitle": "Cópia criada",
     "reuseDoneBody": "A cópia está pronta, mas algumas propriedades não puderam vir junto.",
-    "eventScheduleInvalid": "Confira a data — o fim, a hora ou o fuso horário não parecem certos."
+    "eventScheduleInvalid": "Confira a data — o fim, a hora ou o fuso horário não parecem certos.",
+    "selectedOf": "{selected} de {total} selecionados",
+    "allCommentsShown": "todos aparecem",
+    "blocksOn": "{count} ligados"
   },
   "visibility": {
     "title": "Quem vê estas respostas",

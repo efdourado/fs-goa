@@ -898,7 +898,10 @@
     "libraryProperties": "Propiedades de {name}",
     "reuseDoneTitle": "Copia creada",
     "reuseDoneBody": "La copia está lista, pero algunas propiedades no pudieron venir con ella.",
-    "eventScheduleInvalid": "Revisa la fecha — el final, la hora o la zona horaria no parecen correctos."
+    "eventScheduleInvalid": "Revisa la fecha — el final, la hora o la zona horaria no parecen correctos.",
+    "selectedOf": "{selected} de {total} seleccionados",
+    "allCommentsShown": "se muestran todos",
+    "blocksOn": "{count} activados"
   },
   "visibility": {
     "title": "Quién ve estas respuestas",

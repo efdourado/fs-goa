@@ -898,7 +898,10 @@
     "libraryProperties": "Properties of {name}",
     "reuseDoneTitle": "Copy created",
     "reuseDoneBody": "The copy is ready, but some properties couldn't come across.",
-    "eventScheduleInvalid": "Check the date — the end, the time or the time zone doesn't look right."
+    "eventScheduleInvalid": "Check the date — the end, the time or the time zone doesn't look right.",
+    "selectedOf": "{selected} of {total} selected",
+    "allCommentsShown": "all shown",
+    "blocksOn": "{count} on"
   },
   "visibility": {
     "title": "Who sees these answers",
