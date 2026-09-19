@@ -37,7 +37,7 @@ export function AdminMetrics({ challenge, onAdd, onUpdate, onDelete }: Props) {
             <span>{[metric.visibleDuring ? t("metricDuring") : null, metric.visibleInResults ? t("metricInResults") : null].filter(Boolean).join(" · ") || t("metricHidden")}</span>
             {!closed ? <div className="flex gap-3"><Button variant="secondary" onClick={() => { setEditing(metric); setSuccess(null); }}>{t("edit")}</Button><button type="button" className="min-h-11 px-2 text-[var(--danger)]" onClick={() => { setRemoving(metric); setError(null); }}>{t("remove")}</button></div> : null}
           </div>
-          <MetricBlock metric={metric} />
+          <MetricBlock metric={metric} showExplanation />
         </div>
       ))}</div> : <EmptyState title={t("noMetricsTitle")} />}
       {editing ? <MetricEditor key={editing === "new" ? "new" : editing.id} challenge={challenge} metric={editing === "new" ? undefined : editing} onCancel={() => setEditing(null)} onSave={async (payload) => {

@@ -36,7 +36,8 @@ function MetricExplanation({ metric }: { metric: Metric }) {
   );
 }
 
-export function MetricBlock({ metric, hideThinLabel = false }: { metric: Metric; hideThinLabel?: boolean }) {
+/** `showExplanation` adds the "how this is calculated" note — only the admin's Metrics tab shows it, never the results or showcase a participant sees. */
+export function MetricBlock({ metric, hideThinLabel = false, showExplanation = false }: { metric: Metric; hideThinLabel?: boolean; showExplanation?: boolean }) {
   const t = useTranslations("wrapped");
   const [expanded, setExpanded] = useState(false);
   const series = metric.series;
@@ -68,7 +69,7 @@ export function MetricBlock({ metric, hideThinLabel = false }: { metric: Metric;
   return (
     <article className="min-w-0 py-2">
       <h3 className="text-base font-medium tracking-tight">{metric.label}</h3>
-      <MetricExplanation metric={metric} />
+      {showExplanation ? <MetricExplanation metric={metric} /> : null}
       {series?.length ? (
         visibleRows.length ? (
           <>

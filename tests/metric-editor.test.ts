@@ -49,3 +49,14 @@ test("small samples stay ineligible and explain the configured threshold, includ
   assert.equal(metricMinimum({ operation: "spread", minSample: 1 }), 1, "presentation never raises a configured threshold");
   assert.equal(metric.series![1].value, null);
 });
+
+test("'como este número é calculado' só aparece quando quem renderiza pede — a aba Métricas do admin, nunca o resultado do participante", () => {
+  const metric: Metric = { id: "m", label: "Ranking", operation: "bayesian_average", bayesPriorWeight: 4, minSample: 2, series: [
+    { key: "a", label: "Filme", value: 4.2, formattedValue: "4.2", sampleSize: 3 },
+  ] };
+  const plain = renderWithIntl(createElement(MetricBlock, { metric }));
+  assert.doesNotMatch(plain, /Como este número é calculado/);
+  const admin = renderWithIntl(createElement(MetricBlock, { metric, showExplanation: true }));
+  assert.match(admin, /Como este número é calculado/);
+  assert.match(admin, /4 × média geral/, "a fórmula usa o peso configurado");
+});
