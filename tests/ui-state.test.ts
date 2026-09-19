@@ -478,7 +478,9 @@ test("ranking grande: mostra as primeiras posições e um botão 'ver a lista co
   } as unknown as ChallengeDetail;
 
   const html = renderWithIntl(createElement(ResultView, { challenge }));
-  assert.doesNotMatch(html, /<details/, "nem disclosure nem scroll — é um botão");
+  assert.match(html, /Como este número é calculado/, "a nota ajustada explica como é calculada");
+  const withoutExplanation = html.replace(/<details class="group mt-1">[\s\S]*?<\/details>/, "");
+  assert.doesNotMatch(withoutExplanation, /<details/, "nem disclosure nem scroll — é um botão");
   assert.doesNotMatch(html, /overflow-y-auto/);
   for (let position = 1; position <= 5; position += 1) {
     assert.match(html, new RegExp(`Item ${position}<`), `a posição ${position} aparece direto`);

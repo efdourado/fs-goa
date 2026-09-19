@@ -8,6 +8,33 @@ import type { Metric, MetricSeriesEntry } from "./types";
 // A long list shows its first rows, then a "see the full list (N)" button —
 // same pattern as the group catalogue.
 const PREVIEW_ROWS = 5;
+const DEFAULT_PRIOR_WEIGHT = 4;
+
+const EXPLAINED_OPERATIONS = new Set<Metric["operation"]>([
+  "sum", "average", "count", "min", "max", "median", "completion_rate",
+  "bayesian_average", "spread", "consensus", "surprise", "indicator_bias",
+]);
+
+/** A collapsed "how is this number calculated" note — the formula in plain words. */
+function MetricExplanation({ metric }: { metric: Metric }) {
+  const t = useTranslations("wrapped");
+  if (!EXPLAINED_OPERATIONS.has(metric.operation)) return null;
+  const minimum = metricMinimum(metric);
+  return (
+    <details className="group mt-1">
+      <summary className="inline-flex min-h-8 cursor-pointer list-none items-center gap-1.5 text-xs font-light text-[var(--muted)] transition hover:text-[var(--ink)] [&::-webkit-details-marker]:hidden">
+        <svg viewBox="0 0 16 16" className="h-3 w-3 flex-none transition-transform group-open:rotate-90" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+          <path d="M6 4l4 4-4 4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        {t("howCalculated")}
+      </summary>
+      <div className="mt-1 max-w-prose space-y-1 text-xs leading-5 text-[var(--muted)]">
+        <p>{t(`explain.${metric.operation}`, { weight: metric.bayesPriorWeight ?? DEFAULT_PRIOR_WEIGHT })}</p>
+        {minimum > 1 ? <p>{t("explainMinimum", { minimum })}</p> : null}
+      </div>
+    </details>
+  );
+}
 
 export function MetricBlock({ metric, hideThinLabel = false }: { metric: Metric; hideThinLabel?: boolean }) {
   const t = useTranslations("wrapped");
@@ -41,6 +68,7 @@ export function MetricBlock({ metric, hideThinLabel = false }: { metric: Metric;
   return (
     <article className="min-w-0 py-2">
       <h3 className="text-base font-medium tracking-tight">{metric.label}</h3>
+      <MetricExplanation metric={metric} />
       {series?.length ? (
         visibleRows.length ? (
           <>

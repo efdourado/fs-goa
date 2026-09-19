@@ -1382,7 +1382,22 @@
     "seriesShowAll": "Ver a lista completa ({count})",
     "seriesShowLess": "Ver menos",
     "howCalculated": "Como este número é calculado",
-    "unadjusted": "Média simples: {value}"
+    "unadjusted": "Média simples: {value}",
+    "explain": {
+      "sum": "Soma de todos os valores registrados neste campo.",
+      "average": "A média simples: a soma de todos os valores dividida pela quantidade deles.",
+      "count": "Quantos registros válidos existem.",
+      "min": "O menor valor registrado.",
+      "max": "O maior valor registrado.",
+      "median": "O valor central depois de ordenar tudo (com quantidade par, a média dos dois centrais).",
+      "completion_rate": "Registros concluídos divididos pelo total esperado, vezes 100.",
+      "bayesian_average": "Uma média justa para classificar. Um item com poucas notas é puxado em direção à média geral da lista inteira, então um único voto empolgado não o coloca no topo. Quanto mais notas ele tem, mais perto fica da própria média simples (o número simples aparece logo abaixo). Fórmula: (n × média do item + {weight} × média geral) ÷ (n + {weight}), onde n é o número de notas do item.",
+      "spread": "O quanto as notas divergem (desvio-padrão populacional): quanto maior, mais o grupo se dividiu.",
+      "consensus": "O quanto o grupo concorda, de 0 a 100 — 100 significa que todos deram a mesma nota.",
+      "surprise": "Nota menos expectativa, em pares em que a mesma pessoa deu as duas respostas para o mesmo item. Positivo quer dizer que superou a expectativa.",
+      "indicator_bias": "A média dos itens que cada pessoa indicou menos a média geral — o quanto as indicações agradaram."
+    },
+    "explainMinimum": "Só aparece a partir de {minimum, plural, one {# registro} other {# registros}}."
   },
   "paginator": {
     "pages": "Páginas",

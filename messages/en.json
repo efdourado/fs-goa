@@ -1382,7 +1382,22 @@
     "seriesShowAll": "See the full list ({count})",
     "seriesShowLess": "See less",
     "howCalculated": "How this is calculated",
-    "unadjusted": "Simple arithmetic mean: {value}"
+    "unadjusted": "Simple arithmetic mean: {value}",
+    "explain": {
+      "sum": "Adds up every value recorded for this field.",
+      "average": "The simple average: the sum of all the values divided by how many there are.",
+      "count": "How many valid records there are.",
+      "min": "The lowest value recorded.",
+      "max": "The highest value recorded.",
+      "median": "The middle value once everything is sorted (with an even count, the average of the two middle ones).",
+      "completion_rate": "Completed records divided by everything expected, times 100.",
+      "bayesian_average": "A fair average for ranking. An item with only a few ratings is pulled toward the overall average of the whole list, so a single enthusiastic vote can't put it on top. The more ratings it has, the closer it gets to its own simple average (the plain figure is shown underneath). Formula: (n × item average + {weight} × overall average) ÷ (n + {weight}), where n is the item's number of ratings.",
+      "spread": "How much the ratings disagree (population standard deviation): the higher it is, the more the group was divided.",
+      "consensus": "How much the group agrees, from 0 to 100 — 100 means everyone gave the same rating.",
+      "surprise": "Rating minus expectation, using pairs where the same person gave both for the same item. Positive means it beat expectations.",
+      "indicator_bias": "The average of the items each person recommended minus the overall average — how well their recommendations landed."
+    },
+    "explainMinimum": "Only shown once there are at least {minimum, plural, one {# record} other {# records}}."
   },
   "paginator": {
     "pages": "Pages",
