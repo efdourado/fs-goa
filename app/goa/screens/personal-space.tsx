@@ -1,14 +1,11 @@
 "use client";
 
-import { type ReactNode, useState } from "react";
+import { type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 
-import { API_PATHS, apiRequest } from "../api";
-import { useCsrf } from "../csrf";
-import { useGoaFormat } from "../format";
 import { ActiveChallengeCard } from "./dashboard";
-import type { ChallengeColorTag, ChallengeSummary, Id } from "../types";
-import { BackButton, cx, EmptyState, PageHeading, StatusMessage } from "../ui";
+import type { ChallengeSummary, Id } from "../types";
+import { BackButton, cx, EmptyState, PageHeading } from "../ui";
 import { canManage } from "../utils";
 
 /** A quiet toolbar button — catalogue / bin / new. */
@@ -39,7 +36,6 @@ export function PersonalSpaceScreen({
   onCreateChallenge,
   onOpenCatalog,
   onOpenTrash,
-  onChanged,
 }: {
   challenges: ChallengeSummary[];
   onBack: () => void;
@@ -50,32 +46,11 @@ export function PersonalSpaceScreen({
   onCreateChallenge: () => void;
   onOpenCatalog: () => void;
   onOpenTrash: () => void;
-  /** Called after a pin or colour is saved, so the list is re-read. */
-  onChanged: () => void;
 }) {
   const t = useTranslations("personalSpace");
   const tc = useTranslations("common");
-  const f = useGoaFormat();
-  const csrf = useCsrf();
-  const [error, setError] = useState<string | null>(null);
   const active = challenges.filter((challenge) => challenge.status === "active");
   const other = challenges.filter((challenge) => challenge.status !== "active");
-
-  // Pinning and colouring are per viewer, like on Home; with no shelf for this space there, they live here.
-  async function savePref(id: Id, patch: { pinned?: boolean; colorTag?: ChallengeColorTag | null }) {
-    setError(null);
-    try {
-      await apiRequest(API_PATHS.challengePrefs(id), { method: "PATCH", csrfToken: csrf, body: patch });
-      onChanged();
-    } catch (cause) {
-      setError(f.error(cause));
-    }
-  }
-  const prefProps = {
-    onTogglePin: (id: Id) => { void savePref(id, { pinned: !challenges.find((challenge) => challenge.id === id)?.pinned }); },
-    onSetColor: (id: Id, tag: ChallengeColorTag | null) => { void savePref(id, { colorTag: tag }); },
-    onManage: onOpenAdmin,
-  };
 
   function open(challenge: ChallengeSummary) {
     if (challenge.status === "draft" && canManage(challenge.viewerRole)) onOpenAdmin(challenge.id);
@@ -104,15 +79,13 @@ export function PersonalSpaceScreen({
         </ToolButton>
       </div>
 
-      <StatusMessage error={error} />
-
       {challenges.length ? (
         <div className="mt-8 space-y-10">
           {active.length ? (
             <section>
               <h2 className="mb-4 text-lg font-semibold tracking-[-0.02em]">{t("sectionActive")}</h2>
               <div className="grid gap-4 sm:grid-cols-2">
-                {active.map((challenge) => <ActiveChallengeCard key={challenge.id} challenge={challenge} onOpen={onOpenChallenge} fluid {...prefProps} />)}
+                {active.map((challenge) => <ActiveChallengeCard key={challenge.id} challenge={challenge} onOpen={onOpenChallenge} fluid />)}
               </div>
             </section>
           ) : null}
@@ -120,7 +93,7 @@ export function PersonalSpaceScreen({
             <section>
               <h2 className="mb-4 text-lg font-semibold tracking-[-0.02em]">{t("sectionArchive")}</h2>
               <div className="grid gap-4 sm:grid-cols-2">
-                {other.map((challenge) => <ActiveChallengeCard key={challenge.id} challenge={challenge} onOpen={() => open(challenge)} fluid {...prefProps} />)}
+                {other.map((challenge) => <ActiveChallengeCard key={challenge.id} challenge={challenge} onOpen={() => open(challenge)} fluid />)}
               </div>
             </section>
           ) : null}
