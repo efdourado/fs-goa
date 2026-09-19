@@ -583,6 +583,8 @@ export interface TemplateSummary {
   fieldCount: number;
   itemCount: number;
   metricCount: number;
+  /** People taking part — a count only, never who. */
+  participantCount: number;
   publishedAt: string;
 }
 

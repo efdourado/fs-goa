@@ -982,9 +982,11 @@ test("modelos públicos: publica, lista, detalha sem sessão e duplica para um g
 
   const gallery = await call("GET", "/api/templates");
   assert.equal(gallery.response.status, 200);
-  const listed = (gallery.body as { templates: Array<{ id: string; summary: string; itemCount: number }> }).templates;
+  const listed = (gallery.body as { templates: Array<{ id: string; summary: string; itemCount: number; participantCount: number }> }).templates;
   const mine = listed.find((entry) => entry.id === challengeId);
   assert.ok(mine, "o modelo publicado aparece na galeria pública");
+  assert.equal(typeof mine?.participantCount, "number", "a galeria diz quantas pessoas participam — só o número");
+  assert.ok((mine?.participantCount ?? 0) >= 1);
   // Sem vitrine ainda: a chamada da galeria cai na descrição do desafio.
   assert.equal(mine?.summary, "Um cine clube pronto para começar.");
   assert.equal(mine?.itemCount, 2);
@@ -7165,13 +7167,14 @@ test("o registro principal de um desafio personalizado nasce compartilhado quand
   assert.equal(created.response.status, 201, JSON.stringify(created.body));
   const cid = (created.body as { id: string }).id;
   const detail = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as {
-    entryTypes: Array<{ id: string; answerScope: string; sharedEditPolicy: string | null; isPrimary: boolean; fields: Array<{ key: string }> }>;
+    entryTypes: Array<{ id: string; name: string; answerScope: string; sharedEditPolicy: string | null; isPrimary: boolean; fields: Array<{ key: string }> }>;
     items: Array<{ id: string }>;
   };
   const primary = detail.entryTypes.find((type) => type.isPrimary)!;
   assert.equal(primary.answerScope, "shared");
   assert.equal(primary.sharedEditPolicy, "members_can_edit");
   assert.deepEqual(primary.fields.map((field) => field.key), ["placar"]);
+  assert.equal(primary.name, "Placar final", "a resposta compartilhada tem um nome só: o do seu valor");
   assert.equal(detail.entryTypes.length, 1, "só o registro escolhido — nada de tipo individual sobrando");
 
   await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } });

@@ -30,6 +30,7 @@ interface TemplateRow {
   field_count: number;
   item_count: number;
   metric_count: number;
+  participant_count: number;
 }
 
 function ruleCount(row: Pick<TemplateRow, "rule_sections" | "rules">): number {
@@ -56,7 +57,9 @@ export async function listTemplates() {
               (SELECT count(*)::int FROM challenge_items i
                 WHERE i.challenge_id = c.id AND i.archived_at IS NULL) AS item_count,
               (SELECT count(*)::int FROM challenge_metrics m
-                WHERE m.challenge_id = c.id AND m.archived_at IS NULL) AS metric_count
+                WHERE m.challenge_id = c.id AND m.archived_at IS NULL) AS metric_count,
+              (SELECT count(*)::int FROM challenge_participants cp
+                WHERE cp.challenge_id = c.id AND cp.removed_at IS NULL) AS participant_count
          FROM challenges c
          JOIN groups g ON g.id = c.group_id AND g.deleted_at IS NULL AND g.archived_at IS NULL
         WHERE c.published_as_template_at IS NOT NULL AND c.deleted_at IS NULL
@@ -74,6 +77,7 @@ export async function listTemplates() {
         fieldCount: row.field_count,
         itemCount: row.item_count,
         metricCount: row.metric_count,
+        participantCount: row.participant_count,
         publishedAt: row.published_as_template_at.toISOString(),
       })),
     };

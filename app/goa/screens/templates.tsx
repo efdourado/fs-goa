@@ -96,9 +96,13 @@ export function TemplatesScreen({
                 </h3>
                 {template.summary ? <p className="mt-2 line-clamp-2 text-sm leading-6 text-[var(--muted)]">{template.summary}</p> : null}
                 <p className="mt-4 text-xs text-[var(--muted)]">
-                  {t("cardMeta", { rules: template.ruleCount, fieldCount: template.fieldCount })}
-                  {template.itemCount ? t("cardItems", { count: template.itemCount }) : ""}
-                  {template.metricCount ? t("cardMetrics", { count: template.metricCount }) : ""}
+                  {[
+                    template.participantCount ? t("cardPeople", { count: template.participantCount }) : null,
+                    template.ruleCount ? t("cardRules", { count: template.ruleCount }) : null,
+                    template.fieldCount ? t("cardFields", { count: template.fieldCount }) : null,
+                    template.itemCount ? t("cardItems", { count: template.itemCount }) : null,
+                    template.metricCount ? t("cardMetrics", { count: template.metricCount }) : null,
+                  ].filter(Boolean).join(" · ")}
                 </p>
               </div>
               <span className="block w-full bg-[var(--main-line)] px-5 py-3.5" aria-hidden="true" />
