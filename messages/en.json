@@ -482,7 +482,21 @@
     "recommenderAll": "Everyone",
     "recommenderNone": "No recommender",
     "noMatches": "Nothing matches that filter",
-    "sortDate": "By date"
+    "sortDate": "By date",
+    "notInChallenge": "not in any challenge",
+    "unusedFilter": "Not in a challenge ({count})",
+    "select": "Select",
+    "doneSelecting": "Done",
+    "selectionBar": "Selected items",
+    "selectAll": "Select all ({count})",
+    "clearSelection": "Clear selection",
+    "pickedTally": "{count, plural, =0 {Nothing selected} one {# selected} other {# selected}}",
+    "removePicked": "{count, plural, =0 {Remove} one {Remove #} other {Remove #}}",
+    "removeManyTitle": "{count, plural, one {Remove # item?} other {Remove # items?}}",
+    "removeManyBody": "They leave the catalogue and go to the bin, where you can restore them. An item that a running challenge still uses is skipped.",
+    "removeManyConfirm": "{count, plural, one {Remove # item} other {Remove # items}}",
+    "removedMany": "{count, plural, one {# item removed.} other {# items removed.}}",
+    "removedSome": "{removed, plural, one {# item removed} other {# items removed}}; {skipped, plural, one {# skipped because a running challenge uses it} other {# skipped because running challenges use them}}."
   },
   "cineItems": {
     "titleLabel": "Film title",

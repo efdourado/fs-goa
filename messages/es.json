@@ -482,7 +482,21 @@
     "recommenderAll": "Todos",
     "recommenderNone": "Sin recomendación",
     "noMatches": "Nada coincide con ese filtro",
-    "sortDate": "Por fecha"
+    "sortDate": "Por fecha",
+    "notInChallenge": "en ningún desafío",
+    "unusedFilter": "Fuera de desafíos ({count})",
+    "select": "Seleccionar",
+    "doneSelecting": "Listo",
+    "selectionBar": "Ítems seleccionados",
+    "selectAll": "Seleccionar todos ({count})",
+    "clearSelection": "Limpiar selección",
+    "pickedTally": "{count, plural, =0 {Nada seleccionado} one {# seleccionado} other {# seleccionados}}",
+    "removePicked": "{count, plural, =0 {Quitar} one {Quitar #} other {Quitar #}}",
+    "removeManyTitle": "{count, plural, one {¿Quitar # ítem?} other {¿Quitar # ítems?}}",
+    "removeManyBody": "Salen del acervo y van a la papelera, de donde se pueden restaurar. Un ítem que un desafío en curso aún usa se omite.",
+    "removeManyConfirm": "{count, plural, one {Quitar # ítem} other {Quitar # ítems}}",
+    "removedMany": "{count, plural, one {# ítem quitado.} other {# ítems quitados.}}",
+    "removedSome": "{removed, plural, one {# ítem quitado} other {# ítems quitados}}; {skipped, plural, one {# omitido porque un desafío en curso lo usa} other {# omitidos porque desafíos en curso los usan}}."
   },
   "cineItems": {
     "titleLabel": "Título de la película",

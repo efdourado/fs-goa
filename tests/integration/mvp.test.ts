@@ -7504,3 +7504,50 @@ test("a migração 0051 tira dos Screens os livros que uma versão antiga guardo
     client.release();
   }
 });
+
+test("o acervo diz em quantos desafios cada item está e remove em lote os que estão em nenhum — pulando o que um desafio em andamento ainda usa", async () => {
+  const owner = await register("Tais", "tais_faxina");
+  const member = await register("Beto", "beto_faxina");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Faxina" } })).body as { id: string }).id;
+  const inv = (await call("POST", `/api/groups/${gid}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
+  await call("POST", `/api/invites/${inv.token}`, { session: member, body: {} });
+
+  const made = async (title: string) => ((await call("POST", `/api/groups/${gid}/catalog/items`, { session: owner, body: { kind: "other", title } })).body as { id: string }).id;
+  const [orphanA, orphanB] = [await made("Sobrou A"), await made("Sobrou B")];
+  const created = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner, body: { recipe: "cinema", title: "Ciclo", participantIds: [owner.user.id], items: [{ title: "Em uso" }] },
+  });
+  const cid = (created.body as { id: string }).id;
+  assert.equal((await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } })).response.status, 200);
+
+  const listed = async () => ((await call("GET", `/api/groups/${gid}/catalog`, { session: owner })).body as { items: Array<{ id: string; title: string; challengeCount?: number }> }).items;
+  const before = await listed();
+  const inUse = before.find((item) => item.title === "Em uso")!;
+  assert.equal(inUse.challengeCount, 1, "o item de um desafio conta 1");
+  assert.equal(before.find((item) => item.id === orphanA)?.challengeCount, 0, "o que nenhum desafio usa conta 0");
+
+  const forbidden = await call("POST", `/api/groups/${gid}/catalog/remove`, { session: member, body: { itemIds: [orphanA] } });
+  assert.equal(forbidden.response.status, 403, "participante comum não remove do acervo");
+
+  const result = await call("POST", `/api/groups/${gid}/catalog/remove`, { session: owner, body: { itemIds: [orphanA, orphanB, orphanA, inUse.id, "nao-existe"] } });
+  assert.equal(result.response.status, 200, JSON.stringify(result.body));
+  const body = result.body as { removed: number; removedIds: string[]; skipped: Array<{ id: string; reason: string }> };
+  assert.equal(body.removed, 2, "só os dois sem desafio saem, e o repetido conta uma vez");
+  assert.deepEqual([...body.removedIds].sort(), [orphanA, orphanB].sort());
+  assert.deepEqual(body.skipped.map((entry) => [entry.id, entry.reason]).sort(), [[inUse.id, "in_use"], ["nao-existe", "not_found"]].sort());
+
+  const after = await listed();
+  assert.deepEqual(after.map((item) => item.title), ["Em uso"], "o item em uso continua no acervo");
+  const binned = await adminPool.query("SELECT 1 FROM trash_items WHERE entity_id = ANY($1::text[])", [[orphanA, orphanB]]);
+  assert.equal(binned.rowCount, 2, "os removidos vão para a lixeira, não somem");
+
+  const personal = async (title: string) => ((await call("POST", "/api/personal/catalog/items", { session: owner, body: { kind: "other", title } })).body as { id: string }).id;
+  const mine = [await personal("Leitura solta"), await personal("Corrida solta")];
+  const personalResult = await call("POST", "/api/personal/catalog/remove", { session: owner, body: { itemIds: mine } });
+  assert.equal(personalResult.response.status, 200, JSON.stringify(personalResult.body));
+  assert.equal((personalResult.body as { removed: number }).removed, 2);
+  assert.equal(((await call("GET", "/api/personal/catalog", { session: owner })).body as { items: unknown[] }).items.length, 0);
+
+  const empty = await call("POST", `/api/groups/${gid}/catalog/remove`, { session: owner, body: { itemIds: [] } });
+  assert.equal(empty.response.status, 400, "sem itens não há o que remover");
+});

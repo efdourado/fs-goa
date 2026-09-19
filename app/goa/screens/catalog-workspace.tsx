@@ -7,6 +7,8 @@ import { ActionMenu, ActionMenuItem } from "../action-menu";
 import { API_PATHS, apiRequest } from "../api";
 import { byRatingDesc, bucketize, type CatalogBucket, decadeOf, highlights } from "../catalog-insights";
 import { AddCatalogItemDialog } from "../catalog-item-dialogs";
+import { useCsrf } from "../csrf";
+import { ConfirmDialog } from "../dialog";
 import { useGoaFormat } from "../format";
 import { NewLibraryDialog, LibraryPropertiesDialog, RenameLibraryDialog } from "../library-dialogs";
 import {
@@ -93,6 +95,12 @@ export function CatalogWorkspaceScreen({
   const [view, setView] = useState<View>("list");
   const [dialog, setDialog] = useState<"add" | "new" | "rename" | "properties" | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // Tidying up: show only what no challenge holds, tick items, remove them together.
+  const [unusedOnly, setUnusedOnly] = useState(false);
+  const [selecting, setSelecting] = useState(false);
+  const [picked, setPicked] = useState<ReadonlySet<Id>>(new Set());
+  const [confirmingRemoval, setConfirmingRemoval] = useState(false);
+  const csrf = useCsrf();
   const source = useRecommenderSource(scope, recommendationsEnabled);
   const scopeId = scope === "personal" ? "personal" : scope.groupId;
 
@@ -137,11 +145,16 @@ export function CatalogWorkspaceScreen({
     return [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1]));
   }, [scoped]);
   const activeFilter = recommenderFilter && (recommenderFilter === "none" || recommenders.some(([key]) => key === recommenderFilter)) ? recommenderFilter : "";
+  const isUnused = (item: CatalogItem) => (item.challengeCount ?? item.roundCount ?? 0) === 0;
+  const unusedCount = useMemo(() => scoped.filter((item) => (item.challengeCount ?? item.roundCount ?? 0) === 0).length, [scoped]);
+  // Once the last unused item is gone the chip goes with it, so the filter can't be left stuck on.
+  const onlyUnused = unusedOnly && unusedCount > 0;
   const filtered = useMemo(() => scoped.filter((item) => {
+    if (onlyUnused && (item.challengeCount ?? item.roundCount ?? 0) !== 0) return false;
     if (!activeFilter) return true;
     if (activeFilter === "none") return !item.recommendedBy && !item.originNote;
     return item.recommendedBy ? `${item.recommendedBy.kind}:${item.recommendedBy.id}` === activeFilter : false;
-  }), [scoped, activeFilter]);
+  }), [scoped, activeFilter, onlyUnused]);
   // Only offered where the library keeps an event date (a match's kickoff) on its items.
   const hasDates = scoped.some((item) => item.scheduledAt);
   const startOf = (item: CatalogItem) => (item.scheduledAt ? new Date(item.scheduledAt.startsAt).getTime() : Infinity);
@@ -183,8 +196,32 @@ export function CatalogWorkspaceScreen({
       hidden.has("runtime_minutes") ? null : formatRuntime(item.runtimeMinutes),
       ...custom,
       recommendationsEnabled ? recommenderLine(item.recommendedBy, item.originNote, (name) => t("recommendedBy", { name }), (text) => t("origin", { text })) : null,
-      t("rounds", { count: item.roundCount ?? 0 }),
+      isUnused(item) ? t("notInChallenge") : t("rounds", { count: item.challengeCount ?? item.roundCount ?? 0 }),
     ].filter(Boolean).join(" · ");
+  }
+
+  function togglePicked(ids: Id[], on: boolean) {
+    setPicked((current) => {
+      const next = new Set(current);
+      for (const id of ids) if (on) next.add(id); else next.delete(id);
+      return next;
+    });
+  }
+  function stopSelecting() { setSelecting(false); setPicked(new Set()); }
+  const pickedHere = sorted.filter((item) => picked.has(item.id));
+  const allHerePicked = sorted.length > 0 && pickedHere.length === sorted.length;
+
+  async function removePicked() {
+    const ids = pickedHere.map((item) => item.id);
+    const result = await apiRequest<{ removed: number; skipped: Array<{ id: Id; title: string | null; reason: string }> }>(API_PATHS.catalogWorkspace(scope).remove, {
+      method: "POST", body: { itemIds: ids }, csrfToken: csrf,
+    });
+    setConfirmingRemoval(false);
+    // Tidying often goes in rounds: stay in selection while more unused items are waiting.
+    if (onlyUnused && unusedCount - result.removed > 0) setPicked(new Set());
+    else stopSelecting();
+    setNotice(result.skipped.length ? t("removedSome", { removed: result.removed, skipped: result.skipped.length }) : t("removedMany", { count: result.removed }));
+    reloadAll();
   }
 
   return (
@@ -271,6 +308,32 @@ export function CatalogWorkspaceScreen({
               </div>
             </div>
             <div className="flex w-full flex-none flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+              {canManage && unusedCount > 0 ? (
+                <button
+                  type="button"
+                  aria-pressed={onlyUnused}
+                  onClick={() => { const next = !onlyUnused; setUnusedOnly(next); if (next) setSelecting(true); }}
+                  className={cx(
+                    "min-h-10 cursor-pointer rounded-full border px-4 text-sm transition",
+                    onlyUnused ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] bg-[var(--paper)] text-[var(--ink)] hover:border-[var(--main-line)]",
+                  )}
+                >
+                  {t("unusedFilter", { count: unusedCount })}
+                </button>
+              ) : null}
+              {canManage && scoped.length ? (
+                <button
+                  type="button"
+                  aria-pressed={selecting}
+                  onClick={() => (selecting ? stopSelecting() : setSelecting(true))}
+                  className={cx(
+                    "min-h-10 cursor-pointer rounded-full border px-4 text-sm transition",
+                    selecting ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] bg-[var(--paper)] text-[var(--ink)] hover:border-[var(--main-line)]",
+                  )}
+                >
+                  {selecting ? t("doneSelecting") : t("select")}
+                </button>
+              ) : null}
               {recommendationsEnabled && recommenders.length ? (
                 <label className="text-xs text-[var(--muted)]">
                   <span className="sr-only">{t("recommenderFilterLabel")}</span>
@@ -314,6 +377,17 @@ export function CatalogWorkspaceScreen({
             </nav>
           ) : null}
 
+          {selecting && activeView === "list" ? (
+            <div className="sticky top-16 z-10 mb-3 flex flex-wrap items-center gap-2 rounded-2xl border border-[var(--main-line)] bg-[var(--main-soft)] p-3 shadow-[var(--elevate-1)]" role="region" aria-label={t("selectionBar")}>
+              <Button variant="secondary" disabled={!sorted.length} onClick={() => togglePicked(sorted.map((item) => item.id), !allHerePicked)}>
+                {allHerePicked ? t("clearSelection") : t("selectAll", { count: sorted.length })}
+              </Button>
+              <strong className="text-sm font-medium">{t("pickedTally", { count: pickedHere.length })}</strong>
+              <span className="flex-1" />
+              <Button variant="danger" disabled={!pickedHere.length} onClick={() => setConfirmingRemoval(true)}>{t("removePicked", { count: pickedHere.length })}</Button>
+            </div>
+          ) : null}
+
           {!scoped.length ? (
             <EmptyState
               title={tl("emptyLibrary", { name: libraryName(library) })}
@@ -323,19 +397,31 @@ export function CatalogWorkspaceScreen({
             <EmptyState title={t("noMatches")} />
           ) : activeView === "list" ? (
             <ul className={cx(cardClass, "divide-y divide-[var(--line)] overflow-hidden")}>
-              {sorted.map((item) => (
-                <li key={item.id}>
-                  <button type="button" className="flex w-full cursor-pointer items-center justify-between gap-4 px-5 py-4 text-left transition hover:bg-[var(--wash)]" onClick={() => onOpenItem(item.id)}>
-                    <span className="min-w-0">
+              {sorted.map((item) => {
+                const body = (
+                  <>
+                    <span className="min-w-0 flex-1">
                       <strong className="block truncate font-light">{item.title}{item.year && !hidden.has("year") ? ` (${item.year})` : ""}</strong>
                       <small className="mt-1 block truncate text-[var(--muted)]">{metaFor(item)}</small>
                     </span>
                     <span className="flex-none text-sm tabular-nums">
                       {item.ratingAvg === null || item.ratingAvg === undefined ? <span className="text-[var(--muted)]">—</span> : `${item.ratingAvg} · n=${item.ratingCount ?? 0}`}
                     </span>
-                  </button>
-                </li>
-              ))}
+                  </>
+                );
+                return (
+                  <li key={item.id}>
+                    {selecting ? (
+                      <label className="flex w-full cursor-pointer items-center gap-4 px-5 py-4 text-left transition hover:bg-[var(--wash)]">
+                        <input type="checkbox" className="h-4 w-4 flex-none" checked={picked.has(item.id)} aria-label={item.title} onChange={(event) => togglePicked([item.id], event.target.checked)} />
+                        {body}
+                      </label>
+                    ) : (
+                      <button type="button" className="flex w-full cursor-pointer items-center justify-between gap-4 px-5 py-4 text-left transition hover:bg-[var(--wash)]" onClick={() => onOpenItem(item.id)}>{body}</button>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           ) : activeBuckets.length ? (
             <div className="space-y-4">
@@ -382,6 +468,17 @@ export function CatalogWorkspaceScreen({
       ) : null}
       {dialog === "properties" && library ? (
         <LibraryPropertiesDialog scope={scope} library={library} canEdit={canManage} onClose={() => setDialog(null)} onChanged={reloadAll} />
+      ) : null}
+      {confirmingRemoval ? (
+        <ConfirmDialog
+          title={t("removeManyTitle", { count: pickedHere.length })}
+          body={t("removeManyBody")}
+          confirmLabel={t("removeManyConfirm", { count: pickedHere.length })}
+          busyLabel={tc("saving")}
+          danger
+          onClose={() => setConfirmingRemoval(false)}
+          onConfirm={removePicked}
+        />
       ) : null}
     </main>
   );

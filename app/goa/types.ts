@@ -211,6 +211,8 @@ export interface CatalogItem {
   /** Present only while the library's "Scheduled date and time" property is switched on. */
   scheduledAt?: EventSchedule | null;
   roundCount?: number;
+  /** Challenges that still hold this item — zero means it is safe to tidy away. */
+  challengeCount?: number;
   ratingAvg?: number | null;
   ratingCount?: number;
   /** Custom attributes this group/person defined for this kind — never global. */

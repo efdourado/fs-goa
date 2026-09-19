@@ -37,6 +37,8 @@ import {
   addGroupCatalogItem,
   addPersonalCatalogItem,
   archiveCatalogItem,
+  archiveManyGroupCatalogItems,
+  archiveManyPersonalCatalogItems,
   archivePersonalCatalogItem,
   catalogItemDetail,
   createGroupLibrary,
@@ -353,6 +355,12 @@ export async function POST(request: Request): Promise<Response> {
     }
     if (path[0] === "groups" && path[2] === "catalog" && path[3] === "items" && path.length === 4) {
       return json(await addGroupCatalogItem(session, path[1], body), 201);
+    }
+    if (path[0] === "groups" && path[2] === "catalog" && path[3] === "remove" && path.length === 4) {
+      return json(await archiveManyGroupCatalogItems(session, path[1], body));
+    }
+    if (path[0] === "personal" && path[1] === "catalog" && path[2] === "remove" && path.length === 3) {
+      return json(await archiveManyPersonalCatalogItems(session, body));
     }
     if (path[0] === "personal" && path[1] === "catalog" && path[2] === "items" && path.length === 3) {
       return json(await addPersonalCatalogItem(session, body), 201);

@@ -431,6 +431,7 @@ async function listCatalogWithClient(client: PoolClient, workspaceId: string) {
     scheduled_precision: "date" | "datetime";
     scheduled_time_zone: string | null;
     round_count: number;
+    challenge_count: number;
     rating_avg: number | null;
     rating_count: number;
     recommended_by_user_id: string | null;
@@ -444,6 +445,10 @@ async function listCatalogWithClient(client: PoolClient, workspaceId: string) {
               CASE WHEN ${scheduleVisibleSql("ci")} THEN ci.scheduled_end_at END AS scheduled_end_at,
               ci.scheduled_precision, ci.scheduled_time_zone,
               (SELECT count(DISTINCT it.challenge_id)::int FROM challenge_items it WHERE it.catalog_item_id = ci.id) AS round_count,
+              -- Challenges that still hold it: a removed item or a deleted challenge no longer counts.
+              (SELECT count(DISTINCT it.challenge_id)::int
+                 FROM challenge_items it JOIN challenges c ON c.id = it.challenge_id AND c.deleted_at IS NULL
+                WHERE it.catalog_item_id = ci.id AND it.archived_at IS NULL) AS challenge_count,
               agg.rating_avg, coalesce(agg.rating_count, 0)::int AS rating_count,
               CASE WHEN active_rec.user_id IS NOT NULL THEN ci.recommended_by_user_id END AS recommended_by_user_id,
               CASE WHEN active_rec.user_id IS NOT NULL THEN ru.display_name END AS recommended_by_user_name,
@@ -483,6 +488,7 @@ async function listCatalogWithClient(client: PoolClient, workspaceId: string) {
       runtimeMinutes: item.runtime_minutes,
       scheduledAt: eventScheduleJson(item),
       roundCount: item.round_count,
+      challengeCount: item.challenge_count,
       recommendedBy: !showRecommenders ? null : item.recommended_by_user_id
         ? { kind: "member" as const, id: item.recommended_by_user_id, name: item.recommended_by_user_name ?? "" }
         : item.recommended_by_external_id
@@ -1449,6 +1455,52 @@ export async function archiveCatalogItem(session: SessionContext, catalogItemId:
       await requireGroupRole(session.user.id, item.group_id, ["owner", "admin"], client);
     }
     return archiveCatalogItemWithClient(client, session.user.id, item.group_id, catalogItemId);
+  });
+}
+
+/**
+ * Removes many catalogue items in one go — how a workspace gets tidied. Each goes to the bin like a
+ * single removal (restorable). One that a running challenge still holds is skipped and reported, never
+ * an error for the rest; an id that isn't in this catalogue is simply reported too.
+ */
+async function archiveManyCatalogItems(
+  client: PoolClient,
+  actorUserId: string,
+  workspaceId: string,
+  body: Record<string, unknown>,
+) {
+  const requested = Array.isArray(body.itemIds) ? body.itemIds.filter((id): id is string => typeof id === "string" && id.length > 0) : [];
+  const ids = [...new Set(requested)];
+  if (!ids.length) throw new ApiError(400, "invalid_body", "Escolha ao menos um item.");
+  if (ids.length > 500) throw new ApiError(400, "item_limit", "Remova no máximo 500 itens por vez.");
+  const removed: string[] = [];
+  const skipped: Array<{ id: string; title: string | null; reason: "in_use" | "not_found" }> = [];
+  for (const id of ids) {
+    try {
+      await archiveCatalogItemWithClient(client, actorUserId, workspaceId, id);
+      removed.push(id);
+    } catch (error) {
+      if (!(error instanceof ApiError) || (error.code !== "catalog_item_in_use" && error.code !== "not_found")) throw error;
+      // Both refusals happen before anything is written, so the transaction is still clean.
+      const row = await oneOrNull<{ title: string }>(client, "SELECT title FROM catalog_items WHERE id = $1 AND group_id = $2", [id, workspaceId]);
+      skipped.push({ id, title: row?.title ?? null, reason: error.code === "catalog_item_in_use" ? "in_use" : "not_found" });
+    }
+  }
+  return { removed: removed.length, removedIds: removed, skipped };
+}
+
+export async function archiveManyGroupCatalogItems(session: SessionContext, groupId: string, body: Record<string, unknown>) {
+  return inTransaction(async (client) => {
+    await requireStandardWorkspace(client, session.user.id, groupId, ["owner", "admin"]);
+    return archiveManyCatalogItems(client, session.user.id, groupId, body);
+  });
+}
+
+export async function archiveManyPersonalCatalogItems(session: SessionContext, body: Record<string, unknown>) {
+  return inTransaction(async (client) => {
+    const workspaceId = await personalWorkspaceId(client, session.user.id);
+    if (!workspaceId) throw new ApiError(404, "not_found", "Acervo não encontrado.");
+    return archiveManyCatalogItems(client, session.user.id, workspaceId, body);
   });
 }
 

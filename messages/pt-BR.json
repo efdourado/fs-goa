@@ -482,7 +482,21 @@
     "recommenderAll": "Todo mundo",
     "recommenderNone": "Sem indicação",
     "noMatches": "Nada corresponde a esse filtro",
-    "sortDate": "Por data"
+    "sortDate": "Por data",
+    "notInChallenge": "em nenhum desafio",
+    "unusedFilter": "Fora de desafios ({count})",
+    "select": "Selecionar",
+    "doneSelecting": "Concluir",
+    "selectionBar": "Itens selecionados",
+    "selectAll": "Selecionar todos ({count})",
+    "clearSelection": "Limpar seleção",
+    "pickedTally": "{count, plural, =0 {Nada selecionado} one {# selecionado} other {# selecionados}}",
+    "removePicked": "{count, plural, =0 {Remover} one {Remover #} other {Remover #}}",
+    "removeManyTitle": "{count, plural, one {Remover # item?} other {Remover # itens?}}",
+    "removeManyBody": "Eles saem do acervo e vão para a lixeira, de onde dá para restaurar. Um item que um desafio em andamento ainda usa é pulado.",
+    "removeManyConfirm": "{count, plural, one {Remover # item} other {Remover # itens}}",
+    "removedMany": "{count, plural, one {# item removido.} other {# itens removidos.}}",
+    "removedSome": "{removed, plural, one {# item removido} other {# itens removidos}}; {skipped, plural, one {# pulado porque um desafio em andamento o usa} other {# pulados porque desafios em andamento os usam}}."
   },
   "cineItems": {
     "titleLabel": "Título do filme",

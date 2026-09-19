@@ -78,6 +78,7 @@ export const API_PATHS = {
   catalogRecommender: (recommenderId: Id) => `/api/catalog/recommenders/${encodeURIComponent(recommenderId)}`,
   catalogWorkspace: (scope: "personal" | { groupId: Id }) => ({
     items: scope === "personal" ? "/api/personal/catalog/items" : `/api/groups/${encodeURIComponent(scope.groupId)}/catalog/items`,
+    remove: scope === "personal" ? "/api/personal/catalog/remove" : `/api/groups/${encodeURIComponent(scope.groupId)}/catalog/remove`,
     list: scope === "personal" ? "/api/personal/catalog" : `/api/groups/${encodeURIComponent(scope.groupId)}/catalog`,
     libraries: scope === "personal" ? "/api/personal/catalog/libraries" : `/api/groups/${encodeURIComponent(scope.groupId)}/catalog/libraries`,
     recommenders: scope === "personal" ? "/api/personal/catalog/recommenders" : `/api/groups/${encodeURIComponent(scope.groupId)}/catalog/recommenders`,
