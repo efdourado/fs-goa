@@ -885,7 +885,7 @@ function parseMetricInput(body: Record<string, unknown>): ParsedMetricInput {
   }
   const cumulative = body.cumulative === true;
   if (cumulative && groupBy !== "checkpoint") {
-    throw new ApiError(400, "invalid_metric", "O modo acumulado só existe agrupando por checkpoint.");
+    throw new ApiError(400, "invalid_metric", "O modo acumulado só existe agrupando por etapa.");
   }
   return {
     operation,
@@ -914,7 +914,7 @@ async function assertMetricCoherent(
       "SELECT count(*)::int AS count FROM challenge_checkpoints WHERE challenge_id=$1 AND archived_at IS NULL",
       [challengeId]);
     if (!has || has.count === 0) {
-      throw new ApiError(409, "metric_needs_checkpoints", "Agrupar por checkpoint exige checkpoints no desafio.");
+      throw new ApiError(409, "metric_needs_checkpoints", "Agrupar por etapa exige etapas no desafio.");
     }
   }
   if (parsed.groupBy.startsWith("catalog_")) {

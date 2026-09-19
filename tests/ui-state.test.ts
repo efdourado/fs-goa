@@ -537,7 +537,7 @@ test("header sinaliza logo, perfil e sair como clicáveis", () => {
   assert.match(header, />Início<\/button>/, "há um link 'Início' explícito, não só o logo");
 });
 
-test("planejador de checkpoints: mostra semanas, o tipo, o total de duração e a distribuição", () => {
+test("planejador de etapas: mostra as etapas sem escolha de tipo, o total de duração e a distribuição", () => {
   const challenge = {
     id: "c1",
     status: "draft",
@@ -564,10 +564,26 @@ test("planejador de checkpoints: mostra semanas, o tipo, o total de duração e 
   assert.match(html, /1h40/, "soma a duração dos filmes da semana");
   assert.match(html, /Distribuir em ordem/, "oferece a distribuição sequencial");
   assert.match(html, /Sortear dentro de cada/);
-  assert.match(html, /Sem checkpoint/, "há um balde para itens sem checkpoint");
+  assert.match(html, /Sem etapa/, "há um balde para itens sem etapa");
+  assert.doesNotMatch(html, /<option value="(week|session|milestone|day)"/, "etapas não têm mais um tipo para escolher");
+  assert.match(html, /Selecionar todos \(2\)/, "dá para marcar todos os itens de uma vez");
+  assert.doesNotMatch(html, /Mostrar mais/, "com poucos itens não há botão de mostrar mais");
 });
 
-test("planejador de checkpoints: um desafio com checkpoints diários automáticos não os edita à mão", () => {
+test("planejador de etapas: uma etapa com muitos itens mostra os primeiros e um botão de mostrar mais", () => {
+  const items = Array.from({ length: 12 }, (_, index) => ({ id: `i${index}`, title: `Filme ${index + 1}`, position: index, checkpointId: "w1" }));
+  const challenge = {
+    id: "c9", status: "draft", submissionMode: "item",
+    checkpoints: [{ id: "w1", title: "Fase de grupos", kind: "session", position: 0, itemCount: 12, timeframe: "current" }],
+    items,
+  } as unknown as ChallengeDetail;
+  const html = renderWithIntl(createElement(CheckpointPlanner, { challenge, onSaveCheckpoints: async () => undefined, onAssign: async () => undefined }));
+  assert.match(html, /Filme 8</);
+  assert.doesNotMatch(html, /Filme 9</, "só os oito primeiros aparecem de início");
+  assert.match(html, /Mostrar mais 4/);
+});
+
+test("planejador de etapas: um desafio com dias automáticos não os edita à mão", () => {
   const challenge = {
     id: "c2", status: "active", submissionMode: "daily", startsOn: "2026-03-01", endsOn: "2026-03-10",
     checkpoints: [{ id: "d1", title: "1 mar", kind: "day", position: 0 }], items: [],
@@ -575,11 +591,11 @@ test("planejador de checkpoints: um desafio com checkpoints diários automático
   const html = renderWithIntl(createElement(CheckpointPlanner, {
     challenge, onSaveCheckpoints: async () => undefined, onAssign: async () => undefined,
   }));
-  assert.match(html, /gera um checkpoint por dia/i);
-  assert.doesNotMatch(html, /Adicionar checkpoint/);
+  assert.match(html, /um registro por dia/i);
+  assert.doesNotMatch(html, /Adicionar etapa/);
 });
 
-test("planejador de checkpoints: um desafio diário com período mas SEM dias automáticos ainda organiza por semanas", () => {
+test("planejador de etapas: um desafio diário com período mas SEM dias automáticos ainda organiza por etapas", () => {
   const challenge = {
     id: "c3", status: "active", submissionMode: "daily", startsOn: "2026-03-01", endsOn: "2026-03-31",
     checkpoints: [], items: [{ id: "b1", title: "Um livro", position: 0 }],
@@ -587,8 +603,8 @@ test("planejador de checkpoints: um desafio diário com período mas SEM dias au
   const html = renderWithIntl(createElement(CheckpointPlanner, {
     challenge, onSaveCheckpoints: async () => undefined, onAssign: async () => undefined,
   }));
-  assert.doesNotMatch(html, /gera um checkpoint por dia/i);
-  assert.match(html, /Adicionar checkpoint/);
+  assert.doesNotMatch(html, /um registro por dia/i);
+  assert.match(html, /Adicionar etapa/);
 });
 
 test("painel de importação: analisa e depois lista chaves desconhecidas e badges por linha", async () => {

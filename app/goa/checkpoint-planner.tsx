@@ -9,7 +9,8 @@ import type { ChallengeDetail, CheckpointInput, CheckpointKind, Id } from "./typ
 import { Button, EmptyState, inputClass, labelClass, PageHeading, StatusMessage } from "./ui";
 import { formatRuntime } from "./utils";
 
-const KINDS: CheckpointKind[] = ["week", "session", "milestone", "day"];
+/** How many items a stage lists before "show more". */
+const STAGE_PREVIEW = 8;
 
 interface DraftCheckpoint {
   key: string;
@@ -36,7 +37,6 @@ export function CheckpointPlanner({
 }) {
   const t = useTranslations("checkpointPlanner");
   const tc = useTranslations("common");
-  const tk = useTranslations("checkpointKind");
   const f = useGoaFormat();
   const locked = challenge.status === "closed";
   // Only a round that actually generated day-by-day checkpoints hides the manual
@@ -72,6 +72,9 @@ export function CheckpointPlanner({
     [...challenge.items].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)).map((item) => item.id),
   );
   const [seed, setSeed] = useState(0);
+  // Items ticked for a bulk move, and the stages whose full item list is open ("show more").
+  const [picked, setPicked] = useState<ReadonlySet<Id>>(new Set());
+  const [expanded, setExpanded] = useState<ReadonlySet<Id | "none">>(new Set());
   const [assignBusy, setAssignBusy] = useState(false);
   const [assignError, setAssignError] = useState<string | null>(null);
   const [assignDone, setAssignDone] = useState<string | null>(null);
@@ -89,7 +92,7 @@ export function CheckpointPlanner({
   function addDraft() {
     setDrafts((current) => [
       ...current,
-      { key: crypto.randomUUID(), title: t("newTitle", { n: current.length + 1 }), kind: "week", startsAt: "", dueAt: "", description: "" },
+      { key: crypto.randomUUID(), title: t("newTitle", { n: current.length + 1 }), kind: "session", startsAt: "", dueAt: "", description: "" },
     ]);
   }
 
@@ -172,6 +175,20 @@ export function CheckpointPlanner({
     return buckets;
   }, [order, assignment, savedCheckpoints]);
 
+  function togglePicked(ids: Id[], on: boolean) {
+    setPicked((current) => {
+      const next = new Set(current);
+      for (const id of ids) if (on) next.add(id); else next.delete(id);
+      return next;
+    });
+  }
+
+  /** Puts every ticked item in `stageId` (`null` = no stage) and clears the ticks. */
+  function moveTicked(stageId: Id | null) {
+    setAssignment((current) => ({ ...current, ...Object.fromEntries([...picked].map((id) => [id, stageId])) }));
+    setPicked(new Set());
+  }
+
   function runtimeFor(ids: Id[]): number {
     return ids.reduce((sum, id) => sum + (itemById.get(id)?.catalogItem?.runtimeMinutes ?? 0), 0);
   }
@@ -208,18 +225,11 @@ export function CheckpointPlanner({
                   const saved = savedCheckpoints.find((cp) => cp.id === draft.id);
                   return (
                     <li className="py-5 first:pt-0" key={draft.key}>
-                      <div className="grid gap-2 sm:grid-cols-[1.4fr_0.8fr_auto]">
+                      <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
                         <label>
                           <span className="sr-only">{t("cpTitle")}</span>
                           <input className={inputClass} value={draft.title} maxLength={160} placeholder={t("cpTitlePlaceholder")}
                             onChange={(event) => setDrafts((cur) => cur.map((d) => d.key === draft.key ? { ...d, title: event.target.value } : d))} />
-                        </label>
-                        <label>
-                          <span className="sr-only">{t("cpKind")}</span>
-                          <select className={inputClass} value={draft.kind}
-                            onChange={(event) => setDrafts((cur) => cur.map((d) => d.key === draft.key ? { ...d, kind: event.target.value as CheckpointKind } : d))}>
-                            {KINDS.map((kind) => <option value={kind} key={kind}>{tk(kind)}</option>)}
-                          </select>
                         </label>
                         <div className="flex items-start gap-1">
                           <Button variant="ghost" className="px-2" disabled={index === 0} onClick={() => move(index, -1)}>↑<span className="sr-only">{t("moveUp")}</span></Button>
@@ -268,37 +278,80 @@ export function CheckpointPlanner({
             <Button variant="secondary" onClick={shuffleWithin}>{t("shuffleWithin")}</Button>
           </div>
 
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <Button variant="ghost" onClick={() => togglePicked(order, picked.size < order.length)}>
+              {picked.size < order.length ? t("selectAll", { count: order.length }) : t("clearSelection")}
+            </Button>
+          </div>
+          {picked.size ? (
+            <div className="sticky top-16 z-10 mt-3 flex flex-wrap items-center gap-2 rounded-2xl border border-[var(--main-line)] bg-[var(--main-soft)] p-3 shadow-[var(--elevate-1)]" role="region" aria-label={t("selectionBar")}>
+              <strong className="text-sm font-medium">{t("selected", { count: picked.size })}</strong>
+              <select
+                className="min-h-10 rounded-xl border border-[var(--line)] bg-[var(--paper)] px-3 text-sm"
+                value=""
+                aria-label={t("moveTo")}
+                onChange={(event) => { if (event.target.value) moveTicked(event.target.value === "__none__" ? null : event.target.value); }}
+              >
+                <option value="">{t("moveTo")}</option>
+                {savedCheckpoints.map((option) => <option value={option.id} key={option.id}>{option.title}</option>)}
+                <option value="__none__">{t("unassigned")}</option>
+              </select>
+              <Button variant="secondary" onClick={() => moveTicked(null)}>{t("removeFromStage")}</Button>
+              <Button variant="ghost" onClick={() => setPicked(new Set())}>{t("clearSelection")}</Button>
+            </div>
+          ) : null}
+
           <div className="mt-5 space-y-4">
             {[...savedCheckpoints, null].map((cp) => {
               const key: Id | "none" = cp?.id ?? "none";
               const ids = grouped.get(key) ?? [];
               const runtime = formatRuntime(runtimeFor(ids));
+              const open = expanded.has(key);
+              const shown = open ? ids : ids.slice(0, STAGE_PREVIEW);
+              const allPicked = ids.length > 0 && ids.every((id) => picked.has(id));
               return (
                 <div className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-4" key={key}>
                   <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                    <strong className="text-sm">{cp ? cp.title : t("unassigned")}</strong>
+                    <label className="flex min-w-0 items-center gap-2.5">
+                      <input type="checkbox" className="h-4 w-4 flex-none" disabled={!ids.length} checked={allPicked} aria-label={t("selectStage", { name: cp ? cp.title : t("unassigned") })} onChange={(event) => togglePicked(ids, event.target.checked)} />
+                      <strong className="truncate text-sm">{cp ? cp.title : t("unassigned")}</strong>
+                    </label>
                     <span className="text-xs text-[var(--muted)]">
-                      {cp ? `${tk(cp.kind ?? "session")} · ` : ""}{t("itemsTally", { count: ids.length })}{runtime ? ` · ${runtime}` : ""}
+                      {t("itemsTally", { count: ids.length })}{runtime ? ` · ${runtime}` : ""}
                     </span>
                   </div>
                   {ids.length ? (
-                    <ul className="space-y-1">
-                      {ids.map((id) => {
-                        const item = itemById.get(id);
-                        if (!item) return null;
-                        return (
-                          <li className="flex items-center justify-between gap-3 rounded-lg bg-[var(--wash)] px-3 py-1.5 text-sm" key={id}>
-                            <span className="min-w-0 truncate">{item.title}{item.catalogItem?.year ? ` (${item.catalogItem.year})` : ""}</span>
-                            <select className="min-h-9 rounded-lg border border-[var(--line)] bg-[var(--paper)] px-2 text-xs"
-                              value={assignment[id] ?? ""}
-                              onChange={(event) => setAssignment((cur) => ({ ...cur, [id]: event.target.value || null }))}>
-                              <option value="">{t("unassigned")}</option>
-                              {savedCheckpoints.map((option) => <option value={option.id} key={option.id}>{option.title}</option>)}
-                            </select>
-                          </li>
-                        );
-                      })}
-                    </ul>
+                    <>
+                      <ul className="space-y-1">
+                        {shown.map((id) => {
+                          const item = itemById.get(id);
+                          if (!item) return null;
+                          return (
+                            <li className="flex items-center gap-3 rounded-lg bg-[var(--wash)] px-3 py-1.5 text-sm" key={id}>
+                              <input type="checkbox" className="h-4 w-4 flex-none" checked={picked.has(id)} aria-label={item.title} onChange={(event) => togglePicked([id], event.target.checked)} />
+                              <span className="min-w-0 flex-1 truncate">{item.title}{item.catalogItem?.year ? ` (${item.catalogItem.year})` : ""}</span>
+                              <select className="min-h-9 rounded-lg border border-[var(--line)] bg-[var(--paper)] px-2 text-xs"
+                                value={assignment[id] ?? ""}
+                                aria-label={t("moveItem", { title: item.title })}
+                                onChange={(event) => setAssignment((cur) => ({ ...cur, [id]: event.target.value || null }))}>
+                                <option value="">{t("unassigned")}</option>
+                                {savedCheckpoints.map((option) => <option value={option.id} key={option.id}>{option.title}</option>)}
+                              </select>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                      {ids.length > STAGE_PREVIEW ? (
+                        <button
+                          type="button"
+                          aria-expanded={open}
+                          className="mt-2 min-h-10 w-full rounded-xl border border-[var(--line)] text-xs font-light text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)]"
+                          onClick={() => setExpanded((current) => { const next = new Set(current); if (open) next.delete(key); else next.add(key); return next; })}
+                        >
+                          {open ? t("showLess") : t("showMore", { count: ids.length - STAGE_PREVIEW })}
+                        </button>
+                      ) : null}
+                    </>
                   ) : (
                     <p className="text-xs text-[var(--muted)]">{t("emptyCheckpoint")}</p>
                   )}

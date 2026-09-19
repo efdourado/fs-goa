@@ -47,7 +47,7 @@ export async function syncDailyCheckpoints(
   challengeId: string,
   startsOn: string,
   endsOn: string,
-  rangeMessage = "Use no máximo 366 checkpoints.",
+  rangeMessage = "Use no máximo 366 dias.",
 ): Promise<string[]> {
   const inputs = dailyCheckpointInputs(startsOn, endsOn, rangeMessage);
   const upserted = await client.query<{ id: string; position: number }>(

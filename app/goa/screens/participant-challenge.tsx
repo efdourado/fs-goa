@@ -1028,13 +1028,15 @@ function EntryPicker({
   );
 }
 
+/** How many items a stage card lists before "show more". */
+const STAGE_PREVIEW = 6;
+
 /**
- * Read-only week/session view: each manual checkpoint as a card with its items,
- * a past/now/upcoming badge, and the total runtime when the items carry one.
- * Only shown for round-item challenges organised into non-daily checkpoints.
+ * Read-only stages view: each stage as a card with its items, a past/now/upcoming badge, and the
+ * total runtime when the items carry one. Only shown for round-item challenges organised into
+ * stages (not the automatic day-by-day ones).
  */
 function CheckpointSchedule({ challenge }: { challenge: ChallengeDetail }) {
-  const t = useTranslations("participant");
   const tp = useTranslations("checkpointPlanner");
   const planned = useMemo(
     () =>
@@ -1055,48 +1057,70 @@ function CheckpointSchedule({ challenge }: { challenge: ChallengeDetail }) {
   return (
     <section className="mt-5">
       <h2 className={cx("mb-3", sectionLabelClass)}>{tp("title")}</h2>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {planned.map((cp) => {
-          const items = [...(itemsByCheckpoint.get(cp.id) ?? [])].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
-          const runtime = formatRuntime(cp.totalRuntimeMinutes ?? items.reduce((sum, item) => sum + (item.catalogItem?.runtimeMinutes ?? 0), 0));
-          return (
-            <article
-              className={cx(
-                "rounded-2xl border p-4",
-                cp.timeframe === "current"
-                  ? "border-[var(--main)] bg-[var(--main-soft)]/40"
-                  : "border-[var(--line)] bg-[var(--paper)]",
-                cp.timeframe === "past" && "opacity-70",
-              )}
-              key={cp.id}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <strong className="text-sm">{cp.title}
-                  <span className="text-xs text-[var(--muted)]">
-                    {runtime ? ` | ${runtime}` : ""}
-                  </span>
-                </strong>
-                <span className="rounded-full bg-[var(--wash)] px-2 py-0.5 text-[10px] text-[var(--muted)]">
-                  {tp(`timeframe.${cp.timeframe ?? "current"}`)}
-                </span>
-              </div>
-              {items.length ? (
-                <ul className="mt-2 space-y-1 text-sm">
-                  {items.map((item) => (
-                    <li className="truncate" key={item.id}>
-                      {item.title}
-                      {item.catalogItem?.year ? ` (${item.catalogItem.year})` : ""}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="mt-2 text-xs text-[var(--muted)]">{t("checkpointEmpty")}</p>
-              )}
-            </article>
-          );
-        })}
+      <div className="grid items-start gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {planned.map((cp) => (
+          <StageCard
+            key={cp.id}
+            stage={cp}
+            items={[...(itemsByCheckpoint.get(cp.id) ?? [])].sort((a, b) => (a.position ?? 0) - (b.position ?? 0))}
+          />
+        ))}
       </div>
     </section>
+  );
+}
+
+function StageCard({ stage, items }: { stage: ChallengeItem; items: ChallengeItem[] }) {
+  const t = useTranslations("participant");
+  const tp = useTranslations("checkpointPlanner");
+  const [open, setOpen] = useState(false);
+  const runtime = formatRuntime(stage.totalRuntimeMinutes ?? items.reduce((sum, item) => sum + (item.catalogItem?.runtimeMinutes ?? 0), 0));
+  const shown = open ? items : items.slice(0, STAGE_PREVIEW);
+  return (
+    <article
+      className={cx(
+        "rounded-2xl border p-4",
+        stage.timeframe === "current"
+          ? "border-[var(--main)] bg-[var(--main-soft)]/40"
+          : "border-[var(--line)] bg-[var(--paper)]",
+        stage.timeframe === "past" && "opacity-70",
+      )}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <strong className="text-sm">{stage.title}
+          <span className="text-xs text-[var(--muted)]">
+            {runtime ? ` | ${runtime}` : ""}
+          </span>
+        </strong>
+        <span className="rounded-full bg-[var(--wash)] px-2 py-0.5 text-[10px] text-[var(--muted)]">
+          {tp(`timeframe.${stage.timeframe ?? "current"}`)}
+        </span>
+      </div>
+      {items.length ? (
+        <>
+          <ul className="mt-2 space-y-1 text-sm">
+            {shown.map((item) => (
+              <li className="truncate" key={item.id}>
+                {item.title}
+                {item.catalogItem?.year ? ` (${item.catalogItem.year})` : ""}
+              </li>
+            ))}
+          </ul>
+          {items.length > STAGE_PREVIEW ? (
+            <button
+              type="button"
+              aria-expanded={open}
+              onClick={() => setOpen((value) => !value)}
+              className="mt-2 min-h-9 w-full rounded-xl border border-[var(--line)] text-xs font-light text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)]"
+            >
+              {open ? tp("showLess") : tp("showMore", { count: items.length - STAGE_PREVIEW })}
+            </button>
+          ) : null}
+        </>
+      ) : (
+        <p className="mt-2 text-xs text-[var(--muted)]">{t("checkpointEmpty")}</p>
+      )}
+    </article>
   );
 }
 

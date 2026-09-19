@@ -138,13 +138,13 @@ async function resolveCheckpointId(
   raw: unknown,
 ): Promise<string | null> {
   if (raw === undefined || raw === null || raw === "") return null;
-  if (typeof raw !== "string") throw new ApiError(400, "invalid_checkpoint", "Checkpoint inválido.");
+  if (typeof raw !== "string") throw new ApiError(400, "invalid_checkpoint", "Etapa inválida.");
   const row = await oneOrNull<{ id: string }>(
     client,
     "SELECT id FROM challenge_checkpoints WHERE id = $1 AND challenge_id = $2 AND archived_at IS NULL",
     [raw, challengeId],
   );
-  if (!row) throw new ApiError(400, "invalid_checkpoint", "Checkpoint inexistente neste desafio.");
+  if (!row) throw new ApiError(400, "invalid_checkpoint", "Etapa inexistente neste desafio.");
   return row.id;
 }
 
@@ -210,14 +210,14 @@ export async function saveChallengeItems(
     if (endsOn < startsOn) throw new ApiError(400, "date_range", "A data final deve ser posterior ao início.");
     return inTransaction(async (client) => {
       const access = await challengeAccess(session.user.id, challengeId, client, true);
-      if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores podem gerar checkpoints.");
-      if (access.challenge.status === "closed") throw new ApiError(409, "challenge_locked", "Checkpoints não podem ser gerados depois do encerramento.");
+      if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores podem gerar os dias.");
+      if (access.challenge.status === "closed") throw new ApiError(409, "challenge_locked", "Os dias não podem ser gerados depois do encerramento.");
       const primary = await primaryEntryType(client, challengeId);
       if (primary?.submission_mode !== "daily") {
-        throw new ApiError(409, "invalid_mode", "Este desafio não usa checkpoints diários.");
+        throw new ApiError(409, "invalid_mode", "Este desafio não registra por dia.");
       }
       if (startsOn !== access.challenge.start_date || endsOn !== access.challenge.end_date) {
-        throw new ApiError(400, "date_range", "Os checkpoints diários precisam cobrir todo o período do desafio.");
+        throw new ApiError(400, "date_range", "Os dias precisam cobrir todo o período do desafio.");
       }
       const ids = await generateDailyCheckpoints(client, challengeId, startsOn, endsOn);
       await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
@@ -293,7 +293,7 @@ export async function saveChallengeItems(
       let checkpointId: string | null = null;
       if (typeof item.checkpointId === "string" && item.checkpointId) {
         if (!validCheckpointIds.has(item.checkpointId)) {
-          throw new ApiError(400, "invalid_checkpoint", "Um item aponta para um checkpoint inexistente.");
+          throw new ApiError(400, "invalid_checkpoint", "Um item aponta para uma etapa inexistente.");
         }
         checkpointId = item.checkpointId;
       }
@@ -323,7 +323,7 @@ export async function updateChallengeItem(
   return inTransaction(async (client) => {
     const access = await challengeAccess(session.user.id, challengeId, client, true);
     if (!access.canManage) {
-      throw new ApiError(403, "forbidden", "Somente administradores podem editar itens e checkpoints.");
+      throw new ApiError(403, "forbidden", "Somente administradores podem editar itens e etapas.");
     }
     if (access.challenge.status === "closed") {
       throw new ApiError(409, "challenge_locked", "Desafios encerrados preservam sua leitura histórica.");
@@ -396,7 +396,7 @@ export async function updateChallengeItem(
           const cp = await oneOrNull<{ id: string }>(client,
             "SELECT id FROM challenge_checkpoints WHERE id=$1 AND challenge_id=$2 AND archived_at IS NULL",
             [wanted, challengeId]);
-          if (!cp) throw new ApiError(400, "invalid_checkpoint", "Checkpoint inexistente neste desafio.");
+          if (!cp) throw new ApiError(400, "invalid_checkpoint", "Etapa inexistente neste desafio.");
           checkpointId = wanted;
         }
       }
@@ -490,7 +490,7 @@ export async function updateChallengeItem(
       };
     }
 
-    throw new ApiError(404, "not_found", "Item ou checkpoint não encontrado.");
+    throw new ApiError(404, "not_found", "Item ou etapa não encontrado.");
   });
 }
 

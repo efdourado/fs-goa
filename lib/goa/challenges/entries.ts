@@ -389,9 +389,9 @@ export async function saveEntry(
                 WHERE challenge_id=$1 AND archived_at IS NULL AND starts_at<=now()
                   AND (due_at IS NULL OR due_at>now()) ORDER BY starts_at DESC LIMIT 1`,
               [challengeId]);
-      if (!checkpoint) throw new ApiError(400, "invalid_checkpoint", "Checkpoint diário inexistente ou indisponível.");
+      if (!checkpoint) throw new ApiError(400, "invalid_checkpoint", "Dia inexistente ou indisponível.");
       if (checkpoint.starts_at.getTime() > Date.now()) {
-        throw new ApiError(409, "checkpoint_scheduled", "Este checkpoint ainda não foi liberado.");
+        throw new ApiError(409, "checkpoint_scheduled", "Este dia ainda não foi liberado.");
       }
       occurredOn = checkpoint.day;
       checkpointId = checkpoint.id;

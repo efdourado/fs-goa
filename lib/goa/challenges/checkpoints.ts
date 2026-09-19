@@ -25,11 +25,11 @@ function readCheckpointInput(raw: unknown, index: number): CheckpointInput {
   const record = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   const title = typeof record.title === "string" ? record.title.trim() : "";
   if (!title || title.length > 160) {
-    throw new ApiError(400, "invalid_checkpoint", `O checkpoint ${index + 1} precisa de um título de até 160 caracteres.`);
+    throw new ApiError(400, "invalid_checkpoint", `A etapa ${index + 1} precisa de um título de até 160 caracteres.`);
   }
   const kind = record.kind === undefined ? "session" : record.kind;
   if (!isCheckpointKind(kind)) {
-    throw new ApiError(400, "invalid_checkpoint", "Tipo de checkpoint inválido — use dia, semana, sessão ou marco.");
+    throw new ApiError(400, "invalid_checkpoint", "Tipo de etapa inválido.");
   }
   const description =
     typeof record.description === "string" && record.description.trim()
@@ -38,7 +38,7 @@ function readCheckpointInput(raw: unknown, index: number): CheckpointInput {
   const startsAt = normalizeInstant(record.startsAt ?? record.opensAt ?? null, `checkpoint ${index + 1}`);
   const dueAt = normalizeInstant(record.dueAt ?? null, `checkpoint ${index + 1}`);
   if (startsAt && dueAt && dueAt < startsAt) {
-    throw new ApiError(400, "invalid_checkpoint", `O fim do checkpoint ${index + 1} não pode ser antes do início.`);
+    throw new ApiError(400, "invalid_checkpoint", `O fim da etapa ${index + 1} não pode ser antes do início.`);
   }
   return {
     id: typeof record.id === "string" && record.id ? record.id : undefined,
@@ -107,16 +107,16 @@ export async function saveCheckpoints(
   body: Record<string, unknown>,
 ) {
   if (!Array.isArray(body.checkpoints)) {
-    throw new ApiError(400, "invalid_checkpoint", "Envie a lista de checkpoints.");
+    throw new ApiError(400, "invalid_checkpoint", "Envie a lista de etapas.");
   }
   if (body.checkpoints.length > 104) {
-    throw new ApiError(400, "checkpoint_limit", "Use no máximo 104 checkpoints (dois anos de semanas).");
+    throw new ApiError(400, "checkpoint_limit", "Use no máximo 104 etapas (dois anos de semanas).");
   }
   const inputs = body.checkpoints.map(readCheckpointInput);
 
   return inTransaction(async (client) => {
     const access = await challengeAccess(session.user.id, challengeId, client, true);
-    if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores organizam os checkpoints.");
+    if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores organizam as etapas.");
     if (access.challenge.status === "closed") {
       throw new ApiError(409, "challenge_locked", "Desafios encerrados preservam sua leitura histórica.");
     }
@@ -133,7 +133,7 @@ export async function saveCheckpoints(
 
     for (const input of inputs) {
       if (input.id && !existingById.has(input.id)) {
-        throw new ApiError(404, "not_found", "Um dos checkpoints não pertence a este desafio.");
+        throw new ApiError(404, "not_found", "Uma das etapas não pertence a este desafio.");
       }
     }
 
@@ -149,7 +149,7 @@ export async function saveCheckpoints(
         throw new ApiError(
           409,
           "checkpoint_has_entries",
-          `O checkpoint "${row.title}" já tem ${withEntries.count} registro(s). Mova ou remova os registros antes de excluí-lo.`,
+          `A etapa "${row.title}" já tem ${withEntries.count} registro(s). Mova ou remova os registros antes de excluí-lo.`,
         );
       }
       await client.query(
@@ -261,7 +261,7 @@ export async function assignCheckpointItems(
         throw new ApiError(404, "not_found", "Um dos itens não pertence a este desafio.");
       }
       if (assignment.checkpointId && !validCheckpoints.has(assignment.checkpointId)) {
-        throw new ApiError(400, "invalid_checkpoint", "Um checkpoint da atribuição não existe.");
+        throw new ApiError(400, "invalid_checkpoint", "Uma etapa da atribuição não existe.");
       }
       const result = await client.query(
         `UPDATE challenge_items SET checkpoint_id = $3, position = $4, updated_at = now()
