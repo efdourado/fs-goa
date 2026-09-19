@@ -656,6 +656,7 @@ function SharedAnswerSection({
   onReload?: () => Promise<void>;
 }) {
   const t = useTranslations("sharedAnswers");
+  const tp = useTranslations("participant");
   const f = useGoaFormat();
   const admin = canManage(challenge.viewerRole);
   const policy = type.sharedEditPolicy ?? "members_fill_admin_corrects";
@@ -703,7 +704,9 @@ function SharedAnswerSection({
       ) : null}
       <DynamicEntryForm
         key={`${type.id}-${item.id}-${entry?.id ?? "new"}-${entry?.updatedAt ?? ""}`}
-        heading={type.name}
+        // "Your response", like every other form — the field's own label says what it is, so the
+        // response's name on top would only repeat it.
+        heading={tp("yourResponseTitle")}
         sectioned={false}
         alwaysEditable={!hasRequiredField}
         fields={type.fields}
