@@ -30,17 +30,17 @@ export function EventScheduleInput({
   const problem = eventFormProblem(value);
 
   if (!value.date && !adding) {
+    // Collapsed it is one quiet button — a list of items shouldn't repeat a field label per row.
     return (
-      <Field label={label} optional plain>
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => setAdding(true)}
-          className="min-h-11 self-start rounded-xl border border-dashed border-[var(--line)] px-4 text-sm font-light text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          ＋ {t("add")}
-        </button>
-      </Field>
+      <button
+        type="button"
+        disabled={disabled}
+        aria-label={`${label}: ${t("add")}`}
+        onClick={() => setAdding(true)}
+        className="min-h-11 self-start rounded-xl border border-dashed border-[var(--line)] px-4 text-sm font-light text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        ＋ {t("add")}
+      </button>
     );
   }
 

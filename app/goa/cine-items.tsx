@@ -210,6 +210,89 @@ function authorMissing(row: CineRow, properties: LibraryProperty[] | undefined):
 
 type EditorLibrary = Pick<ChallengeLibraryRef, "id" | "kind" | "source" | "label">;
 
+/** A row for a catalogue item being put into a challenge, carrying what the catalogue already knows about it. */
+function rowFromCatalog(item: CatalogItem, timeZone: string | undefined): CineRow {
+  return newCineRow(item.title, {
+    catalogItemId: item.id,
+    author: item.author ?? "",
+    year: item.year ? String(item.year) : "",
+    pages: item.pageCount ? String(item.pageCount) : "",
+    runtimeMinutes: item.runtimeMinutes ? String(item.runtimeMinutes) : "",
+    mainGenre: item.mainGenre ?? "",
+    scheduled: encodeEventForm(eventFormOf(item.scheduledAt, timeZone ?? ""), timeZone ?? ""),
+  });
+}
+
+/**
+ * The catalogue as a checklist: search, tick a few — or every match at once — and add them in one go.
+ * Items already in the challenge stay listed but can't be ticked again.
+ */
+function CatalogPicker({ items, used, onAdd }: { items: CatalogItem[] | null; used: ReadonlySet<Id | undefined>; onAdd: (picked: CatalogItem[]) => void }) {
+  const t = useTranslations("cineItems");
+  const [query, setQuery] = useState("");
+  const [ticked, setTicked] = useState<ReadonlySet<Id>>(new Set());
+  if (items === null) return <p className="mt-3 p-2 text-xs text-[var(--muted)]">{t("loadingCatalog")}</p>;
+  if (!items.length) return <p className="mt-3 p-2 text-xs text-[var(--muted)]">{t("emptyCatalog")}</p>;
+
+  const needle = query.trim().toLowerCase();
+  const visible = needle
+    ? items.filter((item) => [item.title, item.author, item.mainGenre].some((text) => text?.toLowerCase().includes(needle)))
+    : items;
+  const selectable = visible.filter((item) => !used.has(item.id));
+  const chosen = items.filter((item) => ticked.has(item.id) && !used.has(item.id));
+  const allTicked = selectable.length > 0 && selectable.every((item) => ticked.has(item.id));
+
+  function toggle(id: Id) {
+    setTicked((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  return (
+    <div className="mt-3 rounded-xl border border-[var(--line)] bg-[var(--paper)]">
+      <div className="flex flex-wrap items-center gap-2 border-b border-[var(--line)] p-2">
+        <input
+          className={cx(inputClass, "min-h-10 flex-1 basis-40")}
+          type="search"
+          value={query}
+          placeholder={t("catalogSearch")}
+          aria-label={t("catalogSearch")}
+          onChange={(event) => setQuery(event.target.value)}
+        />
+        <Button variant="secondary" disabled={!selectable.length || allTicked} onClick={() => setTicked((current) => new Set([...current, ...selectable.map((item) => item.id)]))}>
+          {t("selectAll", { count: selectable.length })}
+        </Button>
+        {chosen.length ? <Button variant="ghost" onClick={() => setTicked(new Set())}>{t("clearSelection")}</Button> : null}
+      </div>
+      <ul className="max-h-72 overflow-y-auto p-1">
+        {visible.length ? visible.map((item) => {
+          const taken = used.has(item.id);
+          return (
+            <li key={item.id}>
+              <label className={cx("flex cursor-pointer items-center gap-3 rounded-lg px-2 py-1.5 text-sm hover:bg-[var(--wash)]", taken && "cursor-not-allowed opacity-40")}>
+                <input type="checkbox" className="h-4 w-4 flex-none" checked={taken || ticked.has(item.id)} disabled={taken} onChange={() => toggle(item.id)} />
+                <span className="min-w-0 flex-1">
+                  {item.title}{item.year ? ` (${item.year})` : ""}
+                  {item.author ? <span className="text-[var(--muted)]"> · {item.author}</span> : null}
+                  {item.mainGenre ? <span className="text-[var(--muted)]"> · {item.mainGenre}</span> : null}
+                  {formatRuntime(item.runtimeMinutes) ? <span className="text-[var(--muted)]"> · {formatRuntime(item.runtimeMinutes)}</span> : null}
+                </span>
+                <span className="flex-none text-xs text-[var(--muted)]">{taken ? t("alreadyAdded") : t("roundsCount", { count: item.roundCount ?? 0 })}</span>
+              </label>
+            </li>
+          );
+        }) : <li className="p-2 text-xs text-[var(--muted)]">{t("catalogNoMatch")}</li>}
+      </ul>
+      <div className="flex items-center justify-between gap-2 border-t border-[var(--line)] p-2">
+        <span className="text-xs text-[var(--muted)]">{t("catalogTally", { picked: chosen.length, total: items.length })}</span>
+        <Button disabled={!chosen.length} onClick={() => { onAdd(chosen); setTicked(new Set()); }}>{t("addSelected", { count: chosen.length })}</Button>
+      </div>
+    </div>
+  );
+}
+
 /**
  * The list of items a challenge starts with (or is adding to), for any mix of its
  * libraries. Each row belongs to one library and offers exactly that library's
@@ -483,22 +566,11 @@ export function CineItemsEditor({
           <Button variant="ghost" onClick={() => setShowCatalog((open) => !open)}>{showCatalog ? t("hideCatalog") : t("fromCatalog")}</Button>
         </div>
         {showCatalog ? (
-          <div className="mt-3 max-h-64 overflow-y-auto rounded-xl border border-[var(--line)] bg-[var(--paper)] p-2">
-            {catalog === null ? <p className="p-2 text-xs text-[var(--muted)]">{t("loadingCatalog")}</p>
-              : catalogInTarget.length === 0 ? <p className="p-2 text-xs text-[var(--muted)]">{t("emptyCatalog")}</p>
-              : catalogInTarget.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  disabled={usedCatalogIds.has(item.id)}
-                  onClick={() => onChange([...value, ...stamp([newCineRow(item.title, { catalogItemId: item.id, author: item.author ?? "", year: item.year ? String(item.year) : "", pages: item.pageCount ? String(item.pageCount) : "", runtimeMinutes: item.runtimeMinutes ? String(item.runtimeMinutes) : "", mainGenre: item.mainGenre ?? "", scheduled: encodeEventForm(eventFormOf(item.scheduledAt, timeZone ?? ""), timeZone ?? "") })])])}
-                  className={cx("flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-[var(--wash)] disabled:opacity-40", "")}
-                >
-                  <span>{item.title}{item.year ? ` (${item.year})` : ""}{item.author ? <span className="text-[var(--muted)]"> · {item.author}</span> : null}{item.mainGenre ? <span className="text-[var(--muted)]"> · {item.mainGenre}</span> : null}{formatRuntime(item.runtimeMinutes) ? <span className="text-[var(--muted)]"> · {formatRuntime(item.runtimeMinutes)}</span> : null}</span>
-                  <span className="text-xs text-[var(--muted)]">{usedCatalogIds.has(item.id) ? t("alreadyAdded") : t("roundsCount", { count: item.roundCount ?? 0 })}</span>
-                </button>
-              ))}
-          </div>
+          <CatalogPicker
+            items={catalog === null ? null : catalogInTarget}
+            used={usedCatalogIds}
+            onAdd={(picked) => onChange([...value, ...stamp(picked.map((item) => rowFromCatalog(item, timeZone)))])}
+          />
         ) : null}
       </div>
     </div>
