@@ -49,6 +49,8 @@ export function PersonalSpaceScreen({
 }) {
   const t = useTranslations("personalSpace");
   const tc = useTranslations("common");
+  // Colours are a Home feature; one set earlier doesn't tint these cards.
+  const plain = (challenge: ChallengeSummary): ChallengeSummary => ({ ...challenge, colorTag: null });
   const active = challenges.filter((challenge) => challenge.status === "active");
   const other = challenges.filter((challenge) => challenge.status !== "active");
 
@@ -85,7 +87,7 @@ export function PersonalSpaceScreen({
             <section>
               <h2 className="mb-4 text-lg font-semibold tracking-[-0.02em]">{t("sectionActive")}</h2>
               <div className="grid gap-4 sm:grid-cols-2">
-                {active.map((challenge) => <ActiveChallengeCard key={challenge.id} challenge={challenge} onOpen={onOpenChallenge} fluid />)}
+                {active.map((challenge) => <ActiveChallengeCard key={challenge.id} challenge={plain(challenge)} onOpen={onOpenChallenge} fluid />)}
               </div>
             </section>
           ) : null}
@@ -93,7 +95,7 @@ export function PersonalSpaceScreen({
             <section>
               <h2 className="mb-4 text-lg font-semibold tracking-[-0.02em]">{t("sectionArchive")}</h2>
               <div className="grid gap-4 sm:grid-cols-2">
-                {other.map((challenge) => <ActiveChallengeCard key={challenge.id} challenge={challenge} onOpen={() => open(challenge)} fluid />)}
+                {other.map((challenge) => <ActiveChallengeCard key={challenge.id} challenge={plain(challenge)} onOpen={() => open(challenge)} fluid />)}
               </div>
             </section>
           ) : null}
