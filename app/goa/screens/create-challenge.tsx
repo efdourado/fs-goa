@@ -9,7 +9,8 @@ import { CineItemsEditor, type CineRow, cineRowsToInput } from "../cine-items";
 import { API_PATHS, apiRequest } from "../api";
 import { useCsrf } from "../csrf";
 import { NewLibraryDialog } from "../library-dialogs";
-import { type CatalogScope, LibraryGlyph, LibraryPills, libraryChoices, useCatalogLibraries } from "../libraries";
+import { type CatalogScope, LibraryPills, libraryChoices, useCatalogLibraries } from "../libraries";
+import { RecipeIcon } from "../recipe-icons";
 import { tablesStarterProperties } from "../property-inputs";
 import { RuleSectionsEditor } from "../rules";
 import type { ChallengeCreationInput, ChallengeField, ChallengeRule, CreatableRecipeKey, GroupSummary, Id, SharedEditPolicy } from "../types";
@@ -23,13 +24,13 @@ type EditorLibrary = { id: Id | null; kind: string; source: "screens" | "pages" 
 
 type LibraryMode = "film" | "book" | "tables" | "pick" | null;
 
-const RECIPES: Array<{ key: CreatableRecipeKey; library: LibraryMode; scheduleMode: "period" | "none"; glyph: string; icon?: "tables" | "custom" }> = [
-  { key: "cinema", library: "film", scheduleMode: "none", glyph: "◉" },
-  { key: "bookshelf", library: "book", scheduleMode: "none", glyph: "〇" },
-  { key: "library", library: "book", scheduleMode: "period", glyph: "◎" },
-  { key: "tables", library: "tables", scheduleMode: "none", glyph: "", icon: "tables" },
-  { key: "custom", library: "pick", scheduleMode: "none", glyph: "", icon: "custom" },
-  { key: "habit", library: null, scheduleMode: "none", glyph: "𖣐" },
+const RECIPES: Array<{ key: CreatableRecipeKey; library: LibraryMode; scheduleMode: "period" | "none" }> = [
+  { key: "cinema", library: "film", scheduleMode: "none" },
+  { key: "bookshelf", library: "book", scheduleMode: "none" },
+  { key: "library", library: "book", scheduleMode: "period" },
+  { key: "tables", library: "tables", scheduleMode: "none" },
+  { key: "custom", library: "pick", scheduleMode: "none" },
+  { key: "habit", library: null, scheduleMode: "none" },
 ];
 
 type StepKey = "base" | "fields" | "checkpoints" | "people";
@@ -273,7 +274,7 @@ export function CreateChallengeScreen({
             <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {RECIPES.map((entry) => (
                 <button className={cx("rounded-2xl border p-5 text-left transition", recipe === entry.key ? "border-[var(--main)] bg-[var(--main-soft)] ring-2 ring-[var(--main)]/25" : "border-[var(--line)] bg-[var(--paper)] hover:border-[var(--main-line)]")} type="button" aria-pressed={recipe === entry.key} onClick={() => chooseRecipe(entry.key)} key={entry.key}>
-                  <span className="flex h-8 items-center" aria-hidden="true">{entry.icon ? <LibraryGlyph source={entry.icon} className="h-7 w-7" /> : <span className="text-2xl leading-none">{entry.glyph}</span>}</span>
+                  <span className="flex h-8 items-center" aria-hidden="true"><RecipeIcon name={entry.key} className="h-7 w-7" /></span>
                   <strong className="mt-3 block text-lg">{t(`recipes.${entry.key}.name`)}</strong>
                   <span className="mt-1 block text-sm leading-6 text-[var(--muted)]">{t(`recipes.${entry.key}.body`)}</span>
                 </button>

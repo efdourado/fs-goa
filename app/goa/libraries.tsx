@@ -1,10 +1,11 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { type ReactNode, useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { API_PATHS, apiRequest } from "./api";
 import { useGoaFormat } from "./format";
+import { RecipeIcon, type RecipeIconName } from "./recipe-icons";
 import type { CatalogLibrary, CatalogRecommender, Id } from "./types";
 import { cx } from "./ui";
 
@@ -48,35 +49,16 @@ export function libraryChoices(libraries: CatalogLibrary[]): LibraryChoice[] {
   return [...real, ...missing];
 }
 
-/** A small line icon per source, so a row of libraries reads at a glance without leaning on their names. */
-const GLYPH_PATHS: Record<CatalogLibrary["source"], ReactNode> = {
-  screens: (
-    <>
-      <rect x="2" y="3" width="12" height="8.4" rx="1.7" />
-      <path d="M6 14h4M8 11.4V14" strokeLinecap="round" />
-    </>
-  ),
-  pages: (
-    <>
-      <path d="M8 4.3C6.7 3.2 4.6 3 2.5 3.5v8.3c2.1-.4 4.2-.2 5.5.8 1.3-1 3.4-1.2 5.5-.8V3.5C11.4 3 9.3 3.2 8 4.3Z" strokeLinejoin="round" />
-      <path d="M8 4.3v8.3" />
-    </>
-  ),
-  tables: (
-    <>
-      <rect x="2.4" y="3" width="11.2" height="10" rx="1.7" />
-      <path d="M2.4 6.6h11.2M2.4 9.9h11.2M6.3 6.6V13" />
-    </>
-  ),
-  custom: <path d="M8 2.4l1.3 3.7 3.7 1.3-3.7 1.3L8 12.4 6.7 8.7 3 7.4l3.7-1.3L8 2.4Z" strokeLinejoin="round" />,
+/** The icon for each library source — the same artwork as the recipe it starts from (Screens = Cinema, Pages = Estante…). */
+const GLYPH_ICON: Record<CatalogLibrary["source"], RecipeIconName> = {
+  screens: "cinema",
+  pages: "bookshelf",
+  tables: "tables",
+  custom: "custom",
 };
 
 export function LibraryGlyph({ source, className }: { source: CatalogLibrary["source"]; className?: string }) {
-  return (
-    <svg viewBox="0 0 16 16" className={cx("h-4 w-4 flex-none", className)} fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
-      {GLYPH_PATHS[source]}
-    </svg>
-  );
+  return <RecipeIcon name={GLYPH_ICON[source]} className={cx("h-[18px] w-[18px]", className)} />;
 }
 
 interface Loaded<T> {
