@@ -17,6 +17,7 @@ interface ChallengeAccessRow {
   recipe_key: string | null;
   results_anon: boolean;
   show_schedule: boolean;
+  collects_entry_date: boolean | null;
   results_all_comments: boolean;
   time_zone: string;
   kind: "round" | "list";
@@ -44,7 +45,7 @@ export async function challengeAccess(
       activeClient,
       `SELECT c.id, c.group_id, c.title, c.description, c.rules, c.rule_sections,
               c.start_date::text AS start_date, c.end_date::text AS end_date, c.recipe_key, c.results_anon,
-              c.show_schedule, c.results_all_comments, c.time_zone, c.kind, c.status, gm.role, g.kind AS group_kind,
+              c.show_schedule, c.collects_entry_date, c.results_all_comments, c.time_zone, c.kind, c.status, gm.role, g.kind AS group_kind,
               EXISTS (
                 SELECT 1 FROM challenge_participants cp
                  WHERE cp.challenge_id = c.id AND cp.user_id = $2 AND cp.removed_at IS NULL

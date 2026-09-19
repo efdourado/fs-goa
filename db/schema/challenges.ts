@@ -67,6 +67,9 @@ export const challenges = pgTable(
     // pages. The checkpoints themselves stay — they still drive metrics and the
     // admin schedule editor.
     showSchedule: boolean("show_schedule").notNull().default(true),
+    // Whether an entry form offers "when did it happen". `null` = follow the recipe's
+    // default (Cinema yes; Custom, Tables and Estante no); set once someone chooses.
+    collectsEntryDate: boolean("collects_entry_date"),
     // When true, the Vitrine's comments section is every current text-field
     // answer with content, computed live at read time — a new comment shows
     // up with no curation step. When false (the default), only the comments

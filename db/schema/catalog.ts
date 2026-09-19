@@ -95,7 +95,7 @@ export const catalogNativePropertyConfigs = pgTable(
     unique("catalog_native_property_configs_library_key_unique").on(table.libraryId, table.propertyKey),
     check(
       "catalog_native_property_configs_key_check",
-      sql`${table.propertyKey} in ('title', 'year', 'main_genre', 'runtime_minutes', 'author', 'page_count')`,
+      sql`${table.propertyKey} in ('title', 'year', 'main_genre', 'runtime_minutes', 'author', 'page_count', 'scheduled_at')`,
     ),
     check(
       "catalog_native_property_configs_label_check",
@@ -159,6 +159,16 @@ export const catalogItems = pgTable(
     pageCount: integer("page_count"),
     // Films/series only — books use `pageCount` instead.
     runtimeMinutes: integer("runtime_minutes"),
+    // When the thing itself happens — a match's kickoff, a screening. A property of
+    // the item, so every challenge that uses it reads the same date; a challenge's
+    // own "answers open/close" window is a separate, restricting setting on
+    // `challenge_items`. `scheduled_precision` says whether `scheduled_at` is a
+    // real clock time or just a calendar day (stored as local midnight in
+    // `scheduled_time_zone`).
+    scheduledAt: timestamptz("scheduled_at"),
+    scheduledEndAt: timestamptz("scheduled_end_at"),
+    scheduledPrecision: text("scheduled_precision").notNull().default("datetime"),
+    scheduledTimeZone: text("scheduled_time_zone"),
     // How this item entered the library — independent of any challenge-
     // specific recommendation on `challenge_items` (Phase 6): a catalog-level
     // pick and a round's own pick are different assignments, and setting one
@@ -225,6 +235,12 @@ export const catalogItems = pgTable(
       sql`${table.mainGenre} is null or char_length(btrim(${table.mainGenre})) between 1 and 80`,
     ),
     check("catalog_items_pages_check", sql`${table.pageCount} is null or ${table.pageCount} between 1 and 1000000`),
+    check("catalog_items_scheduled_precision_check", sql`${table.scheduledPrecision} in ('date', 'datetime')`),
+    check(
+      "catalog_items_scheduled_shape_check",
+      sql`(${table.scheduledAt} is not null or (${table.scheduledEndAt} is null and ${table.scheduledTimeZone} is null))
+          and (${table.scheduledEndAt} is null or ${table.scheduledEndAt} >= ${table.scheduledAt})`,
+    ),
   ],
 );
 

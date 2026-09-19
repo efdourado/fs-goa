@@ -12,6 +12,7 @@ import {
   type CatalogAttributeType,
 } from "./catalog-attributes";
 import { writeAudit } from "./domain/audit";
+import { eventScheduleColumns, eventScheduleJson, parseEventSchedule, scheduleVisibleSql } from "./domain/event-schedule";
 import { ensurePersonalWorkspace } from "./domain/challenges";
 import { normalizeTitle, publicId } from "./domain/shared";
 import { moveToTrash } from "./trash";
@@ -73,7 +74,11 @@ export interface CatalogAttributes {
   mainGenre?: unknown;
   pageCount?: unknown;
   runtimeMinutes?: unknown;
+  /** The item's own scheduled date/time (a match's kickoff): `null` clears, absent leaves it alone. */
+  scheduledAt?: unknown;
 }
+
+const DEFAULT_SCHEDULE_TIME_ZONE = "America/Sao_Paulo";
 
 function optionalText(value: unknown, max: number, name: string): string | null {
   if (value === undefined || value === null || value === "") return null;
@@ -95,8 +100,14 @@ function readAttributes(input: CatalogAttributes) {
     mainGenre: optionalText(input.mainGenre, 80, "Gênero principal"),
     pageCount: optionalInt(input.pageCount, 1, 1_000_000, "Páginas"),
     runtimeMinutes: optionalInt(input.runtimeMinutes, 1, 2000, "Duração"),
+    // `undefined` = not sent (keep whatever is stored); `null` = explicitly no schedule.
+    scheduled: input.scheduledAt === undefined
+      ? undefined
+      : parseEventSchedule(input.scheduledAt, DEFAULT_SCHEDULE_TIME_ZONE),
   };
 }
+
+type ParsedAttributes = ReturnType<typeof readAttributes>;
 
 /**
  * Find-or-create a film/book by normalized title within the group. When it
@@ -129,9 +140,10 @@ export async function upsertCatalogItem(
   type Row = {
     id: string; author: string | null; year: number | null;
     main_genre: string | null; page_count: number | null; runtime_minutes: number | null;
+    scheduled_at: Date | null;
   };
   const sameTitle = await client.query<Row>(
-    `SELECT id, author, year, main_genre, page_count, runtime_minutes FROM catalog_items
+    `SELECT id, author, year, main_genre, page_count, runtime_minutes, scheduled_at FROM catalog_items
       WHERE group_id = $1 AND kind = $2 AND normalized_title = $3 AND archived_at IS NULL
       ORDER BY created_at`,
     [groupId, input.kind, normalized],
@@ -167,6 +179,14 @@ export async function upsertCatalogItem(
     enrich("main_genre", existing.main_genre, attributes.mainGenre);
     enrich("page_count", existing.page_count, attributes.pageCount);
     enrich("runtime_minutes", existing.runtime_minutes, attributes.runtimeMinutes);
+    // A film/book already scheduled keeps its date — the same "never overwrite" rule as every attribute.
+    if (attributes.scheduled && !existing.scheduled_at) {
+      const columns = eventScheduleColumns(attributes.scheduled);
+      for (const [column, value] of Object.entries(columns)) {
+        params.push(value);
+        sets.push(`${column} = $${params.length}`);
+      }
+    }
     if (sets.length) {
       await client.query(`UPDATE catalog_items SET ${sets.join(", ")}, updated_at = now() WHERE id = $1`, params);
     }
@@ -186,14 +206,19 @@ async function insertCatalogItemRow(
   kind: string,
   title: string,
   normalized: string,
-  attributes: ReturnType<typeof readAttributes>,
+  attributes: ParsedAttributes,
 ): Promise<string> {
   const id = publicId();
+  const schedule = eventScheduleColumns(attributes.scheduled ?? null);
   await client.query(
     `INSERT INTO catalog_items
-      (id, group_id, kind, title, normalized_title, author, year, main_genre, page_count, runtime_minutes, created_by_user_id, created_at, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,now(),now())`,
-    [id, groupId, kind, title, normalized, attributes.author, attributes.year, attributes.mainGenre, attributes.pageCount, attributes.runtimeMinutes, userId],
+      (id, group_id, kind, title, normalized_title, author, year, main_genre, page_count, runtime_minutes,
+       scheduled_at, scheduled_end_at, scheduled_precision, scheduled_time_zone, created_by_user_id, created_at, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,now(),now())`,
+    [
+      id, groupId, kind, title, normalized, attributes.author, attributes.year, attributes.mainGenre, attributes.pageCount, attributes.runtimeMinutes,
+      schedule.scheduled_at, schedule.scheduled_end_at, schedule.scheduled_precision, schedule.scheduled_time_zone, userId,
+    ],
   );
   return id;
 }
@@ -380,6 +405,10 @@ async function listCatalogWithClient(client: PoolClient, workspaceId: string) {
     main_genre: string | null;
     page_count: number | null;
     runtime_minutes: number | null;
+    scheduled_at: Date | null;
+    scheduled_end_at: Date | null;
+    scheduled_precision: "date" | "datetime";
+    scheduled_time_zone: string | null;
     round_count: number;
     rating_avg: number | null;
     rating_count: number;
@@ -390,6 +419,9 @@ async function listCatalogWithClient(client: PoolClient, workspaceId: string) {
     origin_note: string | null;
   }>(
     `SELECT ci.id, ci.kind, ci.title, ci.author, ci.year, ci.main_genre, ci.page_count, ci.runtime_minutes,
+              CASE WHEN ${scheduleVisibleSql("ci")} THEN ci.scheduled_at END AS scheduled_at,
+              CASE WHEN ${scheduleVisibleSql("ci")} THEN ci.scheduled_end_at END AS scheduled_end_at,
+              ci.scheduled_precision, ci.scheduled_time_zone,
               (SELECT count(DISTINCT it.challenge_id)::int FROM challenge_items it WHERE it.catalog_item_id = ci.id) AS round_count,
               agg.rating_avg, coalesce(agg.rating_count, 0)::int AS rating_count,
               CASE WHEN active_rec.user_id IS NOT NULL THEN ci.recommended_by_user_id END AS recommended_by_user_id,
@@ -428,6 +460,7 @@ async function listCatalogWithClient(client: PoolClient, workspaceId: string) {
       mainGenre: item.main_genre,
       pageCount: item.page_count,
       runtimeMinutes: item.runtime_minutes,
+      scheduledAt: eventScheduleJson(item),
       roundCount: item.round_count,
       recommendedBy: !showRecommenders ? null : item.recommended_by_user_id
         ? { kind: "member" as const, id: item.recommended_by_user_id, name: item.recommended_by_user_name ?? "" }
@@ -455,11 +488,16 @@ async function catalogItemDetailWithClient(
   const item = await oneOrNull<{
     id: string; kind: string; title: string; author: string | null;
     year: number | null; main_genre: string | null; page_count: number | null; runtime_minutes: number | null;
+    scheduled_at: Date | null; scheduled_end_at: Date | null;
+    scheduled_precision: "date" | "datetime"; scheduled_time_zone: string | null;
     recommended_by_user_id: string | null; recommended_by_user_name: string | null;
     recommended_by_external_id: string | null; recommended_by_external_name: string | null; origin_note: string | null;
   }>(
     client,
     `SELECT ci.id, ci.kind, ci.title, ci.author, ci.year, ci.main_genre, ci.page_count, ci.runtime_minutes,
+            CASE WHEN ${scheduleVisibleSql("ci")} THEN ci.scheduled_at END AS scheduled_at,
+            CASE WHEN ${scheduleVisibleSql("ci")} THEN ci.scheduled_end_at END AS scheduled_end_at,
+            ci.scheduled_precision, ci.scheduled_time_zone,
             CASE WHEN active_rec.user_id IS NOT NULL THEN ci.recommended_by_user_id END AS recommended_by_user_id,
             CASE WHEN active_rec.user_id IS NOT NULL THEN ru.display_name END AS recommended_by_user_name,
             ci.recommended_by_external_id, cr.display_name AS recommended_by_external_name, ci.origin_note
@@ -521,6 +559,7 @@ async function catalogItemDetailWithClient(
     mainGenre: item.main_genre,
     pageCount: item.page_count,
     runtimeMinutes: item.runtime_minutes,
+    scheduledAt: eventScheduleJson(item),
     recommendedBy: !showRecommenders ? null : item.recommended_by_user_id
       ? { kind: "member" as const, id: item.recommended_by_user_id, name: item.recommended_by_user_name ?? "" }
       : item.recommended_by_external_id
@@ -611,6 +650,7 @@ async function catalogItemInput(client: PoolClient, groupId: string, body: Recor
     mainGenre: body.mainGenre,
     pageCount: body.pageCount,
     runtimeMinutes: body.runtimeMinutes,
+    scheduledAt: body.scheduledAt,
     attributes: body.attributes,
     catalogRecommendedByUserId: body.catalogRecommendedByUserId,
     catalogRecommendedByExternalId: body.catalogRecommendedByExternalId,
@@ -848,20 +888,24 @@ export async function renameCatalogLibrary(session: SessionContext, libraryId: s
  * the title — the rest of its properties are attribute definitions. Keys are
  * stable: metrics and storage key off these, never off a label.
  */
-const NATIVE_PROPERTIES: Record<string, Array<{ key: string; type: CatalogAttributeType }>> = {
+type NativePropertyType = CatalogAttributeType | "schedule";
+const SCHEDULE_PROPERTY = { key: "scheduled_at", type: "schedule" as NativePropertyType };
+const NATIVE_PROPERTIES: Record<string, Array<{ key: string; type: NativePropertyType }>> = {
   film: [
     { key: "title", type: "text" }, { key: "year", type: "number" },
-    { key: "main_genre", type: "text" }, { key: "runtime_minutes", type: "number" },
+    { key: "main_genre", type: "text" }, { key: "runtime_minutes", type: "number" }, SCHEDULE_PROPERTY,
   ],
   book: [
     { key: "title", type: "text" }, { key: "author", type: "text" }, { key: "year", type: "number" },
-    { key: "main_genre", type: "text" }, { key: "page_count", type: "number" },
+    { key: "main_genre", type: "text" }, { key: "page_count", type: "number" }, SCHEDULE_PROPERTY,
   ],
 };
-const TITLE_ONLY = [{ key: "title", type: "text" as CatalogAttributeType }];
+const TITLE_ONLY: Array<{ key: string; type: NativePropertyType }> = [{ key: "title", type: "text" }, SCHEDULE_PROPERTY];
 function nativePropertiesFor(kind: string) {
   return NATIVE_PROPERTIES[kind] ?? TITLE_ONLY;
 }
+/** Off until someone turns it on: most libraries (films, books, restaurants) have no date of their own. */
+const DEFAULT_HIDDEN_NATIVE = new Set(["scheduled_at"]);
 
 export interface LibraryProperty {
   /** The native key (`year`, `title`…) or the attribute definition's id — never a label. */
@@ -869,7 +913,7 @@ export interface LibraryProperty {
   storage: "native" | "attribute";
   /** `null` on a native property means "use the locale-aware default name". */
   label: string | null;
-  type: CatalogAttributeType;
+  type: NativePropertyType;
   hidden: boolean;
   position: number;
   canHide: boolean;
@@ -897,7 +941,7 @@ async function listLibraryPropertiesWithClient(
       const position = config?.position ?? index;
       return {
         key: native.key, storage: "native" as const, label: config?.label ?? null, type: native.type,
-        hidden: config?.hidden ?? false, position, canHide: native.key !== "title", sort: position,
+        hidden: config?.hidden ?? DEFAULT_HIDDEN_NATIVE.has(native.key), position, canHide: native.key !== "title", sort: position,
       };
     }),
     ...defs.map((def) => ({
@@ -983,10 +1027,10 @@ export async function updateCatalogLibraryProperty(
       );
       const next = {
         label: label === undefined ? current?.label ?? null : label,
-        hidden: hidden === undefined ? current?.hidden ?? false : hidden,
+        hidden: hidden === undefined ? current?.hidden ?? DEFAULT_HIDDEN_NATIVE.has(propertyKey) : hidden,
         position: position === undefined ? current?.position ?? null : position,
       };
-      if (next.label === null && !next.hidden && next.position === null) {
+      if (next.label === null && next.hidden === DEFAULT_HIDDEN_NATIVE.has(propertyKey) && next.position === null) {
         // Back to the defaults: no override to keep.
         await client.query("DELETE FROM catalog_native_property_configs WHERE library_id = $1 AND property_key = $2", [library.id, propertyKey]);
       } else {
@@ -1180,6 +1224,13 @@ export async function applyCatalogItemUpdate(
     ["runtime_minutes", attributes.runtimeMinutes, "runtimeMinutes"],
   ] as const) {
     if (Object.hasOwn(body, key)) {
+      params.push(value);
+      sets.push(`${column} = $${params.length}`);
+    }
+  }
+  // The event schedule is replaced as a whole: the four columns move together, and `null` clears them.
+  if (Object.hasOwn(body, "scheduledAt")) {
+    for (const [column, value] of Object.entries(eventScheduleColumns(attributes.scheduled ?? null))) {
       params.push(value);
       sets.push(`${column} = $${params.length}`);
     }

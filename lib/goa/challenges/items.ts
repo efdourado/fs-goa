@@ -73,11 +73,14 @@ async function createChallengeCatalogItem(
   userId: string,
   kind: string,
   title: string,
-  extra: { author?: unknown; year?: unknown; mainGenre?: unknown; pageCount?: unknown; runtimeMinutes?: unknown; attributes?: unknown } = {},
+  extra: {
+    author?: unknown; year?: unknown; mainGenre?: unknown; pageCount?: unknown; runtimeMinutes?: unknown;
+    scheduledAt?: unknown; attributes?: unknown;
+  } = {},
 ): Promise<string> {
   return kind === "film" || kind === "book"
     ? upsertCatalogItem(client, groupId, userId, { kind, title, ...extra })
-    : createCatalogItem(client, groupId, userId, { kind, title, attributes: extra.attributes });
+    : createCatalogItem(client, groupId, userId, { kind, title, attributes: extra.attributes, scheduledAt: extra.scheduledAt });
 }
 
 /**
@@ -173,11 +176,14 @@ export async function addChallengeItem(
     if (typeof body.catalogItemId === "string" && body.catalogItemId) {
       await assertCatalogItemInGroup(client, body.catalogItemId, access.challenge.group_id, catalogKind);
       catalogItemId = body.catalogItemId;
-      if (author) {
-        await applyCatalogItemUpdate(client, catalogItemId, access.challenge.group_id, { author });
-      }
+      const update: Record<string, unknown> = {};
+      if (author) update.author = author;
+      if (Object.hasOwn(body, "scheduledAt")) update.scheduledAt = body.scheduledAt;
+      if (Object.keys(update).length) await applyCatalogItemUpdate(client, catalogItemId, access.challenge.group_id, update);
     } else {
-      catalogItemId = await createChallengeCatalogItem(client, access.challenge.group_id, session.user.id, catalogKind, title, { author });
+      catalogItemId = await createChallengeCatalogItem(client, access.challenge.group_id, session.user.id, catalogKind, title, {
+        author, scheduledAt: body.scheduledAt,
+      });
     }
     await client.query(
       `INSERT INTO challenge_items
@@ -271,13 +277,14 @@ export async function saveChallengeItems(
       if (typeof item.catalogItemId === "string" && item.catalogItemId) {
         await assertCatalogItemInGroup(client, item.catalogItemId, access.challenge.group_id, catalogKind);
         catalogItemId = item.catalogItemId;
-        if (author) {
-          await applyCatalogItemUpdate(client, catalogItemId, access.challenge.group_id, { author });
-        }
+        const update: Record<string, unknown> = {};
+        if (author) update.author = author;
+        if (Object.hasOwn(item, "scheduledAt")) update.scheduledAt = item.scheduledAt;
+        if (Object.keys(update).length) await applyCatalogItemUpdate(client, catalogItemId, access.challenge.group_id, update);
       } else {
         catalogItemId = await createChallengeCatalogItem(client, access.challenge.group_id, session.user.id, catalogKind, title, {
           author: item.author, year: item.year, mainGenre: item.mainGenre,
-          pageCount: item.pageCount, runtimeMinutes: item.runtimeMinutes, attributes: item.attributes,
+          pageCount: item.pageCount, runtimeMinutes: item.runtimeMinutes, scheduledAt: item.scheduledAt, attributes: item.attributes,
         });
       }
       // A member, a saved outside name, or a free-text note — never a made-up
@@ -451,7 +458,8 @@ export async function updateChallengeItem(
       // lógica de `updateCatalogItem`.
       if (current.catalog_item_id
         && (Object.hasOwn(body, "author") || Object.hasOwn(body, "year") || Object.hasOwn(body, "mainGenre")
-          || Object.hasOwn(body, "pageCount") || Object.hasOwn(body, "runtimeMinutes") || Object.hasOwn(body, "attributes"))) {
+          || Object.hasOwn(body, "pageCount") || Object.hasOwn(body, "runtimeMinutes") || Object.hasOwn(body, "scheduledAt")
+          || Object.hasOwn(body, "attributes"))) {
         // The item's library decides which custom properties `attributes` may set.
         const catalogKind = (await oneOrNull<{ kind: string }>(
           client, "SELECT kind FROM catalog_items WHERE id = $1", [current.catalog_item_id],

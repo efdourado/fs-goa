@@ -47,7 +47,7 @@ export async function duplicateChallenge(
     );
     const title = stringValue(body, "title", { max: 160, optional: true }) ?? `Cópia de ${sourceAccess.challenge.title}`;
     const { copyItems, mode } = readCopyMode(body);
-    const targetId = await copyChallengeStructure(
+    const { id: targetId, skippedProperties } = await copyChallengeStructure(
       client,
       sourceChallengeId,
       targetGroupId,
@@ -65,6 +65,6 @@ export async function duplicateChallenge(
     await writeAudit(client, targetGroupId, targetId, session.user.id,
       "challenge.duplicated", "challenge", targetId, null,
       { sourceChallengeId, sourceGroupId: sourceAccess.challenge.group_id, targetGroupId, mode });
-    return { id: targetId, challengeId: targetId, groupId: targetGroupId, status: "draft" };
+    return { id: targetId, challengeId: targetId, groupId: targetGroupId, status: "draft", skippedProperties };
   });
 }

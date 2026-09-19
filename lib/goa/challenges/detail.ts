@@ -20,6 +20,7 @@ import { readChallengeLibraries } from "./libraries";
 import { generateDailyCheckpoints } from "./items";
 import { recipeCollectsEntryDate } from "./recipes";
 import { metricsForChallenge, resultForChallenge } from "./results";
+import { eventScheduleJson, scheduleVisibleSql } from "../domain/event-schedule";
 import { parseRuleSections, rulesCompatibilityText } from "../domain/rules";
 
 function windowStatus(
@@ -56,6 +57,8 @@ export async function detailItems(
     catalog_item_id: string | null; catalog_kind: string | null; catalog_title: string | null;
     catalog_author: string | null; catalog_year: number | null;
     catalog_main_genre: string | null; catalog_pages: number | null; catalog_runtime_minutes: number | null;
+    scheduled_at: Date | null; scheduled_end_at: Date | null;
+    scheduled_precision: "date" | "datetime"; scheduled_time_zone: string | null;
     recommended_by_id: string | null; recommended_by_name: string | null;
     recommended_by_external_id: string | null; recommended_by_external_name: string | null;
   }>(
@@ -67,6 +70,9 @@ export async function detailItems(
     `SELECT i.id, i.title, i.description, i.position, i.opens_at, i.due_at, i.schedule_precision, i.checkpoint_id, i.origin_note,
             i.catalog_item_id, ci.kind AS catalog_kind, ci.title AS catalog_title, ci.author AS catalog_author, ci.year AS catalog_year,
             ci.main_genre AS catalog_main_genre, ci.page_count AS catalog_pages, ci.runtime_minutes AS catalog_runtime_minutes,
+            CASE WHEN ${scheduleVisibleSql("ci")} THEN ci.scheduled_at END AS scheduled_at,
+            CASE WHEN ${scheduleVisibleSql("ci")} THEN ci.scheduled_end_at END AS scheduled_end_at,
+            ci.scheduled_precision, ci.scheduled_time_zone,
             CASE WHEN active_recommender.user_id IS NOT NULL THEN i.recommended_by_user_id END AS recommended_by_id,
             CASE WHEN active_recommender.user_id IS NOT NULL THEN ru.display_name END AS recommended_by_name,
             i.recommended_by_external_id, cr.display_name AS recommended_by_external_name
@@ -106,6 +112,7 @@ export async function detailItems(
           mainGenre: item.catalog_main_genre,
           pageCount: item.catalog_pages,
           runtimeMinutes: item.catalog_runtime_minutes,
+          scheduledAt: eventScheduleJson(item),
           attributes: attributes.get(item.catalog_item_id) ?? [],
         }
       : null,
@@ -173,6 +180,7 @@ export interface DetailChallengeRow {
   group_kind: string | null;
   results_anon: boolean;
   show_schedule?: boolean;
+  collects_entry_date?: boolean | null;
   results_all_comments?: boolean;
   published_as_template_at?: string | Date | null;
   time_zone?: string;
@@ -276,7 +284,7 @@ export async function buildChallengeDetail(
     kind: ch.kind,
     recipeKey: ch.recipe_key ?? null,
     scope: ch.group_kind === "personal" ? "personal" : "group",
-    collectsEntryDate: recipeCollectsEntryDate(ch.recipe_key),
+    collectsEntryDate: ch.collects_entry_date ?? recipeCollectsEntryDate(ch.recipe_key),
     resultsAnon: ch.results_anon,
     showSchedule: ch.show_schedule ?? true,
     resultsAllComments: ch.results_all_comments === true,
@@ -336,6 +344,12 @@ export async function updateChallenge(
       ? parseRuleSections(access.challenge.rule_sections, access.challenge.rules)
       : parseRuleSections(body.ruleSections, body.rules);
     const rules = rulesCompatibilityText(ruleSections);
+    // `null` hands the choice back to the recipe's default.
+    const touchesEntryDate = Object.hasOwn(body, "collectsEntryDate");
+    if (touchesEntryDate && body.collectsEntryDate !== null && typeof body.collectsEntryDate !== "boolean") {
+      throw new ApiError(400, "invalid_setting", "Informe se o registro pergunta quando aconteceu.");
+    }
+    const collectsEntryDate = touchesEntryDate ? (body.collectsEntryDate as boolean | null) : access.challenge.collects_entry_date;
     const rawStartDate = Object.hasOwn(body, "startsOn")
       ? body.startsOn
       : Object.hasOwn(body, "startDate")
@@ -390,8 +404,8 @@ export async function updateChallenge(
 
     await client.query(
       `UPDATE challenges SET title=$2, description=$3, rules=$4, rule_sections=$5::jsonb,
-              start_date=$6, end_date=$7, updated_at=now() WHERE id=$1`,
-      [challengeId, title, description, rules, JSON.stringify(ruleSections), startDate, endDate],
+              start_date=$6, end_date=$7, collects_entry_date=$8, updated_at=now() WHERE id=$1`,
+      [challengeId, title, description, rules, JSON.stringify(ruleSections), startDate, endDate, collectsEntryDate],
     );
     if (
       checkpointDriven
@@ -414,7 +428,10 @@ export async function updateChallenge(
       { title: access.challenge.title, description: access.challenge.description,
         ruleSections: parseRuleSections(access.challenge.rule_sections, access.challenge.rules),
         startsOn: access.challenge.start_date, endsOn: access.challenge.end_date },
-      { title, description, ruleSections, startsOn: startDate, endsOn: endDate });
-    return { id: challengeId, title, description, rules, ruleSections, startsOn: startDate, endsOn: endDate };
+      { title, description, ruleSections, startsOn: startDate, endsOn: endDate, collectsEntryDate });
+    return {
+      id: challengeId, title, description, rules, ruleSections, startsOn: startDate, endsOn: endDate,
+      collectsEntryDate: collectsEntryDate ?? recipeCollectsEntryDate(access.challenge.recipe_key),
+    };
   });
 }

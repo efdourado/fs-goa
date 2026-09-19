@@ -56,6 +56,23 @@ export async function createChallenge(
   // "books I've read") — it has no round to open or close, so it is born active
   // and can never be closed. See `transitionChallenge` and `isLivingList`.
   const livingList = options.personal === true && !startDate && !endDate;
+  // "Who fills in this response?" — only a Custom challenge lets its main response be filled once
+  // for the whole group instead of by each participant; every other recipe is per participant.
+  const sharedPrimary = body.answerScope === "shared";
+  if (body.answerScope !== undefined && body.answerScope !== "individual" && body.answerScope !== "shared") {
+    throw new ApiError(400, "invalid_answer_scope", "Escolha quem preenche o registro: cada participante ou uma vez para o grupo.");
+  }
+  if (sharedPrimary && recipe.key !== "custom") {
+    throw new ApiError(400, "shared_custom_only", "Só um desafio personalizado pode ter o registro principal compartilhado.");
+  }
+  const sharedEditPolicy = body.sharedEditPolicy ?? "members_fill_admin_corrects";
+  if (sharedPrimary && sharedEditPolicy !== "members_fill_admin_corrects" && sharedEditPolicy !== "members_can_edit") {
+    throw new ApiError(400, "invalid_shared_edit_policy", "Escolha quem pode preencher ou corrigir a resposta compartilhada.");
+  }
+  if (body.collectsEntryDate !== undefined && body.collectsEntryDate !== null && typeof body.collectsEntryDate !== "boolean") {
+    throw new ApiError(400, "invalid_setting", "Informe se o registro pergunta quando aconteceu.");
+  }
+  const collectsEntryDate = typeof body.collectsEntryDate === "boolean" ? body.collectsEntryDate : null;
   const wizardFields = Array.isArray(body.fields) && body.fields.length ? (body.fields as ClientField[]) : null;
   if (wizardFields && wizardFields.length > 30) throw new ApiError(400, "field_limit", "Use no máximo 30 campos.");
   const wantsItems = (recipe.catalogKind !== null || recipe.catalogKindFromBody === true)
@@ -111,11 +128,11 @@ export async function createChallenge(
     await client.query(
       `INSERT INTO challenges
         (id, group_id, created_by_user_id, title, description, rules, rule_sections, recipe_key, recipe_version,
-         start_date, end_date, time_zone, kind, status, activated_at, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11,$12,$13,$14,
+         start_date, end_date, time_zone, kind, status, collects_entry_date, activated_at, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11,$12,$13,$14,$15,
                CASE WHEN $14 = 'active' THEN now() END, now(), now())`,
       [id, groupId, session.user.id, title, description, rules, JSON.stringify(ruleSections),
-        recipe.key, recipe.version, startDate, endDate, timeZone, kind, status],
+        recipe.key, recipe.version, startDate, endDate, timeZone, kind, status, collectsEntryDate],
     );
 
     let primaryTypeId = "";
@@ -126,13 +143,15 @@ export async function createChallenge(
       const type = recipe.entryTypes[typeIndex];
       const typeId = publicId();
       const isPrimary = hasExplicitPrimary ? type.primary === true : typeIndex === 0;
+      const shared = sharedPrimary && type.primary === true;
       await client.query(
         `INSERT INTO entry_types
           (id, challenge_id, semantic_key, name, submission_mode, purpose, target_policy, cardinality, schedule_policy,
-           is_primary, created_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now(),now())`,
+           is_primary, answer_scope, shared_edit_policy, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,now(),now())`,
         [typeId, id, type.semanticKey, type.name, type.submissionMode, type.purpose,
-          type.targetPolicy, type.cardinality, type.schedulePolicy, isPrimary],
+          type.targetPolicy, type.cardinality, type.schedulePolicy, isPrimary,
+          shared ? "shared" : "individual", shared ? sharedEditPolicy : null],
       );
       if (type.purpose === "completion") completionTypeId = typeId;
       const typeFields = type.primary && wizardFields ? wizardFields : type.fields;
@@ -216,12 +235,16 @@ export async function createChallenge(
         if (typeof item.catalogItemId === "string" && item.catalogItemId) {
           await assertCatalogItemInGroup(client, item.catalogItemId, groupId, catalogKind);
           catalogItemId = item.catalogItemId;
-          if (itemAuthor || item.attributes) {
+          if (itemAuthor || item.attributes || Object.hasOwn(item, "scheduledAt")) {
             await applyCatalogItemUpdate(
               client,
               catalogItemId,
               groupId,
-              { ...(itemAuthor ? { author: itemAuthor } : {}), attributes: item.attributes },
+              {
+                ...(itemAuthor ? { author: itemAuthor } : {}),
+                attributes: item.attributes,
+                ...(Object.hasOwn(item, "scheduledAt") ? { scheduledAt: item.scheduledAt } : {}),
+              },
               catalogKind,
             );
           }
@@ -234,6 +257,7 @@ export async function createChallenge(
             mainGenre: item.mainGenre,
             pageCount: item.pageCount,
             runtimeMinutes: item.runtimeMinutes,
+            scheduledAt: item.scheduledAt,
             attributes: item.attributes,
           });
         } else {
@@ -245,6 +269,7 @@ export async function createChallenge(
             kind: catalogKind,
             title: itemTitle,
             attributes: item.attributes,
+            scheduledAt: item.scheduledAt,
           });
         }
 

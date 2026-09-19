@@ -335,10 +335,15 @@ export async function saveEntry(
         throw new ApiError(400, "missing_item", "Selecione um item.");
       }
       if (requestedItemId) {
-        const item = await oneOrNull<{ id: string }>(client,
-          "SELECT id FROM challenge_items WHERE id=$1 AND challenge_id=$2 AND archived_at IS NULL",
+        const item = await oneOrNull<{ id: string; opens_at: Date | null }>(client,
+          "SELECT id, opens_at FROM challenge_items WHERE id=$1 AND challenge_id=$2 AND archived_at IS NULL",
           [requestedItemId, challengeId]);
         if (!item) throw new ApiError(400, "invalid_item", "Item não pertence ao desafio.");
+        // "Answers open from" is a real restriction (the form is locked until then); the item's
+        // "answer by" date is only a reminder and never blocks anything.
+        if (item.opens_at && item.opens_at.getTime() > Date.now()) {
+          throw new ApiError(409, "item_not_open", "As respostas para este item ainda não abriram.");
+        }
         itemId = item.id;
       }
     }

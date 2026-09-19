@@ -357,6 +357,9 @@ export const RECIPES: Record<RecipeKey, Recipe> = {
     catalogKindFromBody: true,
     userDefinedFields: true,
     scheduleMode: "none",
+    // A response is about something else (a match, a place), so "when did it happen" is only asked
+    // when the creator turns it on — every save is still timestamped internally.
+    collectsEntryDate: false,
     entryTypes: [customEntry],
     metrics: [completionMetric],
   },

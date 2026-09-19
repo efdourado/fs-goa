@@ -21,11 +21,31 @@ export function readCopyMode(body: Record<string, unknown>): { copyItems: boolea
 }
 
 /**
+ * A property that could not come across because the destination library already
+ * has one under the same internal key that means something else. The copy keeps
+ * the destination's definition untouched and leaves this property — and its
+ * values — out, rather than push a value into a property of another type.
+ */
+export interface SkippedProperty {
+  library: { kind: string; label: string | null; source: string };
+  key: string;
+  label: string;
+  type: string;
+  reason: "type_mismatch" | "archived";
+  /** `type_mismatch` only: what the destination's property of that key holds. */
+  existingType: string | null;
+}
+
+/**
  * Recreates one library in the target group with the same starting config, name
  * and properties. A library the target already has is left as its owners set it
  * up — the copy only adds custom properties it is missing (so copied values have
  * somewhere to live) and never overwrites their names, order or visibility. The
  * copy is a separate row: renaming either side never touches the other.
+ *
+ * A property the target already defines under the same key is a conflict when its
+ * type differs (or it was archived there): it is skipped, reported back, and
+ * `copyAttributeValues` leaves its values out too.
  */
 async function copyLibrary(
   client: PoolClient,
@@ -33,7 +53,28 @@ async function copyLibrary(
   targetGroupId: string,
   kind: string,
   actorUserId: string,
-): Promise<void> {
+): Promise<SkippedProperty[]> {
+  const conflicts = await client.query<{
+    key: string; label: string; type: string; target_type: string; archived: boolean;
+    library_label: string | null; library_source: string;
+  }>(
+    `SELECT d.semantic_key AS key, d.label, d.type, t.type AS target_type, (t.archived_at IS NOT NULL) AS archived,
+            cl.label AS library_label, cl.source AS library_source
+       FROM catalog_attribute_defs d
+       JOIN catalog_attribute_defs t
+         ON t.group_id = $2 AND t.kind = d.kind AND t.semantic_key = d.semantic_key
+       JOIN catalog_libraries cl ON cl.group_id = d.group_id AND cl.kind = d.kind
+      WHERE d.group_id = $1 AND d.kind = $3 AND d.archived_at IS NULL
+        AND (t.archived_at IS NOT NULL OR t.type <> d.type)
+      ORDER BY d.position`,
+    [sourceGroupId, targetGroupId, kind],
+  );
+  const skipped: SkippedProperty[] = conflicts.rows.map((row) => ({
+    library: { kind, label: row.library_label, source: row.library_source },
+    key: row.key, label: row.label, type: row.type,
+    reason: row.archived ? "archived" : "type_mismatch",
+    existingType: row.archived ? null : row.target_type,
+  }));
   const created = await client.query<{ id: string }>(
     `INSERT INTO catalog_libraries (id, group_id, kind, source, label, position, created_by_user_id, created_at, updated_at)
      SELECT gen_random_uuid()::text, $2, cl.kind, cl.source, cl.label, cl.position, $3, now(), now()
@@ -51,6 +92,19 @@ async function copyLibrary(
          JOIN catalog_libraries cl ON cl.id = n.library_id AND cl.group_id = $1 AND cl.kind = $3`,
       [sourceGroupId, created.rows[0].id, kind],
     );
+  } else {
+    // A library the target already had keeps its own configuration — except the event date
+    // switch: copied items carry their dates, and they'd be stored but invisible without it.
+    await client.query(
+      `INSERT INTO catalog_native_property_configs (id, library_id, property_key, label, hidden, position, created_at, updated_at)
+       SELECT gen_random_uuid()::text, tl.id, n.property_key, n.label, n.hidden, n.position, now(), now()
+         FROM catalog_native_property_configs n
+         JOIN catalog_libraries sl ON sl.id = n.library_id AND sl.group_id = $1 AND sl.kind = $3
+         JOIN catalog_libraries tl ON tl.group_id = $2 AND tl.kind = $3
+        WHERE n.property_key = 'scheduled_at' AND n.hidden = false
+       ON CONFLICT (library_id, property_key) DO NOTHING`,
+      [sourceGroupId, targetGroupId, kind],
+    );
   }
   await client.query(
     `INSERT INTO catalog_attribute_defs
@@ -61,6 +115,7 @@ async function copyLibrary(
      ON CONFLICT (group_id, kind, semantic_key) DO NOTHING`,
     [sourceGroupId, targetGroupId, actorUserId, kind],
   );
+  return skipped;
 }
 
 /**
@@ -74,6 +129,7 @@ async function copyAttributeValues(
   targetCatalogItemId: string,
   targetGroupId: string,
   kind: string,
+  skipKeys: ReadonlySet<string>,
 ): Promise<void> {
   const values = await client.query<{
     key: string; type: string; text_value: string | null; number_value: number | null;
@@ -93,7 +149,7 @@ async function copyAttributeValues(
   )).rows.map((row) => row.key));
   const missing: Record<string, string | number | boolean> = {};
   for (const row of values.rows) {
-    if (have.has(row.key)) continue;
+    if (have.has(row.key) || skipKeys.has(row.key)) continue;
     const value = row.type === "number" ? row.number_value
       : row.type === "date" ? row.date_value
       : row.type === "boolean" ? row.boolean_value
@@ -121,7 +177,8 @@ async function copyAttributeValues(
  *
  * Shared by "duplicate this challenge" and "duplicate this template". Callers own
  * every access check and their own audit/bookkeeping rows; this function only
- * writes the structural copy and returns the new challenge id.
+ * writes the structural copy and returns the new challenge id, plus any library
+ * properties it had to leave out because the destination defines them differently.
  */
 export async function copyChallengeStructure(
   client: PoolClient,
@@ -130,15 +187,22 @@ export async function copyChallengeStructure(
   createdByUserId: string,
   title: string,
   options: { copyItems?: boolean } = {},
-): Promise<string> {
+): Promise<{ id: string; skippedProperties: SkippedProperty[] }> {
   const copyItems = options.copyItems !== false;
   const targetId = publicId();
+  const skippedProperties: SkippedProperty[] = [];
+  const skippedKeys = new Map<string, Set<string>>();
+  const copyLibraryAndRemember = async (sourceGroupId: string, kind: string, createdBy: string) => {
+    const skipped = await copyLibrary(client, sourceGroupId, targetGroupId, kind, createdBy);
+    skippedProperties.push(...skipped);
+    skippedKeys.set(kind, new Set(skipped.map((property) => property.key)));
+  };
   await client.query(
     `INSERT INTO challenges
       (id,group_id,created_by_user_id,title,description,rules,rule_sections,recipe_key,recipe_version,
-       start_date,end_date,time_zone,status,created_at,updated_at)
+       start_date,end_date,time_zone,collects_entry_date,status,created_at,updated_at)
      SELECT $1,$2,$3,$4,description,rules,rule_sections,recipe_key,recipe_version,
-            NULL,NULL,time_zone,'draft',now(),now()
+            NULL,NULL,time_zone,collects_entry_date,'draft',now(),now()
        FROM challenges WHERE id=$5`,
     [targetId, targetGroupId, createdByUserId, title, sourceChallengeId],
   );
@@ -229,7 +293,7 @@ export async function copyChallengeStructure(
   const sourceGroupId = origin.group_id;
   const linkedKinds = new Set<string>();
   for (const library of await readChallengeLibraries(client, sourceChallengeId, sourceGroupId, origin.recipe_key)) {
-    await copyLibrary(client, sourceGroupId, targetGroupId, library.kind, createdByUserId);
+    await copyLibraryAndRemember(sourceGroupId, library.kind, createdByUserId);
     await linkChallengeLibrary(client, targetId, targetGroupId, library.kind, createdByUserId);
     linkedKinds.add(library.kind);
   }
@@ -269,12 +333,24 @@ export async function copyChallengeStructure(
           pageCount: item.catalog_pages,
           runtimeMinutes: item.catalog_runtime,
         })).id;
-        await copyAttributeValues(client, item.catalog_item_id, catalogItemId, targetGroupId, item.catalog_kind);
         if (!linkedKinds.has(item.catalog_kind)) {
-          await copyLibrary(client, sourceGroupId, targetGroupId, item.catalog_kind, createdByUserId);
+          await copyLibraryAndRemember(sourceGroupId, item.catalog_kind, createdByUserId);
           await linkChallengeLibrary(client, targetId, targetGroupId, item.catalog_kind, createdByUserId);
           linkedKinds.add(item.catalog_kind);
         }
+        await copyAttributeValues(
+          client, item.catalog_item_id, catalogItemId, targetGroupId, item.catalog_kind,
+          skippedKeys.get(item.catalog_kind) ?? new Set(),
+        );
+        // The item's own date and time comes along too, unless the item already had one in the target.
+        await client.query(
+          `UPDATE catalog_items t
+              SET scheduled_at = s.scheduled_at, scheduled_end_at = s.scheduled_end_at,
+                  scheduled_precision = s.scheduled_precision, scheduled_time_zone = s.scheduled_time_zone, updated_at = now()
+             FROM catalog_items s
+            WHERE s.id = $1 AND t.id = $2 AND s.scheduled_at IS NOT NULL AND t.scheduled_at IS NULL`,
+          [item.catalog_item_id, catalogItemId],
+        );
       }
       await client.query(
         `INSERT INTO challenge_items
@@ -307,5 +383,5 @@ export async function copyChallengeStructure(
     );
   }
 
-  return targetId;
+  return { id: targetId, skippedProperties };
 }
