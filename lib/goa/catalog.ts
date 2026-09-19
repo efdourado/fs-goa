@@ -50,6 +50,27 @@ export async function ensureCatalogLibrary(
   );
 }
 
+/**
+ * Switches a library's "Scheduled date and time" property on — creating the row of a built-in
+ * library nobody has used yet. Idempotent, and never touches a name or position someone gave the
+ * property. A challenge that says "each item has its own date" does this for the libraries it draws from.
+ */
+export async function enableLibraryEventSchedule(
+  client: PoolClient,
+  groupId: string,
+  userId: string,
+  kind: string,
+): Promise<void> {
+  await ensureCatalogLibrary(client, groupId, kind, userId);
+  await client.query(
+    `INSERT INTO catalog_native_property_configs (id, library_id, property_key, label, hidden, position, created_at, updated_at)
+     SELECT $3, l.id, 'scheduled_at', NULL, false, NULL, now(), now()
+       FROM catalog_libraries l WHERE l.group_id = $1 AND l.kind = $2
+     ON CONFLICT (library_id, property_key) DO UPDATE SET hidden = false, updated_at = now()`,
+    [groupId, kind, publicId()],
+  );
+}
+
 export function normalizeLabel(value: string): string {
   return normalizeTitle(value).slice(0, 80);
 }

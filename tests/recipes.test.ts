@@ -84,6 +84,9 @@ describe("current challenge recipes", () => {
     // Only completion is seeded — a "nota"-keyed metric would be wrong the
     // moment the wizard's Fields step replaces the default fields.
     assert.deepEqual(recipe.metrics.map((metric) => metric.operation), ["completion_rate"]);
+    // A response is about something else (a match, a place) — its date is asked for only when switched on.
+    assert.equal(recipe.collectsEntryDate, false);
+    assert.equal(recipeCollectsEntryDate("custom"), false);
   });
 
   test("Tables rates a place on three 0-5 dimensions with an optional comment and nothing else", () => {

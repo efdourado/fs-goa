@@ -7357,3 +7357,48 @@ test("copiar para um destino com a mesma propriedade de outro tipo (ou arquivada
   const clean = await call("POST", `/api/challenges/${cid}/duplicate`, { session: owner, body: { targetGroupId: dst2, mode: "structure_and_items" } });
   assert.deepEqual((clean.body as { skippedProperties: unknown[] }).skippedProperties, []);
 });
+
+test("criar o desafio com \"cada item tem data e hora\" liga a propriedade nas bibliotecas dele, inclusive nas embutidas ainda sem linha", async () => {
+  const owner = await register("Tiago", "tiago_datas");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Copa" } })).body as { id: string }).id;
+  const matches = (await call("POST", `/api/groups/${gid}/catalog/libraries`, { session: owner, body: { label: "Jogos" } })).body as { id: string; kind: string };
+  const scheduleOf = async (libraryId: string) =>
+    ((await call("GET", `/api/catalog/libraries/${libraryId}/properties`, { session: owner })).body as { properties: Array<{ key: string; hidden: boolean }> })
+      .properties.find((property) => property.key === "scheduled_at")!;
+  assert.equal((await scheduleOf(matches.id)).hidden, true);
+
+  const kickoff = "2026-06-15T19:00:00.000Z";
+  const created = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "custom", title: "Copa", libraryId: matches.id, itemDates: true, participantIds: [owner.user.id],
+      items: [{ title: "Brasil x Argentina", scheduledAt: { startsAt: kickoff, timeZone: "America/Sao_Paulo" } }],
+    },
+  });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  assert.equal((await scheduleOf(matches.id)).hidden, false, "o desafio ligou a data do evento na biblioteca");
+  const detail = (await call("GET", `/api/challenges/${(created.body as { id: string }).id}`, { session: owner })).body as {
+    items: Array<{ catalogItem: { scheduledAt: { startsAt: string } | null } }>;
+  };
+  assert.equal(detail.items[0].catalogItem.scheduledAt?.startsAt, kickoff);
+
+  // uma biblioteca embutida que ainda nem tinha linha ganha a linha e a propriedade ligada
+  const cinema = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "cinema", title: "Sessões", itemDates: true, participantIds: [owner.user.id],
+      items: [{ title: "Aftersun", scheduledAt: { startsOn: "2026-07-01", timeZone: "America/Sao_Paulo" } }],
+    },
+  });
+  assert.equal(cinema.response.status, 201, JSON.stringify(cinema.body));
+  const film = (await call("GET", `/api/groups/${gid}/catalog/libraries`, { session: owner })).body as { libraries: Array<{ id: string; kind: string }> };
+  assert.equal((await scheduleOf(film.libraries.find((library) => library.kind === "film")!.id)).hidden, false);
+
+  // sem a opção, nada muda numa biblioteca que já existe
+  const plain = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner, body: { recipe: "bookshelf", title: "Livros", participantIds: [owner.user.id], items: [{ title: "Dom Casmurro", author: "Machado de Assis" }] },
+  });
+  assert.equal(plain.response.status, 201, JSON.stringify(plain.body));
+  const book = (await call("GET", `/api/groups/${gid}/catalog/libraries`, { session: owner })).body as { libraries: Array<{ id: string; kind: string }> };
+  assert.equal((await scheduleOf(book.libraries.find((library) => library.kind === "book")!.id)).hidden, true);
+});

@@ -7,6 +7,7 @@ import {
   assertCatalogItemInGroup,
   authorRequired,
   createCatalogItem,
+  enableLibraryEventSchedule,
   findOrCreateLibraryBySource,
   resolveItemKind,
   upsertCatalogItem,
@@ -218,6 +219,11 @@ export async function createChallenge(
       }
       for (const kind of namedKinds) await link(kind);
       if (!linkedKinds.length) throw new ApiError(400, "invalid_library", "Escolha a biblioteca de onde vêm os itens.");
+      // "Each item has its own date and time" (a match's kickoff): the libraries this challenge draws
+      // from start asking for it. A property of the library, so other challenges on it read the same date.
+      if (body.itemDates === true) {
+        for (const kind of linkedKinds) await enableLibraryEventSchedule(client, groupId, session.user.id, kind);
+      }
       const linkedRows = linkedKinds.map((kind, position) => ({ id: null, kind, source: "", label: null, position }));
       const usedKeys = new Set<string>();
       for (let index = 0; index < items.length; index += 1) {
