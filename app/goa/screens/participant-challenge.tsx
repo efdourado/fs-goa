@@ -375,6 +375,11 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
   const interactive = canEdit && editing;
   const showsButtons = editing && canEdit;
   const sectioned = sectionedProp ?? Boolean(heading);
+  // A response named after its one field ("Final score" over a "Final score" input) says it once:
+  // the heading keeps the name (and the required mark), the field's label stays only for screen readers.
+  const namedFields = fields.filter((candidate) => candidate.id);
+  const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+  const labelIsHeading = Boolean(heading) && namedFields.length === 1 && sameName(heading ?? "", namedFields[0].label);
   // An all-optional section (Terminei) has nothing to show until you opt in —
   // no required field ever appears on its own, so with nothing filled yet it
   // collapses to a single control; clicking it reveals the heading, the
@@ -397,7 +402,10 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
     <div className={cx(sectioned ? "border-l-[3px] border-[var(--line)] pl-4" : undefined, !heading && canReopen ? "relative" : undefined)}>
       {heading ? (
         <div className="mb-3 flex items-center justify-between gap-2">
-          <h3 className={sectionLabelClass}>{heading}</h3>
+          <h3 className={sectionLabelClass}>
+            {heading}
+            {labelIsHeading && namedFields[0].required ? <span className="ml-1 text-[var(--main-2)]" aria-label={t("required")}>*</span> : null}
+          </h3>
           {canReopen ? (
             <button
               type="button"
@@ -433,7 +441,7 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
           const fieldId = field.id;
           return (
             <div key={field.id}>
-              <label className={labelClass} htmlFor={field.type === "rating" || field.type === "boolean" ? undefined : id}>{field.label}{readOnlyInline ? <span className="ml-1 font-normal text-[var(--muted)]">{t("readOnlyInline")}</span> : null}{field.required ? <span className="ml-1 text-[var(--main-2)]" aria-label={t("required")}>*</span> : <small className="ml-2 font-light text-[var(--muted)]">{t("optional")}</small>}</label>
+              <label className={labelIsHeading ? "sr-only" : labelClass} htmlFor={field.type === "rating" || field.type === "boolean" ? undefined : id}>{field.label}{readOnlyInline ? <span className="ml-1 font-normal text-[var(--muted)]">{t("readOnlyInline")}</span> : null}{field.required ? <span className="ml-1 text-[var(--main-2)]" aria-label={t("required")}>*</span> : <small className="ml-2 font-light text-[var(--muted)]">{t("optional")}</small>}</label>
               {field.type === "text" && field.config?.multiline ? (
                 interactive ? (
                   <div>
@@ -656,7 +664,6 @@ function SharedAnswerSection({
   onReload?: () => Promise<void>;
 }) {
   const t = useTranslations("sharedAnswers");
-  const tp = useTranslations("participant");
   const f = useGoaFormat();
   const admin = canManage(challenge.viewerRole);
   const policy = type.sharedEditPolicy ?? "members_fill_admin_corrects";
@@ -704,9 +711,7 @@ function SharedAnswerSection({
       ) : null}
       <DynamicEntryForm
         key={`${type.id}-${item.id}-${entry?.id ?? "new"}-${entry?.updatedAt ?? ""}`}
-        // "Your response", like every other form — the field's own label says what it is, so the
-        // response's name on top would only repeat it.
-        heading={tp("yourResponseTitle")}
+        heading={type.name}
         sectioned={false}
         alwaysEditable={!hasRequiredField}
         fields={type.fields}
