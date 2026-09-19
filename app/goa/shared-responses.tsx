@@ -50,7 +50,8 @@ export function AddSharedResponseDialog({
     setBusy(true);
     setError(null);
     try {
-      const [clean] = cleanFields([{ ...field, label: field.label.trim() || responseName }]);
+      // One name: it labels the response and the value inside it.
+      const [clean] = cleanFields([{ ...field, label: responseName }]);
       await onAdd({ name: responseName, sharedEditPolicy: policy, field: { ...clean, key: "" } });
     } catch (cause) {
       setError(f.error(cause));
@@ -61,7 +62,7 @@ export function AddSharedResponseDialog({
   return (
     <FormDialog
       title={t("addTitle")}
-      dirty={Boolean(name.trim() || field.label.trim())}
+      dirty={Boolean(name.trim())}
       busy={busy}
       error={error}
       onCancel={onCancel}
@@ -80,20 +81,15 @@ export function AddSharedResponseDialog({
           options={POLICIES.map((value) => ({ value, label: t(`policy.${value}`), hint: t(`policyHint.${value}`) }))}
         />
       </Field>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label={t("fieldLabel")} hint={t("fieldHint")}>
-          <input className={inputClass} value={field.label} maxLength={100} placeholder={name.trim() || t("fieldPlaceholder")} onChange={(event) => setField((current) => ({ ...current, label: event.target.value }))} />
-        </Field>
-        <Field label={tf("typeLabel")}>
-          <select
-            className={inputClass}
-            value={field.type}
-            onChange={(event) => { const type = event.target.value as ChallengeField["type"]; setField((current) => ({ ...current, type, config: newFieldConfig(type) })); }}
-          >
-            {FIELD_TYPES.map((value) => <option value={value} key={value}>{tf(`type.${value}`)}</option>)}
-          </select>
-        </Field>
-      </div>
+      <Field label={tf("typeLabel")}>
+        <select
+          className={inputClass}
+          value={field.type}
+          onChange={(event) => { const type = event.target.value as ChallengeField["type"]; setField((current) => ({ ...current, type, config: newFieldConfig(type) })); }}
+        >
+          {FIELD_TYPES.map((value) => <option value={value} key={value}>{tf(`type.${value}`)}</option>)}
+        </select>
+      </Field>
       {hasConfig ? <FieldConfigInputs field={field} onChange={(patch) => setField((current) => ({ ...current, ...patch }))} /> : null}
       <Toggle checked={field.required} onChange={(next) => setField((current) => ({ ...current, required: next }))} label={t("requiredLabel")} hint={t("requiredHint")} />
     </FormDialog>

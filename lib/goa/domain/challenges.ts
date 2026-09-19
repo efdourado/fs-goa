@@ -145,17 +145,20 @@ export async function createChallenge(
       const typeId = publicId();
       const isPrimary = hasExplicitPrimary ? type.primary === true : typeIndex === 0;
       const shared = sharedPrimary && type.primary === true;
+      const typeFields = type.primary && wizardFields ? wizardFields : type.fields;
+      // A group's single answer has one name: the response is called what its value is called.
+      const onlyLabel = typeFields.length === 1 && typeof typeFields[0].label === "string" ? typeFields[0].label.trim() : "";
+      const typeName = shared && onlyLabel ? onlyLabel.slice(0, 120) : type.name;
       await client.query(
         `INSERT INTO entry_types
           (id, challenge_id, semantic_key, name, submission_mode, purpose, target_policy, cardinality, schedule_policy,
            is_primary, answer_scope, shared_edit_policy, created_at, updated_at)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,now(),now())`,
-        [typeId, id, type.semanticKey, type.name, type.submissionMode, type.purpose,
+        [typeId, id, type.semanticKey, typeName, type.submissionMode, type.purpose,
           type.targetPolicy, type.cardinality, type.schedulePolicy, isPrimary,
           shared ? "shared" : "individual", shared ? sharedEditPolicy : null],
       );
       if (type.purpose === "completion") completionTypeId = typeId;
-      const typeFields = type.primary && wizardFields ? wizardFields : type.fields;
       for (let index = 0; index < typeFields.length; index += 1) {
         const field = await insertField(client, id, typeId, typeFields[index], index);
         if (!fieldByKey.has(field.semanticKey)) {
