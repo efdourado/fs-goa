@@ -9,6 +9,7 @@ import { RuleSectionsView } from "../app/goa/rules";
 import { DynamicEntryForm, itemEntryTypes, ParticipantChallengeScreen, ResultView } from "../app/goa/screens/participant-challenge";
 import type { ChallengeDetail, ChallengeField, ImportPreview } from "../app/goa/types";
 import { AppHeader, ChallengeStatusBadge, SchedulePeriodFields } from "../app/goa/ui";
+import { WelcomePanel } from "../app/goa/welcome";
 import {
   findMissingRequiredField,
   inclusiveDayCount,
@@ -712,6 +713,15 @@ test("Wrapped: quando há blocos, o Resultado os renderiza na ordem gravada e pu
   const summaryIdx = html.indexOf("O clube viu 6 filmes");
   const metricIdx = html.indexOf("Nota média");
   assert.ok(summaryIdx > -1 && metricIdx > summaryIdx, "o resumo (posição 0) vem antes da métrica (posição 2)");
+});
+
+test("boas-vindas de quem não tem nada: as quatro partes de uma rodada, as receitas e três formas de começar", () => {
+  const html = renderWithIntl(createElement(WelcomePanel, { onCreateGroup: () => undefined, onStartSolo: () => undefined, onOpenTemplates: () => undefined }));
+  for (const step of ["Escolha o que você acompanha", "Monte um desafio", "Traga sua turma", "Leia a vitrine"]) assert.match(html, new RegExp(step));
+  for (const recipe of ["Cinema", "Estante", "Clube de leitura", "Hábito", "Personalizado"]) assert.match(html, new RegExp(recipe));
+  assert.match(html, />Criar grupo<\/button>/);
+  assert.match(html, />Novo desafio<\/button>/);
+  assert.match(html, />Ver modelos<\/button>/);
 });
 
 test("header lista convites de grupo pendentes no menu de novidades", () => {

@@ -333,6 +333,47 @@
       "group": "Novo grupo"
     }
   },
+  "welcome": {
+    "lede": "Nada por aqui ainda. O Goa se monta em quatro passos — comece por aquele que você já tem em mente.",
+    "flowTitle": "Como uma rodada se monta",
+    "steps": {
+      "library": {
+        "title": "Escolha o que você acompanha",
+        "body": "Filmes, livros, lugares, partidas — guardados numa biblioteca que lembra de cada item."
+      },
+      "challenge": {
+        "title": "Monte um desafio",
+        "body": "Ver uma lista de filmes, ler por 90 dias, manter um hábito. Escolha uma receita e decida o que cada pessoa registra."
+      },
+      "group": {
+        "title": "Traga sua turma",
+        "body": "Um grupo privado para o clube, os amigos, a família — ou fique só com o seu espaço."
+      },
+      "showcase": {
+        "title": "Leia a vitrine",
+        "body": "O Goa faz as contas — médias, rankings, quem está em dia — e transforma a rodada numa história."
+      }
+    },
+    "recipesTitle": "Receitas para começar",
+    "startTitle": "Por onde você quer começar?",
+    "starts": {
+      "group": {
+        "title": "Criar um grupo",
+        "body": "Para um clube ou uma turma de amigos. Convide as pessoas quando o primeiro desafio estiver pronto.",
+        "cta": "Criar grupo"
+      },
+      "solo": {
+        "title": "Começar por conta própria",
+        "body": "Um desafio privado no Meu espaço — sem grupo, sem convites.",
+        "cta": "Novo desafio"
+      },
+      "templates": {
+        "title": "Copiar um que já existe",
+        "body": "Desafios que outros grupos publicaram como modelo — copie um e deixe do seu jeito.",
+        "cta": "Ver modelos"
+      }
+    }
+  },
   "group": {
     "updated": "Grupo atualizado.",
     "deleteConfirm": "Mover \"{name}\" para a lixeira? Os desafios e registros somem do app.",

@@ -8,6 +8,7 @@ import { API_PATHS, apiRequest } from "../api";
 import { Dialog } from "../dialog";
 import { useGoaFormat } from "../format";
 import { Shelf } from "../shelf";
+import { WelcomePanel } from "../welcome";
 import {
   CHALLENGE_COLOR_TAGS,
   type ChallengeColorTag,
@@ -440,6 +441,8 @@ export function DashboardScreen({
   onOpenChallenge,
   onOpenAdmin,
   onCreateGroup,
+  onCreatePersonalChallenge,
+  onOpenTemplates,
   onChanged,
 }: {
   user: User;
@@ -452,9 +455,12 @@ export function DashboardScreen({
   onOpenChallenge: (id: Id) => void;
   onOpenAdmin: (id: Id) => void;
   onCreateGroup: (name: string) => Promise<void>;
+  onCreatePersonalChallenge: () => void;
+  onOpenTemplates: () => void;
   onChanged?: () => void;
 }) {
   const t = useTranslations("dashboard");
+  const tWelcome = useTranslations("welcome");
   const tr = useTranslations("roles");
 
   const [showGroupDialog, setShowGroupDialog] = useState(false);
@@ -570,7 +576,8 @@ export function DashboardScreen({
   const filteredCount = filtered.pinned.length + filtered.running.length + filtered.archive.length;
   // Personal challenges live on their own page (My space); only a pinned one shows here.
   const hasAnyChallenge = shelves.pinned.length + shelves.running.length + shelves.archive.length > 0;
-  const brandNew = !hasAnyChallenge && !standardGroups.length;
+  // Brand new = nothing anywhere, My space included.
+  const brandNew = challenges.length === 0 && !standardGroups.length;
 
   function renderRail(shelfKey: ShelfKey, list: ChallengeSummary[]): ReactNode {
     // "Move up/down" only makes sense against the real shelf order — the same
@@ -593,7 +600,7 @@ export function DashboardScreen({
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
-      <PageHeading title={t("greeting", { name: user.name.split(" ")[0] })} description={t("subtitle")} />
+      <PageHeading title={t("greeting", { name: user.name.split(" ")[0] })} description={brandNew ? tWelcome("lede") : t("subtitle")} />
 
       {showGroupDialog ? <GroupCreateDialog onClose={() => setShowGroupDialog(false)} onCreate={onCreateGroup} /> : null}
 
@@ -655,7 +662,7 @@ export function DashboardScreen({
       <StatusMessage error={error} />
 
       {brandNew ? (
-        <EmptyState title={t("emptyGroupsTitle")} onClick={() => setShowGroupDialog(true)} />
+        <WelcomePanel onCreateGroup={() => setShowGroupDialog(true)} onStartSolo={onCreatePersonalChallenge} onOpenTemplates={onOpenTemplates} />
       ) : null}
 
       {brandNew ? null : (

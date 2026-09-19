@@ -333,6 +333,47 @@
       "group": "Nuevo grupo"
     }
   },
+  "welcome": {
+    "lede": "Aún no hay nada aquí. Goa se arma en cuatro pasos — empieza por el que ya tengas en mente.",
+    "flowTitle": "Cómo se arma una ronda",
+    "steps": {
+      "library": {
+        "title": "Elige qué sigues",
+        "body": "Películas, libros, lugares, partidos — guardados en una biblioteca que recuerda cada ítem."
+      },
+      "challenge": {
+        "title": "Arma un desafío",
+        "body": "Ver una lista de películas, leer durante 90 días, mantener un hábito. Elige una receta y decide qué registra cada persona."
+      },
+      "group": {
+        "title": "Trae a tu gente",
+        "body": "Un grupo privado para el club, los amigos, la familia — o quédate solo con tu espacio."
+      },
+      "showcase": {
+        "title": "Lee la vitrina",
+        "body": "Goa hace las cuentas — medias, rankings, quién va al día — y convierte la ronda en una historia."
+      }
+    },
+    "recipesTitle": "Recetas para empezar",
+    "startTitle": "¿Por dónde quieres empezar?",
+    "starts": {
+      "group": {
+        "title": "Crear un grupo",
+        "body": "Para un club o un grupo de amigos. Invita a la gente cuando el primer desafío esté listo.",
+        "cta": "Crear grupo"
+      },
+      "solo": {
+        "title": "Empezar por tu cuenta",
+        "body": "Un desafío privado en Mi espacio — sin grupo, sin invitaciones.",
+        "cta": "Nuevo desafío"
+      },
+      "templates": {
+        "title": "Copiar uno ya hecho",
+        "body": "Desafíos que otros grupos publicaron como plantilla — copia uno y hazlo tuyo.",
+        "cta": "Ver plantillas"
+      }
+    }
+  },
   "group": {
     "updated": "Grupo actualizado.",
     "deleteConfirm": "¿Mover \"{name}\" a la papelera? Sus desafíos y registros desaparecen de la app.",

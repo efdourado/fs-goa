@@ -333,6 +333,47 @@
       "group": "New group"
     }
   },
+  "welcome": {
+    "lede": "Nothing here yet. Goa is built in four moves — start with whichever one you already have in mind.",
+    "flowTitle": "How a round comes together",
+    "steps": {
+      "library": {
+        "title": "Choose what you track",
+        "body": "Films, books, places, matches — kept in a library that remembers every item."
+      },
+      "challenge": {
+        "title": "Set a challenge",
+        "body": "Watch a list, read for 90 days, keep a habit. Pick a recipe and decide what everyone records."
+      },
+      "group": {
+        "title": "Bring your people",
+        "body": "A private group for the club, the friends, the family — or keep it just yours."
+      },
+      "showcase": {
+        "title": "Read the showcase",
+        "body": "Goa does the maths — averages, rankings, who's on schedule — and turns the round into a story."
+      }
+    },
+    "recipesTitle": "Recipes to start from",
+    "startTitle": "Where do you want to start?",
+    "starts": {
+      "group": {
+        "title": "Create a group",
+        "body": "For a club or a circle of friends. Invite people once the first challenge is ready.",
+        "cta": "Create group"
+      },
+      "solo": {
+        "title": "Start on your own",
+        "body": "A private challenge in My space — no group, no invites.",
+        "cta": "New challenge"
+      },
+      "templates": {
+        "title": "Copy one that's built",
+        "body": "Challenges other groups published as templates — copy one and make it yours.",
+        "cta": "Browse templates"
+      }
+    }
+  },
   "group": {
     "updated": "Group updated.",
     "deleteConfirm": "Move \"{name}\" to the bin? Its challenges and entries disappear from the app.",
