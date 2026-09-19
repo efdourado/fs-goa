@@ -638,7 +638,7 @@
     "entryDateHint": "Adds an optional “When did it happen?” date to the form. Leave it off when the date belongs to the item itself, like a match's kick-off.",
     "itemDatesLabel": "Each item has its own date and time",
     "itemDatesHint": "Like a match's kick-off or a screening. It's kept on the item, so every challenge that uses it shows the same date.",
-    "errItemSchedule": "Check the items' dates and times — a time zone or an end time doesn't look right."
+    "errItemSchedule": "Check the date — the end, the time or the time zone doesn't look right."
   },
   "adminChallenge": {
     "back": "Back",
@@ -877,7 +877,6 @@
     "moreActions": "More actions",
     "alreadyPublicHint": "This showcase is already public — any change you save here appears on the link and the template immediately.",
     "itemOriginLine": "via {text}",
-    "itemWindowOrder": "“Answer by” can't be before answers open.",
     "errPickLibrary": "Choose the library the items come from.",
     "libraryLabel": "Library",
     "libraryHint": "Which list of things this challenge draws from.",
@@ -890,12 +889,10 @@
     "entryDateHint": "Adds an optional “When did it happen?” date to the response form. Off, the form only asks for what you set up — every response is still timestamped when it's saved.",
     "entryDateOn": "The form now asks when each response happened.",
     "entryDateOff": "The form no longer asks for a date.",
-    "answerWindowTitle": "Answer window",
-    "answerWindowNone": "No limits",
-    "eventScheduleInvalid": "Check the scheduled date and time — the time zone or the end time doesn't look right.",
     "libraryProperties": "Properties of {name}",
     "reuseDoneTitle": "Copy created",
-    "reuseDoneBody": "The copy is ready, but some properties couldn't come across."
+    "reuseDoneBody": "The copy is ready, but some properties couldn't come across.",
+    "eventScheduleInvalid": "Check the date — the end, the time or the time zone doesn't look right."
   },
   "visibility": {
     "title": "Who sees these answers",
@@ -1541,7 +1538,7 @@
       "number": "Number",
       "date": "Date",
       "boolean": "Yes or no",
-      "schedule": "Date and time"
+      "schedule": "Date"
     },
     "builtIn": "built in",
     "hidden": "hidden",
@@ -1568,14 +1565,14 @@
       "main_genre": "Main genre",
       "runtime_minutes": "Runtime (minutes)",
       "page_count": "Pages",
-      "scheduled_at": "Scheduled date and time"
+      "scheduled_at": "Date"
     },
     "tablesStarter": {
       "cozinha": "Cuisine",
       "bairro": "Neighbourhood",
       "endereco": "Address"
     },
-    "scheduleHint": "When the item itself happens — a match's kick-off. Switch it on and every challenge using these items reads the same date. It's separate from when answers may be given."
+    "scheduleHint": "When the item itself happens, like a match's day. Switch it on and every challenge using these items shows the same date."
   },
   "recommenders": {
     "label": "Recommended by",
@@ -1662,21 +1659,6 @@
     "lastEditedAnon": "Last changed {when}",
     "notFilled": "Nobody has filled this in yet."
   },
-  "itemSchedule": {
-    "label": "Answer window",
-    "hint": "Optional. Limits when people can answer this item — it isn't the date of the thing itself.",
-    "none": "No limits",
-    "noneHint": "Answer any time",
-    "date": "Days",
-    "dateHint": "Just dates",
-    "datetime": "Date & time",
-    "datetimeHint": "Exact moments",
-    "opens": "Answers open from",
-    "due": "Answer by",
-    "errOrder": "“Answer by” can't be before answers open.",
-    "neverBlocks": "“Answers open from” keeps the form closed until then. “Answer by” never stops anyone from answering — it's a reminder.",
-    "zoneNote": "Times are in {zone}."
-  },
   "agenda": {
     "title": "Agenda",
     "tally": "{count, plural, one {# item with a date} other {# items with dates}}",
@@ -1697,22 +1679,25 @@
     "due": "Answer by {due}"
   },
   "eventSchedule": {
-    "hint": "When this item itself happens, like a match's kick-off. Leave the time empty if only the day is known. It never opens or closes anything for answering.",
+    "add": "Add date",
     "date": "Date",
+    "endDate": "End date",
+    "includeTime": "Include time",
     "time": "Time",
     "endTime": "End time",
     "zone": "Time zone",
     "zoneHint": "The time zone the time is in — 19:00 in Rio isn't 19:00 in Lisbon.",
     "errZone": "That time zone isn't recognised — use a name like America/Sao_Paulo.",
-    "errEndOrder": "The end time must be after the start time.",
-    "errEndWithoutTime": "Add a start time before an end time.",
+    "errEndOrder": "The end can't be before the start.",
+    "errTime": "Add a time, or switch the time off.",
     "clear": "Remove the date",
-    "invalid": "Check the scheduled date and time — the time zone or the end time doesn't look right."
+    "invalid": "Check the date — the end, the time or the time zone doesn't look right."
   },
   "eventWhen": {
     "timed": "{day} · {time} ({zone})",
     "timedRange": "{day} · {start}–{end} ({zone})",
-    "range": "{start} – {end}"
+    "range": "{start} – {end}",
+    "timedSpan": "{day} · {start} – {endDay} · {end} ({zone})"
   },
   "copyNotice": {
     "title": "{count, plural, one {One property was left out} other {# properties were left out}}",

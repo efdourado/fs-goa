@@ -11,10 +11,8 @@ import { ConfirmDialog, FormDialog } from "../dialog";
 import { AddSharedResponseDialog, RemoveResponseDialog, SharedGlyph, SharedResponsePanel } from "../shared-responses";
 import { cleanFields, FIELD_TYPES, FieldConfigInputs, newFieldConfig, uniqueFieldKey } from "../fields";
 import { LibraryPropertiesDialog } from "../library-dialogs";
-import { ItemScheduleFields, sameSchedule, scheduleBody, scheduleProblem, type ScheduleValue, scheduleValueOf } from "../item-schedule";
 import { type CatalogScope, LibraryGlyph, LibraryPills, libraryChoices, useCatalogLibraries, useLibraryName } from "../libraries";
 import { bodyFromValues, editableProperties, PropertyInputs, type PropertyValues, propertiesHaveProblem, useLibraryProperties, valuesFromItem } from "../property-inputs";
-import { scheduleModeOf } from "../schedule";
 import { ListImportPanel } from "../list-import-panel";
 import { recommenderBody, recommenderLine, RecommenderPicker, recommenderFromItem, type RecommenderValue, sameRecommender, useRecommenderSource } from "../recommender-picker";
 import { RuleSectionsEditor, visibleRuleSections } from "../rules";
@@ -634,14 +632,11 @@ export function ItemEditorDialog({
   const tc = useTranslations("common");
   const f = useGoaFormat();
   const catalogItem = item.catalogItem ?? null;
-  const timeZone = challenge.timeZone ?? "America/Sao_Paulo";
   const isItem = challenge.submissionMode === "item";
   const initialRecommender = recommenderFromItem(item.recommendedBy, item.originNote);
-  const initialSchedule = scheduleValueOf(item, timeZone);
   const initial = { title: item.title, description: item.description ?? "" };
   const [draft, setDraft] = useState(initial);
   const [recommender, setRecommender] = useState<RecommenderValue>(initialRecommender);
-  const [schedule, setSchedule] = useState<ScheduleValue>(initialSchedule);
   // The library's own properties — renamed, hidden or added by its owners — not a fixed set of columns.
   const { properties } = useLibraryProperties(catalogItem && library ? library : null);
   const initialValues = useMemo(() => (catalogItem && properties ? valuesFromItem(properties, catalogItem) : {}), [catalogItem, properties]);
@@ -652,8 +647,7 @@ export function ItemEditorDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const recommenderChanged = !sameRecommender(recommender, initialRecommender);
-  const scheduleChanged = !sameSchedule(schedule, initialSchedule);
-  const dirty = JSON.stringify(draft) !== JSON.stringify(initial) || recommenderChanged || scheduleChanged || editedValues !== null;
+  const dirty = JSON.stringify(draft) !== JSON.stringify(initial) || recommenderChanged || editedValues !== null;
   const authorNeeded = library?.kind === "book" && properties?.find((property) => property.key === "author")?.hidden !== true;
   // The event's own date and time is asked up front; the rest of the library's facts sit in a disclosure.
   const scheduleProperty = properties?.find((property) => property.type === "schedule" && !property.hidden) ?? null;
@@ -662,7 +656,6 @@ export function ItemEditorDialog({
 
   async function submit() {
     if (catalogItem && authorNeeded && !(values.author ?? "").trim()) { setError(tCine("authorRequired")); return; }
-    if (scheduleProblem(schedule)) { setError(t("itemWindowOrder")); return; }
     if (properties && propertiesHaveProblem(properties, values)) { setError(t("eventScheduleInvalid")); return; }
     setBusy(true);
     setError(null);
@@ -672,7 +665,6 @@ export function ItemEditorDialog({
         title: draft.title.trim(),
         description: draft.description.trim(),
         ...(isItem && recommendationsEnabled && recommenderChanged ? recommenderBody(recommender, "item", true) : {}),
-        ...(isItem && scheduleChanged ? scheduleBody(schedule, timeZone) : {}),
         ...(facts ? { ...facts.native, ...(Object.keys(facts.attributes).length ? { attributes: facts.attributes } : {}) } : {}),
       });
     } catch (cause) { setError(f.error(cause)); setBusy(false); }
@@ -705,11 +697,6 @@ export function ItemEditorDialog({
           <div className="pt-2">
             <PropertyInputs properties={factProperties} values={values} onChange={(key, value) => setEditedValues({ ...values, [key]: value })} />
           </div>
-        </Disclosure>
-      ) : null}
-      {isItem ? (
-        <Disclosure summary={t("answerWindowTitle")} preview={f.itemWindow(item, timeZone) ?? t("answerWindowNone")} defaultOpen={scheduleModeOf(item) !== "none"}>
-          <div className="pt-2"><ItemScheduleFields value={schedule} onChange={setSchedule} timeZone={timeZone} /></div>
         </Disclosure>
       ) : null}
     </FormDialog>

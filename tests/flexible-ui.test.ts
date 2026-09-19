@@ -2,15 +2,23 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
 import { bodyFromValues, builtInProperties, propertiesHaveProblem, valuesFromItem } from "../app/goa/property-inputs";
-import { decodeEventForm, encodeEventForm, eventFormProblem, eventPhase } from "../app/goa/schedule";
 import {
   NO_RECOMMENDER,
   recommenderBody,
   recommenderFromItem,
   sameRecommender,
 } from "../app/goa/recommender-picker";
-import { instantToDateKey, instantToWallClock, scheduleModeOf, wallClockToInstant } from "../app/goa/schedule";
-import { scheduleBody, scheduleProblem, scheduleValueOf } from "../app/goa/item-schedule";
+import {
+  decodeEventForm,
+  emptyEventForm,
+  encodeEventForm,
+  type EventForm,
+  eventFormProblem,
+  eventPhase,
+  instantToDateKey,
+  instantToWallClock,
+  wallClockToInstant,
+} from "../app/goa/schedule";
 import type { ChallengeDetail, ChallengeField, Entry, EntryTypeView, LibraryProperty } from "../app/goa/types";
 import { displayAnswer, isItemDone } from "../app/goa/utils";
 import { libraryChoices } from "../app/goa/libraries";
@@ -41,31 +49,6 @@ describe("item schedule in the challenge's own time zone", () => {
     // 23:30 in São Paulo on the 14th is already the 15th in Tokyo.
     assert.equal(instantToDateKey("2026-03-15T02:30:00.000Z", "America/Sao_Paulo"), "2026-03-14");
     assert.equal(instantToDateKey("2026-03-15T02:30:00.000Z", "Asia/Tokyo"), "2026-03-15");
-  });
-
-  test("an item's mode comes from whether it has a window and how it was entered", () => {
-    assert.equal(scheduleModeOf({}), "none");
-    assert.equal(scheduleModeOf({ dueAt: "2026-03-14T03:00:00.000Z", schedulePrecision: "date" }), "date");
-    assert.equal(scheduleModeOf({ opensAt: "2026-03-14T03:00:00.000Z", schedulePrecision: "datetime" }), "datetime");
-  });
-
-  test("editing a date-only window sends days, a precise one sends instants, none sends explicit nulls", () => {
-    assert.deepEqual(scheduleBody({ mode: "date", opens: "2026-03-01", due: "2026-03-08" }, "UTC"), { opensOn: "2026-03-01", dueOn: "2026-03-08" });
-    assert.deepEqual(scheduleBody({ mode: "datetime", opens: "", due: "2026-03-08T18:00" }, "America/Sao_Paulo"), {
-      opensAt: null, dueAt: "2026-03-08T21:00:00.000Z",
-    });
-    assert.deepEqual(scheduleBody({ mode: "none", opens: "", due: "" }, "UTC"), { opensOn: null, dueOn: null });
-  });
-
-  test("a due date before the opening is flagged, a missing end is not", () => {
-    assert.equal(scheduleProblem({ mode: "date", opens: "2026-03-08", due: "2026-03-01" }), "order");
-    assert.equal(scheduleProblem({ mode: "date", opens: "", due: "2026-03-01" }), null);
-    assert.equal(scheduleProblem({ mode: "none", opens: "", due: "" }), null);
-  });
-
-  test("reading an existing item back gives the same values it was saved from", () => {
-    const value = scheduleValueOf({ opensAt: "2026-03-14T23:30:00.000Z", dueAt: null, schedulePrecision: "datetime" }, "America/Sao_Paulo");
-    assert.deepEqual(value, { mode: "datetime", opens: "2026-03-14T20:30", due: "" });
   });
 });
 
@@ -223,25 +206,39 @@ describe("showing a saved answer", () => {
   });
 });
 
-describe("an item's own date and time in property forms", () => {
+describe("an item's own date in property forms", () => {
   const zone = "America/Sao_Paulo";
   const scheduleOn: LibraryProperty = { ...builtInProperties("lib_abc").find((property) => property.type === "schedule")!, hidden: false };
+  const form = (patch: Partial<EventForm>): EventForm => ({ ...emptyEventForm(zone), ...patch });
+  const encoded = (patch: Partial<EventForm>) => encodeEventForm(form(patch), zone);
 
-  test("the built-in schedule is a hidden native property until a library switches it on", () => {
+  test("the built-in date is a hidden native property until a library switches it on", () => {
     const [, hiddenSchedule] = builtInProperties("lib_abc");
     assert.equal(hiddenSchedule.hidden, true);
-    assert.deepEqual(bodyFromValues([hiddenSchedule], { scheduled_at: encodeEventForm({ date: "2026-06-15", time: "16:00", endTime: "", timeZone: zone }, zone) }, "update"), { native: {}, attributes: {} });
+    assert.deepEqual(bodyFromValues([hiddenSchedule], { scheduled_at: encoded({ date: "2026-06-15" }) }, "update"), { native: {}, attributes: {} });
   });
 
-  test("a date and time become an instant in the chosen zone; a bare date stays a day", () => {
-    const withTime = encodeEventForm({ date: "2026-06-15", time: "16:00", endTime: "18:00", timeZone: zone }, zone);
-    assert.deepEqual(bodyFromValues([scheduleOn], { scheduled_at: withTime }, "create").native, {
-      scheduledAt: { startsAt: "2026-06-15T19:00:00.000Z", endsAt: "2026-06-15T21:00:00.000Z", timeZone: zone },
-    });
-    const dayOnly = encodeEventForm({ date: "2026-06-20", time: "", endTime: "", timeZone: zone }, zone);
-    assert.deepEqual(bodyFromValues([scheduleOn], { scheduled_at: dayOnly }, "create").native, {
+  test("just a date is a day; an end date makes it a range", () => {
+    assert.deepEqual(bodyFromValues([scheduleOn], { scheduled_at: encoded({ date: "2026-06-20" }) }, "create").native, {
       scheduledAt: { startsOn: "2026-06-20", timeZone: zone },
     });
+    assert.deepEqual(bodyFromValues([scheduleOn], { scheduled_at: encoded({ date: "2026-06-20", endDate: "2026-06-22" }) }, "create").native, {
+      scheduledAt: { startsOn: "2026-06-20", endsOn: "2026-06-22", timeZone: zone },
+    });
+  });
+
+  test("switching the time on turns it into an instant in the chosen zone, with an optional end", () => {
+    const timed = encoded({ date: "2026-06-15", withTime: true, time: "16:00", endTime: "18:00" });
+    assert.deepEqual(bodyFromValues([scheduleOn], { scheduled_at: timed }, "create").native, {
+      scheduledAt: { startsAt: "2026-06-15T19:00:00.000Z", endsAt: "2026-06-15T21:00:00.000Z", timeZone: zone },
+    });
+    const overnight = encoded({ date: "2026-06-15", withTime: true, time: "22:00", endDate: "2026-06-16", endTime: "01:00" });
+    assert.deepEqual(bodyFromValues([scheduleOn], { scheduled_at: overnight }, "create").native, {
+      scheduledAt: { startsAt: "2026-06-16T01:00:00.000Z", endsAt: "2026-06-16T04:00:00.000Z", timeZone: zone },
+    });
+    // switching the time back off keeps the day and drops the clock
+    const off = encoded({ date: "2026-06-15", withTime: false, time: "16:00", endTime: "18:00" });
+    assert.deepEqual(bodyFromValues([scheduleOn], { scheduled_at: off }, "create").native, { scheduledAt: { startsOn: "2026-06-15", timeZone: zone } });
   });
 
   test("a new item with no date sends nothing; an edit that emptied it says null", () => {
@@ -249,28 +246,33 @@ describe("an item's own date and time in property forms", () => {
     assert.deepEqual(bodyFromValues([scheduleOn], { scheduled_at: "" }, "update").native, { scheduledAt: null });
   });
 
-  test("a saved schedule fills the form back in the zone it was entered in", () => {
-    const values = valuesFromItem([scheduleOn], {
+  test("a saved date fills the form back, in the zone it was entered in", () => {
+    const timed = valuesFromItem([scheduleOn], {
       scheduledAt: { startsAt: "2026-06-15T19:00:00.000Z", endsAt: "2026-06-15T21:00:00.000Z", precision: "datetime", timeZone: zone },
     }, "UTC");
-    assert.deepEqual(decodeEventForm(values.scheduled_at, "UTC"), { date: "2026-06-15", time: "16:00", endTime: "18:00", timeZone: zone });
-    const none = valuesFromItem([scheduleOn], { scheduledAt: null }, zone);
-    assert.equal(none.scheduled_at, "");
+    assert.deepEqual(decodeEventForm(timed.scheduled_at, "UTC"), { date: "2026-06-15", endDate: "", withTime: true, time: "16:00", endTime: "18:00", timeZone: zone });
+    const range = valuesFromItem([scheduleOn], {
+      scheduledAt: { startsAt: "2026-06-20T03:00:00.000Z", endsAt: "2026-06-22T03:00:00.000Z", precision: "date", timeZone: zone },
+    }, "UTC");
+    assert.deepEqual(decodeEventForm(range.scheduled_at, "UTC"), { date: "2026-06-20", endDate: "2026-06-22", withTime: false, time: "", endTime: "", timeZone: zone });
+    assert.equal(valuesFromItem([scheduleOn], { scheduledAt: null }, zone).scheduled_at, "");
   });
 
   test("a zone picked before the date isn't lost, and a problem blocks saving", () => {
-    const zoneOnly = encodeEventForm({ date: "", time: "", endTime: "", timeZone: "Europe/Lisbon" }, zone);
+    const zoneOnly = encoded({ timeZone: "Europe/Lisbon" });
     assert.equal(decodeEventForm(zoneOnly, zone).timeZone, "Europe/Lisbon");
-    assert.equal(encodeEventForm({ date: "", time: "", endTime: "", timeZone: zone }, zone), "");
-    const badZone = encodeEventForm({ date: "2026-06-15", time: "16:00", endTime: "", timeZone: "Nowhere/Land" }, zone);
-    const backwards = encodeEventForm({ date: "2026-06-15", time: "16:00", endTime: "15:00", timeZone: zone }, zone);
-    assert.equal(propertiesHaveProblem([scheduleOn], { scheduled_at: badZone }), true);
-    assert.equal(propertiesHaveProblem([scheduleOn], { scheduled_at: backwards }), true);
+    assert.equal(encoded({}), "");
+    const badZone = encoded({ date: "2026-06-15", withTime: true, time: "16:00", timeZone: "Nowhere/Land" });
+    const backwards = encoded({ date: "2026-06-15", withTime: true, time: "16:00", endTime: "15:00" });
+    const noTime = encoded({ date: "2026-06-15", withTime: true });
+    const endBeforeStart = encoded({ date: "2026-06-15", endDate: "2026-06-14" });
+    for (const bad of [badZone, backwards, noTime, endBeforeStart]) assert.equal(propertiesHaveProblem([scheduleOn], { scheduled_at: bad }), true);
     assert.equal(propertiesHaveProblem([scheduleOn], { scheduled_at: "" }), false);
-    assert.equal(eventFormProblem({ date: "2026-06-15", time: "", endTime: "10:00", timeZone: zone }), "endWithoutTime");
-    // a half-typed zone is a problem, never a crash
+    assert.equal(propertiesHaveProblem([scheduleOn], { scheduled_at: encoded({ date: "2026-06-15", endDate: "2026-06-15" }) }), false, "a one-day range is fine");
+    // a half-typed zone is a problem, never a crash — and the zone doesn't matter while the time is off
     assert.doesNotThrow(() => bodyFromValues([scheduleOn], { scheduled_at: badZone }, "create"));
     assert.deepEqual(bodyFromValues([scheduleOn], { scheduled_at: badZone }, "create").native, {});
+    assert.equal(eventFormProblem(form({ date: "2026-06-15", timeZone: "Nowhere/Land" })), null);
   });
 });
 
@@ -293,5 +295,11 @@ describe("where an event sits in time", () => {
     assert.equal(eventPhase(day, at("2026-06-20T03:00:00Z")), "now");
     assert.equal(eventPhase(day, at("2026-06-21T02:59:00Z")), "now");
     assert.equal(eventPhase(day, at("2026-06-21T03:00:00Z")), "happened");
+  });
+
+  test("a multi-day range stays 'now' through its last day", () => {
+    const range = { startsAt: "2026-06-20T03:00:00.000Z", endsAt: "2026-06-22T03:00:00.000Z", precision: "date" as const, timeZone: zone };
+    assert.equal(eventPhase(range, at("2026-06-22T20:00:00Z")), "now");
+    assert.equal(eventPhase(range, at("2026-06-23T03:00:00Z")), "happened");
   });
 });

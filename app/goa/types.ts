@@ -194,7 +194,7 @@ export interface EventSchedule {
 
 /** What the API takes for an item's date: a whole day, or a clock time with an optional end. */
 export type EventBody =
-  | { startsOn: string; timeZone: string }
+  | { startsOn: string; endsOn?: string; timeZone: string }
   | { startsAt: string; endsAt: string | null; timeZone: string };
 
 export interface CatalogItem {

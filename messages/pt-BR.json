@@ -638,7 +638,7 @@
     "entryDateHint": "Adiciona ao formulário uma data opcional “Quando aconteceu?”. Deixe desligado quando a data pertence ao próprio item, como o início de uma partida.",
     "itemDatesLabel": "Cada item tem data e hora próprias",
     "itemDatesHint": "Como o início de uma partida ou uma sessão. Fica guardada no item, então todo desafio que o usa mostra a mesma data.",
-    "errItemSchedule": "Confira as datas e horas dos itens — um fuso horário ou uma hora de término não parecem certos."
+    "errItemSchedule": "Confira a data — o fim, a hora ou o fuso horário não parecem certos."
   },
   "adminChallenge": {
     "back": "Voltar",
@@ -877,7 +877,6 @@
     "moreActions": "Mais ações",
     "alreadyPublicHint": "Esta vitrine já está pública — qualquer alteração salva aqui aparece no link e no modelo imediatamente.",
     "itemOriginLine": "via {text}",
-    "itemWindowOrder": "“Responder até” não pode vir antes de as respostas abrirem.",
     "errPickLibrary": "Escolha a biblioteca de onde vêm os itens.",
     "libraryLabel": "Biblioteca",
     "libraryHint": "De qual lista de coisas este desafio parte.",
@@ -890,12 +889,10 @@
     "entryDateHint": "Adiciona ao formulário uma data opcional “Quando aconteceu?”. Desligado, o formulário só pergunta o que você configurou — cada registro continua com o horário em que foi salvo.",
     "entryDateOn": "O formulário agora pergunta quando cada registro aconteceu.",
     "entryDateOff": "O formulário não pergunta mais uma data.",
-    "answerWindowTitle": "Janela de respostas",
-    "answerWindowNone": "Sem limites",
-    "eventScheduleInvalid": "Confira a data e a hora programadas — o fuso horário ou a hora de término não parecem certos.",
     "libraryProperties": "Propriedades de {name}",
     "reuseDoneTitle": "Cópia criada",
-    "reuseDoneBody": "A cópia está pronta, mas algumas propriedades não puderam vir junto."
+    "reuseDoneBody": "A cópia está pronta, mas algumas propriedades não puderam vir junto.",
+    "eventScheduleInvalid": "Confira a data — o fim, a hora ou o fuso horário não parecem certos."
   },
   "visibility": {
     "title": "Quem vê estas respostas",
@@ -1541,7 +1538,7 @@
       "number": "Número",
       "date": "Data",
       "boolean": "Sim ou não",
-      "schedule": "Data e hora"
+      "schedule": "Data"
     },
     "builtIn": "padrão",
     "hidden": "oculta",
@@ -1568,14 +1565,14 @@
       "main_genre": "Gênero principal",
       "runtime_minutes": "Duração (minutos)",
       "page_count": "Páginas",
-      "scheduled_at": "Data e hora programadas"
+      "scheduled_at": "Data"
     },
     "tablesStarter": {
       "cozinha": "Tipo de cozinha",
       "bairro": "Bairro",
       "endereco": "Endereço"
     },
-    "scheduleHint": "Quando o item em si acontece — o início de uma partida. Ligue e todo desafio que usa esses itens lê a mesma data. É separado de quando as respostas podem ser dadas."
+    "scheduleHint": "Quando o item em si acontece, como o dia de uma partida. Ligue e todo desafio que usa esses itens mostra a mesma data."
   },
   "recommenders": {
     "label": "Indicado por",
@@ -1662,21 +1659,6 @@
     "lastEditedAnon": "Última alteração {when}",
     "notFilled": "Ninguém preencheu isto ainda."
   },
-  "itemSchedule": {
-    "label": "Janela de respostas",
-    "hint": "Opcional. Limita quando as pessoas podem responder este item — não é a data do próprio evento.",
-    "none": "Sem limites",
-    "noneHint": "Responder a qualquer momento",
-    "date": "Dias",
-    "dateHint": "Só datas",
-    "datetime": "Data e hora",
-    "datetimeHint": "Momentos exatos",
-    "opens": "Respostas abrem em",
-    "due": "Responder até",
-    "errOrder": "“Responder até” não pode vir antes de as respostas abrirem.",
-    "neverBlocks": "“Respostas abrem em” mantém o formulário fechado até lá. “Responder até” nunca impede ninguém de responder — é só um lembrete.",
-    "zoneNote": "Os horários estão em {zone}."
-  },
   "agenda": {
     "title": "Agenda",
     "tally": "{count, plural, one {# item com data} other {# itens com datas}}",
@@ -1697,22 +1679,25 @@
     "due": "Responder até {due}"
   },
   "eventSchedule": {
-    "hint": "Quando o item em si acontece, como o início de uma partida. Deixe a hora vazia se só o dia for conhecido. Isso nunca abre nem fecha nada para responder.",
+    "add": "Adicionar data",
     "date": "Data",
+    "endDate": "Data final",
+    "includeTime": "Incluir horário",
     "time": "Hora",
     "endTime": "Hora de término",
     "zone": "Fuso horário",
     "zoneHint": "O fuso em que a hora está — 19:00 no Rio não é 19:00 em Lisboa.",
     "errZone": "Esse fuso horário não foi reconhecido — use um nome como America/Sao_Paulo.",
-    "errEndOrder": "A hora de término precisa ser depois da hora de início.",
-    "errEndWithoutTime": "Informe a hora de início antes da de término.",
+    "errEndOrder": "O fim não pode vir antes do início.",
+    "errTime": "Informe a hora ou desligue o horário.",
     "clear": "Remover a data",
-    "invalid": "Confira a data e a hora programadas — o fuso horário ou a hora de término não parecem certos."
+    "invalid": "Confira a data — o fim, a hora ou o fuso horário não parecem certos."
   },
   "eventWhen": {
     "timed": "{day} · {time} ({zone})",
     "timedRange": "{day} · {start}–{end} ({zone})",
-    "range": "{start} – {end}"
+    "range": "{start} – {end}",
+    "timedSpan": "{day} · {start} – {endDay} · {end} ({zone})"
   },
   "copyNotice": {
     "title": "{count, plural, one {Uma propriedade ficou de fora} other {# propriedades ficaram de fora}}",

@@ -49,19 +49,16 @@ export function wallClockToInstant(local: string, timeZone: string): string | nu
   return new Date(instant).toISOString();
 }
 
-export type ScheduleMode = "none" | "date" | "datetime";
-
-/** The mode an existing item's schedule is in: none if it has no window, else how it was entered. */
-export function scheduleModeOf(item: { opensAt?: string | null; dueAt?: string | null; schedulePrecision?: "date" | "datetime" }): ScheduleMode {
-  if (!item.opensAt && !item.dueAt) return "none";
-  return item.schedulePrecision === "datetime" ? "datetime" : "date";
-}
-
 // --- An item's own date and time (a match's kickoff): Date · Time · Time zone · optional end time ---------
 
-/** What the event inputs hold. A blank `time` means "the day is known, the hour isn't". */
+/**
+ * What the event inputs hold. The date comes first; the time is an on/off extra — `withTime` says
+ * whether the clock times count. `endDate` and `endTime` are optional and read as "same day / no end" when empty.
+ */
 export interface EventForm {
   date: string;
+  endDate: string;
+  withTime: boolean;
   time: string;
   endTime: string;
   timeZone: string;
@@ -96,39 +93,61 @@ export function knownTimeZones(): string[] {
 }
 
 export function emptyEventForm(timeZone: string): EventForm {
-  return { date: "", time: "", endTime: "", timeZone };
+  return { date: "", endDate: "", withTime: false, time: "", endTime: "", timeZone };
 }
 
 export function eventFormOf(schedule: EventSchedule | null | undefined, fallbackTimeZone: string): EventForm {
   if (!schedule) return emptyEventForm(fallbackTimeZone);
   const zone = schedule.timeZone || fallbackTimeZone;
   const date = instantToDateKey(schedule.startsAt, zone);
-  if (schedule.precision === "date") return { date, time: "", endTime: "", timeZone: zone };
+  const endKey = schedule.endsAt ? instantToDateKey(schedule.endsAt, zone) : "";
+  const endDate = endKey && endKey !== date ? endKey : "";
+  if (schedule.precision === "date") return { date, endDate, withTime: false, time: "", endTime: "", timeZone: zone };
   return {
     date,
+    endDate,
+    withTime: true,
     time: instantToWallClock(schedule.startsAt, zone).slice(11),
     endTime: schedule.endsAt ? instantToWallClock(schedule.endsAt, zone).slice(11) : "",
     timeZone: zone,
   };
 }
 
+/** Where an event ends, as a local `date` (+ `time` when clock times count); `null` when no end was given. */
+function endOf(form: EventForm): { date: string; time: string } | null {
+  if (form.withTime) {
+    // An end on the same day with no end time says nothing the start didn't.
+    if (!form.endTime && (!form.endDate || form.endDate === form.date)) return null;
+    return { date: form.endDate || form.date, time: form.endTime || form.time };
+  }
+  return form.endDate ? { date: form.endDate, time: "" } : null;
+}
+
 /** `null` when the form reads fine; otherwise which problem to show. */
-export function eventFormProblem(form: EventForm): "zone" | "endOrder" | "endWithoutTime" | null {
+export function eventFormProblem(form: EventForm): "zone" | "time" | "endOrder" | null {
   if (!form.date) return null;
-  if (!isKnownTimeZone(form.timeZone)) return "zone";
-  if (form.endTime && !form.time) return "endWithoutTime";
-  if (form.endTime && form.endTime <= form.time) return "endOrder";
+  if (form.withTime && !isKnownTimeZone(form.timeZone)) return "zone";
+  if (form.withTime && !form.time) return "time";
+  const end = endOf(form);
+  if (end && `${end.date}T${end.time}` <= `${form.date}T${form.withTime ? form.time : ""}`) {
+    // A date range may end on its own start day (a one-day event); a timed one must end after it starts.
+    return form.withTime || end.date < form.date ? "endOrder" : null;
+  }
   return null;
 }
 
 export function eventBodyOf(form: EventForm): EventBody | null {
   // A zone still being typed ("Mars/Oly…") must never reach `Intl`, which throws on it.
-  if (!form.date || !isKnownTimeZone(form.timeZone)) return null;
-  if (!form.time) return { startsOn: form.date, timeZone: form.timeZone };
-  const startsAt = wallClockToInstant(`${form.date}T${form.time}`, form.timeZone);
+  if (!form.date || (form.withTime && !isKnownTimeZone(form.timeZone))) return null;
+  const timeZone = isKnownTimeZone(form.timeZone) ? form.timeZone : browserTimeZone();
+  const end = endOf(form);
+  if (!form.withTime) {
+    return { startsOn: form.date, ...(end ? { endsOn: end.date } : {}), timeZone };
+  }
+  if (!form.time) return null;
+  const startsAt = wallClockToInstant(`${form.date}T${form.time}`, timeZone);
   if (!startsAt) return null;
-  const endsAt = form.endTime ? wallClockToInstant(`${form.date}T${form.endTime}`, form.timeZone) : null;
-  return { startsAt, endsAt, timeZone: form.timeZone };
+  return { startsAt, endsAt: end ? wallClockToInstant(`${end.date}T${end.time}`, timeZone) : null, timeZone };
 }
 
 /**
@@ -137,7 +156,7 @@ export function eventBodyOf(form: EventForm): EventBody | null {
  * the date must survive the round trip, or the field would snap back as the person types.
  */
 export function encodeEventForm(form: EventForm, defaultTimeZone: string): string {
-  const untouched = !form.date && !form.time && !form.endTime && form.timeZone === defaultTimeZone;
+  const untouched = !form.date && !form.endDate && !form.withTime && !form.time && !form.endTime && form.timeZone === defaultTimeZone;
   return untouched ? "" : JSON.stringify(form);
 }
 
@@ -145,9 +164,12 @@ export function decodeEventForm(text: string | undefined, fallbackTimeZone: stri
   if (!text) return emptyEventForm(fallbackTimeZone);
   try {
     const parsed = JSON.parse(text) as Partial<EventForm>;
+    const time = typeof parsed.time === "string" ? parsed.time : "";
     return {
       date: typeof parsed.date === "string" ? parsed.date : "",
-      time: typeof parsed.time === "string" ? parsed.time : "",
+      endDate: typeof parsed.endDate === "string" ? parsed.endDate : "",
+      withTime: typeof parsed.withTime === "boolean" ? parsed.withTime : Boolean(time),
+      time,
       endTime: typeof parsed.endTime === "string" ? parsed.endTime : "",
       timeZone: typeof parsed.timeZone === "string" && parsed.timeZone ? parsed.timeZone : fallbackTimeZone,
     };

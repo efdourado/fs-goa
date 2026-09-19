@@ -80,6 +80,10 @@ export function makeGoaFormat(t: Translator, format: Formatter) {
       .formatToParts(new Date(schedule.startsAt)).find((part) => part.type === "timeZoneName")?.value ?? zone;
     const sameDay = schedule.endsAt ? instantToDateKey(schedule.endsAt, zone) === instantToDateKey(schedule.startsAt, zone) : true;
     if (schedule.endsAt && sameDay) return t("eventWhen.timedRange", { day, start: clock(schedule.startsAt), end: clock(schedule.endsAt), zone: zoneName });
+    if (schedule.endsAt) {
+      const endDay = format.dateTime(new Date(schedule.endsAt), { weekday: "short", day: "2-digit", month: "short", timeZone: zone } as never);
+      return t("eventWhen.timedSpan", { day, start: clock(schedule.startsAt), endDay, end: clock(schedule.endsAt), zone: zoneName });
+    }
     return t("eventWhen.timed", { day, time: clock(schedule.startsAt), zone: zoneName });
   }
 
