@@ -20,6 +20,7 @@ import {
 import { useLibraryProperties } from "../property-inputs";
 import { recommenderLine, useRecommenderSource } from "../recommender-picker";
 import { Segmented } from "../Segmented";
+import { Rail, useShelfRail } from "../shelf";
 import type { CatalogItem, CatalogLibrary, Id, Member } from "../types";
 import { BackButton, Button, cardClass, cx, EmptyState, StatusMessage } from "../ui";
 import { formatRuntime } from "../utils";
@@ -100,6 +101,7 @@ export function CatalogWorkspaceScreen({
   const [selecting, setSelecting] = useState(false);
   const [picked, setPicked] = useState<ReadonlySet<Id>>(new Set());
   const [confirmingRemoval, setConfirmingRemoval] = useState(false);
+  const { railRef: libraryRailRef, showFade: libraryShowFade, onScroll: onLibraryScroll } = useShelfRail();
   const csrf = useCsrf();
   const source = useRecommenderSource(scope, recommendationsEnabled);
   const scopeId = scope === "personal" ? "personal" : scope.groupId;
@@ -254,56 +256,59 @@ export function CatalogWorkspaceScreen({
       <StatusMessage error={librariesError ?? itemsError} success={notice} />
 
       {!loading && tabs.length ? (
-        <nav className="mb-7 flex flex-wrap gap-3" aria-label={tl("tabsLabel")}>
-          {tabs.map((entry) => {
-            const active = entry.kind === kind;
-            const counts = countByKind.get(entry.kind) ?? { total: 0, unused: 0 };
-            return (
-              <div key={entry.id} className="group relative w-full sm:w-64">
-                <button
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => chooseLibrary(entry.kind)}
-                  className={cx(
-                    "relative flex min-h-[4.75rem] w-full cursor-pointer items-center gap-3.5 overflow-hidden rounded-[20px] border px-4 text-left shadow-[var(--elevate-card)] transition duration-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25",
-                    active ? "border-[var(--main)] bg-[var(--main-soft)] ring-4 ring-[var(--main)]/10" : "border-[var(--line)] bg-[var(--paper)] hover:-translate-y-0.5 hover:border-[var(--main-line)] hover:shadow-[var(--elevate-2)]",
-                  )}
-                >
-                  <span aria-hidden="true" className={cx("pointer-events-none absolute -bottom-10 -right-10 h-24 w-24 rounded-full border-[14px]", active ? "border-[var(--main)]/[0.13]" : "border-[var(--main)]/[0.07]")} />
-                  <span className={cx("relative grid h-11 w-11 flex-none place-items-center rounded-full", active ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-[var(--elevate-1)]" : "bg-[var(--wash)] text-[var(--muted)] ring-1 ring-inset ring-[var(--line)]")} aria-hidden="true">
-                    <LibraryGlyph source={entry.source} className="h-6 w-6" />
-                  </span>
-                  <span className="relative min-w-0">
-                    <strong className={cx("block truncate pr-6 text-base font-medium tracking-[-0.02em]", active && "text-[var(--main-strong)]")}>{libraryName(entry)}</strong>
-                    <small className={cx("mt-0.5 block truncate text-xs", active ? "text-[var(--main-strong)]/85" : "text-[var(--muted)]")}>
-                      {t("libraryStats", { count: counts.total })}
-                      {canManage && counts.unused > 0 ? <span className="text-[var(--warn)]"> · {t("libraryUnused", { count: counts.unused })}</span> : null}
-                    </small>
-                  </span>
-                </button>
-                <div className="absolute right-2.5 top-2.5">
-                  <KebabMenu label={tl("libraryActions")}>
-                    {(close) => (
-                      <>
-                        <button type="button" className={menuRowClass} onClick={() => { openLibraryDialog(entry, "properties"); close(); }}>{canManage ? tl("editProperties") : tl("viewProperties")}</button>
-                        {canManage ? <button type="button" className={menuRowClass} onClick={() => { openLibraryDialog(entry, "rename"); close(); }}>{tl("renameLibrary")}</button> : null}
-                        {canManage && entry.source !== "screens" && entry.source !== "pages" ? <button type="button" className={cx(menuRowClass, "text-[var(--danger)]")} onClick={() => { openLibraryDialog(entry, "delete"); close(); }}>{tl("deleteLibrary")}</button> : null}
-                      </>
+        // -mx-1 / px-1 (and scroll-px-1, so snapping keeps it): room for a focus ring at the ends of the rail without moving the first card.
+        <nav className="-mx-1 mb-4" aria-label={tl("tabsLabel")}>
+          <Rail railRef={libraryRailRef} showFade={libraryShowFade} onScroll={onLibraryScroll} className="scroll-px-1 px-1">
+            {tabs.map((entry) => {
+              const active = entry.kind === kind;
+              const counts = countByKind.get(entry.kind) ?? { total: 0, unused: 0 };
+              return (
+                <div key={entry.id} className="group relative w-64 flex-none snap-start">
+                  <button
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => chooseLibrary(entry.kind)}
+                    className={cx(
+                      "relative flex min-h-[4.75rem] w-full cursor-pointer items-center gap-3.5 overflow-hidden rounded-[20px] border px-4 text-left shadow-[var(--elevate-card)] transition duration-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25",
+                      active ? "border-[var(--main)] bg-[var(--main-soft)] ring-1 ring-inset ring-[var(--main)]" : "border-[var(--line)] bg-[var(--paper)] hover:-translate-y-0.5 hover:border-[var(--main-line)]",
                     )}
-                  </KebabMenu>
+                  >
+                    <span aria-hidden="true" className={cx("pointer-events-none absolute -bottom-10 -right-10 h-24 w-24 rounded-full border-[14px]", active ? "border-[var(--main)]/[0.13]" : "border-[var(--main)]/[0.07]")} />
+                    <span className={cx("relative grid h-11 w-11 flex-none place-items-center rounded-full", active ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-[var(--elevate-1)]" : "bg-[var(--wash)] text-[var(--muted)] ring-1 ring-inset ring-[var(--line)]")} aria-hidden="true">
+                      <LibraryGlyph source={entry.source} className="h-6 w-6" />
+                    </span>
+                    <span className="relative min-w-0">
+                      <strong className={cx("block truncate pr-6 text-base font-medium tracking-[-0.02em]", active && "text-[var(--main-strong)]")}>{libraryName(entry)}</strong>
+                      <small className={cx("mt-0.5 block truncate text-xs", active ? "text-[var(--main-strong)]/85" : "text-[var(--muted)]")}>
+                        {t("libraryStats", { count: counts.total })}
+                        {canManage && counts.unused > 0 ? <span className="text-[var(--warn)]"> · {t("libraryUnused", { count: counts.unused })}</span> : null}
+                      </small>
+                    </span>
+                  </button>
+                  <div className="absolute right-2.5 top-2.5">
+                    <KebabMenu label={tl("libraryActions")}>
+                      {(close) => (
+                        <>
+                          <button type="button" className={menuRowClass} onClick={() => { openLibraryDialog(entry, "properties"); close(); }}>{canManage ? tl("editProperties") : tl("viewProperties")}</button>
+                          {canManage ? <button type="button" className={menuRowClass} onClick={() => { openLibraryDialog(entry, "rename"); close(); }}>{tl("renameLibrary")}</button> : null}
+                          {canManage && entry.source !== "screens" && entry.source !== "pages" ? <button type="button" className={cx(menuRowClass, "text-[var(--danger)]")} onClick={() => { openLibraryDialog(entry, "delete"); close(); }}>{tl("deleteLibrary")}</button> : null}
+                        </>
+                      )}
+                    </KebabMenu>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-          {canManage ? (
-            <button
-              type="button"
-              onClick={() => setDialog("new")}
-              className="flex min-h-[4.75rem] w-full cursor-pointer items-center justify-center gap-2 rounded-[20px] border border-dashed border-[var(--muted)] px-4 sm:w-64 text-sm font-light text-[var(--muted)] transition hover:border-[var(--ink)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
-            >
-              ＋ {tl("newLibrary")}
-            </button>
-          ) : null}
+              );
+            })}
+            {canManage ? (
+              <button
+                type="button"
+                onClick={() => setDialog("new")}
+                className="flex min-h-[4.75rem] w-64 flex-none cursor-pointer snap-start items-center justify-center gap-2 rounded-[20px] border border-dashed border-[var(--muted)] px-4 text-sm font-light text-[var(--muted)] transition hover:border-[var(--ink)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
+              >
+                ＋ {tl("newLibrary")}
+              </button>
+            ) : null}
+          </Rail>
         </nav>
       ) : null}
 

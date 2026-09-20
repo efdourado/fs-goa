@@ -65,7 +65,7 @@ export function ShelfAddButton({ label, onClick }: { label: string; onClick: () 
 }
 
 /** A rail of cards with the right-edge fade; takes what `useShelfRail` returns, spread. */
-export function Rail({ railRef, showFade, onScroll, children }: Pick<ReturnType<typeof useShelfRail>, "railRef" | "showFade" | "onScroll"> & { children: ReactNode }) {
+export function Rail({ railRef, showFade, onScroll, className, children }: Pick<ReturnType<typeof useShelfRail>, "railRef" | "showFade" | "onScroll"> & { className?: string; children: ReactNode }) {
   return (
     <div className="relative">
       <div
@@ -74,6 +74,7 @@ export function Rail({ railRef, showFade, onScroll, children }: Pick<ReturnType<
         className={cx(
           "flex gap-4 overflow-x-auto overflow-y-visible pb-3 pt-1",
           "snap-x snap-proximity [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+          className,
         )}
       >
         {children}
