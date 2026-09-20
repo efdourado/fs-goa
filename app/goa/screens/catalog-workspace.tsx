@@ -6,7 +6,7 @@ import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { ActionMenu, ActionMenuItem } from "../action-menu";
 import { API_PATHS, apiRequest } from "../api";
 import { AddCatalogItemDialog } from "../catalog-item-dialogs";
-import { CatalogRow, CatalogTile, type CatalogGroupBy, decadeOf, groupCatalogItems, LayoutToggle } from "../catalog-views";
+import { CatalogRow, CatalogTile, type CatalogGroupBy, groupCatalogItems, LayoutToggle } from "../catalog-views";
 import { useCsrf } from "../csrf";
 import { ConfirmDialog } from "../dialog";
 import { useGoaFormat } from "../format";
@@ -93,8 +93,6 @@ export function CatalogWorkspaceScreen({
   const [activeKind, setActiveKind] = useState<string | null>(null);
   const [sort, setSort] = useState<Sort>("recent");
   const [search, setSearch] = useState("");
-  const [genreFilter, setGenreFilter] = useState("");
-  const [decadeFilter, setDecadeFilter] = useState("");
   const [recommenderFilter, setRecommenderFilter] = useState("");
   const [layout, setLayout] = useState<Layout>("covers");
   const [groupBy, setGroupBy] = useState<CatalogGroupBy>("none");
@@ -151,7 +149,7 @@ export function CatalogWorkspaceScreen({
 
   function chooseLibrary(next: string) {
     setActiveKind(next);
-    setSearch(""); setGenreFilter(""); setDecadeFilter(""); setRecommenderFilter("");
+    setSearch(""); setRecommenderFilter("");
     setGroupBy("none");
     setUnusedOnly(false);
   }
@@ -162,8 +160,6 @@ export function CatalogWorkspaceScreen({
     for (const item of scoped) if (item.recommendedBy) seen.set(`${item.recommendedBy.kind}:${item.recommendedBy.id}`, item.recommendedBy.name);
     return [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1]));
   }, [scoped]);
-  const genres = useMemo(() => [...new Set(scoped.map((item) => item.mainGenre?.trim()).filter((genre): genre is string => Boolean(genre)))].sort((a, b) => a.localeCompare(b)), [scoped]);
-  const decades = useMemo(() => [...new Set(scoped.filter((item) => item.year).map((item) => decadeOf(item.year!)))].sort().reverse(), [scoped]);
   const activeFilter = recommenderFilter && (recommenderFilter === "none" || recommenders.some(([key]) => key === recommenderFilter)) ? recommenderFilter : "";
   const unusedCount = countByKind.get(kind ?? "")?.unused ?? 0;
   // Once the last unused item is gone the chip goes with it, so the filter can't be left stuck on.
@@ -172,12 +168,10 @@ export function CatalogWorkspaceScreen({
   const filtered = useMemo(() => scoped.filter((item) => {
     if (onlyUnused && (item.challengeCount ?? item.roundCount ?? 0) !== 0) return false;
     if (query && !fold([item.title, item.author, item.mainGenre, item.year].filter(Boolean).join(" ")).includes(query)) return false;
-    if (genreFilter && (item.mainGenre?.trim() ?? "") !== genreFilter) return false;
-    if (decadeFilter && !(item.year && decadeOf(item.year) === decadeFilter)) return false;
     if (!activeFilter) return true;
     if (activeFilter === "none") return !item.recommendedBy && !item.originNote;
     return item.recommendedBy ? `${item.recommendedBy.kind}:${item.recommendedBy.id}` === activeFilter : false;
-  }), [scoped, activeFilter, onlyUnused, query, genreFilter, decadeFilter]);
+  }), [scoped, activeFilter, onlyUnused, query]);
   // Only offered where the library keeps an event date (a match's kickoff) on its items.
   const hasDates = scoped.some((item) => item.scheduledAt);
   const startOf = (item: CatalogItem) => (item.scheduledAt ? new Date(item.scheduledAt.startsAt).getTime() : Infinity);
@@ -244,7 +238,7 @@ export function CatalogWorkspaceScreen({
   }
 
   const groupLabel = (label: string) => label || (groupBy === "genre" ? t("noGenre") : t("undated"));
-  const narrowed = Boolean(query || genreFilter || decadeFilter || activeFilter || onlyUnused);
+  const narrowed = Boolean(query || activeFilter || onlyUnused);
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
@@ -332,18 +326,6 @@ export function CatalogWorkspaceScreen({
                   className="min-w-0 flex-1 bg-transparent text-sm text-[var(--ink)] outline-none placeholder:text-[var(--muted)]"
                 />
               </label>
-            ) : null}
-            {genres.length > 1 ? (
-              <ChipSelect label={t("genreFilterLabel")} value={genreFilter} onChange={setGenreFilter} active={Boolean(genreFilter)}>
-                <option value="">{t("genreAll")}</option>
-                {genres.map((genre) => <option key={genre} value={genre}>{genre}</option>)}
-              </ChipSelect>
-            ) : null}
-            {decades.length > 1 ? (
-              <ChipSelect label={t("decadeFilterLabel")} value={decadeFilter} onChange={setDecadeFilter} active={Boolean(decadeFilter)}>
-                <option value="">{t("decadeAll")}</option>
-                {decades.map((decade) => <option key={decade} value={decade}>{decade}</option>)}
-              </ChipSelect>
             ) : null}
             {recommendationsEnabled && recommenders.length ? (
               <ChipSelect label={t("recommenderFilterLabel")} value={activeFilter} onChange={setRecommenderFilter} active={Boolean(activeFilter)}>
