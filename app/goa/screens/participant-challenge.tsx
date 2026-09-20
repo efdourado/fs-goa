@@ -1444,7 +1444,7 @@ export function ParticipantChallengeScreen({
       <div className="mb-5 flex items-center justify-between gap-3">
         <BackButton onClick={onBack} label={backLabel ?? t("back")} />
         <div className="flex items-center gap-2">
-          {!preview && challenge.result?.shareToken && challenge.scope !== "personal" ? <SharePublicButton token={challenge.result.shareToken} /> : null}
+          {!preview && challenge.result?.shareToken ? <SharePublicButton token={challenge.result.shareToken} /> : null}
           {previewActions ?? (onAdmin ? <Button variant="secondary" onClick={onAdmin}>{t("manage")}</Button> : null)}
         </div>
       </div>
