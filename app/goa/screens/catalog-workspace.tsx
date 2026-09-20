@@ -3,9 +3,9 @@
 import { useTranslations } from "next-intl";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 
-import { ActionMenu, ActionMenuItem } from "../action-menu";
 import { API_PATHS, apiRequest } from "../api";
 import { AddCatalogItemDialog } from "../catalog-item-dialogs";
+import { KebabMenu, menuRowClass } from "../card-menu";
 import { AddItemTile, CatalogRow, CatalogTile, type CatalogGroupBy, groupCatalogItems, LayoutToggle } from "../catalog-views";
 import { useCsrf } from "../csrf";
 import { ConfirmDialog } from "../dialog";
@@ -92,6 +92,8 @@ export function CatalogWorkspaceScreen({
   const [layout, setLayout] = useState<Layout>("covers");
   const [groupBy, setGroupBy] = useState<CatalogGroupBy>("none");
   const [dialog, setDialog] = useState<"add" | "new" | "rename" | "delete" | "properties" | null>(null);
+  // The library a rename / properties / delete dialog is about — not always the one on screen.
+  const [dialogKind, setDialogKind] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   // Tidying up: show only what no challenge holds, tick items, remove them together.
   const [unusedOnly, setUnusedOnly] = useState(false);
@@ -135,12 +137,19 @@ export function CatalogWorkspaceScreen({
     : null;
   const kind = activeKind && tabs.some((library) => library.kind === activeKind) ? activeKind : fallbackKind;
   const library = tabs.find((entry) => entry.kind === kind) ?? null;
+  const dialogLibrary = tabs.find((entry) => entry.kind === dialogKind) ?? null;
   const scoped = useMemo(() => (items ?? []).filter((item) => item.kind === kind), [items, kind]);
   const isBuiltIn = kind === "film" || kind === "book";
   const loading = items === null || libraries === null;
   // A property someone hid stops showing on lists too — the values stay saved.
   const { properties: libraryProperties } = useLibraryProperties(library ? { id: library.id, kind: library.kind } : null, itemsNonce);
   const hidden = useMemo(() => new Set((libraryProperties ?? []).filter((property) => property.hidden).map((property) => property.key)), [libraryProperties]);
+
+  function openLibraryDialog(entry: CatalogLibrary, which: "rename" | "delete" | "properties") {
+    setNotice(null);
+    setDialogKind(entry.kind);
+    setDialog(which);
+  }
 
   function chooseLibrary(next: string) {
     setActiveKind(next);
@@ -250,26 +259,38 @@ export function CatalogWorkspaceScreen({
             const active = entry.kind === kind;
             const counts = countByKind.get(entry.kind) ?? { total: 0, unused: 0 };
             return (
-              <button
-                key={entry.id}
-                type="button"
-                aria-pressed={active}
-                onClick={() => chooseLibrary(entry.kind)}
-                className={cx(
-                  "flex min-h-[4.75rem] w-64 flex-none cursor-pointer items-center gap-3.5 rounded-[20px] border px-4 text-left transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25",
-                  active ? "border-[var(--main)] bg-[var(--main-soft)] ring-4 ring-[var(--main)]/10" : "border-[var(--line)] bg-[var(--paper)] hover:border-[var(--main-line)]",
-                )}
-              >
-                <span className={cx("grid h-11 w-11 flex-none place-items-center rounded-full", active ? "bg-[var(--paper)] text-[var(--main-strong)]" : "bg-[var(--wash)] text-[var(--muted)]")} aria-hidden="true">
-                  <LibraryGlyph source={entry.source} className="h-6 w-6" />
-                </span>
-                <span className="min-w-0">
-                  <strong className={cx("block truncate text-base font-medium tracking-[-0.02em]", active && "text-[var(--main-strong)]")}>{libraryName(entry)}</strong>
-                  <small className={cx("mt-0.5 block truncate text-xs", active ? "text-[var(--main-strong)]/85" : "text-[var(--muted)]")}>
-                    {t("libraryStats", { count: counts.total })}{canManage && counts.unused > 0 ? ` · ${t("libraryUnused", { count: counts.unused })}` : ""}
-                  </small>
-                </span>
-              </button>
+              <div key={entry.id} className="group relative w-64 flex-none">
+                <button
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => chooseLibrary(entry.kind)}
+                  className={cx(
+                    "flex min-h-[4.75rem] w-full cursor-pointer items-center gap-3.5 rounded-[20px] border px-4 text-left transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25",
+                    active ? "border-[var(--main)] bg-[var(--main-soft)] ring-4 ring-[var(--main)]/10" : "border-[var(--line)] bg-[var(--paper)] hover:border-[var(--main-line)]",
+                  )}
+                >
+                  <span className={cx("grid h-11 w-11 flex-none place-items-center rounded-full", active ? "bg-[var(--paper)] text-[var(--main-strong)]" : "bg-[var(--wash)] text-[var(--muted)]")} aria-hidden="true">
+                    <LibraryGlyph source={entry.source} className="h-6 w-6" />
+                  </span>
+                  <span className="min-w-0">
+                    <strong className={cx("block truncate pr-6 text-base font-medium tracking-[-0.02em]", active && "text-[var(--main-strong)]")}>{libraryName(entry)}</strong>
+                    <small className={cx("mt-0.5 block truncate text-xs", active ? "text-[var(--main-strong)]/85" : "text-[var(--muted)]")}>
+                      {t("libraryStats", { count: counts.total })}{canManage && counts.unused > 0 ? ` · ${t("libraryUnused", { count: counts.unused })}` : ""}
+                    </small>
+                  </span>
+                </button>
+                <div className="absolute right-2.5 top-2.5">
+                  <KebabMenu label={tl("libraryActions")}>
+                    {(close) => (
+                      <>
+                        <button type="button" className={menuRowClass} onClick={() => { openLibraryDialog(entry, "properties"); close(); }}>{canManage ? tl("editProperties") : tl("viewProperties")}</button>
+                        {canManage ? <button type="button" className={menuRowClass} onClick={() => { openLibraryDialog(entry, "rename"); close(); }}>{tl("renameLibrary")}</button> : null}
+                        {canManage && entry.source !== "screens" && entry.source !== "pages" ? <button type="button" className={cx(menuRowClass, "text-[var(--danger)]")} onClick={() => { openLibraryDialog(entry, "delete"); close(); }}>{tl("deleteLibrary")}</button> : null}
+                      </>
+                    )}
+                  </KebabMenu>
+                </div>
+              </div>
             );
           })}
           {canManage ? (
@@ -353,11 +374,6 @@ export function CatalogWorkspaceScreen({
                 {selecting ? t("doneSelecting") : t("select")}
               </button>
             ) : null}
-            <ActionMenu label={tl("libraryActions")} iconOnly>
-              <ActionMenuItem onClick={() => setDialog("properties")}>{canManage ? tl("editProperties") : tl("viewProperties")}</ActionMenuItem>
-              {canManage ? <ActionMenuItem onClick={() => setDialog("rename")}>{tl("renameLibrary")}</ActionMenuItem> : null}
-              {canManage && library && library.source !== "screens" && library.source !== "pages" ? <ActionMenuItem onClick={() => setDialog("delete")}>{tl("deleteLibrary")}</ActionMenuItem> : null}
-            </ActionMenu>
           </div>
 
           {scoped.length ? (
@@ -488,19 +504,24 @@ export function CatalogWorkspaceScreen({
           onCreated={(made) => { setDialog(null); chooseLibrary(made.kind); reloadAll(); }}
         />
       ) : null}
-      {dialog === "rename" && library ? (
-        <RenameLibraryDialog library={library} onCancel={() => setDialog(null)} onRenamed={() => { setDialog(null); reloadLibraries(); }} />
+      {dialog === "rename" && dialogLibrary ? (
+        <RenameLibraryDialog library={dialogLibrary} onCancel={() => setDialog(null)} onRenamed={() => { setDialog(null); reloadLibraries(); }} />
       ) : null}
-      {dialog === "delete" && library ? (
+      {dialog === "delete" && dialogLibrary ? (
         <DeleteLibraryDialog
-          library={library}
-          itemCount={scoped.length}
+          library={dialogLibrary}
+          itemCount={countByKind.get(dialogLibrary.kind)?.total ?? 0}
           onCancel={() => setDialog(null)}
-          onDeleted={(name) => { setDialog(null); chooseLibrary(""); stopSelecting(); setNotice(tl("deleted", { name })); reloadAll(); }}
+          onDeleted={(name) => {
+            setDialog(null);
+            if (dialogLibrary.kind === kind) { chooseLibrary(""); stopSelecting(); }
+            setNotice(tl("deleted", { name }));
+            reloadAll();
+          }}
         />
       ) : null}
-      {dialog === "properties" && library ? (
-        <LibraryPropertiesDialog scope={scope} library={library} canEdit={canManage} onClose={() => setDialog(null)} onChanged={reloadAll} />
+      {dialog === "properties" && dialogLibrary ? (
+        <LibraryPropertiesDialog scope={scope} library={dialogLibrary} canEdit={canManage} onClose={() => setDialog(null)} onChanged={reloadAll} />
       ) : null}
       {confirmingRemoval ? (
         <ConfirmDialog

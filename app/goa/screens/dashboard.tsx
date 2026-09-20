@@ -1,10 +1,10 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { type DragEvent, type FormEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { type DragEvent, type FormEvent, type ReactNode, useRef, useState } from "react";
 
 import { API_PATHS, apiRequest } from "../api";
+import { KebabMenu, menuRowClass } from "../card-menu";
 import { Dialog } from "../dialog";
 import { useGoaFormat } from "../format";
 import { Shelf } from "../shelf";
@@ -158,113 +158,46 @@ function CardMenu({
   onManage: () => void;
 }) {
   const t = useTranslations("dashboard");
-  const [open, setOpen] = useState(false);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-  // The card clips its own overflow (rounded corners + colour edge), so the panel
-  // is a fixed-position portal on `document.body`, anchored to the trigger and
-  // capped to the room around it — it scrolls when the options don't all fit.
-  const [box, setBox] = useState<{ left: number; top?: number; bottom?: number; maxHeight: number } | null>(null);
-  const close = () => setOpen(false);
-
-  const place = useCallback(() => {
-    const r = triggerRef.current?.getBoundingClientRect();
-    if (!r) return;
-    const width = 240;
-    const gap = 12;
-    const left = Math.min(Math.max(gap, r.right - width), window.innerWidth - width - gap);
-    const below = window.innerHeight - r.bottom - gap;
-    if (below >= 240) {
-      setBox({ left, top: r.bottom + 4, maxHeight: below });
-    } else {
-      setBox({ left, bottom: window.innerHeight - r.top + 4, maxHeight: r.top - gap });
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!open) return;
-    place();
-    const reflow = () => place();
-    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
-    const onPointer = (event: PointerEvent) => {
-      const target = event.target as Node;
-      if (!panelRef.current?.contains(target) && !triggerRef.current?.contains(target)) setOpen(false);
-    };
-    window.addEventListener("scroll", reflow, true);
-    window.addEventListener("resize", reflow);
-    document.addEventListener("keydown", onKey);
-    document.addEventListener("pointerdown", onPointer);
-    return () => {
-      window.removeEventListener("scroll", reflow, true);
-      window.removeEventListener("resize", reflow);
-      document.removeEventListener("keydown", onKey);
-      document.removeEventListener("pointerdown", onPointer);
-    };
-  }, [open, place]);
-
-  const rowClass = "flex min-h-10 w-full items-center gap-2.5 rounded-xl px-3 hover:bg-[var(--wash)]";
+  const rowClass = menuRowClass;
 
   return (
-    <span className="flex-none">
-      <button
-        ref={triggerRef}
-        type="button"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-label={t("card.more")}
-        title={t("card.more")}
-        onClick={() => setOpen((value) => !value)}
-        className={cx(
-          "grid h-7 w-7 cursor-pointer place-items-center rounded-full transition hover:bg-[var(--wash)] hover:text-[var(--ink)] focus-visible:opacity-100 group-hover:opacity-100",
-          open ? "bg-[var(--wash)] text-[var(--ink)] opacity-100" : "text-[var(--muted)] opacity-60",
-        )}
-      >
-        <svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor" aria-hidden="true"><circle cx="8" cy="3" r="1.4" /><circle cx="8" cy="8" r="1.4" /><circle cx="8" cy="13" r="1.4" /></svg>
-      </button>
-      {open && box && typeof document !== "undefined"
-        ? createPortal(
-            <div
-              ref={panelRef}
-              role="menu"
-              style={{ left: box.left, top: box.top, bottom: box.bottom, maxHeight: box.maxHeight }}
-              className="fixed z-[70] w-60 overflow-y-auto overscroll-contain rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-1.5 text-sm shadow-[var(--elevate-2)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-            >
-              <div className="px-3 pb-2 pt-1.5">
-                <span className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--muted)]">{t("card.color")}</span>
-                <div className="flex items-center gap-2">
-                  <ColorSwatch tag={null} label={t("color.none")} selected={!challenge.colorTag} onClick={() => { onSetColor(null); close(); }} />
-                  {CHALLENGE_COLOR_TAGS.map((tag) => (
-                    <ColorSwatch key={tag} tag={tag} label={t(`color.${tag}`)} selected={challenge.colorTag === tag} onClick={() => { onSetColor(tag); close(); }} />
-                  ))}
-                </div>
-              </div>
-              <div className="border-t border-[var(--line)] pt-1">
-                <button type="button" className={rowClass} onClick={() => { onTogglePin(); close(); }}>
-                  <CirclePinIcon className="h-[18px] w-[18px] text-[var(--muted)]" filled={challenge.pinned} />
-                  {challenge.pinned ? t("card.unpin") : t("card.pin")}
-                </button>
-                {canMoveUp ? (
-                  <button type="button" className={rowClass} onClick={() => { onMove(-1); close(); }}>
-                    <CircleChevronIcon className="h-[18px] w-[18px] text-[var(--muted)]" dir="up" />{t("card.moveUp")}
-                  </button>
-                ) : null}
-                {canMoveDown ? (
-                  <button type="button" className={rowClass} onClick={() => { onMove(1); close(); }}>
-                    <CircleChevronIcon className="h-[18px] w-[18px] text-[var(--muted)]" dir="down" />{t("card.moveDown")}
-                  </button>
-                ) : null}
-              </div>
-              <div className="border-t border-[var(--line)] pt-1">
-                <button type="button" className="flex min-h-10 w-full items-center rounded-xl px-3 hover:bg-[var(--wash)]" onClick={() => { onOpen(); close(); }}>{t("card.open")}</button>
-                {canManageIt ? (
-                  <button type="button" className="flex min-h-10 w-full items-center rounded-xl px-3 hover:bg-[var(--wash)]" onClick={() => { onManage(); close(); }}>{t("card.manage")}</button>
-                ) : null}
-              </div>
-            </div>,
-            document.body,
-          )
-        : null}
-    </span>
+    <KebabMenu label={t("card.more")}>
+      {(close) => (
+        <>
+          <div className="px-3 pb-2 pt-1.5">
+            <span className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--muted)]">{t("card.color")}</span>
+            <div className="flex items-center gap-2">
+              <ColorSwatch tag={null} label={t("color.none")} selected={!challenge.colorTag} onClick={() => { onSetColor(null); close(); }} />
+              {CHALLENGE_COLOR_TAGS.map((tag) => (
+                <ColorSwatch key={tag} tag={tag} label={t(`color.${tag}`)} selected={challenge.colorTag === tag} onClick={() => { onSetColor(tag); close(); }} />
+              ))}
+            </div>
+          </div>
+          <div className="border-t border-[var(--line)] pt-1">
+            <button type="button" className={rowClass} onClick={() => { onTogglePin(); close(); }}>
+              <CirclePinIcon className="h-[18px] w-[18px] text-[var(--muted)]" filled={challenge.pinned} />
+              {challenge.pinned ? t("card.unpin") : t("card.pin")}
+            </button>
+            {canMoveUp ? (
+              <button type="button" className={rowClass} onClick={() => { onMove(-1); close(); }}>
+                <CircleChevronIcon className="h-[18px] w-[18px] text-[var(--muted)]" dir="up" />{t("card.moveUp")}
+              </button>
+            ) : null}
+            {canMoveDown ? (
+              <button type="button" className={rowClass} onClick={() => { onMove(1); close(); }}>
+                <CircleChevronIcon className="h-[18px] w-[18px] text-[var(--muted)]" dir="down" />{t("card.moveDown")}
+              </button>
+            ) : null}
+          </div>
+          <div className="border-t border-[var(--line)] pt-1">
+            <button type="button" className="flex min-h-10 w-full items-center rounded-xl px-3 hover:bg-[var(--wash)]" onClick={() => { onOpen(); close(); }}>{t("card.open")}</button>
+            {canManageIt ? (
+              <button type="button" className="flex min-h-10 w-full items-center rounded-xl px-3 hover:bg-[var(--wash)]" onClick={() => { onManage(); close(); }}>{t("card.manage")}</button>
+            ) : null}
+          </div>
+        </>
+      )}
+    </KebabMenu>
   );
 }
 
