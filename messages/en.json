@@ -587,33 +587,27 @@
     "recipes": {
       "cinema": {
         "name": "Screens",
-        "body": "A list of films or series; each person rates and comments when they watch, with an optional date. Can have a deadline or stay open.",
-        "title": "Screens — new edition"
+        "body": "A list of films or series; each person rates and comments when they watch, with an optional date. Can have a deadline or stay open."
       },
       "bookshelf": {
         "name": "Pages",
-        "body": "A list of books you just rate and comment on — no pages, no deadline, no \"when\". Great for logging what you've already read.",
-        "title": "Pages"
+        "body": "A list of books you just rate and comment on — no pages, no deadline, no \"when\". Great for logging what you've already read."
       },
       "library": {
         "name": "Reading club",
-        "body": "A list of books with pages read per day and per book, plus a \"Finished\" with a rating. Needs a period.",
-        "title": "Reading club — new season"
+        "body": "A list of books with pages read per day and per book, plus a \"Finished\" with a rating. Needs a period."
       },
       "habit": {
         "name": "Habit",
-        "body": "No film, no book — just a daily check-in. Add whatever fields the habit needs and build your own metrics on them.",
-        "title": "New habit"
+        "body": "No film, no book — just a daily check-in. Add whatever fields the habit needs and build your own metrics on them."
       },
       "tables": {
         "name": "Tables",
-        "body": "Rate restaurants, bars and cafés on food, atmosphere and value — one rating each, no combined score.",
-        "title": "Where should we eat?"
+        "body": "Rate restaurants, bars and cafés on food, atmosphere and value — one rating each, no combined score."
       },
       "custom": {
         "name": "Custom",
-        "body": "Pick any library — matches, games, anything — and decide exactly what everyone records.",
-        "title": "Custom challenge"
+        "body": "Pick any library — matches, games, anything — and decide exactly what everyone records."
       }
     },
     "titleLabel": "Title",

@@ -127,7 +127,6 @@ export function CreateChallengeScreen({
     setFieldsTouched(false);
     setCollectsEntryDate(false);
     setItemDates(false);
-    setTitle(t(`recipes.${next}.title`));
     setScheduleMode(meta.scheduleMode);
     setCineItems([]);
     setExtraKinds([]);

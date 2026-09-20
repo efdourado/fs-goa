@@ -587,33 +587,27 @@
     "recipes": {
       "cinema": {
         "name": "Screens",
-        "body": "Uma lista de filmes ou séries; cada pessoa dá nota e comentário ao assistir, com data opcional. Pode ter prazo ou ficar aberta.",
-        "title": "Screens — nova edição"
+        "body": "Uma lista de filmes ou séries; cada pessoa dá nota e comentário ao assistir, com data opcional. Pode ter prazo ou ficar aberta."
       },
       "bookshelf": {
         "name": "Pages",
-        "body": "Uma lista de livros que você só avalia e comenta — sem páginas, sem prazo, sem \"quando\". Ótimo pra registrar o que já leu.",
-        "title": "Pages"
+        "body": "Uma lista de livros que você só avalia e comenta — sem páginas, sem prazo, sem \"quando\". Ótimo pra registrar o que já leu."
       },
       "library": {
         "name": "Clube de leitura",
-        "body": "Uma lista de livros com páginas lidas por dia e por livro, e um \"Terminei\" com nota. Precisa de período.",
-        "title": "Clube de leitura — nova temporada"
+        "body": "Uma lista de livros com páginas lidas por dia e por livro, e um \"Terminei\" com nota. Precisa de período."
       },
       "habit": {
         "name": "Hábito",
-        "body": "Sem filme, sem livro — só um registro diário. Adicione os campos que o hábito precisar e crie suas próprias métricas a partir deles.",
-        "title": "Novo hábito"
+        "body": "Sem filme, sem livro — só um registro diário. Adicione os campos que o hábito precisar e crie suas próprias métricas a partir deles."
       },
       "tables": {
         "name": "Tables",
-        "body": "Avalie restaurantes, bares e cafés em comida, ambiente e custo-benefício — uma nota para cada, sem nota geral.",
-        "title": "Onde vamos comer?"
+        "body": "Avalie restaurantes, bares e cafés em comida, ambiente e custo-benefício — uma nota para cada, sem nota geral."
       },
       "custom": {
         "name": "Personalizado",
-        "body": "Escolha qualquer biblioteca — jogos, partidas, o que for — e decida exatamente o que cada pessoa registra.",
-        "title": "Desafio personalizado"
+        "body": "Escolha qualquer biblioteca — jogos, partidas, o que for — e decida exatamente o que cada pessoa registra."
       }
     },
     "titleLabel": "Título",
