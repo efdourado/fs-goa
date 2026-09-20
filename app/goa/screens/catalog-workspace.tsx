@@ -6,8 +6,7 @@ import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { ActionMenu, ActionMenuItem } from "../action-menu";
 import { API_PATHS, apiRequest } from "../api";
 import { AddCatalogItemDialog } from "../catalog-item-dialogs";
-import { byRatingDesc, bucketize, type CatalogBucket, decadeOf, highlights } from "../catalog-insights";
-import { CatalogRow, CatalogTile, type CatalogGroupBy, groupCatalogItems, LayoutToggle } from "../catalog-views";
+import { CatalogRow, CatalogTile, type CatalogGroupBy, decadeOf, groupCatalogItems, LayoutToggle } from "../catalog-views";
 import { useCsrf } from "../csrf";
 import { ConfirmDialog } from "../dialog";
 import { useGoaFormat } from "../format";
@@ -25,47 +24,16 @@ import type { CatalogItem, CatalogLibrary, Id, Member } from "../types";
 import { BackButton, Button, cardClass, cx, EmptyState, StatusMessage } from "../ui";
 import { formatRuntime } from "../utils";
 
-type Layout = "covers" | "list" | "insights";
+type Layout = "covers" | "list";
 type Sort = "recent" | "title" | "rating" | "date";
-type InsightBy = "genre" | "decade" | "year";
-
-/** Fixed 0–5 scale so a bar means the same thing across genre / year / decade. */
-const RATING_MAX = 5;
 
 const icon = { fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true } as const;
 const GridIcon = () => <svg viewBox="0 0 16 16" className="h-4 w-4" {...icon}><rect x="2" y="2" width="5" height="5" rx="1.2" /><rect x="9" y="2" width="5" height="5" rx="1.2" /><rect x="2" y="9" width="5" height="5" rx="1.2" /><rect x="9" y="9" width="5" height="5" rx="1.2" /></svg>;
 const ListIcon = () => <svg viewBox="0 0 16 16" className="h-4 w-4" {...icon}><path d="M3 4h10M3 8h10M3 12h10" /></svg>;
-const ChartIcon = () => <svg viewBox="0 0 16 16" className="h-4 w-4" {...icon}><path d="M3 13V8M8 13V3M13 13V6" /></svg>;
 const SearchIcon = () => <svg viewBox="0 0 16 16" className="h-4 w-4 flex-none" {...icon}><circle cx="7" cy="7" r="4.5" /><path d="m10.5 10.5 3 3" /></svg>;
 
 /** Lower-cased, accent-free, for matching what someone typed against a title. */
 const fold = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-
-function BucketBars({ buckets, emptyLabel }: { buckets: CatalogBucket[]; emptyLabel: string }) {
-  const t = useTranslations("personalCatalog");
-  const rows = byRatingDesc(buckets);
-  return (
-    <ul className={cx(cardClass, "divide-y divide-[var(--line)] overflow-hidden")}>
-      {rows.map((bucket) => {
-        const pct = bucket.ratingAvg === null ? 0 : Math.max(2, Math.min(100, (bucket.ratingAvg / RATING_MAX) * 100));
-        return (
-          <li key={bucket.key} className="grid grid-cols-[7rem_1fr_auto] items-center gap-3 px-5 py-3.5 sm:grid-cols-[9rem_1fr_auto]">
-            <span className="truncate text-sm font-light" title={bucket.label || emptyLabel}>{bucket.label || emptyLabel}</span>
-            <span className="h-2.5 rounded-full bg-[var(--wash)]" aria-hidden="true">
-              <span className="block h-full rounded-full bg-[var(--main)]" style={{ width: `${pct}%` }} />
-            </span>
-            <span className="whitespace-nowrap text-right text-sm tabular-nums">
-              {bucket.ratingAvg === null ? <span className="text-[var(--muted)]">—</span> : bucket.ratingAvg}
-              <span className="ml-2 text-[10px] font-light text-[var(--muted)]">
-                {t("bucketMeta", { ratings: bucket.ratingCount, items: bucket.itemCount })}
-              </span>
-            </span>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
 
 /** A native select dressed as a chip; it lights up once it narrows the list. */
 function ChipSelect({ label, value, onChange, active, children }: { label: string; value: string; onChange: (value: string) => void; active: boolean; children: ReactNode }) {
@@ -130,7 +98,6 @@ export function CatalogWorkspaceScreen({
   const [recommenderFilter, setRecommenderFilter] = useState("");
   const [layout, setLayout] = useState<Layout>("covers");
   const [groupBy, setGroupBy] = useState<CatalogGroupBy>("none");
-  const [insightBy, setInsightBy] = useState<InsightBy>("genre");
   const [dialog, setDialog] = useState<"add" | "new" | "rename" | "delete" | "properties" | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   // Tidying up: show only what no challenge holds, tick items, remove them together.
@@ -185,7 +152,7 @@ export function CatalogWorkspaceScreen({
   function chooseLibrary(next: string) {
     setActiveKind(next);
     setSearch(""); setGenreFilter(""); setDecadeFilter(""); setRecommenderFilter("");
-    setGroupBy("none"); setInsightBy("genre"); setLayout((current) => (current === "insights" && !(next === "film" || next === "book") ? "covers" : current));
+    setGroupBy("none");
     setUnusedOnly(false);
   }
 
@@ -226,22 +193,6 @@ export function CatalogWorkspaceScreen({
   ), [filtered, sort, hasDates]);
   const groups = useMemo(() => groupCatalogItems(sorted, groupBy), [sorted, groupBy]);
 
-  const genreBuckets = useMemo(
-    () => bucketize(scoped, (item) => ({ key: (item.mainGenre ?? "").toLowerCase() || "__none__", label: item.mainGenre?.trim() ?? "" })),
-    [scoped],
-  );
-  const yearBuckets = useMemo(
-    () => bucketize(scoped, (item) => (item.year ? { key: String(item.year), label: String(item.year) } : null)),
-    [scoped],
-  );
-  const decadeBuckets = useMemo(
-    () => bucketize(scoped, (item) => (item.year ? { key: decadeOf(item.year), label: decadeOf(item.year) } : null)),
-    [scoped],
-  );
-  const activeLayout: Layout = layout === "insights" && !isBuiltIn ? "covers" : layout;
-  const activeBuckets = insightBy === "genre" ? genreBuckets : insightBy === "year" ? yearBuckets : decadeBuckets;
-  const topGenres = useMemo(() => highlights(genreBuckets), [genreBuckets]);
-  const topYears = useMemo(() => highlights(yearBuckets), [yearBuckets]);
   const rated = scoped.filter((item) => item.ratingAvg !== null && item.ratingAvg !== undefined);
   const average = rated.length ? Math.round((rated.reduce((sum, item) => sum + (item.ratingAvg ?? 0), 0) / rated.length) * 100) / 100 : null;
 
@@ -426,16 +377,15 @@ export function CatalogWorkspaceScreen({
             {scoped.length ? (
               <LayoutToggle<Layout>
                 label={t("viewLabel")}
-                value={activeLayout}
+                value={layout}
                 onChange={setLayout}
                 options={[
                   { value: "covers", label: t("viewCovers"), icon: <GridIcon /> },
                   { value: "list", label: t("viewList"), icon: <ListIcon /> },
-                  ...(isBuiltIn ? [{ value: "insights" as const, label: t("viewInsights"), icon: <ChartIcon /> }] : []),
                 ]}
               />
             ) : null}
-            {canManage && scoped.length && activeLayout !== "insights" ? (
+            {canManage && scoped.length ? (
               <button
                 type="button"
                 aria-pressed={selecting}
@@ -461,7 +411,7 @@ export function CatalogWorkspaceScreen({
                 <strong className="font-medium text-[var(--ink)]">{narrowed ? t("resultOf", { shown: sorted.length, total: scoped.length }) : t("resultCount", { count: scoped.length })}</strong>
                 {average !== null ? ` · ${t("averageRating", { value: average })}` : ""}
               </p>
-              {isBuiltIn && activeLayout !== "insights" ? (
+              {isBuiltIn ? (
                 <div className="flex items-center gap-2.5 text-xs text-[var(--muted)]">
                   {t("groupByLabel")}
                   <Segmented<CatalogGroupBy>
@@ -478,26 +428,10 @@ export function CatalogWorkspaceScreen({
                   />
                 </div>
               ) : null}
-              {activeLayout === "insights" ? (
-                <div className="flex items-center gap-2.5 text-xs text-[var(--muted)]">
-                  {t("breakDownLabel")}
-                  <Segmented<InsightBy>
-                    className="w-56"
-                    ariaLabel={t("breakDownLabel")}
-                    value={insightBy}
-                    onChange={setInsightBy}
-                    options={[
-                      { value: "genre", label: t("group.genre") },
-                      { value: "decade", label: t("group.decade") },
-                      { value: "year", label: t("group.year") },
-                    ]}
-                  />
-                </div>
-              ) : null}
             </div>
           ) : null}
 
-          {selecting && activeLayout !== "insights" ? (
+          {selecting ? (
             <div className="sticky top-16 z-10 mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-[var(--main-line)] bg-[var(--main-soft)] p-3 shadow-[var(--elevate-1)]" role="region" aria-label={t("selectionBar")}>
               <Button variant="secondary" disabled={!sorted.length} onClick={() => togglePicked(sorted.map((item) => item.id), !allHerePicked)}>
                 {allHerePicked ? t("clearSelection") : t("selectAll", { count: sorted.length })}
@@ -514,21 +448,6 @@ export function CatalogWorkspaceScreen({
                 title={tl("emptyLibrary", { name: libraryName(library) })}
                 onClick={canManage ? () => setDialog("add") : undefined}
               />
-            ) : activeLayout === "insights" ? (
-              activeBuckets.length ? (
-                <div className="space-y-4">
-                  {(insightBy === "genre" ? topGenres : insightBy === "year" ? topYears : []).length ? (
-                    <p className="text-sm text-[var(--muted)]">
-                      {t(insightBy === "genre" ? "bestGenres" : "bestYears", {
-                        list: (insightBy === "genre" ? topGenres : topYears).map((bucket) => `${bucket.label || t("noGenre")} (${bucket.ratingAvg})`).join(", "),
-                      })}
-                    </p>
-                  ) : null}
-                  <BucketBars buckets={activeBuckets} emptyLabel={t("noGenre")} />
-                </div>
-              ) : (
-                <EmptyState title={t("bucketEmptyTitle")} />
-              )
             ) : !sorted.length ? (
               <EmptyState title={t("noMatches")} />
             ) : (
@@ -541,7 +460,7 @@ export function CatalogWorkspaceScreen({
                         <span className="text-xs text-[var(--muted)]">{group.items.length}</span>
                       </h2>
                     ) : null}
-                    {activeLayout === "covers" ? (
+                    {layout === "covers" ? (
                       <div className="grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 sm:gap-x-5 lg:grid-cols-4 xl:grid-cols-5">
                         {group.items.map((item) => {
                           const unused = isUnused(item);

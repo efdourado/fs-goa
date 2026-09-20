@@ -489,11 +489,7 @@
       "film": "Films",
       "book": "Books"
     },
-    "bucketMeta": "{ratings} ratings · {items} titles",
-    "bestGenres": "Best genres: {list}",
-    "bestYears": "Best years: {list}",
     "noGenre": "No genre",
-    "bucketEmptyTitle": "Nothing to break down yet",
     "addItem": "Add item",
     "recommendedBy": "recommended by {name}",
     "origin": "via {text}",
@@ -523,7 +519,6 @@
     "removedSome": "{removed, plural, one {# item removed} other {# items removed}}; {skipped, plural, one {# skipped because a running challenge uses it} other {# skipped because running challenges use them}}.",
     "viewCovers": "Covers",
     "viewList": "List",
-    "viewInsights": "Insights",
     "groupByLabel": "Group by",
     "group": {
       "none": "None",
@@ -531,7 +526,6 @@
       "decade": "Decade",
       "year": "Year"
     },
-    "breakDownLabel": "Break down by",
     "searchPlaceholder": "Search {name}",
     "searchLabel": "Search the catalogue",
     "genreFilterLabel": "Filter by genre",

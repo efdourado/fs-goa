@@ -2,11 +2,12 @@
 
 import type { ReactNode } from "react";
 
-import { decadeOf } from "./catalog-insights";
 import { CoverSwatch, ItemCover, ScoreRing } from "./catalog-cover";
 import { cx } from "./ui";
 
 export type CatalogGroupBy = "none" | "genre" | "decade" | "year";
+
+export const decadeOf = (year: number): string => `${Math.floor(year / 10) * 10}s`;
 
 export interface CatalogGroup<T> {
   key: string;
@@ -109,7 +110,7 @@ export function CatalogRow({ title, year, avg, ratingLabel, meta, selecting, pic
     : <button type="button" onClick={onOpen} className={cx(shared, "cursor-pointer")}>{body}</button>;
 }
 
-/** Grid / list / insights as three icon buttons on one track. */
+/** Covers / list as icon buttons on one track. */
 export function LayoutToggle<T extends string>({ value, onChange, options, label }: {
   value: T;
   onChange: (next: T) => void;

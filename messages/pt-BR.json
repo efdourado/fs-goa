@@ -489,11 +489,7 @@
       "film": "Filmes",
       "book": "Livros"
     },
-    "bucketMeta": "{ratings} notas · {items} títulos",
-    "bestGenres": "Melhores gêneros: {list}",
-    "bestYears": "Melhores anos: {list}",
     "noGenre": "Sem gênero",
-    "bucketEmptyTitle": "Ainda não há o que cruzar",
     "addItem": "Adicionar item",
     "recommendedBy": "indicado por {name}",
     "origin": "via {text}",
@@ -523,7 +519,6 @@
     "removedSome": "{removed, plural, one {# item removido} other {# itens removidos}}; {skipped, plural, one {# pulado porque um desafio em andamento o usa} other {# pulados porque desafios em andamento os usam}}.",
     "viewCovers": "Capas",
     "viewList": "Lista",
-    "viewInsights": "Análises",
     "groupByLabel": "Agrupar por",
     "group": {
       "none": "Nenhum",
@@ -531,7 +526,6 @@
       "decade": "Década",
       "year": "Ano"
     },
-    "breakDownLabel": "Detalhar por",
     "searchPlaceholder": "Buscar em {name}",
     "searchLabel": "Buscar no acervo",
     "genreFilterLabel": "Filtrar por gênero",

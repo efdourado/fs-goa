@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { COVER_TONES, coverToneOf } from "../app/goa/catalog-cover";
-import { groupCatalogItems } from "../app/goa/catalog-views";
+import { decadeOf, groupCatalogItems } from "../app/goa/catalog-views";
 
 test("a title always gets the same cover colour, and the same title in any case or spacing agrees", () => {
   assert.equal(coverToneOf("Solaris"), coverToneOf("  SOLARIS "));
@@ -24,4 +24,9 @@ test("grouping keeps the sort inside each section, orders sections, and sends it
   assert.deepEqual(ids(groupCatalogItems(items, "genre")), [["Drama", "ac"], ["sci-fi", "be"], ["", "d"]], "genres A→Z, matched without regard to case");
   assert.deepEqual(ids(groupCatalogItems(items, "decade")), [["2020s", "ac"], ["1970s", "be"], ["", "d"]], "decades newest first");
   assert.deepEqual(ids(groupCatalogItems(items, "year")), [["2023", "c"], ["2021", "a"], ["1979", "b"], ["1972", "e"], ["", "d"]]);
+});
+
+test("decadeOf floors a year to its decade", () => {
+  assert.equal(decadeOf(1994), "1990s");
+  assert.equal(decadeOf(2000), "2000s");
 });
