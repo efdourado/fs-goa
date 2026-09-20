@@ -16,8 +16,12 @@
  * script only ever writes `data-theme` for an explicit light/dark choice; on
  * "system" it writes nothing and lets the media query decide.
  *
- * `--main*` is the brand accent (violet); `--wash*` are neutral fills;
+ * `--main*` is the brand accent (pine green, hue ≈172°); `--wash*` are neutral fills;
  * `--ok/--warn/--danger` are status colours with soft + line variants.
+ * The chromatic tokens are steps of one OKLCH scheme, so they sit together: the accent is
+ * L≈0.50 / C≈0.085 (dark theme 0.545), soft and line are its light tints, the six `--tag-*`
+ * hues share one lightness and chroma, and ok/warn/danger use the same steps. The tag names
+ * are stored with challenges — retune the values, never the names.
  * `--spotlight*` is the always-dark hero surface (auth aside, results banner).
  * `--edge/--hover*` replace raw black/white overlays; `--elevate-*` hold full
  * shadow values so cards keep depth in both themes.
@@ -34,22 +38,22 @@
   --wash: #f0ebe0;
   --wash-strong: #e6dfce;
 
-  --main: #6758d8;
-  --main-strong: #5344bd;
-  --main-soft: #ece9fb;
-  --main-line: #cfc7f0;
-  --main-2: #f16e50;
+  --main: #20735e;
+  --main-strong: #015845;
+  --main-soft: #e5f4ef;
+  --main-line: #bbdfd3;
+  --main-2: #eb7353;
 
-  --ok: #0f7a52;
-  --ok-soft: #d9f2e5;
-  --ok-line: #a9ddc4;
-  --warn: #92500e;
-  --warn-soft: #fbeecb;
-  --warn-line: #eecf92;
-  --danger: #b3261e;
+  --ok: #4b763b;
+  --ok-soft: #e3f5de;
+  --ok-line: #b8d9ad;
+  --warn: #8b551c;
+  --warn-soft: #fbedcd;
+  --warn-line: #eccd8c;
+  --danger: #b02b27;
   --danger-strong: #7f1d1d;
-  --danger-soft: #fdeceb;
-  --danger-line: #f3c9c5;
+  --danger-soft: #fee9e6;
+  --danger-line: #f6c2bd;
 
   --spotlight: #20241f;
   --spotlight-ink: #f5f1e8;
@@ -60,12 +64,12 @@
   --elevate-2: 0 12px 40px rgba(32, 36, 31, 0.16);
 
   /* Homepage colour tags — a private per-viewer label on a challenge card. */
-  --tag-green: #2f8f63;
-  --tag-blue: #4372c4;
-  --tag-violet: #6758d8;
-  --tag-coral: #ec6b4e;
-  --tag-amber: #cf8a2f;
-  --tag-rose: #c65b7c;
+  --tag-green: #32965e;
+  --tag-blue: #4982c9;
+  --tag-violet: #866fc2;
+  --tag-coral: #d3745b;
+  --tag-amber: #cb9337;
+  --tag-rose: #ba5d80;
 }
 
 /* Dark palette — block A: visitors on "system". Mirror of block B below. */
@@ -81,22 +85,22 @@
     --wash: #262319;
     --wash-strong: #302c20;
 
-    --main: #6d5ce0;
-    --main-strong: #ac9ff8;
-    --main-soft: #241f42;
-    --main-line: #443b70;
-    --main-2: #f47c5e;
+    --main: #2b816a;
+    --main-strong: #8dcdb8;
+    --main-soft: #192b25;
+    --main-line: #2c4940;
+    --main-2: #ee8265;
 
-    --ok: #3fb98a;
-    --ok-soft: #173a2e;
-    --ok-line: #2e5f4b;
-    --warn: #d9a054;
-    --warn-soft: #3a2e15;
-    --warn-line: #5e4a24;
-    --danger: #f06a62;
+    --ok: #82b570;
+    --ok-soft: #21301c;
+    --ok-line: #3a5630;
+    --warn: #d6a866;
+    --warn-soft: #362913;
+    --warn-line: #61481b;
+    --danger: #e66f64;
     --danger-strong: #f5a39d;
-    --danger-soft: #3a1d1c;
-    --danger-line: #5e2e2b;
+    --danger-soft: #3a211f;
+    --danger-line: #6c3531;
 
     --spotlight: #211d15;
     --spotlight-ink: #f5f1e8;
@@ -106,12 +110,12 @@
     --elevate-1: 0 1px 2px rgba(0, 0, 0, 0.5);
     --elevate-2: 0 16px 48px rgba(0, 0, 0, 0.6);
 
-    --tag-green: #3fa878;
-    --tag-blue: #6f9be8;
-    --tag-violet: #9d90f0;
-    --tag-coral: #f08a6e;
-    --tag-amber: #e0a860;
-    --tag-rose: #dd88a4;
+    --tag-green: #6bb888;
+    --tag-blue: #77a7e5;
+    --tag-violet: #a997e0;
+    --tag-coral: #eb9982;
+    --tag-amber: #deae67;
+    --tag-rose: #da88a4;
   }
 }
 
@@ -127,22 +131,22 @@
   --wash: #262319;
   --wash-strong: #302c20;
 
-  --main: #6d5ce0;
-  --main-strong: #ac9ff8;
-  --main-soft: #241f42;
-  --main-line: #443b70;
-  --main-2: #f47c5e;
+  --main: #2b816a;
+  --main-strong: #8dcdb8;
+  --main-soft: #192b25;
+  --main-line: #2c4940;
+  --main-2: #ee8265;
 
-  --ok: #3fb98a;
-  --ok-soft: #173a2e;
-  --ok-line: #2e5f4b;
-  --warn: #d9a054;
-  --warn-soft: #3a2e15;
-  --warn-line: #5e4a24;
-  --danger: #f06a62;
+  --ok: #82b570;
+  --ok-soft: #21301c;
+  --ok-line: #3a5630;
+  --warn: #d6a866;
+  --warn-soft: #362913;
+  --warn-line: #61481b;
+  --danger: #e66f64;
   --danger-strong: #f5a39d;
-  --danger-soft: #3a1d1c;
-  --danger-line: #5e2e2b;
+  --danger-soft: #3a211f;
+  --danger-line: #6c3531;
 
   --spotlight: #211d15;
   --spotlight-ink: #f5f1e8;
@@ -152,12 +156,12 @@
   --elevate-1: 0 1px 2px rgba(0, 0, 0, 0.5);
   --elevate-2: 0 16px 48px rgba(0, 0, 0, 0.6);
 
-  --tag-green: #3fa878;
-  --tag-blue: #6f9be8;
-  --tag-violet: #9d90f0;
-  --tag-coral: #f08a6e;
-  --tag-amber: #e0a860;
-  --tag-rose: #dd88a4;
+  --tag-green: #6bb888;
+  --tag-blue: #77a7e5;
+  --tag-violet: #a997e0;
+  --tag-coral: #eb9982;
+  --tag-amber: #deae67;
+  --tag-rose: #da88a4;
 }
 
 * { box-sizing: border-box; }

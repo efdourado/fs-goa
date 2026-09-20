@@ -18,8 +18,8 @@ export function coverToneOf(title: string): CoverTone {
 function coverColors(tone: CoverTone): CSSProperties {
   const color = `var(--tag-${tone})`;
   return {
-    "--cover-bg": `color-mix(in srgb, ${color} 16%, var(--paper))`,
-    "--cover-deco": `color-mix(in srgb, ${color} 30%, var(--paper))`,
+    "--cover-bg": `color-mix(in srgb, ${color} 20%, var(--paper))`,
+    "--cover-deco": `color-mix(in srgb, ${color} 34%, var(--paper))`,
     "--cover-ink": `color-mix(in srgb, ${color} 38%, var(--ink))`,
   } as CSSProperties;
 }
