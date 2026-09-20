@@ -436,13 +436,14 @@
     "recommendedBy": "indicado por {name}",
     "noRounds": "Este item ainda não entrou em nenhuma rodada visível.",
     "remove": "Excluir do acervo",
+    "keepItem": "Manter",
     "removeHint": "O item sai do acervo e vai para a lixeira, de onde dá para restaurar. As rodadas que já o usaram continuam intactas.",
     "status": {
       "draft": "rascunho",
       "active": "em andamento",
       "closed": "encerrada"
     },
-    "edit": "Editar",
+    "edit": "Editar item",
     "origin": "via {text}",
     "specYear": "Ano",
     "specWhen": "Data",
@@ -459,7 +460,6 @@
     "notRated": "Ainda sem nota",
     "ratedAria": "Nota {value} de 5",
     "roundRatings": "{count, plural, one {# avaliação} other {# avaliações}}",
-    "moreActions": "Mais ações",
     "removeTitle": "Excluir \"{title}\" do acervo?"
   },
   "personalSpace": {

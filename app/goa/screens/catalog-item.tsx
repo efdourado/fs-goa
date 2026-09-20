@@ -3,11 +3,9 @@
 import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 
-import { ActionMenu, ActionMenuItem } from "../action-menu";
 import { apiRequest } from "../api";
 import { ItemCover, ScoreRing } from "../catalog-cover";
 import { EditCatalogItemDialog } from "../catalog-item-dialogs";
-import { ConfirmDialog } from "../dialog";
 import { useGoaFormat } from "../format";
 import { type CatalogScope, LibraryGlyph, useCatalogLibraries, useLibraryName } from "../libraries";
 import { useRecommenderSource } from "../recommender-picker";
@@ -20,14 +18,21 @@ interface CatalogItemEditing {
 }
 
 /** The "Edit" control and its dialog. Its own component so the libraries load only when someone may actually edit. */
-function EditItemAction({ item, scope, recommendationsEnabled, editing, onSaved }: { item: CatalogItemDetail; scope: CatalogScope; recommendationsEnabled: boolean; editing: CatalogItemEditing; onSaved: () => void }) {
+function EditItemAction({ item, scope, recommendationsEnabled, editing, onSaved, onRemove }: { item: CatalogItemDetail; scope: CatalogScope; recommendationsEnabled: boolean; editing: CatalogItemEditing; onSaved: () => void; onRemove?: () => Promise<void> }) {
   const t = useTranslations("catalog");
   const { data: libraries } = useCatalogLibraries(scope);
   const source = useRecommenderSource(scope, recommendationsEnabled);
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Button variant="secondary" className="min-h-11 flex-1" disabled={!libraries} onClick={() => setOpen(true)}>{t("edit")}</Button>
+      <button
+        type="button"
+        disabled={!libraries}
+        onClick={() => setOpen(true)}
+        className="inline-flex min-h-12 w-full cursor-pointer items-center justify-center rounded-[28px] border border-[var(--line)] px-5 text-sm font-light text-[var(--ink)] transition hover:bg-[var(--hover)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 disabled:cursor-not-allowed disabled:opacity-55"
+      >
+        {t("edit")}
+      </button>
       {open && libraries ? (
         <EditCatalogItemDialog
           scope={scope}
@@ -38,6 +43,7 @@ function EditItemAction({ item, scope, recommendationsEnabled, editing, onSaved 
           source={source}
           onCancel={() => setOpen(false)}
           onSaved={() => { setOpen(false); onSaved(); }}
+          onRemove={onRemove}
         />
       ) : null}
     </>
@@ -73,7 +79,6 @@ export function CatalogItemScreen({
   const f = useGoaFormat();
   const [item, setItem] = useState<CatalogItemDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [confirmingRemoval, setConfirmingRemoval] = useState(false);
   const [nonce, setNonce] = useState(0);
   const libraryName = useLibraryName();
   const { data: libraries } = useCatalogLibraries(scope);
@@ -124,14 +129,9 @@ export function CatalogItemScreen({
       <div className="grid items-start gap-10 lg:grid-cols-[340px_minmax(0,1fr)] lg:gap-16">
         <div className="w-full max-w-[280px] sm:max-w-[340px]">
           <ItemCover size="xl" title={item.title} year={item.year} />
-          {editing || onDelete ? (
-            <div className="mt-5 flex items-center gap-2.5">
-              {editing ? <EditItemAction item={item} scope={scope} recommendationsEnabled={recommendationsEnabled} editing={editing} onSaved={() => setNonce((value) => value + 1)} /> : null}
-              {onDelete ? (
-                <ActionMenu label={t("moreActions")} iconOnly>
-                  <ActionMenuItem danger onClick={() => setConfirmingRemoval(true)}>{t("remove")}</ActionMenuItem>
-                </ActionMenu>
-              ) : null}
+          {editing ? (
+            <div className="mt-5">
+              <EditItemAction item={item} scope={scope} recommendationsEnabled={recommendationsEnabled} editing={editing} onSaved={() => setNonce((value) => value + 1)} onRemove={onDelete} />
             </div>
           ) : null}
         </div>
@@ -199,17 +199,6 @@ export function CatalogItemScreen({
         </div>
       </div>
 
-      {confirmingRemoval && onDelete ? (
-        <ConfirmDialog
-          title={t("removeTitle", { title: item.title })}
-          body={t("removeHint")}
-          confirmLabel={t("remove")}
-          busyLabel={tc("saving")}
-          danger
-          onClose={() => setConfirmingRemoval(false)}
-          onConfirm={onDelete}
-        />
-      ) : null}
     </main>
   );
 }

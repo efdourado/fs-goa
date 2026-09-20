@@ -436,13 +436,14 @@
     "recommendedBy": "recommended by {name}",
     "noRounds": "This item hasn't been in any visible round yet.",
     "remove": "Remove from catalogue",
+    "keepItem": "Keep it",
     "removeHint": "It leaves the catalogue and goes to the bin, where you can restore it. Rounds that already used it stay intact.",
     "status": {
       "draft": "draft",
       "active": "in progress",
       "closed": "closed"
     },
-    "edit": "Edit",
+    "edit": "Edit item",
     "origin": "via {text}",
     "specYear": "Year",
     "specWhen": "Date",
@@ -459,7 +460,6 @@
     "notRated": "Not rated yet",
     "ratedAria": "Rated {value} out of 5",
     "roundRatings": "{count, plural, one {# rating} other {# ratings}}",
-    "moreActions": "More actions",
     "removeTitle": "Remove \"{title}\" from the catalogue?"
   },
   "personalSpace": {

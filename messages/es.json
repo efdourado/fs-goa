@@ -436,13 +436,14 @@
     "recommendedBy": "recomendado por {name}",
     "noRounds": "Este ítem aún no ha entrado en ninguna ronda visible.",
     "remove": "Quitar del acervo",
+    "keepItem": "Conservar",
     "removeHint": "Sale del acervo y va a la papelera, de donde se puede restaurar. Las rondas que ya lo usaron quedan intactas.",
     "status": {
       "draft": "borrador",
       "active": "en curso",
       "closed": "cerrada"
     },
-    "edit": "Editar",
+    "edit": "Editar ítem",
     "origin": "vía {text}",
     "specYear": "Año",
     "specWhen": "Fecha",
@@ -459,7 +460,6 @@
     "notRated": "Sin nota aún",
     "ratedAria": "Nota {value} de 5",
     "roundRatings": "{count, plural, one {# valoración} other {# valoraciones}}",
-    "moreActions": "Más acciones",
     "removeTitle": "¿Quitar \"{title}\" del acervo?"
   },
   "personalSpace": {

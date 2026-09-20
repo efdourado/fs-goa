@@ -194,6 +194,7 @@ export function EditCatalogItemDialog({
   source,
   onCancel,
   onSaved,
+  onRemove,
 }: {
   scope: CatalogScope;
   item: CatalogItemDetail;
@@ -203,8 +204,12 @@ export function EditCatalogItemDialog({
   source: RecommenderSource;
   onCancel: () => void;
   onSaved: () => void;
+  /** Takes the item out of the catalogue (to the bin). Offered at the foot of the form, after a second click. */
+  onRemove?: () => Promise<void>;
 }) {
   const t = useTranslations("catalogAdd");
+  const tCat = useTranslations("catalog");
+  const tc = useTranslations("common");
   const tEvent = useTranslations("eventSchedule");
   const f = useGoaFormat();
   const csrf = useCsrf();
@@ -218,7 +223,22 @@ export function EditCatalogItemDialog({
   const values = edited ?? initialValues;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingRemoval, setConfirmingRemoval] = useState(false);
+  const [removing, setRemoving] = useState(false);
   const dirty = title.trim() !== item.title || edited !== null || !sameRecommender(recommender, initialRecommender);
+
+  async function remove() {
+    if (!onRemove) return;
+    setRemoving(true);
+    setError(null);
+    try {
+      await onRemove();
+    } catch (cause) {
+      setError(f.error(cause));
+      setRemoving(false);
+      setConfirmingRemoval(false);
+    }
+  }
 
   async function submit() {
     const name = title.trim();
@@ -249,7 +269,7 @@ export function EditCatalogItemDialog({
     <FormDialog
       title={t("editTitle")}
       dirty={dirty}
-      busy={busy}
+      busy={busy || removing}
       error={error ?? propertiesError}
       onCancel={onCancel}
       onSubmit={submit}
@@ -265,6 +285,20 @@ export function EditCatalogItemDialog({
         <p className="text-sm text-[var(--muted)]">{t("loadingProperties")}</p>
       )}
       {recommendationsEnabled ? <RecommenderPicker value={recommender} onChange={setRecommender} members={members} source={source} /> : null}
+      {onRemove ? (
+        <div className="border-t border-[var(--line)] pt-5">
+          <p className="text-sm leading-6 text-[var(--muted)]">{tCat("removeHint")}</p>
+          {confirmingRemoval ? (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="mr-auto text-sm font-medium">{tCat("removeTitle", { title: item.title })}</span>
+              <Button variant="secondary" disabled={removing} onClick={() => setConfirmingRemoval(false)}>{tCat("keepItem")}</Button>
+              <Button variant="danger" disabled={removing} onClick={() => void remove()}>{removing ? tc("saving") : tCat("remove")}</Button>
+            </div>
+          ) : (
+            <Button variant="danger" className="mt-3" disabled={busy} onClick={() => setConfirmingRemoval(true)}>{tCat("remove")}</Button>
+          )}
+        </div>
+      ) : null}
     </FormDialog>
   );
 }
