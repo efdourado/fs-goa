@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 import { API_PATHS, apiRequest } from "../api";
+import { CARD_COLUMN, COVER_GRID } from "../card-grid";
 import { AddCatalogItemDialog } from "../catalog-item-dialogs";
 import { KebabMenu, menuRowClass } from "../card-menu";
 import { AddItemTile, CatalogRow, CatalogTile, type CatalogGroupBy, groupCatalogItems, LayoutToggle } from "../catalog-views";
@@ -26,6 +27,7 @@ import { BackButton, Button, cardClass, cx, EmptyState, StatusMessage } from "..
 import { formatRuntime } from "../utils";
 
 type Layout = "covers" | "list";
+type Sort = "recent" | "title" | "rating" | "date";
 
 const icon = { fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true } as const;
 const GridIcon = () => <svg viewBox="0 0 16 16" className="h-4 w-4" {...icon}><rect x="2" y="2" width="5" height="5" rx="1.2" /><rect x="9" y="2" width="5" height="5" rx="1.2" /><rect x="2" y="9" width="5" height="5" rx="1.2" /><rect x="9" y="9" width="5" height="5" rx="1.2" /></svg>;
@@ -89,6 +91,7 @@ export function CatalogWorkspaceScreen({
   const [activeKind, setActiveKind] = useState<string | null>(null);
   const [recommenderFilter, setRecommenderFilter] = useState("");
   const [layout, setLayout] = useState<Layout>("covers");
+  const [sort, setSort] = useState<Sort>("recent");
   const [groupBy, setGroupBy] = useState<CatalogGroupBy>("none");
   const [dialog, setDialog] = useState<"add" | "new" | "rename" | "delete" | "properties" | null>(null);
   // The library a rename / properties / delete dialog is about — not always the one on screen.
@@ -174,12 +177,20 @@ export function CatalogWorkspaceScreen({
     if (activeFilter === "none") return !item.recommendedBy && !item.originNote;
     return item.recommendedBy ? `${item.recommendedBy.kind}:${item.recommendedBy.id}` === activeFilter : false;
   }), [scoped, activeFilter, onlyUnused]);
-  // Newest first: what was added to the catalogue last comes first.
+  // Only offered where the library keeps an event date (a match's kickoff) on its items.
+  const hasDates = scoped.some((item) => item.scheduledAt);
+  const activeSort: Sort = sort === "date" && !hasDates ? "recent" : sort;
+  const startOf = (item: CatalogItem) => (item.scheduledAt ? new Date(item.scheduledAt.startsAt).getTime() : Infinity);
   const addedAt = (item: CatalogItem) => (item.createdAt ? Date.parse(item.createdAt) : 0);
-  const sorted = useMemo(
-    () => [...filtered].sort((left, right) => addedAt(right) - addedAt(left) || left.title.localeCompare(right.title)),
-    [filtered],
-  );
+  const sorted = useMemo(() => [...filtered].sort((left, right) =>
+    activeSort === "rating"
+      ? (right.ratingAvg ?? -1) - (left.ratingAvg ?? -1) || left.title.localeCompare(right.title)
+      : activeSort === "date"
+        ? startOf(left) - startOf(right) || left.title.localeCompare(right.title)
+        : activeSort === "recent"
+          ? addedAt(right) - addedAt(left) || left.title.localeCompare(right.title)
+          : left.title.localeCompare(right.title),
+  ), [filtered, activeSort]);
   const groups = useMemo(() => groupCatalogItems(sorted, groupBy), [sorted, groupBy]);
 
   const rated = scoped.filter((item) => item.ratingAvg !== null && item.ratingAvg !== undefined);
@@ -254,26 +265,24 @@ export function CatalogWorkspaceScreen({
               const active = entry.kind === kind;
               const counts = countByKind.get(entry.kind) ?? { total: 0, unused: 0 };
               return (
-                <div key={entry.id} className="group relative w-64 flex-none snap-start">
+                <div key={entry.id} className={cx("group relative", CARD_COLUMN)}>
                   <button
                     type="button"
                     aria-pressed={active}
                     onClick={() => chooseLibrary(entry.kind)}
                     className={cx(
-                      "relative flex min-h-[4.75rem] w-full cursor-pointer items-center gap-3.5 overflow-hidden rounded-[20px] border px-4 text-left shadow-[var(--elevate-card)] transition duration-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25",
+                      "relative flex min-h-[4.75rem] w-full cursor-pointer items-center gap-2.5 overflow-hidden rounded-[20px] border px-3 py-3 text-left shadow-[var(--elevate-card)] transition duration-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 md:gap-3.5 md:px-4",
                       active ? "border-[var(--main)] bg-[var(--main-soft)] ring-1 ring-inset ring-[var(--main)]" : "border-[var(--line)] bg-[var(--paper)] hover:-translate-y-0.5 hover:border-[var(--main-line)]",
                     )}
                   >
                     <span aria-hidden="true" className={cx("pointer-events-none absolute -bottom-10 -right-10 h-24 w-24 rounded-full border-[14px]", active ? "border-[var(--main)]/[0.13]" : "border-[var(--main)]/[0.07]")} />
-                    <span className={cx("relative grid h-11 w-11 flex-none place-items-center rounded-full", active ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-[var(--elevate-1)]" : "bg-[var(--wash)] text-[var(--muted)] ring-1 ring-inset ring-[var(--line)]")} aria-hidden="true">
-                      <LibraryGlyph source={entry.source} className="h-6 w-6" />
+                    <span className={cx("relative grid h-9 w-9 flex-none place-items-center rounded-full md:h-11 md:w-11", active ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-[var(--elevate-1)]" : "bg-[var(--wash)] text-[var(--muted)] ring-1 ring-inset ring-[var(--line)]")} aria-hidden="true">
+                      <LibraryGlyph source={entry.source} className="h-5 w-5 md:h-6 md:w-6" />
                     </span>
                     <span className="relative min-w-0">
                       <strong className={cx("block truncate pr-6 text-base font-medium tracking-[-0.02em]", active && "text-[var(--main-strong)]")}>{libraryName(entry)}</strong>
-                      <small className={cx("mt-0.5 block truncate text-xs", active ? "text-[var(--main-strong)]/85" : "text-[var(--muted)]")}>
-                        {t("libraryStats", { count: counts.total })}
-                        {canManage && counts.unused > 0 ? <span className="text-[var(--warn)]"> · {t("libraryUnused", { count: counts.unused })}</span> : null}
-                      </small>
+                      <small className={cx("mt-0.5 block truncate text-xs", active ? "text-[var(--main-strong)]/85" : "text-[var(--muted)]")}>{t("libraryStats", { count: counts.total })}</small>
+                      {canManage && counts.unused > 0 ? <small className="block truncate text-xs text-[var(--warn)]">{t("libraryUnused", { count: counts.unused })}</small> : null}
                     </span>
                   </button>
                   <div className="absolute right-2.5 top-2.5">
@@ -294,7 +303,7 @@ export function CatalogWorkspaceScreen({
               <button
                 type="button"
                 onClick={() => setDialog("new")}
-                className="flex min-h-[4.75rem] w-64 flex-none cursor-pointer snap-start items-center justify-center gap-2 rounded-[20px] border border-dashed border-[var(--muted)] px-4 text-sm font-light text-[var(--muted)] transition hover:border-[var(--ink)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
+                className={cx("flex min-h-[4.75rem] cursor-pointer items-center justify-center gap-2 rounded-[20px] border border-dashed border-[var(--muted)] px-4 text-sm font-light text-[var(--muted)] transition hover:border-[var(--ink)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25", CARD_COLUMN)}
               >
                 ＋ {tl("newLibrary")}
               </button>
@@ -372,23 +381,34 @@ export function CatalogWorkspaceScreen({
                 <strong className="font-medium text-[var(--ink)]">{narrowed ? t("resultOf", { shown: sorted.length, total: scoped.length }) : t("resultCount", { count: scoped.length })}</strong>
                 {average !== null ? ` · ${t("averageRating", { value: average })}` : ""}
               </p>
-              {isBuiltIn ? (
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                {isBuiltIn ? (
+                  <div className="flex items-center gap-2.5 text-xs text-[var(--muted)]">
+                    {t("groupByLabel")}
+                    <Segmented<CatalogGroupBy>
+                      className="w-64"
+                      ariaLabel={t("groupByLabel")}
+                      value={groupBy}
+                      onChange={setGroupBy}
+                      options={[
+                        { value: "none", label: t("group.none") },
+                        { value: "genre", label: t("group.genre") },
+                        { value: "decade", label: t("group.decade") },
+                        { value: "year", label: t("group.year") },
+                      ]}
+                    />
+                  </div>
+                ) : null}
                 <div className="flex items-center gap-2.5 text-xs text-[var(--muted)]">
-                  {t("groupByLabel")}
-                  <Segmented<CatalogGroupBy>
-                    className="w-64"
-                    ariaLabel={t("groupByLabel")}
-                    value={groupBy}
-                    onChange={setGroupBy}
-                    options={[
-                      { value: "none", label: t("group.none") },
-                      { value: "genre", label: t("group.genre") },
-                      { value: "decade", label: t("group.decade") },
-                      { value: "year", label: t("group.year") },
-                    ]}
-                  />
+                  {t("sortLabel")}
+                  <ChipSelect label={t("sortLabel")} value={activeSort} onChange={(next) => setSort(next as Sort)} active={false}>
+                    <option value="recent">{t("sortRecent")}</option>
+                    <option value="title">{t("sortTitle")}</option>
+                    <option value="rating">{t("sortRating")}</option>
+                    {hasDates ? <option value="date">{t("sortDate")}</option> : null}
+                  </ChipSelect>
                 </div>
-              ) : null}
+              </div>
             </div>
           ) : null}
 
@@ -422,7 +442,7 @@ export function CatalogWorkspaceScreen({
                       </h2>
                     ) : null}
                     {layout === "covers" ? (
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 sm:gap-x-5 lg:grid-cols-4 xl:grid-cols-5">
+                      <div className={COVER_GRID}>
                         {canManage && !selecting && index === 0 ? <AddItemTile label={t("addItem")} onClick={() => { setNotice(null); setDialog("add"); }} /> : null}
                         {group.items.map((item) => {
                           const unused = isUnused(item);

@@ -508,6 +508,11 @@
     "viewCovers": "Covers",
     "viewList": "List",
     "groupByLabel": "Group by",
+    "sortLabel": "Sort by",
+    "sortRecent": "Recently added",
+    "sortTitle": "Title",
+    "sortRating": "Rating",
+    "sortDate": "Event date",
     "group": {
       "none": "None",
       "genre": "Genre",

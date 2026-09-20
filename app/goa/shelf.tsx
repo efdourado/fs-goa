@@ -72,7 +72,7 @@ export function Rail({ railRef, showFade, onScroll, className, children }: Pick<
         ref={railRef}
         onScroll={onScroll}
         className={cx(
-          "flex gap-4 overflow-x-auto overflow-y-visible pb-3 pt-1",
+          "flex gap-4 overflow-x-auto overflow-y-visible pb-3 pt-1 sm:gap-5",
           "snap-x snap-proximity [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
           className,
         )}

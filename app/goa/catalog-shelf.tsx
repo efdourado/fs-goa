@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { AddCardTile } from "./add-tile";
 import { API_PATHS, apiRequest } from "./api";
+import { COVER_COLUMN } from "./card-grid";
 import { CatalogTile } from "./catalog-views";
 import { useGoaFormat } from "./format";
 import { type CatalogScope, LibraryGlyph, useCatalogLibraries, useLibraryName } from "./libraries";
@@ -100,12 +101,11 @@ export function CatalogShelf({ scope, canManage, onOpenCatalog, onOpenItem }: {
             </div>
           ) : null}
           <Rail railRef={railRef} showFade={showFade} onScroll={onScroll}>
-            {canManage ? <AddCardTile label={t("catalogAddItem")} onClick={onOpenCatalog} className="aspect-[3/4] w-44 flex-none snap-start self-start" /> : null}
+            {canManage ? <AddCardTile label={t("catalogAddItem")} onClick={onOpenCatalog} className={cx("aspect-[3/4] self-start", COVER_COLUMN)} /> : null}
             {visible.map((item) => (
               <CatalogTile
                 key={item.id}
-                size="sm"
-                className="w-44 flex-none snap-start"
+                className={COVER_COLUMN}
                 title={item.title}
                 year={item.year}
                 avg={item.ratingAvg}
@@ -118,7 +118,7 @@ export function CatalogShelf({ scope, canManage, onOpenCatalog, onOpenItem }: {
               <button
                 type="button"
                 onClick={onOpenCatalog}
-                className="flex aspect-[3/4] w-44 flex-none cursor-pointer snap-start flex-col items-center justify-center gap-1.5 self-start rounded-[20px] border border-[var(--line)] bg-[var(--paper)] transition hover:border-[var(--main-line)]"
+                className={cx("flex aspect-[3/4] cursor-pointer flex-col items-center justify-center gap-1.5 self-start rounded-[20px] border border-[var(--line)] bg-[var(--paper)] transition hover:border-[var(--main-line)]", COVER_COLUMN)}
               >
                 <span className="text-3xl font-light tracking-[-0.04em]">{sorted.length - visible.length}</span>
                 <span className="px-3 text-center text-xs text-[var(--muted)]">{t("catalogMoreIn", { name: shelf ? libraryName(shelf) : t("catalogTitle") })}</span>

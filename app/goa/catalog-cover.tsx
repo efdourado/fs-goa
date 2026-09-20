@@ -62,7 +62,6 @@ export function CoverSwatch({ title, className }: { title: string; className?: s
 }
 
 const SIZES = {
-  sm: { clamp: "line-clamp-4 pr-5", pad: "p-[15px]", year: "text-[10px]", title: "text-[21px]", ring: "-right-[46px] -bottom-[46px] h-[148px] w-[148px] border-[19px]", badge: 40, badgeText: "text-[12px] font-medium", badgeInset: "bottom-2.5 right-2.5" },
   md: { clamp: "line-clamp-4 pr-5", pad: "p-4 sm:p-[18px]", year: "text-[10px] sm:text-[11px]", title: "text-[21px] sm:text-[25px]", ring: "-right-[54px] -bottom-[54px] h-[176px] w-[176px] border-[22px]", badge: 46, badgeText: "text-[13px] font-medium", badgeInset: "bottom-3 right-3" },
   xl: { clamp: "line-clamp-5", pad: "p-7", year: "text-[13px]", title: "text-[54px]", ring: "-right-[90px] -bottom-[90px] h-[300px] w-[300px] border-[38px]", badge: 0, badgeText: "", badgeInset: "" },
 } as const;

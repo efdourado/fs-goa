@@ -42,7 +42,7 @@ export function groupCatalogItems<T extends Groupable>(items: readonly T[], by: 
 }
 
 /** One cover in the grid — a button that opens the item, or a checkbox while items are being picked. */
-export function CatalogTile({ title, year, avg, ratingLabel, caption, note, noteTone = "muted", size = "md", className, selecting, picked, onPick, onOpen }: {
+export function CatalogTile({ title, year, avg, ratingLabel, caption, note, noteTone = "muted", className, selecting, picked, onPick, onOpen }: {
   title: string;
   year?: number | null;
   avg?: number | null;
@@ -50,7 +50,6 @@ export function CatalogTile({ title, year, avg, ratingLabel, caption, note, note
   caption: string;
   note?: string;
   noteTone?: "muted" | "warn";
-  size?: "sm" | "md";
   /** Sizes the tile inside a rail; a grid leaves it out. */
   className?: string;
   selecting?: boolean;
@@ -60,7 +59,7 @@ export function CatalogTile({ title, year, avg, ratingLabel, caption, note, note
 }) {
   const body = (
     <>
-      <ItemCover title={title} year={year} avg={avg} ratingLabel={ratingLabel} size={size} className={cx("transition duration-200", picked ? "ring-[3px] ring-[var(--main)] ring-offset-2 ring-offset-[var(--canvas)]" : "group-hover:-translate-y-0.5 group-hover:shadow-[var(--elevate-2)]")}>
+      <ItemCover title={title} year={year} avg={avg} ratingLabel={ratingLabel} size="md" className={cx("transition duration-200", picked ? "ring-[3px] ring-[var(--main)] ring-offset-2 ring-offset-[var(--canvas)]" : "group-hover:-translate-y-0.5 group-hover:shadow-[var(--elevate-2)]")}>
         {selecting ? (
           <span aria-hidden="true" className={cx("absolute bottom-3 left-3 grid h-6 w-6 place-items-center rounded-full border-2 text-xs", picked ? "border-[var(--main)] bg-[var(--main)] text-white" : "border-[var(--cover-ink)] bg-[var(--paper)]/70")}>{picked ? "✓" : ""}</span>
         ) : null}

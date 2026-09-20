@@ -508,6 +508,11 @@
     "viewCovers": "Capas",
     "viewList": "Lista",
     "groupByLabel": "Agrupar por",
+    "sortLabel": "Ordenar por",
+    "sortRecent": "Adicionados recentemente",
+    "sortTitle": "Título",
+    "sortRating": "Nota",
+    "sortDate": "Data do evento",
     "group": {
       "none": "Nenhum",
       "genre": "Gênero",

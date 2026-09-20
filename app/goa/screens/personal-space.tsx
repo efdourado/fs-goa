@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 
+import { CARD_GRID } from "../card-grid";
 import { CatalogShelf } from "../catalog-shelf";
 import { ActiveChallengeCard } from "./dashboard";
 import { ShelfAddButton } from "../shelf";
@@ -60,7 +61,7 @@ export function PersonalSpaceScreen({
                   <h2 className="text-lg font-semibold tracking-[-0.02em]">{t("sectionActive")}</h2>
                   {newChallenge}
                 </div>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <div className={CARD_GRID}>
                   {active.map((challenge) => <ActiveChallengeCard key={challenge.id} challenge={plain(challenge)} onOpen={onOpenChallenge} fluid />)}
                 </div>
               </section>
@@ -71,7 +72,7 @@ export function PersonalSpaceScreen({
                   <h2 className="text-lg font-semibold tracking-[-0.02em]">{t("sectionArchive")}</h2>
                   {active.length ? null : newChallenge}
                 </div>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <div className={CARD_GRID}>
                   {other.map((challenge) => <ActiveChallengeCard key={challenge.id} challenge={plain(challenge)} onOpen={() => open(challenge)} fluid />)}
                 </div>
               </section>
