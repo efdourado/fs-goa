@@ -365,6 +365,13 @@
       "when": 1789826164271,
       "tag": "0051_books_out_of_screens",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1789909302975,
+      "tag": "0052_perfect_hulk",
+      "breakpoints": true
     }
   ]
 }

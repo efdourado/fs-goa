@@ -3,6 +3,7 @@ import { withClient } from "../../db";
 import { challengeAccess } from "../../goa-domain";
 import { ApiError } from "../../http";
 import { normalizeTitle } from "../catalog";
+import { CATALOG_YEAR_MAX, CATALOG_YEAR_MIN } from "../domain/shared";
 import { entryTypesForChallenge, usesRoundItems } from "./entry-types";
 import { readChallengeLibraries, resolveItemLibrary } from "./libraries";
 
@@ -113,7 +114,7 @@ function extractRow(
   const author = joinStrings(keyForField(record, "author", mapping)).slice(0, 200) || null;
   if (kind === "book" && !author) errors.push("Livro sem autor.");
 
-  const year = intOrNull(keyForField(record, "year", mapping), 1870, 2200);
+  const year = intOrNull(keyForField(record, "year", mapping), CATALOG_YEAR_MIN, CATALOG_YEAR_MAX);
   const pageCount = intOrNull(keyForField(record, "pageCount", mapping), 1, 1_000_000);
   const runtimeMinutes = intOrNull(keyForField(record, "runtimeMinutes", mapping), 1, 2000);
   const mainGenre = firstString(keyForField(record, "mainGenre", mapping)).slice(0, 80) || null;

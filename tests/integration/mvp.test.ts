@@ -7656,3 +7656,40 @@ test("o acervo devolve quando cada item entrou — é o que ordena \"adicionados
   const mine = ((await call("GET", "/api/personal/catalog", { session: owner })).body as { items: Array<{ createdAt?: string }> }).items;
   assert.ok(mine.every((item) => typeof item.createdAt === "string"), "o acervo pessoal também");
 });
+
+test("o ano de um item vai de antes de Cristo a 2200: Crime e castigo (1866) e a Odisseia entram, e o que passa disso é recusado", async () => {
+  const owner = await register("Lia", "lia_classicos");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clássicos" } })).body as { id: string }).id;
+  const add = (body: Record<string, unknown>) => call("POST", `/api/groups/${gid}/catalog/items`, { session: owner, body });
+
+  const crime = await add({ kind: "book", title: "Crime e castigo", author: "Dostoiévski", year: 1866 });
+  assert.equal(crime.response.status, 201, JSON.stringify(crime.body));
+  const odyssey = await add({ kind: "book", title: "Odisseia", author: "Homero", year: -700 });
+  assert.equal(odyssey.response.status, 201, JSON.stringify(odyssey.body));
+
+  const tooFar = await add({ kind: "book", title: "Do futuro", author: "Alguém", year: 3000 });
+  assert.equal(tooFar.response.status, 400);
+  assert.equal((tooFar.body as { error: string }).error, "invalid_number");
+  const notWhole = await add({ kind: "book", title: "Quebrado", author: "Alguém", year: 1866.5 });
+  assert.equal(notWhole.response.status, 400);
+
+  const items = ((await call("GET", `/api/groups/${gid}/catalog`, { session: owner })).body as { items: Array<{ title: string; year: number | null }> }).items;
+  assert.equal(items.find((item) => item.title === "Crime e castigo")?.year, 1866);
+  assert.equal(items.find((item) => item.title === "Odisseia")?.year, -700);
+
+  // o banco também aceita — e recusa fora da faixa mesmo sem passar pela API
+  await assert.rejects(adminPool.query("UPDATE catalog_items SET year = 2201 WHERE group_id = $1", [gid]), /catalog_items_year_check/);
+  await adminPool.query("UPDATE catalog_items SET year = -3000 WHERE group_id = $1 AND title = 'Odisseia'", [gid]);
+
+  // a importação de lista lê o mesmo intervalo
+  const created = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner, body: { recipe: "bookshelf", title: "Estante clássica", participantIds: [owner.user.id], items: [{ title: "Dom Casmurro", author: "Machado de Assis", year: 1899 }] },
+  });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const preview = await call("POST", `/api/challenges/${(created.body as { id: string }).id}/items/preview`, {
+    session: owner, body: { json: JSON.stringify([{ title: "Dom Quixote", author: "Cervantes", year: 1605 }, { title: "Ilíada", author: "Homero", year: -750 }]) },
+  });
+  assert.equal(preview.response.status, 200, JSON.stringify(preview.body));
+  const rows = (preview.body as { rows: Array<{ title: string; mapped: { year: number | null } }> }).rows;
+  assert.deepEqual(rows.map((row) => row.mapped.year), [1605, -750]);
+});

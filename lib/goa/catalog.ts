@@ -13,7 +13,7 @@ import {
 import { writeAudit } from "./domain/audit";
 import { eventScheduleColumns, eventScheduleJson, parseEventSchedule, scheduleVisibleSql } from "./domain/event-schedule";
 import { ensurePersonalWorkspace } from "./domain/challenges";
-import { normalizeTitle, publicId } from "./domain/shared";
+import { CATALOG_YEAR_MAX, CATALOG_YEAR_MIN, normalizeTitle, publicId } from "./domain/shared";
 import { moveToTrash } from "./trash";
 
 export type CatalogKind = "film" | "book" | "other";
@@ -112,7 +112,7 @@ function optionalText(value: unknown, max: number, name: string): string | null 
 function readAttributes(input: CatalogAttributes) {
   return {
     author: optionalText(input.author, 200, "Autor"),
-    year: optionalInt(input.year, 1870, 2200, "Ano"),
+    year: optionalInt(input.year, CATALOG_YEAR_MIN, CATALOG_YEAR_MAX, "Ano"),
     mainGenre: optionalText(input.mainGenre, 80, "Gênero principal"),
     pageCount: optionalInt(input.pageCount, 1, 1_000_000, "Páginas"),
     runtimeMinutes: optionalInt(input.runtimeMinutes, 1, 2000, "Duração"),

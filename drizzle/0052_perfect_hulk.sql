@@ -1,0 +1,2 @@
+ALTER TABLE "catalog_items" DROP CONSTRAINT "catalog_items_year_check";--> statement-breakpoint
+ALTER TABLE "catalog_items" ADD CONSTRAINT "catalog_items_year_check" CHECK ("catalog_items"."year" is null or "catalog_items"."year" between -3000 and 2200);

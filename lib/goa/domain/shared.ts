@@ -1,6 +1,13 @@
 import { ApiError } from "../../http";
 import { validateDateValue } from "../../validation";
 
+/**
+ * The years a catalogue item may carry: negative for BC (the Odyssey is about −700), and up to the
+ * far end of any release calendar. The database CHECK `catalog_items_year_check` states the same bounds.
+ */
+export const CATALOG_YEAR_MIN = -3000;
+export const CATALOG_YEAR_MAX = 2200;
+
 export function publicId(): string {
   return crypto.randomUUID();
 }

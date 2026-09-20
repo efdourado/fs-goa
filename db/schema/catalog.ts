@@ -229,7 +229,8 @@ export const catalogItems = pgTable(
       sql`${table.author} is null or char_length(btrim(${table.author})) between 1 and 200`,
     ),
     check("catalog_items_normalized_title_check", sql`char_length(${table.normalizedTitle}) between 1 and 300`),
-    check("catalog_items_year_check", sql`${table.year} is null or ${table.year} between 1870 and 2200`),
+    // Same bounds as CATALOG_YEAR_MIN / CATALOG_YEAR_MAX in lib/goa/domain/shared.ts.
+    check("catalog_items_year_check", sql`${table.year} is null or ${table.year} between -3000 and 2200`),
     check(
       "catalog_items_main_genre_check",
       sql`${table.mainGenre} is null or char_length(btrim(${table.mainGenre})) between 1 and 80`,
