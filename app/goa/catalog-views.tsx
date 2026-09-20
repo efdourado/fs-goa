@@ -61,7 +61,7 @@ export function CatalogTile({ title, year, avg, ratingLabel, caption, note, note
     <>
       <ItemCover title={title} year={year} avg={avg} ratingLabel={ratingLabel} size={size} className={cx("transition duration-200", picked ? "ring-[3px] ring-[var(--main)] ring-offset-2 ring-offset-[var(--canvas)]" : "group-hover:-translate-y-0.5 group-hover:shadow-[var(--elevate-2)]")}>
         {selecting ? (
-          <span aria-hidden="true" className={cx("absolute left-3 top-3 grid h-6 w-6 place-items-center rounded-full border-2 text-xs", picked ? "border-[var(--main)] bg-[var(--main)] text-white" : "border-[var(--cover-ink)] bg-[var(--paper)]/70")}>{picked ? "✓" : ""}</span>
+          <span aria-hidden="true" className={cx("absolute bottom-3 left-3 grid h-6 w-6 place-items-center rounded-full border-2 text-xs", picked ? "border-[var(--main)] bg-[var(--main)] text-white" : "border-[var(--cover-ink)] bg-[var(--paper)]/70")}>{picked ? "✓" : ""}</span>
         ) : null}
       </ItemCover>
       <span className="flex flex-col gap-0.5 text-xs text-[var(--muted)] sm:flex-row sm:items-baseline sm:justify-between sm:gap-2">
