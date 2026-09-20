@@ -82,7 +82,6 @@ export function GroupScreen({
   const [memberError, setMemberError] = useState<string | null>(null);
   const [memberSuccess, setMemberSuccess] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<CatalogItem[] | null>(null);
-  const [catalogSort, setCatalogSort] = useState<"recent" | "rating" | "title">("recent");
   const [catalogKind, setCatalogKind] = useState<string | null>(null);
   const { data: libraries } = useCatalogLibraries({ groupId: group.id });
   const libraryName = useLibraryName();
@@ -105,13 +104,7 @@ export function GroupScreen({
   const addedAt = (item: CatalogItem) => (item.createdAt ? Date.parse(item.createdAt) : 0);
   const sortedCatalog = [...(catalog ?? [])]
     .filter((item) => !bothCatalogKinds || item.kind === activeCatalogKind)
-    .sort((a, b) =>
-      catalogSort === "rating"
-        ? (b.ratingAvg ?? -1) - (a.ratingAvg ?? -1) || a.title.localeCompare(b.title)
-        : catalogSort === "title"
-          ? a.title.localeCompare(b.title)
-          : addedAt(b) - addedAt(a) || a.title.localeCompare(b.title),
-    );
+    .sort((a, b) => addedAt(b) - addedAt(a) || a.title.localeCompare(b.title));
   const visibleCatalog = sortedCatalog.slice(0, CATALOG_PREVIEW_COUNT);
   const activeCatalogLibrary = catalogLibraries.find((library) => library.kind === activeCatalogKind) ?? null;
   const [groupBusy, setGroupBusy] = useState(false);
@@ -263,7 +256,7 @@ export function GroupScreen({
   const groupHeaderDescription = group.description || undefined;
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-8 pb-24 sm:px-6 sm:py-10">
+    <main className="mx-auto max-w-7xl px-4 py-8 pb-24 sm:px-6 sm:py-10">
       <BackButton onClick={onBack} label={backLabel ?? tc("back")} className="mb-6" />
 
       <div className="flex items-start justify-between gap-4">
@@ -353,7 +346,7 @@ export function GroupScreen({
             {canManage(group.role) && challenges.length < challengeLimit ? <ShelfAddButton label={t("createChallengeCta")} onClick={onCreateChallenge} /> : null}
           </div>
           {challenges.length ? (
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {challenges.map((challenge) => <ActiveChallengeCard key={challenge.id} challenge={challenge} onOpen={onOpenChallenge} fluid />)}
             </div>
           ) : canManage(group.role) && challenges.length < challengeLimit
@@ -365,11 +358,20 @@ export function GroupScreen({
           <section>
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-baseline gap-2.5">
-                <h2 className="text-lg font-semibold tracking-[-0.02em]">{t("catalogTitle")}</h2>
-                <span className="text-xs text-[var(--muted)]">{(catalog ?? []).length}</span>
+                <button
+                  type="button"
+                  onClick={onOpenCatalog}
+                  className="cursor-pointer text-lg font-semibold tracking-[-0.02em] hover:underline"
+                >
+                  {t("catalogTitle")}
+                </button>
+
+                <span className="text-xs text-[var(--muted)]">
+                  {(catalog ?? []).length}
+                </span>
               </div>
+
               <div className="flex items-center gap-2">
-                <Button variant="secondary" className="min-h-9 px-3.5 text-xs" onClick={onOpenCatalog}>{canManage(group.role) ? t("catalogManage") : t("catalogOpen")} →</Button>
                 {sortedCatalog.length ? <RailArrows nudge={nudgeCatalog} /> : null}
               </div>
             </div>
@@ -399,18 +401,6 @@ export function GroupScreen({
                       })}
                     </div>
                   ) : <span />}
-                  <label>
-                    <span className="sr-only">{t("catalogSortLabel")}</span>
-                    <select
-                      className="min-h-9 cursor-pointer rounded-full border border-[var(--line)] bg-[var(--paper)] px-3.5 text-xs text-[var(--ink)] outline-none transition hover:border-[var(--main-line)] focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
-                      value={catalogSort}
-                      onChange={(event) => setCatalogSort(event.target.value as "recent" | "rating" | "title")}
-                    >
-                      <option value="recent">{t("catalogSortRecent")}</option>
-                      <option value="rating">{t("catalogSortRating")}</option>
-                      <option value="title">{t("catalogSortTitle")}</option>
-                    </select>
-                  </label>
                 </div>
                 <Rail railRef={catalogRailRef} showFade={catalogShowFade} onScroll={onCatalogScroll}>
                   {canManage(group.role) ? (
