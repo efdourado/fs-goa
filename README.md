@@ -178,8 +178,8 @@ messages/   textos da interface em pt-BR, en e es (mesmo conjunto de chaves nos 
 - **Grupos, papéis e Meu espaço** — o grupo é duradouro e reúne pessoas entre
   rodadas. `owner` > `admin` > `participant`. Convites por link expirável / código
   curto, ou por @usuário com aceite de quem é convidado. **Meu espaço** (`/personal`,
-  link no cabeçalho) é o espaço só seu — desafios, acervo e lixeira próprios, sem
-  grupo nem convites. Quem ainda não tem nada vê, no Início, uma tela de boas-vindas
+  link no cabeçalho) é o espaço só seu — desafios e acervo próprios (a página mostra
+  uma prévia do acervo) e uma lixeira própria, aberta pela conta, sem grupo nem convites. Quem ainda não tem nada vê, no Início, uma tela de boas-vindas
   com as partes de uma rodada e três formas de começar.
 - **Rodadas por receita** — seis criáveis (na interface, `cinema` aparece como
   **Screens** e `bookshelf` como **Pages**): `cinema` (nota 0–5 + comentário, com

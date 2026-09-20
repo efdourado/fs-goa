@@ -33,7 +33,7 @@ pai, nomeada no botão.
 | `/modelos` · `/modelos/:id` | público | Galeria de modelos e a prévia somente leitura de um deles |
 | `/results/:token` | público (por token) | Vitrine pública; a busca é pelo hash do token, e desde a migração `0035` o token completo também fica no banco para reapresentar o link a quem pode gerenciar |
 | `/personal` | sessão | **Meu espaço** — os desafios pessoais (link no cabeçalho) |
-| `/personal/trash` · `/groups/:id/trash` | sessão | Lixeira do espaço pessoal / do grupo |
+| `/personal/trash` · `/groups/:id/trash` | sessão | Lixeira do espaço pessoal (aberta pela conta) / do grupo |
 | `/catalog` · `/catalog/:itemId` | sessão | Acervo pessoal e um item dele |
 | `/groups/:id` · `/groups/:id/catalog[/:itemId]` | sessão (membro) | Grupo e o acervo dele |
 | `/challenges/new` · `/challenges/:id` · `/challenges/:id/manage` | sessão | Criar desafio; participar; gerenciar (owner/admin) |

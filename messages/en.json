@@ -461,7 +461,6 @@
     "subtitle": "Just yours — no group, no invites.",
     "create": "+ Personal challenge",
     "emptyTitle": "Start a challenge of your own",
-    "trash": "Bin",
     "createShort": "New challenge",
     "sectionActive": "In progress",
     "sectionArchive": "Closed & drafts"
@@ -1687,6 +1686,7 @@
     "home": "Home",
     "signIn": "Sign in",
     "templates": "Templates",
+    "account": "Your account",
     "mySpace": "My space",
     "myCatalogue": "My catalogue",
     "catalogue": "Catalogue",

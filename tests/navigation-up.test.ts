@@ -46,8 +46,11 @@ describe("Back goes up the hierarchy, never to wherever you were", () => {
     assert.deepEqual(backTargetFor({ kind: "create-challenge", groupId: "g1" }, lookup())!.label, { kind: "named", name: "Copa 2026" });
     assert.deepEqual(backTargetFor({ kind: "personal-catalog-item", itemId: "i" }, lookup())!.screen, { kind: "personal-catalog" });
     assert.deepEqual(backTargetFor({ kind: "personal-catalog" }, lookup())!.screen, { kind: "personal-space" });
-    assert.deepEqual(backTargetFor({ kind: "personal-trash" }, lookup())!.screen, { kind: "personal-space" });
     assert.deepEqual(backTargetFor({ kind: "create-personal-challenge" }, lookup())!.screen, { kind: "personal-space" });
+  });
+
+  test("the personal bin is opened from the account page, so Back returns there", () => {
+    assert.deepEqual(backTargetFor({ kind: "personal-trash" }, lookup()), { screen: { kind: "account" }, label: { kind: "account" } });
   });
 
   test("account, about, templates and invites go Home when signed in, and to sign-in when not", () => {

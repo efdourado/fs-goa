@@ -461,7 +461,6 @@
     "subtitle": "Solo tuyo — sin grupo, sin invitaciones.",
     "create": "+ Desafío personal",
     "emptyTitle": "Empieza un desafío solo tuyo",
-    "trash": "Papelera",
     "createShort": "Nuevo desafío",
     "sectionActive": "En marcha",
     "sectionArchive": "Cerrados y borradores"
@@ -1687,6 +1686,7 @@
     "home": "Inicio",
     "signIn": "Entrar",
     "templates": "Plantillas",
+    "account": "Tu cuenta",
     "mySpace": "Mi espacio",
     "myCatalogue": "Mi acervo",
     "catalogue": "Acervo",

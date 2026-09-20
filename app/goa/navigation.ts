@@ -160,7 +160,7 @@ export function urlForScreen(screen: Screen): string | null {
 
 /** What a Back button reads: a fixed name, or the name of the group / challenge it leads to. */
 export type BackLabel =
-  | { kind: "home" | "signIn" | "templates" | "mySpace" | "myCatalogue" | "catalogue" | "challenge" }
+  | { kind: "home" | "signIn" | "templates" | "account" | "mySpace" | "myCatalogue" | "catalogue" | "challenge" }
   | { kind: "named"; name: string };
 
 interface BackTarget {
@@ -213,9 +213,10 @@ export function backTargetFor(screen: Screen, lookup: BackLookup): BackTarget | 
     case "catalog-item":
       return { screen: { kind: "group-catalog", groupId: screen.groupId }, label: { kind: "catalogue" } };
     case "personal-catalog":
-    case "personal-trash":
     case "create-personal-challenge":
       return { screen: { kind: "personal-space" }, label: { kind: "mySpace" } };
+    case "personal-trash":
+      return { screen: { kind: "account" }, label: { kind: "account" } };
     case "personal-catalog-item":
       return { screen: { kind: "personal-catalog" }, label: { kind: "myCatalogue" } };
     case "challenge": {

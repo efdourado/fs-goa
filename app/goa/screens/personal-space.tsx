@@ -1,6 +1,5 @@
 "use client";
 
-import { type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 
 import { CatalogShelf } from "../catalog-shelf";
@@ -10,20 +9,7 @@ import type { ChallengeSummary, Id } from "../types";
 import { BackButton, EmptyState, PageHeading } from "../ui";
 import { canManage } from "../utils";
 
-/** A quiet toolbar button — the bin. */
-function ToolButton({ children, onClick }: { children: ReactNode; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-xl border border-[var(--line)] px-3.5 text-[13px] text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)]"
-    >
-      {children}
-    </button>
-  );
-}
-
-/** The hidden solo workspace, treated as a group of one: its own page, its own catalogue link. */
+/** The hidden solo workspace, treated as a group of one: its own page, its challenges and a preview of its catalogue. */
 export function PersonalSpaceScreen({
   challenges,
   onBack,
@@ -33,7 +19,6 @@ export function PersonalSpaceScreen({
   onCreateChallenge,
   onOpenCatalog,
   onOpenCatalogItem,
-  onOpenTrash,
 }: {
   challenges: ChallengeSummary[];
   onBack: () => void;
@@ -44,7 +29,6 @@ export function PersonalSpaceScreen({
   onCreateChallenge: () => void;
   onOpenCatalog: () => void;
   onOpenCatalogItem: (itemId: Id) => void;
-  onOpenTrash: () => void;
 }) {
   const t = useTranslations("personalSpace");
   const tc = useTranslations("common");
@@ -66,13 +50,6 @@ export function PersonalSpaceScreen({
       <BackButton onClick={onBack} label={backLabel ?? tc("back")} className="mb-6" />
 
       <PageHeading title={t("title")} description={t("subtitle")} />
-
-      <div className="flex flex-wrap items-center gap-2 border-b border-[var(--line)] pb-5">
-        <ToolButton onClick={onOpenTrash}>
-          <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M3 5h10M6 5V3.5h4V5M5 5l.6 8h4.8L11 5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-          {t("trash")}
-        </ToolButton>
-      </div>
 
       <div className="mt-8 space-y-10">
         {challenges.length ? (
