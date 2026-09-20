@@ -4,7 +4,6 @@ import { useTranslations } from "next-intl";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 import { API_PATHS, apiRequest } from "../api";
-import { CARD_COLUMN, COVER_GRID } from "../card-grid";
 import { AddCatalogItemDialog } from "../catalog-item-dialogs";
 import { KebabMenu, menuRowClass } from "../card-menu";
 import { AddItemTile, CatalogRow, CatalogTile, type CatalogGroupBy, groupCatalogItems, LayoutToggle } from "../catalog-views";
@@ -265,24 +264,26 @@ export function CatalogWorkspaceScreen({
               const active = entry.kind === kind;
               const counts = countByKind.get(entry.kind) ?? { total: 0, unused: 0 };
               return (
-                <div key={entry.id} className={cx("group relative", CARD_COLUMN)}>
+                <div key={entry.id} className="group relative w-64 flex-none snap-start">
                   <button
                     type="button"
                     aria-pressed={active}
                     onClick={() => chooseLibrary(entry.kind)}
                     className={cx(
-                      "relative flex min-h-[4.75rem] w-full cursor-pointer items-center gap-2.5 overflow-hidden rounded-[20px] border px-3 py-3 text-left shadow-[var(--elevate-card)] transition duration-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 md:gap-3.5 md:px-4",
+                      "relative flex min-h-[4.75rem] w-full cursor-pointer items-center gap-3.5 overflow-hidden rounded-[20px] border px-4 text-left shadow-[var(--elevate-card)] transition duration-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25",
                       active ? "border-[var(--main)] bg-[var(--main-soft)] ring-1 ring-inset ring-[var(--main)]" : "border-[var(--line)] bg-[var(--paper)] hover:-translate-y-0.5 hover:border-[var(--main-line)]",
                     )}
                   >
                     <span aria-hidden="true" className={cx("pointer-events-none absolute -bottom-10 -right-10 h-24 w-24 rounded-full border-[14px]", active ? "border-[var(--main)]/[0.13]" : "border-[var(--main)]/[0.07]")} />
-                    <span className={cx("relative grid h-9 w-9 flex-none place-items-center rounded-full md:h-11 md:w-11", active ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-[var(--elevate-1)]" : "bg-[var(--wash)] text-[var(--muted)] ring-1 ring-inset ring-[var(--line)]")} aria-hidden="true">
-                      <LibraryGlyph source={entry.source} className="h-5 w-5 md:h-6 md:w-6" />
+                    <span className={cx("relative grid h-11 w-11 flex-none place-items-center rounded-full", active ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-[var(--elevate-1)]" : "bg-[var(--wash)] text-[var(--muted)] ring-1 ring-inset ring-[var(--line)]")} aria-hidden="true">
+                      <LibraryGlyph source={entry.source} className="h-6 w-6" />
                     </span>
                     <span className="relative min-w-0">
                       <strong className={cx("block truncate pr-6 text-base font-medium tracking-[-0.02em]", active && "text-[var(--main-strong)]")}>{libraryName(entry)}</strong>
-                      <small className={cx("mt-0.5 block truncate text-xs", active ? "text-[var(--main-strong)]/85" : "text-[var(--muted)]")}>{t("libraryStats", { count: counts.total })}</small>
-                      {canManage && counts.unused > 0 ? <small className="block truncate text-xs text-[var(--warn)]">{t("libraryUnused", { count: counts.unused })}</small> : null}
+                      <small className={cx("mt-0.5 block truncate text-xs", active ? "text-[var(--main-strong)]/85" : "text-[var(--muted)]")}>
+                        {t("libraryStats", { count: counts.total })}
+                        {canManage && counts.unused > 0 ? <span className="text-[var(--warn)]"> · {t("libraryUnused", { count: counts.unused })}</span> : null}
+                      </small>
                     </span>
                   </button>
                   <div className="absolute right-2.5 top-2.5">
@@ -303,7 +304,7 @@ export function CatalogWorkspaceScreen({
               <button
                 type="button"
                 onClick={() => setDialog("new")}
-                className={cx("flex min-h-[4.75rem] cursor-pointer items-center justify-center gap-2 rounded-[20px] border border-dashed border-[var(--muted)] px-4 text-sm font-light text-[var(--muted)] transition hover:border-[var(--ink)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25", CARD_COLUMN)}
+                className="flex min-h-[4.75rem] w-64 flex-none cursor-pointer snap-start items-center justify-center gap-2 rounded-[20px] border border-dashed border-[var(--muted)] px-4 text-sm font-light text-[var(--muted)] transition hover:border-[var(--ink)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
               >
                 ＋ {tl("newLibrary")}
               </button>
@@ -442,7 +443,7 @@ export function CatalogWorkspaceScreen({
                       </h2>
                     ) : null}
                     {layout === "covers" ? (
-                      <div className={COVER_GRID}>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 sm:gap-x-5 lg:grid-cols-4 xl:grid-cols-5">
                         {canManage && !selecting && index === 0 ? <AddItemTile label={t("addItem")} onClick={() => { setNotice(null); setDialog("add"); }} /> : null}
                         {group.items.map((item) => {
                           const unused = isUnused(item);

@@ -4,7 +4,6 @@ import { useTranslations } from "next-intl";
 import { type DragEvent, type FormEvent, type ReactNode, useRef, useState } from "react";
 
 import { API_PATHS, apiRequest } from "../api";
-import { CARD_COLUMN } from "../card-grid";
 import { KebabMenu, menuRowClass } from "../card-menu";
 import { Dialog } from "../dialog";
 import { useGoaFormat } from "../format";
@@ -236,7 +235,7 @@ export function ActiveChallengeCard({
       onDragEnd={dragHandlers?.onDragEnd}
       className={cx(
         "group relative flex flex-col overflow-hidden rounded-[20px] border bg-[var(--paper)] shadow-[var(--elevate-1)] transition",
-        fluid ? "w-full" : CARD_COLUMN,
+        fluid ? "w-full" : "w-[78vw] max-w-[19rem] shrink-0 snap-start sm:w-[19rem]",
         reorderMode ? "cursor-grab active:cursor-grabbing" : "hover:-translate-y-0.5",
         livingList ? "border-[var(--line)]" : tone.border,
         "has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-[var(--main)]/25",
@@ -327,7 +326,7 @@ function ArchiveChallengeRow({
     <button
       type="button"
       onClick={onOpen}
-      className={cx(cardClass, "relative flex items-center gap-2.5 overflow-hidden px-4 py-4 text-left text-sm hover:border-[var(--muted)]", CARD_COLUMN)}
+      className={cx(cardClass, "relative flex w-[78vw] max-w-[19rem] shrink-0 snap-start items-center gap-2.5 overflow-hidden px-4 py-4 text-left text-sm hover:border-[var(--muted)] sm:w-[19rem]")}
     >
       {challenge.colorTag ? <span className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: `var(--tag-${challenge.colorTag})` }} aria-hidden="true" /> : null}
       <ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />
@@ -601,7 +600,7 @@ export function DashboardScreen({
                         key={group.id}
                         type="button"
                         onClick={() => onOpenGroup(group.id)}
-                        className={cx(cardClass, "flex min-h-[5.5rem] flex-col justify-center gap-1 p-4 text-left transition hover:-translate-y-0.5 hover:border-[var(--muted)]", CARD_COLUMN)}
+                        className={cx(cardClass, "flex min-h-[5.5rem] w-[78vw] max-w-[19rem] shrink-0 snap-start flex-col justify-center gap-1 p-4 text-left transition hover:-translate-y-0.5 hover:border-[var(--muted)] sm:w-[19rem]")}
                       >
                         <span className="text-sm">{group.name}</span>
                         <small className="text-[var(--muted)]">{t("peopleCount", { count })} · {tr(group.role)}</small>

@@ -1,19 +1,23 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { type FormEvent, useRef, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 
+import { API_PATHS, apiRequest } from "../api";
 import { copyText } from "../clipboard";
 import { ActionMenu, ActionMenuItem } from "../action-menu";
 import { Dialog } from "../dialog";
 import { useGoaFormat } from "../format";
-import { CARD_GRID } from "../card-grid";
-import { CatalogShelf } from "../catalog-shelf";
-import { ShelfAddButton } from "../shelf";
-import type { ChallengeSummary, GroupInviteResult, GroupSummary, Id, Member, PendingGroupRequest } from "../types";
+import { CatalogTile } from "../catalog-views";
+import { LibraryGlyph, useCatalogLibraries, useLibraryName } from "../libraries";
+import { Rail, RailArrows, ShelfAddButton, useShelfRail } from "../shelf";
+import type { CatalogItem, ChallengeSummary, GroupInviteResult, GroupSummary, Id, Member, PendingGroupRequest } from "../types";
 import { BackButton, Button, cx, EmptyState, Field, inputClass, StatusMessage, Toggle } from "../ui";
-import { canManage } from "../utils";
+import { canManage, formatRuntime } from "../utils";
 import { ActiveChallengeCard } from "./dashboard";
+
+/** The group page shows only the head of the catalog; the rest is one tap away. */
+const CATALOG_PREVIEW_COUNT = 10;
 
 export function GroupScreen({
   group,
@@ -56,6 +60,8 @@ export function GroupScreen({
   onSetMemberRole?: (userId: Id, role: "admin" | "participant") => Promise<void>;
 }) {
   const t = useTranslations("group");
+  const tCat = useTranslations("catalog");
+  const tl = useTranslations("libraries");
   const tx = useTranslations("managementUX");
   const tc = useTranslations("common");
   const tr = useTranslations("roles");
@@ -75,6 +81,32 @@ export function GroupScreen({
   const [memberBusy, setMemberBusy] = useState(false);
   const [memberError, setMemberError] = useState<string | null>(null);
   const [memberSuccess, setMemberSuccess] = useState<string | null>(null);
+  const [catalog, setCatalog] = useState<CatalogItem[] | null>(null);
+  const [catalogKind, setCatalogKind] = useState<string | null>(null);
+  const { data: libraries } = useCatalogLibraries({ groupId: group.id });
+  const libraryName = useLibraryName();
+  const { railRef: catalogRailRef, showFade: catalogShowFade, onScroll: onCatalogScroll, nudge: nudgeCatalog } = useShelfRail();
+
+  useEffect(() => {
+    const controller = new AbortController();
+    apiRequest<{ items: CatalogItem[] }>(API_PATHS.groupCatalog(group.id), { signal: controller.signal })
+      .then((response) => setCatalog(response.items))
+      .catch(() => setCatalog([]));
+    return () => controller.abort();
+  }, [group.id]);
+
+  // Each library is its own shelf — one sorted list never mixes them.
+  const catalogLibraries = (libraries ?? []).filter((library) => (catalog ?? []).some((item) => item.kind === library.kind));
+  const bothCatalogKinds = catalogLibraries.length > 1;
+  const activeCatalogKind = catalogKind && catalogLibraries.some((library) => library.kind === catalogKind)
+    ? catalogKind
+    : catalogLibraries[0]?.kind ?? null;
+  const addedAt = (item: CatalogItem) => (item.createdAt ? Date.parse(item.createdAt) : 0);
+  const sortedCatalog = [...(catalog ?? [])]
+    .filter((item) => !bothCatalogKinds || item.kind === activeCatalogKind)
+    .sort((a, b) => addedAt(b) - addedAt(a) || a.title.localeCompare(b.title));
+  const visibleCatalog = sortedCatalog.slice(0, CATALOG_PREVIEW_COUNT);
+  const activeCatalogLibrary = catalogLibraries.find((library) => library.kind === activeCatalogKind) ?? null;
   const [groupBusy, setGroupBusy] = useState(false);
   const [groupError, setGroupError] = useState<string | null>(null);
   const [groupSuccess, setGroupSuccess] = useState<string | null>(null);
@@ -314,7 +346,7 @@ export function GroupScreen({
             {canManage(group.role) && challenges.length < challengeLimit ? <ShelfAddButton label={t("createChallengeCta")} onClick={onCreateChallenge} /> : null}
           </div>
           {challenges.length ? (
-            <div className={CARD_GRID}>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {challenges.map((challenge) => <ActiveChallengeCard key={challenge.id} challenge={challenge} onOpen={onOpenChallenge} fluid />)}
             </div>
           ) : canManage(group.role) && challenges.length < challengeLimit
@@ -322,7 +354,96 @@ export function GroupScreen({
             : <EmptyState title={t("noChallengesTitle")} hint={canManage(group.role) ? t("challengeLimitReached", { limit: challengeLimit }) : t("noChallengesMember")} />}
         </section>
 
-        <CatalogShelf scope={{ groupId: group.id }} canManage={canManage(group.role)} onOpenCatalog={onOpenCatalog} onOpenItem={onOpenCatalogItem} />
+        {sortedCatalog.length || canManage(group.role) ? (
+          <section>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-baseline gap-2.5">
+                <button
+                  type="button"
+                  onClick={onOpenCatalog}
+                  className="cursor-pointer text-lg font-semibold tracking-[-0.02em] hover:underline"
+                >
+                  {t("catalogTitle")}
+                </button>
+
+                <span className="text-xs text-[var(--muted)]">
+                  {(catalog ?? []).length}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {sortedCatalog.length ? <RailArrows nudge={nudgeCatalog} /> : null}
+              </div>
+            </div>
+            {sortedCatalog.length ? (
+              <>
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                  {bothCatalogKinds && activeCatalogKind ? (
+                    <div role="group" aria-label={tl("tabsLabel")} className="flex max-w-full gap-0.5 overflow-x-auto rounded-full bg-[var(--wash-strong)]/70 p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                      {catalogLibraries.map((library) => {
+                        const active = library.kind === activeCatalogKind;
+                        return (
+                          <button
+                            key={library.id}
+                            type="button"
+                            aria-pressed={active}
+                            onClick={() => setCatalogKind(library.kind)}
+                            className={cx(
+                              "inline-flex min-h-9 flex-none cursor-pointer items-center gap-2 rounded-full px-3.5 text-[13px] transition",
+                              active ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]",
+                            )}
+                          >
+                            <LibraryGlyph source={library.source} className="h-4 w-4" />
+                            {libraryName(library)}
+                            <span className="text-[11px] opacity-70">{(catalog ?? []).filter((item) => item.kind === library.kind).length}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : <span />}
+                </div>
+                <Rail railRef={catalogRailRef} showFade={catalogShowFade} onScroll={onCatalogScroll}>
+                  {canManage(group.role) ? (
+                    <button
+                      type="button"
+                      onClick={onOpenCatalog}
+                      className="flex aspect-[3/4] w-44 flex-none cursor-pointer snap-start flex-col items-center justify-center gap-2.5 self-start rounded-[20px] border border-dashed border-[var(--main-line)] text-[var(--main-strong)] transition hover:bg-[var(--main-soft)]"
+                    >
+                      <span aria-hidden="true" className="grid h-10 w-10 place-items-center rounded-full bg-[var(--main-soft)] text-lg">＋</span>
+                      <span className="text-[13px]">{t("catalogAddItem")}</span>
+                    </button>
+                  ) : null}
+                  {visibleCatalog.map((item) => (
+                    <CatalogTile
+                      key={item.id}
+                      size="sm"
+                      className="w-44 flex-none snap-start"
+                      title={item.title}
+                      year={item.year}
+                      avg={item.ratingAvg}
+                      ratingLabel={item.ratingAvg === null || item.ratingAvg === undefined ? tCat("notRated") : tCat("ratedAria", { value: item.ratingAvg })}
+                      caption={[item.scheduledAt ? f.eventWhen(item.scheduledAt) : item.author, item.mainGenre, formatRuntime(item.runtimeMinutes)].filter(Boolean).slice(0, 2).join(" · ")}
+                      onOpen={() => onOpenCatalogItem(item.id)}
+                    />
+                  ))}
+                  {sortedCatalog.length > visibleCatalog.length ? (
+                    <button
+                      type="button"
+                      onClick={onOpenCatalog}
+                      className="flex aspect-[3/4] w-44 flex-none cursor-pointer snap-start flex-col items-center justify-center gap-1.5 self-start rounded-[20px] border border-[var(--line)] bg-[var(--paper)] transition hover:border-[var(--main-line)]"
+                    >
+                      <span className="text-3xl font-light tracking-[-0.04em]">{sortedCatalog.length - visibleCatalog.length}</span>
+                      <span className="px-3 text-center text-xs text-[var(--muted)]">{t("catalogMoreIn", { name: activeCatalogLibrary ? libraryName(activeCatalogLibrary) : t("catalogTitle") })}</span>
+                      <span className="mt-2.5 text-[13px] text-[var(--main-strong)]">{t("catalogSeeAll")} →</span>
+                    </button>
+                  ) : null}
+                </Rail>
+              </>
+            ) : (
+              <EmptyState title={t("catalogEmptyTitle")} onClick={onOpenCatalog} />
+            )}
+          </section>
+        ) : null}
 
         <section>
           <div className="mb-4 flex items-baseline gap-2.5">
