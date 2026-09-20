@@ -30,10 +30,6 @@ type Sort = "recent" | "title" | "rating" | "date";
 const icon = { fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true } as const;
 const GridIcon = () => <svg viewBox="0 0 16 16" className="h-4 w-4" {...icon}><rect x="2" y="2" width="5" height="5" rx="1.2" /><rect x="9" y="2" width="5" height="5" rx="1.2" /><rect x="2" y="9" width="5" height="5" rx="1.2" /><rect x="9" y="9" width="5" height="5" rx="1.2" /></svg>;
 const ListIcon = () => <svg viewBox="0 0 16 16" className="h-4 w-4" {...icon}><path d="M3 4h10M3 8h10M3 12h10" /></svg>;
-const SearchIcon = () => <svg viewBox="0 0 16 16" className="h-4 w-4 flex-none" {...icon}><circle cx="7" cy="7" r="4.5" /><path d="m10.5 10.5 3 3" /></svg>;
-
-/** Lower-cased, accent-free, for matching what someone typed against a title. */
-const fold = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
 /** A native select dressed as a chip; it lights up once it narrows the list. */
 function ChipSelect({ label, value, onChange, active, children }: { label: string; value: string; onChange: (value: string) => void; active: boolean; children: ReactNode }) {
@@ -92,7 +88,6 @@ export function CatalogWorkspaceScreen({
   const [itemsNonce, setItemsNonce] = useState(0);
   const [activeKind, setActiveKind] = useState<string | null>(null);
   const [sort, setSort] = useState<Sort>("recent");
-  const [search, setSearch] = useState("");
   const [recommenderFilter, setRecommenderFilter] = useState("");
   const [layout, setLayout] = useState<Layout>("covers");
   const [groupBy, setGroupBy] = useState<CatalogGroupBy>("none");
@@ -149,7 +144,7 @@ export function CatalogWorkspaceScreen({
 
   function chooseLibrary(next: string) {
     setActiveKind(next);
-    setSearch(""); setRecommenderFilter("");
+    setRecommenderFilter("");
     setGroupBy("none");
     setUnusedOnly(false);
   }
@@ -164,14 +159,12 @@ export function CatalogWorkspaceScreen({
   const unusedCount = countByKind.get(kind ?? "")?.unused ?? 0;
   // Once the last unused item is gone the chip goes with it, so the filter can't be left stuck on.
   const onlyUnused = unusedOnly && unusedCount > 0;
-  const query = fold(search.trim());
   const filtered = useMemo(() => scoped.filter((item) => {
     if (onlyUnused && (item.challengeCount ?? item.roundCount ?? 0) !== 0) return false;
-    if (query && !fold([item.title, item.author, item.mainGenre, item.year].filter(Boolean).join(" ")).includes(query)) return false;
     if (!activeFilter) return true;
     if (activeFilter === "none") return !item.recommendedBy && !item.originNote;
     return item.recommendedBy ? `${item.recommendedBy.kind}:${item.recommendedBy.id}` === activeFilter : false;
-  }), [scoped, activeFilter, onlyUnused, query]);
+  }), [scoped, activeFilter, onlyUnused]);
   // Only offered where the library keeps an event date (a match's kickoff) on its items.
   const hasDates = scoped.some((item) => item.scheduledAt);
   const startOf = (item: CatalogItem) => (item.scheduledAt ? new Date(item.scheduledAt.startsAt).getTime() : Infinity);
@@ -238,7 +231,7 @@ export function CatalogWorkspaceScreen({
   }
 
   const groupLabel = (label: string) => label || (groupBy === "genre" ? t("noGenre") : t("undated"));
-  const narrowed = Boolean(query || activeFilter || onlyUnused);
+  const narrowed = Boolean(activeFilter || onlyUnused);
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
@@ -308,17 +301,15 @@ export function CatalogWorkspaceScreen({
         <section aria-label={libraryName(library)}>
           <div className="flex flex-wrap items-center gap-2.5">
             {scoped.length ? (
-              <label className="flex min-h-11 min-w-0 basis-full items-center gap-2.5 rounded-xl border border-[var(--line)] bg-[var(--paper)] px-3.5 text-[var(--muted)] focus-within:border-[var(--main)] focus-within:ring-4 focus-within:ring-[var(--main)]/18 sm:basis-72">
-                <SearchIcon />
-                <input
-                  type="search"
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder={t("searchPlaceholder", { name: libraryName(library) })}
-                  aria-label={t("searchLabel")}
-                  className="min-w-0 flex-1 bg-transparent text-sm text-[var(--ink)] outline-none placeholder:text-[var(--muted)]"
-                />
-              </label>
+              <LayoutToggle<Layout>
+                label={t("viewLabel")}
+                value={layout}
+                onChange={setLayout}
+                options={[
+                  { value: "covers", label: t("viewCovers"), icon: <GridIcon /> },
+                  { value: "list", label: t("viewList"), icon: <ListIcon /> },
+                ]}
+              />
             ) : null}
             {recommendationsEnabled && recommenders.length ? (
               <ChipSelect label={t("recommenderFilterLabel")} value={activeFilter} onChange={setRecommenderFilter} active={Boolean(activeFilter)}>
@@ -348,17 +339,6 @@ export function CatalogWorkspaceScreen({
                 <option value="rating">{t("sortRating")}</option>
                 {hasDates ? <option value="date">{t("sortDate")}</option> : null}
               </ChipSelect>
-            ) : null}
-            {scoped.length ? (
-              <LayoutToggle<Layout>
-                label={t("viewLabel")}
-                value={layout}
-                onChange={setLayout}
-                options={[
-                  { value: "covers", label: t("viewCovers"), icon: <GridIcon /> },
-                  { value: "list", label: t("viewList"), icon: <ListIcon /> },
-                ]}
-              />
             ) : null}
             {canManage && scoped.length ? (
               <button

@@ -526,8 +526,6 @@
       "decade": "Década",
       "year": "Ano"
     },
-    "searchPlaceholder": "Buscar em {name}",
-    "searchLabel": "Buscar no acervo",
     "sortRecent": "Adicionados recentemente",
     "libraryUnused": "{count} sem desafio",
     "resultCount": "{count, plural, one {# item} other {# itens}}",

@@ -526,8 +526,6 @@
       "decade": "Decade",
       "year": "Year"
     },
-    "searchPlaceholder": "Search {name}",
-    "searchLabel": "Search the catalogue",
     "sortRecent": "Recently added",
     "libraryUnused": "{count} in no challenge",
     "resultCount": "{count, plural, one {# item} other {# items}}",
