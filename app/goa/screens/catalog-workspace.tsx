@@ -254,12 +254,12 @@ export function CatalogWorkspaceScreen({
       <StatusMessage error={librariesError ?? itemsError} success={notice} />
 
       {!loading && tabs.length ? (
-        <nav className="-mx-4 mb-4 flex gap-3 overflow-x-auto px-4 pb-5 pt-2 sm:-mx-6 sm:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label={tl("tabsLabel")}>
+        <nav className="mb-7 flex flex-wrap gap-3" aria-label={tl("tabsLabel")}>
           {tabs.map((entry) => {
             const active = entry.kind === kind;
             const counts = countByKind.get(entry.kind) ?? { total: 0, unused: 0 };
             return (
-              <div key={entry.id} className="group relative w-64 flex-none">
+              <div key={entry.id} className="group relative w-full sm:w-64">
                 <button
                   type="button"
                   aria-pressed={active}
@@ -299,7 +299,7 @@ export function CatalogWorkspaceScreen({
             <button
               type="button"
               onClick={() => setDialog("new")}
-              className="flex min-h-[4.75rem] w-64 flex-none cursor-pointer items-center justify-center gap-2 rounded-[20px] border border-dashed border-[var(--muted)] px-4 text-sm font-light text-[var(--muted)] transition hover:border-[var(--ink)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
+              className="flex min-h-[4.75rem] w-full cursor-pointer items-center justify-center gap-2 rounded-[20px] border border-dashed border-[var(--muted)] px-4 sm:w-64 text-sm font-light text-[var(--muted)] transition hover:border-[var(--ink)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
             >
               ＋ {tl("newLibrary")}
             </button>
