@@ -287,7 +287,7 @@ export function CreateChallengeScreen({
                     <div><div className="mb-3"><span className={labelClass}>{t("rulesLabel")} <small className="font-light text-[var(--muted)]">{t("optional")}</small></span><p className="text-xs leading-5 text-[var(--muted)]">{t("rulesHint")}</p></div><RuleSectionsEditor value={ruleSections} onChange={setRuleSections} /></div>
                   </div>
                 ) : (
-                  <button type="button" className={cx("min-h-11 rounded-xl border border-dashed border-[var(--line)] px-4 text-sm font-light text-[var(--muted)] hover:border-[var(--main-line)] hover:text-[var(--ink)]")} onClick={() => setShowOptional(true)}>{t("showOptional", { count: 2 })}</button>
+                  <button type="button" className={backLinkClass} onClick={() => setShowOptional(true)}>{t("showOptional", { count: 2 })}</button>
                 )}
               </div>
             </div>
