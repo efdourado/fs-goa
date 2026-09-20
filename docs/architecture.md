@@ -80,6 +80,10 @@ Espaço = grupo, ou o espaço pessoal (groups.kind = 'personal', oculto e de uma
   conclusão), `bookshelf` (só avaliação, sem período), `habit` (check-in sem
   catálogo), `tables` (restaurantes/bares: três notas por dimensão, sem nota
   combinada) e `custom` (qualquer biblioteca; quem cria decide o que se registra).
+  As chaves são internas: na interface `cinema` se chama **Screens** e `bookshelf`,
+  **Pages**, como as bibliotecas que alimentam. `tables` só sai depois que a pessoa
+  criou a biblioteca Tables do espaço (`409 library_missing`) — o assistente
+  oferece um botão para isso e nada é criado sozinho.
   As quatro antigas (`cine_free`/`cine_curated`/`reading_club`/`reading_daily`)
   continuam legíveis no banco mas não criam mais estrutura. A receita também decide
   se a rodada coleta a data opcional de cada registro (`challenges.collects_entry_date`,
@@ -88,7 +92,8 @@ Espaço = grupo, ou o espaço pessoal (groups.kind = 'personal', oculto e de uma
 - **Bibliotecas e propriedades** (`catalog.ts`): cada espaço tem as suas. Screens e
   Pages são a evolução de filmes/livros (`kind` continua `film`/`book`, com colunas
   nativas e o casamento por título); Tables e as personalizadas nascem com `kind`
-  opaco. Renomear muda só o `label`. Um editor único (`GET/PATCH …/properties`)
+  opaco e **sem propriedades além das nativas** (título e data do evento) — quem
+  cria acrescenta as suas. Renomear muda só o `label`. Um editor único (`GET/PATCH …/properties`)
   mexe em colunas nativas e atributos personalizados: rótulo, ocultar, ordem
   (`title` nunca se oculta). Uma biblioteca que uma pessoa criou pode ser
   **excluída** (`DELETE /api/catalog/libraries/:id?deleteItems=1`): ela é arquivada

@@ -307,7 +307,6 @@ export function CineItemsEditor({
   scope,
   libraries,
   recommendationsEnabled = true,
-  fallbackProperties,
   refreshKey = 0,
   onProblem,
   onTargetChange,
@@ -322,8 +321,6 @@ export function CineItemsEditor({
   /** Every library the challenge draws from; at least one. */
   libraries: readonly EditorLibrary[];
   recommendationsEnabled?: boolean;
-  /** Properties to offer, by library kind, while that library has no row to read yet (a Tables library nobody has created). */
-  fallbackProperties?: Record<string, LibraryProperty[]>;
   /** Bump to re-read the libraries' properties after they were edited elsewhere. */
   refreshKey?: number;
   /** Reports what would block saving these rows: a missing book author, or an event date that can't be saved. */
@@ -359,7 +356,7 @@ export function CineItemsEditor({
       : [...properties, { key: "scheduled_at", storage: "native", label: null, type: "schedule", hidden: false, position: 999, canHide: true }];
   };
   const propertiesFor = (library: Pick<EditorLibrary, "id" | "kind">): LibraryProperty[] | undefined =>
-    scheduleOn(library.id ? loaded.get(library.kind) : fallbackProperties?.[library.kind] ?? loaded.get(library.kind));
+    scheduleOn(loaded.get(library.kind));
   const libraryOf = (row: CineRow) => libraries.find((library) => library.kind === row.libraryKind);
 
   const problem = value.some((row) => authorMissing(row, loaded.get(row.libraryKind))) ? "author"

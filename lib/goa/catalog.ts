@@ -6,7 +6,6 @@ import { ApiError, stringValue } from "../http";
 import {
   attributeValuesForItems,
   listDefsWithClient,
-  seedAttributeDefs,
   setCatalogItemAttributeValues,
   updateAttributeDef,
   type CatalogAttributeType,
@@ -750,17 +749,6 @@ async function listLibrariesWithClient(client: PoolClient, groupId: string): Pro
   return rows.rows.map(mapLibrary);
 }
 
-/**
- * What a Tables library starts with — optional catalog facts about a place,
- * not challenge answers (no rating, price or "would return"). Ordinary
- * attribute definitions: rename, hide or archive any of them.
- */
-const TABLES_STARTER_PROPERTIES: Array<{ key: string; label: string; type: CatalogAttributeType }> = [
-  { key: "cozinha", label: "Tipo de cozinha", type: "text" },
-  { key: "bairro", label: "Bairro", type: "text" },
-  { key: "endereco", label: "Endereço", type: "text" },
-];
-
 // Sources a person can pick when creating a new library. `screens`/`pages`
 // only ever come from the film/book evolution (`ensureCatalogLibrary`),
 // never from this endpoint.
@@ -774,7 +762,7 @@ async function insertLibrary(
 ): Promise<CatalogLibrary> {
   const source = typeof body.source === "string" && CREATABLE_LIBRARY_SOURCES.has(body.source) ? body.source : "custom";
   // A Tables library can go without a stored name — it then shows the locale-aware
-  // default until someone renames it, like the ones a challenge creates itself.
+  // default until someone renames it.
   const label = source === "tables" && (body.label === undefined || body.label === null || body.label === "")
     ? null
     : stringValue(body, "label", { min: 1, max: 80 })!;
@@ -794,23 +782,20 @@ async function insertLibrary(
      VALUES ($1,$2,$3,$4,$5,$6,$7,now(),now())`,
     [id, groupId, kind, source, label, position, userId],
   );
-  if (source === "tables") await seedAttributeDefs(client, groupId, kind, userId, TABLES_STARTER_PROPERTIES);
   await writeAudit(client, groupId, null, userId, "catalog.library_created", "catalog_library", id, null, { label, source });
   return { id, kind, source: source as CatalogLibrary["source"], label, position };
 }
 
 /**
- * The workspace's library of a given starting config, created on first use — so
- * a preset (Tables) works from a blank workspace without a separate "create the
- * library" step. Returns its opaque `kind`. Never touches an existing library's
- * name or properties.
+ * The workspace's existing library of a given starting config (Tables), by its opaque `kind` — or
+ * `null`. It is never created behind the person's back: they create it themselves, then a Tables
+ * challenge can draw from it.
  */
-export async function findOrCreateLibraryBySource(
+export async function findLibraryBySource(
   client: PoolClient,
   groupId: string,
-  userId: string,
   source: "tables",
-): Promise<string> {
+): Promise<string | null> {
   const existing = await oneOrNull<{ kind: string }>(
     client,
     `SELECT kind FROM catalog_libraries
@@ -818,24 +803,7 @@ export async function findOrCreateLibraryBySource(
       ORDER BY position, created_at LIMIT 1`,
     [groupId, source],
   );
-  if (existing) return existing.kind;
-  // No stored label: the app shows the locale-aware default for `source` until
-  // someone renames it (same as the migrated Screens/Pages libraries).
-  const kind = `lib_${crypto.randomUUID().replace(/-/g, "")}`;
-  const positionRow = await oneOrNull<{ position: number }>(
-    client,
-    "SELECT coalesce(max(position), -1)::int + 1 AS position FROM catalog_libraries WHERE group_id = $1",
-    [groupId],
-  );
-  const id = publicId();
-  await client.query(
-    `INSERT INTO catalog_libraries (id, group_id, kind, source, label, position, created_by_user_id, created_at, updated_at)
-     VALUES ($1,$2,$3,$4,NULL,$5,$6,now(),now())`,
-    [id, groupId, kind, source, positionRow?.position ?? 0, userId],
-  );
-  if (source === "tables") await seedAttributeDefs(client, groupId, kind, userId, TABLES_STARTER_PROPERTIES);
-  await writeAudit(client, groupId, null, userId, "catalog.library_created", "catalog_library", id, null, { label: null, source });
-  return kind;
+  return existing?.kind ?? null;
 }
 
 async function renameLibraryWithClient(

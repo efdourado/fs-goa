@@ -8,7 +8,7 @@ import {
   authorRequired,
   createCatalogItem,
   enableLibraryEventSchedule,
-  findOrCreateLibraryBySource,
+  findLibraryBySource,
   resolveItemKind,
   upsertCatalogItem,
 } from "../catalog";
@@ -196,8 +196,8 @@ export async function createChallenge(
           );
       // The libraries this challenge draws from, stored on the challenge itself.
       // Cinema/Estante/Library track their fixed one; Tables the workspace's own
-      // Tables library (created on first use); `custom` only what the caller
-      // names. Any recipe can also be given more libraries — Movies and TV Shows
+      // Tables library (which the person creates first — never on their behalf);
+      // `custom` only what the caller names. Any recipe can also be given more libraries — Movies and TV Shows
       // in one list — via `libraryIds` (or the older single `libraryId`).
       const linkedKinds: string[] = [];
       const link = async (kind: string) => {
@@ -218,7 +218,11 @@ export async function createChallenge(
               [groupId, namedKinds, recipe.defaultLibrarySource],
             )
           : null;
-        if (!picked) await link(await findOrCreateLibraryBySource(client, groupId, session.user.id, recipe.defaultLibrarySource));
+        if (!picked) {
+          const own = await findLibraryBySource(client, groupId, recipe.defaultLibrarySource);
+          if (!own) throw new ApiError(409, "library_missing", "Crie a biblioteca Tables antes de criar esta rodada.");
+          await link(own);
+        }
       }
       for (const kind of namedKinds) await link(kind);
       if (!linkedKinds.length) throw new ApiError(400, "invalid_library", "Escolha a biblioteca de onde vêm os itens.");

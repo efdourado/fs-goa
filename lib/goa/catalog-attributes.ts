@@ -133,25 +133,6 @@ async function resolveDefKind(client: PoolClient, groupId: string, input: { kind
   return input.kind;
 }
 
-/** Starter properties a new library begins with (e.g. Tables). Each one is an ordinary def: renamable, hideable, archivable. */
-export async function seedAttributeDefs(
-  client: PoolClient,
-  groupId: string,
-  kind: string,
-  actorUserId: string,
-  defs: Array<{ key: string; label: string; type: CatalogAttributeType }>,
-): Promise<void> {
-  for (let index = 0; index < defs.length; index += 1) {
-    await client.query(
-      `INSERT INTO catalog_attribute_defs
-        (id, group_id, kind, semantic_key, label, type, position, created_by_user_id, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,now(),now())
-       ON CONFLICT (group_id, kind, semantic_key) DO NOTHING`,
-      [publicId(), groupId, kind, defs[index].key, defs[index].label, defs[index].type, index, actorUserId],
-    );
-  }
-}
-
 /** Renames, hides/shows, or reorders one attribute definition. Values and metrics that read it are untouched. */
 export async function updateAttributeDef(
   client: PoolClient,

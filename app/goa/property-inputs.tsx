@@ -44,20 +44,6 @@ export function builtInProperties(kind: string): LibraryProperty[] {
 }
 
 /**
- * What a Tables library starts with. The server seeds these three under these
- * exact keys the first time a Tables library is created, so a challenge can send
- * values for them before that library exists; once it does, the real (possibly
- * renamed or hidden) properties are read from it instead.
- */
-const TABLES_STARTER_KEYS = ["cozinha", "bairro", "endereco"] as const;
-
-export function tablesStarterProperties(label: (key: (typeof TABLES_STARTER_KEYS)[number]) => string): LibraryProperty[] {
-  return TABLES_STARTER_KEYS.map((key, position) => ({
-    key, attributeKey: key, storage: "attribute" as const, label: label(key), type: "text" as const, hidden: false, position: position + 10, canHide: true,
-  }));
-}
-
-/**
  * A library's properties as saved — or, for a built-in library nobody has used
  * yet (no row to read), its known columns. `properties` is `null` while loading.
  */

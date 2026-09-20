@@ -102,7 +102,8 @@ ambos `201 { id, challengeId, status: "draft" }`. Corpo:
 
 A receita abre os tipos de registro, os campos e as métricas de análise; `fields`
 sobrescreve os campos do tipo primário. Cinema liga a biblioteca Screens, Tables a
-biblioteca Tables do espaço (criada na primeira vez), Library/Bookshelf a Pages e
+biblioteca Tables do espaço (que precisa existir: `409 library_missing`; crie-a com
+`POST …/catalog/libraries { source: "tables" }`), Library/Bookshelf a Pages e
 `custom` só o que for nomeado. Cada item pode trazer `scheduledAt` (ver Acervo) e
 `libraryId|libraryKind` quando há mais de uma biblioteca (`409 library_required`).
 As quatro chaves antigas (`cine_free`, `cine_curated`, `reading_club`,
@@ -186,7 +187,7 @@ deriva o espaço do próprio objeto (`/api/catalog/…`).
 | `PATCH /api/catalog/:itemId` · `PATCH /api/personal/catalog/:itemId` | owner/admin / dono | `{ title?, year?, runtimeMinutes?, pageCount?, genres?, scheduledAt?, attributes?, recommender… }` — afeta todas as rodadas |
 | `DELETE /api/catalog/:itemId` · `DELETE /api/personal/catalog/:itemId` | owner/admin / dono | vai para a lixeira; `409 catalog_item_in_use` enquanto um desafio em andamento o usa |
 | `POST …/catalog/remove` | owner/admin / dono | `{ itemIds[] }` (até 500) → `{ removed, removedIds[], skipped: [{ id, title, reason: "in_use" \| "not_found" }] }` — remoção em lote |
-| `GET …/catalog/libraries` · `POST …/catalog/libraries` | membro; owner/admin / dono | lista as bibliotecas · cria `{ label, source?: "tables" \| "custom" }` |
+| `GET …/catalog/libraries` · `POST …/catalog/libraries` | membro; owner/admin / dono | lista as bibliotecas · cria `{ label?, source?: "tables" \| "custom" }` — sem propriedades de partida; `source: "tables"` dispensa o nome (mostra o padrão do idioma) |
 | `PATCH /api/catalog/libraries/:id` | owner/admin / dono | `{ label }` — renomear nunca muda `kind` |
 | `DELETE /api/catalog/libraries/:id` | owner/admin / dono | `?deleteItems=1`. Arquiva a biblioteca e manda os itens para a lixeira. `409 library_builtin` (Screens/Pages), `409 library_has_items` (`details.count`), `409 library_busy` (`details.challenges`) |
 | `GET /api/catalog/libraries/:id/properties` · `PATCH …/properties/:key` | membro; owner/admin / dono | o editor único de propriedades nativas + personalizadas · `{ label?, hidden?, position? }` |

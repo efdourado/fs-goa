@@ -168,6 +168,7 @@
       "library_required": "Este desafío usa más de una biblioteca — elige de cuál viene cada ítem.",
       "library_not_linked": "Esa biblioteca no forma parte de este desafío. Añádela primero al desafío.",
       "library_in_use": "Hay ítems de este desafío que vienen de esa biblioteca. Quítalos antes de sacar la biblioteca.",
+      "library_missing": "Crea primero la biblioteca Tables y luego arma el desafío.",
       "library_builtin": "Screens y Pages vienen con la app y no se pueden eliminar.",
       "library_has_items": "Esta biblioteca aún tiene ítems. Confirma para eliminarla junto con ellos.",
       "library_busy": "Algunos ítems de esta biblioteca están en desafíos aún en curso. Sácalos de esos desafíos primero.",
@@ -585,14 +586,14 @@
     "startTitle": "Elige un punto de partida",
     "recipes": {
       "cinema": {
-        "name": "Cine",
+        "name": "Screens",
         "body": "Una lista de películas o series; cada persona da nota y comentario al verlas, con fecha opcional. Puede tener plazo o quedar abierta.",
-        "title": "Cine — nueva edición"
+        "title": "Screens — nueva edición"
       },
       "bookshelf": {
-        "name": "Estantería",
+        "name": "Pages",
         "body": "Una lista de libros que solo valoras y comentas — sin páginas, sin plazo, sin \"cuándo\". Ideal para registrar lo que ya leíste.",
-        "title": "Estantería"
+        "title": "Pages"
       },
       "library": {
         "name": "Club de lectura",
@@ -653,7 +654,8 @@
     "expectationLabel": "Recolectar una nota de expectativa",
     "expectationHint": "Los participantes dan una nota de cuánto esperan disfrutar cada título antes de verlo. Se bloquea cuando envían la valoración real. También puedes activarlo después.",
     "errPickLibrary": "Elige la biblioteca de la que vienen los ítems.",
-    "tablesItemsHint": "Añade los lugares para valorar — uno por línea. Cocina, barrio y dirección son detalles opcionales de cada uno.",
+    "errTablesLibrary": "Crea primero la biblioteca Tables.",
+    "tablesItemsHint": "Añade los lugares para valorar — uno por línea.",
     "customItemsHint": "Añade los ítems a seguir — uno por línea. Cada ítem se convierte en algo que todos pueden registrar.",
     "libraryLabel": "Biblioteca",
     "libraryHint": "De qué lista de cosas parte este desafío.",
@@ -1058,7 +1060,7 @@
       "comentario": "Comentario",
       "paginasLidas": "Páginas leídas",
       "comoFoi": "¿Qué tal fue?",
-      "comida": "Comida",
+      "comida": "Comida y bebida",
       "ambienteAtendimento": "Ambiente y servicio",
       "custoBeneficio": "Calidad-precio",
       "resultado": "Resultado"
@@ -1500,17 +1502,17 @@
       "custom": "Biblioteca"
     },
     "newTitle": "Nueva biblioteca",
-    "newBody": "Una biblioteca es una lista de cosas que siguen juntos — lugares, partidos, juegos, lo que sea. Empieza desde un modelo o desde una página en blanco.",
-    "startFrom": "Empezar desde",
-    "blank": "Biblioteca en blanco",
-    "blankHint": "Solo un nombre. Añade las propiedades que quieras.",
-    "tablesPreset": "Tables",
-    "tablesPresetHint": "Para restaurantes, bares y cafés — trae tipo de cocina, barrio y dirección.",
+    "newBody": "Una biblioteca es una lista de cosas que sigues juntas — lugares, partidos, juegos, lo que sea. Ponle un nombre; después defines qué guarda cada ítem.",
     "nameLabel": "Nombre",
     "nameHint": "Cómo vas a llamar a esta biblioteca.",
     "namePlaceholder": "p. ej.: Partidos",
     "nameRequired": "Ponle un nombre a la biblioteca.",
     "create": "Crear biblioteca",
+    "tablesPromptTitle": "Empieza con una biblioteca Tables",
+    "tablesPromptBody": "Una biblioteca guarda en un solo lugar lo que sigues. Tables es la de restaurantes, bares y cafés — los lugares que añades quedan guardados en ella, listos para volver a valorarlos en otros desafíos.",
+    "tablesPromptCreate": "Crear biblioteca Tables",
+    "tablesPromptCreating": "Creando…",
+    "tablesPromptMore": "Puedes crear más bibliotecas cuando quieras — Bares, Cafeterías, Partidos — desde el acervo.",
     "renameTitle": "Renombrar biblioteca",
     "renameHint": "Solo cambia el nombre — los ítems y las propiedades siguen igual.",
     "rename": "Renombrar",
@@ -1553,11 +1555,6 @@
       "runtime_minutes": "Duración (minutos)",
       "page_count": "Páginas",
       "scheduled_at": "Fecha"
-    },
-    "tablesStarter": {
-      "cozinha": "Tipo de cocina",
-      "bairro": "Barrio",
-      "endereco": "Dirección"
     },
     "scheduleHint": "Cuándo ocurre el propio ítem, como el día de un partido. Actívala y todo desafío que use estos ítems muestra la misma fecha."
   },

@@ -69,7 +69,7 @@ registrar o procedimento de recuperação antes de alterações destrutivas.
 
 ## Notas de release (rascunho para o v1.0.0)
 
-GOA v1.0.0 entrega desafios de Cinema, Clube de Leitura, Estante, Hábito, Tables
+GOA v1.0.0 entrega desafios de Screens, Clube de Leitura, Pages, Hábito, Tables
 e Personalizado, bibliotecas de itens, respostas compartilhadas, espaço pessoal e
 grupos, registros, vitrine com consentimento nominal, modelos e lixeira. Conteúdo
 privado por padrão.

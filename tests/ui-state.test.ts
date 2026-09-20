@@ -9,6 +9,7 @@ import { RuleSectionsView } from "../app/goa/rules";
 import { DynamicEntryForm, itemEntryTypes, ParticipantChallengeScreen, ResultView } from "../app/goa/screens/participant-challenge";
 import type { ChallengeDetail, ChallengeField, ImportPreview } from "../app/goa/types";
 import { AppHeader, ChallengeStatusBadge, SchedulePeriodFields } from "../app/goa/ui";
+import { NewLibraryDialog, TablesLibraryPrompt } from "../app/goa/library-dialogs";
 import { WelcomePanel } from "../app/goa/welcome";
 import {
   findMissingRequiredField,
@@ -718,10 +719,21 @@ test("Wrapped: quando há blocos, o Resultado os renderiza na ordem gravada e pu
 test("boas-vindas de quem não tem nada: as quatro partes de uma rodada, as receitas e três formas de começar", () => {
   const html = renderWithIntl(createElement(WelcomePanel, { onCreateGroup: () => undefined, onStartSolo: () => undefined, onOpenTemplates: () => undefined }));
   for (const step of ["Escolha o que você acompanha", "Monte um desafio", "Traga sua turma", "Leia a vitrine"]) assert.match(html, new RegExp(step));
-  for (const recipe of ["Cinema", "Estante", "Clube de leitura", "Hábito", "Personalizado"]) assert.match(html, new RegExp(recipe));
+  for (const recipe of ["Screens", "Pages", "Clube de leitura", "Hábito", "Personalizado"]) assert.match(html, new RegExp(recipe));
   assert.match(html, />Criar grupo<\/button>/);
   assert.match(html, />Novo desafio<\/button>/);
   assert.match(html, />Ver modelos<\/button>/);
+});
+
+test("Tables sem biblioteca: convida a criá-la e avisa que dá para criar outras, sem preset nem propriedades de partida", () => {
+  const prompt = renderWithIntl(createElement(TablesLibraryPrompt, { scope: "personal", onCreated: () => undefined }));
+  assert.match(prompt, /Comece com uma biblioteca Tables/);
+  assert.match(prompt, />Criar biblioteca Tables<\/button>/);
+  assert.match(prompt, /outras bibliotecas/, "sugere criar mais bibliotecas depois");
+  assert.doesNotMatch(prompt, /Bairro|Endereço|cozinha/i);
+  const dialog = renderWithIntl(createElement(NewLibraryDialog, { scope: "personal", onCancel: () => undefined, onCreated: () => undefined }));
+  assert.match(dialog, /Criar biblioteca/, "o diálogo renderiza");
+  assert.doesNotMatch(dialog, /Bairro|Endereço|preset|Biblioteca em branco/i, "criar biblioteca é só dar um nome");
 });
 
 test("header lista convites de grupo pendentes no menu de novidades", () => {

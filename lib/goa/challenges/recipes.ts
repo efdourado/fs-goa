@@ -209,7 +209,7 @@ const tablesEntry: RecipeEntryType = {
   cardinality: "once_per_item",
   schedulePolicy: "while_active",
   fields: [
-    { key: "comida", label: "Comida", type: "rating", required: true },
+    { key: "comida", label: "Comida e bebida", type: "rating", required: true },
     { key: "ambiente_atendimento", label: "Ambiente e atendimento", type: "rating", required: true },
     { key: "custo_beneficio", label: "Custo-benefício", type: "rating", required: true },
     { key: "comentario", label: "Comentário", type: "text", required: false, config: { multiline: true, maxLength: 500 } },
@@ -356,7 +356,7 @@ export const RECIPES: Record<RecipeKey, Recipe> = {
     collectsEntryDate: false,
     entryTypes: [tablesEntry],
     metrics: [
-      { key: "media_comida", label: "Comida (média por lugar)", operation: "average", fieldKey: "comida", groupBy: "item" },
+      { key: "media_comida", label: "Comida e bebida (média por lugar)", operation: "average", fieldKey: "comida", groupBy: "item" },
       { key: "media_ambiente_atendimento", label: "Ambiente e atendimento (média por lugar)", operation: "average", fieldKey: "ambiente_atendimento", groupBy: "item" },
       { key: "media_custo_beneficio", label: "Custo-benefício (média por lugar)", operation: "average", fieldKey: "custo_beneficio", groupBy: "item" },
       completionMetric,
@@ -380,13 +380,13 @@ const TEMPLATE_ALIAS: Record<string, RecipeKey> = {
 export function resolveRecipe(body: Record<string, unknown>): Recipe {
   if (Object.hasOwn(body, "recipe")) {
     if (!isRecipeKey(body.recipe)) {
-      throw new ApiError(400, "invalid_recipe", "Escolha o modelo Cinema, Estante, Clube de leitura, Hábito, Tables ou Personalizado.");
+      throw new ApiError(400, "invalid_recipe", "Escolha o modelo Screens, Pages, Clube de leitura, Hábito, Tables ou Personalizado.");
     }
     return RECIPES[body.recipe];
   }
   if (Object.hasOwn(body, "template")) {
     if (typeof body.template !== "string" || !Object.hasOwn(TEMPLATE_ALIAS, body.template)) {
-      throw new ApiError(400, "invalid_recipe", "Escolha o modelo Cinema, Estante, Clube de leitura, Hábito, Tables ou Personalizado.");
+      throw new ApiError(400, "invalid_recipe", "Escolha o modelo Screens, Pages, Clube de leitura, Hábito, Tables ou Personalizado.");
     }
     return RECIPES[TEMPLATE_ALIAS[body.template]];
   }
@@ -396,5 +396,5 @@ export function resolveRecipe(body: Record<string, unknown>): Recipe {
   if (body.submissionMode === undefined || body.submissionMode === "item") {
     return RECIPES.cinema;
   }
-  throw new ApiError(400, "invalid_recipe", "Escolha o modelo Cinema, Estante ou Clube de leitura.");
+  throw new ApiError(400, "invalid_recipe", "Escolha o modelo Screens, Pages ou Clube de leitura.");
 }

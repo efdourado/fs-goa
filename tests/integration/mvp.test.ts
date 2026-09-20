@@ -2132,7 +2132,7 @@ test("indicação por nome externo (fase 6): reutilizável, exclusiva, isolada p
   );
 });
 
-test("Tables (fase 7): a biblioteca nasce sozinha, três notas 0–5 e comentário opcional, sem campos forçados", async () => {
+test("Tables (fase 7): a biblioteca só existe quando a pessoa a cria, três notas 0–5 e comentário opcional, sem campos forçados", async () => {
   const owner = await register("Bruna", "bruna_tables");
   const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Rolês" } })).body as { id: string }).id;
 
@@ -2140,6 +2140,17 @@ test("Tables (fase 7): a biblioteca nasce sozinha, três notas 0–5 e comentár
   const before = await call("GET", `/api/groups/${gid}/catalog/libraries`, { session: owner });
   assert.equal((before.body as { libraries: Array<{ source: string }> }).libraries.some((lib) => lib.source === "tables"), false);
 
+  // sem a biblioteca, a rodada não sai — e nada é criado por baixo dos panos
+  const refused = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: { recipe: "tables", title: "Onde comer", participantIds: [owner.user.id], items: [{ title: "Cantina do Zé" }] },
+  });
+  assert.equal(refused.response.status, 409, JSON.stringify(refused.body));
+  assert.equal((refused.body as { error: string }).error, "library_missing");
+  const untouched = await call("GET", `/api/groups/${gid}/catalog/libraries`, { session: owner });
+  assert.equal((untouched.body as { libraries: Array<{ source: string }> }).libraries.some((lib) => lib.source === "tables"), false, "recusar não cria a biblioteca");
+
+  assert.equal((await call("POST", `/api/groups/${gid}/catalog/libraries`, { session: owner, body: { source: "tables" } })).response.status, 201);
   const created = await call("POST", `/api/groups/${gid}/challenges`, {
     session: owner,
     body: { recipe: "tables", title: "Onde comer", participantIds: [owner.user.id], items: [{ title: "Cantina do Zé" }, { title: "Cantina do Zé" }] },
@@ -2151,7 +2162,7 @@ test("Tables (fase 7): a biblioteca nasce sozinha, três notas 0–5 e comentár
     libraries: Array<{ source: string; label: string | null; kind: string }>;
   };
   const tablesLibs = libs.libraries.filter((lib) => lib.source === "tables");
-  assert.equal(tablesLibs.length, 1, "uma biblioteca Tables criada sob demanda");
+  assert.equal(tablesLibs.length, 1, "uma biblioteca Tables, a que a pessoa criou");
   assert.equal(tablesLibs[0].label, null, "o nome padrão fica por conta do idioma, não gravado");
 
   // um segundo desafio reaproveita a mesma biblioteca em vez de criar outra
@@ -2408,10 +2419,11 @@ test("propriedades da biblioteca: renomear e ocultar, nativa ou personalizada, p
   assert.equal((await call("GET", `/api/catalog/libraries/${screens.id}/properties`, { session: member })).response.status, 200);
 });
 
-test("propriedades da biblioteca: Tables já nasce com propriedades úteis e cada biblioteca tem as suas", async () => {
+test("propriedades da biblioteca: Tables nasce só com o nome e cada biblioteca tem as suas", async () => {
   const owner = await register("Tiago", "tiago_props");
   const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Rolês" } })).body as { id: string }).id;
 
+  await call("POST", `/api/groups/${gid}/catalog/libraries`, { session: owner, body: { source: "tables" } });
   await call("POST", `/api/groups/${gid}/challenges`, {
     session: owner, body: { recipe: "tables", title: "Onde comer", participantIds: [owner.user.id], items: [{ title: "Cantina" }] },
   });
@@ -2422,7 +2434,7 @@ test("propriedades da biblioteca: Tables já nasce com propriedades úteis e cad
     (await call("GET", `/api/catalog/libraries/${libraryId}/properties`, { session: owner })).body as { properties: Array<{ key: string; storage: string; label: string | null }> };
 
   const starter = await list(tables.id);
-  assert.deepEqual(starter.properties.filter((p) => p.storage === "attribute").map((p) => p.label), ["Tipo de cozinha", "Bairro", "Endereço"]);
+  assert.deepEqual(starter.properties.filter((p) => p.storage === "attribute"), [], "nenhuma propriedade de partida além das nativas");
   assert.deepEqual(starter.properties.filter((p) => p.storage === "native").map((p) => p.key), ["title", "scheduled_at"], "fora film/book só o título e a data do evento são nativos");
 
   // "Kickoff" numa biblioteca Matches não aparece em Tables
@@ -6702,13 +6714,14 @@ test("desafio traz a biblioteca de onde vêm os itens, e a regra de preenchiment
   assert.deepEqual(cinemaDetail.libraries.map((library) => [library.kind, library.source]), [["film", "screens"]]);
   assert.equal(cinemaDetail.recommendationsEnabled, true);
 
+  await call("POST", `/api/groups/${gid}/catalog/libraries`, { session: owner, body: { source: "tables" } });
   const tables = await call("POST", `/api/groups/${gid}/challenges`, {
     session: owner, body: { recipe: "tables", title: "Onde comer", participantIds: [owner.user.id], items: [{ title: "Cantina do Zé" }] },
   });
   const tablesId = (tables.body as { id: string }).id;
   const tablesDetail = (await call("GET", `/api/challenges/${tablesId}`, { session: owner })).body as { libraries: Array<{ id: string; source: string; kind: string }> };
   assert.deepEqual(tablesDetail.libraries.map((library) => library.source), ["tables"]);
-  assert.ok(tablesDetail.libraries[0].id, "a biblioteca Tables nasceu junto com o desafio");
+  assert.ok(tablesDetail.libraries[0].id, "o desafio ficou ligado à biblioteca Tables que a pessoa criou");
 
   // um hábito não tem biblioteca nenhuma
   const habit = await call("POST", `/api/groups/${gid}/challenges`, {
@@ -7070,16 +7083,22 @@ test("qualquer receita aceita bibliotecas a mais na criação; Tables não se du
   assert.equal(ambiguous.response.status, 400, JSON.stringify(ambiguous.body));
   assert.equal((ambiguous.body as { error: string }).error, "library_required");
 
-  // Tables + uma biblioteca a mais: a Tables da receita é ligada uma vez só
+  // Tables + uma biblioteca a mais: a Tables da receita é ligada uma vez só — e precisa existir antes
+  const noTables = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: { recipe: "tables", title: "Comer e ver", participantIds: [owner.user.id], libraries: [{ libraryId: shows.id }], items: [{ title: "Serial", libraryId: shows.id }] },
+  });
+  assert.equal(noTables.response.status, 409, "sem a biblioteca Tables não há rodada Tables");
+  assert.equal((noTables.body as { error: string }).error, "library_missing");
+  const tablesLib = (await call("POST", `/api/groups/${gid}/catalog/libraries`, { session: owner, body: { source: "tables" } }));
+  assert.equal(tablesLib.response.status, 201, JSON.stringify(tablesLib.body));
+  assert.equal((tablesLib.body as { label: string | null }).label, null, "Tables sem nome guardado mostra o nome padrão");
   const tables = await call("POST", `/api/groups/${gid}/challenges`, {
     session: owner,
     body: { recipe: "tables", title: "Comer e ver", participantIds: [owner.user.id], libraries: [{ libraryId: shows.id }], items: [{ title: "Sem biblioteca" }] },
   });
   assert.equal(tables.response.status, 400, "com duas bibliotecas, o item de Tables também precisa dizer de onde vem");
   assert.equal((tables.body as { error: string }).error, "library_required");
-  const tablesLib = (await call("POST", `/api/groups/${gid}/catalog/libraries`, { session: owner, body: { source: "tables" } }));
-  assert.equal(tablesLib.response.status, 201, JSON.stringify(tablesLib.body));
-  assert.equal((tablesLib.body as { label: string | null }).label, null, "Tables sem nome guardado mostra o nome padrão");
   const withTables = await call("POST", `/api/groups/${gid}/challenges`, {
     session: owner,
     body: {

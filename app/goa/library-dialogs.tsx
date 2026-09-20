@@ -9,13 +9,14 @@ import { useCsrf } from "./csrf";
 import { ConfirmDialog, Dialog, FormDialog } from "./dialog";
 import { useGoaFormat } from "./format";
 import { type CatalogScope, LibraryGlyph, useLibraryName } from "./libraries";
+import { RecipeIcon } from "./recipe-icons";
 import type { CatalogAttributeDef, CatalogLibrary, LibraryProperty } from "./types";
-import { Button, cx, EmptyState, Field, inputClass, SelectableCards, StatusMessage, Toggle } from "./ui";
+import { Button, cx, EmptyState, Field, inputClass, StatusMessage, Toggle } from "./ui";
 
 type PropertyType = LibraryProperty["type"];
 const PROPERTY_TYPES: PropertyType[] = ["text", "number", "date", "boolean"];
 
-/** Create a library: a Tables preset with starter properties, or a blank one shaped entirely by its owner. */
+/** Create a library: just a name — what each item can hold is shaped afterwards, in its properties. */
 export function NewLibraryDialog({
   scope,
   onCancel,
@@ -29,19 +30,18 @@ export function NewLibraryDialog({
   const tc = useTranslations("common");
   const f = useGoaFormat();
   const csrf = useCsrf();
-  const [source, setSource] = useState<"tables" | "custom">("custom");
   const [label, setLabel] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function submit() {
-    const name = label.trim() || (source === "tables" ? t("source.tables") : "");
+    const name = label.trim();
     if (!name) { setError(t("nameRequired")); return; }
     setBusy(true);
     setError(null);
     try {
       const made = await apiRequest<CatalogLibrary>(API_PATHS.catalogWorkspace(scope).libraries, {
-        method: "POST", body: { label: name, source }, csrfToken: csrf,
+        method: "POST", body: { label: name }, csrfToken: csrf,
       });
       onCreated(made);
     } catch (cause) {
@@ -62,26 +62,58 @@ export function NewLibraryDialog({
       busyLabel={tc("saving")}
     >
       <p className="text-sm leading-6 text-[var(--muted)]">{t("newBody")}</p>
-      <Field label={t("startFrom")} plain>
-        <SelectableCards
-          value={source}
-          onChange={setSource}
-          options={[
-            { value: "custom", label: t("blank"), hint: t("blankHint") },
-            { value: "tables", label: t("tablesPreset"), hint: t("tablesPresetHint") },
-          ]}
-        />
-      </Field>
       <Field label={t("nameLabel")} hint={t("nameHint")}>
         <input
           className={inputClass}
           value={label}
           maxLength={80}
-          placeholder={source === "tables" ? t("source.tables") : t("namePlaceholder")}
+          placeholder={t("namePlaceholder")}
           onChange={(event) => setLabel(event.target.value)}
         />
       </Field>
     </FormDialog>
+  );
+}
+
+/**
+ * Where a Tables challenge needs its library and the space has none: says what it is and lets the
+ * person create it. Nothing is created for them — and it points at making more libraries later.
+ */
+export function TablesLibraryPrompt({ scope, onCreated }: { scope: CatalogScope; onCreated: () => void }) {
+  const t = useTranslations("libraries");
+  const f = useGoaFormat();
+  const csrf = useCsrf();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function create() {
+    setBusy(true);
+    setError(null);
+    try {
+      await apiRequest(API_PATHS.catalogWorkspace(scope).libraries, { method: "POST", body: { source: "tables" }, csrfToken: csrf });
+      onCreated();
+    } catch (cause) {
+      setError(f.error(cause));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border border-dashed border-[var(--main-line)] bg-[var(--paper)] p-5 sm:p-6">
+      <div className="flex items-start gap-4">
+        <span className="grid h-11 w-11 flex-none place-items-center rounded-xl bg-[var(--main-soft)] text-[var(--main)]" aria-hidden="true">
+          <RecipeIcon name="tables" className="h-6 w-6" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <strong className="block text-lg font-medium tracking-[-0.02em]">{t("tablesPromptTitle")}</strong>
+          <p className="mt-1.5 text-sm leading-6 text-[var(--muted)]">{t("tablesPromptBody")}</p>
+          <Button className="mt-4" disabled={busy} onClick={() => void create()}>{busy ? t("tablesPromptCreating") : t("tablesPromptCreate")}</Button>
+          <StatusMessage error={error} />
+          <p className="mt-4 text-xs leading-5 text-[var(--muted)]">{t("tablesPromptMore")}</p>
+        </div>
+      </div>
+    </div>
   );
 }
 

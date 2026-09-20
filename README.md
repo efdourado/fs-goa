@@ -181,10 +181,12 @@ messages/   textos da interface em pt-BR, en e es (mesmo conjunto de chaves nos 
   link no cabeçalho) é o espaço só seu — desafios, acervo e lixeira próprios, sem
   grupo nem convites. Quem ainda não tem nada vê, no Início, uma tela de boas-vindas
   com as partes de uma rodada e três formas de começar.
-- **Rodadas por receita** — seis criáveis: `cinema` (nota 0–5 + comentário, com
+- **Rodadas por receita** — seis criáveis (na interface, `cinema` aparece como
+  **Screens** e `bookshelf` como **Pages**): `cinema` (nota 0–5 + comentário, com
   expectativa opcional que trava ao avaliar), `library` (livros, progresso por dia +
   conclusão + nota), `bookshelf` (só avaliação, sem período), `habit` (check-in sem
-  catálogo), `tables` (restaurantes e afins, uma nota por dimensão) e `custom`
+  catálogo), `tables` (restaurantes e afins, uma nota por dimensão; pede que você
+  crie antes a biblioteca Tables, que nasce só com o nome) e `custom`
   (qualquer biblioteca; você decide o que registrar). As quatro chaves antigas
   (`cine_free`, `cine_curated`, `reading_club`, `reading_daily`) continuam legíveis
   no banco mas não criam mais estrutura. Estados `draft → active → closed`; período

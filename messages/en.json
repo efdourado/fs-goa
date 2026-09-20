@@ -168,6 +168,7 @@
       "library_required": "This challenge draws from more than one library — choose which one each item comes from.",
       "library_not_linked": "That library isn't part of this challenge. Add it to the challenge first.",
       "library_in_use": "Some items in this challenge come from that library. Remove them before taking the library out.",
+      "library_missing": "Create the Tables library first, then set up the challenge.",
       "library_builtin": "Screens and Pages come with the app and can't be deleted.",
       "library_has_items": "This library still has items. Confirm to delete it together with them.",
       "library_busy": "Some of this library's items are in challenges that are still running. Take them out of those challenges first.",
@@ -585,14 +586,14 @@
     "startTitle": "Choose a starting point",
     "recipes": {
       "cinema": {
-        "name": "Cinema",
+        "name": "Screens",
         "body": "A list of films or series; each person rates and comments when they watch, with an optional date. Can have a deadline or stay open.",
-        "title": "Cinema — new edition"
+        "title": "Screens — new edition"
       },
       "bookshelf": {
-        "name": "Bookshelf",
+        "name": "Pages",
         "body": "A list of books you just rate and comment on — no pages, no deadline, no \"when\". Great for logging what you've already read.",
-        "title": "Bookshelf"
+        "title": "Pages"
       },
       "library": {
         "name": "Reading club",
@@ -653,7 +654,8 @@
     "expectationLabel": "Collect an expectation rating",
     "expectationHint": "Participants rate how much they expect to like each title before watching. It locks once they send the real rating. You can also toggle this later.",
     "errPickLibrary": "Choose the library the items come from.",
-    "tablesItemsHint": "Add the places to rate — one per line. Cuisine, neighbourhood and address are optional details on each.",
+    "errTablesLibrary": "Create the Tables library first.",
+    "tablesItemsHint": "Add the places to rate — one per line.",
     "customItemsHint": "Add the items to track — one per line. Each item becomes something everyone can record.",
     "libraryLabel": "Library",
     "libraryHint": "Which list of things this challenge draws from.",
@@ -1058,7 +1060,7 @@
       "comentario": "Comment",
       "paginasLidas": "Pages read",
       "comoFoi": "How did it go?",
-      "comida": "Food",
+      "comida": "Food and drink",
       "ambienteAtendimento": "Atmosphere & service",
       "custoBeneficio": "Value for money",
       "resultado": "Result"
@@ -1500,17 +1502,17 @@
       "custom": "Library"
     },
     "newTitle": "New library",
-    "newBody": "A library is a list of things you track together — places, matches, games, anything. Start from a preset or from a blank page.",
-    "startFrom": "Start from",
-    "blank": "Blank library",
-    "blankHint": "Just a name. Add the properties you want.",
-    "tablesPreset": "Tables",
-    "tablesPresetHint": "For restaurants, bars and cafés — cuisine, neighbourhood and address to start.",
+    "newBody": "A library is a list of things you track together — places, matches, games, anything. Give it a name; you shape what each item can hold afterwards.",
     "nameLabel": "Name",
     "nameHint": "What you'll call this library.",
     "namePlaceholder": "e.g. Matches",
     "nameRequired": "Give the library a name.",
     "create": "Create library",
+    "tablesPromptTitle": "Start with a Tables library",
+    "tablesPromptBody": "A library keeps what you track in one place. Tables is the one for restaurants, bars and cafés — the places you add here are saved in it, ready to rate again in later challenges.",
+    "tablesPromptCreate": "Create Tables library",
+    "tablesPromptCreating": "Creating…",
+    "tablesPromptMore": "You can create more libraries any time — Bars, Coffee shops, Matches — from the catalogue.",
     "renameTitle": "Rename library",
     "renameHint": "Only the name changes — its items and properties stay as they are.",
     "rename": "Rename",
@@ -1553,11 +1555,6 @@
       "runtime_minutes": "Runtime (minutes)",
       "page_count": "Pages",
       "scheduled_at": "Date"
-    },
-    "tablesStarter": {
-      "cozinha": "Cuisine",
-      "bairro": "Neighbourhood",
-      "endereco": "Address"
     },
     "scheduleHint": "When the item itself happens, like a match's day. Switch it on and every challenge using these items shows the same date."
   },
