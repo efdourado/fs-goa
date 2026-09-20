@@ -26,7 +26,6 @@ import { BackButton, Button, cardClass, cx, EmptyState, StatusMessage } from "..
 import { formatRuntime } from "../utils";
 
 type Layout = "covers" | "list";
-type Sort = "recent" | "title" | "rating" | "date";
 
 const icon = { fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true } as const;
 const GridIcon = () => <svg viewBox="0 0 16 16" className="h-4 w-4" {...icon}><rect x="2" y="2" width="5" height="5" rx="1.2" /><rect x="9" y="2" width="5" height="5" rx="1.2" /><rect x="2" y="9" width="5" height="5" rx="1.2" /><rect x="9" y="9" width="5" height="5" rx="1.2" /></svg>;
@@ -88,7 +87,6 @@ export function CatalogWorkspaceScreen({
   const [itemsError, setItemsError] = useState<string | null>(null);
   const [itemsNonce, setItemsNonce] = useState(0);
   const [activeKind, setActiveKind] = useState<string | null>(null);
-  const [sort, setSort] = useState<Sort>("recent");
   const [recommenderFilter, setRecommenderFilter] = useState("");
   const [layout, setLayout] = useState<Layout>("covers");
   const [groupBy, setGroupBy] = useState<CatalogGroupBy>("none");
@@ -176,19 +174,12 @@ export function CatalogWorkspaceScreen({
     if (activeFilter === "none") return !item.recommendedBy && !item.originNote;
     return item.recommendedBy ? `${item.recommendedBy.kind}:${item.recommendedBy.id}` === activeFilter : false;
   }), [scoped, activeFilter, onlyUnused]);
-  // Only offered where the library keeps an event date (a match's kickoff) on its items.
-  const hasDates = scoped.some((item) => item.scheduledAt);
-  const startOf = (item: CatalogItem) => (item.scheduledAt ? new Date(item.scheduledAt.startsAt).getTime() : Infinity);
+  // Newest first: what was added to the catalogue last comes first.
   const addedAt = (item: CatalogItem) => (item.createdAt ? Date.parse(item.createdAt) : 0);
-  const sorted = useMemo(() => [...filtered].sort((left, right) =>
-    sort === "rating"
-      ? (right.ratingAvg ?? -1) - (left.ratingAvg ?? -1) || left.title.localeCompare(right.title)
-      : sort === "date" && hasDates
-        ? startOf(left) - startOf(right) || left.title.localeCompare(right.title)
-        : sort === "recent"
-          ? addedAt(right) - addedAt(left) || left.title.localeCompare(right.title)
-          : left.title.localeCompare(right.title),
-  ), [filtered, sort, hasDates]);
+  const sorted = useMemo(
+    () => [...filtered].sort((left, right) => addedAt(right) - addedAt(left) || left.title.localeCompare(right.title)),
+    [filtered],
+  );
   const groups = useMemo(() => groupCatalogItems(sorted, groupBy), [sorted, groupBy]);
 
   const rated = scoped.filter((item) => item.ratingAvg !== null && item.ratingAvg !== undefined);
@@ -360,14 +351,6 @@ export function CatalogWorkspaceScreen({
               </button>
             ) : null}
             <span className="flex-1" />
-            {scoped.length ? (
-              <ChipSelect label={t("sortLabel")} value={sort} onChange={(next) => setSort(next as Sort)} active={false}>
-                <option value="recent">{t("sortRecent")}</option>
-                <option value="title">{t("sortTitle")}</option>
-                <option value="rating">{t("sortRating")}</option>
-                {hasDates ? <option value="date">{t("sortDate")}</option> : null}
-              </ChipSelect>
-            ) : null}
             {canManage && scoped.length ? (
               <button
                 type="button"
