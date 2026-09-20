@@ -318,7 +318,7 @@ export function CreateChallengeScreen({
                   />
                 </Field>
               ) : null}
-            </div> : null}<FieldBuilder fields={fields} onChange={(next) => { setFields(next); setFieldsTouched(true); }} />{recipe === "custom" ? <div className="mt-5 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4"><Toggle checked={collectsEntryDate} onChange={setCollectsEntryDate} label={t("entryDateLabel")} hint={t("entryDateHint")} /></div> : null}{canOfferExpectation ? <label className="mt-5 flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4 text-sm"><input type="checkbox" className="mt-0.5" aria-label={t("expectationLabel")} checked={expectation} onChange={(event) => setExpectation(event.target.checked)} /><span><strong className="block">{t("expectationLabel")}</strong><span className="mt-0.5 block text-xs text-[var(--muted)]">{t("expectationHint")}</span></span></label> : null}</div> : null}
+            </div> : null}<FieldBuilder fields={fields} onChange={(next) => { setFields(next); setFieldsTouched(true); }} />{recipe === "custom" ? <Toggle className="mt-5 bg-[var(--paper)]" checked={collectsEntryDate} onChange={setCollectsEntryDate} label={t("entryDateLabel")} hint={t("entryDateHint")} /> : null}{canOfferExpectation ? <label className="mt-5 flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4 text-sm"><input type="checkbox" className="mt-0.5" aria-label={t("expectationLabel")} checked={expectation} onChange={(event) => setExpectation(event.target.checked)} /><span><strong className="block">{t("expectationLabel")}</strong><span className="mt-0.5 block text-xs text-[var(--muted)]">{t("expectationHint")}</span></span></label> : null}</div> : null}
 
         {step === checkpointsStep && tracksCatalog ? (
           <div>
@@ -337,9 +337,7 @@ export function CreateChallengeScreen({
                 />
               </Field>
             )}
-            <div className="mb-5 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4">
-              <Toggle checked={itemDates} onChange={setItemDates} label={t("itemDatesLabel")} hint={t("itemDatesHint")} />
-            </div>
+            <Toggle className="mb-5 bg-[var(--paper)]" checked={itemDates} onChange={setItemDates} label={t("itemDatesLabel")} hint={t("itemDatesHint")} />
             {itemLibraries.length ? (
               <CineItemsEditor
                 value={cineItems}
