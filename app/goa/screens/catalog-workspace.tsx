@@ -6,7 +6,7 @@ import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { ActionMenu, ActionMenuItem } from "../action-menu";
 import { API_PATHS, apiRequest } from "../api";
 import { AddCatalogItemDialog } from "../catalog-item-dialogs";
-import { CatalogRow, CatalogTile, type CatalogGroupBy, groupCatalogItems, LayoutToggle } from "../catalog-views";
+import { AddItemTile, CatalogRow, CatalogTile, type CatalogGroupBy, groupCatalogItems, LayoutToggle } from "../catalog-views";
 import { useCsrf } from "../csrf";
 import { ConfirmDialog } from "../dialog";
 import { useGoaFormat } from "../format";
@@ -244,16 +244,9 @@ export function CatalogWorkspaceScreen({
     <main className="mx-auto max-w-7xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
       <BackButton onClick={onBack} label={backLabel} className="mb-6" />
 
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-medium tracking-[-0.045em] sm:text-4xl">{title}</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">{subtitle}</p>
-        </div>
-        {canManage ? (
-          <div className="flex flex-none items-center gap-2">
-            <Button onClick={() => { setNotice(null); setDialog("add"); }}>＋ {t("addItem")}</Button>
-          </div>
-        ) : null}
+      <div className="mb-8">
+        <h1 className="text-3xl font-medium tracking-[-0.045em] sm:text-4xl">{title}</h1>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">{subtitle}</p>
       </div>
 
       <StatusMessage error={librariesError ?? itemsError} success={notice} />
@@ -290,7 +283,7 @@ export function CatalogWorkspaceScreen({
             <button
               type="button"
               onClick={() => setDialog("new")}
-              className="flex min-h-[4.75rem] flex-none cursor-pointer items-center justify-center gap-2 rounded-[20px] border border-dashed border-[var(--main-line)] px-6 text-sm font-light text-[var(--muted)] transition hover:text-[var(--ink)]"
+              className="flex min-h-[4.75rem] w-64 flex-none cursor-pointer items-center justify-center gap-2 rounded-[20px] border border-dashed border-[var(--muted)] px-4 text-sm font-light text-[var(--muted)] transition hover:border-[var(--ink)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
             >
               ＋ {tl("newLibrary")}
             </button>
@@ -434,7 +427,7 @@ export function CatalogWorkspaceScreen({
               <EmptyState title={t("noMatches")} />
             ) : (
               <div className="space-y-10">
-                {groups.map((group) => (
+                {groups.map((group, index) => (
                   <section key={group.key} aria-label={groupBy === "none" ? undefined : groupLabel(group.label)}>
                     {groupBy !== "none" ? (
                       <h2 className="mb-4 flex items-baseline gap-2.5 text-lg font-light tracking-[-0.02em]">
@@ -444,6 +437,7 @@ export function CatalogWorkspaceScreen({
                     ) : null}
                     {layout === "covers" ? (
                       <div className="grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 sm:gap-x-5 lg:grid-cols-4 xl:grid-cols-5">
+                        {canManage && !selecting && index === 0 ? <AddItemTile label={t("addItem")} onClick={() => { setNotice(null); setDialog("add"); }} /> : null}
                         {group.items.map((item) => {
                           const unused = isUnused(item);
                           return (
