@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { API_PATHS, apiRequest } from "./api";
 import { useCsrf } from "./csrf";
-import { FormDialog } from "./dialog";
+import { ConfirmDialog, FormDialog } from "./dialog";
 import { useGoaFormat } from "./format";
 import { type CatalogScope, LibraryPills, libraryChoices } from "./libraries";
 import {
@@ -224,21 +224,7 @@ export function EditCatalogItemDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmingRemoval, setConfirmingRemoval] = useState(false);
-  const [removing, setRemoving] = useState(false);
   const dirty = title.trim() !== item.title || edited !== null || !sameRecommender(recommender, initialRecommender);
-
-  async function remove() {
-    if (!onRemove) return;
-    setRemoving(true);
-    setError(null);
-    try {
-      await onRemove();
-    } catch (cause) {
-      setError(f.error(cause));
-      setRemoving(false);
-      setConfirmingRemoval(false);
-    }
-  }
 
   async function submit() {
     const name = title.trim();
@@ -266,39 +252,39 @@ export function EditCatalogItemDialog({
   }
 
   return (
-    <FormDialog
-      title={t("editTitle")}
-      dirty={dirty}
-      busy={busy || removing}
-      error={error ?? propertiesError}
-      onCancel={onCancel}
-      onSubmit={submit}
-      submitLabel={t("saveChanges")}
-      submitDisabled={!properties}
-    >
-      <Field label={t("titleLabel")}>
-        <input className={inputClass} value={title} maxLength={300} required onChange={(event) => setTitle(event.target.value)} />
-      </Field>
-      {properties ? (
-        <PropertyInputs properties={properties} values={values} onChange={(key, value) => setEdited({ ...values, [key]: value })} />
-      ) : (
-        <p className="text-sm text-[var(--muted)]">{t("loadingProperties")}</p>
-      )}
-      {recommendationsEnabled ? <RecommenderPicker value={recommender} onChange={setRecommender} members={members} source={source} /> : null}
-      {onRemove ? (
-        <div className="border-t border-[var(--line)] pt-5">
-          <p className="text-sm leading-6 text-[var(--muted)]">{tCat("removeHint")}</p>
-          {confirmingRemoval ? (
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <span className="mr-auto text-sm font-medium">{tCat("removeTitle", { title: item.title })}</span>
-              <Button variant="secondary" disabled={removing} onClick={() => setConfirmingRemoval(false)}>{tCat("keepItem")}</Button>
-              <Button variant="danger" disabled={removing} onClick={() => void remove()}>{removing ? tc("saving") : tCat("remove")}</Button>
-            </div>
-          ) : (
-            <Button variant="danger" className="mt-3" disabled={busy} onClick={() => setConfirmingRemoval(true)}>{tCat("remove")}</Button>
-          )}
-        </div>
+    <>
+      <FormDialog
+        title={t("editTitle")}
+        dirty={dirty}
+        busy={busy}
+        error={error ?? propertiesError}
+        onCancel={onCancel}
+        onSubmit={submit}
+        submitLabel={t("saveChanges")}
+        submitDisabled={!properties}
+        footerStart={onRemove ? <Button variant="danger" disabled={busy} onClick={() => setConfirmingRemoval(true)}>{tCat("remove")}</Button> : null}
+      >
+        <Field label={t("titleLabel")}>
+          <input className={inputClass} value={title} maxLength={300} required onChange={(event) => setTitle(event.target.value)} />
+        </Field>
+        {properties ? (
+          <PropertyInputs properties={properties} values={values} onChange={(key, value) => setEdited({ ...values, [key]: value })} />
+        ) : (
+          <p className="text-sm text-[var(--muted)]">{t("loadingProperties")}</p>
+        )}
+        {recommendationsEnabled ? <RecommenderPicker value={recommender} onChange={setRecommender} members={members} source={source} /> : null}
+      </FormDialog>
+      {confirmingRemoval && onRemove ? (
+        <ConfirmDialog
+          title={tCat("removeTitle", { title: item.title })}
+          body={tCat("removeHint")}
+          confirmLabel={tCat("remove")}
+          busyLabel={tc("saving")}
+          danger
+          onClose={() => setConfirmingRemoval(false)}
+          onConfirm={onRemove}
+        />
       ) : null}
-    </FormDialog>
+    </>
   );
 }

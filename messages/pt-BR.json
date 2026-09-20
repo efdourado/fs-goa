@@ -436,7 +436,6 @@
     "recommendedBy": "indicado por {name}",
     "noRounds": "Este item ainda não entrou em nenhuma rodada visível.",
     "remove": "Excluir do acervo",
-    "keepItem": "Manter",
     "removeHint": "O item sai do acervo e vai para a lixeira, de onde dá para restaurar. As rodadas que já o usaram continuam intactas.",
     "status": {
       "draft": "rascunho",

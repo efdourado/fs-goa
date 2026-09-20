@@ -436,7 +436,6 @@
     "recommendedBy": "recommended by {name}",
     "noRounds": "This item hasn't been in any visible round yet.",
     "remove": "Remove from catalogue",
-    "keepItem": "Keep it",
     "removeHint": "It leaves the catalogue and goes to the bin, where you can restore it. Rounds that already used it stay intact.",
     "status": {
       "draft": "draft",

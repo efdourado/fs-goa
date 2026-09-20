@@ -436,7 +436,6 @@
     "recommendedBy": "recomendado por {name}",
     "noRounds": "Este ítem aún no ha entrado en ninguna ronda visible.",
     "remove": "Quitar del acervo",
-    "keepItem": "Conservar",
     "removeHint": "Sale del acervo y va a la papelera, de donde se puede restaurar. Las rondas que ya lo usaron quedan intactas.",
     "status": {
       "draft": "borrador",

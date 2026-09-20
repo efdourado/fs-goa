@@ -55,8 +55,9 @@ export function Dialog({ title, children, onClose, busy = false }: {
 /**
  * The shared shell for every editing modal (field, item, metric, correction, …):
  * a `Dialog`, the "unsaved changes" guard, a `<form>` with a disabled-while-busy
- * `<fieldset>`, an inline error, and a right-aligned Cancel · Save footer. A
- * caller passes only the fields and the save action.
+ * `<fieldset>`, an inline error, and a right-aligned Cancel · Save footer (with an
+ * optional `footerStart` action pinned to its left). A caller passes only the
+ * fields and the save action.
  */
 export function FormDialog({
   title,
@@ -69,6 +70,7 @@ export function FormDialog({
   busyLabel,
   danger = false,
   submitDisabled = false,
+  footerStart,
   children,
 }: {
   title: string;
@@ -81,6 +83,8 @@ export function FormDialog({
   busyLabel?: string;
   danger?: boolean;
   submitDisabled?: boolean;
+  /** An action at the footer's left edge, apart from Cancel · Save (a destructive one, say). */
+  footerStart?: ReactNode;
   children: ReactNode;
 }) {
   const tc = useTranslations("common");
@@ -100,7 +104,8 @@ export function FormDialog({
       <form onSubmit={(event) => { event.preventDefault(); void onSubmit(); }} className="space-y-6">
         <fieldset disabled={busy} className="min-w-0 space-y-5">{children}</fieldset>
         <StatusMessage error={error} />
-        <div className="flex justify-end gap-3 border-t border-[var(--line)] pt-4">
+        <div className="flex flex-wrap items-center justify-end gap-3 border-t border-[var(--line)] pt-4">
+          {footerStart ? <div className="mr-auto">{footerStart}</div> : null}
           <Button variant="secondary" disabled={busy} onClick={close}>{tc("cancel")}</Button>
           <Button type="submit" variant={danger ? "danger" : "primary"} disabled={busy || submitDisabled}>
             {busy ? busyLabel ?? tc("saving") : submitLabel}
