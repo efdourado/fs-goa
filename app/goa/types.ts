@@ -213,6 +213,8 @@ export interface CatalogItem {
   roundCount?: number;
   /** Challenges that still hold this item — zero means it is safe to tidy away. */
   challengeCount?: number;
+  /** When it joined the catalogue (ISO) — what "recently added" sorts on. */
+  createdAt?: string;
   ratingAvg?: number | null;
   ratingCount?: number;
   /** Custom attributes this group/person defined for this kind — never global. */

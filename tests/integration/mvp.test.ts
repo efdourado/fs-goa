@@ -7639,3 +7639,20 @@ test("excluir uma biblioteca: pede confirmação se tem itens, respeita desafio 
   assert.equal((await call("DELETE", `/api/catalog/libraries/${personal.id}`, { session: member })).response.status, 403, "biblioteca pessoal só o dono exclui");
   assert.equal((await call("DELETE", `/api/catalog/libraries/${personal.id}`, { session: owner })).response.status, 200);
 });
+
+test("o acervo devolve quando cada item entrou — é o que ordena \"adicionados recentemente\"", async () => {
+  const owner = await register("Nina", "nina_recente");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Recentes" } })).body as { id: string }).id;
+  for (const title of ["Primeiro", "Segundo"]) {
+    assert.equal((await call("POST", `/api/groups/${gid}/catalog/items`, { session: owner, body: { kind: "film", title } })).response.status, 201);
+    await new Promise((resolve) => setTimeout(resolve, 15));
+  }
+  const items = ((await call("GET", `/api/groups/${gid}/catalog`, { session: owner })).body as { items: Array<{ title: string; createdAt: string }> }).items;
+  const at = (title: string) => Date.parse(items.find((item) => item.title === title)!.createdAt);
+  assert.ok(Number.isFinite(at("Primeiro")), "createdAt é uma data ISO");
+  assert.ok(at("Segundo") > at("Primeiro"), "o mais novo tem a data mais recente");
+  const personal = await call("POST", "/api/personal/catalog/items", { session: owner, body: { kind: "film", title: "Solto" } });
+  assert.equal(personal.response.status, 201);
+  const mine = ((await call("GET", "/api/personal/catalog", { session: owner })).body as { items: Array<{ createdAt?: string }> }).items;
+  assert.ok(mine.every((item) => typeof item.createdAt === "string"), "o acervo pessoal também");
+});

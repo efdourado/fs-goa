@@ -1,12 +1,13 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 import { ActionMenu, ActionMenuItem } from "../action-menu";
 import { API_PATHS, apiRequest } from "../api";
-import { byRatingDesc, bucketize, type CatalogBucket, decadeOf, highlights } from "../catalog-insights";
 import { AddCatalogItemDialog } from "../catalog-item-dialogs";
+import { byRatingDesc, bucketize, type CatalogBucket, decadeOf, highlights } from "../catalog-insights";
+import { CatalogRow, CatalogTile, type CatalogGroupBy, groupCatalogItems, LayoutToggle } from "../catalog-views";
 import { useCsrf } from "../csrf";
 import { ConfirmDialog } from "../dialog";
 import { useGoaFormat } from "../format";
@@ -19,14 +20,26 @@ import {
 } from "../libraries";
 import { useLibraryProperties } from "../property-inputs";
 import { recommenderLine, useRecommenderSource } from "../recommender-picker";
+import { Segmented } from "../Segmented";
 import type { CatalogItem, CatalogLibrary, Id, Member } from "../types";
 import { BackButton, Button, cardClass, cx, EmptyState, StatusMessage } from "../ui";
 import { formatRuntime } from "../utils";
 
-type View = "list" | "genre" | "year" | "decade";
+type Layout = "covers" | "list" | "insights";
+type Sort = "recent" | "title" | "rating" | "date";
+type InsightBy = "genre" | "decade" | "year";
 
 /** Fixed 0–5 scale so a bar means the same thing across genre / year / decade. */
 const RATING_MAX = 5;
+
+const icon = { fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true } as const;
+const GridIcon = () => <svg viewBox="0 0 16 16" className="h-4 w-4" {...icon}><rect x="2" y="2" width="5" height="5" rx="1.2" /><rect x="9" y="2" width="5" height="5" rx="1.2" /><rect x="2" y="9" width="5" height="5" rx="1.2" /><rect x="9" y="9" width="5" height="5" rx="1.2" /></svg>;
+const ListIcon = () => <svg viewBox="0 0 16 16" className="h-4 w-4" {...icon}><path d="M3 4h10M3 8h10M3 12h10" /></svg>;
+const ChartIcon = () => <svg viewBox="0 0 16 16" className="h-4 w-4" {...icon}><path d="M3 13V8M8 13V3M13 13V6" /></svg>;
+const SearchIcon = () => <svg viewBox="0 0 16 16" className="h-4 w-4 flex-none" {...icon}><circle cx="7" cy="7" r="4.5" /><path d="m10.5 10.5 3 3" /></svg>;
+
+/** Lower-cased, accent-free, for matching what someone typed against a title. */
+const fold = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
 function BucketBars({ buckets, emptyLabel }: { buckets: CatalogBucket[]; emptyLabel: string }) {
   const t = useTranslations("personalCatalog");
@@ -51,6 +64,25 @@ function BucketBars({ buckets, emptyLabel }: { buckets: CatalogBucket[]; emptyLa
         );
       })}
     </ul>
+  );
+}
+
+/** A native select dressed as a chip; it lights up once it narrows the list. */
+function ChipSelect({ label, value, onChange, active, children }: { label: string; value: string; onChange: (value: string) => void; active: boolean; children: ReactNode }) {
+  return (
+    <label className="min-w-0">
+      <span className="sr-only">{label}</span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className={cx(
+          "min-h-10 max-w-48 cursor-pointer rounded-full border px-4 text-sm outline-none transition focus-visible:ring-4 focus-visible:ring-[var(--main)]/25",
+          active ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] bg-[var(--paper)] text-[var(--ink)] hover:border-[var(--main-line)]",
+        )}
+      >
+        {children}
+      </select>
+    </label>
   );
 }
 
@@ -81,6 +113,7 @@ export function CatalogWorkspaceScreen({
   onOpenItem: (itemId: Id) => void;
 }) {
   const t = useTranslations("personalCatalog");
+  const tItem = useTranslations("catalog");
   const tl = useTranslations("libraries");
   const tc = useTranslations("common");
   const f = useGoaFormat();
@@ -90,9 +123,14 @@ export function CatalogWorkspaceScreen({
   const [itemsError, setItemsError] = useState<string | null>(null);
   const [itemsNonce, setItemsNonce] = useState(0);
   const [activeKind, setActiveKind] = useState<string | null>(null);
-  const [sort, setSort] = useState<"title" | "rating" | "date">("title");
+  const [sort, setSort] = useState<Sort>("recent");
+  const [search, setSearch] = useState("");
+  const [genreFilter, setGenreFilter] = useState("");
+  const [decadeFilter, setDecadeFilter] = useState("");
   const [recommenderFilter, setRecommenderFilter] = useState("");
-  const [view, setView] = useState<View>("list");
+  const [layout, setLayout] = useState<Layout>("covers");
+  const [groupBy, setGroupBy] = useState<CatalogGroupBy>("none");
+  const [insightBy, setInsightBy] = useState<InsightBy>("genre");
   const [dialog, setDialog] = useState<"add" | "new" | "rename" | "delete" | "properties" | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   // Tidying up: show only what no challenge holds, tick items, remove them together.
@@ -119,15 +157,21 @@ export function CatalogWorkspaceScreen({
 
   const reloadAll = () => { reloadLibraries(); setItemsNonce((value) => value + 1); };
 
-  // Libraries a person can see as tabs: the real ones. A built-in (Screens/Pages) shows up once it has an item.
+  // Libraries a person can see as cards: the real ones. A built-in (Screens/Pages) shows up once it has an item.
   const tabs: CatalogLibrary[] = useMemo(() => libraries ?? [], [libraries]);
+  const isUnused = (item: CatalogItem) => (item.challengeCount ?? item.roundCount ?? 0) === 0;
   const countByKind = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const item of items ?? []) counts.set(item.kind, (counts.get(item.kind) ?? 0) + 1);
+    const counts = new Map<string, { total: number; unused: number }>();
+    for (const item of items ?? []) {
+      const entry = counts.get(item.kind) ?? { total: 0, unused: 0 };
+      entry.total += 1;
+      if ((item.challengeCount ?? item.roundCount ?? 0) === 0) entry.unused += 1;
+      counts.set(item.kind, entry);
+    }
     return counts;
   }, [items]);
   const fallbackKind = tabs.length
-    ? [...tabs].sort((a, b) => (countByKind.get(b.kind) ?? 0) - (countByKind.get(a.kind) ?? 0))[0].kind
+    ? [...tabs].sort((a, b) => (countByKind.get(b.kind)?.total ?? 0) - (countByKind.get(a.kind)?.total ?? 0))[0].kind
     : null;
   const kind = activeKind && tabs.some((library) => library.kind === activeKind) ? activeKind : fallbackKind;
   const library = tabs.find((entry) => entry.kind === kind) ?? null;
@@ -138,33 +182,49 @@ export function CatalogWorkspaceScreen({
   const { properties: libraryProperties } = useLibraryProperties(library ? { id: library.id, kind: library.kind } : null, itemsNonce);
   const hidden = useMemo(() => new Set((libraryProperties ?? []).filter((property) => property.hidden).map((property) => property.key)), [libraryProperties]);
 
+  function chooseLibrary(next: string) {
+    setActiveKind(next);
+    setSearch(""); setGenreFilter(""); setDecadeFilter(""); setRecommenderFilter("");
+    setGroupBy("none"); setInsightBy("genre"); setLayout((current) => (current === "insights" && !(next === "film" || next === "book") ? "covers" : current));
+    setUnusedOnly(false);
+  }
+
   // Who brought things into this library, for the "recommended by" filter.
   const recommenders = useMemo(() => {
     const seen = new Map<string, string>();
     for (const item of scoped) if (item.recommendedBy) seen.set(`${item.recommendedBy.kind}:${item.recommendedBy.id}`, item.recommendedBy.name);
     return [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1]));
   }, [scoped]);
+  const genres = useMemo(() => [...new Set(scoped.map((item) => item.mainGenre?.trim()).filter((genre): genre is string => Boolean(genre)))].sort((a, b) => a.localeCompare(b)), [scoped]);
+  const decades = useMemo(() => [...new Set(scoped.filter((item) => item.year).map((item) => decadeOf(item.year!)))].sort().reverse(), [scoped]);
   const activeFilter = recommenderFilter && (recommenderFilter === "none" || recommenders.some(([key]) => key === recommenderFilter)) ? recommenderFilter : "";
-  const isUnused = (item: CatalogItem) => (item.challengeCount ?? item.roundCount ?? 0) === 0;
-  const unusedCount = useMemo(() => scoped.filter((item) => (item.challengeCount ?? item.roundCount ?? 0) === 0).length, [scoped]);
+  const unusedCount = countByKind.get(kind ?? "")?.unused ?? 0;
   // Once the last unused item is gone the chip goes with it, so the filter can't be left stuck on.
   const onlyUnused = unusedOnly && unusedCount > 0;
+  const query = fold(search.trim());
   const filtered = useMemo(() => scoped.filter((item) => {
     if (onlyUnused && (item.challengeCount ?? item.roundCount ?? 0) !== 0) return false;
+    if (query && !fold([item.title, item.author, item.mainGenre, item.year].filter(Boolean).join(" ")).includes(query)) return false;
+    if (genreFilter && (item.mainGenre?.trim() ?? "") !== genreFilter) return false;
+    if (decadeFilter && !(item.year && decadeOf(item.year) === decadeFilter)) return false;
     if (!activeFilter) return true;
     if (activeFilter === "none") return !item.recommendedBy && !item.originNote;
     return item.recommendedBy ? `${item.recommendedBy.kind}:${item.recommendedBy.id}` === activeFilter : false;
-  }), [scoped, activeFilter, onlyUnused]);
+  }), [scoped, activeFilter, onlyUnused, query, genreFilter, decadeFilter]);
   // Only offered where the library keeps an event date (a match's kickoff) on its items.
   const hasDates = scoped.some((item) => item.scheduledAt);
   const startOf = (item: CatalogItem) => (item.scheduledAt ? new Date(item.scheduledAt.startsAt).getTime() : Infinity);
+  const addedAt = (item: CatalogItem) => (item.createdAt ? Date.parse(item.createdAt) : 0);
   const sorted = useMemo(() => [...filtered].sort((left, right) =>
     sort === "rating"
-      ? (right.ratingAvg ?? -1) - (left.ratingAvg ?? -1)
+      ? (right.ratingAvg ?? -1) - (left.ratingAvg ?? -1) || left.title.localeCompare(right.title)
       : sort === "date" && hasDates
         ? startOf(left) - startOf(right) || left.title.localeCompare(right.title)
-        : left.title.localeCompare(right.title),
+        : sort === "recent"
+          ? addedAt(right) - addedAt(left) || left.title.localeCompare(right.title)
+          : left.title.localeCompare(right.title),
   ), [filtered, sort, hasDates]);
+  const groups = useMemo(() => groupCatalogItems(sorted, groupBy), [sorted, groupBy]);
 
   const genreBuckets = useMemo(
     () => bucketize(scoped, (item) => ({ key: (item.mainGenre ?? "").toLowerCase() || "__none__", label: item.mainGenre?.trim() ?? "" })),
@@ -178,15 +238,15 @@ export function CatalogWorkspaceScreen({
     () => bucketize(scoped, (item) => (item.year ? { key: decadeOf(item.year), label: decadeOf(item.year) } : null)),
     [scoped],
   );
-  const activeView: View = isBuiltIn ? view : "list";
-  const activeBuckets = activeView === "genre" ? genreBuckets : activeView === "year" ? yearBuckets : activeView === "decade" ? decadeBuckets : [];
+  const activeLayout: Layout = layout === "insights" && !isBuiltIn ? "covers" : layout;
+  const activeBuckets = insightBy === "genre" ? genreBuckets : insightBy === "year" ? yearBuckets : decadeBuckets;
   const topGenres = useMemo(() => highlights(genreBuckets), [genreBuckets]);
   const topYears = useMemo(() => highlights(yearBuckets), [yearBuckets]);
-  const views: View[] = ["list", "genre", "decade", "year"];
   const rated = scoped.filter((item) => item.ratingAvg !== null && item.ratingAvg !== undefined);
   const average = rated.length ? Math.round((rated.reduce((sum, item) => sum + (item.ratingAvg ?? 0), 0) / rated.length) * 100) / 100 : null;
 
-  function metaFor(item: CatalogItem): string {
+  /** What sets an item apart, minus the year (which the cover carries) and who recommended it. */
+  function detailsFor(item: CatalogItem): string[] {
     const custom = (item.attributes ?? []).map((attribute) =>
       attribute.type === "boolean" ? `${attribute.label}: ${attribute.value ? tc("yes") : tc("no")}` : `${attribute.label}: ${String(attribute.value)}`);
     return [
@@ -195,8 +255,16 @@ export function CatalogWorkspaceScreen({
       hidden.has("main_genre") ? null : item.mainGenre,
       hidden.has("runtime_minutes") ? null : formatRuntime(item.runtimeMinutes),
       ...custom,
+    ].filter((part): part is string => Boolean(part));
+  }
+  const challengesOf = (item: CatalogItem) => item.challengeCount ?? item.roundCount ?? 0;
+  const ratingLabel = (item: CatalogItem) => (item.ratingAvg === null || item.ratingAvg === undefined ? tItem("notRated") : tItem("ratedAria", { value: item.ratingAvg }));
+  const yearOf = (item: CatalogItem) => (hidden.has("year") ? null : item.year);
+  function metaFor(item: CatalogItem): string {
+    return [
+      ...detailsFor(item),
       recommendationsEnabled ? recommenderLine(item.recommendedBy, item.originNote, (name) => t("recommendedBy", { name }), (text) => t("origin", { text })) : null,
-      isUnused(item) ? t("notInChallenge") : t("rounds", { count: item.challengeCount ?? item.roundCount ?? 0 }),
+      isUnused(item) ? t("notInChallenge") : t("rounds", { count: challengesOf(item) }),
     ].filter(Boolean).join(" · ");
   }
 
@@ -224,11 +292,14 @@ export function CatalogWorkspaceScreen({
     reloadAll();
   }
 
+  const groupLabel = (label: string) => label || (groupBy === "genre" ? t("noGenre") : t("undated"));
+  const narrowed = Boolean(query || genreFilter || decadeFilter || activeFilter || onlyUnused);
+
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
+    <main className="mx-auto max-w-7xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
       <BackButton onClick={onBack} label={backLabel} className="mb-6" />
 
-      <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-3xl font-medium tracking-[-0.045em] sm:text-4xl">{title}</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">{subtitle}</p>
@@ -243,40 +314,43 @@ export function CatalogWorkspaceScreen({
       <StatusMessage error={librariesError ?? itemsError} success={notice} />
 
       {!loading && tabs.length ? (
-        <div className="mb-6 flex items-center gap-2">
-          <nav className="-mx-1 flex min-w-0 flex-1 gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label={tl("tabsLabel")}>
-            {tabs.map((entry) => {
-              const active = entry.kind === kind;
-              return (
-                <button
-                  key={entry.id}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => { setActiveKind(entry.kind); setView("list"); }}
-                  className={cx(
-                    "inline-flex min-h-11 flex-none cursor-pointer items-center gap-2 rounded-full border px-4 text-sm transition",
-                    active
-                      ? "border-[var(--main)] bg-[var(--main-soft)] font-medium text-[var(--main-strong)] shadow-[var(--elevate-1)]"
-                      : "border-[var(--line)] bg-[var(--paper)] text-[var(--muted)] hover:border-[var(--main-line)] hover:text-[var(--ink)]",
-                  )}
-                >
-                  <LibraryGlyph source={entry.source} />
-                  {libraryName(entry)}
-                  <span className={cx("rounded-full px-2 py-0.5 text-[11px] tabular-nums", active ? "bg-[var(--main)]/12" : "bg-[var(--wash)]")}>{countByKind.get(entry.kind) ?? 0}</span>
-                </button>
-              );
-            })}
-          </nav>
+        <nav className="-mx-4 mb-7 flex gap-3 overflow-x-auto px-4 pb-2 pt-1 sm:-mx-6 sm:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label={tl("tabsLabel")}>
+          {tabs.map((entry) => {
+            const active = entry.kind === kind;
+            const counts = countByKind.get(entry.kind) ?? { total: 0, unused: 0 };
+            return (
+              <button
+                key={entry.id}
+                type="button"
+                aria-pressed={active}
+                onClick={() => chooseLibrary(entry.kind)}
+                className={cx(
+                  "flex min-h-[4.75rem] w-64 flex-none cursor-pointer items-center gap-3.5 rounded-[20px] border px-4 text-left transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25",
+                  active ? "border-[var(--main)] bg-[var(--main-soft)] ring-4 ring-[var(--main)]/10" : "border-[var(--line)] bg-[var(--paper)] hover:border-[var(--main-line)]",
+                )}
+              >
+                <span className={cx("grid h-11 w-11 flex-none place-items-center rounded-full", active ? "bg-[var(--paper)] text-[var(--main-strong)]" : "bg-[var(--wash)] text-[var(--muted)]")} aria-hidden="true">
+                  <LibraryGlyph source={entry.source} className="h-6 w-6" />
+                </span>
+                <span className="min-w-0">
+                  <strong className={cx("block truncate text-base font-medium tracking-[-0.02em]", active && "text-[var(--main-strong)]")}>{libraryName(entry)}</strong>
+                  <small className={cx("mt-0.5 block truncate text-xs", active ? "text-[var(--main-strong)]/85" : "text-[var(--muted)]")}>
+                    {t("libraryStats", { count: counts.total })}{canManage && counts.unused > 0 ? ` · ${t("libraryUnused", { count: counts.unused })}` : ""}
+                  </small>
+                </span>
+              </button>
+            );
+          })}
           {canManage ? (
             <button
               type="button"
               onClick={() => setDialog("new")}
-              className="inline-flex min-h-11 flex-none cursor-pointer items-center gap-1.5 rounded-full border border-dashed border-[var(--line)] px-4 text-sm text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)]"
+              className="flex min-h-[4.75rem] flex-none cursor-pointer items-center justify-center gap-2 rounded-[20px] border border-dashed border-[var(--main-line)] px-6 text-sm font-light text-[var(--muted)] transition hover:text-[var(--ink)]"
             >
               ＋ {tl("newLibrary")}
             </button>
           ) : null}
-        </div>
+        </nav>
       ) : null}
 
       {loading ? (
@@ -294,92 +368,137 @@ export function CatalogWorkspaceScreen({
         />
       ) : library ? (
         <section aria-label={libraryName(library)}>
-          <div className={cx(cardClass, "mb-5 flex flex-wrap items-center gap-x-5 gap-y-3 px-5 py-4")}>
-            <div className="flex min-w-0 flex-1 basis-52 items-center gap-4">
-              <span className="grid h-12 w-12 flex-none place-items-center rounded-2xl bg-[var(--main-soft)] text-[var(--main-strong)]" aria-hidden="true">
-                <LibraryGlyph source={library.source} className="h-6 w-6" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <h2 className="truncate text-xl font-light tracking-[-0.02em]">{libraryName(library)}</h2>
-                <p className="mt-0.5 text-xs text-[var(--muted)]">
-                  {t("libraryStats", { count: scoped.length })}
-                  {average !== null ? ` · ${t("averageRating", { value: average })}` : ""}
-                </p>
-              </div>
-            </div>
-            <div className="flex w-full flex-none flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
-              {canManage && unusedCount > 0 ? (
-                <button
-                  type="button"
-                  aria-pressed={onlyUnused}
-                  onClick={() => { const next = !onlyUnused; setUnusedOnly(next); if (next) setSelecting(true); }}
-                  className={cx(
-                    "min-h-10 cursor-pointer rounded-full border px-4 text-sm transition",
-                    onlyUnused ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] bg-[var(--paper)] text-[var(--ink)] hover:border-[var(--main-line)]",
-                  )}
-                >
-                  {t("unusedFilter", { count: unusedCount })}
-                </button>
-              ) : null}
-              {canManage && scoped.length ? (
-                <button
-                  type="button"
-                  aria-pressed={selecting}
-                  onClick={() => (selecting ? stopSelecting() : setSelecting(true))}
-                  className={cx(
-                    "min-h-10 cursor-pointer rounded-full border px-4 text-sm transition",
-                    selecting ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] bg-[var(--paper)] text-[var(--ink)] hover:border-[var(--main-line)]",
-                  )}
-                >
-                  {selecting ? t("doneSelecting") : t("select")}
-                </button>
-              ) : null}
-              {recommendationsEnabled && recommenders.length ? (
-                <label className="text-xs text-[var(--muted)]">
-                  <span className="sr-only">{t("recommenderFilterLabel")}</span>
-                  <select className="min-h-10 max-w-44 rounded-full border border-[var(--line)] bg-[var(--paper)] px-4 text-sm text-[var(--ink)]" value={activeFilter} onChange={(event) => setRecommenderFilter(event.target.value)}>
-                    <option value="">{t("recommenderAll")}</option>
-                    {recommenders.map(([key, name]) => <option key={key} value={key}>{t("recommendedBy", { name })}</option>)}
-                    <option value="none">{t("recommenderNone")}</option>
-                  </select>
-                </label>
-              ) : null}
-              {scoped.length ? (
-                <label className="text-xs text-[var(--muted)]">
-                  <span className="sr-only">{t("sortLabel")}</span>
-                  <select className="min-h-10 rounded-full border border-[var(--line)] bg-[var(--paper)] px-4 text-sm text-[var(--ink)]" value={sort} onChange={(event) => setSort(event.target.value as "title" | "rating" | "date")}>
-                    <option value="title">{t("sortTitle")}</option>
-                    <option value="rating">{t("sortRating")}</option>
-                    {hasDates ? <option value="date">{t("sortDate")}</option> : null}
-                  </select>
-                </label>
-              ) : null}
-              <ActionMenu label={tl("libraryActions")} iconOnly>
-                <ActionMenuItem onClick={() => setDialog("properties")}>{canManage ? tl("editProperties") : tl("viewProperties")}</ActionMenuItem>
-                {canManage ? <ActionMenuItem onClick={() => setDialog("rename")}>{tl("renameLibrary")}</ActionMenuItem> : null}
-                {canManage && library && library.source !== "screens" && library.source !== "pages" ? <ActionMenuItem onClick={() => setDialog("delete")}>{tl("deleteLibrary")}</ActionMenuItem> : null}
-              </ActionMenu>
-            </div>
+          <div className="flex flex-wrap items-center gap-2.5">
+            {scoped.length ? (
+              <label className="flex min-h-11 min-w-0 basis-full items-center gap-2.5 rounded-xl border border-[var(--line)] bg-[var(--paper)] px-3.5 text-[var(--muted)] focus-within:border-[var(--main)] focus-within:ring-4 focus-within:ring-[var(--main)]/18 sm:basis-72">
+                <SearchIcon />
+                <input
+                  type="search"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder={t("searchPlaceholder", { name: libraryName(library) })}
+                  aria-label={t("searchLabel")}
+                  className="min-w-0 flex-1 bg-transparent text-sm text-[var(--ink)] outline-none placeholder:text-[var(--muted)]"
+                />
+              </label>
+            ) : null}
+            {genres.length > 1 ? (
+              <ChipSelect label={t("genreFilterLabel")} value={genreFilter} onChange={setGenreFilter} active={Boolean(genreFilter)}>
+                <option value="">{t("genreAll")}</option>
+                {genres.map((genre) => <option key={genre} value={genre}>{genre}</option>)}
+              </ChipSelect>
+            ) : null}
+            {decades.length > 1 ? (
+              <ChipSelect label={t("decadeFilterLabel")} value={decadeFilter} onChange={setDecadeFilter} active={Boolean(decadeFilter)}>
+                <option value="">{t("decadeAll")}</option>
+                {decades.map((decade) => <option key={decade} value={decade}>{decade}</option>)}
+              </ChipSelect>
+            ) : null}
+            {recommendationsEnabled && recommenders.length ? (
+              <ChipSelect label={t("recommenderFilterLabel")} value={activeFilter} onChange={setRecommenderFilter} active={Boolean(activeFilter)}>
+                <option value="">{t("recommenderAll")}</option>
+                {recommenders.map(([key, name]) => <option key={key} value={key}>{t("recommendedBy", { name })}</option>)}
+                <option value="none">{t("recommenderNone")}</option>
+              </ChipSelect>
+            ) : null}
+            {canManage && unusedCount > 0 ? (
+              <button
+                type="button"
+                aria-pressed={onlyUnused}
+                onClick={() => { const next = !onlyUnused; setUnusedOnly(next); if (next) setSelecting(true); }}
+                className={cx(
+                  "min-h-10 cursor-pointer rounded-full border border-dashed px-4 text-sm transition",
+                  onlyUnused ? "border-[var(--warn)] bg-[var(--warn-soft)] text-[var(--warn)]" : "border-[var(--warn-line)] bg-[var(--warn-soft)]/60 text-[var(--warn)] hover:bg-[var(--warn-soft)]",
+                )}
+              >
+                {t("unusedFilter", { count: unusedCount })}
+              </button>
+            ) : null}
+            <span className="flex-1" />
+            {scoped.length ? (
+              <ChipSelect label={t("sortLabel")} value={sort} onChange={(next) => setSort(next as Sort)} active={false}>
+                <option value="recent">{t("sortRecent")}</option>
+                <option value="title">{t("sortTitle")}</option>
+                <option value="rating">{t("sortRating")}</option>
+                {hasDates ? <option value="date">{t("sortDate")}</option> : null}
+              </ChipSelect>
+            ) : null}
+            {scoped.length ? (
+              <LayoutToggle<Layout>
+                label={t("viewLabel")}
+                value={activeLayout}
+                onChange={setLayout}
+                options={[
+                  { value: "covers", label: t("viewCovers"), icon: <GridIcon /> },
+                  { value: "list", label: t("viewList"), icon: <ListIcon /> },
+                  ...(isBuiltIn ? [{ value: "insights" as const, label: t("viewInsights"), icon: <ChartIcon /> }] : []),
+                ]}
+              />
+            ) : null}
+            {canManage && scoped.length && activeLayout !== "insights" ? (
+              <button
+                type="button"
+                aria-pressed={selecting}
+                onClick={() => (selecting ? stopSelecting() : setSelecting(true))}
+                className={cx(
+                  "min-h-10 cursor-pointer rounded-full border px-4 text-sm transition",
+                  selecting ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] bg-[var(--paper)] text-[var(--ink)] hover:border-[var(--main-line)]",
+                )}
+              >
+                {selecting ? t("doneSelecting") : t("select")}
+              </button>
+            ) : null}
+            <ActionMenu label={tl("libraryActions")} iconOnly>
+              <ActionMenuItem onClick={() => setDialog("properties")}>{canManage ? tl("editProperties") : tl("viewProperties")}</ActionMenuItem>
+              {canManage ? <ActionMenuItem onClick={() => setDialog("rename")}>{tl("renameLibrary")}</ActionMenuItem> : null}
+              {canManage && library && library.source !== "screens" && library.source !== "pages" ? <ActionMenuItem onClick={() => setDialog("delete")}>{tl("deleteLibrary")}</ActionMenuItem> : null}
+            </ActionMenu>
           </div>
 
-          {isBuiltIn && scoped.length ? (
-            <nav className="mb-4 flex w-fit gap-1 rounded-full bg-[var(--wash-strong)]/70 p-1 text-xs" aria-label={t("viewLabel")}>
-              {views.map((option) => (
-                <button
-                  type="button"
-                  key={option}
-                  aria-pressed={view === option}
-                  className={cx("min-h-9 rounded-full px-3 font-light", view === option ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]")}
-                  onClick={() => setView(option)}
-                >
-                  {t(`view.${option}`)}
-                </button>
-              ))}
-            </nav>
+          {scoped.length ? (
+            <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-[var(--muted)]" aria-live="polite">
+                <strong className="font-medium text-[var(--ink)]">{narrowed ? t("resultOf", { shown: sorted.length, total: scoped.length }) : t("resultCount", { count: scoped.length })}</strong>
+                {average !== null ? ` · ${t("averageRating", { value: average })}` : ""}
+              </p>
+              {isBuiltIn && activeLayout !== "insights" ? (
+                <div className="flex items-center gap-2.5 text-xs text-[var(--muted)]">
+                  {t("groupByLabel")}
+                  <Segmented<CatalogGroupBy>
+                    className="w-64"
+                    ariaLabel={t("groupByLabel")}
+                    value={groupBy}
+                    onChange={setGroupBy}
+                    options={[
+                      { value: "none", label: t("group.none") },
+                      { value: "genre", label: t("group.genre") },
+                      { value: "decade", label: t("group.decade") },
+                      { value: "year", label: t("group.year") },
+                    ]}
+                  />
+                </div>
+              ) : null}
+              {activeLayout === "insights" ? (
+                <div className="flex items-center gap-2.5 text-xs text-[var(--muted)]">
+                  {t("breakDownLabel")}
+                  <Segmented<InsightBy>
+                    className="w-56"
+                    ariaLabel={t("breakDownLabel")}
+                    value={insightBy}
+                    onChange={setInsightBy}
+                    options={[
+                      { value: "genre", label: t("group.genre") },
+                      { value: "decade", label: t("group.decade") },
+                      { value: "year", label: t("group.year") },
+                    ]}
+                  />
+                </div>
+              ) : null}
+            </div>
           ) : null}
 
-          {selecting && activeView === "list" ? (
-            <div className="sticky top-16 z-10 mb-3 flex flex-wrap items-center gap-2 rounded-2xl border border-[var(--main-line)] bg-[var(--main-soft)] p-3 shadow-[var(--elevate-1)]" role="region" aria-label={t("selectionBar")}>
+          {selecting && activeLayout !== "insights" ? (
+            <div className="sticky top-16 z-10 mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-[var(--main-line)] bg-[var(--main-soft)] p-3 shadow-[var(--elevate-1)]" role="region" aria-label={t("selectionBar")}>
               <Button variant="secondary" disabled={!sorted.length} onClick={() => togglePicked(sorted.map((item) => item.id), !allHerePicked)}>
                 {allHerePicked ? t("clearSelection") : t("selectAll", { count: sorted.length })}
               </Button>
@@ -389,55 +508,85 @@ export function CatalogWorkspaceScreen({
             </div>
           ) : null}
 
-          {!scoped.length ? (
-            <EmptyState
-              title={tl("emptyLibrary", { name: libraryName(library) })}
-              onClick={canManage ? () => setDialog("add") : undefined}
-            />
-          ) : activeView === "list" && !sorted.length ? (
-            <EmptyState title={t("noMatches")} />
-          ) : activeView === "list" ? (
-            <ul className={cx(cardClass, "divide-y divide-[var(--line)] overflow-hidden")}>
-              {sorted.map((item) => {
-                const body = (
-                  <>
-                    <span className="min-w-0 flex-1">
-                      <strong className="block truncate font-light">{item.title}{item.year && !hidden.has("year") ? ` (${item.year})` : ""}</strong>
-                      <small className="mt-1 block truncate text-[var(--muted)]">{metaFor(item)}</small>
-                    </span>
-                    <span className="flex-none text-sm tabular-nums">
-                      {item.ratingAvg === null || item.ratingAvg === undefined ? <span className="text-[var(--muted)]">—</span> : `${item.ratingAvg} · n=${item.ratingCount ?? 0}`}
-                    </span>
-                  </>
-                );
-                return (
-                  <li key={item.id}>
-                    {selecting ? (
-                      <label className="flex w-full cursor-pointer items-center gap-4 px-5 py-4 text-left transition hover:bg-[var(--wash)]">
-                        <input type="checkbox" className="h-4 w-4 flex-none" checked={picked.has(item.id)} aria-label={item.title} onChange={(event) => togglePicked([item.id], event.target.checked)} />
-                        {body}
-                      </label>
+          <div className="mt-5">
+            {!scoped.length ? (
+              <EmptyState
+                title={tl("emptyLibrary", { name: libraryName(library) })}
+                onClick={canManage ? () => setDialog("add") : undefined}
+              />
+            ) : activeLayout === "insights" ? (
+              activeBuckets.length ? (
+                <div className="space-y-4">
+                  {(insightBy === "genre" ? topGenres : insightBy === "year" ? topYears : []).length ? (
+                    <p className="text-sm text-[var(--muted)]">
+                      {t(insightBy === "genre" ? "bestGenres" : "bestYears", {
+                        list: (insightBy === "genre" ? topGenres : topYears).map((bucket) => `${bucket.label || t("noGenre")} (${bucket.ratingAvg})`).join(", "),
+                      })}
+                    </p>
+                  ) : null}
+                  <BucketBars buckets={activeBuckets} emptyLabel={t("noGenre")} />
+                </div>
+              ) : (
+                <EmptyState title={t("bucketEmptyTitle")} />
+              )
+            ) : !sorted.length ? (
+              <EmptyState title={t("noMatches")} />
+            ) : (
+              <div className="space-y-10">
+                {groups.map((group) => (
+                  <section key={group.key} aria-label={groupBy === "none" ? undefined : groupLabel(group.label)}>
+                    {groupBy !== "none" ? (
+                      <h2 className="mb-4 flex items-baseline gap-2.5 text-lg font-light tracking-[-0.02em]">
+                        {groupLabel(group.label)}
+                        <span className="text-xs text-[var(--muted)]">{group.items.length}</span>
+                      </h2>
+                    ) : null}
+                    {activeLayout === "covers" ? (
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 sm:gap-x-5 lg:grid-cols-4 xl:grid-cols-5">
+                        {group.items.map((item) => {
+                          const unused = isUnused(item);
+                          return (
+                            <CatalogTile
+                              key={item.id}
+                              title={item.title}
+                              year={yearOf(item)}
+                              avg={item.ratingAvg}
+                              ratingLabel={ratingLabel(item)}
+                              caption={detailsFor(item).slice(0, 2).join(" · ")}
+                              note={unused ? t("notInChallenge") : t("rounds", { count: challengesOf(item) })}
+                              noteTone={unused ? "warn" : "muted"}
+                              selecting={selecting}
+                              picked={picked.has(item.id)}
+                              onPick={(on) => togglePicked([item.id], on)}
+                              onOpen={() => onOpenItem(item.id)}
+                            />
+                          );
+                        })}
+                      </div>
                     ) : (
-                      <button type="button" className="flex w-full cursor-pointer items-center justify-between gap-4 px-5 py-4 text-left transition hover:bg-[var(--wash)]" onClick={() => onOpenItem(item.id)}>{body}</button>
+                      <ul className={cx(cardClass, "divide-y divide-[var(--line)] overflow-hidden")}>
+                        {group.items.map((item) => (
+                          <li key={item.id}>
+                            <CatalogRow
+                              title={item.title}
+                              year={yearOf(item)}
+                              avg={item.ratingAvg}
+                              ratingLabel={ratingLabel(item)}
+                              meta={metaFor(item)}
+                              selecting={selecting}
+                              picked={picked.has(item.id)}
+                              onPick={(on) => togglePicked([item.id], on)}
+                              onOpen={() => onOpenItem(item.id)}
+                            />
+                          </li>
+                        ))}
+                      </ul>
                     )}
-                  </li>
-                );
-              })}
-            </ul>
-          ) : activeBuckets.length ? (
-            <div className="space-y-4">
-              {(activeView === "genre" ? topGenres : topYears).length ? (
-                <p className="text-sm text-[var(--muted)]">
-                  {t(activeView === "genre" ? "bestGenres" : "bestYears", {
-                    list: (activeView === "genre" ? topGenres : topYears).map((bucket) => `${bucket.label || t("noGenre")} (${bucket.ratingAvg})`).join(", "),
-                  })}
-                </p>
-              ) : null}
-              <BucketBars buckets={activeBuckets} emptyLabel={t("noGenre")} />
-            </div>
-          ) : (
-            <EmptyState title={t("bucketEmptyTitle")} />
-          )}
+                  </section>
+                ))}
+              </div>
+            )}
+          </div>
         </section>
       ) : null}
 
@@ -461,7 +610,7 @@ export function CatalogWorkspaceScreen({
         <NewLibraryDialog
           scope={scope}
           onCancel={() => setDialog(null)}
-          onCreated={(made) => { setDialog(null); setActiveKind(made.kind); setView("list"); reloadAll(); }}
+          onCreated={(made) => { setDialog(null); chooseLibrary(made.kind); reloadAll(); }}
         />
       ) : null}
       {dialog === "rename" && library ? (
@@ -472,7 +621,7 @@ export function CatalogWorkspaceScreen({
           library={library}
           itemCount={scoped.length}
           onCancel={() => setDialog(null)}
-          onDeleted={(name) => { setDialog(null); setActiveKind(null); setView("list"); setUnusedOnly(false); stopSelecting(); setNotice(tl("deleted", { name })); reloadAll(); }}
+          onDeleted={(name) => { setDialog(null); chooseLibrary(""); stopSelecting(); setNotice(tl("deleted", { name })); reloadAll(); }}
         />
       ) : null}
       {dialog === "properties" && library ? (

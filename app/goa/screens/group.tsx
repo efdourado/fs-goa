@@ -9,9 +9,10 @@ import { AddTile } from "../add-tile";
 import { ActionMenu, ActionMenuItem } from "../action-menu";
 import { Dialog } from "../dialog";
 import { useGoaFormat } from "../format";
-import { useCatalogLibraries, useLibraryName } from "../libraries";
+import { CatalogTile } from "../catalog-views";
+import { LibraryGlyph, useCatalogLibraries, useLibraryName } from "../libraries";
+import { Rail, RailArrows, useShelfRail } from "../shelf";
 import type { CatalogItem, ChallengeSummary, GroupInviteResult, GroupSummary, Id, Member, PendingGroupRequest } from "../types";
-import { Segmented } from "../Segmented";
 import { BackButton, Button, cx, EmptyState, Field, inputClass, StatusMessage, Toggle } from "../ui";
 import { canManage, formatRuntime } from "../utils";
 import { ActiveChallengeCard } from "./dashboard";
@@ -60,6 +61,8 @@ export function GroupScreen({
   onSetMemberRole?: (userId: Id, role: "admin" | "participant") => Promise<void>;
 }) {
   const t = useTranslations("group");
+  const tCat = useTranslations("catalog");
+  const tl = useTranslations("libraries");
   const tx = useTranslations("managementUX");
   const tc = useTranslations("common");
   const tr = useTranslations("roles");
@@ -80,11 +83,11 @@ export function GroupScreen({
   const [memberError, setMemberError] = useState<string | null>(null);
   const [memberSuccess, setMemberSuccess] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<CatalogItem[] | null>(null);
-  const [catalogSort, setCatalogSort] = useState<"title" | "rating">("title");
+  const [catalogSort, setCatalogSort] = useState<"recent" | "rating" | "title">("recent");
   const [catalogKind, setCatalogKind] = useState<string | null>(null);
   const { data: libraries } = useCatalogLibraries({ groupId: group.id });
   const libraryName = useLibraryName();
-  const [catalogExpanded, setCatalogExpanded] = useState(false);
+  const { railRef: catalogRailRef, showFade: catalogShowFade, onScroll: onCatalogScroll, nudge: nudgeCatalog } = useShelfRail();
 
   useEffect(() => {
     const controller = new AbortController();
@@ -100,14 +103,18 @@ export function GroupScreen({
   const activeCatalogKind = catalogKind && catalogLibraries.some((library) => library.kind === catalogKind)
     ? catalogKind
     : catalogLibraries[0]?.kind ?? null;
+  const addedAt = (item: CatalogItem) => (item.createdAt ? Date.parse(item.createdAt) : 0);
   const sortedCatalog = [...(catalog ?? [])]
     .filter((item) => !bothCatalogKinds || item.kind === activeCatalogKind)
     .sort((a, b) =>
       catalogSort === "rating"
-        ? (b.ratingAvg ?? -1) - (a.ratingAvg ?? -1)
-        : a.title.localeCompare(b.title),
+        ? (b.ratingAvg ?? -1) - (a.ratingAvg ?? -1) || a.title.localeCompare(b.title)
+        : catalogSort === "title"
+          ? a.title.localeCompare(b.title)
+          : addedAt(b) - addedAt(a) || a.title.localeCompare(b.title),
     );
-  const visibleCatalog = catalogExpanded ? sortedCatalog : sortedCatalog.slice(0, CATALOG_PREVIEW_COUNT);
+  const visibleCatalog = sortedCatalog.slice(0, CATALOG_PREVIEW_COUNT);
+  const activeCatalogLibrary = catalogLibraries.find((library) => library.kind === activeCatalogKind) ?? null;
   const [groupBusy, setGroupBusy] = useState(false);
   const [groupError, setGroupError] = useState<string | null>(null);
   const [groupSuccess, setGroupSuccess] = useState<string | null>(null);
@@ -356,66 +363,90 @@ export function GroupScreen({
         {sortedCatalog.length || canManage(group.role) ? (
           <section>
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-baseline gap-2.5">
                 <h2 className="text-lg font-semibold tracking-[-0.02em]">{t("catalogTitle")}</h2>
-                {bothCatalogKinds && activeCatalogKind ? (
-                  <Segmented
-                    className="text-[11px]"
-                    ariaLabel={t("catalogKindLabel")}
-                    value={activeCatalogKind}
-                    onChange={setCatalogKind}
-                    options={catalogLibraries.map((library) => ({ value: library.kind, label: libraryName(library) }))}
-                  />
-                ) : null}
+                <span className="text-xs text-[var(--muted)]">{(catalog ?? []).length}</span>
               </div>
               <div className="flex items-center gap-2">
-                {sortedCatalog.length ? (
-                  <select
-                    aria-label={t("catalogSortLabel")}
-                    className="min-h-9 cursor-pointer appearance-none rounded-full border border-[var(--line)] bg-[var(--paper)] py-1.5 pl-3.5 pr-9 text-xs text-[var(--ink)] outline-none transition hover:border-[var(--main-line)] focus:border-[var(--main)]"
-                    value={catalogSort}
-                    onChange={(event) => setCatalogSort(event.target.value as "title" | "rating")}
-                  >
-                    <option value="title">{t("catalogSortTitle")}</option>
-                    <option value="rating">{t("catalogSortRating")}</option>
-                  </select>
-                ) : null}
-                <Button variant="secondary" className="min-h-9 px-3.5 text-xs" onClick={onOpenCatalog}>{canManage(group.role) ? t("catalogManage") : t("catalogOpen")}</Button>
+                <Button variant="secondary" className="min-h-9 px-3.5 text-xs" onClick={onOpenCatalog}>{canManage(group.role) ? t("catalogManage") : t("catalogOpen")} →</Button>
+                {sortedCatalog.length ? <RailArrows nudge={nudgeCatalog} /> : null}
               </div>
             </div>
             {sortedCatalog.length ? (
               <>
-                <ul className="divide-y divide-[var(--line)] overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--paper)]">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                  {bothCatalogKinds && activeCatalogKind ? (
+                    <div role="group" aria-label={tl("tabsLabel")} className="flex max-w-full gap-0.5 overflow-x-auto rounded-full bg-[var(--wash-strong)]/70 p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                      {catalogLibraries.map((library) => {
+                        const active = library.kind === activeCatalogKind;
+                        return (
+                          <button
+                            key={library.id}
+                            type="button"
+                            aria-pressed={active}
+                            onClick={() => setCatalogKind(library.kind)}
+                            className={cx(
+                              "inline-flex min-h-9 flex-none cursor-pointer items-center gap-2 rounded-full px-3.5 text-[13px] transition",
+                              active ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]",
+                            )}
+                          >
+                            <LibraryGlyph source={library.source} className="h-4 w-4" />
+                            {libraryName(library)}
+                            <span className="text-[11px] opacity-70">{(catalog ?? []).filter((item) => item.kind === library.kind).length}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : <span />}
+                  <label>
+                    <span className="sr-only">{t("catalogSortLabel")}</span>
+                    <select
+                      className="min-h-9 cursor-pointer rounded-full border border-[var(--line)] bg-[var(--paper)] px-3.5 text-xs text-[var(--ink)] outline-none transition hover:border-[var(--main-line)] focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
+                      value={catalogSort}
+                      onChange={(event) => setCatalogSort(event.target.value as "recent" | "rating" | "title")}
+                    >
+                      <option value="recent">{t("catalogSortRecent")}</option>
+                      <option value="rating">{t("catalogSortRating")}</option>
+                      <option value="title">{t("catalogSortTitle")}</option>
+                    </select>
+                  </label>
+                </div>
+                <Rail railRef={catalogRailRef} showFade={catalogShowFade} onScroll={onCatalogScroll}>
+                  {canManage(group.role) ? (
+                    <button
+                      type="button"
+                      onClick={onOpenCatalog}
+                      className="flex aspect-[3/4] w-44 flex-none cursor-pointer snap-start flex-col items-center justify-center gap-2.5 self-start rounded-[20px] border border-dashed border-[var(--main-line)] text-[var(--main-strong)] transition hover:bg-[var(--main-soft)]"
+                    >
+                      <span aria-hidden="true" className="grid h-10 w-10 place-items-center rounded-full bg-[var(--main-soft)] text-lg">＋</span>
+                      <span className="text-[13px]">{t("catalogAddItem")}</span>
+                    </button>
+                  ) : null}
                   {visibleCatalog.map((item) => (
-                    <li key={item.id}>
-                      <button
-                        type="button"
-                        onClick={() => onOpenCatalogItem(item.id)}
-                        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-[var(--wash)]"
-                      >
-                        <span className="min-w-0">
-                          <strong className="block truncate text-sm font-medium">{item.title}{item.year ? ` (${item.year})` : ""}</strong>
-                          <span className="mt-0.5 block text-xs text-[var(--muted)]">{[item.mainGenre, formatRuntime(item.runtimeMinutes), ...(item.attributes ?? []).slice(0, 2).map((attribute) => `${attribute.label}: ${String(attribute.value)}`), t("catalogRounds", { count: item.roundCount ?? 0 })].filter(Boolean).join(" · ")}</span>
-                        </span>
-                        <span className="flex-none text-sm tabular-nums">
-                          {item.ratingAvg === null || item.ratingAvg === undefined
-                            ? <span className="text-[var(--muted)]">—</span>
-                            : <>{item.ratingAvg}<span className="ml-1.5 text-[10px] font-light text-[var(--muted)]">n={item.ratingCount ?? 0}</span></>}
-                        </span>
-                      </button>
-                    </li>
+                    <CatalogTile
+                      key={item.id}
+                      size="sm"
+                      className="w-44 flex-none snap-start"
+                      title={item.title}
+                      year={item.year}
+                      avg={item.ratingAvg}
+                      ratingLabel={item.ratingAvg === null || item.ratingAvg === undefined ? tCat("notRated") : tCat("ratedAria", { value: item.ratingAvg })}
+                      caption={[item.scheduledAt ? f.eventWhen(item.scheduledAt) : item.author, item.mainGenre, formatRuntime(item.runtimeMinutes)].filter(Boolean).slice(0, 2).join(" · ")}
+                      onOpen={() => onOpenCatalogItem(item.id)}
+                    />
                   ))}
-                </ul>
-                {sortedCatalog.length > CATALOG_PREVIEW_COUNT ? (
-                  <button
-                    type="button"
-                    onClick={() => setCatalogExpanded((value) => !value)}
-                    aria-expanded={catalogExpanded}
-                    className="mt-3 min-h-10 w-full rounded-xl border border-[var(--line)] text-xs font-light text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)]"
-                  >
-                    {catalogExpanded ? t("catalogShowLess") : t("catalogShowAll", { count: sortedCatalog.length })}
-                  </button>
-                ) : null}
+                  {sortedCatalog.length > visibleCatalog.length ? (
+                    <button
+                      type="button"
+                      onClick={onOpenCatalog}
+                      className="flex aspect-[3/4] w-44 flex-none cursor-pointer snap-start flex-col items-center justify-center gap-1.5 self-start rounded-[20px] border border-[var(--line)] bg-[var(--paper)] transition hover:border-[var(--main-line)]"
+                    >
+                      <span className="text-3xl font-light tracking-[-0.04em]">{sortedCatalog.length - visibleCatalog.length}</span>
+                      <span className="px-3 text-center text-xs text-[var(--muted)]">{t("catalogMoreIn", { name: activeCatalogLibrary ? libraryName(activeCatalogLibrary) : t("catalogTitle") })}</span>
+                      <span className="mt-2.5 text-[13px] text-[var(--main-strong)]">{t("catalogSeeAll")} →</span>
+                    </button>
+                  ) : null}
+                </Rail>
               </>
             ) : (
               <EmptyState title={t("catalogEmptyTitle")} onClick={onOpenCatalog} />

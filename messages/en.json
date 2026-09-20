@@ -408,10 +408,6 @@
     "catalogSortLabel": "Sort catalogue",
     "catalogSortTitle": "By title",
     "catalogSortRating": "By rating",
-    "catalogRounds": "{count, plural, one {# round} other {# rounds}}",
-    "catalogShowAll": "See the full catalogue ({count})",
-    "catalogShowLess": "Show less",
-    "catalogKindLabel": "Films or books",
     "peopleTitle": "People",
     "makeAdmin": "Make admin",
     "makeParticipant": "Make participant",
@@ -425,28 +421,46 @@
     "recommendationsHint": "Ask who recommended each item and show it. Turn off to hide it everywhere in this group — what's already recorded is kept.",
     "catalogManage": "Open & manage",
     "catalogOpen": "Open catalogue",
-    "catalogEmptyTitle": "Start the catalogue"
+    "catalogEmptyTitle": "Start the catalogue",
+    "catalogSortRecent": "Recently added",
+    "catalogAddItem": "Add item",
+    "catalogMoreIn": "more in {name}",
+    "catalogSeeAll": "See all"
   },
   "catalog": {
     "back": "Back",
     "errorTitle": "Couldn't open the item",
     "pages": "{count} pages",
     "byAuthor": "by {name}",
-    "historyTitle": "Across the group's rounds",
-    "groupRating": "{count, plural, =0 {no ratings yet} one {group rating · # rating} other {group rating · # ratings}}",
+    "historyTitle": "History",
     "recommendedBy": "recommended by {name}",
     "noRounds": "This item hasn't been in any visible round yet.",
     "remove": "Remove from catalogue",
-    "removeHint": "It leaves the list and the \"from catalogue\" picker. Closed rounds that already used it stay intact.",
-    "removeConfirm": "Remove \"{title}\" from the catalogue?",
+    "removeHint": "It leaves the catalogue and goes to the bin, where you can restore it. Rounds that already used it stay intact.",
     "status": {
       "draft": "draft",
       "active": "in progress",
       "closed": "closed"
     },
     "edit": "Edit",
-    "editHint": "Change the title, its properties or who recommended it.",
-    "origin": "via {text}"
+    "origin": "via {text}",
+    "specYear": "Year",
+    "specWhen": "Date",
+    "specAuthor": "Author",
+    "specGenre": "Genre",
+    "specRuntime": "Runtime",
+    "specPages": "Pages",
+    "specRecommendedBy": "Recommended by",
+    "specOrigin": "Origin",
+    "ratingTitle": "Group rating",
+    "outOfFive": "out of 5",
+    "ratingSummary": "{ratings, plural, one {# rating} other {# ratings}} across {rounds, plural, one {# challenge} other {# challenges}}.",
+    "notRatedYet": "Nobody has rated it yet.",
+    "notRated": "Not rated yet",
+    "ratedAria": "Rated {value} out of 5",
+    "roundRatings": "{count, plural, one {# rating} other {# ratings}}",
+    "moreActions": "More actions",
+    "removeTitle": "Remove \"{title}\" from the catalogue?"
   },
   "personalSpace": {
     "back": "Back",
@@ -472,12 +486,6 @@
     "rounds": "{count, plural, =0 {no rounds} one {# round} other {# rounds}}",
     "emptyTitle": "Your catalogue is empty",
     "viewLabel": "View",
-    "view": {
-      "list": "List",
-      "genre": "By genre",
-      "decade": "By decade",
-      "year": "By year"
-    },
     "kind": {
       "film": "Films",
       "book": "Books"
@@ -513,7 +521,29 @@
     "removeManyBody": "They leave the catalogue and go to the bin, where you can restore them. An item that a running challenge still uses is skipped.",
     "removeManyConfirm": "{count, plural, one {Remove # item} other {Remove # items}}",
     "removedMany": "{count, plural, one {# item removed.} other {# items removed.}}",
-    "removedSome": "{removed, plural, one {# item removed} other {# items removed}}; {skipped, plural, one {# skipped because a running challenge uses it} other {# skipped because running challenges use them}}."
+    "removedSome": "{removed, plural, one {# item removed} other {# items removed}}; {skipped, plural, one {# skipped because a running challenge uses it} other {# skipped because running challenges use them}}.",
+    "viewCovers": "Covers",
+    "viewList": "List",
+    "viewInsights": "Insights",
+    "groupByLabel": "Group by",
+    "group": {
+      "none": "None",
+      "genre": "Genre",
+      "decade": "Decade",
+      "year": "Year"
+    },
+    "breakDownLabel": "Break down by",
+    "searchPlaceholder": "Search {name}",
+    "searchLabel": "Search the catalogue",
+    "genreFilterLabel": "Filter by genre",
+    "genreAll": "All genres",
+    "decadeFilterLabel": "Filter by decade",
+    "decadeAll": "Any decade",
+    "sortRecent": "Recently added",
+    "libraryUnused": "{count} in no challenge",
+    "resultCount": "{count, plural, one {# item} other {# items}}",
+    "resultOf": "{shown} of {total} items",
+    "undated": "Undated"
   },
   "cineItems": {
     "titleLabel": "Film title",

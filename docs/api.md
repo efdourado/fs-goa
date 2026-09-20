@@ -180,7 +180,7 @@ deriva o espaço do próprio objeto (`/api/catalog/…`).
 
 | Método · rota | Acesso | Corpo / retorna |
 | --- | --- | --- |
-| `GET …/catalog` | membro / dono | `{ items: [{ id, kind, title, year, author?, genres, roundCount, challengeCount, ratingAvg, ratingCount, recommendedBy?, scheduledAt? }] }`. `challengeCount` = em quantos desafios o item está (0 = solto) |
+| `GET …/catalog` | membro / dono | `{ items: [{ id, kind, title, year, author?, genres, roundCount, challengeCount, createdAt, ratingAvg, ratingCount, recommendedBy?, scheduledAt? }] }`. `challengeCount` = em quantos desafios o item está (0 = solto); `createdAt` = quando entrou no acervo (ordena "adicionados recentemente") |
 | `GET …/catalog/:itemId` | membro / dono | o item + `rounds: [{ challengeId, title, status, startsOn, endsOn, recommendedBy, ratingAvg, ratingCount }]` |
 | `GET …/catalog/search?title=&kind=\|libraryId=` | membro / dono | candidatos a "usar o existente" ao criar um item |
 | `POST …/catalog/items` | owner/admin / dono | `{ libraryId \| kind, title, year?, author?, scheduledAt?, attributes?, recommendedBy… }` — filme/livro casam por título(+autor); outras bibliotecas nunca fundem sozinhas |

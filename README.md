@@ -197,7 +197,10 @@ messages/   textos da interface em pt-BR, en e es (mesmo conjunto de chaves nos 
   próprias (Jogos, Séries…), renomeáveis, com propriedades que você mostra, oculta e
   reordena. Um item tem identidade estável e reaparece em outra rodada sem perder o
   histórico; uma rodada pode tirar itens de várias bibliotecas. O acervo mostra o que
-  está em nenhum desafio e remove em lote; uma biblioteca criada por você pode ser
+  está em nenhum desafio e remove em lote; cada item ganha uma **capa tipográfica**
+  (sem imagens: o título é a arte, com uma cor estável e a nota do grupo num anel),
+  em grade ou lista, com busca, filtros e agrupamento por gênero/década; a página do
+  item mostra ficha, nota do grupo e o histórico nas rodadas; uma biblioteca criada por você pode ser
   excluída (os itens vão para a lixeira junto). Um item pode ter **data de evento**
   (um dia ou horário com fuso) e um **indicador** — membro, nome guardado de quem
   está fora do Goa, ou uma nota.

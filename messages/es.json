@@ -408,10 +408,6 @@
     "catalogSortLabel": "Ordenar acervo",
     "catalogSortTitle": "Por título",
     "catalogSortRating": "Por nota",
-    "catalogRounds": "{count, plural, one {# ronda} other {# rondas}}",
-    "catalogShowAll": "Ver el acervo completo ({count})",
-    "catalogShowLess": "Ver menos",
-    "catalogKindLabel": "Películas o libros",
     "peopleTitle": "Personas",
     "makeAdmin": "Hacer administrador",
     "makeParticipant": "Hacer participante",
@@ -425,28 +421,46 @@
     "recommendationsHint": "Pregunta quién recomendó cada ítem y lo muestra. Desactívalo para ocultarlo en todo el grupo — lo ya registrado se conserva.",
     "catalogManage": "Abrir y gestionar",
     "catalogOpen": "Abrir catálogo",
-    "catalogEmptyTitle": "Empieza el catálogo"
+    "catalogEmptyTitle": "Empieza el catálogo",
+    "catalogSortRecent": "Añadidos recientemente",
+    "catalogAddItem": "Añadir ítem",
+    "catalogMoreIn": "más en {name}",
+    "catalogSeeAll": "Ver todo"
   },
   "catalog": {
     "back": "Volver",
     "errorTitle": "No se pudo abrir el ítem",
     "pages": "{count} páginas",
     "byAuthor": "por {name}",
-    "historyTitle": "En las rondas del grupo",
-    "groupRating": "{count, plural, =0 {aún sin notas} one {nota del grupo · # valoración} other {nota del grupo · # valoraciones}}",
+    "historyTitle": "Historial",
     "recommendedBy": "recomendado por {name}",
     "noRounds": "Este ítem aún no ha entrado en ninguna ronda visible.",
     "remove": "Quitar del acervo",
-    "removeHint": "Desaparece de la lista y del selector \"del acervo\". Las rondas cerradas que ya lo usaron quedan intactas.",
-    "removeConfirm": "¿Quitar \"{title}\" del acervo?",
+    "removeHint": "Sale del acervo y va a la papelera, de donde se puede restaurar. Las rondas que ya lo usaron quedan intactas.",
     "status": {
       "draft": "borrador",
       "active": "en curso",
       "closed": "cerrada"
     },
     "edit": "Editar",
-    "editHint": "Cambia el título, las propiedades o quién lo recomendó.",
-    "origin": "vía {text}"
+    "origin": "vía {text}",
+    "specYear": "Año",
+    "specWhen": "Fecha",
+    "specAuthor": "Autor",
+    "specGenre": "Género",
+    "specRuntime": "Duración",
+    "specPages": "Páginas",
+    "specRecommendedBy": "Recomendado por",
+    "specOrigin": "Origen",
+    "ratingTitle": "Nota del grupo",
+    "outOfFive": "de 5",
+    "ratingSummary": "{ratings, plural, one {# valoración} other {# valoraciones}} en {rounds, plural, one {# desafío} other {# desafíos}}.",
+    "notRatedYet": "Nadie lo ha valorado aún.",
+    "notRated": "Sin nota aún",
+    "ratedAria": "Nota {value} de 5",
+    "roundRatings": "{count, plural, one {# valoración} other {# valoraciones}}",
+    "moreActions": "Más acciones",
+    "removeTitle": "¿Quitar \"{title}\" del acervo?"
   },
   "personalSpace": {
     "back": "Volver",
@@ -472,12 +486,6 @@
     "rounds": "{count, plural, =0 {sin rondas} one {# ronda} other {# rondas}}",
     "emptyTitle": "Tu acervo está vacío",
     "viewLabel": "Vista",
-    "view": {
-      "list": "Lista",
-      "genre": "Por género",
-      "decade": "Por década",
-      "year": "Por año"
-    },
     "kind": {
       "film": "Películas",
       "book": "Libros"
@@ -513,7 +521,29 @@
     "removeManyBody": "Salen del acervo y van a la papelera, de donde se pueden restaurar. Un ítem que un desafío en curso aún usa se omite.",
     "removeManyConfirm": "{count, plural, one {Quitar # ítem} other {Quitar # ítems}}",
     "removedMany": "{count, plural, one {# ítem quitado.} other {# ítems quitados.}}",
-    "removedSome": "{removed, plural, one {# ítem quitado} other {# ítems quitados}}; {skipped, plural, one {# omitido porque un desafío en curso lo usa} other {# omitidos porque desafíos en curso los usan}}."
+    "removedSome": "{removed, plural, one {# ítem quitado} other {# ítems quitados}}; {skipped, plural, one {# omitido porque un desafío en curso lo usa} other {# omitidos porque desafíos en curso los usan}}.",
+    "viewCovers": "Portadas",
+    "viewList": "Lista",
+    "viewInsights": "Análisis",
+    "groupByLabel": "Agrupar por",
+    "group": {
+      "none": "Ninguno",
+      "genre": "Género",
+      "decade": "Década",
+      "year": "Año"
+    },
+    "breakDownLabel": "Desglosar por",
+    "searchPlaceholder": "Buscar en {name}",
+    "searchLabel": "Buscar en el acervo",
+    "genreFilterLabel": "Filtrar por género",
+    "genreAll": "Todos los géneros",
+    "decadeFilterLabel": "Filtrar por década",
+    "decadeAll": "Cualquier década",
+    "sortRecent": "Añadidos recientemente",
+    "libraryUnused": "{count} sin desafío",
+    "resultCount": "{count, plural, one {# ítem} other {# ítems}}",
+    "resultOf": "{shown} de {total} ítems",
+    "undated": "Sin fecha"
   },
   "cineItems": {
     "titleLabel": "Título de la película",

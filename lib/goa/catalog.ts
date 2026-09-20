@@ -434,8 +434,9 @@ async function listCatalogWithClient(client: PoolClient, workspaceId: string) {
     recommended_by_external_id: string | null;
     recommended_by_external_name: string | null;
     origin_note: string | null;
+    created_at: Date;
   }>(
-    `SELECT ci.id, ci.kind, ci.title, ci.author, ci.year, ci.main_genre, ci.page_count, ci.runtime_minutes,
+    `SELECT ci.id, ci.kind, ci.title, ci.author, ci.year, ci.main_genre, ci.page_count, ci.runtime_minutes, ci.created_at,
               CASE WHEN ${scheduleVisibleSql("ci")} THEN ci.scheduled_at END AS scheduled_at,
               CASE WHEN ${scheduleVisibleSql("ci")} THEN ci.scheduled_end_at END AS scheduled_end_at,
               ci.scheduled_precision, ci.scheduled_time_zone,
@@ -484,6 +485,7 @@ async function listCatalogWithClient(client: PoolClient, workspaceId: string) {
       scheduledAt: eventScheduleJson(item),
       roundCount: item.round_count,
       challengeCount: item.challenge_count,
+      createdAt: item.created_at.toISOString(),
       recommendedBy: !showRecommenders ? null : item.recommended_by_user_id
         ? { kind: "member" as const, id: item.recommended_by_user_id, name: item.recommended_by_user_name ?? "" }
         : item.recommended_by_external_id
