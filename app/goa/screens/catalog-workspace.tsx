@@ -254,7 +254,7 @@ export function CatalogWorkspaceScreen({
       <StatusMessage error={librariesError ?? itemsError} success={notice} />
 
       {!loading && tabs.length ? (
-        <nav className="-mx-4 mb-7 flex gap-3 overflow-x-auto px-4 pb-2 pt-1 sm:-mx-6 sm:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label={tl("tabsLabel")}>
+        <nav className="-mx-4 mb-4 flex gap-3 overflow-x-auto px-4 pb-5 pt-2 sm:-mx-6 sm:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label={tl("tabsLabel")}>
           {tabs.map((entry) => {
             const active = entry.kind === kind;
             const counts = countByKind.get(entry.kind) ?? { total: 0, unused: 0 };
@@ -265,17 +265,19 @@ export function CatalogWorkspaceScreen({
                   aria-pressed={active}
                   onClick={() => chooseLibrary(entry.kind)}
                   className={cx(
-                    "flex min-h-[4.75rem] w-full cursor-pointer items-center gap-3.5 rounded-[20px] border px-4 text-left transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25",
-                    active ? "border-[var(--main)] bg-[var(--main-soft)] ring-4 ring-[var(--main)]/10" : "border-[var(--line)] bg-[var(--paper)] hover:border-[var(--main-line)]",
+                    "relative flex min-h-[4.75rem] w-full cursor-pointer items-center gap-3.5 overflow-hidden rounded-[20px] border px-4 text-left shadow-[var(--elevate-card)] transition duration-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25",
+                    active ? "border-[var(--main)] bg-[var(--main-soft)] ring-4 ring-[var(--main)]/10" : "border-[var(--line)] bg-[var(--paper)] hover:-translate-y-0.5 hover:border-[var(--main-line)] hover:shadow-[var(--elevate-2)]",
                   )}
                 >
-                  <span className={cx("grid h-11 w-11 flex-none place-items-center rounded-full", active ? "bg-[var(--paper)] text-[var(--main-strong)]" : "bg-[var(--wash)] text-[var(--muted)]")} aria-hidden="true">
+                  <span aria-hidden="true" className={cx("pointer-events-none absolute -bottom-10 -right-10 h-24 w-24 rounded-full border-[14px]", active ? "border-[var(--main)]/[0.13]" : "border-[var(--main)]/[0.07]")} />
+                  <span className={cx("relative grid h-11 w-11 flex-none place-items-center rounded-full", active ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-[var(--elevate-1)]" : "bg-[var(--wash)] text-[var(--muted)] ring-1 ring-inset ring-[var(--line)]")} aria-hidden="true">
                     <LibraryGlyph source={entry.source} className="h-6 w-6" />
                   </span>
-                  <span className="min-w-0">
+                  <span className="relative min-w-0">
                     <strong className={cx("block truncate pr-6 text-base font-medium tracking-[-0.02em]", active && "text-[var(--main-strong)]")}>{libraryName(entry)}</strong>
                     <small className={cx("mt-0.5 block truncate text-xs", active ? "text-[var(--main-strong)]/85" : "text-[var(--muted)]")}>
-                      {t("libraryStats", { count: counts.total })}{canManage && counts.unused > 0 ? ` · ${t("libraryUnused", { count: counts.unused })}` : ""}
+                      {t("libraryStats", { count: counts.total })}
+                      {canManage && counts.unused > 0 ? <span className="text-[var(--warn)]"> · {t("libraryUnused", { count: counts.unused })}</span> : null}
                     </small>
                   </span>
                 </button>

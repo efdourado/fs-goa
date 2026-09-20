@@ -61,6 +61,7 @@
   --hover: rgba(20, 24, 20, 0.04);
   --hover-strong: rgba(20, 24, 20, 0.06);
   --elevate-1: 0 1px 2px rgba(32, 36, 31, 0.06);
+  --elevate-card: 0 1px 2px rgba(32, 36, 31, 0.06), 0 10px 24px -14px rgba(32, 36, 31, 0.32);
   --elevate-2: 0 12px 40px rgba(32, 36, 31, 0.16);
 
   /* Homepage colour tags — a private per-viewer label on a challenge card. */
@@ -108,6 +109,7 @@
     --hover: rgba(255, 255, 255, 0.06);
     --hover-strong: rgba(255, 255, 255, 0.09);
     --elevate-1: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --elevate-card: 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 24px -12px rgba(0, 0, 0, 0.7);
     --elevate-2: 0 16px 48px rgba(0, 0, 0, 0.6);
 
     --tag-green: #6bb888;
@@ -154,6 +156,7 @@
   --hover: rgba(255, 255, 255, 0.06);
   --hover-strong: rgba(255, 255, 255, 0.09);
   --elevate-1: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --elevate-card: 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 24px -12px rgba(0, 0, 0, 0.7);
   --elevate-2: 0 16px 48px rgba(0, 0, 0, 0.6);
 
   --tag-green: #6bb888;
