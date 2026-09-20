@@ -1,7 +1,8 @@
 # Arquitetura
 
-O que a V1 precisa entregar está em [`ROADMAP.md`](../ROADMAP.md); este documento
-descreve como o código está organizado hoje.
+Este documento descreve como o código está organizado **hoje**. O escopo original
+da V1 (e a numeração de seções citada nos comentários do código) está em
+[`ROADMAP.md`](../ROADMAP.md); a superfície HTTP está em [`api.md`](api.md).
 
 ## Visão geral
 
@@ -13,7 +14,7 @@ replica tudo localmente.
 ```text
 navegador ──JSON + cookie HTTP-only──▶ Next.js / route handlers ──SQL parametrizado──▶ PostgreSQL
                                         ├── autenticação, CSRF e autorização
-                                        ├── grupos, convites, acervo
+                                        ├── grupos, convites, bibliotecas e acervo
                                         ├── rodadas: receitas, tipos de registro, registros
                                         ├── análise, vitrine e auditoria
 ```
@@ -29,24 +30,33 @@ navegador ──JSON + cookie HTTP-only──▶ Next.js / route handlers ──
 | `lib/auth.ts` | contas, sessões, rate limit, papéis, troca de senha autenticada |
 | `lib/admin.ts` | serviços do `/admin` — só metadados |
 | `lib/security.ts` | PBKDF2, tokens, cookies, origem e CSRF |
-| `lib/goa/domain/` | criação de grupos, convites e desafios |
-| `lib/goa/challenges/` | receitas, tipos de registro, campos, itens, checkpoints, importação de lista, registros, prontidão, análise, vitrine, duplicação |
-| `lib/goa/catalog.ts` | acervo do grupo e histórico de um item entre rodadas |
+| `lib/goa/domain/` | criação de grupos, convites e desafios; `event-schedule.ts` (data de evento de um item, com fuso) |
+| `lib/goa/challenges/` | receitas, tipos de registro (inclusive compartilhados), campos, itens, etapas (checkpoints), bibliotecas do desafio (`libraries.ts`), indicadores (`recommender.ts`), importação de lista, registros, prontidão, análise, vitrine, duplicação e cópia (`copy.ts`) |
+| `lib/goa/catalog.ts` | bibliotecas, propriedades, acervo do espaço, indicadores externos, remoção em lote e histórico de um item entre rodadas |
+| `lib/goa/catalog-attributes.ts` | propriedades personalizadas (tipadas) de uma biblioteca |
 | `lib/goa/analysis.ts` · `lib/metrics.ts` | matemática pura das métricas (bayes, mediana, desvio, consenso, afinidade) |
 | `lib/goa/challenges/rankings.ts` | rankings pessoais + afinidade direta/composta (blocos derivados) |
 | `lib/goa/trash.ts` · `lib/goa/purge.ts` | lixeira recuperável (registro `trash_items`, restauração, exclusão permanente) e deleção física da árvore |
-| `lib/validation.ts` | validação tipada e exportação CSV segura |
+| `lib/validation.ts` | validação tipada de valores de campo |
 | `db/schema/` | schema Drizzle, dividido por área |
 | `drizzle/` | única fonte de migrações reproduzíveis |
 
 ## Modelo de domínio
 
 ```
-Grupo
-├── Acervo — catalog_items (filme/livro): ano, gênero principal (escalar),
-│              duração/páginas, atributos tipados por grupo
-│              identidade estável entre rodadas
+Espaço = grupo, ou o espaço pessoal (groups.kind = 'personal', oculto e de uma pessoa só)
+├── Bibliotecas — catalog_libraries: Screens (`film`) · Pages (`book`) · Tables ·
+│      personalizadas. `kind` é opaco (`lib_<uuid>`, exceto film/book) e o `label` é
+│      renomeável; nunca são identidade. Propriedades = colunas nativas (título, ano,
+│      gênero, duração, autor, páginas, data do evento — `catalog_native_property_configs`
+│      só guarda rótulo/visibilidade/ordem) + atributos tipados (`catalog_attribute_defs`)
+├── Acervo — catalog_items: identidade estável entre rodadas. Filme/livro casam por
+│      título(+autor); qualquer outra biblioteca nunca funde por título (a pessoa
+│      escolhe "usar o existente" ou "criar novo")
+├── Indicadores externos — catalog_recommenders: nome guardado ("Ana do trabalho"),
+│      por espaço, nunca público
 └── Rodada (challenges) — recipe_key + recipe_version
+    ├── challenge_libraries — de quais bibliotecas a rodada tira itens (uma ou várias)
     ├── entry_types — 4 eixos ortogonais (o submission_mode fica, derivado):
     │     purpose (progress·completion·expectation·rating·checkin)
     │     target_policy (required·optional·none)  — precisa de um round item?
@@ -54,20 +64,63 @@ Grupo
     │     schedule_policy (free·while_active·checkpoint)
     │     visibility_policy (group_realtime·after_own·after_close·author_only)
     │        — quem vê a resposta dos outros deste tipo, e quando
-    ├── challenge_items — o filme/livro nesta rodada + catalog_item_id +
-    │        recommended_by_user_id OU origin_note (origem textual) + checkpoint_id
-    ├── challenge_checkpoints — kind (day·week·session·milestone), posição, janela;
-    │        "semana" é só uma apresentação, nunca uma entidade própria
+    │     answer_scope (individual·shared) + shared_edit_policy — uma resposta do grupo
+    ├── challenge_items — o item nesta rodada + catalog_item_id +
+    │        recommended_by_user_id | recommended_by_external_id | origin_note +
+    │        checkpoint_id (opens_at/due_at existem, mas nenhuma tela os define)
+    ├── challenge_checkpoints — as **etapas**: kind (day·week·session·milestone),
+    │        posição, janela; a interface só cria etapas genéricas (`session`), e
+    │        `day` nasce automaticamente nas rodadas dia-a-dia
     ├── challenge_fields — campos semânticos por tipo de registro
     └── entries — participante + tipo + item/checkpoint + occurred_on + entry_values
 ```
 
-- **Receitas** (`lib/goa/challenges/recipes.ts`): quatro criáveis — `cinema`
+- **Receitas** (`lib/goa/challenges/recipes.ts`): seis criáveis — `cinema`
   (avaliação: nota 0–5 + comentário até 500), `library` (progresso/dia +
   conclusão), `bookshelf` (só avaliação, sem período), `habit` (check-in sem
-  catálogo). As quatro antigas (`cine_free`/`cine_curated`/`reading_club`/
-  `reading_daily`) continuam legíveis no banco mas não criam mais estrutura.
-  Campos mínimos e invariantes de cada uma: `ROADMAP.md` §3–4.
+  catálogo), `tables` (restaurantes/bares: três notas por dimensão, sem nota
+  combinada) e `custom` (qualquer biblioteca; quem cria decide o que se registra).
+  As quatro antigas (`cine_free`/`cine_curated`/`reading_club`/`reading_daily`)
+  continuam legíveis no banco mas não criam mais estrutura. A receita também decide
+  se a rodada coleta a data opcional de cada registro (`challenges.collects_entry_date`,
+  nulo = padrão da receita; `custom` nasce sem). Campos mínimos e invariantes das
+  quatro originais: `ROADMAP.md` §3–4.
+- **Bibliotecas e propriedades** (`catalog.ts`): cada espaço tem as suas. Screens e
+  Pages são a evolução de filmes/livros (`kind` continua `film`/`book`, com colunas
+  nativas e o casamento por título); Tables e as personalizadas nascem com `kind`
+  opaco. Renomear muda só o `label`. Um editor único (`GET/PATCH …/properties`)
+  mexe em colunas nativas e atributos personalizados: rótulo, ocultar, ordem
+  (`title` nunca se oculta). Uma biblioteca que uma pessoa criou pode ser
+  **excluída** (`DELETE /api/catalog/libraries/:id?deleteItems=1`): ela é arquivada
+  (`archived_at`), os itens vão para a lixeira junto e restaurar um deles traz a
+  biblioteca de volta. Screens/Pages não saem (`library_builtin`); item ainda em
+  desafio em andamento barra a exclusão (`library_busy`).
+- **Acervo** — `GET …/catalog` devolve `challengeCount` por item (em quantos desafios
+  ele está). A remoção em lote (`POST …/catalog/remove { itemIds }`, até 500) manda
+  cada item para a lixeira e **pula** os que um desafio em andamento ainda usa
+  (`skipped[].reason = in_use | not_found`).
+- **Data do evento** (`event-schedule.ts`): propriedade nativa `scheduled_at` do
+  item do acervo — um dia (`startsOn`/`endsOn`) ou um instante com fuso
+  (`startsAt`/`endsAt` + `timeZone`). Nasce oculta; criar a rodada com `itemDates`
+  (ou ligá-la na biblioteca) a torna visível e só então a API a devolve. É
+  informação sobre o item: nunca abre nem fecha o registro (`due_at` é lembrete).
+- **Respostas compartilhadas** (`entry_types.answer_scope = 'shared'`): uma resposta
+  única por item para o grupo inteiro (um placar final), ao lado das individuais
+  (nota, comentário). `shared_edit_policy` diz quem preenche (`members_fill_admin_corrects`
+  ou `members_can_edit`); salvar envia `expectedUpdatedAt` e uma edição concorrente
+  responde `409 shared_conflict` com o valor mais recente. "Feito", conclusão,
+  métricas e rankings entendem respostas compartilhadas. Remover um tipo de resposta
+  que já tem respostas avisa quantas (`409 entry_type_has_entries`) e só apaga com
+  `?deleteAnswers=1`; métricas que o leem exigem `?archiveMetrics=1`.
+- **Indicadores** (`recommender.ts`): quem trouxe o item pode ser um membro, um nome
+  guardado do espaço ou uma nota — exclusivos entre si. `groups.recommendations_enabled
+  = false` esconde tudo isso nas leituras e barra defini-lo (`409 recommendations_disabled`);
+  os dados continuam guardados.
+- **Cópia** (`copy.ts`, `duplicate.ts`, `templates.ts`): estrutura de um desafio ou
+  modelo, com os modos `structure` (sem itens, mas recriando as bibliotecas e suas
+  propriedades) e `structure_and_items`. Propriedades que não cabem no destino
+  (outro tipo, ou arquivadas) são puladas e devolvidas em `skippedProperties`,
+  nunca reinterpretadas.
 - Um mesmo item aceita **mais de um tipo** de registro por pessoa (unicidade por
   item × tipo × pessoa; `once_per_item_day` inclui `occurred_on`).
 - **Expectativa** (`purpose = 'expectation'`, `seedExpectationType`): tipo opcional
@@ -98,7 +151,7 @@ Grupo
   lista, limite de 200). Ordenação/sorteio são puros no cliente: manter, ordenar,
   sortear tudo, sortear por bloco, distribuir entre checkpoints — com prévia e
   re-sorteio antes de salvar.
-- **Checkpoints** (`lib/goa/challenges/checkpoints.ts`): `saveCheckpoints` monta a
+- **Etapas / checkpoints** (`lib/goa/challenges/checkpoints.ts`; na interface são "etapas"): `saveCheckpoints` monta a
   lista numa transação; um checkpoint com registros não pode ser removido (409
   `checkpoint_has_entries`) e arquivar um vazio só solta os itens (`checkpoint_id
   = NULL`), nunca deixa registro órfão. `assignCheckpointItems` liga itens a
@@ -126,31 +179,38 @@ Grupo
   redistribuído) só aparece quando há amostra por dimensão. Vivo enquanto o
   desafio corre; `generateShowcase` congela em `result_blocks` (`kind ∈
   {ranking, affinity}`).
-- **Wrapped interno** (`resultForChallenge` → `blocks[]`): o resultado interno é
-  a lista ordenada de `result_blocks` (capa · resumo · total de registros ·
-  métricas · ranking · afinidade · comentários). Vivo enquanto o desafio corre;
-  `generateShowcase` congela ao encerrar; reabrir invalida o snapshot publicado.
-  O admin reordena e esconde blocos com `PATCH …/results/blocks` — os valores
-  calculados **não** mudam. Empates nas séries desempatam por rótulo.
-- **Publicação** (§12): nada é público por padrão; só owner/admin, só desafio
-  encerrado. Desde a migração `0035`, o banco guarda **hash e token completo**
+- **Vitrine** (`resultForChallenge` → `blocks[]`): o resultado é a lista ordenada de
+  `result_blocks` (capa · resumo · total de registros · métricas · ranking ·
+  afinidade · comentários). Métricas, rankings e afinidade **sempre** se recalculam
+  ao ler (`value_snapshot` é nulo) — não existe "regenerar" nem rascunho; um
+  comentário destacado lê o texto atual do registro. Curar (manchete, resumo,
+  métricas em destaque, comentários, `allComments`, ocultar a grade de etapas)
+  vale a qualquer momento e nunca publica nada sozinho; `PATCH …/results/blocks`
+  reordena e esconde blocos sem mudar valores. Empates desempatam por rótulo.
+- **Publicação** (§12): nada é público por padrão; só owner/admin, e só o link
+  público (`POST …/results/publish`) exige desafio encerrado (ou lista viva
+  pessoal). Desde a migração `0035`, o banco guarda **hash e token completo**
   para reapresentar o link aos usuários autorizados. A consulta pública usa o
   hash; rotacionar invalida o link anterior e despublicar limpa ambos. Um acesso
   ao banco também pode revelar esses links; esta é uma mudança em relação à
-  decisão original de guardar apenas hash. A página pública é
-  `noindex`. Publicar a vitrine **não** cria template (conceitos e rotas
-  separados: `/results/:token` vs `/modelos/:id`).
+  decisão original de guardar apenas hash. A página pública é `noindex`.
+  Publicar a vitrine **não** cria template (conceitos e rotas separados:
+  `/results/:token` vs `/modelos/:id`).
 - **Consentimento** (§12): `challenges.results_anon` nasce `true` (anônima por
   padrão). Cada participante autoriza o próprio nome por desafio
   (`challenge_participants.name_consent`, começa `false`, revogável, `PATCH
-  …/consent`); numa publicação com nomes, quem não autorizou continua
-  "Participante N". Ao sair do grupo/desafio, toda vitrine publicada é retirada
-  do ar e regenerada sem a pessoa (`regeneratePublishedShowcases`); o admin
-  republica.
+  …/consent`; reentrar nunca restaura o consentimento). O mascaramento
+  (`maskShowcaseIdentities`: "Participante N", chave pública opaca por desafio,
+  quem saiu sempre mascarado) é calculado **ao vivo** a cada leitura, pelo link e
+  pelo modelo — sair, ser removido ou revogar o consentimento esconde a identidade
+  na hora, sem despublicar nem republicar; só a atribuição muda, nunca o conteúdo
+  ou as notas. Se o mascaramento não puder ser calculado, o conteúdo não é servido.
 - **Duplicação** é só estrutural, em transação: desafio, tipos, campos, opções,
   itens e métricas ganham novos IDs; a receita carrega, a agenda zera, os itens
-  re-resolvem contra o acervo do grupo de destino. Participantes, registros,
-  valores, checkpoints, blocos, tokens e indicadores **nunca** são copiados.
+  re-resolvem contra o acervo do grupo de destino. As etapas manuais vêm sem datas
+  (a cópia nasce sem período) e a data de evento de cada item acompanha; etapas
+  dia-a-dia se regeneram do período. Participantes, registros, valores, blocos,
+  tokens e indicadores **nunca** são copiados.
 - **Lixeira e recuperação** (§13, `lib/goa/trash.ts`): quatro ações distintas —
   **arquivar** (`archived_at`, fica no histórico, some do dia a dia, sem exclusão
   possível enquanto a dependência existir); **mover para a lixeira** (linha
@@ -194,8 +254,8 @@ Grupo
 - toda mutação autenticada exige `Origin` exata + token CSRF ligado à sessão;
 - toda consulta a recurso privado parte da associação ativa ao grupo — IDs não
   concedem acesso; participante só altera o próprio registro;
-- payload JSON limitado, campos dinâmicos com validação estrita, CSV neutraliza
-  células-fórmula, métricas usam enums (nunca SQL nem fórmula arbitrária);
+- payload JSON limitado, campos dinâmicos com validação estrita, métricas usam
+  enums (nunca SQL nem fórmula arbitrária);
 - auditoria append-only registra correções e transições — `before`/`after`
   passam por `redactAuditPayload`: texto longo (comentário, regra, manchete) vira
   `[texto omitido]`, só a identificação do campo e valores curtos ficam;

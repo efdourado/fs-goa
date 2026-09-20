@@ -1,6 +1,11 @@
 # GOA V1 — gate final (ROADMAP §15–17)
 
-**Estado:** os componentes dos tópicos 1–17 existem em `main` e os gates técnicos
+> **Documento histórico** (setembro/2026): registra o gate da V1 naquela data. As
+> contagens de testes e as descrições de comportamento abaixo não são o estado
+> atual — ver `docs/architecture.md` e `docs/api.md`. O teste de aceite citado
+> segue em `tests/integration/mvp.test.ts`.
+
+**Estado na época:** os componentes dos tópicos 1–17 existem em `main` e os gates técnicos
 estão verdes, mas a V1 **ainda não está pronta para divulgação aberta**. Uma
 revisão de código (setembro/2026) encontrou 5 bloqueadores P0 — já corrigidos e
 cobertos por teste (ver "Correções P0" abaixo) — e uma lista de P1/P2 que precisa
@@ -213,8 +218,7 @@ API existe.
   não substitui uso real.
 
 Documentação alinhada: `docs/api.md` (rotas de lixeira/conta, `system-audit`, sem
-lixeira global no `/admin`, sem `/api/auth/forgot|reset`, receitas criáveis, CSV
-como única resposta não-JSON); `README.md` (receitas criáveis, poderes do
+lixeira global no `/admin`, sem `/api/auth/forgot|reset`, receitas criáveis); `README.md` (receitas criáveis, poderes do
 `platform_admin`, seção "Recuperação de senha" = fora do ar); `docs/architecture.md`
 (identidade sem redefinição por link); `ROADMAP.md` §13 e a linha do P1 de
 privacidade (os "30 dias" e a purga automática do texto original foram

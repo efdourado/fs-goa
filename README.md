@@ -5,8 +5,9 @@ o sistema organiza e calcula; o administrador revisa e transforma o resultado em
 memória do grupo.
 
 Next.js 16 (App Router) + React 19 + TypeScript, API REST no mesmo runtime e
-PostgreSQL como fonte de verdade. O MVP está completo e verificado por testes
-automatizados.
+PostgreSQL como fonte de verdade. A V1 está implementada e coberta por testes
+automatizados; o produto continua evoluindo (bibliotecas, respostas compartilhadas,
+datas de evento e o espaço pessoal vieram depois — ver "O que o Goa faz").
 
 ## Rodar localmente
 
@@ -130,9 +131,10 @@ cortar a latência de cada consulta.
 2. **Environment Variables** (Production): `DATABASE_URL` (use a URL **pooled** do
    Neon — host com `-pooler` — com `sslmode=require`, para reaproveitar conexões
    entre invocações), `APP_ORIGIN` (origem pública exata, ex.: `https://goa.vercel.app`),
-   `ADMIN_PASSWORD` (mínimo 10 caracteres). Opcional: `ADMIN_USERNAME`, `ADMIN_NAME`,
-   `MAX_GROUPS_PER_OWNER` / `MAX_CHALLENGES_PER_GROUP` (padrão 6),
-   `MAX_MEMBERS_PER_GROUP` (padrão 62).
+   `ADMIN_PASSWORD` (mínimo 10 caracteres). Opcional: `ADMIN_USERNAME`, `ADMIN_NAME` e
+   os limites de criação — `MAX_GROUPS_PER_OWNER` / `MAX_CHALLENGES_PER_GROUP`
+   (padrão 6), `MAX_CHALLENGES_PER_PERSONAL_SPACE` (30), `MAX_MEMBERS_PER_GROUP`
+   (62), `MAX_GROUPS_PER_MEMBER` (186), `MAX_PENDING_INVITES_PER_USER` (31); ver `.env.example`.
 3. **`git push`** dispara o build e o deploy. No deploy de **produção**
    (`VERCEL_ENV=production`) o `deploy.sh` roda `scripts/migrate.mjs` antes do
    build; deploys de preview pulam a migração (defina `RUN_MIGRATIONS=1` na env
@@ -144,9 +146,9 @@ cortar a latência de cada consulta.
    ```
 
    A conta de administração já existe — só rode `scripts/seed-admin.mjs` do mesmo
-   jeito se precisar redefinir a senha. Algumas migrações vêm com um _backfill_
-   pontual e idempotente: depois da `0010` (acervo do grupo), rode uma vez
-   `node --env-file=.env.production.local scripts/backfill-catalog.mjs`.
+   jeito se precisar redefinir a senha. As migrações são aditivas e idempotentes;
+   as que corrigem dados (por exemplo a `0051`, que tira dos Screens os livros que
+   uma versão antiga guardou como filme) rodam junto, sem passo manual.
 
 ### Contêiner (alternativa à Vercel)
 
@@ -161,9 +163,10 @@ app/        interface, API REST (app/api), vitrine (app/results), galeria de mod
 db/         schema Drizzle do PostgreSQL
 drizzle/    migrações versionadas
 lib/        autenticação, domínio, receitas, análise e validação
-scripts/    migração, seed da conta de administração e seed de demonstração (scripts/seed-reading)
-tests/      unidade, smoke e integração
-docs/       arquitetura (docs/architecture.md) e endpoints (docs/api.md)
+scripts/    migração, deploy, seed da conta de administração e seed de demonstração (scripts/seed-reading)
+tests/      unidade, smoke (HTML renderizado) e integração (tests/integration/mvp.test.ts)
+docs/       arquitetura (docs/architecture.md), endpoints (docs/api.md), Fase 2 e releases
+messages/   textos da interface em pt-BR, en e es (mesmo conjunto de chaves nos três)
 ```
 
 ## O que o Goa faz
@@ -172,26 +175,46 @@ docs/       arquitetura (docs/architecture.md) e endpoints (docs/api.md)
   troca de senha nas Configurações (com a senha atual). O e-mail é opcional e por
   ora serve só para login: a redefinição por link está fora do ar até haver um
   canal de e-mail (ver "Recuperação de senha").
-- **Grupos e papéis** — o grupo é duradouro e reúne pessoas entre rodadas. `owner`
-  > `admin` > `participant`. Convites por link expirável / código curto.
-- **Rodadas por receita** — quatro criáveis: `cinema` (nota 0–5 + comentário, com
-  expectativa opcional que trava ao avaliar), `library` (livros do acervo, progresso
-  por dia + conclusão + nota), `bookshelf` (só avaliação, sem período) e `habit`
-  (check-in sem catálogo). As quatro chaves antigas (`cine_free`, `cine_curated`,
-  `reading_club`, `reading_daily`) continuam legíveis no banco mas não criam mais
-  estrutura. Estados `draft → active → closed`; período opcional; campos
-  semânticos estáveis.
-- **Acervo** — filme/livro tem identidade estável no grupo (`catalog_items`), com
-  atributos e gêneros; reaparece em outra rodada sem perder o histórico.
-- **Registros** — cada pessoa edita o próprio; owner/admin corrigem com motivo
-  (auditado). Um registro aponta item + dia + checkpoint conforme a receita.
+- **Grupos, papéis e Meu espaço** — o grupo é duradouro e reúne pessoas entre
+  rodadas. `owner` > `admin` > `participant`. Convites por link expirável / código
+  curto, ou por @usuário com aceite de quem é convidado. **Meu espaço** (`/personal`,
+  link no cabeçalho) é o espaço só seu — desafios, acervo e lixeira próprios, sem
+  grupo nem convites. Quem ainda não tem nada vê, no Início, uma tela de boas-vindas
+  com as partes de uma rodada e três formas de começar.
+- **Rodadas por receita** — seis criáveis: `cinema` (nota 0–5 + comentário, com
+  expectativa opcional que trava ao avaliar), `library` (livros, progresso por dia +
+  conclusão + nota), `bookshelf` (só avaliação, sem período), `habit` (check-in sem
+  catálogo), `tables` (restaurantes e afins, uma nota por dimensão) e `custom`
+  (qualquer biblioteca; você decide o que registrar). As quatro chaves antigas
+  (`cine_free`, `cine_curated`, `reading_club`, `reading_daily`) continuam legíveis
+  no banco mas não criam mais estrutura. Estados `draft → active → closed`; período
+  opcional; campos semânticos estáveis; itens em **etapas**; cronograma, campos e
+  itens seguem editáveis com o desafio ativo.
+- **Bibliotecas e acervo** — cada espaço organiza o que acompanha em bibliotecas:
+  Screens (filmes, séries…), Pages (livros e leituras), Tables (lugares) e as suas
+  próprias (Jogos, Séries…), renomeáveis, com propriedades que você mostra, oculta e
+  reordena. Um item tem identidade estável e reaparece em outra rodada sem perder o
+  histórico; uma rodada pode tirar itens de várias bibliotecas. O acervo mostra o que
+  está em nenhum desafio e remove em lote; uma biblioteca criada por você pode ser
+  excluída (os itens vão para a lixeira junto). Um item pode ter **data de evento**
+  (um dia ou horário com fuso) e um **indicador** — membro, nome guardado de quem
+  está fora do Goa, ou uma nota.
+- **Registros e respostas compartilhadas** — cada pessoa edita o próprio registro.
+  Uma resposta pode ser **do grupo** (um placar final, um veredito), gravada uma vez
+  por item, com política de quem preenche e aviso quando duas pessoas salvam ao
+  mesmo tempo. Um registro aponta item + dia + etapa conforme a receita.
 - **Análise** — `group_by` calculado: ranking com nota ajustada (bayesiana, com
   mínimo de amostra), polarização (desvio), surpresa × decepção (avaliação −
   expectativa), viés do indicador. As receitas já semeiam as métricas certas.
-- **Vitrine** — ao encerrar, o Goa gera a história (hero, KPIs, ranking, perfis,
-  melhores comentários) e congela um snapshot; owner/admin ajustam manchete/
-  resumo, regeneram e publicam em `/results/<token>` (desde a migração `0035`,
-  o banco guarda hash e token completo para reapresentar o link aos autorizados).
+- **Vitrine** — o Goa monta a história (hero, KPIs, ranking, perfis, melhores
+  comentários) e tudo se recalcula a cada leitura, sem passo de "regenerar";
+  owner/admin curam manchete, resumo e destaques a qualquer momento e publicam em
+  `/results/<token>` depois de encerrar (desde a migração `0035`, o banco guarda
+  hash e token completo para reapresentar o link aos autorizados). Nomes só
+  aparecem com o consentimento de cada pessoa, e sair do grupo ou revogar o
+  consentimento esconde a identidade na hora.
+- **Modelos** — desafios que um `platform_admin` publica em `/modelos`; qualquer
+  pessoa copia a estrutura (com ou sem os itens) para um grupo seu.
 - **`/admin`** — painel só de metadados para a conta `platform_admin`: uso,
   tamanho do banco, auditoria (sem textos privados), moderação de contas. **Não**
   tem lixeira global nem redefine senha — a lixeira é sempre do dono do conteúdo.
@@ -203,8 +226,8 @@ segurança e as decisões; [docs/api.md](docs/api.md) para os endpoints.
 ## Para onde vai
 
 [ROADMAP.md](ROADMAP.md) — escopo e histórico da V1.
-[Plano da Fase 2](docs/phase-2.md) — organização, edição e descoberta pública.
-[Releases](docs/releases.md) — revisão atual, pendências e versionamento no GitHub.
+[Plano da Fase 2](docs/phase-2.md) — o que falta: descoberta pública e beta.
+[Releases](docs/releases.md) — versionamento e checklist de lançamento no GitHub.
 
 ## Licença
 

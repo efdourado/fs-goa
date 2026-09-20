@@ -1,10 +1,13 @@
 # Roadmap GOA — Versão 1
 
-> **Estado:** tópicos 1–17 implementados em `main`. O gate final (§15–17) e a
-> execução dos 23 passos do §16 estão documentados em `docs/v1-acceptance.md`.
-> O código já inclui migrações até `0035`; aplicação no Neon precisa de verificação
-> operacional. Beta fechado real ainda é um gate. Revisão atual e próximos passos:
-> `docs/releases.md` e `docs/phase-2.md`.
+> **Estado:** este é o escopo e o histórico da **V1** — tópicos 1–17 implementados
+> em `main`; o gate final (§15–17) e os 23 passos do §16 estão em
+> `docs/v1-acceptance.md`. O produto seguiu além dele: seis receitas (não quatro),
+> bibliotecas de itens, respostas compartilhadas, datas de evento, indicadores
+> externos, Meu espaço e uma vitrine sempre calculada ao vivo. Onde este documento
+> e o código divergirem, vale o código: o estado atual está em
+> `docs/architecture.md` e `docs/api.md`. Próximos passos: `docs/releases.md`
+> e `docs/phase-2.md`.
 
 ## 1. Definição do produto
 
