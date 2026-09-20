@@ -8,7 +8,7 @@ import { ApiError } from "../../http";
 export type CheckpointKind = "day" | "week" | "session" | "milestone";
 const CHECKPOINT_KINDS: readonly CheckpointKind[] = ["day", "week", "session", "milestone"];
 
-export function isCheckpointKind(value: unknown): value is CheckpointKind {
+function isCheckpointKind(value: unknown): value is CheckpointKind {
   return typeof value === "string" && (CHECKPOINT_KINDS as readonly string[]).includes(value);
 }
 

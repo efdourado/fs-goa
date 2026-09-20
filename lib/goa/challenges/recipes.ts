@@ -18,7 +18,7 @@ import type { MetricOperation } from "./types";
  * `CATALOG_KIND` to pre-fill step 1. Bump `version` when an existing key's shape
  * changes so old rounds stay pinned to what they were built with.
  */
-export interface RecipeEntryType {
+interface RecipeEntryType {
   semanticKey: string;
   name: string;
   purpose: Purpose;
@@ -36,7 +36,7 @@ export interface RecipeEntryType {
  * with zero config. `fieldKey` is a field's semantic key on any of the recipe's
  * entry types (undefined for `count`/`completion_rate`).
  */
-export interface RecipeMetric {
+interface RecipeMetric {
   key: string;
   label: string;
   operation: MetricOperation;
@@ -52,7 +52,7 @@ export interface RecipeMetric {
   settings?: { minSample?: number; bayesPriorWeight?: number };
 }
 
-export interface Recipe {
+interface Recipe {
   key: RecipeKey;
   version: number;
   catalogKind: "film" | "book" | null;
@@ -86,32 +86,12 @@ export interface Recipe {
   metrics: RecipeMetric[];
 }
 
-/** Recipes offered for new challenges. Historical rows keep their frozen shape. */
-export type RecipeKey = "cinema" | "library" | "bookshelf" | "habit" | "custom" | "tables";
-
 /**
- * Stored by challenges created before the two-template consolidation. These keys
- * remain valid in the database so their existing entry types and fields can be
- * read faithfully, but `resolveRecipe` never creates a new challenge from them.
+ * Recipes offered for new challenges. Historical rows keep their frozen shape, and may carry an older
+ * key (`cine_free`, `cine_curated`, `reading_club`, `reading_daily`) that is still read faithfully but
+ * that `resolveRecipe` never creates a challenge from.
  */
-export type LegacyRecipeKey =
-  | "cine_free"
-  | "cine_curated"
-  | "reading_club"
-  | "reading_daily";
-
-export type StoredRecipeKey = RecipeKey | LegacyRecipeKey;
-
-const LEGACY_RECIPE_KEYS = new Set<string>([
-  "cine_free",
-  "cine_curated",
-  "reading_club",
-  "reading_daily",
-]);
-
-export function isLegacyRecipeKey(value: unknown): value is LegacyRecipeKey {
-  return typeof value === "string" && LEGACY_RECIPE_KEYS.has(value);
-}
+export type RecipeKey = "cinema" | "library" | "bookshelf" | "habit" | "custom" | "tables";
 
 export function isRecipeKey(value: unknown): value is RecipeKey {
   return value === "cinema" || value === "library" || value === "bookshelf" || value === "habit" || value === "custom" || value === "tables";

@@ -28,8 +28,6 @@ export const labelClass = "mb-1.5 block text-[13px] font-medium text-[var(--ink)
  * instead of a slightly different one-off.
  */
 export const sectionLabelClass = "text-base font-light";
-export const linkClass =
-  "px-4 py-2 border-l-1 rounded-xl border-[var(--muted)] underline-offset-4 hover:opacity-90 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50";
 /** Legacy plain back-link style; new screens use `<BackButton>`. */
 export const backLinkClass =
   "min-h-11 cursor-pointer text-sm font-light text-[var(--muted)] hover:text-[var(--ink)]";

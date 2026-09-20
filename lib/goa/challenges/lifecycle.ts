@@ -32,15 +32,15 @@ export async function transitionChallenge(
     if (reopening) {
       // Reabrir não repete a checagem de prontidão (já passou por ela uma vez) —
       // apenas libera os registros de novo e limpa a marca de encerramento.
-      // Uma vitrine publicada exige um desafio fechado (CHECK do banco) e o link é
-      // um snapshot congelado, então a mesma transação revoga a publicação e o
-      // token. Republicar depois de fechar de novo gera um link novo.
+      // Uma vitrine publicada exige um desafio fechado (CHECK do banco), então a
+      // mesma transação revoga a publicação e o token. Republicar depois de fechar
+      // de novo gera um link novo.
       const wasPublished = access.challenge.results_published_at !== null;
       await client.query(
         `UPDATE challenges
             SET status='active', closed_at=NULL,
                 results_published_at=NULL, result_share_token_hash=NULL,
-                result_share_token=NULL, results_published_snapshot=NULL, updated_at=now()
+                result_share_token=NULL, updated_at=now()
           WHERE id=$1`,
         [challengeId],
       );
@@ -91,7 +91,7 @@ export async function softDeleteChallenge(session: SessionContext, challengeId: 
     }
     // Sets `deleted_at` + the explicit bin row.
     await moveToTrash(client, "challenge", challengeId, session.user.id);
-    // Binning also takes the showcase offline for good: the snapshot may name
+    // Binning also takes the showcase offline for good: it may name
     // people, and clearing the token here means a later restore cannot silently
     // resurrect the old public URL — the admin has to publish again on purpose.
     await unpublishResults(client, challengeId);

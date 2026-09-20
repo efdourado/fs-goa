@@ -14,8 +14,8 @@ import {
 /**
  * Personal rankings + affinity — the derived Wrapped blocks that are not
  * `challenge_metrics` (V1 §9 "Rankings pessoais", §10 "Afinidade", §11 items
- * 7 / 9 / 12). Computed live for the in-app result and frozen into the published
- * snapshot. `groupBy=checkpoint` / metric editing stays out of here.
+ * 7 / 9 / 12). Always computed live — the in-app result and the public showcase
+ * both read them from here. `groupBy=checkpoint` / metric editing stays out of here.
  */
 
 const DIRECT_MIN_SAMPLE = 5;

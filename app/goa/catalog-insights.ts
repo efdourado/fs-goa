@@ -5,7 +5,7 @@
  * bucket average equals the mean of every rating in it, not a mean of means.
  */
 
-export interface CatalogItemLike {
+interface CatalogItemLike {
   mainGenre?: string | null;
   year?: number | null;
   ratingAvg?: number | null;

@@ -23,7 +23,7 @@ function optionalBoolean(value: unknown): boolean | null {
   return value;
 }
 
-export interface FeedbackContext {
+interface FeedbackContext {
   appVersion: string | null;
 }
 

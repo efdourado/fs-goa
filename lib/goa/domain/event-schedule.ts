@@ -14,14 +14,14 @@ export interface EventSchedule {
   timeZone: string;
 }
 
-export interface EventScheduleJson {
+interface EventScheduleJson {
   startsAt: string;
   endsAt: string | null;
   precision: "date" | "datetime";
   timeZone: string;
 }
 
-export interface EventScheduleRow {
+interface EventScheduleRow {
   scheduled_at: Date | null;
   scheduled_end_at: Date | null;
   scheduled_precision: "date" | "datetime";
@@ -97,7 +97,7 @@ export function eventScheduleColumns(schedule: EventSchedule | null) {
   };
 }
 
-export function eventScheduleFromRow(row: EventScheduleRow): EventSchedule | null {
+function eventScheduleFromRow(row: EventScheduleRow): EventSchedule | null {
   if (!row.scheduled_at) return null;
   return {
     startsAt: row.scheduled_at,

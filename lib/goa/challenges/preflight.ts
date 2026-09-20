@@ -12,7 +12,7 @@ import {
 } from "./entry-types";
 import { isRecipeKey, RECIPES } from "./recipes";
 
-export type PreflightSeverity = "error" | "warning";
+type PreflightSeverity = "error" | "warning";
 
 export interface PreflightIssue {
   /** Stable code — the client maps it to a localized message. */

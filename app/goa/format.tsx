@@ -12,7 +12,7 @@ export type Translator = ((key: string, values?: Record<string, string | number 
 export type Formatter = Pick<ReturnType<typeof useFormatter>, "dateTime">;
 
 /** The two ends of an item's window, plus whether they were entered as whole days or as a date and time. */
-export interface ItemWindow {
+interface ItemWindow {
   opensAt?: string | null;
   dueAt?: string | null;
   schedulePrecision?: "date" | "datetime";
@@ -153,7 +153,7 @@ export function makeGoaFormat(t: Translator, format: Formatter) {
   return { date, dateTime, dateRange, eventWhen, itemWindow, itemDeadline, itemStatusLabel, challengeStatusLabel, entryUnavailableMessage, error };
 }
 
-export type GoaFormat = ReturnType<typeof makeGoaFormat>;
+type GoaFormat = ReturnType<typeof makeGoaFormat>;
 
 export function useGoaFormat(): GoaFormat {
   const t = useTranslations();

@@ -2,8 +2,6 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
 import {
-  escapeCsvCell,
-  guardCsvFormula,
   validateBooleanValue,
   validateChoiceValue,
   validateDateValue,
@@ -118,28 +116,5 @@ describe("field dispatch and required values", () => {
     assert.deepEqual(validateFieldValue({ type: "choice", optionIds: ["yes"] }, "yes"), { ok: true, value: "yes" });
     assert.deepEqual(validateFieldValue({ type: "boolean" }, false), { ok: true, value: false });
     assert.deepEqual(validateFieldValue({ type: "date" }, "2027-01-01"), { ok: true, value: "2027-01-01" });
-  });
-});
-
-describe("CSV formula injection guard", () => {
-  test("prefixes spreadsheet formula and control-character payloads", () => {
-    for (const dangerous of [
-      "=1+1",
-      "+SUM(A1:A2)",
-      "-2+3",
-      "@cmd",
-      "   =HYPERLINK(\"https://evil.test\")",
-      "\tformula",
-      "\rformula",
-      "\nformula",
-    ] as const) {
-      assert.equal(guardCsvFormula(dangerous), `'${dangerous}`);
-    }
-  });
-
-  test("preserves ordinary text and quotes CSV cells after guarding", () => {
-    assert.equal(guardCsvFormula("A avaliação foi ótima"), "A avaliação foi ótima");
-    assert.equal(guardCsvFormula("1-2"), "1-2");
-    assert.equal(escapeCsvCell('=1+1,"filme"'), '"\'=1+1,""filme"""');
   });
 });

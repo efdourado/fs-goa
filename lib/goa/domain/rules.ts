@@ -1,11 +1,11 @@
 import { ApiError, stringValue } from "../../http";
 
-export interface ChallengeRuleTopic {
+interface ChallengeRuleTopic {
   title: string;
   description: string;
 }
 
-export interface ChallengeRuleSection {
+interface ChallengeRuleSection {
   title: string;
   description: string;
   topics?: ChallengeRuleTopic[];

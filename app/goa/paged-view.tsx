@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 
 import { cx } from "./ui";
 
-export interface PagedPage {
+interface PagedPage {
   id: string;
   title: string;
   body: ReactNode;

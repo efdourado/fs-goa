@@ -12,12 +12,6 @@ import { metricHasData, metricTheme } from "./utils";
 
 type Translator = ReturnType<typeof useTranslations>;
 
-/** "Ana", "Ana • Bruno", "Ana • Bruno • Caio", "Ana • Bruno • +4". */
-export function namesWithBullets(names: string[], max = 6): string {
-  if (names.length <= max) return names.join(" • ");
-  return [...names.slice(0, max), `+${names.length - max}`].join(" • ");
-}
-
 type ShowcaseComment = { id: string; text: string; itemTitle?: string | null };
 type SeriesTheme = "ranking" | "debate" | "people";
 

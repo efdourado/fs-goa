@@ -4,7 +4,7 @@ import { publicId } from "./shared";
 /** Longer strings are prose (a comment, a rule, a headline) — the audit trail
  *  keeps the shape of a change, not its content. */
 const REDACT_OVER = 60;
-export const REDACTED = "[texto omitido]";
+const REDACTED = "[texto omitido]";
 
 /**
  * Strips free text out of an audit `before`/`after` payload while keeping the
@@ -12,7 +12,7 @@ export const REDACTED = "[texto omitido]";
  * role. The platform admin needs to see *that* a field changed, never the
  * private text that went into it.
  */
-export function redactAuditPayload(value: unknown, depth = 0): unknown {
+function redactAuditPayload(value: unknown, depth = 0): unknown {
   if (value === null || value === undefined) return value ?? null;
   if (typeof value === "string") return value.length > REDACT_OVER ? REDACTED : value;
   if (typeof value === "number" || typeof value === "boolean") return value;

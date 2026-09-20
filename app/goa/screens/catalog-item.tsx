@@ -12,7 +12,7 @@ import type { CatalogItemDetail, CatalogLibrary, Id, Member } from "../types";
 import { BackButton, Button, cardClass, cx, EmptyState, LoadingView, PageHeading } from "../ui";
 import { formatRuntime } from "../utils";
 
-export interface CatalogItemEditing {
+interface CatalogItemEditing {
   members: Member[];
 }
 

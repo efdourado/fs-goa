@@ -163,7 +163,7 @@ function LockIcon() {
 }
 
 /** Imperative handle for a combined "save everything" button above several stacked sections. */
-export interface DynamicEntryFormHandle {
+interface DynamicEntryFormHandle {
   /** Saves this section if it's currently open for editing; a no-op (resolves `ok: true`) when it's collapsed/locked, since there's nothing to save. */
   submitIfEditing: () => Promise<{ ok: boolean }>;
 }

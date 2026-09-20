@@ -4,13 +4,13 @@ import { oneOrNull } from "../../db";
 import { ApiError } from "../../http";
 import { assertRecommendationsAllowed, assertRecommenderInGroup } from "../catalog";
 
-export interface ItemRecommender {
+interface ItemRecommender {
   userId: string | null;
   externalId: string | null;
   note: string | null;
 }
 
-export const NO_ITEM_RECOMMENDER: ItemRecommender = { userId: null, externalId: null, note: null };
+const NO_ITEM_RECOMMENDER: ItemRecommender = { userId: null, externalId: null, note: null };
 
 /**
  * Reads "who brought this in" off a request: a group member (`recommendedByUserId`),

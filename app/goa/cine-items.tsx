@@ -42,7 +42,7 @@ export interface CineRow {
   attributes: Record<string, string | number | boolean>;
 }
 
-export function newCineRow(title = "", extra: Partial<CineRow> = {}): CineRow {
+function newCineRow(title = "", extra: Partial<CineRow> = {}): CineRow {
   return {
     key: crypto.randomUUID(),
     title,
@@ -81,7 +81,7 @@ const KNOWN_PASTE_KEYS = new Set([
   "runtimeMinutes", "runtime_minutes", "duration", "durationMinutes",
 ].map((key) => key.toLowerCase()));
 
-export interface JsonPasteSummary {
+interface JsonPasteSummary {
   /** Entries in the pasted array, valid or not. */
   total: number;
   added: number;

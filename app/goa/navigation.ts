@@ -163,7 +163,7 @@ export type BackLabel =
   | { kind: "home" | "signIn" | "templates" | "mySpace" | "myCatalogue" | "catalogue" | "challenge" }
   | { kind: "named"; name: string };
 
-export interface BackTarget {
+interface BackTarget {
   screen: Screen;
   label: BackLabel;
 }

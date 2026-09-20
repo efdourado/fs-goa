@@ -25,9 +25,9 @@ import { purgeChallengeRows, purgeGroupRows } from "./purge";
 
 // ── kinds ──────────────────────────────────────────────────────────────────
 /** Independent units that get a real bin (`trash_items`). */
-export type BinKind = "group" | "challenge" | "catalog_item" | "entry";
+type BinKind = "group" | "challenge" | "catalog_item" | "entry";
 /** Structure recovered in place via `archived_at`; physical delete rides with the parent. */
-export type ArchiveKind =
+type ArchiveKind =
   | "challenge_item" | "checkpoint" | "entry_type" | "field" | "field_option" | "metric"
   | "catalog_attribute_def";
 export type TrashKind = BinKind | ArchiveKind;
@@ -41,7 +41,7 @@ const CHALLENGE_STRUCTURE: readonly ArchiveKind[] = [
   "challenge_item", "checkpoint", "entry_type", "field", "field_option", "metric",
 ];
 
-export interface Dependency {
+interface Dependency {
   type: string;
   count: number;
 }
@@ -59,7 +59,7 @@ interface RowContext {
   publishedTemplate: boolean;
 }
 
-export interface TrashItemView {
+interface TrashItemView {
   kind: TrashKind;
   id: string;
   label: string;
@@ -71,7 +71,7 @@ export interface TrashItemView {
   blocked: { code: string; message: string } | null;
 }
 
-export interface ActionPreview {
+interface ActionPreview {
   kind: TrashKind;
   id: string;
   label: string;
@@ -228,7 +228,7 @@ async function dependencies(client: PoolClient, row: RowContext): Promise<Depend
 // ── guards ────────────────────────────────────────────────────────────────
 
 /** May this object be moved to the bin at all? (bin kinds only) */
-async function trashGuard(client: PoolClient, row: RowContext): Promise<{ code: string; message: string; canArchive?: boolean } | null> {
+async function trashGuard(row: RowContext): Promise<{ code: string; message: string; canArchive?: boolean } | null> {
   switch (row.kind) {
     case "group":
       if (row.groupKind === "personal") return { code: "personal_workspace", message: "O espaço pessoal não pode ser excluído." };
@@ -515,7 +515,7 @@ export async function moveToTrash(
   opts: { reason?: string | null; skipMarker?: boolean } = {},
 ): Promise<void> {
   const row = await locate(client, kind, entityId);
-  const guard = await trashGuard(client, row);
+  const guard = await trashGuard(row);
   if (guard) throw new ApiError(409, guard.code, guard.message, guard.canArchive ? { canArchive: true } : undefined);
 
   // Personal-workspace content is scoped to that workspace ("Minha lixeira").

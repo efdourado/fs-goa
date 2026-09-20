@@ -1,11 +1,11 @@
 const textEncoder = new TextEncoder();
 
-export const USERNAME_MIN_LENGTH = 3;
-export const USERNAME_MAX_LENGTH = 32;
+const USERNAME_MIN_LENGTH = 3;
+const USERNAME_MAX_LENGTH = 32;
 export const PASSWORD_MIN_LENGTH = 10;
-export const PASSWORD_MAX_BYTES = 1024;
+const PASSWORD_MAX_BYTES = 1024;
 
-export const PASSWORD_HASH_VERSION = 1;
+const PASSWORD_HASH_VERSION = 1;
 export const PASSWORD_HASH_ITERATIONS = 600_000;
 export const PASSWORD_HASH_BYTES = 32;
 export const PASSWORD_SALT_BYTES = 16;

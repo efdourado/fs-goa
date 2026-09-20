@@ -12,10 +12,6 @@ import { cx } from "./ui";
 /** Where a catalogue lives: the caller's own space, or one group's. */
 export type CatalogScope = "personal" | { groupId: Id };
 
-export function scopeKey(scope: CatalogScope): string {
-  return scope === "personal" ? "personal" : scope.groupId;
-}
-
 /**
  * A library's display name: whatever someone typed, or the product name for its
  * source (Screens, Pages, Tables) until they rename it. `label` is never
@@ -27,13 +23,13 @@ export function useLibraryName(): (library: Pick<CatalogLibrary, "label" | "sour
 }
 
 /** The two built-in libraries every workspace can use before it has created anything. */
-export const BUILT_IN_LIBRARIES: ReadonlyArray<{ kind: "film" | "book"; source: "screens" | "pages" }> = [
+const BUILT_IN_LIBRARIES: ReadonlyArray<{ kind: "film" | "book"; source: "screens" | "pages" }> = [
   { kind: "film", source: "screens" },
   { kind: "book", source: "pages" },
 ];
 
 /** Libraries as a picker sees them: real ones plus the built-ins not created yet (made the first time they get an item). */
-export interface LibraryChoice {
+interface LibraryChoice {
   /** `null` for a built-in that doesn't exist yet. */
   id: Id | null;
   kind: string;

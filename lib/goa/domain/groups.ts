@@ -85,7 +85,7 @@ export async function assertUnderMembershipCap(
 }
 
 /** Bounds the pile of unanswered directed invites a single account can receive. */
-export async function assertUnderPendingInviteCap(
+async function assertUnderPendingInviteCap(
   client: PoolClient,
   userId: string,
 ): Promise<void> {
@@ -342,10 +342,10 @@ export async function respondToMemberRequest(
  * asked, because there is nothing to choose: their entries stay (the round's
  * history stays intact) but every place that names them (recommended-by,
  * per-participant metrics) shows a neutral "left the group" label instead, the
- * same way a deleted account already shows "Conta removida". Any published
- * showcase in the group is pulled offline and regenerated without them (V1 §12);
- * the admin republishes when ready. The owner cannot leave (no ownership
- * transfer yet — delete the group instead).
+ * same way a deleted account already shows "Conta removida". A published
+ * showcase keeps serving — its identity masking is computed live from the roster
+ * (`maskShowcaseIdentities`), so their name disappears from it at once (V1 §12).
+ * The owner cannot leave (no ownership transfer yet — delete the group instead).
  */
 export async function leaveGroup(session: SessionContext, groupId: string) {
   return inTransaction(async (client) => {
@@ -553,11 +553,11 @@ export async function softDeleteGroup(session: SessionContext, groupId: string) 
     // Sets `deleted_at` + records the explicit bin row (or 409s on a published
     // template). Restore and permanent deletion go through `lib/goa/trash.ts`.
     await moveToTrash(client, "group", groupId, session.user.id);
-    // Every public showcase in the group goes offline with it — the snapshot may
-    // still name people; the admin republishes after a restore.
+    // Every public showcase in the group goes offline with it — it may name
+    // people; the admin republishes after a restore.
     await client.query(
       `UPDATE challenges SET results_published_at = NULL, result_share_token_hash = NULL,
-          result_share_token = NULL, results_published_snapshot = NULL, updated_at = now()
+          result_share_token = NULL, updated_at = now()
         WHERE group_id = $1 AND results_published_at IS NOT NULL`,
       [groupId],
     );

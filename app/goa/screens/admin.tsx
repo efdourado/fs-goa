@@ -84,7 +84,7 @@ function ShowMoreList<T>({
     </>
   );
 }
-export interface DuplicateTargetGroup {
+interface DuplicateTargetGroup {
   id: Id;
   name: string;
   challengeCount: number;
@@ -604,7 +604,7 @@ export function FieldEditorDialog({
   );
 }
 
-export type ItemUpdatePayload = { title: string; description: string } & Record<string, unknown>;
+type ItemUpdatePayload = { title: string; description: string } & Record<string, unknown>;
 
 export function ItemEditorDialog({
   item,

@@ -56,6 +56,8 @@ export const challenges = pgTable(
     // The frozen document served at /results/<token>: title, dates, the
     // (already anonymized) participant list and result blocks as of the last
     // publish. Editing the draft afterwards never touches this until republish.
+    // Legacy: the published showcase is computed live now, so nothing reads or writes this.
+    // Drop it in a future migration.
     resultsPublishedSnapshot: jsonb("results_published_snapshot"),
     // When true (the default — V1 §12), the public /results page replaces
     // participant names with "Participante 1, 2…". Even when false, a

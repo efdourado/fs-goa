@@ -3,7 +3,6 @@ import test from "node:test";
 
 import {
   applyOrder,
-  checkpointTimeframe,
   seededShuffle,
   type OrderableItem,
 } from "../app/goa/ordering";
@@ -72,12 +71,4 @@ test("distribute with a seed still fills every checkpoint evenly", () => {
     return acc;
   }, {});
   assert.deepEqual(counts, { a: 3, b: 3 });
-});
-
-test("checkpointTimeframe splits past / current / future around now", () => {
-  const now = Date.parse("2026-03-15T12:00:00Z");
-  assert.equal(checkpointTimeframe("2026-03-20T00:00:00Z", "2026-03-27T00:00:00Z", now), "future");
-  assert.equal(checkpointTimeframe("2026-03-01T00:00:00Z", "2026-03-08T00:00:00Z", now), "past");
-  assert.equal(checkpointTimeframe("2026-03-10T00:00:00Z", "2026-03-17T00:00:00Z", now), "current");
-  assert.equal(checkpointTimeframe(null, null, now), "current");
 });

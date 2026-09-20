@@ -1,6 +1,6 @@
 export type MetricOperation = "sum" | "average" | "count" | "min" | "max" | "completion_rate";
 
-export interface MetricInput {
+interface MetricInput {
   operation: MetricOperation;
   values?: readonly number[];
   completed?: number;
@@ -8,7 +8,7 @@ export interface MetricInput {
   decimalPlaces?: number;
 }
 
-export interface MetricResult {
+interface MetricResult {
   value: number | null;
   sampleSize: number;
 }

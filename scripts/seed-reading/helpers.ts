@@ -6,9 +6,9 @@ import { oneOrNull, withClient } from "../../lib/db";
 
 import { SEED_TITLE } from "./data";
 
-export const SEED_USERNAME = "dudupizzas";
+const SEED_USERNAME = "dudupizzas";
 
-export interface SeedAccount {
+interface SeedAccount {
   id: string;
   username: string;
   name: string;
@@ -66,7 +66,7 @@ export function sessionFor(account: SeedAccount): SessionContext {
   };
 }
 
-export interface CliOptions { dryRun: boolean; reset: boolean }
+interface CliOptions { dryRun: boolean; reset: boolean }
 
 export function parseArgs(argv: string[]): CliOptions {
   let dryRun = false;
@@ -92,7 +92,7 @@ export function pastWindow(days: number, endGap = 3): { startsOn: string; endsOn
   return { startsOn: addDays(endsOn, -(days - 1)), endsOn };
 }
 
-export interface ChallengeShape {
+interface ChallengeShape {
   typeByPurpose: Map<string, string>;
   fieldId: (key: string, purpose?: string) => string;
   itemId: (title: string) => string;

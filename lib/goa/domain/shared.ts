@@ -23,7 +23,7 @@ export function dateString(value: unknown, name: string): string {
   return result.value;
 }
 
-export interface ChallengeDateRange {
+interface ChallengeDateRange {
   startDate: string | null;
   endDate: string | null;
 }

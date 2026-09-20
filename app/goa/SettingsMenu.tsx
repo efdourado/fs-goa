@@ -17,7 +17,7 @@ import { cx, NotificationBell, NotificationList } from "./ui";
  * locale cookie and refreshes the layout; an optimistic value keeps the pill
  * from snapping back while the refresh lands.
  */
-export function LanguageSegmented({ className }: { className?: string }) {
+function LanguageSegmented({ className }: { className?: string }) {
   const t = useTranslations("language");
   const active = useLocale();
   const router = useRouter();

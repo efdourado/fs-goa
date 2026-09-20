@@ -68,14 +68,12 @@ export const API_PATHS = {
   groupCatalog: (groupId: Id) => `/api/groups/${encodeURIComponent(groupId)}/catalog`,
   groupCatalogItem: (groupId: Id, itemId: Id) =>
     `/api/groups/${encodeURIComponent(groupId)}/catalog/${encodeURIComponent(itemId)}`,
-  personalCatalog: "/api/personal/catalog",
   personalCatalogItem: (itemId: Id) => `/api/personal/catalog/${encodeURIComponent(itemId)}`,
   catalogItem: (itemId: Id) => `/api/catalog/${encodeURIComponent(itemId)}`,
   catalogLibrary: (libraryId: Id) => `/api/catalog/libraries/${encodeURIComponent(libraryId)}`,
   libraryProperties: (libraryId: Id) => `/api/catalog/libraries/${encodeURIComponent(libraryId)}/properties`,
   libraryProperty: (libraryId: Id, key: string) =>
     `/api/catalog/libraries/${encodeURIComponent(libraryId)}/properties/${encodeURIComponent(key)}`,
-  catalogRecommender: (recommenderId: Id) => `/api/catalog/recommenders/${encodeURIComponent(recommenderId)}`,
   catalogWorkspace: (scope: "personal" | { groupId: Id }) => ({
     items: scope === "personal" ? "/api/personal/catalog/items" : `/api/groups/${encodeURIComponent(scope.groupId)}/catalog/items`,
     remove: scope === "personal" ? "/api/personal/catalog/remove" : `/api/groups/${encodeURIComponent(scope.groupId)}/catalog/remove`,
@@ -89,10 +87,8 @@ export const API_PATHS = {
         : `/api/groups/${encodeURIComponent(scope.groupId)}/catalog/search?${searchParams(query)}`,
     item: (itemId: Id) => scope === "personal" ? `/api/personal/catalog/${encodeURIComponent(itemId)}` : `/api/catalog/${encodeURIComponent(itemId)}`,
   }),
-  groupCatalogAttributes: (groupId: Id) => `/api/groups/${encodeURIComponent(groupId)}/catalog-attributes`,
   groupCatalogAttribute: (groupId: Id, attributeId: Id) =>
     `/api/groups/${encodeURIComponent(groupId)}/catalog-attributes/${encodeURIComponent(attributeId)}`,
-  personalCatalogAttributes: "/api/personal/catalog-attributes",
   personalCatalogAttribute: (attributeId: Id) => `/api/personal/catalog-attributes/${encodeURIComponent(attributeId)}`,
   groupMembers: (groupId: Id) => `/api/groups/${encodeURIComponent(groupId)}/members`,
   groupMember: (groupId: Id, userId: Id) =>
@@ -119,8 +115,6 @@ export const API_PATHS = {
     `/api/challenges/${encodeURIComponent(challengeId)}/expectation`,
   nameConsent: (challengeId: Id) =>
     `/api/challenges/${encodeURIComponent(challengeId)}/consent`,
-  resultBlocks: (challengeId: Id) =>
-    `/api/challenges/${encodeURIComponent(challengeId)}/results/blocks`,
   items: (challengeId: Id) => `/api/challenges/${encodeURIComponent(challengeId)}/items`,
   item: (challengeId: Id, itemId: Id) =>
     `/api/challenges/${encodeURIComponent(challengeId)}/items/${encodeURIComponent(itemId)}`,

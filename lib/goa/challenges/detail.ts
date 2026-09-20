@@ -42,7 +42,7 @@ type ChallengeStatus = "draft" | "active" | "closed";
  * shaped for the client. Shared by the in-group detail and the public template
  * preview.
  */
-export async function detailItems(
+async function detailItems(
   client: PoolClient,
   challengeId: string,
   groupId: string,
@@ -125,7 +125,7 @@ export async function detailItems(
 }
 
 /** The dated sessions (weeks / milestones / generated days), shaped for the client. */
-export async function detailCheckpoints(
+async function detailCheckpoints(
   client: PoolClient,
   challengeId: string,
   status: ChallengeStatus,
@@ -191,7 +191,7 @@ type ParticipantRow = { id: string; display_name: string; username: string; name
 /**
  * Shapes a `ChallengeDetail` from an already-loaded challenge row. `getChallengeDetail`
  * feeds it the in-group view (real participants, live result); `getTemplatePreview`
- * feeds it the public view (no participants, the frozen published showcase).
+ * feeds it the public view (no participants, the showcase computed for a visitor).
  */
 export async function buildChallengeDetail(
   client: PoolClient,
@@ -237,9 +237,8 @@ export async function buildChallengeDetail(
   const primaryEntryTypeId = primaryType?.id ?? null;
   const completionEntryTypeId = completionType?.id ?? null;
   const metrics = await metricsForChallenge(client, challengeId);
-  // Rankings + affinity update live while the round is open (ROADMAP §11). Once
-  // closed they are frozen in `result_blocks` and this flag is a no-op. The
-  // template preview passes its own `result` (the frozen published snapshot).
+  // Rankings + affinity are computed live from the entries; `result_blocks` only
+  // decides which of them show. The template preview passes its own `result`.
   const result = "result" in opts
     ? opts.result
     : await resultForChallenge(client, challengeId, metrics, { liveRankings: true });

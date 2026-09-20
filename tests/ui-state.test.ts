@@ -829,7 +829,7 @@ test("detalhe do modelo: a mesma tela do desafio, só leitura — cabeçalho, re
 });
 
 test("dashboard: shelves split by pin, workspace and status; colour filter narrows", async () => {
-  const { splitShelves, sortByIndex, applyColorFilter } = await import("../app/goa/screens/dashboard");
+  const { splitShelves, applyColorFilter } = await import("../app/goa/screens/dashboard");
   const c = (over: Partial<import("../app/goa/types").ChallengeSummary>): import("../app/goa/types").ChallengeSummary => ({
     id: over.id ?? "x", groupId: over.groupId ?? "g", title: over.title ?? "T", status: over.status ?? "active", ...over,
   });
@@ -849,9 +849,4 @@ test("dashboard: shelves split by pin, workspace and status; colour filter narro
 
   assert.deepEqual(applyColorFilter(shelves.running, "green").map((x) => x.id), ["run"]);
   assert.deepEqual(applyColorFilter(shelves.running, null).map((x) => x.id), ["run", "run2"]);
-
-  const sorted = sortByIndex([
-    c({ id: "b", sortIndex: 2 }), c({ id: "a", sortIndex: 0 }), c({ id: "n" }), c({ id: "c", sortIndex: 1 }),
-  ]);
-  assert.deepEqual(sorted.map((x) => x.id), ["a", "c", "b", "n"], "unset sortIndex falls to the end");
 });

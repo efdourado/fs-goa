@@ -27,11 +27,11 @@ export const VISIBILITY_POLICIES: readonly VisibilityPolicy[] = [
   "group_realtime", "after_own", "after_close", "author_only",
 ];
 
-export function isVisibilityPolicy(value: unknown): value is VisibilityPolicy {
+function isVisibilityPolicy(value: unknown): value is VisibilityPolicy {
   return typeof value === "string" && (VISIBILITY_POLICIES as readonly string[]).includes(value);
 }
 
-export interface EntryTypeRow {
+interface EntryTypeRow {
   id: string;
   challenge_id: string;
   semantic_key: string;
@@ -222,7 +222,7 @@ export function usesRoundItems(types: EntryTypeRow[]): boolean {
   return types.some((type) => targetPolicyOf(type) !== "none");
 }
 
-export const EXPECTATION_SEMANTIC_KEY = "expectativa";
+const EXPECTATION_SEMANTIC_KEY = "expectativa";
 
 /**
  * The optional Cinema/Estante "Expectativa" type (V1 §3.1): a pre-watch 0–5

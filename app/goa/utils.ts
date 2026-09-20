@@ -20,7 +20,7 @@ export function isPersonalChallenge(
     || (personalWorkspaceId !== null && challenge.groupId === personalWorkspaceId);
 }
 
-export type MetricTheme = "ranking" | "people" | "debate";
+type MetricTheme = "ranking" | "people" | "debate";
 
 /**
  * Groups a results-page ranking by theme instead of a flat stack: "by person"
@@ -50,13 +50,6 @@ export function metricHasData(metric: { value?: unknown; series?: Array<{ value:
   return metric.value !== null && metric.value !== undefined && metric.value !== "";
 }
 
-/** "Ana", "Ana e Bruno", "Ana, Bruno e Caio", "Ana, Bruno e mais 4". */
-export function participantsSentence(names: string[], andMore: (count: number) => string): string {
-  const list = new Intl.ListFormat(undefined, { style: "long", type: "conjunction" });
-  if (names.length <= 3) return list.format(names);
-  return list.format([...names.slice(0, 2), andMore(names.length - 2)]);
-}
-
 export function slugify(value: string): string {
   return value
     .normalize("NFD")
@@ -66,7 +59,7 @@ export function slugify(value: string): string {
     .replace(/^_+|_+$/g, "") || "campo";
 }
 
-export function formatDate(value?: string | null, options?: Intl.DateTimeFormatOptions): string {
+function formatDate(value?: string | null, options?: Intl.DateTimeFormatOptions): string {
   if (!value) return "Sem data";
   const date = new Date(value.length === 10 ? `${value}T12:00:00` : value);
   if (Number.isNaN(date.getTime())) return value;
@@ -82,13 +75,6 @@ export function formatDateTime(value?: string | null): string {
     hour: "2-digit",
     minute: "2-digit",
   });
-}
-
-export function formatDateRange(startsOn?: string | null, endsOn?: string | null): string {
-  if (startsOn && endsOn) return `${formatDate(startsOn)} — ${formatDate(endsOn)}`;
-  if (startsOn) return `Desde ${formatDate(startsOn)}`;
-  if (endsOn) return `Até ${formatDate(endsOn)}`;
-  return "Sem datas";
 }
 
 /**
@@ -114,29 +100,6 @@ export function inclusiveDayCount(startsOn?: string | null, endsOn?: string | nu
   const end = Date.parse(`${endsOn}T00:00:00Z`);
   if (Number.isNaN(start) || Number.isNaN(end) || end < start) return null;
   return Math.round((end - start) / 86_400_000) + 1;
-}
-
-export function inviteTokenFromText(value: string, baseUrl = "https://goa.invalid"): string {
-  const trimmed = value.trim();
-  if (!trimmed) return "";
-
-  try {
-    const url = new URL(trimmed, baseUrl);
-    const queryToken = url.searchParams.get("invite")?.trim();
-    if (queryToken) return queryToken;
-    const pathToken = url.pathname.split("/").filter(Boolean).at(-1);
-    if (pathToken) {
-      try {
-        return decodeURIComponent(pathToken);
-      } catch {
-        return pathToken;
-      }
-    }
-  } catch {
-    // Mantém compatibilidade com um código bruto ou texto parcialmente colado.
-  }
-
-  return trimmed.split("/").filter(Boolean).at(-1) ?? trimmed;
 }
 
 export function dateKeyInSaoPaulo(now: Date): string {
@@ -249,7 +212,7 @@ export function itemIdForEntry(entry: Entry): Id | null {
   return entry.itemId ?? entry.checkpointId ?? null;
 }
 
-export type CommentBlock = { kind: "quote" | "text" | "divider"; text: string };
+type CommentBlock = { kind: "quote" | "text" | "divider"; text: string };
 
 const OPENS_QUOTE = /^['‘]/;
 const CLOSES_QUOTE = /['’]$/;

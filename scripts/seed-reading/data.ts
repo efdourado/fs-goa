@@ -17,7 +17,7 @@ export const SEED_DESCRIPTION = "Um trimestre de leitura: páginas registradas t
 export const SEED_HEADLINE = "6 livros, 2.201 páginas, um trimestre de leitura.";
 export const SEED_SUMMARY = "Desafio pessoal de leitura: páginas por dia, um livro por vez, nota e comentário ao terminar. Métricas de ritmo semanal, páginas por gênero e ranking dos livros.";
 
-export interface SeedBook {
+interface SeedBook {
   title: string;
   author: string;
   year: number;

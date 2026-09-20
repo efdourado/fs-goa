@@ -5,7 +5,7 @@ import { useSyncExternalStore } from "react";
 
 import { Segmented } from "./Segmented";
 
-export type ThemePreference = "system" | "light" | "dark";
+type ThemePreference = "system" | "light" | "dark";
 
 const STORAGE_KEY = "goa-theme";
 const PREFERENCES: ThemePreference[] = ["system", "light", "dark"];

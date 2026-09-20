@@ -19,7 +19,7 @@ import {
 
 export type GroupRole = "owner" | "admin" | "participant";
 
-export interface AuthenticatedUser {
+interface AuthenticatedUser {
   id: string;
   name: string;
   username: string;
@@ -52,7 +52,6 @@ interface SessionRow extends UserRow {
 const DUMMY_PASSWORD_HASH =
   "PBKDF2-SHA256$v=1$i=600000$l=32$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 const SESSION_LIFETIME_MS = SESSION_COOKIE_MAX_AGE_SECONDS * 1_000;
-const LOGIN_WINDOW_MS = 15 * 60 * 1_000;
 const LOGIN_MAX_FAILURES = 10;
 
 /** Login accepts a username or an e-mail — resolve which, and how to normalize it. */
@@ -446,11 +445,11 @@ export async function deleteOwnAccount(
     }
 
     // Unpublish the departing person's showcases in the groups that survive —
-    // the frozen snapshot may name them. An admin republishes when ready.
+    // their name or words may appear in them. An admin republishes when ready.
     await client.query(
       `UPDATE challenges c
           SET results_published_at = NULL, result_share_token_hash = NULL,
-              result_share_token = NULL, results_published_snapshot = NULL, updated_at = now()
+              result_share_token = NULL, updated_at = now()
         WHERE c.results_published_at IS NOT NULL AND c.deleted_at IS NULL
           AND EXISTS (SELECT 1 FROM challenge_participants cp WHERE cp.challenge_id = c.id AND cp.user_id = $1)`,
       [session.user.id],
@@ -583,7 +582,7 @@ export async function csrfForSession(session: SessionContext): Promise<string> {
   return deriveCsrfToken(session.rawToken);
 }
 
-export async function groupRole(userId: string, groupId: string, client?: PoolClient): Promise<GroupRole | null> {
+async function groupRole(userId: string, groupId: string, client?: PoolClient): Promise<GroupRole | null> {
   const work = async (activeClient: PoolClient) => {
     const row = await oneOrNull<{ role: GroupRole }>(
       activeClient,
@@ -609,8 +608,3 @@ export async function requireGroupRole(
   if (!allowed.includes(role)) throw new ApiError(403, "forbidden", "Você não pode executar esta ação.");
   return role;
 }
-
-export const LOGIN_SECURITY_POLICY = Object.freeze({
-  maxFailures: LOGIN_MAX_FAILURES,
-  windowMs: LOGIN_WINDOW_MS,
-});

@@ -5,7 +5,7 @@
  * thin sample into `value: null` while still reporting how thin it was.
  */
 
-export interface AnalysisResult {
+interface AnalysisResult {
   value: number | null;
   sampleSize: number;
 }
@@ -84,7 +84,7 @@ export interface AffinityDimension {
   weight: number;
 }
 
-export interface CompositeAffinityResult {
+interface CompositeAffinityResult {
   value: number | null;
   /** Dimensions that actually contributed, with their post-redistribution weight. */
   used: Array<{ key: string; value: number; weight: number; sampleSize: number }>;

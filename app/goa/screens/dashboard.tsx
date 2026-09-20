@@ -38,8 +38,8 @@ import { canManage, isChallengeScheduled, isLivingList, isPersonalChallenge } fr
 
 // ── shelf helpers (pure, unit-tested) ────────────────────────────────────
 
-export type ShelfKey = "pinned" | "running" | "space" | "archive";
-export const CHALLENGE_SHELF_ORDER: ShelfKey[] = ["pinned", "running", "space", "archive"];
+type ShelfKey = "pinned" | "running" | "space" | "archive";
+const CHALLENGE_SHELF_ORDER: ShelfKey[] = ["pinned", "running", "space", "archive"];
 
 /**
  * Split the viewer's challenges into the four homepage shelves. A pinned
@@ -58,18 +58,6 @@ export function splitShelves(
     else out.archive.push(challenge);
   }
   return out;
-}
-
-/** Stable sort by the viewer's manual `sortIndex` (unset falls to the end). */
-export function sortByIndex(challenges: ChallengeSummary[]): ChallengeSummary[] {
-  return challenges
-    .map((challenge, i) => ({ challenge, i }))
-    .sort((a, b) => {
-      const ai = a.challenge.sortIndex ?? Number.MAX_SAFE_INTEGER;
-      const bi = b.challenge.sortIndex ?? Number.MAX_SAFE_INTEGER;
-      return ai === bi ? a.i - b.i : ai - bi;
-    })
-    .map((entry) => entry.challenge);
 }
 
 export function applyColorFilter(
@@ -408,7 +396,7 @@ export function ActiveChallengeCard({
   );
 }
 
-export function ArchiveChallengeRow({
+function ArchiveChallengeRow({
   challenge,
   onOpen,
 }: {

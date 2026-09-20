@@ -3,7 +3,6 @@ import { describe, test } from "node:test";
 
 import { ApiError } from "../lib/http";
 import {
-  isLegacyRecipeKey,
   isRecipeKey,
   recipeCollectsEntryDate,
   resolveRecipe,
@@ -107,9 +106,8 @@ describe("current challenge recipes", () => {
     assert.deepEqual(recipe.metrics.map((metric) => metric.fieldKey), ["comida", "ambiente_atendimento", "custo_beneficio", undefined]);
   });
 
-  test("legacy keys remain identifiable but cannot seed a new challenge", () => {
+  test("legacy keys are not recipes and cannot seed a new challenge", () => {
     for (const key of ["cine_free", "cine_curated", "reading_club", "reading_daily"] as const) {
-      assert.equal(isLegacyRecipeKey(key), true);
       assert.equal(isRecipeKey(key), false);
       assertInvalidRecipe(key);
     }

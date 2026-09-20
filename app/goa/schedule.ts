@@ -72,7 +72,7 @@ export function browserTimeZone(): string {
   }
 }
 
-export function isKnownTimeZone(zone: string): boolean {
+function isKnownTimeZone(zone: string): boolean {
   if (!zone.trim()) return false;
   try {
     new Intl.DateTimeFormat("en-US", { timeZone: zone });

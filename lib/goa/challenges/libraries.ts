@@ -8,7 +8,7 @@ import { writeAudit } from "../domain/audit";
 import { ensureCatalogLibrary, resolveItemKind } from "../catalog";
 import { entryTypesForChallenge, recipeCatalogKind, usesRoundItems } from "./entry-types";
 
-export interface ChallengeLibraryRow {
+interface ChallengeLibraryRow {
   /** `null` for a built-in library (Screens/Pages) that has never held an item, so has no row yet. */
   id: string | null;
   kind: string;

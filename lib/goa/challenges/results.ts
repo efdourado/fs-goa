@@ -214,7 +214,7 @@ function explainMetric(
   }
 }
 
-export async function calculateMetricRow(
+async function calculateMetricRow(
   client: PoolClient,
   metric: MetricRow,
 ): Promise<Record<string, unknown>> {
@@ -1202,10 +1202,9 @@ export async function curateResults(
 }
 
 /**
- * Admin reorders the Wrapped's blocks and toggles which ones show, without
- * rebuilding them — the frozen values stay frozen (V1 §11 "O administrador
- * escolhe ordem e visibilidade dos blocos", "Valores calculados não podem ser
- * editados").
+ * Admin reorders the Wrapped's blocks and toggles which ones show — only order
+ * and visibility change, never a computed value (V1 §11 "O administrador escolhe
+ * ordem e visibilidade dos blocos", "Valores calculados não podem ser editados").
  */
 export async function reorderResultBlocks(
   session: SessionContext,
@@ -1261,7 +1260,7 @@ export async function reorderResultBlocks(
  * person's identity the moment either surface is next read, with no admin
  * action needed, and a rejoin (a fresh `name_consent=false` row) never
  * restores it. Only identity/attribution fields change here — the caller's
- * `result` already carries the curated text and frozen scores from
+ * `result` already carries the curated text and the live scores from
  * `resultForChallenge`, untouched.
  *
  * Every participant-grouped series, the personal rankings and the affinity
@@ -1455,7 +1454,7 @@ export async function unpublishResults(client: PoolClient, challengeId: string):
   await client.query(
     `UPDATE challenges
         SET results_published_at=NULL, result_share_token_hash=NULL,
-            result_share_token=NULL, results_published_snapshot=NULL, updated_at=now()
+            result_share_token=NULL, updated_at=now()
       WHERE id=$1`,
     [challengeId],
   );
@@ -1477,8 +1476,8 @@ export async function unpublishChallengeResults(session: SessionContext, challen
 
 /**
  * The public `/results/<token>` page. Computed live on every request — the
- * curated headline/summary/metric values come from `resultForChallenge`
- * (frozen at whatever point the admin last saved the showcase), and identity
+ * curated headline/summary come from `resultForChallenge` (as last saved by the
+ * admin) with its metric values computed live, and identity
  * masking comes from `maskShowcaseIdentities` (always the CURRENT roster) —
  * so a save propagates immediately, and so does a leave/removal/consent
  * change, with no separate publish step for either. Fails closed: if the

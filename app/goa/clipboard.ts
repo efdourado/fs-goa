@@ -1,7 +1,7 @@
 type CopySource = Pick<HTMLInputElement | HTMLTextAreaElement, "focus" | "select" | "setSelectionRange" | "value">;
 
 /** Carries a stable `code` so the UI layer can localise the failure. */
-export class ClipboardError extends Error {
+class ClipboardError extends Error {
   constructor(public readonly code: "clipboard_empty" | "clipboard_failed") {
     super(code);
     this.name = "ClipboardError";

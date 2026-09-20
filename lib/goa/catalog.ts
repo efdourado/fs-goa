@@ -71,10 +71,6 @@ export async function enableLibraryEventSchedule(
   );
 }
 
-export function normalizeLabel(value: string): string {
-  return normalizeTitle(value).slice(0, 80);
-}
-
 /** Matches the database's book-identity expression without altering accents. */
 function normalizeAuthor(value: string): string {
   return value.toLowerCase().replace(/\s+/gu, " ").trim();
@@ -89,7 +85,7 @@ function optionalInt(value: unknown, min: number, max: number, name: string): nu
   return number;
 }
 
-export interface CatalogAttributes {
+interface CatalogAttributes {
   author?: unknown;
   year?: unknown;
   mainGenre?: unknown;

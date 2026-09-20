@@ -1,9 +1,9 @@
-export const DEFAULT_TEXT_MAX_LENGTH = 5_000;
-export const NUMBER_ABSOLUTE_LIMIT = Number.MAX_SAFE_INTEGER;
+const DEFAULT_TEXT_MAX_LENGTH = 5_000;
+const NUMBER_ABSOLUTE_LIMIT = Number.MAX_SAFE_INTEGER;
 
 export type FieldType = "text" | "number" | "rating" | "choice" | "boolean" | "date";
 
-export type ValidationCode =
+type ValidationCode =
   | "required"
   | "invalid_type"
   | "invalid_text"
@@ -15,16 +15,16 @@ export type ValidationCode =
   | "invalid_date"
   | "invalid_configuration";
 
-export type ValidationResult<T> =
+type ValidationResult<T> =
   | { ok: true; value: T }
   | { ok: false; code: ValidationCode; message: string };
 
-export interface TextConstraints {
+interface TextConstraints {
   minLength?: number;
   maxLength?: number;
 }
 
-export interface NumberConstraints {
+interface NumberConstraints {
   min?: number;
   max?: number;
   step?: number;
@@ -34,28 +34,28 @@ interface BaseFieldDefinition {
   required?: boolean;
 }
 
-export interface TextFieldDefinition extends BaseFieldDefinition, TextConstraints {
+interface TextFieldDefinition extends BaseFieldDefinition, TextConstraints {
   type: "text";
 }
 
-export interface NumberFieldDefinition extends BaseFieldDefinition, NumberConstraints {
+interface NumberFieldDefinition extends BaseFieldDefinition, NumberConstraints {
   type: "number";
 }
 
-export interface RatingFieldDefinition extends BaseFieldDefinition {
+interface RatingFieldDefinition extends BaseFieldDefinition {
   type: "rating";
 }
 
-export interface ChoiceFieldDefinition extends BaseFieldDefinition {
+interface ChoiceFieldDefinition extends BaseFieldDefinition {
   type: "choice";
   optionIds: readonly string[];
 }
 
-export interface BooleanFieldDefinition extends BaseFieldDefinition {
+interface BooleanFieldDefinition extends BaseFieldDefinition {
   type: "boolean";
 }
 
-export interface DateFieldDefinition extends BaseFieldDefinition {
+interface DateFieldDefinition extends BaseFieldDefinition {
   type: "date";
 }
 
@@ -67,7 +67,7 @@ export type FieldDefinition =
   | BooleanFieldDefinition
   | DateFieldDefinition;
 
-export type FieldValue = string | number | boolean | null;
+type FieldValue = string | number | boolean | null;
 
 function valid<T>(value: T): ValidationResult<T> {
   return { ok: true, value };
@@ -286,23 +286,3 @@ export function validateFieldValue(
   }
 }
 
-/**
- * Prevents spreadsheet applications from interpreting untrusted CSV text as
- * a formula. CSV quoting/escaping should be applied after this guard.
- */
-export function guardCsvFormula(value: string): string {
-  if (typeof value !== "string") {
-    throw new TypeError("CSV formula guard expects a string.");
-  }
-
-  const startsWithControl = /^[\t\r\n]/u.test(value);
-  const startsWithFormula = /^[ \t\r\n]*[=+@-]/u.test(value);
-
-  return startsWithControl || startsWithFormula ? `'${value}` : value;
-}
-
-/** Produces a quoted CSV cell after applying the formula-injection guard. */
-export function escapeCsvCell(value: string): string {
-  const guarded = guardCsvFormula(value);
-  return `"${guarded.replaceAll('"', '""')}"`;
-}

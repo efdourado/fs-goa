@@ -49,7 +49,7 @@ export function builtInProperties(kind: string): LibraryProperty[] {
  * values for them before that library exists; once it does, the real (possibly
  * renamed or hidden) properties are read from it instead.
  */
-export const TABLES_STARTER_KEYS = ["cozinha", "bairro", "endereco"] as const;
+const TABLES_STARTER_KEYS = ["cozinha", "bairro", "endereco"] as const;
 
 export function tablesStarterProperties(label: (key: (typeof TABLES_STARTER_KEYS)[number]) => string): LibraryProperty[] {
   return TABLES_STARTER_KEYS.map((key, position) => ({
@@ -115,7 +115,7 @@ export function useLibrariesProperties(
 }
 
 /** A property's name as shown: whatever the library renamed it to, else its default. */
-export function useNativePropertyName(): (property: Pick<LibraryProperty, "key" | "label" | "storage">) => string {
+function useNativePropertyName(): (property: Pick<LibraryProperty, "key" | "label" | "storage">) => string {
   const t = useTranslations("libraries");
   return (property) => property.label?.trim() || (property.storage === "native" && t.has(`native.${property.key}`) ? t(`native.${property.key}`) : property.key);
 }

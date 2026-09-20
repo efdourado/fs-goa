@@ -13,22 +13,6 @@ export interface ClientField {
   config?: unknown;
 }
 
-export function defaultFields(template: unknown): ClientField[] {
-  if (template === "reading") {
-    return [
-      { key: "livro_atual", label: "Livro atual", type: "text", required: true },
-      { key: "paginas", label: "Páginas lidas hoje", type: "number", required: true, config: { min: 0, step: 1 } },
-      { key: "livro_concluido", label: "Livro concluído?", type: "boolean", required: true },
-      { key: "nota", label: "Nota do livro", type: "rating", required: false },
-      { key: "comentario", label: "Comentário", type: "text", required: false, config: { multiline: true, maxLength: 500 } },
-    ];
-  }
-  return [
-    { key: "nota", label: "Nota", type: "rating", required: true },
-    { key: "comentario", label: "Comentário", type: "text", required: false, config: { multiline: true, maxLength: 280 } },
-  ];
-}
-
 function scaled(value: unknown, scale: number): number | null {
   if (value === undefined || value === null || value === "") return null;
   const number = Number(value);
