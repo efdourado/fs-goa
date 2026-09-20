@@ -509,10 +509,10 @@
     "viewList": "Lista",
     "groupByLabel": "Agrupar por",
     "sortLabel": "Ordenar por",
-    "sortRecent": "Añadidos recientemente",
+    "sortRecent": "Recientes",
     "sortTitle": "Título",
     "sortRating": "Nota",
-    "sortDate": "Fecha del evento",
+    "sortDate": "Fecha",
     "group": {
       "none": "Ninguno",
       "genre": "Género",

@@ -509,10 +509,10 @@
     "viewList": "List",
     "groupByLabel": "Group by",
     "sortLabel": "Sort by",
-    "sortRecent": "Recently added",
+    "sortRecent": "Recent",
     "sortTitle": "Title",
     "sortRating": "Rating",
-    "sortDate": "Event date",
+    "sortDate": "Date",
     "group": {
       "none": "None",
       "genre": "Genre",

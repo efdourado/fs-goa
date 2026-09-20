@@ -402,12 +402,18 @@ export function CatalogWorkspaceScreen({
                 ) : null}
                 <div className="flex items-center gap-2.5 text-xs text-[var(--muted)]">
                   {t("sortLabel")}
-                  <ChipSelect label={t("sortLabel")} value={activeSort} onChange={(next) => setSort(next as Sort)} active={false}>
-                    <option value="recent">{t("sortRecent")}</option>
-                    <option value="title">{t("sortTitle")}</option>
-                    <option value="rating">{t("sortRating")}</option>
-                    {hasDates ? <option value="date">{t("sortDate")}</option> : null}
-                  </ChipSelect>
+                  <Segmented<Sort>
+                    className={hasDates ? "w-64" : "w-48"}
+                    ariaLabel={t("sortLabel")}
+                    value={activeSort}
+                    onChange={setSort}
+                    options={[
+                      { value: "recent", label: t("sortRecent") },
+                      { value: "title", label: t("sortTitle") },
+                      { value: "rating", label: t("sortRating") },
+                      ...(hasDates ? [{ value: "date" as const, label: t("sortDate") }] : []),
+                    ]}
+                  />
                 </div>
               </div>
             </div>
