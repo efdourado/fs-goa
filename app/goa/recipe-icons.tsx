@@ -4,7 +4,7 @@ import { cx } from "./ui";
 
 /**
  * The recipe icons — filled 24 × 24 outlines, drawn in `currentColor` so they follow the surrounding
- * text colour. The paths are the ones in `public/recipe-icons/*.svg`, inlined so they can be tinted.
+ * text colour. The artwork is the app's own set of six glyphs, kept as inline paths so it can be tinted.
  */
 export type RecipeIconName = "cinema" | "bookshelf" | "library" | "tables" | "custom" | "habit";
 
