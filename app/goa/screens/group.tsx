@@ -5,13 +5,12 @@ import { type FormEvent, useEffect, useRef, useState } from "react";
 
 import { API_PATHS, apiRequest } from "../api";
 import { copyText } from "../clipboard";
-import { AddTile } from "../add-tile";
 import { ActionMenu, ActionMenuItem } from "../action-menu";
 import { Dialog } from "../dialog";
 import { useGoaFormat } from "../format";
 import { CatalogTile } from "../catalog-views";
 import { LibraryGlyph, useCatalogLibraries, useLibraryName } from "../libraries";
-import { Rail, RailArrows, useShelfRail } from "../shelf";
+import { Rail, RailArrows, ShelfAddButton, useShelfRail } from "../shelf";
 import type { CatalogItem, ChallengeSummary, GroupInviteResult, GroupSummary, Id, Member, PendingGroupRequest } from "../types";
 import { BackButton, Button, cx, EmptyState, Field, inputClass, StatusMessage, Toggle } from "../ui";
 import { canManage, formatRuntime } from "../utils";
@@ -346,14 +345,16 @@ export function GroupScreen({
 
       <div className="mt-8 space-y-12">
         <section>
-          <div className="mb-4 flex items-baseline gap-2.5">
-            <h2 className="text-lg font-semibold tracking-[-0.02em]">{t("challengesTitle")}</h2>
-            <span className="text-xs text-[var(--muted)]">{challenges.length}</span>
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="flex items-baseline gap-2.5">
+              <h2 className="text-lg font-semibold tracking-[-0.02em]">{t("challengesTitle")}</h2>
+              <span className="text-xs text-[var(--muted)]">{challenges.length}</span>
+            </div>
+            {canManage(group.role) && challenges.length < challengeLimit ? <ShelfAddButton label={t("createChallengeCta")} onClick={onCreateChallenge} /> : null}
           </div>
           {challenges.length ? (
             <div className="grid gap-4 sm:grid-cols-2">
               {challenges.map((challenge) => <ActiveChallengeCard key={challenge.id} challenge={challenge} onOpen={onOpenChallenge} fluid />)}
-              {canManage(group.role) && challenges.length < challengeLimit ? <AddTile label={t("createChallengeCta")} onClick={onCreateChallenge} /> : null}
             </div>
           ) : canManage(group.role) && challenges.length < challengeLimit
             ? <EmptyState title={t("noChallengesTitle")} onClick={onCreateChallenge} />

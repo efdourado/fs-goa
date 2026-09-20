@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 
+import { AddCardTile } from "./add-tile";
 import { CoverSwatch, ItemCover, ScoreRing } from "./catalog-cover";
 import { cx } from "./ui";
 
@@ -83,16 +84,7 @@ export function CatalogTile({ title, year, avg, ratingLabel, caption, note, note
 
 /** The dashed "+ Add item" cell that opens the add dialog — the same tile the group page's shelf starts with, sized like a cover. */
 export function AddItemTile({ label, onClick }: { label: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex aspect-[3/4] w-full cursor-pointer flex-col items-center justify-center gap-2.5 self-start rounded-[20px] border border-dashed border-[var(--main-line)] text-[var(--main-strong)] transition hover:bg-[var(--main-soft)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
-    >
-      <span aria-hidden="true" className="grid h-10 w-10 place-items-center rounded-full bg-[var(--main-soft)] text-lg">＋</span>
-      <span className="text-[13px]">{label}</span>
-    </button>
-  );
+  return <AddCardTile label={label} onClick={onClick} className="aspect-[3/4] w-full self-start" />;
 }
 
 /** One row of the list layout: a small cover swatch, the title and its details, the rating ring. */

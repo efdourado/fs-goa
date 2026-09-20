@@ -7,7 +7,7 @@ import { API_PATHS, apiRequest } from "../api";
 import { KebabMenu, menuRowClass } from "../card-menu";
 import { Dialog } from "../dialog";
 import { useGoaFormat } from "../format";
-import { Shelf } from "../shelf";
+import { Shelf, ShelfAddButton } from "../shelf";
 import { WelcomePanel } from "../welcome";
 import {
   CHALLENGE_COLOR_TAGS,
@@ -105,20 +105,6 @@ function GroupCreateDialog({ onClose, onCreate }: { onClose: () => void; onCreat
         </div>
       </form>
     </Dialog>
-  );
-}
-
-/** A small dashed "+ new…" pill that sits in a shelf header, not in the rail. */
-function ShelfAddButton({ label, onClick }: { label: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-full border border-dashed border-[var(--line)] px-3 text-xs text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)]"
-    >
-      <span aria-hidden="true" className="text-sm leading-none">+</span>
-      {label}
-    </button>
   );
 }
 

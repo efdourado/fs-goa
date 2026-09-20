@@ -50,6 +50,20 @@ export function RailArrows({ nudge }: { nudge: (direction: -1 | 1) => void }) {
   );
 }
 
+/** A small dashed "+ new…" pill that sits in a shelf header, not in the rail. */
+export function ShelfAddButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-full border border-dashed border-[var(--line)] px-3 text-xs text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)]"
+    >
+      <span aria-hidden="true" className="text-sm leading-none">+</span>
+      {label}
+    </button>
+  );
+}
+
 /** A rail of cards with the right-edge fade; takes what `useShelfRail` returns, spread. */
 export function Rail({ railRef, showFade, onScroll, children }: Pick<ReturnType<typeof useShelfRail>, "railRef" | "showFade" | "onScroll"> & { children: ReactNode }) {
   return (
