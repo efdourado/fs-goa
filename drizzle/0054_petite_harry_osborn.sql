@@ -1,0 +1,3 @@
+ALTER TABLE "catalog_libraries" ADD COLUMN "cover_top_property" text;--> statement-breakpoint
+ALTER TABLE "catalog_libraries" ADD COLUMN "cover_badge_hidden" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "catalog_libraries" ADD CONSTRAINT "catalog_libraries_cover_top_property_check" CHECK ("catalog_libraries"."cover_top_property" is null or "catalog_libraries"."cover_top_property" = 'none' or "catalog_libraries"."cover_top_property" ~ '^[a-z][a-z0-9_]{0,63}$');

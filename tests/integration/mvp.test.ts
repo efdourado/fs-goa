@@ -2485,6 +2485,58 @@ test("propriedades da biblioteca: renomear e ocultar, nativa ou personalizada, p
   assert.equal((await call("GET", `/api/catalog/libraries/${screens.id}/properties`, { session: member })).response.status, 200);
 });
 
+test("capa da biblioteca: uma biblioteca sem ano nem nota escolhe o que aparece no topo e pode esconder o selo de nota", async () => {
+  const owner = await register("Rafa", "rafa_capa");
+  const member = await register("Iris", "iris_capa");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Treinos" } })).body as { id: string }).id;
+  const invite = await call("POST", `/api/groups/${gid}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } });
+  await call("POST", `/api/invites/${(invite.body as { token: string }).token}`, { session: member, body: {} });
+
+  const lib = await call("POST", `/api/groups/${gid}/catalog/libraries`, { session: owner, body: { label: "Sessões de treino" } });
+  assert.equal(lib.response.status, 201, JSON.stringify(lib.body));
+  const library = lib.body as { id: string; coverTopProperty: string | null; coverBadgeHidden: boolean };
+  assert.deepEqual([library.coverTopProperty, library.coverBadgeHidden], [null, false], "nasce no padrão: sem escolha própria");
+
+  const def = await call("POST", `/api/groups/${gid}/catalog-attributes`, { session: owner, body: { libraryId: library.id, label: "Séries x repetições" } });
+  assert.equal(def.response.status, 201, JSON.stringify(def.body));
+  const attrKey = (def.body as { key: string }).key;
+
+  // uma chave que não existe nesta biblioteca é recusada
+  const invalid = await call("PATCH", `/api/catalog/libraries/${library.id}`, { session: owner, body: { coverTopProperty: "nao_existe" } });
+  assert.equal(invalid.response.status, 400, JSON.stringify(invalid.body));
+
+  // a chave semântica do atributo — a mesma que os itens usam — é aceita
+  const setTop = await call("PATCH", `/api/catalog/libraries/${library.id}`, { session: owner, body: { coverTopProperty: attrKey } });
+  assert.equal(setTop.response.status, 200, JSON.stringify(setTop.body));
+  assert.equal((setTop.body as { coverTopProperty: string }).coverTopProperty, attrKey);
+
+  const setBadge = await call("PATCH", `/api/catalog/libraries/${library.id}`, { session: owner, body: { coverBadgeHidden: true } });
+  assert.equal(setBadge.response.status, 200, JSON.stringify(setBadge.body));
+  assert.deepEqual(
+    [(setBadge.body as { coverTopProperty: string; coverBadgeHidden: boolean }).coverTopProperty, (setBadge.body as { coverBadgeHidden: boolean }).coverBadgeHidden],
+    [attrKey, true],
+    "mudar um não reseta o outro",
+  );
+
+  const libraries = (await call("GET", `/api/groups/${gid}/catalog/libraries`, { session: owner })).body as {
+    libraries: Array<{ id: string; coverTopProperty: string | null; coverBadgeHidden: boolean }>;
+  };
+  assert.deepEqual(
+    [libraries.libraries.find((entry) => entry.id === library.id)?.coverTopProperty, libraries.libraries.find((entry) => entry.id === library.id)?.coverBadgeHidden],
+    [attrKey, true],
+    "a lista de bibliotecas devolve a escolha salva",
+  );
+
+  // "nenhum" é uma escolha explícita, diferente de voltar ao padrão (null)
+  const setNone = await call("PATCH", `/api/catalog/libraries/${library.id}`, { session: owner, body: { coverTopProperty: "none" } });
+  assert.equal((setNone.body as { coverTopProperty: string }).coverTopProperty, "none");
+  const back = await call("PATCH", `/api/catalog/libraries/${library.id}`, { session: owner, body: { coverTopProperty: null } });
+  assert.equal((back.body as { coverTopProperty: string | null }).coverTopProperty, null);
+
+  // só administrador escolhe; qualquer membro só lê
+  assert.equal((await call("PATCH", `/api/catalog/libraries/${library.id}`, { session: member, body: { coverBadgeHidden: false } })).response.status, 403);
+});
+
 test("propriedades da biblioteca: Tables nasce só com o nome e cada biblioteca tem as suas", async () => {
   const owner = await register("Tiago", "tiago_props");
   const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Rolês" } })).body as { id: string }).id;

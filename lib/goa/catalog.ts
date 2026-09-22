@@ -736,15 +736,21 @@ export interface CatalogLibrary {
   source: "screens" | "pages" | "tables" | "custom";
   label: string | null;
   position: number;
+  coverTopProperty: string | null;
+  coverBadgeHidden: boolean;
 }
 
-function mapLibrary(row: { id: string; kind: string; source: string; label: string | null; position: number }): CatalogLibrary {
-  return { id: row.id, kind: row.kind, source: row.source as CatalogLibrary["source"], label: row.label, position: row.position };
+type LibraryRow = { id: string; kind: string; source: string; label: string | null; position: number; cover_top_property: string | null; cover_badge_hidden: boolean };
+function mapLibrary(row: LibraryRow): CatalogLibrary {
+  return {
+    id: row.id, kind: row.kind, source: row.source as CatalogLibrary["source"], label: row.label, position: row.position,
+    coverTopProperty: row.cover_top_property, coverBadgeHidden: row.cover_badge_hidden,
+  };
 }
 
 async function listLibrariesWithClient(client: PoolClient, groupId: string): Promise<CatalogLibrary[]> {
-  const rows = await client.query<{ id: string; kind: string; source: string; label: string | null; position: number }>(
-    `SELECT id, kind, source, label, position FROM catalog_libraries
+  const rows = await client.query<LibraryRow>(
+    `SELECT id, kind, source, label, position, cover_top_property, cover_badge_hidden FROM catalog_libraries
       WHERE group_id = $1 AND archived_at IS NULL ORDER BY position, created_at`,
     [groupId],
   );
@@ -785,7 +791,7 @@ async function insertLibrary(
     [id, groupId, kind, source, label, position, userId],
   );
   await writeAudit(client, groupId, null, userId, "catalog.library_created", "catalog_library", id, null, { label, source });
-  return { id, kind, source: source as CatalogLibrary["source"], label, position };
+  return { id, kind, source: source as CatalogLibrary["source"], label, position, coverTopProperty: null, coverBadgeHidden: false };
 }
 
 /**
@@ -849,14 +855,23 @@ export async function createPersonalLibrary(session: SessionContext, body: Recor
   return inTransaction((client) => insertLibrary(client, workspaceId, session.user.id, body));
 }
 
-/** Renames any of the caller's libraries (built-in or user-created) by id — mirrors `updateCatalogItem`'s group-agnostic shape. */
-export async function renameCatalogLibrary(session: SessionContext, libraryId: string, body: Record<string, unknown>) {
+/**
+ * Updates any of the caller's libraries (built-in or user-created) by id — mirrors
+ * `updateCatalogItem`'s group-agnostic shape. `label` renames it; `coverTopProperty`
+ * and `coverBadgeHidden` are the two independent choices that shape every cover on
+ * its shelves. Each field is optional — send only the ones actually changing.
+ */
+export async function updateCatalogLibrary(session: SessionContext, libraryId: string, body: Record<string, unknown>) {
   return inTransaction(async (client) => {
-    const library = await oneOrNull<{ group_id: string; group_kind: "standard" | "personal"; owner_user_id: string }>(
+    const library = await oneOrNull<{
+      group_id: string; kind: string; group_kind: "standard" | "personal"; owner_user_id: string;
+      label: string | null; cover_top_property: string | null; cover_badge_hidden: boolean;
+    }>(
       client,
-      `SELECT cl.group_id, g.kind AS group_kind, g.owner_user_id
+      `SELECT cl.group_id, cl.kind, g.kind AS group_kind, g.owner_user_id, cl.label, cl.cover_top_property, cl.cover_badge_hidden
          FROM catalog_libraries cl JOIN groups g ON g.id = cl.group_id
-        WHERE cl.id = $1 AND cl.archived_at IS NULL AND g.archived_at IS NULL AND g.deleted_at IS NULL`,
+        WHERE cl.id = $1 AND cl.archived_at IS NULL AND g.archived_at IS NULL AND g.deleted_at IS NULL
+        FOR UPDATE OF cl`,
       [libraryId],
     );
     if (!library) throw new ApiError(404, "not_found", "Biblioteca não encontrada.");
@@ -867,9 +882,50 @@ export async function renameCatalogLibrary(session: SessionContext, libraryId: s
     } else {
       await requireGroupRole(session.user.id, library.group_id, ["owner", "admin"], client);
     }
-    const label = stringValue(body, "label", { min: 1, max: 80 })!;
-    await renameLibraryWithClient(client, session.user.id, library.group_id, libraryId, label);
-    return { id: libraryId, label };
+
+    let label = library.label;
+    if (Object.hasOwn(body, "label")) {
+      label = stringValue(body, "label", { min: 1, max: 80 })!;
+      await renameLibraryWithClient(client, session.user.id, library.group_id, libraryId, label);
+    }
+
+    let coverTopProperty = library.cover_top_property;
+    let coverBadgeHidden = library.cover_badge_hidden;
+    if (Object.hasOwn(body, "coverTopProperty") || Object.hasOwn(body, "coverBadgeHidden")) {
+      if (Object.hasOwn(body, "coverTopProperty")) {
+        const value = body.coverTopProperty;
+        if (value === null) {
+          coverTopProperty = null;
+        } else if (value === "none") {
+          coverTopProperty = "none";
+        } else if (typeof value === "string") {
+          // Matched against `attributeKey` (a custom property's semantic key — the
+          // same string `item.attributes[].key` uses) so rendering a cover never
+          // needs a second lookup from id to key; a native property's own key
+          // already is that string.
+          const properties = await listLibraryPropertiesWithClient(client, library.group_id, { id: libraryId, kind: library.kind });
+          if (!properties.some((property) => property.key !== "title" && (property.attributeKey ?? property.key) === value)) {
+            throw new ApiError(400, "invalid_property", "Essa propriedade não existe nesta biblioteca.");
+          }
+          coverTopProperty = value;
+        } else {
+          throw new ApiError(400, "invalid_property", "Escolha uma propriedade válida para o topo da capa.");
+        }
+      }
+      if (Object.hasOwn(body, "coverBadgeHidden")) {
+        if (typeof body.coverBadgeHidden !== "boolean") {
+          throw new ApiError(400, "invalid_property", "Informe se o selo de nota fica oculto.");
+        }
+        coverBadgeHidden = body.coverBadgeHidden;
+      }
+      await client.query(
+        "UPDATE catalog_libraries SET cover_top_property = $1, cover_badge_hidden = $2, updated_at = now() WHERE id = $3",
+        [coverTopProperty, coverBadgeHidden, libraryId],
+      );
+      await writeAudit(client, library.group_id, null, session.user.id, "catalog.library_cover_updated", "catalog_library", libraryId, null, { coverTopProperty, coverBadgeHidden });
+    }
+
+    return { id: libraryId, label, coverTopProperty, coverBadgeHidden };
   });
 }
 
@@ -1197,7 +1253,7 @@ export async function createPersonalRecommender(session: SessionContext, body: R
   return inTransaction((client) => insertRecommender(client, workspaceId, session.user.id, body));
 }
 
-/** Renames any of the caller's saved external names by id — same group-agnostic shape as `renameCatalogLibrary`. */
+/** Renames any of the caller's saved external names by id — same group-agnostic shape as `updateCatalogLibrary`. */
 export async function renameCatalogRecommender(session: SessionContext, recommenderId: string, body: Record<string, unknown>) {
   return inTransaction(async (client) => {
     const recommender = await oneOrNull<{ group_id: string; group_kind: "standard" | "personal"; owner_user_id: string }>(

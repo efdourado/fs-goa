@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 
 import { AddCardTile } from "./add-tile";
 import { API_PATHS, apiRequest } from "./api";
-import { CatalogTile } from "./catalog-views";
+import { CatalogTile, resolveCoverTop } from "./catalog-views";
 import { useGoaFormat } from "./format";
 import { type CatalogScope, LibraryGlyph, useCatalogLibraries, useLibraryName } from "./libraries";
 import { Rail, RailArrows, useShelfRail } from "./shelf";
@@ -108,8 +108,9 @@ export function CatalogShelf({ scope, canManage, onOpenCatalog, onOpenItem }: {
                 size="sm"
                 className="w-44 flex-none snap-start"
                 title={item.title}
-                year={item.year}
+                year={resolveCoverTop(item, shelf?.coverTopProperty, f)}
                 avg={item.ratingAvg}
+                badgeHidden={shelf?.coverBadgeHidden}
                 ratingLabel={item.ratingAvg === null || item.ratingAvg === undefined ? tCat("notRated") : tCat("ratedAria", { value: item.ratingAvg })}
                 caption={[item.scheduledAt ? f.eventWhen(item.scheduledAt) : item.author, item.mainGenre, formatRuntime(item.runtimeMinutes)].filter(Boolean).slice(0, 2).join(" · ")}
                 onOpen={() => onOpenItem(item.id)}

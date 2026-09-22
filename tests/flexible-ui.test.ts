@@ -140,8 +140,8 @@ describe("library choices", () => {
 
   test("a real library replaces its built-in placeholder rather than doubling it", () => {
     const choices = libraryChoices([
-      { id: "l1", kind: "film", source: "screens", label: null, position: 0 },
-      { id: "l2", kind: "lib_x", source: "custom", label: "Matches", position: 1 },
+      { id: "l1", kind: "film", source: "screens", label: null, position: 0, coverTopProperty: null, coverBadgeHidden: false },
+      { id: "l2", kind: "lib_x", source: "custom", label: "Matches", position: 1, coverTopProperty: null, coverBadgeHidden: false },
     ]);
     assert.deepEqual(choices.map((choice) => choice.kind), ["film", "lib_x", "book"]);
     assert.equal(choices.find((choice) => choice.kind === "film")?.id, "l1");

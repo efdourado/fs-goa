@@ -72,11 +72,14 @@ const SIZES = {
  * a soft tint from the tag palette, the year in mono, the title set large, one quiet ring, and (on the
  * smaller sizes) the group rating in the corner.
  */
-export function ItemCover({ title, year, avg, ratingLabel, size, className, children }: {
+export function ItemCover({ title, year, avg, ratingLabel, showBadge = true, size, className, children }: {
   title: string;
-  year?: number | null;
+  /** Whatever the library chose for the top slot — a year, a short attribute value, or blank. */
+  year?: string | number | null;
   avg?: number | null;
   ratingLabel?: string;
+  /** The library's own choice to turn off the rating ring — distinct from "no rating yet", which still shows the ring. */
+  showBadge?: boolean;
   size: keyof typeof SIZES;
   className?: string;
   /** Laid over the cover — a selection mark, say. */
@@ -90,9 +93,9 @@ export function ItemCover({ title, year, avg, ratingLabel, size, className, chil
     >
       <span aria-hidden="true" className={cx("absolute rounded-full border-[var(--cover-deco)]", spec.ring)} />
       <span aria-hidden="true" className="absolute right-3.5 top-3.5 h-2.5 w-2.5 rounded-full bg-[var(--cover-deco)]" />
-      <span className={cx("relative tracking-[0.08em]", spec.year)} style={{ fontFamily: "var(--font-geist-mono), ui-monospace, monospace" }}>{year ?? "\u00a0"}</span>
+      <span className={cx("relative truncate tracking-[0.08em]", spec.year)} style={{ fontFamily: "var(--font-geist-mono), ui-monospace, monospace" }}>{year ?? "\u00a0"}</span>
       <span className={cx("relative break-words font-light leading-[1.05] tracking-[-0.04em]", spec.clamp, spec.title)}>{title}</span>
-      {spec.badge ? (
+      {spec.badge && showBadge ? (
         <span className={cx("absolute", spec.badgeInset)}>
           <ScoreRing value={avg} size={spec.badge} label={ratingLabel ?? ""} className="bg-[var(--paper)] shadow-[0_2px_8px_rgba(32,36,31,0.14)]" textClassName={spec.badgeText} />
         </span>

@@ -6,7 +6,7 @@ import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { API_PATHS, apiRequest } from "../api";
 import { AddCatalogItemDialog } from "../catalog-item-dialogs";
 import { KebabMenu, menuRowClass } from "../card-menu";
-import { AddItemTile, CatalogRow, CatalogTile, type CatalogGroupBy, groupCatalogItems, LayoutToggle } from "../catalog-views";
+import { AddItemTile, CatalogRow, CatalogTile, type CatalogGroupBy, groupCatalogItems, LayoutToggle, resolveCoverTop } from "../catalog-views";
 import { useCsrf } from "../csrf";
 import { ConfirmDialog } from "../dialog";
 import { useGoaFormat } from "../format";
@@ -195,21 +195,25 @@ export function CatalogWorkspaceScreen({
   const rated = scoped.filter((item) => item.ratingAvg !== null && item.ratingAvg !== undefined);
   const average = rated.length ? Math.round((rated.reduce((sum, item) => sum + (item.ratingAvg ?? 0), 0) / rated.length) * 100) / 100 : null;
 
-  /** What sets an item apart, minus the year (which the cover carries) and who recommended it. */
+  /** What sets an item apart, minus whatever the cover's top slot already carries (year by default) and who recommended it. */
   function detailsFor(item: CatalogItem): string[] {
-    const custom = (item.attributes ?? []).map((attribute) =>
-      attribute.type === "boolean" ? `${attribute.label}: ${attribute.value ? tc("yes") : tc("no")}` : `${attribute.label}: ${String(attribute.value)}`);
+    const topSlot = library?.coverTopProperty ?? "year";
+    const custom = (item.attributes ?? [])
+      .filter((attribute) => attribute.key !== topSlot)
+      .map((attribute) => attribute.type === "boolean" ? `${attribute.label}: ${attribute.value ? tc("yes") : tc("no")}` : `${attribute.label}: ${String(attribute.value)}`);
     return [
-      item.scheduledAt ? f.eventWhen(item.scheduledAt) : null,
-      hidden.has("author") ? null : item.author,
-      hidden.has("main_genre") ? null : item.mainGenre,
-      hidden.has("runtime_minutes") ? null : formatRuntime(item.runtimeMinutes),
+      topSlot === "scheduled_at" ? null : item.scheduledAt ? f.eventWhen(item.scheduledAt) : null,
+      hidden.has("author") || topSlot === "author" ? null : item.author,
+      hidden.has("main_genre") || topSlot === "main_genre" ? null : item.mainGenre,
+      hidden.has("runtime_minutes") || topSlot === "runtime_minutes" ? null : formatRuntime(item.runtimeMinutes),
       ...custom,
     ].filter((part): part is string => Boolean(part));
   }
   const challengesOf = (item: CatalogItem) => item.challengeCount ?? item.roundCount ?? 0;
   const ratingLabel = (item: CatalogItem) => (item.ratingAvg === null || item.ratingAvg === undefined ? tItem("notRated") : tItem("ratedAria", { value: item.ratingAvg }));
   const yearOf = (item: CatalogItem) => (hidden.has("year") ? null : item.year);
+  /** The library's own choice for the cover's top slot — falls back to `yearOf` (hidden-aware) when it hasn't picked one. */
+  const topOf = (item: CatalogItem) => (library?.coverTopProperty ? resolveCoverTop(item, library.coverTopProperty, f) : yearOf(item));
   function metaFor(item: CatalogItem): string {
     return [
       ...detailsFor(item),
@@ -457,8 +461,9 @@ export function CatalogWorkspaceScreen({
                             <CatalogTile
                               key={item.id}
                               title={item.title}
-                              year={yearOf(item)}
+                              year={topOf(item)}
                               avg={item.ratingAvg}
+                              badgeHidden={library?.coverBadgeHidden}
                               ratingLabel={ratingLabel(item)}
                               caption={detailsFor(item).slice(0, 2).join(" · ")}
                               note={unused ? t("notInChallenge") : t("rounds", { count: challengesOf(item) })}
@@ -477,8 +482,9 @@ export function CatalogWorkspaceScreen({
                           <li key={item.id}>
                             <CatalogRow
                               title={item.title}
-                              year={yearOf(item)}
+                              year={topOf(item)}
                               avg={item.ratingAvg}
+                              badgeHidden={library?.coverBadgeHidden}
                               ratingLabel={ratingLabel(item)}
                               meta={metaFor(item)}
                               selecting={selecting}

@@ -755,7 +755,7 @@ function ChallengeLibrariesBar({
                   aria-label={t("libraryProperties", { name: libraryName(library) })}
                   title={t("libraryProperties", { name: libraryName(library) })}
                   className="ml-0.5 grid h-6 w-6 cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--main)]/15 hover:text-[var(--ink)]"
-                  onClick={() => setPropertiesOf({ id: library.id!, kind: library.kind, source: library.source, label: library.label, position: 0 })}
+                  onClick={() => setPropertiesOf((workspaceLibraries ?? []).find((candidate) => candidate.kind === library.kind) ?? { id: library.id!, kind: library.kind, source: library.source, label: library.label, position: 0, coverTopProperty: null, coverBadgeHidden: false })}
                 >
                   <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M2.5 4.5h7M12.5 4.5h1M2.5 11.5h1M6.5 11.5h7" strokeLinecap="round" /><circle cx="11" cy="4.5" r="1.5" /><circle cx="5" cy="11.5" r="1.5" /></svg>
                 </button>

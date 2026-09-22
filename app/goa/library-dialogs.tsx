@@ -15,6 +15,8 @@ import { Button, cx, EmptyState, Field, inputClass, StatusMessage, Toggle } from
 
 type PropertyType = LibraryProperty["type"];
 const PROPERTY_TYPES: PropertyType[] = ["text", "number", "date", "boolean"];
+/** A `<select>` sentinel — `coverTopProperty: null` (the historical default) has no literal HTML option value. */
+const DEFAULT_COVER_TOP = "__default__";
 
 /** Create a library: just a name — what each item can hold is shaped afterwards, in its properties. */
 export function NewLibraryDialog({
@@ -253,6 +255,9 @@ export function LibraryPropertiesDialog({
   const [newLabel, setNewLabel] = useState("");
   const [newType, setNewType] = useState<PropertyType>("text");
   const [adding, setAdding] = useState(false);
+  const [coverTop, setCoverTop] = useState(library.coverTopProperty ?? DEFAULT_COVER_TOP);
+  const [coverBadgeHidden, setCoverBadgeHidden] = useState(library.coverBadgeHidden);
+  const [coverBusy, setCoverBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -368,8 +373,40 @@ export function LibraryPropertiesDialog({
     }
   }
 
+  async function saveCoverTop(next: string) {
+    setCoverBusy(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      await apiRequest(API_PATHS.catalogLibrary(library.id), { method: "PATCH", body: { coverTopProperty: next === DEFAULT_COVER_TOP ? null : next }, csrfToken: csrf });
+      setCoverTop(next);
+      onChanged();
+      setSuccess(t("coversSaved"));
+    } catch (cause) {
+      setError(f.error(cause));
+    } finally {
+      setCoverBusy(false);
+    }
+  }
+
+  async function saveCoverBadgeHidden(nextHidden: boolean) {
+    setCoverBusy(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      await apiRequest(API_PATHS.catalogLibrary(library.id), { method: "PATCH", body: { coverBadgeHidden: nextHidden }, csrfToken: csrf });
+      setCoverBadgeHidden(nextHidden);
+      onChanged();
+      setSuccess(t("coversSaved"));
+    } catch (cause) {
+      setError(f.error(cause));
+    } finally {
+      setCoverBusy(false);
+    }
+  }
+
   return (
-    <Dialog title={t("propertiesTitle", { name: libraryName(library) })} onClose={onClose} busy={busyKey !== null || adding}>
+    <Dialog title={t("propertiesTitle", { name: libraryName(library) })} onClose={onClose} busy={busyKey !== null || adding || coverBusy}>
       <p className="text-sm leading-6 text-[var(--muted)]">{canEdit ? t("propertiesBody") : t("propertiesReadOnly")}</p>
 
       <div className="mt-4"><StatusMessage error={error} success={success} /></div>
@@ -451,6 +488,30 @@ export function LibraryPropertiesDialog({
             <Button type="submit" disabled={adding}>{adding ? tc("saving") : t("addProperty")}</Button>
           </div>
         </form>
+      ) : null}
+
+      {canEdit && properties && properties.length ? (
+        <section className="mt-6 border-t border-[var(--line)] pt-5">
+          <h3 className="text-sm font-medium">{t("coversTitle")}</h3>
+          <p className="mb-3 mt-0.5 text-xs leading-5 text-[var(--muted)]">{t("coversHint")}</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label={t("coverTopLabel")}>
+              <select className={inputClass} value={coverTop} disabled={coverBusy} onChange={(event) => void saveCoverTop(event.target.value)}>
+                <option value={DEFAULT_COVER_TOP}>{t("coverTopDefault")}</option>
+                <option value="none">{t("coverTopNone")}</option>
+                {properties.filter((property) => property.key !== "title").map((property) => (
+                  <option key={property.key} value={property.attributeKey ?? property.key}>{nameOf(property)}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label={t("coverBadgeLabel")}>
+              <div className="flex min-h-12 items-center gap-3 rounded-xl border border-[var(--line)] px-3">
+                <Toggle checked={!coverBadgeHidden} disabled={coverBusy} onChange={(show) => void saveCoverBadgeHidden(!show)} />
+                <span className="text-sm">{coverBadgeHidden ? t("coverBadgeOff") : t("coverBadgeOn")}</span>
+              </div>
+            </Field>
+          </div>
+        </section>
       ) : null}
 
       {properties && !properties.length ? <div className="mt-4"><EmptyState title={t("noProperties")} /></div> : null}

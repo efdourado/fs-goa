@@ -153,7 +153,7 @@ export function makeGoaFormat(t: Translator, format: Formatter) {
   return { date, dateTime, dateRange, eventWhen, itemWindow, itemDeadline, itemStatusLabel, challengeStatusLabel, entryUnavailableMessage, error };
 }
 
-type GoaFormat = ReturnType<typeof makeGoaFormat>;
+export type GoaFormat = ReturnType<typeof makeGoaFormat>;
 
 export function useGoaFormat(): GoaFormat {
   const t = useTranslations();

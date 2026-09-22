@@ -8,7 +8,7 @@ import { copyText } from "../clipboard";
 import { ActionMenu, ActionMenuItem } from "../action-menu";
 import { Dialog } from "../dialog";
 import { useGoaFormat } from "../format";
-import { CatalogTile } from "../catalog-views";
+import { CatalogTile, resolveCoverTop } from "../catalog-views";
 import { LibraryGlyph, useCatalogLibraries, useLibraryName } from "../libraries";
 import { Rail, RailArrows, ShelfAddButton, useShelfRail } from "../shelf";
 import type { CatalogItem, ChallengeSummary, GroupInviteResult, GroupSummary, Id, Member, PendingGroupRequest } from "../types";
@@ -419,8 +419,9 @@ export function GroupScreen({
                       size="sm"
                       className="w-44 flex-none snap-start"
                       title={item.title}
-                      year={item.year}
+                      year={resolveCoverTop(item, activeCatalogLibrary?.coverTopProperty, f)}
                       avg={item.ratingAvg}
+                      badgeHidden={activeCatalogLibrary?.coverBadgeHidden}
                       ratingLabel={item.ratingAvg === null || item.ratingAvg === undefined ? tCat("notRated") : tCat("ratedAria", { value: item.ratingAvg })}
                       caption={[item.scheduledAt ? f.eventWhen(item.scheduledAt) : item.author, item.mainGenre, formatRuntime(item.runtimeMinutes)].filter(Boolean).slice(0, 2).join(" · ")}
                       onOpen={() => onOpenCatalogItem(item.id)}

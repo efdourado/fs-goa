@@ -4,6 +4,8 @@ import type { ReactNode } from "react";
 
 import { AddCardTile } from "./add-tile";
 import { CoverSwatch, ItemCover, ScoreRing } from "./catalog-cover";
+import type { GoaFormat } from "./format";
+import type { CatalogAttributeValue, CatalogLibrary, EventSchedule } from "./types";
 import { cx } from "./ui";
 
 export type CatalogGroupBy = "none" | "genre" | "decade" | "year";
@@ -41,11 +43,48 @@ export function groupCatalogItems<T extends Groupable>(items: readonly T[], by: 
   return [...named, ...[...groups.values()].filter((group) => !group.label)];
 }
 
+/**
+ * What a library's `coverTopProperty` choice resolves to for one item — a native
+ * field, a custom attribute (matched by its semantic key, the same string
+ * `item.attributes[].key` already uses), `"none"` for blank, or `null` (the
+ * historical default: native `year`, which is already blank for any kind that
+ * never had one).
+ */
+export function resolveCoverTop(
+  item: {
+    year?: number | null; author?: string | null; mainGenre?: string | null;
+    runtimeMinutes?: number | null; pageCount?: number | null; scheduledAt?: EventSchedule | null;
+    attributes?: CatalogAttributeValue[];
+  },
+  coverTopProperty: CatalogLibrary["coverTopProperty"] | undefined,
+  f: GoaFormat,
+): string | number | null {
+  if (coverTopProperty === undefined || coverTopProperty === null) return item.year ?? null;
+  if (coverTopProperty === "none") return null;
+  switch (coverTopProperty) {
+    case "year": return item.year ?? null;
+    case "author": return item.author ?? null;
+    case "main_genre": return item.mainGenre ?? null;
+    case "runtime_minutes": return item.runtimeMinutes ?? null;
+    case "page_count": return item.pageCount ?? null;
+    case "scheduled_at": return item.scheduledAt ? f.eventWhen(item.scheduledAt) : null;
+    default: {
+      const attribute = item.attributes?.find((entry) => entry.key === coverTopProperty);
+      if (!attribute) return null;
+      if (attribute.type === "boolean") return attribute.value ? "✓" : null;
+      if (attribute.type === "date") return f.date(String(attribute.value));
+      return attribute.value as string | number;
+    }
+  }
+}
+
 /** One cover in the grid — a button that opens the item, or a checkbox while items are being picked. */
-export function CatalogTile({ title, year, avg, ratingLabel, caption, note, noteTone = "muted", size = "md", className, selecting, picked, onPick, onOpen }: {
+export function CatalogTile({ title, year, avg, ratingLabel, badgeHidden, caption, note, noteTone = "muted", size = "md", className, selecting, picked, onPick, onOpen }: {
   title: string;
-  year?: number | null;
+  year?: string | number | null;
   avg?: number | null;
+  /** Turns off the rating ring badge regardless of `avg` — the library's own choice, not "no rating yet". */
+  badgeHidden?: boolean;
   ratingLabel: string;
   caption: string;
   note?: string;
@@ -60,7 +99,7 @@ export function CatalogTile({ title, year, avg, ratingLabel, caption, note, note
 }) {
   const body = (
     <>
-      <ItemCover title={title} year={year} avg={avg} ratingLabel={ratingLabel} size={size} className={cx("transition duration-200", picked ? "ring-[3px] ring-[var(--main)] ring-offset-2 ring-offset-[var(--canvas)]" : "group-hover:-translate-y-0.5 group-hover:shadow-[var(--elevate-2)]")}>
+      <ItemCover title={title} year={year} avg={avg} ratingLabel={ratingLabel} showBadge={!badgeHidden} size={size} className={cx("transition duration-200", picked ? "ring-[3px] ring-[var(--main)] ring-offset-2 ring-offset-[var(--canvas)]" : "group-hover:-translate-y-0.5 group-hover:shadow-[var(--elevate-2)]")}>
         {selecting ? (
           <span aria-hidden="true" className={cx("absolute bottom-3 left-3 grid h-6 w-6 place-items-center rounded-full border-2 text-xs", picked ? "border-[var(--main)] bg-[var(--main)] text-white" : "border-[var(--cover-ink)] bg-[var(--paper)]/70")}>{picked ? "✓" : ""}</span>
         ) : null}
@@ -88,10 +127,12 @@ export function AddItemTile({ label, onClick }: { label: string; onClick: () => 
 }
 
 /** One row of the list layout: a small cover swatch, the title and its details, the rating ring. */
-export function CatalogRow({ title, year, avg, ratingLabel, meta, selecting, picked, onPick, onOpen }: {
+export function CatalogRow({ title, year, avg, ratingLabel, badgeHidden, meta, selecting, picked, onPick, onOpen }: {
   title: string;
-  year?: number | null;
+  year?: string | number | null;
   avg?: number | null;
+  /** Turns off the rating ring badge regardless of `avg` — the library's own choice, not "no rating yet". */
+  badgeHidden?: boolean;
   ratingLabel: string;
   meta: string;
   selecting?: boolean;
@@ -107,7 +148,7 @@ export function CatalogRow({ title, year, avg, ratingLabel, meta, selecting, pic
         <strong className="block truncate font-light">{title}{year ? <span className="ml-1.5 text-[var(--muted)]">{year}</span> : null}</strong>
         <small className="mt-1 block truncate text-[var(--muted)]">{meta}</small>
       </span>
-      <ScoreRing value={avg} size={38} label={ratingLabel} strokeWidth={3} textClassName="text-[11px] font-medium" />
+      {badgeHidden ? null : <ScoreRing value={avg} size={38} label={ratingLabel} strokeWidth={3} textClassName="text-[11px] font-medium" />}
     </>
   );
   const shared = "flex w-full items-center gap-4 px-4 py-3 text-left transition hover:bg-[var(--wash)] sm:px-5";

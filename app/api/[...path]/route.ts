@@ -54,7 +54,7 @@ import {
   listPersonalLibraries,
   listPersonalRecommenders,
   personalCatalogItemDetail,
-  renameCatalogLibrary,
+  updateCatalogLibrary,
   renameCatalogRecommender,
   updateCatalogLibraryProperty,
   searchGroupCatalogItems,
@@ -487,7 +487,7 @@ export async function PATCH(request: Request): Promise<Response> {
       return json(await updateCatalogItem(session, path[1], body));
     }
     if (path[0] === "catalog" && path[1] === "libraries" && path.length === 3) {
-      return json(await renameCatalogLibrary(session, path[2], body));
+      return json(await updateCatalogLibrary(session, path[2], body));
     }
     if (path[0] === "catalog" && path[1] === "libraries" && path[3] === "properties" && path.length === 5) {
       return json(await updateCatalogLibraryProperty(session, path[2], path[4], body));

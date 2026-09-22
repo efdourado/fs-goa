@@ -48,6 +48,19 @@ export const catalogLibraries = pgTable(
     // actually renames it.
     label: text("label"),
     position: integer("position").notNull().default(0),
+    // What each cover on this library's shelves shows besides the title: a
+    // native property key (`year`, `author`…) or a custom attribute's semantic
+    // key — the same string `catalog_attribute_values`/`item.attributes[].key`
+    // already use, so no id lookup is needed to render it. `null` is the
+    // historical default (native `year` for Screens/Pages, blank for everything
+    // else) — set only once someone actually picks a property for a library
+    // that has no year of its own (a workout log, a study plan…). `'none'` is
+    // an explicit "nothing here", distinct from "still the default".
+    coverTopProperty: text("cover_top_property"),
+    // The rating ring badge is always computed live from any `rating`-kind
+    // challenge field on the item — this only ever turns it off, for a library
+    // where a bare "not rated" ring is dead weight rather than information.
+    coverBadgeHidden: boolean("cover_badge_hidden").notNull().default(false),
     createdByUserId: text("created_by_user_id")
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
@@ -65,6 +78,13 @@ export const catalogLibraries = pgTable(
       sql`${table.label} is null or char_length(btrim(${table.label})) between 1 and 80`,
     ),
     check("catalog_libraries_position_check", sql`${table.position} >= 0`),
+    // Loose shape check only (same slug shape as a native key or a semantic
+    // key) — the API validates the value names a property that actually
+    // exists on this specific library, which a static CHECK can't express.
+    check(
+      "catalog_libraries_cover_top_property_check",
+      sql`${table.coverTopProperty} is null or ${table.coverTopProperty} = 'none' or ${table.coverTopProperty} ~ '^[a-z][a-z0-9_]{0,63}$'`,
+    ),
   ],
 );
 

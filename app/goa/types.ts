@@ -168,6 +168,14 @@ export interface CatalogLibrary {
   /** `null` means "show the locale-aware default name for `source`". */
   label: string | null;
   position: number;
+  /**
+   * The property shown at the top of each cover on this library's shelves —
+   * a `LibraryProperty.key`, `"none"`, or `null` for the historical default
+   * (native `year` for Screens/Pages, blank otherwise).
+   */
+  coverTopProperty: string | null;
+  /** Turns off the rating ring badge on every cover — the rating itself is still computed and shown elsewhere. */
+  coverBadgeHidden: boolean;
 }
 
 /** One property of a library — a native column or a custom attribute, edited the same way. */
