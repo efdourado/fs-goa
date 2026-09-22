@@ -1116,7 +1116,6 @@
     "cardMetrics": "{count, plural, one {# métrica} other {# métricas}}",
     "unpublish": "Despublicar",
     "detailLoading": "Cargando plantilla…",
-    "closeCopy": "Cerrar",
     "duplicateCta": "Duplicar",
     "signInToDuplicate": "Entrar para duplicar",
     "errNameGroup": "Ponle un nombre al nuevo grupo.",

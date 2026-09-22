@@ -1116,7 +1116,6 @@
     "cardMetrics": "{count, plural, one {# metric} other {# metrics}}",
     "unpublish": "Unpublish",
     "detailLoading": "Loading template…",
-    "closeCopy": "Close",
     "duplicateCta": "Duplicate",
     "signInToDuplicate": "Sign in to duplicate",
     "errNameGroup": "Give the new group a name.",

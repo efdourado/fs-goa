@@ -5,6 +5,7 @@ import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 
 import { API_PATHS, apiRequest } from "../api";
 import { SkippedPropertiesNotice } from "../copy-notice";
+import { Dialog } from "../dialog";
 import { useGoaFormat } from "../format";
 import { SettingsMenu } from "../SettingsMenu";
 import type {
@@ -16,7 +17,7 @@ import type {
   TemplateSummary,
   User,
 } from "../types";
-import { BackButton, Brand, Button, cardClass, cx, EmptyState, inputClass, labelClass, PageHeading, StatusMessage } from "../ui";
+import { BackButton, Brand, Button, EmptyState, inputClass, labelClass, PageHeading, StatusMessage } from "../ui";
 import { ParticipantChallengeScreen } from "./participant-challenge";
 
 function PublicChrome({ user, onSignIn, children }: { user: User | null; onSignIn: () => void; children: ReactNode }) {
@@ -213,8 +214,8 @@ export function TemplateDetailScreen({
 
   const headerActions = (
     <>
-      <Button onClick={() => (user ? setShowCopy((open) => !open) : onSignIn())}>
-        {user ? (showCopy ? t("closeCopy") : t("duplicateCta")) : t("signInToDuplicate")}
+      <Button onClick={() => (user ? setShowCopy(true) : onSignIn())}>
+        {user ? t("duplicateCta") : t("signInToDuplicate")}
       </Button>
       {canPublish ? (
         <Button variant="danger" disabled={unpublishing} onClick={() => void unpublish()}>
@@ -251,32 +252,30 @@ export function TemplateDetailScreen({
         <div className="mx-auto max-w-7xl px-4 sm:px-6"><StatusMessage error={unpublishError} /></div>
       ) : null}
       {user && showCopy ? (
-        <div className="mx-auto max-w-7xl px-4 pb-24 sm:px-6">
-          <section className={cx(cardClass, "p-5")} aria-label={t("duplicateAria")}>
-            <p className="text-sm text-[var(--muted)]">{t("duplicateBody")}</p>
-            {copied ? <SkippedPropertiesNotice skipped={copied.skippedProperties} onOpen={() => { if (copied.challengeId) onDuplicated({ challengeId: copied.challengeId }); }} /> : null}
-            <form className="mt-4 grid gap-3" onSubmit={duplicate} hidden={Boolean(copied)}>
-              <label><span className={labelClass}>{t("targetGroupLabel")}</span>
-                <select className={inputClass} name="target" defaultValue={manageable[0]?.id ?? "__new__"}>
-                  {manageable.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
-                  <option value="__new__">{t("newGroupOption")}</option>
-                </select>
-              </label>
-              <label><span className={labelClass}>{t("newGroupNameLabel")}</span>
-                <input className={inputClass} name="newGroupName" maxLength={120} placeholder={detail.title} />
-              </label>
-              <label><span className={labelClass}>{t("copyModeLabel")}</span>
-                <select className={inputClass} name="mode" defaultValue="structure_and_items">
-                  <option value="structure_and_items">{t("copyModeItems")}</option>
-                  <option value="structure">{t("copyModeStructure")}</option>
-                </select>
-              </label>
-              <p className="text-xs text-[var(--muted)]">{t("copyModeHint")}</p>
-              <div><Button type="submit" disabled={busy}>{busy ? t("duplicating") : t("duplicateSubmit")}</Button></div>
-              <StatusMessage error={copyError} />
-            </form>
-          </section>
-        </div>
+        <Dialog title={t("duplicateAria")} onClose={() => setShowCopy(false)} busy={busy}>
+          <p className="text-sm text-[var(--muted)]">{t("duplicateBody")}</p>
+          {copied ? <SkippedPropertiesNotice skipped={copied.skippedProperties} onOpen={() => { if (copied.challengeId) onDuplicated({ challengeId: copied.challengeId }); }} /> : null}
+          <form className="mt-4 grid gap-3" onSubmit={duplicate} hidden={Boolean(copied)}>
+            <label><span className={labelClass}>{t("targetGroupLabel")}</span>
+              <select className={inputClass} name="target" defaultValue={manageable[0]?.id ?? "__new__"}>
+                {manageable.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
+                <option value="__new__">{t("newGroupOption")}</option>
+              </select>
+            </label>
+            <label><span className={labelClass}>{t("newGroupNameLabel")}</span>
+              <input className={inputClass} name="newGroupName" maxLength={120} placeholder={detail.title} />
+            </label>
+            <label><span className={labelClass}>{t("copyModeLabel")}</span>
+              <select className={inputClass} name="mode" defaultValue="structure_and_items">
+                <option value="structure_and_items">{t("copyModeItems")}</option>
+                <option value="structure">{t("copyModeStructure")}</option>
+              </select>
+            </label>
+            <p className="text-xs text-[var(--muted)]">{t("copyModeHint")}</p>
+            <div><Button type="submit" disabled={busy}>{busy ? t("duplicating") : t("duplicateSubmit")}</Button></div>
+            <StatusMessage error={copyError} />
+          </form>
+        </Dialog>
       ) : null}
     </>
   );
