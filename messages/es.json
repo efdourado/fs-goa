@@ -726,7 +726,6 @@
     "stateScheduled": "El desafío ya está activado, pero está programado para {date}. Los registros se liberarán cuando empiece.",
     "stateActive": "Los participantes pueden enviar y editar sus registros. Cerrar bloquea los datos de origen.",
     "stateClosed": "Los registros y la estructura están congelados; la curaduría de la vitrina aún puede actualizarse. Reabrir libera todo de nuevo.",
-    "activateConfirm": "¿Activar este desafío? Los participantes seleccionados podrán registrar.",
     "activated": "Desafío activado.",
     "activate": "Activar desafío",
     "reopen": "Reabrir desafío",

@@ -726,7 +726,6 @@
     "stateScheduled": "The challenge is already active but scheduled for {date}. Entries open once it starts.",
     "stateActive": "Participants can submit and edit their entries. Closing locks the source data.",
     "stateClosed": "Entries and structure are frozen; the showcase curation can still be updated. Reopening unlocks everything again.",
-    "activateConfirm": "Activate this challenge? Selected participants will be able to log entries.",
     "activated": "Challenge activated.",
     "activate": "Activate challenge",
     "reopen": "Reopen challenge",

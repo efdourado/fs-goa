@@ -183,9 +183,10 @@ export function FieldBuilder({
               <div className="mt-3">
                 <FieldConfigInputs field={field} onChange={(patch) => update(index, patch)} />
               </div>
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                <code className="rounded bg-[var(--wash)] px-2 py-1 text-[11px] text-[var(--muted)]">{field.key}</code>
-                <div className="flex gap-1"><Button variant="ghost" onClick={() => move(index, -1)} disabled={index === 0} className="px-3">↑<span className="sr-only">{t("moveUp")}</span></Button><Button variant="ghost" onClick={() => move(index, 1)} disabled={index === fields.length - 1} className="px-3">↓<span className="sr-only">{t("moveDown")}</span></Button><button type="button" className="min-h-11 px-2 text-sm text-[var(--danger)] hover:underline" onClick={() => onChange(fields.filter((_, fieldIndex) => fieldIndex !== index))}>{t("remove")}</button></div>
+              <div className="mt-3 flex justify-end gap-1">
+                <Button variant="ghost" onClick={() => move(index, -1)} disabled={index === 0} className="px-3">↑<span className="sr-only">{t("moveUp")}</span></Button>
+                <Button variant="ghost" onClick={() => move(index, 1)} disabled={index === fields.length - 1} className="px-3">↓<span className="sr-only">{t("moveDown")}</span></Button>
+                <button type="button" className="min-h-11 px-2 text-sm text-[var(--danger)] hover:underline" onClick={() => onChange(fields.filter((_, fieldIndex) => fieldIndex !== index))}>{t("remove")}</button>
               </div>
             </li>
           ))}

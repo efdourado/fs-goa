@@ -407,7 +407,6 @@ function AdminFields({
                 <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--muted)]">
                   {tf(`type.${field.type}`)}
                   {field.required ? <span className="text-[var(--main-strong)]">· {t("fieldRequiredShort")}</span> : null}
-                  <code className="rounded bg-[var(--wash)] px-1.5 py-0.5 font-mono text-[11px]">{field.key}</code>
                 </span>
               </div>
               {!locked ? (
