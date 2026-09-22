@@ -345,11 +345,11 @@
         "body": "Para um clube ou uma turma de amigos. Convide as pessoas quando o primeiro desafio estiver pronto.",
         "cta": "Criar grupo"
       },
-      "solo": {
-        "title": "Começar por conta própria",
-        "body": "Um desafio privado no Meu espaço — sem grupo, sem convites.",
-        "cta": "Novo desafio"
-      },
+      "quick": {
+      "title": "Comece um desafio",
+      "body": "Três perguntas rápidas, tudo por toque — sem como errar.",
+      "cta": "Começar"
+    },
       "templates": {
         "title": "Copiar um que já existe",
         "body": "Desafios que outros grupos publicaram como modelo — copie um e deixe do seu jeito.",
@@ -1720,6 +1720,28 @@
     "updated": "Atualizada em {date}",
     "itemsDone": "{done} de {total} concluídos",
     "titleRequired": "Dê um título a ela."
+  },
+  "quickCreate": {
+    "title": "Comece um desafio",
+    "subtitle": "Três toques rápidos — sem biblioteca, sem grupo, sem campo pra errar.",
+    "q1": "O que você quer acompanhar?",
+    "q2": "Só pra você, ou com um grupo?",
+    "q3": "Como vamos chamar isso?",
+    "change": "Mudar",
+    "justMe": "Só eu",
+    "justMeHint": "Um desafio privado, no Meu espaço.",
+    "groupHint": "{count, plural, one {# pessoa} other {# pessoas}}",
+    "newGroup": "Um grupo novo",
+    "newGroupHint": "Convide as pessoas depois de criado.",
+    "newGroupPlaceholder": "Nome do grupo",
+    "newGroupCreate": "Criar grupo",
+    "titlePlaceholder": "ex.: Sessão de terça",
+    "q4Cinema": "Qual é o primeiro filme ou série?",
+    "q4Bookshelf": "Qual é o primeiro livro?",
+    "itemPlaceholderCinema": "ex.: Paris, Texas",
+    "itemPlaceholderBookshelf": "ex.: Piranesi",
+    "create": "Criar desafio",
+    "groupWithoutId": "O grupo foi criado, mas perdemos o rastro dele."
   },
   "backTo": {
     "home": "Início",

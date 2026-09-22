@@ -348,7 +348,7 @@ export function DashboardScreen({
   onOpenChallenge,
   onOpenAdmin,
   onCreateGroup,
-  onCreatePersonalChallenge,
+  onQuickCreate,
   onOpenTemplates,
   onChanged,
 }: {
@@ -362,7 +362,7 @@ export function DashboardScreen({
   onOpenChallenge: (id: Id) => void;
   onOpenAdmin: (id: Id) => void;
   onCreateGroup: (name: string) => Promise<void>;
-  onCreatePersonalChallenge: () => void;
+  onQuickCreate: () => void;
   onOpenTemplates: () => void;
   onChanged?: () => void;
 }) {
@@ -569,7 +569,7 @@ export function DashboardScreen({
       <StatusMessage error={error} />
 
       {brandNew ? (
-        <WelcomePanel onCreateGroup={() => setShowGroupDialog(true)} onStartSolo={onCreatePersonalChallenge} onOpenTemplates={onOpenTemplates} />
+        <WelcomePanel onCreateGroup={() => setShowGroupDialog(true)} onQuickCreate={onQuickCreate} onOpenTemplates={onOpenTemplates} />
       ) : null}
 
       {brandNew ? null : (

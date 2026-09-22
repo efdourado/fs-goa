@@ -14,6 +14,7 @@ import {
 import { useGoaFormat } from "./goa/format";
 import { AboutScreen } from "./goa/screens/about";
 import { NotesScreen } from "./goa/screens/notes";
+import { QuickCreateScreen } from "./goa/screens/quick-create";
 import { AccountScreen } from "./goa/screens/account";
 import { AccountDeactivatedScreen } from "./goa/screens/account-deactivated";
 import { AdminScreen } from "./goa/screens/admin";
@@ -373,12 +374,17 @@ export default function GoaApp() {
     setScreen({ kind: "auth", mode: "login" });
   }
 
-  async function createGroup(name: string) {
-    if (!bootstrap) return;
+  /** Makes the group and hands back its id, refreshed bootstrap included — no navigation, for a caller with its own next step (quick-create). */
+  async function createGroupAndGetId(name: string): Promise<Id | null> {
+    if (!bootstrap) return null;
     const response = await apiRequest<unknown>(API_PATHS.groups, { method: "POST", body: { name }, csrfToken: bootstrap.csrfToken });
     const groupId = normalizeCreatedId(response);
     const data = await refreshBootstrap();
-    const resolvedId = groupId ?? data.groups.find((group) => group.name === name)?.id;
+    return groupId ?? data.groups.find((group) => group.name === name)?.id ?? null;
+  }
+
+  async function createGroup(name: string) {
+    const resolvedId = await createGroupAndGetId(name);
     if (resolvedId) setScreen({ kind: "group", groupId: resolvedId });
   }
 
@@ -630,6 +636,8 @@ export default function GoaApp() {
     content = <AboutScreen onBack={goUp} backLabel={backLabel} />;
   } else if (screen.kind === "notes") {
     content = <NotesScreen onBack={goUp} backLabel={backLabel} />;
+  } else if (screen.kind === "quick-create") {
+    content = <QuickCreateScreen currentUserId={user.id} groups={bootstrap.groups} onBack={goUp} backLabel={backLabel} onCreateGroup={createGroupAndGetId} onSubmit={createChallenge} />;
   } else if (screen.kind === "group" && selectedGroup) {
     content = <GroupScreen key={selectedGroup.id} group={selectedGroup} challenges={bootstrap.challenges.filter((challenge) => challenge.groupId === selectedGroup.id)} challengeLimit={bootstrap.limits.challengesPerGroup} pendingRequests={selectedGroup.pendingRequests ?? []} onBack={goUp} backLabel={backLabel} onCreateChallenge={() => setScreen({ kind: "create-challenge", groupId: selectedGroup.id })} onOpenChallenge={(id) => openParticipant(id)} onOpenCatalogItem={(itemId) => setScreen({ kind: "catalog-item", groupId: selectedGroup.id, itemId })} onOpenCatalog={() => setScreen({ kind: "group-catalog", groupId: selectedGroup.id })} onCreateInvite={async (payload) => apiRequest<{ token?: string; url?: string }>(API_PATHS.groupInvites(selectedGroup.id), { method: "POST", body: payload, csrfToken: bootstrap.csrfToken })} onInviteByUsername={(username) => apiRequest<GroupInviteResult>(API_PATHS.groupMembers(selectedGroup.id), { method: "POST", body: { username }, csrfToken: bootstrap.csrfToken })} onCancelRequest={cancelMemberRequest} onUpdateGroup={(payload) => updateGroup(selectedGroup.id, payload)} onDeleteGroup={selectedGroup.role === "owner" ? () => deleteGroup(selectedGroup.id) : undefined} onLeaveGroup={selectedGroup.role === "owner" ? undefined : () => leaveGroup(selectedGroup.id)} onSetMemberRole={selectedGroup.role === "owner" ? (userId, role) => setMemberRole(selectedGroup.id, userId, role) : undefined} />;
   } else if (screen.kind === "group-catalog" && selectedGroup) {
@@ -655,7 +663,7 @@ export default function GoaApp() {
   } else if (screen.kind === "admin" || screen.kind === "create-challenge") {
     content = <main className="mx-auto max-w-2xl px-5 py-16"><EmptyState title={t("adminUnavailableTitle")} action={<Button onClick={() => setScreen({ kind: "dashboard" })}>{t("backToStart")}</Button>} /></main>;
   } else {
-    content = <DashboardScreen user={user} groups={bootstrap.groups} challenges={bootstrap.challenges} personalWorkspaceId={bootstrap.personalWorkspaceId} limits={bootstrap.limits} csrfToken={bootstrap.csrfToken} onOpenGroup={(groupId) => setScreen({ kind: "group", groupId })} onOpenChallenge={(id) => openParticipant(id)} onOpenAdmin={(id) => openAdmin(id)} onCreateGroup={createGroup} onCreatePersonalChallenge={() => setScreen({ kind: "create-personal-challenge" })} onOpenTemplates={() => setScreen({ kind: "templates" })} onChanged={() => { void refreshBootstrap(); }} />;
+    content = <DashboardScreen user={user} groups={bootstrap.groups} challenges={bootstrap.challenges} personalWorkspaceId={bootstrap.personalWorkspaceId} limits={bootstrap.limits} csrfToken={bootstrap.csrfToken} onOpenGroup={(groupId) => setScreen({ kind: "group", groupId })} onOpenChallenge={(id) => openParticipant(id)} onOpenAdmin={(id) => openAdmin(id)} onCreateGroup={createGroup} onQuickCreate={() => setScreen({ kind: "quick-create" })} onOpenTemplates={() => setScreen({ kind: "templates" })} onChanged={() => { void refreshBootstrap(); }} />;
   }
 
   return (

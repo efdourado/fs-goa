@@ -649,6 +649,7 @@ export type Screen =
   | { kind: "templates" }
   | { kind: "template"; challengeId: Id }
   | { kind: "notes" }
+  | { kind: "quick-create" }
   | { kind: "about" };
 
 /** A library property a copy had to leave out — the destination defines the same key differently (or removed it). */

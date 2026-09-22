@@ -345,11 +345,11 @@
         "body": "For a club or a circle of friends. Invite people once the first challenge is ready.",
         "cta": "Create group"
       },
-      "solo": {
-        "title": "Start on your own",
-        "body": "A private challenge in My space — no group, no invites.",
-        "cta": "New challenge"
-      },
+      "quick": {
+      "title": "Start a challenge",
+      "body": "Three quick questions, all of them taps — no way to get it wrong.",
+      "cta": "Get started"
+    },
       "templates": {
         "title": "Copy one that's built",
         "body": "Challenges other groups published as templates — copy one and make it yours.",
@@ -1720,6 +1720,28 @@
     "updated": "Updated {date}",
     "itemsDone": "{done} of {total} done",
     "titleRequired": "Give it a title."
+  },
+  "quickCreate": {
+    "title": "Start a challenge",
+    "subtitle": "Three quick taps — no group, no library, no field to fill in wrong.",
+    "q1": "What would you like to track?",
+    "q2": "Just for you, or with a group?",
+    "q3": "What should we call it?",
+    "change": "Change",
+    "justMe": "Just me",
+    "justMeHint": "A private challenge, in My space.",
+    "groupHint": "{count, plural, one {# person} other {# people}}",
+    "newGroup": "A new group",
+    "newGroupHint": "Invite people once it's made.",
+    "newGroupPlaceholder": "Group name",
+    "newGroupCreate": "Create group",
+    "titlePlaceholder": "e.g. Tuesday film night",
+    "q4Cinema": "What's the first film or show?",
+    "q4Bookshelf": "What's the first book?",
+    "itemPlaceholderCinema": "e.g. Paris, Texas",
+    "itemPlaceholderBookshelf": "e.g. Piranesi",
+    "create": "Create challenge",
+    "groupWithoutId": "The group was created, but we lost track of it."
   },
   "backTo": {
     "home": "Home",

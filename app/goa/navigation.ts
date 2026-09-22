@@ -39,6 +39,7 @@ export function screenFromUrl(pathname: string, search = ""): Screen | null {
   }
   if (parts[0] === "sobre" && parts.length === 1) return { kind: "about" };
   if (parts[0] === "notes" && parts.length === 1) return { kind: "notes" };
+  if (parts[0] === "start" && parts.length === 1) return { kind: "quick-create" };
   if (parts[0] === "personal" && parts.length === 1) return { kind: "personal-space" };
   if (parts[0] === "personal" && parts[1] === "trash" && parts.length === 2) return { kind: "personal-trash" };
   if (parts[0] === "catalog" && parts.length === 1) return { kind: "personal-catalog" };
@@ -143,6 +144,8 @@ export function urlForScreen(screen: Screen): string | null {
       return "/sobre";
     case "notes":
       return "/notes";
+    case "quick-create":
+      return "/start";
     case "invite":
       return `/invites/${encodeURIComponent(screen.token)}`;
     case "invite-success":
@@ -203,6 +206,7 @@ export function backTargetFor(screen: Screen, lookup: BackLookup): BackTarget | 
     case "group":
     case "personal-space":
     case "notes":
+    case "quick-create":
       return HOME;
     case "about":
     case "templates":

@@ -14,18 +14,19 @@ const RECIPES: RecipeIconName[] = ["cinema", "bookshelf", "library", "habit", "t
  */
 export function WelcomePanel({
   onCreateGroup,
-  onStartSolo,
+  onQuickCreate,
   onOpenTemplates,
 }: {
   onCreateGroup: () => void;
-  onStartSolo: () => void;
+  /** The guided, tap-only way to a first challenge — replaces what used to be a straight line to the full wizard. */
+  onQuickCreate: () => void;
   onOpenTemplates: () => void;
 }) {
   const t = useTranslations("welcome");
   const tr = useTranslations("createChallenge");
   const starts = [
-    { key: "group", onClick: onCreateGroup, primary: true },
-    { key: "solo", onClick: onStartSolo, primary: false },
+    { key: "quick", onClick: onQuickCreate, primary: true },
+    { key: "group", onClick: onCreateGroup, primary: false },
     { key: "templates", onClick: onOpenTemplates, primary: false },
   ] as const;
 
