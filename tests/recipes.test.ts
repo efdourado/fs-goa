@@ -99,11 +99,18 @@ describe("current challenge recipes", () => {
     assert.deepEqual(fields.map((field) => field.key), ["comida", "ambiente_atendimento", "custo_beneficio", "comentario"]);
     assert.deepEqual(fields.map((field) => field.type), ["rating", "rating", "rating", "text"]);
     assert.deepEqual(fields.map((field) => field.required), [true, true, true, false]);
-    // No forced address, visit date, price, overall rating or "would return".
+    // No forced address, visit date, price, overall rating or "would return" field — an overall *metric* is fine.
     assert.equal(recipe.collectsEntryDate, false);
-    assert.equal(fields.some((field) => /endere|pre[cç]o|geral|voltar/i.test(String(field.label))), false);
-    // Only the three dimensions' per-place averages (no combined score) + completion.
-    assert.deepEqual(recipe.metrics.map((metric) => metric.fieldKey), ["comida", "ambiente_atendimento", "custo_beneficio", undefined]);
+    assert.equal(fields.some((field) => /endere|pre[cç]o|voltar/i.test(String(field.label))), false);
+    // The three dimensions' per-place averages, a combined "Nota geral" averaging all three, + completion.
+    assert.deepEqual(
+      recipe.metrics.map((metric) => metric.fieldKey),
+      ["comida", "ambiente_atendimento", "custo_beneficio", undefined, undefined],
+    );
+    const overall = recipe.metrics.find((metric) => metric.key === "nota_geral")!;
+    assert.deepEqual(overall.fieldKeys, ["comida", "ambiente_atendimento", "custo_beneficio"]);
+    assert.equal(overall.operation, "average");
+    assert.equal(overall.groupBy, "item");
   });
 
   test("legacy keys are not recipes and cannot seed a new challenge", () => {

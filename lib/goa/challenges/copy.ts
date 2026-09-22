@@ -372,6 +372,16 @@ export async function copyChallengeStructure(
             decimal_places,visible_during_challenge,position,settings
        FROM challenge_metrics WHERE challenge_id=$1 AND archived_at IS NULL ORDER BY position`, [sourceChallengeId]);
   for (const source of metrics.rows) {
+    // `settings.fieldIds` (a multi-field metric, e.g. Tables' "Nota geral") names fields by id — those ids
+    // belong to the source challenge, so they need the same remap `field_id` itself just got.
+    const sourceSettings = (source.settings ?? {}) as { fieldIds?: unknown };
+    const fieldIds = Array.isArray(sourceSettings.fieldIds)
+      ? sourceSettings.fieldIds
+        .filter((fieldId): fieldId is string => typeof fieldId === "string")
+        .map((fieldId) => fieldMap.get(fieldId))
+        .filter((fieldId): fieldId is string => Boolean(fieldId))
+      : null;
+    const settings = fieldIds ? { ...sourceSettings, fieldIds } : sourceSettings;
     await client.query(
       `INSERT INTO challenge_metrics
         (id,challenge_id,entry_type_id,field_id,semantic_key,label,operation,group_by,
@@ -379,7 +389,7 @@ export async function copyChallengeStructure(
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13,now(),now())`,
       [publicId(), targetId, typeMap.get(source.entry_type_id), source.field_id ? fieldMap.get(source.field_id) : null,
         source.semantic_key, source.label, source.operation, source.group_by, source.decimal_places,
-        source.visible_during_challenge, source.position, JSON.stringify(source.settings ?? {}), createdByUserId],
+        source.visible_during_challenge, source.position, JSON.stringify(settings), createdByUserId],
     );
   }
 

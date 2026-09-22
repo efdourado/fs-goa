@@ -41,6 +41,12 @@ interface RecipeMetric {
   label: string;
   operation: MetricOperation;
   fieldKey?: string;
+  /**
+   * Several field keys instead of one: the metric averages them together per entry (Tables' "Nota geral" —
+   * the mean of its three ratings) rather than reading a single measure. Mutually exclusive with `fieldKey`;
+   * skipped, like a single field that no longer resolves, if any key doesn't.
+   */
+  fieldKeys?: string[];
   groupBy?: "none" | "participant" | "item";
   visibleDuring?: boolean;
   visibleInResults?: boolean;
@@ -344,11 +350,10 @@ export const RECIPES: Record<RecipeKey, Recipe> = {
     metrics: [completionMetric],
   },
   // A ready-made challenge on a Tables library: rate each place on food,
-  // atmosphere/service and value. Per-place averages of each rating, no
-  // combined score.
+  // atmosphere/service and value, plus one combined score averaging all three.
   tables: {
     key: "tables",
-    version: 1,
+    version: 2,
     catalogKind: null,
     catalogKindFromBody: true,
     defaultLibrarySource: "tables",
@@ -359,6 +364,13 @@ export const RECIPES: Record<RecipeKey, Recipe> = {
       { key: "media_comida", label: "Comida e bebida (média por lugar)", operation: "average", fieldKey: "comida", groupBy: "item" },
       { key: "media_ambiente_atendimento", label: "Ambiente e atendimento (média por lugar)", operation: "average", fieldKey: "ambiente_atendimento", groupBy: "item" },
       { key: "media_custo_beneficio", label: "Custo-benefício (média por lugar)", operation: "average", fieldKey: "custo_beneficio", groupBy: "item" },
+      {
+        key: "nota_geral",
+        label: "Nota geral (média por lugar)",
+        operation: "average",
+        fieldKeys: ["comida", "ambiente_atendimento", "custo_beneficio"],
+        groupBy: "item",
+      },
       completionMetric,
     ],
   },

@@ -2193,6 +2193,72 @@ test("Tables (fase 7): a biblioteca só existe quando a pessoa a cria, três not
   assert.equal(complete.response.status, 201, JSON.stringify(complete.body));
 });
 
+test("Tables: a Nota geral média as três notas por lugar, e sobrevive a uma cópia do desafio", async () => {
+  const owner = await register("Duda", "duda_tables_geral");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Rolês 2" } })).body as { id: string }).id;
+  await call("POST", `/api/groups/${gid}/catalog/libraries`, { session: owner, body: { source: "tables" } });
+  const created = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "tables", title: "Onde comer", participantIds: [owner.user.id],
+      items: [{ title: "Cantina do Zé" }, { title: "Boteco da Ana" }],
+    },
+  });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const cid = (created.body as { id: string }).id;
+
+  const detail = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as {
+    items: Array<{ id: string; title: string }>;
+    metrics: Array<{ key: string; fieldId: string | null }>;
+  };
+  assert.deepEqual(
+    detail.metrics.map((metric) => metric.key),
+    ["media_comida", "media_ambiente_atendimento", "media_custo_beneficio", "nota_geral", "taxa_conclusao"],
+    "a receita semeia as três médias, a nota geral combinada e a conclusão",
+  );
+  assert.ok(detail.metrics.find((metric) => metric.key === "nota_geral")!.fieldId, "a métrica combinada ainda aponta um campo, para a checagem do banco");
+  const cantina = detail.items.find((item) => item.title === "Cantina do Zé")!.id;
+  const boteco = detail.items.find((item) => item.title === "Boteco da Ana")!.id;
+
+  await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } });
+  // Cantina: (5+5+5)/3 = 5. Boteco: (1+2+3)/3 = 2. A nota geral é a média por lugar dessas três, não a soma bruta.
+  await call("POST", `/api/challenges/${cid}/entries`, { session: owner, body: { itemId: cantina, values: { comida: 5, ambiente_atendimento: 5, custo_beneficio: 5 } } });
+  await call("POST", `/api/challenges/${cid}/entries`, { session: owner, body: { itemId: boteco, values: { comida: 1, ambiente_atendimento: 2, custo_beneficio: 3 } } });
+
+  const withEntries = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as {
+    metrics: Array<{ key: string; value: number | null; series?: Array<{ label: string; value: number | null }> }>;
+  };
+  const notaGeral = withEntries.metrics.find((metric) => metric.key === "nota_geral")!;
+  assert.equal(notaGeral.value, 3.5, "média das duas notas combinadas, (5 + 2) / 2");
+  assert.deepEqual(
+    [...notaGeral.series ?? []].sort((a, b) => a.label.localeCompare(b.label)).map((entry) => [entry.label, entry.value]),
+    [["Boteco da Ana", 2], ["Cantina do Zé", 5]],
+  );
+  // As três médias individuais continuam corretas e independentes da combinada.
+  assert.equal(withEntries.metrics.find((metric) => metric.key === "media_comida")!.value, 3, "(5 + 1) / 2");
+
+  // Uma cópia do desafio (mesmo sem entradas ainda) precisa remapear os três campos da métrica combinada
+  // para os campos NOVOS — não os do desafio de origem — ou a nota geral fica muda no destino.
+  const dstGid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Rolês 2 (cópia)" } })).body as { id: string }).id;
+  const duplicated = await call("POST", `/api/challenges/${cid}/duplicate`, { session: owner, body: { targetGroupId: dstGid } });
+  assert.equal(duplicated.response.status, 201, JSON.stringify(duplicated.body));
+  const dcid = (duplicated.body as { id: string }).id;
+  const dupDetail = (await call("GET", `/api/challenges/${dcid}`, { session: owner })).body as {
+    items: Array<{ id: string; title: string }>;
+  };
+  const dupItemId = dupDetail.items[0].id;
+  // A duplicate starts with no participants of its own (the destination group may not be the same
+  // people) — pick them again before the round can take entries.
+  await call("POST", `/api/challenges/${dcid}/participants`, { session: owner, body: { participantIds: [owner.user.id] } });
+  await call("POST", `/api/challenges/${dcid}/transition`, { session: owner, body: { status: "active" } });
+  const dupEntry = await call("POST", `/api/challenges/${dcid}/entries`, { session: owner, body: { itemId: dupItemId, values: { comida: 4, ambiente_atendimento: 4, custo_beneficio: 4 } } });
+  assert.equal(dupEntry.response.status, 201, JSON.stringify(dupEntry.body));
+  const dupWithEntry = (await call("GET", `/api/challenges/${dcid}`, { session: owner })).body as {
+    metrics: Array<{ key: string; value: number | null }>;
+  };
+  assert.equal(dupWithEntry.metrics.find((metric) => metric.key === "nota_geral")!.value, 4, "a métrica combinada da cópia lê os campos da cópia");
+});
+
 test("cópia de modelo (fase 7): só a estrutura ou com itens, o escopo compartilhado fica, nada privado atravessa", async () => {
   const admin = await register("Curador", "curador_copia");
   await adminPool.query("UPDATE users SET platform_admin = true WHERE id = $1", [admin.user.id]);

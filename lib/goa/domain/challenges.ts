@@ -351,12 +351,26 @@ export async function createChallenge(
       const operation = soloRanking ? "average" : recipeMetric.operation;
       const settings = soloRanking ? { minSample: 1 } : recipeMetric.settings;
       let fieldId: string | null = null;
+      // Several fields (Tables' "Nota geral"): every key must still resolve, same all-or-nothing rule as
+      // one — the recorded field ids ride along in `settings.fieldIds` for `ratingRows` to average per entry.
+      let combinedFieldIds: string[] | null = null;
       // Completion rate counts the "done" signal — a dedicated completion type
       // when the recipe has one, otherwise the primary type.
       let metricTypeId = operation === "completion_rate" && completionTypeId
         ? completionTypeId
         : entryTypeId;
-      if (recipeMetric.fieldKey) {
+      if (recipeMetric.fieldKeys) {
+        const resolvedIds: string[] = [];
+        for (const key of recipeMetric.fieldKeys) {
+          const resolved = fieldByKey.get(key);
+          if (!resolved) break;
+          resolvedIds.push(resolved.id);
+          metricTypeId = resolved.entryTypeId;
+        }
+        if (resolvedIds.length !== recipeMetric.fieldKeys.length) continue;
+        fieldId = resolvedIds[0];
+        if (resolvedIds.length > 1) combinedFieldIds = resolvedIds;
+      } else if (recipeMetric.fieldKey) {
         const resolved = fieldByKey.get(recipeMetric.fieldKey);
         if (!resolved) continue;
         fieldId = resolved.id;
@@ -375,6 +389,7 @@ export async function createChallenge(
           recipeMetric.visibleDuring !== false, metricPosition,
           JSON.stringify({
             visibleInResults: recipeMetric.visibleInResults !== false,
+            ...(combinedFieldIds ? { fieldIds: combinedFieldIds } : {}),
             ...settings,
           }),
           session.user.id],

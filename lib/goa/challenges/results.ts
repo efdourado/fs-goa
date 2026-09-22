@@ -62,18 +62,35 @@ interface RatingRow {
 
 
 /**
+ * `settings.fieldIds` (≥ 2 entries) marks a metric composed of several fields on the same entry type —
+ * "Nota geral" on Tables, say, averaging the three rating fields together. `field_id` still names one of
+ * them (the DB requires a numeric metric to point at *a* field), but the value each entry contributes is
+ * the average across every field this list names, not just that one.
+ */
+function compositeFieldIds(metric: MetricRow): string[] | null {
+  const raw = (metric.settings as { fieldIds?: unknown } | undefined)?.fieldIds;
+  if (!Array.isArray(raw)) return null;
+  const ids = raw.filter((id): id is string => typeof id === "string" && id.length > 0);
+  return ids.length >= 2 ? ids : null;
+}
+
+/**
  * Numeric field values for a metric, tagged with their item, participant, and
  * — when the round tracks a catalog — the release year / author / main genre
  * of the film or book that item points at. That's what lets a metric group by
  * "best movies of 2026" or "best authors" instead of only participant/item.
  */
 async function ratingRows(client: PoolClient, metric: MetricRow): Promise<RatingRow[]> {
+  const fieldIds = compositeFieldIds(metric);
+  // A participant who has since left the challenge (or the group, or whose
+  // account is gone) keeps contributing to the numbers but not the name — the
+  // per-person breakdown labels them generically instead. Same rule for
+  // whoever recommended the item.
+  const value = fieldIds
+    ? "AVG(ev.number_scaled::float8 / (10 ^ f.number_scale))"
+    : "(ev.number_scaled::float8 / (10 ^ f.number_scale))";
   const result = await client.query<RatingRow>(
-    // A participant who has since left the challenge (or the group, or whose
-    // account is gone) keeps contributing to the numbers but not the name — the
-    // per-person breakdown labels them generically instead. Same rule for
-    // whoever recommended the item.
-    `SELECT (ev.number_scaled::float8 / (10 ^ f.number_scale)) AS value,
+    `SELECT ${value} AS value,
             e.item_id, ci.title AS item_title,
             e.participant_user_id AS participant_id,
             CASE WHEN cp.user_id IS NOT NULL THEN u.display_name ELSE 'Quem já saiu' END AS participant_name,
@@ -100,9 +117,15 @@ async function ratingRows(client: PoolClient, metric: MetricRow): Promise<Rating
          ON active_recommender.group_id = c.group_id
         AND active_recommender.user_id = ci.recommended_by_user_id
         AND active_recommender.removed_at IS NULL
-      WHERE e.challenge_id = $1 AND ev.field_id = $2
-        AND e.deleted_at IS NULL AND ev.number_scaled IS NOT NULL`,
-    [metric.challenge_id, metric.field_id],
+      WHERE e.challenge_id = $1 AND ${fieldIds ? "ev.field_id = ANY($2::text[])" : "ev.field_id = $2"}
+        AND e.deleted_at IS NULL AND ev.number_scaled IS NOT NULL
+      ${fieldIds
+        ? `GROUP BY e.id, e.item_id, ci.title, e.participant_user_id, cp.user_id, u.display_name,
+                    cat.year, cat.author, cat.main_genre, ci.recommended_by_user_id,
+                    active_recommender.user_id, recommender.display_name,
+                    cc.id, cc.title, cc.position`
+        : ""}`,
+    [metric.challenge_id, fieldIds ?? metric.field_id],
   );
   return result.rows;
 }
