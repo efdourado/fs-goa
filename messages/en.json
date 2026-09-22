@@ -104,6 +104,10 @@
     "until": "Until {date}"
   },
   "metrics": {
+    "combineOp": {
+      "average": "Average",
+      "sum": "Sum"
+    },
     "operationName": {
       "sum": "Sum",
       "average": "Average",
@@ -815,6 +819,14 @@
     "metricNamePlaceholder": "e.g. Group average",
     "metricOperationLabel": "Operation",
     "metricFieldLabel": "Field",
+    "metricCombineLabel": "Combine more than one field",
+    "metricCombineHint": "Fold two or more fields into one number per entry — a total score from several ratings, say — before this calculation runs.",
+    "metricFieldsLabel": "Fields to combine",
+    "metricFieldsHint": "Pick two or more, from the same form.",
+    "metricPickTwoFields": "Pick at least two fields.",
+    "metricCombineOpLabel": "How to combine them",
+    "metricCombineOpHint": "Average keeps the same scale as one field on its own; sum adds them all together.",
+    "metricCombinedPreview": "{count, plural, one {# field combined} other {# fields combined}}",
     "metricFieldPlaceholder": "Select",
     "metricGroupByLabel": "Group by",
     "metricMinSampleLabel": "Minimum sample",
@@ -1378,6 +1390,8 @@
     "totalEntries": "{count, plural, one {# record} other {# records}}",
     "numbersAria": "Results in numbers",
     "showLess": "Show less",
+    "combinesSum": "Sum of {fields}.",
+    "combinesAverage": "Average of {fields}.",
     "pageMain": "Key numbers",
     "pageSeriesRanking": "Rankings",
     "pageSeriesDebate": "Split the room",

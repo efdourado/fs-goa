@@ -370,6 +370,12 @@ export interface Metric {
   label: string;
   operation: MetricOperation;
   fieldId?: Id | null;
+  /** Present on a combined metric — several fields folded into one number per registro before `operation` runs. */
+  fieldIds?: Id[];
+  /** Same order as `fieldIds` — their labels, for showing "combines Food, Value, …" without a second lookup. */
+  fieldLabels?: string[];
+  /** How `fieldIds` fold together — `average` unless set. Meaningless without `fieldIds`. */
+  combineOp?: "sum" | "average";
   groupBy?: MetricGroupBy;
   /** `groupBy: "checkpoint"` only — each row folds in every earlier checkpoint. */
   cumulative?: boolean;

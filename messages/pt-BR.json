@@ -104,6 +104,10 @@
     "until": "Até {date}"
   },
   "metrics": {
+    "combineOp": {
+      "average": "Média",
+      "sum": "Soma"
+    },
     "operationName": {
       "sum": "Soma",
       "average": "Média",
@@ -815,6 +819,14 @@
     "metricNamePlaceholder": "Ex.: Média do grupo",
     "metricOperationLabel": "Operação",
     "metricFieldLabel": "Campo",
+    "metricCombineLabel": "Combinar mais de um campo",
+    "metricCombineHint": "Junta dois ou mais campos num só número por registro — uma nota geral a partir de várias notas, por exemplo — antes de este cálculo rodar.",
+    "metricFieldsLabel": "Campos para combinar",
+    "metricFieldsHint": "Escolha dois ou mais, do mesmo formulário.",
+    "metricPickTwoFields": "Escolha pelo menos dois campos.",
+    "metricCombineOpLabel": "Como combiná-los",
+    "metricCombineOpHint": "A média mantém a mesma escala de um campo sozinho; a soma junta todos.",
+    "metricCombinedPreview": "{count, plural, one {# campo combinado} other {# campos combinados}}",
     "metricFieldPlaceholder": "Selecione",
     "metricGroupByLabel": "Agrupar",
     "metricMinSampleLabel": "Amostra mínima",
@@ -1378,6 +1390,8 @@
     "totalEntries": "{count, plural, one {# registro} other {# registros}}",
     "numbersAria": "Resultados em números",
     "showLess": "Ver menos",
+    "combinesSum": "Soma de {fields}.",
+    "combinesAverage": "Média de {fields}.",
     "pageMain": "Números principais",
     "pageSeriesRanking": "Rankings",
     "pageSeriesDebate": "Dividiu opiniões",

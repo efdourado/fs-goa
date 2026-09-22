@@ -6,6 +6,7 @@ import { Dialog, FormDialog } from "../dialog";
 import { MetricBlock } from "../metrics-view";
 import { metricFields, metricGroupings, metricNeedsField, metricOperations } from "../metric-editor";
 import { useGoaFormat } from "../format";
+import { Segmented } from "../Segmented";
 import type { ChallengeDetail, Id, Metric } from "../types";
 import { Button, Disclosure, EmptyState, Field, inputClass, PageHeading, StatusMessage, Toggle } from "../ui";
 
@@ -67,6 +68,10 @@ export function MetricEditor({ challenge, metric, onCancel, onSave }: {
   const [label, setLabel] = useState(metric?.label ?? "");
   const [operation, setOperation] = useState<Metric["operation"]>(metric?.operation ?? (fields.length ? "average" : "count"));
   const [fieldId, setFieldId] = useState(metric?.fieldId ?? (fields.length === 1 ? fields[0].id! : ""));
+  // Two or more fields folded into one number per registro (a combined ranking) instead of reading just one.
+  const [combine, setCombine] = useState((metric?.fieldIds?.length ?? 0) >= 2);
+  const [fieldIds, setFieldIds] = useState<string[]>(metric?.fieldIds ?? []);
+  const [combineOp, setCombineOp] = useState<"sum" | "average">(metric?.combineOp ?? "average");
   const [groupBy, setGroupBy] = useState(metric?.groupBy ?? "none");
   const [minSample, setMinSample] = useState(String(metric?.minSample ?? 1));
   const [cumulative, setCumulative] = useState(metric?.cumulative ?? false);
@@ -76,17 +81,32 @@ export function MetricEditor({ challenge, metric, onCancel, onSave }: {
   const [error, setError] = useState<string | null>(null);
   const needsField = metricNeedsField(operation);
   const selectedField = fields.find((field) => field.id === fieldId);
+  const combinedFields = fields.filter((field) => fieldIds.includes(field.id!));
   const options = metricGroupings(challenge, operation);
   // Existing configurations stay editable without silently changing their grouping.
   const groups = options.includes(groupBy) ? options : [groupBy, ...options];
-  const dirty = label !== (metric?.label ?? "") || operation !== (metric?.operation ?? (fields.length ? "average" : "count")) || fieldId !== (metric?.fieldId ?? (fields.length === 1 ? fields[0].id! : "")) || groupBy !== (metric?.groupBy ?? "none") || minSample !== String(metric?.minSample ?? 1) || cumulative !== (metric?.cumulative ?? false) || visibleDuring !== (metric?.visibleDuring ?? true) || visibleInResults !== (metric?.visibleInResults ?? true);
-  const validSource = !needsField || Boolean(selectedField);
+  function toggleField(id: Id, on: boolean) {
+    setFieldIds((current) => (on ? [...current, id] : current.filter((entry) => entry !== id)));
+  }
+  const dirty = label !== (metric?.label ?? "") || operation !== (metric?.operation ?? (fields.length ? "average" : "count"))
+    || combine !== ((metric?.fieldIds?.length ?? 0) >= 2)
+    || (combine
+      ? JSON.stringify([...fieldIds].sort()) !== JSON.stringify([...(metric?.fieldIds ?? [])].sort()) || combineOp !== (metric?.combineOp ?? "average")
+      : fieldId !== (metric?.fieldId ?? (fields.length === 1 ? fields[0].id! : "")))
+    || groupBy !== (metric?.groupBy ?? "none") || minSample !== String(metric?.minSample ?? 1) || cumulative !== (metric?.cumulative ?? false)
+    || visibleDuring !== (metric?.visibleDuring ?? true) || visibleInResults !== (metric?.visibleInResults ?? true);
+  const validSource = !needsField || (combine ? fieldIds.length >= 2 : Boolean(selectedField));
   const [calculationOpen] = useState(!metric || !validSource);
   async function submit() {
-    if (!validSource) { setError(t("errPickField")); return; }
+    if (!validSource) { setError(combine ? t("metricPickTwoFields") : t("errPickField")); return; }
     setBusy(true); setError(null);
     try {
-      await onSave({ label: label.trim(), operation, fieldId: needsField ? fieldId : null, groupBy,
+      await onSave({
+        label: label.trim(), operation,
+        fieldId: needsField && !combine ? fieldId : null,
+        fieldIds: needsField && combine ? fieldIds : undefined,
+        combineOp: needsField && combine ? combineOp : undefined,
+        groupBy,
         minSample: Number(minSample) || 1, cumulative: groupBy === "checkpoint" && cumulative,
         ...(metric?.bayesPriorWeight != null ? { bayesPriorWeight: metric.bayesPriorWeight } : {}), visibleDuring, visibleInResults });
     } catch (cause) { setError(f.error(cause)); setBusy(false); }
@@ -110,7 +130,15 @@ export function MetricEditor({ challenge, metric, onCancel, onSave }: {
         <Toggle checked={visibleDuring} onChange={setVisibleDuring} label={t("metricVisibleDuring")} />
         <Toggle checked={visibleInResults} onChange={setVisibleInResults} label={t("metricVisibleResults")} />
       </fieldset>
-      <Disclosure summary={t("metricCalculation")} defaultOpen={calculationOpen} preview={[tm(`operationName.${operation}`), selectedField?.label, tm(`groupBy.${groupBy}`)].filter(Boolean).join(" · ")}>
+      <Disclosure
+        summary={t("metricCalculation")}
+        defaultOpen={calculationOpen}
+        preview={[
+          tm(`operationName.${operation}`),
+          combine ? t("metricCombinedPreview", { count: combinedFields.length }) : selectedField?.label,
+          tm(`groupBy.${groupBy}`),
+        ].filter(Boolean).join(" · ")}
+      >
         <div className="space-y-4 pt-2">
           <Field label={t("metricOperationLabel")}>
             <select className={inputClass} value={operation} onChange={(e) => {
@@ -119,7 +147,50 @@ export function MetricEditor({ challenge, metric, onCancel, onSave }: {
               if (!selectedField && fields.length === 1) setFieldId(fields[0].id!);
             }}>{metricOperations.filter((op) => op === operation || ((!metricNeedsField(op) || fields.length > 0) && (op !== "surprise" || challenge.entryTypes.some((type) => type.purpose === "expectation")))).map((op) => <option value={op} key={op}>{tm(`operationName.${op}`)}</option>)}</select>
           </Field>
-          {needsField ? (
+          {needsField && fields.length >= 2 ? (
+            <Toggle
+              checked={combine}
+              onChange={(next) => {
+                setCombine(next);
+                // Carry the one field already picked across, either direction, so switching modes never loses it.
+                if (next) setFieldIds((current) => (current.length ? current : fieldId ? [fieldId] : []));
+                else if (fieldIds.length) setFieldId(fieldIds[0]);
+              }}
+              label={t("metricCombineLabel")}
+              hint={t("metricCombineHint")}
+            />
+          ) : null}
+          {needsField && combine ? (
+            <Field label={t("metricFieldsLabel")} hint={t("metricFieldsHint")} error={fieldIds.length < 2 ? t("metricPickTwoFields") : null}>
+              <div className="space-y-1.5 rounded-xl border border-[var(--line)] p-2.5">
+                {fields.map((field) => (
+                  <label key={field.id} className="flex min-h-9 cursor-pointer items-center gap-2.5 rounded-lg px-2 text-sm hover:bg-[var(--wash)]">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 flex-none accent-[var(--main)]"
+                      checked={fieldIds.includes(field.id!)}
+                      onChange={(e) => toggleField(field.id!, e.target.checked)}
+                    />
+                    <span className="min-w-0 truncate">{field.label}{field.source ? ` · ${field.source}` : ""}</span>
+                  </label>
+                ))}
+              </div>
+            </Field>
+          ) : null}
+          {needsField && combine && fieldIds.length >= 2 ? (
+            <Field label={t("metricCombineOpLabel")} hint={t("metricCombineOpHint")}>
+              <Segmented<"sum" | "average">
+                ariaLabel={t("metricCombineOpLabel")}
+                value={combineOp}
+                onChange={setCombineOp}
+                options={[
+                  { value: "average", label: tm("combineOp.average") },
+                  { value: "sum", label: tm("combineOp.sum") },
+                ]}
+              />
+            </Field>
+          ) : null}
+          {needsField && !combine ? (
             <Field label={t("metricFieldLabel")} error={!fields.length ? t("metricNoFields") : null}>
               <select className={inputClass} value={fieldId} onChange={(e) => setFieldId(e.target.value)} required>
                 <option value="">{t("metricFieldPlaceholder")}</option>

@@ -69,6 +69,11 @@ export function MetricBlock({ metric, hideThinLabel = false, showExplanation = f
   return (
     <article className="min-w-0 py-2">
       <h3 className="text-base font-medium tracking-tight">{metric.label}</h3>
+      {metric.fieldLabels?.length ? (
+        <p className="mt-0.5 text-xs leading-5 text-[var(--muted)]">
+          {t(metric.combineOp === "sum" ? "combinesSum" : "combinesAverage", { fields: metric.fieldLabels.join(", ") })}
+        </p>
+      ) : null}
       {showExplanation ? <MetricExplanation metric={metric} /> : null}
       {series?.length ? (
         visibleRows.length ? (

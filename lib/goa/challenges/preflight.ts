@@ -160,6 +160,13 @@ export async function computePreflight(
       err("metric_field_archived", `A métrica "${metric.label}" aponta para um campo que não existe mais.`);
       continue;
     }
+    // A combined metric (settings.fieldIds) is only as good as every field it folds together — one
+    // archived away quietly changes what the number means, so it gets the same refusal as a single field.
+    const combinedFieldIds = (metric.settings as { fieldIds?: unknown } | null)?.fieldIds;
+    if (Array.isArray(combinedFieldIds) && combinedFieldIds.some((id) => typeof id !== "string" || !liveFieldById.has(id))) {
+      err("metric_field_archived", `A métrica "${metric.label}" combina um campo que não existe mais.`);
+      continue;
+    }
     const field = metric.field_id ? liveFieldById.get(metric.field_id) : null;
     if (NUMERIC_OPS.has(metric.operation)) {
       if (!field) {

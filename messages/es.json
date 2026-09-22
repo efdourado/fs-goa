@@ -104,6 +104,10 @@
     "until": "Hasta {date}"
   },
   "metrics": {
+    "combineOp": {
+      "average": "Promedio",
+      "sum": "Suma"
+    },
     "operationName": {
       "sum": "Suma",
       "average": "Media",
@@ -815,6 +819,14 @@
     "metricNamePlaceholder": "Ej.: Media del grupo",
     "metricOperationLabel": "Operación",
     "metricFieldLabel": "Campo",
+    "metricCombineLabel": "Combinar más de un campo",
+    "metricCombineHint": "Junta dos o más campos en un solo número por registro — una nota general a partir de varias notas, por ejemplo — antes de que se ejecute este cálculo.",
+    "metricFieldsLabel": "Campos para combinar",
+    "metricFieldsHint": "Elige dos o más, del mismo formulario.",
+    "metricPickTwoFields": "Elige al menos dos campos.",
+    "metricCombineOpLabel": "Cómo combinarlos",
+    "metricCombineOpHint": "El promedio mantiene la misma escala que un solo campo; la suma los junta a todos.",
+    "metricCombinedPreview": "{count, plural, one {# campo combinado} other {# campos combinados}}",
     "metricFieldPlaceholder": "Selecciona",
     "metricGroupByLabel": "Agrupar",
     "metricMinSampleLabel": "Muestra mínima",
@@ -1378,6 +1390,8 @@
     "totalEntries": "{count, plural, one {# registro} other {# registros}}",
     "numbersAria": "Resultados en números",
     "showLess": "Ver menos",
+    "combinesSum": "Suma de {fields}.",
+    "combinesAverage": "Promedio de {fields}.",
     "pageMain": "Números principales",
     "pageSeriesRanking": "Rankings",
     "pageSeriesDebate": "Dividió opiniones",

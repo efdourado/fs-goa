@@ -62,16 +62,20 @@ interface RatingRow {
 
 
 /**
- * `settings.fieldIds` (≥ 2 entries) marks a metric composed of several fields on the same entry type —
- * "Nota geral" on Tables, say, averaging the three rating fields together. `field_id` still names one of
- * them (the DB requires a numeric metric to point at *a* field), but the value each entry contributes is
- * the average across every field this list names, not just that one.
+ * `settings.fieldIds` (≥ 2 entries) marks a metric composed of several fields on the same entry type — a
+ * combined ranking anyone can build from the Metrics tab ("Nota geral" on Tables started life exactly this
+ * way). `field_id` still names one of them (the DB requires a numeric metric to point at *a* field), but
+ * the value each entry contributes is every field this list names, folded into one by `combineOp`: their
+ * sum, or their average — `average` by default, so an older composite (seeded before `combineOp` existed)
+ * keeps behaving exactly as it always did.
  */
-function compositeFieldIds(metric: MetricRow): string[] | null {
-  const raw = (metric.settings as { fieldIds?: unknown } | undefined)?.fieldIds;
+function compositeFields(metric: MetricRow): { fieldIds: string[]; combineOp: "sum" | "average" } | null {
+  const settings = metric.settings as { fieldIds?: unknown; combineOp?: unknown } | undefined;
+  const raw = settings?.fieldIds;
   if (!Array.isArray(raw)) return null;
   const ids = raw.filter((id): id is string => typeof id === "string" && id.length > 0);
-  return ids.length >= 2 ? ids : null;
+  if (ids.length < 2) return null;
+  return { fieldIds: ids, combineOp: settings?.combineOp === "sum" ? "sum" : "average" };
 }
 
 /**
@@ -81,13 +85,14 @@ function compositeFieldIds(metric: MetricRow): string[] | null {
  * "best movies of 2026" or "best authors" instead of only participant/item.
  */
 async function ratingRows(client: PoolClient, metric: MetricRow): Promise<RatingRow[]> {
-  const fieldIds = compositeFieldIds(metric);
+  const composite = compositeFields(metric);
+  const fieldIds = composite?.fieldIds ?? null;
   // A participant who has since left the challenge (or the group, or whose
   // account is gone) keeps contributing to the numbers but not the name — the
   // per-person breakdown labels them generically instead. Same rule for
   // whoever recommended the item.
-  const value = fieldIds
-    ? "AVG(ev.number_scaled::float8 / (10 ^ f.number_scale))"
+  const value = composite
+    ? `${composite.combineOp === "sum" ? "SUM" : "AVG"}(ev.number_scaled::float8 / (10 ^ f.number_scale))`
     : "(ev.number_scaled::float8 / (10 ^ f.number_scale))";
   const result = await client.query<RatingRow>(
     `SELECT ${value} AS value,
@@ -201,40 +206,48 @@ function explainMetric(
 ): { formula: string; sample: string } {
   const { minSample, bayesPriorWeight } = metricSettings(metric);
   const n = result.sampleSize;
-  switch (metric.operation) {
-    case "count":
-      return { formula: "Número de registros válidos.", sample: `${n} registro(s).` };
-    case "sum":
-      return { formula: "Soma dos valores do campo.", sample: `${n} valor(es).` };
-    case "average":
-      return { formula: "média = soma dos valores ÷ n.", sample: `n = ${n} avaliação(ões).` };
-    case "median":
-      return { formula: "Valor central da sequência ordenada (em contagem par, a média dos dois centrais).", sample: `n = ${n}.` };
-    case "min":
-      return { formula: "Menor valor registrado.", sample: `n = ${n}.` };
-    case "max":
-      return { formula: "Maior valor registrado.", sample: `n = ${n}.` };
-    case "completion_rate":
-      return {
-        formula: "conclusão = registros concluídos ÷ total esperado × 100.",
-        sample: `${n} de ${extra.expected ?? 0} esperados${extra.expectedNote ? ` (${extra.expectedNote})` : ""}.`,
-      };
-    case "bayesian_average":
-      return {
-        formula: `nota ajustada = (n × média do item + m × média global) ÷ (n + m); m = ${bayesPriorWeight}.`,
-        sample: `elegível a partir de ${minSample} avaliação(ões) por item.`,
-      };
-    case "spread":
-      return { formula: "Desvio-padrão populacional das avaliações — quanto maior, mais o grupo divergiu.", sample: `mínimo ${Math.max(2, minSample)} avaliações.` };
-    case "consensus":
-      return { formula: "consenso = max(0, 1 − desvio ÷ (amplitude ÷ 2)) × 100.", sample: `mínimo ${Math.max(2, minSample)} avaliações; 100 = unanimidade.` };
-    case "surprise":
-      return { formula: "surpresa = avaliação − expectativa, em respostas pareadas da mesma pessoa e item.", sample: `${n} par(es) avaliação/expectativa.` };
-    case "indicator_bias":
-      return { formula: "desempenho = média dos itens indicados pela pessoa − média global.", sample: `${n} indicação(ões) avaliada(s).` };
-    default:
-      return { formula: "", sample: `n = ${n}.` };
-  }
+  const base = ((): { formula: string; sample: string } => {
+    switch (metric.operation) {
+      case "count":
+        return { formula: "Número de registros válidos.", sample: `${n} registro(s).` };
+      case "sum":
+        return { formula: "Soma dos valores do campo.", sample: `${n} valor(es).` };
+      case "average":
+        return { formula: "média = soma dos valores ÷ n.", sample: `n = ${n} avaliação(ões).` };
+      case "median":
+        return { formula: "Valor central da sequência ordenada (em contagem par, a média dos dois centrais).", sample: `n = ${n}.` };
+      case "min":
+        return { formula: "Menor valor registrado.", sample: `n = ${n}.` };
+      case "max":
+        return { formula: "Maior valor registrado.", sample: `n = ${n}.` };
+      case "completion_rate":
+        return {
+          formula: "conclusão = registros concluídos ÷ total esperado × 100.",
+          sample: `${n} de ${extra.expected ?? 0} esperados${extra.expectedNote ? ` (${extra.expectedNote})` : ""}.`,
+        };
+      case "bayesian_average":
+        return {
+          formula: `nota ajustada = (n × média do item + m × média global) ÷ (n + m); m = ${bayesPriorWeight}.`,
+          sample: `elegível a partir de ${minSample} avaliação(ões) por item.`,
+        };
+      case "spread":
+        return { formula: "Desvio-padrão populacional das avaliações — quanto maior, mais o grupo divergiu.", sample: `mínimo ${Math.max(2, minSample)} avaliações.` };
+      case "consensus":
+        return { formula: "consenso = max(0, 1 − desvio ÷ (amplitude ÷ 2)) × 100.", sample: `mínimo ${Math.max(2, minSample)} avaliações; 100 = unanimidade.` };
+      case "surprise":
+        return { formula: "surpresa = avaliação − expectativa, em respostas pareadas da mesma pessoa e item.", sample: `${n} par(es) avaliação/expectativa.` };
+      case "indicator_bias":
+        return { formula: "desempenho = média dos itens indicados pela pessoa − média global.", sample: `${n} indicação(ões) avaliada(s).` };
+      default:
+        return { formula: "", sample: `n = ${n}.` };
+    }
+  })();
+  const composite = compositeFields(metric);
+  if (!composite) return base;
+  // A combined metric folds several fields into one number per registro first — say so, ahead of
+  // whatever the metric's own operation then does with that folded value (rank it, average it by item…).
+  const combine = composite.combineOp === "sum" ? "soma" : "média";
+  return { formula: `Por registro: ${combine} de ${composite.fieldIds.length} campos combinados. Depois, ${base.formula}`, sample: base.sample };
 }
 
 async function calculateMetricRow(
@@ -321,12 +334,23 @@ async function calculateMetricRow(
   }
   const suffix = metric.operation === "completion_rate" && result.value !== null ? "%" : "";
   const explanation = explainMetric(metric, result, explainExtra);
+  const composite = compositeFields(metric);
+  // Field *names*, not just ids — "combines Food, Atmosphere, Value" reads at a glance; "combines 3 fields"
+  // makes someone who didn't build the metric go find out what they even are.
+  const fieldLabels = composite
+    ? (await client.query<{ id: string; label: string }>(
+        "SELECT id, label FROM challenge_fields WHERE id = ANY($1::text[])", [composite.fieldIds],
+      )).rows.reduce((map, row) => map.set(row.id, row.label), new Map<string, string>())
+    : null;
   return {
     id: metric.id,
     key: metric.semantic_key,
     label: metric.label,
     operation: metric.operation,
     fieldId: metric.field_id,
+    fieldIds: composite?.fieldIds,
+    fieldLabels: composite && fieldLabels ? composite.fieldIds.map((id) => fieldLabels.get(id) ?? "") : undefined,
+    combineOp: composite?.combineOp,
     groupBy: metric.group_by,
     cumulative: (metric.settings as { cumulative?: unknown })?.cumulative === true,
     visibleDuring: metric.visible_during_challenge,
@@ -959,13 +983,49 @@ async function assertMetricCoherent(
 }
 
 /** Resolves + validates the field/entry-type pair a metric computes over. Shared by create and edit. */
+const SHARED_SCOPE_MESSAGE =
+  "Uma resposta compartilhada não pertence a uma pessoa: ela não entra em métricas por participante nem em análises entre pessoas (divergência, consenso, surpresa, viés).";
+
+async function assertNotSharedScope(client: PoolClient, entryTypeId: string, operation: string, groupBy: string): Promise<void> {
+  if (!SHARED_UNSUPPORTED_OPS.has(operation) && groupBy !== "participant") return;
+  const shared = await oneOrNull<{ id: string }>(client,
+    "SELECT id FROM entry_types WHERE id=$1 AND answer_scope='shared'", [entryTypeId]);
+  if (shared) throw new ApiError(400, "shared_metric_unsupported", SHARED_SCOPE_MESSAGE);
+}
+
+/**
+ * Resolves + validates the field(s) a metric computes over — one, the ordinary case, or several, a
+ * combined metric anyone can build from the Metrics tab (settings.fieldIds; see `compositeFields`).
+ * Shared by create and edit.
+ */
 async function resolveMetricField(
   client: PoolClient,
   challengeId: string,
   operation: string,
   fieldId: string | null,
+  fieldIds: string[] | null,
   groupBy = "none",
-): Promise<{ entryTypeId: string; fieldId: string | null }> {
+): Promise<{ entryTypeId: string; fieldId: string | null; fieldIds: string[] | null }> {
+  if (fieldIds && fieldIds.length) {
+    if (fieldIds.length < 2) throw new ApiError(400, "invalid_metric", "Uma combinação precisa de pelo menos dois campos.");
+    if (fieldIds.length > 8) throw new ApiError(400, "invalid_metric", "Combine no máximo 8 campos.");
+    if (new Set(fieldIds).size !== fieldIds.length) throw new ApiError(400, "invalid_metric", "Cada campo só pode entrar uma vez na combinação.");
+    if (!NUMERIC_FIELD_OPS.has(operation)) throw new ApiError(400, "invalid_metric", "Combinar campos exige uma operação numérica.");
+    const rows = await client.query<{ id: string; entry_type_id: string; kind: string }>(
+      "SELECT id, entry_type_id, kind FROM challenge_fields WHERE id = ANY($1::text[]) AND challenge_id = $2 AND archived_at IS NULL",
+      [fieldIds, challengeId],
+    );
+    if (rows.rows.length !== fieldIds.length) throw new ApiError(400, "invalid_field", "Um dos campos combinados não pertence ao desafio.");
+    if (rows.rows.some((row) => row.kind !== "number" && row.kind !== "rating")) {
+      throw new ApiError(400, "invalid_metric", "Uma combinação só aceita campos numéricos ou notas.");
+    }
+    const entryTypeId = rows.rows[0].entry_type_id;
+    if (rows.rows.some((row) => row.entry_type_id !== entryTypeId)) {
+      throw new ApiError(400, "invalid_metric", "Combine campos do mesmo tipo de registro — misturar tipos deixaria a maioria dos registros de fora.");
+    }
+    await assertNotSharedScope(client, entryTypeId, operation, groupBy);
+    return { entryTypeId, fieldId: fieldIds[0], fieldIds };
+  }
   if (fieldId) {
     const field = await oneOrNull<{ entry_type_id: string; kind: string }>(client,
       "SELECT entry_type_id, kind FROM challenge_fields WHERE id=$1 AND challenge_id=$2 AND archived_at IS NULL",
@@ -974,33 +1034,36 @@ async function resolveMetricField(
     if (NUMERIC_FIELD_OPS.has(operation) && !["number", "rating"].includes(field.kind)) {
       throw new ApiError(400, "invalid_metric", "Essa operação exige campo numérico ou nota.");
     }
-    if (SHARED_UNSUPPORTED_OPS.has(operation) || groupBy === "participant") {
-      const shared = await oneOrNull<{ id: string }>(client,
-        "SELECT id FROM entry_types WHERE id=$1 AND answer_scope='shared'", [field.entry_type_id]);
-      if (shared) {
-        throw new ApiError(
-          400, "shared_metric_unsupported",
-          "Uma resposta compartilhada não pertence a uma pessoa: ela não entra em métricas por participante nem em análises entre pessoas (divergência, consenso, surpresa, viés).",
-        );
-      }
-    }
-    return { entryTypeId: field.entry_type_id, fieldId };
+    await assertNotSharedScope(client, field.entry_type_id, operation, groupBy);
+    return { entryTypeId: field.entry_type_id, fieldId, fieldIds: null };
   }
   if (NUMERIC_FIELD_OPS.has(operation)) {
     throw new ApiError(400, "invalid_metric", "Selecione um campo numérico.");
   }
   const type = await primaryEntryType(client, challengeId);
   if (!type) throw new ApiError(409, "missing_entry_type", "Tipo de registro ausente.");
-  return { entryTypeId: type.id, fieldId: operation === "completion_rate" ? null : fieldId };
+  return { entryTypeId: type.id, fieldId: operation === "completion_rate" ? null : fieldId, fieldIds: null };
 }
 
-function metricSettingsJson(parsed: ParsedMetricInput): string {
+function metricSettingsJson(parsed: ParsedMetricInput, resolved: { fieldIds: string[] | null }, combineOp: "sum" | "average"): string {
   return JSON.stringify({
     visibleInResults: parsed.visibleInResults,
     ...(Number.isFinite(parsed.minSample) && parsed.minSample > 0 ? { minSample: Math.floor(parsed.minSample) } : {}),
     ...(Number.isFinite(parsed.bayesPriorWeight) && parsed.bayesPriorWeight >= 0 ? { bayesPriorWeight: parsed.bayesPriorWeight } : {}),
     ...(parsed.cumulative ? { cumulative: true } : {}),
+    ...(resolved.fieldIds ? { fieldIds: resolved.fieldIds, combineOp } : {}),
   });
+}
+
+/** `body.fieldIds` — several field ids to combine into one metric, instead of the ordinary single `fieldId`. */
+function parseFieldIds(body: Record<string, unknown>): string[] | null {
+  if (!Array.isArray(body.fieldIds)) return null;
+  const ids = body.fieldIds.filter((id): id is string => typeof id === "string" && id.length > 0);
+  return ids.length ? ids : null;
+}
+
+function parseCombineOp(body: Record<string, unknown>): "sum" | "average" {
+  return body.combineOp === "sum" ? "sum" : "average";
 }
 
 export async function addMetric(
@@ -1015,7 +1078,10 @@ export async function addMetric(
     if (access.challenge.status === "closed") throw new ApiError(409, "challenge_closed", "O desafio está encerrado.");
     await assertMetricCoherent(client, challengeId, parsed);
     const requestedFieldId = typeof body.fieldId === "string" ? body.fieldId : null;
-    const { entryTypeId, fieldId } = await resolveMetricField(client, challengeId, parsed.operation, requestedFieldId, parsed.groupBy);
+    const requestedFieldIds = parseFieldIds(body);
+    const combineOp = parseCombineOp(body);
+    const resolved = await resolveMetricField(client, challengeId, parsed.operation, requestedFieldId, requestedFieldIds, parsed.groupBy);
+    const { entryTypeId, fieldId } = resolved;
     const id = publicId();
     const positionRow = await oneOrNull<{ position: number }>(client,
       "SELECT coalesce(max(position),-1)::int + 1 AS position FROM challenge_metrics WHERE challenge_id=$1", [challengeId]);
@@ -1026,10 +1092,10 @@ export async function addMetric(
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,2,$9,$10,$11::jsonb,$12,now(),now())`,
       [id, challengeId, entryTypeId, fieldId, semanticKey(body.key ?? parsed.label, `metrica_${positionRow?.position ?? 0}`),
         parsed.label, parsed.operation, parsed.groupBy, parsed.visibleDuring, positionRow?.position ?? 0,
-        metricSettingsJson(parsed), session.user.id],
+        metricSettingsJson(parsed, resolved, combineOp), session.user.id],
     );
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
-      "metric.created", "challenge_metric", id, null, { label: parsed.label, operation: parsed.operation, fieldId });
+      "metric.created", "challenge_metric", id, null, { label: parsed.label, operation: parsed.operation, fieldId, fieldIds: resolved.fieldIds });
     return { id };
   });
 }
@@ -1056,17 +1122,20 @@ export async function updateMetric(
     if (!existing) throw new ApiError(404, "not_found", "Métrica não encontrada.");
     await assertMetricCoherent(client, challengeId, parsed);
     const requestedFieldId = typeof body.fieldId === "string" ? body.fieldId : null;
-    const { entryTypeId, fieldId } = await resolveMetricField(client, challengeId, parsed.operation, requestedFieldId, parsed.groupBy);
+    const requestedFieldIds = parseFieldIds(body);
+    const combineOp = parseCombineOp(body);
+    const resolved = await resolveMetricField(client, challengeId, parsed.operation, requestedFieldId, requestedFieldIds, parsed.groupBy);
+    const { entryTypeId, fieldId } = resolved;
     await client.query(
       `UPDATE challenge_metrics
           SET entry_type_id=$3, field_id=$4, label=$5, operation=$6, group_by=$7,
               visible_during_challenge=$8, settings=$9::jsonb, updated_at=now()
         WHERE id=$1 AND challenge_id=$2`,
       [metricId, challengeId, entryTypeId, fieldId, parsed.label, parsed.operation, parsed.groupBy,
-        parsed.visibleDuring, metricSettingsJson(parsed)],
+        parsed.visibleDuring, metricSettingsJson(parsed, resolved, combineOp)],
     );
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
-      "metric.updated", "challenge_metric", metricId, null, { label: parsed.label, operation: parsed.operation, fieldId });
+      "metric.updated", "challenge_metric", metricId, null, { label: parsed.label, operation: parsed.operation, fieldId, fieldIds: resolved.fieldIds });
     return { id: metricId };
   });
 }

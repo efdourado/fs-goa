@@ -7831,3 +7831,113 @@ test("notas: um texto e uma lista de tarefas no espaço da pessoa, marcar item, 
   const stillThere = await adminPool.query("SELECT deleted_at FROM notes WHERE id = $1", [listNote.id]);
   assert.ok(stillThere.rows[0].deleted_at, "a linha continua no banco, só marcada");
 });
+
+test("métricas combinadas: qualquer pessoa cria no próprio desafio uma métrica que soma ou tira a média de vários campos", async () => {
+  const owner = await register("Dona Métricas", "dona_metricas");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube das Métricas" } })).body as { id: string }).id;
+  const created = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: { recipe: "cinema", title: "Crítica completa", participantIds: [owner.user.id], items: [{ title: "Aftersun" }] },
+  });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const cid = (created.body as { id: string }).id;
+  const itemId = ((await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { items: Array<{ id: string }> }).items[0].id;
+
+  const notaId = ((await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { fields: Array<{ id: string; key: string }> })
+    .fields.find((field) => field.key === "nota")!.id;
+  const direcao = await call("POST", `/api/challenges/${cid}/fields`, { session: owner, body: { label: "Direção", type: "rating", required: false } });
+  const roteiro = await call("POST", `/api/challenges/${cid}/fields`, { session: owner, body: { label: "Roteiro", type: "rating", required: false } });
+  assert.equal(direcao.response.status, 201, JSON.stringify(direcao.body));
+  const direcaoId = (direcao.body as { id: string }).id;
+  const roteiroId = (roteiro.body as { id: string }).id;
+
+  await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } });
+  // A field added after creation has its own generated semantic key — look it up rather than guessing it.
+  const detailFields = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { fields: Array<{ id: string; key: string }> };
+  const keyOf = (id: string) => detailFields.fields.find((field) => field.id === id)!.key;
+  const entryResp = await call("POST", `/api/challenges/${cid}/entries`, {
+    session: owner, body: { itemId, values: { nota: 4, [keyOf(direcaoId)]: 5, [keyOf(roteiroId)]: 3 } },
+  });
+  assert.equal(entryResp.response.status, 201, JSON.stringify(entryResp.body));
+
+  // menos de dois campos: recusado
+  const tooFew = await call("POST", `/api/challenges/${cid}/metrics`, {
+    session: owner, body: { label: "Só um", operation: "average", fieldIds: [notaId], groupBy: "item" },
+  });
+  assert.equal(tooFew.response.status, 400, JSON.stringify(tooFew.body));
+
+  // campo duplicado: recusado
+  const dup = await call("POST", `/api/challenges/${cid}/metrics`, {
+    session: owner, body: { label: "Duplicado", operation: "average", fieldIds: [notaId, notaId], groupBy: "item" },
+  });
+  assert.equal(dup.response.status, 400, JSON.stringify(dup.body));
+
+  // campo que não existe: recusado
+  const bogus = await call("POST", `/api/challenges/${cid}/metrics`, {
+    session: owner, body: { label: "Campo fantasma", operation: "average", fieldIds: [notaId, "campo_inexistente"], groupBy: "item" },
+  });
+  assert.equal(bogus.response.status, 400, JSON.stringify(bogus.body));
+
+  // campo de texto (comentário) não é numérico: recusado
+  const comentarioId = detailFields.fields.find((field) => field.key === "comentario")!.id;
+  const notNumeric = await call("POST", `/api/challenges/${cid}/metrics`, {
+    session: owner, body: { label: "Com texto", operation: "average", fieldIds: [notaId, comentarioId], groupBy: "item" },
+  });
+  assert.equal(notNumeric.response.status, 400, JSON.stringify(notNumeric.body));
+
+  // campos de tipos de registro diferentes: recusado (misturaria a maioria dos registros de fora)
+  const sharedType = await call("POST", `/api/challenges/${cid}/entry-types`, {
+    session: owner,
+    body: { name: "Nota da crítica", sharedEditPolicy: "members_fill_admin_corrects", field: { key: "critica", label: "Nota da crítica", type: "rating", required: false } },
+  });
+  assert.equal(sharedType.response.status, 201, JSON.stringify(sharedType.body));
+  // A shared type's field lives on its own entry type, not the primary one — the flat `fields` list on
+  // challenge detail only ever shows the primary form, so read the id straight off the creation response.
+  const criticaId = (sharedType.body as { fieldId: string }).fieldId;
+  const crossType = await call("POST", `/api/challenges/${cid}/metrics`, {
+    session: owner, body: { label: "Tipos diferentes", operation: "average", fieldIds: [notaId, criticaId], groupBy: "item" },
+  });
+  assert.equal(crossType.response.status, 400, JSON.stringify(crossType.body));
+
+  // a métrica combinada de verdade: soma dos três — para o único item, 4 + 5 + 3 = 12
+  const summed = await call("POST", `/api/challenges/${cid}/metrics`, {
+    session: owner,
+    body: { label: "Nota combinada", operation: "average", groupBy: "item", fieldIds: [notaId, direcaoId, roteiroId], combineOp: "sum" },
+  });
+  assert.equal(summed.response.status, 201, JSON.stringify(summed.body));
+  const metricId = (summed.body as { id: string }).id;
+
+  const withMetric = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as {
+    metrics: Array<{ id: string; fieldIds?: string[]; fieldLabels?: string[]; combineOp?: string; value: number | null; series?: Array<{ label: string; value: number | null }> }>;
+  };
+  const combined = withMetric.metrics.find((metric) => metric.id === metricId)!;
+  assert.deepEqual(combined.fieldIds, [notaId, direcaoId, roteiroId]);
+  assert.deepEqual(combined.fieldLabels, ["Nota", "Direção", "Roteiro"]);
+  assert.equal(combined.combineOp, "sum");
+  assert.equal(combined.series?.[0]?.value, 12, JSON.stringify(combined.series));
+
+  // editar a mesma métrica para média em vez de soma — agora (4 + 5 + 3) / 3 = 4
+  const edited = await call("PATCH", `/api/challenges/${cid}/metrics/${metricId}`, {
+    session: owner,
+    body: { label: "Nota combinada", operation: "average", groupBy: "item", fieldIds: [notaId, direcaoId, roteiroId], combineOp: "average" },
+  });
+  assert.equal(edited.response.status, 200, JSON.stringify(edited.body));
+  const withAverage = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as {
+    metrics: Array<{ id: string; combineOp?: string; series?: Array<{ value: number | null }> }>;
+  };
+  const averaged = withAverage.metrics.find((metric) => metric.id === metricId)!;
+  assert.equal(averaged.combineOp, "average");
+  assert.equal(averaged.series?.[0]?.value, 4, JSON.stringify(averaged.series));
+
+  // voltando a um único campo (edição também sabe desfazer a combinação)
+  const backToOne = await call("PATCH", `/api/challenges/${cid}/metrics/${metricId}`, {
+    session: owner, body: { label: "Só direção", operation: "average", fieldId: direcaoId, groupBy: "item" },
+  });
+  assert.equal(backToOne.response.status, 200, JSON.stringify(backToOne.body));
+  const single = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as {
+    metrics: Array<{ id: string; fieldIds?: string[]; fieldId?: string | null }>;
+  };
+  const undone = single.metrics.find((metric) => metric.id === metricId)!;
+  assert.equal(undone.fieldId, direcaoId);
+  assert.equal(undone.fieldIds, undefined);
+});
