@@ -372,6 +372,13 @@
       "when": 1789909302975,
       "tag": "0052_perfect_hulk",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1790075187724,
+      "tag": "0053_nebulous_mauler",
+      "breakpoints": true
     }
   ]
 }

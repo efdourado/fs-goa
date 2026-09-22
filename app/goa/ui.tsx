@@ -556,6 +556,7 @@ export function AppHeader({
   onHome,
   onAccount,
   onOpenPersonalSpace,
+  onOpenNotes,
   onOpenTemplates,
   onOpenAbout,
   onLogout,
@@ -567,6 +568,7 @@ export function AppHeader({
   onHome: () => void;
   onAccount: () => void;
   onOpenPersonalSpace: () => void;
+  onOpenNotes: () => void;
   onOpenTemplates: () => void;
   onOpenAbout: () => void;
   onLogout: () => Promise<void>;
@@ -583,6 +585,7 @@ export function AppHeader({
         <div className="flex min-w-0 items-center gap-0.5 sm:gap-2">
           <button className={cx(navLink, "hidden items-center sm:inline-flex")} type="button" onClick={onHome}>{t("home")}</button>
           <button className={cx(navLink, "hidden items-center sm:inline-flex")} type="button" onClick={onOpenPersonalSpace}>{t("mySpace")}</button>
+          <button className={cx(navLink, "hidden items-center sm:inline-flex")} type="button" onClick={onOpenNotes}>{t("notes")}</button>
           <button className={cx(navLink, "hidden items-center sm:inline-flex")} type="button" onClick={onOpenTemplates}>{t("templates")}</button>
           <button className={cx(navLink, "hidden items-center sm:inline-flex")} type="button" onClick={onOpenAbout}>{t("about")}</button>
           {user.platformAdmin ? (
@@ -623,7 +626,7 @@ export function AppHeader({
           >
             {busy ? t("signingOut") : t("signOut")}
           </button>
-          <HeaderOverflowMenu isPlatformAdmin={Boolean(user.platformAdmin)} busy={busy} onHome={onHome} onOpenPersonalSpace={onOpenPersonalSpace} onOpenTemplates={onOpenTemplates} onOpenAbout={onOpenAbout} onLogout={async () => { setBusy(true); try { await onLogout(); } finally { setBusy(false); } }} />
+          <HeaderOverflowMenu isPlatformAdmin={Boolean(user.platformAdmin)} busy={busy} onHome={onHome} onOpenPersonalSpace={onOpenPersonalSpace} onOpenNotes={onOpenNotes} onOpenTemplates={onOpenTemplates} onOpenAbout={onOpenAbout} onLogout={async () => { setBusy(true); try { await onLogout(); } finally { setBusy(false); } }} />
         </div>
       </div>
     </header>
@@ -640,6 +643,7 @@ function HeaderOverflowMenu({
   busy,
   onHome,
   onOpenPersonalSpace,
+  onOpenNotes,
   onOpenTemplates,
   onOpenAbout,
   onLogout,
@@ -648,6 +652,7 @@ function HeaderOverflowMenu({
   busy: boolean;
   onHome: () => void;
   onOpenPersonalSpace: () => void;
+  onOpenNotes: () => void;
   onOpenTemplates: () => void;
   onOpenAbout: () => void;
   onLogout: () => Promise<void>;
@@ -690,6 +695,7 @@ function HeaderOverflowMenu({
         <div className="absolute right-0 z-50 mt-2 w-52 rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-1.5 shadow-[var(--elevate-2)]" role="dialog" aria-label={t("menu")}>
           <button className={cx(itemClass, "w-full text-left")} type="button" onClick={() => { onHome(); setOpen(false); }}>{t("home")}</button>
           <button className={cx(itemClass, "w-full text-left")} type="button" onClick={() => { onOpenPersonalSpace(); setOpen(false); }}>{t("mySpace")}</button>
+          <button className={cx(itemClass, "w-full text-left")} type="button" onClick={() => { onOpenNotes(); setOpen(false); }}>{t("notes")}</button>
           <button className={cx(itemClass, "w-full text-left")} type="button" onClick={() => { onOpenTemplates(); setOpen(false); }}>{t("templates")}</button>
           <button className={cx(itemClass, "w-full text-left")} type="button" onClick={() => { onOpenAbout(); setOpen(false); }}>{t("about")}</button>
           {isPlatformAdmin ? <Link className={itemClass} href="/admin" onClick={() => setOpen(false)}>{t("admin")}</Link> : null}

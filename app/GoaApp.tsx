@@ -13,6 +13,7 @@ import {
 } from "./goa/api";
 import { useGoaFormat } from "./goa/format";
 import { AboutScreen } from "./goa/screens/about";
+import { NotesScreen } from "./goa/screens/notes";
 import { AccountScreen } from "./goa/screens/account";
 import { AccountDeactivatedScreen } from "./goa/screens/account-deactivated";
 import { AdminScreen } from "./goa/screens/admin";
@@ -627,6 +628,8 @@ export default function GoaApp() {
     content = <TemplateDetailScreen key={screen.challengeId} user={user} challengeId={screen.challengeId} groups={bootstrap.groups.filter((candidate) => candidate.kind !== "personal")} csrfToken={bootstrap.csrfToken} autoCopy={resumeTemplateCopy === screen.challengeId} onBack={() => { setResumeTemplateCopy(null); goUp(); }} backLabel={backLabel} onSignIn={() => undefined} onDuplicated={async (result) => { setResumeTemplateCopy(null); await refreshBootstrap(); openAdmin(result.challengeId); }} onUnpublished={async () => { await refreshBootstrap(); setScreen({ kind: "templates" }); }} />;
   } else if (screen.kind === "about") {
     content = <AboutScreen onBack={goUp} backLabel={backLabel} />;
+  } else if (screen.kind === "notes") {
+    content = <NotesScreen onBack={goUp} backLabel={backLabel} />;
   } else if (screen.kind === "group" && selectedGroup) {
     content = <GroupScreen key={selectedGroup.id} group={selectedGroup} challenges={bootstrap.challenges.filter((challenge) => challenge.groupId === selectedGroup.id)} challengeLimit={bootstrap.limits.challengesPerGroup} pendingRequests={selectedGroup.pendingRequests ?? []} onBack={goUp} backLabel={backLabel} onCreateChallenge={() => setScreen({ kind: "create-challenge", groupId: selectedGroup.id })} onOpenChallenge={(id) => openParticipant(id)} onOpenCatalogItem={(itemId) => setScreen({ kind: "catalog-item", groupId: selectedGroup.id, itemId })} onOpenCatalog={() => setScreen({ kind: "group-catalog", groupId: selectedGroup.id })} onCreateInvite={async (payload) => apiRequest<{ token?: string; url?: string }>(API_PATHS.groupInvites(selectedGroup.id), { method: "POST", body: payload, csrfToken: bootstrap.csrfToken })} onInviteByUsername={(username) => apiRequest<GroupInviteResult>(API_PATHS.groupMembers(selectedGroup.id), { method: "POST", body: { username }, csrfToken: bootstrap.csrfToken })} onCancelRequest={cancelMemberRequest} onUpdateGroup={(payload) => updateGroup(selectedGroup.id, payload)} onDeleteGroup={selectedGroup.role === "owner" ? () => deleteGroup(selectedGroup.id) : undefined} onLeaveGroup={selectedGroup.role === "owner" ? undefined : () => leaveGroup(selectedGroup.id)} onSetMemberRole={selectedGroup.role === "owner" ? (userId, role) => setMemberRole(selectedGroup.id, userId, role) : undefined} />;
   } else if (screen.kind === "group-catalog" && selectedGroup) {
@@ -658,7 +661,7 @@ export default function GoaApp() {
   return (
     <CsrfProvider token={bootstrap.csrfToken}>
     <div className="flex min-h-screen flex-col bg-[var(--canvas)] text-[var(--ink)]">
-      <AppHeader user={user} notifications={bootstrap.memberRequests} onHome={() => setScreen({ kind: "dashboard" })} onAccount={() => setScreen({ kind: "account" })} onOpenPersonalSpace={() => setScreen({ kind: "personal-space" })} onOpenTemplates={() => setScreen({ kind: "templates" })} onOpenAbout={() => setScreen({ kind: "about" })} onLogout={logout} onAcceptRequest={(id) => respondToMemberRequest(id, "accept")} onDeclineRequest={(id) => respondToMemberRequest(id, "decline")} />
+      <AppHeader user={user} notifications={bootstrap.memberRequests} onHome={() => setScreen({ kind: "dashboard" })} onAccount={() => setScreen({ kind: "account" })} onOpenPersonalSpace={() => setScreen({ kind: "personal-space" })} onOpenNotes={() => setScreen({ kind: "notes" })} onOpenTemplates={() => setScreen({ kind: "templates" })} onOpenAbout={() => setScreen({ kind: "about" })} onLogout={logout} onAcceptRequest={(id) => respondToMemberRequest(id, "accept")} onDeclineRequest={(id) => respondToMemberRequest(id, "decline")} />
       <div className="flex-1">{content}</div>
     </div>
     </CsrfProvider>

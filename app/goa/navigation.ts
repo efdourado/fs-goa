@@ -38,6 +38,7 @@ export function screenFromUrl(pathname: string, search = ""): Screen | null {
     return token ? { kind: "invite", token } : null;
   }
   if (parts[0] === "sobre" && parts.length === 1) return { kind: "about" };
+  if (parts[0] === "notes" && parts.length === 1) return { kind: "notes" };
   if (parts[0] === "personal" && parts.length === 1) return { kind: "personal-space" };
   if (parts[0] === "personal" && parts[1] === "trash" && parts.length === 2) return { kind: "personal-trash" };
   if (parts[0] === "catalog" && parts.length === 1) return { kind: "personal-catalog" };
@@ -140,6 +141,8 @@ export function urlForScreen(screen: Screen): string | null {
       return `/modelos/${encodeURIComponent(screen.challengeId)}`;
     case "about":
       return "/sobre";
+    case "notes":
+      return "/notes";
     case "invite":
       return `/invites/${encodeURIComponent(screen.token)}`;
     case "invite-success":
@@ -199,6 +202,7 @@ export function backTargetFor(screen: Screen, lookup: BackLookup): BackTarget | 
     case "account":
     case "group":
     case "personal-space":
+    case "notes":
       return HOME;
     case "about":
     case "templates":

@@ -71,6 +71,7 @@ import {
   listPersonalCatalogAttributes,
 } from "@/lib/goa/catalog-attributes";
 import type { CatalogKind } from "@/lib/goa/catalog";
+import { createNote, deleteNote, listNotes, toggleNoteItem, updateNote } from "@/lib/goa/notes";
 
 function catalogKindParam(request: Request): CatalogKind | undefined {
   const raw = new URL(request.url).searchParams.get("kind");
@@ -207,6 +208,9 @@ export async function GET(request: Request): Promise<Response> {
     }
     if (isPath(path, "personal", "catalog")) {
       return json(await listPersonalCatalog(await requireSession(request)));
+    }
+    if (isPath(path, "notes")) {
+      return json(await listNotes(await requireSession(request)));
     }
     if (path[0] === "personal" && path[1] === "catalog" && path[2] === "search" && path.length === 3) {
       const params = new URL(request.url).searchParams;
@@ -366,6 +370,12 @@ export async function POST(request: Request): Promise<Response> {
     if (path[0] === "personal" && path[1] === "catalog" && path[2] === "items" && path.length === 3) {
       return json(await addPersonalCatalogItem(session, body), 201);
     }
+    if (isPath(path, "notes")) {
+      return json(await createNote(session, body), 201);
+    }
+    if (path[0] === "notes" && path[2] === "toggle" && path.length === 3) {
+      return json(await toggleNoteItem(session, path[1], body));
+    }
     if (path[0] === "groups" && path[2] === "catalog" && path[3] === "libraries" && path.length === 4) {
       return json(await createGroupLibrary(session, path[1], body), 201);
     }
@@ -488,6 +498,9 @@ export async function PATCH(request: Request): Promise<Response> {
     if (path[0] === "personal" && path[1] === "catalog" && path.length === 3) {
       return json(await updatePersonalCatalogItem(session, path[2], body));
     }
+    if (path[0] === "notes" && path.length === 2) {
+      return json(await updateNote(session, path[1], body));
+    }
     if (path[0] === "groups" && path.length === 2) {
       return json(await updateGroup(session, path[1], body));
     }
@@ -543,6 +556,9 @@ export async function DELETE(request: Request): Promise<Response> {
     }
     if (path[0] === "personal" && path[1] === "catalog" && path.length === 3) {
       return json(await archivePersonalCatalogItem(session, path[2]));
+    }
+    if (path[0] === "notes" && path.length === 2) {
+      return json(await deleteNote(session, path[1]));
     }
     if (path[0] === "catalog" && path[1] === "libraries" && path.length === 3) {
       return json(await deleteCatalogLibrary(session, path[2], { deleteItems: new URL(request.url).searchParams.get("deleteItems") === "1" }));
