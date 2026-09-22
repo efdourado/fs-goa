@@ -36,6 +36,7 @@ export function CatalogShelf({ scope, canManage, onOpenCatalog, onOpenItem }: {
   const [activeKind, setActiveKind] = useState<string | null>(null);
   const { railRef, showFade, onScroll, nudge } = useShelfRail();
   const scopeId = scope === "personal" ? "personal" : scope.groupId;
+  const title = scope === "personal" ? t("myCatalogTitle") : t("catalogTitle");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -68,7 +69,7 @@ export function CatalogShelf({ scope, canManage, onOpenCatalog, onOpenItem }: {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-baseline gap-2.5">
           <button type="button" onClick={onOpenCatalog} className="cursor-pointer text-lg font-semibold tracking-[-0.02em] hover:underline">
-            {t("catalogTitle")}
+            {title}
           </button>
           <span className="text-xs text-[var(--muted)]">{all.length}</span>
         </div>
@@ -121,7 +122,7 @@ export function CatalogShelf({ scope, canManage, onOpenCatalog, onOpenItem }: {
                 className="flex aspect-[3/4] w-44 flex-none cursor-pointer snap-start flex-col items-center justify-center gap-1.5 self-start rounded-[20px] border border-[var(--line)] bg-[var(--paper)] transition hover:border-[var(--main-line)]"
               >
                 <span className="text-3xl font-light tracking-[-0.04em]">{sorted.length - visible.length}</span>
-                <span className="px-3 text-center text-xs text-[var(--muted)]">{t("catalogMoreIn", { name: shelf ? libraryName(shelf) : t("catalogTitle") })}</span>
+                <span className="px-3 text-center text-xs text-[var(--muted)]">{t("catalogMoreIn", { name: shelf ? libraryName(shelf) : title })}</span>
                 <span className="mt-2.5 text-[13px] text-[var(--main-strong)]">{t("catalogSeeAll")} →</span>
               </button>
             ) : null}

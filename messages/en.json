@@ -410,6 +410,7 @@
     "noChallengesMember": "When an admin creates a challenge, it will appear here.",
     "createChallengeCta": "Create challenge",
     "catalogTitle": "Catalogue",
+    "myCatalogTitle": "My catalogue",
     "peopleTitle": "People",
     "makeAdmin": "Make admin",
     "makeParticipant": "Make participant",
