@@ -47,6 +47,14 @@ export function presetFields(recipe: CreatableRecipeKey, label: PresetLabels): C
   ];
 }
 
+/** What each record of a check-in holds to begin with — a workout's weight and repetitions, there to be renamed or replaced. */
+export function sessionPresetFields(label: PresetLabels): ChallengeField[] {
+  return [
+    { key: "carga", label: label("weight"), type: "number", required: true, config: { min: 0, step: 0.5 } },
+    { key: "repeticoes", label: label("repetitions"), type: "number", required: true, config: { min: 0, step: 1 } },
+  ];
+}
+
 /** What a response filled in once for the whole group starts with: one line of text, not a rating each. */
 export function sharedPresetFields(label: PresetLabels): ChallengeField[] {
   return [{ key: "resultado", label: label("resultado"), type: "text", required: true, config: { maxLength: 200 } }];

@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { useGoaFormat } from "../format";
-import { cleanFields, FieldBuilder, presetFields, sharedPresetFields } from "../fields";
+import { cleanFields, FieldBuilder, presetFields, sessionPresetFields, sharedPresetFields } from "../fields";
 import { CineItemsEditor, type CineRow, cineRowsToInput } from "../cine-items";
 import { NewLibraryDialog, TablesLibraryPrompt } from "../library-dialogs";
 import { type CatalogScope, LibraryPills, libraryChoices, useCatalogLibraries } from "../libraries";
@@ -61,6 +61,9 @@ export function CreateChallengeScreen({
   const [fields, setFields] = useState<ChallengeField[]>([]);
   // Custom only: who fills the main response in — every participant, or once for the whole group.
   const [answerScope, setAnswerScope] = useState<"individual" | "shared">("individual");
+  // Custom only: one response per item, or one check-in that holds a record for each of several items.
+  const [recordingMode, setRecordingMode] = useState<"single" | "session">("single");
+  const [sessionName, setSessionName] = useState("");
   const [sharedEditPolicy, setSharedEditPolicy] = useState<SharedEditPolicy>("members_fill_admin_corrects");
   const [fieldsTouched, setFieldsTouched] = useState(false);
   // Custom starts without "when did it happen" — that date belongs to the response, not to the match.
@@ -123,6 +126,8 @@ export function CreateChallengeScreen({
     setRecipe(next);
     setFields(presetFields(next, (key) => tp(key)));
     setAnswerScope("individual");
+    setRecordingMode("single");
+    setSessionName("");
     setSharedEditPolicy("members_fill_admin_corrects");
     setFieldsTouched(false);
     setCollectsEntryDate(false);
@@ -130,6 +135,13 @@ export function CreateChallengeScreen({
     setScheduleMode(meta.scheduleMode);
     setCineItems([]);
     setExtraKinds([]);
+  }
+
+  function chooseRecording(next: "single" | "session") {
+    setRecordingMode(next);
+    setAnswerScope("individual");
+    // A check-in's record isn't a 0–5 rating either: swap the starting fields, but never ones the creator already edited.
+    if (!fieldsTouched) setFields(next === "session" ? sessionPresetFields((key) => tp(key)) : presetFields("custom", (key) => tp(key)));
   }
 
   function chooseScope(next: "individual" | "shared") {
@@ -233,7 +245,9 @@ export function CreateChallengeScreen({
         items: tracksCatalog ? itemInputs : [],
         generateDaily: false,
         expectation: canOfferExpectation && expectation,
-        ...(recipe === "custom" ? { collectsEntryDate, answerScope, ...(answerScope === "shared" ? { sharedEditPolicy } : {}) } : {}),
+        ...(recipe === "custom" && recordingMode === "session"
+          ? { recordingMode, sessionName: sessionName.trim() || t("sessionNameDefault"), sessionNoteLabel: tp("comoFoi") }
+          : recipe === "custom" ? { collectsEntryDate, answerScope, ...(answerScope === "shared" ? { sharedEditPolicy } : {}) } : {}),
         ...(tracksCatalog && itemDates ? { itemDates: true } : {}),
         participantIds,
       });
@@ -295,7 +309,22 @@ export function CreateChallengeScreen({
         ) : null}
 
         {step === 2 ? <div><h2 className="text-xl font-light">{t("fieldsTitle")}</h2><p className="mb-5 mt-1 text-sm text-[var(--muted)]">{t("fieldsSubtitle")}</p>{recipe === "custom" ? <div className="mb-6 space-y-5">
-              <Field label={t("scopeLabel")} hint={t("scopeHint")} plain>
+              <Field label={t("recordingLabel")} hint={t("recordingHint")} plain>
+                <SelectableCards
+                  value={recordingMode}
+                  onChange={chooseRecording}
+                  options={[
+                    { value: "single", label: t("recordingSingle"), hint: t("recordingSingleHint") },
+                    { value: "session", label: t("recordingSession"), hint: t("recordingSessionHint") },
+                  ]}
+                />
+              </Field>
+              {recordingMode === "session" ? (
+                <Field label={t("sessionNameLabel")} hint={t("sessionNameHint")}>
+                  <input className={inputClass} value={sessionName} onChange={(event) => setSessionName(event.target.value)} maxLength={60} placeholder={t("sessionNamePlaceholder")} />
+                </Field>
+              ) : null}
+              {recordingMode === "single" ? <Field label={t("scopeLabel")} hint={t("scopeHint")} plain>
                 <SelectableCards
                   value={answerScope}
                   onChange={chooseScope}
@@ -304,8 +333,8 @@ export function CreateChallengeScreen({
                     { value: "shared", label: t("scopeShared"), hint: t("scopeSharedHint") },
                   ]}
                 />
-              </Field>
-              {answerScope === "shared" ? (
+              </Field> : null}
+              {recordingMode === "single" && answerScope === "shared" ? (
                 <Field label={tSr("policyLabel")} hint={tSr(`policyHint.${sharedEditPolicy}`)} plain>
                   <SelectableCards
                     value={sharedEditPolicy}
@@ -317,7 +346,7 @@ export function CreateChallengeScreen({
                   />
                 </Field>
               ) : null}
-            </div> : null}<FieldBuilder fields={fields} onChange={(next) => { setFields(next); setFieldsTouched(true); }} />{recipe === "custom" ? <Toggle className="mt-5 bg-[var(--paper)]" checked={collectsEntryDate} onChange={setCollectsEntryDate} label={t("entryDateLabel")} hint={t("entryDateHint")} /> : null}{canOfferExpectation ? <label className="mt-5 flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4 text-sm"><input type="checkbox" className="mt-0.5" aria-label={t("expectationLabel")} checked={expectation} onChange={(event) => setExpectation(event.target.checked)} /><span><strong className="block">{t("expectationLabel")}</strong><span className="mt-0.5 block text-xs text-[var(--muted)]">{t("expectationHint")}</span></span></label> : null}</div> : null}
+            </div> : null}<FieldBuilder fields={fields} onChange={(next) => { setFields(next); setFieldsTouched(true); }} />{recipe === "custom" && recordingMode === "single" ? <Toggle className="mt-5 bg-[var(--paper)]" checked={collectsEntryDate} onChange={setCollectsEntryDate} label={t("entryDateLabel")} hint={t("entryDateHint")} /> : null}{canOfferExpectation ? <label className="mt-5 flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4 text-sm"><input type="checkbox" className="mt-0.5" aria-label={t("expectationLabel")} checked={expectation} onChange={(event) => setExpectation(event.target.checked)} /><span><strong className="block">{t("expectationLabel")}</strong><span className="mt-0.5 block text-xs text-[var(--muted)]">{t("expectationHint")}</span></span></label> : null}</div> : null}
 
         {step === checkpointsStep && tracksCatalog ? (
           <div>

@@ -9,6 +9,7 @@ import { useGoaFormat } from "../format";
 import { useDoneItems } from "../use-done-items";
 import { recommenderLine } from "../recommender-picker";
 import { SharedGlyph } from "../shared-responses";
+import { SessionLog, type SessionPayload, sessionSpecOf } from "../session-log";
 import { defaultShowcaseBlocks, hasShowcaseContent, ShowcaseView } from "../showcase-view";
 import { RuleSectionsView, visibleRuleSections } from "../rules";
 import type {
@@ -1182,6 +1183,8 @@ export function ParticipantChallengeScreen({
   backLabel,
   onAdmin,
   onSaveEntry,
+  onSaveSession,
+  onAddSessionItem,
   onDeleteEntry,
   onReload,
   preview = false,
@@ -1197,6 +1200,10 @@ export function ParticipantChallengeScreen({
   backLabel?: string;
   onAdmin?: () => void;
   onSaveEntry?: (itemId: Id | null, values: Record<Id, unknown>, entry?: Entry, occurredOn?: string | null, entryTypeId?: Id, checkpointId?: Id | null, options?: { expectedUpdatedAt?: string | null }) => Promise<void>;
+  /** A check-in that holds a record per item (a workout): saves it whole — a new one, or the given one rewritten. */
+  onSaveSession?: (payload: SessionPayload, entry?: Entry) => Promise<void>;
+  /** For someone who may add items (an admin, or the owner of a personal challenge): adds one and returns its id. */
+  onAddSessionItem?: (title: string) => Promise<Id>;
   onDeleteEntry?: (entryId: Id) => Promise<void>;
   /** Re-reads the challenge and its entries — used to show the latest shared answer after a clash. */
   onReload?: () => Promise<void>;
@@ -1282,6 +1289,16 @@ export function ParticipantChallengeScreen({
     return map;
   }, [entries, user?.id, challenge.entryTypes]);
   const sortedItems = useMemo(() => [...challenge.items].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)), [challenge.items]);
+  // A workout-style challenge: one check-in that holds a record for each of several items. It replaces the
+  // per-item picker and form on Today, and its progress is "check-ins logged", not "items done".
+  const sessionSpec = useMemo(() => sessionSpecOf(challenge), [challenge]);
+  const tSession = useTranslations("sessionLog");
+  const ownCheckinCount = sessionSpec
+    ? entries.filter((entry) => entry.entryTypeId === sessionSpec.visit.id && entry.userId === user?.id).length
+    : 0;
+  const checkinCountFor = (participantUserId: Id | undefined) => sessionSpec
+    ? entries.filter((entry) => entry.entryTypeId === sessionSpec.visit.id && entry.userId === participantUserId).length
+    : 0;
   const sortedSessions = useMemo(
     () => [...(challenge.checkpoints ?? [])].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
     [challenge.checkpoints],
@@ -1343,6 +1360,7 @@ export function ParticipantChallengeScreen({
     schedulePrecision: selectedItem?.schedulePrecision,
     timeZone,
   });
+  const sessionUnavailable = f.entryUnavailableMessage({ challengeStatus: challenge.status, isParticipant: challenge.isParticipant });
   const itemForms = itemEntryTypes(challenge);
   const useItemPanel = itemForms.length > 0 && !undatedDaily && Boolean(selectedItem);
   const perDayItem = itemForms.some((type) => type.cardinality === "once_per_item_day");
@@ -1409,7 +1427,7 @@ export function ParticipantChallengeScreen({
 
   // The picker on Today drives which checkpoint the form is filling; each row
   // ends with the rating this participant gave it.
-  const checkpointPicker = sessionMode && sortedSessions.length > 1 ? (
+  const checkpointPicker = sessionSpec ? null : sessionMode && sortedSessions.length > 1 ? (
     <EntryPicker
       title={t("sessionsTitle")}
       selectedId={selectedSession?.id ?? null}
@@ -1453,7 +1471,8 @@ export function ParticipantChallengeScreen({
           <div className="flex flex-wrap items-center justify-between gap-3">{livingList ? <span /> : <ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />}<span className="text-xs text-white/65">{livingList ? t("livingListMeta", { count: sortedItems.length }) : f.dateRange(challenge.startsOn, challenge.endsOn)}</span></div>
           <h1 className="mt-10 max-w-3xl text-4xl font-medium leading-none tracking-[-0.055em] sm:text-6xl">{challenge.title}</h1>
           {challenge.description ? <p className="mt-4 max-w-2xl text-sm leading-6 text-white/70">{challenge.description}</p> : null}
-          {!preview && sortedItems.length ? <div className="mt-8 max-w-2xl"><div className="mb-2 flex justify-between text-xs text-white/70"><span>{t.rich("entriesProgress", { done: doneCount, total: sortedItems.length, b: (chunks) => <strong className="text-white">{chunks}</strong> })}</span><span>{completion}%</span></div><div className="h-2 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-[var(--main-2)]" style={{ width: `${Math.min(100, completion)}%` }} /></div></div> : null}
+          {!preview && sessionSpec ? <p className="mt-8 text-sm text-white/80">{tSession("checkinsLogged", { count: ownCheckinCount })}</p> : null}
+          {!preview && !sessionSpec && sortedItems.length ? <div className="mt-8 max-w-2xl"><div className="mb-2 flex justify-between text-xs text-white/70"><span>{t.rich("entriesProgress", { done: doneCount, total: sortedItems.length, b: (chunks) => <strong className="text-white">{chunks}</strong> })}</span><span>{completion}%</span></div><div className="h-2 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-[var(--main-2)]" style={{ width: `${Math.min(100, completion)}%` }} /></div></div> : null}
         </div>
         <span className="absolute -right-28 -top-36 h-96 w-96 rounded-full border border-white/10" aria-hidden="true" />
       </section>
@@ -1465,7 +1484,7 @@ export function ParticipantChallengeScreen({
           collapses everything to "results" but still wants the schedule as
           read-only context). Grupo already lists the same checkpoints as
           table columns, and a real Results tab doesn't act on one at all. */}
-      {activeTab === "today" || preview ? <CheckpointSchedule challenge={challenge} /> : null}
+      {(activeTab === "today" || preview) && !sessionSpec ? <CheckpointSchedule challenge={challenge} /> : null}
 
       {/* Shared across Today and Grupo — whichever item/session is picked here
           is what both tabs act on, so it lives above the tab selector itself,
@@ -1482,6 +1501,18 @@ export function ParticipantChallengeScreen({
         {activeTab === "today" ? (
           challenge.status === "closed" ? (
             <EmptyState title={t("closedTitle")} />
+          ) : sessionSpec ? (
+            <SessionLog
+              challenge={challenge}
+              spec={sessionSpec}
+              entries={entries}
+              userId={user?.id}
+              canEdit={Boolean(onSaveSession) && !sessionUnavailable}
+              unavailableMessage={sessionUnavailable}
+              onSave={(payload, entry) => onSaveSession!(payload, entry)}
+              onDelete={canDeleteEntry}
+              onAddItem={challenge.status === "active" ? onAddSessionItem : undefined}
+            />
           ) : challenge.submissionMode !== "free" && !selectedItem && !undatedDaily ? (
             <EmptyState title={t("noCheckpointTitle")} />
           ) : (
@@ -1520,7 +1551,30 @@ export function ParticipantChallengeScreen({
           )
         ) : null}
 
-        {activeTab === "grupo" ? (
+        {activeTab === "grupo" && sessionSpec ? (
+          <section className={cx(cardClass, "min-w-0 p-5 sm:p-7")}>
+            <div className="divide-y divide-[var(--line)]">
+              {[...challenge.participants].sort((a, b) => Number(b.userId === user?.id) - Number(a.userId === user?.id)).map((participant) => {
+                const daysAgo = lastEntryDaysAgo(participant.userId);
+                const caption = [
+                  tSession("groupCount", { count: checkinCountFor(participant.userId) }),
+                  daysAgo === null ? t("groupLastRegisterNone") : t("groupLastRegister", { days: daysAgo }),
+                ].join(" · ");
+                return (
+                  <div key={participant.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+                    <span className="grid h-9 w-9 flex-none place-items-center rounded-full border-2 border-[var(--paper)] bg-[var(--main-line)] text-xs font-black" aria-hidden="true">{participant.name.split(/\s+/).slice(0, 1).map((part) => part[0]).join("")}</span>
+                    <div className="min-w-0 flex-1 leading-tight">
+                      <span className="block truncate text-sm">{participant.name} {participant.userId === user?.id && `(${t("youLabel")})`}</span>
+                      <span className="block truncate text-xs text-[var(--muted)]">{caption}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        ) : null}
+
+        {activeTab === "grupo" && !sessionSpec ? (
           <div>
             <section className={cx(cardClass, "min-w-0 p-5 sm:p-7")}>
               {selectedItem

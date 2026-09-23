@@ -319,6 +319,8 @@ export interface EntryTypeView {
   /** `shared`: one answer per item for the whole group; `individual`: one per participant. */
   answerScope?: AnswerScope;
   sharedEditPolicy?: SharedEditPolicy | null;
+  /** Set on a type whose entries live inside an entry of another type — a workout's exercise records. */
+  parentTypeId?: Id | null;
   fields: ChallengeField[];
 }
 
@@ -340,6 +342,8 @@ export interface Entry {
   answerScope?: AnswerScope;
   /** Who last touched a shared answer. */
   lastEditedByName?: string | null;
+  /** The check-in this record lives inside (a workout's exercise), or null for an ordinary entry. */
+  parentEntryId?: Id | null;
   participantId?: Id | null;
   userId?: Id | null;
   participantName?: string | null;
@@ -706,6 +710,12 @@ export interface ChallengeCreationInput {
   collectsEntryDate?: boolean;
   /** Custom only: who fills the main response in — each participant, or once for the whole group. */
   answerScope?: "individual" | "shared";
+  /** Custom only: `session` makes each entry one check-in holding a record per item (a workout of exercises). */
+  recordingMode?: "single" | "session";
+  /** With `session`: what one check-in is called ("Workout"). */
+  sessionName?: string;
+  /** With `session`: the label of the optional note on each check-in ("How did it go?"). */
+  sessionNoteLabel?: string;
   sharedEditPolicy?: SharedEditPolicy;
   /** Each item of the chosen libraries has its own scheduled date and time (a match's kickoff). */
   itemDates?: boolean;

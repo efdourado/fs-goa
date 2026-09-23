@@ -385,7 +385,7 @@ export const RECIPES: Record<RecipeKey, Recipe> = {
 // gets its own record with the fields the creator defined. Only `custom` offers it: `wizardFields` are the
 // fields of one *record*, so the primary type is the record type and the visit is its parent.
 const SESSION_KEY = "sessao";
-const sessionEntry = (name: string): RecipeEntryType => ({
+const sessionEntry = (name: string, noteLabel: string): RecipeEntryType => ({
   semanticKey: SESSION_KEY,
   name,
   purpose: "checkin",
@@ -395,7 +395,7 @@ const sessionEntry = (name: string): RecipeEntryType => ({
   cardinality: "repeatable",
   schedulePolicy: "while_active",
   fields: [
-    { key: "nota_sessao", label: "Como foi?", type: "text", required: false, config: { multiline: true, maxLength: 500 } },
+    { key: "nota_sessao", label: noteLabel, type: "text", required: false, config: { multiline: true, maxLength: 500 } },
   ],
 });
 const recordEntry: RecipeEntryType = {
@@ -431,11 +431,14 @@ export function withRecordingMode(recipe: Recipe, body: Record<string, unknown>)
   }
   const rawName = typeof body.sessionName === "string" ? body.sessionName.trim() : "";
   const name = (rawName || "Sessão").slice(0, 60);
+  // The optional note on each check-in is named in the creator's language, like the check-in itself.
+  const rawNote = typeof body.sessionNoteLabel === "string" ? body.sessionNoteLabel.trim() : "";
+  const noteLabel = (rawNote || "Como foi?").slice(0, 100);
   return {
     mode: "session",
     recipe: {
       ...recipe,
-      entryTypes: [sessionEntry(name), recordEntry],
+      entryTypes: [sessionEntry(name, noteLabel), recordEntry],
       metrics: [
         { key: "frequencia", label: "Frequência", operation: "count", entryTypeKey: SESSION_KEY, groupBy: "none" },
         { key: "frequencia_por_pessoa", label: "Frequência por pessoa", operation: "count", entryTypeKey: SESSION_KEY, groupBy: "participant", needsGroup: true },
