@@ -1763,7 +1763,8 @@
     "itemPlaceholderCinema": "e.g. Paris, Texas",
     "itemPlaceholderBookshelf": "e.g. Piranesi",
     "create": "Create challenge",
-    "groupWithoutId": "The group was created, but we lost track of it."
+    "groupWithoutId": "The group was created, but we lost track of it.",
+    "entryCta": "Start by chat"
   },
   "backTo": {
     "home": "Home",

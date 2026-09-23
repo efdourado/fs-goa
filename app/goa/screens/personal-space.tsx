@@ -6,7 +6,7 @@ import { CatalogShelf } from "../catalog-shelf";
 import { ActiveChallengeCard } from "./dashboard";
 import { ShelfAddButton } from "../shelf";
 import type { ChallengeSummary, Id } from "../types";
-import { BackButton, EmptyState, PageHeading } from "../ui";
+import { BackButton, Button, EmptyState, PageHeading } from "../ui";
 import { canManage } from "../utils";
 
 /** The hidden solo workspace, treated as a group of one: its own page, its challenges and a preview of its catalogue. */
@@ -17,6 +17,7 @@ export function PersonalSpaceScreen({
   onOpenChallenge,
   onOpenAdmin,
   onCreateChallenge,
+  onQuickCreate,
   onOpenCatalog,
   onOpenCatalogItem,
 }: {
@@ -27,10 +28,13 @@ export function PersonalSpaceScreen({
   onOpenChallenge: (id: Id) => void;
   onOpenAdmin: (id: Id) => void;
   onCreateChallenge: () => void;
+  /** The guided, question-by-question way to start a challenge here. */
+  onQuickCreate: () => void;
   onOpenCatalog: () => void;
   onOpenCatalogItem: (itemId: Id) => void;
 }) {
   const t = useTranslations("personalSpace");
+  const tQuick = useTranslations("quickCreate");
   const tc = useTranslations("common");
   // Colours are a Home feature; one set earlier doesn't tint these cards.
   const plain = (challenge: ChallengeSummary): ChallengeSummary => ({ ...challenge, colorTag: null });
@@ -38,7 +42,12 @@ export function PersonalSpaceScreen({
   const other = challenges.filter((challenge) => challenge.status !== "active");
 
   // One "new challenge" pill, in the header of the first section shown.
-  const newChallenge = <ShelfAddButton label={t("createShort")} onClick={onCreateChallenge} />;
+  const newChallenge = (
+    <div className="flex flex-wrap items-center gap-2">
+      <ShelfAddButton label={tQuick("entryCta")} onClick={onQuickCreate} />
+      <ShelfAddButton label={t("createShort")} onClick={onCreateChallenge} />
+    </div>
+  );
 
   function open(challenge: ChallengeSummary) {
     if (challenge.status === "draft" && canManage(challenge.viewerRole)) onOpenAdmin(challenge.id);
@@ -78,7 +87,15 @@ export function PersonalSpaceScreen({
             ) : null}
           </>
         ) : (
-          <EmptyState title={t("emptyTitle")} onClick={onCreateChallenge} />
+          <EmptyState
+            title={t("emptyTitle")}
+            action={(
+              <div className="flex flex-wrap justify-center gap-2">
+                <Button onClick={onQuickCreate}>{tQuick("entryCta")}</Button>
+                <Button variant="secondary" onClick={onCreateChallenge}>{t("createShort")}</Button>
+              </div>
+            )}
+          />
         )}
         <CatalogShelf scope="personal" canManage onOpenCatalog={onOpenCatalog} onOpenItem={onOpenCatalogItem} />
       </div>

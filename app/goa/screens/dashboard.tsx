@@ -369,6 +369,7 @@ export function DashboardScreen({
   const t = useTranslations("dashboard");
   const tWelcome = useTranslations("welcome");
   const tr = useTranslations("roles");
+  const tQuick = useTranslations("quickCreate");
 
   const [showGroupDialog, setShowGroupDialog] = useState(false);
   const [colorFilter, setColorFilter] = useState<ChallengeColorTag | null>(null);
@@ -580,7 +581,7 @@ export function DashboardScreen({
             </Shelf>
           ) : null}
 
-          <Shelf title={t("shelf.running")} count={filtered.running.length}>
+          <Shelf title={t("shelf.running")} count={filtered.running.length} actions={<ShelfAddButton label={tQuick("entryCta")} onClick={onQuickCreate} />}>
             {filtered.running.length
               ? renderRail("running", filtered.running)
               : <div className="w-full max-w-xl"><EmptyState title={colorFilter ? t("filter.empty") : t("noChallengesTitle")} /></div>}

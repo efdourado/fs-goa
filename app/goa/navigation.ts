@@ -39,7 +39,11 @@ export function screenFromUrl(pathname: string, search = ""): Screen | null {
   }
   if (parts[0] === "sobre" && parts.length === 1) return { kind: "about" };
   if (parts[0] === "notes" && parts.length === 1) return { kind: "notes" };
-  if (parts[0] === "start" && parts.length === 1) return { kind: "quick-create" };
+  if (parts[0] === "start" && parts.length === 1) {
+    const groupId = params.get("group");
+    if (groupId) return { kind: "quick-create", into: { groupId } };
+    return params.get("personal") ? { kind: "quick-create", into: "personal" } : { kind: "quick-create" };
+  }
   if (parts[0] === "personal" && parts.length === 1) return { kind: "personal-space" };
   if (parts[0] === "personal" && parts[1] === "trash" && parts.length === 2) return { kind: "personal-trash" };
   if (parts[0] === "catalog" && parts.length === 1) return { kind: "personal-catalog" };
@@ -145,7 +149,8 @@ export function urlForScreen(screen: Screen): string | null {
     case "notes":
       return "/notes";
     case "quick-create":
-      return "/start";
+      if (screen.into === "personal") return "/start?personal=1";
+      return screen.into ? `/start?group=${encodeURIComponent(screen.into.groupId)}` : "/start";
     case "invite":
       return `/invites/${encodeURIComponent(screen.token)}`;
     case "invite-success":
@@ -206,8 +211,10 @@ export function backTargetFor(screen: Screen, lookup: BackLookup): BackTarget | 
     case "group":
     case "personal-space":
     case "notes":
-    case "quick-create":
       return HOME;
+    case "quick-create":
+      if (screen.into === "personal") return { screen: { kind: "personal-space" }, label: { kind: "mySpace" } };
+      return screen.into ? toGroup(screen.into.groupId) : HOME;
     case "about":
     case "templates":
     case "invite":

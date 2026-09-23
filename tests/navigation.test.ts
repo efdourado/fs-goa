@@ -57,6 +57,15 @@ test("resolve a vitrine pública de modelos e mantém compatibilidade com /templ
   assert.equal(urlForScreen({ kind: "template", challengeId: "ch 1" }), "/modelos/ch%201");
 });
 
+test("o chat de criação abre solto, dentro de um grupo ou dentro do My space — e a URL guarda qual", () => {
+  assert.deepEqual(screenFromUrl("/start"), { kind: "quick-create" });
+  assert.deepEqual(screenFromUrl("/start", "?group=g%201"), { kind: "quick-create", into: { groupId: "g 1" } });
+  assert.deepEqual(screenFromUrl("/start", "?personal=1"), { kind: "quick-create", into: "personal" });
+  assert.equal(urlForScreen({ kind: "quick-create" }), "/start");
+  assert.equal(urlForScreen({ kind: "quick-create", into: { groupId: "g 1" } }), "/start?group=g%201");
+  assert.equal(urlForScreen({ kind: "quick-create", into: "personal" }), "/start?personal=1");
+});
+
 test("toda tela roteável volta de urlForScreen → screenFromUrl com o mesmo tipo", () => {
   const screens = [
     { kind: "dashboard" },
@@ -70,6 +79,9 @@ test("toda tela roteável volta de urlForScreen → screenFromUrl com o mesmo ti
     { kind: "group-trash", groupId: "g1" },
     { kind: "create-challenge", groupId: "g1" },
     { kind: "create-personal-challenge" },
+    { kind: "quick-create" },
+    { kind: "quick-create", into: { groupId: "g1" } },
+    { kind: "quick-create", into: "personal" },
     { kind: "challenge", challengeId: "c1", tab: "today" },
     { kind: "admin", challengeId: "c1", tab: "metrics" },
     { kind: "templates" },

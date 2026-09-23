@@ -7,6 +7,7 @@ import { RecipeIcon } from "../recipe-icons";
 import type { ChallengeCreationInput, GroupSummary, Id } from "../types";
 import { BackButton, Button, cardClass, cx, inputClass, PageHeading, StatusMessage } from "../ui";
 import { useGoaFormat } from "../format";
+import { canManage } from "../utils";
 
 /**
  * The three recipes that need nothing set up first: Screens and Pages draw from their own always-there
@@ -57,13 +58,14 @@ function OptionCard({ onClick, icon, title, hint }: { onClick: () => void; icon?
 
 /**
  * A short, guided way to start a challenge — three questions, every answer a tap (a title and, for a new
- * group, its name are the only typing). Built for someone's very first challenge: the fast path with no
- * way to end up somewhere half-configured, not a replacement for the full wizard, which is always still
- * one tap away from wherever this lands.
+ * group, its name are the only typing). The fast path with no way to end up somewhere half-configured, for
+ * a first challenge or the fifth — not a replacement for the full wizard, which is always still one tap
+ * away from wherever this lands.
  */
 export function QuickCreateScreen({
   currentUserId,
   groups,
+  into,
   onBack,
   backLabel,
   onCreateGroup,
@@ -71,6 +73,8 @@ export function QuickCreateScreen({
 }: {
   currentUserId: Id;
   groups: GroupSummary[];
+  /** Started from a group page or My space: that answers "where" before it is asked. */
+  into?: { groupId: Id } | "personal";
   onBack: () => void;
   backLabel?: string;
   /** Makes the group and hands back its id — does not navigate anywhere on its own. */
@@ -81,8 +85,14 @@ export function QuickCreateScreen({
   const tr = useTranslations("createChallenge");
   const tc = useTranslations("common");
   const f = useGoaFormat();
+  const standardGroups = groups.filter((group) => group.kind !== "personal" && canManage(group.role));
+  const presetWhere = (): Where | null => {
+    if (into === "personal") return { kind: "personal" };
+    const target = into ? standardGroups.find((group) => group.id === into.groupId) : null;
+    return target ? { kind: "group", groupId: target.id, name: target.name, participantIds: target.members?.map((member) => member.id) ?? [currentUserId] } : null;
+  };
   const [recipe, setRecipe] = useState<SafeRecipe | null>(null);
-  const [where, setWhere] = useState<Where | null>(null);
+  const [where, setWhere] = useState<Where | null>(presetWhere);
   const [pickingNewGroup, setPickingNewGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
   const [groupBusy, setGroupBusy] = useState(false);
@@ -92,11 +102,11 @@ export function QuickCreateScreen({
   const [itemTitle, setItemTitle] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const standardGroups = groups.filter((group) => group.kind !== "personal");
 
   function resetFrom(step: "recipe" | "where" | "title") {
     if (step === "recipe") setRecipe(null);
-    if (step !== "title") { setWhere(null); setPickingNewGroup(false); setNewGroupName(""); setGroupError(null); }
+    // Changing the recipe keeps a destination the chat was opened into; changing the destination itself clears it.
+    if (step !== "title") { setWhere(step === "recipe" ? presetWhere() : null); setPickingNewGroup(false); setNewGroupName(""); setGroupError(null); }
     setTitle(null);
     setTitleDraft("");
     setItemTitle("");

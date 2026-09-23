@@ -49,6 +49,13 @@ describe("Back goes up the hierarchy, never to wherever you were", () => {
     assert.deepEqual(backTargetFor({ kind: "create-personal-challenge" }, lookup())!.screen, { kind: "personal-space" });
   });
 
+  test("the chat starts from Home, a group or My space, and Back returns to whichever it was opened from", () => {
+    assert.deepEqual(backTargetFor({ kind: "quick-create" }, lookup())!.screen, { kind: "dashboard" });
+    assert.deepEqual(backTargetFor({ kind: "quick-create", into: { groupId: "g1" } }, lookup())!.screen, { kind: "group", groupId: "g1" });
+    assert.deepEqual(backTargetFor({ kind: "quick-create", into: { groupId: "g1" } }, lookup())!.label, { kind: "named", name: "Copa 2026" });
+    assert.deepEqual(backTargetFor({ kind: "quick-create", into: "personal" }, lookup())!.label, { kind: "mySpace" });
+  });
+
   test("the personal bin is opened from the account page, so Back returns there", () => {
     assert.deepEqual(backTargetFor({ kind: "personal-trash" }, lookup()), { screen: { kind: "account" }, label: { kind: "account" } });
   });

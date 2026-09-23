@@ -663,7 +663,8 @@ export type Screen =
   | { kind: "templates" }
   | { kind: "template"; challengeId: Id }
   | { kind: "notes" }
-  | { kind: "quick-create" }
+  /** `into` skips the "where" question when the chat is started from a group page or My space. */
+  | { kind: "quick-create"; into?: { groupId: Id } | "personal" }
   | { kind: "about" };
 
 /** A library property a copy had to leave out — the destination defines the same key differently (or removed it). */

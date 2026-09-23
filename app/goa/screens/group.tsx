@@ -26,6 +26,7 @@ export function GroupScreen({
   onBack,
   backLabel,
   onCreateChallenge,
+  onQuickCreate,
   onOpenChallenge,
   onOpenCatalogItem,
   onOpenCatalog,
@@ -46,6 +47,8 @@ export function GroupScreen({
   /** What the button says — the parent screen's name; falls back to plain "Back". */
   backLabel?: string;
   onCreateChallenge: () => void;
+  /** The guided, question-by-question way to start a challenge here. */
+  onQuickCreate: () => void;
   onOpenChallenge: (id: Id) => void;
   onOpenCatalogItem: (itemId: Id) => void;
   onOpenCatalog: () => void;
@@ -60,6 +63,7 @@ export function GroupScreen({
   onSetMemberRole?: (userId: Id, role: "admin" | "participant") => Promise<void>;
 }) {
   const t = useTranslations("group");
+  const tQuick = useTranslations("quickCreate");
   const tCat = useTranslations("catalog");
   const tl = useTranslations("libraries");
   const tx = useTranslations("managementUX");
@@ -343,7 +347,12 @@ export function GroupScreen({
               <h2 className="text-lg font-semibold tracking-[-0.02em]">{t("challengesTitle")}</h2>
               <span className="text-xs text-[var(--muted)]">{challenges.length}</span>
             </div>
-            {canManage(group.role) && challenges.length < challengeLimit ? <ShelfAddButton label={t("createChallengeCta")} onClick={onCreateChallenge} /> : null}
+            {canManage(group.role) && challenges.length < challengeLimit ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <ShelfAddButton label={tQuick("entryCta")} onClick={onQuickCreate} />
+                <ShelfAddButton label={t("createChallengeCta")} onClick={onCreateChallenge} />
+              </div>
+            ) : null}
           </div>
           {challenges.length ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
