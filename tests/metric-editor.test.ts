@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createElement } from "react";
-import { metricFields, metricGroupings, metricMinimum } from "../app/goa/metric-editor";
+import { canRankItems, defaultRankingFieldIds, metricFields, metricGroupings, metricMinimum } from "../app/goa/metric-editor";
 import { MetricBlock } from "../app/goa/metrics-view";
 import { MetricEditor } from "../app/goa/screens/metrics";
 import type { ChallengeDetail, Metric } from "../app/goa/types";
@@ -59,4 +59,34 @@ test("'como este número é calculado' só aparece quando quem renderiza pede �
   const admin = renderWithIntl(createElement(MetricBlock, { metric, showExplanation: true }));
   assert.match(admin, /Como este número é calculado/);
   assert.match(admin, /4 × média geral/, "a fórmula usa o peso configurado");
+});
+
+const restaurants = {
+  recipeKey: "tables", scope: "group", checkpoints: [], submissionMode: "item",
+  fields: [
+    { id: "comida", label: "Comida", type: "rating" },
+    { id: "ambiente", label: "Ambiente", type: "rating" },
+    { id: "preco", label: "Preço médio", type: "number" },
+    { id: "obs", label: "Observação", type: "text" },
+  ],
+  entryTypes: [],
+} as unknown as ChallengeDetail;
+
+test("uma receita com itens (Tables, personalizada) também agrupa e ranqueia por item — não só filmes e livros", () => {
+  assert.ok(metricGroupings(restaurants, "average").includes("item"), "Tables agrupa por item");
+  assert.ok(metricGroupings({ ...restaurants, recipeKey: "custom" }, "average").includes("item"), "uma personalizada também");
+  assert.ok(!metricGroupings({ ...restaurants, recipeKey: "habit", submissionMode: "daily" }, "average").includes("item"), "um hábito não tem itens para ranquear");
+  assert.equal(canRankItems(restaurants), true);
+  assert.equal(canRankItems({ ...restaurants, recipeKey: "habit", submissionMode: "daily" }), false, "sem itens não há ranking");
+  assert.equal(canRankItems({ ...restaurants, fields: [], entryTypes: [] }), false, "sem nada numérico para ordenar também não");
+});
+
+test("ranking novo: as notas já vêm marcadas e o agrupamento é por item, sem perguntar", () => {
+  assert.deepEqual(defaultRankingFieldIds(metricFields(restaurants)), ["comida", "ambiente"], "só as notas — preço e texto ficam de fora");
+  const html = renderWithIntl(createElement(MetricEditor, { challenge: restaurants, ranking: true, onCancel: () => undefined, onSave: async () => undefined }));
+  assert.match(html, /value="Melhores itens"/, "nome de partida");
+  assert.match(html, /checked=""[^>]*/, "as notas começam marcadas");
+  assert.match(html, /Como pontuar/);
+  assert.doesNotMatch(html, /Agrupar por/, "o agrupamento fica travado em item");
+  assert.doesNotMatch(html, /type="submit"[^>]*disabled/, "já dá para adicionar sem mexer em nada");
 });

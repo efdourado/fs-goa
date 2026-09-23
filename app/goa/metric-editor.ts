@@ -24,11 +24,12 @@ export function metricFields(challenge: Pick<ChallengeDetail, "fields" | "entryT
   return [...fields.values()];
 }
 
-export function metricGroupings(challenge: Pick<ChallengeDetail, "recipeKey" | "checkpoints" | "scope">, operation: Metric["operation"]): MetricGroupBy[] {
+export function metricGroupings(challenge: Pick<ChallengeDetail, "recipeKey" | "checkpoints" | "scope" | "submissionMode">, operation: Metric["operation"]): MetricGroupBy[] {
   const kind = recipeCatalogKind(challenge.recipeKey);
   const base: MetricGroupBy[] = ["none"];
   if (challenge.scope !== "personal") base.push("participant");
-  if (kind) base.push("item");
+  // Any challenge built on items can rank them — Tables and custom ones too, not only films and books.
+  if (kind || challenge.submissionMode === "item") base.push("item");
   if (challenge.checkpoints.length) base.push("checkpoint");
   if (kind) base.push("catalog_year", "catalog_genre");
   if (kind === "book") base.push("catalog_author");
@@ -41,6 +42,19 @@ export function metricGroupings(challenge: Pick<ChallengeDetail, "recipeKey" | "
     indicator_bias: ["none", "participant"],
   };
   return base.filter((group) => !allowed[operation] || allowed[operation]!.includes(group));
+}
+
+/** How a ranking of items scores each one: a plain average, or one that steadies items with only a few ratings. */
+export const rankingScores: Metric["operation"][] = ["average", "bayesian_average"];
+
+/** Whether the challenge has items to rank and something numeric to rank them by. */
+export function canRankItems(challenge: Pick<ChallengeDetail, "recipeKey" | "checkpoints" | "scope" | "submissionMode" | "fields" | "entryTypes">): boolean {
+  return metricFields(challenge).length > 0 && metricGroupings(challenge, "average").includes("item");
+}
+
+/** "Average of my ratings" is what a ranking almost always means, so the rating fields start ticked. */
+export function defaultRankingFieldIds(fields: Array<Pick<ChallengeField, "id" | "type">>): string[] {
+  return fields.filter((field) => field.type === "rating" && field.id).map((field) => field.id!);
 }
 
 export function metricMinimum(metric: Pick<Metric, "operation" | "minSample">): number {

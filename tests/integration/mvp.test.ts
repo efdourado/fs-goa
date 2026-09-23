@@ -7993,3 +7993,64 @@ test("métricas combinadas: qualquer pessoa cria no próprio desafio uma métric
   assert.equal(undone.fieldId, direcaoId);
   assert.equal(undone.fieldIds, undefined);
 });
+
+test("ranking de itens: a média de várias notas é a nota geral de cada item, e os itens saem ordenados por ela — numa receita personalizada também", async () => {
+  const owner = await register("Rita Ranking", "rita_ranking");
+  const guest = await register("Caio Ranking", "caio_ranking");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Onde comer" } })).body as { id: string }).id;
+  const invite = await call("POST", `/api/groups/${gid}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } });
+  await call("POST", `/api/invites/${(invite.body as { token: string }).token}`, { session: guest, body: {} });
+  const library = (await call("POST", `/api/groups/${gid}/catalog/libraries`, { session: owner, body: { label: "Restaurantes" } })).body as { id: string };
+
+  const rating = (key: string, label: string) => ({ key, label, type: "rating", required: true, config: { min: 0, max: 5, step: 0.5 } });
+  const created = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "custom", title: "Melhor lugar", libraryId: library.id, participantIds: [owner.user.id, guest.user.id],
+      items: [{ title: "Cantina" }, { title: "Sushi" }, { title: "Padaria" }],
+      fields: [rating("comida", "Comida"), rating("ambiente", "Ambiente"), rating("custo", "Custo-benefício")],
+    },
+  });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const cid = (created.body as { id: string }).id;
+  await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } });
+  const detail = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as {
+    items: Array<{ id: string; title: string }>; fields: Array<{ id: string; key: string }>;
+  };
+  const itemId = (title: string) => detail.items.find((item) => item.title === title)!.id;
+  const fieldId = (key: string) => detail.fields.find((field) => field.key === key)!.id;
+
+  // Cantina tem a comida nota 5 mas o resto fraco; Sushi é bom em tudo; a Padaria só uma pessoa avaliou.
+  const give = async (who: typeof owner, title: string, comida: number, ambiente: number, custo: number) => {
+    const response = await call("POST", `/api/challenges/${cid}/entries`, { session: who, body: { itemId: itemId(title), values: { comida, ambiente, custo } } });
+    assert.equal(response.response.status, 201, JSON.stringify(response.body));
+  };
+  await give(owner, "Cantina", 5, 2, 2);
+  await give(guest, "Cantina", 5, 3, 1);
+  await give(owner, "Sushi", 4, 4, 4);
+  await give(guest, "Sushi", 5, 4, 3);
+  await give(owner, "Padaria", 5, 5, 5);
+
+  const ranking = await call("POST", `/api/challenges/${cid}/metrics`, {
+    session: owner,
+    body: { label: "Melhores lugares", operation: "average", groupBy: "item", fieldIds: [fieldId("comida"), fieldId("ambiente"), fieldId("custo")], combineOp: "average" },
+  });
+  assert.equal(ranking.response.status, 201, JSON.stringify(ranking.body));
+  const adjusted = await call("POST", `/api/challenges/${cid}/metrics`, {
+    session: owner,
+    body: { label: "Melhores lugares (ajustada)", operation: "bayesian_average", groupBy: "item", fieldIds: [fieldId("comida"), fieldId("ambiente"), fieldId("custo")], combineOp: "average" },
+  });
+  assert.equal(adjusted.response.status, 201, JSON.stringify(adjusted.body));
+
+  const metrics = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as {
+    metrics: Array<{ id: string; label: string; series?: Array<{ label: string; value: number | null; sampleSize: number }> }>;
+  };
+  const series = metrics.metrics.find((metric) => metric.id === (ranking.body as { id: string }).id)!.series!;
+  // Cada registro vira uma nota só (a média das três); depois cada item é a média de quem o avaliou.
+  // Padaria 5; Sushi ((4+4+4)/3 + (5+4+3)/3)/2 = 4; Cantina ((5+2+2)/3 + (5+3+1)/3)/2 = 3 — e a ordem segue a nota geral, não a comida sozinha.
+  assert.deepEqual(series.map((entry) => [entry.label, entry.value, entry.sampleSize]), [["Padaria", 5, 1], ["Sushi", 4, 2], ["Cantina", 3, 2]]);
+  const adjustedSeries = metrics.metrics.find((metric) => metric.id === (adjusted.body as { id: string }).id)!.series!;
+  assert.deepEqual(adjustedSeries.map((entry) => entry.label), ["Padaria", "Sushi", "Cantina"], "a nota ajustada mantém a ordem com amostras parecidas");
+  const padaria = adjustedSeries.find((entry) => entry.label === "Padaria")!;
+  assert.ok(padaria.value !== null && padaria.value < 5, "com um voto só, a ajustada puxa o item para a média geral em vez de deixá-lo no 5");
+});
