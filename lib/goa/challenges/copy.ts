@@ -212,9 +212,10 @@ export async function copyChallengeStructure(
     id: string; semantic_key: string; name: string; description: string | null; submission_mode: string;
     purpose: string | null; target_policy: string | null; cardinality: string | null; schedule_policy: string | null;
     is_primary: boolean; answer_scope: string; shared_edit_policy: string | null; visibility_policy: string;
+    parent_type_id: string | null;
   }>(
     `SELECT id,semantic_key,name,description,submission_mode,purpose,target_policy,cardinality,schedule_policy,is_primary,
-            answer_scope,shared_edit_policy,visibility_policy
+            answer_scope,shared_edit_policy,visibility_policy,parent_type_id
        FROM entry_types WHERE challenge_id=$1 AND archived_at IS NULL ORDER BY created_at`,
     [sourceChallengeId]);
   for (const source of sourceTypes.rows) {
@@ -229,6 +230,13 @@ export async function copyChallengeStructure(
         source.purpose, source.target_policy, source.cardinality, source.schedule_policy, source.is_primary,
         source.answer_scope, source.shared_edit_policy, source.visibility_policy],
     );
+  }
+  // A type that lives inside another (a workout's exercise records) keeps pointing at its copy of it.
+  for (const source of sourceTypes.rows) {
+    if (!source.parent_type_id || !typeMap.has(source.parent_type_id)) continue;
+    await client.query(
+      "UPDATE entry_types SET parent_type_id=$3 WHERE id=$2 AND challenge_id=$1",
+      [targetId, typeMap.get(source.id), typeMap.get(source.parent_type_id)]);
   }
 
   const fieldMap = new Map<string, string>();

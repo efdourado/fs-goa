@@ -15,10 +15,14 @@ import {
 } from "../../validation";
 import {
   cardinalityOf,
+  childEntryType,
+  type EntryTypeRow,
   entryTypeById,
+  entryTypesForChallenge,
   primaryEntryType,
   purposeOf,
   schedulePolicyOf,
+  sessionPairOf,
   targetPolicyOf,
 } from "./entry-types";
 import type { FieldRow } from "./types";
@@ -168,6 +172,76 @@ async function writeEntryValues(
   return normalized;
 }
 
+interface ChildInput {
+  id?: string;
+  itemId: string;
+  values: unknown;
+}
+
+/** The exercise records of one check-in as the client sent them: each names its item, may carry its own id when it already exists. */
+function parseChildren(raw: unknown): ChildInput[] {
+  if (!Array.isArray(raw)) throw new ApiError(400, "invalid_children", "Informe os itens deste check-in.");
+  if (raw.length > 60) throw new ApiError(400, "children_limit", "Use no máximo 60 itens por check-in.");
+  return raw.map((entry) => {
+    const record = asRecord(entry);
+    if (typeof record.itemId !== "string" || !record.itemId) throw new ApiError(400, "missing_item", "Selecione um item em cada linha.");
+    return { id: typeof record.id === "string" && record.id ? record.id : undefined, itemId: record.itemId, values: record.values };
+  });
+}
+
+/** Deletes records for good — a row taken out of a check-in while editing it, or a check-in purged from the bin. */
+export async function purgeEntryRows(client: PoolClient, entryIds: string[]): Promise<void> {
+  if (!entryIds.length) return;
+  // A curated Vitrine comment references an entry's value with ON DELETE RESTRICT — it goes with the record.
+  await client.query("DELETE FROM result_blocks WHERE source_entry_id = ANY($1::text[])", [entryIds]);
+  await client.query("DELETE FROM entry_values WHERE entry_id = ANY($1::text[])", [entryIds]);
+  await client.query("DELETE FROM entries WHERE id = ANY($1::text[])", [entryIds]);
+}
+
+/**
+ * Writes the exercise records of one check-in: a row with an id is updated, a row without one is created, and a
+ * record the check-in used to hold that this save no longer lists is removed — so "Save workout" always
+ * leaves the workout exactly as the form showed it. Every record belongs to the check-in's person and date.
+ */
+async function saveChildren(
+  client: PoolClient,
+  ctx: { challengeId: string; parentId: string; childType: EntryTypeRow; participantId: string; actorId: string; occurredOn: string | null },
+  children: ChildInput[],
+): Promise<Array<{ id: string; itemId: string; values: Record<string, unknown> }>> {
+  const fields = await storageFields(client, ctx.challengeId, ctx.childType.id);
+  const existing = await client.query<{ id: string }>(
+    "SELECT id FROM entries WHERE parent_entry_id=$1 AND deleted_at IS NULL FOR UPDATE", [ctx.parentId]);
+  const existingIds = new Set(existing.rows.map((row) => row.id));
+  const kept = new Set<string>();
+  const saved: Array<{ id: string; itemId: string; values: Record<string, unknown> }> = [];
+  for (const child of children) {
+    const item = await oneOrNull<{ id: string }>(client,
+      "SELECT id FROM challenge_items WHERE id=$1 AND challenge_id=$2 AND archived_at IS NULL", [child.itemId, ctx.challengeId]);
+    if (!item) throw new ApiError(400, "invalid_item", "Item não pertence ao desafio.");
+    let entryId = child.id;
+    if (entryId) {
+      if (!existingIds.has(entryId) || kept.has(entryId)) throw new ApiError(400, "invalid_child", "Esse registro não faz parte deste check-in.");
+      await client.query(
+        "UPDATE entries SET item_id=$2,occurred_on=$3,last_edited_by_user_id=$4,updated_at=now(),submitted_at=now() WHERE id=$1",
+        [entryId, child.itemId, ctx.occurredOn, ctx.actorId]);
+    } else {
+      entryId = publicId();
+      await client.query(
+        `INSERT INTO entries
+          (id,challenge_id,entry_type_id,submission_mode,cardinality,item_id,participant_user_id,answer_scope,parent_entry_id,occurred_on,
+           submitted_at,created_by_user_id,last_edited_by_user_id,created_at,updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,'individual',$8,$9,now(),$10,$10,now(),now())`,
+        [entryId, ctx.challengeId, ctx.childType.id, ctx.childType.submission_mode, cardinalityOf(ctx.childType), child.itemId,
+          ctx.participantId, ctx.parentId, ctx.occurredOn, ctx.actorId]);
+    }
+    kept.add(entryId);
+    const values = await writeEntryValues(client, entryId, ctx.challengeId, ctx.childType.id, fields, child.values);
+    saved.push({ id: entryId, itemId: child.itemId, values });
+  }
+  await purgeEntryRows(client, [...existingIds].filter((id) => !kept.has(id)));
+  return saved;
+}
+
 async function entryValues(client: PoolClient, entryIds: string[]): Promise<Map<string, Record<string, unknown>>> {
   const byEntry = new Map<string, Record<string, unknown>>();
   if (!entryIds.length) return byEntry;
@@ -200,12 +274,12 @@ export async function listEntries(session: SessionContext, challengeId: string) 
     }
     const closed = access.challenge.status === "closed";
     const result = await client.query<{
-      id: string; item_id: string | null; checkpoint_id: string | null; entry_type_id: string;
+      id: string; item_id: string | null; checkpoint_id: string | null; entry_type_id: string; parent_entry_id: string | null;
       participant_user_id: string | null; display_name: string | null; visibility_policy: string;
       answer_scope: "individual" | "shared"; last_editor_name: string | null;
       username: string | null; occurred_on: string | null; submitted_at: Date; updated_at: Date;
     }>(
-      `SELECT e.id,e.item_id,e.checkpoint_id,e.entry_type_id,e.participant_user_id,u.display_name,u.username,
+      `SELECT e.id,e.item_id,e.checkpoint_id,e.entry_type_id,e.parent_entry_id,e.participant_user_id,u.display_name,u.username,
               e.answer_scope, CASE WHEN e.answer_scope = 'shared' THEN le.display_name END AS last_editor_name,
               coalesce(et.visibility_policy, 'group_realtime') AS visibility_policy,
               e.occurred_on::text AS occurred_on,e.submitted_at,e.updated_at
@@ -230,7 +304,7 @@ export async function listEntries(session: SessionContext, challengeId: string) 
         .filter((entry) => entry.participant_user_id === session.user.id)
         .map((entry) => `${entry.entry_type_id}:${entry.item_id ?? entry.checkpoint_id ?? "-"}`),
     );
-    const visibleRows = result.rows.filter((entry) => {
+    const isVisible = (entry: (typeof result.rows)[number]) => {
       if (access.canManage || entry.participant_user_id === session.user.id || entry.answer_scope === "shared") return true;
       switch (entry.visibility_policy) {
         case "author_only": return false;
@@ -238,7 +312,10 @@ export async function listEntries(session: SessionContext, challengeId: string) 
         case "after_own": return ownItemType.has(`${entry.entry_type_id}:${entry.item_id ?? entry.checkpoint_id ?? "-"}`);
         default: return true;
       }
-    });
+    };
+    // A record inside a check-in is seen exactly when its check-in is — one visibility rule, the visit's.
+    const visibleVisits = new Set(result.rows.filter((entry) => !entry.parent_entry_id && isVisible(entry)).map((entry) => entry.id));
+    const visibleRows = result.rows.filter((entry) => (entry.parent_entry_id ? visibleVisits.has(entry.parent_entry_id) : isVisible(entry)));
 
     const values = await entryValues(client, visibleRows.map((entry) => entry.id));
     const checkpoints = await client.query<{ id: string; day: string }>(
@@ -254,6 +331,8 @@ export async function listEntries(session: SessionContext, challengeId: string) 
       itemId: entry.item_id ?? null,
       checkpointId: entry.checkpoint_id ?? checkpointByDay.get(entry.occurred_on ?? "") ?? null,
       entryTypeId: entry.entry_type_id,
+      // The check-in this record lives inside (a workout's exercise), or null.
+      parentEntryId: entry.parent_entry_id,
       answerScope: entry.answer_scope,
       // Who last touched a shared answer — it has no author, only editors.
       lastEditedByName: entry.last_editor_name,
@@ -308,6 +387,15 @@ export async function saveEntry(
       ? await entryTypeById(client, challengeId, body.entryTypeId)
       : await primaryEntryType(client, challengeId);
     if (!entryType) throw new ApiError(400, "invalid_entry_type", "Tipo de registro inválido.");
+    // A workout-style challenge saves the whole check-in at once: the visit plus one record per item in it.
+    // A record on its own has nothing to hang from, so it is refused rather than left orphaned.
+    const sessionPair = sessionPairOf(await entryTypesForChallenge(client, challengeId));
+    if (sessionPair?.child.id === entryType.id) {
+      throw new ApiError(400, "record_needs_visit", "Esse registro faz parte de um check-in — salve pelo check-in.");
+    }
+    const visitChildType = sessionPair?.parent.id === entryType.id ? sessionPair.child : null;
+    const children = visitChildType ? parseChildren(body.children) : null;
+    if (children && !children.length) throw new ApiError(400, "empty_session", "Adicione pelo menos um item ao check-in.");
     const challengeHasPeriod =
       access.challenge.start_date !== null && access.challenge.end_date !== null;
     const targetPolicy = targetPolicyOf(entryType);
@@ -460,9 +548,13 @@ export async function saveEntry(
       );
     }
     const normalized = await writeEntryValues(client, entryId, challengeId, entryType.id, fields, body.values);
+    const savedChildren = visitChildType && children
+      ? await saveChildren(client, { challengeId, parentId: entryId, childType: visitChildType, participantId, actorId: session.user.id, occurredOn }, children)
+      : undefined;
     return {
       id: entryId, itemId, checkpointId, participantId, occurredOn, values: normalized,
       updated: Boolean(existing), answerScope,
+      ...(savedChildren ? { children: savedChildren } : {}),
     };
   });
 }
@@ -475,12 +567,12 @@ export async function updateEntry(
   return inTransaction(async (client) => {
     const entry = await oneOrNull<{
       id: string; challenge_id: string; entry_type_id: string; participant_user_id: string | null;
-      item_id: string | null; purpose: string | null; answer_scope: "individual" | "shared";
+      item_id: string | null; purpose: string | null; answer_scope: "individual" | "shared"; parent_entry_id: string | null;
       shared_edit_policy: "members_fill_admin_corrects" | "members_can_edit" | null;
-      updated_at: Date; group_id: string; status: "draft" | "active" | "closed";
+      updated_at: Date; group_id: string; status: "draft" | "active" | "closed"; time_zone: string | null;
     }>(client,
-      `SELECT e.id,e.challenge_id,e.entry_type_id,e.participant_user_id,e.item_id,t.purpose,
-              e.answer_scope,t.shared_edit_policy,e.updated_at,c.group_id,c.status
+      `SELECT e.id,e.challenge_id,e.entry_type_id,e.participant_user_id,e.item_id,t.purpose,e.parent_entry_id,
+              e.answer_scope,t.shared_edit_policy,e.updated_at,c.group_id,c.status,c.time_zone
          FROM entries e JOIN challenges c ON c.id=e.challenge_id
          JOIN entry_types t ON t.id=e.entry_type_id
         WHERE e.id=$1 AND e.deleted_at IS NULL AND c.deleted_at IS NULL FOR UPDATE`, [entryId]);
@@ -506,6 +598,32 @@ export async function updateEntry(
       if (entry.participant_user_id !== session.user.id) throw new ApiError(404, "not_found", "Registro não encontrado.");
     }
     if (entry.status !== "active") throw new ApiError(409, "challenge_not_active", "O desafio não aceita correções agora.");
+    if (entry.parent_entry_id) {
+      throw new ApiError(400, "record_edit_via_visit", "Esse registro faz parte de um check-in — edite pelo check-in.");
+    }
+    // A check-in that holds records: the visit's own fields, its date, and the full list of records it should now have.
+    const childType = await childEntryType(client, entry.challenge_id, entry.entry_type_id);
+    if (childType && entry.participant_user_id) {
+      let occurredOn: string | undefined;
+      if (Object.hasOwn(body, "occurredOn")) {
+        occurredOn = dateString(body.occurredOn, "Data");
+        if (occurredOn > dateKeyInTimeZone(new Date(), entry.time_zone ?? "UTC")) {
+          throw new ApiError(409, "checkin_in_future", "O check-in pode ser de hoje ou de uma data passada.");
+        }
+        await client.query("UPDATE entries SET occurred_on=$2 WHERE id=$1 OR parent_entry_id=$1", [entryId, occurredOn]);
+      }
+      const visitFields = await storageFields(client, entry.challenge_id, entry.entry_type_id);
+      const visitValues = body.values === undefined ? {} : await writeEntryValues(client, entryId, entry.challenge_id, entry.entry_type_id, visitFields, body.values);
+      let savedChildren: Awaited<ReturnType<typeof saveChildren>> | undefined;
+      if (Object.hasOwn(body, "children")) {
+        const children = parseChildren(body.children);
+        if (!children.length) throw new ApiError(400, "empty_session", "Adicione pelo menos um item ao check-in.");
+        const date = occurredOn ?? (await oneOrNull<{ occurred_on: string | null }>(client, "SELECT occurred_on::text AS occurred_on FROM entries WHERE id=$1", [entryId]))?.occurred_on ?? null;
+        savedChildren = await saveChildren(client, { challengeId: entry.challenge_id, parentId: entryId, childType, participantId: entry.participant_user_id, actorId: session.user.id, occurredOn: date }, children);
+      }
+      await client.query("UPDATE entries SET last_edited_by_user_id=$2,updated_at=now() WHERE id=$1", [entryId, session.user.id]);
+      return { id: entryId, values: visitValues, ...(savedChildren ? { children: savedChildren } : {}) };
+    }
     if (entry.purpose === "expectation" && entry.item_id && entry.participant_user_id) {
       const rated = await oneOrNull<{ id: string }>(client,
         `SELECT e.id FROM entries e JOIN entry_types t ON t.id = e.entry_type_id
@@ -529,12 +647,12 @@ export async function deleteEntry(
 ) {
   return inTransaction(async (client) => {
     const entry = await oneOrNull<{
-      id: string; challenge_id: string; participant_user_id: string | null;
+      id: string; challenge_id: string; participant_user_id: string | null; parent_entry_id: string | null;
       answer_scope: "individual" | "shared";
       shared_edit_policy: "members_fill_admin_corrects" | "members_can_edit" | null;
       group_id: string; status: "draft" | "active" | "closed";
     }>(client,
-      `SELECT e.id,e.challenge_id,e.participant_user_id,e.answer_scope,t.shared_edit_policy,c.group_id,c.status
+      `SELECT e.id,e.challenge_id,e.participant_user_id,e.parent_entry_id,e.answer_scope,t.shared_edit_policy,c.group_id,c.status
          FROM entries e JOIN challenges c ON c.id=e.challenge_id
          JOIN entry_types t ON t.id=e.entry_type_id
         WHERE e.id=$1 AND e.deleted_at IS NULL AND c.deleted_at IS NULL FOR UPDATE`, [entryId]);
@@ -558,10 +676,18 @@ export async function deleteEntry(
     if (entry.status !== "active") {
       throw new ApiError(409, "challenge_not_active", "Registros só podem ser excluídos com o desafio ativo.");
     }
+    if (entry.parent_entry_id) {
+      throw new ApiError(400, "record_edit_via_visit", "Esse registro faz parte de um check-in — tire-o editando o check-in.");
+    }
     // Moves the entry to the bin: `deleted_at` (so it leaves listings, metrics
     // and the showcase, and frees the partial unique indexes) plus the explicit
     // `trash_items` row. The participant restores it from the challenge screen.
     await moveToTrash(client, "entry", entryId, session.user.id, { skipMarker: false, reason: null });
+    // A check-in takes its records with it — binned alongside it, without a bin row of their own, so
+    // restoring the check-in brings every record back (same as an item's entries).
+    await client.query(
+      "UPDATE entries SET deleted_at=now(), last_edited_by_user_id=$2, updated_at=now() WHERE parent_entry_id=$1 AND deleted_at IS NULL",
+      [entryId, session.user.id]);
     return { id: entryId, deleted: true };
   });
 }

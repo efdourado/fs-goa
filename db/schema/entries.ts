@@ -39,6 +39,9 @@ export const entries = pgTable(
     // Null iff shared: a shared answer belongs to the item, not a person.
     answerScope: text("answer_scope").notNull().default("individual"),
     participantUserId: text("participant_user_id"),
+    // The entry this one lives inside — an exercise performance points at its workout. Null for every
+    // ordinary entry. Always in the same challenge; the app keeps both rows' owner and date in step.
+    parentEntryId: text("parent_entry_id"),
     // Nullable: a plain round entry ("I watched it, no date in mind") can skip
     // the date. Day-keyed cardinalities (`once_per_day`, `once_per_item_day`)
     // still always carry one — the entry API fills today when it's omitted.
@@ -60,6 +63,14 @@ export const entries = pgTable(
       table.challengeId,
       table.entryTypeId,
     ),
+    unique("entries_id_challenge_unique").on(table.id, table.challengeId),
+    foreignKey({
+      name: "entries_parent_fk",
+      columns: [table.parentEntryId, table.challengeId],
+      foreignColumns: [table.id, table.challengeId],
+    }).onDelete("no action"),
+    index("entries_parent_idx").on(table.parentEntryId),
+    check("entries_parent_not_self_check", sql`${table.parentEntryId} is null or ${table.parentEntryId} <> ${table.id}`),
     foreignKey({
       name: "entries_challenge_participant_fk",
       columns: [table.challengeId, table.participantUserId],

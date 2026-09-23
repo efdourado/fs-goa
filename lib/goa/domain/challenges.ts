@@ -16,7 +16,7 @@ import { syncDailyCheckpoints } from "../daily-checkpoints";
 import { seedExpectationType } from "../challenges/entry-types";
 import { linkChallengeLibrary, resolveItemLibrary } from "../challenges/libraries";
 import { resolveItemRecommender } from "../challenges/recommender";
-import { resolveRecipe } from "../challenges/recipes";
+import { resolveRecipe, withRecordingMode } from "../challenges/recipes";
 import { writeAudit } from "./audit";
 import { insertField, type ClientField } from "./fields";
 import { parseRuleSections, rulesCompatibilityText } from "./rules";
@@ -52,7 +52,7 @@ export async function createChallenge(
     Object.hasOwn(body, "endsOn") ? body.endsOn : body.endDate,
   );
   const timeZone = timeZoneValue(body.timeZone, "America/Sao_Paulo");
-  const recipe = resolveRecipe(body);
+  const { recipe, mode: recordingMode } = withRecordingMode(resolveRecipe(body), body);
   // A personal challenge with no start/end is a living list ("films I've seen",
   // "books I've read") — it has no round to open or close, so it is born active
   // and can never be closed. See `transitionChallenge` and `isLivingList`.
@@ -62,6 +62,9 @@ export async function createChallenge(
   const sharedPrimary = body.answerScope === "shared";
   if (body.answerScope !== undefined && body.answerScope !== "individual" && body.answerScope !== "shared") {
     throw new ApiError(400, "invalid_answer_scope", "Escolha quem preenche o registro: cada participante ou uma vez para o grupo.");
+  }
+  if (sharedPrimary && recordingMode === "session") {
+    throw new ApiError(400, "shared_session_unsupported", "Um check-in com vários itens é sempre de cada participante.");
   }
   if (sharedPrimary && recipe.key !== "custom") {
     throw new ApiError(400, "shared_custom_only", "Só um desafio personalizado pode ter o registro principal compartilhado.");
@@ -139,10 +142,12 @@ export async function createChallenge(
     let primaryTypeId = "";
     let completionTypeId = "";
     const fieldByKey = new Map<string, { id: string; kind: string; entryTypeId: string }>();
+    const typeIdByKey = new Map<string, string>();
     const hasExplicitPrimary = recipe.entryTypes.some((type) => type.primary);
     for (let typeIndex = 0; typeIndex < recipe.entryTypes.length; typeIndex += 1) {
       const type = recipe.entryTypes[typeIndex];
       const typeId = publicId();
+      typeIdByKey.set(type.semanticKey, typeId);
       const isPrimary = hasExplicitPrimary ? type.primary === true : typeIndex === 0;
       const shared = sharedPrimary && type.primary === true;
       const typeFields = type.primary && wizardFields ? wizardFields : type.fields;
@@ -170,6 +175,14 @@ export async function createChallenge(
       }
     }
     const entryTypeId = primaryTypeId;
+    // A type that lives inside another (a workout's exercise records) points at it — both exist by now.
+    for (const type of recipe.entryTypes) {
+      if (!type.parentKey) continue;
+      await client.query(
+        "UPDATE entry_types SET parent_type_id=$3 WHERE id=$2 AND challenge_id=$1",
+        [id, typeIdByKey.get(type.semanticKey), typeIdByKey.get(type.parentKey)],
+      );
+    }
 
     // The optional Cinema/Estante "Expectativa" type (V1 §3.1) — a pre-watch
     // rating that locks once the real one is in. Enabled here or later in the
@@ -356,9 +369,11 @@ export async function createChallenge(
       let combinedFieldIds: string[] | null = null;
       // Completion rate counts the "done" signal — a dedicated completion type
       // when the recipe has one, otherwise the primary type.
-      let metricTypeId = operation === "completion_rate" && completionTypeId
-        ? completionTypeId
-        : entryTypeId;
+      let metricTypeId = recipeMetric.entryTypeKey
+        ? typeIdByKey.get(recipeMetric.entryTypeKey) ?? entryTypeId
+        : operation === "completion_rate" && completionTypeId
+          ? completionTypeId
+          : entryTypeId;
       if (recipeMetric.fieldKeys) {
         const resolvedIds: string[] = [];
         for (const key of recipeMetric.fieldKeys) {

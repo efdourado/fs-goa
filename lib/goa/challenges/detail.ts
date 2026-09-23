@@ -232,6 +232,8 @@ export async function buildChallengeDetail(
     visibilityPolicy: type.visibility_policy,
     answerScope: type.answer_scope,
     sharedEditPolicy: type.shared_edit_policy,
+    // Set on a type whose entries live inside an entry of another — a workout's exercise records.
+    parentTypeId: type.parent_type_id,
     fields: fieldsByType.get(type.id) ?? [],
   }));
   const primaryEntryTypeId = primaryType?.id ?? null;

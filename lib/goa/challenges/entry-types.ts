@@ -31,7 +31,7 @@ function isVisibilityPolicy(value: unknown): value is VisibilityPolicy {
   return typeof value === "string" && (VISIBILITY_POLICIES as readonly string[]).includes(value);
 }
 
-interface EntryTypeRow {
+export interface EntryTypeRow {
   id: string;
   challenge_id: string;
   semantic_key: string;
@@ -45,11 +45,13 @@ interface EntryTypeRow {
   visibility_policy: VisibilityPolicy;
   answer_scope: AnswerScope;
   shared_edit_policy: SharedEditPolicy | null;
+  /** Set on a type whose entries live inside an entry of another type (a workout's exercise records). */
+  parent_type_id: string | null;
 }
 
 const SELECT_COLUMNS = `id, challenge_id, semantic_key, name, submission_mode,
   purpose, target_policy, cardinality, schedule_policy, is_primary, visibility_policy,
-  answer_scope, shared_edit_policy`;
+  answer_scope, shared_edit_policy, parent_type_id`;
 
 /**
  * The four orthogonal axes are nullable until every legacy row is backfilled, so
@@ -114,6 +116,8 @@ export async function completionEntryType(
   const types = await entryTypesForChallenge(client, challengeId);
   return (
     types.find((type) => type.purpose === "completion")
+    // A visit that holds records (a workout) is the "done" signal — not one of the records inside it.
+    ?? types.find((type) => types.some((child) => child.parent_type_id === type.id))
     ?? types.find((type) => type.is_primary)
     ?? types.find((type) => type.purpose !== "expectation")
     ?? types[0]
@@ -132,6 +136,30 @@ export async function entryTypesForChallenge(
     [challengeId],
   );
   return result.rows;
+}
+
+/**
+ * The pair behind "one check-in holds several item records" — a workout and its exercise performances.
+ * `null` for every ordinary challenge. There is at most one pair per challenge.
+ */
+export function sessionPairOf(types: EntryTypeRow[]): { parent: EntryTypeRow; child: EntryTypeRow } | null {
+  const child = types.find((type) => type.parent_type_id !== null);
+  const parent = child ? types.find((type) => type.id === child.parent_type_id) : null;
+  return child && parent ? { parent, child } : null;
+}
+
+/** The type nested inside `parentTypeId` — a workout's exercise records — or `null` for an ordinary type. */
+export async function childEntryType(
+  client: PoolClient,
+  challengeId: string,
+  parentTypeId: string,
+): Promise<EntryTypeRow | null> {
+  return oneOrNull<EntryTypeRow>(
+    client,
+    `SELECT ${SELECT_COLUMNS} FROM entry_types
+      WHERE challenge_id = $1 AND parent_type_id = $2 AND archived_at IS NULL`,
+    [challengeId, parentTypeId],
+  );
 }
 
 export async function entryTypeById(
@@ -404,6 +432,10 @@ export async function archiveEntryType(
     const types = await entryTypesForChallenge(client, challengeId);
     const type = types.find((candidate) => candidate.id === entryTypeId);
     if (!type) throw new ApiError(404, "not_found", "Tipo de registro não encontrado.");
+    const pair = sessionPairOf(types);
+    if (pair && (pair.parent.id === entryTypeId || pair.child.id === entryTypeId)) {
+      throw new ApiError(409, "session_type_locked", "O registro com vários itens é a estrutura deste desafio — para mudar isso, crie outro desafio.");
+    }
     const remaining = types.filter((candidate) => candidate.id !== entryTypeId);
     if (!remaining.some((candidate) => purposeOf(candidate) !== "expectation")) {
       throw new ApiError(409, "last_entry_type", "O desafio precisa de pelo menos um tipo de registro.");

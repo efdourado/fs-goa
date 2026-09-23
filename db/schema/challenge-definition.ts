@@ -56,6 +56,10 @@ export const entryTypes = pgTable(
     //     may change or clear it after that.
     //   members_can_edit — any eligible member may fill, change, or clear it.
     sharedEditPolicy: text("shared_edit_policy"),
+    // A type whose entries only exist inside an entry of another type — a workout's exercise
+    // performances live inside a "workout" entry. Null for every ordinary type. The parent is the
+    // visit (date, attendance); the child carries the item and its own fields.
+    parentTypeId: text("parent_type_id"),
     archivedAt: timestamptz("archived_at"),
     createdAt: timestamptz("created_at").defaultNow().notNull(),
     updatedAt: timestamptz("updated_at").defaultNow().notNull(),
@@ -63,6 +67,12 @@ export const entryTypes = pgTable(
   (table) => [
     unique("entry_types_challenge_key_unique").on(table.challengeId, table.semanticKey),
     unique("entry_types_id_challenge_unique").on(table.id, table.challengeId),
+    foreignKey({
+      name: "entry_types_parent_fk",
+      columns: [table.parentTypeId, table.challengeId],
+      foreignColumns: [table.id, table.challengeId],
+    }).onDelete("no action"),
+    check("entry_types_parent_not_self_check", sql`${table.parentTypeId} is null or ${table.parentTypeId} <> ${table.id}`),
     unique("entry_types_id_challenge_mode_unique").on(
       table.id,
       table.challengeId,

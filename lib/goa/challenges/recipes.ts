@@ -29,6 +29,8 @@ interface RecipeEntryType {
   fields: ClientField[];
   /** The type the wizard's field step and the challenge detail's flat view use. */
   primary?: boolean;
+  /** The `semanticKey` of the type whose entries hold this one's — a workout's exercise records. */
+  parentKey?: string;
 }
 
 /**
@@ -47,6 +49,8 @@ interface RecipeMetric {
    * skipped, like a single field that no longer resolves, if any key doesn't.
    */
   fieldKeys?: string[];
+  /** Reads this entry type instead of the primary one — attendance counts the visits, not the records inside. */
+  entryTypeKey?: string;
   groupBy?: "none" | "participant" | "item";
   visibleDuring?: boolean;
   visibleInResults?: boolean;
@@ -375,6 +379,71 @@ export const RECIPES: Record<RecipeKey, Recipe> = {
     ],
   },
 };
+
+// One check-in that holds several item records — a workout of exercises, a study session of subjects, a
+// match night of games. The visit is the entry (a date, an optional note, attendance); each item in it
+// gets its own record with the fields the creator defined. Only `custom` offers it: `wizardFields` are the
+// fields of one *record*, so the primary type is the record type and the visit is its parent.
+const SESSION_KEY = "sessao";
+const sessionEntry = (name: string): RecipeEntryType => ({
+  semanticKey: SESSION_KEY,
+  name,
+  purpose: "checkin",
+  // `daily` (not `free`) so the dashboard's progress counter shows a plain count of visits, like a habit.
+  submissionMode: "daily",
+  targetPolicy: "none",
+  cardinality: "repeatable",
+  schedulePolicy: "while_active",
+  fields: [
+    { key: "nota_sessao", label: "Como foi?", type: "text", required: false, config: { multiline: true, maxLength: 500 } },
+  ],
+});
+const recordEntry: RecipeEntryType = {
+  semanticKey: "desempenho",
+  name: "Desempenho",
+  purpose: "progress",
+  submissionMode: "item",
+  targetPolicy: "required",
+  cardinality: "repeatable",
+  schedulePolicy: "while_active",
+  fields: [
+    { key: "carga", label: "Carga", type: "number", required: true, config: { min: 0, step: 0.5 } },
+    { key: "repeticoes", label: "Repetições", type: "number", required: true, config: { min: 0, step: 1 } },
+  ],
+  primary: true,
+  parentKey: SESSION_KEY,
+};
+
+export type RecordingMode = "single" | "session";
+
+/**
+ * A `custom` challenge can record one answer per item (the default) or one check-in holding a record for
+ * each of several items. Any other recipe refuses `session`; the recipe it returns is what `createChallenge` builds from.
+ */
+export function withRecordingMode(recipe: Recipe, body: Record<string, unknown>): { recipe: Recipe; mode: RecordingMode } {
+  const requested = body.recordingMode;
+  if (requested !== undefined && requested !== "single" && requested !== "session") {
+    throw new ApiError(400, "invalid_recording_mode", "Escolha se cada registro é uma resposta por item ou um check-in com vários itens.");
+  }
+  if (requested !== "session") return { recipe, mode: "single" };
+  if (recipe.key !== "custom") {
+    throw new ApiError(400, "session_custom_only", "Só um desafio personalizado pode registrar um check-in com vários itens.");
+  }
+  const rawName = typeof body.sessionName === "string" ? body.sessionName.trim() : "";
+  const name = (rawName || "Sessão").slice(0, 60);
+  return {
+    mode: "session",
+    recipe: {
+      ...recipe,
+      entryTypes: [sessionEntry(name), recordEntry],
+      metrics: [
+        { key: "frequencia", label: "Frequência", operation: "count", entryTypeKey: SESSION_KEY, groupBy: "none" },
+        { key: "frequencia_por_pessoa", label: "Frequência por pessoa", operation: "count", entryTypeKey: SESSION_KEY, groupBy: "participant", needsGroup: true },
+        { key: "registros_por_item", label: "Registros por item", operation: "count", groupBy: "item" },
+      ],
+    },
+  };
+}
 
 const TEMPLATE_ALIAS: Record<string, RecipeKey> = {
   cine: "cinema",

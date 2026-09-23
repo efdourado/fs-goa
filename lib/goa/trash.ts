@@ -433,6 +433,12 @@ async function applyPurge(client: PoolClient, row: RowContext): Promise<Record<s
       await client.query("DELETE FROM catalog_items WHERE id=$1", [row.id]);
       break;
     case "entry":
+      // A check-in's records (a workout's exercises) go with it, before the check-in they hang from.
+      await client.query(
+        "DELETE FROM result_blocks WHERE source_entry_id IN (SELECT id FROM entries WHERE parent_entry_id=$1)", [row.id]);
+      await client.query(
+        "DELETE FROM entry_values WHERE entry_id IN (SELECT id FROM entries WHERE parent_entry_id=$1)", [row.id]);
+      await client.query("DELETE FROM entries WHERE parent_entry_id=$1", [row.id]);
       // A comment picked into the Vitrine is a `result_blocks` row that
       // references this entry's values with ON DELETE RESTRICT — purging the
       // entry for good means that curated card goes with it.
@@ -724,6 +730,13 @@ export async function restoreTrashItem(session: SessionContext, body: Record<str
       await client.query("UPDATE groups SET name=$2, updated_at=now() WHERE id=$1", [id, rename]);
     }
     await client.query(CLEAR_MARKER[kind], [id]);
+    if (kind === "entry") {
+      // A check-in's records were binned with it (no bin row of their own) — they come back with it.
+      await client.query(
+        `UPDATE entries SET deleted_at=NULL, updated_at=now()
+          WHERE parent_entry_id=$1 AND deleted_at IS NOT NULL
+            AND id NOT IN (SELECT entity_id FROM trash_items WHERE entity_kind='entry')`, [id]);
+    }
     if (kind === "challenge_item") {
       // Entries cascade-binned with the item come back; ones a participant binned
       // by hand (a `trash_items` row of their own) stay binned.

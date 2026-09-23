@@ -8054,3 +8054,166 @@ test("ranking de itens: a média de várias notas é a nota geral de cada item, 
   const padaria = adjustedSeries.find((entry) => entry.label === "Padaria")!;
   assert.ok(padaria.value !== null && padaria.value < 5, "com um voto só, a ajustada puxa o item para a média geral em vez de deixá-lo no 5");
 });
+
+test("check-in com vários itens: um treino guarda um registro por exercício, e a frequência, o histórico e as métricas saem daí", async () => {
+  const owner = await register("Tati Treino", "tati_treino");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Academia" } })).body as { id: string }).id;
+  const library = (await call("POST", `/api/groups/${gid}/catalog/libraries`, { session: owner, body: { label: "Exercícios" } })).body as { id: string };
+  const number = (key: string, label: string) => ({ key, label, type: "number", required: true, config: { min: 0, step: 0.5 } });
+  const created = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "custom", recordingMode: "session", sessionName: "Treino", title: "Meu treino", libraryId: library.id,
+      participantIds: [owner.user.id],
+      items: [{ title: "Supino reto" }, { title: "Agachamento" }, { title: "Puxada" }],
+      fields: [number("carga", "Carga (kg)"), number("reps", "Repetições")],
+    },
+  });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const cid = (created.body as { id: string }).id;
+  await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } });
+
+  type Detail = {
+    items: Array<{ id: string; title: string }>;
+    entryTypes: Array<{ id: string; name: string; semanticKey: string; parentTypeId: string | null; isPrimary: boolean; fields: Array<{ id: string; key: string }> }>;
+    metrics: Array<{ id: string; label: string; value: number | null; series?: Array<{ label: string; value: number | null }> }>;
+  };
+  const detail = async () => (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as Detail;
+  const d = await detail();
+  const visitType = d.entryTypes.find((type) => type.semanticKey === "sessao")!;
+  const recordType = d.entryTypes.find((type) => type.semanticKey === "desempenho")!;
+  assert.equal(visitType.name, "Treino", "o check-in tem o nome que o criador deu");
+  assert.equal(recordType.parentTypeId, visitType.id, "o registro de cada item mora dentro do check-in");
+  assert.equal(recordType.isPrimary, true, "os campos que o criador definiu são os do registro por item");
+  assert.deepEqual(recordType.fields.map((field) => field.key), ["carga", "reps"]);
+  const item = (title: string) => d.items.find((entry) => entry.title === title)!.id;
+
+  const listed = async () => ((await call("GET", `/api/challenges/${cid}/entries`, { session: owner })).body as { entries: Array<{
+    id: string; entryTypeId: string; parentEntryId: string | null; itemId: string | null; occurredOn: string | null; values: Record<string, unknown>;
+  }> }).entries;
+  const carga = recordType.fields.find((field) => field.key === "carga")!.id;
+
+  // um registro sozinho não tem onde morar — recusado; um check-in vazio também
+  const alone = await call("POST", `/api/challenges/${cid}/entries`, { session: owner, body: { entryTypeId: recordType.id, itemId: item("Puxada"), values: { carga: 45, reps: 10 } } });
+  assert.equal(alone.response.status, 400, JSON.stringify(alone.body));
+  const empty = await call("POST", `/api/challenges/${cid}/entries`, { session: owner, body: { entryTypeId: visitType.id, occurredOn: "2026-09-19", children: [] } });
+  assert.equal(empty.response.status, 400, JSON.stringify(empty.body));
+  const badItem = await call("POST", `/api/challenges/${cid}/entries`, { session: owner, body: { entryTypeId: visitType.id, occurredOn: "2026-09-19", children: [{ itemId: "nao-existe", values: { carga: 1, reps: 1 } }] } });
+  assert.equal(badItem.response.status, 400, JSON.stringify(badItem.body));
+  const missingField = await call("POST", `/api/challenges/${cid}/entries`, { session: owner, body: { entryTypeId: visitType.id, occurredOn: "2026-09-19", children: [{ itemId: item("Puxada"), values: { carga: 45 } }] } });
+  assert.equal(missingField.response.status, 400, "cada registro valida os campos do criador");
+  assert.equal((await listed()).length, 0, "nada disso deixou linha pela metade");
+
+  // treino 19/09: dois exercícios → um check-in e dois registros, numa transação só
+  const first = await call("POST", `/api/challenges/${cid}/entries`, {
+    session: owner,
+    body: {
+      entryTypeId: visitType.id, occurredOn: "2026-09-19",
+      children: [{ itemId: item("Supino reto"), values: { carga: 55, reps: 6 } }, { itemId: item("Agachamento"), values: { carga: 70, reps: 8 } }],
+    },
+  });
+  assert.equal(first.response.status, 201, JSON.stringify(first.body));
+  const firstId = (first.body as { id: string; children: Array<{ id: string }> }).id;
+  assert.equal((first.body as { children: unknown[] }).children.length, 2);
+  // treino 22/09: três exercícios, o supino de novo
+  const second = await call("POST", `/api/challenges/${cid}/entries`, {
+    session: owner,
+    body: {
+      entryTypeId: visitType.id, occurredOn: "2026-09-22", values: { nota_sessao: "Dia bom" },
+      children: [
+        { itemId: item("Supino reto"), values: { carga: 55, reps: 8 } },
+        { itemId: item("Agachamento"), values: { carga: 70, reps: 8 } },
+        { itemId: item("Puxada"), values: { carga: 45, reps: 10 } },
+      ],
+    },
+  });
+  assert.equal(second.response.status, 201, JSON.stringify(second.body));
+  const secondId = (second.body as { id: string }).id;
+
+  const after = await listed();
+  const visits = after.filter((entry) => entry.entryTypeId === visitType.id);
+  const records = after.filter((entry) => entry.entryTypeId === recordType.id);
+  assert.equal(visits.length, 2, "duas idas à academia");
+  assert.equal(records.length, 5, "cinco registros de exercício");
+  assert.ok(visits.every((visit) => visit.parentEntryId === null));
+  assert.deepEqual(records.filter((record) => record.parentEntryId === secondId).map((record) => record.occurredOn), ["2026-09-22", "2026-09-22", "2026-09-22"], "cada registro herda a data do treino");
+  // a progressão do supino, lida do histórico — sem nenhum "recorde atual" digitado
+  const bench = records.filter((record) => record.itemId === item("Supino reto")).sort((a, b) => (a.occurredOn ?? "").localeCompare(b.occurredOn ?? ""));
+  assert.deepEqual(bench.map((record) => [record.occurredOn, record.values[carga]]), [["2026-09-19", 55], ["2026-09-22", 55]]);
+
+  // as métricas de partida: frequência (visitas) e registros por item
+  const seeded = await detail();
+  assert.equal(seeded.metrics.find((metric) => metric.label === "Frequência")?.value, 2, "a frequência conta treinos, não exercícios");
+  const perItem = seeded.metrics.find((metric) => metric.label === "Registros por item")!.series!;
+  assert.deepEqual(perItem.map((entry) => [entry.label, entry.value]).sort(), [["Agachamento", 2], ["Puxada", 1], ["Supino reto", 2]]);
+  // e uma métrica de recorde do próprio usuário: a maior carga por exercício
+  const record = await call("POST", `/api/challenges/${cid}/metrics`, { session: owner, body: { label: "Maior carga", operation: "max", fieldId: carga, groupBy: "item" } });
+  assert.equal(record.response.status, 201, JSON.stringify(record.body));
+  const records2 = (await detail()).metrics.find((metric) => metric.label === "Maior carga")!.series!;
+  assert.deepEqual(records2.map((entry) => [entry.label, entry.value]).sort(), [["Agachamento", 70], ["Puxada", 45], ["Supino reto", 55]]);
+
+  // o progresso do card na Home conta treinos (o check-in), não registros de exercício
+  const boot = (await call("GET", "/api/bootstrap", { session: owner })).body as { challenges: Array<{ id: string; completedCount: number; totalCount: number | null }> };
+  assert.equal(boot.challenges.find((challenge) => challenge.id === cid)?.completedCount, 2);
+
+  // editar o treino: muda uma carga, tira a puxada, põe outro supino — e "salvar" deixa exatamente o que o formulário mostrava
+  const secondRecords = after.filter((entry) => entry.parentEntryId === secondId);
+  const benchRow = secondRecords.find((entry) => entry.itemId === item("Supino reto"))!;
+  const squatRow = secondRecords.find((entry) => entry.itemId === item("Agachamento"))!;
+  const edited = await call("PATCH", `/api/entries/${secondId}`, {
+    session: owner,
+    body: {
+      values: { nota_sessao: "Dia ótimo" },
+      children: [
+        { id: benchRow.id, itemId: item("Supino reto"), values: { carga: 57.5, reps: 8 } },
+        { id: squatRow.id, itemId: item("Agachamento"), values: { carga: 70, reps: 8 } },
+        { itemId: item("Supino reto"), values: { carga: 50, reps: 12 } },
+      ],
+    },
+  });
+  assert.equal(edited.response.status, 200, JSON.stringify(edited.body));
+  const reread = (await listed()).filter((entry) => entry.parentEntryId === secondId);
+  assert.equal(reread.length, 3);
+  assert.equal(reread.find((entry) => entry.id === benchRow.id)?.values[carga], 57.5, "o registro existente foi atualizado, com o mesmo id");
+  assert.ok(!reread.some((entry) => entry.itemId === item("Puxada")), "a puxada saiu do treino");
+  assert.equal((await adminPool.query("SELECT 1 FROM entries WHERE parent_entry_id = $1 AND item_id = $2", [secondId, item("Puxada")])).rowCount, 0, "e não ficou linha fantasma");
+  // mudar só a data leva os registros junto
+  await call("PATCH", `/api/entries/${firstId}`, { session: owner, body: { occurredOn: "2026-09-18" } });
+  assert.deepEqual((await listed()).filter((entry) => entry.parentEntryId === firstId).map((entry) => entry.occurredOn), ["2026-09-18", "2026-09-18"]);
+  // um registro solto não se edita nem se apaga por fora do treino
+  assert.equal((await call("PATCH", `/api/entries/${benchRow.id}`, { session: owner, body: { values: { carga: 1, reps: 1 } } })).response.status, 400);
+  assert.equal((await call("DELETE", `/api/entries/${benchRow.id}`, { session: owner })).response.status, 400);
+
+  // apagar o treino manda os registros junto para a lixeira; restaurar traz tudo de volta
+  assert.equal((await call("DELETE", `/api/entries/${secondId}`, { session: owner })).response.status, 200);
+  assert.equal((await listed()).filter((entry) => entry.id === secondId || entry.parentEntryId === secondId).length, 0);
+  assert.equal((await detail()).metrics.find((metric) => metric.label === "Frequência")?.value, 1, "a frequência cai");
+  const restored = await call("POST", `/api/challenges/${cid}/trash/restore`, { session: owner, body: { kind: "entry", id: secondId } });
+  assert.equal(restored.response.status, 200, JSON.stringify(restored.body));
+  assert.equal((await listed()).filter((entry) => entry.parentEntryId === secondId).length, 3, "os três registros voltam com o treino");
+
+  // a estrutura do treino não se desmonta por fora
+  const lock = await call("DELETE", `/api/challenges/${cid}/entry-types/${recordType.id}`, { session: owner });
+  assert.equal(lock.response.status, 409, JSON.stringify(lock.body));
+
+  // copiar o desafio leva a estrutura: o tipo de registro continua dentro do tipo de check-in
+  const otherGroup = ((await call("POST", "/api/groups", { session: owner, body: { name: "Outra academia" } })).body as { id: string }).id;
+  const copy = await call("POST", `/api/challenges/${cid}/duplicate`, { session: owner, body: { title: "Cópia do treino", targetGroupId: otherGroup } });
+  assert.equal(copy.response.status, 201, JSON.stringify(copy.body));
+  const copied = (await call("GET", `/api/challenges/${(copy.body as { challengeId: string }).challengeId}`, { session: owner })).body as Detail;
+  const copiedVisit = copied.entryTypes.find((type) => type.semanticKey === "sessao")!;
+  assert.equal(copied.entryTypes.find((type) => type.semanticKey === "desempenho")?.parentTypeId, copiedVisit.id);
+});
+
+test("check-in com vários itens só existe num desafio personalizado", async () => {
+  const owner = await register("Otto Sessão", "otto_sessao");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Grupo" } })).body as { id: string }).id;
+  const cinema = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner, body: { recipe: "cinema", recordingMode: "session", title: "Filmes", participantIds: [owner.user.id], items: [{ title: "Aftersun" }] },
+  });
+  assert.equal(cinema.response.status, 400, JSON.stringify(cinema.body));
+  const invalid = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner, body: { recipe: "habit", recordingMode: "varios", title: "Hábito", participantIds: [owner.user.id] },
+  });
+  assert.equal(invalid.response.status, 400, JSON.stringify(invalid.body));
+});

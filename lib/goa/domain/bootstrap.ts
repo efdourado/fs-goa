@@ -200,7 +200,10 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
                     CASE WHEN et.submission_mode = 'daily' AND c.start_date IS NOT NULL THEN 'checkpoint' ELSE 'free' END) AS schedule_policy
              FROM entry_types et
             WHERE et.challenge_id = c.id AND et.archived_at IS NULL
-            ORDER BY (et.purpose = 'completion') DESC, (et.purpose = 'expectation'),
+            ORDER BY (et.purpose = 'completion') DESC,
+                     -- A visit that holds records (a workout) is what counts as done, not a record inside it.
+                     EXISTS (SELECT 1 FROM entry_types child WHERE child.parent_type_id = et.id AND child.archived_at IS NULL) DESC,
+                     (et.purpose = 'expectation'),
                      et.is_primary DESC, et.created_at
             LIMIT 1
          ) ct ON true
