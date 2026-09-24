@@ -400,7 +400,7 @@ export function CreateChallengeScreen({
         <div className="mt-6"><StatusMessage error={error} /></div>
         <div className="mt-7 flex flex-col-reverse gap-2 border-t border-[var(--line)] pt-5 sm:flex-row sm:justify-between">
           <Button variant="secondary" onClick={() => step === 1 ? onBack() : setStep((current) => current - 1)}>{step === 1 ? tc("cancel") : t("backStep")}</Button>
-          {step < lastStep ? <Button onClick={nextStep}>{t("next")}</Button> : <Button disabled={busy} onClick={() => void submit()}>{busy ? t("creatingDraft") : t("createDraft")}</Button>}
+          {step < lastStep ? <Button className="min-h-11 px-6" onClick={nextStep}>{t("next")}</Button> : <Button className="min-h-11 px-6" disabled={busy} onClick={() => void submit()}>{busy ? t("creatingDraft") : t("createDraft")}</Button>}
         </div>
       </section>
       {newLibrary ? (

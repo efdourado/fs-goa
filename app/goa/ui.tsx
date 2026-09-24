@@ -72,15 +72,15 @@ export function Button({
   className?: string;
 }) {
   const tones = {
-    primary: "border-transparent bg-[var(--main)] text-white hover:opacity-90",
-    secondary: "border-[var(--line)] bg-transparent text-[var(--ink)] hover:bg-[var(--hover)]",
-    ghost: "border-transparent bg-transparent text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--ink)]",
-    danger: "border-[var(--danger-line)] bg-transparent text-[var(--danger)] hover:bg-[var(--danger-soft)]",
+    primary: "border-transparent bg-[var(--main)] font-medium text-white shadow-[var(--elevate-1)] hover:opacity-90",
+    secondary: "border-[var(--line)] bg-transparent font-light text-[var(--ink)] hover:bg-[var(--hover)]",
+    ghost: "border-transparent bg-transparent font-light text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--ink)]",
+    danger: "border-[var(--danger-line)] bg-transparent font-light text-[var(--danger)] hover:bg-[var(--danger-soft)]",
   };
   return (
     <button
       className={cx(
-        "cursor-pointer inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-light transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 disabled:cursor-not-allowed disabled:opacity-55",
+        "cursor-pointer inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 disabled:cursor-not-allowed disabled:opacity-55",
         tones[variant],
         className,
       )}
