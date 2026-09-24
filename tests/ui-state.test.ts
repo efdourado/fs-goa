@@ -717,13 +717,15 @@ test("Wrapped: quando há blocos, o Resultado os renderiza na ordem gravada e pu
   assert.ok(summaryIdx > -1 && metricIdx > summaryIdx, "o resumo (posição 0) vem antes da métrica (posição 2)");
 });
 
-test("boas-vindas de quem não tem nada: as quatro partes de uma rodada, as receitas e três formas de começar", () => {
+test("boas-vindas de quem não tem nada: um caminho em destaque, dois em link, e as quatro partes de uma rodada escondidas até pedir", () => {
   const html = renderWithIntl(createElement(WelcomePanel, { onCreateGroup: () => undefined, onQuickCreate: () => undefined, onOpenTemplates: () => undefined }));
+  assert.match(html, />Começar<\/button>/, "o caminho guiado é o botão");
+  assert.match(html, />Criar um grupo<\/button>/);
+  assert.match(html, />Copiar um que já existe<\/button>/);
+  assert.equal((html.match(/<button/g) ?? []).length, 3, "um botão de destaque e dois links — nada além");
+  assert.match(html, /<details(?![^>]*\sopen)/, "as quatro partes ficam recolhidas");
   for (const step of ["Escolha o que você acompanha", "Monte um desafio", "Traga sua turma", "Leia a vitrine"]) assert.match(html, new RegExp(step));
-  for (const recipe of ["Screens", "Pages", "Clube de leitura", "Hábito", "Personalizado"]) assert.match(html, new RegExp(recipe));
-  assert.match(html, />Criar grupo<\/button>/);
-  assert.match(html, />Começar<\/button>/);
-  assert.match(html, />Ver modelos<\/button>/);
+  assert.doesNotMatch(html, /Receitas para começar/, "sem os chips de receita que pareciam clicáveis");
 });
 
 test("Tables sem biblioteca: convida a criá-la e avisa que dá para criar outras, sem preset nem propriedades de partida", () => {

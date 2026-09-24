@@ -321,7 +321,7 @@
     }
   },
   "welcome": {
-    "lede": "Nada por aqui ainda. O Goa se monta em quatro passos — comece por aquele que você já tem em mente.",
+    "lede": "Nada por aqui ainda. Comece por um desafio — o resto vem depois.",
     "flowTitle": "Como uma rodada se monta",
     "steps": {
       "library": {
@@ -341,25 +341,20 @@
         "body": "O Goa faz as contas — médias, rankings, quem está em dia — e transforma a rodada numa história."
       }
     },
-    "recipesTitle": "Receitas para começar",
-    "startTitle": "Por onde você quer começar?",
     "starts": {
       "group": {
-        "title": "Criar um grupo",
-        "body": "Para um clube ou uma turma de amigos. Convide as pessoas quando o primeiro desafio estiver pronto.",
-        "cta": "Criar grupo"
+        "title": "Criar um grupo"
       },
       "quick": {
-      "title": "Comece um desafio",
-      "body": "Três perguntas rápidas, tudo por toque — sem como errar.",
-      "cta": "Começar"
-    },
+        "title": "Comece um desafio",
+        "body": "Três perguntas rápidas, tudo por toque — sem como errar.",
+        "cta": "Começar"
+      },
       "templates": {
-        "title": "Copiar um que já existe",
-        "body": "Desafios que outros grupos publicaram como modelo — copie um e deixe do seu jeito.",
-        "cta": "Ver modelos"
+        "title": "Copiar um que já existe"
       }
-    }
+    },
+    "otherWays": "Ou:"
   },
   "group": {
     "updated": "Grupo atualizado.",

@@ -321,7 +321,7 @@
     }
   },
   "welcome": {
-    "lede": "Nothing here yet. Goa is built in four moves — start with whichever one you already have in mind.",
+    "lede": "Nothing here yet. Start with one challenge — the rest can come later.",
     "flowTitle": "How a round comes together",
     "steps": {
       "library": {
@@ -341,25 +341,20 @@
         "body": "Goa does the maths — averages, rankings, who's on schedule — and turns the round into a story."
       }
     },
-    "recipesTitle": "Recipes to start from",
-    "startTitle": "Where do you want to start?",
     "starts": {
       "group": {
-        "title": "Create a group",
-        "body": "For a club or a circle of friends. Invite people once the first challenge is ready.",
-        "cta": "Create group"
+        "title": "Create a group"
       },
       "quick": {
-      "title": "Start a challenge",
-      "body": "Three quick questions, all of them taps — no way to get it wrong.",
-      "cta": "Get started"
-    },
+        "title": "Start a challenge",
+        "body": "Three quick questions, all of them taps — no way to get it wrong.",
+        "cta": "Get started"
+      },
       "templates": {
-        "title": "Copy one that's built",
-        "body": "Challenges other groups published as templates — copy one and make it yours.",
-        "cta": "Browse templates"
+        "title": "Copy one that's built"
       }
-    }
+    },
+    "otherWays": "Or:"
   },
   "group": {
     "updated": "Group updated.",

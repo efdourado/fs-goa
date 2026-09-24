@@ -321,7 +321,7 @@
     }
   },
   "welcome": {
-    "lede": "Aún no hay nada aquí. Goa se arma en cuatro pasos — empieza por el que ya tengas en mente.",
+    "lede": "Todavía no hay nada. Empieza por un desafío — lo demás viene después.",
     "flowTitle": "Cómo se arma una ronda",
     "steps": {
       "library": {
@@ -341,25 +341,20 @@
         "body": "Goa hace las cuentas — medias, rankings, quién va al día — y convierte la ronda en una historia."
       }
     },
-    "recipesTitle": "Recetas para empezar",
-    "startTitle": "¿Por dónde quieres empezar?",
     "starts": {
       "group": {
-        "title": "Crear un grupo",
-        "body": "Para un club o un grupo de amigos. Invita a la gente cuando el primer desafío esté listo.",
-        "cta": "Crear grupo"
+        "title": "Crear un grupo"
       },
       "quick": {
-      "title": "Empieza un desafío",
-      "body": "Tres preguntas rápidas, todo por toques — sin forma de equivocarte.",
-      "cta": "Empezar"
-    },
+        "title": "Empieza un desafío",
+        "body": "Tres preguntas rápidas, todo por toques — sin forma de equivocarte.",
+        "cta": "Empezar"
+      },
       "templates": {
-        "title": "Copiar uno ya hecho",
-        "body": "Desafíos que otros grupos publicaron como plantilla — copia uno y hazlo tuyo.",
-        "cta": "Ver plantillas"
+        "title": "Copiar uno ya hecho"
       }
-    }
+    },
+    "otherWays": "O:"
   },
   "group": {
     "updated": "Grupo actualizado.",
