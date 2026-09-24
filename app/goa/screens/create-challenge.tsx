@@ -308,7 +308,7 @@ export function CreateChallengeScreen({
           </div>
         ) : null}
 
-        {step === 2 ? <div><h2 className="text-xl font-light">{t("fieldsTitle")}</h2><p className="mb-5 mt-1 text-sm text-[var(--muted)]">{t("fieldsSubtitle")}</p>{recipe === "custom" ? <div className="mb-6 space-y-5">
+        {step === 2 ? <div><h2 className="mb-5 text-xl font-light">{t("fieldsTitle")}</h2>{recipe === "custom" ? <div className="mb-6 space-y-5">
               <Field label={t("recordingLabel")} hint={t("recordingHint")} plain>
                 <SelectableCards
                   value={recordingMode}

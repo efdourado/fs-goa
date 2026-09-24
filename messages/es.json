@@ -640,7 +640,6 @@
     "rulesLabel": "Reglas con título",
     "rulesHint": "Destaca cada acuerdo importante del desafío.",
     "fieldsTitle": "¿Qué registra cada persona?",
-    "fieldsSubtitle": "El identificador de cada campo se mantiene estable aunque cambie la etiqueta.",
     "checkpointsTitle": "Arma la lista",
     "cineItemsHint": "Pega un título por línea (películas o series). Cada ítem se convierte en una oportunidad de registro para cada participante.",
     "bookItemsHint": "Pega un libro por línea. Cada libro entra en el acervo y recibe progreso por día, un \"Terminé\" y nota.",

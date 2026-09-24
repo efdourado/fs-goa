@@ -640,7 +640,6 @@
     "rulesLabel": "Titled rules",
     "rulesHint": "Give every important agreement its own spotlight.",
     "fieldsTitle": "What does each person log?",
-    "fieldsSubtitle": "Each field's identifier stays stable even if the label changes.",
     "checkpointsTitle": "Build the list",
     "cineItemsHint": "Paste one title per line (films or series). Each item becomes a logging opportunity for every participant.",
     "bookItemsHint": "Paste one book per line. Each book joins the catalogue and gets per-day progress, a \"Finished\", and a rating.",
