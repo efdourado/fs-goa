@@ -864,3 +864,23 @@ test("dashboard: shelves split by pin, workspace and status; colour filter narro
   assert.deepEqual(applyColorFilter(shelves.running, "green").map((x) => x.id), ["run"]);
   assert.deepEqual(applyColorFilter(shelves.running, null).map((x) => x.id), ["run", "run2"]);
 });
+
+test("my space: the same pin and order as Home, split into pinned, in progress, and closed or draft — only its own challenges", async () => {
+  const { splitSpace } = await import("../app/goa/screens/personal-space");
+  const c = (over: Partial<import("../app/goa/types").ChallengeSummary>): import("../app/goa/types").ChallengeSummary => ({
+    id: over.id ?? "x", groupId: over.groupId ?? "ws", scope: "personal", title: over.title ?? "T", status: over.status ?? "active", ...over,
+  });
+  const challenges = [
+    c({ id: "b", status: "active" }),
+    c({ id: "pin", status: "closed", pinned: true }),
+    c({ id: "a", status: "active" }),
+    c({ id: "draft", status: "draft" }),
+    c({ id: "group-one", groupId: "g", scope: undefined, status: "active" }),
+    c({ id: "old", status: "closed" }),
+  ];
+  const space = splitSpace(challenges, "ws");
+  assert.deepEqual(space.pinned.map((x) => x.id), ["pin"], "a pinned one comes first, whatever its status");
+  assert.deepEqual(space.active.map((x) => x.id), ["b", "a"], "the given (viewer's) order is kept");
+  assert.deepEqual(space.archive.map((x) => x.id), ["draft", "old"]);
+  assert.ok(![...space.pinned, ...space.active, ...space.archive].some((x) => x.id === "group-one"), "a group's challenge is not part of My space");
+});

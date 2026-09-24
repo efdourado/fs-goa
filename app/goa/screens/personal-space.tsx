@@ -3,15 +3,40 @@
 import { useTranslations } from "next-intl";
 
 import { CatalogShelf } from "../catalog-shelf";
+import { applyColorFilter, OrganizeBar, useChallengeOrganizer } from "../organize";
 import { ActiveChallengeCard } from "./dashboard";
 import { ShelfAddButton } from "../shelf";
 import type { ChallengeSummary, Id } from "../types";
-import { BackButton, Button, EmptyState, PageHeading } from "../ui";
-import { canManage } from "../utils";
+import { BackButton, Button, EmptyState, PageHeading, StatusMessage } from "../ui";
+import { canManage, isPersonalChallenge } from "../utils";
 
-/** The hidden solo workspace, treated as a group of one: its own page, its challenges and a preview of its catalogue. */
+type SpaceSection = "pinned" | "active" | "archive";
+const SPACE_SECTIONS: SpaceSection[] = ["pinned", "active", "archive"];
+
+/**
+ * My space's sections, like Home's shelves: what the viewer pinned first, then what is running, then everything
+ * closed or still a draft. Only the space's own challenges, in the order they are given.
+ */
+export function splitSpace(challenges: ChallengeSummary[], personalWorkspaceId: Id | null): Record<SpaceSection, ChallengeSummary[]> {
+  const out: Record<SpaceSection, ChallengeSummary[]> = { pinned: [], active: [], archive: [] };
+  for (const challenge of challenges) {
+    if (!isPersonalChallenge(challenge, personalWorkspaceId)) continue;
+    if (challenge.pinned) out.pinned.push(challenge);
+    else if (challenge.status === "active") out.active.push(challenge);
+    else out.archive.push(challenge);
+  }
+  return out;
+}
+
+/**
+ * The hidden solo workspace, treated as a group of one: its own page, its challenges and a preview of its catalogue.
+ * The challenges are organised the way Home organises them — pin, colour, order — and it is the same setting:
+ * a challenge pinned here is pinned there.
+ */
 export function PersonalSpaceScreen({
   challenges,
+  personalWorkspaceId,
+  csrfToken,
   onBack,
   backLabel,
   onOpenChallenge,
@@ -20,8 +45,12 @@ export function PersonalSpaceScreen({
   onQuickCreate,
   onOpenCatalog,
   onOpenCatalogItem,
+  onChanged,
 }: {
+  /** All of the viewer's challenges — the order is one list across Home and here, so it is sent whole. */
   challenges: ChallengeSummary[];
+  personalWorkspaceId: Id | null;
+  csrfToken: string;
   onBack: () => void;
   /** What the button says — the parent screen's name; falls back to plain "Back". */
   backLabel?: string;
@@ -32,14 +61,28 @@ export function PersonalSpaceScreen({
   onQuickCreate: () => void;
   onOpenCatalog: () => void;
   onOpenCatalogItem: (itemId: Id) => void;
+  onChanged?: () => void;
 }) {
   const t = useTranslations("personalSpace");
+  const tDash = useTranslations("dashboard");
   const tQuick = useTranslations("quickCreate");
   const tc = useTranslations("common");
-  // Colours are a Home feature; one set earlier doesn't tint these cards.
-  const plain = (challenge: ChallengeSummary): ChallengeSummary => ({ ...challenge, colorTag: null });
-  const active = challenges.filter((challenge) => challenge.status === "active");
-  const other = challenges.filter((challenge) => challenge.status !== "active");
+  const { shelves, colorFilter, setColorFilter, reorderMode, setReorderMode, error, cardProps } = useChallengeOrganizer({
+    challenges,
+    csrfToken,
+    onChanged,
+    keys: SPACE_SECTIONS,
+    split: (ordered) => splitSpace(ordered, personalWorkspaceId),
+  });
+  const filtered = {
+    pinned: applyColorFilter(shelves.pinned, colorFilter),
+    active: applyColorFilter(shelves.active, colorFilter),
+    archive: applyColorFilter(shelves.archive, colorFilter),
+  };
+  const shown = SPACE_SECTIONS.filter((key) => filtered[key].length);
+  const filteredCount = filtered.pinned.length + filtered.active.length + filtered.archive.length;
+  const hasAny = shelves.pinned.length + shelves.active.length + shelves.archive.length > 0;
+  const sectionTitle: Record<SpaceSection, string> = { pinned: tDash("shelf.pinned"), active: t("sectionActive"), archive: t("sectionArchive") };
 
   // One "new challenge" pill, in the header of the first section shown.
   const newChallenge = (
@@ -60,44 +103,39 @@ export function PersonalSpaceScreen({
 
       <PageHeading title={t("title")} description={t("subtitle")} />
 
-      <div className="mt-8 space-y-10">
-        {challenges.length ? (
-          <>
-            {active.length ? (
-              <section>
+      <div className="mt-8">
+        {hasAny ? (
+          <OrganizeBar colorFilter={colorFilter} onColorFilter={setColorFilter} reorderMode={reorderMode} onReorderMode={setReorderMode} filteredCount={filteredCount} />
+        ) : null}
+        <StatusMessage error={error} />
+        <div className="space-y-10">
+          {hasAny ? (
+            shown.length ? shown.map((key, index) => (
+              <section key={key}>
                 <div className="mb-4 flex items-center justify-between gap-3">
-                  <h2 className="text-lg font-semibold tracking-[-0.02em]">{t("sectionActive")}</h2>
-                  {newChallenge}
+                  <h2 className="text-lg font-semibold tracking-[-0.02em]">{sectionTitle[key]}</h2>
+                  {index === 0 ? newChallenge : null}
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                  {active.map((challenge) => <ActiveChallengeCard key={challenge.id} challenge={plain(challenge)} onOpen={onOpenChallenge} fluid />)}
+                  {filtered[key].map((challenge) => (
+                    <ActiveChallengeCard key={challenge.id} challenge={challenge} onOpen={() => open(challenge)} fluid {...cardProps(key, challenge, onOpenAdmin)} />
+                  ))}
                 </div>
               </section>
-            ) : null}
-            {other.length ? (
-              <section>
-                <div className="mb-4 flex items-center justify-between gap-3">
-                  <h2 className="text-lg font-semibold tracking-[-0.02em]">{t("sectionArchive")}</h2>
-                  {active.length ? null : newChallenge}
+            )) : <EmptyState title={tDash("filter.empty")} action={newChallenge} />
+          ) : (
+            <EmptyState
+              title={t("emptyTitle")}
+              action={(
+                <div className="flex flex-wrap justify-center gap-2">
+                  <Button onClick={onQuickCreate}>{tQuick("entryCta")}</Button>
+                  <Button variant="secondary" onClick={onCreateChallenge}>{t("createShort")}</Button>
                 </div>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                  {other.map((challenge) => <ActiveChallengeCard key={challenge.id} challenge={plain(challenge)} onOpen={() => open(challenge)} fluid />)}
-                </div>
-              </section>
-            ) : null}
-          </>
-        ) : (
-          <EmptyState
-            title={t("emptyTitle")}
-            action={(
-              <div className="flex flex-wrap justify-center gap-2">
-                <Button onClick={onQuickCreate}>{tQuick("entryCta")}</Button>
-                <Button variant="secondary" onClick={onCreateChallenge}>{t("createShort")}</Button>
-              </div>
-            )}
-          />
-        )}
-        <CatalogShelf scope="personal" canManage onOpenCatalog={onOpenCatalog} onOpenItem={onOpenCatalogItem} />
+              )}
+            />
+          )}
+          <CatalogShelf scope="personal" canManage onOpenCatalog={onOpenCatalog} onOpenItem={onOpenCatalogItem} />
+        </div>
       </div>
     </main>
   );

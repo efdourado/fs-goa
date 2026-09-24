@@ -1,12 +1,12 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { type DragEvent, type FormEvent, type ReactNode, useRef, useState } from "react";
+import { type DragEvent, type FormEvent, type ReactNode, useState } from "react";
 
-import { API_PATHS, apiRequest } from "../api";
 import { KebabMenu, menuRowClass } from "../card-menu";
 import { Dialog } from "../dialog";
 import { useGoaFormat } from "../format";
+import { applyColorFilter, OrganizeBar, useChallengeOrganizer } from "../organize";
 import { Shelf, ShelfAddButton } from "../shelf";
 import { WelcomePanel } from "../welcome";
 import {
@@ -60,12 +60,7 @@ export function splitShelves(
   return out;
 }
 
-export function applyColorFilter(
-  challenges: ChallengeSummary[],
-  tag: ChallengeColorTag | null,
-): ChallengeSummary[] {
-  return tag ? challenges.filter((challenge) => challenge.colorTag === tag) : challenges;
-}
+export { applyColorFilter };
 
 // ── group-create dialog ─────────────────────────────────────────────────
 
@@ -372,100 +367,13 @@ export function DashboardScreen({
   const tQuick = useTranslations("quickCreate");
 
   const [showGroupDialog, setShowGroupDialog] = useState(false);
-  const [colorFilter, setColorFilter] = useState<ChallengeColorTag | null>(null);
-  const [reorderMode, setReorderMode] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Local overlay for optimistic pin/colour/order edits; resynced whenever the
-  // bootstrap challenge list changes underneath us.
-  const propKey = challenges.map((c) => `${c.id}:${c.pinned ? 1 : 0}:${c.colorTag ?? ""}:${c.sortIndex ?? ""}`).join("|");
-  const [items, setItems] = useState(challenges);
-  const [order, setOrder] = useState<Id[]>(() => challenges.map((c) => c.id));
-  const [prevKey, setPrevKey] = useState(propKey);
-  if (propKey !== prevKey) {
-    setPrevKey(propKey);
-    setItems(challenges);
-    setOrder(challenges.map((c) => c.id));
-  }
-  const dragId = useRef<Id | null>(null);
-
-  const byId = new Map(items.map((c) => [c.id, c]));
-  const ordered = order.map((id) => byId.get(id)).filter((c): c is ChallengeSummary => Boolean(c));
-  const shelves = splitShelves(ordered, personalWorkspaceId);
-  const shelfOf = (id: Id): ShelfKey | null =>
-    CHALLENGE_SHELF_ORDER.find((key) => shelves[key].some((c) => c.id === id)) ?? null;
-
-  async function patchPref(id: Id, patch: { pinned?: boolean; colorTag?: ChallengeColorTag | null }) {
-    const snapshot = items;
-    setItems((cur) => cur.map((c) => (c.id === id ? { ...c, ...patch } : c)));
-    setError(null);
-    try {
-      await apiRequest(API_PATHS.challengePrefs(id), { method: "PATCH", csrfToken, body: patch });
-      onChanged?.();
-    } catch (cause) {
-      setItems(snapshot);
-      setError((cause as Error).message || t("prefError"));
-    }
-  }
-
-  async function persistOrder(nextOrder: Id[]) {
-    setError(null);
-    try {
-      await apiRequest(API_PATHS.challengeOrder, { method: "PATCH", csrfToken, body: { ids: nextOrder } });
-      onChanged?.();
-    } catch (cause) {
-      setError((cause as Error).message || t("prefError"));
-    }
-  }
-
-  /** Slot one shelf's ids back into the global order, keeping every other id put. */
-  function withShelfReordered(shelfKey: ShelfKey, nextShelfIds: Id[]): Id[] {
-    const shelfSet = new Set(shelves[shelfKey].map((c) => c.id));
-    let cursor = 0;
-    return order.map((id) => (shelfSet.has(id) ? nextShelfIds[cursor++] ?? id : id));
-  }
-
-  function move(id: Id, dir: -1 | 1) {
-    const shelfKey = shelfOf(id);
-    if (!shelfKey) return;
-    const ids = shelves[shelfKey].map((c) => c.id);
-    const from = ids.indexOf(id);
-    const to = from + dir;
-    if (to < 0 || to >= ids.length) return;
-    [ids[from], ids[to]] = [ids[to], ids[from]];
-    const next = withShelfReordered(shelfKey, ids);
-    setOrder(next);
-    void persistOrder(next);
-  }
-
-  function dragOver(shelfKey: ShelfKey, overId: Id) {
-    const source = dragId.current;
-    if (!source || source === overId) return;
-    const ids = shelves[shelfKey].map((c) => c.id);
-    const from = ids.indexOf(source);
-    const to = ids.indexOf(overId);
-    if (from < 0 || to < 0) return;
-    ids.splice(to, 0, ids.splice(from, 1)[0]);
-    setOrder(withShelfReordered(shelfKey, ids));
-  }
-
-  function cardProps(shelfKey: ShelfKey, challenge: ChallengeSummary) {
-    return {
-      onTogglePin: (id: Id) => patchPref(id, { pinned: !byId.get(id)?.pinned }),
-      onSetColor: (id: Id, tag: ChallengeColorTag | null) => patchPref(id, { colorTag: tag }),
-      onMove: move,
-      onManage: onOpenAdmin,
-      reorderMode,
-      dragHandlers: reorderMode
-        ? {
-            onDragStart: () => { dragId.current = challenge.id; },
-            onDragOver: (event: DragEvent) => { event.preventDefault(); dragOver(shelfKey, challenge.id); },
-            onDrop: () => { void persistOrder(order); },
-            onDragEnd: () => { dragId.current = null; void persistOrder(order); },
-          }
-        : undefined,
-    };
-  }
+  const { shelves, colorFilter, setColorFilter, reorderMode, setReorderMode, error, cardProps } = useChallengeOrganizer({
+    challenges,
+    csrfToken,
+    onChanged,
+    keys: CHALLENGE_SHELF_ORDER,
+    split: (ordered) => splitShelves(ordered, personalWorkspaceId),
+  });
 
   const standardGroups = groups.filter((group) => group.kind !== "personal");
   const ownedGroups = standardGroups.filter((group) => group.role === "owner").length;
@@ -488,22 +396,14 @@ export function DashboardScreen({
   const brandNew = challenges.length === 0 && !standardGroups.length;
 
   function renderRail(shelfKey: ShelfKey, list: ChallengeSummary[]): ReactNode {
-    // "Move up/down" only makes sense against the real shelf order — the same
-    // list `move()` reorders — so the ends are read from there, not the filtered view.
-    const fullIds = shelves[shelfKey].map((challenge) => challenge.id);
-    return list.map((challenge) => {
-      const at = fullIds.indexOf(challenge.id);
-      return (
-        <ActiveChallengeCard
-          key={challenge.id}
-          challenge={challenge}
-          onOpen={onOpenChallenge}
-          canMoveUp={at > 0}
-          canMoveDown={at > -1 && at < fullIds.length - 1}
-          {...cardProps(shelfKey, challenge)}
-        />
-      );
-    });
+    return list.map((challenge) => (
+      <ActiveChallengeCard
+        key={challenge.id}
+        challenge={challenge}
+        onOpen={onOpenChallenge}
+        {...cardProps(shelfKey, challenge, onOpenAdmin)}
+      />
+    ));
   }
 
   return (
@@ -513,58 +413,7 @@ export function DashboardScreen({
       {showGroupDialog ? <GroupCreateDialog onClose={() => setShowGroupDialog(false)} onCreate={onCreateGroup} /> : null}
 
       {hasAnyChallenge ? (
-        <div className="mb-6 flex flex-wrap items-center gap-2 border-b border-[var(--line)] pb-4">
-          <button
-            type="button"
-            onClick={() => setColorFilter(null)}
-            aria-pressed={colorFilter === null}
-            className={cx(
-              "inline-flex min-h-9 items-center rounded-full border px-3.5 text-[13px] transition",
-              colorFilter === null
-                ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]"
-                : "border-[var(--line)] text-[var(--muted)] hover:border-[var(--main-line)]",
-            )}
-          >
-            {t("filter.all")}
-          </button>
-          {CHALLENGE_COLOR_TAGS.map((tag) => (
-            <button
-              key={tag}
-              type="button"
-              onClick={() => setColorFilter((cur) => (cur === tag ? null : tag))}
-              aria-label={t(`color.${tag}`)}
-              aria-pressed={colorFilter === tag}
-              className={cx(
-                "grid h-9 w-9 place-items-center rounded-full border transition",
-                colorFilter === tag ? "border-[var(--main)] bg-[var(--main-soft)]" : "border-[var(--line)] hover:border-[var(--main-line)]",
-              )}
-            >
-              <span className="h-3.5 w-3.5 rounded-full ring-1 ring-inset ring-[var(--edge)]" style={{ backgroundColor: `var(--tag-${tag})` }} />
-            </button>
-          ))}
-          <span className="flex-1" />
-          {colorFilter ? (
-            <button type="button" onClick={() => setColorFilter(null)} className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-[13px] text-[var(--muted)] transition hover:text-[var(--ink)]">
-              <CircleMinusIcon className="h-4 w-4" />
-              {t("filter.context", { count: filteredCount })}
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setReorderMode((v) => !v)}
-              aria-pressed={reorderMode}
-              className={cx(
-                "inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3.5 text-[13px] transition",
-                reorderMode
-                  ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]"
-                  : "border-dashed border-[var(--line)] text-[var(--muted)] hover:border-[var(--main-line)]",
-              )}
-            >
-              <DragDotsIcon className="h-3.5 w-3.5" />
-              {reorderMode ? t("filter.reorderDone") : t("filter.reorder")}
-            </button>
-          )}
-        </div>
+        <OrganizeBar colorFilter={colorFilter} onColorFilter={setColorFilter} reorderMode={reorderMode} onReorderMode={setReorderMode} filteredCount={filteredCount} />
       ) : null}
 
       <StatusMessage error={error} />
