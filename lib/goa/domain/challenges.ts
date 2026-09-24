@@ -221,7 +221,7 @@ export async function createChallenge(
       const named = namedLibraries(body);
       if (recipe.catalogKind) await link(recipe.catalogKind);
       const namedKinds: string[] = [];
-      for (const spec of named) namedKinds.push(await resolveItemKind(client, groupId, spec));
+      for (const spec of named) namedKinds.push(await resolveItemKind(client, groupId, { libraryId: spec.libraryId, kind: spec.libraryKind }));
       if (recipe.defaultLibrarySource) {
         // The preset's own library — unless the caller already picked one of that kind themselves.
         const picked = namedKinds.length

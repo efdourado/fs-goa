@@ -8217,3 +8217,24 @@ test("check-in com vários itens só existe num desafio personalizado", async ()
   });
   assert.equal(invalid.response.status, 400, JSON.stringify(invalid.body));
 });
+
+test("um desafio personalizado aceita uma biblioteca embutida que ainda não tem itens, escolhida só pelo tipo, e guarda o modo de check-in", async () => {
+  const owner = await register("Ana Embutida", "ana_embutida");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Biblioteca nova" } })).body as { id: string }).id;
+  const created = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "custom", title: "Treino", participantIds: [owner.user.id],
+      recordingMode: "session", sessionName: "Treino", sessionNoteLabel: "Como foi?",
+      libraries: [{ libraryKind: "film" }],
+      fields: [{ key: "carga", label: "Carga", type: "number", required: true }],
+      items: [{ title: "Supino", libraryKind: "film" }],
+    },
+  });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const id = (created.body as { id: string }).id;
+  const types = await adminPool.query<{ purpose: string; parent_type_id: string | null }>(
+    "SELECT purpose, parent_type_id FROM entry_types WHERE challenge_id = $1 AND archived_at IS NULL", [id],
+  );
+  assert.ok(types.rows.some((row) => row.parent_type_id !== null), "o desafio nasceu em modo check-in, com um tipo filho por item");
+});
