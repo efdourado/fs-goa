@@ -12,7 +12,7 @@ import { RecipeIcon } from "../recipe-icons";
 import { RecipePreview } from "../recipe-previews";
 import { RuleSectionsEditor } from "../rules";
 import type { ChallengeCreationInput, ChallengeField, ChallengeRule, CreatableRecipeKey, GroupSummary, Id, SharedEditPolicy } from "../types";
-import { BackButton, backLinkClass, Button, cardClass, cx, EmptyState, Field, inputClass, labelClass, PageHeading, SchedulePeriodFields, SelectableCards, StatusMessage, Toggle } from "../ui";
+import { BackButton, backLinkClass, Button, cardClass, cx, Disclosure, EmptyState, Field, inputClass, labelClass, PageHeading, SchedulePeriodFields, SelectableCards, StatusMessage, Toggle } from "../ui";
 
 /** Where a recipe's items come from: a fixed built-in library, the workspace's Tables library, one the creator picks, or none at all. */
 type EditorLibrary = { id: Id | null; kind: string; source: "screens" | "pages" | "tables" | "custom"; label: string | null };
@@ -327,27 +327,32 @@ export function CreateChallengeScreen({
                   <input className={inputClass} value={sessionName} onChange={(event) => setSessionName(event.target.value)} maxLength={60} placeholder={t("sessionNamePlaceholder")} />
                 </Field>
               ) : null}
-              {recordingMode === "single" ? <Field label={t("scopeLabel")} hint={t("scopeHint")} plain>
-                <SelectableCards
-                  value={answerScope}
-                  onChange={chooseScope}
-                  options={[
-                    { value: "individual", label: t("scopeIndividual"), hint: t("scopeIndividualHint") },
-                    { value: "shared", label: t("scopeShared"), hint: t("scopeSharedHint") },
-                  ]}
-                />
-              </Field> : null}
-              {recordingMode === "single" && answerScope === "shared" ? (
-                <Field label={tSr("policyLabel")} hint={tSr(`policyHint.${sharedEditPolicy}`)} plain>
-                  <SelectableCards
-                    value={sharedEditPolicy}
-                    onChange={setSharedEditPolicy}
-                    options={[
-                      { value: "members_fill_admin_corrects", label: tSr("policy.members_fill_admin_corrects") },
-                      { value: "members_can_edit", label: tSr("policy.members_can_edit") },
-                    ]}
-                  />
-                </Field>
+              {recordingMode === "single" ? (
+                <Disclosure summary={t("scopeLabel")} preview={answerScope === "shared" ? t("scopeShared") : t("scopeIndividual")} defaultOpen={answerScope === "shared"}>
+                  <div className="space-y-5 pt-2">
+                    <p className="text-xs leading-5 text-[var(--muted)]">{t("scopeHint")}</p>
+                    <SelectableCards
+                      value={answerScope}
+                      onChange={chooseScope}
+                      options={[
+                        { value: "individual", label: t("scopeIndividual"), hint: t("scopeIndividualHint") },
+                        { value: "shared", label: t("scopeShared"), hint: t("scopeSharedHint") },
+                      ]}
+                    />
+                    {answerScope === "shared" ? (
+                      <Field label={tSr("policyLabel")} hint={tSr(`policyHint.${sharedEditPolicy}`)} plain>
+                        <SelectableCards
+                          value={sharedEditPolicy}
+                          onChange={setSharedEditPolicy}
+                          options={[
+                            { value: "members_fill_admin_corrects", label: tSr("policy.members_fill_admin_corrects") },
+                            { value: "members_can_edit", label: tSr("policy.members_can_edit") },
+                          ]}
+                        />
+                      </Field>
+                    ) : null}
+                  </div>
+                </Disclosure>
               ) : null}
             </div> : null}<FieldBuilder fields={fields} onChange={(next) => { setFields(next); setFieldsTouched(true); }} />{recipe === "custom" && recordingMode === "single" ? <Toggle className="mt-5 bg-[var(--paper)]" checked={collectsEntryDate} onChange={setCollectsEntryDate} label={t("entryDateLabel")} hint={t("entryDateHint")} /> : null}{canOfferExpectation ? <label className="mt-5 flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4 text-sm"><input type="checkbox" className="mt-0.5" aria-label={t("expectationLabel")} checked={expectation} onChange={(event) => setExpectation(event.target.checked)} /><span><strong className="block">{t("expectationLabel")}</strong><span className="mt-0.5 block text-xs text-[var(--muted)]">{t("expectationHint")}</span></span></label> : null}</div> : null}
 
