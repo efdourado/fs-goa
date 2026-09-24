@@ -49,6 +49,7 @@ import type {
   Screen,
 } from "./goa/types";
 import { CACHE_KEYS, clearCache, readCache, writeCache } from "./goa/cache";
+import { challengeRequestBody } from "./goa/challenge-request";
 import { AppHeader, BackButton, Brand, Button, cardClass, cx, EmptyState, LoadingView, PageHeading } from "./goa/ui";
 import { canManage, isPersonalChallenge } from "./goa/utils";
 
@@ -461,24 +462,7 @@ export default function GoaApp() {
 
   async function createChallenge(target: { groupId: Id } | { personal: true }, input: ChallengeCreationInput) {
     if (!bootstrap) return;
-    const body = {
-      recipe: input.recipe,
-      ...(input.libraries?.length ? { libraries: input.libraries } : {}),
-      title: input.title,
-      description: input.description,
-      ruleSections: input.ruleSections,
-      startsOn: input.startsOn,
-      endsOn: input.endsOn,
-      fields: input.fields,
-      items: input.items,
-      generateDaily: input.generateDaily,
-      expectation: input.expectation === true,
-      ...(input.collectsEntryDate !== undefined ? { collectsEntryDate: input.collectsEntryDate } : {}),
-      ...(input.answerScope ? { answerScope: input.answerScope } : {}),
-      ...(input.sharedEditPolicy ? { sharedEditPolicy: input.sharedEditPolicy } : {}),
-      ...(input.itemDates ? { itemDates: true } : {}),
-      participantIds: input.participantIds,
-    };
+    const body = challengeRequestBody(input);
     const created = await apiRequest<unknown>(
       "personal" in target ? API_PATHS.personalChallenges : API_PATHS.groupChallenges(target.groupId),
       { method: "POST", csrfToken: bootstrap.csrfToken, body },
