@@ -702,6 +702,13 @@
     },
     "errPeriod": "Completa el inicio y el fin, o elige un desafío sin plazo.",
     "errEndBeforeStart": "La fecha final debe ser igual o posterior al inicio.",
+    "setup": {
+      "todo": "{count, plural, one {Falta # cosa para poder empezar} other {Faltan # cosas para poder empezar}}",
+      "ready": "Todo lo necesario está en su sitio. Empieza el desafío desde el menú de arriba.",
+      "go": "Ir a {tab}",
+      "stepDone": "en orden",
+      "stepTodo": "necesita atención"
+    },
     "saveChanges": "Guardar cambios",
     "changesSaved": "Cambios guardados.",
     "unsavedChanges": "Cambios sin guardar",

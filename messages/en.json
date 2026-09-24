@@ -702,6 +702,13 @@
     },
     "errPeriod": "Fill in the start and end, or choose a challenge with no deadline.",
     "errEndBeforeStart": "The end date must be the same as or after the start.",
+    "setup": {
+      "todo": "{count, plural, one {# thing left before you can start} other {# things left before you can start}}",
+      "ready": "Everything it needs is in place. Start the challenge from the menu at the top.",
+      "go": "Go to {tab}",
+      "stepDone": "in order",
+      "stepTodo": "needs attention"
+    },
     "saveChanges": "Save changes",
     "changesSaved": "Changes saved.",
     "unsavedChanges": "Unsaved changes",

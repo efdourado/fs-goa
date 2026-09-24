@@ -53,6 +53,7 @@ import {
 } from "../ui";
 import { formatRuntime, isLivingList, itemIdForEntry, valuesAsRecord } from "../utils";
 import { AdminMetrics } from "./metrics";
+import { SETUP_STEPS, SetupSummary, setupState, StepMarker, useChallengePreflight } from "../setup-progress";
 
 /** A curation list that shows its first `preview` rows, the rest behind a toggle. */
 function ShowMoreList<T>({
@@ -272,7 +273,7 @@ function AdminGeneral({
           </section>
         ) : null}
 
-        <div className="sticky bottom-0 z-10 -mx-4 mt-8 border-t border-[var(--line)] bg-[color-mix(in_srgb,var(--canvas)_92%,transparent)] px-4 py-3 backdrop-blur-md sm:mx-0 sm:rounded-2xl sm:border">
+        <div className={cx("z-10 mt-8 border-[var(--line)] px-4 py-3", dirty && "sticky bottom-0 -mx-4 border-t bg-[color-mix(in_srgb,var(--canvas)_92%,transparent)] backdrop-blur-md sm:mx-0 sm:rounded-2xl sm:border")}>
           <StatusMessage error={error} success={success} />
           {locked ? null : (
             <div className="flex items-center justify-between gap-3">
@@ -1223,6 +1224,10 @@ export function AdminScreen({
   ];
   const requestedTab = tab === "participants" ? "overview" : tab;
   const activeTab = tabs.includes(requestedTab) ? requestedTab : "overview";
+  // While it is a draft, the tabs that must be in order before it can start show their progress.
+  const setupOrder = SETUP_STEPS.filter((step) => tabs.includes(step));
+  const preflight = useChallengePreflight(challenge.id, challenge.status === "draft", challenge);
+  const setup = preflight ? setupState(preflight, setupOrder) : null;
 
   return (
     <main className="pb-24">
@@ -1243,10 +1248,11 @@ export function AdminScreen({
                 aria-current={activeTab === id ? "page" : undefined}
                 onClick={() => onTab(id)}
                 className={cx(
-                  "min-h-11 flex-none cursor-pointer whitespace-nowrap border-b-2 px-3.5 text-[13.5px] font-medium transition",
+                  "inline-flex min-h-11 flex-none cursor-pointer items-center gap-1.5 whitespace-nowrap border-b-2 px-3.5 text-[13.5px] font-medium transition",
                   activeTab === id ? "border-[var(--main-strong)] text-[var(--main-strong)]" : "border-transparent text-[var(--muted)] hover:text-[var(--ink)]",
                 )}
               >
+                {setup && setupOrder.includes(id) ? <StepMarker number={setupOrder.indexOf(id) + 1} todo={(setup.errors[id] ?? 0) > 0} /> : null}
                 {t(`tabs.${id}`)}
               </button>
             ))}
@@ -1255,6 +1261,7 @@ export function AdminScreen({
       </div>
 
       <div className="mx-auto max-w-5xl px-4 pt-8 sm:px-6 sm:pt-10">
+        {setup ? <div className="mx-auto max-w-2xl"><SetupSummary state={setup} activeTab={activeTab} onGo={onTab} /></div> : null}
         {activeTab === "overview" ? <AdminGeneral challenge={challenge} group={group} isPersonal={isPersonal} onSaveBasics={onSaveBasics} onSaveParticipants={onSaveParticipants} /> : null}
         {activeTab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.visibilityPolicy}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} onSaveVisibility={onSaveEntryTypeVisibility} onSetExpectation={onSetExpectation} onSaveEntryDate={onSaveEntryDate} onAddShared={onAddSharedResponse} onRemoveType={onRemoveEntryType} onSavePolicy={onSaveSharedPolicy} /> : null}
         {activeTab === "items" ? <AdminItems challenge={challenge} group={group} entries={entries} onAdd={onAddItems} onUpdate={onUpdateItem} onArchive={onArchiveItem} onPreviewImport={onPreviewImport} onLinkLibrary={onLinkLibrary} onUnlinkLibrary={onUnlinkLibrary} onLibraryChanged={onArchiveChanged} /> : null}
