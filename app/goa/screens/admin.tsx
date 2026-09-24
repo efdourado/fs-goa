@@ -91,77 +91,111 @@ interface DuplicateTargetGroup {
   challengeLimit: number;
 }
 
-/** Basic details form. Lifecycle + publication live in the "Challenge state" dialog. */
-function AdminOverview({
+/**
+ * The General tab: the basic details and, in a group, who takes part — saved together. One button writes
+ * whichever part changed, so there is never a question of whether "the other half" was saved.
+ * Lifecycle + publication live in the "Challenge state" dialog.
+ */
+function AdminGeneral({
   challenge,
-  onSave,
+  group,
+  isPersonal,
+  onSaveBasics,
+  onSaveParticipants,
 }: {
   challenge: ChallengeDetail;
-  onSave: (payload: Partial<ChallengeSummary>) => Promise<void>;
+  group?: GroupSummary;
+  isPersonal: boolean;
+  onSaveBasics: (payload: Partial<ChallengeSummary>) => Promise<void>;
+  onSaveParticipants: (participantIds: Id[]) => Promise<void>;
 }) {
   const t = useTranslations("adminChallenge");
   const tc = useTranslations("common");
+  const tr = useTranslations("roles");
   const trules = useTranslations("rules");
   const f = useGoaFormat();
+  const initialRules = () => visibleRuleSections(challenge.ruleSections, challenge.rules, trules("legacyTitle"));
   const [title, setTitle] = useState(challenge.title);
   const [description, setDescription] = useState(challenge.description ?? "");
-  const [ruleSections, setRuleSections] = useState(() => visibleRuleSections(challenge.ruleSections, challenge.rules, trules("legacyTitle")));
+  const [ruleSections, setRuleSections] = useState(initialRules);
   const [scheduleMode, setScheduleMode] = useState<"period" | "none">(
     challenge.startsOn && challenge.endsOn ? "period" : "none",
   );
   const [startsOn, setStartsOn] = useState(challenge.startsOn ?? "");
   const [endsOn, setEndsOn] = useState(challenge.endsOn ?? "");
+  const initialIds = challenge.participants.map((participant) => participant.userId ?? participant.id);
+  const idsKey = initialIds.join(",");
+  const [selected, setSelected] = useState<Id[]>(initialIds);
+  const [seenIdsKey, setSeenIdsKey] = useState(idsKey);
+  // Who takes part changed on the server (someone left, a save landed): the list follows it.
+  if (idsKey !== seenIdsKey) {
+    setSeenIdsKey(idsKey);
+    setSelected(initialIds);
+  }
   const hasOptionalContent = Boolean(description.trim()) || ruleSections.length > 0;
-  const [busy, setBusy] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const livingList = isLivingList(challenge);
+  const locked = challenge.status === "closed";
+  const saving = busy;
+  const canPickParticipants = !isPersonal && Boolean(group?.members?.length);
 
-  async function run(label: string, action: () => Promise<void>, successText: string) {
-    setBusy(label);
-    setError(null);
-    setSuccess(null);
-    try {
-      await action();
-      setSuccess(successText);
-    } catch (cause) {
-      setError(f.error(cause));
-    } finally {
-      setBusy(null);
-    }
-  }
+  const rulesPayload = (rules: typeof ruleSections) => rules.map((rule) => ({
+    title: rule.title.trim(),
+    description: rule.description.trim(),
+    ...(rule.topics?.length
+      ? { topics: rule.topics.map((topic) => ({ title: topic.title.trim(), description: topic.description.trim() })) }
+      : {}),
+  }));
+  const basicsDirty = title.trim() !== challenge.title
+    || description.trim() !== (challenge.description ?? "").trim()
+    || JSON.stringify(rulesPayload(ruleSections)) !== JSON.stringify(rulesPayload(initialRules()))
+    || (scheduleMode === "period"
+      ? startsOn !== (challenge.startsOn ?? "") || endsOn !== (challenge.endsOn ?? "")
+      : Boolean(challenge.startsOn || challenge.endsOn));
+  const participantsDirty = canPickParticipants
+    && (selected.length !== initialIds.length || selected.some((id) => !initialIds.includes(id)));
+  const dirty = basicsDirty || participantsDirty;
 
-  function saveBasics(event: FormEvent<HTMLFormElement>) {
+  async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (scheduleMode === "period" && (!startsOn || !endsOn)) {
+    if (basicsDirty && scheduleMode === "period" && (!startsOn || !endsOn)) {
       setError(t("errPeriod"));
       return;
     }
-    if (scheduleMode === "period" && endsOn < startsOn) {
+    if (basicsDirty && scheduleMode === "period" && endsOn < startsOn) {
       setError(t("errEndBeforeStart"));
       return;
     }
-    void run("save", () => onSave({
-      title: title.trim(),
-      description: description.trim(),
-      ruleSections: ruleSections.map((rule) => ({
-        title: rule.title.trim(),
-        description: rule.description.trim(),
-        ...(rule.topics?.length
-          ? { topics: rule.topics.map((topic) => ({ title: topic.title.trim(), description: topic.description.trim() })) }
-          : {}),
-      })),
-      startsOn: scheduleMode === "period" ? startsOn : null,
-      endsOn: scheduleMode === "period" ? endsOn : null,
-    }), t("basicsSaved"));
+    setBusy(true);
+    setError(null);
+    setSuccess(null);
+    let basicsSaved = false;
+    try {
+      if (basicsDirty) {
+        await onSaveBasics({
+          title: title.trim(),
+          description: description.trim(),
+          ruleSections: rulesPayload(ruleSections),
+          startsOn: scheduleMode === "period" ? startsOn : null,
+          endsOn: scheduleMode === "period" ? endsOn : null,
+        });
+        basicsSaved = true;
+      }
+      if (participantsDirty) await onSaveParticipants(selected);
+      setSuccess(t("changesSaved"));
+    } catch (cause) {
+      setError(basicsSaved ? t("savedDetailsOnly", { error: f.error(cause) }) : f.error(cause));
+    } finally {
+      setBusy(false);
+    }
   }
-
-  const locked = challenge.status === "closed";
 
   return (
     <div className="mx-auto max-w-2xl">
-      <PageHeading title={t("basicsTitle")} description={t("basicsSubtitle")} />
-      <form className="space-y-6" onSubmit={saveBasics}>
+      <form onSubmit={save}>
+        <PageHeading title={t("basicsTitle")} description={t("basicsSubtitle")} />
         <fieldset disabled={locked} className="min-w-0 space-y-6">
           <Field label={t("titleLabel")}>
             <input className={inputClass} value={title} onChange={(event) => setTitle(event.target.value)} required maxLength={140} />
@@ -205,65 +239,50 @@ function AdminOverview({
           </Disclosure>
         </fieldset>
 
-        <StatusMessage error={error} success={success} />
-        {!locked ? <Button type="submit" className="w-full" disabled={busy === "save"}>{busy === "save" ? tc("saving") : t("saveBasics")}</Button> : null}
+        {!isPersonal ? (
+          <section className="mt-10 border-t border-[var(--line)] pt-8">
+            <PageHeading title={t("participantsTitle")} description={t("participantsSubtitle")} />
+            {group?.members?.length ? (
+            <ul className="grid gap-2 sm:grid-cols-2">
+              {group.members.map((member) => {
+                const checked = selected.includes(member.id);
+                const disabled = locked || saving;
+                return (
+                  <li key={member.id}>
+                    <label className={cx(
+                      "flex min-h-14 items-center gap-3 rounded-xl border px-4 py-3 transition",
+                      disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer",
+                      checked ? "border-[var(--main)] bg-[var(--main-soft)]" : "border-[var(--line)] hover:border-[var(--main-line)]",
+                    )}>
+                      <input type="checkbox" className="peer sr-only" aria-label={t("selectMember", { name: member.name })} checked={checked} disabled={disabled}
+                        onChange={(event) => setSelected((current) => event.target.checked ? [...current, member.id] : current.filter((id) => id !== member.id))} />
+                      <span className={cx("grid h-[18px] w-[18px] flex-none place-items-center rounded-[5px] border-[1.5px] text-white transition", checked ? "border-[var(--main)] bg-[var(--main)]" : "border-[var(--line)]")}>
+                        <svg viewBox="0 0 16 16" className={cx("h-2.5 w-2.5", checked ? "opacity-100" : "opacity-0")} fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                      </span>
+                      <span className="min-w-0">
+                        <strong className="block text-sm font-medium">{member.name}</strong>
+                        <small className="text-[var(--muted)]">{t("memberMeta", { username: member.username, role: tr(member.role) })}</small>
+                      </span>
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+            ) : <EmptyState title={t("noMembersTitle")} />}
+          </section>
+        ) : null}
+
+        <div className="sticky bottom-0 z-10 -mx-4 mt-8 border-t border-[var(--line)] bg-[color-mix(in_srgb,var(--canvas)_92%,transparent)] px-4 py-3 backdrop-blur-md sm:mx-0 sm:rounded-2xl sm:border">
+          <StatusMessage error={error} success={success} />
+          {locked ? null : (
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs text-[var(--muted)]" aria-live="polite">{dirty ? t("unsavedChanges") : t("nothingToSave")}</span>
+              <Button type="submit" className="min-h-11 px-6" disabled={saving || !dirty}>{saving ? tc("saving") : t("saveChanges")}</Button>
+            </div>
+          )}
+        </div>
       </form>
     </div>
-  );
-}
-
-function AdminParticipants({
-  challenge,
-  group,
-  onSave,
-}: {
-  challenge: ChallengeDetail;
-  group?: GroupSummary;
-  onSave: (participantIds: Id[]) => Promise<void>;
-}) {
-  const t = useTranslations("adminChallenge");
-  const tc = useTranslations("common");
-  const tr = useTranslations("roles");
-  const f = useGoaFormat();
-  const initial = challenge.participants.map((participant) => participant.userId ?? participant.id);
-  const [selected, setSelected] = useState<Id[]>(initial);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-
-  return (
-    <section className="mx-auto max-w-2xl">
-      <PageHeading title={t("participantsTitle")} description={t("participantsSubtitle")} />
-      {group?.members?.length ? (
-        <ul className="grid gap-2 sm:grid-cols-2">
-          {group.members.map((member) => {
-            const checked = selected.includes(member.id);
-            const disabled = challenge.status === "closed" || busy;
-            return (
-              <li key={member.id}>
-                <label className={cx(
-                  "flex min-h-14 items-center gap-3 rounded-xl border px-4 py-3 transition",
-                  disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer",
-                  checked ? "border-[var(--main)] bg-[var(--main-soft)]" : "border-[var(--line)] hover:border-[var(--main-line)]",
-                )}>
-                  <input type="checkbox" className="peer sr-only" aria-label={t("selectMember", { name: member.name })} checked={checked} disabled={disabled}
-                    onChange={(event) => setSelected((current) => event.target.checked ? [...current, member.id] : current.filter((id) => id !== member.id))} />
-                  <span className={cx("grid h-[18px] w-[18px] flex-none place-items-center rounded-[5px] border-[1.5px] text-white transition", checked ? "border-[var(--main)] bg-[var(--main)]" : "border-[var(--line)]")}>
-                    <svg viewBox="0 0 16 16" className={cx("h-2.5 w-2.5", checked ? "opacity-100" : "opacity-0")} fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                  </span>
-                  <span className="min-w-0">
-                    <strong className="block text-sm font-medium">{member.name}</strong>
-                    <small className="text-[var(--muted)]">{t("memberMeta", { username: member.username, role: tr(member.role) })}</small>
-                  </span>
-                </label>
-              </li>
-            );
-          })}
-        </ul>
-      ) : <EmptyState title={t("noMembersTitle")} />}
-      <div className="mt-5"><StatusMessage error={error} success={success} /></div>
-      {challenge.status !== "closed" && group?.members?.length ? <Button className="mt-5 w-full" disabled={busy} onClick={() => { setBusy(true); setError(null); setSuccess(null); onSave(selected).then(() => setSuccess(t("participantsSaved"))).catch((cause: unknown) => setError(f.error(cause))).finally(() => setBusy(false)); }}>{busy ? tc("saving") : t("saveParticipants")}</Button> : null}
-    </section>
   );
 }
 
@@ -1236,7 +1255,7 @@ export function AdminScreen({
       </div>
 
       <div className="mx-auto max-w-5xl px-4 pt-8 sm:px-6 sm:pt-10">
-        {activeTab === "overview" ? <div className="mx-auto max-w-2xl space-y-10"><AdminOverview challenge={challenge} onSave={onSaveBasics} />{!isPersonal ? <div className="border-t border-[var(--line)] pt-8"><AdminParticipants key={challenge.participants.map((p) => p.userId ?? p.id).join(",")} challenge={challenge} group={group} onSave={onSaveParticipants} /></div> : null}</div> : null}
+        {activeTab === "overview" ? <AdminGeneral challenge={challenge} group={group} isPersonal={isPersonal} onSaveBasics={onSaveBasics} onSaveParticipants={onSaveParticipants} /> : null}
         {activeTab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.visibilityPolicy}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} onSaveVisibility={onSaveEntryTypeVisibility} onSetExpectation={onSetExpectation} onSaveEntryDate={onSaveEntryDate} onAddShared={onAddSharedResponse} onRemoveType={onRemoveEntryType} onSavePolicy={onSaveSharedPolicy} /> : null}
         {activeTab === "items" ? <AdminItems challenge={challenge} group={group} entries={entries} onAdd={onAddItems} onUpdate={onUpdateItem} onArchive={onArchiveItem} onPreviewImport={onPreviewImport} onLinkLibrary={onLinkLibrary} onUnlinkLibrary={onUnlinkLibrary} onLibraryChanged={onArchiveChanged} /> : null}
         {activeTab === "checkpoints" ? <CheckpointPlanner key={`${challenge.id}:${challenge.checkpoints.map((cp) => cp.id).join(",")}`} challenge={challenge} onSaveCheckpoints={onSaveCheckpoints} onAssign={onAssignCheckpointItems} /> : null}
