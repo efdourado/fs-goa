@@ -47,7 +47,12 @@ test("o registro de um treino: formulário com uma linha por item, histórico s�
   assert.match(html, /Registrar Treino/, "o título usa o nome que o criador deu");
   assert.match(html, /Carga \(kg\)/);
   assert.match(html, /Repetições/);
-  assert.match(html, /Adicionar item/);
+  assert.match(html, /Adicionar outro/);
+  // Cada exercício é um cartão com os próprios rótulos — sem um cabeçalho de colunas repetindo o que está em cada linha.
+  const form = html.slice(html.indexOf("<form"), html.indexOf("</form>"));
+  assert.match(form, /<ol/, "os exercícios formam uma lista de cartões");
+  assert.equal((form.match(/Carga \(kg\)/g) ?? []).length, 1, "o rótulo de cada campo aparece uma vez por exercício");
+  assert.doesNotMatch(form, /aria-hidden="true"[^>]*>\s*<span[^>]*>Exercícios</, "sem linha de cabeçalho de colunas");
   assert.match(html, /2 check-ins/, "só os seus dois treinos contam");
   assert.doesNotMatch(html, /100/, "o treino de outra pessoa não entra no seu histórico nem nos recordes");
   assert.match(html, /Melhor Carga \(kg\): 57,5|Melhor Carga \(kg\): 57\.5/, "o recorde do supino sai do histórico, sem ninguém digitá-lo");

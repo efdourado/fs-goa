@@ -52,16 +52,33 @@ function ratingChoices(config?: FieldConfig): number[] {
   return Array.from({ length: Math.max(0, count) }, (_, index) => Number((min + index * step).toFixed(4)));
 }
 
-/** One field of one record, in the compact shape a table cell needs. */
-function CellInput({ field, value, disabled, id, onChange }: {
-  field: ChallengeField; value: unknown; disabled: boolean; id: string; onChange: (value: unknown) => void;
+function ChevronIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+      <path d="M4 6l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function CloseIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+      <path d="M4.5 4.5l7 7M11.5 4.5l-7 7" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** One field of one record, sized for a card. */
+function CellInput({ field, value, disabled, id, onChange, className }: {
+  field: ChallengeField; value: unknown; disabled: boolean; id: string; onChange: (value: unknown) => void; className?: string;
 }) {
+  const cls = className ?? inputClass;
   const t = useTranslations("entryForm");
   const tc = useTranslations("common");
   if (field.type === "number") {
     return (
       <input
-        id={id} className={inputClass} type="number" inputMode="decimal" min={field.config?.min} max={field.config?.max}
+        id={id} className={cls} type="number" inputMode="decimal" min={field.config?.min} max={field.config?.max}
         step={field.config?.step ?? "any"} disabled={disabled}
         value={typeof value === "number" || typeof value === "string" ? value : ""}
         onChange={(event) => onChange(event.target.value === "" ? "" : Number(event.target.value))}
@@ -70,7 +87,7 @@ function CellInput({ field, value, disabled, id, onChange }: {
   }
   if (field.type === "rating") {
     return (
-      <select id={id} className={inputClass} disabled={disabled} value={value === null || value === undefined ? "" : String(value)} onChange={(event) => onChange(event.target.value === "" ? "" : Number(event.target.value))}>
+      <select id={id} className={cls} disabled={disabled} value={value === null || value === undefined ? "" : String(value)} onChange={(event) => onChange(event.target.value === "" ? "" : Number(event.target.value))}>
         <option value="">—</option>
         {ratingChoices(field.config).map((rating) => <option key={rating} value={String(rating)}>{String(rating).replace(".", ",")}</option>)}
       </select>
@@ -78,7 +95,7 @@ function CellInput({ field, value, disabled, id, onChange }: {
   }
   if (field.type === "select") {
     return (
-      <select id={id} className={inputClass} disabled={disabled} value={typeof value === "string" ? value : ""} onChange={(event) => onChange(event.target.value)}>
+      <select id={id} className={cls} disabled={disabled} value={typeof value === "string" ? value : ""} onChange={(event) => onChange(event.target.value)}>
         <option value="">{t("select")}</option>
         {(field.config?.options ?? []).filter((option) => !option.archived).map((option) => (
           <option key={option.id ?? option.value ?? option.label} value={option.id ?? option.value ?? option.label}>{option.label}</option>
@@ -88,7 +105,7 @@ function CellInput({ field, value, disabled, id, onChange }: {
   }
   if (field.type === "boolean") {
     return (
-      <select id={id} className={inputClass} disabled={disabled} value={value === true ? "yes" : value === false ? "no" : ""} onChange={(event) => onChange(event.target.value === "" ? "" : event.target.value === "yes")}>
+      <select id={id} className={cls} disabled={disabled} value={value === true ? "yes" : value === false ? "no" : ""} onChange={(event) => onChange(event.target.value === "" ? "" : event.target.value === "yes")}>
         <option value="">—</option>
         <option value="yes">{tc("yes")}</option>
         <option value="no">{tc("no")}</option>
@@ -96,12 +113,12 @@ function CellInput({ field, value, disabled, id, onChange }: {
     );
   }
   if (field.type === "date") {
-    return <input id={id} className={inputClass} type="date" disabled={disabled} value={typeof value === "string" ? value : ""} onChange={(event) => onChange(event.target.value)} />;
+    return <input id={id} className={cls} type="date" disabled={disabled} value={typeof value === "string" ? value : ""} onChange={(event) => onChange(event.target.value)} />;
   }
   if (field.config?.multiline) {
-    return <textarea id={id} className={inputClass} rows={2} maxLength={field.config.maxLength} disabled={disabled} value={String(value ?? "")} onChange={(event) => onChange(event.target.value)} />;
+    return <textarea id={id} className={cls} rows={2} maxLength={field.config.maxLength} disabled={disabled} value={String(value ?? "")} onChange={(event) => onChange(event.target.value)} />;
   }
-  return <input id={id} className={inputClass} maxLength={field.config?.maxLength} disabled={disabled} value={String(value ?? "")} onChange={(event) => onChange(event.target.value)} />;
+  return <input id={id} className={cls} maxLength={field.config?.maxLength} disabled={disabled} value={String(value ?? "")} onChange={(event) => onChange(event.target.value)} />;
 }
 
 /** Numbers read best untouched; everything else reads the way the form showed it. */
@@ -231,8 +248,8 @@ export function SessionLog({
     setSuccess(null);
   }
 
-  /** The most recent record of an item, before the check-in being edited — "last time: 55 kg × 8". */
-  function lastTimeFor(itemId: Id): string | null {
+  /** The most recent record of an item, before the check-in being edited — "last time: 55 kg × 8" — and its values. */
+  function lastRecordFor(itemId: Id): { text: string; values: Record<Id, unknown> } | null {
     let latest: Entry | null = null;
     for (const [visitId, records] of recordsByVisit) {
       if (visitId === editing?.id) continue;
@@ -244,7 +261,7 @@ export function SessionLog({
     if (!latest) return null;
     const values = valuesAsRecord(latest.values);
     const summary = recordFields.map((field) => showValue(field, values[field.id as Id])).filter(Boolean).join(" · ");
-    return t("lastTime", { values: summary, date: f.date(latest.occurredOn, shortDate) });
+    return { text: t("lastTime", { values: summary, date: f.date(latest.occurredOn, shortDate) }), values };
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -275,9 +292,6 @@ export function SessionLog({
       setBusy(false);
     }
   }
-
-  const gridStyle = { "--cols": `minmax(0,1.4fr) repeat(${Math.max(1, recordFields.length)}, minmax(0,1fr)) 2.5rem` } as CSSProperties;
-  const rowGrid = "sm:grid sm:[grid-template-columns:var(--cols)] sm:items-end sm:gap-2";
 
   // Per item: how many check-ins it appeared in, the best of each numeric field, and its latest records.
   const byItem = useMemo(() => {
@@ -314,61 +328,47 @@ export function SessionLog({
     <div className="space-y-6">
       <section className={cx(cardClass, "min-w-0 p-5 sm:p-7")}>
         <form onSubmit={submit} noValidate>
-          <div className="mb-5 flex flex-col gap-3 border-b border-[var(--line)] pb-5 sm:flex-row sm:items-end sm:justify-between">
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
             <h2 className="text-2xl font-light tracking-[-0.04em]">
               {editing ? t("editTitle", { name: spec.visit.name, date: f.date(editing.occurredOn, shortDate) }) : t("composerTitle", { name: spec.visit.name })}
             </h2>
-            <label className="block sm:w-48">
-              <span className={labelClass}>{t("dateLabel")}</span>
+            <label className="block w-full sm:w-44">
+              <span className="sr-only">{t("dateLabel")}</span>
               <input className={inputClass} type="date" max={today} value={occurredOn} disabled={disabled} onChange={(event) => setOccurredOn(event.target.value || today)} />
             </label>
           </div>
 
-          <div className="hidden pb-2 sm:grid sm:[grid-template-columns:var(--cols)] sm:gap-2" style={gridStyle} aria-hidden="true">
-            <span className="text-xs font-medium text-[var(--muted)]">{itemsHeading}</span>
-            {recordFields.map((field) => <span key={field.id} className="text-xs font-medium text-[var(--muted)]">{field.label}</span>)}
-            <span />
-          </div>
-          <ul className="space-y-3">
-            {rows.map((row) => {
-              const last = row.itemId ? lastTimeFor(row.itemId) : null;
+          <ol className="space-y-4">
+            {rows.map((row, index) => {
+              const last = row.itemId ? lastRecordFor(row.itemId) : null;
               return (
-                <li key={row.key} className="rounded-2xl border border-[var(--line)] p-3 sm:rounded-none sm:border-0 sm:p-0" style={gridStyle}>
-                  <div className={rowGrid}>
-                    <label className="block">
-                      <span className={cx(labelClass, "sm:sr-only")}>{itemsHeading}</span>
-                      <select
-                        className={inputClass} disabled={disabled} value={row.itemId}
-                        onChange={(event) => {
-                          if (event.target.value === NEW_ITEM) setCreating({ rowKey: row.key, title: "", busy: false, error: null });
-                          else patchRow(row.key, { itemId: event.target.value });
-                        }}
-                      >
-                        <option value="">{t("pickItem")}</option>
-                        {items.map((item: ChallengeItem) => <option key={item.id} value={item.id}>{item.title}</option>)}
-                        {onAddItem ? <option value={NEW_ITEM}>{t("newItem")}</option> : null}
-                      </select>
-                    </label>
-                    {recordFields.map((field) => (
-                      <label className="mt-2 block sm:mt-0" key={field.id}>
-                        <span className={cx(labelClass, "sm:sr-only")}>{field.label}{field.required ? <span className="ml-1 text-[var(--main-2)]" aria-label={tf("required")}>*</span> : null}</span>
-                        <CellInput
-                          id={`${row.key}-${field.id}`} field={field} disabled={disabled} value={row.values[field.id as Id]}
-                          onChange={(value) => patchRow(row.key, { values: { ...row.values, [field.id as Id]: value } })}
-                        />
-                      </label>
-                    ))}
-                    <button
-                      type="button" disabled={disabled || rows.length === 1}
-                      className="mt-2 min-h-11 rounded-xl px-2 text-sm text-[var(--danger)] hover:bg-[var(--wash)] disabled:opacity-40 sm:mt-0"
-                      aria-label={t("removeRow")} title={t("removeRow")}
-                      onClick={() => setRows((current) => current.filter((candidate) => candidate.key !== row.key))}
+                <li key={row.key} className="rounded-2xl border border-[var(--line)] bg-[var(--canvas)]/50 p-4 sm:p-5">
+                  <div className="flex items-center gap-3">
+                    <span className="grid h-8 w-8 flex-none place-items-center rounded-full bg-[var(--main-soft)] text-sm font-medium text-[var(--main-strong)]" aria-hidden="true">{index + 1}</span>
+                    <select
+                      aria-label={itemsHeading} className={cx(inputClass, "min-w-0 flex-1 text-base font-medium")} disabled={disabled} value={row.itemId}
+                      onChange={(event) => {
+                        if (event.target.value === NEW_ITEM) setCreating({ rowKey: row.key, title: "", busy: false, error: null });
+                        else patchRow(row.key, { itemId: event.target.value });
+                      }}
                     >
-                      ✕
-                    </button>
+                      <option value="">{t("pickItem")}</option>
+                      {items.map((item: ChallengeItem) => <option key={item.id} value={item.id}>{item.title}</option>)}
+                      {onAddItem ? <option value={NEW_ITEM}>{t("newItem")}</option> : null}
+                    </select>
+                    {rows.length > 1 ? (
+                      <button
+                        type="button" disabled={disabled}
+                        className="grid h-10 w-10 flex-none cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--danger)] disabled:cursor-not-allowed disabled:opacity-40"
+                        aria-label={t("removeRow")} title={t("removeRow")}
+                        onClick={() => setRows((current) => current.filter((candidate) => candidate.key !== row.key))}
+                      >
+                        <CloseIcon className="h-4 w-4" />
+                      </button>
+                    ) : null}
                   </div>
                   {creating?.rowKey === row.key ? (
-                    <div className="mt-2 flex flex-wrap items-center gap-2 rounded-xl bg-[var(--wash)] p-2.5">
+                    <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-[var(--wash)] p-2.5">
                       <input
                         ref={newItemInput} className={cx(inputClass, "min-w-0 flex-1")} value={creating.title} maxLength={200} disabled={creating.busy}
                         placeholder={t("newItemPlaceholder")} aria-label={t("newItemPlaceholder")}
@@ -380,21 +380,49 @@ export function SessionLog({
                       {creating.error ? <span className="w-full"><StatusMessage error={creating.error} /></span> : null}
                     </div>
                   ) : null}
-                  {last ? <p className="mt-1.5 text-xs text-[var(--muted)]">{last}</p> : null}
+                  {last ? (
+                    <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 pl-11 text-xs text-[var(--muted)]">
+                      <span>{last.text}</span>
+                      <button
+                        type="button" disabled={disabled}
+                        className="min-h-8 cursor-pointer rounded-full px-2.5 font-medium text-[var(--main-strong)] transition hover:bg-[var(--main-soft)] disabled:cursor-not-allowed disabled:opacity-50"
+                        onClick={() => patchRow(row.key, { values: { ...last.values } })}
+                      >
+                        {t("repeatLast")}
+                      </button>
+                    </p>
+                  ) : null}
+                  <div
+                    className="mt-4 grid grid-cols-2 items-end gap-3 sm:[grid-template-columns:repeat(var(--n),minmax(0,1fr))] sm:[max-width:calc(var(--n)*14rem)]"
+                    style={{ "--n": Math.min(Math.max(recordFields.length, 1), 4) } as CSSProperties}
+                  >
+                    {recordFields.map((field) => (
+                      <label className="block" key={field.id}>
+                        <span className="mb-1 block text-xs font-medium leading-tight text-[var(--muted)]">
+                          {field.label}{field.required ? <span className="ml-1 text-[var(--main-2)]" aria-label={tf("required")}>*</span> : null}
+                        </span>
+                        <CellInput
+                          id={`${row.key}-${field.id}`} field={field} disabled={disabled} value={row.values[field.id as Id]}
+                          className={cx(inputClass, "text-base tabular-nums")}
+                          onChange={(value) => patchRow(row.key, { values: { ...row.values, [field.id as Id]: value } })}
+                        />
+                      </label>
+                    ))}
+                  </div>
                 </li>
               );
             })}
-          </ul>
+          </ol>
           <button
             type="button" disabled={disabled}
-            className="mt-3 inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-xl border border-dashed border-[var(--main-line)] px-4 text-sm text-[var(--main-strong)] transition hover:bg-[var(--main-soft)] disabled:cursor-not-allowed disabled:opacity-50"
+            className="mt-4 flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-[var(--main-line)] text-sm font-medium text-[var(--main-strong)] transition hover:bg-[var(--main-soft)] disabled:cursor-not-allowed disabled:opacity-50"
             onClick={() => setRows((current) => [...current, blankRow()])}
           >
-            <span aria-hidden="true">+</span>{t("addRow")}
+            <span aria-hidden="true" className="text-lg leading-none">+</span>{t("addRow")}
           </button>
 
           {visitFields.length ? (
-            <div className="mt-5 space-y-3 border-t border-[var(--line)] pt-5">
+            <div className="mt-6 space-y-3">
               {visitFields.map((field) => (
                 <label className="block" key={field.id}>
                   <span className={labelClass}>{field.label}{field.required ? <span className="ml-1 text-[var(--main-2)]" aria-label={tf("required")}>*</span> : <small className="ml-2 font-light text-[var(--muted)]">{tf("optional")}</small>}</span>
@@ -407,10 +435,10 @@ export function SessionLog({
           <div className="mt-5"><StatusMessage error={error} success={success} /></div>
           {!canEdit && unavailableMessage ? <p className="mt-3 rounded-xl border border-[var(--line)] bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{unavailableMessage}</p> : null}
           <div className="mt-5 flex flex-col gap-2 sm:flex-row">
-            <Button type="submit" className="w-full sm:flex-1" disabled={disabled}>
+            <Button type="submit" className="min-h-12 w-full text-base sm:flex-1" disabled={disabled}>
               {busy ? tc("saving") : editing ? tc("saveChanges") : t("save", { name: spec.visit.name })}<span aria-hidden="true">→</span>
             </Button>
-            {editing ? <Button type="button" variant="secondary" className="w-full sm:flex-1" disabled={busy} onClick={reset}>{tc("cancel")}</Button> : null}
+            {editing ? <Button type="button" variant="secondary" className="min-h-12 w-full sm:flex-1" disabled={busy} onClick={reset}>{tc("cancel")}</Button> : null}
           </div>
         </form>
       </section>
@@ -434,7 +462,7 @@ export function SessionLog({
                           <strong className="block text-base font-medium">{f.date(visit.occurredOn, shortDate)}</strong>
                           <span className="block truncate text-xs text-[var(--muted)]">{t("itemCount", { count: records.length })} · {records.slice(0, 3).map((record) => itemTitle(record.itemId)).join(", ")}{records.length > 3 ? "…" : ""}</span>
                         </span>
-                        <span aria-hidden="true" className="text-[var(--muted)] transition-transform group-open:rotate-180">⌄</span>
+                        <ChevronIcon className="h-4 w-4 flex-none text-[var(--muted)] transition-transform group-open:rotate-180" />
                       </summary>
                       <div className="mt-3 overflow-x-auto rounded-xl border border-[var(--line)]">
                         <table className="w-full min-w-[20rem] text-left text-sm">
@@ -487,19 +515,23 @@ export function SessionLog({
             {byItem.map(({ item, list, records, sessions }) => (
               <li key={item.id} className="py-4 first:pt-0 last:pb-0">
                 <details className="group">
-                  <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
-                    <span className="min-w-0">
-                      <strong className="block text-base font-medium">{item.title}</strong>
-                      <span className="block text-xs text-[var(--muted)]">{t("performedIn", { count: sessions })}</span>
+                  <summary className="min-h-11 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                    <span className="flex items-center justify-between gap-3">
+                      <span className="min-w-0">
+                        <strong className="block text-base font-medium">{item.title}</strong>
+                        <span className="block text-xs text-[var(--muted)]">{t("performedIn", { count: sessions })}</span>
+                      </span>
+                      <ChevronIcon className="h-4 w-4 flex-none text-[var(--muted)] transition-transform group-open:rotate-180" />
                     </span>
-                    <span className="flex flex-none flex-wrap items-center justify-end gap-1.5">
-                      {records.map((record) => (
-                        <span key={record.field.id} className="rounded-full bg-[var(--main-soft)] px-2.5 py-1 text-xs text-[var(--main-strong)]">
-                          {t("recordChip", { field: record.field.label, value: String(record.value).replace(".", ",") })}
-                        </span>
-                      ))}
-                      <span aria-hidden="true" className="text-[var(--muted)] transition-transform group-open:rotate-180">⌄</span>
-                    </span>
+                    {records.length ? (
+                      <span className="mt-2.5 flex flex-wrap gap-1.5">
+                        {records.map((record) => (
+                          <span key={record.field.id} className="rounded-full bg-[var(--main-soft)] px-2.5 py-1 text-xs text-[var(--main-strong)]">
+                            {t("recordChip", { field: record.field.label, value: String(record.value).replace(".", ",") })}
+                          </span>
+                        ))}
+                      </span>
+                    ) : null}
                   </summary>
                   <div className="mt-3 overflow-x-auto rounded-xl border border-[var(--line)]">
                     <table className="w-full min-w-[20rem] text-left text-sm">
