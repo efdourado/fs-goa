@@ -90,7 +90,7 @@ export function AuthScreen({
           ) : null}
           <h1 className="mt-2 text-3xl font-light tracking-[-0.045em]">{heading}</h1>
           <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{subheading}</p>
-          {mode === "register" ? <p className="mt-3 rounded-xl bg-[var(--wash)] px-4 py-3 text-xs leading-5 text-[var(--muted)]">{t("reassure")}</p> : null}
+          <p className="mt-3 rounded-xl bg-[var(--wash)] px-4 py-3 text-xs leading-5 text-[var(--muted)]">{t("reassure")}</p>
 
           <form className="mt-6 space-y-4" onSubmit={submit}>
             {mode === "register" ? (
