@@ -188,7 +188,7 @@ export function QuickCreateScreen({
                   onClick={() => setRecipe(key)}
                   icon={<RecipeIcon name={key} className="h-[18px] w-[18px]" />}
                   title={tr(`recipes.${key}.name`)}
-                  hint={tr(`recipes.${key}.body`)}
+                  hint={tr(`recipes.${key}.tagline`)}
                 />
               ))}
             </div>

@@ -9,6 +9,7 @@ import { CineItemsEditor, type CineRow, cineRowsToInput } from "../cine-items";
 import { NewLibraryDialog, TablesLibraryPrompt } from "../library-dialogs";
 import { type CatalogScope, LibraryPills, libraryChoices, useCatalogLibraries } from "../libraries";
 import { RecipeIcon } from "../recipe-icons";
+import { RecipePreview } from "../recipe-previews";
 import { RuleSectionsEditor } from "../rules";
 import type { ChallengeCreationInput, ChallengeField, ChallengeRule, CreatableRecipeKey, GroupSummary, Id, SharedEditPolicy } from "../types";
 import { BackButton, backLinkClass, Button, cardClass, cx, EmptyState, Field, inputClass, labelClass, PageHeading, SchedulePeriodFields, SelectableCards, StatusMessage, Toggle } from "../ui";
@@ -275,10 +276,12 @@ export function CreateChallengeScreen({
                 <button className={cx("rounded-2xl border p-5 text-left transition", recipe === entry.key ? "border-[var(--main)] bg-[var(--main-soft)] ring-2 ring-[var(--main)]/25" : "border-[var(--line)] bg-[var(--paper)] hover:border-[var(--main-line)]")} type="button" aria-pressed={recipe === entry.key} onClick={() => chooseRecipe(entry.key)} key={entry.key}>
                   <span className="flex h-8 items-center" aria-hidden="true"><RecipeIcon name={entry.key} className="h-7 w-7" /></span>
                   <strong className="mt-3 block text-lg">{t(`recipes.${entry.key}.name`)}</strong>
-                  <span className="mt-1 block text-sm leading-6 text-[var(--muted)]">{t(`recipes.${entry.key}.body`)}</span>
+                  <span className="mt-0.5 block text-sm leading-6 text-[var(--muted)]">{t(`recipes.${entry.key}.tagline`)}</span>
+                  <RecipePreview recipe={entry.key} />
                 </button>
               ))}
             </div>
+            {recipe ? <p className="mt-3 rounded-xl bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{t(`recipes.${recipe}.body`)}</p> : null}
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
               <label className="sm:col-span-2"><span className={labelClass}>{t("titleLabel")}</span><input className={inputClass} value={title} onChange={(event) => setTitle(event.target.value)} maxLength={140} required /></label>
               <fieldset className="sm:col-span-2">

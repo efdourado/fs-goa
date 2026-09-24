@@ -597,26 +597,32 @@
     "recipes": {
       "cinema": {
         "name": "Screens",
+        "tagline": "Avalie filmes e séries",
         "body": "Uma lista de filmes ou séries; cada pessoa dá nota e comentário ao assistir, com data opcional. Pode ter prazo ou ficar aberta."
       },
       "bookshelf": {
         "name": "Pages",
+        "tagline": "Avalie o que você já leu",
         "body": "Uma lista de livros que você só avalia e comenta — sem páginas, sem prazo, sem \"quando\". Ótimo pra registrar o que já leu."
       },
       "library": {
         "name": "Clube de leitura",
+        "tagline": "Páginas lidas por dia",
         "body": "Uma lista de livros com páginas lidas por dia e por livro, e um \"Terminei\" com nota. Precisa de período."
       },
       "habit": {
         "name": "Hábito",
+        "tagline": "Um check-in por dia",
         "body": "Sem filme, sem livro — só um registro diário. Adicione os campos que o hábito precisar e crie suas próprias métricas a partir deles."
       },
       "tables": {
         "name": "Tables",
+        "tagline": "Avalie lugares para comer",
         "body": "Avalie restaurantes, bares e cafés em comida, ambiente e custo-benefício — uma nota para cada, sem nota geral."
       },
       "custom": {
         "name": "Personalizado",
+        "tagline": "Você define o que registrar",
         "body": "Escolha qualquer biblioteca — jogos, partidas, o que for — e decida exatamente o que cada pessoa registra."
       }
     },
