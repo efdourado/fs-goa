@@ -1,5 +1,5 @@
 import { csrfForSession, type GroupRole, type SessionContext } from "../../auth";
-import { withClient } from "../../db";
+import { getPool } from "../../db";
 import { LIMITS } from "../../limits";
 import type { ChallengeStatus } from "./access";
 
@@ -21,17 +21,19 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
     };
   }
 
-  return withClient(async (client) => {
-    const personalWorkspace = await client.query<{ id: string }>(
+  return (async () => {
+    // Every round trip is a wait on a remote database, so what doesn't depend on something else starts together:
+    // the personal workspace, the groups, the pending invitations and the challenges all only need the person.
+    const pool = getPool();
+    const personalWorkspaceQuery = pool.query<{ id: string }>(
       `SELECT id FROM groups
         WHERE owner_user_id = $1 AND kind = 'personal'
           AND archived_at IS NULL AND deleted_at IS NULL
         LIMIT 1`,
       [session.user.id],
     );
-    const personalWorkspaceId = personalWorkspace.rows[0]?.id ?? null;
 
-    const groupsResult = await client.query<{
+    const groupsQuery = pool.query<{
       id: string;
       name: string;
       description: string | null;
@@ -53,57 +55,7 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
         ORDER BY g.created_at`,
       [session.user.id],
     );
-    const groupIds = groupsResult.rows.map((group) => group.id);
-    const membersByGroup = new Map<string, Array<Record<string, unknown>>>();
-    if (groupIds.length) {
-      const members = await client.query<{
-        group_id: string;
-        id: string;
-        display_name: string;
-        username: string;
-        role: GroupRole;
-      }>(
-        `SELECT gm.group_id, u.id, u.display_name, u.username, gm.role
-           FROM group_members gm JOIN users u ON u.id = gm.user_id
-          WHERE gm.group_id = ANY($1::text[]) AND gm.removed_at IS NULL
-          ORDER BY u.display_name`,
-        [groupIds],
-      );
-      for (const member of members.rows) {
-        const list = membersByGroup.get(member.group_id) ?? [];
-        list.push({ id: member.id, name: member.display_name, username: member.username, role: member.role });
-        membersByGroup.set(member.group_id, list);
-      }
-    }
-
-    // Pending outgoing invites, shown on the group screen so admins can track or
-    // withdraw them. Only groups the viewer manages.
-    const manageableGroupIds = groupsResult.rows
-      .filter((group) => group.role === "owner" || group.role === "admin")
-      .map((group) => group.id);
-    const pendingByGroup = new Map<string, Array<Record<string, unknown>>>();
-    if (manageableGroupIds.length) {
-      const pending = await client.query<{
-        group_id: string;
-        id: string;
-        display_name: string;
-        username: string;
-        created_at: Date;
-      }>(
-        `SELECT r.group_id, r.id, u.display_name, u.username, r.created_at
-           FROM group_member_requests r JOIN users u ON u.id = r.user_id
-          WHERE r.group_id = ANY($1::text[]) AND r.status = 'pending'
-          ORDER BY r.created_at`,
-        [manageableGroupIds],
-      );
-      for (const row of pending.rows) {
-        const list = pendingByGroup.get(row.group_id) ?? [];
-        list.push({ id: row.id, name: row.display_name, username: row.username, createdAt: row.created_at.toISOString() });
-        pendingByGroup.set(row.group_id, list);
-      }
-    }
-
-    const memberRequestsResult = await client.query<{
+    const memberRequestsQuery = pool.query<{
       id: string;
       group_id: string;
       group_name: string;
@@ -122,7 +74,7 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
       [session.user.id],
     );
 
-    const challengesResult = await client.query<{
+    const challengesQuery = pool.query<{
       id: string;
       group_id: string;
       title: string;
@@ -215,6 +167,62 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
       [session.user.id],
     );
 
+    const [personalWorkspace, groupsResult, memberRequestsResult, challengesResult] = await Promise.all([
+      personalWorkspaceQuery, groupsQuery, memberRequestsQuery, challengesQuery,
+    ]);
+    const personalWorkspaceId = personalWorkspace.rows[0]?.id ?? null;
+
+    const groupIds = groupsResult.rows.map((group) => group.id);
+    // Pending outgoing invites, shown on the group screen so admins can track or
+    // withdraw them. Only groups the viewer manages.
+    const manageableGroupIds = groupsResult.rows
+      .filter((group) => group.role === "owner" || group.role === "admin")
+      .map((group) => group.id);
+    // Both only need the group list, so they go out together.
+    const membersQuery = groupIds.length
+      ? pool.query<{
+          group_id: string;
+          id: string;
+          display_name: string;
+          username: string;
+          role: GroupRole;
+        }>(
+          `SELECT gm.group_id, u.id, u.display_name, u.username, gm.role
+             FROM group_members gm JOIN users u ON u.id = gm.user_id
+            WHERE gm.group_id = ANY($1::text[]) AND gm.removed_at IS NULL
+            ORDER BY u.display_name`,
+          [groupIds],
+        )
+      : null;
+    const pendingQuery = manageableGroupIds.length
+      ? pool.query<{
+          group_id: string;
+          id: string;
+          display_name: string;
+          username: string;
+          created_at: Date;
+        }>(
+          `SELECT r.group_id, r.id, u.display_name, u.username, r.created_at
+             FROM group_member_requests r JOIN users u ON u.id = r.user_id
+            WHERE r.group_id = ANY($1::text[]) AND r.status = 'pending'
+            ORDER BY r.created_at`,
+          [manageableGroupIds],
+        )
+      : null;
+    const [members, pending] = await Promise.all([membersQuery, pendingQuery]);
+    const membersByGroup = new Map<string, Array<Record<string, unknown>>>();
+    for (const member of members?.rows ?? []) {
+      const list = membersByGroup.get(member.group_id) ?? [];
+      list.push({ id: member.id, name: member.display_name, username: member.username, role: member.role });
+      membersByGroup.set(member.group_id, list);
+    }
+    const pendingByGroup = new Map<string, Array<Record<string, unknown>>>();
+    for (const row of pending?.rows ?? []) {
+      const list = pendingByGroup.get(row.group_id) ?? [];
+      list.push({ id: row.id, name: row.display_name, username: row.username, createdAt: row.created_at.toISOString() });
+      pendingByGroup.set(row.group_id, list);
+    }
+
     return {
       csrfToken: await csrfForSession(session),
       user: session.user,
@@ -267,5 +275,5 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
         createdAt: request.created_at.toISOString(),
       })),
     };
-  });
+  })();
 }

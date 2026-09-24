@@ -1,15 +1,15 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, useRef, useState } from "react";
 
-import { API_PATHS, apiRequest } from "../api";
 import { copyText } from "../clipboard";
 import { ActionMenu, ActionMenuItem } from "../action-menu";
 import { Dialog } from "../dialog";
 import { useGoaFormat } from "../format";
+import { CatalogShelfSkeleton } from "../catalog-shelf";
 import { CatalogTile, resolveCoverTop } from "../catalog-views";
-import { LibraryGlyph, useCatalogLibraries, useLibraryName } from "../libraries";
+import { LibraryGlyph, useCatalogShelf, useLibraryName } from "../libraries";
 import { Rail, RailArrows, ShelfAddButton, useShelfRail } from "../shelf";
 import type { CatalogItem, ChallengeSummary, GroupInviteResult, GroupSummary, Id, Member, PendingGroupRequest } from "../types";
 import { BackButton, Button, cx, EmptyState, Field, inputClass, StatusMessage, Toggle } from "../ui";
@@ -85,22 +85,18 @@ export function GroupScreen({
   const [memberBusy, setMemberBusy] = useState(false);
   const [memberError, setMemberError] = useState<string | null>(null);
   const [memberSuccess, setMemberSuccess] = useState<string | null>(null);
-  const [catalog, setCatalog] = useState<CatalogItem[] | null>(null);
   const [catalogKind, setCatalogKind] = useState<string | null>(null);
-  const { data: libraries } = useCatalogLibraries({ groupId: group.id });
+  // One request brings the libraries, how many items each holds and the newest few of each; the last answer
+  // paints at once when the page is opened again.
+  const shelfData = useCatalogShelf({ groupId: group.id });
+  const catalog = shelfData ? shelfData.items : null;
+  const catalogCounts = shelfData?.counts ?? {};
   const libraryName = useLibraryName();
   const { railRef: catalogRailRef, showFade: catalogShowFade, onScroll: onCatalogScroll, nudge: nudgeCatalog } = useShelfRail();
 
-  useEffect(() => {
-    const controller = new AbortController();
-    apiRequest<{ items: CatalogItem[] }>(API_PATHS.groupCatalog(group.id), { signal: controller.signal })
-      .then((response) => setCatalog(response.items))
-      .catch(() => setCatalog([]));
-    return () => controller.abort();
-  }, [group.id]);
-
   // Each library is its own shelf — one sorted list never mixes them.
-  const catalogLibraries = (libraries ?? []).filter((library) => (catalog ?? []).some((item) => item.kind === library.kind));
+  const catalogLibraries = (shelfData?.libraries ?? []).filter((library) => (catalogCounts[library.kind] ?? 0) > 0);
+  const totalCatalogItems = Object.values(catalogCounts).reduce((sum, count) => sum + count, 0);
   const bothCatalogKinds = catalogLibraries.length > 1;
   const activeCatalogKind = catalogKind && catalogLibraries.some((library) => library.kind === catalogKind)
     ? catalogKind
@@ -111,6 +107,8 @@ export function GroupScreen({
     .sort((a, b) => addedAt(b) - addedAt(a) || a.title.localeCompare(b.title));
   const visibleCatalog = sortedCatalog.slice(0, CATALOG_PREVIEW_COUNT);
   const activeCatalogLibrary = catalogLibraries.find((library) => library.kind === activeCatalogKind) ?? null;
+  // The server sends only the newest few of each library, so how many more there are comes from the counts.
+  const remainingCatalog = Math.max(0, (activeCatalogKind ? catalogCounts[activeCatalogKind] ?? sortedCatalog.length : sortedCatalog.length) - visibleCatalog.length);
   const [groupBusy, setGroupBusy] = useState(false);
   const [groupError, setGroupError] = useState<string | null>(null);
   const [groupSuccess, setGroupSuccess] = useState<string | null>(null);
@@ -363,7 +361,7 @@ export function GroupScreen({
             : <EmptyState title={t("noChallengesTitle")} hint={canManage(group.role) ? t("challengeLimitReached", { limit: challengeLimit }) : t("noChallengesMember")} />}
         </section>
 
-        {sortedCatalog.length || canManage(group.role) ? (
+        {shelfData === null ? <CatalogShelfSkeleton title={t("catalogTitle")} /> : sortedCatalog.length || canManage(group.role) ? (
           <section>
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-baseline gap-2.5">
@@ -376,7 +374,7 @@ export function GroupScreen({
                 </button>
 
                 <span className="text-xs text-[var(--muted)]">
-                  {(catalog ?? []).length}
+                  {totalCatalogItems}
                 </span>
               </div>
 
@@ -404,7 +402,7 @@ export function GroupScreen({
                           >
                             <LibraryGlyph source={library.source} className="h-4 w-4" />
                             {libraryName(library)}
-                            <span className="text-[11px] opacity-70">{(catalog ?? []).filter((item) => item.kind === library.kind).length}</span>
+                            <span className="text-[11px] opacity-70">{catalogCounts[library.kind] ?? 0}</span>
                           </button>
                         );
                       })}
@@ -436,13 +434,13 @@ export function GroupScreen({
                       onOpen={() => onOpenCatalogItem(item.id)}
                     />
                   ))}
-                  {sortedCatalog.length > visibleCatalog.length ? (
+                  {remainingCatalog > 0 ? (
                     <button
                       type="button"
                       onClick={onOpenCatalog}
                       className="flex aspect-[3/4] w-44 flex-none cursor-pointer snap-start flex-col items-center justify-center gap-1.5 self-start rounded-[20px] border border-[var(--line)] bg-[var(--paper)] transition hover:border-[var(--main-line)]"
                     >
-                      <span className="text-3xl font-light tracking-[-0.04em]">{sortedCatalog.length - visibleCatalog.length}</span>
+                      <span className="text-3xl font-light tracking-[-0.04em]">{remainingCatalog}</span>
                       <span className="px-3 text-center text-xs text-[var(--muted)]">{t("catalogMoreIn", { name: activeCatalogLibrary ? libraryName(activeCatalogLibrary) : t("catalogTitle") })}</span>
                       <span className="mt-2.5 text-[13px] text-[var(--main-strong)]">{t("catalogSeeAll")} →</span>
                     </button>

@@ -50,6 +50,7 @@ import type {
 } from "./goa/types";
 import { CACHE_KEYS, clearCache, readCache, writeCache } from "./goa/cache";
 import { challengeRequestBody } from "./goa/challenge-request";
+import { prefetchCatalogShelf } from "./goa/libraries";
 import { AppHeader, BackButton, Brand, Button, cardClass, cx, EmptyState, LoadingView, PageHeading } from "./goa/ui";
 import { canManage, isPersonalChallenge } from "./goa/utils";
 
@@ -93,6 +94,10 @@ export default function GoaApp() {
     const pathMatch = window.location.pathname.match(/\/invites?\/([^/]+)/);
     const inviteToken = queryToken || (pathMatch ? decodeURIComponent(pathMatch[1]) : null);
     const routed = screenFromUrl(window.location.pathname, window.location.search);
+    // A page opened straight from its address needs its catalogue too — ask for it now, beside the
+    // bootstrap, instead of only once the page has drawn.
+    if (!inviteToken && routed?.kind === "personal-space") prefetchCatalogShelf("personal");
+    else if (!inviteToken && routed?.kind === "group") prefetchCatalogShelf({ groupId: routed.groupId });
 
     const PUBLIC_KINDS = new Set<Screen["kind"]>(["templates", "template", "about"]);
     const resolveScreen = (data: BootstrapData): Screen => {
@@ -682,7 +687,7 @@ export default function GoaApp() {
   return (
     <CsrfProvider token={bootstrap.csrfToken}>
     <div className="flex min-h-screen flex-col bg-[var(--canvas)] text-[var(--ink)]">
-      <AppHeader user={user} notifications={bootstrap.memberRequests} onHome={() => setScreen({ kind: "dashboard" })} onAccount={() => setScreen({ kind: "account" })} onOpenPersonalSpace={() => setScreen({ kind: "personal-space" })} onOpenNotes={() => setScreen({ kind: "notes" })} onOpenTemplates={() => setScreen({ kind: "templates" })} onOpenAbout={() => setScreen({ kind: "about" })} onLogout={logout} onAcceptRequest={(id) => respondToMemberRequest(id, "accept")} onDeclineRequest={(id) => respondToMemberRequest(id, "decline")} />
+      <AppHeader user={user} notifications={bootstrap.memberRequests} onHome={() => setScreen({ kind: "dashboard" })} onAccount={() => setScreen({ kind: "account" })} onOpenPersonalSpace={() => setScreen({ kind: "personal-space" })} onWarmPersonalSpace={() => prefetchCatalogShelf("personal")} onOpenNotes={() => setScreen({ kind: "notes" })} onOpenTemplates={() => setScreen({ kind: "templates" })} onOpenAbout={() => setScreen({ kind: "about" })} onLogout={logout} onAcceptRequest={(id) => respondToMemberRequest(id, "accept")} onDeclineRequest={(id) => respondToMemberRequest(id, "decline")} />
       <div className="flex-1">{content}</div>
     </div>
     </CsrfProvider>

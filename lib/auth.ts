@@ -47,11 +47,14 @@ interface UserRow {
 
 interface SessionRow extends UserRow {
   session_id: string;
+  last_seen_at: Date;
 }
 
 const DUMMY_PASSWORD_HASH =
   "PBKDF2-SHA256$v=1$i=600000$l=32$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 const SESSION_LIFETIME_MS = SESSION_COOKIE_MAX_AGE_SECONDS * 1_000;
+/** How stale `last_seen_at` may get before a request bothers to refresh it. */
+const SESSION_TOUCH_INTERVAL_MS = 15 * 60 * 1_000;
 const LOGIN_MAX_FAILURES = 10;
 
 /** Login accepts a username or an e-mail — resolve which, and how to normalize it. */
@@ -501,7 +504,7 @@ export async function sessionFromToken(rawToken: string | null): Promise<Session
   return withClient(async (client) => {
     const row = await oneOrNull<SessionRow>(
       client,
-      `SELECT s.id AS session_id, u.id, u.display_name, u.username, u.email, u.password_hash,
+      `SELECT s.id AS session_id, s.last_seen_at, u.id, u.display_name, u.username, u.email, u.password_hash,
               u.platform_admin, u.deactivated_at
          FROM sessions s
          JOIN users u ON u.id = s.user_id
@@ -510,11 +513,15 @@ export async function sessionFromToken(rawToken: string | null): Promise<Session
       [tokenHash],
     );
     if (!row) return null;
-    await client.query(
-      `UPDATE sessions SET last_seen_at = now()
-        WHERE id = $1 AND last_seen_at < now() - interval '15 minutes'`,
-      [row.session_id],
-    );
+    // "Last seen" only needs to be roughly right. Deciding staleness from the row we just read spares every
+    // request a database round trip that, nearly always, would have matched nothing.
+    if (Date.now() - new Date(row.last_seen_at).getTime() > SESSION_TOUCH_INTERVAL_MS) {
+      await client.query(
+        `UPDATE sessions SET last_seen_at = now()
+          WHERE id = $1 AND last_seen_at < now() - interval '15 minutes'`,
+        [row.session_id],
+      );
+    }
     return { id: row.session_id, rawToken, user: publicUser(row) };
   });
 }

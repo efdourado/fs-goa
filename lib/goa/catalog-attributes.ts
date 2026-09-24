@@ -287,29 +287,15 @@ export async function setCatalogItemAttributeValues(
   }
 }
 
-/** Batch-loads every filled-in attribute value for a set of catalog items. */
-export async function attributeValuesForItems(
-  client: PoolClient,
-  catalogItemIds: string[],
-): Promise<Map<string, CatalogAttributeValue[]>> {
+type AttributeValueRow = {
+  catalog_item_id: string; key: string; label: string; type: string;
+  text_value: string | null; number_value: number | null; date_value: string | null; boolean_value: boolean | null;
+};
+
+/** The attribute values as each item shows them: hidden or archived definitions and empty values stay out. */
+function attributeValueMap(rows: AttributeValueRow[]): Map<string, CatalogAttributeValue[]> {
   const map = new Map<string, CatalogAttributeValue[]>();
-  if (!catalogItemIds.length) return map;
-  const rows = await client.query<{
-    catalog_item_id: string; key: string; label: string; type: string;
-    text_value: string | null; number_value: number | null; date_value: string | null; boolean_value: boolean | null;
-  }>(
-    // `date_value::text`: a plain date must stay the calendar day that was
-    // stored — the driver would otherwise hand back a Date at local midnight,
-    // which serializes as a different instant depending on the server's zone.
-    `SELECT v.catalog_item_id, d.semantic_key AS key, d.label, d.type,
-            v.text_value, v.number_value, v.date_value::text AS date_value, v.boolean_value
-       FROM catalog_attribute_values v
-       JOIN catalog_attribute_defs d ON d.id = v.attribute_def_id AND d.archived_at IS NULL AND NOT d.hidden
-      WHERE v.catalog_item_id = ANY($1::text[])
-      ORDER BY d.position`,
-    [catalogItemIds],
-  );
-  for (const row of rows.rows) {
+  for (const row of rows) {
     const value = row.type === "number" ? row.number_value
       : row.type === "date" ? row.date_value
       : row.type === "boolean" ? row.boolean_value
@@ -320,6 +306,57 @@ export async function attributeValuesForItems(
     map.set(row.catalog_item_id, list);
   }
   return map;
+}
+
+// `date_value::text`: a plain date must stay the calendar day that was
+// stored — the driver would otherwise hand back a Date at local midnight,
+// which serializes as a different instant depending on the server's zone.
+const ATTRIBUTE_VALUE_COLUMNS = `v.catalog_item_id, d.semantic_key AS key, d.label, d.type,
+            v.text_value, v.number_value, v.date_value::text AS date_value, v.boolean_value`;
+
+/** Batch-loads every filled-in attribute value for a set of catalog items. */
+export async function attributeValuesForItems(
+  client: Pick<PoolClient, "query">,
+  catalogItemIds: string[],
+): Promise<Map<string, CatalogAttributeValue[]>> {
+  if (!catalogItemIds.length) return new Map();
+  const rows = await client.query<AttributeValueRow>(
+    `SELECT ${ATTRIBUTE_VALUE_COLUMNS}
+       FROM catalog_attribute_values v
+       JOIN catalog_attribute_defs d ON d.id = v.attribute_def_id AND d.archived_at IS NULL AND NOT d.hidden
+      WHERE v.catalog_item_id = ANY($1::text[])
+      ORDER BY d.position`,
+    [catalogItemIds],
+  );
+  return attributeValueMap(rows.rows);
+}
+
+/**
+ * The same values for a whole workspace's catalogue — or, with `perKind`, only for the newest items of each
+ * library (the head a page's shelf shows). Needing no list of ids, it can be asked at the same moment as the
+ * items themselves instead of after them.
+ */
+export async function attributeValuesForWorkspace(
+  client: Pick<PoolClient, "query">,
+  groupId: string,
+  perKind?: number,
+): Promise<Map<string, CatalogAttributeValue[]>> {
+  const limited = perKind !== undefined;
+  const rows = await client.query<AttributeValueRow>(
+    `SELECT ${ATTRIBUTE_VALUE_COLUMNS}
+       FROM catalog_attribute_values v
+       JOIN catalog_attribute_defs d ON d.id = v.attribute_def_id AND d.archived_at IS NULL AND NOT d.hidden
+      WHERE v.group_id = $1
+        AND v.catalog_item_id IN (${limited
+          ? `SELECT id FROM (
+               SELECT ci.id, row_number() OVER (PARTITION BY ci.kind ORDER BY ci.created_at DESC, ci.title) AS rn
+                 FROM catalog_items ci WHERE ci.group_id = $1 AND ci.archived_at IS NULL
+             ) ranked WHERE rn <= $2`
+          : "SELECT id FROM catalog_items WHERE group_id = $1 AND archived_at IS NULL"})
+      ORDER BY d.position`,
+    limited ? [groupId, perKind] : [groupId],
+  );
+  return attributeValueMap(rows.rows);
 }
 
 // --- Group-scoped endpoints -------------------------------------------------

@@ -71,4 +71,6 @@ export function clearCache(): void {
 export const CACHE_KEYS = {
   bootstrap: "bootstrap",
   challenge: (challengeId: string) => `challenge:${challengeId}`,
+  /** A catalogue shelf, by the request path that fetches it (one per workspace). */
+  shelf: (path: string) => `shelf:${path}`,
 } as const;

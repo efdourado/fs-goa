@@ -556,6 +556,7 @@ export function AppHeader({
   onHome,
   onAccount,
   onOpenPersonalSpace,
+  onWarmPersonalSpace,
   onOpenNotes,
   onOpenTemplates,
   onOpenAbout,
@@ -568,6 +569,8 @@ export function AppHeader({
   onHome: () => void;
   onAccount: () => void;
   onOpenPersonalSpace: () => void;
+  /** Called when the person is likely about to open My space (hover, focus, menu open), so its data can start loading. */
+  onWarmPersonalSpace?: () => void;
   onOpenNotes: () => void;
   onOpenTemplates: () => void;
   onOpenAbout: () => void;
@@ -584,7 +587,7 @@ export function AppHeader({
         <button className="cursor-pointer rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25" type="button" onClick={onHome}><Brand /></button>
         <div className="flex min-w-0 items-center gap-0.5 sm:gap-2">
           <button className={cx(navLink, "hidden items-center sm:inline-flex")} type="button" onClick={onHome}>{t("home")}</button>
-          <button className={cx(navLink, "hidden items-center sm:inline-flex")} type="button" onClick={onOpenPersonalSpace}>{t("mySpace")}</button>
+          <button className={cx(navLink, "hidden items-center sm:inline-flex")} type="button" onClick={onOpenPersonalSpace} onPointerEnter={onWarmPersonalSpace} onFocus={onWarmPersonalSpace}>{t("mySpace")}</button>
           <button className={cx(navLink, "hidden items-center sm:inline-flex")} type="button" onClick={onOpenNotes}>{t("notes")}</button>
           <button className={cx(navLink, "hidden items-center sm:inline-flex")} type="button" onClick={onOpenTemplates}>{t("templates")}</button>
           <button className={cx(navLink, "hidden items-center sm:inline-flex")} type="button" onClick={onOpenAbout}>{t("about")}</button>
@@ -626,7 +629,7 @@ export function AppHeader({
           >
             {busy ? t("signingOut") : t("signOut")}
           </button>
-          <HeaderOverflowMenu isPlatformAdmin={Boolean(user.platformAdmin)} busy={busy} onHome={onHome} onOpenPersonalSpace={onOpenPersonalSpace} onOpenNotes={onOpenNotes} onOpenTemplates={onOpenTemplates} onOpenAbout={onOpenAbout} onLogout={async () => { setBusy(true); try { await onLogout(); } finally { setBusy(false); } }} />
+          <HeaderOverflowMenu isPlatformAdmin={Boolean(user.platformAdmin)} busy={busy} onHome={onHome} onOpenPersonalSpace={onOpenPersonalSpace} onWarmPersonalSpace={onWarmPersonalSpace} onOpenNotes={onOpenNotes} onOpenTemplates={onOpenTemplates} onOpenAbout={onOpenAbout} onLogout={async () => { setBusy(true); try { await onLogout(); } finally { setBusy(false); } }} />
         </div>
       </div>
     </header>
@@ -643,6 +646,7 @@ function HeaderOverflowMenu({
   busy,
   onHome,
   onOpenPersonalSpace,
+  onWarmPersonalSpace,
   onOpenNotes,
   onOpenTemplates,
   onOpenAbout,
@@ -652,6 +656,7 @@ function HeaderOverflowMenu({
   busy: boolean;
   onHome: () => void;
   onOpenPersonalSpace: () => void;
+  onWarmPersonalSpace?: () => void;
   onOpenNotes: () => void;
   onOpenTemplates: () => void;
   onOpenAbout: () => void;
@@ -681,7 +686,7 @@ function HeaderOverflowMenu({
       <button
         className="grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-xl text-[var(--muted)] hover:bg-[var(--wash)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
         type="button"
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => { if (!open) onWarmPersonalSpace?.(); setOpen((value) => !value); }}
         aria-label={t("menu")}
         aria-expanded={open}
       >

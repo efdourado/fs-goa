@@ -8238,3 +8238,100 @@ test("um desafio personalizado aceita uma biblioteca embutida que ainda não tem
   );
   assert.ok(types.rows.some((row) => row.parent_type_id !== null), "o desafio nasceu em modo check-in, com um tipo filho por item");
 });
+
+test("prateleira do acervo: uma chamada traz as bibliotecas, a contagem de cada uma e só os 10 itens mais novos, com os atributos", async () => {
+  const owner = await register("Paula Prateleira", "paula_prateleira");
+  const stranger = await register("Rui Estranho", "rui_estranho");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Prateleira" } })).body as { id: string }).id;
+  const titles: string[] = [];
+  for (let n = 1; n <= 12; n += 1) {
+    const title = `Filme ${String(n).padStart(2, "0")}`;
+    titles.push(title);
+    assert.equal((await call("POST", `/api/groups/${gid}/catalog/items`, { session: owner, body: { kind: "film", title } })).response.status, 201);
+  }
+  const library = (await call("POST", `/api/groups/${gid}/catalog/libraries`, { session: owner, body: { label: "Treinos" } })).body as { id: string; kind: string };
+  const def = (await call("POST", `/api/groups/${gid}/catalog-attributes`, { session: owner, body: { libraryId: library.id, label: "Carga" } })).body as { key: string };
+  const workout = await call("POST", `/api/groups/${gid}/catalog/items`, {
+    session: owner, body: { libraryId: library.id, title: "Agachamento", attributes: { [def.key]: "80 kg" } },
+  });
+  assert.equal(workout.response.status, 201, JSON.stringify(workout.body));
+
+  type Shelf = {
+    libraries: Array<{ kind: string }>;
+    counts: Record<string, number>;
+    items: Array<{ id: string; title: string; kind: string; createdAt: string; attributes: Array<{ label: string; value: unknown }> }>;
+  };
+  const shelf = await call("GET", `/api/groups/${gid}/catalog/shelf`, { session: owner });
+  assert.equal(shelf.response.status, 200, JSON.stringify(shelf.body));
+  const data = shelf.body as Shelf;
+
+  assert.equal(data.counts.film, 12, "a contagem é do acervo todo, não do que veio");
+  assert.equal(data.counts[library.kind], 1);
+  assert.ok(data.libraries.some((entry) => entry.kind === "film") && data.libraries.some((entry) => entry.kind === library.kind));
+
+  const films = data.items.filter((item) => item.kind === "film");
+  assert.equal(films.length, 10, "no máximo 10 por biblioteca");
+  assert.deepEqual(films.map((item) => item.title).sort(), titles.slice(2).sort(), "os 10 mais novos: 03 a 12");
+  assert.ok(films.every((item) => typeof item.createdAt === "string"));
+  const squat = data.items.find((item) => item.title === "Agachamento");
+  assert.deepEqual(squat?.attributes.map((a) => [a.label, a.value]), [["Carga", "80 kg"]], "os atributos vêm junto");
+
+  // o que já foi para a lixeira sai da prateleira e da contagem
+  const removed = await call("POST", `/api/groups/${gid}/catalog/remove`, { session: owner, body: { itemIds: [data.items.find((item) => item.title === "Filme 12")!.id] } });
+  assert.equal(removed.response.status, 200, JSON.stringify(removed.body));
+  const after = (await call("GET", `/api/groups/${gid}/catalog/shelf`, { session: owner })).body as Shelf;
+  assert.equal(after.counts.film, 11);
+  const filmsAfter = after.items.filter((item) => item.kind === "film").map((item) => item.title).sort();
+  assert.deepEqual(filmsAfter, titles.slice(1, 11).sort(), "o próximo mais novo ocupa o lugar");
+
+  // só quem é do grupo vê; o resto da API do acervo não muda
+  const denied = await call("GET", `/api/groups/${gid}/catalog/shelf`, { session: stranger });
+  assert.ok([403, 404].includes(denied.response.status), `estranho recebeu ${denied.response.status}`);
+  assert.equal((await call("GET", `/api/groups/${gid}/catalog/shelf`)).response.status, 401);
+  const full = (await call("GET", `/api/groups/${gid}/catalog`, { session: owner })).body as { items: unknown[] };
+  assert.equal(full.items.length, 12, "a lista completa continua devolvendo tudo");
+});
+
+test("prateleira do acervo pessoal: só o acervo de quem pede, com contagem e limite por biblioteca", async () => {
+  const owner = await register("Pedro Pessoal", "pedro_pessoal");
+  const other = await register("Olga Outra", "olga_outra");
+  for (let n = 1; n <= 11; n += 1) {
+    assert.equal((await call("POST", "/api/personal/catalog/items", { session: owner, body: { kind: "film", title: `Meu ${String(n).padStart(2, "0")}` } })).response.status, 201);
+  }
+  assert.equal((await call("POST", "/api/personal/catalog/items", { session: other, body: { kind: "film", title: "Da Olga" } })).response.status, 201);
+
+  type Shelf = { counts: Record<string, number>; items: Array<{ title: string }> };
+  const mine = (await call("GET", "/api/personal/catalog/shelf", { session: owner })).body as Shelf;
+  assert.equal(mine.counts.film, 11);
+  assert.equal(mine.items.length, 10);
+  assert.ok(!mine.items.some((item) => item.title === "Meu 01"), "o mais antigo fica de fora");
+  assert.ok(!mine.items.some((item) => item.title === "Da Olga"), "nada de outra conta");
+
+  const theirs = (await call("GET", "/api/personal/catalog/shelf", { session: other })).body as Shelf;
+  assert.deepEqual([theirs.counts.film, theirs.items.map((item) => item.title)], [1, ["Da Olga"]]);
+  assert.equal((await call("GET", "/api/personal/catalog/shelf")).response.status, 401);
+
+  // quem nunca abriu o espaço pessoal recebe uma prateleira vazia, não um erro
+  const fresh = await register("Nova Pessoa", "nova_pessoa_prateleira");
+  const empty = await call("GET", "/api/personal/catalog/shelf", { session: fresh });
+  assert.equal(empty.response.status, 200, JSON.stringify(empty.body));
+  assert.deepEqual((empty.body as Shelf).items, []);
+});
+
+test("sessão: a última atividade só é regravada depois de 15 minutos, mas a sessão continua valendo", async () => {
+  const user = await register("Sara Sessão", "sara_sessao_touch");
+  const userSessions = async () => (await adminPool.query<{ id: string; last_seen_at: Date }>("SELECT id, last_seen_at FROM sessions WHERE user_id = $1", [user.user.id])).rows;
+  const [before] = await userSessions();
+  assert.ok(before, "a sessão existe");
+
+  // um pedido logo em seguida não mexe na marca
+  assert.equal((await call("GET", "/api/bootstrap", { session: user })).response.status, 200);
+  const [soon] = await userSessions();
+  assert.equal(soon.last_seen_at.getTime(), before.last_seen_at.getTime());
+
+  // passados 15 minutos, o próximo pedido atualiza
+  await adminPool.query("UPDATE sessions SET last_seen_at = now() - interval '20 minutes' WHERE id = $1", [before.id]);
+  assert.equal((await call("GET", "/api/bootstrap", { session: user })).response.status, 200);
+  const [later] = await userSessions();
+  assert.ok(Date.now() - later.last_seen_at.getTime() < 5 * 60 * 1000, "voltou a ser recente");
+});

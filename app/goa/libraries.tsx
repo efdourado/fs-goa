@@ -4,9 +4,10 @@ import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 
 import { API_PATHS, apiRequest } from "./api";
+import { CACHE_KEYS, readCache, writeCache } from "./cache";
 import { useGoaFormat } from "./format";
 import { RecipeIcon, type RecipeIconName } from "./recipe-icons";
-import type { CatalogLibrary, CatalogRecommender, Id } from "./types";
+import type { CatalogItem, CatalogLibrary, CatalogRecommender, Id } from "./types";
 import { cx } from "./ui";
 
 /** Where a catalogue lives: the caller's own space, or one group's. */
@@ -83,6 +84,68 @@ function useScopedList<T>(path: string, pick: (raw: never) => T): Loaded<T> {
   const reload = useCallback(() => setNonce((value) => value + 1), []);
   // A stale answer for a previous path must never show under the new one.
   return { data: state.path === path ? state.data : null, error: state.path === path ? state.error : null, reload };
+}
+
+/** What a page's catalogue shelf draws from: the libraries, how many items each holds, and the newest few of each. */
+export interface CatalogShelfData {
+  libraries: CatalogLibrary[];
+  /** Items per library, by its `kind` — the whole count, not just the ones in `items`. */
+  counts: Record<string, number>;
+  items: CatalogItem[];
+}
+
+const shelfInflight = new Map<string, Promise<CatalogShelfData>>();
+/** When a warm-up last brought a shelf in, so the page that opens right after does not ask for it again. */
+const shelfWarmedAt = new Map<string, number>();
+const WARM_ANSWER_MS = 5_000;
+
+/** Asks for a shelf once at a time: a prefetch already on its way is the request the page then waits on. */
+function fetchShelf(path: string): Promise<CatalogShelfData> {
+  let pending = shelfInflight.get(path);
+  if (!pending) {
+    pending = apiRequest<CatalogShelfData>(path)
+      .then((data) => {
+        writeCache(CACHE_KEYS.shelf(path), data);
+        return data;
+      })
+      .finally(() => shelfInflight.delete(path));
+    shelfInflight.set(path, pending);
+  }
+  return pending;
+}
+
+/** Starts loading a shelf before its page is open — on hovering the link, or beside the app's own first load. */
+export function prefetchCatalogShelf(scope: CatalogScope): void {
+  const path = API_PATHS.catalogWorkspace(scope).shelf;
+  if (readCache(CACHE_KEYS.shelf(path))) return;
+  fetchShelf(path).then(() => shelfWarmedAt.set(path, Date.now())).catch(() => undefined);
+}
+
+/**
+ * One request for the whole shelf, painted from the tab's last answer (the app's stale-while-revalidate cache)
+ * while a fresh one loads. `null` only when there is nothing recent to show.
+ */
+export function useCatalogShelf(scope: CatalogScope): CatalogShelfData | null {
+  const path = API_PATHS.catalogWorkspace(scope).shelf;
+  const [state, setState] = useState<{ path: string; data: CatalogShelfData | null }>(() => ({ path, data: readCache<CatalogShelfData>(CACHE_KEYS.shelf(path)) }));
+  useEffect(() => {
+    let active = true;
+    // An answer a warm-up fetched seconds ago is as good as a new one — use it once, then revalidate as usual.
+    const warmedAt = shelfWarmedAt.get(path);
+    shelfWarmedAt.delete(path);
+    if (warmedAt !== undefined && Date.now() - warmedAt < WARM_ANSWER_MS && readCache<CatalogShelfData>(CACHE_KEYS.shelf(path))) return;
+    fetchShelf(path)
+      .then((data) => {
+        shelfWarmedAt.delete(path); // the page has taken this answer; the next visit revalidates
+        if (active) setState({ path, data });
+      })
+      .catch(() => {
+        // A failed refresh keeps whatever is already showing; with nothing to show, the shelf just stays out of the way.
+        if (active) setState((current) => (current.path === path && current.data ? current : { path, data: { libraries: [], counts: {}, items: [] } }));
+      });
+    return () => { active = false; };
+  }, [path]);
+  return state.path === path ? state.data : readCache<CatalogShelfData>(CACHE_KEYS.shelf(path));
 }
 
 const pickLibraries = (raw: { libraries: CatalogLibrary[] }) => raw.libraries;

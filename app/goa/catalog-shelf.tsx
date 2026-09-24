@@ -1,24 +1,42 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { AddCardTile } from "./add-tile";
-import { API_PATHS, apiRequest } from "./api";
 import { CatalogTile, resolveCoverTop } from "./catalog-views";
 import { useGoaFormat } from "./format";
-import { type CatalogScope, LibraryGlyph, useCatalogLibraries, useLibraryName } from "./libraries";
+import { type CatalogScope, LibraryGlyph, useCatalogShelf, useLibraryName } from "./libraries";
 import { Rail, RailArrows, useShelfRail } from "./shelf";
-import type { CatalogItem, Id } from "./types";
+import type { Id } from "./types";
 import { cx, EmptyState } from "./ui";
 import { formatRuntime } from "./utils";
 
 /** A page shows only the head of the catalogue; the rest is one tap away. */
 const PREVIEW_COUNT = 10;
 
+/** Where the shelf's covers will be, drawn while the first answer is still on its way. */
+export function CatalogShelfSkeleton({ title }: { title: string }) {
+  return (
+    <section aria-busy="true">
+      <div className="mb-4 flex items-baseline gap-2.5">
+        <span className="text-lg font-semibold tracking-[-0.02em]">{title}</span>
+        <span className="h-3 w-5 animate-pulse rounded bg-[var(--wash-strong)]" aria-hidden="true" />
+      </div>
+      <div className="flex gap-4 overflow-hidden" aria-hidden="true">
+        {[0, 1, 2, 3, 4, 5].map((index) => (
+          <span key={index} className="block aspect-[3/4] w-44 flex-none animate-pulse rounded-[20px] bg-[var(--wash)]" style={{ animationDelay: `${index * 90}ms` }} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 /**
  * The catalogue as a preview on a page: the newest items of one library as a rail of covers, with the
  * libraries as tabs when more than one has items, an "Add item" tile, and a "N more" tile at the end.
+ * One request brings all of it (the server sends only the newest few of each library, plus the counts), and
+ * the last answer is painted straight away when the page is opened again.
  */
 export function CatalogShelf({ scope, canManage, onOpenCatalog, onOpenItem }: {
   scope: CatalogScope;
@@ -31,38 +49,30 @@ export function CatalogShelf({ scope, canManage, onOpenCatalog, onOpenItem }: {
   const tCat = useTranslations("catalog");
   const f = useGoaFormat();
   const libraryName = useLibraryName();
-  const { data: libraries } = useCatalogLibraries(scope);
-  const [items, setItems] = useState<CatalogItem[] | null>(null);
+  const data = useCatalogShelf(scope);
   const [activeKind, setActiveKind] = useState<string | null>(null);
   const { railRef, showFade, onScroll, nudge } = useShelfRail();
-  const scopeId = scope === "personal" ? "personal" : scope.groupId;
   const title = scope === "personal" ? t("myCatalogTitle") : t("catalogTitle");
 
-  useEffect(() => {
-    const controller = new AbortController();
-    apiRequest<{ items: CatalogItem[] }>(API_PATHS.catalogWorkspace(scope).list, { signal: controller.signal })
-      .then((response) => setItems(response.items))
-      .catch((cause: unknown) => {
-        if (cause instanceof DOMException && cause.name === "AbortError") return;
-        setItems([]);
-      });
-    return () => controller.abort();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scopeId]);
-
   // Each library is its own shelf — one sorted list never mixes them.
-  const all = items ?? [];
-  const shelves = (libraries ?? []).filter((library) => all.some((item) => item.kind === library.kind));
+  const counts = data?.counts ?? {};
+  const all = data?.items ?? [];
+  const shelves = (data?.libraries ?? []).filter((library) => (counts[library.kind] ?? 0) > 0);
+  const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
   const tabbed = shelves.length > 1;
   const kind = activeKind && shelves.some((library) => library.kind === activeKind) ? activeKind : shelves[0]?.kind ?? null;
-  const addedAt = (item: CatalogItem) => (item.createdAt ? Date.parse(item.createdAt) : 0);
+  const addedAt = (item: (typeof all)[number]) => (item.createdAt ? Date.parse(item.createdAt) : 0);
   const sorted = all
     .filter((item) => !tabbed || item.kind === kind)
     .sort((a, b) => addedAt(b) - addedAt(a) || a.title.localeCompare(b.title));
   const visible = sorted.slice(0, PREVIEW_COUNT);
   const shelf = shelves.find((library) => library.kind === kind) ?? null;
+  // The server sends only the newest few of each library, so how many more there are comes from the counts.
+  const inShelf = kind ? counts[kind] ?? sorted.length : sorted.length;
+  const remaining = Math.max(0, inShelf - visible.length);
 
-  if (items === null || (!sorted.length && !canManage)) return null;
+  if (data === null) return <CatalogShelfSkeleton title={title} />;
+  if (!sorted.length && !canManage) return null;
 
   return (
     <section>
@@ -71,7 +81,7 @@ export function CatalogShelf({ scope, canManage, onOpenCatalog, onOpenItem }: {
           <button type="button" onClick={onOpenCatalog} className="cursor-pointer text-lg font-semibold tracking-[-0.02em] hover:underline">
             {title}
           </button>
-          <span className="text-xs text-[var(--muted)]">{all.length}</span>
+          <span className="text-xs text-[var(--muted)]">{total}</span>
         </div>
         {sorted.length ? <RailArrows nudge={nudge} /> : null}
       </div>
@@ -94,7 +104,7 @@ export function CatalogShelf({ scope, canManage, onOpenCatalog, onOpenItem }: {
                   >
                     <LibraryGlyph source={library.source} className="h-4 w-4" />
                     {libraryName(library)}
-                    <span className="text-[11px] opacity-70">{all.filter((item) => item.kind === library.kind).length}</span>
+                    <span className="text-[11px] opacity-70">{counts[library.kind] ?? 0}</span>
                   </button>
                 );
               })}
@@ -116,13 +126,13 @@ export function CatalogShelf({ scope, canManage, onOpenCatalog, onOpenItem }: {
                 onOpen={() => onOpenItem(item.id)}
               />
             ))}
-            {sorted.length > visible.length ? (
+            {remaining > 0 ? (
               <button
                 type="button"
                 onClick={onOpenCatalog}
                 className="flex aspect-[3/4] w-44 flex-none cursor-pointer snap-start flex-col items-center justify-center gap-1.5 self-start rounded-[20px] border border-[var(--line)] bg-[var(--paper)] transition hover:border-[var(--main-line)]"
               >
-                <span className="text-3xl font-light tracking-[-0.04em]">{sorted.length - visible.length}</span>
+                <span className="text-3xl font-light tracking-[-0.04em]">{remaining}</span>
                 <span className="px-3 text-center text-xs text-[var(--muted)]">{t("catalogMoreIn", { name: shelf ? libraryName(shelf) : title })}</span>
                 <span className="mt-2.5 text-[13px] text-[var(--main-strong)]">{t("catalogSeeAll")} →</span>
               </button>

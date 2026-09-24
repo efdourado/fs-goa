@@ -1,10 +1,11 @@
 import type { PoolClient } from "pg";
 
 import { requireGroupRole, type SessionContext } from "../auth";
-import { inTransaction, oneOrNull, withClient } from "../db";
+import { getPool, inTransaction, oneOrNull, withClient } from "../db";
 import { ApiError, stringValue } from "../http";
 import {
   attributeValuesForItems,
+  attributeValuesForWorkspace,
   listDefsWithClient,
   setCatalogItemAttributeValues,
   updateAttributeDef,
@@ -411,8 +412,14 @@ export async function authorRequired(client: PoolClient, groupId: string, kind: 
   return hidden?.hidden !== true;
 }
 
-async function listCatalogWithClient(client: PoolClient, workspaceId: string) {
-  const items = await client.query<{
+/**
+ * A whole catalogue, or with `perKind` only the newest items of each library — the head a page's shelf shows.
+ * Anything with a `query` works, and handing it the pool (not one checked-out connection) lets the three reads
+ * below go out at the same moment.
+ */
+async function listCatalogWithClient(client: Pick<PoolClient, "query">, workspaceId: string, options: { perKind?: number } = {}) {
+  const limited = options.perKind !== undefined;
+  const itemsQuery = client.query<{
     id: string;
     kind: string;
     title: string;
@@ -450,7 +457,10 @@ async function listCatalogWithClient(client: PoolClient, workspaceId: string) {
               CASE WHEN active_rec.user_id IS NOT NULL THEN ru.display_name END AS recommended_by_user_name,
               ci.recommended_by_external_id, cr.display_name AS recommended_by_external_name,
               ci.origin_note
-         FROM catalog_items ci
+         FROM ${limited
+           ? `(SELECT c.*, row_number() OVER (PARTITION BY c.kind ORDER BY c.created_at DESC, c.title) AS rn
+                 FROM catalog_items c WHERE c.group_id = $1 AND c.archived_at IS NULL)`
+           : "catalog_items"} ci
          LEFT JOIN users ru ON ru.id = ci.recommended_by_user_id
          LEFT JOIN group_members active_rec ON active_rec.group_id = ci.group_id
           AND active_rec.user_id = ci.recommended_by_user_id AND active_rec.removed_at IS NULL
@@ -466,12 +476,15 @@ async function listCatalogWithClient(client: PoolClient, workspaceId: string) {
              JOIN challenge_fields f ON f.id = ev.field_id AND f.kind = 'rating'
             WHERE it.catalog_item_id = ci.id AND it.archived_at IS NULL
          ) agg ON true
-        WHERE ci.group_id = $1 AND ci.archived_at IS NULL
-        ORDER BY ci.title`,
-    [workspaceId],
+        WHERE ci.group_id = $1 AND ci.archived_at IS NULL${limited ? " AND ci.rn <= $2" : ""}
+        ORDER BY ${limited ? "ci.created_at DESC, ci.title" : "ci.title"}`,
+    limited ? [workspaceId, options.perKind] : [workspaceId],
   );
-  const attributesByItem = await attributeValuesForItems(client, items.rows.map((item) => item.id));
-  const showRecommenders = await recommendationsVisible(client, workspaceId);
+  const [items, attributesByItem, showRecommenders] = await Promise.all([
+    itemsQuery,
+    attributeValuesForWorkspace(client, workspaceId, options.perKind),
+    recommendationsVisible(client, workspaceId),
+  ]);
   return {
     items: items.rows.map((item) => ({
       id: item.id,
@@ -623,7 +636,7 @@ async function requireStandardWorkspace(
   }
 }
 
-async function personalWorkspaceId(client: PoolClient, userId: string): Promise<string | null> {
+async function personalWorkspaceId(client: Pick<PoolClient, "query">, userId: string): Promise<string | null> {
   const workspace = await oneOrNull<{ id: string }>(
     client,
     `SELECT id FROM groups
@@ -639,6 +652,52 @@ export async function listGroupCatalog(session: SessionContext, groupId: string)
     await requireStandardWorkspace(client, session.user.id, groupId, ["owner", "admin", "participant"]);
     return listCatalogWithClient(client, groupId);
   });
+}
+
+/** How many of a library's newest items a page's shelf shows. */
+export const SHELF_ITEMS_PER_LIBRARY = 10;
+
+/**
+ * Everything a page's catalogue shelf needs in one request: the libraries, how many items each holds, and the
+ * newest few of each. The shelf used to fetch the whole catalogue (and the libraries, separately) just to
+ * draw ten covers; every extra request and every extra query was another wait on the database.
+ */
+async function catalogShelf(db: Pick<PoolClient, "query">, workspaceId: string) {
+  const [list, libraries, counts] = await Promise.all([
+    listCatalogWithClient(db, workspaceId, { perKind: SHELF_ITEMS_PER_LIBRARY }),
+    listLibrariesWithClient(db, workspaceId),
+    db.query<{ kind: string; total: number }>(
+      "SELECT kind, count(*)::int AS total FROM catalog_items WHERE group_id = $1 AND archived_at IS NULL GROUP BY kind",
+      [workspaceId],
+    ),
+  ]);
+  return {
+    libraries,
+    counts: Object.fromEntries(counts.rows.map((row) => [row.kind, row.total])),
+    items: list.items,
+  };
+}
+
+export async function groupCatalogShelf(session: SessionContext, groupId: string) {
+  const db = getPool();
+  // The access check and the data don't depend on each other, so they go out together; nothing is returned unless the check passes.
+  const [, shelf] = await Promise.all([
+    (async () => {
+      await requireGroupRole(session.user.id, groupId, ["owner", "admin", "participant"]);
+      const group = await oneOrNull<{ kind: string }>(
+        db, "SELECT kind FROM groups WHERE id = $1 AND archived_at IS NULL AND deleted_at IS NULL", [groupId],
+      );
+      if (!group || group.kind !== "standard") throw new ApiError(404, "not_found", "Grupo não encontrado.");
+    })(),
+    catalogShelf(db, groupId),
+  ]);
+  return shelf;
+}
+
+export async function personalCatalogShelf(session: SessionContext) {
+  const db = getPool();
+  const workspaceId = await personalWorkspaceId(db, session.user.id);
+  return workspaceId ? catalogShelf(db, workspaceId) : { libraries: [], counts: {}, items: [] };
 }
 
 export async function catalogItemDetail(session: SessionContext, groupId: string, catalogItemId: string) {
@@ -748,7 +807,7 @@ function mapLibrary(row: LibraryRow): CatalogLibrary {
   };
 }
 
-async function listLibrariesWithClient(client: PoolClient, groupId: string): Promise<CatalogLibrary[]> {
+async function listLibrariesWithClient(client: Pick<PoolClient, "query">, groupId: string): Promise<CatalogLibrary[]> {
   const rows = await client.query<LibraryRow>(
     `SELECT id, kind, source, label, position, cover_top_property, cover_badge_hidden FROM catalog_libraries
       WHERE group_id = $1 AND archived_at IS NULL ORDER BY position, created_at`,
@@ -1284,7 +1343,7 @@ export async function renameCatalogRecommender(session: SessionContext, recommen
  * saved name.
  */
 /** Whether "who recommended it" may be shown for this workspace — false once its group switched recommendations off. */
-async function recommendationsVisible(client: PoolClient, workspaceId: string): Promise<boolean> {
+async function recommendationsVisible(client: Pick<PoolClient, "query">, workspaceId: string): Promise<boolean> {
   const group = await oneOrNull<{ recommendations_enabled: boolean }>(
     client, "SELECT recommendations_enabled FROM groups WHERE id = $1", [workspaceId],
   );

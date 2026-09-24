@@ -43,6 +43,8 @@ import {
   catalogItemDetail,
   createGroupLibrary,
   createGroupRecommender,
+  groupCatalogShelf,
+  personalCatalogShelf,
   createPersonalLibrary,
   deleteCatalogLibrary,
   createPersonalRecommender,
@@ -197,6 +199,9 @@ export async function GET(request: Request): Promise<Response> {
         { kind: params.get("kind"), libraryId: params.get("libraryId") }, params.get("title"),
       ));
     }
+    if (path[0] === "groups" && path[2] === "catalog" && path[3] === "shelf" && path.length === 4) {
+      return json(await groupCatalogShelf(await requireSession(request), path[1]));
+    }
     if (path[0] === "groups" && path[2] === "catalog" && path[3] === "libraries" && path.length === 4) {
       return json(await listGroupLibraries(await requireSession(request), path[1]));
     }
@@ -218,6 +223,9 @@ export async function GET(request: Request): Promise<Response> {
         await requireSession(request),
         { kind: params.get("kind"), libraryId: params.get("libraryId") }, params.get("title"),
       ));
+    }
+    if (path[0] === "personal" && path[1] === "catalog" && path[2] === "shelf" && path.length === 3) {
+      return json(await personalCatalogShelf(await requireSession(request)));
     }
     if (path[0] === "personal" && path[1] === "catalog" && path[2] === "libraries" && path.length === 3) {
       return json(await listPersonalLibraries(await requireSession(request)));
