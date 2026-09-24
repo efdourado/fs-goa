@@ -90,7 +90,7 @@ export function AuthScreen({
           ) : null}
           <h1 className="mt-2 text-3xl font-light tracking-[-0.045em]">{heading}</h1>
           <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{subheading}</p>
-          <p className="mt-3 rounded-xl bg-[var(--wash)] px-4 py-3 text-xs leading-5 text-[var(--muted)]">{t("reassure")}</p>
+          {mode === "register" ? <p className="mt-3 rounded-xl bg-[var(--wash)] px-4 py-3 text-xs leading-5 text-[var(--muted)]">{t("reassure")}</p> : null}
 
           <form className="mt-6 space-y-4" onSubmit={submit}>
             {mode === "register" ? (
@@ -134,7 +134,7 @@ export function AuthScreen({
 
           <p className="mt-3 text-center text-sm text-[var(--muted)]">
             {mode === "login" ? t("noAccount") : t("hasAccount")}
-            <button className="min-h-11 font-light underline-offset-4 hover:underline cursor-pointer" type="button" onClick={() => goTo(mode === "login" ? "register" : "login")}>
+            <button className="min-h-11 font-medium text-[var(--main-strong)] underline-offset-4 hover:underline cursor-pointer" type="button" onClick={() => goTo(mode === "login" ? "register" : "login")}>
               {mode === "login" ? t("goRegister") : t("goLogin")}
             </button>
           </p>
