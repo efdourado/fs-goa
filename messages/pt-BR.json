@@ -203,8 +203,8 @@
     "start": "Início",
     "end": "Término",
     "duration": "Duração",
-    "durationHint": "Escolha um atalho ou digite os dias — o término se ajusta a partir do início{today}.",
-    "durationHintToday": " (hoje, até você escolher outra data)",
+    "durationHint": "Começa hoje, a menos que você escolha datas exatas.",
+    "exactDates": "Datas exatas",
     "durationDaysAria": "Duração em dias",
     "days": "dias",
     "preset": {

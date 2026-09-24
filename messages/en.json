@@ -203,8 +203,8 @@
     "start": "Start",
     "end": "End",
     "duration": "Duration",
-    "durationHint": "Pick a shortcut or type the number of days — the end date follows the start{today}.",
-    "durationHintToday": " (today, until you pick another date)",
+    "durationHint": "Starts today unless you choose exact dates.",
+    "exactDates": "Exact dates",
     "durationDaysAria": "Duration in days",
     "days": "days",
     "preset": {

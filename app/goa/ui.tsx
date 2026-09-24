@@ -466,9 +466,9 @@ const DURATION_PRESETS: Array<{ key: "d30" | "d60" | "d90" | "m6" | "y1"; shift:
 ];
 
 /**
- * Início/término pair with duration shortcuts: pick "90 dias" (or type the day
- * count) and the end date is derived from the start — no calendar counting. The
- * start can sit in the past, so a challenge run before the app can be rebuilt.
+ * How long a challenge runs: one tap on a duration ("90 days") and the end date follows the start — no
+ * calendar counting. The exact dates (and a free number of days) sit one fold below for the rare case that
+ * needs them. The start can sit in the past, so a challenge run before the app can be rebuilt.
  */
 export function SchedulePeriodFields({
   startsOn,
@@ -488,6 +488,10 @@ export function SchedulePeriodFields({
   const today = dateKeyInSaoPaulo(new Date());
   const anchor = startsOn || today;
   const duration = inclusiveDayCount(startsOn, endsOn);
+  const matchesPreset = (preset: (typeof DURATION_PRESETS)[number]) => Boolean(startsOn && endsOn) && shiftDateKey(anchor, preset.shift) === endsOn;
+  // Dates that no shortcut produces are already the "exact" kind: show them open. Decided once, so the fold
+  // never jumps shut under someone typing a day count that happens to equal a shortcut.
+  const [openExact] = useState(() => Boolean(startsOn && endsOn) && !DURATION_PRESETS.some(matchesPreset));
 
   function applyShift(shift: { days?: number; months?: number }) {
     if (!startsOn) onStartsOn(anchor);
@@ -495,58 +499,63 @@ export function SchedulePeriodFields({
   }
 
   return (
-    <>
-      <label>
-        <span className={labelClass}>{t("start")}</span>
-        <input className={inputClass} type="date" value={startsOn} onChange={(event) => onStartsOn(event.target.value)} required disabled={disabled} />
-      </label>
-      <label>
-        <span className={labelClass}>{t("end")}</span>
-        <input className={inputClass} type="date" min={startsOn || undefined} value={endsOn} onChange={(event) => onEndsOn(event.target.value)} required disabled={disabled} />
-      </label>
-      <div className="sm:col-span-2">
-        <span className={labelClass}>{t("duration")}</span>
-        <p className="text-xs leading-5 text-[var(--muted)]">{t("durationHint", { today: startsOn ? "" : t("durationHintToday") })}</p>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          {DURATION_PRESETS.map((preset) => {
-            const active = Boolean(startsOn && endsOn) && shiftDateKey(anchor, preset.shift) === endsOn;
-            return (
-              <button
-                key={preset.key}
-                type="button"
-                disabled={disabled}
-                aria-pressed={active}
-                onClick={() => applyShift(preset.shift)}
-                className={cx(
-                  "min-h-9 rounded-full border px-3 text-xs transition disabled:cursor-not-allowed disabled:opacity-60",
-                  active ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] text-[var(--muted)] hover:border-[var(--main-line)]",
-                )}
-              >
-                {t(`preset.${preset.key}`)}
-              </button>
-            );
-          })}
-          <label className="flex items-center gap-1.5 text-xs text-[var(--muted)]">
-            <input
-              type="number"
-              min={1}
-              max={3660}
-              inputMode="numeric"
+    <div className="sm:col-span-2">
+      <span className={labelClass}>{t("duration")}</span>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        {DURATION_PRESETS.map((preset) => {
+          const active = matchesPreset(preset);
+          return (
+            <button
+              key={preset.key}
+              type="button"
               disabled={disabled}
-              value={duration ?? ""}
-              onChange={(event) => {
-                const days = Number(event.target.value);
-                if (Number.isInteger(days) && days >= 1 && days <= 3660) applyShift({ days: days - 1 });
-              }}
-              className="w-16 rounded-lg border border-[var(--line)] bg-[var(--paper)] px-2 py-1.5 text-center text-sm text-[var(--ink)] outline-none focus:border-[var(--main)] disabled:cursor-not-allowed disabled:bg-[var(--canvas)]"
-              aria-label={t("durationDaysAria")}
-            />
-            {t("days")}
-          </label>
-        </div>
-        {duration ? <p className="mt-2 text-xs text-[var(--muted)]">{t("span", { count: duration, range: f.dateRange(startsOn, endsOn) })}</p> : null}
+              aria-pressed={active}
+              onClick={() => applyShift(preset.shift)}
+              className={cx(
+                "min-h-10 rounded-full border px-4 text-sm transition disabled:cursor-not-allowed disabled:opacity-60",
+                active ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] text-[var(--muted)] hover:border-[var(--main-line)]",
+              )}
+            >
+              {t(`preset.${preset.key}`)}
+            </button>
+          );
+        })}
       </div>
-    </>
+      <p className="mt-2 text-xs leading-5 text-[var(--muted)]">
+        {duration ? t("span", { count: duration, range: f.dateRange(startsOn, endsOn) }) : t("durationHint")}
+      </p>
+      <div className="mt-2">
+        <Disclosure summary={t("exactDates")} defaultOpen={openExact}>
+          <div className="grid gap-4 pt-1 sm:grid-cols-2">
+            <label>
+              <span className={labelClass}>{t("start")}</span>
+              <input className={inputClass} type="date" value={startsOn} onChange={(event) => onStartsOn(event.target.value)} disabled={disabled} />
+            </label>
+            <label>
+              <span className={labelClass}>{t("end")}</span>
+              <input className={inputClass} type="date" min={startsOn || undefined} value={endsOn} onChange={(event) => onEndsOn(event.target.value)} disabled={disabled} />
+            </label>
+            <label className="sm:col-span-2 flex items-center gap-2 text-sm text-[var(--muted)]">
+              <span>{t("durationDaysAria")}</span>
+              <input
+                type="number"
+                min={1}
+                max={3660}
+                inputMode="numeric"
+                disabled={disabled}
+                value={duration ?? ""}
+                onChange={(event) => {
+                  const days = Number(event.target.value);
+                  if (Number.isInteger(days) && days >= 1 && days <= 3660) applyShift({ days: days - 1 });
+                }}
+                className="w-20 rounded-lg border border-[var(--line)] bg-[var(--paper)] px-2 py-1.5 text-center text-sm text-[var(--ink)] outline-none focus:border-[var(--main)] disabled:cursor-not-allowed disabled:bg-[var(--canvas)]"
+              />
+              {t("days")}
+            </label>
+          </div>
+        </Disclosure>
+      </div>
+    </div>
   );
 }
 

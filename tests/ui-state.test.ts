@@ -180,7 +180,19 @@ test("campos de período oferecem atalhos de duração e refletem o span atual",
     onStartsOn: () => undefined,
     onEndsOn: () => undefined,
   }));
-  assert.match(empty, /hoje, até você escolher/);
+  assert.match(empty, /Começa hoje, a menos que você escolha datas exatas/);
+
+  // As datas exatas ficam recolhidas quando um atalho explica o período, e abertas quando nenhum explica.
+  assert.match(withPeriod, /<details(?![^>]*\sopen)/);
+  assert.doesNotMatch(empty, /<details[^>]*\sopen/);
+  const custom = renderWithIntl(createElement(SchedulePeriodFields, {
+    startsOn: "2026-08-30",
+    endsOn: "2026-09-14",
+    onStartsOn: () => undefined,
+    onEndsOn: () => undefined,
+  }));
+  assert.match(custom, /<details[^>]*\sopen/);
+  assert.match(custom, /Datas exatas/);
 });
 
 test("explica por que um registro está indisponível sem chamar futuro de encerrado", () => {

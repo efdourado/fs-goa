@@ -203,8 +203,8 @@
     "start": "Inicio",
     "end": "Fin",
     "duration": "Duración",
-    "durationHint": "Elige un atajo o escribe los días — la fecha de fin se ajusta a partir del inicio{today}.",
-    "durationHintToday": " (hoy, hasta que elijas otra fecha)",
+    "durationHint": "Empieza hoy, salvo que elijas fechas exactas.",
+    "exactDates": "Fechas exactas",
     "durationDaysAria": "Duración en días",
     "days": "días",
     "preset": {
