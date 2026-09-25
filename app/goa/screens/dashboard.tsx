@@ -8,6 +8,7 @@ import { Dialog } from "../dialog";
 import { useGoaFormat } from "../format";
 import { API_PATHS, apiRequest } from "../api";
 import { CatalogShelf } from "../catalog-shelf";
+import { useHomePrefs } from "../home-prefs";
 import { HomeSideLink, HomeViewPanel, resolveHomeView, visibleSections } from "../home-view";
 import { applyColorFilter, OrganizeBar, useChallengeOrganizer } from "../organize";
 import { Segmented } from "../Segmented";
@@ -410,8 +411,11 @@ export function DashboardScreen({
   const tr = useTranslations("roles");
   const tQuick = useTranslations("quickCreate");
 
+  const prefs = useHomePrefs();
   const [showGroupDialog, setShowGroupDialog] = useState(false);
-  const [showViewPanel, setShowViewPanel] = useState(false);
+  const [viewPanelOpen, setShowViewPanel] = useState(false);
+  // The View button is opt-in (header preferences); switched off, the arrangement stays as it is.
+  const showViewPanel = viewPanelOpen && prefs.showView;
   const [world, setWorld] = useState<WorldFilter>("all");
   const [saved, setSaved] = useState<HomeView | null>(homeView);
   const [viewError, setViewError] = useState<string | null>(null);
@@ -439,6 +443,7 @@ export function DashboardScreen({
     onChanged,
     keys: CHALLENGE_SHELF_ORDER,
     split: (ordered) => splitShelves(ordered, personalWorkspaceId, { mixed, sections: shownSections }),
+    orderLocked: prefs.lockOrder,
   });
 
   async function saveView(next: HomeView | null) {
@@ -567,7 +572,7 @@ export function DashboardScreen({
       <PageHeading
         title={t("greeting", { name: user.name.split(" ")[0] })}
         description={brandNew ? tWelcome("lede") : t("subtitle")}
-        action={brandNew ? undefined : (
+        action={brandNew || !prefs.showView ? undefined : (
           <button
             type="button"
             onClick={() => setShowViewPanel((open) => !open)}
@@ -615,7 +620,7 @@ export function DashboardScreen({
       ) : null}
 
       {hasAnyChallenge ? (
-        <OrganizeBar colorFilter={colorFilter} onColorFilter={setColorFilter} reorderMode={reorderMode} onReorderMode={setReorderMode} filteredCount={filteredCount} />
+        <OrganizeBar colorFilter={colorFilter} onColorFilter={setColorFilter} reorderMode={reorderMode} onReorderMode={setReorderMode} filteredCount={filteredCount} allowReorder={!prefs.lockOrder} />
       ) : null}
 
       <StatusMessage error={error} />

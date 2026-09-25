@@ -23,8 +23,10 @@ export function applyColorFilter(
  * shuffled, so it never scrambles what the other page shows. `challenges` is therefore always the full list;
  * `split` picks out the sections this page draws.
  */
-export function useChallengeOrganizer<K extends string>({ challenges, csrfToken, onChanged, keys, split }: {
+export function useChallengeOrganizer<K extends string>({ challenges, csrfToken, onChanged, keys, split, orderLocked = false }: {
   challenges: ChallengeSummary[];
+  /** The viewer locked the order: no reordering at all — pin and colour still work. */
+  orderLocked?: boolean;
   csrfToken: string;
   onChanged?: () => void;
   /** The page's sections, in the order they appear. */
@@ -34,7 +36,8 @@ export function useChallengeOrganizer<K extends string>({ challenges, csrfToken,
 }) {
   const t = useTranslations("dashboard");
   const [colorFilter, setColorFilter] = useState<ChallengeColorTag | null>(null);
-  const [reorderMode, setReorderMode] = useState(false);
+  const [reorderRequested, setReorderMode] = useState(false);
+  const reorderMode = reorderRequested && !orderLocked;
   const [error, setError] = useState<string | null>(null);
 
   const propKey = challenges.map((c) => `${c.id}:${c.pinned ? 1 : 0}:${c.colorTag ?? ""}:${c.sortIndex ?? ""}`).join("|");
@@ -114,11 +117,11 @@ export function useChallengeOrganizer<K extends string>({ challenges, csrfToken,
     const fullIds = shelves[shelfKey].map((c) => c.id);
     const at = fullIds.indexOf(challenge.id);
     return {
-      canMoveUp: at > 0,
-      canMoveDown: at > -1 && at < fullIds.length - 1,
+      canMoveUp: !orderLocked && at > 0,
+      canMoveDown: !orderLocked && at > -1 && at < fullIds.length - 1,
       onTogglePin: (id: Id) => patchPref(id, { pinned: !byId.get(id)?.pinned }),
       onSetColor: (id: Id, tag: ChallengeColorTag | null) => patchPref(id, { colorTag: tag }),
-      onMove: move,
+      onMove: orderLocked ? undefined : move,
       onManage,
       reorderMode,
       dragHandlers: reorderMode
@@ -136,8 +139,10 @@ export function useChallengeOrganizer<K extends string>({ challenges, csrfToken,
 }
 
 /** The colour filter and the Reorder switch above a page's challenges. */
-export function OrganizeBar({ colorFilter, onColorFilter, reorderMode, onReorderMode, filteredCount }: {
+export function OrganizeBar({ colorFilter, onColorFilter, reorderMode, onReorderMode, filteredCount, allowReorder = true }: {
   colorFilter: ChallengeColorTag | null;
+  /** False when the viewer locked the order — the Reorder switch goes away. */
+  allowReorder?: boolean;
   onColorFilter: (tag: ChallengeColorTag | null) => void;
   reorderMode: boolean;
   onReorderMode: (on: boolean) => void;
@@ -181,7 +186,7 @@ export function OrganizeBar({ colorFilter, onColorFilter, reorderMode, onReorder
           <CircleMinusIcon className="h-4 w-4" />
           {t("filter.context", { count: filteredCount })}
         </button>
-      ) : (
+      ) : allowReorder ? (
         <button
           type="button"
           onClick={() => onReorderMode(!reorderMode)}
@@ -196,7 +201,7 @@ export function OrganizeBar({ colorFilter, onColorFilter, reorderMode, onReorder
           <DragDotsIcon className="h-3.5 w-3.5" />
           {reorderMode ? t("filter.reorderDone") : t("filter.reorder")}
         </button>
-      )}
+      ) : null}
     </div>
   );
 }

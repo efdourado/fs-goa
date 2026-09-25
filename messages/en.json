@@ -35,7 +35,10 @@
     "wait": "Please wait…"
   },
   "settings": {
-    "legend": "Preferences"
+    "legend": "Preferences",
+    "homeLegend": "Home",
+    "showView": "Show the View button",
+    "lockOrder": "Lock the order"
   },
   "theme": {
     "legend": "Theme",

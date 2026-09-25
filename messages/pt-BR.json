@@ -35,7 +35,10 @@
     "wait": "Aguarde…"
   },
   "settings": {
-    "legend": "Preferências"
+    "legend": "Preferências",
+    "homeLegend": "Início",
+    "showView": "Mostrar o botão Exibição",
+    "lockOrder": "Travar a ordem"
   },
   "theme": {
     "legend": "Tema",

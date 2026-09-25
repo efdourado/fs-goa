@@ -614,9 +614,10 @@ export function AppHeader({
               onAcceptRequest={onAcceptRequest}
               onDeclineRequest={onDeclineRequest}
             />
-            <SettingsMenu />
+            <SettingsMenu homeOptions />
           </div>
           <MobileHeaderMenu
+            homeOptions
             notifications={notifications}
             onAcceptRequest={onAcceptRequest}
             onDeclineRequest={onDeclineRequest}

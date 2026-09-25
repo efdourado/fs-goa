@@ -8,6 +8,7 @@ import { locales } from "@/i18n/config";
 import { setUserLocale } from "@/i18n/locale";
 import type { Id, MemberRequest } from "./types";
 import { BottomSheet } from "./bottom-sheet";
+import { HomePrefsToggles } from "./home-prefs";
 import { Segmented } from "./Segmented";
 import { ThemeToggle } from "./ThemeToggle";
 import { cx, NotificationBell, NotificationList } from "./ui";
@@ -58,8 +59,11 @@ export function MobileHeaderMenu({
   notifications,
   onAcceptRequest,
   onDeclineRequest,
+  homeOptions = false,
 }: {
   notifications: MemberRequest[];
+  /** Signed in: also the Home switches (View button, order lock). */
+  homeOptions?: boolean;
   onAcceptRequest: (id: Id) => Promise<void>;
   onDeclineRequest: (id: Id) => Promise<void>;
 }) {
@@ -100,13 +104,23 @@ export function MobileHeaderMenu({
             <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--muted)]">{tLang("legend")}</h3>
             <LanguageSegmented />
           </section>
+          {homeOptions ? (
+            <section className="mt-5">
+              <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--muted)]">{t("homeLegend")}</h3>
+              <HomePrefsToggles />
+            </section>
+          ) : null}
         </BottomSheet>
       ) : null}
     </div>
   );
 }
 
-export function SettingsMenu({ className }: { className?: string }) {
+export function SettingsMenu({ className, homeOptions = false }: {
+  className?: string;
+  /** Signed in: also the Home switches (View button, order lock). */
+  homeOptions?: boolean;
+}) {
   const t = useTranslations("settings");
   const tTheme = useTranslations("theme");
   const tLang = useTranslations("language");
@@ -164,6 +178,12 @@ export function SettingsMenu({ className }: { className?: string }) {
             {label(tLang("legend"))}
             <LanguageSegmented className="mt-2" />
           </div>
+          {homeOptions ? (
+            <div>
+              {label(t("homeLegend"))}
+              <div className="mt-1"><HomePrefsToggles /></div>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>
