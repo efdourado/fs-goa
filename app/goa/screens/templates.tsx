@@ -27,7 +27,7 @@ function PublicChrome({ user, onSignIn, children }: { user: User | null; onSignI
   return (
     <div className="flex min-h-screen flex-col bg-[var(--canvas)] text-[var(--ink)]">
       <header className="sticky top-0 z-30 border-b border-[var(--edge)] bg-[var(--canvas)]/92 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:h-[76px] sm:px-6">
+        <div className="flex h-16 items-center justify-between px-4 sm:h-[76px] sm:px-6 lg:px-10">
           <Brand />
           <div className="flex items-center gap-2">
             <SettingsMenu />
@@ -79,7 +79,7 @@ export function TemplatesScreen({
   const front = pickFrontPage(templates ?? []);
 
   const body = (
-    <main className="mx-auto max-w-7xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
+    <main className="px-4 py-8 pb-24 sm:px-6 sm:py-12 lg:px-10">
       {user ? (
         <>
           <BackButton onClick={onBack} label={backLabel ?? t("back")} className="mb-6" />
@@ -105,7 +105,7 @@ export function TemplatesScreen({
         {front.rest.length ? (
           <h2 className="mb-5 mt-14 border-t border-[var(--line)] pt-6 text-lg font-medium tracking-[-0.03em] sm:text-xl">{t("moreTitle")}</h2>
         ) : null}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
           {front.rest.map((template) => (
             <article
               key={template.id}

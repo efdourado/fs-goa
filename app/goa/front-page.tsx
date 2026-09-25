@@ -93,19 +93,19 @@ export function storyExcerpt(
 
 // ── the stories ─────────────────────────────────────────────────────────
 
-function StorySkeleton({ lead }: { lead: boolean }) {
+function StorySkeleton() {
   return (
     <div aria-busy="true" className="space-y-4">
       <span className="block h-3 w-32 animate-pulse rounded bg-[var(--wash-strong)]" />
-      <span className={cx("block animate-pulse rounded-xl bg-[var(--wash)]", lead ? "h-24" : "h-16")} />
+      <span className="block h-24 animate-pulse rounded-xl bg-[var(--wash)]" />
       <span className="block h-4 w-3/4 animate-pulse rounded bg-[var(--wash)]" />
-      <span className={cx("block animate-pulse rounded-2xl bg-[var(--wash)]", lead ? "h-28" : "h-20")} />
+      <span className="block h-28 animate-pulse rounded-2xl bg-[var(--wash)]" />
     </div>
   );
 }
 
 /** One featured template, laid out like a newspaper story: kicker, headline, lede, its numbers and a quote. */
-function Story({ template, lead, onOpen }: { template: TemplateSummary; lead: boolean; onOpen: (id: Id) => void }) {
+function Story({ template, onOpen }: { template: TemplateSummary; onOpen: (id: Id) => void }) {
   const t = useTranslations("templates");
   const f = useGoaFormat();
   const locale = useLocale();
@@ -122,7 +122,7 @@ function Story({ template, lead, onOpen }: { template: TemplateSummary; lead: bo
     return () => controller.abort();
   }, [template.id]);
 
-  if (!detail && !failed) return <StorySkeleton lead={lead} />;
+  if (!detail && !failed) return <StorySkeleton />;
 
   const headline = detail?.result?.headline || template.title;
   const lede = detail?.result?.summary || template.summary;
@@ -132,7 +132,7 @@ function Story({ template, lead, onOpen }: { template: TemplateSummary; lead: bo
     criticNote: (average) => t("storyCriticNote", { average }),
     fmt: (value) => value.toLocaleString(locale, { maximumFractionDigits: 2 }),
   };
-  const { stats, quote } = detail ? storyExcerpt(detail, lead ? 3 : 2, labels) : { stats: [], quote: null };
+  const { stats, quote } = detail ? storyExcerpt(detail, 3, labels) : { stats: [], quote: null };
   const dates = detail ? f.dateRange(detail.startsOn, detail.endsOn) : "";
   const kicker = [headline !== template.title ? template.title : null, dates || null, t(`mode.${template.submissionMode}`)].filter(Boolean).join(" · ");
   const facts = [
@@ -144,34 +144,31 @@ function Story({ template, lead, onOpen }: { template: TemplateSummary; lead: bo
   return (
     <article className="flex min-w-0 flex-col">
       <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">{kicker}</p>
-      <h2 className={cx(
-        "mt-3 font-light tracking-[-0.05em]",
-        lead ? "text-4xl leading-[1.02] sm:text-5xl" : "text-3xl leading-[1.05]",
-      )}>
+      <h2 className="mt-3 text-4xl font-light leading-[1.02] tracking-[-0.05em] sm:text-5xl">
         <button type="button" onClick={() => onOpen(template.id)} className="cursor-pointer text-left hover:underline hover:decoration-1 hover:underline-offset-4 focus-visible:outline-none">
           {headline}
         </button>
       </h2>
-      {lede ? <p className={cx("mt-4 max-w-2xl leading-7 text-[var(--muted)]", lead ? "text-base line-clamp-4" : "text-sm line-clamp-3")}>{lede}</p> : null}
+      {lede ? <p className="mt-4 line-clamp-4 max-w-2xl text-base leading-7 text-[var(--muted)]">{lede}</p> : null}
 
       {stats.length ? (
-        <dl className={cx("mt-6 grid gap-x-6 gap-y-5 border-t-2 border-[var(--ink)] pt-4", stats.length >= 3 ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2")}>
+        <dl className={cx("mt-8 grid gap-x-6 gap-y-5", stats.length >= 3 ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2")}>
           {stats.map((stat) => (
             <div key={stat.label} className="min-w-0">
-              <dd className={cx("font-medium tracking-[-0.04em] tabular-nums", stat.note ? "line-clamp-2 text-xl leading-tight" : lead ? "text-4xl" : "text-3xl")}>{stat.value}</dd>
+              <dd className={cx("font-medium tracking-[-0.04em] tabular-nums", stat.note ? "line-clamp-2 text-xl leading-tight" : "text-4xl")}>{stat.value}</dd>
               {stat.note ? <dd className="mt-0.5 text-sm tabular-nums text-[var(--main-strong)]">{stat.note}</dd> : null}
               <dt className="mt-1 text-xs leading-5 text-[var(--muted)]">{stat.label}</dt>
             </div>
           ))}
         </dl>
       ) : facts ? (
-        <p className="mt-6 border-t-2 border-[var(--ink)] pt-4 text-sm text-[var(--muted)]">{facts}</p>
+        <p className="mt-8 text-sm text-[var(--muted)]">{facts}</p>
       ) : null}
 
       {quote ? (
         <figure className="mt-6 border-l-2 border-[var(--main)] pl-4">
-          <div className={cx("overflow-hidden", lead ? "line-clamp-4" : "line-clamp-3")}>
-            <CommentText text={quote.text} className={lead ? "text-lg font-light" : "text-base font-light"} />
+          <div className="line-clamp-4 overflow-hidden">
+            <CommentText text={quote.text} className="text-lg font-light" />
           </div>
           {quote.itemTitle ? <figcaption className="mt-2 text-xs text-[var(--muted)]">{quote.itemTitle}</figcaption> : null}
         </figure>
@@ -186,19 +183,17 @@ function Story({ template, lead, onOpen }: { template: TemplateSummary; lead: bo
   );
 }
 
-/** The gallery's front page: the lead story wide, the second beside it (stacked on a phone). */
+/** The gallery's front page: the two featured stories side by side, the same size (stacked on a phone). */
 export function FrontPageStories({ featured, onOpen }: { featured: TemplateSummary[]; onOpen: (id: Id) => void }) {
   if (!featured.length) return null;
-  const [lead, second] = featured;
   return (
     <section className="border-t-2 border-[var(--ink)] pt-8">
-      <div className={cx("grid gap-10", second && "lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]")}>
-        <Story template={lead} lead onOpen={onOpen} />
-        {second ? (
-          <div className="border-t border-[var(--line)] pt-10 lg:border-l lg:border-t-0 lg:pl-10 lg:pt-0">
-            <Story template={second} lead={false} onOpen={onOpen} />
+      <div className="grid gap-10 lg:grid-cols-2">
+        {featured.map((template, index) => (
+          <div key={template.id} className={cx(index > 0 && "border-t border-[var(--line)] pt-10 lg:border-l lg:border-t-0 lg:pl-10 lg:pt-0")}>
+            <Story template={template} onOpen={onOpen} />
           </div>
-        ) : null}
+        ))}
       </div>
     </section>
   );
