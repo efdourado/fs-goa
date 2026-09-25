@@ -537,7 +537,6 @@ test("header sinaliza logo, perfil e sair como clicáveis", () => {
     notifications: [],
     onHome: () => undefined,
     onAccount: () => undefined,
-    onOpenPersonalSpace: () => undefined,
     onOpenTemplates: () => undefined,
     onOpenAbout: () => undefined,
     onLogout: async () => undefined,
@@ -550,7 +549,7 @@ test("header sinaliza logo, perfil e sair como clicáveis", () => {
   assert.match(header, /aria-label="Novidades"/);
   assert.match(header, />Sair<\/button>/);
   assert.match(header, />Início<\/button>/, "há um link 'Início' explícito, não só o logo");
-  assert.match(header, />Meu espaço<\/button>/, "Meu espaço tem página própria, com link no cabeçalho");
+  assert.doesNotMatch(header, /Meu espaço/, "Meu espaço agora é parte do Início, sem link próprio");
 });
 
 test("planejador de etapas: mostra as etapas sem escolha de tipo, o total de duração e a distribuição", () => {
@@ -758,7 +757,6 @@ test("header lista convites de grupo pendentes no menu de novidades", () => {
     ],
     onHome: () => undefined,
     onAccount: () => undefined,
-    onOpenPersonalSpace: () => undefined,
     onOpenTemplates: () => undefined,
     onOpenAbout: () => undefined,
     onLogout: async () => undefined,
@@ -854,7 +852,7 @@ test("detalhe do modelo: a mesma tela do desafio, só leitura — cabeçalho, re
   assert.doesNotMatch(html, />Hoje</, "a aba 'Hoje' some no preview");
 });
 
-test("dashboard: shelves split by pin, workspace and status; colour filter narrows", async () => {
+test("dashboard: shelves split by pin, side and status; a mixed Home pools both sides; a hidden side drops out", async () => {
   const { splitShelves, applyColorFilter } = await import("../app/goa/screens/dashboard");
   const c = (over: Partial<import("../app/goa/types").ChallengeSummary>): import("../app/goa/types").ChallengeSummary => ({
     id: over.id ?? "x", groupId: over.groupId ?? "g", title: over.title ?? "T", status: over.status ?? "active", ...over,
@@ -862,37 +860,44 @@ test("dashboard: shelves split by pin, workspace and status; colour filter narro
   const challenges = [
     c({ id: "pin", status: "active", pinned: true, colorTag: "green" }),
     c({ id: "run", status: "active", colorTag: "green" }),
+    c({ id: "solo", groupId: "ws", scope: "personal", status: "active", colorTag: "blue" }),
     c({ id: "run2", status: "active" }),
     c({ id: "old", status: "closed" }),
-    c({ id: "solo", groupId: "ws", scope: "personal", status: "active", colorTag: "blue" }),
+    c({ id: "soloDraft", groupId: "ws", scope: "personal", status: "draft" }),
   ];
+  const ids = (list: Array<{ id: string }>) => list.map((x) => x.id);
 
-  const shelves = splitShelves(challenges, "ws");
-  assert.deepEqual(shelves.pinned.map((x) => x.id), ["pin"]);
-  assert.deepEqual(shelves.running.map((x) => x.id), ["run", "run2"], "pinned + personal are pulled out of running");
-  assert.deepEqual(shelves.space.map((x) => x.id), ["solo"]);
-  assert.deepEqual(shelves.archive.map((x) => x.id), ["old"]);
+  const separated = splitShelves(challenges, "ws");
+  assert.deepEqual(ids(separated.pinned), ["pin"]);
+  assert.deepEqual(ids(separated.group), ["run", "run2"], "pinned + personal are pulled out of the groups' shelf");
+  assert.deepEqual(ids(separated.personal), ["solo"]);
+  assert.deepEqual(ids(separated.archive), ["old", "soloDraft"]);
+  assert.deepEqual(separated.mixed, []);
 
-  assert.deepEqual(applyColorFilter(shelves.running, "green").map((x) => x.id), ["run"]);
-  assert.deepEqual(applyColorFilter(shelves.running, null).map((x) => x.id), ["run", "run2"]);
+  const mixed = splitShelves(challenges, "ws", { mixed: true });
+  assert.deepEqual(ids(mixed.mixed), ["run", "solo", "run2"], "both sides in one shelf, the viewer's order kept");
+  assert.deepEqual([...mixed.personal, ...mixed.group], []);
+
+  const onlyMine = splitShelves(challenges, "ws", { sections: ["personal"] });
+  assert.deepEqual(ids(onlyMine.pinned), [], "a pinned group challenge stays off a Home showing only the person's side");
+  assert.deepEqual(ids(onlyMine.personal), ["solo"]);
+  assert.deepEqual(ids(onlyMine.archive), ["soloDraft"]);
+  assert.deepEqual(onlyMine.group, []);
+
+  assert.deepEqual(ids(applyColorFilter(separated.group, "green")), ["run"]);
+  assert.deepEqual(ids(applyColorFilter(separated.group, null)), ["run", "run2"]);
 });
 
-test("my space: the same pin and order as Home, split into pinned, in progress, and closed or draft — only its own challenges", async () => {
-  const { splitSpace } = await import("../app/goa/screens/personal-space");
-  const c = (over: Partial<import("../app/goa/types").ChallengeSummary>): import("../app/goa/types").ChallengeSummary => ({
-    id: over.id ?? "x", groupId: over.groupId ?? "ws", scope: "personal", title: over.title ?? "T", status: over.status ?? "active", ...over,
-  });
-  const challenges = [
-    c({ id: "b", status: "active" }),
-    c({ id: "pin", status: "closed", pinned: true }),
-    c({ id: "a", status: "active" }),
-    c({ id: "draft", status: "draft" }),
-    c({ id: "group-one", groupId: "g", scope: undefined, status: "active" }),
-    c({ id: "old", status: "closed" }),
-  ];
-  const space = splitSpace(challenges, "ws");
-  assert.deepEqual(space.pinned.map((x) => x.id), ["pin"], "a pinned one comes first, whatever its status");
-  assert.deepEqual(space.active.map((x) => x.id), ["b", "a"], "the given (viewer's) order is kept");
-  assert.deepEqual(space.archive.map((x) => x.id), ["draft", "old"]);
-  assert.ok(![...space.pinned, ...space.active, ...space.archive].some((x) => x.id === "group-one"), "a group's challenge is not part of My space");
+test("home view: until the person picks, Home shows the side they use, busiest first; a saved view wins", async () => {
+  const { resolveHomeView, visibleSections } = await import("../app/goa/home-view");
+  const usage = (personal: number, personalActive: number, groups: number, groupActive: number) => ({ personal, personalActive, groups, groupActive });
+
+  assert.deepEqual(visibleSections(resolveHomeView(null, usage(10, 8, 0, 0))), ["personal"], "solo only → just their side");
+  assert.deepEqual(visibleSections(resolveHomeView(null, usage(0, 0, 2, 1))), ["groups"], "groups only → just groups");
+  assert.deepEqual(visibleSections(resolveHomeView(null, usage(10, 8, 2, 2))), ["personal", "groups"], "both → the busier side first");
+  assert.deepEqual(visibleSections(resolveHomeView(null, usage(1, 1, 2, 5))), ["groups", "personal"]);
+
+  const saved = { layout: "separated" as const, order: ["groups" as const, "personal" as const], hidden: ["personal" as const] };
+  assert.deepEqual(resolveHomeView(saved, usage(10, 8, 0, 0)), saved, "the person's choice is kept even against their usage");
+  assert.deepEqual(visibleSections({ layout: "mixed", order: ["personal", "groups"], hidden: ["groups"] }), ["personal", "groups"], "mixed always shows both");
 });

@@ -6,7 +6,11 @@ import { type DragEvent, type FormEvent, type ReactNode, useState } from "react"
 import { KebabMenu, menuRowClass } from "../card-menu";
 import { Dialog } from "../dialog";
 import { useGoaFormat } from "../format";
+import { API_PATHS, apiRequest } from "../api";
+import { CatalogShelf } from "../catalog-shelf";
+import { HomeSideLink, HomeViewPanel, resolveHomeView, visibleSections } from "../home-view";
 import { applyColorFilter, OrganizeBar, useChallengeOrganizer } from "../organize";
+import { Segmented } from "../Segmented";
 import { Shelf, ShelfAddButton } from "../shelf";
 import { WelcomePanel } from "../welcome";
 import {
@@ -14,6 +18,8 @@ import {
   type ChallengeColorTag,
   type ChallengeSummary,
   type GroupSummary,
+  type HomeSection,
+  type HomeView,
   type Id,
   type Limits,
   type User,
@@ -38,24 +44,28 @@ import { canManage, isChallengeScheduled, isLivingList, isPersonalChallenge } fr
 
 // ── shelf helpers (pure, unit-tested) ────────────────────────────────────
 
-type ShelfKey = "pinned" | "running" | "space" | "archive";
-const CHALLENGE_SHELF_ORDER: ShelfKey[] = ["pinned", "running", "space", "archive"];
+type ShelfKey = "pinned" | "personal" | "group" | "mixed" | "archive";
+const CHALLENGE_SHELF_ORDER: ShelfKey[] = ["pinned", "personal", "group", "mixed", "archive"];
 
 /**
- * Split the viewer's challenges into the four homepage shelves. A pinned
- * challenge shows only in "pinned" (pulled out of its normal shelf); the rest
- * split by workspace and status. Order within each shelf is preserved.
+ * Split the viewer's challenges into Home's shelves. Only the sides in `sections` are kept. A pinned challenge
+ * shows only in "pinned"; the rest go by status — running ones into their side's shelf ("personal"/"group"), or
+ * into one "mixed" shelf when Home mixes both — and everything closed or still a draft into "archive". Order
+ * within each shelf is preserved.
  */
 export function splitShelves(
   challenges: ChallengeSummary[],
   personalWorkspaceId: Id | null,
+  { mixed = false, sections = ["personal", "groups"] }: { mixed?: boolean; sections?: HomeSection[] } = {},
 ): Record<ShelfKey, ChallengeSummary[]> {
-  const out: Record<ShelfKey, ChallengeSummary[]> = { pinned: [], running: [], space: [], archive: [] };
+  const out: Record<ShelfKey, ChallengeSummary[]> = { pinned: [], personal: [], group: [], mixed: [], archive: [] };
   for (const challenge of challenges) {
-    if (challenge.pinned) { out.pinned.push(challenge); continue; }
-    if (isPersonalChallenge(challenge, personalWorkspaceId)) { out.space.push(challenge); continue; }
-    if (challenge.status === "active") out.running.push(challenge);
-    else out.archive.push(challenge);
+    const personal = isPersonalChallenge(challenge, personalWorkspaceId);
+    if (!sections.includes(personal ? "personal" : "groups")) continue;
+    if (challenge.pinned) out.pinned.push(challenge);
+    else if (challenge.status !== "active") out.archive.push(challenge);
+    else if (mixed) out.mixed.push(challenge);
+    else out[personal ? "personal" : "group"].push(challenge);
   }
   return out;
 }
@@ -193,6 +203,7 @@ export function ActiveChallengeCard({
   canMoveDown = true,
   reorderMode = false,
   fluid = false,
+  context,
   dragHandlers,
 }: {
   challenge: ChallengeSummary;
@@ -204,8 +215,10 @@ export function ActiveChallengeCard({
   canMoveUp?: boolean;
   canMoveDown?: boolean;
   reorderMode?: boolean;
-  /** Fill the container instead of the fixed shelf width (grids on My space / a group). */
+  /** Fill the container instead of the fixed shelf width (a group's grid). */
   fluid?: boolean;
+  /** Whose challenge it is — "Just you" or the group's name — where Home mixes both sides. */
+  context?: string;
   dragHandlers?: {
     onDragStart: () => void;
     onDragOver: (event: DragEvent) => void;
@@ -296,6 +309,7 @@ export function ActiveChallengeCard({
             {challenge.title}
           </button>
         </h3>
+        {context ? <p className="mt-1 truncate text-xs text-[var(--muted)]">{context}</p> : null}
         {challenge.description ? <p className="mt-1.5 line-clamp-1 text-sm leading-6 text-[var(--muted)]">{challenge.description}</p> : null}
 
         {total > 0 ? (
@@ -330,13 +344,33 @@ function ArchiveChallengeRow({
   );
 }
 
+
 // ── the screen ──────────────────────────────────────────────────────────
 
+/** A side of Home — the person's own challenges or their groups' — under one big heading. */
+function HomeSectionBlock({ title, first, children }: { title: string; first: boolean; children: ReactNode }) {
+  return (
+    <section className={first ? "" : "mt-12 border-t border-[var(--line)] pt-8"}>
+      <h2 className="mb-6 text-2xl font-light tracking-[-0.04em] sm:text-3xl">{title}</h2>
+      {children}
+    </section>
+  );
+}
+
+type WorldFilter = "all" | HomeSection;
+
+/**
+ * Home: the person's own challenges and their groups' on one page. How the two sides sit is theirs to pick
+ * (`HomeView`, saved on the account): separated — two sections in the order they chose, either one hideable — or
+ * mixed into one list with each card labelled. Until they pick, Home shows the side they use, busiest first; a
+ * side that is hidden or unused shrinks to one line at the bottom instead of an empty shelf.
+ */
 export function DashboardScreen({
   user,
   groups,
   challenges,
   personalWorkspaceId,
+  homeView,
   limits,
   csrfToken,
   onOpenGroup,
@@ -344,6 +378,10 @@ export function DashboardScreen({
   onOpenAdmin,
   onCreateGroup,
   onQuickCreate,
+  onQuickCreatePersonal,
+  onCreatePersonalChallenge,
+  onOpenPersonalCatalog,
+  onOpenPersonalCatalogItem,
   onOpenTemplates,
   onChanged,
 }: {
@@ -351,6 +389,7 @@ export function DashboardScreen({
   groups: GroupSummary[];
   challenges: ChallengeSummary[];
   personalWorkspaceId: Id | null;
+  homeView: HomeView | null;
   limits: Limits;
   csrfToken: string;
   onOpenGroup: (id: Id) => void;
@@ -358,59 +397,222 @@ export function DashboardScreen({
   onOpenAdmin: (id: Id) => void;
   onCreateGroup: (name: string) => Promise<void>;
   onQuickCreate: () => void;
+  onQuickCreatePersonal: () => void;
+  onCreatePersonalChallenge: () => void;
+  onOpenPersonalCatalog: () => void;
+  onOpenPersonalCatalogItem: (itemId: Id) => void;
   onOpenTemplates: () => void;
   onChanged?: () => void;
 }) {
   const t = useTranslations("dashboard");
+  const th = useTranslations("dashboard.home");
   const tWelcome = useTranslations("welcome");
   const tr = useTranslations("roles");
   const tQuick = useTranslations("quickCreate");
 
   const [showGroupDialog, setShowGroupDialog] = useState(false);
+  const [showViewPanel, setShowViewPanel] = useState(false);
+  const [world, setWorld] = useState<WorldFilter>("all");
+  const [saved, setSaved] = useState<HomeView | null>(homeView);
+  const [viewError, setViewError] = useState<string | null>(null);
+
+  const standardGroups = groups.filter((group) => group.kind !== "personal");
+  const ownedGroups = standardGroups.filter((group) => group.role === "owner").length;
+  const atGroupLimit = ownedGroups >= limits.groupsPerOwner;
+  const groupName = new Map(standardGroups.map((group) => [group.id, group.name]));
+
+  const personalChallenges = challenges.filter((challenge) => isPersonalChallenge(challenge, personalWorkspaceId));
+  const groupChallenges = challenges.filter((challenge) => !isPersonalChallenge(challenge, personalWorkspaceId));
+  const view = resolveHomeView(saved, {
+    personal: personalChallenges.length,
+    personalActive: personalChallenges.filter((challenge) => challenge.status === "active").length,
+    groups: standardGroups.length,
+    groupActive: groupChallenges.filter((challenge) => challenge.status === "active").length,
+  });
+  const mixed = view.layout === "mixed";
+  const shownSections: HomeSection[] = mixed ? (world === "all" ? ["personal", "groups"] : [world]) : visibleSections(view);
+  const hiddenSections: HomeSection[] = mixed ? [] : view.order.filter((section) => view.hidden.includes(section));
+
   const { shelves, colorFilter, setColorFilter, reorderMode, setReorderMode, error, cardProps } = useChallengeOrganizer({
     challenges,
     csrfToken,
     onChanged,
     keys: CHALLENGE_SHELF_ORDER,
-    split: (ordered) => splitShelves(ordered, personalWorkspaceId),
+    split: (ordered) => splitShelves(ordered, personalWorkspaceId, { mixed, sections: shownSections }),
   });
 
-  const standardGroups = groups.filter((group) => group.kind !== "personal");
-  const ownedGroups = standardGroups.filter((group) => group.role === "owner").length;
-  const atGroupLimit = ownedGroups >= limits.groupsPerOwner;
+  async function saveView(next: HomeView | null) {
+    const previous = saved;
+    setSaved(next);
+    setViewError(null);
+    try {
+      await apiRequest(API_PATHS.homeView, { method: "PATCH", csrfToken, body: { view: next } });
+      onChanged?.();
+    } catch (cause) {
+      setSaved(previous);
+      setViewError((cause as Error).message || t("prefError"));
+    }
+  }
+
+  /** Bring a hidden side back — from the automatic view too, which then becomes the saved one. */
+  function showSection(section: HomeSection) {
+    void saveView({ ...view, hidden: view.hidden.filter((entry) => entry !== section) });
+  }
 
   function openChallenge(challenge: ChallengeSummary) {
     if (challenge.status === "draft" && canManage(challenge.viewerRole)) onOpenAdmin(challenge.id);
     else onOpenChallenge(challenge.id);
   }
 
+  const contextOf = (challenge: ChallengeSummary) =>
+    isPersonalChallenge(challenge, personalWorkspaceId) ? th("justYou") : groupName.get(challenge.groupId ?? "") ?? undefined;
+
   const filtered = {
     pinned: applyColorFilter(shelves.pinned, colorFilter),
-    running: applyColorFilter(shelves.running, colorFilter),
+    personal: applyColorFilter(shelves.personal, colorFilter),
+    group: applyColorFilter(shelves.group, colorFilter),
+    mixed: applyColorFilter(shelves.mixed, colorFilter),
     archive: applyColorFilter(shelves.archive, colorFilter),
   };
-  const filteredCount = filtered.pinned.length + filtered.running.length + filtered.archive.length;
-  // Personal challenges live on their own page (My space); only a pinned one shows here.
-  const hasAnyChallenge = shelves.pinned.length + shelves.running.length + shelves.archive.length > 0;
-  // Brand new = nothing anywhere, My space included.
+  const filteredCount = Object.values(filtered).reduce((sum, list) => sum + list.length, 0);
+  const hasAnyChallenge = challenges.length > 0;
+  // Brand new = nothing anywhere: no challenge of their own, no group.
   const brandNew = challenges.length === 0 && !standardGroups.length;
 
-  function renderRail(shelfKey: ShelfKey, list: ChallengeSummary[]): ReactNode {
+  function renderRail(shelfKey: ShelfKey, list: ChallengeSummary[], labelled: boolean): ReactNode {
     return list.map((challenge) => (
       <ActiveChallengeCard
         key={challenge.id}
         challenge={challenge}
-        onOpen={onOpenChallenge}
+        onOpen={() => openChallenge(challenge)}
+        context={labelled ? contextOf(challenge) : undefined}
         {...cardProps(shelfKey, challenge, onOpenAdmin)}
       />
     ));
   }
 
+  const emptyRail = (title: string) => <div className="w-full max-w-xl"><EmptyState title={colorFilter ? t("filter.empty") : title} /></div>;
+
+  const personalAdd = (
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      <ShelfAddButton label={tQuick("entryCta")} onClick={onQuickCreatePersonal} />
+      <ShelfAddButton label={th("newChallenge")} onClick={onCreatePersonalChallenge} />
+    </div>
+  );
+
+  const groupsShelf = colorFilter ? null : (
+    <Shelf
+      title={t("groupsTitle")}
+      count={standardGroups.length}
+      actions={atGroupLimit ? undefined : <ShelfAddButton label={t("shelfAdd.group")} onClick={() => setShowGroupDialog(true)} />}
+    >
+      {standardGroups.length
+        ? standardGroups.map((group) => {
+            const count = group.memberCount ?? group.members?.length ?? 0;
+            return (
+              <button
+                key={group.id}
+                type="button"
+                onClick={() => onOpenGroup(group.id)}
+                className={cx(cardClass, "flex min-h-[5.5rem] w-[78vw] max-w-[19rem] shrink-0 snap-start flex-col justify-center gap-1 p-4 text-left transition hover:-translate-y-0.5 hover:border-[var(--muted)] sm:w-[19rem]")}
+              >
+                <span className="text-sm">{group.name}</span>
+                <small className="text-[var(--muted)]">{t("peopleCount", { count })} · {tr(group.role)}</small>
+              </button>
+            );
+          })
+        : <div className="w-full max-w-xl"><EmptyState title={t("emptyGroupsTitle")} onClick={atGroupLimit ? undefined : () => setShowGroupDialog(true)} /></div>}
+    </Shelf>
+  );
+
+  const personalLibrary = colorFilter ? null : (
+    <div className="mt-8">
+      <CatalogShelf scope="personal" canManage onOpenCatalog={onOpenPersonalCatalog} onOpenItem={onOpenPersonalCatalogItem} />
+    </div>
+  );
+
+  const sectionContent: Record<HomeSection, ReactNode> = {
+    personal: (
+      <>
+        <Shelf title={th("personalRunning")} count={filtered.personal.length} actions={personalAdd}>
+          {filtered.personal.length ? renderRail("personal", filtered.personal, false) : emptyRail(th("personalEmpty"))}
+        </Shelf>
+        {personalLibrary}
+      </>
+    ),
+    groups: (
+      <>
+        <Shelf title={t("shelf.running")} count={filtered.group.length} actions={<ShelfAddButton label={tQuick("entryCta")} onClick={onQuickCreate} />}>
+          {filtered.group.length ? renderRail("group", filtered.group, false) : emptyRail(t("noChallengesTitle"))}
+        </Shelf>
+        {groupsShelf}
+      </>
+    ),
+  };
+
+  // What a hidden side shrinks to: a way back to it, or — if it was never used — a nudge to start.
+  const sideLinks = (mixed ? [] : hiddenSections).map((section) => {
+    if (section === "groups") {
+      return standardGroups.length
+        ? <HomeSideLink key={section} label={th("showGroups", { count: standardGroups.length })} onClick={() => showSection("groups")} />
+        : atGroupLimit ? null : <HomeSideLink key={section} label={th("inviteGroups")} onClick={() => setShowGroupDialog(true)} />;
+    }
+    return personalChallenges.length
+      ? <HomeSideLink key={section} label={th("showPersonal", { count: personalChallenges.length })} onClick={() => showSection("personal")} />
+      : <HomeSideLink key={section} label={th("invitePersonal")} onClick={onQuickCreatePersonal} />;
+  });
+
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
-      <PageHeading title={t("greeting", { name: user.name.split(" ")[0] })} description={brandNew ? tWelcome("lede") : t("subtitle")} />
+      <PageHeading
+        title={t("greeting", { name: user.name.split(" ")[0] })}
+        description={brandNew ? tWelcome("lede") : t("subtitle")}
+        action={brandNew ? undefined : (
+          <button
+            type="button"
+            onClick={() => setShowViewPanel((open) => !open)}
+            aria-expanded={showViewPanel}
+            className={cx(
+              "inline-flex min-h-9 cursor-pointer items-center gap-1.5 self-start rounded-full border px-3.5 text-[13px] transition sm:self-auto",
+              showViewPanel
+                ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]"
+                : "border-[var(--line)] text-[var(--muted)] hover:border-[var(--main-line)] hover:text-[var(--ink)]",
+            )}
+          >
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><rect x="2" y="2.5" width="12" height="4.5" rx="1.5" /><rect x="2" y="9" width="12" height="4.5" rx="1.5" /></svg>
+            {th("view")}
+          </button>
+        )}
+      />
 
-      {showGroupDialog ? <GroupCreateDialog onClose={() => setShowGroupDialog(false)} onCreate={onCreateGroup} /> : null}
+      {showGroupDialog ? (
+        <GroupCreateDialog
+          onClose={() => setShowGroupDialog(false)}
+          onCreate={async (name) => {
+            await onCreateGroup(name);
+            if (saved?.hidden.includes("groups")) showSection("groups");
+          }}
+        />
+      ) : null}
+
+      {showViewPanel && !brandNew ? (
+        <HomeViewPanel view={view} automatic={saved === null} onChange={(next) => void saveView(next)} onReset={() => void saveView(null)} />
+      ) : null}
+      <StatusMessage error={viewError} />
+
+      {mixed && hasAnyChallenge ? (
+        <Segmented
+          className="mb-4 max-w-md"
+          ariaLabel={th("worldLabel")}
+          value={world}
+          onChange={setWorld}
+          options={[
+            { value: "all", label: th("chip", { section: th("both"), count: challenges.length }) },
+            { value: "personal", label: th("chip", { section: th("sectionPersonal"), count: personalChallenges.length }) },
+            { value: "groups", label: th("chip", { section: th("sectionGroups"), count: groupChallenges.length }) },
+          ]}
+        />
+      ) : null}
 
       {hasAnyChallenge ? (
         <OrganizeBar colorFilter={colorFilter} onColorFilter={setColorFilter} reorderMode={reorderMode} onReorderMode={setReorderMode} filteredCount={filteredCount} />
@@ -420,54 +622,47 @@ export function DashboardScreen({
 
       {brandNew ? (
         <WelcomePanel onCreateGroup={() => setShowGroupDialog(true)} onQuickCreate={onQuickCreate} onOpenTemplates={onOpenTemplates} />
-      ) : null}
-
-      {brandNew ? null : (
+      ) : (
         <>
           {filtered.pinned.length ? (
-            <Shelf title={t("shelf.pinned")} count={filtered.pinned.length}>
-              {renderRail("pinned", filtered.pinned)}
-            </Shelf>
+            <div className="mb-12">
+              <Shelf title={t("shelf.pinned")} count={filtered.pinned.length}>
+                {renderRail("pinned", filtered.pinned, true)}
+              </Shelf>
+            </div>
           ) : null}
 
-          <Shelf title={t("shelf.running")} count={filtered.running.length} actions={<ShelfAddButton label={tQuick("entryCta")} onClick={onQuickCreate} />}>
-            {filtered.running.length
-              ? renderRail("running", filtered.running)
-              : <div className="w-full max-w-xl"><EmptyState title={colorFilter ? t("filter.empty") : t("noChallengesTitle")} /></div>}
-          </Shelf>
-
-          {colorFilter ? null : (
-            <Shelf
-              title={t("groupsTitle")}
-              count={standardGroups.length}
-              actions={atGroupLimit ? undefined : <ShelfAddButton label={t("shelfAdd.group")} onClick={() => setShowGroupDialog(true)} />}
-            >
-              {standardGroups.length
-                ? standardGroups.map((group) => {
-                    const count = group.memberCount ?? group.members?.length ?? 0;
-                    return (
-                      <button
-                        key={group.id}
-                        type="button"
-                        onClick={() => onOpenGroup(group.id)}
-                        className={cx(cardClass, "flex min-h-[5.5rem] w-[78vw] max-w-[19rem] shrink-0 snap-start flex-col justify-center gap-1 p-4 text-left transition hover:-translate-y-0.5 hover:border-[var(--muted)] sm:w-[19rem]")}
-                      >
-                        <span className="text-sm">{group.name}</span>
-                        <small className="text-[var(--muted)]">{t("peopleCount", { count })} · {tr(group.role)}</small>
-                      </button>
-                    );
-                  })
-                : <div className="w-full max-w-xl"><EmptyState title={t("emptyGroupsTitle")} onClick={atGroupLimit ? undefined : () => setShowGroupDialog(true)} /></div>}
-            </Shelf>
+          {mixed ? (
+            <>
+              <Shelf
+                title={th("inProgress")}
+                count={filtered.mixed.length}
+                actions={<ShelfAddButton label={tQuick("entryCta")} onClick={world === "personal" ? onQuickCreatePersonal : onQuickCreate} />}
+              >
+                {filtered.mixed.length ? renderRail("mixed", filtered.mixed, true) : emptyRail(t("noChallengesTitle"))}
+              </Shelf>
+              {shownSections.includes("groups") ? groupsShelf : null}
+              {shownSections.includes("personal") ? personalLibrary : null}
+            </>
+          ) : (
+            shownSections.map((section, index) => (
+              <HomeSectionBlock key={section} first={index === 0 && !filtered.pinned.length} title={section === "personal" ? th("sectionPersonal") : th("sectionGroups")}>
+                {sectionContent[section]}
+              </HomeSectionBlock>
+            ))
           )}
 
           {filtered.archive.length ? (
-            <Shelf title={t("archiveTitle")} count={filtered.archive.length}>
-              {filtered.archive.map((challenge) => (
-                <ArchiveChallengeRow key={challenge.id} challenge={challenge} onOpen={() => openChallenge(challenge)} />
-              ))}
-            </Shelf>
+            <div className="mt-12">
+              <Shelf title={t("archiveTitle")} count={filtered.archive.length}>
+                {filtered.archive.map((challenge) => (
+                  <ArchiveChallengeRow key={challenge.id} challenge={challenge} onOpen={() => openChallenge(challenge)} />
+                ))}
+              </Shelf>
+            </div>
           ) : null}
+
+          {sideLinks.some(Boolean) ? <div className="mt-12 space-y-3">{sideLinks}</div> : null}
         </>
       )}
     </main>

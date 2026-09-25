@@ -54,7 +54,6 @@
   },
   "nav": {
     "home": "Home",
-    "mySpace": "My space",
     "templates": "Templates",
     "about": "About",
     "admin": "Console",
@@ -317,6 +316,33 @@
     "prefError": "Could not save your preference.",
     "shelfAdd": {
       "group": "New group"
+    },
+    "home": {
+      "view": "View",
+      "viewTitle": "How Home is arranged",
+      "layoutLabel": "Layout",
+      "separated": "Separated",
+      "mixed": "Mixed",
+      "separatedHint": "Your own challenges and your groups' in two sections, one below the other. Pick the order and which to show.",
+      "mixedHint": "Your own challenges and your groups' in one list, each card saying whose it is.",
+      "show": "Show {section} on Home",
+      "lastVisible": "At least one section stays on Home.",
+      "automatic": "Back to automatic",
+      "automaticNow": "Automatic — shows what you use, busiest first",
+      "sectionPersonal": "Just me",
+      "sectionGroups": "Groups",
+      "chip": "{section} · {count}",
+      "justYou": "Just you",
+      "personalRunning": "In progress",
+      "personalEmpty": "Nothing of your own in progress",
+      "inProgress": "In progress",
+      "newChallenge": "New challenge",
+      "showGroups": "Show your groups ({count})",
+      "showPersonal": "Show your own challenges ({count})",
+      "inviteGroups": "Doing this with friends? Create a group",
+      "invitePersonal": "Track something just for you",
+      "both": "Both",
+      "worldLabel": "Whose challenges to show"
     }
   },
   "welcome": {
@@ -454,16 +480,6 @@
     "ratedAria": "Rated {value} out of 5",
     "roundRatings": "{count, plural, one {# rating} other {# ratings}}",
     "removeTitle": "Remove \"{title}\" from the catalogue?"
-  },
-  "personalSpace": {
-    "back": "Back",
-    "title": "My space",
-    "subtitle": "Just yours — no group, no invites.",
-    "create": "+ Personal challenge",
-    "emptyTitle": "Start a challenge of your own",
-    "createShort": "New challenge",
-    "sectionActive": "In progress",
-    "sectionArchive": "Closed & drafts"
   },
   "personalCatalog": {
     "back": "Back",
@@ -1793,7 +1809,6 @@
     "signIn": "Sign in",
     "templates": "Templates",
     "account": "Your account",
-    "mySpace": "My space",
     "myCatalogue": "My catalogue",
     "catalogue": "Catalogue",
     "challenge": "Challenge"

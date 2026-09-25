@@ -54,7 +54,6 @@
   },
   "nav": {
     "home": "Início",
-    "mySpace": "Meu espaço",
     "templates": "Modelos",
     "about": "Sobre",
     "admin": "Gestão",
@@ -317,6 +316,33 @@
     "prefError": "Não foi possível salvar sua preferência.",
     "shelfAdd": {
       "group": "Novo grupo"
+    },
+    "home": {
+      "view": "Exibição",
+      "viewTitle": "Como o Início se organiza",
+      "layoutLabel": "Disposição",
+      "separated": "Separado",
+      "mixed": "Misturado",
+      "separatedHint": "Seus desafios e os dos grupos em duas seções, uma abaixo da outra. Escolha a ordem e quais mostrar.",
+      "mixedHint": "Seus desafios e os dos grupos numa lista só, cada cartão dizendo de quem é.",
+      "show": "Mostrar {section} no Início",
+      "lastVisible": "Pelo menos uma seção fica no Início.",
+      "automatic": "Voltar ao automático",
+      "automaticNow": "Automático — mostra o que você usa, o mais movimentado primeiro",
+      "sectionPersonal": "Só eu",
+      "sectionGroups": "Grupos",
+      "chip": "{section} · {count}",
+      "justYou": "Só você",
+      "personalRunning": "Em andamento",
+      "personalEmpty": "Nada seu em andamento",
+      "inProgress": "Em andamento",
+      "newChallenge": "Novo desafio",
+      "showGroups": "Mostrar seus grupos ({count})",
+      "showPersonal": "Mostrar seus desafios ({count})",
+      "inviteGroups": "Quer fazer isso com amigos? Crie um grupo",
+      "invitePersonal": "Acompanhe algo só seu",
+      "both": "Ambos",
+      "worldLabel": "De quem mostrar os desafios"
     }
   },
   "welcome": {
@@ -454,16 +480,6 @@
     "ratedAria": "Nota {value} de 5",
     "roundRatings": "{count, plural, one {# avaliação} other {# avaliações}}",
     "removeTitle": "Excluir \"{title}\" do acervo?"
-  },
-  "personalSpace": {
-    "back": "Voltar",
-    "title": "Meu espaço",
-    "subtitle": "Só seu — sem grupo, sem convites.",
-    "create": "+ Desafio pessoal",
-    "emptyTitle": "Comece um desafio só seu",
-    "createShort": "Novo desafio",
-    "sectionActive": "Em andamento",
-    "sectionArchive": "Encerrados e rascunhos"
   },
   "personalCatalog": {
     "back": "Voltar",
@@ -1793,7 +1809,6 @@
     "signIn": "Entrar",
     "templates": "Modelos",
     "account": "Sua conta",
-    "mySpace": "Meu espaço",
     "myCatalogue": "Meu acervo",
     "catalogue": "Acervo",
     "challenge": "Desafio"

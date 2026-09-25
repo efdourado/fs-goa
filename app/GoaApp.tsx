@@ -27,7 +27,6 @@ import { ParticipantChallengeScreen } from "./goa/screens/participant-challenge"
 import { type SessionPayload, sessionSpecOf } from "./goa/session-log";
 import { CatalogWorkspaceScreen } from "./goa/screens/catalog-workspace";
 import { CsrfProvider } from "./goa/csrf";
-import { PersonalSpaceScreen } from "./goa/screens/personal-space";
 import { PersonalTrashScreen } from "./goa/screens/personal-trash";
 import { TrashView } from "./goa/trash-view";
 import { TemplateDetailScreen, TemplatesScreen } from "./goa/screens/templates";
@@ -95,7 +94,7 @@ export default function GoaApp() {
     const routed = screenFromUrl(window.location.pathname, window.location.search);
     // A page opened straight from its address needs its catalogue too — ask for it now, beside the
     // bootstrap, instead of only once the page has drawn.
-    if (!inviteToken && routed?.kind === "personal-space") prefetchCatalogShelf("personal");
+    if (!inviteToken && (!routed || routed.kind === "dashboard")) prefetchCatalogShelf("personal");
     else if (!inviteToken && routed?.kind === "group") prefetchCatalogShelf({ groupId: routed.groupId });
 
     const PUBLIC_KINDS = new Set<Screen["kind"]>(["templates", "template", "about"]);
@@ -659,8 +658,6 @@ export default function GoaApp() {
     content = <CatalogWorkspaceScreen key={selectedGroup.id} scope={{ groupId: selectedGroup.id }} title={t("groupCatalogTitle", { name: selectedGroup.name })} subtitle={t("groupCatalogSubtitle")} canManage={canManage(selectedGroup.role)} members={selectedGroup.members ?? []} recommendationsEnabled={selectedGroup.recommendationsEnabled !== false} onBack={goUp} backLabel={backLabel} onOpenItem={(itemId) => setScreen({ kind: "catalog-item", groupId: selectedGroup.id, itemId })} />;
   } else if (screen.kind === "catalog-item" && selectedGroup) {
     content = <CatalogItemScreen key={screen.itemId} scope={{ groupId: selectedGroup.id }} recommendationsEnabled={selectedGroup.recommendationsEnabled !== false} detailPath={API_PATHS.groupCatalogItem(screen.groupId, screen.itemId)} itemId={screen.itemId} onBack={goUp} backLabel={backLabel} onOpenChallenge={(id) => openParticipant(id)} editing={canManage(selectedGroup.role) ? { members: selectedGroup.members ?? [] } : undefined} onDelete={canManage(selectedGroup.role) ? () => deleteCatalogItem(API_PATHS.catalogItem(screen.itemId), { kind: "group-catalog", groupId: screen.groupId }) : undefined} />;
-  } else if (screen.kind === "personal-space") {
-    content = <PersonalSpaceScreen challenges={bootstrap.challenges} personalWorkspaceId={bootstrap.personalWorkspaceId} csrfToken={bootstrap.csrfToken} onChanged={() => { void refreshBootstrap(); }} onBack={goUp} backLabel={backLabel} onOpenChallenge={(id) => openParticipant(id)} onOpenAdmin={(id) => openAdmin(id)} onCreateChallenge={() => setScreen({ kind: "create-personal-challenge" })} onQuickCreate={() => setScreen({ kind: "quick-create", into: "personal" })} onOpenCatalog={() => setScreen({ kind: "personal-catalog" })} onOpenCatalogItem={(itemId) => setScreen({ kind: "personal-catalog-item", itemId })} />;
   } else if (screen.kind === "personal-catalog") {
     content = <CatalogWorkspaceScreen key="personal" scope="personal" title={tPersonalCatalog("title")} subtitle={tPersonalCatalog("subtitle")} canManage members={[]} recommendationsEnabled onBack={goUp} backLabel={backLabel} onOpenItem={(itemId) => setScreen({ kind: "personal-catalog-item", itemId })} />;
   } else if (screen.kind === "personal-catalog-item") {
@@ -678,13 +675,13 @@ export default function GoaApp() {
   } else if (screen.kind === "admin" || screen.kind === "create-challenge") {
     content = <main className="mx-auto max-w-2xl px-5 py-16"><EmptyState title={t("adminUnavailableTitle")} action={<Button onClick={() => setScreen({ kind: "dashboard" })}>{t("backToStart")}</Button>} /></main>;
   } else {
-    content = <DashboardScreen user={user} groups={bootstrap.groups} challenges={bootstrap.challenges} personalWorkspaceId={bootstrap.personalWorkspaceId} limits={bootstrap.limits} csrfToken={bootstrap.csrfToken} onOpenGroup={(groupId) => setScreen({ kind: "group", groupId })} onOpenChallenge={(id) => openParticipant(id)} onOpenAdmin={(id) => openAdmin(id)} onCreateGroup={createGroup} onQuickCreate={() => setScreen({ kind: "quick-create" })} onOpenTemplates={() => setScreen({ kind: "templates" })} onChanged={() => { void refreshBootstrap(); }} />;
+    content = <DashboardScreen user={user} groups={bootstrap.groups} challenges={bootstrap.challenges} personalWorkspaceId={bootstrap.personalWorkspaceId} homeView={bootstrap.homeView} limits={bootstrap.limits} csrfToken={bootstrap.csrfToken} onOpenGroup={(groupId) => setScreen({ kind: "group", groupId })} onOpenChallenge={(id) => openParticipant(id)} onOpenAdmin={(id) => openAdmin(id)} onCreateGroup={createGroup} onQuickCreate={() => setScreen({ kind: "quick-create" })} onQuickCreatePersonal={() => setScreen({ kind: "quick-create", into: "personal" })} onCreatePersonalChallenge={() => setScreen({ kind: "create-personal-challenge" })} onOpenPersonalCatalog={() => setScreen({ kind: "personal-catalog" })} onOpenPersonalCatalogItem={(itemId) => setScreen({ kind: "personal-catalog-item", itemId })} onOpenTemplates={() => setScreen({ kind: "templates" })} onChanged={() => { void refreshBootstrap(); }} />;
   }
 
   return (
     <CsrfProvider token={bootstrap.csrfToken}>
     <div className="flex min-h-screen flex-col bg-[var(--canvas)] text-[var(--ink)]">
-      <AppHeader user={user} notifications={bootstrap.memberRequests} onHome={() => setScreen({ kind: "dashboard" })} onAccount={() => setScreen({ kind: "account" })} onOpenPersonalSpace={() => setScreen({ kind: "personal-space" })} onWarmPersonalSpace={() => prefetchCatalogShelf("personal")} onOpenTemplates={() => setScreen({ kind: "templates" })} onOpenAbout={() => setScreen({ kind: "about" })} onLogout={logout} onAcceptRequest={(id) => respondToMemberRequest(id, "accept")} onDeclineRequest={(id) => respondToMemberRequest(id, "decline")} />
+      <AppHeader user={user} notifications={bootstrap.memberRequests} onHome={() => setScreen({ kind: "dashboard" })} onAccount={() => setScreen({ kind: "account" })} onOpenTemplates={() => setScreen({ kind: "templates" })} onOpenAbout={() => setScreen({ kind: "about" })} onLogout={logout} onAcceptRequest={(id) => respondToMemberRequest(id, "accept")} onDeclineRequest={(id) => respondToMemberRequest(id, "decline")} />
       <div className="flex-1">{content}</div>
     </div>
     </CsrfProvider>

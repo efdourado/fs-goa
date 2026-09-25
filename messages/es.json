@@ -54,7 +54,6 @@
   },
   "nav": {
     "home": "Inicio",
-    "mySpace": "Mi espacio",
     "templates": "Plantillas",
     "about": "Acerca de",
     "admin": "Gestión",
@@ -317,6 +316,33 @@
     "prefError": "No se pudo guardar tu preferencia.",
     "shelfAdd": {
       "group": "Nuevo grupo"
+    },
+    "home": {
+      "view": "Vista",
+      "viewTitle": "Cómo se organiza el Inicio",
+      "layoutLabel": "Disposición",
+      "separated": "Separado",
+      "mixed": "Mezclado",
+      "separatedHint": "Tus desafíos y los de tus grupos en dos secciones, una debajo de la otra. Elige el orden y cuáles mostrar.",
+      "mixedHint": "Tus desafíos y los de tus grupos en una sola lista, cada tarjeta dice de quién es.",
+      "show": "Mostrar {section} en el Inicio",
+      "lastVisible": "Al menos una sección queda en el Inicio.",
+      "automatic": "Volver a automático",
+      "automaticNow": "Automático — muestra lo que usas, lo más activo primero",
+      "sectionPersonal": "Solo yo",
+      "sectionGroups": "Grupos",
+      "chip": "{section} · {count}",
+      "justYou": "Solo tú",
+      "personalRunning": "En marcha",
+      "personalEmpty": "Nada tuyo en marcha",
+      "inProgress": "En marcha",
+      "newChallenge": "Nuevo desafío",
+      "showGroups": "Mostrar tus grupos ({count})",
+      "showPersonal": "Mostrar tus desafíos ({count})",
+      "inviteGroups": "¿Lo haces con amigos? Crea un grupo",
+      "invitePersonal": "Sigue algo solo para ti",
+      "both": "Ambos",
+      "worldLabel": "De quién mostrar los desafíos"
     }
   },
   "welcome": {
@@ -454,16 +480,6 @@
     "ratedAria": "Nota {value} de 5",
     "roundRatings": "{count, plural, one {# valoración} other {# valoraciones}}",
     "removeTitle": "¿Quitar \"{title}\" del acervo?"
-  },
-  "personalSpace": {
-    "back": "Volver",
-    "title": "Mi espacio",
-    "subtitle": "Solo tuyo — sin grupo, sin invitaciones.",
-    "create": "+ Desafío personal",
-    "emptyTitle": "Empieza un desafío solo tuyo",
-    "createShort": "Nuevo desafío",
-    "sectionActive": "En marcha",
-    "sectionArchive": "Cerrados y borradores"
   },
   "personalCatalog": {
     "back": "Volver",
@@ -1793,7 +1809,6 @@
     "signIn": "Entrar",
     "templates": "Plantillas",
     "account": "Tu cuenta",
-    "mySpace": "Mi espacio",
     "myCatalogue": "Mi acervo",
     "catalogue": "Acervo",
     "challenge": "Desafío"

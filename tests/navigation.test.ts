@@ -72,7 +72,6 @@ test("toda tela roteável volta de urlForScreen → screenFromUrl com o mesmo ti
     { kind: "group", groupId: "g1" },
     { kind: "group-catalog", groupId: "g1" },
     { kind: "catalog-item", groupId: "g1", itemId: "i1" },
-    { kind: "personal-space" },
     { kind: "personal-catalog" },
     { kind: "personal-catalog-item", itemId: "i1" },
     { kind: "personal-trash" },

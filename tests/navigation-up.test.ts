@@ -26,11 +26,10 @@ describe("Back goes up the hierarchy, never to wherever you were", () => {
     assert.equal(backTargetFor(third.screen, lookup()), null, "Home is the top");
   });
 
-  test("a personal challenge goes to My space, and every path ends at Home", () => {
+  test("a personal challenge goes straight up to Home, where the person's own challenges live", () => {
     const up = backTargetFor({ kind: "challenge", challengeId: "solo", tab: "today" }, lookup())!;
-    assert.deepEqual(up.screen, { kind: "personal-space" });
-    assert.deepEqual(up.label, { kind: "mySpace" });
-    assert.deepEqual(backTargetFor(up.screen, lookup())!.screen, { kind: "dashboard" });
+    assert.deepEqual(up.screen, { kind: "dashboard" });
+    assert.deepEqual(up.label, { kind: "home" });
   });
 
   test("a challenge or group that can't be found falls back to Home instead of a dead screen", () => {
@@ -45,15 +44,15 @@ describe("Back goes up the hierarchy, never to wherever you were", () => {
     assert.deepEqual(backTargetFor({ kind: "group-trash", groupId: "g1" }, lookup())!.screen, { kind: "group", groupId: "g1" });
     assert.deepEqual(backTargetFor({ kind: "create-challenge", groupId: "g1" }, lookup())!.label, { kind: "named", name: "Copa 2026" });
     assert.deepEqual(backTargetFor({ kind: "personal-catalog-item", itemId: "i" }, lookup())!.screen, { kind: "personal-catalog" });
-    assert.deepEqual(backTargetFor({ kind: "personal-catalog" }, lookup())!.screen, { kind: "personal-space" });
-    assert.deepEqual(backTargetFor({ kind: "create-personal-challenge" }, lookup())!.screen, { kind: "personal-space" });
+    assert.deepEqual(backTargetFor({ kind: "personal-catalog" }, lookup())!.screen, { kind: "dashboard" });
+    assert.deepEqual(backTargetFor({ kind: "create-personal-challenge" }, lookup())!.screen, { kind: "dashboard" });
   });
 
-  test("the chat starts from Home, a group or My space, and Back returns to whichever it was opened from", () => {
+  test("the chat starts from Home or a group, and Back returns to whichever it was opened from", () => {
     assert.deepEqual(backTargetFor({ kind: "quick-create" }, lookup())!.screen, { kind: "dashboard" });
     assert.deepEqual(backTargetFor({ kind: "quick-create", into: { groupId: "g1" } }, lookup())!.screen, { kind: "group", groupId: "g1" });
     assert.deepEqual(backTargetFor({ kind: "quick-create", into: { groupId: "g1" } }, lookup())!.label, { kind: "named", name: "Copa 2026" });
-    assert.deepEqual(backTargetFor({ kind: "quick-create", into: "personal" }, lookup())!.label, { kind: "mySpace" });
+    assert.deepEqual(backTargetFor({ kind: "quick-create", into: "personal" }, lookup())!.label, { kind: "home" });
   });
 
   test("the personal bin is opened from the account page, so Back returns there", () => {

@@ -15,6 +15,7 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
         pendingInvitesPerUser: LIMITS.pendingInvitesPerUser,
       },
       personalWorkspaceId: null,
+      homeView: null,
       groups: [],
       challenges: [],
       memberRequests: [],
@@ -32,6 +33,8 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
         LIMIT 1`,
       [session.user.id],
     );
+
+    const homeViewQuery = pool.query<{ home_view: unknown }>("SELECT home_view FROM users WHERE id = $1", [session.user.id]);
 
     const groupsQuery = pool.query<{
       id: string;
@@ -167,8 +170,8 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
       [session.user.id],
     );
 
-    const [personalWorkspace, groupsResult, memberRequestsResult, challengesResult] = await Promise.all([
-      personalWorkspaceQuery, groupsQuery, memberRequestsQuery, challengesQuery,
+    const [personalWorkspace, homeViewResult, groupsResult, memberRequestsResult, challengesResult] = await Promise.all([
+      personalWorkspaceQuery, homeViewQuery, groupsQuery, memberRequestsQuery, challengesQuery,
     ]);
     const personalWorkspaceId = personalWorkspace.rows[0]?.id ?? null;
 
@@ -233,6 +236,7 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
         pendingInvitesPerUser: LIMITS.pendingInvitesPerUser,
       },
       personalWorkspaceId,
+      homeView: homeViewResult.rows[0]?.home_view ?? null,
       groups: groupsResult.rows.map((group) => ({
         id: group.id,
         name: group.name,

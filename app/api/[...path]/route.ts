@@ -73,6 +73,7 @@ import {
   listPersonalCatalogAttributes,
 } from "@/lib/goa/catalog-attributes";
 import type { CatalogKind } from "@/lib/goa/catalog";
+import { setHomeView } from "@/lib/goa/home-view";
 
 function catalogKindParam(request: Request): CatalogKind | undefined {
   const raw = new URL(request.url).searchParams.get("kind");
@@ -480,6 +481,9 @@ export async function PATCH(request: Request): Promise<Response> {
     }
     if (isPath(path, "account")) {
       return json(await updateAccount(session, body));
+    }
+    if (isPath(path, "account", "home-view")) {
+      return json(await setHomeView(session, body));
     }
     if (path[0] === "catalog" && path.length === 2) {
       return json(await updateCatalogItem(session, path[1], body));

@@ -103,8 +103,8 @@ export function Shelf({
   return (
     <section className="mt-8 first:mt-0">
       <div className="mb-3 flex items-end justify-between gap-3 pr-1">
-        <div className="flex items-baseline gap-2.5">
-          <span className="text-lg font-medium tracking-[-0.03em] sm:text-xl">{title}</span>
+        <div className="flex shrink-0 items-baseline gap-2.5">
+          <span className="whitespace-nowrap text-lg font-medium tracking-[-0.03em] sm:text-xl">{title}</span>
           {count != null ? <span className="text-xs font-medium text-[var(--muted)]">{count}</span> : null}
         </div>
         <div className="flex items-center gap-2">

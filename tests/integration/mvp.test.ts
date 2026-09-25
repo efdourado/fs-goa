@@ -5624,7 +5624,7 @@ test("cenário de aceitação V1: grupo de 6, Cinema com semanas, JSON, expectat
   // 23. Abrir todas as telas diretamente por URL (deep-link + refresh).
   const { screenFromUrl } = await import("../../app/goa/navigation");
   const routes: Array<[string, string]> = [
-    ["/", "dashboard"], ["/personal", "personal-space"], ["/personal/trash", "personal-trash"],
+    ["/", "dashboard"], ["/personal", "dashboard"], ["/personal/trash", "personal-trash"],
     ["/catalog", "personal-catalog"], ["/catalog/abc", "personal-catalog-item"],
     [`/groups/${groupId}`, "group"], [`/groups/${groupId}/trash`, "group-trash"],
     [`/groups/${groupId}/catalog/xyz`, "catalog-item"],
@@ -8262,4 +8262,33 @@ test("sessão: a última atividade só é regravada depois de 15 minutos, mas a 
   assert.equal((await call("GET", "/api/bootstrap", { session: user })).response.status, 200);
   const [later] = await userSessions();
   assert.ok(Date.now() - later.last_seen_at.getTime() < 5 * 60 * 1000, "voltou a ser recente");
+});
+
+test("home view: salvo na conta, volta no bootstrap, validado, e null devolve ao automático", async () => {
+  const owner = await register("Hana", "hana_home");
+  const boot = async () => ((await call("GET", "/api/bootstrap", { session: owner })).body as { homeView: unknown }).homeView;
+  assert.equal(await boot(), null, "nada escolhido: o Início decide");
+
+  const view = { layout: "separated", order: ["groups", "personal"], hidden: ["personal"] };
+  const saved = await call("PATCH", "/api/account/home-view", { session: owner, body: { view } });
+  assert.equal(saved.response.status, 200, JSON.stringify(saved.body));
+  assert.deepEqual(await boot(), view);
+
+  for (const bad of [
+    { layout: "grid", order: ["personal", "groups"], hidden: [] },
+    { layout: "separated", order: ["personal"], hidden: [] },
+    { layout: "separated", order: ["personal", "personal"], hidden: [] },
+    { layout: "separated", order: ["personal", "groups"], hidden: ["personal", "groups"] },
+    { layout: "separated", order: ["personal", "groups"], hidden: ["notes"] },
+  ]) {
+    const refused = await call("PATCH", "/api/account/home-view", { session: owner, body: { view: bad } });
+    assert.equal(refused.response.status, 400, JSON.stringify(bad));
+  }
+  assert.deepEqual(await boot(), view, "uma escolha inválida não mexe na salva");
+
+  const other = await register("Ivo", "ivo_home");
+  assert.equal(((await call("GET", "/api/bootstrap", { session: other })).body as { homeView: unknown }).homeView, null, "é de cada pessoa");
+
+  await call("PATCH", "/api/account/home-view", { session: owner, body: { view: null } });
+  assert.equal(await boot(), null);
 });

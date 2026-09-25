@@ -43,7 +43,8 @@ export function screenFromUrl(pathname: string, search = ""): Screen | null {
     if (groupId) return { kind: "quick-create", into: { groupId } };
     return params.get("personal") ? { kind: "quick-create", into: "personal" } : { kind: "quick-create" };
   }
-  if (parts[0] === "personal" && parts.length === 1) return { kind: "personal-space" };
+  // My space was folded into Home; old links still land somewhere sensible.
+  if (parts[0] === "personal" && parts.length === 1) return { kind: "dashboard" };
   if (parts[0] === "personal" && parts[1] === "trash" && parts.length === 2) return { kind: "personal-trash" };
   if (parts[0] === "catalog" && parts.length === 1) return { kind: "personal-catalog" };
   if (parts[0] === "catalog" && parts.length === 2) {
@@ -121,8 +122,6 @@ export function urlForScreen(screen: Screen): string | null {
       return `/groups/${encodeURIComponent(screen.groupId)}/catalog`;
     case "catalog-item":
       return `/groups/${encodeURIComponent(screen.groupId)}/catalog/${encodeURIComponent(screen.itemId)}`;
-    case "personal-space":
-      return "/personal";
     case "personal-catalog":
       return "/catalog";
     case "personal-catalog-item":
@@ -168,7 +167,7 @@ export function urlForScreen(screen: Screen): string | null {
 
 /** What a Back button reads: a fixed name, or the name of the group / challenge it leads to. */
 export type BackLabel =
-  | { kind: "home" | "signIn" | "templates" | "account" | "mySpace" | "myCatalogue" | "catalogue" | "challenge" }
+  | { kind: "home" | "signIn" | "templates" | "account" | "myCatalogue" | "catalogue" | "challenge" }
   | { kind: "named"; name: string };
 
 interface BackTarget {
@@ -188,7 +187,7 @@ const HOME: BackTarget = { screen: { kind: "dashboard" }, label: { kind: "home" 
 
 /**
  * The screen "Back" leads to — always the parent in the app's hierarchy, never "wherever you were":
- * Manage → its challenge → its group (or My space) → Home. Going Back therefore can't bounce between
+ * Manage → its challenge → its group (or Home, for a personal one) → Home. Going Back therefore can't bounce between
  * two screens that link to each other. `null` for a screen with nowhere to go up to.
  */
 export function backTargetFor(screen: Screen, lookup: BackLookup): BackTarget | null {
@@ -206,11 +205,9 @@ export function backTargetFor(screen: Screen, lookup: BackLookup): BackTarget | 
       return null;
     case "account":
     case "group":
-    case "personal-space":
       return HOME;
     case "quick-create":
-      if (screen.into === "personal") return { screen: { kind: "personal-space" }, label: { kind: "mySpace" } };
-      return screen.into ? toGroup(screen.into.groupId) : HOME;
+      return screen.into && screen.into !== "personal" ? toGroup(screen.into.groupId) : HOME;
     case "about":
     case "templates":
     case "invite":
@@ -225,7 +222,7 @@ export function backTargetFor(screen: Screen, lookup: BackLookup): BackTarget | 
       return { screen: { kind: "group-catalog", groupId: screen.groupId }, label: { kind: "catalogue" } };
     case "personal-catalog":
     case "create-personal-challenge":
-      return { screen: { kind: "personal-space" }, label: { kind: "mySpace" } };
+      return HOME;
     case "personal-trash":
       return { screen: { kind: "account" }, label: { kind: "account" } };
     case "personal-catalog-item":
@@ -233,7 +230,6 @@ export function backTargetFor(screen: Screen, lookup: BackLookup): BackTarget | 
     case "challenge": {
       const challenge = lookup.challenge(screen.challengeId);
       if (challenge?.groupId) return toGroup(challenge.groupId);
-      if (challenge?.personal) return { screen: { kind: "personal-space" }, label: { kind: "mySpace" } };
       return HOME;
     }
     case "admin":
