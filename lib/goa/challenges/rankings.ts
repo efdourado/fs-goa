@@ -1,6 +1,7 @@
 import type { PoolClient } from "pg";
 
 import { oneOrNull } from "../../db";
+import { challengeRatingFieldIds } from "./rating";
 import {
   compositeAffinity,
   directAffinity,
@@ -35,26 +36,37 @@ interface RatingFact {
   recommendedBy: string | null;
 }
 
-async function ratingField(client: PoolClient, challengeId: string): Promise<{ fieldId: string; range: number } | null> {
+/**
+ * The fields an item's rating is read from, and the scale's range: the challenge's rating metric when it names one
+ * (several fields averaged per entry — see `rating.ts`), otherwise its first individual rating field.
+ */
+async function ratingFields(client: PoolClient, challengeId: string): Promise<{ fieldIds: string[]; range: number } | null> {
+  const named = await challengeRatingFieldIds(client, challengeId);
   const row = await oneOrNull<{
     id: string; min_scaled: number | null; max_scaled: number | null; number_scale: number | null;
   }>(
     client,
-    `SELECT f.id, f.min_scaled, f.max_scaled, f.number_scale
-       FROM challenge_fields f JOIN entry_types t ON t.id = f.entry_type_id
-      WHERE f.challenge_id = $1 AND f.archived_at IS NULL AND f.kind = 'rating'
-        AND coalesce(t.purpose, 'rating') = 'rating' AND t.answer_scope = 'individual'
-      ORDER BY (f.semantic_key = 'nota') DESC, f.position
-      LIMIT 1`,
-    [challengeId],
+    named
+      ? `SELECT f.id, f.min_scaled, f.max_scaled, f.number_scale
+           FROM challenge_fields f
+          WHERE f.id = ANY($2::text[]) AND f.challenge_id = $1 AND f.archived_at IS NULL AND f.kind = 'rating'
+          ORDER BY f.position LIMIT 1`
+      : `SELECT f.id, f.min_scaled, f.max_scaled, f.number_scale
+           FROM challenge_fields f JOIN entry_types t ON t.id = f.entry_type_id
+          WHERE f.challenge_id = $1 AND f.archived_at IS NULL AND f.kind = 'rating'
+            AND coalesce(t.purpose, 'rating') = 'rating' AND t.answer_scope = 'individual'
+          ORDER BY (f.semantic_key = 'nota') DESC, f.position
+          LIMIT 1`,
+    named ? [challengeId, named] : [challengeId],
   );
   if (!row || row.min_scaled === null || row.max_scaled === null) return null;
   const factor = 10 ** (row.number_scale ?? 0);
   const range = (row.max_scaled - row.min_scaled) / factor;
-  return range > 0 ? { fieldId: row.id, range } : null;
+  return range > 0 ? { fieldIds: named ?? [row.id], range } : null;
 }
 
-async function ratingFacts(client: PoolClient, challengeId: string, fieldId: string): Promise<RatingFact[]> {
+/** One fact per rated entry: its rating is the average of the rating fields it answered. */
+async function ratingFacts(client: PoolClient, challengeId: string, fieldIds: string[]): Promise<RatingFact[]> {
   const result = await client.query<{
     participant_id: string; participant_name: string | null; item_id: string; item_title: string | null;
     value: number; year: number | null; genre: string | null; runtime: number | null; recommended_by: string | null;
@@ -62,7 +74,7 @@ async function ratingFacts(client: PoolClient, challengeId: string, fieldId: str
     `SELECT e.participant_user_id AS participant_id,
             CASE WHEN cp.user_id IS NOT NULL THEN u.display_name ELSE 'Quem já saiu' END AS participant_name,
             e.item_id, ci.title AS item_title,
-            (ev.number_scaled::float8 / (10 ^ f.number_scale)) AS value,
+            avg(ev.number_scaled::float8 / (10 ^ f.number_scale)) AS value,
             cat.year, cat.main_genre AS genre, cat.runtime_minutes AS runtime,
             ci.recommended_by_user_id AS recommended_by
        FROM entry_values ev
@@ -73,9 +85,11 @@ async function ratingFacts(client: PoolClient, challengeId: string, fieldId: str
        LEFT JOIN users u ON u.id = e.participant_user_id
        LEFT JOIN challenge_participants cp
          ON cp.challenge_id = e.challenge_id AND cp.user_id = e.participant_user_id AND cp.removed_at IS NULL
-      WHERE e.challenge_id = $1 AND ev.field_id = $2
-        AND e.deleted_at IS NULL AND ev.number_scaled IS NOT NULL AND e.item_id IS NOT NULL`,
-    [challengeId, fieldId],
+      WHERE e.challenge_id = $1 AND ev.field_id = ANY($2::text[])
+        AND e.deleted_at IS NULL AND ev.number_scaled IS NOT NULL AND e.item_id IS NOT NULL
+      GROUP BY e.id, e.participant_user_id, cp.user_id, u.display_name, e.item_id, ci.title,
+               cat.year, cat.main_genre, cat.runtime_minutes, ci.recommended_by_user_id`,
+    [challengeId, fieldIds],
   );
   return result.rows.map((row) => ({
     participantId: row.participant_id,
@@ -211,10 +225,10 @@ export async function computeRankings(
   client: PoolClient,
   challengeId: string,
 ): Promise<{ personal: PersonalRanking[]; affinity: AffinityBlock | null }> {
-  const field = await ratingField(client, challengeId);
+  const field = await ratingFields(client, challengeId);
   if (!field) return { personal: [], affinity: null };
 
-  const facts = await ratingFacts(client, challengeId, field.fieldId);
+  const facts = await ratingFacts(client, challengeId, field.fieldIds);
   const itemCount = (await oneOrNull<{ count: number }>(
     client,
     "SELECT count(*)::int AS count FROM challenge_items WHERE challenge_id = $1 AND archived_at IS NULL",
@@ -225,12 +239,14 @@ export async function computeRankings(
   // Expectation pairs for surprise/disappointment.
   const expectationRows = await client.query<{ participant_id: string; item_id: string; item_title: string | null; delta: number }>(
     `SELECT re.participant_user_id AS participant_id, re.item_id, ci.title AS item_title,
-            (rv.number_scaled::float8 / (10 ^ rf.number_scale))
-            - (xv.number_scaled::float8 / (10 ^ xf.number_scale)) AS delta
+            rv.value - (xv.number_scaled::float8 / (10 ^ xf.number_scale)) AS delta
        FROM entries re
        JOIN entry_types rt ON rt.id = re.entry_type_id AND coalesce(rt.purpose,'rating') = 'rating'
-       JOIN entry_values rv ON rv.entry_id = re.id AND rv.field_id = $2
-       JOIN challenge_fields rf ON rf.id = rv.field_id
+       JOIN LATERAL (
+         SELECT avg(v.number_scaled::float8 / (10 ^ vf.number_scale)) AS value
+           FROM entry_values v JOIN challenge_fields vf ON vf.id = v.field_id
+          WHERE v.entry_id = re.id AND v.field_id = ANY($2::text[]) AND v.number_scaled IS NOT NULL
+       ) rv ON rv.value IS NOT NULL
        JOIN entries xe ON xe.challenge_id = re.challenge_id AND xe.item_id = re.item_id
         AND xe.participant_user_id = re.participant_user_id AND xe.deleted_at IS NULL
        JOIN entry_types xt ON xt.id = xe.entry_type_id AND xt.purpose = 'expectation'
@@ -238,8 +254,8 @@ export async function computeRankings(
        JOIN challenge_fields xf ON xf.id = xv.field_id AND xf.kind = 'rating'
        LEFT JOIN challenge_items ci ON ci.id = re.item_id
       WHERE re.challenge_id = $1 AND re.deleted_at IS NULL AND re.item_id IS NOT NULL
-        AND rv.number_scaled IS NOT NULL AND xv.number_scaled IS NOT NULL`,
-    [challengeId, field.fieldId],
+        AND xv.number_scaled IS NOT NULL`,
+    [challengeId, field.fieldIds],
   );
 
   const byParticipant = new Map<string, RatingFact[]>();

@@ -957,3 +957,21 @@ test("front page story: a ranking's winner, the most in-tune pair and the toughe
   assert.deepEqual(excerpt.quote, { text: "Best night of the year.", itemTitle: "Aftersun" });
   assert.equal(storyExcerpt(challenge, 2, labels).stats.length, 2);
 });
+
+test("today's rating: the challenge's rating metric averages its fields per entry; without one, the first rating field", async () => {
+  const { entryRatingReader } = await import("../app/goa/utils");
+  const entryTypes = [
+    { id: "t", purpose: "rating", answerScope: "individual", fields: [{ id: "food", type: "rating" }, { id: "vibe", type: "rating" }, { id: "value", type: "rating" }] },
+    { id: "x", purpose: "expectation", answerScope: "individual", fields: [{ id: "hope", type: "rating" }] },
+  ] as unknown as import("../app/goa/types").ChallengeDetail["entryTypes"];
+  const entry = (entryTypeId: string, values: Record<string, unknown>) => ({ id: "e", entryTypeId, values }) as unknown as import("../app/goa/types").Entry;
+
+  const combined = entryRatingReader({ entryTypes, ratingFieldIds: ["food", "vibe", "value"] });
+  assert.equal(combined(entry("t", { food: 2, vibe: 4, value: "3" })), 3, "the average of the three, not the food score");
+  assert.equal(combined(entry("t", { food: 2 })), 2, "only what was answered counts");
+  assert.equal(combined(entry("x", { hope: 5 })), null);
+
+  const plain = entryRatingReader({ entryTypes, ratingFieldIds: null });
+  assert.equal(plain(entry("t", { food: 2, vibe: 4, value: 3 })), 2, "no rating metric → the first rating field, as before");
+  assert.equal(plain(entry("x", { hope: 5 })), null, "an expectation is a different question");
+});

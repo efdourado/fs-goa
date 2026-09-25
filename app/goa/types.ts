@@ -365,6 +365,8 @@ export interface Metric {
   fieldLabels?: string[];
   /** How `fieldIds` fold together — `average` unless set. Meaningless without `fieldIds`. */
   combineOp?: "sum" | "average";
+  /** This metric is the challenge's rating: Today, the catalogue and the rankings read an item's rating from it. */
+  isRating?: boolean;
   groupBy?: MetricGroupBy;
   /** `groupBy: "checkpoint"` only — each row folds in every earlier checkpoint. */
   cumulative?: boolean;
@@ -520,6 +522,8 @@ export interface ChallengeLibraryRef {
 }
 
 export interface ChallengeDetail extends ChallengeSummary {
+  /** The fields "the rating" averages when a metric is named the challenge's rating; null → the first rating field. */
+  ratingFieldIds?: Id[] | null;
   /** Template preview only: whether it's on the front page. */
   templateFeatured?: boolean;
   fields: ChallengeField[];

@@ -954,7 +954,10 @@
     "eventScheduleInvalid": "Revisa la fecha — el final, la hora o la zona horaria no parecen correctos.",
     "selectedOf": "{selected} de {total} seleccionados",
     "allCommentsShown": "se muestran todos",
-    "blocksOn": "{count} activados"
+    "blocksOn": "{count} activados",
+    "metricIsRating": "Usar como la nota del desafío",
+    "metricIsRatingHint": "Hoy, el acervo y los rankings muestran la nota de un ítem como este promedio. Solo una métrica puede ser la nota.",
+    "metricIsRatingTag": "La nota del desafío"
   },
   "visibility": {
     "title": "Quién ve estas respuestas",

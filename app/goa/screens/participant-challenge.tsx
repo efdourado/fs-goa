@@ -41,6 +41,7 @@ import {
   canManage,
   dateKeyInSaoPaulo,
   displayAnswer,
+  entryRatingReader,
   findMissingRequiredField,
   formatRuntime,
   isChallengeScheduled,
@@ -1236,47 +1237,32 @@ export function ParticipantChallengeScreen({
   // whose *purpose* is "rating" count here — an expectation's field uses the
   // same rating widget but is a different question, and mixing the two in with
   // the real rating both overwrote it (self) and duplicated the person (group).
+  const readRating = useMemo(() => entryRatingReader(challenge), [challenge]);
   const ratingByItem = useMemo(() => {
-    const ratingFieldByType = new Map(
-      challenge.entryTypes
-        .filter((type) => type.purpose === "rating" && type.answerScope !== "shared")
-        .map((type) => [type.id, type.fields.find((field) => field.type === "rating")?.id ?? null]),
-    );
     const map = new Map<Id, number>();
     for (const entry of ownEntries) {
       const itemId = itemIdForEntry(entry);
-      const fieldId = ratingFieldByType.get(entry.entryTypeId ?? "");
-      if (!itemId || !fieldId) continue;
-      const raw = valuesAsRecord(entry.values)[fieldId];
-      const value = typeof raw === "number" ? raw : typeof raw === "string" && raw.trim() !== "" ? Number(raw) : NaN;
-      if (!Number.isNaN(value)) map.set(itemId, value);
+      const value = itemId ? readRating(entry) : null;
+      if (itemId && value !== null) map.set(itemId, value);
     }
     return map;
-  }, [ownEntries, challenge.entryTypes]);
+  }, [ownEntries, readRating]);
   // Everyone else's rating for each item — shown alongside the entry form so a
   // person can weigh their own take against the group's while filling it in,
   // not just after the round closes.
   const groupRatingsByItem = useMemo(() => {
-    const ratingFieldByType = new Map(
-      challenge.entryTypes
-        .filter((type) => type.purpose === "rating" && type.answerScope !== "shared")
-        .map((type) => [type.id, type.fields.find((field) => field.type === "rating")?.id ?? null]),
-    );
     const map = new Map<Id, Array<{ id: Id; name: string; value: number }>>();
     for (const entry of entries) {
       if (entry.userId && entry.userId === user?.id) continue;
       const itemId = itemIdForEntry(entry);
-      const fieldId = ratingFieldByType.get(entry.entryTypeId ?? "");
-      if (!itemId || !fieldId) continue;
-      const raw = valuesAsRecord(entry.values)[fieldId];
-      const value = typeof raw === "number" ? raw : typeof raw === "string" && raw.trim() !== "" ? Number(raw) : NaN;
-      if (Number.isNaN(value)) continue;
+      const value = itemId ? readRating(entry) : null;
+      if (!itemId || value === null) continue;
       const list = map.get(itemId) ?? [];
       list.push({ id: entry.userId ?? entry.id, name: entry.participantName ?? "—", value });
       map.set(itemId, list);
     }
     return map;
-  }, [entries, user?.id, challenge.entryTypes]);
+  }, [entries, user?.id, readRating]);
   const sortedItems = useMemo(() => [...challenge.items].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)), [challenge.items]);
   // A workout-style challenge: one check-in that holds a record for each of several items. It replaces the
   // per-item picker and form on Today, and its progress is "check-ins logged", not "items done".

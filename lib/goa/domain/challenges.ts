@@ -405,6 +405,7 @@ export async function createChallenge(
           JSON.stringify({
             visibleInResults: recipeMetric.visibleInResults !== false,
             ...(combinedFieldIds ? { fieldIds: combinedFieldIds } : {}),
+            ...(recipeMetric.isRating ? { isRating: true } : {}),
             ...settings,
           }),
           session.user.id],

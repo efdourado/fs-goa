@@ -49,6 +49,8 @@ interface RecipeMetric {
    * skipped, like a single field that no longer resolves, if any key doesn't.
    */
   fieldKeys?: string[];
+  /** This metric is the challenge's rating from the start — Today, the catalogue and the rankings read it (rating.ts). */
+  isRating?: boolean;
   /** Reads this entry type instead of the primary one — attendance counts the visits, not the records inside. */
   entryTypeKey?: string;
   groupBy?: "none" | "participant" | "item";
@@ -354,10 +356,10 @@ export const RECIPES: Record<RecipeKey, Recipe> = {
     metrics: [completionMetric],
   },
   // A ready-made challenge on a Tables library: rate each place on food,
-  // atmosphere/service and value, plus one combined score averaging all three.
+  // atmosphere/service and value, plus one combined score averaging all three — which is the place's rating.
   tables: {
     key: "tables",
-    version: 2,
+    version: 3,
     catalogKind: null,
     catalogKindFromBody: true,
     defaultLibrarySource: "tables",
@@ -374,6 +376,7 @@ export const RECIPES: Record<RecipeKey, Recipe> = {
         operation: "average",
         fieldKeys: ["comida", "ambiente_atendimento", "custo_beneficio"],
         groupBy: "item",
+        isRating: true,
       },
       completionMetric,
     ],

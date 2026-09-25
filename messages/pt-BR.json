@@ -954,7 +954,10 @@
     "eventScheduleInvalid": "Confira a data — o fim, a hora ou o fuso horário não parecem certos.",
     "selectedOf": "{selected} de {total} selecionados",
     "allCommentsShown": "todos aparecem",
-    "blocksOn": "{count} ligados"
+    "blocksOn": "{count} ligados",
+    "metricIsRating": "Usar como a nota do desafio",
+    "metricIsRatingHint": "O Hoje, o acervo e os rankings mostram a nota de um item como esta média. Só uma métrica pode ser a nota.",
+    "metricIsRatingTag": "A nota do desafio"
   },
   "visibility": {
     "title": "Quem vê estas respostas",

@@ -45,7 +45,10 @@ export function AdminMetrics({ challenge, onAdd, onUpdate, onDelete }: Props) {
       {challenge.metrics.length ? <div className="divide-y divide-[var(--line)]">{challenge.metrics.map((metric) => (
         <div key={metric.id} className="py-6 first:pt-0">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3 text-xs text-[var(--muted)]">
-            <span>{[metric.visibleDuring ? t("metricDuring") : null, metric.visibleInResults ? t("metricInResults") : null].filter(Boolean).join(" · ") || t("metricHidden")}</span>
+            <span>
+              {[metric.visibleDuring ? t("metricDuring") : null, metric.visibleInResults ? t("metricInResults") : null].filter(Boolean).join(" · ") || t("metricHidden")}
+              {metric.isRating ? <span className="ml-2 rounded-full bg-[var(--main-soft)] px-2 py-0.5 text-[var(--main-strong)]">{t("metricIsRatingTag")}</span> : null}
+            </span>
             {!closed ? <div className="flex gap-3"><Button variant="secondary" onClick={() => { setEditing(metric); setSuccess(null); }}>{t("edit")}</Button><button type="button" className="min-h-11 px-2 text-[var(--danger)]" onClick={() => { setRemoving(metric); setError(null); }}>{t("remove")}</button></div> : null}
           </div>
           <MetricBlock metric={metric} showExplanation />
@@ -66,6 +69,9 @@ export function AdminMetrics({ challenge, onAdd, onUpdate, onDelete }: Props) {
     </section>
   );
 }
+
+/** The averages that can stand for "the rating" — see `lib/goa/challenges/rating.ts`. */
+const RATING_OPERATIONS: Metric["operation"][] = ["average", "bayesian_average"];
 
 export function MetricEditor({ challenge, metric, ranking = false, onCancel, onSave }: {
   challenge: ChallengeDetail; metric?: Metric;
@@ -105,6 +111,7 @@ export function MetricEditor({ challenge, metric, ranking = false, onCancel, onS
   const [cumulative, setCumulative] = useState(metric?.cumulative ?? false);
   const [visibleDuring, setVisibleDuring] = useState(metric?.visibleDuring ?? true);
   const [visibleInResults, setVisibleInResults] = useState(metric?.visibleInResults ?? true);
+  const [isRating, setIsRating] = useState(metric?.isRating ?? false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const needsField = metricNeedsField(operation);
@@ -122,8 +129,13 @@ export function MetricEditor({ challenge, metric, ranking = false, onCancel, onS
       ? JSON.stringify([...fieldIds].sort()) !== JSON.stringify([...seed.fieldIds].sort()) || combineOp !== seed.combineOp
       : fieldId !== seed.fieldId)
     || groupBy !== seed.groupBy || minSample !== String(metric?.minSample ?? 1) || cumulative !== (metric?.cumulative ?? false)
-    || visibleDuring !== (metric?.visibleDuring ?? true) || visibleInResults !== (metric?.visibleInResults ?? true);
+    || visibleDuring !== (metric?.visibleDuring ?? true) || visibleInResults !== (metric?.visibleInResults ?? true)
+    || isRating !== (metric?.isRating ?? false);
   const validSource = !needsField || (combine ? fieldIds.length >= 2 : Boolean(selectedField));
+  // Only an average of rating fields is on the rating scale, so only it can stand for the challenge's rating.
+  const canBeRating = RATING_OPERATIONS.includes(operation) && needsField && (combine
+    ? fieldIds.length >= 2 && combineOp === "average" && combinedFields.every((field) => field.type === "rating")
+    : selectedField?.type === "rating");
   const [calculationOpen] = useState(!metric || !validSource);
   async function submit() {
     if (!validSource) { setError(combine ? t("metricPickTwoFields") : t("errPickField")); return; }
@@ -136,7 +148,8 @@ export function MetricEditor({ challenge, metric, ranking = false, onCancel, onS
         combineOp: needsField && combine ? combineOp : undefined,
         groupBy,
         minSample: Number(minSample) || 1, cumulative: groupBy === "checkpoint" && cumulative,
-        ...(metric?.bayesPriorWeight != null ? { bayesPriorWeight: metric.bayesPriorWeight } : {}), visibleDuring, visibleInResults });
+        ...(metric?.bayesPriorWeight != null ? { bayesPriorWeight: metric.bayesPriorWeight } : {}), visibleDuring, visibleInResults,
+        isRating: canBeRating && isRating });
     } catch (cause) { setError(f.error(cause)); setBusy(false); }
   }
   return (
@@ -158,6 +171,9 @@ export function MetricEditor({ challenge, metric, ranking = false, onCancel, onS
         <legend className="mb-2 text-[13px] font-medium">{t("metricWhere")}</legend>
         <Toggle checked={visibleDuring} onChange={setVisibleDuring} label={t("metricVisibleDuring")} />
         <Toggle checked={visibleInResults} onChange={setVisibleInResults} label={t("metricVisibleResults")} />
+        {canBeRating ? (
+          <Toggle checked={isRating} onChange={setIsRating} label={t("metricIsRating")} hint={t("metricIsRatingHint")} />
+        ) : null}
       </fieldset>
       <Disclosure
         summary={t("metricCalculation")}

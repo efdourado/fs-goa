@@ -208,6 +208,34 @@ export function valuesAsRecord(values: Entry["values"]): Record<Id, unknown> {
   return values ?? {};
 }
 
+/**
+ * How to read "the rating" an entry gave its item. When a metric is named the challenge's rating
+ * (`ratingFieldIds`), it's the average of those fields the entry answered; otherwise the first rating field of a
+ * rating-purpose, individually answered type — an expectation uses the same widget but is a different question.
+ */
+export function entryRatingReader(challenge: Pick<ChallengeDetail, "entryTypes" | "ratingFieldIds">): (entry: Entry) => number | null {
+  const numeric = (raw: unknown) => (typeof raw === "number" ? raw : typeof raw === "string" && raw.trim() !== "" ? Number(raw) : NaN);
+  const named = challenge.ratingFieldIds?.length ? challenge.ratingFieldIds : null;
+  if (named) {
+    return (entry) => {
+      const values = valuesAsRecord(entry.values);
+      const answered = named.map((id) => numeric(values[id])).filter((value) => !Number.isNaN(value));
+      return answered.length ? answered.reduce((sum, value) => sum + value, 0) / answered.length : null;
+    };
+  }
+  const fieldByType = new Map(
+    (challenge.entryTypes ?? [])
+      .filter((type) => type.purpose === "rating" && type.answerScope !== "shared")
+      .map((type) => [type.id, type.fields.find((field) => field.type === "rating")?.id ?? null]),
+  );
+  return (entry) => {
+    const fieldId = fieldByType.get(entry.entryTypeId ?? "");
+    if (!fieldId) return null;
+    const value = numeric(valuesAsRecord(entry.values)[fieldId]);
+    return Number.isNaN(value) ? null : value;
+  };
+}
+
 export function itemIdForEntry(entry: Entry): Id | null {
   return entry.itemId ?? entry.checkpointId ?? null;
 }

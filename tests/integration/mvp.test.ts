@@ -2259,6 +2259,65 @@ test("Tables: a Nota geral média as três notas por lugar, e sobrevive a uma c�
   assert.equal(dupWithEntry.metrics.find((metric) => metric.key === "nota_geral")!.value, 4, "a métrica combinada da cópia lê os campos da cópia");
 });
 
+test("a nota do desafio: a Nota geral do Tables já nasce como a nota; o acervo e os rankings leem a média das três; só uma métrica é a nota", async () => {
+  const owner = await register("Nina", "nina_nota_desafio");
+  const friend = await register("Otto", "otto_nota_desafio");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Rolês 3" } })).body as { id: string }).id;
+  const invite = (await call("POST", `/api/groups/${gid}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
+  await call("POST", `/api/invites/${invite.token}`, { session: friend, body: {} });
+  await call("POST", `/api/groups/${gid}/catalog/libraries`, { session: owner, body: { source: "tables" } });
+  const created = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: { recipe: "tables", title: "Onde jantar", participantIds: [owner.user.id, friend.user.id], items: [{ title: "Armazém do Juca" }] },
+  });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const cid = (created.body as { id: string }).id;
+
+  type Detail = {
+    items: Array<{ id: string }>;
+    fields: Array<{ id: string; key?: string }>;
+    ratingFieldIds: string[] | null;
+    metrics: Array<{ id: string; key: string; isRating?: boolean; fieldId: string | null; fieldIds?: string[]; label: string; operation: string; groupBy: string }>;
+  };
+  const detail = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as Detail;
+  const notaGeral = detail.metrics.find((metric) => metric.key === "nota_geral")!;
+  assert.equal(notaGeral.isRating, true, "a receita Tables já marca a Nota geral como a nota do desafio");
+  assert.equal(detail.metrics.filter((metric) => metric.isRating).length, 1);
+  assert.deepEqual([...(detail.ratingFieldIds ?? [])].sort(), [...(notaGeral.fieldIds ?? [])].sort(), "o detalhe diz de quais campos a nota vem");
+
+  await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } });
+  const itemId = detail.items[0].id;
+  // Nina: (2+4+3)/3 = 3. Otto: (5+5+5)/3 = 5. Só a Comida daria 2 e 5.
+  await call("POST", `/api/challenges/${cid}/entries`, { session: owner, body: { itemId, values: { comida: 2, ambiente_atendimento: 4, custo_beneficio: 3 } } });
+  await call("POST", `/api/challenges/${cid}/entries`, { session: friend, body: { itemId, values: { comida: 5, ambiente_atendimento: 5, custo_beneficio: 5 } } });
+
+  const catalog = (await call("GET", `/api/groups/${gid}/catalog`, { session: owner })).body as { items: Array<{ title: string; ratingAvg: number | null; ratingCount?: number }> };
+  const juca = catalog.items.find((item) => item.title === "Armazém do Juca")!;
+  assert.equal(juca.ratingAvg, 4, "o acervo mostra a média das notas gerais, (3 + 5) / 2 — não a da Comida (3,5)");
+
+  await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "closed" } });
+  const closed = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { result?: { personalRankings?: Array<{ name: string; ratingsMean: number | null }> } };
+  const means = Object.fromEntries((closed.result?.personalRankings ?? []).map((person) => [person.name, person.ratingsMean]));
+  assert.deepEqual(means, { Nina: 3, Otto: 5 }, "os perfis de cada pessoa leem a nota geral, não só a Comida");
+
+  // Reabre para mexer nas métricas: marcar a média da Comida como a nota tira a marca da Nota geral.
+  await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } });
+  const comida = detail.metrics.find((metric) => metric.key === "media_comida")!;
+  const moved = await call("PATCH", `/api/challenges/${cid}/metrics/${comida.id}`, {
+    session: owner, body: { label: comida.label, operation: "average", fieldId: comida.fieldId, groupBy: "item", isRating: true },
+  });
+  assert.equal(moved.response.status, 200, JSON.stringify(moved.body));
+  const after = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as Detail;
+  assert.deepEqual(after.metrics.filter((metric) => metric.isRating).map((metric) => metric.key), ["media_comida"], "só uma métrica é a nota");
+  assert.deepEqual(after.ratingFieldIds, [comida.fieldId]);
+
+  // Uma soma não está na escala de nota: recusada.
+  const refused = await call("PATCH", `/api/challenges/${cid}/metrics/${notaGeral.id}`, {
+    session: owner, body: { label: notaGeral.label, operation: "average", fieldIds: notaGeral.fieldIds, combineOp: "sum", groupBy: "item", isRating: true },
+  });
+  assert.equal(refused.response.status, 400, JSON.stringify(refused.body));
+});
+
 test("cópia de modelo (fase 7): só a estrutura ou com itens, o escopo compartilhado fica, nada privado atravessa", async () => {
   const admin = await register("Curador", "curador_copia");
   await adminPool.query("UPDATE users SET platform_admin = true WHERE id = $1", [admin.user.id]);

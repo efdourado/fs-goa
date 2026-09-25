@@ -954,7 +954,10 @@
     "eventScheduleInvalid": "Check the date — the end, the time or the time zone doesn't look right.",
     "selectedOf": "{selected} of {total} selected",
     "allCommentsShown": "all shown",
-    "blocksOn": "{count} on"
+    "blocksOn": "{count} on",
+    "metricIsRating": "Use as this challenge's rating",
+    "metricIsRatingHint": "Today, the catalogue and the rankings show an item's rating as this average. Only one metric can be the rating.",
+    "metricIsRatingTag": "The challenge's rating"
   },
   "visibility": {
     "title": "Who sees these answers",

@@ -18,6 +18,7 @@ import { fieldsForChallenge } from "./fields";
 import { attributeValuesForItems } from "../catalog-attributes";
 import { readChallengeLibraries } from "./libraries";
 import { generateDailyCheckpoints } from "./items";
+import { challengeRatingFieldIds } from "./rating";
 import { recipeCollectsEntryDate } from "./recipes";
 import { metricsForChallenge, resultForChallenge } from "./results";
 import { eventScheduleJson, scheduleVisibleSql } from "../domain/event-schedule";
@@ -292,6 +293,8 @@ export async function buildChallengeDetail(
     publishedAsTemplate: ch.published_as_template_at != null,
     submissionMode,
     completionEntryTypeId,
+    // What "the rating" of an item is read from, when a metric is named the challenge's rating (see rating.ts).
+    ratingFieldIds: await challengeRatingFieldIds(client, challengeId),
     viewerRole: viewer.role,
     isParticipant: viewer.isParticipant,
     // The viewer's own name-in-publication consent for this challenge (V1 §12).

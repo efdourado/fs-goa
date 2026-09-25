@@ -13,6 +13,7 @@ import { calculateMetric } from "../../metrics";
 import { generateOpaqueToken, hashToken } from "../../security";
 import { primaryEntryType } from "./entry-types";
 import { computeRankings } from "./rankings";
+import { RATING_METRIC_OPERATIONS } from "./rating";
 import type { MetricRow } from "./types";
 
 interface SeriesEntry {
@@ -351,6 +352,7 @@ async function calculateMetricRow(
     fieldIds: composite?.fieldIds,
     fieldLabels: composite && fieldLabels ? composite.fieldIds.map((id) => fieldLabels.get(id) ?? "") : undefined,
     combineOp: composite?.combineOp,
+    isRating: (metric.settings as { isRating?: unknown })?.isRating === true,
     groupBy: metric.group_by,
     cumulative: (metric.settings as { cumulative?: unknown })?.cumulative === true,
     visibleDuring: metric.visible_during_challenge,
@@ -1045,14 +1047,43 @@ async function resolveMetricField(
   return { entryTypeId: type.id, fieldId: operation === "completion_rate" ? null : fieldId, fieldIds: null };
 }
 
-function metricSettingsJson(parsed: ParsedMetricInput, resolved: { fieldIds: string[] | null }, combineOp: "sum" | "average"): string {
+function metricSettingsJson(parsed: ParsedMetricInput, resolved: { fieldIds: string[] | null }, combineOp: "sum" | "average", isRating = false): string {
   return JSON.stringify({
     visibleInResults: parsed.visibleInResults,
     ...(Number.isFinite(parsed.minSample) && parsed.minSample > 0 ? { minSample: Math.floor(parsed.minSample) } : {}),
     ...(Number.isFinite(parsed.bayesPriorWeight) && parsed.bayesPriorWeight >= 0 ? { bayesPriorWeight: parsed.bayesPriorWeight } : {}),
     ...(parsed.cumulative ? { cumulative: true } : {}),
     ...(resolved.fieldIds ? { fieldIds: resolved.fieldIds, combineOp } : {}),
+    ...(isRating ? { isRating: true } : {}),
   });
+}
+
+/**
+ * `body.isRating` — this metric is the challenge's rating (see `rating.ts`). Only an average of rating fields
+ * qualifies: a sum, a count or a number field isn't on the rating scale.
+ */
+async function assertRatingMetric(
+  client: PoolClient,
+  operation: string,
+  resolved: { fieldId: string | null; fieldIds: string[] | null },
+  combineOp: "sum" | "average",
+) {
+  const ids = resolved.fieldIds ?? (resolved.fieldId ? [resolved.fieldId] : []);
+  const kinds = ids.length
+    ? (await client.query<{ kind: string }>("SELECT kind FROM challenge_fields WHERE id = ANY($1::text[])", [ids])).rows
+    : [];
+  const ok = RATING_METRIC_OPERATIONS.has(operation) && combineOp === "average"
+    && kinds.length === ids.length && kinds.length > 0 && kinds.every((row) => row.kind === "rating");
+  if (!ok) throw new ApiError(400, "invalid_rating_metric", "Só a média de campos de nota pode ser a nota do desafio.");
+}
+
+/** A challenge has at most one rating — naming a new one takes the flag off whichever had it. */
+async function clearOtherRatingMetrics(client: PoolClient, challengeId: string, keepId: string) {
+  await client.query(
+    `UPDATE challenge_metrics SET settings = settings - 'isRating', updated_at = now()
+      WHERE challenge_id = $1 AND id <> $2 AND settings ? 'isRating'`,
+    [challengeId, keepId],
+  );
 }
 
 /** `body.fieldIds` — several field ids to combine into one metric, instead of the ordinary single `fieldId`. */
@@ -1082,6 +1113,8 @@ export async function addMetric(
     const combineOp = parseCombineOp(body);
     const resolved = await resolveMetricField(client, challengeId, parsed.operation, requestedFieldId, requestedFieldIds, parsed.groupBy);
     const { entryTypeId, fieldId } = resolved;
+    const isRating = body.isRating === true;
+    if (isRating) await assertRatingMetric(client, parsed.operation, resolved, combineOp);
     const id = publicId();
     const positionRow = await oneOrNull<{ position: number }>(client,
       "SELECT coalesce(max(position),-1)::int + 1 AS position FROM challenge_metrics WHERE challenge_id=$1", [challengeId]);
@@ -1092,8 +1125,9 @@ export async function addMetric(
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,2,$9,$10,$11::jsonb,$12,now(),now())`,
       [id, challengeId, entryTypeId, fieldId, semanticKey(body.key ?? parsed.label, `metrica_${positionRow?.position ?? 0}`),
         parsed.label, parsed.operation, parsed.groupBy, parsed.visibleDuring, positionRow?.position ?? 0,
-        metricSettingsJson(parsed, resolved, combineOp), session.user.id],
+        metricSettingsJson(parsed, resolved, combineOp, isRating), session.user.id],
     );
+    if (isRating) await clearOtherRatingMetrics(client, challengeId, id);
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
       "metric.created", "challenge_metric", id, null, { label: parsed.label, operation: parsed.operation, fieldId, fieldIds: resolved.fieldIds });
     return { id };
@@ -1126,14 +1160,17 @@ export async function updateMetric(
     const combineOp = parseCombineOp(body);
     const resolved = await resolveMetricField(client, challengeId, parsed.operation, requestedFieldId, requestedFieldIds, parsed.groupBy);
     const { entryTypeId, fieldId } = resolved;
+    const isRating = body.isRating === true;
+    if (isRating) await assertRatingMetric(client, parsed.operation, resolved, combineOp);
     await client.query(
       `UPDATE challenge_metrics
           SET entry_type_id=$3, field_id=$4, label=$5, operation=$6, group_by=$7,
               visible_during_challenge=$8, settings=$9::jsonb, updated_at=now()
         WHERE id=$1 AND challenge_id=$2`,
       [metricId, challengeId, entryTypeId, fieldId, parsed.label, parsed.operation, parsed.groupBy,
-        parsed.visibleDuring, metricSettingsJson(parsed, resolved, combineOp)],
+        parsed.visibleDuring, metricSettingsJson(parsed, resolved, combineOp, isRating)],
     );
+    if (isRating) await clearOtherRatingMetrics(client, challengeId, metricId);
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
       "metric.updated", "challenge_metric", metricId, null, { label: parsed.label, operation: parsed.operation, fieldId, fieldIds: resolved.fieldIds });
     return { id: metricId };

@@ -11,6 +11,7 @@ import {
   updateAttributeDef,
   type CatalogAttributeType,
 } from "./catalog-attributes";
+import { entryRatingSql } from "./challenges/rating";
 import { writeAudit } from "./domain/audit";
 import { eventScheduleColumns, eventScheduleJson, parseEventSchedule, scheduleVisibleSql } from "./domain/event-schedule";
 import { ensurePersonalWorkspace } from "./domain/challenges";
@@ -465,15 +466,14 @@ async function listCatalogWithClient(client: Pick<PoolClient, "query">, workspac
          LEFT JOIN group_members active_rec ON active_rec.group_id = ci.group_id
           AND active_rec.user_id = ci.recommended_by_user_id AND active_rec.removed_at IS NULL
          LEFT JOIN catalog_recommenders cr ON cr.id = ci.recommended_by_external_id
+         -- Each entry's rating as its challenge defines it (see rating.ts), then averaged over entries.
          LEFT JOIN LATERAL (
-           SELECT avg(ev.number_scaled::float8 / (10 ^ f.number_scale)) AS rating_avg,
-                  count(ev.entry_id) AS rating_count
+           SELECT avg(er.value) AS rating_avg, count(er.value) AS rating_count
              FROM challenge_items it
              JOIN challenges c ON c.id = it.challenge_id AND c.deleted_at IS NULL AND c.status <> 'draft'
              JOIN entries e ON e.item_id = it.id AND e.deleted_at IS NULL
               AND e.entry_type_id IN (SELECT id FROM entry_types WHERE challenge_id = c.id AND purpose IN ('rating', 'completion') AND answer_scope = 'individual')
-             JOIN entry_values ev ON ev.entry_id = e.id AND ev.number_scaled IS NOT NULL
-             JOIN challenge_fields f ON f.id = ev.field_id AND f.kind = 'rating'
+             CROSS JOIN LATERAL (SELECT ${entryRatingSql("e", "c")} AS value) er
             WHERE it.catalog_item_id = ci.id AND it.archived_at IS NULL
          ) agg ON true
         WHERE ci.group_id = $1 AND ci.archived_at IS NULL${limited ? " AND ci.rn <= $2" : ""}
@@ -558,8 +558,8 @@ async function catalogItemDetailWithClient(
     `SELECT c.id AS challenge_id, c.title, c.status,
               c.start_date::text AS start_date, c.end_date::text AS end_date,
               CASE WHEN active_recommender.user_id IS NOT NULL THEN ru.display_name END AS recommended_by,
-              avg(ev.number_scaled::float8 / (10 ^ f.number_scale)) AS rating_avg,
-              count(ev.entry_id)::int AS rating_count
+              avg(er.value) AS rating_avg,
+              count(er.value)::int AS rating_count
          FROM challenge_items it
          JOIN challenges c ON c.id = it.challenge_id AND c.deleted_at IS NULL AND c.status <> 'draft'
          LEFT JOIN users ru ON ru.id = it.recommended_by_user_id
@@ -569,8 +569,7 @@ async function catalogItemDetailWithClient(
           AND active_recommender.removed_at IS NULL
          LEFT JOIN entries e ON e.item_id = it.id AND e.deleted_at IS NULL
           AND e.entry_type_id IN (SELECT id FROM entry_types WHERE challenge_id = c.id AND purpose IN ('rating', 'completion') AND answer_scope = 'individual')
-         LEFT JOIN entry_values ev ON ev.entry_id = e.id AND ev.number_scaled IS NOT NULL
-         LEFT JOIN challenge_fields f ON f.id = ev.field_id AND f.kind = 'rating'
+         LEFT JOIN LATERAL (SELECT ${entryRatingSql("e", "c")} AS value) er ON true
         WHERE it.catalog_item_id = $1 AND it.archived_at IS NULL
         GROUP BY c.id, c.title, c.status, c.start_date, c.end_date, active_recommender.user_id, ru.display_name, c.created_at
         ORDER BY c.start_date NULLS LAST, c.created_at`,
