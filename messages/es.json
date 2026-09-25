@@ -1222,11 +1222,13 @@
     "cardFields": "{count, plural, one {# campo} other {# campos}}",
     "frontTitle": "Desafíos con tu gente, o solo tú.",
     "frontLede": "Sigue películas, libros, hábitos — lo que quieras — y mira cómo todo se convierte en un resultado para compartir. Estos son reales.",
-    "createAccount": "Crear cuenta",
     "moreTitle": "Más plantillas",
     "seeResult": "Ver el resultado completo",
     "feature": "Destacar en portada",
-    "unfeature": "Quitar de portada"
+    "unfeature": "Quitar de portada",
+    "storyInTune": "Más en sintonía",
+    "storyCritic": "Crítico más exigente",
+    "storyCriticNote": "promedio {average}"
   },
   "invite": {
     "verifying": "Verificando invitación…",

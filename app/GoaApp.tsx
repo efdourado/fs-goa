@@ -608,7 +608,7 @@ export default function GoaApp() {
       return <InviteScreen token={screen.token} user={null} csrfToken={bootstrap.csrfToken} onBack={goUp} backLabel={backLabel} onNeedAuth={() => setScreen({ kind: "auth", mode: "login" })} onAccepted={async () => undefined} />;
     }
     if (screen.kind === "templates") {
-      return <TemplatesScreen user={null} onOpen={(id) => setScreen({ kind: "template", challengeId: id })} onBack={goUp} backLabel={backLabel} onSignIn={() => setScreen({ kind: "auth", mode: "login" })} onSignUp={() => setScreen({ kind: "auth", mode: "register" })} onEmpty={() => replaceScreen({ kind: "auth", mode: "login" })} />;
+      return <TemplatesScreen user={null} onOpen={(id) => setScreen({ kind: "template", challengeId: id })} onBack={goUp} backLabel={backLabel} onSignIn={() => setScreen({ kind: "auth", mode: "login" })} onEmpty={() => replaceScreen({ kind: "auth", mode: "login" })} />;
     }
     if (screen.kind === "template") {
       return <TemplateDetailScreen user={null} challengeId={screen.challengeId} groups={[]} csrfToken={bootstrap.csrfToken} onBack={goUp} backLabel={backLabel} onSignIn={() => goToAuthFrom(screen)} onDuplicated={() => undefined} />;

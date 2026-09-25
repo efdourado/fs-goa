@@ -1222,11 +1222,13 @@
     "cardFields": "{count, plural, one {# field} other {# fields}}",
     "frontTitle": "Challenges with your people, or just you.",
     "frontLede": "Track films, books, habits — anything — and watch it add up to a result worth sharing. These are real ones.",
-    "createAccount": "Create account",
     "moreTitle": "More templates",
     "seeResult": "See the whole result",
     "feature": "Feature on the front page",
-    "unfeature": "Take off the front page"
+    "unfeature": "Take off the front page",
+    "storyInTune": "Most in tune",
+    "storyCritic": "Toughest critic",
+    "storyCriticNote": "average {average}"
   },
   "invite": {
     "verifying": "Checking the invite…",

@@ -21,7 +21,7 @@ import type {
 import { BackButton, Brand, Button, EmptyState, inputClass, labelClass, PageHeading, StatusMessage } from "../ui";
 import { ParticipantChallengeScreen } from "./participant-challenge";
 
-function PublicChrome({ user, onSignIn, onSignUp, children }: { user: User | null; onSignIn: () => void; onSignUp?: () => void; children: ReactNode }) {
+function PublicChrome({ user, onSignIn, children }: { user: User | null; onSignIn: () => void; children: ReactNode }) {
   const t = useTranslations("templates");
   if (user) return <>{children}</>;
   return (
@@ -32,7 +32,6 @@ function PublicChrome({ user, onSignIn, onSignUp, children }: { user: User | nul
           <div className="flex items-center gap-2">
             <SettingsMenu />
             <Button variant="secondary" onClick={onSignIn}>{t("signIn")}</Button>
-            {onSignUp ? <Button onClick={onSignUp}>{t("createAccount")}</Button> : null}
           </div>
         </div>
       </header>
@@ -47,7 +46,6 @@ export function TemplatesScreen({
   onBack,
   backLabel,
   onSignIn,
-  onSignUp,
   onEmpty,
 }: {
   user: User | null;
@@ -56,8 +54,6 @@ export function TemplatesScreen({
   /** What the button says — the parent screen's name; falls back to plain "Back". */
   backLabel?: string;
   onSignIn: () => void;
-  /** Signed out: straight to creating an account. */
-  onSignUp?: () => void;
   /** Signed out and nothing published — the front door has nothing to show, so the caller sends them to sign in. */
   onEmpty?: () => void;
 }) {
@@ -90,11 +86,10 @@ export function TemplatesScreen({
           <PageHeading title={t("title")} description={t("subtitle")} />
         </>
       ) : (
-        // Signed out, this is goa's front door: say what it is, then show real results before asking for anything.
+        // Signed out, this is goa's front door: say what it is, then show real results; Sign in waits in the header.
         <header className="mb-10 max-w-3xl">
           <h1 className="text-4xl font-medium leading-[1.02] tracking-[-0.05em] sm:text-6xl">{t("frontTitle")}</h1>
           <p className="mt-4 text-base leading-7 text-[var(--muted)]">{t("frontLede")}</p>
-          {onSignUp ? <Button className="mt-6" onClick={onSignUp}>{t("createAccount")}</Button> : null}
         </header>
       )}
 
@@ -144,7 +139,7 @@ export function TemplatesScreen({
     </main>
   );
 
-  return <PublicChrome user={user} onSignIn={onSignIn} onSignUp={onSignUp}>{body}</PublicChrome>;
+  return <PublicChrome user={user} onSignIn={onSignIn}>{body}</PublicChrome>;
 }
 
 export function TemplateDetailScreen({

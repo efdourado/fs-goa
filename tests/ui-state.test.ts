@@ -923,24 +923,37 @@ test("front page: featured templates lead, most recently featured first, topped 
   assert.deepEqual(ids(three.rest), ["a"]);
 });
 
-test("front page story: the plain numbers first, then each ranking's winner, and the first comment", async () => {
+test("front page story: a ranking's winner, the most in-tune pair and the toughest critic come before plain numbers; the completion rate never shows", async () => {
   const { storyExcerpt } = await import("../app/goa/front-page");
+  const labels = { inTune: "Most in tune", critic: "Toughest critic", criticNote: (a: string) => `average ${a}`, fmt: (n: number) => String(n) };
+  const person = (userId: string, name: string, ratingsMean: number | null) => ({ userId, name, ratingsMean });
   const challenge = {
     id: "c", groupId: "g", title: "T", status: "closed", participants: [{ id: "u1" }, { id: "u2" }], metrics: [], fields: [],
     result: {
       blocks: [
-        { id: "b1", kind: "metric", position: 1, visible: true, metric: { id: "m1", label: "Top film", operation: "average", series: [{ key: "k", label: "Aftersun", value: 4.8, formattedValue: "4.8", sampleSize: 3 }] } },
-        { id: "b2", kind: "metric", position: 0, visible: true, metric: { id: "m2", label: "Average", operation: "average", value: 4.2, formattedValue: "4.2", sampleSize: 9 } },
-        { id: "b3", kind: "metric", position: 2, visible: false, metric: { id: "m3", label: "Hidden", operation: "count", value: 9, formattedValue: "9", sampleSize: 9 } },
-        { id: "b4", kind: "entry_value", position: 3, visible: true, comment: { id: "x", text: "Best night of the year.", itemTitle: "Aftersun" } },
+        { id: "b0", kind: "metric", position: 0, visible: true, metric: { id: "m0", label: "Completion", operation: "completion_rate", value: 1, formattedValue: "100%", sampleSize: 9 } },
+        { id: "b1", kind: "metric", position: 1, visible: true, metric: { id: "m2", label: "Average", operation: "average", value: 4.2, formattedValue: "4.2", sampleSize: 9 } },
+        { id: "b1b", kind: "metric", position: 1, visible: true, metric: { id: "m4", label: "Pages per week", operation: "sum", groupBy: "checkpoint", series: [{ key: "w1", label: "Week 1", value: 496, formattedValue: "496", sampleSize: 3 }] } },
+        { id: "b1c", kind: "metric", position: 1, visible: true, metric: { id: "m5", label: "Pages by genre", operation: "sum", groupBy: "genre", series: [{ key: "g", label: "Fiction", value: 822, formattedValue: "822", sampleSize: 3 }] } },
+        { id: "b2", kind: "metric", position: 2, visible: true, metric: { id: "m1", label: "Top film", operation: "average", groupBy: "item", series: [{ key: "k", label: "Aftersun", value: 4.8, formattedValue: "4.8", sampleSize: 3 }] } },
+        { id: "b3", kind: "metric", position: 3, visible: false, metric: { id: "m3", label: "Hidden", operation: "average", series: [{ key: "h", label: "Nope", value: 5, formattedValue: "5", sampleSize: 3 }] } },
+        { id: "b4", kind: "affinity", position: 4, visible: true, affinity: { minSample: 3, scale: 5, compositeAvailable: false, pairs: [
+          { a: { userId: "u1", name: "Ana" }, b: { userId: "u2", name: "Bia" }, sampleSize: 4, direct: 0.4, composite: null, dimensions: [], skippedDimensions: [] },
+          { a: { userId: "u1", name: "Ana" }, b: { userId: "u3", name: "Caio" }, sampleSize: 4, direct: 0.9, composite: null, dimensions: [], skippedDimensions: [] },
+        ] } },
+        { id: "b5", kind: "ranking", position: 5, visible: true, ranking: [person("u1", "Ana", 4.1), person("u2", "Bia", 2.3), person("u3", "Caio", null)] },
+        { id: "b6", kind: "entry_value", position: 6, visible: true, comment: { id: "x", text: "Best night of the year.", itemTitle: "Aftersun" } },
       ],
     },
   } as unknown as import("../app/goa/types").ChallengeDetail;
-  const excerpt = storyExcerpt(challenge, 3);
+  const excerpt = storyExcerpt(challenge, 5, labels);
   assert.deepEqual(excerpt.stats, [
-    { label: "Average", value: "4.2" },
     { label: "Top film", value: "Aftersun", note: "4.8" },
-  ], "a hidden block stays hidden; numbers before winners");
+    { label: "Most in tune", value: "Ana & Caio", note: "0.9" },
+    { label: "Toughest critic", value: "Bia", note: "average 2.3" },
+    { label: "Pages by genre", value: "Fiction", note: "822" },
+    { label: "Average", value: "4.2" },
+  ], "no completion rate, no timeline 'winner', a hidden block stays hidden, an item ranking leads, stories before bookkeeping");
   assert.deepEqual(excerpt.quote, { text: "Best night of the year.", itemTitle: "Aftersun" });
-  assert.equal(storyExcerpt(challenge, 1).stats.length, 1);
+  assert.equal(storyExcerpt(challenge, 2, labels).stats.length, 2);
 });

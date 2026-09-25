@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 
 import { API_PATHS, apiRequest } from "./api";
@@ -31,32 +31,64 @@ export function pickFrontPage(templates: TemplateSummary[], count = 2): { featur
 export interface StoryStat {
   label: string;
   value: string;
-  /** A ranking's top value, under its winner. */
+  /** The number under a winner (its score, a pair's affinity, a critic's average). */
   note?: string | null;
 }
 
+export interface StoryLabels {
+  inTune: string;
+  critic: string;
+  criticNote: (average: string) => string;
+  fmt: (value: number) => string;
+}
+
 /**
- * What a story shows of a template's Results without opening it: its plain numbers first, then the winner of
- * each ranking, and the first curated comment. Only what the showcase itself shows (visible blocks, in order).
+ * What a story shows of a template's Results without opening it — the parts that tell a story, not bookkeeping:
+ * a ranking's winner first, then the most in-tune pair (affinity) and the toughest critic (per-person rankings),
+ * then the other winners, and plain numbers only to fill what's left. The completion rate never shows. Plus the
+ * first curated comment. Only what the showcase itself shows (visible blocks, in order).
  */
-export function storyExcerpt(challenge: ChallengeDetail, maxStats: number): { stats: StoryStat[]; quote: { text: string; itemTitle?: string | null } | null } {
+export function storyExcerpt(
+  challenge: ChallengeDetail,
+  maxStats: number,
+  labels: StoryLabels,
+): { stats: StoryStat[]; quote: { text: string; itemTitle?: string | null } | null } {
   const blocks = challengeShowcaseBlocks(challenge).filter((block) => block.visible).sort((a, b) => a.position - b.position);
-  const scalars: StoryStat[] = [];
+  const itemWinners: StoryStat[] = [];
   const winners: StoryStat[] = [];
+  const people: StoryStat[] = [];
+  const scalars: StoryStat[] = [];
   let quote: { text: string; itemTitle?: string | null } | null = null;
   for (const block of blocks) {
     const metric = block.metric;
     if (block.kind === "metric" && metric && metricHasData(metric as unknown as Record<string, unknown>)) {
       if (metric.series?.length) {
-        const top = metric.series.find((entry) => entry.value !== null);
-        if (top) winners.push({ label: metric.label, value: top.label, note: top.formattedValue ?? String(top.value) });
-      } else {
+        // A week-by-week series is a timeline, not a ranking — its first row isn't a winner.
+        const top = metric.groupBy === "checkpoint" ? null : metric.series.find((entry) => entry.value !== null);
+        const stat = top ? { label: metric.label, value: top.label, note: top.formattedValue ?? String(top.value) } : null;
+        // Items ranked against each other (the best film, the favourite book) lead; other breakdowns follow.
+        if (stat) (metric.groupBy === "item" ? itemWinners : winners).push(stat);
+      } else if (metric.operation !== "completion_rate") {
         scalars.push({ label: metric.label, value: String(metric.formattedValue ?? metric.value ?? "—") });
       }
     }
+    if (block.kind === "affinity" && block.affinity) {
+      const best = block.affinity.pairs
+        .filter((pair) => pair.direct !== null)
+        .sort((a, b) => (b.direct ?? 0) - (a.direct ?? 0))[0];
+      if (best) people.push({ label: labels.inTune, value: `${best.a.name} & ${best.b.name}`, note: labels.fmt(best.direct!) });
+    }
+    if (block.kind === "ranking" && (block.ranking?.length ?? 0) > 1) {
+      const critic = block.ranking!
+        .filter((person) => person.ratingsMean !== null)
+        .sort((a, b) => (a.ratingsMean ?? 0) - (b.ratingsMean ?? 0))[0];
+      if (critic) people.push({ label: labels.critic, value: critic.name, note: labels.criticNote(labels.fmt(critic.ratingsMean!)) });
+    }
     if (!quote && block.kind === "entry_value" && block.comment?.text) quote = { text: block.comment.text, itemTitle: block.comment.itemTitle };
   }
-  return { stats: [...scalars, ...winners].slice(0, maxStats), quote };
+  const ranked = [...itemWinners, ...winners];
+  const stats = [...ranked.slice(0, 1), ...people, ...ranked.slice(1), ...scalars].slice(0, maxStats);
+  return { stats, quote };
 }
 
 // ── the stories ─────────────────────────────────────────────────────────
@@ -76,6 +108,7 @@ function StorySkeleton({ lead }: { lead: boolean }) {
 function Story({ template, lead, onOpen }: { template: TemplateSummary; lead: boolean; onOpen: (id: Id) => void }) {
   const t = useTranslations("templates");
   const f = useGoaFormat();
+  const locale = useLocale();
   const [detail, setDetail] = useState<ChallengeDetail | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -93,7 +126,13 @@ function Story({ template, lead, onOpen }: { template: TemplateSummary; lead: bo
 
   const headline = detail?.result?.headline || template.title;
   const lede = detail?.result?.summary || template.summary;
-  const { stats, quote } = detail ? storyExcerpt(detail, lead ? 3 : 2) : { stats: [], quote: null };
+  const labels: StoryLabels = {
+    inTune: t("storyInTune"),
+    critic: t("storyCritic"),
+    criticNote: (average) => t("storyCriticNote", { average }),
+    fmt: (value) => value.toLocaleString(locale, { maximumFractionDigits: 2 }),
+  };
+  const { stats, quote } = detail ? storyExcerpt(detail, lead ? 3 : 2, labels) : { stats: [], quote: null };
   const dates = detail ? f.dateRange(detail.startsOn, detail.endsOn) : "";
   const kicker = [headline !== template.title ? template.title : null, dates || null, t(`mode.${template.submissionMode}`)].filter(Boolean).join(" · ");
   const facts = [
