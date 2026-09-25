@@ -37,8 +37,7 @@
   "settings": {
     "legend": "Preferences",
     "homeLegend": "Home",
-    "showView": "Show the View button",
-    "lockOrder": "Lock the order"
+    "lockApp": "Lock app"
   },
   "theme": {
     "legend": "Theme",

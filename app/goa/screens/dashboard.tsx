@@ -8,11 +8,12 @@ import { Dialog } from "../dialog";
 import { useGoaFormat } from "../format";
 import { API_PATHS, apiRequest } from "../api";
 import { CatalogShelf } from "../catalog-shelf";
-import { useHomePrefs } from "../home-prefs";
+import { useAppLocked } from "../home-prefs";
 import { HomeSideLink, HomeViewPanel, resolveHomeView, visibleSections } from "../home-view";
 import { applyColorFilter, OrganizeBar, useChallengeOrganizer } from "../organize";
 import { Segmented } from "../Segmented";
 import { Shelf, ShelfAddButton } from "../shelf";
+import { RecipeIcon } from "../recipe-icons";
 import { WelcomePanel } from "../welcome";
 import {
   CHALLENGE_COLOR_TAGS,
@@ -411,11 +412,11 @@ export function DashboardScreen({
   const tr = useTranslations("roles");
   const tQuick = useTranslations("quickCreate");
 
-  const prefs = useHomePrefs();
+  const locked = useAppLocked();
   const [showGroupDialog, setShowGroupDialog] = useState(false);
   const [viewPanelOpen, setShowViewPanel] = useState(false);
-  // The View button is opt-in (header preferences); switched off, the arrangement stays as it is.
-  const showViewPanel = viewPanelOpen && prefs.showView;
+  // "Lock app" (header preferences) takes the View button away; the arrangement stays as it is.
+  const showViewPanel = viewPanelOpen && !locked;
   const [world, setWorld] = useState<WorldFilter>("all");
   const [saved, setSaved] = useState<HomeView | null>(homeView);
   const [viewError, setViewError] = useState<string | null>(null);
@@ -443,7 +444,7 @@ export function DashboardScreen({
     onChanged,
     keys: CHALLENGE_SHELF_ORDER,
     split: (ordered) => splitShelves(ordered, personalWorkspaceId, { mixed, sections: shownSections }),
-    orderLocked: prefs.lockOrder,
+    orderLocked: locked,
   });
 
   async function saveView(next: HomeView | null) {
@@ -572,7 +573,7 @@ export function DashboardScreen({
       <PageHeading
         title={t("greeting", { name: user.name.split(" ")[0] })}
         description={brandNew ? tWelcome("lede") : t("subtitle")}
-        action={brandNew || !prefs.showView ? undefined : (
+        action={brandNew || locked ? undefined : (
           <button
             type="button"
             onClick={() => setShowViewPanel((open) => !open)}
@@ -584,7 +585,7 @@ export function DashboardScreen({
                 : "border-[var(--line)] text-[var(--muted)] hover:border-[var(--main-line)] hover:text-[var(--ink)]",
             )}
           >
-            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><rect x="2" y="2.5" width="12" height="4.5" rx="1.5" /><rect x="2" y="9" width="12" height="4.5" rx="1.5" /></svg>
+            <RecipeIcon name="library" className="h-4 w-4" />
             {th("view")}
           </button>
         )}
@@ -620,7 +621,7 @@ export function DashboardScreen({
       ) : null}
 
       {hasAnyChallenge ? (
-        <OrganizeBar colorFilter={colorFilter} onColorFilter={setColorFilter} reorderMode={reorderMode} onReorderMode={setReorderMode} filteredCount={filteredCount} allowReorder={!prefs.lockOrder} />
+        <OrganizeBar colorFilter={colorFilter} onColorFilter={setColorFilter} reorderMode={reorderMode} onReorderMode={setReorderMode} filteredCount={filteredCount} allowReorder={!locked} />
       ) : null}
 
       <StatusMessage error={error} />

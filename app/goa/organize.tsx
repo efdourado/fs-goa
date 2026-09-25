@@ -4,8 +4,9 @@ import { useTranslations } from "next-intl";
 import { type DragEvent, useRef, useState } from "react";
 
 import { API_PATHS, apiRequest } from "./api";
+import { RecipeIcon } from "./recipe-icons";
 import { CHALLENGE_COLOR_TAGS, type ChallengeColorTag, type ChallengeSummary, type Id } from "./types";
-import { CircleMinusIcon, cx, DragDotsIcon } from "./ui";
+import { CircleMinusIcon, cx } from "./ui";
 
 export function applyColorFilter(
   challenges: ChallengeSummary[],
@@ -25,7 +26,7 @@ export function applyColorFilter(
  */
 export function useChallengeOrganizer<K extends string>({ challenges, csrfToken, onChanged, keys, split, orderLocked = false }: {
   challenges: ChallengeSummary[];
-  /** The viewer locked the order: no reordering at all — pin and colour still work. */
+  /** The viewer locked the app: no reordering at all — pin and colour still work. */
   orderLocked?: boolean;
   csrfToken: string;
   onChanged?: () => void;
@@ -141,7 +142,7 @@ export function useChallengeOrganizer<K extends string>({ challenges, csrfToken,
 /** The colour filter and the Reorder switch above a page's challenges. */
 export function OrganizeBar({ colorFilter, onColorFilter, reorderMode, onReorderMode, filteredCount, allowReorder = true }: {
   colorFilter: ChallengeColorTag | null;
-  /** False when the viewer locked the order — the Reorder switch goes away. */
+  /** False when the viewer locked the app — the Reorder switch goes away. */
   allowReorder?: boolean;
   onColorFilter: (tag: ChallengeColorTag | null) => void;
   reorderMode: boolean;
@@ -198,7 +199,7 @@ export function OrganizeBar({ colorFilter, onColorFilter, reorderMode, onReorder
               : "border-dashed border-[var(--line)] text-[var(--muted)] hover:border-[var(--main-line)]",
           )}
         >
-          <DragDotsIcon className="h-3.5 w-3.5" />
+          <RecipeIcon name="custom" className="h-4 w-4" />
           {reorderMode ? t("filter.reorderDone") : t("filter.reorder")}
         </button>
       ) : null}

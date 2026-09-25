@@ -8,7 +8,7 @@ import { locales } from "@/i18n/config";
 import { setUserLocale } from "@/i18n/locale";
 import type { Id, MemberRequest } from "./types";
 import { BottomSheet } from "./bottom-sheet";
-import { HomePrefsToggles } from "./home-prefs";
+import { LockAppToggle } from "./home-prefs";
 import { Segmented } from "./Segmented";
 import { ThemeToggle } from "./ThemeToggle";
 import { cx, NotificationBell, NotificationList } from "./ui";
@@ -62,7 +62,7 @@ export function MobileHeaderMenu({
   homeOptions = false,
 }: {
   notifications: MemberRequest[];
-  /** Signed in: also the Home switches (View button, order lock). */
+  /** Signed in: also the "Lock app" switch for Home. */
   homeOptions?: boolean;
   onAcceptRequest: (id: Id) => Promise<void>;
   onDeclineRequest: (id: Id) => Promise<void>;
@@ -107,7 +107,7 @@ export function MobileHeaderMenu({
           {homeOptions ? (
             <section className="mt-5">
               <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--muted)]">{t("homeLegend")}</h3>
-              <HomePrefsToggles />
+              <LockAppToggle />
             </section>
           ) : null}
         </BottomSheet>
@@ -118,7 +118,7 @@ export function MobileHeaderMenu({
 
 export function SettingsMenu({ className, homeOptions = false }: {
   className?: string;
-  /** Signed in: also the Home switches (View button, order lock). */
+  /** Signed in: also the "Lock app" switch for Home. */
   homeOptions?: boolean;
 }) {
   const t = useTranslations("settings");
@@ -181,7 +181,7 @@ export function SettingsMenu({ className, homeOptions = false }: {
           {homeOptions ? (
             <div>
               {label(t("homeLegend"))}
-              <div className="mt-1"><HomePrefsToggles /></div>
+              <div className="mt-1"><LockAppToggle /></div>
             </div>
           ) : null}
         </div>
