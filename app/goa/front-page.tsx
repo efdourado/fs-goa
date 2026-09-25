@@ -155,7 +155,7 @@ function Story({ template, onOpen }: { template: TemplateSummary; onOpen: (id: I
         <dl className={cx("mt-8 grid gap-x-6 gap-y-5", stats.length >= 3 ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2")}>
           {stats.map((stat) => (
             <div key={stat.label} className="min-w-0">
-              <dd className={cx("font-medium tracking-[-0.04em] tabular-nums", stat.note ? "line-clamp-2 text-xl leading-tight" : "text-4xl")}>{stat.value}</dd>
+              <dd title={stat.value} className={cx("truncate font-medium tracking-[-0.04em] tabular-nums", stat.note ? "text-xl leading-tight" : "text-4xl")}>{stat.value}</dd>
               {stat.note ? <dd className="mt-0.5 text-sm tabular-nums text-[var(--main-strong)]">{stat.note}</dd> : null}
               <dt className="mt-1 text-xs leading-5 text-[var(--muted)]">{stat.label}</dt>
             </div>
