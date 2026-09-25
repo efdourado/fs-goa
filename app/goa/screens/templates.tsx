@@ -27,7 +27,7 @@ function PublicChrome({ user, onSignIn, children }: { user: User | null; onSignI
   return (
     <div className="flex min-h-screen flex-col bg-[var(--canvas)] text-[var(--ink)]">
       <header className="sticky top-0 z-30 border-b border-[var(--edge)] bg-[var(--canvas)]/92 backdrop-blur-xl">
-        <div className="flex h-16 items-center justify-between px-4 sm:h-[76px] sm:px-6 lg:px-10">
+        <div className="flex h-16 items-center justify-between px-4 sm:h-[76px] sm:px-6 lg:px-20">
           <Brand />
           <div className="flex items-center gap-2">
             <SettingsMenu />
@@ -79,7 +79,7 @@ export function TemplatesScreen({
   const front = pickFrontPage(templates ?? []);
 
   const body = (
-    <main className="px-4 py-8 pb-24 sm:px-6 sm:py-12 lg:px-10">
+    <main className="px-4 py-8 pb-24 sm:px-6 sm:py-12 lg:px-20">
       {user ? (
         <>
           <BackButton onClick={onBack} label={backLabel ?? t("back")} className="mb-6" />

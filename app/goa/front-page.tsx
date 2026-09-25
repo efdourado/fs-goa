@@ -144,8 +144,8 @@ function Story({ template, onOpen }: { template: TemplateSummary; onOpen: (id: I
   return (
     <article className="flex min-w-0 flex-col">
       <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">{kicker}</p>
-      <h2 className="mt-3 text-4xl font-light leading-[1.02] tracking-[-0.05em] sm:text-5xl">
-        <button type="button" onClick={() => onOpen(template.id)} className="cursor-pointer text-left hover:underline hover:decoration-1 hover:underline-offset-4 focus-visible:outline-none">
+      <h2 className="mt-3 min-w-0 text-4xl font-light leading-[1.1] tracking-[-0.05em] sm:text-5xl">
+        <button type="button" onClick={() => onOpen(template.id)} title={headline} className="block w-full cursor-pointer truncate text-left hover:underline hover:decoration-1 hover:underline-offset-4 focus-visible:outline-none">
           {headline}
         </button>
       </h2>
