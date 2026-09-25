@@ -1219,7 +1219,14 @@
     "copyModeStructureHint": "Fields, rules and metrics only — you add your own items.",
     "cardPeople": "{count, plural, one {# person} other {# people}}",
     "cardRules": "{count, plural, one {# rule} other {# rules}}",
-    "cardFields": "{count, plural, one {# field} other {# fields}}"
+    "cardFields": "{count, plural, one {# field} other {# fields}}",
+    "frontTitle": "Challenges with your people, or just you.",
+    "frontLede": "Track films, books, habits — anything — and watch it add up to a result worth sharing. These are real ones.",
+    "createAccount": "Create account",
+    "moreTitle": "More templates",
+    "seeResult": "See the whole result",
+    "feature": "Feature on the front page",
+    "unfeature": "Take off the front page"
   },
   "invite": {
     "verifying": "Checking the invite…",

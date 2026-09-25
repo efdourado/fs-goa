@@ -901,3 +901,46 @@ test("home view: until the person picks, Home shows the side they use, busiest f
   assert.deepEqual(resolveHomeView(saved, usage(10, 8, 0, 0)), saved, "the person's choice is kept even against their usage");
   assert.deepEqual(visibleSections({ layout: "mixed", order: ["personal", "groups"], hidden: ["groups"] }), ["personal", "groups"], "mixed always shows both");
 });
+
+test("front page: featured templates lead, most recently featured first, topped up with the newest; the rest go below", async () => {
+  const { pickFrontPage } = await import("../app/goa/front-page");
+  const tpl = (id: string, featuredAt: string | null = null) => ({
+    id, title: id, submissionMode: "item" as const, ruleCount: 0, fieldCount: 0, itemCount: 0, metricCount: 0, participantCount: 0,
+    publishedAt: "2026-09-01T00:00:00Z", featuredAt,
+  });
+  const ids = (list: Array<{ id: string }>) => list.map((x) => x.id);
+  // The gallery arrives newest-published first.
+  const none = pickFrontPage([tpl("new"), tpl("mid"), tpl("old")]);
+  assert.deepEqual(ids(none.featured), ["new", "mid"], "nothing featured → the two newest");
+  assert.deepEqual(ids(none.rest), ["old"]);
+
+  const one = pickFrontPage([tpl("new"), tpl("mid"), tpl("old", "2026-09-10T00:00:00Z")]);
+  assert.deepEqual(ids(one.featured), ["old", "new"], "one featured leads, the newest fills the second slot");
+  assert.deepEqual(ids(one.rest), ["mid"]);
+
+  const three = pickFrontPage([tpl("a", "2026-09-01T00:00:00Z"), tpl("b", "2026-09-03T00:00:00Z"), tpl("c", "2026-09-02T00:00:00Z")]);
+  assert.deepEqual(ids(three.featured), ["b", "c"], "more than two featured → the two most recently featured");
+  assert.deepEqual(ids(three.rest), ["a"]);
+});
+
+test("front page story: the plain numbers first, then each ranking's winner, and the first comment", async () => {
+  const { storyExcerpt } = await import("../app/goa/front-page");
+  const challenge = {
+    id: "c", groupId: "g", title: "T", status: "closed", participants: [{ id: "u1" }, { id: "u2" }], metrics: [], fields: [],
+    result: {
+      blocks: [
+        { id: "b1", kind: "metric", position: 1, visible: true, metric: { id: "m1", label: "Top film", operation: "average", series: [{ key: "k", label: "Aftersun", value: 4.8, formattedValue: "4.8", sampleSize: 3 }] } },
+        { id: "b2", kind: "metric", position: 0, visible: true, metric: { id: "m2", label: "Average", operation: "average", value: 4.2, formattedValue: "4.2", sampleSize: 9 } },
+        { id: "b3", kind: "metric", position: 2, visible: false, metric: { id: "m3", label: "Hidden", operation: "count", value: 9, formattedValue: "9", sampleSize: 9 } },
+        { id: "b4", kind: "entry_value", position: 3, visible: true, comment: { id: "x", text: "Best night of the year.", itemTitle: "Aftersun" } },
+      ],
+    },
+  } as unknown as import("../app/goa/types").ChallengeDetail;
+  const excerpt = storyExcerpt(challenge, 3);
+  assert.deepEqual(excerpt.stats, [
+    { label: "Average", value: "4.2" },
+    { label: "Top film", value: "Aftersun", note: "4.8" },
+  ], "a hidden block stays hidden; numbers before winners");
+  assert.deepEqual(excerpt.quote, { text: "Best night of the year.", itemTitle: "Aftersun" });
+  assert.equal(storyExcerpt(challenge, 1).stats.length, 1);
+});

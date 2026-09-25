@@ -64,6 +64,7 @@ export const API_PATHS = {
   template: (challengeId: Id) => `/api/templates/${encodeURIComponent(challengeId)}`,
   templateDuplicate: (challengeId: Id) => `/api/templates/${encodeURIComponent(challengeId)}/duplicate`,
   challengeTemplate: (challengeId: Id) => `/api/challenges/${encodeURIComponent(challengeId)}/template`,
+  challengeTemplateFeatured: (challengeId: Id) => `/api/challenges/${encodeURIComponent(challengeId)}/template/featured`,
   groups: "/api/groups",
   group: (groupId: Id) => `/api/groups/${encodeURIComponent(groupId)}`,
   groupCatalog: (groupId: Id) => `/api/groups/${encodeURIComponent(groupId)}/catalog`,

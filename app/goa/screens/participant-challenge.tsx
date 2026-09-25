@@ -10,7 +10,7 @@ import { useDoneItems } from "../use-done-items";
 import { recommenderLine } from "../recommender-picker";
 import { SharedGlyph } from "../shared-responses";
 import { SessionLog, type SessionPayload, sessionSpecOf } from "../session-log";
-import { defaultShowcaseBlocks, hasShowcaseContent, ShowcaseView } from "../showcase-view";
+import { challengeShowcaseBlocks, hasShowcaseContent, ShowcaseView } from "../showcase-view";
 import { RuleSectionsView, visibleRuleSections } from "../rules";
 import type {
   ChallengeDetail,
@@ -531,18 +531,7 @@ export function ResultView({
   const dropsCompletion = (metric?: Metric | null) =>
     hideCompletionRate && metric?.operation === "completion_rate";
 
-  const blocks = (result?.blocks?.length ?? 0) > 0
-    ? result!.blocks!.map((block) =>
-        block.kind === "metric" && dropsCompletion(block.metric) ? { ...block, visible: false } : block)
-    : defaultShowcaseBlocks({
-        metrics: (result?.metrics?.length
-          ? result.metrics
-          : challenge.metrics.filter((metric) => metric.visibleInResults !== false)
-        ).filter((metric) => !dropsCompletion(metric)),
-        personalRankings: solo ? [] : result?.personalRankings,
-        affinity: solo ? null : result?.affinity,
-        comments: result?.comments,
-      });
+  const blocks = challengeShowcaseBlocks(challenge, dropsCompletion);
 
   if (!hasShowcaseContent(blocks)) {
     return <EmptyState title={live ? t("liveEmptyTitle") : t("emptyTitle")} />;

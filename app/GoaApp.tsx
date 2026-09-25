@@ -103,7 +103,9 @@ export default function GoaApp() {
       // A public page (gallery, template, about) opens for a logged-out visitor
       // straight from its URL — the session check comes after.
       if (routed && PUBLIC_KINDS.has(routed.kind)) return routed;
-      if (!data.user) return { kind: "auth", mode: "login" };
+      // Signed out, the front door is the gallery — real results first, sign-in one tap away. A private page
+      // opened from its address still asks to sign in.
+      if (!data.user) return !routed || routed.kind === "dashboard" ? { kind: "templates" } : { kind: "auth", mode: "login" };
       return routed && routed.kind !== "invite" ? routed : { kind: "dashboard" };
     };
 
@@ -606,7 +608,7 @@ export default function GoaApp() {
       return <InviteScreen token={screen.token} user={null} csrfToken={bootstrap.csrfToken} onBack={goUp} backLabel={backLabel} onNeedAuth={() => setScreen({ kind: "auth", mode: "login" })} onAccepted={async () => undefined} />;
     }
     if (screen.kind === "templates") {
-      return <TemplatesScreen user={null} onOpen={(id) => setScreen({ kind: "template", challengeId: id })} onBack={goUp} backLabel={backLabel} onSignIn={() => goToAuthFrom(screen)} />;
+      return <TemplatesScreen user={null} onOpen={(id) => setScreen({ kind: "template", challengeId: id })} onBack={goUp} backLabel={backLabel} onSignIn={() => setScreen({ kind: "auth", mode: "login" })} onSignUp={() => setScreen({ kind: "auth", mode: "register" })} onEmpty={() => replaceScreen({ kind: "auth", mode: "login" })} />;
     }
     if (screen.kind === "template") {
       return <TemplateDetailScreen user={null} challengeId={screen.challengeId} groups={[]} csrfToken={bootstrap.csrfToken} onBack={goUp} backLabel={backLabel} onSignIn={() => goToAuthFrom(screen)} onDuplicated={() => undefined} />;

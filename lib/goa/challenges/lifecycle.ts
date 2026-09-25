@@ -83,7 +83,7 @@ export async function softDeleteChallenge(session: SessionContext, challengeId: 
     const wasTemplate = access.challenge.published_as_template_at !== null;
     if (wasTemplate) {
       await client.query(
-        "UPDATE challenges SET published_as_template_at = NULL, updated_at = now() WHERE id = $1",
+        "UPDATE challenges SET published_as_template_at = NULL, template_featured_at = NULL, updated_at = now() WHERE id = $1",
         [challengeId],
       );
       await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,

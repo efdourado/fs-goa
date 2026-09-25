@@ -31,6 +31,7 @@ export {
   getTemplatePreview,
   listTemplates,
   setChallengeTemplate,
+  setTemplateFeatured,
   unpublishChallengeTemplate,
 } from "./goa/challenges/templates";
 export {

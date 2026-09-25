@@ -26,6 +26,7 @@ interface TemplateRow {
   start_date: string | null;
   end_date: string | null;
   published_as_template_at: Date;
+  template_featured_at: Date | null;
   submission_mode: "item" | "daily" | "free" | null;
   field_count: number;
   item_count: number;
@@ -48,7 +49,7 @@ export async function listTemplates() {
                 WHERE rb.challenge_id = c.id AND rb.kind = 'text' AND rb.heading = 'summary'
                   AND rb.body_snapshot <> '' LIMIT 1) AS summary,
               c.rules, c.rule_sections, c.start_date::text AS start_date,
-              c.end_date::text AS end_date, c.published_as_template_at,
+              c.end_date::text AS end_date, c.published_as_template_at, c.template_featured_at,
               (SELECT et.submission_mode FROM entry_types et
                 WHERE et.challenge_id = c.id AND et.archived_at IS NULL
                 ORDER BY (et.purpose = 'expectation'), et.created_at LIMIT 1) AS submission_mode,
@@ -79,6 +80,7 @@ export async function listTemplates() {
         metricCount: row.metric_count,
         participantCount: row.participant_count,
         publishedAt: row.published_as_template_at.toISOString(),
+        featuredAt: row.template_featured_at?.toISOString() ?? null,
       })),
     };
   });
@@ -97,12 +99,13 @@ export async function listTemplates() {
  */
 export async function getTemplatePreview(challengeId: string) {
   return withClient(async (client) => {
-    const row = await oneOrNull<DetailChallengeRow>(
+    const row = await oneOrNull<DetailChallengeRow & { template_featured_at: Date | null }>(
       client,
       `SELECT c.id, c.group_id, c.title, c.description, c.rules, c.rule_sections,
               c.start_date::text AS start_date, c.end_date::text AS end_date,
               c.status, c.kind, c.recipe_key, g.kind AS group_kind, c.results_anon,
-              c.show_schedule, c.collects_entry_date, c.published_as_template_at, c.time_zone
+              c.show_schedule, c.collects_entry_date, c.published_as_template_at, c.time_zone,
+              c.template_featured_at
          FROM challenges c
          JOIN groups g ON g.id = c.group_id AND g.deleted_at IS NULL AND g.archived_at IS NULL
         WHERE c.id = $1 AND c.published_as_template_at IS NOT NULL AND c.deleted_at IS NULL
@@ -127,7 +130,7 @@ export async function getTemplatePreview(challengeId: string) {
       { userId: null, role: null, isParticipant: false },
       { participants: [], result: publishedResult },
     );
-    return detail;
+    return { ...detail, templateFeatured: row.template_featured_at !== null };
   });
 }
 
@@ -188,7 +191,7 @@ export async function unpublishChallengeTemplate(session: SessionContext, challe
       throw new ApiError(403, "forbidden", "Você precisa administrar este desafio.");
     }
     await client.query(
-      `UPDATE challenges SET published_as_template_at = NULL, updated_at = now()
+      `UPDATE challenges SET published_as_template_at = NULL, template_featured_at = NULL, updated_at = now()
         WHERE id = $1`,
       [challengeId],
     );
@@ -274,5 +277,40 @@ export async function duplicateTemplate(
       { sourceChallengeId: template.id, fromTemplate: true, targetGroupId, mode },
     );
     return { id: targetId, challengeId: targetId, groupId: targetGroupId, status: "draft", skippedProperties };
+  });
+}
+
+/**
+ * Puts a published template on the public front page, or takes it off. Platform admins only — the same people
+ * who publish templates. The front page leads with the two most recently featured.
+ */
+export async function setTemplateFeatured(session: SessionContext, challengeId: string, body: Record<string, unknown>) {
+  if (!session.user.platformAdmin) {
+    throw new ApiError(403, "forbidden", "Somente a administração da plataforma destaca modelos.");
+  }
+  if (typeof body.featured !== "boolean") throw new ApiError(400, "invalid_request", "`featured` deve ser booleano.");
+  const featured = body.featured;
+  return inTransaction(async (client) => {
+    const updated = await oneOrNull<{ group_id: string; template_featured_at: Date | null }>(
+      client,
+      `UPDATE challenges
+          SET template_featured_at = CASE WHEN $2 THEN now() ELSE NULL END, updated_at = now()
+        WHERE id = $1 AND published_as_template_at IS NOT NULL AND deleted_at IS NULL
+      RETURNING group_id, template_featured_at`,
+      [challengeId, featured],
+    );
+    if (!updated) throw new ApiError(404, "not_found", "Modelo não encontrado.");
+    await writeAudit(
+      client,
+      updated.group_id,
+      challengeId,
+      session.user.id,
+      featured ? "challenge.template_featured" : "challenge.template_unfeatured",
+      "challenge",
+      challengeId,
+      null,
+      null,
+    );
+    return { id: challengeId, featured, featuredAt: updated.template_featured_at?.toISOString() ?? null };
   });
 }

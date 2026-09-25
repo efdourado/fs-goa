@@ -117,6 +117,7 @@ import {
   saveChallengeItems,
   setChallengeParticipants,
   setChallengeTemplate,
+  setTemplateFeatured,
   softDeleteChallenge,
   transitionChallenge,
   unpublishChallengeResults,
@@ -449,6 +450,9 @@ export async function POST(request: Request): Promise<Response> {
     }
     if (path[0] === "challenges" && path[2] === "template" && path.length === 3) {
       return json(await setChallengeTemplate(session, path[1]));
+    }
+    if (path[0] === "challenges" && path[2] === "template" && path[3] === "featured" && path.length === 4) {
+      return json(await setTemplateFeatured(session, path[1], body));
     }
     if (path[0] === "templates" && path[2] === "duplicate" && path.length === 3) {
       return json(await duplicateTemplate(session, path[1], body), 201);

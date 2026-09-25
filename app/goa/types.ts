@@ -520,6 +520,8 @@ export interface ChallengeLibraryRef {
 }
 
 export interface ChallengeDetail extends ChallengeSummary {
+  /** Template preview only: whether it's on the front page. */
+  templateFeatured?: boolean;
   fields: ChallengeField[];
   /** Every library the challenge draws items from, in the order they were linked. */
   libraries?: ChallengeLibraryRef[];
@@ -621,6 +623,8 @@ export interface TemplateSummary {
   /** People taking part — a count only, never who. */
   participantCount: number;
   publishedAt: string;
+  /** When a platform admin put it on the front page; the two most recent lead the gallery. */
+  featuredAt?: string | null;
 }
 
 // A published template's detail is served as a read-only `ChallengeDetail`

@@ -78,6 +78,8 @@ export const challenges = pgTable(
     // explicitly picked in `curateResults` (frozen into `result_blocks`) show.
     resultsAllComments: boolean("results_all_comments").notNull().default(false),
     publishedAsTemplateAt: timestamptz("published_as_template_at"),
+    // A platform admin put this template on the public front page (/modelos); the two most recent lead it.
+    templateFeaturedAt: timestamptz("template_featured_at"),
     deletedAt: timestamptz("deleted_at"),
     deletedByUserId: text("deleted_by_user_id").references(() => users.id, {
       onDelete: "set null",

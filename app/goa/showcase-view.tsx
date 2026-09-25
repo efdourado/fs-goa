@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 import { MetricBlock } from "./metrics-view";
 import { PagedView } from "./paged-view";
 import { AffinityBlockView, PersonalRankingsBlock } from "./rankings-view";
-import type { AffinityBlock, Metric, PersonalRanking, WrappedBlock } from "./types";
+import type { AffinityBlock, ChallengeDetail, Metric, PersonalRanking, WrappedBlock } from "./types";
 import { CommentText, cx } from "./ui";
 import { metricHasData, metricTheme } from "./utils";
 
@@ -129,6 +129,27 @@ export function defaultShowcaseBlocks(input: {
     add({ id: comment.id, kind: "entry_value", comment: { id: comment.id, text: comment.text, itemTitle: comment.itemTitle ?? undefined } });
   }
   return blocks;
+}
+
+/**
+ * A challenge's showcase as one block list: the admin-arranged blocks when there are any, otherwise the raw result
+ * parts in their default order. `drop` hides a metric (e.g. the completion rate a participant already sees).
+ */
+export function challengeShowcaseBlocks(challenge: ChallengeDetail, drop: (metric?: Metric | null) => boolean = () => false): WrappedBlock[] {
+  const result = challenge.result;
+  const solo = challenge.scope === "personal" || challenge.participants.length < 2;
+  if ((result?.blocks?.length ?? 0) > 0) {
+    return result!.blocks!.map((block) => (block.kind === "metric" && drop(block.metric) ? { ...block, visible: false } : block));
+  }
+  return defaultShowcaseBlocks({
+    metrics: (result?.metrics?.length
+      ? result.metrics
+      : challenge.metrics.filter((metric) => metric.visibleInResults !== false)
+    ).filter((metric) => !drop(metric)),
+    personalRankings: solo ? [] : result?.personalRankings,
+    affinity: solo ? null : result?.affinity,
+    comments: result?.comments,
+  });
 }
 
 function PageBody({ page, hideThinLabel }: { page: Page; hideThinLabel: boolean }) {

@@ -6,6 +6,7 @@ import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import { API_PATHS, apiRequest } from "../api";
 import { SkippedPropertiesNotice } from "../copy-notice";
 import { Dialog } from "../dialog";
+import { FrontPageStories, pickFrontPage } from "../front-page";
 import { useGoaFormat } from "../format";
 import { SettingsMenu } from "../SettingsMenu";
 import type {
@@ -20,7 +21,7 @@ import type {
 import { BackButton, Brand, Button, EmptyState, inputClass, labelClass, PageHeading, StatusMessage } from "../ui";
 import { ParticipantChallengeScreen } from "./participant-challenge";
 
-function PublicChrome({ user, onSignIn, children }: { user: User | null; onSignIn: () => void; children: ReactNode }) {
+function PublicChrome({ user, onSignIn, onSignUp, children }: { user: User | null; onSignIn: () => void; onSignUp?: () => void; children: ReactNode }) {
   const t = useTranslations("templates");
   if (user) return <>{children}</>;
   return (
@@ -31,6 +32,7 @@ function PublicChrome({ user, onSignIn, children }: { user: User | null; onSignI
           <div className="flex items-center gap-2">
             <SettingsMenu />
             <Button variant="secondary" onClick={onSignIn}>{t("signIn")}</Button>
+            {onSignUp ? <Button onClick={onSignUp}>{t("createAccount")}</Button> : null}
           </div>
         </div>
       </header>
@@ -45,6 +47,8 @@ export function TemplatesScreen({
   onBack,
   backLabel,
   onSignIn,
+  onSignUp,
+  onEmpty,
 }: {
   user: User | null;
   onOpen: (challengeId: Id) => void;
@@ -52,6 +56,10 @@ export function TemplatesScreen({
   /** What the button says — the parent screen's name; falls back to plain "Back". */
   backLabel?: string;
   onSignIn: () => void;
+  /** Signed out: straight to creating an account. */
+  onSignUp?: () => void;
+  /** Signed out and nothing published — the front door has nothing to show, so the caller sends them to sign in. */
+  onEmpty?: () => void;
 }) {
   const t = useTranslations("templates");
   const f = useGoaFormat();
@@ -61,7 +69,10 @@ export function TemplatesScreen({
   useEffect(() => {
     const controller = new AbortController();
     apiRequest<{ templates: TemplateSummary[] }>(API_PATHS.templates, { signal: controller.signal })
-      .then((response) => setTemplates(response.templates))
+      .then((response) => {
+        setTemplates(response.templates);
+        if (!response.templates.length) onEmpty?.();
+      })
       .catch((cause: unknown) => {
         if (!(cause instanceof DOMException && cause.name === "AbortError")) setError(f.error(cause));
       });
@@ -69,10 +80,23 @@ export function TemplatesScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const front = pickFrontPage(templates ?? []);
+
   const body = (
     <main className="mx-auto max-w-7xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
-      <BackButton onClick={onBack} label={backLabel ?? t("back")} className="mb-6" />
-      <PageHeading title={t("title")} description={t("subtitle")} />
+      {user ? (
+        <>
+          <BackButton onClick={onBack} label={backLabel ?? t("back")} className="mb-6" />
+          <PageHeading title={t("title")} description={t("subtitle")} />
+        </>
+      ) : (
+        // Signed out, this is goa's front door: say what it is, then show real results before asking for anything.
+        <header className="mb-10 max-w-3xl">
+          <h1 className="text-4xl font-medium leading-[1.02] tracking-[-0.05em] sm:text-6xl">{t("frontTitle")}</h1>
+          <p className="mt-4 text-base leading-7 text-[var(--muted)]">{t("frontLede")}</p>
+          {onSignUp ? <Button className="mt-6" onClick={onSignUp}>{t("createAccount")}</Button> : null}
+        </header>
+      )}
 
       <div className="mt-2"><StatusMessage error={error} /></div>
 
@@ -81,8 +105,13 @@ export function TemplatesScreen({
       ) : templates.length === 0 ? (
         <EmptyState title={t("emptyTitle")} />
       ) : (
+        <>
+        <FrontPageStories featured={front.featured} onOpen={onOpen} />
+        {front.rest.length ? (
+          <h2 className="mb-5 mt-14 border-t border-[var(--line)] pt-6 text-lg font-medium tracking-[-0.03em] sm:text-xl">{t("moreTitle")}</h2>
+        ) : null}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {templates.map((template) => (
+          {front.rest.map((template) => (
             <article
               key={template.id}
               className="relative flex flex-col overflow-hidden rounded-[20px] border border-[var(--main-line)] bg-[var(--paper)] shadow-[var(--elevate-1)] transition hover:-translate-y-0.5 has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-[var(--main)]/25"
@@ -110,11 +139,12 @@ export function TemplatesScreen({
             </article>
           ))}
         </div>
+        </>
       )}
     </main>
   );
 
-  return <PublicChrome user={user} onSignIn={onSignIn}>{body}</PublicChrome>;
+  return <PublicChrome user={user} onSignIn={onSignIn} onSignUp={onSignUp}>{body}</PublicChrome>;
 }
 
 export function TemplateDetailScreen({
@@ -152,6 +182,7 @@ export function TemplateDetailScreen({
   // Set when the copy worked but had to leave properties out — shown before opening the copy.
   const [copied, setCopied] = useState<CopyResult | null>(null);
   const [unpublishing, setUnpublishing] = useState(false);
+  const [featuring, setFeaturing] = useState(false);
   const [unpublishError, setUnpublishError] = useState<string | null>(null);
 
   const manageable = groups.filter((group) => group.role === "owner" || group.role === "admin");
@@ -212,11 +243,31 @@ export function TemplateDetailScreen({
     }
   }
 
+  async function toggleFeatured() {
+    if (!detail) return;
+    const featured = !detail.templateFeatured;
+    setFeaturing(true);
+    setUnpublishError(null);
+    try {
+      await apiRequest(API_PATHS.challengeTemplateFeatured(challengeId), { method: "POST", body: { featured }, csrfToken });
+      setDetail({ ...detail, templateFeatured: featured });
+    } catch (cause) {
+      setUnpublishError(f.error(cause));
+    } finally {
+      setFeaturing(false);
+    }
+  }
+
   const headerActions = (
     <>
       <Button onClick={() => (user ? setShowCopy(true) : onSignIn())}>
         {user ? t("duplicateCta") : t("signInToDuplicate")}
       </Button>
+      {canPublish ? (
+        <Button variant="secondary" disabled={featuring} onClick={() => void toggleFeatured()}>
+          {detail?.templateFeatured ? t("unfeature") : t("feature")}
+        </Button>
+      ) : null}
       {canPublish ? (
         <Button variant="danger" disabled={unpublishing} onClick={() => void unpublish()}>
           {t("unpublish")}

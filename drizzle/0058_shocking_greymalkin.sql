@@ -1,0 +1,1 @@
+ALTER TABLE "challenges" ADD COLUMN "template_featured_at" timestamp with time zone;

@@ -8292,3 +8292,41 @@ test("home view: salvo na conta, volta no bootstrap, validado, e null devolve ao
   await call("PATCH", "/api/account/home-view", { session: owner, body: { view: null } });
   assert.equal(await boot(), null);
 });
+
+test("capa dos modelos: só a administração da plataforma destaca, o destaque aparece na lista e no detalhe, e despublicar tira da capa", async () => {
+  const admin = await register("Editora", "editora_capa");
+  await adminPool.query("UPDATE users SET platform_admin = true WHERE id = $1", [admin.user.id]);
+  const adminSession = await login("editora_capa");
+  const stranger = await register("Leitor", "leitor_capa");
+
+  const groupId = ((await call("POST", "/api/groups", { session: adminSession, body: { name: "Redação" } })).body as { id: string }).id;
+  const created = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: adminSession,
+    body: {
+      title: "Cine de capa", startsOn: "2026-09-01", endsOn: "2026-09-30", submissionMode: "item",
+      participantIds: [admin.user.id], items: [{ title: "Filme 1" }],
+      fields: [{ key: "nota", label: "Nota", type: "rating", required: true }],
+    },
+  });
+  const challengeId = (created.body as { id: string }).id;
+
+  const notPublished = await call("POST", `/api/challenges/${challengeId}/template/featured`, { session: adminSession, body: { featured: true } });
+  assert.equal(notPublished.response.status, 404, "só um modelo publicado vai para a capa");
+
+  await call("POST", `/api/challenges/${challengeId}/template`, { session: adminSession, body: {} });
+  const refused = await call("POST", `/api/challenges/${challengeId}/template/featured`, { session: stranger, body: { featured: true } });
+  assert.equal(refused.response.status, 403);
+  const invalid = await call("POST", `/api/challenges/${challengeId}/template/featured`, { session: adminSession, body: { featured: "sim" } });
+  assert.equal(invalid.response.status, 400);
+
+  const featured = await call("POST", `/api/challenges/${challengeId}/template/featured`, { session: adminSession, body: { featured: true } });
+  assert.equal(featured.response.status, 200, JSON.stringify(featured.body));
+  const listed = ((await call("GET", "/api/templates")).body as { templates: Array<{ id: string; featuredAt: string | null }> }).templates;
+  assert.ok(listed.find((template) => template.id === challengeId)?.featuredAt, "a lista traz quando foi destacado");
+  assert.equal(((await call("GET", `/api/templates/${challengeId}`)).body as { templateFeatured: boolean }).templateFeatured, true);
+
+  await call("DELETE", `/api/challenges/${challengeId}/template`, { session: adminSession });
+  await call("POST", `/api/challenges/${challengeId}/template`, { session: adminSession, body: {} });
+  const republished = ((await call("GET", "/api/templates")).body as { templates: Array<{ id: string; featuredAt: string | null }> }).templates;
+  assert.equal(republished.find((template) => template.id === challengeId)?.featuredAt, null, "despublicar tira da capa; republicar não recoloca");
+});
