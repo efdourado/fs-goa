@@ -393,6 +393,13 @@
       "when": 1790200823359,
       "tag": "0055_watery_the_professor",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1790295889110,
+      "tag": "0056_smiling_cloak",
+      "breakpoints": true
     }
   ]
 }

@@ -136,29 +136,6 @@ export interface CatalogAttributeDef {
   hidden?: boolean;
 }
 
-/** One row of a checklist note. */
-export interface NoteItem {
-  id: Id;
-  text: string;
-  done: boolean;
-}
-
-/**
- * A private note in the person's own space — nothing to do with a group or a challenge. `text` renders
- * `body` with `CommentText`'s quote/divider syntax; `checklist` ignores `body` and keeps `items` instead.
- */
-export interface Note {
-  id: Id;
-  kind: "text" | "checklist";
-  title: string;
-  body: string | null;
-  items: NoteItem[];
-  colorTag: ChallengeColorTag | null;
-  pinned: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
 /** A workspace's list of things it tracks — Screens, Pages, Tables, or one it made itself. */
 export interface CatalogLibrary {
   id: Id;
@@ -666,7 +643,6 @@ export type Screen =
   | { kind: "admin"; challengeId: Id; tab: AdminTab }
   | { kind: "templates" }
   | { kind: "template"; challengeId: Id }
-  | { kind: "notes" }
   /** `into` skips the "where" question when the chat is started from a group page or My space. */
   | { kind: "quick-create"; into?: { groupId: Id } | "personal" }
   | { kind: "about" };

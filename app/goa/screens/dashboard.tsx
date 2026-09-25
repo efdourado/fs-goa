@@ -105,7 +105,7 @@ function GroupCreateDialog({ onClose, onCreate }: { onClose: () => void; onCreat
 
 // ── the challenge card + its per-viewer menu ────────────────────────────
 
-export function ColorSwatch({ tag, selected, onClick, label }: {
+function ColorSwatch({ tag, selected, onClick, label }: {
   tag: ChallengeColorTag | null; selected: boolean; onClick: () => void; label: string;
 }) {
   return (

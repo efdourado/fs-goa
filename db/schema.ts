@@ -37,4 +37,3 @@ export {
   catalogAttributeDefs,
   catalogAttributeValues,
 } from "./schema/catalog";
-export { notes } from "./schema/notes";

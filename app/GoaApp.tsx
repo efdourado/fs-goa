@@ -13,7 +13,6 @@ import {
 } from "./goa/api";
 import { useGoaFormat } from "./goa/format";
 import { AboutScreen } from "./goa/screens/about";
-import { NotesScreen } from "./goa/screens/notes";
 import { QuickCreateScreen } from "./goa/screens/quick-create";
 import { AccountScreen } from "./goa/screens/account";
 import { AccountDeactivatedScreen } from "./goa/screens/account-deactivated";
@@ -652,8 +651,6 @@ export default function GoaApp() {
     content = <TemplateDetailScreen key={screen.challengeId} user={user} challengeId={screen.challengeId} groups={bootstrap.groups.filter((candidate) => candidate.kind !== "personal")} csrfToken={bootstrap.csrfToken} autoCopy={resumeTemplateCopy === screen.challengeId} onBack={() => { setResumeTemplateCopy(null); goUp(); }} backLabel={backLabel} onSignIn={() => undefined} onDuplicated={async (result) => { setResumeTemplateCopy(null); await refreshBootstrap(); openAdmin(result.challengeId); }} onUnpublished={async () => { await refreshBootstrap(); setScreen({ kind: "templates" }); }} />;
   } else if (screen.kind === "about") {
     content = <AboutScreen onBack={goUp} backLabel={backLabel} />;
-  } else if (screen.kind === "notes") {
-    content = <NotesScreen onBack={goUp} backLabel={backLabel} />;
   } else if (screen.kind === "quick-create") {
     content = <QuickCreateScreen currentUserId={user.id} groups={bootstrap.groups} into={screen.into} onBack={goUp} backLabel={backLabel} onCreateGroup={createGroupAndGetId} onSubmit={createChallenge} />;
   } else if (screen.kind === "group" && selectedGroup) {
@@ -687,7 +684,7 @@ export default function GoaApp() {
   return (
     <CsrfProvider token={bootstrap.csrfToken}>
     <div className="flex min-h-screen flex-col bg-[var(--canvas)] text-[var(--ink)]">
-      <AppHeader user={user} notifications={bootstrap.memberRequests} onHome={() => setScreen({ kind: "dashboard" })} onAccount={() => setScreen({ kind: "account" })} onOpenPersonalSpace={() => setScreen({ kind: "personal-space" })} onWarmPersonalSpace={() => prefetchCatalogShelf("personal")} onOpenNotes={() => setScreen({ kind: "notes" })} onOpenTemplates={() => setScreen({ kind: "templates" })} onOpenAbout={() => setScreen({ kind: "about" })} onLogout={logout} onAcceptRequest={(id) => respondToMemberRequest(id, "accept")} onDeclineRequest={(id) => respondToMemberRequest(id, "decline")} />
+      <AppHeader user={user} notifications={bootstrap.memberRequests} onHome={() => setScreen({ kind: "dashboard" })} onAccount={() => setScreen({ kind: "account" })} onOpenPersonalSpace={() => setScreen({ kind: "personal-space" })} onWarmPersonalSpace={() => prefetchCatalogShelf("personal")} onOpenTemplates={() => setScreen({ kind: "templates" })} onOpenAbout={() => setScreen({ kind: "about" })} onLogout={logout} onAcceptRequest={(id) => respondToMemberRequest(id, "accept")} onDeclineRequest={(id) => respondToMemberRequest(id, "decline")} />
       <div className="flex-1">{content}</div>
     </div>
     </CsrfProvider>

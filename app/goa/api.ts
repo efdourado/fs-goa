@@ -35,9 +35,6 @@ export const API_PATHS = {
   accountDelete: "/api/account/delete",
   accountDeletionPreview: "/api/account/deletion-preview",
   personalTrash: "/api/personal/trash",
-  notes: "/api/notes",
-  note: (noteId: Id) => `/api/notes/${encodeURIComponent(noteId)}`,
-  noteToggle: (noteId: Id) => `/api/notes/${encodeURIComponent(noteId)}/toggle`,
   groupTrash: (groupId: Id) => `/api/groups/${encodeURIComponent(groupId)}/trash`,
   challengeArchive: (challengeId: Id) => `/api/challenges/${encodeURIComponent(challengeId)}/archive`,
   trashPreview: (scope: "personal" | { groupId: Id } | { challengeId: Id }) =>

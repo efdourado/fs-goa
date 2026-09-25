@@ -38,7 +38,6 @@ export function screenFromUrl(pathname: string, search = ""): Screen | null {
     return token ? { kind: "invite", token } : null;
   }
   if (parts[0] === "sobre" && parts.length === 1) return { kind: "about" };
-  if (parts[0] === "notes" && parts.length === 1) return { kind: "notes" };
   if (parts[0] === "start" && parts.length === 1) {
     const groupId = params.get("group");
     if (groupId) return { kind: "quick-create", into: { groupId } };
@@ -146,8 +145,6 @@ export function urlForScreen(screen: Screen): string | null {
       return `/modelos/${encodeURIComponent(screen.challengeId)}`;
     case "about":
       return "/sobre";
-    case "notes":
-      return "/notes";
     case "quick-create":
       if (screen.into === "personal") return "/start?personal=1";
       return screen.into ? `/start?group=${encodeURIComponent(screen.into.groupId)}` : "/start";
@@ -210,7 +207,6 @@ export function backTargetFor(screen: Screen, lookup: BackLookup): BackTarget | 
     case "account":
     case "group":
     case "personal-space":
-    case "notes":
       return HOME;
     case "quick-create":
       if (screen.into === "personal") return { screen: { kind: "personal-space" }, label: { kind: "mySpace" } };
