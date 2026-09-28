@@ -56,8 +56,10 @@ test("o registro de um treino: bandeja de itens para tocar, histórico só seu e
   assert.match(html, /<strong[^>]*>2<\/strong> de \d+ dias com registro/, "só os seus dois treinos contam na faixa de dias");
   assert.doesNotMatch(html, /<h2[^>]*>Seus check-ins<\/h2>/, "o histórico repetido embaixo da faixa saiu");
   assert.doesNotMatch(html, /100(?!%)/, "o treino de outra pessoa não entra no seu histórico nem nos recordes");
-  assert.match(html, /Melhor Carga \(kg\): 57,5|Melhor Carga \(kg\): 57\.5/, "o recorde do supino sai do histórico, sem ninguém digitá-lo");
-  assert.match(html, /em 2 check-ins/, "o supino apareceu nos dois treinos");
+  assert.match(html, /Melhor · Carga \(kg\)<\/dt><dd[^>]*>57,5<\/dd>/, "o recorde do supino sai do histórico, sem ninguém digitá-lo");
+  assert.match(html, /Supino<\/strong><span[^>]*>2 check-ins<\/span>/, "o supino apareceu nos dois treinos");
+  assert.match(html, /Carga \(kg\) · último/, "o número grande é o último registro do campo principal");
+  assert.match(html, /\+2,5 desde o primeiro/, "e diz quanto mudou desde o primeiro");
 });
 
 test("quem pode criar itens ganha o botão Novo item na bandeja", () => {

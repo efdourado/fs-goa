@@ -1070,8 +1070,6 @@
     "deleteTitle": "Delete this {name}?",
     "deleteBody": "It goes to the bin together with its {count, plural, one {# record} other {# records}}. You can restore it from there.",
     "byItemTitle": "By item",
-    "performedIn": "{count, plural, one {in # check-in} other {in # check-ins}}",
-    "recordChip": "Best {field}: {value}",
     "latestOnly": "Showing the latest {count}.",
     "checkinsLogged": "{count, plural, one {# check-in} other {# check-ins}} logged",
     "groupCount": "{count, plural, one {# check-in} other {# check-ins}}",
@@ -1092,7 +1090,16 @@
     "onThisDay": "On this day",
     "newVisitOnDay": "New {name}",
     "savedChanges": "Changes saved.",
-    "trendCaption": "{field}: the highest of each check-in"
+    "byItemCount": "{count, plural, one {# item} other {# items}}",
+    "checkinCountShort": "{count, plural, one {# check-in} other {# check-ins}}",
+    "latestLabel": "{field} · latest",
+    "firstRecord": "first entry",
+    "sameAsFirst": "same as the first",
+    "sinceFirst": "{value} since the first",
+    "oneMore": "Log it again to see the curve.",
+    "bestLabel": "Best · {field}",
+    "lastOn": "Last",
+    "historyToggle": "History"
   },
   "checkinLog": {
     "title": "Your check-ins",

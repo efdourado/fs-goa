@@ -1070,8 +1070,6 @@
     "deleteTitle": "Excluir {name}?",
     "deleteBody": "Vai para a lixeira junto com {count, plural, one {# registro} other {# registros}}. Dá para restaurar de lá.",
     "byItemTitle": "Por item",
-    "performedIn": "{count, plural, one {em # check-in} other {em # check-ins}}",
-    "recordChip": "Melhor {field}: {value}",
     "latestOnly": "Mostrando os {count} mais recentes.",
     "checkinsLogged": "{count, plural, one {# check-in registrado} other {# check-ins registrados}}",
     "groupCount": "{count, plural, one {# check-in} other {# check-ins}}",
@@ -1092,7 +1090,16 @@
     "onThisDay": "Neste dia",
     "newVisitOnDay": "Novo {name}",
     "savedChanges": "Alterações salvas.",
-    "trendCaption": "{field}: o maior de cada check-in"
+    "byItemCount": "{count, plural, one {# item} other {# itens}}",
+    "checkinCountShort": "{count, plural, one {# check-in} other {# check-ins}}",
+    "latestLabel": "{field} · último",
+    "firstRecord": "primeiro registro",
+    "sameAsFirst": "igual ao primeiro",
+    "sinceFirst": "{value} desde o primeiro",
+    "oneMore": "Registre de novo para ver a curva.",
+    "bestLabel": "Melhor · {field}",
+    "lastOn": "Último",
+    "historyToggle": "Histórico"
   },
   "checkinLog": {
     "title": "Seus check-ins",

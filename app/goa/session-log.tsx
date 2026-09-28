@@ -188,24 +188,33 @@ function NumberStepper({ id, field, value, last, disabled, onChange }: {
 }
 
 /** The best of the first number field in each check-in an item was in, oldest to newest, with the peak marked. */
-function Sparkline({ values }: { values: number[] }) {
-  if (values.length === 0) return null;
-  const width = 120;
-  const height = 34;
-  const pad = 4;
+/**
+ * An item's numbers over time, full width: the line and its wash stretch with the card, while the latest
+ * point sits on top as a plain dot — positioned in percent, so it stays round at any width.
+ */
+function TrendChart({ values }: { values: number[] }) {
+  if (values.length < 2) return null;
+  const width = 300;
+  const height = 64;
+  const pad = 6;
   const high = Math.max(...values);
   const low = Math.min(...values);
-  const x = (index: number) => (values.length === 1 ? width / 2 : pad + (index * (width - 2 * pad)) / (values.length - 1));
+  const x = (index: number) => (index * width) / (values.length - 1);
   const y = (value: number) => (high === low ? height / 2 : height - pad - ((value - low) / (high - low)) * (height - 2 * pad));
   const line = values.map((value, index) => `${index ? "L" : "M"}${x(index).toFixed(1)} ${y(value).toFixed(1)}`).join(" ");
-  const area = `${line} L${x(values.length - 1).toFixed(1)} ${height} L${x(0).toFixed(1)} ${height} Z`;
-  const peak = values.lastIndexOf(high);
+  const area = `${line} L${width} ${height} L0 ${height} Z`;
+  const last = values[values.length - 1];
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="h-[34px] w-[120px] flex-none" preserveAspectRatio="none" aria-hidden="true">
-      {values.length > 1 ? <path d={area} fill="var(--main-soft)" /> : null}
-      {values.length > 1 ? <path d={line} fill="none" stroke="var(--main)" strokeWidth="1.6" vectorEffect="non-scaling-stroke" /> : null}
-      <circle cx={x(peak)} cy={y(high)} r="3" fill="var(--main-2)" />
-    </svg>
+    <div className="relative mt-3 h-16" aria-hidden="true">
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-full w-full overflow-visible" preserveAspectRatio="none">
+        <path d={area} fill="var(--main-soft)" />
+        <path d={line} fill="none" stroke="var(--main)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+      </svg>
+      <span
+        className="absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--main-2)] ring-[3px] ring-[var(--paper)]"
+        style={{ left: "100%", top: `${(y(last) / height) * 100}%` }}
+      />
+    </div>
   );
 }
 
@@ -679,55 +688,80 @@ export function SessionLog({
 
       {byItem.length ? (
         <section className={cx(cardClass, "min-w-0 p-5 sm:p-7")}>
-          <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+          <div className="mb-4 flex items-baseline justify-between gap-3">
             <h2 className={sectionLabelClass}>{t("byItemTitle")}</h2>
-            {numberFields[0] ? <span className="text-xs text-[var(--muted)]">{t("trendCaption", { field: numberFields[0].label })}</span> : null}
+            <span className="text-xs text-[var(--muted)]">{t("byItemCount", { count: byItem.length })}</span>
           </div>
-          <ul className="divide-y divide-[var(--line)]">
-            {byItem.map(({ item, list, records, trend, sessions }) => (
-              <li key={item.id} className="py-4 first:pt-0 last:pb-0">
-                <details className="group">
-                  <summary className="min-h-11 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-                    <span className="flex items-center justify-between gap-3">
-                      <span className="min-w-0 flex-1">
-                        <strong className="block text-base font-medium">{item.title}</strong>
-                        <span className="block text-xs text-[var(--muted)]">{t("performedIn", { count: sessions })}</span>
-                      </span>
-                      <Sparkline values={trend} />
-                      <ChevronIcon className="h-4 w-4 flex-none text-[var(--muted)] transition-transform group-open:rotate-180" />
-                    </span>
-                    {records.length ? (
-                      <span className="mt-2.5 flex flex-wrap gap-1.5">
-                        {records.map((record) => (
-                          <span key={record.field.id} className="rounded-full bg-[var(--main-soft)] px-2.5 py-1 text-xs text-[var(--main-strong)]">
-                            {t("recordChip", { field: record.field.label, value: String(record.value).replace(".", ",") })}
-                          </span>
-                        ))}
-                      </span>
-                    ) : null}
-                  </summary>
-                  <div className="mt-3 overflow-x-auto rounded-xl border border-[var(--line)]">
-                    <table className="w-full min-w-[20rem] text-left text-sm">
-                      <thead className="bg-[var(--wash)] text-xs text-[var(--muted)]">
-                        <tr>
-                          <th className="px-3 py-2 font-medium">{t("dateLabel")}</th>
-                          {recordFields.map((field) => <th className="px-3 py-2 font-medium" key={field.id}>{field.label}</th>)}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[var(--line)]">
-                        {list.slice(0, 6).map((row) => (
-                          <tr key={row.entry.id}>
-                            <td className="px-3 py-2 text-[var(--muted)]">{f.date(row.entry.occurredOn, shortDate)}</td>
-                            {recordFields.map((field) => <td className="px-3 py-2 tabular-nums" key={field.id}>{showValue(field, row.values[field.id as Id]) || "—"}</td>)}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+          <ul className="grid items-start gap-3 md:grid-cols-2">
+            {byItem.map(({ item, list, records, trend, sessions }) => {
+              const trendField = numberFields[0];
+              const latest = trend.at(-1);
+              const change = trend.length > 1 && latest !== undefined ? Number((latest - trend[0]).toFixed(4)) : null;
+              const number = (value: number) => nf.number(value, { maximumFractionDigits: 2 });
+              const answer = (field: ChallengeField, raw: unknown) => {
+                const value = field.type === "number" ? numberValue(raw) : null;
+                return value !== null ? number(value) : showValue(field, raw);
+              };
+              return (
+                <li key={item.id} className="flex min-w-0 flex-col rounded-2xl border border-[var(--line)] bg-[var(--canvas)]/50 p-4 sm:p-5">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <strong className="min-w-0 truncate text-base font-medium">{item.title}</strong>
+                    <span className="flex-none text-xs text-[var(--muted)]">{t("checkinCountShort", { count: sessions })}</span>
                   </div>
-                  {list.length > 6 ? <p className="mt-2 text-xs text-[var(--muted)]">{t("latestOnly", { count: 6 })}</p> : null}
-                </details>
-              </li>
-            ))}
+
+                  {trendField && latest !== undefined ? (
+                    <div className="mt-3">
+                      <span className="block text-[11px] uppercase tracking-[0.08em] text-[var(--muted)]">{t("latestLabel", { field: trendField.label })}</span>
+                      <div className="mt-0.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                        <span className="text-3xl font-light tabular-nums tracking-[-0.03em]">{number(latest)}</span>
+                        {change === null ? (
+                          <span className="text-xs text-[var(--muted)]">{t("firstRecord")}</span>
+                        ) : (
+                          <span className={cx("text-xs font-medium tabular-nums", change > 0 ? "text-[var(--ok)]" : change < 0 ? "text-[var(--warn)]" : "text-[var(--muted)]")}>
+                            {change === 0 ? t("sameAsFirst") : t("sinceFirst", { value: `${change > 0 ? "+" : "−"}${number(Math.abs(change))}` })}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
+                  {trend.length > 1 ? <TrendChart values={trend} /> : trendField ? <p className="mt-3 text-xs text-[var(--muted)]">{t("oneMore")}</p> : null}
+
+                  <dl className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(6.5rem,1fr))] gap-x-4 gap-y-3 border-t border-[var(--line)] pt-3">
+                    {records.map((record) => (
+                      <div key={record.field.id} className="min-w-0">
+                        <dt className="truncate text-[11px] text-[var(--muted)]">{t("bestLabel", { field: record.field.label })}</dt>
+                        <dd className="text-sm font-medium tabular-nums">{number(record.value)}</dd>
+                      </div>
+                    ))}
+                    <div className="min-w-0">
+                      <dt className="truncate text-[11px] text-[var(--muted)]">{t("lastOn")}</dt>
+                      <dd className="text-sm font-medium">{f.date(list[0]?.entry.occurredOn)}</dd>
+                    </div>
+                  </dl>
+
+                  <details className="group mt-3">
+                    <summary className="flex min-h-10 cursor-pointer list-none items-center gap-1.5 text-xs text-[var(--muted)] transition hover:text-[var(--ink)] [&::-webkit-details-marker]:hidden">
+                      {t("historyToggle")}
+                      <ChevronIcon className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
+                    </summary>
+                    <ol className="mt-1 divide-y divide-[var(--line)] text-sm">
+                      {list.slice(0, 8).map((row) => (
+                        <li key={row.entry.id} className="flex items-baseline justify-between gap-4 py-2">
+                          <span className="flex-none text-xs text-[var(--muted)]">{f.date(row.entry.occurredOn)}</span>
+                          <span className="min-w-0 truncate text-right tabular-nums">
+                            {recordFields.map((field) => {
+                              const text = answer(field, row.values[field.id as Id]);
+                              return text ? <span key={field.id} className="ml-3 first:ml-0">{text} <span className="text-xs text-[var(--muted)]">{field.label}</span></span> : null;
+                            })}
+                          </span>
+                        </li>
+                      ))}
+                    </ol>
+                    {list.length > 8 ? <p className="mt-1 text-xs text-[var(--muted)]">{t("latestOnly", { count: 8 })}</p> : null}
+                  </details>
+                </li>
+              );
+            })}
           </ul>
         </section>
       ) : null}
