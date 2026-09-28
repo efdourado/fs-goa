@@ -9,7 +9,6 @@ import { CineItemsEditor, type CineRow, cineRowsToInput } from "../cine-items";
 import { NewLibraryDialog, TablesLibraryPrompt } from "../library-dialogs";
 import { type CatalogScope, LibraryPills, libraryChoices, useCatalogLibraries } from "../libraries";
 import { RecipeIcon } from "../recipe-icons";
-import { RecipePreview } from "../recipe-previews";
 import { RuleSectionsEditor } from "../rules";
 import type { ChallengeCreationInput, ChallengeField, ChallengeRule, CreatableRecipeKey, GroupSummary, Id, SharedEditPolicy } from "../types";
 import { BackButton, backLinkClass, Button, cardClass, cx, Disclosure, EmptyState, Field, inputClass, labelClass, PageHeading, SchedulePeriodFields, SelectableCards, StatusMessage, Toggle } from "../ui";
@@ -277,7 +276,6 @@ export function CreateChallengeScreen({
                   <span className="flex h-8 items-center" aria-hidden="true"><RecipeIcon name={entry.key} className="h-7 w-7" /></span>
                   <strong className="mt-3 block text-lg">{t(`recipes.${entry.key}.name`)}</strong>
                   <span className="mt-0.5 block text-sm leading-6 text-[var(--muted)]">{t(`recipes.${entry.key}.tagline`)}</span>
-                  <RecipePreview recipe={entry.key} />
                 </button>
               ))}
             </div>
