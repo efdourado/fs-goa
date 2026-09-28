@@ -958,9 +958,6 @@
     "metricIsRating": "Use as this challenge's rating",
     "metricIsRatingHint": "Today, the catalogue and the rankings show an item's rating as this average. Only one metric can be the rating.",
     "metricIsRatingTag": "The challenge's rating",
-    "metricIsCoverTag": "On covers",
-    "metricIsCover": "Show on the item covers",
-    "metricIsCoverHint": "Each item shows its number on its cover in the library, instead of the rating — \"120 kg\" rather than a 0–5 ring.",
     "metricCountWhat": "What to count",
     "metricCountDays": "Count days, not entries",
     "metricCountDaysHint": "Two entries on the same day count as one day.",
@@ -1102,13 +1099,10 @@
     "savedChanges": "Changes saved.",
     "byItemCount": "{count, plural, one {# item} other {# items}}",
     "checkinCountShort": "{count, plural, one {# check-in} other {# check-ins}}",
-    "latestLabel": "{field} · latest",
     "firstRecord": "first entry",
     "sameAsFirst": "same as the first",
     "sinceFirst": "{value} since the first",
-    "oneMore": "Log it again to see the curve.",
     "bestLabel": "Best · {field}",
-    "lastOn": "Last",
     "historyToggle": "History"
   },
   "checkinLog": {

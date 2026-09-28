@@ -958,9 +958,6 @@
     "metricIsRating": "Usar como la nota del desafío",
     "metricIsRatingHint": "Hoy, el acervo y los rankings muestran la nota de un ítem como este promedio. Solo una métrica puede ser la nota.",
     "metricIsRatingTag": "La nota del desafío",
-    "metricIsCoverTag": "En la portada",
-    "metricIsCover": "Mostrar en las portadas de los ítems",
-    "metricIsCoverHint": "Cada ítem muestra su número en su portada, en la biblioteca, en lugar de la nota — \"120 kg\" en vez de un anillo de 0 a 5.",
     "metricCountWhat": "Qué contar",
     "metricCountDays": "Contar días, no registros",
     "metricCountDaysHint": "Dos registros el mismo día cuentan como un día.",
@@ -1102,13 +1099,10 @@
     "savedChanges": "Cambios guardados.",
     "byItemCount": "{count, plural, one {# ítem} other {# ítems}}",
     "checkinCountShort": "{count, plural, one {# check-in} other {# check-ins}}",
-    "latestLabel": "{field} · último",
     "firstRecord": "primer registro",
     "sameAsFirst": "igual que el primero",
     "sinceFirst": "{value} desde el primero",
-    "oneMore": "Regístralo de nuevo para ver la curva.",
     "bestLabel": "Mejor · {field}",
-    "lastOn": "Último",
     "historyToggle": "Historial"
   },
   "checkinLog": {

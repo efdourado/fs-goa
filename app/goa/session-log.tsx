@@ -711,8 +711,7 @@ export function SessionLog({
 
                   {trendField && latest !== undefined ? (
                     <div className="mt-3">
-                      <span className="block text-[11px] uppercase tracking-[0.08em] text-[var(--muted)]">{t("latestLabel", { field: trendField.label })}</span>
-                      <div className="mt-0.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                         <span className="text-3xl font-light tabular-nums tracking-[-0.03em]">{number(latest)}{trendField.config?.unit ? <span className="ml-1 text-base text-[var(--muted)]">{trendField.config.unit}</span> : null}</span>
                         {change === null ? (
                           <span className="text-xs text-[var(--muted)]">{t("firstRecord")}</span>
@@ -724,7 +723,7 @@ export function SessionLog({
                       </div>
                     </div>
                   ) : null}
-                  {trend.length > 1 ? <TrendChart values={trend} /> : trendField ? <p className="mt-3 text-xs text-[var(--muted)]">{t("oneMore")}</p> : null}
+                  {trend.length > 1 ? <TrendChart values={trend} /> : null}
 
                   <dl className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(6.5rem,1fr))] gap-x-4 gap-y-3 border-t border-[var(--line)] pt-3">
                     {records.map((record) => (
@@ -733,10 +732,6 @@ export function SessionLog({
                         <dd className="text-sm font-medium tabular-nums">{number(record.value)}{record.field.config?.unit ? ` ${record.field.config.unit}` : ""}</dd>
                       </div>
                     ))}
-                    <div className="min-w-0">
-                      <dt className="truncate text-[11px] text-[var(--muted)]">{t("lastOn")}</dt>
-                      <dd className="text-sm font-medium">{f.date(list[0]?.entry.occurredOn)}</dd>
-                    </div>
                   </dl>
 
                   <details className="group mt-3">
