@@ -22,6 +22,7 @@
     "db:migrate:prod": "node --env-file=.env.production.local scripts/migrate.mjs",
     "db:seed": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/seed-admin.mjs",
     "db:seed-reading": "node --import tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/seed-reading/index.ts",
+    "db:seed-local": "node --import tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/seed-local/index.ts",
     "db:seed-reading:prod": "node --import tsx --env-file=.env.production.local scripts/seed-reading/index.ts",
     "db:setup": "npm run db:migrate && npm run db:seed",
     "db:studio": "drizzle-kit studio",
