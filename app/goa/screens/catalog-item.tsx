@@ -157,23 +157,13 @@ export function CatalogItemScreen({
           ) : null}
 
           <section className={cx(cardClass, "mt-7 flex flex-wrap items-center gap-x-8 gap-y-5 p-6 sm:p-7")} aria-label={t("ratingTitle")}>
-            {item.coverStat ? (
-              // The challenge chose its own number for this item ("120 kg") — it reads as that, not as a 0–5 score.
-              <div className="min-w-0 flex-1 basis-56">
-                <h2 className="text-xs uppercase tracking-[0.08em] text-[var(--muted)]">{item.coverStat.label}</h2>
-                <p className="mt-2 text-[44px] font-light leading-none tracking-[-0.05em] tabular-nums">{item.coverStat.formatted}</p>
-              </div>
-            ) : (
-              <>
-                <ScoreRing value={item.ratingAvg} size={132} strokeWidth={2} label={rated ? t("ratedAria", { value: item.ratingAvg ?? 0 }) : t("notRatedYet")} caption={rated ? t("outOfFive") : undefined} textClassName="text-[44px] font-light leading-none tracking-[-0.05em]" />
-                <div className="min-w-0 flex-1 basis-56">
-                  <h2 className="text-xs uppercase tracking-[0.08em] text-[var(--muted)]">{t("ratingTitle")}</h2>
-                  <p className="mt-2 text-xl font-light leading-snug tracking-[-0.03em] sm:text-2xl">
-                    {rated ? t("ratingSummary", { ratings: item.ratingCount ?? 0, rounds: item.rounds.length }) : t("notRatedYet")}
-                  </p>
-                </div>
-              </>
-            )}
+            <ScoreRing value={item.ratingAvg} size={132} strokeWidth={2} label={rated ? t("ratedAria", { value: item.ratingAvg ?? 0 }) : t("notRatedYet")} caption={rated ? t("outOfFive") : undefined} textClassName="text-[44px] font-light leading-none tracking-[-0.05em]" />
+            <div className="min-w-0 flex-1 basis-56">
+              <h2 className="text-xs uppercase tracking-[0.08em] text-[var(--muted)]">{t("ratingTitle")}</h2>
+              <p className="mt-2 text-xl font-light leading-snug tracking-[-0.03em] sm:text-2xl">
+                {rated ? t("ratingSummary", { ratings: item.ratingCount ?? 0, rounds: item.rounds.length }) : t("notRatedYet")}
+              </p>
+            </div>
           </section>
 
           <section className="mt-10">

@@ -120,7 +120,6 @@ export function CatalogShelf({ scope, canManage, onOpenCatalog, onOpenItem }: {
                 title={item.title}
                 year={resolveCoverTop(item, shelf?.coverTopProperty, f)}
                 avg={item.ratingAvg}
-                stat={item.coverStat?.formatted}
                 badgeHidden={shelf?.coverBadgeHidden}
                 ratingLabel={item.ratingAvg === null || item.ratingAvg === undefined ? tCat("notRated") : tCat("ratedAria", { value: item.ratingAvg })}
                 caption={[item.scheduledAt ? f.eventWhen(item.scheduledAt) : item.author, item.mainGenre, formatRuntime(item.runtimeMinutes)].filter(Boolean).slice(0, 2).join(" · ")}

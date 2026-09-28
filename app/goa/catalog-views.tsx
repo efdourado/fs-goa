@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 
 import { AddCardTile } from "./add-tile";
-import { CoverSwatch, ItemCover, ScoreRing, StatPill } from "./catalog-cover";
+import { CoverSwatch, ItemCover, ScoreRing } from "./catalog-cover";
 import type { GoaFormat } from "./format";
 import type { CatalogAttributeValue, CatalogLibrary, EventSchedule } from "./types";
 import { cx } from "./ui";
@@ -79,12 +79,10 @@ export function resolveCoverTop(
 }
 
 /** One cover in the grid — a button that opens the item, or a checkbox while items are being picked. */
-export function CatalogTile({ title, year, avg, stat, ratingLabel, badgeHidden, caption, note, noteTone = "muted", size = "md", className, selecting, picked, onPick, onOpen }: {
+export function CatalogTile({ title, year, avg, ratingLabel, badgeHidden, caption, note, noteTone = "muted", size = "md", className, selecting, picked, onPick, onOpen }: {
   title: string;
   year?: string | number | null;
   avg?: number | null;
-  /** The challenge's cover number ("120 kg") — takes the rating ring's place. */
-  stat?: string | null;
   /** Turns off the rating ring badge regardless of `avg` — the library's own choice, not "no rating yet". */
   badgeHidden?: boolean;
   ratingLabel: string;
@@ -101,7 +99,7 @@ export function CatalogTile({ title, year, avg, stat, ratingLabel, badgeHidden, 
 }) {
   const body = (
     <>
-      <ItemCover title={title} year={year} avg={avg} stat={stat} ratingLabel={ratingLabel} showBadge={!badgeHidden} size={size} className={cx("transition duration-200", picked ? "ring-[3px] ring-[var(--main)] ring-offset-2 ring-offset-[var(--canvas)]" : "group-hover:-translate-y-0.5 group-hover:shadow-[var(--elevate-2)]")}>
+      <ItemCover title={title} year={year} avg={avg} ratingLabel={ratingLabel} showBadge={!badgeHidden} size={size} className={cx("transition duration-200", picked ? "ring-[3px] ring-[var(--main)] ring-offset-2 ring-offset-[var(--canvas)]" : "group-hover:-translate-y-0.5 group-hover:shadow-[var(--elevate-2)]")}>
         {selecting ? (
           <span aria-hidden="true" className={cx("absolute bottom-3 left-3 grid h-6 w-6 place-items-center rounded-full border-2 text-xs", picked ? "border-[var(--main)] bg-[var(--main)] text-white" : "border-[var(--cover-ink)] bg-[var(--paper)]/70")}>{picked ? "✓" : ""}</span>
         ) : null}
@@ -129,12 +127,10 @@ export function AddItemTile({ label, onClick }: { label: string; onClick: () => 
 }
 
 /** One row of the list layout: a small cover swatch, the title and its details, the rating ring. */
-export function CatalogRow({ title, year, avg, stat, ratingLabel, badgeHidden, meta, selecting, picked, onPick, onOpen }: {
+export function CatalogRow({ title, year, avg, ratingLabel, badgeHidden, meta, selecting, picked, onPick, onOpen }: {
   title: string;
   year?: string | number | null;
   avg?: number | null;
-  /** The challenge's cover number ("120 kg") — takes the rating ring's place. */
-  stat?: string | null;
   /** Turns off the rating ring badge regardless of `avg` — the library's own choice, not "no rating yet". */
   badgeHidden?: boolean;
   ratingLabel: string;
@@ -152,7 +148,7 @@ export function CatalogRow({ title, year, avg, stat, ratingLabel, badgeHidden, m
         <strong className="block truncate font-light">{title}{year ? <span className="ml-1.5 text-[var(--muted)]">{year}</span> : null}</strong>
         <small className="mt-1 block truncate text-[var(--muted)]">{meta}</small>
       </span>
-      {badgeHidden ? null : stat ? <StatPill text={stat} className="flex-none shadow-none ring-1 ring-[var(--line)]" /> : <ScoreRing value={avg} size={38} label={ratingLabel} strokeWidth={3} textClassName="text-[11px] font-medium" />}
+      {badgeHidden ? null : <ScoreRing value={avg} size={38} label={ratingLabel} strokeWidth={3} textClassName="text-[11px] font-medium" />}
     </>
   );
   const shared = "flex w-full items-center gap-4 px-4 py-3 text-left transition hover:bg-[var(--wash)] sm:px-5";

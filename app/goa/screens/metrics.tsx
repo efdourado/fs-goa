@@ -48,7 +48,6 @@ export function AdminMetrics({ challenge, onAdd, onUpdate, onDelete }: Props) {
             <span>
               {[metric.visibleDuring ? t("metricDuring") : null, metric.visibleInResults ? t("metricInResults") : null].filter(Boolean).join(" · ") || t("metricHidden")}
               {metric.isRating ? <span className="ml-2 rounded-full bg-[var(--main-soft)] px-2 py-0.5 text-[var(--main-strong)]">{t("metricIsRatingTag")}</span> : null}
-              {metric.isCover ? <span className="ml-2 rounded-full bg-[var(--main-soft)] px-2 py-0.5 text-[var(--main-strong)]">{t("metricIsCoverTag")}</span> : null}
             </span>
             {!closed ? <div className="flex gap-3"><Button variant="secondary" onClick={() => { setEditing(metric); setSuccess(null); }}>{t("edit")}</Button><button type="button" className="min-h-11 px-2 text-[var(--danger)]" onClick={() => { setRemoving(metric); setError(null); }}>{t("remove")}</button></div> : null}
           </div>
@@ -120,7 +119,6 @@ export function MetricEditor({ challenge, metric, ranking = false, onCancel, onS
   const [countTypeId, setCountTypeId] = useState(metric?.entryTypeId ?? primaryTypeId);
   const [countDays, setCountDays] = useState(metric?.countDays ?? false);
   const [itemId, setItemId] = useState(metric?.itemId ?? "");
-  const [isCover, setIsCover] = useState(metric?.isCover ?? false);
   const items = [...(challenge.items ?? [])].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -142,12 +140,11 @@ export function MetricEditor({ challenge, metric, ranking = false, onCancel, onS
     || visibleDuring !== (metric?.visibleDuring ?? true) || visibleInResults !== (metric?.visibleInResults ?? true)
     || isRating !== (metric?.isRating ?? false)
     || countTypeId !== (metric?.entryTypeId ?? primaryTypeId) || countDays !== (metric?.countDays ?? false)
-    || itemId !== (metric?.itemId ?? "") || isCover !== (metric?.isCover ?? false);
+    || itemId !== (metric?.itemId ?? "");
   const isCount = operation === "count";
   // One item only — never while the metric is itself split by item or by the catalogue.
   const canScopeItem = ITEM_SCOPE_OPERATIONS.includes(operation) && ["none", "participant", "checkpoint"].includes(groupBy) && items.length > 1;
   const scopedItemId = canScopeItem ? itemId : "";
-  const canCover = groupBy === "item";
   const validSource = !needsField || (combine ? fieldIds.length >= 2 : Boolean(selectedField));
   // Only an average of rating fields is on the rating scale, so only it can stand for the challenge's rating.
   const canBeRating = RATING_OPERATIONS.includes(operation) && needsField && (combine
@@ -169,8 +166,7 @@ export function MetricEditor({ challenge, metric, ranking = false, onCancel, onS
         isRating: canBeRating && isRating,
         entryTypeId: isCount ? countTypeId || undefined : undefined,
         countDays: isCount && countDays,
-        itemId: scopedItemId || null,
-        isCover: canCover && isCover });
+        itemId: scopedItemId || null });
     } catch (cause) { setError(f.error(cause)); setBusy(false); }
   }
   return (
@@ -194,9 +190,6 @@ export function MetricEditor({ challenge, metric, ranking = false, onCancel, onS
         <Toggle checked={visibleInResults} onChange={setVisibleInResults} label={t("metricVisibleResults")} />
         {canBeRating ? (
           <Toggle checked={isRating} onChange={setIsRating} label={t("metricIsRating")} hint={t("metricIsRatingHint")} />
-        ) : null}
-        {canCover ? (
-          <Toggle checked={isCover} onChange={setIsCover} label={t("metricIsCover")} hint={t("metricIsCoverHint")} />
         ) : null}
       </fieldset>
       <Disclosure

@@ -8401,7 +8401,7 @@ test("capa dos modelos: só a administração da plataforma destaca, o destaque 
   assert.equal(republished.find((template) => template.id === challengeId)?.featuredAt, null, "despublicar tira da capa; republicar não recoloca");
 });
 
-test("métricas de treino: unidade no campo, contar check-ins ou dias, o recorde de um item só, e o número na capa do acervo", async () => {
+test("métricas de treino: unidade no campo, contar check-ins ou dias e o recorde de um item só", async () => {
   const owner = await register("Leo Treino", "leo_treino_metricas");
   const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Força" } })).body as { id: string }).id;
   const library = (await call("POST", `/api/groups/${gid}/catalog/libraries`, { session: owner, body: { label: "Exercícios" } })).body as { id: string };
@@ -8453,15 +8453,13 @@ test("métricas de treino: unidade no campo, contar check-ins ou dias, o recorde
   const days = await add({ label: "Dias treinados", operation: "count", entryTypeId: visit.id, countDays: true, groupBy: "none" });
   const records = await add({ label: "Séries", operation: "count", groupBy: "none" });
   const terraPr = await add({ label: "PR terra", operation: "max", fieldId: carga.id, itemId: item("Terra"), groupBy: "none" });
-  const cover = await add({ label: "Recorde", operation: "max", fieldId: carga.id, groupBy: "item", isCover: true });
+  const byItem = await add({ label: "Recorde", operation: "max", fieldId: carga.id, groupBy: "item" });
 
-  // uma métrica de um item só não se agrupa por item, e só uma por item vai para a capa
+  // uma métrica de um item só não se agrupa por item
   const badScope = await call("POST", `/api/challenges/${cid}/metrics`, { session: owner, body: { label: "x", operation: "max", fieldId: carga.id, itemId: item("Terra"), groupBy: "item" } });
   assert.equal(badScope.response.status, 400, JSON.stringify(badScope.body));
-  const badCover = await call("POST", `/api/challenges/${cid}/metrics`, { session: owner, body: { label: "x", operation: "max", fieldId: carga.id, groupBy: "none", isCover: true } });
-  assert.equal(badCover.response.status, 400, JSON.stringify(badCover.body));
 
-  type MetricView = { id: string; value: number | null; formattedValue: string; unit: string | null; itemTitle: string | null; isCover: boolean; series?: Array<{ label: string; formattedValue: string }> };
+  type MetricView = { id: string; value: number | null; formattedValue: string; unit: string | null; itemTitle: string | null; series?: Array<{ label: string; formattedValue: string }> };
   const metrics = ((await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { metrics: MetricView[] }).metrics;
   const byId = (id: string) => metrics.find((metric) => metric.id === id)!;
   assert.equal(byId(checkins).value, 3, "três check-ins");
@@ -8471,16 +8469,7 @@ test("métricas de treino: unidade no campo, contar check-ins ou dias, o recorde
   assert.equal(byId(terraPr).formattedValue, "110 kg", "o número sai com a unidade do campo");
   assert.equal(byId(terraPr).itemTitle, "Terra");
   assert.equal(byId(checkins).unit, null, "uma contagem não está em kg");
-  assert.deepEqual(byId(cover).series?.map((entry) => [entry.label, entry.formattedValue]).sort(), [["Supino", "55 kg"], ["Terra", "110 kg"]]);
-
-  // a capa do acervo mostra o número escolhido, com a unidade
-  const catalog = (await call("GET", `/api/groups/${gid}/catalog`, { session: owner })).body as { items: Array<{ title: string; coverStat: { value: number; formatted: string; label: string } | null }> };
-  assert.deepEqual(catalog.items.find((row) => row.title === "Terra")?.coverStat, { value: 110, formatted: "110 kg", label: "Recorde" });
-
-  // outra métrica na capa tira a marca da anterior
-  const coverReps = await add({ label: "Mais repetições", operation: "max", fieldId: reps.id, groupBy: "item", isCover: true });
-  const after = ((await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { metrics: MetricView[] }).metrics;
-  assert.deepEqual(after.filter((metric) => metric.isCover).map((metric) => metric.id), [coverReps], "uma capa por desafio");
+  assert.deepEqual(byId(byItem).series?.map((entry) => [entry.label, entry.formattedValue]).sort(), [["Supino", "55 kg"], ["Terra", "110 kg"]]);
 
   // trocar a unidade é só um rótulo: nenhum valor muda
   const patched = await call("POST", `/api/challenges/${cid}/fields`, {

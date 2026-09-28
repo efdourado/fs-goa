@@ -42,16 +42,14 @@ function metricSettings(metric: MetricRow): { minSample: number; bayesPriorWeigh
 }
 
 /**
- * What a metric narrows itself to or marks itself as, beyond its field and grouping: one item only
- * (`itemId` — "the deadlift's best"), days instead of registros (`countDays`), and the number shown on
- * the item covers of the challenge's library (`isCover`).
+ * What a metric narrows itself to beyond its field and grouping: one item only (`itemId` — "the
+ * deadlift's best") and days instead of registros (`countDays`).
  */
-function metricScope(metric: Pick<MetricRow, "settings">): { itemId: string | null; countDays: boolean; isCover: boolean } {
+function metricScope(metric: Pick<MetricRow, "settings">): { itemId: string | null; countDays: boolean } {
   const settings = (metric.settings ?? {}) as Record<string, unknown>;
   return {
     itemId: typeof settings.itemId === "string" && settings.itemId ? settings.itemId : null,
     countDays: settings.countDays === true,
-    isCover: settings.isCover === true,
   };
 }
 
@@ -410,7 +408,6 @@ async function calculateMetricRow(
     itemId: scope.itemId,
     itemTitle,
     countDays: scope.countDays,
-    isCover: scope.isCover,
     explanation: explanation.formula,
     sample: explanation.sample,
   };
@@ -718,44 +715,6 @@ async function computeIndicatorBias(
     sampleSize: picks.rows.length,
     series: metric.group_by === "participant" ? series : undefined,
   };
-}
-
-/**
- * The number each catalogue item shows on its cover, from the challenges that named a by-item metric as
- * their cover number — "120 kg", not a 0–5 ring. The most recently active challenge wins when two
- * challenges hold the same item. Only metrics the members can already see count.
- */
-export async function coverStatsForWorkspace(
-  client: Pick<PoolClient, "query">,
-  workspaceId: string,
-): Promise<Map<string, { value: number; formatted: string; label: string }>> {
-  const metrics = await client.query<MetricRow>(
-    `SELECT m.id, m.challenge_id, m.entry_type_id, m.field_id, m.semantic_key, m.label, m.operation,
-            m.group_by, m.decimal_places, m.visible_during_challenge, m.position, m.settings
-       FROM challenge_metrics m
-       JOIN challenges c ON c.id = m.challenge_id AND c.deleted_at IS NULL AND c.status <> 'draft'
-      WHERE c.group_id = $1 AND m.archived_at IS NULL AND m.group_by = 'item'
-        AND m.settings->>'isCover' = 'true'
-        AND (m.visible_during_challenge OR c.status = 'closed')
-      ORDER BY c.updated_at DESC`,
-    [workspaceId],
-  );
-  const stats = new Map<string, { value: number; formatted: string; label: string }>();
-  for (const metric of metrics.rows) {
-    const calculated = await calculateMetricRow(client as PoolClient, metric);
-    const series = calculated.series as SeriesEntry[] | undefined;
-    if (!series?.length) continue;
-    const items = await client.query<{ id: string; catalog_item_id: string | null }>(
-      "SELECT id, catalog_item_id FROM challenge_items WHERE challenge_id = $1", [metric.challenge_id],
-    );
-    const catalogOf = new Map(items.rows.map((row) => [row.id, row.catalog_item_id]));
-    for (const entry of series) {
-      const catalogId = catalogOf.get(entry.key);
-      if (!catalogId || entry.value === null || stats.has(catalogId)) continue;
-      stats.set(catalogId, { value: entry.value, formatted: entry.formattedValue, label: metric.label });
-    }
-  }
-  return stats;
 }
 
 export async function metricsForChallenge(client: PoolClient, challengeId: string) {
@@ -1147,16 +1106,15 @@ async function resolveMetricField(
   return { entryTypeId: type.id, fieldId: operation === "completion_rate" ? null : fieldId, fieldIds: null };
 }
 
-interface MetricScopeInput { itemId: string | null; countDays: boolean; isCover: boolean }
+interface MetricScopeInput { itemId: string | null; countDays: boolean }
 
 /** Operations that can be narrowed to one item — the ones reading a plain value or counting. */
 const ITEM_SCOPE_OPS = new Set(["sum", "average", "median", "min", "max", "count"]);
 
-/** `body.itemId` / `body.countDays` / `body.isCover`, checked against the operation and grouping. */
+/** `body.itemId` / `body.countDays`, checked against the operation and grouping. */
 async function parseMetricScope(client: PoolClient, challengeId: string, parsed: ParsedMetricInput, body: Record<string, unknown>): Promise<MetricScopeInput> {
   const itemId = typeof body.itemId === "string" && body.itemId ? body.itemId : null;
   const countDays = body.countDays === true;
-  const isCover = body.isCover === true;
   if (itemId) {
     if (!ITEM_SCOPE_OPS.has(parsed.operation)) throw new ApiError(400, "invalid_metric", "Essa operação não pode ser limitada a um item.");
     if (!["none", "participant", "checkpoint"].includes(parsed.groupBy)) {
@@ -1167,26 +1125,13 @@ async function parseMetricScope(client: PoolClient, challengeId: string, parsed:
     if (!item) throw new ApiError(400, "invalid_item", "Item não pertence ao desafio.");
   }
   if (countDays && parsed.operation !== "count") throw new ApiError(400, "invalid_metric", "Só uma contagem pode contar dias.");
-  if (isCover && (parsed.groupBy !== "item" || itemId)) {
-    throw new ApiError(400, "invalid_metric", "Só uma métrica agrupada por item pode aparecer na capa dos itens.");
-  }
-  return { itemId, countDays, isCover };
-}
-
-/** A challenge's covers show one number — marking a new metric takes the flag off whichever had it. */
-async function clearOtherCoverMetrics(client: PoolClient, challengeId: string, keepId: string) {
-  await client.query(
-    `UPDATE challenge_metrics SET settings = settings - 'isCover', updated_at = now()
-      WHERE challenge_id = $1 AND id <> $2 AND settings ? 'isCover'`,
-    [challengeId, keepId],
-  );
+  return { itemId, countDays };
 }
 
 function metricSettingsJson(parsed: ParsedMetricInput, resolved: { fieldIds: string[] | null }, combineOp: "sum" | "average", isRating = false, scope?: MetricScopeInput): string {
   return JSON.stringify({
     ...(scope?.itemId ? { itemId: scope.itemId } : {}),
     ...(scope?.countDays ? { countDays: true } : {}),
-    ...(scope?.isCover ? { isCover: true } : {}),
     visibleInResults: parsed.visibleInResults,
     ...(Number.isFinite(parsed.minSample) && parsed.minSample > 0 ? { minSample: Math.floor(parsed.minSample) } : {}),
     ...(Number.isFinite(parsed.bayesPriorWeight) && parsed.bayesPriorWeight >= 0 ? { bayesPriorWeight: parsed.bayesPriorWeight } : {}),
@@ -1268,7 +1213,6 @@ export async function addMetric(
         metricSettingsJson(parsed, resolved, combineOp, isRating, scope), session.user.id],
     );
     if (isRating) await clearOtherRatingMetrics(client, challengeId, id);
-    if (scope.isCover) await clearOtherCoverMetrics(client, challengeId, id);
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
       "metric.created", "challenge_metric", id, null, { label: parsed.label, operation: parsed.operation, fieldId, fieldIds: resolved.fieldIds });
     return { id };
@@ -1314,7 +1258,6 @@ export async function updateMetric(
         parsed.visibleDuring, metricSettingsJson(parsed, resolved, combineOp, isRating, scope)],
     );
     if (isRating) await clearOtherRatingMetrics(client, challengeId, metricId);
-    if (scope.isCover) await clearOtherCoverMetrics(client, challengeId, metricId);
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
       "metric.updated", "challenge_metric", metricId, null, { label: parsed.label, operation: parsed.operation, fieldId, fieldIds: resolved.fieldIds });
     return { id: metricId };
