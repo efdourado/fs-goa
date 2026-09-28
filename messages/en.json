@@ -1954,9 +1954,9 @@
     "about": "About —",
     "tiles": {
       "rating": "Score",
-      "ratings": "Scores",
       "entries": "Entries",
-      "when": "When"
+      "when": "When",
+      "average": "Average"
     },
     "noRating": "no score",
     "noEntries": "Nothing logged yet.",
@@ -1989,6 +1989,7 @@
     "recordsLede": "The best for each item, across every entry.",
     "colophon": "Made with Goa on {date}. The data is yours — this PDF is just a nice way to keep it.",
     "footer": "goa · {title} · page ",
-    "streakValue": "{count, plural, one {# day} other {# days}}"
+    "streakValue": "{count, plural, one {# day} other {# days}}",
+    "showWhen": "Dates on cards"
   }
 }

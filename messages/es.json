@@ -1954,9 +1954,9 @@
     "about": "Sobre —",
     "tiles": {
       "rating": "Nota",
-      "ratings": "Notas",
       "entries": "Registros",
-      "when": "Cuándo"
+      "when": "Cuándo",
+      "average": "Media"
     },
     "noRating": "sin nota",
     "noEntries": "Todavía sin registro.",
@@ -1989,6 +1989,7 @@
     "recordsLede": "Lo mejor de cada ítem, sumando todos los registros.",
     "colophon": "Generado con Goa el {date}. Los datos son tuyos — este PDF es solo una forma bonita de guardarlos.",
     "footer": "goa · {title} · página ",
-    "streakValue": "{count, plural, one {# día} other {# días}}"
+    "streakValue": "{count, plural, one {# día} other {# días}}",
+    "showWhen": "Fechas en las tarjetas"
   }
 }

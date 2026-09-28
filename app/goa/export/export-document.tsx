@@ -223,8 +223,8 @@ function HowItWorks({ challenge, model, doc }: { challenge: ChallengeDetail; mod
   );
 }
 
-function ItemCard({ item, chapter, model, doc, people }: {
-  item: DocItem; chapter: DocChapter; model: ExportModel; doc: Doc; people: Map<string, DocPerson>;
+function ItemCard({ item, chapter, model, doc, people, showWhen }: {
+  item: DocItem; chapter: DocChapter; model: ExportModel; doc: Doc; people: Map<string, DocPerson>; showWhen: boolean;
 }) {
   const multiPeople = model.people.length > 1;
   const types = new Set(item.entries.map((entry) => entry.typeName));
@@ -249,30 +249,20 @@ function ItemCard({ item, chapter, model, doc, people }: {
       </article>
     );
   }
+  // Each person's own score lives in their row and on the scoreboard — a tile only ever holds one number:
+  // the score itself when it's one person's, the average when it's several.
   const tiles: Array<{ label: string; body: ReactNode }> = [];
   if (model.hasRatings) {
     tiles.push({
-      label: doc.t("tiles.rating"),
+      label: doc.t(multiPeople ? "tiles.average" : "tiles.rating"),
       body: item.ratingAvg !== null
         ? <><Dots value={item.ratingAvg} max={model.ratingMax} /><small>{doc.n(item.ratingAvg)}/{model.ratingMax}</small></>
         : <small>{doc.t("noRating")}</small>,
     });
   }
-  if (model.hasRatings && multiPeople) {
-    tiles.push({
-      label: doc.t("tiles.ratings"),
-      body: item.ratings.length
-        ? <>{item.ratings.map((rating, index) => {
-          const person = people.get(rating.personKey);
-          return <span key={rating.personKey} className={`xd-ink ${tone(person?.color)}`}>{index ? "· " : ""}{person?.name.split(" ")[0]} {doc.n(rating.value)}</span>;
-        })}</>
-        : <small>—</small>,
-    });
-  } else {
-    const count = item.entries.length + item.progress.reduce((sum, row) => sum + row.points.length, 0);
-    tiles.push({ label: doc.t("tiles.entries"), body: <>{doc.n(count)}</> });
-  }
-  tiles.push({ label: doc.t("tiles.when"), body: <>{item.lastDay ? doc.day(item.lastDay) : <small>—</small>}</> });
+  const count = item.entries.length + item.progress.reduce((sum, row) => sum + row.points.length, 0);
+  tiles.push({ label: doc.t("tiles.entries"), body: <>{doc.n(count)}</> });
+  if (showWhen && item.lastDay) tiles.push({ label: doc.t("tiles.when"), body: <>{doc.day(item.lastDay)}</> });
   const long = item.entries.length > 5 || item.entries.some((entry) => entry.values.some((value) => value.long && value.text.length > 600));
   return (
     <article className={`xd-card ${tone(chapter.color)}${long ? " is-long" : ""}`}>
@@ -316,7 +306,7 @@ function ItemCard({ item, chapter, model, doc, people }: {
   );
 }
 
-function Items({ model, doc, people }: { model: ExportModel; doc: Doc; people: Map<string, DocPerson> }) {
+function Items({ model, doc, people, showWhen }: { model: ExportModel; doc: Doc; people: Map<string, DocPerson>; showWhen: boolean }) {
   const itemCount = model.chapters.reduce((sum, chapter) => sum + chapter.items.length, 0);
   const labelled = model.chapters.length > 1;
   return (
@@ -331,7 +321,7 @@ function Items({ model, doc, people }: { model: ExportModel; doc: Doc; people: M
               {chapter.subtitle ? <p>{chapter.subtitle}</p> : null}
             </div>
           ) : <div style={{ height: "4mm" }} />}
-          {chapter.items.map((item) => <ItemCard key={item.id} item={item} chapter={chapter} model={model} doc={doc} people={people} />)}
+          {chapter.items.map((item) => <ItemCard key={item.id} item={item} chapter={chapter} model={model} doc={doc} people={people} showWhen={showWhen} />)}
         </div>
       ))}
     </section>
@@ -535,6 +525,7 @@ export function ExportDocument({ challenge, entries, userId, fontClassName }: {
   const doc = useDoc();
   const tc = useTranslations("common");
   const [onlyMine, setOnlyMine] = useState(false);
+  const [showWhen, setShowWhen] = useState(true);
   const words = { yes: tc("yes"), no: tc("no"), group: doc.t("group") };
   const everyone = useMemo(() => buildExportModel({ challenge, entries, userId, words }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -587,6 +578,15 @@ export function ExportDocument({ challenge, entries, userId, fontClassName }: {
                 {doc.t(section === "scoreboard" && model.sessionMode ? "sections.records" : `sections.${section}`)}
               </button>
             ))}
+            {shown("items") ? (
+              <>
+                <span className="xd-chip-gap" aria-hidden="true" />
+                <button type="button" className="xd-chip" aria-pressed={showWhen} onClick={() => setShowWhen((value) => !value)}>
+                  {showWhen ? <CheckIcon /> : null}
+                  {doc.t("showWhen")}
+                </button>
+              </>
+            ) : null}
             {everyone.people.length > 1 ? (
               <>
                 <span className="xd-chip-gap" aria-hidden="true" />
@@ -603,7 +603,7 @@ export function ExportDocument({ challenge, entries, userId, fontClassName }: {
         <article className="xd">
           {shown("cover") ? <Cover challenge={challenge} model={model} doc={doc} /> : null}
           {shown("rules") ? <HowItWorks challenge={challenge} model={model} doc={doc} /> : null}
-          {shown("items") ? <Items model={model} doc={doc} people={people} /> : null}
+          {shown("items") ? <Items model={model} doc={doc} people={people} showWhen={showWhen} /> : null}
           {shown("diary") ? <Diary model={model} doc={doc} people={people} /> : null}
           {shown("scoreboard") ? (model.sessionMode ? <Records model={model} doc={doc} /> : <Scoreboard model={model} doc={doc} />) : null}
           <p className="xd-colophon">{doc.t("colophon", { date: doc.day(dateKeyInSaoPaulo(new Date())) })}</p>
