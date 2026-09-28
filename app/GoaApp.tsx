@@ -244,13 +244,16 @@ export default function GoaApp() {
     return data;
   }
 
-  async function loadChallenge(challengeId: Id): Promise<ChallengeDetail> {
-    const cached = readCache<{ challenge: ChallengeDetail; entries: Entry[] }>(CACHE_KEYS.challenge(challengeId));
+  // `inPlace`: the challenge is already on screen (a reload after a save). It refreshes behind the page instead of
+  // swapping it for the loading view, which would unmount whatever the person is in the middle of — a workout
+  // being edited lost its rows whenever the 60-second cache had expired by the time a new exercise was added.
+  async function loadChallenge(challengeId: Id, { inPlace = false }: { inPlace?: boolean } = {}): Promise<ChallengeDetail> {
+    const cached = inPlace ? null : readCache<{ challenge: ChallengeDetail; entries: Entry[] }>(CACHE_KEYS.challenge(challengeId));
     if (cached) {
       setSelectedChallenge(cached.challenge);
       setEntries(cached.entries);
       setDetailError(null);
-    } else {
+    } else if (!inPlace) {
       setDetailLoading(true);
       setDetailError(null);
     }
@@ -266,15 +269,16 @@ export default function GoaApp() {
       writeCache(CACHE_KEYS.challenge(challengeId), { challenge, entries: nextEntries });
       return challenge;
     } catch (cause) {
-      if (!cached) setDetailError(f.error(cause));
+      // In place, the caller reports the failure; the page it was showing stays up.
+      if (!cached && !inPlace) setDetailError(f.error(cause));
       throw cause;
     } finally {
-      setDetailLoading(false);
+      if (!inPlace) setDetailLoading(false);
     }
   }
 
   async function reloadSelected(): Promise<void> {
-    if (selectedChallenge) await loadChallenge(selectedChallenge.id);
+    if (selectedChallenge) await loadChallenge(selectedChallenge.id, { inPlace: true });
   }
 
   async function authenticate(mode: "login" | "register", payload: Record<string, string>) {
