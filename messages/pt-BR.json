@@ -957,7 +957,17 @@
     "blocksOn": "{count} ligados",
     "metricIsRating": "Usar como a nota do desafio",
     "metricIsRatingHint": "O Hoje, o acervo e os rankings mostram a nota de um item como esta média. Só uma métrica pode ser a nota.",
-    "metricIsRatingTag": "A nota do desafio"
+    "metricIsRatingTag": "A nota do desafio",
+    "metricIsCoverTag": "Na capa",
+    "metricIsCover": "Mostrar na capa dos itens",
+    "metricIsCoverHint": "O número de cada item aparece na capa dele, no acervo, no lugar da nota — \"120 kg\" em vez de um anel de 0 a 5.",
+    "metricCountWhat": "O que contar",
+    "metricCountDays": "Contar dias, não registros",
+    "metricCountDaysHint": "Dois registros no mesmo dia contam como um dia.",
+    "metricDaysPreview": "dias com registro",
+    "metricItemLabel": "Só um item",
+    "metricItemAll": "Todos os itens",
+    "metricItemHint": "Mostra o número de um item só — o recorde do levantamento terra, por exemplo."
   },
   "visibility": {
     "title": "Quem vê estas respostas",
@@ -1264,7 +1274,9 @@
     "fieldTypeSr": "Tipo do campo",
     "add": "Adicionar",
     "requiredHint": "Bloqueia o registro enquanto estiver em branco.",
-    "ratingFixed": "Escala fixa: 0 a 5, com meio ponto."
+    "ratingFixed": "Escala fixa: 0 a 5, com meio ponto.",
+    "unit": "Unidade",
+    "unitPlaceholder": "kg, km, min…"
   },
   "templates": {
     "signIn": "Entrar",

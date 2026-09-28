@@ -66,7 +66,7 @@ function CommentBlocks({ text }: { text: string }) {
 
 /** A short answer in the reader's terms: a number with their decimal mark, a date spelled out. */
 function answerText(value: DocEntry["values"][number], doc: Doc): string {
-  if (value.type === "number" && Number.isFinite(Number(value.text))) return doc.n(Number(value.text));
+  if (value.number !== null) return value.unit ? `${doc.n(value.number)} ${value.unit}` : doc.n(value.number);
   if (value.type === "date" && /^\d{4}-\d{2}-\d{2}/.test(value.text)) return doc.day(value.text.slice(0, 10));
   return value.text;
 }
@@ -262,7 +262,7 @@ function ItemCard({ item, chapter, model, doc, people, showWhen }: {
                     <span className="xd-point" key={index}><span>{doc.day(point.day, { day: "numeric", month: "short" })} · </span>{point.text}</span>
                   ))}
                 </div>
-                {row.total !== null && row.points.length > 1 ? <p className="xd-total">{doc.t("total", { value: doc.n(row.total) })}</p> : null}
+                {row.total !== null && row.points.length > 1 ? <p className="xd-total">{doc.t("total", { value: row.unit ? `${doc.n(row.total)} ${row.unit}` : doc.n(row.total) })}</p> : null}
               </dd>
             </div>
           );
@@ -458,7 +458,7 @@ function Records({ model, doc }: { model: ExportModel; doc: Doc }) {
                 <td className="num">{String(index + 1).padStart(2, "0")}</td>
                 <td className="title">{record.title}</td>
                 <td className="score">{doc.n(record.sessions)}</td>
-                <td className="small">{record.bests.map((best) => `${best.label} ${doc.n(best.value)}`).join(" · ") || "—"}</td>
+                <td className="small">{record.bests.map((best) => `${best.label} ${doc.n(best.value)}${best.unit ? ` ${best.unit}` : ""}`).join(" · ") || "—"}</td>
                 <td className="small muted">{record.lastDay ? doc.day(record.lastDay, { day: "2-digit", month: "2-digit", year: "2-digit" }) : "—"}</td>
               </tr>
             ))}

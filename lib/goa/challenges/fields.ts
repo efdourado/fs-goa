@@ -4,6 +4,7 @@ import { inTransaction, oneOrNull } from "../../db";
 import {
   asRecord,
   challengeAccess,
+  fieldUnit,
   insertField,
   integerValue,
   publicId,
@@ -131,6 +132,7 @@ export async function fieldsForChallenge(
       step: unscale(field.step_scaled, field.number_scale),
       maxLength: field.max_length ?? undefined,
       options: optionsByField.get(field.id) ?? [],
+      unit: field.kind === "number" && typeof field.settings?.unit === "string" && field.settings.unit ? field.settings.unit : undefined,
     },
   }));
 }
@@ -210,6 +212,9 @@ export async function saveChallengeFields(
         if (stepScaled !== null && stepScaled <= 0) {
           throw new ApiError(400, "invalid_field_config", "O intervalo precisa ser positivo.");
         }
+        // The unit is a label only — renaming "kg" never touches a stored value.
+        const unit = fieldUnit(config.unit);
+        settings = { ...settings, unit: unit ?? undefined };
       } else if (current.kind === "text") {
         maxLength = integerValue(config.maxLength, current.max_length ?? 5_000, 1, 20_000);
         settings = { ...settings, multiline: config.multiline === true };

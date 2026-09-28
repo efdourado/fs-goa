@@ -41,6 +41,23 @@ function metricSettings(metric: MetricRow): { minSample: number; bayesPriorWeigh
   };
 }
 
+/**
+ * What a metric narrows itself to or marks itself as, beyond its field and grouping: one item only
+ * (`itemId` — "the deadlift's best"), days instead of registros (`countDays`), and the number shown on
+ * the item covers of the challenge's library (`isCover`).
+ */
+function metricScope(metric: Pick<MetricRow, "settings">): { itemId: string | null; countDays: boolean; isCover: boolean } {
+  const settings = (metric.settings ?? {}) as Record<string, unknown>;
+  return {
+    itemId: typeof settings.itemId === "string" && settings.itemId ? settings.itemId : null,
+    countDays: settings.countDays === true,
+    isCover: settings.isCover === true,
+  };
+}
+
+/** The calendar day an entry counts for — its own date, or the day it was saved when it has none. */
+const ENTRY_DAY_SQL = "coalesce(e.occurred_on, (e.submitted_at AT TIME ZONE 'America/Sao_Paulo')::date)";
+
 function formatValue(value: number | null, decimalPlaces: number, suffix = ""): string {
   if (value === null) return "—";
   return `${value.toLocaleString("pt-BR", { maximumFractionDigits: decimalPlaces })}${suffix}`;
@@ -125,13 +142,14 @@ async function ratingRows(client: PoolClient, metric: MetricRow): Promise<Rating
         AND active_recommender.removed_at IS NULL
       WHERE e.challenge_id = $1 AND ${fieldIds ? "ev.field_id = ANY($2::text[])" : "ev.field_id = $2"}
         AND e.deleted_at IS NULL AND ev.number_scaled IS NOT NULL
+        AND ($3::text IS NULL OR e.item_id = $3)
       ${fieldIds
         ? `GROUP BY e.id, e.item_id, ci.title, e.participant_user_id, cp.user_id, u.display_name,
                     cat.year, cat.author, cat.main_genre, ci.recommended_by_user_id,
                     active_recommender.user_id, recommender.display_name,
                     cc.id, cc.title, cc.position`
         : ""}`,
-    [metric.challenge_id, fieldIds ?? metric.field_id],
+    [metric.challenge_id, fieldIds ?? metric.field_id, metricScope(metric).itemId],
   );
   return result.rows;
 }
@@ -251,6 +269,19 @@ function explainMetric(
   return { formula: `Por registro: ${combine} de ${composite.fieldIds.length} campos combinados. Depois, ${base.formula}`, sample: base.sample };
 }
 
+/** Operations whose result is in the field's own terms — a count, a rate or a bias isn't in kg. */
+const UNIT_OPERATIONS = new Set(["sum", "average", "median", "min", "max", "bayesian_average", "spread"]);
+
+/** The unit the metric's field(s) share, or null when they have none or disagree (kg + reps). */
+async function metricUnit(client: Pick<PoolClient, "query">, fieldIds: string[]): Promise<string | null> {
+  if (!fieldIds.length) return null;
+  const rows = await client.query<{ unit: string | null }>(
+    "SELECT nullif(trim(settings->>'unit'), '') AS unit FROM challenge_fields WHERE id = ANY($1::text[])", [fieldIds],
+  );
+  const units = new Set(rows.rows.map((row) => row.unit));
+  return units.size === 1 ? [...units][0] : null;
+}
+
 async function calculateMetricRow(
   client: PoolClient,
   metric: MetricRow,
@@ -336,6 +367,17 @@ async function calculateMetricRow(
   const suffix = metric.operation === "completion_rate" && result.value !== null ? "%" : "";
   const explanation = explainMetric(metric, result, explainExtra);
   const composite = compositeFields(metric);
+  const scope = metricScope(metric);
+  // "40" means 40 kg: a value read straight off a field carries that field's unit everywhere it's shown.
+  const unit = UNIT_OPERATIONS.has(metric.operation) ? await metricUnit(client, composite?.fieldIds ?? (metric.field_id ? [metric.field_id] : [])) : null;
+  const withUnit = (text: string | undefined) => (unit && text && text !== "—" ? `${text} ${unit}` : text);
+  const rawSeries = "series" in result ? (result.series as SeriesEntry[] | undefined) : undefined;
+  const series = rawSeries
+    ? rawSeries.map((entry) => ({ ...entry, formattedValue: withUnit(entry.formattedValue) ?? entry.formattedValue, rawFormattedValue: withUnit(entry.rawFormattedValue) }))
+    : undefined;
+  const itemTitle = scope.itemId
+    ? (await oneOrNull<{ title: string }>(client, "SELECT title FROM challenge_items WHERE id = $1", [scope.itemId]))?.title ?? null
+    : null;
   // Field *names*, not just ids — "combines Food, Atmosphere, Value" reads at a glance; "combines 3 fields"
   // makes someone who didn't build the metric go find out what they even are.
   const fieldLabels = composite
@@ -361,8 +403,14 @@ async function calculateMetricRow(
     bayesPriorWeight: metricSettings(metric).bayesPriorWeight,
     value: result.value,
     sampleSize: result.sampleSize,
-    series: "series" in result ? result.series : undefined,
-    formattedValue: formatValue(result.value, metric.decimal_places, suffix),
+    series,
+    formattedValue: withUnit(formatValue(result.value, metric.decimal_places, suffix)),
+    unit,
+    entryTypeId: metric.entry_type_id,
+    itemId: scope.itemId,
+    itemTitle,
+    countDays: scope.countDays,
+    isCover: scope.isCover,
     explanation: explanation.formula,
     sample: explanation.sample,
   };
@@ -376,16 +424,21 @@ type ValueResult = { value: number | null; sampleSize: number; series?: SeriesEn
  * the count to entries that actually filled that field.
  */
 async function computeCountMetric(client: PoolClient, metric: MetricRow): Promise<ValueResult> {
-  const fromWhere = metric.field_id
+  const { itemId, countDays } = metricScope(metric);
+  const params: unknown[] = [metric.challenge_id, metric.field_id ?? metric.entry_type_id];
+  if (itemId) params.push(itemId);
+  const itemClause = itemId ? ` AND e.item_id = $${params.length}` : "";
+  const fromWhere = (metric.field_id
     ? `FROM entry_values ev JOIN entries e ON e.id = ev.entry_id
         LEFT JOIN challenge_items ci ON ci.id = e.item_id
        WHERE e.challenge_id = $1 AND ev.field_id = $2 AND e.deleted_at IS NULL`
     : `FROM entries e LEFT JOIN challenge_items ci ON ci.id = e.item_id
-       WHERE e.challenge_id = $1 AND e.entry_type_id = $2 AND e.deleted_at IS NULL`;
-  const params = [metric.challenge_id, metric.field_id ?? metric.entry_type_id];
+       WHERE e.challenge_id = $1 AND e.entry_type_id = $2 AND e.deleted_at IS NULL`) + itemClause;
+  // "Days with a record": two check-ins on one day are one day.
+  const countExpr = countDays ? `count(DISTINCT ${ENTRY_DAY_SQL})::int` : "count(*)::int";
+  const total = await oneOrNull<{ n: number }>(client, `SELECT ${countExpr} AS n ${fromWhere}`, params);
 
   if (metric.group_by === "none") {
-    const total = await oneOrNull<{ n: number }>(client, `SELECT count(*)::int AS n ${fromWhere}`, params);
     return { value: total?.n ?? 0, sampleSize: total?.n ?? 0 };
   }
 
@@ -393,15 +446,16 @@ async function computeCountMetric(client: PoolClient, metric: MetricRow): Promis
     metric.group_by === "participant" ? "e.participant_user_id"
       : metric.group_by === "item" ? "e.item_id"
         : "coalesce(e.checkpoint_id, ci.checkpoint_id)";
+  const groupParam = `$${params.length + 1}`;
   const rows = await client.query<{ key: string | null; label: string | null; position: number; n: number }>(
     `SELECT k.key,
-            CASE $3
+            CASE ${groupParam}
               WHEN 'participant' THEN u.display_name
               WHEN 'item' THEN it.title
               ELSE cc.title END AS label,
             coalesce(cc.position, 0)::int AS position,
             k.n
-       FROM (SELECT ${keyExpr} AS key, count(*)::int AS n ${fromWhere} GROUP BY 1) k
+       FROM (SELECT ${keyExpr} AS key, ${countExpr} AS n ${fromWhere} GROUP BY 1) k
        LEFT JOIN users u ON u.id = k.key
        LEFT JOIN challenge_items it ON it.id = k.key
        LEFT JOIN challenge_checkpoints cc ON cc.id = k.key
@@ -416,8 +470,7 @@ async function computeCountMetric(client: PoolClient, metric: MetricRow): Promis
     sampleSize: row.n,
     formattedValue: formatValue(row.n, 0),
   }));
-  const total = series.reduce((sum, entry) => sum + (entry.value ?? 0), 0);
-  return { value: total, sampleSize: total, series };
+  return { value: total?.n ?? 0, sampleSize: total?.n ?? 0, series };
 }
 
 interface AggregateContext {
@@ -665,6 +718,44 @@ async function computeIndicatorBias(
     sampleSize: picks.rows.length,
     series: metric.group_by === "participant" ? series : undefined,
   };
+}
+
+/**
+ * The number each catalogue item shows on its cover, from the challenges that named a by-item metric as
+ * their cover number — "120 kg", not a 0–5 ring. The most recently active challenge wins when two
+ * challenges hold the same item. Only metrics the members can already see count.
+ */
+export async function coverStatsForWorkspace(
+  client: Pick<PoolClient, "query">,
+  workspaceId: string,
+): Promise<Map<string, { value: number; formatted: string; label: string }>> {
+  const metrics = await client.query<MetricRow>(
+    `SELECT m.id, m.challenge_id, m.entry_type_id, m.field_id, m.semantic_key, m.label, m.operation,
+            m.group_by, m.decimal_places, m.visible_during_challenge, m.position, m.settings
+       FROM challenge_metrics m
+       JOIN challenges c ON c.id = m.challenge_id AND c.deleted_at IS NULL AND c.status <> 'draft'
+      WHERE c.group_id = $1 AND m.archived_at IS NULL AND m.group_by = 'item'
+        AND m.settings->>'isCover' = 'true'
+        AND (m.visible_during_challenge OR c.status = 'closed')
+      ORDER BY c.updated_at DESC`,
+    [workspaceId],
+  );
+  const stats = new Map<string, { value: number; formatted: string; label: string }>();
+  for (const metric of metrics.rows) {
+    const calculated = await calculateMetricRow(client as PoolClient, metric);
+    const series = calculated.series as SeriesEntry[] | undefined;
+    if (!series?.length) continue;
+    const items = await client.query<{ id: string; catalog_item_id: string | null }>(
+      "SELECT id, catalog_item_id FROM challenge_items WHERE challenge_id = $1", [metric.challenge_id],
+    );
+    const catalogOf = new Map(items.rows.map((row) => [row.id, row.catalog_item_id]));
+    for (const entry of series) {
+      const catalogId = catalogOf.get(entry.key);
+      if (!catalogId || entry.value === null || stats.has(catalogId)) continue;
+      stats.set(catalogId, { value: entry.value, formatted: entry.formattedValue, label: metric.label });
+    }
+  }
+  return stats;
 }
 
 export async function metricsForChallenge(client: PoolClient, challengeId: string) {
@@ -1007,6 +1098,7 @@ async function resolveMetricField(
   fieldId: string | null,
   fieldIds: string[] | null,
   groupBy = "none",
+  entryTypeId: string | null = null,
 ): Promise<{ entryTypeId: string; fieldId: string | null; fieldIds: string[] | null }> {
   if (fieldIds && fieldIds.length) {
     if (fieldIds.length < 2) throw new ApiError(400, "invalid_metric", "Uma combinação precisa de pelo menos dois campos.");
@@ -1042,13 +1134,59 @@ async function resolveMetricField(
   if (NUMERIC_FIELD_OPS.has(operation)) {
     throw new ApiError(400, "invalid_metric", "Selecione um campo numérico.");
   }
+  // A count picks what it counts — a workout's check-ins rather than the exercise records inside them.
+  if (operation === "count" && entryTypeId) {
+    const chosen = await oneOrNull<{ id: string }>(client,
+      "SELECT id FROM entry_types WHERE id=$1 AND challenge_id=$2 AND archived_at IS NULL", [entryTypeId, challengeId]);
+    if (!chosen) throw new ApiError(400, "invalid_metric", "Esse tipo de registro não pertence ao desafio.");
+    await assertNotSharedScope(client, chosen.id, operation, groupBy);
+    return { entryTypeId: chosen.id, fieldId: null, fieldIds: null };
+  }
   const type = await primaryEntryType(client, challengeId);
   if (!type) throw new ApiError(409, "missing_entry_type", "Tipo de registro ausente.");
   return { entryTypeId: type.id, fieldId: operation === "completion_rate" ? null : fieldId, fieldIds: null };
 }
 
-function metricSettingsJson(parsed: ParsedMetricInput, resolved: { fieldIds: string[] | null }, combineOp: "sum" | "average", isRating = false): string {
+interface MetricScopeInput { itemId: string | null; countDays: boolean; isCover: boolean }
+
+/** Operations that can be narrowed to one item — the ones reading a plain value or counting. */
+const ITEM_SCOPE_OPS = new Set(["sum", "average", "median", "min", "max", "count"]);
+
+/** `body.itemId` / `body.countDays` / `body.isCover`, checked against the operation and grouping. */
+async function parseMetricScope(client: PoolClient, challengeId: string, parsed: ParsedMetricInput, body: Record<string, unknown>): Promise<MetricScopeInput> {
+  const itemId = typeof body.itemId === "string" && body.itemId ? body.itemId : null;
+  const countDays = body.countDays === true;
+  const isCover = body.isCover === true;
+  if (itemId) {
+    if (!ITEM_SCOPE_OPS.has(parsed.operation)) throw new ApiError(400, "invalid_metric", "Essa operação não pode ser limitada a um item.");
+    if (!["none", "participant", "checkpoint"].includes(parsed.groupBy)) {
+      throw new ApiError(400, "invalid_metric_grouping", "Uma métrica de um item só não se agrupa por item nem por acervo.");
+    }
+    const item = await oneOrNull<{ id: string }>(client,
+      "SELECT id FROM challenge_items WHERE id=$1 AND challenge_id=$2 AND archived_at IS NULL", [itemId, challengeId]);
+    if (!item) throw new ApiError(400, "invalid_item", "Item não pertence ao desafio.");
+  }
+  if (countDays && parsed.operation !== "count") throw new ApiError(400, "invalid_metric", "Só uma contagem pode contar dias.");
+  if (isCover && (parsed.groupBy !== "item" || itemId)) {
+    throw new ApiError(400, "invalid_metric", "Só uma métrica agrupada por item pode aparecer na capa dos itens.");
+  }
+  return { itemId, countDays, isCover };
+}
+
+/** A challenge's covers show one number — marking a new metric takes the flag off whichever had it. */
+async function clearOtherCoverMetrics(client: PoolClient, challengeId: string, keepId: string) {
+  await client.query(
+    `UPDATE challenge_metrics SET settings = settings - 'isCover', updated_at = now()
+      WHERE challenge_id = $1 AND id <> $2 AND settings ? 'isCover'`,
+    [challengeId, keepId],
+  );
+}
+
+function metricSettingsJson(parsed: ParsedMetricInput, resolved: { fieldIds: string[] | null }, combineOp: "sum" | "average", isRating = false, scope?: MetricScopeInput): string {
   return JSON.stringify({
+    ...(scope?.itemId ? { itemId: scope.itemId } : {}),
+    ...(scope?.countDays ? { countDays: true } : {}),
+    ...(scope?.isCover ? { isCover: true } : {}),
     visibleInResults: parsed.visibleInResults,
     ...(Number.isFinite(parsed.minSample) && parsed.minSample > 0 ? { minSample: Math.floor(parsed.minSample) } : {}),
     ...(Number.isFinite(parsed.bayesPriorWeight) && parsed.bayesPriorWeight >= 0 ? { bayesPriorWeight: parsed.bayesPriorWeight } : {}),
@@ -1111,10 +1249,12 @@ export async function addMetric(
     const requestedFieldId = typeof body.fieldId === "string" ? body.fieldId : null;
     const requestedFieldIds = parseFieldIds(body);
     const combineOp = parseCombineOp(body);
-    const resolved = await resolveMetricField(client, challengeId, parsed.operation, requestedFieldId, requestedFieldIds, parsed.groupBy);
+    const requestedEntryTypeId = typeof body.entryTypeId === "string" && body.entryTypeId ? body.entryTypeId : null;
+    const resolved = await resolveMetricField(client, challengeId, parsed.operation, requestedFieldId, requestedFieldIds, parsed.groupBy, requestedEntryTypeId);
     const { entryTypeId, fieldId } = resolved;
     const isRating = body.isRating === true;
     if (isRating) await assertRatingMetric(client, parsed.operation, resolved, combineOp);
+    const scope = await parseMetricScope(client, challengeId, parsed, body);
     const id = publicId();
     const positionRow = await oneOrNull<{ position: number }>(client,
       "SELECT coalesce(max(position),-1)::int + 1 AS position FROM challenge_metrics WHERE challenge_id=$1", [challengeId]);
@@ -1125,9 +1265,10 @@ export async function addMetric(
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,2,$9,$10,$11::jsonb,$12,now(),now())`,
       [id, challengeId, entryTypeId, fieldId, semanticKey(body.key ?? parsed.label, `metrica_${positionRow?.position ?? 0}`),
         parsed.label, parsed.operation, parsed.groupBy, parsed.visibleDuring, positionRow?.position ?? 0,
-        metricSettingsJson(parsed, resolved, combineOp, isRating), session.user.id],
+        metricSettingsJson(parsed, resolved, combineOp, isRating, scope), session.user.id],
     );
     if (isRating) await clearOtherRatingMetrics(client, challengeId, id);
+    if (scope.isCover) await clearOtherCoverMetrics(client, challengeId, id);
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
       "metric.created", "challenge_metric", id, null, { label: parsed.label, operation: parsed.operation, fieldId, fieldIds: resolved.fieldIds });
     return { id };
@@ -1158,19 +1299,22 @@ export async function updateMetric(
     const requestedFieldId = typeof body.fieldId === "string" ? body.fieldId : null;
     const requestedFieldIds = parseFieldIds(body);
     const combineOp = parseCombineOp(body);
-    const resolved = await resolveMetricField(client, challengeId, parsed.operation, requestedFieldId, requestedFieldIds, parsed.groupBy);
+    const requestedEntryTypeId = typeof body.entryTypeId === "string" && body.entryTypeId ? body.entryTypeId : null;
+    const resolved = await resolveMetricField(client, challengeId, parsed.operation, requestedFieldId, requestedFieldIds, parsed.groupBy, requestedEntryTypeId);
     const { entryTypeId, fieldId } = resolved;
     const isRating = body.isRating === true;
     if (isRating) await assertRatingMetric(client, parsed.operation, resolved, combineOp);
+    const scope = await parseMetricScope(client, challengeId, parsed, body);
     await client.query(
       `UPDATE challenge_metrics
           SET entry_type_id=$3, field_id=$4, label=$5, operation=$6, group_by=$7,
               visible_during_challenge=$8, settings=$9::jsonb, updated_at=now()
         WHERE id=$1 AND challenge_id=$2`,
       [metricId, challengeId, entryTypeId, fieldId, parsed.label, parsed.operation, parsed.groupBy,
-        parsed.visibleDuring, metricSettingsJson(parsed, resolved, combineOp, isRating)],
+        parsed.visibleDuring, metricSettingsJson(parsed, resolved, combineOp, isRating, scope)],
     );
     if (isRating) await clearOtherRatingMetrics(client, challengeId, metricId);
+    if (scope.isCover) await clearOtherCoverMetrics(client, challengeId, metricId);
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
       "metric.updated", "challenge_metric", metricId, null, { label: parsed.label, operation: parsed.operation, fieldId, fieldIds: resolved.fieldIds });
     return { id: metricId };

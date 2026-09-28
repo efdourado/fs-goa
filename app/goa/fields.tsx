@@ -116,10 +116,11 @@ export function FieldConfigInputs({
   }
   if (field.type === "number") {
     return (
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Field label={t("min")}><input className={inputClass} type="number" step="any" value={field.config?.min ?? ""} onChange={(event) => patchConfig({ min: event.target.value === "" ? undefined : Number(event.target.value) })} /></Field>
         <Field label={t("max")}><input className={inputClass} type="number" step="any" value={field.config?.max ?? ""} onChange={(event) => patchConfig({ max: event.target.value === "" ? undefined : Number(event.target.value) })} /></Field>
         <Field label={t("step")}><input className={inputClass} type="number" step="any" min="0.01" value={field.config?.step ?? 1} onChange={(event) => patchConfig({ step: Number(event.target.value) || 1 })} /></Field>
+        <Field label={t("unit")}><input className={inputClass} maxLength={12} placeholder={t("unitPlaceholder")} value={field.config?.unit ?? ""} onChange={(event) => patchConfig({ unit: event.target.value || undefined })} /></Field>
       </div>
     );
   }

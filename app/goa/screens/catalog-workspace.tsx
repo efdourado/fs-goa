@@ -463,6 +463,7 @@ export function CatalogWorkspaceScreen({
                               title={item.title}
                               year={topOf(item)}
                               avg={item.ratingAvg}
+                              stat={item.coverStat?.formatted}
                               badgeHidden={library?.coverBadgeHidden}
                               ratingLabel={ratingLabel(item)}
                               caption={detailsFor(item).slice(0, 2).join(" · ")}
@@ -484,6 +485,7 @@ export function CatalogWorkspaceScreen({
                               title={item.title}
                               year={topOf(item)}
                               avg={item.ratingAvg}
+                              stat={item.coverStat?.formatted}
                               badgeHidden={library?.coverBadgeHidden}
                               ratingLabel={ratingLabel(item)}
                               meta={metaFor(item)}

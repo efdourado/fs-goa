@@ -485,7 +485,7 @@ export function SessionLog({
   const deltaText = (field: ChallengeField, current: number, previous: number) => {
     const diff = Number((current - previous).toFixed(4));
     if (diff === 0) return { text: t("deltaSame"), tone: "same" as const };
-    const value = nf.number(Math.abs(diff), { maximumFractionDigits: 2 });
+    const value = `${nf.number(Math.abs(diff), { maximumFractionDigits: 2 })}${field.config?.unit ? ` ${field.config.unit}` : ""}`;
     return diff > 0 ? { text: t("deltaUp", { value }), tone: "up" as const } : { text: t("deltaDown", { value }), tone: "down" as const };
   };
 
@@ -700,7 +700,7 @@ export function SessionLog({
               const number = (value: number) => nf.number(value, { maximumFractionDigits: 2 });
               const answer = (field: ChallengeField, raw: unknown) => {
                 const value = field.type === "number" ? numberValue(raw) : null;
-                return value !== null ? number(value) : showValue(field, raw);
+                return value !== null ? `${number(value)}${field.config?.unit ? ` ${field.config.unit}` : ""}` : showValue(field, raw);
               };
               return (
                 <li key={item.id} className="flex min-w-0 flex-col rounded-2xl border border-[var(--line)] bg-[var(--canvas)]/50 p-4 sm:p-5">
@@ -713,12 +713,12 @@ export function SessionLog({
                     <div className="mt-3">
                       <span className="block text-[11px] uppercase tracking-[0.08em] text-[var(--muted)]">{t("latestLabel", { field: trendField.label })}</span>
                       <div className="mt-0.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                        <span className="text-3xl font-light tabular-nums tracking-[-0.03em]">{number(latest)}</span>
+                        <span className="text-3xl font-light tabular-nums tracking-[-0.03em]">{number(latest)}{trendField.config?.unit ? <span className="ml-1 text-base text-[var(--muted)]">{trendField.config.unit}</span> : null}</span>
                         {change === null ? (
                           <span className="text-xs text-[var(--muted)]">{t("firstRecord")}</span>
                         ) : (
                           <span className={cx("text-xs font-medium tabular-nums", change > 0 ? "text-[var(--ok)]" : change < 0 ? "text-[var(--warn)]" : "text-[var(--muted)]")}>
-                            {change === 0 ? t("sameAsFirst") : t("sinceFirst", { value: `${change > 0 ? "+" : "−"}${number(Math.abs(change))}` })}
+                            {change === 0 ? t("sameAsFirst") : t("sinceFirst", { value: `${change > 0 ? "+" : "−"}${number(Math.abs(change))}${trendField.config?.unit ? ` ${trendField.config.unit}` : ""}` })}
                           </span>
                         )}
                       </div>
@@ -730,7 +730,7 @@ export function SessionLog({
                     {records.map((record) => (
                       <div key={record.field.id} className="min-w-0">
                         <dt className="truncate text-[11px] text-[var(--muted)]">{t("bestLabel", { field: record.field.label })}</dt>
-                        <dd className="text-sm font-medium tabular-nums">{number(record.value)}</dd>
+                        <dd className="text-sm font-medium tabular-nums">{number(record.value)}{record.field.config?.unit ? ` ${record.field.config.unit}` : ""}</dd>
                       </div>
                     ))}
                     <div className="min-w-0">

@@ -112,6 +112,8 @@ export interface FieldConfig {
   maxLength?: number;
   multiline?: boolean;
   options?: FieldOption[];
+  /** Number fields only: what the number is in — "kg", "km", "min". Shown after every value. */
+  unit?: string;
 }
 
 export interface ChallengeField {
@@ -225,6 +227,8 @@ export interface CatalogItem {
   createdAt?: string;
   ratingAvg?: number | null;
   ratingCount?: number;
+  /** A challenge's chosen cover number for this item ("120 kg") — shown instead of the rating ring. */
+  coverStat?: { value: number; formatted: string; label: string } | null;
   /** Custom attributes this group/person defined for this kind — never global. */
   attributes?: CatalogAttributeValue[];
   recommendedBy?: RecommenderRef | null;
@@ -367,6 +371,17 @@ export interface Metric {
   combineOp?: "sum" | "average";
   /** This metric is the challenge's rating: Today, the catalogue and the rankings read an item's rating from it. */
   isRating?: boolean;
+  /** This by-item metric is the number on the covers of the challenge's items. */
+  isCover?: boolean;
+  /** Count only: which record type it counts (a workout's check-ins, or the records inside them). */
+  entryTypeId?: Id;
+  /** Narrowed to one item — "the deadlift's best". */
+  itemId?: Id | null;
+  itemTitle?: string | null;
+  /** Count only: days with a record, not records. */
+  countDays?: boolean;
+  /** The unit of the field(s) it reads, already appended to `formattedValue`. */
+  unit?: string | null;
   groupBy?: MetricGroupBy;
   /** `groupBy: "checkpoint"` only — each row folds in every earlier checkpoint. */
   cumulative?: boolean;

@@ -72,12 +72,23 @@ const SIZES = {
  * a soft tint from the tag palette, the year in mono, the title set large, one quiet ring, and (on the
  * smaller sizes) the group rating in the corner.
  */
-export function ItemCover({ title, year, avg, ratingLabel, showBadge = true, size, className, children }: {
+/** A challenge's own cover number ("120 kg") — a plain pill where the rating ring would sit, since a ring can't hold kilos. */
+export function StatPill({ text, className }: { text: string; className?: string }) {
+  return (
+    <span className={cx("inline-flex max-w-full items-center truncate rounded-full bg-[var(--paper)] px-2.5 py-1 text-[12px] font-medium tabular-nums text-[var(--ink)] shadow-[0_2px_8px_rgba(32,36,31,0.14)]", className)}>
+      {text}
+    </span>
+  );
+}
+
+export function ItemCover({ title, year, avg, ratingLabel, stat, showBadge = true, size, className, children }: {
   title: string;
   /** Whatever the library chose for the top slot — a year, a short attribute value, or blank. */
   year?: string | number | null;
   avg?: number | null;
   ratingLabel?: string;
+  /** The challenge's cover number, already formatted — shown instead of the rating ring. */
+  stat?: string | null;
   /** The library's own choice to turn off the rating ring — distinct from "no rating yet", which still shows the ring. */
   showBadge?: boolean;
   size: keyof typeof SIZES;
@@ -95,7 +106,9 @@ export function ItemCover({ title, year, avg, ratingLabel, showBadge = true, siz
       <span aria-hidden="true" className="absolute right-3.5 top-3.5 h-2.5 w-2.5 rounded-full bg-[var(--cover-deco)]" />
       <span className={cx("relative truncate tracking-[0.08em]", spec.year)} style={{ fontFamily: "var(--font-geist-mono), ui-monospace, monospace" }}>{year ?? "\u00a0"}</span>
       <span className={cx("relative break-words font-light leading-[1.05] tracking-[-0.04em]", spec.clamp, spec.title)}>{title}</span>
-      {spec.badge && showBadge ? (
+      {spec.badge && showBadge && stat ? (
+        <span className={cx("absolute left-3 flex justify-end", spec.badgeInset)}><StatPill text={stat} /></span>
+      ) : spec.badge && showBadge ? (
         <span className={cx("absolute", spec.badgeInset)}>
           <ScoreRing value={avg} size={spec.badge} label={ratingLabel ?? ""} className="bg-[var(--paper)] shadow-[0_2px_8px_rgba(32,36,31,0.14)]" textClassName={spec.badgeText} />
         </span>

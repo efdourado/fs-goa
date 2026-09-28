@@ -8400,3 +8400,94 @@ test("capa dos modelos: só a administração da plataforma destaca, o destaque 
   const republished = ((await call("GET", "/api/templates")).body as { templates: Array<{ id: string; featuredAt: string | null }> }).templates;
   assert.equal(republished.find((template) => template.id === challengeId)?.featuredAt, null, "despublicar tira da capa; republicar não recoloca");
 });
+
+test("métricas de treino: unidade no campo, contar check-ins ou dias, o recorde de um item só, e o número na capa do acervo", async () => {
+  const owner = await register("Leo Treino", "leo_treino_metricas");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Força" } })).body as { id: string }).id;
+  const library = (await call("POST", `/api/groups/${gid}/catalog/libraries`, { session: owner, body: { label: "Exercícios" } })).body as { id: string };
+  const created = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "custom", recordingMode: "session", sessionName: "Treino", title: "Força", libraryId: library.id,
+      participantIds: [owner.user.id],
+      items: [{ title: "Supino" }, { title: "Terra" }],
+      fields: [
+        { key: "carga", label: "Carga", type: "number", required: true, config: { min: 0, step: 0.5, unit: "kg" } },
+        { key: "reps", label: "Repetições", type: "number", required: true, config: { min: 0, step: 1 } },
+      ],
+    },
+  });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const cid = (created.body as { id: string }).id;
+  await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } });
+  type Detail = {
+    items: Array<{ id: string; title: string }>;
+    entryTypes: Array<{ id: string; parentTypeId: string | null; fields: Array<{ id: string; key: string; config?: { unit?: string } }> }>;
+  };
+  const detail = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as Detail;
+  const visit = detail.entryTypes.find((type) => !type.parentTypeId)!;
+  const record = detail.entryTypes.find((type) => type.parentTypeId)!;
+  const carga = record.fields.find((field) => field.key === "carga")!;
+  const reps = record.fields.find((field) => field.key === "reps")!;
+  assert.equal(carga.config?.unit, "kg", "a unidade fica guardada no campo");
+  assert.equal(reps.config?.unit, undefined);
+  const item = (title: string) => detail.items.find((row) => row.title === title)!.id;
+  const workout = (day: string, supino: number, terra: number) => call("POST", `/api/challenges/${cid}/entries`, {
+    session: owner,
+    body: { entryTypeId: visit.id, occurredOn: day, values: {}, children: [
+      { itemId: item("Supino"), values: { [carga.id]: supino, [reps.id]: 8 } },
+      { itemId: item("Terra"), values: { [carga.id]: terra, [reps.id]: 5 } },
+    ] },
+  });
+  for (const [day, supino, terra] of [["2026-09-01", 50, 100], ["2026-09-03", 52.5, 110], ["2026-09-03", 55, 105]] as const) {
+    const saved = await workout(day, supino, terra);
+    assert.equal(saved.response.status, 201, JSON.stringify(saved.body));
+  }
+
+  const add = async (body: Record<string, unknown>) => {
+    const response = await call("POST", `/api/challenges/${cid}/metrics`, { session: owner, body });
+    assert.equal(response.response.status, 201, JSON.stringify(response.body));
+    return (response.body as { id: string }).id;
+  };
+  const checkins = await add({ label: "Treinos", operation: "count", entryTypeId: visit.id, groupBy: "none" });
+  const days = await add({ label: "Dias treinados", operation: "count", entryTypeId: visit.id, countDays: true, groupBy: "none" });
+  const records = await add({ label: "Séries", operation: "count", groupBy: "none" });
+  const terraPr = await add({ label: "PR terra", operation: "max", fieldId: carga.id, itemId: item("Terra"), groupBy: "none" });
+  const cover = await add({ label: "Recorde", operation: "max", fieldId: carga.id, groupBy: "item", isCover: true });
+
+  // uma métrica de um item só não se agrupa por item, e só uma por item vai para a capa
+  const badScope = await call("POST", `/api/challenges/${cid}/metrics`, { session: owner, body: { label: "x", operation: "max", fieldId: carga.id, itemId: item("Terra"), groupBy: "item" } });
+  assert.equal(badScope.response.status, 400, JSON.stringify(badScope.body));
+  const badCover = await call("POST", `/api/challenges/${cid}/metrics`, { session: owner, body: { label: "x", operation: "max", fieldId: carga.id, groupBy: "none", isCover: true } });
+  assert.equal(badCover.response.status, 400, JSON.stringify(badCover.body));
+
+  type MetricView = { id: string; value: number | null; formattedValue: string; unit: string | null; itemTitle: string | null; isCover: boolean; series?: Array<{ label: string; formattedValue: string }> };
+  const metrics = ((await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { metrics: MetricView[] }).metrics;
+  const byId = (id: string) => metrics.find((metric) => metric.id === id)!;
+  assert.equal(byId(checkins).value, 3, "três check-ins");
+  assert.equal(byId(days).value, 2, "dois check-ins no mesmo dia contam um dia só");
+  assert.equal(byId(records).value, 6, "sem escolher, a contagem segue o tipo principal: os registros de cada exercício");
+  assert.equal(byId(terraPr).value, 110, "o recorde do terra, sem misturar o supino");
+  assert.equal(byId(terraPr).formattedValue, "110 kg", "o número sai com a unidade do campo");
+  assert.equal(byId(terraPr).itemTitle, "Terra");
+  assert.equal(byId(checkins).unit, null, "uma contagem não está em kg");
+  assert.deepEqual(byId(cover).series?.map((entry) => [entry.label, entry.formattedValue]).sort(), [["Supino", "55 kg"], ["Terra", "110 kg"]]);
+
+  // a capa do acervo mostra o número escolhido, com a unidade
+  const catalog = (await call("GET", `/api/groups/${gid}/catalog`, { session: owner })).body as { items: Array<{ title: string; coverStat: { value: number; formatted: string; label: string } | null }> };
+  assert.deepEqual(catalog.items.find((row) => row.title === "Terra")?.coverStat, { value: 110, formatted: "110 kg", label: "Recorde" });
+
+  // outra métrica na capa tira a marca da anterior
+  const coverReps = await add({ label: "Mais repetições", operation: "max", fieldId: reps.id, groupBy: "item", isCover: true });
+  const after = ((await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { metrics: MetricView[] }).metrics;
+  assert.deepEqual(after.filter((metric) => metric.isCover).map((metric) => metric.id), [coverReps], "uma capa por desafio");
+
+  // trocar a unidade é só um rótulo: nenhum valor muda
+  const patched = await call("POST", `/api/challenges/${cid}/fields`, {
+    session: owner,
+    body: { entryTypeId: record.id, fields: record.fields.map((field) => ({ id: field.id, key: field.key, label: field.key === "carga" ? "Carga" : "Repetições", type: "number", required: true, config: { min: 0, step: field.key === "carga" ? 0.5 : 1, unit: field.key === "carga" ? "lb" : "" } })) },
+  });
+  assert.equal(patched.response.status, 201, JSON.stringify(patched.body));
+  const renamed = ((await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { metrics: MetricView[] }).metrics.find((metric) => metric.id === terraPr)!;
+  assert.equal(renamed.formattedValue, "110 lb");
+});

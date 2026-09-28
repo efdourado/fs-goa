@@ -957,7 +957,17 @@
     "blocksOn": "{count} on",
     "metricIsRating": "Use as this challenge's rating",
     "metricIsRatingHint": "Today, the catalogue and the rankings show an item's rating as this average. Only one metric can be the rating.",
-    "metricIsRatingTag": "The challenge's rating"
+    "metricIsRatingTag": "The challenge's rating",
+    "metricIsCoverTag": "On covers",
+    "metricIsCover": "Show on the item covers",
+    "metricIsCoverHint": "Each item shows its number on its cover in the library, instead of the rating — \"120 kg\" rather than a 0–5 ring.",
+    "metricCountWhat": "What to count",
+    "metricCountDays": "Count days, not entries",
+    "metricCountDaysHint": "Two entries on the same day count as one day.",
+    "metricDaysPreview": "days logged",
+    "metricItemLabel": "One item only",
+    "metricItemAll": "Every item",
+    "metricItemHint": "Shows the number for a single item — your deadlift record, say."
   },
   "visibility": {
     "title": "Who sees these answers",
@@ -1264,7 +1274,9 @@
     "fieldTypeSr": "Field type",
     "add": "Add",
     "requiredHint": "Blocks the entry while it's left blank.",
-    "ratingFixed": "Fixed scale: 0 to 5, half steps."
+    "ratingFixed": "Fixed scale: 0 to 5, half steps.",
+    "unit": "Unit",
+    "unitPlaceholder": "kg, km, min…"
   },
   "templates": {
     "signIn": "Sign in",

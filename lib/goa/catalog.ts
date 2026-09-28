@@ -12,6 +12,7 @@ import {
   type CatalogAttributeType,
 } from "./catalog-attributes";
 import { entryRatingSql } from "./challenges/rating";
+import { coverStatsForWorkspace } from "./challenges/results";
 import { writeAudit } from "./domain/audit";
 import { eventScheduleColumns, eventScheduleJson, parseEventSchedule, scheduleVisibleSql } from "./domain/event-schedule";
 import { ensurePersonalWorkspace } from "./domain/challenges";
@@ -480,10 +481,11 @@ async function listCatalogWithClient(client: Pick<PoolClient, "query">, workspac
         ORDER BY ${limited ? "ci.created_at DESC, ci.title" : "ci.title"}`,
     limited ? [workspaceId, options.perKind] : [workspaceId],
   );
-  const [items, attributesByItem, showRecommenders] = await Promise.all([
+  const [items, attributesByItem, showRecommenders, coverStats] = await Promise.all([
     itemsQuery,
     attributeValuesForWorkspace(client, workspaceId, options.perKind),
     recommendationsVisible(client, workspaceId),
+    coverStatsForWorkspace(client, workspaceId),
   ]);
   return {
     items: items.rows.map((item) => ({
@@ -507,6 +509,8 @@ async function listCatalogWithClient(client: Pick<PoolClient, "query">, workspac
       originNote: showRecommenders ? item.origin_note : null,
       ratingAvg: item.rating_avg === null ? null : Number(item.rating_avg.toFixed(2)),
       ratingCount: item.rating_count,
+      // A challenge's own cover number ("120 kg") — shown instead of the rating ring when set.
+      coverStat: coverStats.get(item.id) ?? null,
       attributes: attributesByItem.get(item.id) ?? [],
     })),
   };
@@ -578,6 +582,7 @@ async function catalogItemDetailWithClient(
 
   const attributes = (await attributeValuesForItems(client, [item.id])).get(item.id) ?? [];
   const showRecommenders = await recommendationsVisible(client, workspaceId);
+  const coverStat = (await coverStatsForWorkspace(client, workspaceId)).get(item.id) ?? null;
   // The group's overall rating for this item, across every round — a true
   // weighted average (avg*count sums back to each round's total, so summing
   // those and dividing by the total count is exact, not an average of averages).
@@ -604,6 +609,7 @@ async function catalogItemDetailWithClient(
     originNote: showRecommenders ? item.origin_note : null,
     ratingAvg,
     ratingCount: totalRatings,
+    coverStat,
     attributes,
     rounds: rounds.rows.map((round) => ({
       challengeId: round.challenge_id,

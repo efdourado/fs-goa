@@ -359,5 +359,7 @@ export function displayAnswer(field: ChallengeField, raw: unknown, words: { yes:
     return option?.label ?? String(raw);
   }
   if (field.type === "rating") return String(raw).replace(".", ",");
+  // A number keeps the unit its field is in — "40 kg", not a bare 40.
+  if (field.type === "number" && field.config?.unit) return `${raw} ${field.config.unit}`;
   return String(raw);
 }

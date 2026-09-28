@@ -30,6 +30,9 @@ export interface DocValue {
   label: string;
   text: string;
   type: ChallengeField["type"];
+  /** Number fields: the value itself and its unit, so the document can format and add them up. */
+  number: number | null;
+  unit: string | null;
   /** Worth its own paragraph (a comment), rather than a chip in a line. */
   long: boolean;
 }
@@ -54,6 +57,7 @@ export interface DocProgress {
   /** The sum when every point is one number (pages read in total). */
   total: number | null;
   label: string | null;
+  unit: string | null;
 }
 
 export interface DocItem {
@@ -93,7 +97,7 @@ export interface DocRecord {
   title: string;
   chapter: number;
   sessions: number;
-  bests: Array<{ label: string; value: number }>;
+  bests: Array<{ label: string; value: number; unit: string | null }>;
   lastDay: string | null;
 }
 
@@ -217,8 +221,9 @@ export function buildExportModel(input: {
       const key = field.id ?? field.key;
       const text = displayAnswer(field, record[key], words).trim();
       if (!text) continue;
+      const numeric = field.type === "number" && Number.isFinite(Number(record[key])) ? Number(record[key]) : null;
       values.push({
-        label: field.label, text, type: field.type,
+        label: field.label, text, type: field.type, number: numeric, unit: field.config?.unit ?? null,
         long: field.type === "text" && (Boolean(field.config?.multiline) || text.length > 48),
       });
     }
@@ -284,13 +289,14 @@ export function buildExportModel(input: {
     }
     const progress: DocProgress[] = [...progressByPerson].map(([personKey, docs]) => {
       const sorted = docs.slice().sort((a, b) => (a.day ?? "").localeCompare(b.day ?? ""));
-      const numbers = sorted.map((doc) => (doc.values[0]?.type === "number" ? Number(doc.values[0].text) : NaN));
+      const numbers = sorted.map((doc) => doc.values[0]?.number ?? NaN);
       const allNumbers = numbers.length > 0 && numbers.every((value) => Number.isFinite(value));
       return {
         personKey,
         points: sorted.map((doc) => ({ day: doc.day, text: doc.values[0]?.text ?? "" })),
         total: allNumbers ? numbers.reduce((sum, value) => sum + value, 0) : null,
         label: sorted[0]?.values[0]?.label ?? null,
+        unit: sorted[0]?.values[0]?.unit ?? null,
       };
     });
     rows.sort((a, b) => (a.day ?? "").localeCompare(b.day ?? "") || personIndex(a.personKey) - personIndex(b.personKey));
@@ -378,16 +384,17 @@ export function buildExportModel(input: {
       const docs = perItem.get(item.id);
       if (!docs?.length) continue;
       const bests = new Map<string, number>();
+      const units = new Map<string, string | null>();
       for (const doc of docs) {
         for (const value of doc.values) {
-          const number = Number(value.text.replace(",", "."));
-          if (value.type !== "number" || !Number.isFinite(number)) continue;
-          bests.set(value.label, Math.max(bests.get(value.label) ?? -Infinity, number));
+          if (value.number === null) continue;
+          units.set(value.label, value.unit);
+          bests.set(value.label, Math.max(bests.get(value.label) ?? -Infinity, value.number));
         }
       }
       records.push({
         itemId: item.id, title: item.title, chapter: chapterOf.get(item.id) ?? 0, sessions: docs.length,
-        bests: [...bests].map(([label, value]) => ({ label, value })),
+        bests: [...bests].map(([label, value]) => ({ label, value, unit: units.get(label) ?? null })),
         lastDay: latest(docs.map((doc) => doc.day)),
       });
     }

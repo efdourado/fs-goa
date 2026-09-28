@@ -48,6 +48,7 @@ export function AdminMetrics({ challenge, onAdd, onUpdate, onDelete }: Props) {
             <span>
               {[metric.visibleDuring ? t("metricDuring") : null, metric.visibleInResults ? t("metricInResults") : null].filter(Boolean).join(" · ") || t("metricHidden")}
               {metric.isRating ? <span className="ml-2 rounded-full bg-[var(--main-soft)] px-2 py-0.5 text-[var(--main-strong)]">{t("metricIsRatingTag")}</span> : null}
+              {metric.isCover ? <span className="ml-2 rounded-full bg-[var(--main-soft)] px-2 py-0.5 text-[var(--main-strong)]">{t("metricIsCoverTag")}</span> : null}
             </span>
             {!closed ? <div className="flex gap-3"><Button variant="secondary" onClick={() => { setEditing(metric); setSuccess(null); }}>{t("edit")}</Button><button type="button" className="min-h-11 px-2 text-[var(--danger)]" onClick={() => { setRemoving(metric); setError(null); }}>{t("remove")}</button></div> : null}
           </div>
@@ -72,6 +73,8 @@ export function AdminMetrics({ challenge, onAdd, onUpdate, onDelete }: Props) {
 
 /** The averages that can stand for "the rating" — see `lib/goa/challenges/rating.ts`. */
 const RATING_OPERATIONS: Metric["operation"][] = ["average", "bayesian_average"];
+/** Operations that can read one item only (see `ITEM_SCOPE_OPS` on the server). */
+const ITEM_SCOPE_OPERATIONS: Metric["operation"][] = ["sum", "average", "median", "min", "max", "count"];
 
 export function MetricEditor({ challenge, metric, ranking = false, onCancel, onSave }: {
   challenge: ChallengeDetail; metric?: Metric;
@@ -112,6 +115,13 @@ export function MetricEditor({ challenge, metric, ranking = false, onCancel, onS
   const [visibleDuring, setVisibleDuring] = useState(metric?.visibleDuring ?? true);
   const [visibleInResults, setVisibleInResults] = useState(metric?.visibleInResults ?? true);
   const [isRating, setIsRating] = useState(metric?.isRating ?? false);
+  // What a count counts: a workout's check-ins or the records inside them — the primary type unless chosen.
+  const primaryTypeId = challenge.entryTypes?.find((type) => type.isPrimary)?.id ?? challenge.entryTypes?.[0]?.id ?? "";
+  const [countTypeId, setCountTypeId] = useState(metric?.entryTypeId ?? primaryTypeId);
+  const [countDays, setCountDays] = useState(metric?.countDays ?? false);
+  const [itemId, setItemId] = useState(metric?.itemId ?? "");
+  const [isCover, setIsCover] = useState(metric?.isCover ?? false);
+  const items = [...(challenge.items ?? [])].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const needsField = metricNeedsField(operation);
@@ -130,7 +140,14 @@ export function MetricEditor({ challenge, metric, ranking = false, onCancel, onS
       : fieldId !== seed.fieldId)
     || groupBy !== seed.groupBy || minSample !== String(metric?.minSample ?? 1) || cumulative !== (metric?.cumulative ?? false)
     || visibleDuring !== (metric?.visibleDuring ?? true) || visibleInResults !== (metric?.visibleInResults ?? true)
-    || isRating !== (metric?.isRating ?? false);
+    || isRating !== (metric?.isRating ?? false)
+    || countTypeId !== (metric?.entryTypeId ?? primaryTypeId) || countDays !== (metric?.countDays ?? false)
+    || itemId !== (metric?.itemId ?? "") || isCover !== (metric?.isCover ?? false);
+  const isCount = operation === "count";
+  // One item only — never while the metric is itself split by item or by the catalogue.
+  const canScopeItem = ITEM_SCOPE_OPERATIONS.includes(operation) && ["none", "participant", "checkpoint"].includes(groupBy) && items.length > 1;
+  const scopedItemId = canScopeItem ? itemId : "";
+  const canCover = groupBy === "item";
   const validSource = !needsField || (combine ? fieldIds.length >= 2 : Boolean(selectedField));
   // Only an average of rating fields is on the rating scale, so only it can stand for the challenge's rating.
   const canBeRating = RATING_OPERATIONS.includes(operation) && needsField && (combine
@@ -149,7 +166,11 @@ export function MetricEditor({ challenge, metric, ranking = false, onCancel, onS
         groupBy,
         minSample: Number(minSample) || 1, cumulative: groupBy === "checkpoint" && cumulative,
         ...(metric?.bayesPriorWeight != null ? { bayesPriorWeight: metric.bayesPriorWeight } : {}), visibleDuring, visibleInResults,
-        isRating: canBeRating && isRating });
+        isRating: canBeRating && isRating,
+        entryTypeId: isCount ? countTypeId || undefined : undefined,
+        countDays: isCount && countDays,
+        itemId: scopedItemId || null,
+        isCover: canCover && isCover });
     } catch (cause) { setError(f.error(cause)); setBusy(false); }
   }
   return (
@@ -174,13 +195,17 @@ export function MetricEditor({ challenge, metric, ranking = false, onCancel, onS
         {canBeRating ? (
           <Toggle checked={isRating} onChange={setIsRating} label={t("metricIsRating")} hint={t("metricIsRatingHint")} />
         ) : null}
+        {canCover ? (
+          <Toggle checked={isCover} onChange={setIsCover} label={t("metricIsCover")} hint={t("metricIsCoverHint")} />
+        ) : null}
       </fieldset>
       <Disclosure
         summary={t("metricCalculation")}
         defaultOpen={calculationOpen}
         preview={[
           tm(`operationName.${operation}`),
-          combine ? t("metricCombinedPreview", { count: combinedFields.length }) : selectedField?.label,
+          isCount ? (countDays ? t("metricDaysPreview") : challenge.entryTypes.find((type) => type.id === countTypeId)?.name) : combine ? t("metricCombinedPreview", { count: combinedFields.length }) : selectedField?.label,
+          scopedItemId ? items.find((item) => item.id === scopedItemId)?.title : null,
           tm(`groupBy.${groupBy}`),
         ].filter(Boolean).join(" · ")}
       >
@@ -254,12 +279,28 @@ export function MetricEditor({ challenge, metric, ranking = false, onCancel, onS
               </select>
             </Field>
           ) : null}
+          {isCount && challenge.entryTypes.length > 1 ? (
+            <Field label={t("metricCountWhat")}>
+              <select className={inputClass} value={countTypeId} onChange={(e) => setCountTypeId(e.target.value)}>
+                {challenge.entryTypes.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
+              </select>
+            </Field>
+          ) : null}
+          {isCount ? <Toggle checked={countDays} onChange={setCountDays} label={t("metricCountDays")} hint={t("metricCountDaysHint")} /> : null}
           {groups.length > 1 && !isRanking ? (
             <Field label={t("metricGroupByLabel")}>
               <select className={inputClass} value={groupBy} onChange={(e) => setGroupBy(e.target.value as NonNullable<Metric["groupBy"]>)}>{groups.map((group) => <option key={group} value={group}>{tm(`groupBy.${group}`)}</option>)}</select>
             </Field>
           ) : null}
           {groupBy === "checkpoint" ? <Toggle checked={cumulative} onChange={setCumulative} label={t("metricCumulativeLabel")} /> : null}
+          {canScopeItem ? (
+            <Field label={t("metricItemLabel")} hint={t("metricItemHint")}>
+              <select className={inputClass} value={itemId} onChange={(e) => setItemId(e.target.value)}>
+                <option value="">{t("metricItemAll")}</option>
+                {items.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
+              </select>
+            </Field>
+          ) : null}
           {needsField ? (
             <Disclosure summary={t("metricAdvanced")}>
               <Field label={t("metricMinSampleLabel")} hint={t("metricMinSampleHint")} className="pt-2">

@@ -22,6 +22,15 @@ function scaled(value: unknown, scale: number): number | null {
   return result;
 }
 
+/** A number field's unit ("kg", "km", "min") — short free text, blank for none. */
+export function fieldUnit(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const unit = value.trim();
+  if (!unit) return null;
+  if (Array.from(unit).length > 12) throw new ApiError(400, "invalid_field_config", "A unidade tem no máximo 12 caracteres.");
+  return unit;
+}
+
 export async function insertField(
   client: PoolClient,
   challengeId: string,
@@ -59,7 +68,11 @@ export async function insertField(
        number_scale, min_scaled, max_scaled, step_scaled, max_length, settings, created_at, updated_at)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb,now(),now())`,
     [id, challengeId, entryTypeId, key, label, clientKind, field.required === true, position,
-      scale, min, max, step, maxLength, JSON.stringify(clientKind === "text" ? { multiline: config.multiline === true } : {})],
+      scale, min, max, step, maxLength, JSON.stringify(
+        clientKind === "text" ? { multiline: config.multiline === true }
+          : clientKind === "number" && fieldUnit(config.unit) ? { unit: fieldUnit(config.unit) }
+            : {},
+      )],
   );
   if (clientKind === "choice") {
     const options = Array.isArray(config.options) ? config.options : [];
