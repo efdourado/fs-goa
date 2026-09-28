@@ -93,13 +93,15 @@ async function detailItems(
   const attributes = isPublic
     ? new Map<string, never[]>()
     : await attributeValuesForItems(client, result.rows.flatMap((row) => (row.catalog_item_id ? [row.catalog_item_id] : [])));
+  // Who suggested an item is group-private: a group that switched recommendations off never shows it, and the
+  // public template preview never names anyone — member or outside name, nor the free-text origin.
+  const showWho = recommendationsEnabled && !isPublic;
   return result.rows.map((item) => ({
     id: item.id, title: item.title,
     description: item.description, position: item.position,
     checkpointId: item.checkpoint_id ?? null,
-    // A group that turned recommendations off never shows who suggested what —
-    // whatever was recorded before stays stored, just unseen.
-    originNote: recommendationsEnabled ? item.origin_note ?? null : null,
+    // Whatever was recorded stays stored, just unseen.
+    originNote: showWho ? item.origin_note ?? null : null,
     opensAt: item.opens_at?.toISOString() ?? null, dueAt: item.due_at?.toISOString() ?? null,
     schedulePrecision: item.schedule_precision,
     status: windowStatus(status, item.opens_at, item.due_at),
@@ -117,9 +119,9 @@ async function detailItems(
           attributes: attributes.get(item.catalog_item_id) ?? [],
         }
       : null,
-    recommendedBy: !recommendationsEnabled ? null : item.recommended_by_id
+    recommendedBy: !showWho ? null : item.recommended_by_id
       ? { kind: "member" as const, id: item.recommended_by_id, name: item.recommended_by_name ?? "" }
-      : item.recommended_by_external_id && !isPublic
+      : item.recommended_by_external_id
         ? { kind: "external" as const, id: item.recommended_by_external_id, name: item.recommended_by_external_name ?? "" }
         : null,
   }));

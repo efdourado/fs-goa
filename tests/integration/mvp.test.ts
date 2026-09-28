@@ -2096,6 +2096,17 @@ test("indicação por nome externo (fase 6): reutilizável, exclusiva, isolada p
   );
   assert.equal(JSON.stringify(publicDetail.body).includes("Ana"), false, "o nome não vaza em nenhum outro campo do modelo público");
 
+  // nem quem indicou sendo membro do grupo: nome e id ficam dentro do grupo
+  const byMember = await call("PATCH", `/api/challenges/${cid}/items/${itemId}`, { session: owner, body: { recommendedByUserId: owner.user.id } });
+  assert.equal(byMember.response.status, 200, JSON.stringify(byMember.body));
+  const inGroupMember = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { items: Array<{ recommendedBy: { kind: string } | null }> };
+  assert.equal(inGroupMember.items[0].recommendedBy?.kind, "member", "dentro do grupo a indicação aparece");
+  const publicMember = await call("GET", `/api/templates/${cid}`);
+  assert.equal((publicMember.body as { items: Array<{ recommendedBy: unknown; originNote: unknown }> }).items[0].recommendedBy, null, "o modelo público não diz qual membro indicou");
+  assert.equal(JSON.stringify(publicMember.body).includes(owner.user.name), false, "o nome do membro não vaza no modelo público");
+  assert.equal(JSON.stringify(publicMember.body).includes(owner.user.id), false, "nem o id do membro");
+  await call("PATCH", `/api/challenges/${cid}/items/${itemId}`, { session: owner, body: { recommendedByExternalId: anaId } });
+
   // desligar a indicação esconde a capacidade, sem apagar o dado
   const disabled = await call("PATCH", `/api/groups/${gid}`, { session: owner, body: { recommendationsEnabled: false } });
   assert.equal(disabled.response.status, 200, JSON.stringify(disabled.body));
