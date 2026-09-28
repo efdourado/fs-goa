@@ -1311,7 +1311,8 @@
     "unfeature": "Tirar da capa",
     "storyInTune": "Mais em sintonia",
     "storyCritic": "Crítico mais exigente",
-    "storyCriticNote": "média {average}"
+    "storyCriticNote": "média {average}",
+    "storyBadge": "Destaque"
   },
   "invite": {
     "verifying": "Verificando convite…",

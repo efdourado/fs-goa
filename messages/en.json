@@ -1311,7 +1311,8 @@
     "unfeature": "Take off the front page",
     "storyInTune": "Most in tune",
     "storyCritic": "Toughest critic",
-    "storyCriticNote": "average {average}"
+    "storyCriticNote": "average {average}",
+    "storyBadge": "Featured"
   },
   "invite": {
     "verifying": "Checking the invite…",

@@ -7,7 +7,7 @@ import { API_PATHS, apiRequest } from "./api";
 import { useGoaFormat } from "./format";
 import { challengeShowcaseBlocks } from "./showcase-view";
 import type { ChallengeDetail, Id, TemplateSummary } from "./types";
-import { CommentText, cx } from "./ui";
+import { CirclePinIcon, CommentText, cx } from "./ui";
 import { metricHasData } from "./utils";
 
 // ── picking and excerpting (pure, unit-tested) ─────────────────────────────
@@ -93,9 +93,13 @@ export function storyExcerpt(
 
 // ── the stories ─────────────────────────────────────────────────────────
 
+/** A featured story's frame: a large paper card that lifts on hover, like the gallery's smaller cards. */
+const storyCardClass =
+  "relative flex min-w-0 flex-col rounded-[28px] border border-[var(--line)] bg-[var(--paper)] p-6 shadow-[var(--elevate-1)] transition hover:-translate-y-0.5 hover:shadow-[var(--elevate-card)] has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-[var(--main)]/25 sm:p-9";
+
 function StorySkeleton() {
   return (
-    <div aria-busy="true" className="space-y-4">
+    <div aria-busy="true" className={cx(storyCardClass, "space-y-4")}>
       <span className="block h-3 w-32 animate-pulse rounded bg-[var(--wash-strong)]" />
       <span className="block h-24 animate-pulse rounded-xl bg-[var(--wash)]" />
       <span className="block h-4 w-3/4 animate-pulse rounded bg-[var(--wash)]" />
@@ -142,17 +146,24 @@ function Story({ template, onOpen }: { template: TemplateSummary; onOpen: (id: I
   ].filter(Boolean).join(" · ");
 
   return (
-    <article className="flex min-w-0 flex-col">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">{kicker}</p>
+    <article className={storyCardClass}>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--main-soft)] px-2.5 py-1 text-[11px] font-medium text-[var(--main-strong)]">
+          {/* The same filled disc Home uses for a pinned challenge — a featured one is pinned to the front page. */}
+          <CirclePinIcon filled className="h-3.5 w-3.5" />
+          {t("storyBadge")}
+        </span>
+        <p className="min-w-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">{kicker}</p>
+      </div>
       <h2 className="mt-3 min-w-0 text-4xl font-light leading-[1.1] tracking-[-0.05em] sm:text-5xl">
-        <button type="button" onClick={() => onOpen(template.id)} title={headline} className="block w-full cursor-pointer truncate text-left hover:underline hover:decoration-1 hover:underline-offset-4 focus-visible:outline-none">
+        <button type="button" onClick={() => onOpen(template.id)} title={headline} className="line-clamp-2 w-full cursor-pointer break-words text-left hover:underline hover:decoration-1 hover:underline-offset-4 focus-visible:outline-none">
           {headline}
         </button>
       </h2>
       {lede ? <p className="mt-4 line-clamp-4 max-w-2xl text-base leading-7 text-[var(--muted)]">{lede}</p> : null}
 
       {stats.length ? (
-        <dl className={cx("mt-8 grid gap-x-6 gap-y-5", stats.length >= 3 ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2")}>
+        <dl className={cx("mt-8 grid gap-x-6 gap-y-5 rounded-2xl bg-[var(--wash)] p-5", stats.length >= 3 ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2")}>
           {stats.map((stat) => (
             <div key={stat.label} className="min-w-0">
               <dd title={stat.value} className={cx("truncate font-medium tracking-[-0.04em] tabular-nums", stat.note ? "text-xl leading-tight" : "text-4xl")}>{stat.value}</dd>
@@ -174,8 +185,8 @@ function Story({ template, onOpen }: { template: TemplateSummary; onOpen: (id: I
         </figure>
       ) : null}
 
-      <div className="mt-6">
-        <button type="button" onClick={() => onOpen(template.id)} className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 text-sm text-[var(--main-strong)] hover:underline hover:underline-offset-4">
+      <div className="mt-auto pt-8">
+        <button type="button" onClick={() => onOpen(template.id)} className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-full border border-[var(--main-line)] px-4 text-sm text-[var(--main-strong)] transition hover:bg-[var(--main-soft)] focus-visible:outline-none">
           {t("seeResult")} <span aria-hidden="true">→</span>
         </button>
       </div>
@@ -187,14 +198,8 @@ function Story({ template, onOpen }: { template: TemplateSummary; onOpen: (id: I
 export function FrontPageStories({ featured, onOpen }: { featured: TemplateSummary[]; onOpen: (id: Id) => void }) {
   if (!featured.length) return null;
   return (
-    <section className="border-t-2 border-[var(--ink)] pt-8">
-      <div className="grid gap-10 lg:grid-cols-2">
-        {featured.map((template, index) => (
-          <div key={template.id} className={cx(index > 0 && "border-t border-[var(--line)] pt-10 lg:border-l lg:border-t-0 lg:pl-10 lg:pt-0")}>
-            <Story template={template} onOpen={onOpen} />
-          </div>
-        ))}
-      </div>
+    <section className="grid gap-5 lg:grid-cols-2">
+      {featured.map((template) => <Story key={template.id} template={template} onOpen={onOpen} />)}
     </section>
   );
 }
