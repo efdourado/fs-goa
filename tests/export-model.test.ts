@@ -92,7 +92,9 @@ test("o documento mostra capa, regras, cartões e placar preenchido", () => {
   assert.doesNotMatch(html, /<span>Notas<\/span>/, "as notas de cada um ficam nas linhas e no placar, não num quadro apertado");
   assert.match(html, /<span>Média<\/span>/, "com duas pessoas, o quadro mostra a média");
   const solo = renderWithIntl(createElement(ExportDocument, {
-    challenge: { ...challenge, participants: [challenge.participants[1]] }, entries: entries.filter((row) => row.userId === "dudu"), userId: "dudu", fontClassName: "",
+    challenge: { ...challenge, ruleSections: [], participants: [challenge.participants[1]] }, entries: entries.filter((row) => row.userId === "dudu"), userId: "dudu", fontClassName: "",
   }));
   assert.match(solo, /<span>Nota<\/span>/, "uma pessoa só: a nota dela, no singular");
+  assert.doesNotMatch(html, /Legenda/, "a legenda dos campos saiu do PDF");
+  assert.doesNotMatch(solo, /Como funciona/, "sem regras, a seção some — e o botão dela também");
 });

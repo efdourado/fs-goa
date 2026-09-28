@@ -1944,16 +1944,6 @@
     },
     "rulesTitle": "How it works",
     "rulesLede": "The challenge's rules, as they were agreed.",
-    "legendTitle": "Key",
-    "legendLede": "What each field records.",
-    "fieldType": {
-      "rating": "a score from {min} to {max}",
-      "number": "a number",
-      "text": "free text",
-      "select": "one of: {options}",
-      "boolean": "yes or no",
-      "date": "a date"
-    },
     "itemsTitle": "The log",
     "itemsLede": "{items, plural, one {# item} other {# items}}{chapters, plural, =0 {} one {} other {, in # parts}}. Each card keeps everything written about it.",
     "chapter": "Part {n}",

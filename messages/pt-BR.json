@@ -1944,16 +1944,6 @@
     },
     "rulesTitle": "Como funciona",
     "rulesLede": "As regras do desafio, do jeito que foram combinadas.",
-    "legendTitle": "Legenda",
-    "legendLede": "O que cada campo registra.",
-    "fieldType": {
-      "rating": "nota de {min} a {max}",
-      "number": "um número",
-      "text": "texto livre",
-      "select": "uma das opções: {options}",
-      "boolean": "sim ou não",
-      "date": "uma data"
-    },
     "itemsTitle": "O registro",
     "itemsLede": "{items, plural, one {# item} other {# itens}}{chapters, plural, =0 {} one {} other {, em # blocos}}. Cada cartão guarda tudo o que foi escrito sobre ele.",
     "chapter": "Bloco {n}",

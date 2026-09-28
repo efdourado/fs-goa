@@ -4,7 +4,7 @@ import { useFormatter, useLocale, useTranslations } from "next-intl";
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 
 import { monthCells } from "../checkin-days";
-import type { ChallengeDetail, ChallengeField, Entry, Id } from "../types";
+import type { ChallengeDetail, Entry, Id } from "../types";
 import { dateKeyInSaoPaulo, parseCommentBlocks } from "../utils";
 import {
   buildExportModel, coverLines, DOC_COLORS, type DocChapter, type DocColor, type DocEntry, type DocItem,
@@ -165,60 +165,26 @@ function StatBlock({ stat, doc }: { stat: DocStat; doc: Doc }) {
   );
 }
 
-function fieldHint(field: ChallengeField, doc: Doc): string {
-  switch (field.type) {
-    case "rating": return doc.t("fieldType.rating", { min: field.config?.min ?? 0, max: field.config?.max ?? 5 });
-    case "select": {
-      const options = (field.config?.options ?? []).filter((option) => !option.archived).map((option) => option.label);
-      return options.length ? doc.t("fieldType.select", { options: options.join(" · ") }) : doc.t("fieldType.text");
-    }
-    default: return doc.t(`fieldType.${field.type}`);
-  }
-}
-
-function HowItWorks({ challenge, model, doc }: { challenge: ChallengeDetail; model: ExportModel; doc: Doc }) {
+function HowItWorks({ challenge, doc }: { challenge: ChallengeDetail; doc: Doc }) {
   const rules = challenge.ruleSections ?? [];
-  // A legend alone is too little for a page of its own — the next section follows right under it.
   return (
-    <section className={rules.length ? "xd-page" : "xd-page xd-legend-band"}>
-      {rules.length ? (
-        <>
-          <h2 className="xd-h2">{doc.t("rulesTitle")}</h2>
-          <p className="xd-lede">{doc.t("rulesLede")}</p>
-          <ol className="xd-rules">
-            {rules.map((rule, index) => (
-              <li key={index}>
-                <b>{rule.title}</b>{rule.description ? <> {rule.description}</> : null}
-                {rule.topics?.length ? (
-                  <ol>
-                    {rule.topics.map((topic, topicIndex) => (
-                      <li key={topicIndex}><span>{index + 1}.{topicIndex + 1}</span><b>{topic.title}</b>{topic.description ? <> {topic.description}</> : null}</li>
-                    ))}
-                  </ol>
-                ) : null}
-              </li>
-            ))}
-          </ol>
-        </>
-      ) : null}
-      {model.legend.length ? (
-        <div className={rules.length ? "xd-section-gap" : undefined}>
-          <h2 className="xd-h2">{doc.t("legendTitle")}</h2>
-          <p className="xd-lede">{doc.t("legendLede")}</p>
-          <div className="xd-legend">
-            {model.legend.map((type) => (
-              <div className="xd-legend-card" key={type.id}>
-                <h3>{type.name}</h3>
-                <ul>
-                  {type.fields.map((field) => (
-                    <li key={field.id ?? field.key}><b>{field.label}</b> <span>{fieldHint(field, doc)}</span></li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : null}
+    <section className="xd-page">
+      <h2 className="xd-h2">{doc.t("rulesTitle")}</h2>
+      <p className="xd-lede">{doc.t("rulesLede")}</p>
+      <ol className="xd-rules">
+        {rules.map((rule, index) => (
+          <li key={index}>
+            <b>{rule.title}</b>{rule.description ? <> {rule.description}</> : null}
+            {rule.topics?.length ? (
+              <ol>
+                {rule.topics.map((topic, topicIndex) => (
+                  <li key={topicIndex}><span>{index + 1}.{topicIndex + 1}</span><b>{topic.title}</b>{topic.description ? <> {topic.description}</> : null}</li>
+                ))}
+              </ol>
+            ) : null}
+          </li>
+        ))}
+      </ol>
     </section>
   );
 }
@@ -537,7 +503,7 @@ export function ExportDocument({ challenge, entries, userId, fontClassName }: {
 
   const available: Record<Section, boolean> = {
     cover: true,
-    rules: Boolean(challenge.ruleSections?.length || model.legend.length),
+    rules: Boolean(challenge.ruleSections?.length),
     items: !model.sessionMode && model.chapters.length > 0,
     diary: model.diary.length > 0,
     scoreboard: model.sessionMode ? model.records.length > 0 : model.chapters.length > 0,
@@ -602,7 +568,7 @@ export function ExportDocument({ challenge, entries, userId, fontClassName }: {
       <div className="xd-stage">
         <article className="xd">
           {shown("cover") ? <Cover challenge={challenge} model={model} doc={doc} /> : null}
-          {shown("rules") ? <HowItWorks challenge={challenge} model={model} doc={doc} /> : null}
+          {shown("rules") ? <HowItWorks challenge={challenge} doc={doc} /> : null}
           {shown("items") ? <Items model={model} doc={doc} people={people} showWhen={showWhen} /> : null}
           {shown("diary") ? <Diary model={model} doc={doc} people={people} /> : null}
           {shown("scoreboard") ? (model.sessionMode ? <Records model={model} doc={doc} /> : <Scoreboard model={model} doc={doc} />) : null}

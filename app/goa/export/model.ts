@@ -107,12 +107,6 @@ export type DocStat =
   | { kind: "days"; value: number }
   | { kind: "streak"; value: number };
 
-export interface DocLegendType {
-  id: Id;
-  name: string;
-  fields: ChallengeField[];
-}
-
 export interface ExportModel {
   people: DocPerson[];
   chapters: DocChapter[];
@@ -128,7 +122,6 @@ export interface ExportModel {
   stats: DocStat[];
   firstDay: string | null;
   lastDay: string | null;
-  legend: DocLegendType[];
 }
 
 const PROGRESS_PURPOSES = new Set<EntryPurpose>(["progress", "checkin"]);
@@ -456,9 +449,6 @@ export function buildExportModel(input: {
     stats,
     firstDay: everyDay[0] ?? null,
     lastDay: everyDay.at(-1) ?? null,
-    legend: challenge.entryTypes
-      .filter((type) => type.fields.length)
-      .map((type) => ({ id: type.id, name: type.name, fields: type.fields })),
   };
 }
 

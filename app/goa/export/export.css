@@ -212,33 +212,6 @@
 .xd-rules ol { margin: 1.5mm 0 0; padding-left: 5mm; list-style: none; color: var(--xd-soft); }
 .xd-rules ol li + li { margin-top: 1mm; }
 .xd-rules ol span { margin-right: 2mm; font-variant-numeric: tabular-nums; color: var(--xd-muted); }
-.xd-section-gap { margin-top: 12mm; }
-.xd-legend-band + .xd-page { break-before: auto; margin-top: 14mm; }
-.xd-legend {
-  margin-top: 6mm;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 4mm;
-}
-.xd-legend-card {
-  border: 1px solid var(--xd-line);
-  border-radius: 4mm;
-  background: var(--xd-card);
-  padding: 5mm;
-  break-inside: avoid;
-}
-.xd-legend-card h3 {
-  font-size: 7.5pt;
-  font-weight: 600;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--xd-muted);
-}
-.xd-legend-card ul { margin: 3mm 0 0; padding: 0; list-style: none; font-size: 9pt; }
-.xd-legend-card li + li { margin-top: 1.5mm; }
-.xd-legend-card li b { font-family: var(--xd-font-display), "Poppins", sans-serif; font-weight: 500; }
-.xd-legend-card li span { color: var(--xd-soft); }
-
 /* ── Items ─────────────────────────────────────────────────────── */
 .xd-chapter {
   margin: 10mm 0 5mm;
@@ -375,7 +348,6 @@
   margin: 1.5mm 0;
   border-left: 0.8mm solid var(--c, var(--xd-ink));
   padding-left: 3mm;
-  font-style: italic;
   white-space: pre-wrap;
 }
 .xd-text hr { margin: 2.5mm 0; border: 0; border-top: 1px solid var(--xd-line); }
@@ -490,7 +462,7 @@
   .xd { width: 100%; border-radius: 0; padding: 28px 16px 40px; font-size: 10pt; }
   .xd-cover { min-height: 0; }
   .xd-stats { margin-top: 36px; grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 20px; }
-  .xd-people, .xd-people.is-many, .xd-legend, .xd-podium { grid-template-columns: minmax(0, 1fr); }
+  .xd-people, .xd-people.is-many, .xd-podium { grid-template-columns: minmax(0, 1fr); }
   .xd-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .xd-row { grid-template-columns: minmax(0, 1fr); gap: 1mm; }
   .xd-month-body { grid-template-columns: minmax(0, 1fr); }
@@ -507,5 +479,4 @@
   .xd-stage { padding: 0; }
   .xd { width: auto; padding: 0; border-radius: 0; box-shadow: none; }
   .xd-page + .xd-page, .xd-cover + .xd-page { margin-top: 0; }
-  .xd-legend-band + .xd-page { margin-top: 14mm; }
 }
