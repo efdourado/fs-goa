@@ -1,0 +1,511 @@
+/*
+ * The exported log — a printed keepsake, so it keeps its own inks in light and dark mode.
+ * On screen it's a sheet of A4 paper under a toolbar; printed ("Save as PDF") it paginates
+ * with the page number in the bottom margin (see the <style> the export page writes).
+ */
+.xd-screen {
+  --xd-ink: #1b1b1f;
+  --xd-soft: #4f4d47;
+  --xd-muted: #98948a;
+  --xd-line: #e7e2d6;
+  --xd-tile: #f5f2ea;
+  --xd-paper: #faf8f3;
+  --xd-card: #fffefb;
+  --xd-coral: #ff6a3d;
+  --xd-blue: #2563eb;
+  --xd-violet: #7c3aed;
+  --xd-rose: #c2185b;
+  --xd-green: #0e8f6e;
+  --xd-amber: #d4860b;
+  min-height: 100vh;
+  background: var(--canvas);
+  color: var(--ink);
+}
+
+.xd-c-coral { --c: var(--xd-coral); }
+.xd-c-blue { --c: var(--xd-blue); }
+.xd-c-violet { --c: var(--xd-violet); }
+.xd-c-rose { --c: var(--xd-rose); }
+.xd-c-green { --c: var(--xd-green); }
+.xd-c-amber { --c: var(--xd-amber); }
+.xd-ink { color: var(--c); }
+
+/* ── Toolbar (screen only) ─────────────────────────────────────── */
+.xd-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--paper) 92%, transparent);
+  backdrop-filter: blur(10px);
+}
+.xd-toolbar-inner {
+  margin: 0 auto;
+  display: grid;
+  max-width: 1100px;
+  gap: 10px;
+  padding: 10px 16px 12px;
+}
+.xd-toolbar-row { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 16px; }
+/* One row that scrolls sideways on a phone rather than wrapping into a column. */
+.xd-chips {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  margin: 0 -16px;
+  padding: 0 16px 2px;
+  scrollbar-width: none;
+}
+.xd-chips::-webkit-scrollbar { display: none; }
+.xd-chip-gap { flex: none; width: 1px; margin: 6px 6px; background: var(--line); }
+.xd-chip {
+  flex: none;
+  white-space: nowrap;
+  display: inline-flex;
+  min-height: 34px;
+  cursor: pointer;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 13px;
+  font-weight: 300;
+  color: var(--muted);
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+}
+.xd-chip:hover { color: var(--ink); }
+.xd-chip[aria-pressed="true"] {
+  border-color: var(--main-line);
+  background: var(--main-soft);
+  color: var(--main-strong);
+}
+.xd-chip svg { width: 12px; height: 12px; }
+
+.xd-stage { padding: 32px 16px 96px; }
+
+/* ── The sheet ─────────────────────────────────────────────────── */
+.xd {
+  margin: 0 auto;
+  width: 210mm;
+  max-width: 100%;
+  background: var(--xd-paper);
+  color: var(--xd-ink);
+  font-family: var(--xd-font-text), "Lato", system-ui, sans-serif;
+  font-size: 10.5pt;
+  line-height: 1.5;
+  padding: 18mm 16mm 20mm;
+  border-radius: 6px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.06), 0 24px 60px -24px rgb(0 0 0 / 0.28);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.xd h1, .xd h2, .xd h3, .xd .xd-display {
+  font-family: var(--xd-font-display), "Poppins", system-ui, sans-serif;
+  margin: 0;
+}
+.xd p { margin: 0; }
+.xd-page { break-before: page; padding-top: 2mm; }
+.xd-page + .xd-page, .xd-cover + .xd-page { margin-top: 18mm; }
+
+.xd-eyebrow {
+  font-family: var(--xd-font-display), "Poppins", sans-serif;
+  font-size: 8pt;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--xd-muted);
+}
+.xd-h2 { font-size: 26pt; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
+.xd-lede { margin-top: 6px !important; color: var(--xd-soft); font-size: 10.5pt; }
+
+/* ── Cover ─────────────────────────────────────────────────────── */
+.xd-cover {
+  display: flex;
+  min-height: 259mm;
+  flex-direction: column;
+  break-after: page;
+}
+.xd-cover-title {
+  margin-top: 14mm !important;
+  font-weight: 800;
+  line-height: 0.92;
+  letter-spacing: -0.035em;
+  text-transform: uppercase;
+  overflow-wrap: break-word;
+}
+.xd-cover-title span { display: block; }
+.xd-cover-lede {
+  margin-top: 9mm !important;
+  max-width: 128mm;
+  font-family: var(--xd-font-display), "Poppins", sans-serif;
+  font-size: 15pt;
+  font-weight: 300;
+  line-height: 1.45;
+  color: #3b3a36;
+}
+.xd-ribbon { margin-top: 12mm; display: grid; gap: 3.2mm; }
+.xd-ribbon span { display: block; height: 8mm; border-radius: 999px; background: var(--c); }
+.xd-people {
+  margin-top: 13mm;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5mm;
+}
+.xd-people.is-many { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.xd-person {
+  border: 1px solid var(--xd-line);
+  border-radius: 5mm;
+  background: #fff;
+  padding: 7mm 7mm 6mm;
+  break-inside: avoid;
+}
+.xd-person strong {
+  display: block;
+  font-family: var(--xd-font-display), "Poppins", sans-serif;
+  font-size: 17pt;
+  font-weight: 700;
+  line-height: 1.1;
+  text-transform: uppercase;
+  color: var(--c);
+  overflow-wrap: anywhere;
+}
+.xd-person p { margin-top: 2.5mm !important; font-size: 8.5pt; color: var(--xd-soft); }
+.xd-stats {
+  margin-top: auto;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4mm;
+  border-top: 1px solid var(--xd-line);
+  padding-top: 8mm;
+}
+.xd-stat b {
+  display: block;
+  font-family: var(--xd-font-display), "Poppins", sans-serif;
+  font-size: 20pt;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+.xd-stat span {
+  display: block;
+  margin-top: 2mm;
+  font-family: var(--xd-font-display), "Poppins", sans-serif;
+  font-size: 6.5pt;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--xd-muted);
+}
+
+/* ── How it works ──────────────────────────────────────────────── */
+.xd-rules {
+  margin: 7mm 0 0;
+  border-left: 1.4mm solid var(--xd-blue);
+  padding: 1mm 0 1mm 7mm;
+  list-style: none;
+  counter-reset: rule;
+}
+.xd-rules > li { counter-increment: rule; break-inside: avoid; }
+.xd-rules > li + li { margin-top: 3mm; }
+.xd-rules > li::before { content: counter(rule) ". "; font-weight: 700; }
+.xd-rules b { font-weight: 700; }
+.xd-rules ol { margin: 1.5mm 0 0; padding-left: 5mm; list-style: none; color: var(--xd-soft); }
+.xd-rules ol li + li { margin-top: 1mm; }
+.xd-rules ol span { margin-right: 2mm; font-variant-numeric: tabular-nums; color: var(--xd-muted); }
+.xd-section-gap { margin-top: 12mm; }
+.xd-legend-band + .xd-page { break-before: auto; margin-top: 14mm; }
+.xd-legend {
+  margin-top: 6mm;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4mm;
+}
+.xd-legend-card {
+  border: 1px solid var(--xd-line);
+  border-radius: 4mm;
+  background: var(--xd-card);
+  padding: 5mm;
+  break-inside: avoid;
+}
+.xd-legend-card h3 {
+  font-size: 7.5pt;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--xd-muted);
+}
+.xd-legend-card ul { margin: 3mm 0 0; padding: 0; list-style: none; font-size: 9pt; }
+.xd-legend-card li + li { margin-top: 1.5mm; }
+.xd-legend-card li b { font-family: var(--xd-font-display), "Poppins", sans-serif; font-weight: 500; }
+.xd-legend-card li span { color: var(--xd-soft); }
+
+/* ── Items ─────────────────────────────────────────────────────── */
+.xd-chapter {
+  margin: 10mm 0 5mm;
+  display: flex;
+  align-items: baseline;
+  gap: 3mm;
+  border-bottom: 0.9mm solid var(--c);
+  padding-bottom: 2.5mm;
+  break-after: avoid;
+}
+.xd-chapter h3 { font-size: 14pt; font-weight: 600; color: var(--c); }
+.xd-chapter p { font-family: var(--xd-font-display), "Poppins", sans-serif; font-size: 9.5pt; font-weight: 300; color: var(--xd-muted); }
+.xd-first-chapter { margin-top: 8mm; }
+
+.xd-card {
+  position: relative;
+  margin-top: 4.5mm;
+  overflow: hidden;
+  border: 1px solid var(--xd-line);
+  border-radius: 4mm;
+  background: var(--xd-card);
+  padding: 6mm 6mm 4mm 7.5mm;
+  break-inside: avoid;
+}
+.xd-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 1.3mm;
+  background: var(--c);
+}
+.xd-card.is-long { break-inside: auto; }
+.xd-card.is-empty { padding-top: 4.5mm; padding-bottom: 4.5mm; }
+.xd-card.is-empty .xd-num { font-size: 15pt; }
+.xd-card.is-empty .xd-card-title h3 { font-size: 12pt; }
+.xd-card-empty { margin-top: 0.8mm !important; font-size: 8.5pt; font-style: italic; color: var(--xd-muted); }
+.xd-card-head { display: flex; align-items: flex-start; gap: 5mm; }
+.xd-num {
+  flex: none;
+  min-width: 11mm;
+  font-family: var(--xd-font-display), "Poppins", sans-serif;
+  font-size: 19pt;
+  font-weight: 700;
+  line-height: 1.05;
+  color: var(--c);
+  font-variant-numeric: tabular-nums;
+}
+.xd-card-title { min-width: 0; flex: 1; }
+.xd-card-title h3 { font-size: 14pt; font-weight: 600; line-height: 1.2; letter-spacing: -0.01em; }
+.xd-card-title p {
+  margin-top: 0.8mm !important;
+  font-family: var(--xd-font-display), "Poppins", sans-serif;
+  font-size: 8.5pt;
+  font-weight: 300;
+  color: var(--xd-muted);
+}
+.xd-by { flex: none; text-align: right; }
+.xd-by span {
+  display: block;
+  font-family: var(--xd-font-display), "Poppins", sans-serif;
+  font-size: 6.5pt;
+  letter-spacing: 0.3em;
+  color: var(--xd-muted);
+  text-transform: uppercase;
+}
+.xd-by strong {
+  display: block;
+  font-family: var(--xd-font-display), "Poppins", sans-serif;
+  font-size: 12pt;
+  font-weight: 700;
+  color: var(--c);
+}
+.xd-tiles {
+  margin-top: 4.5mm;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 3mm;
+}
+.xd-tile { min-width: 0; border-radius: 2.5mm; background: var(--xd-tile); padding: 2.5mm 3.5mm; }
+.xd-tile > span {
+  display: block;
+  font-family: var(--xd-font-display), "Poppins", sans-serif;
+  font-size: 6.5pt;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--xd-muted);
+}
+.xd-tile > b {
+  display: flex;
+  margin-top: 0.6mm;
+  align-items: center;
+  gap: 1.6mm;
+  font-family: var(--xd-font-display), "Poppins", sans-serif;
+  font-size: 10pt;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.xd-dots { display: inline-flex; gap: 0.9mm; }
+.xd-dots i { display: block; width: 2.4mm; height: 2.4mm; border-radius: 999px; background: #e4dfd3; }
+.xd-dots i.on { background: var(--c); }
+.xd-dots i.half { background: linear-gradient(90deg, var(--c) 50%, #e4dfd3 50%); }
+.xd-tile small { font-size: 8.5pt; font-weight: 400; color: var(--xd-soft); }
+.xd-lead { margin-top: 4mm !important; font-size: 9.5pt; line-height: 1.6; }
+.xd-lead b { font-family: var(--xd-font-display), "Poppins", sans-serif; font-weight: 600; color: var(--c); }
+
+.xd-rows { margin: 3.5mm 0 0; }
+.xd-row {
+  display: grid;
+  grid-template-columns: 30mm minmax(0, 1fr);
+  gap: 4mm;
+  border-top: 1px solid #efebe2;
+  padding: 2.4mm 0;
+  break-inside: avoid;
+}
+.xd-row dt {
+  font-family: var(--xd-font-display), "Poppins", sans-serif;
+  font-size: 8pt;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--c, var(--xd-muted));
+  overflow-wrap: anywhere;
+}
+.xd-row dt small { display: block; margin-top: 0.4mm; font-size: 6.5pt; letter-spacing: 0.08em; color: var(--xd-muted); }
+.xd-row dd { margin: 0; min-width: 0; font-size: 9.2pt; }
+.xd-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 1mm 3.5mm; }
+.xd-kv span { color: var(--xd-muted); }
+.xd-kv b { font-weight: 700; }
+.xd-type { font-size: 7.5pt; letter-spacing: 0.08em; text-transform: uppercase; color: var(--xd-muted); }
+.xd-text { margin-top: 1.2mm; color: #2b2a27; line-height: 1.6; white-space: pre-wrap; }
+.xd-text + .xd-text { margin-top: 1.8mm; }
+.xd-text blockquote {
+  margin: 1.5mm 0;
+  border-left: 0.8mm solid var(--c, var(--xd-ink));
+  padding-left: 3mm;
+  font-style: italic;
+  white-space: pre-wrap;
+}
+.xd-text hr { margin: 2.5mm 0; border: 0; border-top: 1px solid var(--xd-line); }
+.xd-text-label { display: block; font-size: 7.5pt; letter-spacing: 0.08em; text-transform: uppercase; color: var(--xd-muted); }
+.xd-empty { color: var(--xd-muted); font-style: italic; }
+.xd-points { display: flex; flex-wrap: wrap; gap: 1.2mm; }
+.xd-point {
+  border-radius: 1.6mm;
+  background: var(--xd-tile);
+  padding: 0.5mm 2mm;
+  font-size: 8pt;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.xd-point span { color: var(--xd-muted); }
+.xd-total { margin-top: 1.5mm !important; font-size: 8.5pt; color: var(--xd-soft); }
+
+/* ── Diary ─────────────────────────────────────────────────────── */
+.xd-month { margin-top: 9mm; }
+.xd-month-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4mm;
+  border-bottom: 0.9mm solid var(--c);
+  padding-bottom: 2.5mm;
+  break-after: avoid;
+}
+.xd-month-head h3 { font-size: 15pt; font-weight: 600; color: var(--c); text-transform: capitalize; }
+.xd-month-head h3 span { font-weight: 300; color: var(--xd-muted); }
+.xd-month-head p { font-size: 8.5pt; color: var(--xd-muted); }
+.xd-month-body { margin-top: 5mm; display: grid; grid-template-columns: 52mm minmax(0, 1fr); gap: 8mm; align-items: start; }
+.xd-cal { display: grid; min-width: 0; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 1.2mm; break-inside: avoid; }
+.xd-cal > span {
+  font-family: var(--xd-font-display), "Poppins", sans-serif;
+  font-size: 6pt;
+  letter-spacing: 0.1em;
+  text-align: center;
+  text-transform: uppercase;
+  color: var(--xd-muted);
+}
+.xd-cal > i {
+  position: relative;
+  display: grid;
+  aspect-ratio: 1;
+  place-items: center;
+  border-radius: 999px;
+  font-size: 6.5pt;
+  font-style: normal;
+  color: var(--xd-muted);
+  font-variant-numeric: tabular-nums;
+}
+.xd-cal > i.on { background: var(--c); color: #fff; font-weight: 700; }
+.xd-cal > i.many { box-shadow: 0 0 0 0.5mm var(--xd-paper), 0 0 0 0.9mm var(--c2, var(--c)); }
+.xd-timeline { margin: 0; padding: 0; list-style: none; }
+.xd-day {
+  display: grid;
+  grid-template-columns: 12mm minmax(0, 1fr);
+  gap: 3mm;
+  border-top: 1px solid #efebe2;
+  padding: 2.4mm 0;
+  break-inside: avoid;
+}
+.xd-day:first-child { border-top: 0; padding-top: 0; }
+.xd-day-date { text-align: center; line-height: 1.05; }
+.xd-day-date b { display: block; font-family: var(--xd-font-display), "Poppins", sans-serif; font-size: 14pt; font-weight: 600; font-variant-numeric: tabular-nums; }
+.xd-day-date span { font-size: 6.5pt; letter-spacing: 0.14em; text-transform: uppercase; color: var(--xd-muted); }
+.xd-who { font-family: var(--xd-font-display), "Poppins", sans-serif; font-size: 7.5pt; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--c); }
+.xd-sets { margin-top: 1.5mm; width: 100%; border-collapse: collapse; font-size: 8.5pt; }
+.xd-sets td { border-top: 1px dashed var(--xd-line); padding: 1mm 2mm 1mm 0; vertical-align: top; }
+.xd-sets td:first-child { width: 38%; font-weight: 700; }
+
+/* ── Scoreboard ────────────────────────────────────────────────── */
+.xd-table { margin-top: 7mm; width: 100%; border-collapse: collapse; font-size: 9.5pt; }
+.xd-table th {
+  border-bottom: 0.6mm solid var(--xd-ink);
+  padding: 0 2mm 2.5mm;
+  font-family: var(--xd-font-display), "Poppins", sans-serif;
+  font-size: 6.5pt;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-align: left;
+  text-transform: uppercase;
+  color: var(--xd-muted);
+  white-space: nowrap;
+}
+.xd-table td { border-bottom: 1px solid #ece7dc; padding: 2.6mm 2mm; vertical-align: middle; }
+.xd-table tr { break-inside: avoid; }
+.xd-table .num { font-family: var(--xd-font-display), "Poppins", sans-serif; font-weight: 700; color: var(--c); font-variant-numeric: tabular-nums; }
+.xd-table .title { font-family: var(--xd-font-display), "Poppins", sans-serif; font-weight: 500; }
+.xd-table .score { background: var(--xd-tile); text-align: center; font-variant-numeric: tabular-nums; border-left: 1px solid #e8e3d8; }
+.xd-table th.score { background: none; border-left: 0; text-align: center; }
+.xd-table .avg { font-weight: 700; }
+.xd-table .muted { color: var(--xd-muted); }
+.xd-table .small { font-size: 8.5pt; white-space: nowrap; }
+.xd-podium {
+  margin-top: 7mm;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4mm;
+  break-inside: avoid;
+}
+.xd-podium div { border: 1px solid var(--xd-line); border-radius: 3.5mm; background: var(--xd-card); padding: 4mm 5mm; }
+.xd-podium span { display: block; font-family: var(--xd-font-display), "Poppins", sans-serif; font-size: 6.5pt; letter-spacing: 0.24em; text-transform: uppercase; color: var(--xd-muted); }
+.xd-podium b { display: block; margin-top: 1mm; font-family: var(--xd-font-display), "Poppins", sans-serif; font-size: 12pt; font-weight: 600; line-height: 1.25; color: var(--c, var(--xd-ink)); }
+.xd-podium small { display: block; margin-top: 0.5mm; font-size: 8.5pt; color: var(--xd-soft); }
+.xd-colophon { margin-top: 10mm !important; font-size: 8pt; color: var(--xd-muted); }
+
+/* ── Small screens: the sheet reflows instead of scrolling sideways ── */
+@media screen and (max-width: 820px) {
+  .xd-stage { padding: 16px 0 72px; }
+  .xd { width: 100%; border-radius: 0; padding: 28px 16px 40px; font-size: 10pt; }
+  .xd-cover { min-height: 0; }
+  .xd-stats { margin-top: 36px; grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 20px; }
+  .xd-people, .xd-people.is-many, .xd-legend, .xd-podium { grid-template-columns: minmax(0, 1fr); }
+  .xd-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .xd-row { grid-template-columns: minmax(0, 1fr); gap: 1mm; }
+  .xd-month-body { grid-template-columns: minmax(0, 1fr); }
+  .xd-cal { max-width: 240px; }
+  .xd-table-wrap { overflow-x: auto; }
+  .xd-by { display: none; }
+}
+
+/* ── Print ─────────────────────────────────────────────────────── */
+@media print {
+  html, body, .xd-screen { background: #faf8f3 !important; }
+  body { min-height: 0 !important; }
+  .xd-toolbar { display: none !important; }
+  .xd-stage { padding: 0; }
+  .xd { width: auto; padding: 0; border-radius: 0; box-shadow: none; }
+  .xd-page + .xd-page, .xd-cover + .xd-page { margin-top: 0; }
+  .xd-legend-band + .xd-page { margin-top: 14mm; }
+}

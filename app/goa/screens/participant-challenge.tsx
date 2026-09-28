@@ -559,6 +559,24 @@ export function ResultView({
  * for every member (not just admins). On click the copy glyph fades out and a
  * circled checkmark draws itself in, then reverts after a couple of seconds.
  */
+/** Opens the printable log of the challenge — its own page, outside the app, ready to save as a PDF. */
+function ExportLogButton({ challengeId }: { challengeId: string }) {
+  const t = useTranslations("exportDoc");
+  return (
+    <a
+      href={`/challenges/${encodeURIComponent(challengeId)}/export`}
+      aria-label={t("button")}
+      className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[var(--line)] px-3 py-2 text-sm font-light text-[var(--ink)] transition-colors hover:bg-[var(--hover)] sm:px-4"
+    >
+      <svg viewBox="0 0 20 20" className="size-4 flex-none" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+        <path d="M6 2.5h5.5L15 6v10a1.5 1.5 0 0 1-1.5 1.5h-7.5A1.5 1.5 0 0 1 4.5 16V4A1.5 1.5 0 0 1 6 2.5Z" strokeLinejoin="round" />
+        <path d="M10 8.5v5m0 0-2-2m2 2 2-2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      <span className="hidden sm:inline">{t("button")}</span>
+    </a>
+  );
+}
+
 function SharePublicButton({ token }: { token: string }) {
   const t = useTranslations("resultView");
   const [copied, setCopied] = useState(false);
@@ -1489,6 +1507,7 @@ export function ParticipantChallengeScreen({
         <BackButton onClick={onBack} label={backLabel ?? t("back")} />
         <div className="flex items-center gap-2">
           {!preview && challenge.result?.shareToken ? <SharePublicButton token={challenge.result.shareToken} /> : null}
+          {!preview ? <ExportLogButton challengeId={challenge.id} /> : null}
           {previewActions ?? (onAdmin ? <Button variant="secondary" onClick={onAdmin}>{t("manage")}</Button> : null)}
         </div>
       </div>
