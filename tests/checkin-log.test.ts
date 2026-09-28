@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { createElement } from "react";
 
 import {
   amountFromPosition,
@@ -14,7 +15,9 @@ import {
   streak,
   sumBefore,
 } from "../app/goa/checkin-days";
-import type { ChallengeField } from "../app/goa/types";
+import { CheckinLog, type LogRecord } from "../app/goa/checkin-log";
+import type { ChallengeField, Entry } from "../app/goa/types";
+import { renderWithIntl } from "./helpers/intl";
 
 const pages: ChallengeField = { id: "p", key: "paginas", label: "Páginas lidas", type: "number", required: true, config: { min: 0, step: 1 } };
 const note: ChallengeField = { id: "n", key: "nota_dia", label: "Como foi?", type: "text", required: false, config: { multiline: true } };
@@ -106,4 +109,36 @@ test("o calendário do mês começa no domingo e cobre os meses tocados", () => 
   assert.equal(cells.filter((cell) => cell === null).length, 2); // 1/9/2026 é terça
   assert.equal(cells.at(-1), "2026-09-30");
   assert.deepEqual(monthsIn("2026-11-20", "2027-01-05"), ["2026-11", "2026-12", "2027-01"]);
+});
+
+const book = (day: string, pagesRead: number): [string, LogRecord] => [day, { entry: { id: `e-${day}`, userId: "me", occurredOn: day, values: { p: pagesRead } } as Entry, value: pagesRead }];
+
+test("o log de um livro mostra a página, o ritmo e um dia por chip, com hoje ainda em aberto", () => {
+  const records = new Map([book("2026-09-14", 22), book("2026-09-15", 18), book("2026-09-17", 25)]);
+  const html = renderWithIntl(createElement(CheckinLog, {
+    from: "2026-09-14", to: "2026-10-07", today: "2026-09-28", deadline: "2026-10-07",
+    records, selectedDay: "2026-09-28", onSelectDay: () => undefined, canEdit: true,
+    counter: { field: pages, notes: [], total: 352, paceFrom: "2026-09-14", paceTo: "2026-10-07", onSave: async () => undefined },
+  }));
+  assert.match(html, /p\. 65/);
+  assert.match(html, /de 352/);
+  assert.match(html, /ritmo · p\. 220/);
+  assert.match(html, /155 págs\. atrás do ritmo/);
+  assert.match(html, /Faltam <strong[^>]*>287<\/strong> páginas/);
+  assert.match(html, /aria-label="Hoje, 28 de setembro, sem registro"/);
+  assert.match(html, /aria-label="[^"]*16 de setembro, sem registro"/);
+  assert.match(html, /Parei na página/);
+  // dias futuros ficam travados
+  assert.match(html, /disabled=""[^>]*data-day="2026-10-01"|data-day="2026-10-01"[^>]*disabled=""/);
+});
+
+test("um hábito sem número marca o dia com ✓ e deixa o formulário de sempre embaixo", () => {
+  const records = new Map([["2026-09-27", { entry: { id: "h1", userId: "me", occurredOn: "2026-09-27", values: {} } as Entry, value: null }]]);
+  const html = renderWithIntl(createElement(CheckinLog, {
+    from: "2026-08-25", to: "2026-09-28", today: "2026-09-28",
+    records, selectedDay: "2026-09-28", onSelectDay: () => undefined, canEdit: true,
+  }, createElement("p", null, "formulário do dia")));
+  assert.match(html, /27 de setembro, registrado/);
+  assert.match(html, /formulário do dia/);
+  assert.doesNotMatch(html, /ritmo/);
 });

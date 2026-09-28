@@ -4,6 +4,8 @@ import { useFormatter, useTranslations } from "next-intl";
 import { type FormEvent, forwardRef, type ReactNode, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 
 import { ApiError } from "../api";
+import { counterField, logRange } from "../checkin-days";
+import { CheckinLog, type LogCounter, type LogRecord } from "../checkin-log";
 import { copyText } from "../clipboard";
 import { useGoaFormat } from "../format";
 import { useDoneItems } from "../use-done-items";
@@ -12,6 +14,7 @@ import { SharedGlyph } from "../shared-responses";
 import { SessionLog, type SessionPayload, sessionSpecOf } from "../session-log";
 import { challengeShowcaseBlocks, hasShowcaseContent, ShowcaseView } from "../showcase-view";
 import { RuleSectionsView, visibleRuleSections } from "../rules";
+import { instantToDateKey } from "../schedule";
 import type {
   ChallengeDetail,
   ChallengeField,
@@ -745,6 +748,7 @@ function ItemEntryPanel({
   checkpointId,
   onSaveEntry,
   onDeleteEntry,
+  skipTypeId,
 }: {
   challenge: ChallengeDetail;
   item: ChallengeItem;
@@ -767,16 +771,20 @@ function ItemEntryPanel({
   onSaveEntry: (itemId: Id | null, values: Record<Id, unknown>, entry?: Entry, occurredOn?: string | null, entryTypeId?: Id, checkpointId?: Id | null, options?: { expectedUpdatedAt?: string | null }) => Promise<void>;
   // Present only while the round is active and the viewer may remove entries.
   onDeleteEntry?: (entryId: Id) => Promise<void>;
+  // A type the check-in log above already edits (a book's daily pages) — left out here.
+  skipTypeId?: Id | null;
 }) {
   const t = useTranslations("participant");
   const tc = useTranslations("common");
   const tv = useTranslations("visibility");
   // Individual answers first, each person's own; the group's shared ones follow.
   const allTypes = itemEntryTypes(challenge);
-  const types = allTypes.filter((type) => type.answerScope !== "shared");
+  const ownTypes = allTypes.filter((type) => type.answerScope !== "shared");
+  const types = skipTypeId ? ownTypes.filter((type) => type.id !== skipTypeId) : ownTypes;
   const sharedTypes = allTypes.filter((type) => type.answerScope === "shared");
   const ratingTypeId = types.find((type) => type.purpose === "rating")?.id;
-  const stacked = types.length > 1;
+  // Counted before the skip: "Terminei" keeps its own heading when the pages moved up into the log.
+  const stacked = ownTypes.length > 1;
   // Looked up once (both to build the JSX below and to seed the shared
   // button's initial open/closed state) — a type is unanswered exactly when
   // it has no matching entry yet.
@@ -862,7 +870,7 @@ function ItemEntryPanel({
           : undefined;
         const combinable = stacked && hasRequiredField && useSharedButton;
         return (
-          <div key={type.id || "registro"}>
+          <div key={type.id || "registro"} id={type.id ? `entry-type-${type.id}` : undefined}>
             <DynamicEntryForm
               key={`${type.id}-${item.id}-${perDay ? occurredOn || today : "fixed"}-${entry?.id ?? "new"}`}
               ref={(handle) => { formRefs.current.set(type.id, handle); }}
@@ -1350,6 +1358,49 @@ export function ParticipantChallengeScreen({
   const canDeleteEntry = challenge.status === "active" ? onDeleteEntry : undefined;
   const hasGroup = challenge.participants.length > 1;
 
+  // The check-in log replaces the date picker wherever a day is what you pick:
+  // a book's daily progress, or a habit's daily check-in. Session-bound rounds
+  // keep their session picker.
+  const logDayType = useItemPanel && perDayItem && !sessionMode
+    ? itemForms.find((type) => type.cardinality === "once_per_item_day" && type.answerScope !== "shared") ?? null
+    : null;
+  const logItem = logDayType ? selectedItem : null;
+  const showLog = !preview && (Boolean(logDayType && logItem) || undatedDaily);
+  const logFields = logDayType ? logDayType.fields : challenge.fields;
+  const logCounterField = showLog ? counterField(logFields) : null;
+  const logRecords = new Map<string, LogRecord>();
+  if (showLog) {
+    for (const entry of ownEntries) {
+      if (!entry.occurredOn || entry.answerScope === "shared") continue;
+      if (logDayType ? (itemIdForEntry(entry) !== logItem?.id || entry.entryTypeId !== logDayType.id) : itemIdForEntry(entry)) continue;
+      const raw = logCounterField?.id ? valuesAsRecord(entry.values)[logCounterField.id] : null;
+      const value = raw === null || raw === undefined || raw === "" || !Number.isFinite(Number(raw)) ? null : Number(raw);
+      logRecords.set(entry.occurredOn, { entry, value: logCounterField ? value ?? 0 : null });
+    }
+  }
+  const logOpensOn = logItem?.opensAt ? instantToDateKey(logItem.opensAt, timeZone) : null;
+  const logDueOn = logItem?.dueAt ? instantToDateKey(logItem.dueAt, timeZone) : null;
+  const logBounds = logRange({ today, startsOn: challenge.startsOn, endsOn: challenge.endsOn, opensOn: logOpensOn, dueOn: logDueOn, loggedDays: [...logRecords.keys()] });
+  const logDeadline = logDueOn ?? challenge.endsOn ?? null;
+  const pageCount = logItem?.catalogItem?.pageCount ?? null;
+  const completionType = logDayType ? itemForms.find((type) => type.purpose === "completion" && type.answerScope !== "shared") ?? null : null;
+  const finishedBook = Boolean(completionType && logItem && ownEntries.some((entry) => entry.entryTypeId === completionType.id && itemIdForEntry(entry) === logItem.id));
+  const logCounter: LogCounter | null = logCounterField ? {
+    field: logCounterField,
+    notes: logFields.filter((field) => field.id && field !== logCounterField),
+    total: pageCount && (logCounterField.key === "paginas" || logItem?.catalogItem?.kind === "book") ? pageCount : null,
+    paceFrom: logOpensOn ?? challenge.startsOn ?? logBounds.from,
+    paceTo: logDueOn ?? challenge.endsOn ?? null,
+    onSave: (day, values, entry) => onSaveEntry!(logItem?.id ?? null, values, entry, entry ? undefined : day, logDayType?.id || undefined),
+    onDelete: canDeleteEntry ? (entry) => canDeleteEntry(entry.id) : undefined,
+    // Reaching the last page points at "Terminei" — it never records the finish by itself.
+    onFinish: completionType && !finishedBook ? () => {
+      const section = document.getElementById(`entry-type-${completionType.id}`);
+      section?.scrollIntoView({ behavior: "smooth", block: "center" });
+      section?.querySelector<HTMLElement>("button, input, textarea")?.focus({ preventScroll: true });
+    } : undefined,
+  } : null;
+
   // The Grupo tab shows everyone's status for whichever item/session is
   // currently selected in the shared "Checkpoints" picker, plus two
   // mode-independent stats: overall completion and freshness of their last entry.
@@ -1493,7 +1544,8 @@ export function ParticipantChallengeScreen({
           ) : (
             <div>
               <section className={cx(cardClass, "min-w-0 p-5 sm:p-7")}>
-                <div className="mb-5 flex flex-col gap-3 border-b border-[var(--line)] pb-5 sm:flex-row sm:items-start sm:justify-between">
+                {/* A habit's log names the day itself, so its card needs no "Check-in for …" title on top. */}
+                {showLog && !selectedItem ? null : <div className="mb-5 flex flex-col gap-3 border-b border-[var(--line)] pb-5 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <h2 className="text-2xl font-light tracking-[-0.04em]">
                       {selectedItem
@@ -1507,7 +1559,34 @@ export function ParticipantChallengeScreen({
                       </span>
                     : null
                   }
-                </div>
+                </div>}
+                {showLog ? (
+                  <CheckinLog
+                    from={logBounds.from}
+                    to={logBounds.to}
+                    today={today}
+                    deadline={logDeadline}
+                    records={logRecords}
+                    selectedDay={effectiveOccurredOn}
+                    onSelectDay={setOccurredOn}
+                    counter={logCounter}
+                    canEdit={!unavailableMessage && Boolean(onSaveEntry)}
+                    unavailableMessage={unavailableMessage}
+                  >
+                    {logItem ? (
+                      <ItemEntryPanel key={`${logItem.id}-no-session`} challenge={challenge} item={logItem} entries={entries} ownEntries={ownEntries} timeZone={timeZone} onReload={onReload} occurredOn={occurredOn} onOccurredOnChange={setOccurredOn} offerOptionalDate={false} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} onSaveEntry={onSaveEntry!} onDeleteEntry={canDeleteEntry} />
+                    ) : (
+                      <DynamicEntryForm key={`daily-${effectiveOccurredOn}-${currentEntry?.id ?? "new"}`} timeZone={timeZone} heading={t("yourResponseTitle")} sectioned={false} alwaysEditable={!challenge.fields.some((field) => field.required)} fields={challenge.fields} item={null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry!(null, values, entry, effectiveOccurredOn)} onDelete={currentEntry && canDeleteEntry ? () => canDeleteEntry(currentEntry.id) : undefined} />
+                    )}
+                  </CheckinLog>
+                ) : null}
+                {/* The rest of the book's forms (Terminei, a rating) follow the log's own editor. */}
+                {showLog && logItem && logCounter && itemForms.some((type) => type.id !== logDayType?.id) ? (
+                  <div className="mt-8 border-t border-[var(--line)] pt-6">
+                    <ItemEntryPanel key={`${logItem.id}-rest`} challenge={challenge} item={logItem} entries={entries} ownEntries={ownEntries} timeZone={timeZone} onReload={onReload} occurredOn={occurredOn} onOccurredOnChange={setOccurredOn} offerOptionalDate={false} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} onSaveEntry={onSaveEntry!} onDeleteEntry={canDeleteEntry} skipTypeId={logDayType?.id} />
+                  </div>
+                ) : null}
+                {showLog ? null : <>
                 {/* When more than one form is stacked (ItemEntryPanel), "Sua
                     resposta" introduces the whole group and each form gets
                     its own heading below. A single form instead takes the
@@ -1521,6 +1600,7 @@ export function ParticipantChallengeScreen({
                 ) : (
                   <DynamicEntryForm key={`${selectedItem?.id ?? "free"}-${undatedDaily ? effectiveOccurredOn : "fixed"}-${currentEntry?.id ?? "new"}`} timeZone={timeZone} heading={t("yourResponseTitle")} sectioned={false} alwaysEditable={!challenge.fields.some((field) => field.required)} fields={challenge.fields} item={selectedItem ?? null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry!(selectedItem?.id ?? null, values, entry, undatedDaily ? effectiveOccurredOn : undefined)} onDelete={currentEntry && canDeleteEntry ? () => canDeleteEntry(currentEntry.id) : undefined} />
                 )}
+                </>}
               </section>
             </div>
           )
