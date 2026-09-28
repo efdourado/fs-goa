@@ -1,12 +1,15 @@
 "use client";
 
-import { useTranslations } from "next-intl";
-import { type CSSProperties, type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { useFormatter, useTranslations } from "next-intl";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+
+import { logRange } from "./checkin-days";
+import { CheckinLog, type LogRecord } from "./checkin-log";
 
 import { ConfirmDialog } from "./dialog";
 import { useGoaFormat } from "./format";
 import { useLibraryName } from "./libraries";
-import type { ChallengeDetail, ChallengeField, ChallengeItem, Entry, EntryTypeView, FieldConfig, Id } from "./types";
+import type { ChallengeDetail, ChallengeField, Entry, EntryTypeView, FieldConfig, Id } from "./types";
 import { Button, cardClass, cx, EmptyState, inputClass, labelClass, sectionLabelClass, StatusMessage } from "./ui";
 import { dateKeyInSaoPaulo, displayAnswer, findMissingRequiredField, valuesAsRecord } from "./utils";
 
@@ -36,9 +39,6 @@ interface Row {
   itemId: Id | "";
   values: Record<Id, unknown>;
 }
-
-/** The picker's "+ New item" entry — never a real item id. */
-const NEW_ITEM = "__new__";
 
 let rowCounter = 0;
 /** A stable React key for a row of the form — rows come and go, so an index would mix their inputs up. */
@@ -133,10 +133,87 @@ const numberValue = (raw: unknown): number | null => {
   return null;
 };
 
+/** A best-so-far per numeric field of one item, read off the person's records (the check-in being edited left out). */
+function bestValues(records: Iterable<Entry>, itemId: Id, fields: ChallengeField[], skipVisitId: Id | null): Map<Id, number> {
+  const best = new Map<Id, number>();
+  for (const record of records) {
+    if (record.itemId !== itemId || (skipVisitId && record.parentEntryId === skipVisitId)) continue;
+    const values = valuesAsRecord(record.values);
+    for (const field of fields) {
+      const value = numberValue(values[field.id as Id]);
+      if (value !== null && (!best.has(field.id as Id) || value > (best.get(field.id as Id) as number))) best.set(field.id as Id, value);
+    }
+  }
+  return best;
+}
+
 /**
- * A workout-style challenge on Today: the form for one check-in (a date and a row per item, each row filled with
- * the fields the creator defined), the person's past check-ins, and — per item — the history and the records
- * that fall out of it. Nothing here asks for a "current best": the records are read off what was logged.
+ * A number with − / + on either side. Empty, the first tap takes last time's number (shown as the placeholder),
+ * so "same as last time, one step heavier" is two taps; after that each tap moves one step.
+ */
+function NumberStepper({ id, field, value, last, disabled, onChange }: {
+  id: string; field: ChallengeField; value: unknown; last: number | null; disabled: boolean; onChange: (value: unknown) => void;
+}) {
+  const t = useTranslations("sessionLog");
+  const nf = useFormatter();
+  const step = field.config?.step && field.config.step > 0 ? field.config.step : 1;
+  const min = field.config?.min;
+  const max = field.config?.max;
+  const current = numberValue(value);
+  const clamp = (next: number) => {
+    let result = Number(next.toFixed(4));
+    if (min !== undefined) result = Math.max(min, result);
+    if (max !== undefined) result = Math.min(max, result);
+    return result;
+  };
+  const nudge = (direction: 1 | -1) => {
+    if (current === null) onChange(clamp(last ?? (direction > 0 ? step : 0)));
+    else onChange(clamp(current + direction * step));
+  };
+  const button = "w-10 flex-none cursor-pointer bg-[var(--wash)] text-lg text-[var(--muted)] transition hover:bg-[var(--wash-strong)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50";
+  return (
+    <div className="flex items-stretch overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--paper)] focus-within:border-[var(--main)] focus-within:ring-[3px] focus-within:ring-[var(--main-soft)]">
+      <button type="button" className={button} disabled={disabled} aria-label={t("stepDown", { field: field.label })} onClick={() => nudge(-1)}>−</button>
+      <input
+        id={id}
+        className="w-full min-w-0 border-0 bg-transparent px-1 py-2 text-center text-lg tabular-nums outline-none placeholder:text-[var(--muted)]/45 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        type="number" inputMode="decimal" min={min} max={max} step={field.config?.step ?? "any"} disabled={disabled}
+        placeholder={last !== null ? nf.number(last, { maximumFractionDigits: 2 }) : undefined}
+        value={typeof value === "number" || typeof value === "string" ? value : ""}
+        onChange={(event) => onChange(event.target.value === "" ? "" : Number(event.target.value))}
+      />
+      <button type="button" className={button} disabled={disabled} aria-label={t("stepUp", { field: field.label })} onClick={() => nudge(1)}>+</button>
+    </div>
+  );
+}
+
+/** The best of the first number field in each check-in an item was in, oldest to newest, with the peak marked. */
+function Sparkline({ values }: { values: number[] }) {
+  if (values.length === 0) return null;
+  const width = 120;
+  const height = 34;
+  const pad = 4;
+  const high = Math.max(...values);
+  const low = Math.min(...values);
+  const x = (index: number) => (values.length === 1 ? width / 2 : pad + (index * (width - 2 * pad)) / (values.length - 1));
+  const y = (value: number) => (high === low ? height / 2 : height - pad - ((value - low) / (high - low)) * (height - 2 * pad));
+  const line = values.map((value, index) => `${index ? "L" : "M"}${x(index).toFixed(1)} ${y(value).toFixed(1)}`).join(" ");
+  const area = `${line} L${x(values.length - 1).toFixed(1)} ${height} L${x(0).toFixed(1)} ${height} Z`;
+  const peak = values.lastIndexOf(high);
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} className="h-[34px] w-[120px] flex-none" preserveAspectRatio="none" aria-hidden="true">
+      {values.length > 1 ? <path d={area} fill="var(--main-soft)" /> : null}
+      {values.length > 1 ? <path d={line} fill="none" stroke="var(--main)" strokeWidth="1.6" vectorEffect="non-scaling-stroke" /> : null}
+      <circle cx={x(peak)} cy={y(high)} r="3" fill="var(--main-2)" />
+    </svg>
+  );
+}
+
+/**
+ * A workout-style challenge on Today: the days you checked in (the same strip / month as a daily log, each day
+ * showing how many items it held), and the check-in of the picked day — a tray of the challenge's items to tap
+ * in, a card per item with last time's numbers at hand, and one Save. Below, your check-ins and, per item, the
+ * history and the bests that fall out of it. Nothing here asks for a "current best": it's read off what was logged.
  */
 export function SessionLog({
   challenge,
@@ -157,18 +234,20 @@ export function SessionLog({
   unavailableMessage?: string | null;
   onSave: (payload: SessionPayload, entry?: Entry) => Promise<void>;
   onDelete?: (entryId: Id) => Promise<void>;
-  /** Present for someone who may add items to the challenge — makes "+ New item" available in every row's picker. */
+  /** Present for someone who may add items to the challenge — makes "New item" available in the tray. */
   onAddItem?: (title: string) => Promise<Id>;
 }) {
   const t = useTranslations("sessionLog");
   const tf = useTranslations("entryForm");
   const tc = useTranslations("common");
   const f = useGoaFormat();
+  const nf = useFormatter();
   const libraryName = useLibraryName();
   const showValue = useShowValue();
   const today = dateKeyInSaoPaulo(new Date());
   const shortDate: Intl.DateTimeFormatOptions = { day: "2-digit", month: "short", year: "numeric" };
   const recordFields = useMemo(() => spec.record.fields.filter((field) => field.id), [spec.record.fields]);
+  const numberFields = useMemo(() => recordFields.filter((field) => field.type === "number"), [recordFields]);
   const visitFields = useMemo(() => spec.visit.fields.filter((field) => field.id), [spec.visit.fields]);
   const items = useMemo(() => [...challenge.items].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)), [challenge.items]);
   const itemTitle = (id: Id | null | undefined) => items.find((item) => item.id === id)?.title ?? "—";
@@ -191,53 +270,113 @@ export function SessionLog({
     }
     return map;
   }, [entries, spec.record.id, userId]);
+  const ownRecords = useMemo(() => [...recordsByVisit.values()].flat(), [recordsByVisit]);
+  const sortedRecords = (visitId: Id) => (recordsByVisit.get(visitId) ?? []).slice().sort((a, b) => (a.submittedAt ?? "").localeCompare(b.submittedAt ?? ""));
 
-  const blankRow = (): Row => ({ key: newRowKey(), itemId: "", values: {} });
-  const [editing, setEditing] = useState<Entry | null>(null);
+  // Newest first within a day: a day with two check-ins opens the latest.
+  const visitsByDay = useMemo(() => {
+    const map = new Map<string, Entry[]>();
+    for (const visit of ownVisits) {
+      if (!visit.occurredOn) continue;
+      const list = map.get(visit.occurredOn) ?? [];
+      list.push(visit);
+      map.set(visit.occurredOn, list);
+    }
+    return map;
+  }, [ownVisits]);
+  // What the strip shows on each day: how many items went into it.
+  const logRecords = useMemo(() => {
+    const map = new Map<string, LogRecord>();
+    for (const [day, visits] of visitsByDay) {
+      const count = visits.reduce((sum, visit) => sum + (recordsByVisit.get(visit.id)?.length ?? 0), 0);
+      map.set(day, { entry: visits[0], value: count });
+    }
+    return map;
+  }, [visitsByDay, recordsByVisit]);
+  const range = useMemo(
+    () => logRange({ today, startsOn: challenge.startsOn, endsOn: challenge.endsOn, loggedDays: [...visitsByDay.keys()] }),
+    [today, challenge.startsOn, challenge.endsOn, visitsByDay],
+  );
+
+  const [day, setDay] = useState(today);
+  const [editing, setEditing] = useState<Entry | null>(() => visitsByDay.get(today)?.[0] ?? null);
   const [occurredOn, setOccurredOn] = useState(today);
-  const [visitValues, setVisitValues] = useState<Record<Id, unknown>>({});
-  const [rows, setRows] = useState<Row[]>(() => [blankRow()]);
+  const [visitValues, setVisitValues] = useState<Record<Id, unknown>>(() => (editing ? valuesAsRecord(editing.values) : {}));
+  const [rows, setRows] = useState<Row[]>(() => (editing ? sortedRecords(editing.id).map((record) => ({ key: newRowKey(), id: record.id, itemId: record.itemId ?? "", values: valuesAsRecord(record.values) })) : []));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [removing, setRemoving] = useState<Entry | null>(null);
   const [showAll, setShowAll] = useState(false);
-  // The row that is naming a brand-new item instead of picking one.
-  const [creating, setCreating] = useState<{ rowKey: string; title: string; busy: boolean; error: string | null } | null>(null);
+  // "New item" being named in the tray. It never touches the rows until the item exists.
+  const [creating, setCreating] = useState<{ title: string; busy: boolean; error: string | null } | null>(null);
+  // After a save, the check-in to reopen once the reload brings it back: the edited one, or the newest of that day.
+  const [reopen, setReopen] = useState<{ day: string; visitId?: Id; known: Set<Id> } | null>(null);
   const newItemInput = useRef<HTMLInputElement>(null);
-  const creatingRow = creating?.rowKey;
-  // Picking "+ New item" is a request to type a name — put the cursor there.
-  useEffect(() => { if (creatingRow) newItemInput.current?.focus(); }, [creatingRow]);
+  const cardsRef = useRef<HTMLOListElement>(null);
+  const isCreating = creating !== null;
+  useEffect(() => { if (isCreating) newItemInput.current?.focus(); }, [isCreating]);
   const disabled = !canEdit || busy;
 
-  function reset() {
-    setEditing(null);
-    setOccurredOn(today);
-    setVisitValues({});
-    setRows([blankRow()]);
+  function load(visit: Entry | null, onDay: string) {
+    setEditing(visit);
+    setOccurredOn(visit?.occurredOn ?? onDay);
+    setVisitValues(visit ? valuesAsRecord(visit.values) : {});
+    setRows(visit ? sortedRecords(visit.id).map((record) => ({ key: newRowKey(), id: record.id, itemId: record.itemId ?? "", values: valuesAsRecord(record.values) })) : []);
     setError(null);
   }
 
-  function startEditing(visit: Entry) {
-    const records = (recordsByVisit.get(visit.id) ?? []).slice().sort((a, b) => (a.submittedAt ?? "").localeCompare(b.submittedAt ?? ""));
-    setEditing(visit);
-    setOccurredOn(visit.occurredOn ?? today);
-    setVisitValues(valuesAsRecord(visit.values));
-    setRows(records.map((record) => ({ key: newRowKey(), id: record.id, itemId: record.itemId ?? "", values: valuesAsRecord(record.values) })));
-    setError(null);
+  useEffect(() => {
+    if (!reopen) return;
+    const visits = visitsByDay.get(reopen.day) ?? [];
+    const found = reopen.visitId
+      ? visits.find((visit) => visit.id === reopen.visitId)
+      : visits.find((visit) => !reopen.known.has(visit.id));
+    if (!found) return;
+    setReopen(null);
+    load(found, reopen.day);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reopen, visitsByDay]);
+
+  function selectDay(next: string) {
+    setDay(next);
     setSuccess(null);
+    setCreating(null);
+    load(visitsByDay.get(next)?.[0] ?? null, next);
+  }
+
+  function startEditing(visit: Entry) {
+    setDay(visit.occurredOn ?? today);
+    setSuccess(null);
+    load(visit, visit.occurredOn ?? today);
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function focusCard(itemId: Id) {
+    const card = cardsRef.current?.querySelector<HTMLElement>(`[data-item="${itemId}"]`);
+    card?.scrollIntoView({ behavior: "smooth", block: "center" });
+    card?.querySelector<HTMLElement>("input, select, textarea")?.focus({ preventScroll: true });
+  }
+
+  function addItemRow(itemId: Id) {
+    if (rows.some((row) => row.itemId === itemId)) { focusCard(itemId); return; }
+    setRows((current) => [...current, { key: newRowKey(), itemId, values: {} }]);
+    setSuccess(null);
+    setError(null);
+    requestAnimationFrame(() => focusCard(itemId));
   }
 
   async function createItem() {
     if (!creating || !onAddItem) return;
     const title = creating.title.trim();
     if (!title) return;
+    const existing = items.find((item) => item.title.trim().toLowerCase() === title.toLowerCase());
+    if (existing) { setCreating(null); addItemRow(existing.id); return; }
     setCreating({ ...creating, busy: true, error: null });
     try {
       const itemId = await onAddItem(title);
-      patchRow(creating.rowKey, { itemId });
       setCreating(null);
+      addItemRow(itemId);
     } catch (cause) {
       setCreating((current) => (current ? { ...current, busy: false, error: f.error(cause) } : current));
     }
@@ -255,6 +394,7 @@ export function SessionLog({
       if (visitId === editing?.id) continue;
       for (const record of records) {
         if (record.itemId !== itemId) continue;
+        if ((record.occurredOn ?? "") > occurredOn) continue;
         if (!latest || (record.occurredOn ?? "") > (latest.occurredOn ?? "")) latest = record;
       }
     }
@@ -264,28 +404,34 @@ export function SessionLog({
     return { text: t("lastTime", { values: summary, date: f.date(latest.occurredOn, shortDate) }), values };
   }
 
+  const missingCount = rows.filter((row) => findMissingRequiredField(recordFields, row.values)).length;
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
     setSuccess(null);
-    const filled = rows.filter((row) => row.itemId || Object.values(row.values).some((value) => value !== "" && value !== undefined && value !== null));
-    if (!filled.length) { setError(t("errNoRows")); return; }
-    if (filled.some((row) => !row.itemId)) { setError(t("errPickItem")); return; }
-    for (const row of filled) {
+    if (!rows.length) { setError(t("errNoRows")); return; }
+    for (const row of rows) {
       const missing = findMissingRequiredField(recordFields, row.values);
-      if (missing) { setError(tf("fillField", { label: `${itemTitle(row.itemId)} · ${missing.label}` })); return; }
+      if (missing) {
+        setError(tf("fillField", { label: `${itemTitle(row.itemId)} · ${missing.label}` }));
+        focusCard(row.itemId as Id);
+        return;
+      }
     }
     const missingVisit = findMissingRequiredField(visitFields, visitValues);
     if (missingVisit) { setError(tf("fillField", { label: missingVisit.label })); return; }
     setBusy(true);
     try {
+      const target = occurredOn || day;
       await onSave({
-        occurredOn,
+        occurredOn: target,
         values: visitValues,
-        children: filled.map((row) => ({ ...(row.id ? { id: row.id } : {}), itemId: row.itemId as Id, values: row.values })),
+        children: rows.map((row) => ({ ...(row.id ? { id: row.id } : {}), itemId: row.itemId as Id, values: row.values })),
       }, editing ?? undefined);
-      setSuccess(t("saved"));
-      reset();
+      setSuccess(editing ? t("savedChanges") : t("saved"));
+      setDay(target);
+      setReopen({ day: target, visitId: editing?.id, known: new Set((visitsByDay.get(target) ?? []).map((visit) => visit.id)) });
     } catch (cause) {
       setError(f.error(cause));
     } finally {
@@ -293,7 +439,7 @@ export function SessionLog({
     }
   }
 
-  // Per item: how many check-ins it appeared in, the best of each numeric field, and its latest records.
+  // Per item: how many check-ins it appeared in, the best of each numeric field, its trend and its latest records.
   const byItem = useMemo(() => {
     const groups = new Map<Id, Array<{ entry: Entry; values: Record<Id, unknown> }>>();
     for (const records of recordsByVisit.values()) {
@@ -304,6 +450,7 @@ export function SessionLog({
         groups.set(entry.itemId, list);
       }
     }
+    const trendField = numberFields[0];
     return items
       .filter((item) => groups.has(item.id))
       .map((item) => {
@@ -316,131 +463,227 @@ export function SessionLog({
           }
           return best ? [{ field, ...best }] : [];
         });
-        return { item, list, records, sessions: new Set(list.map((row) => row.entry.parentEntryId)).size };
-      });
-  }, [recordsByVisit, items, recordFields]);
+        const trend = trendField
+          ? list.slice().reverse().map((row) => numberValue(row.values[trendField.id as Id])).filter((value): value is number => value !== null)
+          : [];
+        return { item, list, records, trend, sessions: new Set(list.map((row) => row.entry.parentEntryId)).size };
+      })
+      .sort((a, b) => b.sessions - a.sessions);
+  }, [recordsByVisit, items, recordFields, numberFields]);
 
-  if (!items.length) return <EmptyState title={t("noItems")} />;
+  // The tray lists the items used most first, so the usual ones are always at hand.
+  const trayItems = useMemo(() => {
+    const uses = new Map(byItem.map((row) => [row.item.id, row.sessions]));
+    return [...items].sort((a, b) => (uses.get(b.id) ?? 0) - (uses.get(a.id) ?? 0) || (a.position ?? 0) - (b.position ?? 0));
+  }, [items, byItem]);
+
+  if (!items.length && !onAddItem) return <EmptyState title={t("noItems")} />;
 
   const shownVisits = showAll ? ownVisits : ownVisits.slice(0, 5);
+  const dayVisits = visitsByDay.get(day) ?? [];
+  const lastNumber = (last: { values: Record<Id, unknown> } | null, field: ChallengeField) => (last ? numberValue(last.values[field.id as Id]) : null);
+  const deltaText = (field: ChallengeField, current: number, previous: number) => {
+    const diff = Number((current - previous).toFixed(4));
+    if (diff === 0) return { text: t("deltaSame"), tone: "same" as const };
+    const value = nf.number(Math.abs(diff), { maximumFractionDigits: 2 });
+    return diff > 0 ? { text: t("deltaUp", { value }), tone: "up" as const } : { text: t("deltaDown", { value }), tone: "down" as const };
+  };
 
   return (
     <div className="space-y-6">
       <section className={cx(cardClass, "min-w-0 p-5 sm:p-7")}>
-        <form onSubmit={submit} noValidate>
-          <div className="mb-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
-            <h2 className="text-2xl font-light tracking-[-0.04em]">
-              {editing ? t("editTitle", { name: spec.visit.name, date: f.date(editing.occurredOn, shortDate) }) : t("composerTitle", { name: spec.visit.name })}
-            </h2>
-            <label className="block w-full sm:w-44">
-              <span className="sr-only">{t("dateLabel")}</span>
-              <input className={inputClass} type="date" max={today} value={occurredOn} disabled={disabled} onChange={(event) => setOccurredOn(event.target.value || today)} />
-            </label>
-          </div>
-
-          <ol className="space-y-4">
-            {rows.map((row, index) => {
-              const last = row.itemId ? lastRecordFor(row.itemId) : null;
-              return (
-                <li key={row.key} className="rounded-2xl border border-[var(--line)] bg-[var(--canvas)]/50 p-4 sm:p-5">
-                  <div className="flex items-center gap-3">
-                    <span className="grid h-8 w-8 flex-none place-items-center rounded-full bg-[var(--main-soft)] text-sm font-medium text-[var(--main-strong)]" aria-hidden="true">{index + 1}</span>
-                    <select
-                      aria-label={itemsHeading} className={cx(inputClass, "min-w-0 flex-1 text-base font-medium")} disabled={disabled} value={row.itemId}
-                      onChange={(event) => {
-                        if (event.target.value === NEW_ITEM) setCreating({ rowKey: row.key, title: "", busy: false, error: null });
-                        else patchRow(row.key, { itemId: event.target.value });
-                      }}
-                    >
-                      <option value="">{t("pickItem")}</option>
-                      {items.map((item: ChallengeItem) => <option key={item.id} value={item.id}>{item.title}</option>)}
-                      {onAddItem ? <option value={NEW_ITEM}>{t("newItem")}</option> : null}
-                    </select>
-                    {rows.length > 1 ? (
-                      <button
-                        type="button" disabled={disabled}
-                        className="grid h-10 w-10 flex-none cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--danger)] disabled:cursor-not-allowed disabled:opacity-40"
-                        aria-label={t("removeRow")} title={t("removeRow")}
-                        onClick={() => setRows((current) => current.filter((candidate) => candidate.key !== row.key))}
-                      >
-                        <CloseIcon className="h-4 w-4" />
-                      </button>
-                    ) : null}
-                  </div>
-                  {creating?.rowKey === row.key ? (
-                    <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-[var(--wash)] p-2.5">
-                      <input
-                        ref={newItemInput} className={cx(inputClass, "min-w-0 flex-1")} value={creating.title} maxLength={200} disabled={creating.busy}
-                        placeholder={t("newItemPlaceholder")} aria-label={t("newItemPlaceholder")}
-                        onChange={(event) => setCreating({ ...creating, title: event.target.value })}
-                        onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void createItem(); } }}
-                      />
-                      <Button type="button" disabled={creating.busy || !creating.title.trim()} onClick={() => void createItem()}>{creating.busy ? tc("saving") : t("newItemAdd")}</Button>
-                      <Button type="button" variant="ghost" disabled={creating.busy} onClick={() => setCreating(null)}>{tc("cancel")}</Button>
-                      {creating.error ? <span className="w-full"><StatusMessage error={creating.error} /></span> : null}
-                    </div>
-                  ) : null}
-                  {last ? (
-                    <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 pl-11 text-xs text-[var(--muted)]">
-                      <span>{last.text}</span>
-                      <button
-                        type="button" disabled={disabled}
-                        className="min-h-8 cursor-pointer rounded-full px-2.5 font-medium text-[var(--main-strong)] transition hover:bg-[var(--main-soft)] disabled:cursor-not-allowed disabled:opacity-50"
-                        onClick={() => patchRow(row.key, { values: { ...last.values } })}
-                      >
-                        {t("repeatLast")}
-                      </button>
-                    </p>
-                  ) : null}
-                  <div
-                    className="mt-4 grid grid-cols-2 items-end gap-3 sm:[grid-template-columns:repeat(var(--n),minmax(0,1fr))] sm:[max-width:calc(var(--n)*14rem)]"
-                    style={{ "--n": Math.min(Math.max(recordFields.length, 1), 4) } as CSSProperties}
-                  >
-                    {recordFields.map((field) => (
-                      <label className="block" key={field.id}>
-                        <span className="mb-1 block text-xs font-medium leading-tight text-[var(--muted)]">
-                          {field.label}{field.required ? <span className="ml-1 text-[var(--main-2)]" aria-label={tf("required")}>*</span> : null}
-                        </span>
-                        <CellInput
-                          id={`${row.key}-${field.id}`} field={field} disabled={disabled} value={row.values[field.id as Id]}
-                          className={cx(inputClass, "text-base tabular-nums")}
-                          onChange={(value) => patchRow(row.key, { values: { ...row.values, [field.id as Id]: value } })}
-                        />
-                      </label>
-                    ))}
-                  </div>
-                </li>
-              );
-            })}
-          </ol>
-          <button
-            type="button" disabled={disabled}
-            className="mt-4 flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-[var(--main-line)] text-sm font-medium text-[var(--main-strong)] transition hover:bg-[var(--main-soft)] disabled:cursor-not-allowed disabled:opacity-50"
-            onClick={() => setRows((current) => [...current, blankRow()])}
-          >
-            <span aria-hidden="true" className="text-lg leading-none">+</span>{t("addRow")}
-          </button>
-
-          {visitFields.length ? (
-            <div className="mt-6 space-y-3">
-              {visitFields.map((field) => (
-                <label className="block" key={field.id}>
-                  <span className={labelClass}>{field.label}{field.required ? <span className="ml-1 text-[var(--main-2)]" aria-label={tf("required")}>*</span> : <small className="ml-2 font-light text-[var(--muted)]">{tf("optional")}</small>}</span>
-                  <CellInput id={`visit-${field.id}`} field={field} disabled={disabled} value={visitValues[field.id as Id]} onChange={(value) => { setVisitValues((current) => ({ ...current, [field.id as Id]: value })); setSuccess(null); }} />
+        <CheckinLog
+          from={range.from}
+          to={range.to}
+          today={today}
+          deadline={challenge.endsOn ?? null}
+          records={logRecords}
+          selectedDay={day}
+          onSelectDay={selectDay}
+          canEdit={canEdit}
+          unavailableMessage={unavailableMessage}
+        >
+          <form onSubmit={submit} noValidate>
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+              <h3 className="text-sm text-[var(--muted)]">
+                {editing ? t("editTitle", { name: spec.visit.name, date: f.date(editing.occurredOn, shortDate) }) : t("composerTitle", { name: spec.visit.name })}
+              </h3>
+              {editing ? (
+                <label className="flex items-center gap-2 text-xs text-[var(--muted)]">
+                  {t("dateLabel")}
+                  <input className={cx(inputClass, "w-40")} type="date" max={today} value={occurredOn} disabled={disabled} onChange={(event) => setOccurredOn(event.target.value || day)} />
                 </label>
-              ))}
+              ) : null}
             </div>
-          ) : null}
 
-          <div className="mt-5"><StatusMessage error={error} success={success} /></div>
-          {!canEdit && unavailableMessage ? <p className="mt-3 rounded-xl border border-[var(--line)] bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{unavailableMessage}</p> : null}
-          <div className="mt-5 flex flex-col gap-2 sm:flex-row">
-            <Button type="submit" className="min-h-12 w-full text-base sm:flex-1" disabled={disabled}>
-              {busy ? tc("saving") : editing ? tc("saveChanges") : t("save", { name: spec.visit.name })}<span aria-hidden="true">→</span>
-            </Button>
-            {editing ? <Button type="button" variant="secondary" className="min-h-12 w-full sm:flex-1" disabled={busy} onClick={reset}>{tc("cancel")}</Button> : null}
-          </div>
-        </form>
+            {dayVisits.length > 1 || (editing && dayVisits.length) ? (
+              <div className="mb-5 flex flex-wrap items-center gap-2 text-xs" role="group" aria-label={t("onThisDay")}>
+                <span className="text-[var(--muted)]">{t("onThisDay")}</span>
+                {dayVisits.slice().reverse().map((visit, index) => (
+                  <button
+                    key={visit.id} type="button" aria-pressed={editing?.id === visit.id} disabled={busy}
+                    onClick={() => { setSuccess(null); load(visit, day); }}
+                    className={cx("min-h-8 cursor-pointer rounded-full border px-3", editing?.id === visit.id ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] hover:border-[var(--main-line)]")}
+                  >
+                    {index + 1} · {t("itemCount", { count: recordsByVisit.get(visit.id)?.length ?? 0 })}
+                  </button>
+                ))}
+                {canEdit ? (
+                  <button type="button" disabled={busy} onClick={() => { setSuccess(null); load(null, day); }} className={cx("min-h-8 cursor-pointer rounded-full border border-dashed px-3", !editing ? "border-[var(--main)] text-[var(--main-strong)]" : "border-[var(--main-line)] text-[var(--main-strong)] hover:bg-[var(--main-soft)]")}>
+                    + {t("newVisitOnDay", { name: spec.visit.name })}
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+
+            <p className={cx("mb-2.5", sectionLabelClass)}>{t("trayLabel")}</p>
+            <div className="flex flex-wrap gap-2" role="group" aria-label={itemsHeading}>
+              {trayItems.map((item) => {
+                const inside = rows.some((row) => row.itemId === item.id);
+                const last = lastRecordFor(item.id);
+                const lastLead = last && numberFields[0] ? numberValue(last.values[numberFields[0].id as Id]) : null;
+                return (
+                  <button
+                    key={item.id} type="button" aria-pressed={inside} disabled={disabled}
+                    onClick={() => addItemRow(item.id)}
+                    className={cx(
+                      "inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border py-1.5 pl-1.5 pr-3 text-sm transition disabled:cursor-not-allowed disabled:opacity-50",
+                      inside ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] bg-[var(--paper)] hover:border-[var(--main-line)]",
+                    )}
+                  >
+                    <span className={cx("grid h-6 w-6 place-items-center rounded-full text-xs", inside ? "bg-[var(--main)] text-white" : "bg-[var(--wash)] text-[var(--muted)]")} aria-hidden="true">{inside ? "✓" : "+"}</span>
+                    {item.title}
+                    {lastLead !== null ? <span className="text-[11px] tabular-nums text-[var(--muted)]">{nf.number(lastLead, { maximumFractionDigits: 2 })}</span> : null}
+                  </button>
+                );
+              })}
+              {onAddItem && !creating ? (
+                <button type="button" disabled={disabled} onClick={() => setCreating({ title: "", busy: false, error: null })} className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border border-dashed border-[var(--main-line)] py-1.5 pl-1.5 pr-3 text-sm text-[var(--main-strong)] transition hover:bg-[var(--main-soft)] disabled:cursor-not-allowed disabled:opacity-50">
+                  <span className="grid h-6 w-6 place-items-center rounded-full bg-[var(--main-soft)] text-xs" aria-hidden="true">+</span>{t("newItemPill")}
+                </button>
+              ) : null}
+            </div>
+            {creating ? (
+              <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-[var(--wash)] p-2.5">
+                <input
+                  ref={newItemInput} className={cx(inputClass, "min-w-0 flex-1")} value={creating.title} maxLength={200} disabled={creating.busy}
+                  placeholder={t("newItemPlaceholder")} aria-label={t("newItemPlaceholder")}
+                  onChange={(event) => setCreating({ ...creating, title: event.target.value })}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") { event.preventDefault(); void createItem(); }
+                    if (event.key === "Escape") { event.preventDefault(); setCreating(null); }
+                  }}
+                />
+                <Button type="button" disabled={creating.busy || !creating.title.trim()} onClick={() => void createItem()}>{creating.busy ? tc("saving") : t("newItemAdd")}</Button>
+                <Button type="button" variant="ghost" disabled={creating.busy} onClick={() => setCreating(null)}>{tc("cancel")}</Button>
+                {creating.error ? <span className="w-full"><StatusMessage error={creating.error} /></span> : null}
+              </div>
+            ) : null}
+
+            {rows.length ? (
+              <ol ref={cardsRef} className="mt-5 space-y-3">
+                {rows.map((row, index) => {
+                  const last = row.itemId ? lastRecordFor(row.itemId) : null;
+                  const best = row.itemId ? bestValues(ownRecords, row.itemId, recordFields.filter((field) => field.type === "number" || field.type === "rating"), editing?.id ?? null) : new Map<Id, number>();
+                  const newBests = recordFields.filter((field) => {
+                    const value = numberValue(row.values[field.id as Id]);
+                    const previous = best.get(field.id as Id);
+                    return value !== null && previous !== undefined && value > previous;
+                  });
+                  return (
+                    <li key={row.key} data-item={row.itemId} className="rounded-2xl border border-[var(--line)] bg-[var(--canvas)]/50 p-4 sm:p-5">
+                      <div className="flex items-start gap-3">
+                        <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-[var(--main-soft)] text-xs font-medium text-[var(--main-strong)]" aria-hidden="true">{index + 1}</span>
+                        <div className="min-w-0 flex-1">
+                          <strong className="block text-base font-medium">{itemTitle(row.itemId)}</strong>
+                          <span className="block text-xs text-[var(--muted)]">{last ? last.text : t("firstTime")}</span>
+                        </div>
+                        {last ? (
+                          <button
+                            type="button" disabled={disabled}
+                            className="min-h-9 flex-none cursor-pointer rounded-full px-3 text-xs font-medium text-[var(--main-strong)] transition hover:bg-[var(--main-soft)] disabled:cursor-not-allowed disabled:opacity-50"
+                            onClick={() => patchRow(row.key, { values: { ...last.values } })}
+                          >
+                            {t("repeatLast")}
+                          </button>
+                        ) : null}
+                        <button
+                          type="button" disabled={disabled}
+                          className="grid h-9 w-9 flex-none cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--danger-soft)] hover:text-[var(--danger)] disabled:cursor-not-allowed disabled:opacity-40"
+                          aria-label={t("removeRow", { name: itemTitle(row.itemId) })} title={t("removeRow", { name: itemTitle(row.itemId) })}
+                          onClick={() => setRows((current) => current.filter((candidate) => candidate.key !== row.key))}
+                        >
+                          <CloseIcon className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] items-start gap-3">
+                        {recordFields.map((field) => {
+                          const id = `${row.key}-${field.id}`;
+                          const current = numberValue(row.values[field.id as Id]);
+                          const previous = lastNumber(last, field);
+                          const delta = field.type === "number" && current !== null && previous !== null ? deltaText(field, current, previous) : null;
+                          return (
+                            <div key={field.id}>
+                              <label className="mb-1 block text-xs font-medium leading-tight text-[var(--muted)]" htmlFor={id}>
+                                {field.label}{field.required ? <span className="ml-1 text-[var(--main-2)]" aria-label={tf("required")}>*</span> : null}
+                              </label>
+                              {field.type === "number" ? (
+                                <NumberStepper id={id} field={field} value={row.values[field.id as Id]} last={previous} disabled={disabled} onChange={(value) => patchRow(row.key, { values: { ...row.values, [field.id as Id]: value } })} />
+                              ) : (
+                                <CellInput id={id} field={field} disabled={disabled} value={row.values[field.id as Id]} className={cx(inputClass, "text-base")} onChange={(value) => patchRow(row.key, { values: { ...row.values, [field.id as Id]: value } })} />
+                              )}
+                              {delta ? (
+                                <span className={cx("mt-1 block text-[11px] tabular-nums", delta.tone === "up" ? "text-[var(--ok)]" : delta.tone === "down" ? "text-[var(--warn)]" : "text-[var(--muted)]")}>{delta.text}</span>
+                              ) : null}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {newBests.length ? (
+                        <p className="mt-3 flex flex-wrap gap-1.5">
+                          {newBests.map((field) => (
+                            <span key={field.id} className="rounded-full bg-[var(--main-2)]/15 px-2.5 py-1 text-xs font-medium text-[var(--main-2)]">
+                              {t("newBest", { field: field.label, value: showValue(field, best.get(field.id as Id)) })}
+                            </span>
+                          ))}
+                        </p>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ol>
+            ) : (
+              <p className="mt-5 rounded-2xl border border-dashed border-[var(--line)] px-4 py-5 text-center text-sm text-[var(--muted)]">{t("emptyRows", { name: spec.visit.name })}</p>
+            )}
+
+            {visitFields.length ? (
+              <div className="mt-6 space-y-3">
+                {visitFields.map((field) => (
+                  <label className="block" key={field.id}>
+                    <span className={labelClass}>{field.label}{field.required ? <span className="ml-1 text-[var(--main-2)]" aria-label={tf("required")}>*</span> : <small className="ml-2 font-light text-[var(--muted)]">{tf("optional")}</small>}</span>
+                    <CellInput id={`visit-${field.id}`} field={field} disabled={disabled} value={visitValues[field.id as Id]} onChange={(value) => { setVisitValues((current) => ({ ...current, [field.id as Id]: value })); setSuccess(null); }} />
+                  </label>
+                ))}
+              </div>
+            ) : null}
+
+            <div className="mt-5"><StatusMessage error={error} success={success} /></div>
+            {!canEdit && unavailableMessage ? <p className="mt-3 rounded-xl border border-[var(--line)] bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{unavailableMessage}</p> : null}
+            {canEdit ? (
+              <div className="sticky bottom-[calc(84px+env(safe-area-inset-bottom,0px))] z-20 mt-5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-2.5 pl-4 shadow-[var(--elevate-card)] sm:bottom-4">
+                <span className="min-w-0 flex-1 text-sm text-[var(--muted)]">
+                  {rows.length
+                    ? <>{t.rich("summary", { count: rows.length, b: (chunks) => <strong className="font-medium text-[var(--ink)]">{chunks}</strong> })} · {missingCount ? t("summaryMissing", { count: missingCount }) : t("summaryReady")}</>
+                    : t("summaryEmpty")}
+                </span>
+                {editing && onDelete ? <button type="button" className="min-h-11 cursor-pointer px-3 text-sm text-[var(--muted)] hover:text-[var(--danger)]" disabled={busy} onClick={() => setRemoving(editing)}>{t("remove")}</button> : null}
+                <Button type="submit" className="min-h-11" disabled={disabled || !rows.length}>
+                  {busy ? tc("saving") : editing ? tc("saveChanges") : t("save", { name: spec.visit.name })}<span aria-hidden="true">→</span>
+                </Button>
+              </div>
+            ) : null}
+          </form>
+        </CheckinLog>
       </section>
 
       <section className={cx(cardClass, "min-w-0 p-5 sm:p-7")}>
@@ -452,7 +695,7 @@ export function SessionLog({
           <>
             <ul className="divide-y divide-[var(--line)]">
               {shownVisits.map((visit) => {
-                const records = (recordsByVisit.get(visit.id) ?? []).slice().sort((a, b) => (a.submittedAt ?? "").localeCompare(b.submittedAt ?? ""));
+                const records = sortedRecords(visit.id);
                 const note = visitFields.length ? valuesAsRecord(visit.values) : null;
                 return (
                   <li key={visit.id} className="py-4 first:pt-0 last:pb-0">
@@ -510,17 +753,21 @@ export function SessionLog({
 
       {byItem.length ? (
         <section className={cx(cardClass, "min-w-0 p-5 sm:p-7")}>
-          <h2 className={cx(sectionLabelClass, "mb-4")}>{t("byItemTitle")}</h2>
+          <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+            <h2 className={sectionLabelClass}>{t("byItemTitle")}</h2>
+            {numberFields[0] ? <span className="text-xs text-[var(--muted)]">{t("trendCaption", { field: numberFields[0].label })}</span> : null}
+          </div>
           <ul className="divide-y divide-[var(--line)]">
-            {byItem.map(({ item, list, records, sessions }) => (
+            {byItem.map(({ item, list, records, trend, sessions }) => (
               <li key={item.id} className="py-4 first:pt-0 last:pb-0">
                 <details className="group">
                   <summary className="min-h-11 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
                     <span className="flex items-center justify-between gap-3">
-                      <span className="min-w-0">
+                      <span className="min-w-0 flex-1">
                         <strong className="block text-base font-medium">{item.title}</strong>
                         <span className="block text-xs text-[var(--muted)]">{t("performedIn", { count: sessions })}</span>
                       </span>
+                      <Sparkline values={trend} />
                       <ChevronIcon className="h-4 w-4 flex-none text-[var(--muted)] transition-transform group-open:rotate-180" />
                     </span>
                     {records.length ? (
@@ -567,8 +814,9 @@ export function SessionLog({
           danger
           onClose={() => setRemoving(null)}
           onConfirm={async () => {
+            const wasOpen = editing?.id === removing.id;
             await onDelete(removing.id);
-            if (editing?.id === removing.id) reset();
+            if (wasOpen) load(null, day);
             setRemoving(null);
           }}
         />

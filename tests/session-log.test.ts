@@ -4,6 +4,7 @@ import { createElement } from "react";
 
 import { SessionLog, sessionSpecOf } from "../app/goa/session-log";
 import type { ChallengeDetail, Entry } from "../app/goa/types";
+import { dateKeyInSaoPaulo } from "../app/goa/utils";
 import { renderWithIntl } from "./helpers/intl";
 
 const visitType = { id: "visit", name: "Treino", semanticKey: "sessao", parentTypeId: null, fields: [{ id: "note", key: "nota", label: "Como foi?", type: "text", required: false }] };
@@ -39,24 +40,51 @@ test("um check-in que guarda registros por item é reconhecido pelos tipos; um d
   assert.equal(sessionSpecOf({ entryTypes: [{ ...visitType, parentTypeId: null }] } as unknown as ChallengeDetail), null);
 });
 
-test("o registro de um treino: formulário com uma linha por item, histórico só seu e o melhor de cada campo por exercício", () => {
+test("o registro de um treino: bandeja de itens para tocar, histórico só seu e o melhor de cada campo por exercício", () => {
   const spec = sessionSpecOf(challenge)!;
   const html = renderWithIntl(createElement(SessionLog, {
     challenge, spec, entries, userId: "me", canEdit: true, onSave: async () => undefined, onDelete: async () => undefined,
   }));
   assert.match(html, /Registrar Treino/, "o título usa o nome que o criador deu");
-  assert.match(html, /Carga \(kg\)/);
-  assert.match(html, /Repetições/);
-  assert.match(html, /Adicionar outro/);
-  // Cada exercício é um cartão com os próprios rótulos — sem um cabeçalho de colunas repetindo o que está em cada linha.
+  assert.match(html, /Toque para adicionar/);
   const form = html.slice(html.indexOf("<form"), html.indexOf("</form>"));
-  assert.match(form, /<ol/, "os exercícios formam uma lista de cartões");
-  assert.equal((form.match(/Carga \(kg\)/g) ?? []).length, 1, "o rótulo de cada campo aparece uma vez por exercício");
-  assert.doesNotMatch(form, /aria-hidden="true"[^>]*>\s*<span[^>]*>Exercícios</, "sem linha de cabeçalho de colunas");
+  // Cada item é um botão da bandeja, os mais usados primeiro; nenhum ainda neste treino.
+  assert.ok(form.indexOf("Supino") < form.indexOf("Agachamento"), "o supino, usado duas vezes, vem antes");
+  assert.ok((form.match(/aria-pressed="false"/g) ?? []).length >= 2);
+  assert.match(form, /Escolha acima o que entrou neste Treino/, "sem cartões, uma dica em vez de um formulário vazio");
+  assert.doesNotMatch(form, /Novo item/, "sem permissão, não há como criar item");
   assert.match(html, /2 check-ins/, "só os seus dois treinos contam");
   assert.doesNotMatch(html, /100/, "o treino de outra pessoa não entra no seu histórico nem nos recordes");
   assert.match(html, /Melhor Carga \(kg\): 57,5|Melhor Carga \(kg\): 57\.5/, "o recorde do supino sai do histórico, sem ninguém digitá-lo");
   assert.match(html, /em 2 check-ins/, "o supino apareceu nos dois treinos");
+});
+
+test("quem pode criar itens ganha o botão Novo item na bandeja", () => {
+  const spec = sessionSpecOf(challenge)!;
+  const html = renderWithIntl(createElement(SessionLog, {
+    challenge, spec, entries, userId: "me", canEdit: true, onSave: async () => undefined, onAddItem: async () => "new",
+  }));
+  assert.match(html, /Novo item/);
+});
+
+test("o treino de hoje já registrado abre para editar, com a última vez, a diferença e o recorde", () => {
+  const spec = sessionSpecOf(challenge)!;
+  const today = dateKeyInSaoPaulo(new Date());
+  const withToday = [
+    ...entries,
+    entry({ id: "w3", entryTypeId: "visit", occurredOn: today }),
+    entry({ id: "w3-bench", entryTypeId: "record", parentEntryId: "w3", itemId: "bench", occurredOn: today, values: { carga: 60, reps: 8 } }),
+  ];
+  const html = renderWithIntl(createElement(SessionLog, {
+    challenge, spec, entries: withToday, userId: "me", canEdit: true, onSave: async () => undefined, onDelete: async () => undefined,
+  }));
+  const form = html.slice(html.indexOf("<form"), html.indexOf("</form>"));
+  assert.match(form, /Editando Treino/);
+  assert.match(form, /data-item="bench"/, "o supino de hoje vira um cartão");
+  assert.match(form, /\+2,5 vs\. última/, "a carga subiu 2,5 desde o último treino");
+  assert.match(form, /Recorde de Carga \(kg\) · antes 57[,.]5/);
+  assert.match(form, /aria-pressed="true"[^>]*>(?:(?!<\/button>).)*Supino/s, "o supino aparece marcado na bandeja");
+  assert.match(form, />Excluir</, "um treino salvo pode ser excluído dali mesmo");
 });
 
 test("sem itens no desafio, o log avisa em vez de mostrar um formulário vazio", () => {
