@@ -307,7 +307,6 @@ export function SessionLog({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [removing, setRemoving] = useState<Entry | null>(null);
-  const [showAll, setShowAll] = useState(false);
   // "New item" being named in the tray. It never touches the rows until the item exists.
   const [creating, setCreating] = useState<{ title: string; busy: boolean; error: string | null } | null>(null);
   // After a save, the check-in to reopen once the reload brings it back: the edited one, or the newest of that day.
@@ -343,13 +342,6 @@ export function SessionLog({
     setSuccess(null);
     setCreating(null);
     load(visitsByDay.get(next)?.[0] ?? null, next);
-  }
-
-  function startEditing(visit: Entry) {
-    setDay(visit.occurredOn ?? today);
-    setSuccess(null);
-    load(visit, visit.occurredOn ?? today);
-    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function focusCard(itemId: Id) {
@@ -479,7 +471,6 @@ export function SessionLog({
 
   if (!items.length && !onAddItem) return <EmptyState title={t("noItems")} />;
 
-  const shownVisits = showAll ? ownVisits : ownVisits.slice(0, 5);
   const dayVisits = visitsByDay.get(day) ?? [];
   const lastNumber = (last: { values: Record<Id, unknown> } | null, field: ChallengeField) => (last ? numberValue(last.values[field.id as Id]) : null);
   const deltaText = (field: ChallengeField, current: number, previous: number) => {
@@ -684,71 +675,6 @@ export function SessionLog({
             ) : null}
           </form>
         </CheckinLog>
-      </section>
-
-      <section className={cx(cardClass, "min-w-0 p-5 sm:p-7")}>
-        <div className="mb-4 flex items-baseline justify-between gap-3">
-          <h2 className={sectionLabelClass}>{t("historyTitle")}</h2>
-          <span className="text-xs text-[var(--muted)]">{t("checkinCount", { count: ownVisits.length })}</span>
-        </div>
-        {ownVisits.length ? (
-          <>
-            <ul className="divide-y divide-[var(--line)]">
-              {shownVisits.map((visit) => {
-                const records = sortedRecords(visit.id);
-                const note = visitFields.length ? valuesAsRecord(visit.values) : null;
-                return (
-                  <li key={visit.id} className="py-4 first:pt-0 last:pb-0">
-                    <details className="group">
-                      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
-                        <span className="min-w-0">
-                          <strong className="block text-base font-medium">{f.date(visit.occurredOn, shortDate)}</strong>
-                          <span className="block truncate text-xs text-[var(--muted)]">{t("itemCount", { count: records.length })} · {records.slice(0, 3).map((record) => itemTitle(record.itemId)).join(", ")}{records.length > 3 ? "…" : ""}</span>
-                        </span>
-                        <ChevronIcon className="h-4 w-4 flex-none text-[var(--muted)] transition-transform group-open:rotate-180" />
-                      </summary>
-                      <div className="mt-3 overflow-x-auto rounded-xl border border-[var(--line)]">
-                        <table className="w-full min-w-[20rem] text-left text-sm">
-                          <thead className="bg-[var(--wash)] text-xs text-[var(--muted)]">
-                            <tr>
-                              <th className="px-3 py-2 font-medium">{itemsHeading}</th>
-                              {recordFields.map((field) => <th className="px-3 py-2 font-medium" key={field.id}>{field.label}</th>)}
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-[var(--line)]">
-                            {records.map((record) => {
-                              const values = valuesAsRecord(record.values);
-                              return (
-                                <tr key={record.id}>
-                                  <td className="px-3 py-2 font-medium">{itemTitle(record.itemId)}</td>
-                                  {recordFields.map((field) => <td className="px-3 py-2 tabular-nums" key={field.id}>{showValue(field, values[field.id as Id]) || "—"}</td>)}
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                      {note && visitFields.some((field) => showValue(field, note[field.id as Id])) ? (
-                        <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{visitFields.map((field) => showValue(field, note[field.id as Id])).filter(Boolean).join(" · ")}</p>
-                      ) : null}
-                      {canEdit ? (
-                        <div className="mt-3 flex gap-2">
-                          <Button variant="secondary" onClick={() => startEditing(visit)}>{t("edit")}</Button>
-                          {onDelete ? <button type="button" className="min-h-11 px-3 text-sm text-[var(--danger)] hover:underline" onClick={() => setRemoving(visit)}>{t("remove")}</button> : null}
-                        </div>
-                      ) : null}
-                    </details>
-                  </li>
-                );
-              })}
-            </ul>
-            {ownVisits.length > 5 ? (
-              <button type="button" className="mt-4 min-h-10 w-full rounded-xl border border-[var(--line)] text-xs font-light text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)]" aria-expanded={showAll} onClick={() => setShowAll((open) => !open)}>
-                {showAll ? t("showLess") : t("showAll", { count: ownVisits.length })}
-              </button>
-            ) : null}
-          </>
-        ) : <p className="text-sm text-[var(--muted)]">{t("historyEmpty")}</p>}
       </section>
 
       {byItem.length ? (

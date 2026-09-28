@@ -53,7 +53,8 @@ test("o registro de um treino: bandeja de itens para tocar, histórico só seu e
   assert.ok((form.match(/aria-pressed="false"/g) ?? []).length >= 2);
   assert.match(form, /Escolha acima o que entrou neste Treino/, "sem cartões, uma dica em vez de um formulário vazio");
   assert.doesNotMatch(form, /Novo item/, "sem permissão, não há como criar item");
-  assert.match(html, /2 check-ins/, "só os seus dois treinos contam");
+  assert.match(html, /<strong[^>]*>2<\/strong> de \d+ dias com registro/, "só os seus dois treinos contam na faixa de dias");
+  assert.doesNotMatch(html, /<h2[^>]*>Seus check-ins<\/h2>/, "o histórico repetido embaixo da faixa saiu");
   assert.doesNotMatch(html, /100(?!%)/, "o treino de outra pessoa não entra no seu histórico nem nos recordes");
   assert.match(html, /Melhor Carga \(kg\): 57,5|Melhor Carga \(kg\): 57\.5/, "o recorde do supino sai do histórico, sem ninguém digitá-lo");
   assert.match(html, /em 2 check-ins/, "o supino apareceu nos dois treinos");
