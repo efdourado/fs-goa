@@ -356,9 +356,9 @@ function MonthGrid({
   // Sunday-first initials, from a known Sunday (2026-09-06) so they follow the locale.
   const weekdays = Array.from({ length: 7 }, (_, index) => f.date(addDays("2026-09-06", index), { weekday: "narrow" }));
   return (
-    <div className="grid gap-5 sm:grid-cols-2">
+    <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
       {monthsIn(from, to).map((month) => (
-        <div key={month}>
+        <div key={month} className="w-full max-w-sm">
           <h4 className="mb-2 text-[13px] font-medium first-letter:uppercase">{f.date(`${month}-01`, { month: "long", year: "numeric" })}</h4>
           <div className="grid grid-cols-7 gap-1">
             {weekdays.map((weekday, index) => <span key={index} className="text-center text-[10px] uppercase text-[var(--muted)]" aria-hidden="true">{weekday}</span>)}
@@ -381,12 +381,13 @@ function MonthGrid({
                   onClick={() => onSelect(day)}
                   className={cx(
                     "grid aspect-square content-center justify-items-center rounded-[10px] border text-xs leading-tight transition",
-                    !inRange && "invisible",
-                    inRange && future && "cursor-default border-transparent opacity-40",
+                    // Outside the book's window (or the challenge): kept as a faint number so the month still reads as a calendar.
+                    !inRange && "cursor-default border-transparent text-[var(--muted)] opacity-35",
+                    inRange && future && cx("cursor-default opacity-40", day !== deadline && "border-transparent"),
                     inRange && !future && !record && (day === today ? "border-[1.5px] border-[var(--main)] text-[var(--main)]" : "border-dashed border-[var(--line)] text-[var(--muted)]"),
                     record && "border-transparent",
                     record && heat >= 60 ? "text-white" : record ? "text-[var(--main-strong)]" : undefined,
-                    day === deadline && "border-[1.5px] border-[var(--main-2)]",
+                    day === deadline && "border-[1.5px] border-[var(--main-2)] text-[var(--main-2)] opacity-100",
                     day === selectedDay && "outline outline-2 outline-offset-1 outline-[var(--ink)]",
                   )}
                   style={record ? { background: `color-mix(in srgb, var(--main) ${heat}%, var(--main-soft))` } : undefined}
@@ -570,7 +571,9 @@ function CounterEditor({
   const notesChanged = notes.some((note) => (noteValues[note.id as Id] ?? "") !== String(storedNotes[note.id as Id] ?? ""));
   const unchanged = saved !== null && amount === saved && !notesChanged;
   const step = field.config?.step && field.config.step > 0 ? field.config.step : 1;
-  const quick = isBook ? [5, 10, 20, 30] : [step, step * 5, step * 10];
+  // Shortcuts in whole units: a 0.5 step still jumps by 1, 5 and 10.
+  const unit = Math.max(1, step);
+  const quick = isBook ? [5, 10, 20, 30] : [unit, unit * 5, unit * 10];
   const format = (value: number) => nf.number(value, { maximumFractionDigits: 2 });
   const shown = (value: number) => (isBook ? t("pagesCount", { count: value, formatted: format(value) }) : format(value));
 
