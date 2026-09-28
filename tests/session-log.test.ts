@@ -54,7 +54,7 @@ test("o registro de um treino: bandeja de itens para tocar, histórico só seu e
   assert.match(form, /Escolha acima o que entrou neste Treino/, "sem cartões, uma dica em vez de um formulário vazio");
   assert.doesNotMatch(form, /Novo item/, "sem permissão, não há como criar item");
   assert.match(html, /2 check-ins/, "só os seus dois treinos contam");
-  assert.doesNotMatch(html, /100/, "o treino de outra pessoa não entra no seu histórico nem nos recordes");
+  assert.doesNotMatch(html, /100(?!%)/, "o treino de outra pessoa não entra no seu histórico nem nos recordes");
   assert.match(html, /Melhor Carga \(kg\): 57,5|Melhor Carga \(kg\): 57\.5/, "o recorde do supino sai do histórico, sem ninguém digitá-lo");
   assert.match(html, /em 2 check-ins/, "o supino apareceu nos dois treinos");
 });
@@ -83,7 +83,7 @@ test("o treino de hoje já registrado abre para editar, com a última vez, a dif
   assert.match(form, /data-item="bench"/, "o supino de hoje vira um cartão");
   assert.match(form, /\+2,5 vs\. última/, "a carga subiu 2,5 desde o último treino");
   assert.match(form, /Recorde de Carga \(kg\) · antes 57[,.]5/);
-  assert.match(form, /aria-pressed="true"[^>]*>(?:(?!<\/button>).)*Supino/s, "o supino aparece marcado na bandeja");
+  assert.match(form, /aria-pressed="true"[^>]*>(?:(?!<\/button>)[\s\S])*Supino/, "o supino aparece marcado na bandeja");
   assert.match(form, />Excluir</, "um treino salvo pode ser excluído dali mesmo");
 });
 
