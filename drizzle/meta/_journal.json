@@ -414,6 +414,13 @@
       "when": 1790337860903,
       "tag": "0058_shocking_greymalkin",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1790629258705,
+      "tag": "0059_classy_frightful_four",
+      "breakpoints": true
     }
   ]
 }

@@ -518,10 +518,10 @@ export interface ChallengeSummary {
 }
 
 /** The fixed set of homepage colour tags a viewer can assign to a challenge. */
-export type ChallengeColorTag = "green" | "blue" | "violet" | "coral" | "amber" | "rose";
+export type ChallengeColorTag = "green" | "blue" | "violet" | "amber";
 
 export const CHALLENGE_COLOR_TAGS: readonly ChallengeColorTag[] = [
-  "green", "blue", "violet", "coral", "amber", "rose",
+  "green", "blue", "violet", "amber",
 ];
 
 /** A library a challenge draws items from. `id` is null for a built-in one that has never held an item. */

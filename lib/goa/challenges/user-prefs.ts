@@ -9,7 +9,7 @@ import { challengeAccess } from "../domain/access";
  * gate; anyone who can see a challenge can organise it for themselves.
  */
 
-const COLOR_TAGS = new Set(["green", "blue", "violet", "coral", "amber", "rose"]);
+const COLOR_TAGS = new Set(["green", "blue", "violet", "amber"]);
 
 /** Toggle the pin and/or set the colour tag for one challenge. */
 export async function setChallengePref(

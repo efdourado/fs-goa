@@ -224,7 +224,7 @@ export const challengeUserPrefs = pgTable(
       .where(sql`${table.pinned}`),
     check(
       "challenge_user_prefs_color_tag_check",
-      sql`${table.colorTag} is null or ${table.colorTag} in ('green', 'blue', 'violet', 'coral', 'amber', 'rose')`,
+      sql`${table.colorTag} is null or ${table.colorTag} in ('green', 'blue', 'violet', 'amber')`,
     ),
   ],
 );
