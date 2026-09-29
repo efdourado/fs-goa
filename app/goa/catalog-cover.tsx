@@ -15,7 +15,7 @@ export function coverToneOf(title: string): CoverTone {
 }
 
 /** The cover's three colours, mixed from the theme's own tokens so light and dark both hold. */
-function coverColors(tone: CoverTone): CSSProperties {
+export function coverColors(tone: CoverTone): CSSProperties {
   const color = `var(--tag-${tone})`;
   return {
     "--cover-bg": `color-mix(in srgb, ${color} 20%, var(--paper))`,

@@ -23,6 +23,7 @@
     "db:seed": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/seed-admin.mjs",
     "db:seed-reading": "node --import tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/seed-reading/index.ts",
     "db:seed-local": "node --import tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/seed-local/index.ts",
+    "db:seed-showcase": "node --import tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/seed-showcase/index.ts",
     "db:seed-reading:prod": "node --import tsx --env-file=.env.production.local scripts/seed-reading/index.ts",
     "db:setup": "npm run db:migrate && npm run db:seed",
     "db:studio": "drizzle-kit studio",
@@ -32,6 +33,7 @@
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
     "drizzle-orm": "0.45.2",
+    "html-to-image": "^1.11.13",
     "next": "^16.3.3",
     "next-intl": "^4.14.1",
     "pg": "^8.23.0",

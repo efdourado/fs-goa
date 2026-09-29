@@ -246,3 +246,13 @@ button:focus-visible, a:focus-visible, textarea:focus-visible {
   .taste-drift, .taste-rise { animation: none; opacity: 1; }
   .taste-line { animation: none; stroke-dashoffset: 0; }
 }
+
+/* The thread (app/goa/story): a dated thread uncovers itself left to right, like the days did. */
+@keyframes story-sweep {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+.story-sweep { animation: story-sweep 1800ms cubic-bezier(0.3, 0.7, 0.2, 1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .story-sweep { animation: none; }
+}

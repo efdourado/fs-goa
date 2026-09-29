@@ -1,9 +1,10 @@
 "use client";
 
 import { useFormatter, useTranslations } from "next-intl";
-import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useState } from "react";
 
 import { copyText } from "./clipboard";
+import { firstName, landedAfter, personTone, RatingScale } from "./rating-scale";
 import { ConfirmDialog } from "./dialog";
 import type { ChallengeDetail, ChallengeItem, Entry, EntryTypeView, Id } from "./types";
 import { Button, cx } from "./ui";
@@ -42,6 +43,7 @@ export function RevealPanel({
   entries,
   userId,
   onReveal,
+  onPoll,
   onCreateInvite,
 }: {
   challenge: ChallengeDetail;
@@ -50,6 +52,8 @@ export function RevealPanel({
   entries: Entry[];
   userId: Id | undefined;
   onReveal?: (itemId: Id) => Promise<void>;
+  /** Re-reads the challenge: while sealed it runs every few seconds, so a reveal on someone else's phone plays here too. */
+  onPoll?: () => Promise<void>;
   /** Managers: a link into the group and this challenge, to share with whoever is missing. */
   onCreateInvite?: () => Promise<string>;
 }) {
@@ -64,6 +68,15 @@ export function RevealPanel({
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [invite, setInvite] = useState<"idle" | "busy" | "copied" | "shared" | "failed">("idle");
+
+  // Everyone waiting on a sealed item sees the reveal the moment anyone taps it — no refresh needed.
+  useEffect(() => {
+    if (!sealed || !onPoll) return;
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void onPoll().catch(() => undefined);
+    }, 4000);
+    return () => window.clearInterval(timer);
+  }, [sealed, onPoll]);
 
   // "We're revealing — yours is missing": the phone's share sheet where there is one, the clipboard otherwise.
   async function shareInvite() {
@@ -185,15 +198,6 @@ function LockGlyph() {
   );
 }
 
-/** Distance from the group, as a share of the scale: close is green, far is coral. */
-function toneFor(distance: number): string {
-  if (distance <= 0.15) return "var(--tag-green)";
-  if (distance <= 0.3) return "var(--tag-amber)";
-  return "var(--main-2)";
-}
-
-const DROP_MS = 520;
-
 function RevealStage({
   challenge,
   item,
@@ -216,6 +220,7 @@ function RevealStage({
   const max = ratingField?.config?.max ?? 5;
   const range = Math.max(1, max - min);
   const readRating = useMemo(() => entryRatingReader(challenge), [challenge]);
+  const personIds = challenge.participants.flatMap((participant) => (participant.userId ? [participant.userId] : []));
 
   const landed: Landed[] = [];
   for (const entry of entries) {
@@ -228,20 +233,6 @@ function RevealStage({
   }
 
   const mean = landed.length ? landed.reduce((sum, person) => sum + person.value, 0) / landed.length : null;
-  // Where the group actually sits: the median, so one outlier doesn't tint everyone else as far off.
-  const sorted = landed.map((person) => person.value).sort((a, b) => a - b);
-  const center = sorted.length ? (sorted[Math.floor((sorted.length - 1) / 2)] + sorted[Math.ceil((sorted.length - 1) / 2)]) / 2 : 0;
-  const toneOf = (value: number) => toneFor(Math.abs(value - center) / range);
-  // Avatars closer than their own width stack instead of overlapping — measured, so a phone stacks more.
-  const scaleRef = useRef<HTMLDivElement>(null);
-  const [scaleWidth, setScaleWidth] = useState(0);
-  useEffect(() => {
-    const node = scaleRef.current;
-    if (!node) return;
-    const observer = new ResizeObserver(([entry]) => setScaleWidth(entry.contentRect.width));
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
   const spread = landed.length > 1 ? (Math.max(...landed.map((p) => p.value)) - Math.min(...landed.map((p) => p.value))) / range : 0;
   const verdict = landed.length < 2 ? "single" : spread === 0 ? "unanimous" : spread <= 0.2 ? "close" : spread <= 0.5 ? "split" : "apart";
   // The one furthest from everyone else, when there is a real gap to name.
@@ -273,19 +264,7 @@ function RevealStage({
     return { expected: avg(0), actual: avg(1) };
   })();
 
-  // The closest land first; the outlier drops last.
-  const order = [...landed].sort((a, b) => Math.abs(a.value - center) - Math.abs(b.value - center));
-  const minGap = scaleWidth ? (44 / scaleWidth) * 100 : 8;
-  const placed: Array<{ person: Landed; index: number; level: number; left: number; tone: string }> = [];
-  for (const [index, person] of order.entries()) {
-    const left = ((person.value - min) / range) * 100;
-    let level = 0;
-    while (placed.some((other) => other.level === level && Math.abs(other.left - left) < minGap)) level += 1;
-    placed.push({ person, index, level, left, tone: toneOf(person.value) });
-  }
-  const tallest = Math.max(1, ...placed.map((spot) => spot.level + 1));
-  const afterDrops = order.length * DROP_MS + 250;
-  const ticks = Array.from({ length: Math.floor(range) + 1 }, (_, index) => min + index).filter((tick) => range <= 10 || tick % Math.ceil(range / 5) === 0);
+  const afterDrops = landedAfter(landed.length);
   const fmt = (value: number) => nf.number(value, { maximumFractionDigits: 1 });
   const delay = (ms: number): CSSProperties => ({ animationDelay: `${ms}ms` });
 
@@ -298,31 +277,15 @@ function RevealStage({
         </button>
       </div>
 
-      {/* The scale: each person drops onto their number, stacked when two agree exactly. */}
-      <div ref={scaleRef} className="relative mx-4 mt-6 sm:mx-6" style={{ height: `${tallest * 46 + 40}px` }}>
-        {mean !== null ? (
-          <div className="reveal-fade absolute bottom-6 top-0 w-px -translate-x-1/2 border-l border-dashed border-white/35" style={{ left: `${((mean - min) / range) * 100}%`, ...delay(afterDrops) }}>
-            <span className="absolute -top-1 left-1.5 whitespace-nowrap text-[10px] uppercase tracking-wider text-white/55">{t("average")} {fmt(mean)}</span>
-          </div>
-        ) : null}
-        {placed.map(({ person, index, level, left, tone }) => (
-          <div key={person.id} className="absolute bottom-6 -translate-x-1/2" style={{ left: `${left}%`, marginBottom: `${level * 46}px` }}>
-            <div className="reveal-drop flex flex-col items-center" style={delay(index * DROP_MS)}>
-              <span
-                className={cx("grid h-10 w-10 place-items-center rounded-full text-xs font-bold text-white shadow-lg", person.self && "ring-2 ring-white ring-offset-2 ring-offset-[var(--spotlight)]")}
-                style={{ background: tone }}
-                title={`${person.name} · ${fmt(person.value)}`}
-              >
-                {initials(person.name)}
-              </span>
-              {level === 0 ? <span className="h-2 w-0.5" style={{ background: tone }} aria-hidden="true" /> : null}
-            </div>
-          </div>
-        ))}
-        <div className="absolute inset-x-0 bottom-6 h-0.5 rounded-full bg-white/20" />
-        {ticks.map((tick) => (
-          <span key={tick} className="absolute bottom-0 -translate-x-1/2 text-[11px] tabular-nums text-white/45" style={{ left: `${((tick - min) / range) * 100}%` }}>{tick}</span>
-        ))}
+      <div className="mt-6">
+        <RatingScale
+          people={landed.map((person) => ({ id: person.id, name: person.name, value: person.value, tone: personTone(personIds, person.id), self: person.self }))}
+          min={min}
+          max={max}
+          average={mean}
+          averageLabel={t("average")}
+          labelFor={(person) => (person.self ? t("you") : firstName(person.name))}
+        />
       </div>
 
       <div className="reveal-rise mt-6" style={delay(afterDrops + 150)}>
@@ -339,7 +302,7 @@ function RevealStage({
       <ul className="mt-6 space-y-2.5">
         {[...landed].sort((a, b) => b.value - a.value).map((person, index) => (
           <li key={person.id} className="reveal-rise flex gap-3 rounded-2xl bg-white/[0.05] p-3" style={delay(afterDrops + 450 + index * 160)}>
-            <span className="w-9 flex-none text-lg font-medium tabular-nums" style={{ color: toneOf(person.value) }}>{fmt(person.value)}</span>
+            <span className="w-9 flex-none text-lg font-medium tabular-nums" style={{ color: personTone(personIds, person.id) }}>{fmt(person.value)}</span>
             <div className="min-w-0 leading-snug">
               <span className="block text-xs text-white/55">{person.self ? t("you") : person.name}</span>
               {person.comment ? <p className="mt-0.5 whitespace-pre-line text-sm text-white/90">“{person.comment}”</p> : null}

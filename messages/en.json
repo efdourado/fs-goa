@@ -1327,7 +1327,8 @@
     "storyInTune": "Most in tune",
     "storyCritic": "Toughest critic",
     "storyCriticNote": "average {average}",
-    "storyBadge": "Featured"
+    "storyBadge": "Featured",
+    "frontDemo": "See it in 30 seconds — an example group"
   },
   "invite": {
     "verifying": "Checking the invite…",
@@ -2069,5 +2070,185 @@
     "sharedSoFar": "{name} · {count} so far",
     "emptyTitle": "Your taste map draws itself as you rate.",
     "emptyBody": "Once you and someone else have rated {count} of the same titles — in any challenge in this group — they'll appear here, as close to you as your ratings are."
+  },
+  "demo": {
+    "label": "Example",
+    "badge": "Example · an invented group",
+    "clubName": "Friday Film Club",
+    "title": "Five friends watched the same eight films.",
+    "body": "Each one rated in secret. Nobody has seen anyone else's number yet — this is what Goa does next.",
+    "step1": "1 · The reveal",
+    "sealed": "Five ratings, sealed. Not even the person who runs the group can see them.",
+    "step2": "2 · The season, drawn",
+    "ctaTitle": "Now do it with your people.",
+    "ctaBody": "Pick a film, rate it blind, reveal it together. Three taps to start — the recap builds itself.",
+    "cta": "Try this with your group",
+    "comments": {
+      "tarCaio": "Two hours and forty minutes of a conductor being mean. I clapped when it ended.",
+      "tarAna": "I haven't stopped thinking about the last scene. A masterpiece.",
+      "pastLivesDuda": "I cried in the taxi home. Then again at breakfast.",
+      "megalopolisBruno": "I have questions. Mostly: why?",
+      "barbieLucas": "Went in to make fun of it. Came out rethinking my life."
+    },
+    "step2Body": "Eight Fridays in one picture: everyone's line through the films, and every fact their ratings can tell — the podium, the genres, who agrees with whom, and where two people who never agree still meet.",
+    "step3": "3 · Same idea, for a habit",
+    "step3Body": "Four friends, a month of reading. Streaks, gaps, comebacks and totals — nobody had to build a spreadsheet.",
+    "readingName": "30 days of reading",
+    "pagesLabel": "Pages",
+    "notes": {
+      "dudaBest": "Couldn't put it down — sixty pages on a Tuesday.",
+      "anaBack": "Back after a week off. Starting small.",
+      "lucasSmall": "Ten pages a day. It adds up."
+    }
+  },
+  "story": {
+    "eyebrow": "The thread",
+    "threadAria": "{count} people's ratings across {items} titles",
+    "lanesAria": "{count} people's check-ins over {days} days",
+    "redraw": "Draw again",
+    "readRated": "Each line is one person, rising and falling with their rating. Where lines braid, you agreed; where they fan out, you split. The thick faint line is the group.",
+    "readDated": "Each lane is one person: solid where they kept going, gaps where they stopped, bigger beads for bigger days. The outlined stretch is their longest run.",
+    "almanac": "The almanac",
+    "almanacNote": "Every card downloads on its own.",
+    "downloadCard": "Download this card",
+    "downloadPoster": "Download the poster",
+    "downloading": "Preparing…",
+    "downloadHint": "The drawing and the almanac, as one image.",
+    "showAll": "Show all {count}",
+    "showLess": "Show less",
+    "datedHeadline": "{count, plural, one {One person's days, drawn.} other {# people's days, drawn side by side.}}",
+    "mood": {
+      "sync": "Suspiciously in sync.",
+      "mixed": "Mostly agreeing. Mostly.",
+      "apart": "Same titles, very different takes.",
+      "solo": "Your season, drawn."
+    },
+    "figures": {
+      "people": "{count, plural, one {person} other {people}}",
+      "film": "{count, plural, one {film} other {films}}",
+      "book": "{count, plural, one {book} other {books}}",
+      "place": "{count, plural, one {place} other {places}}",
+      "item": "{count, plural, one {title} other {titles}}",
+      "ratings": "{count, plural, one {rating} other {ratings}}",
+      "together": "each, watching",
+      "comments": "{count, plural, one {comment} other {comments}}",
+      "days": "{count, plural, one {day} other {days}}",
+      "checkins": "{count, plural, one {check-in} other {check-ins}}"
+    },
+    "noun": {
+      "film": "{count, plural, one {# film} other {# films}}",
+      "book": "{count, plural, one {# book} other {# books}}",
+      "place": "{count, plural, one {# place} other {# places}}",
+      "item": "{count, plural, one {# title} other {# titles}}"
+    },
+    "streakDays": "{count, plural, one {# day} other {# days}}",
+    "note": {
+      "favourite": "★ The favourite · {value}",
+      "split": "The split · {low} to {high}",
+      "surprise": "Surprise · expected {expected}, gave {actual}",
+      "flop": "The flop · {value}",
+      "loner": "{name}, alone at {value}"
+    },
+    "podium": {
+      "eyebrow": "The podium"
+    },
+    "common": {
+      "eyebrow": "Common ground",
+      "title": "{a} and {b} meet at {genre}",
+      "line": "{a} & {b} agree {agreement}% overall — but on {genre} it's {aValue} and {bValue}.",
+      "hint": "Next time they pick together, start there."
+    },
+    "genres": {
+      "eyebrow": "By genre",
+      "title": "{genre} wins, at {value}",
+      "note": "{count} genres, ranked by the group's average."
+    },
+    "time": {
+      "eyebrow": "Time in front of the screen",
+      "title": "{hours} h {minutes} min each",
+      "longest": "Longest",
+      "shortest": "Shortest",
+      "worthIt": "Long ones averaged {long}, short ones {short} — the hours were worth it.",
+      "notWorth": "Long ones averaged {long}, short ones {short} — shorter was better."
+    },
+    "critics": {
+      "eyebrow": "The critics",
+      "title": "{name} is the toughest, at {value}",
+      "generous": "most generous",
+      "tough": "toughest",
+      "detail": "{top, plural, =0 {no perfect scores} one {one perfect score} other {# perfect scores}} · #1: {favourite}"
+    },
+    "pairs": {
+      "eyebrow": "Who agrees with whom",
+      "title": "{a} & {b}: {agreement}%",
+      "note": "{count, plural, one {# pair} other {# pairs}} with 3 or more titles in common."
+    },
+    "surprises": {
+      "eyebrow": "Expectation vs reality",
+      "title": "{title} changed the most",
+      "note": "Average guess before pressing play, average rating after."
+    },
+    "property": {
+      "eyebrow": "Favourite {label}",
+      "file": "favourite",
+      "labels": {
+        "director": "director",
+        "author": "author"
+      },
+      "line": "{things}, averaging {value}.",
+      "runnerUp": "Next: {name}, {value}"
+    },
+    "favourites": {
+      "eyebrow": "Everyone's #1"
+    },
+    "quotes": {
+      "eyebrow": "Best lines",
+      "by": "{name} on {title} · {value}"
+    },
+    "streaks": {
+      "eyebrow": "Streaks",
+      "title": "{name}: {count, plural, one {# day} other {# days}} straight",
+      "none": "No streaks yet",
+      "best": "best {count}",
+      "now": "now {count}"
+    },
+    "consistency": {
+      "eyebrow": "Consistency",
+      "title": "{name} showed up {value}% of the days",
+      "note": "Share of the {days} days with a check-in."
+    },
+    "totals": {
+      "eyebrow": "{label}",
+      "title": "{total} {unit}",
+      "file": "totals"
+    },
+    "weekdays": {
+      "eyebrow": "Day of the week",
+      "title": "Strongest: {day}",
+      "even": "Every day pulls its weight"
+    },
+    "bestDay": {
+      "eyebrow": "Best single day",
+      "title": "{name}: {value} {unit} on {day}"
+    },
+    "comeback": {
+      "eyebrow": "The comeback",
+      "title": "{name} stopped for {gap} days",
+      "line": "…and came back on {day}.",
+      "note": "Missing days isn't failing. Coming back is the habit."
+    },
+    "records": {
+      "eyebrow": "Personal records",
+      "title": "{title}: {first} → {best}",
+      "note": "{label}: the first session against the best one."
+    },
+    "notes": {
+      "eyebrow": "In their words"
+    },
+    "years": {
+      "eyebrow": "By release year",
+      "title": "From {first} to {last}",
+      "note": "Column height is how many titles; the number on top is their average."
+    }
   }
 }

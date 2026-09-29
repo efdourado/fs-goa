@@ -11,6 +11,7 @@ import { useGoaFormat } from "../format";
 import { useDoneItems } from "../use-done-items";
 import { recommenderLine } from "../recommender-picker";
 import { isSealed, RevealPanel, sealedRatingType } from "../reveal";
+import { ChallengeStory } from "../story/for-challenge";
 import { SharedGlyph } from "../shared-responses";
 import { SessionLog, type SessionPayload, sessionSpecOf } from "../session-log";
 import { challengeShowcaseBlocks, hasShowcaseContent, ShowcaseView } from "../showcase-view";
@@ -1648,7 +1649,7 @@ export function ParticipantChallengeScreen({
               </section>
               {sealedType && (logItem ?? selectedItem) ? (
                 <div className="mt-5">
-                  <RevealPanel challenge={challenge} item={(logItem ?? selectedItem)!} type={sealedType} entries={entries} userId={user?.id} onReveal={onRevealItem} onCreateInvite={onCreateChallengeInvite} />
+                  <RevealPanel challenge={challenge} item={(logItem ?? selectedItem)!} type={sealedType} entries={entries} userId={user?.id} onReveal={onRevealItem} onPoll={onReload} onCreateInvite={onCreateChallengeInvite} />
                 </div>
               ) : null}
             </div>
@@ -1726,7 +1727,10 @@ export function ParticipantChallengeScreen({
         ) : null}
 
         {activeTab === "results" ? (
-          <ResultView challenge={challenge} hideCompletionRate live={!preview} />
+          <>
+            {!preview ? <ChallengeStory challenge={challenge} entries={entries} /> : null}
+            <ResultView challenge={challenge} hideCompletionRate live={!preview} />
+          </>
         ) : null}
       </div>
 

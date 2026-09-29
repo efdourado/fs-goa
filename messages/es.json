@@ -1327,7 +1327,8 @@
     "storyInTune": "Más en sintonía",
     "storyCritic": "Crítico más exigente",
     "storyCriticNote": "promedio {average}",
-    "storyBadge": "Destacado"
+    "storyBadge": "Destacado",
+    "frontDemo": "Míralo en 30 segundos — un grupo de ejemplo"
   },
   "invite": {
     "verifying": "Verificando invitación…",
@@ -2069,5 +2070,185 @@
     "sharedSoFar": "{name} · {count} por ahora",
     "emptyTitle": "Tu mapa de gusto se dibuja mientras puntúas.",
     "emptyBody": "Cuando tú y otra persona hayan puntuado {count} títulos iguales — en cualquier reto de este grupo — aparecerá aquí, tan cerca de ti como sus notas."
+  },
+  "demo": {
+    "label": "Ejemplo",
+    "badge": "Ejemplo · un grupo inventado",
+    "clubName": "Cineclub del Viernes",
+    "title": "Cinco amigos vieron las mismas ocho películas.",
+    "body": "Cada uno puntuó en secreto. Nadie ha visto la nota de nadie todavía — aquí entra Goa.",
+    "step1": "1 · La revelación",
+    "sealed": "Cinco notas, selladas. Ni quien organiza el grupo puede verlas.",
+    "step2": "2 · La temporada, dibujada",
+    "ctaTitle": "Ahora hazlo con tu gente.",
+    "ctaBody": "Elige una película, puntúa a ciegas, revelen juntos. Tres toques para empezar — el resumen se arma solo.",
+    "cta": "Probar con mi grupo",
+    "comments": {
+      "tarCaio": "Dos horas y cuarenta de una directora siendo cruel. Aplaudí cuando terminó.",
+      "tarAna": "No dejo de pensar en la última escena. Una obra maestra.",
+      "pastLivesDuda": "Lloré en el taxi de vuelta. Y otra vez en el desayuno.",
+      "megalopolisBruno": "Tengo preguntas. Sobre todo: ¿por qué?",
+      "barbieLucas": "Fui a burlarme. Salí replanteándome la vida."
+    },
+    "step2Body": "Ocho viernes en una sola imagen: la línea de cada uno por las películas, y todo lo que cuentan sus notas — el podio, los géneros, quién coincide con quién, y dónde dos personas que nunca coinciden aún se encuentran.",
+    "step3": "3 · La misma idea, para un hábito",
+    "step3Body": "Cuatro amigos, un mes de lectura. Rachas, huecos, vueltas y totales — nadie tuvo que armar una hoja de cálculo.",
+    "readingName": "30 días de lectura",
+    "pagesLabel": "Páginas",
+    "notes": {
+      "dudaBest": "No pude soltarlo — sesenta páginas un martes.",
+      "anaBack": "De vuelta tras una semana parada. Empezando poco a poco.",
+      "lucasSmall": "Diez páginas al día. Se va sumando."
+    }
+  },
+  "story": {
+    "eyebrow": "El hilo",
+    "threadAria": "Notas de {count} personas en {items} títulos",
+    "lanesAria": "Registros de {count} personas en {days} días",
+    "redraw": "Dibujar otra vez",
+    "readRated": "Cada línea es una persona, subiendo y bajando con su nota. Donde las líneas se trenzan, coincidieron; donde se abren, discreparon. La línea gruesa y tenue es el grupo.",
+    "readDated": "Cada carril es una persona: continuo donde siguió, con huecos donde paró, cuentas más grandes en los días más grandes. El tramo contorneado es su racha más larga.",
+    "almanac": "El almanaque",
+    "almanacNote": "Cada tarjeta se descarga por separado.",
+    "downloadCard": "Descargar esta tarjeta",
+    "downloadPoster": "Descargar el póster",
+    "downloading": "Preparando…",
+    "downloadHint": "El dibujo y el almanaque, en una sola imagen.",
+    "showAll": "Ver los {count}",
+    "showLess": "Ver menos",
+    "datedHeadline": "{count, plural, one {Los días de una persona, dibujados.} other {Los días de # personas, lado a lado.}}",
+    "mood": {
+      "sync": "Sospechosamente en sintonía.",
+      "mixed": "Casi siempre de acuerdo. Casi.",
+      "apart": "Los mismos títulos, opiniones muy distintas.",
+      "solo": "Tu temporada, dibujada."
+    },
+    "figures": {
+      "people": "{count, plural, one {persona} other {personas}}",
+      "film": "{count, plural, one {película} other {películas}}",
+      "book": "{count, plural, one {libro} other {libros}}",
+      "place": "{count, plural, one {lugar} other {lugares}}",
+      "item": "{count, plural, one {título} other {títulos}}",
+      "ratings": "{count, plural, one {nota} other {notas}}",
+      "together": "de pantalla, cada uno",
+      "comments": "{count, plural, one {comentario} other {comentarios}}",
+      "days": "{count, plural, one {día} other {días}}",
+      "checkins": "{count, plural, one {registro} other {registros}}"
+    },
+    "noun": {
+      "film": "{count, plural, one {# película} other {# películas}}",
+      "book": "{count, plural, one {# libro} other {# libros}}",
+      "place": "{count, plural, one {# lugar} other {# lugares}}",
+      "item": "{count, plural, one {# título} other {# títulos}}"
+    },
+    "streakDays": "{count, plural, one {# día} other {# días}}",
+    "note": {
+      "favourite": "★ La favorita · {value}",
+      "split": "La división · de {low} a {high}",
+      "surprise": "Sorpresa · esperaban {expected}, dieron {actual}",
+      "flop": "El fracaso · {value}",
+      "loner": "{name}, solo en el {value}"
+    },
+    "podium": {
+      "eyebrow": "El podio"
+    },
+    "common": {
+      "eyebrow": "Terreno común",
+      "title": "{a} y {b} se encuentran en {genre}",
+      "line": "{a} y {b} coinciden un {agreement}% en general — pero en {genre} es {aValue} y {bValue}.",
+      "hint": "La próxima vez que elijan juntos, empiecen por ahí."
+    },
+    "genres": {
+      "eyebrow": "Por género",
+      "title": "{genre} gana, con {value}",
+      "note": "{count} géneros, según la media del grupo."
+    },
+    "time": {
+      "eyebrow": "Tiempo de pantalla",
+      "title": "{hours} h {minutes} min cada uno",
+      "longest": "La más larga",
+      "shortest": "La más corta",
+      "worthIt": "Las largas promediaron {long}, las cortas {short} — las horas valieron la pena.",
+      "notWorth": "Las largas promediaron {long}, las cortas {short} — menos fue más."
+    },
+    "critics": {
+      "eyebrow": "Los críticos",
+      "title": "{name} es el más exigente, con {value}",
+      "generous": "el más generoso",
+      "tough": "el más exigente",
+      "detail": "{top, plural, =0 {ninguna nota máxima} one {una nota máxima} other {# notas máximas}} · n.º 1: {favourite}"
+    },
+    "pairs": {
+      "eyebrow": "Quién coincide con quién",
+      "title": "{a} y {b}: {agreement}%",
+      "note": "{count, plural, one {# pareja} other {# parejas}} con 3 o más títulos en común."
+    },
+    "surprises": {
+      "eyebrow": "Expectativa vs realidad",
+      "title": "{title} fue la que más cambió",
+      "note": "Apuesta media antes del play, nota media después."
+    },
+    "property": {
+      "eyebrow": "{label} favorito",
+      "file": "favorito",
+      "labels": {
+        "director": "Director",
+        "author": "Autor"
+      },
+      "line": "{things}, media {value}.",
+      "runnerUp": "Después: {name}, {value}"
+    },
+    "favourites": {
+      "eyebrow": "El n.º 1 de cada uno"
+    },
+    "quotes": {
+      "eyebrow": "Las mejores frases",
+      "by": "{name} sobre {title} · {value}"
+    },
+    "streaks": {
+      "eyebrow": "Rachas",
+      "title": "{name}: {count, plural, one {# día} other {# días}} seguidos",
+      "none": "Sin rachas todavía",
+      "best": "mejor {count}",
+      "now": "ahora {count}"
+    },
+    "consistency": {
+      "eyebrow": "Constancia",
+      "title": "{name} apareció el {value}% de los días",
+      "note": "Parte de los {days} días con registro."
+    },
+    "totals": {
+      "eyebrow": "{label}",
+      "title": "{total} {unit}",
+      "file": "totales"
+    },
+    "weekdays": {
+      "eyebrow": "Día de la semana",
+      "title": "Más fuertes: {day}",
+      "even": "Todos los días pesan igual"
+    },
+    "bestDay": {
+      "eyebrow": "El mejor día",
+      "title": "{name}: {value} {unit} el {day}"
+    },
+    "comeback": {
+      "eyebrow": "La vuelta",
+      "title": "{name} paró {gap} días",
+      "line": "…y volvió el {day}.",
+      "note": "Perder días no es fallar. Volver es el hábito."
+    },
+    "records": {
+      "eyebrow": "Récords personales",
+      "title": "{title}: {first} → {best}",
+      "note": "{label}: la primera sesión contra la mejor."
+    },
+    "notes": {
+      "eyebrow": "En sus palabras"
+    },
+    "years": {
+      "eyebrow": "Por año de estreno",
+      "title": "De {first} a {last}",
+      "note": "La altura es cuántos títulos; el número de arriba es su media."
+    }
   }
 }
