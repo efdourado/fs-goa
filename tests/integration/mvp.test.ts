@@ -1954,7 +1954,8 @@ test("resposta compartilhada: Done, conclusão e métricas respeitam o escopo, e
   const soloSharedId = (soloShared.body as { id: string }).id;
   const soloDetail = (await call("GET", `/api/challenges/${sid}`, { session: soloOwner })).body as { entryTypes: Array<{ id: string; answerScope: string }> };
   const individualId = soloDetail.entryTypes.find((type) => type.answerScope === "individual")!.id;
-  assert.equal((await call("DELETE", `/api/challenges/${sid}/entry-types/${individualId}`, { session: soloOwner })).response.status, 200);
+  // Its automatic metrics go with it once confirmed (archiveMetrics).
+  assert.equal((await call("DELETE", `/api/challenges/${sid}/entry-types/${individualId}?archiveMetrics=1`, { session: soloOwner })).response.status, 200);
   // recriar um tipo com o mesmo nome depois de remover outro não pode colidir com a chave arquivada
   const again = await call("POST", `/api/challenges/${sid}/entry-types`, {
     session: soloOwner, body: { name: "Placar", sharedEditPolicy: "members_fill_admin_corrects", field: { key: "placar", label: "Placar", type: "number", required: false } },
@@ -4917,6 +4918,43 @@ test("gosto em comum: concordância cruza os desafios do grupo pelo título do c
 
   const outsider = await register("Fora Gosto", "fora_gosto");
   assert.equal((await call("GET", `/api/groups/${groupId}/taste`, { session: outsider })).response.status, 404);
+});
+
+test("métricas automáticas: todo número ou nota que alguém cria ganha métricas, e apagar uma é para sempre", async () => {
+  const owner = await register("Dona Auto", "dona_auto_metric");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Auto Métricas" } })).body as { id: string }).id;
+  const created = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: {
+      recipe: "habit", title: "Correr", participantIds: [owner.user.id],
+      fields: [{ key: "km", label: "Km", type: "number", required: true, config: { min: 0, step: 0.5 } }],
+    },
+  });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const cid = (created.body as { id: string }).id;
+  type M = { id: string; label: string; operation: string; groupBy: string };
+  const metrics = async () => ((await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { metrics: M[] }).metrics;
+  const auto = (list: M[]) => list.filter((metric) => metric.label.startsWith("Km —")).map((metric) => `${metric.operation}/${metric.groupBy}`).sort();
+  assert.deepEqual(auto(await metrics()), ["max/none", "sum/none", "sum/participant"], "total, leaderboard and record from the start");
+
+  // A field added later gets its own; deleting one of the automatic ones sticks across the next save.
+  const detail = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { fields: Array<{ id: string; key: string; label: string; type: string; required: boolean; config?: unknown }> };
+  const saved = await call("POST", `/api/challenges/${cid}/fields`, {
+    session: owner, body: { replace: true, fields: [...detail.fields.map((field) => ({ id: field.id, label: field.label, type: field.type, required: field.required, config: field.config })), { key: "humor", label: "Humor", type: "rating", required: false, config: { min: 0, max: 5, step: 1 } }] },
+  });
+  assert.equal(saved.response.status, 201, JSON.stringify(saved.body));
+  const humor = (await metrics()).filter((metric) => metric.label.startsWith("Humor —"));
+  assert.deepEqual(humor.map((metric) => `${metric.operation}/${metric.groupBy}`).sort(), ["average/none", "average/participant"], "a habit's rating: average and per person (no items to rank)");
+  const total = (await metrics()).find((metric) => metric.label === "Km — total")!;
+  assert.equal((await call("DELETE", `/api/challenges/${cid}/metrics/${total.id}`, { session: owner })).response.status, 200);
+  const again = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { fields: Array<{ id: string; label: string; type: string; required: boolean; config?: unknown }> };
+  await call("POST", `/api/challenges/${cid}/fields`, { session: owner, body: { replace: true, fields: again.fields.map((field) => ({ id: field.id, label: field.label, type: field.type, required: field.required, config: field.config })) } });
+  assert.ok(!(await metrics()).some((metric) => metric.label === "Km — total"), "the deleted automatic metric does not grow back");
+
+  // A recipe's own rating is already covered — no duplicates.
+  const cinema = await call("POST", `/api/groups/${groupId}/challenges`, { session: owner, body: { recipe: "cinema", title: "Filmes", participantIds: [owner.user.id], items: [{ title: "Filme" }] } });
+  const cinemaMetrics = ((await call("GET", `/api/challenges/${(cinema.body as { id: string }).id}`, { session: owner })).body as { metrics: M[] }).metrics;
+  assert.ok(!cinemaMetrics.some((metric) => metric.label.includes(" — ")), "cinema's nota already has its recipe metrics");
 });
 
 test("métricas oficiais: mediana e consenso calculam pela fórmula, toda métrica traz explicação e amostra, e combinações inválidas caem", async () => {

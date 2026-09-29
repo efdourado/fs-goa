@@ -11,6 +11,7 @@ import {
   semanticKey,
   writeAudit,
 } from "../../goa-domain";
+import { seedFieldMetrics } from "./auto-metrics";
 import { ApiError } from "../../http";
 import { entryTypeById, primaryEntryType } from "./entry-types";
 import type { FieldRow } from "./types";
@@ -154,6 +155,7 @@ export async function addChallengeField(
     const inserted = await insertField(client, challengeId, entryType.id, { ...body, key }, position);
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
       "field.created", "challenge_field", inserted.id, null, { key: inserted.semanticKey, kind: inserted.kind });
+    await seedFieldMetrics(client, challengeId, session.user.id);
     return { id: inserted.id };
   });
 }
@@ -318,7 +320,15 @@ export async function saveChallengeFields(
           );
         }
       }
-      // A field a live metric computes over can't just vanish — resolve the
+      // Goa's own automatic metrics go with the field they were made for — nobody asked for them.
+      await client.query(
+        `UPDATE challenge_metrics m SET archived_at=now(), updated_at=now()
+           FROM challenge_fields f
+          WHERE m.field_id = f.id AND m.archived_at IS NULL AND coalesce((m.settings->>'auto')::boolean, false)
+            AND f.challenge_id=$1 AND f.entry_type_id=$2 AND f.archived_at IS NULL AND NOT (f.id=ANY($3::text[]))`,
+        [challengeId, entryType.id, keptIds],
+      );
+      // A field a live metric the owner made computes over can't just vanish — resolve the
       // metric first (V1 §4). Applies in draft too: a dangling metric would
       // fail the preflight anyway.
       const usedByMetric = await client.query<{ label: string }>(
@@ -343,6 +353,7 @@ export async function saveChallengeFields(
     }
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
       "fields.updated", "challenge", challengeId, null, { fieldIds: keptIds });
+    await seedFieldMetrics(client, challengeId, session.user.id);
     return { fieldIds: keptIds };
   });
 }

@@ -19,6 +19,7 @@ import { resolveItemRecommender } from "../challenges/recommender";
 import { resolveRecipe, withRecordingMode } from "../challenges/recipes";
 import { writeAudit } from "./audit";
 import { insertField, type ClientField } from "./fields";
+import { seedFieldMetrics } from "../challenges/auto-metrics";
 import { parseRuleSections, rulesCompatibilityText } from "./rules";
 import { asRecord, dateRange, publicId, semanticKey, timeZoneValue } from "./shared";
 
@@ -420,6 +421,8 @@ export async function createChallenge(
       );
       metricPosition += 1;
     }
+    // Whatever numbers the creator asked for beyond the recipe get their metrics too.
+    await seedFieldMetrics(client, id, session.user.id);
     await writeAudit(client, groupId, id, session.user.id, "challenge.created", "challenge", id, null, {
       title,
       template: body.template ?? null,
