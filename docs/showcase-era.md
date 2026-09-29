@@ -39,6 +39,20 @@ Princípios que saíram das conversas:
 | **Demo pública** | `/demo` | Grupo inventado e rotulado: revelar *Tár*, ler a temporada desenhada, e um mês de leitura de quatro amigos. Termina em "Fazer com o meu grupo". |
 | **Seed da vitrine** | `npm run db:seed-showcase [--reset]` | No banco local: "Cineclube de Sexta" com a Temporada 1 encerrada (o fio), a Temporada 2 com uma nota selada esperando a sua, e "30 dias de leitura". |
 
+### Dupla e solo têm o próprio desenho
+
+Duas pessoas não são "72% em sintonia" — a diferença é o que torna a dupla interessante. Para dois:
+**a mistura de vocês** (onde se encontraram, o que cada um trouxe para o outro), o que os dois amaram, o
+que vai render discussão, para onde cada um pende por gênero e como cada um usa a escala; no desenho, o
+espaço entre as duas linhas vira uma fita. Sozinho: **o seu gosto** (a sua escala, as notas máximas, a mais
+baixa, o seu instinto de palpite) e, nos hábitos, um calendário no lugar de uma faixa solitária.
+
+### Sem abas de Métricas e Vitrine
+
+As métricas nascem sozinhas e o resultado é o fio + o almanaque, então as abas Métricas e Vitrine saíram
+do Gerenciar (a API continua — a nota do Hoje e do acervo lê uma métrica). O download é um botão
+"Baixar páginas" ao lado de "Baixar PDF": páginas em retrato (4:5) com capa, o fio e o almanaque.
+
 ### O almanaque, cartão por cartão
 
 Desafios com nota: **pódio** (top 3 + lista completa), **terreno comum** (duas pessoas que
