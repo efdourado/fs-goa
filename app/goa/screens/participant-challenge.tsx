@@ -565,14 +565,10 @@ function ExportLogButton({ challengeId }: { challengeId: string }) {
   return (
     <a
       href={`/challenges/${encodeURIComponent(challengeId)}/export`}
-      aria-label={t("button")}
-      className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[var(--line)] px-3 py-2 text-sm font-light text-[var(--ink)] transition-colors hover:bg-[var(--hover)] sm:px-4"
+      className="group inline-flex min-h-10 items-center gap-2 rounded-xl border border-[var(--line)] px-4 py-2 text-sm font-light text-[var(--ink)] transition-colors hover:bg-[var(--hover)]"
     >
-      <svg viewBox="0 0 20 20" className="size-4 flex-none" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
-        <path d="M6 2.5h5.5L15 6v10a1.5 1.5 0 0 1-1.5 1.5h-7.5A1.5 1.5 0 0 1 4.5 16V4A1.5 1.5 0 0 1 6 2.5Z" strokeLinejoin="round" />
-        <path d="M10 8.5v5m0 0-2-2m2 2 2-2" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-      <span className="hidden sm:inline">{t("button")}</span>
+      {t("button")}
+      <span aria-hidden="true" className="transition-transform group-hover:translate-x-0.5">→</span>
     </a>
   );
 }
@@ -1502,7 +1498,7 @@ export function ParticipantChallengeScreen({
     <main className="mx-auto max-w-7xl overflow-x-clip px-4 py-6 pb-28 sm:px-6 sm:py-10">
       <div className="mb-5 flex items-center justify-between gap-3">
         <BackButton onClick={onBack} label={backLabel ?? t("back")} />
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           {!preview && challenge.result?.shareToken ? <SharePublicButton token={challenge.result.shareToken} /> : null}
           {!preview ? <ExportLogButton challengeId={challenge.id} /> : null}
           {previewActions ?? (onAdmin ? <Button variant="secondary" onClick={onAdmin}>{t("manage")}</Button> : null)}
