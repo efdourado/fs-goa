@@ -9,13 +9,14 @@ import type { Id, Metric } from "../types";
 import { cx } from "../ui";
 import type { DatedStory, GroupStat, RatedStory, Story, StoryInput } from "./model";
 
-/** A small typographic cover — the title is the artwork, tinted like the catalogue's. */
-export function TitleChip({ title, year, className }: { title: string; year?: number | null; className?: string }) {
+/** A small typographic cover — the title is the artwork, tinted like the catalogue's. `bare` drops the title when it is printed beside it. */
+export function TitleChip({ title, year, className, bare = false }: { title: string; year?: number | null; className?: string; bare?: boolean }) {
   return (
     <span className={cx("relative flex aspect-[3/4] flex-col justify-between overflow-hidden rounded-lg bg-[var(--cover-bg)] p-1.5 text-[var(--cover-ink)]", className)} style={coverColors(coverToneOf(title))}>
       <span aria-hidden="true" className="absolute -bottom-5 -right-5 h-12 w-12 rounded-full border-[8px] border-[var(--cover-deco)]" />
       <span className="relative text-[7px] tracking-[0.08em]" style={{ fontFamily: "var(--font-geist-mono), ui-monospace, monospace" }}>{year ?? " "}</span>
-      <span className="relative line-clamp-3 break-words text-[10px] font-light leading-[1.05]">{title}</span>
+      {/* Bare: the title is already written right next to the cover — don't say it twice. */}
+      {bare ? null : <span className="relative line-clamp-3 break-words text-[10px] font-light leading-[1.05]">{title}</span>}
     </span>
   );
 }
@@ -172,7 +173,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
             <div className="grid max-w-md grid-cols-3 items-end gap-3">
               {[podium[1], podium[0], podium[2]].map((score, index) => score ? (
                 <div key={score.item.id} className="flex flex-col items-center text-center">
-                  <TitleChip title={score.item.title} year={score.item.year} className={cx("w-full", index === 1 ? "max-w-[6.5rem]" : "max-w-[5.25rem]")} />
+                  <TitleChip bare title={score.item.title} year={score.item.year} className={cx("w-full", index === 1 ? "max-w-[6.5rem]" : "max-w-[5.25rem]")} />
                   <p className="mt-2 line-clamp-1 text-xs">{score.item.title}</p>
                   <div className={cx("mt-2 flex w-full flex-col items-center rounded-lg bg-[var(--wash)] pt-2", index === 1 ? "h-24" : index === 0 ? "h-16" : "h-12")}>
                     <span className="text-lg font-medium tabular-nums">{fmt(score.average)}</span>
@@ -231,7 +232,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
         <ul className="space-y-2 text-sm">
           {rows.slice(0, 5).map((row) => (
             <li key={row.item.id} className="flex items-center gap-3">
-              <TitleChip title={row.item.title} year={row.item.year} className="w-8 flex-none" />
+              <TitleChip bare title={row.item.title} year={row.item.year} className="w-8 flex-none" />
               <span className="min-w-0 flex-1 truncate">{row.item.title}</span>
               <span className="flex-none tabular-nums text-xs">
                 <span className={lead === "b" ? "text-[var(--muted)]" : "font-medium"} style={lead === "a" ? { color: toneA } : undefined}>{fmt(row.a)}</span>
@@ -273,7 +274,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
             {d.sharedFavourite ? (
               <Block title={t("duo.loved")}>
                 <div className="flex items-center gap-4">
-                  <TitleChip title={d.sharedFavourite.item.title} year={d.sharedFavourite.item.year} className="w-20 flex-none" />
+                  <TitleChip bare title={d.sharedFavourite.item.title} year={d.sharedFavourite.item.year} className="w-20 flex-none" />
                   <div>
                     <p className="text-2xl font-light tracking-[-0.03em]">{d.sharedFavourite.item.title}</p>
                     <p className="mt-1 text-sm"><span style={{ color: toneA }}>{nameA} {fmt(d.sharedFavourite.a)}</span> <span className="text-[var(--muted)]">·</span> <span style={{ color: toneB }}>{nameB} {fmt(d.sharedFavourite.b)}</span></p>
@@ -284,7 +285,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
             {d.argument ? (
               <Block title={t("duo.argument")}>
                 <div className="flex items-center gap-4">
-                  <TitleChip title={d.argument.item.title} year={d.argument.item.year} className="w-20 flex-none" />
+                  <TitleChip bare title={d.argument.item.title} year={d.argument.item.year} className="w-20 flex-none" />
                   <div>
                     <p className="text-2xl font-light tracking-[-0.03em]">{d.argument.item.title}</p>
                     <p className="mt-1 text-sm"><span style={{ color: toneA }}>{nameA} {fmt(d.argument.a)}</span> <span className="text-[var(--muted)]">·</span> <span style={{ color: toneB }}>{nameB} {fmt(d.argument.b)}</span></p>
@@ -360,14 +361,14 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
             {o.perfect.length ? (
               <Block title={t("solo.perfect")}>
                 <ul className="flex flex-wrap gap-3">
-                  {o.perfect.map((score) => <li key={score.item.id} className="w-16"><TitleChip title={score.item.title} year={score.item.year} className="w-full" /><p className="mt-1 truncate text-xs">{score.item.title}</p></li>)}
+                  {o.perfect.map((score) => <li key={score.item.id} className="w-16"><TitleChip bare title={score.item.title} year={score.item.year} className="w-full" /><p className="mt-1 truncate text-xs">{score.item.title}</p></li>)}
                 </ul>
               </Block>
             ) : null}
             {o.lowest ? (
               <Block title={t("solo.lowest")}>
                 <div className="flex items-center gap-4">
-                  <TitleChip title={o.lowest.item.title} year={o.lowest.item.year} className="w-16 flex-none grayscale" />
+                  <TitleChip bare title={o.lowest.item.title} year={o.lowest.item.year} className="w-16 flex-none grayscale" />
                   <div><p className="text-xl font-light">{o.lowest.item.title}</p><p className="text-3xl font-light tabular-nums">{fmt(o.lowest.average)}</p></div>
                 </div>
               </Block>
