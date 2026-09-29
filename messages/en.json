@@ -970,23 +970,26 @@
   },
   "visibility": {
     "title": "Who sees these answers",
-    "hint": "Applies to each participant seeing others' answers of this type. Admins and the author always see everything.",
+    "hint": "Applies to each participant seeing others' answers of this type. Admins and the author always see everything — except a sealed rating, which waits for the reveal like everyone else.",
     "saved": "Visibility updated.",
     "policy": {
       "group_realtime": "The group, in real time",
       "after_own": "Others, after you've answered",
       "after_close": "The group, only after the round closes",
-      "author_only": "Only you and the admins"
+      "author_only": "Only you and the admins",
+      "until_reveal": "Sealed until the group reveals"
     },
     "explain": {
       "group_realtime": "Every participant sees everyone's answer while the round runs.",
       "after_own": "You only see someone else's answer for an item after you've submitted your own.",
       "after_close": "During the round only you and the admins see your answer; the group sees it in the result.",
-      "author_only": "Your answer never shows up collectively — only aggregate metrics can include it."
+      "author_only": "Your answer never shows up collectively — only aggregate metrics can include it.",
+      "until_reveal": "Nobody — admins included — sees another rating until someone who has rated taps Reveal on that item."
     },
     "note": {
       "after_close": "Only the admins see your answer until the round closes.",
-      "author_only": "Only you and the admins see this answer."
+      "author_only": "Only you and the admins see this answer.",
+      "until_reveal": "Sealed: nobody sees your rating until the group reveals it together."
     }
   },
   "preflight": {
@@ -1058,7 +1061,8 @@
     "historyTitle": "Your entries",
     "deletingEntry": "Deleting…",
     "checkpointEmpty": "No items yet.",
-    "origin": "via {text}"
+    "origin": "via {text}",
+    "groupSealed": "Rated · sealed"
   },
   "sessionLog": {
     "composerTitle": "Log a {name}",
@@ -1907,7 +1911,14 @@
     "itemPlaceholderBookshelf": "e.g. Piranesi",
     "create": "Create challenge",
     "groupWithoutId": "The group was created, but we lost track of it.",
-    "entryCta": "Start by chat"
+    "entryCta": "Start by chat",
+    "q5": "How should the ratings come out?",
+    "modeReveal": "Reveal together",
+    "modeRevealHint": "Everyone rates blind; one tap shows them all at once.",
+    "modeGuess": "Guess first, then reveal",
+    "modeGuessHint": "Say what you expect before, rate after — see who got surprised.",
+    "modeOpen": "As you go",
+    "modeOpenHint": "Each rating shows up for the group as soon as it's in."
   },
   "backTo": {
     "home": "Home",
@@ -1999,5 +2010,40 @@
     "footer": "goa · {title} · page ",
     "streakValue": "{count, plural, one {# day} other {# days}}",
     "showWhen": "Dates on cards"
+  },
+  "reveal": {
+    "sealedTitle": "Sealed ratings",
+    "revealedTitle": "Already revealed",
+    "sealedBody": "Nobody sees anyone's rating — not even the admins — until someone taps Reveal. Then everyone sees them all at once.",
+    "rateBeforeLooking": "The group has revealed its ratings. Give yours first, so theirs don't sway you.",
+    "countRated": "{done} of {total} rated",
+    "whoRated": "Who has rated",
+    "you": "You",
+    "revealButton": "Reveal",
+    "revealing": "Revealing…",
+    "rateFirst": "Give your rating to unlock the reveal.",
+    "showAnyway": "Show me anyway",
+    "stillMissing": "Still missing: {names}",
+    "confirmTitle": "Reveal without everyone?",
+    "confirmBody": "{names} haven't rated yet. Once it's revealed, everyone sees every rating — theirs will land after.",
+    "confirmAction": "Reveal now",
+    "replay": "Play again",
+    "average": "Average",
+    "verdict": {
+      "single": "Just one rating so far.",
+      "unanimous": "Unanimous.",
+      "close": "Pretty much the same verdict.",
+      "split": "Opinions split.",
+      "apart": "Did you even see the same thing?"
+    },
+    "loner": "{name} is out on their own at {value}",
+    "expectation": "Expected {expected}, gave {actual}",
+    "inviteFirst": "Invite your people",
+    "inviteMore": "Invite someone else",
+    "inviteHint": "The link brings them into the group and straight to this challenge.",
+    "inviteMessage": "We're rating “{title}” blind and revealing together. Yours is missing:",
+    "inviteCopied": "Link copied — paste it in your group chat.",
+    "inviteShared": "Sent.",
+    "inviteFailed": "Couldn't make the link. Try again."
   }
 }

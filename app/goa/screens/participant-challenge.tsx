@@ -10,6 +10,7 @@ import { copyText } from "../clipboard";
 import { useGoaFormat } from "../format";
 import { useDoneItems } from "../use-done-items";
 import { recommenderLine } from "../recommender-picker";
+import { isSealed, RevealPanel, sealedRatingType } from "../reveal";
 import { SharedGlyph } from "../shared-responses";
 import { SessionLog, type SessionPayload, sessionSpecOf } from "../session-log";
 import { challengeShowcaseBlocks, hasShowcaseContent, ShowcaseView } from "../showcase-view";
@@ -891,7 +892,7 @@ function ItemEntryPanel({
         // the two "the group sees it soon enough" cases, which don't need a sentence
         // of their own. The two that actually withhold the answer (only after close,
         // only you) still get one.
-        const note = type.visibilityPolicy === "after_close" || type.visibilityPolicy === "author_only"
+        const note = type.visibilityPolicy === "after_close" || type.visibilityPolicy === "author_only" || (type.visibilityPolicy === "until_reveal" && isSealed(challenge, item))
           ? <p className="mb-3 rounded-lg bg-[var(--wash)] px-3 py-2 text-xs text-[var(--muted)]">{tv(`note.${type.visibilityPolicy}`)}</p>
           : undefined;
         const combinable = stacked && hasRequiredField && useSharedButton;
@@ -1212,6 +1213,8 @@ export function ParticipantChallengeScreen({
   onRenameEntryType,
   onDeleteEntry,
   onReload,
+  onRevealItem,
+  onCreateChallengeInvite,
   preview = false,
   previewActions,
 }: {
@@ -1234,6 +1237,10 @@ export function ParticipantChallengeScreen({
   onDeleteEntry?: (entryId: Id) => Promise<void>;
   /** Re-reads the challenge and its entries — used to show the latest shared answer after a clash. */
   onReload?: () => Promise<void>;
+  /** Opens an item's sealed ratings for the whole group ("reveal together"). */
+  onRevealItem?: (itemId: Id) => Promise<void>;
+  /** Managers: makes a link that brings someone into the group and straight into this challenge. */
+  onCreateChallengeInvite?: () => Promise<string>;
   /** Read-only public view (a published template): drops the Today tab and every
    *  entry form, keeps the header + rules + schedule + the Results showcase. */
   preview?: boolean;
@@ -1383,6 +1390,8 @@ export function ParticipantChallengeScreen({
   const dateRequired = undatedDaily || (useItemPanel && perDayItem);
   const canDeleteEntry = challenge.status === "active" ? onDeleteEntry : undefined;
   const hasGroup = challenge.participants.length > 1;
+  // "Reveal together": ratings stay sealed until someone reveals the item.
+  const sealedType = sealedRatingType(challenge);
 
   // The check-in log replaces the date picker wherever a day is what you pick:
   // a book's daily progress, or a habit's daily check-in. Session-bound rounds
@@ -1637,6 +1646,11 @@ export function ParticipantChallengeScreen({
                 )}
                 </>}
               </section>
+              {sealedType && (logItem ?? selectedItem) ? (
+                <div className="mt-5">
+                  <RevealPanel challenge={challenge} item={(logItem ?? selectedItem)!} type={sealedType} entries={entries} userId={user?.id} onReveal={onRevealItem} onCreateInvite={onCreateChallengeInvite} />
+                </div>
+              ) : null}
             </div>
           )
         ) : null}
@@ -1695,8 +1709,10 @@ export function ParticipantChallengeScreen({
                         <span className="block truncate text-xs text-[var(--muted)]">{caption}</span>
                       </div>
                       <div className="flex-none">
-                        {rating !== null ? (
+                        {rating !== null && !(sealedType && selectedItem && !isSelf && isSealed(challenge, selectedItem)) ? (
                           <RatingBar value={rating} />
+                        ) : sealedType && selectedItem && isSealed(challenge, selectedItem) && participant.userId && selectedItem.answeredUserIds?.includes(participant.userId) ? (
+                          <span className="text-xs text-[var(--muted)]">{t("groupSealed")}</span>
                         ) : (
                           <span className="text-sm text-[var(--muted)]"></span>
                         )}

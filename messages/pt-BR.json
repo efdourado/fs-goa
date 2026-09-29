@@ -970,23 +970,26 @@
   },
   "visibility": {
     "title": "Quem vê estas respostas",
-    "hint": "Vale para cada participante ver as respostas dos outros deste tipo. Admins e o autor sempre veem tudo.",
+    "hint": "Vale para cada participante ver as respostas dos outros deste tipo. Admins e o autor sempre veem tudo — menos uma nota selada, que espera a revelação como todo mundo.",
     "saved": "Visibilidade atualizada.",
     "policy": {
       "group_realtime": "O grupo, em tempo real",
       "after_own": "Os outros, depois que você responder",
       "after_close": "O grupo, só depois de encerrar",
-      "author_only": "Só você e os admins"
+      "author_only": "Só você e os admins",
+      "until_reveal": "Seladas até o grupo revelar"
     },
     "explain": {
       "group_realtime": "Todo participante vê a resposta de todo mundo enquanto a rodada corre.",
       "after_own": "Você só vê a resposta de outra pessoa para um item depois de enviar a sua.",
       "after_close": "Durante a rodada, só você e os admins veem sua resposta; o grupo vê no resultado.",
-      "author_only": "Sua resposta nunca aparece coletivamente — só métricas agregadas podem incluí-la."
+      "author_only": "Sua resposta nunca aparece coletivamente — só métricas agregadas podem incluí-la.",
+      "until_reveal": "Ninguém — nem os admins — vê a nota dos outros até alguém que já avaliou tocar em Revelar naquele item."
     },
     "note": {
       "after_close": "Só os admins veem sua resposta até a rodada encerrar.",
-      "author_only": "Só você e os admins veem esta resposta."
+      "author_only": "Só você e os admins veem esta resposta.",
+      "until_reveal": "Selada: ninguém vê a sua nota até o grupo revelar junto."
     }
   },
   "preflight": {
@@ -1058,7 +1061,8 @@
     "historyTitle": "Seus registros",
     "deletingEntry": "Excluindo…",
     "checkpointEmpty": "Nada ainda.",
-    "origin": "via {text}"
+    "origin": "via {text}",
+    "groupSealed": "Deu nota · selada"
   },
   "sessionLog": {
     "composerTitle": "Registrar {name}",
@@ -1907,7 +1911,14 @@
     "itemPlaceholderBookshelf": "ex.: Piranesi",
     "create": "Criar desafio",
     "groupWithoutId": "O grupo foi criado, mas perdemos o rastro dele.",
-    "entryCta": "Começar por chat"
+    "entryCta": "Começar por chat",
+    "q5": "Como as notas devem aparecer?",
+    "modeReveal": "Revelar juntos",
+    "modeRevealHint": "Todo mundo dá nota às cegas; um toque mostra todas de uma vez.",
+    "modeGuess": "Palpite antes, revelação depois",
+    "modeGuessHint": "Diga o que espera antes, dê a nota depois — veja quem se surpreendeu.",
+    "modeOpen": "Na hora",
+    "modeOpenHint": "Cada nota aparece para o grupo assim que é dada."
   },
   "backTo": {
     "home": "Início",
@@ -1999,5 +2010,40 @@
     "footer": "goa · {title} · página ",
     "streakValue": "{count, plural, one {# dia} other {# dias}}",
     "showWhen": "Datas nos cartões"
+  },
+  "reveal": {
+    "sealedTitle": "Notas seladas",
+    "revealedTitle": "Já revelado",
+    "sealedBody": "Ninguém vê a nota de ninguém — nem os admins — até alguém tocar em Revelar. Aí todo mundo vê tudo de uma vez.",
+    "rateBeforeLooking": "O grupo já revelou as notas. Dê a sua antes, para a dos outros não te influenciar.",
+    "countRated": "{done} de {total} deram nota",
+    "whoRated": "Quem já deu nota",
+    "you": "Você",
+    "revealButton": "Revelar",
+    "revealing": "Revelando…",
+    "rateFirst": "Dê a sua nota para liberar a revelação.",
+    "showAnyway": "Mostrar mesmo assim",
+    "stillMissing": "Falta: {names}",
+    "confirmTitle": "Revelar sem todo mundo?",
+    "confirmBody": "{names} ainda não deram nota. Depois de revelar, todo mundo vê todas as notas — as que faltam aparecem depois.",
+    "confirmAction": "Revelar agora",
+    "replay": "Ver de novo",
+    "average": "Média",
+    "verdict": {
+      "single": "Só uma nota até agora.",
+      "unanimous": "Unanimidade.",
+      "close": "Praticamente o mesmo veredito.",
+      "split": "Opiniões divididas.",
+      "apart": "Vocês viram a mesma coisa?"
+    },
+    "loner": "{name} ficou sozinho no {value}",
+    "expectation": "Esperavam {expected}, deram {actual}",
+    "inviteFirst": "Chamar a sua turma",
+    "inviteMore": "Chamar mais alguém",
+    "inviteHint": "O link traz a pessoa para o grupo e direto para este desafio.",
+    "inviteMessage": "A gente está dando nota às cegas para “{title}” e vai revelar junto. Falta a sua:",
+    "inviteCopied": "Link copiado — cole no grupo de vocês.",
+    "inviteShared": "Enviado.",
+    "inviteFailed": "Não deu para criar o link. Tente de novo."
   }
 }

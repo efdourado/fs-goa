@@ -18,6 +18,7 @@ export function challengeRequestBody(input: ChallengeCreationInput) {
     items: input.items,
     generateDaily: input.generateDaily,
     expectation: input.expectation === true,
+    ...(input.revealTogether ? { revealTogether: true } : {}),
     ...(input.collectsEntryDate !== undefined ? { collectsEntryDate: input.collectsEntryDate } : {}),
     ...(input.answerScope ? { answerScope: input.answerScope } : {}),
     ...(input.recordingMode ? { recordingMode: input.recordingMode } : {}),

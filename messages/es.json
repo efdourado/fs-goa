@@ -970,23 +970,26 @@
   },
   "visibility": {
     "title": "Quién ve estas respuestas",
-    "hint": "Vale para que cada participante vea las respuestas de los demás de este tipo. Los administradores y el autor siempre ven todo.",
+    "hint": "Vale para que cada participante vea las respuestas de los demás de este tipo. Los administradores y el autor siempre ven todo — salvo una nota sellada, que espera la revelación como todos.",
     "saved": "Visibilidad actualizada.",
     "policy": {
       "group_realtime": "El grupo, en tiempo real",
       "after_own": "Los demás, después de que respondas",
       "after_close": "El grupo, solo después de cerrar",
-      "author_only": "Solo tú y los administradores"
+      "author_only": "Solo tú y los administradores",
+      "until_reveal": "Selladas hasta que el grupo revele"
     },
     "explain": {
       "group_realtime": "Cada participante ve la respuesta de todos mientras la ronda transcurre.",
       "after_own": "Solo ves la respuesta de otra persona para un ítem después de enviar la tuya.",
       "after_close": "Durante la ronda, solo tú y los administradores ven tu respuesta; el grupo la ve en el resultado.",
-      "author_only": "Tu respuesta nunca aparece de forma colectiva — solo las métricas agregadas pueden incluirla."
+      "author_only": "Tu respuesta nunca aparece de forma colectiva — solo las métricas agregadas pueden incluirla.",
+      "until_reveal": "Nadie — ni los admins — ve la nota de otros hasta que alguien que ya puntuó toque Revelar en ese ítem."
     },
     "note": {
       "after_close": "Solo los administradores ven tu respuesta hasta que la ronda cierre.",
-      "author_only": "Solo tú y los administradores ven esta respuesta."
+      "author_only": "Solo tú y los administradores ven esta respuesta.",
+      "until_reveal": "Sellada: nadie ve tu nota hasta que el grupo la revele junto."
     }
   },
   "preflight": {
@@ -1058,7 +1061,8 @@
     "historyTitle": "Tus registros",
     "deletingEntry": "Eliminando…",
     "checkpointEmpty": "Nada todavía.",
-    "origin": "vía {text}"
+    "origin": "vía {text}",
+    "groupSealed": "Puntuó · sellada"
   },
   "sessionLog": {
     "composerTitle": "Registrar {name}",
@@ -1907,7 +1911,14 @@
     "itemPlaceholderBookshelf": "p. ej. Piranesi",
     "create": "Crear desafío",
     "groupWithoutId": "Se creó el grupo, pero perdimos su rastro.",
-    "entryCta": "Empezar por chat"
+    "entryCta": "Empezar por chat",
+    "q5": "¿Cómo deben salir las notas?",
+    "modeReveal": "Revelar juntos",
+    "modeRevealHint": "Todos puntúan a ciegas; un toque las muestra todas a la vez.",
+    "modeGuess": "Primero la apuesta, luego la revelación",
+    "modeGuessHint": "Di qué esperas antes, puntúa después — mira quién se sorprendió.",
+    "modeOpen": "Sobre la marcha",
+    "modeOpenHint": "Cada nota aparece para el grupo en cuanto se da."
   },
   "backTo": {
     "home": "Inicio",
@@ -1999,5 +2010,40 @@
     "footer": "goa · {title} · página ",
     "streakValue": "{count, plural, one {# día} other {# días}}",
     "showWhen": "Fechas en las tarjetas"
+  },
+  "reveal": {
+    "sealedTitle": "Notas selladas",
+    "revealedTitle": "Ya revelado",
+    "sealedBody": "Nadie ve la nota de nadie — ni los admins — hasta que alguien toque Revelar. Entonces todos las ven a la vez.",
+    "rateBeforeLooking": "El grupo ya reveló sus notas. Da la tuya primero, para que las de los demás no te influyan.",
+    "countRated": "{done} de {total} ya puntuaron",
+    "whoRated": "Quién ya puntuó",
+    "you": "Tú",
+    "revealButton": "Revelar",
+    "revealing": "Revelando…",
+    "rateFirst": "Da tu nota para desbloquear la revelación.",
+    "showAnyway": "Mostrar igualmente",
+    "stillMissing": "Falta: {names}",
+    "confirmTitle": "¿Revelar sin todos?",
+    "confirmBody": "{names} aún no han puntuado. Una vez revelado, todos ven todas las notas — las que faltan llegarán después.",
+    "confirmAction": "Revelar ahora",
+    "replay": "Ver otra vez",
+    "average": "Media",
+    "verdict": {
+      "single": "Solo una nota por ahora.",
+      "unanimous": "Unanimidad.",
+      "close": "Prácticamente el mismo veredicto.",
+      "split": "Opiniones divididas.",
+      "apart": "¿De verdad vieron lo mismo?"
+    },
+    "loner": "{name} se quedó solo en el {value}",
+    "expectation": "Esperaban {expected}, dieron {actual}",
+    "inviteFirst": "Invita a tu gente",
+    "inviteMore": "Invitar a alguien más",
+    "inviteHint": "El enlace los trae al grupo y directo a este reto.",
+    "inviteMessage": "Estamos puntuando “{title}” a ciegas y vamos a revelar juntos. Falta la tuya:",
+    "inviteCopied": "Enlace copiado — pégalo en el chat del grupo.",
+    "inviteShared": "Enviado.",
+    "inviteFailed": "No se pudo crear el enlace. Inténtalo de nuevo."
   }
 }

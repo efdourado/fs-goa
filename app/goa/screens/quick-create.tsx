@@ -20,6 +20,10 @@ type SafeRecipe = (typeof SAFE_RECIPES)[number];
 const NEEDS_ITEM: Record<SafeRecipe, boolean> = { cinema: true, bookshelf: true, habit: false };
 
 type Where = { kind: "personal" } | { kind: "group"; groupId: Id; name: string; participantIds: Id[] };
+/** How a group's ratings come out: sealed until revealed, sealed with a guess first, or live. */
+const RATING_MODES = ["reveal", "guess", "open"] as const;
+type RatingMode = (typeof RATING_MODES)[number];
+const MODE_KEY: Record<RatingMode, string> = { reveal: "modeReveal", guess: "modeGuess", open: "modeOpen" };
 
 /** goa's own turn in the exchange — a small mark, then the question, in a quiet bubble. */
 function Ask({ children }: { children: ReactNode }) {
@@ -97,16 +101,22 @@ export function QuickCreateScreen({
   const [newGroupName, setNewGroupName] = useState("");
   const [groupBusy, setGroupBusy] = useState(false);
   const [groupError, setGroupError] = useState<string | null>(null);
+  const [mode, setMode] = useState<RatingMode | null>(null);
   const [title, setTitle] = useState<string | null>(null);
   const [titleDraft, setTitleDraft] = useState("");
   const [itemTitle, setItemTitle] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function resetFrom(step: "recipe" | "where" | "title") {
+  // Only a group rating something together has a reveal to plan.
+  const asksMode = Boolean(recipe && NEEDS_ITEM[recipe] && where?.kind === "group");
+  const modeSettled = !asksMode || mode !== null;
+
+  function resetFrom(step: "recipe" | "where" | "mode" | "title") {
     if (step === "recipe") setRecipe(null);
+    if (step !== "title") setMode(null);
     // Changing the recipe keeps a destination the chat was opened into; changing the destination itself clears it.
-    if (step !== "title") { setWhere(step === "recipe" ? presetWhere() : null); setPickingNewGroup(false); setNewGroupName(""); setGroupError(null); }
+    if (step === "recipe" || step === "where") { setWhere(step === "recipe" ? presetWhere() : null); setPickingNewGroup(false); setNewGroupName(""); setGroupError(null); }
     setTitle(null);
     setTitleDraft("");
     setItemTitle("");
@@ -146,6 +156,8 @@ export function QuickCreateScreen({
         fields: [],
         items: firstItem ? [{ title: firstItem, position: 0 }] : [],
         generateDaily: false,
+        ...(asksMode && mode !== "open" ? { revealTogether: true } : {}),
+        ...(asksMode && mode === "guess" ? { expectation: true } : {}),
         participantIds: where.kind === "personal" ? [] : where.participantIds,
       };
       await onSubmit(where.kind === "personal" ? { personal: true } : { groupId: where.groupId }, input);
@@ -236,7 +248,22 @@ export function QuickCreateScreen({
           </div>
         ) : null}
 
-        {recipe && where ? (
+        {asksMode && where ? (
+          <div className="space-y-3">
+            <Ask>{t("q5")}</Ask>
+            {mode ? (
+              <Answered onEdit={() => resetFrom("mode")} editLabel={t("change")}>{t(MODE_KEY[mode])}</Answered>
+            ) : (
+              <div className="ml-10 grid gap-3 sm:grid-cols-3">
+                {RATING_MODES.map((key) => (
+                  <OptionCard key={key} onClick={() => setMode(key)} title={t(MODE_KEY[key])} hint={t(`${MODE_KEY[key]}Hint`)} />
+                ))}
+              </div>
+            )}
+          </div>
+        ) : null}
+
+        {recipe && where && modeSettled ? (
           <div className="space-y-3">
             <Ask>{t("q3")}</Ask>
             {title !== null ? (
@@ -260,7 +287,7 @@ export function QuickCreateScreen({
           </div>
         ) : null}
 
-        {recipe && where && title !== null && NEEDS_ITEM[recipe] ? (
+        {recipe && where && modeSettled && title !== null && NEEDS_ITEM[recipe] ? (
           <div className="space-y-3">
             <Ask>{t(recipe === "cinema" ? "q4Cinema" : "q4Bookshelf")}</Ask>
             <form onSubmit={submitItem} className="ml-10 flex flex-wrap items-center gap-2.5">

@@ -287,7 +287,7 @@ function AdminGeneral({
   );
 }
 
-const VISIBILITY_POLICIES = ["group_realtime", "after_own", "after_close", "author_only"] as const;
+const VISIBILITY_POLICIES = ["group_realtime", "after_own", "after_close", "author_only", "until_reveal"] as const;
 
 function AdminFields({
   challenge,

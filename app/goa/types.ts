@@ -266,6 +266,10 @@ export interface ChallengeItem {
   recommendedBy?: RecommenderRef | null;
   /** Free-text provenance for an item nobody in the group recommended. */
   originNote?: string | null;
+  /** When the group revealed this item's sealed (`until_reveal`) answers — null while still sealed. */
+  revealedAt?: string | null;
+  /** Who has answered a sealed type for this item — ids only; the values stay hidden until the reveal. */
+  answeredUserIds?: Id[];
   /** On checkpoint rows: how it's presented, plus roll-ups over its items. */
   kind?: CheckpointKind;
   itemCount?: number;
@@ -304,7 +308,7 @@ export interface EntryTypeView {
   fields: ChallengeField[];
 }
 
-export type VisibilityPolicy = "group_realtime" | "after_own" | "after_close" | "author_only";
+export type VisibilityPolicy = "group_realtime" | "after_own" | "after_close" | "author_only" | "until_reveal";
 export type AnswerScope = "individual" | "shared";
 export type SharedEditPolicy = "members_fill_admin_corrects" | "members_can_edit";
 
@@ -714,6 +718,8 @@ export interface ChallengeCreationInput {
   generateDaily: boolean;
   /** Cinema/Estante: also open the optional pre-watch "Expectativa" rating. */
   expectation?: boolean;
+  /** Group Cinema/Estante: ratings stay sealed until someone reveals each item. */
+  revealTogether?: boolean;
   /** Custom only: ask "when did it happen" on each response. Left out, the recipe's default applies. */
   collectsEntryDate?: boolean;
   /** Custom only: who fills the main response in — each participant, or once for the whole group. */

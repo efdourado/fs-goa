@@ -122,6 +122,8 @@ export const API_PATHS = {
   items: (challengeId: Id) => `/api/challenges/${encodeURIComponent(challengeId)}/items`,
   item: (challengeId: Id, itemId: Id) =>
     `/api/challenges/${encodeURIComponent(challengeId)}/items/${encodeURIComponent(itemId)}`,
+  itemReveal: (challengeId: Id, itemId: Id) =>
+    `/api/challenges/${encodeURIComponent(challengeId)}/items/${encodeURIComponent(itemId)}/reveal`,
   itemsPreview: (challengeId: Id) =>
     `/api/challenges/${encodeURIComponent(challengeId)}/items/preview`,
   itemsAssign: (challengeId: Id) =>
