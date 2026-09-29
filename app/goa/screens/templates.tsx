@@ -18,7 +18,7 @@ import type {
   TemplateSummary,
   User,
 } from "../types";
-import { BackButton, Brand, Button, CirclePinIcon, cx, EmptyState, inputClass, labelClass, PageHeading, StatusMessage } from "../ui";
+import { BackButton, Brand, Button, CircleMinusIcon, CirclePinIcon, cx, EmptyState, inputClass, labelClass, PageHeading, StatusMessage } from "../ui";
 import { ParticipantChallengeScreen } from "./participant-challenge";
 
 function PublicChrome({ user, onSignIn, children }: { user: User | null; onSignIn: () => void; children: ReactNode }) {
@@ -272,7 +272,7 @@ export function TemplateDetailScreen({
       ) : null}
       {canPublish ? (
         <button type="button" className={cx(pill, outline, "hover:border-[var(--main-2)] hover:text-[var(--main-2)]")} disabled={unpublishing} onClick={() => void unpublish()}>
-          <svg viewBox="0 0 20 20" className="size-4 flex-none" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M3 10s2.6-5 7-5 7 5 7 5-2.6 5-7 5-7-5-7-5Z" /><path d="M4 16 16 4" strokeLinecap="round" /></svg>
+          <CircleMinusIcon className="size-4 flex-none" />
           {t("unpublish")}
         </button>
       ) : null}
