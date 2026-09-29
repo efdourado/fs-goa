@@ -421,6 +421,13 @@
       "when": 1790629258705,
       "tag": "0059_classy_frightful_four",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1790702922159,
+      "tag": "0060_rating_reveal",
+      "breakpoints": true
     }
   ]
 }

@@ -14,6 +14,7 @@ import { generateOpaqueToken, hashToken } from "../../security";
 import { primaryEntryType } from "./entry-types";
 import { computeRankings } from "./rankings";
 import { RATING_METRIC_OPERATIONS } from "./rating";
+import { unsealedEntrySql } from "./reveal";
 import type { MetricRow } from "./types";
 
 interface SeriesEntry {
@@ -140,7 +141,7 @@ async function ratingRows(client: PoolClient, metric: MetricRow): Promise<Rating
         AND active_recommender.removed_at IS NULL
       WHERE e.challenge_id = $1 AND ${fieldIds ? "ev.field_id = ANY($2::text[])" : "ev.field_id = $2"}
         AND e.deleted_at IS NULL AND ev.number_scaled IS NOT NULL
-        AND ($3::text IS NULL OR e.item_id = $3)
+        AND ($3::text IS NULL OR e.item_id = $3) AND ${unsealedEntrySql("e")}
       ${fieldIds
         ? `GROUP BY e.id, e.item_id, ci.title, e.participant_user_id, cp.user_id, u.display_name,
                     cat.year, cat.author, cat.main_genre, ci.recommended_by_user_id,
@@ -636,7 +637,7 @@ async function computeSurprise(
        JOIN challenge_fields xf ON xf.id = xv.field_id AND xf.kind = 'rating'
        LEFT JOIN challenge_items ci ON ci.id = re.item_id
       WHERE re.challenge_id = $1 AND re.deleted_at IS NULL AND re.item_id IS NOT NULL
-        AND rv.number_scaled IS NOT NULL AND xv.number_scaled IS NOT NULL`,
+        AND rv.number_scaled IS NOT NULL AND xv.number_scaled IS NOT NULL AND ${unsealedEntrySql("re")}`,
     [metric.challenge_id, metric.field_id],
   );
   const overall = meanDelta(
@@ -689,7 +690,7 @@ async function computeIndicatorBias(
         AND active_recommender.user_id = ci.recommended_by_user_id
         AND active_recommender.removed_at IS NULL
       WHERE e.challenge_id = $1 AND ev.field_id = $2
-        AND e.deleted_at IS NULL AND ev.number_scaled IS NOT NULL`,
+        AND e.deleted_at IS NULL AND ev.number_scaled IS NOT NULL AND ${unsealedEntrySql("e")}`,
     [metric.challenge_id, metric.field_id],
   );
   const byPerson = new Map<string, { label: string; values: number[] }>();
@@ -751,7 +752,7 @@ async function liveAllComments(client: PoolClient, challengeId: string) {
        LEFT JOIN challenge_checkpoints cc ON cc.challenge_id = e.challenge_id
         AND (cc.starts_at AT TIME ZONE 'America/Sao_Paulo')::date = e.occurred_on
         AND cc.archived_at IS NULL
-      WHERE e.challenge_id = $1 AND e.deleted_at IS NULL
+      WHERE e.challenge_id = $1 AND e.deleted_at IS NULL AND ${unsealedEntrySql("e")}
         AND ev.text_value IS NOT NULL AND btrim(ev.text_value) <> ''
       ORDER BY e.submitted_at DESC`,
     [challengeId],

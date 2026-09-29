@@ -2,6 +2,7 @@ import type { PoolClient } from "pg";
 
 import { oneOrNull } from "../../db";
 import { challengeRatingFieldIds } from "./rating";
+import { unsealedEntrySql } from "./reveal";
 import {
   compositeAffinity,
   directAffinity,
@@ -87,6 +88,7 @@ async function ratingFacts(client: PoolClient, challengeId: string, fieldIds: st
          ON cp.challenge_id = e.challenge_id AND cp.user_id = e.participant_user_id AND cp.removed_at IS NULL
       WHERE e.challenge_id = $1 AND ev.field_id = ANY($2::text[])
         AND e.deleted_at IS NULL AND ev.number_scaled IS NOT NULL AND e.item_id IS NOT NULL
+        AND ${unsealedEntrySql("e")}
       GROUP BY e.id, e.participant_user_id, cp.user_id, u.display_name, e.item_id, ci.title,
                cat.year, cat.main_genre, cat.runtime_minutes, ci.recommended_by_user_id`,
     [challengeId, fieldIds],
@@ -254,7 +256,7 @@ export async function computeRankings(
        JOIN challenge_fields xf ON xf.id = xv.field_id AND xf.kind = 'rating'
        LEFT JOIN challenge_items ci ON ci.id = re.item_id
       WHERE re.challenge_id = $1 AND re.deleted_at IS NULL AND re.item_id IS NOT NULL
-        AND xv.number_scaled IS NOT NULL`,
+        AND xv.number_scaled IS NOT NULL AND ${unsealedEntrySql("re")}`,
     [challengeId, field.fieldIds],
   );
 

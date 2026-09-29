@@ -4798,6 +4798,67 @@ test("preflight avisa quando a expectativa fica visível para o grupo antes da a
   assert.equal(after.warnings.some((warning) => warning.code === "expectation_visible_early"), true);
 });
 
+test("revelar juntos: a nota fica selada até alguém revelar, inclusive para o admin e para as métricas", async () => {
+  const owner = await register("Dona Revela", "dona_revela");
+  const b = await register("Bia Revela", "bia_revela");
+  const c = await register("Caio Revela", "caio_revela");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube Revela" } })).body as { id: string }).id;
+  for (const member of [b, c]) {
+    const invite = (await call("POST", `/api/groups/${groupId}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
+    await call("POST", `/api/invites/${invite.token}`, { session: member, body: {} });
+  }
+  const created = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: { recipe: "cinema", title: "Às cegas", participantIds: [owner.user.id, b.user.id, c.user.id], revealTogether: true, items: [{ title: "Filme R" }] },
+  });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const cid = (created.body as { id: string }).id;
+  type RevealDetail = {
+    entryTypes: Array<{ id: string; purpose: string; visibilityPolicy: string; fields: Array<{ id: string; key: string }> }>;
+    items: Array<{ id: string; title: string; revealedAt: string | null; answeredUserIds: string[] }>;
+    metrics: Array<{ id: string; fieldId: string | null; sampleSize?: number; series?: Array<{ label: string; sampleSize: number }> }>;
+  };
+  const detail = async (session: ClientSession) => (await call("GET", `/api/challenges/${cid}`, { session })).body as RevealDetail;
+  const first = await detail(owner);
+  const rating = first.entryTypes.find((type) => type.purpose === "rating")!;
+  assert.equal(rating.visibilityPolicy, "until_reveal");
+  const nota = rating.fields.find((field) => field.key === "nota")!.id;
+  const itemId = first.items[0].id;
+  await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } });
+
+  const rate = (session: ClientSession, value: number) =>
+    call("POST", `/api/challenges/${cid}/entries`, { session, body: { itemId, entryTypeId: rating.id, values: { [nota]: value } } });
+  assert.equal((await rate(b, 4.5)).response.status, 201);
+  assert.equal((await rate(c, 1)).response.status, 201);
+
+  const ratingsSeenBy = async (session: ClientSession) =>
+    ((await call("GET", `/api/challenges/${cid}/entries`, { session })).body as { entries: Array<{ entryTypeId: string; userId: string }> })
+      .entries.filter((entry) => entry.entryTypeId === rating.id).map((entry) => entry.userId).sort();
+  assert.deepEqual(await ratingsSeenBy(owner), [], "nem o admin vê antes da revelação");
+  assert.deepEqual(await ratingsSeenBy(b), [b.user.id], "cada um só vê a própria");
+  const sealed = await detail(owner);
+  assert.deepEqual([...sealed.items[0].answeredUserIds].sort(), [b.user.id, c.user.id].sort(), "o detalhe diz quem já deu nota, sem o valor");
+  assert.equal(sealed.items[0].revealedAt, null);
+  const sampleOf = (d: RevealDetail) => d.metrics.filter((metric) => metric.fieldId === nota).reduce((sum, metric) => sum + (metric.sampleSize ?? 0) + (metric.series ?? []).reduce((n, row) => n + row.sampleSize, 0), 0);
+  assert.equal(sampleOf(sealed), 0, "nenhuma métrica conta uma nota selada");
+
+  const early = await call("POST", `/api/challenges/${cid}/items/${itemId}/reveal`, { session: owner, body: {} });
+  assert.equal(early.response.status, 200, "o admin pode revelar mesmo sem ter dado nota");
+  await adminPool.query("UPDATE challenge_items SET revealed_at = NULL WHERE id = $1", [itemId]);
+  await adminPool.query("UPDATE group_members SET role = 'participant' WHERE group_id = $1 AND user_id = $2", [groupId, owner.user.id]);
+  const noAnswer = await call("POST", `/api/challenges/${cid}/items/${itemId}/reveal`, { session: owner, body: {} });
+  assert.equal(noAnswer.response.status, 409, "quem não deu nota não revela");
+  assert.equal((noAnswer.body as { error: string }).error, "reveal_needs_answer");
+  await adminPool.query("UPDATE group_members SET role = 'owner' WHERE group_id = $1 AND user_id = $2", [groupId, owner.user.id]);
+
+  const revealed = await call("POST", `/api/challenges/${cid}/items/${itemId}/reveal`, { session: b, body: {} });
+  assert.equal(revealed.response.status, 200, JSON.stringify(revealed.body));
+  const again = await call("POST", `/api/challenges/${cid}/items/${itemId}/reveal`, { session: c, body: {} });
+  assert.equal((again.body as { revealedAt: string }).revealedAt, (revealed.body as { revealedAt: string }).revealedAt, "revelar de novo não muda nada");
+  assert.deepEqual(await ratingsSeenBy(owner), [b.user.id, c.user.id].sort(), "revelado, todo mundo vê");
+  assert.ok(sampleOf(await detail(owner)) > 0, "e as métricas passam a contar");
+});
+
 test("métricas oficiais: mediana e consenso calculam pela fórmula, toda métrica traz explicação e amostra, e combinações inválidas caem", async () => {
   const owner = await register("Dona Métrica", "dona_metrica_v1");
   const b = await register("Beto Métrica", "beto_metrica_v1");

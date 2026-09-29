@@ -2,6 +2,7 @@ import type { PoolClient } from "pg";
 
 import { publicId } from "../domain/shared";
 import { computeRankings } from "./rankings";
+import { unsealedEntrySql } from "./reveal";
 import { metricsForChallenge } from "./results";
 
 /**
@@ -133,7 +134,7 @@ async function pickComments(client: PoolClient, challengeId: string): Promise<Pi
        LEFT JOIN challenge_checkpoints cc ON cc.challenge_id = e.challenge_id
         AND (cc.starts_at AT TIME ZONE 'America/Sao_Paulo')::date = e.occurred_on
         AND cc.archived_at IS NULL
-      WHERE e.challenge_id = $1 AND e.deleted_at IS NULL
+      WHERE e.challenge_id = $1 AND e.deleted_at IS NULL AND ${unsealedEntrySql("e")}
         AND ev.text_value IS NOT NULL AND char_length(btrim(ev.text_value)) >= 20
       ORDER BY coalesce(e.item_id, e.id), char_length(btrim(ev.text_value)) DESC`,
     [challengeId],

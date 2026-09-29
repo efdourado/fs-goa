@@ -194,6 +194,14 @@ export async function createChallenge(
     if (wantsExpectation) {
       await seedExpectationType(client, id);
     }
+    // "Reveal together": every rating stays sealed until someone taps Reveal on the item.
+    if (body.revealTogether === true && wantsItems && !options.personal) {
+      await client.query(
+        `UPDATE entry_types SET visibility_policy = 'until_reveal'
+          WHERE challenge_id = $1 AND purpose = 'rating' AND answer_scope = 'individual'`,
+        [id],
+      );
+    }
 
     if (wantsItems) {
       if (!items.length || items.length > 200) throw new ApiError(400, "item_limit", "Adicione de 1 a 200 itens.");

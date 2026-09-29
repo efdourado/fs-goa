@@ -13,6 +13,7 @@ export {
 export { addChallengeField, saveChallengeFields } from "./goa/challenges/fields";
 export { addSharedResponseType, archiveEntryType, setExpectationEnabled, updateEntryTypeVisibility } from "./goa/challenges/entry-types";
 export { VISIBILITY_POLICIES } from "./goa/challenges/entry-types";
+export { revealItem } from "./goa/challenges/reveal";
 export type { VisibilityPolicy } from "./goa/challenges/entry-types";
 export {
   addChallengeItem,

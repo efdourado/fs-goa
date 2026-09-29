@@ -275,18 +275,20 @@ export async function listEntries(session: SessionContext, challengeId: string) 
     const closed = access.challenge.status === "closed";
     const result = await client.query<{
       id: string; item_id: string | null; checkpoint_id: string | null; entry_type_id: string; parent_entry_id: string | null;
-      participant_user_id: string | null; display_name: string | null; visibility_policy: string;
+      participant_user_id: string | null; display_name: string | null; visibility_policy: string; item_revealed: boolean;
       answer_scope: "individual" | "shared"; last_editor_name: string | null;
       username: string | null; occurred_on: string | null; submitted_at: Date; updated_at: Date;
     }>(
       `SELECT e.id,e.item_id,e.checkpoint_id,e.entry_type_id,e.parent_entry_id,e.participant_user_id,u.display_name,u.username,
               e.answer_scope, CASE WHEN e.answer_scope = 'shared' THEN le.display_name END AS last_editor_name,
               coalesce(et.visibility_policy, 'group_realtime') AS visibility_policy,
+              (ri.revealed_at IS NOT NULL) AS item_revealed,
               e.occurred_on::text AS occurred_on,e.submitted_at,e.updated_at
          FROM entries e
          LEFT JOIN users u ON u.id=e.participant_user_id
          LEFT JOIN users le ON le.id=e.last_edited_by_user_id
          LEFT JOIN entry_types et ON et.id = e.entry_type_id
+         LEFT JOIN challenge_items ri ON ri.id = e.item_id
         WHERE e.challenge_id=$1 AND e.deleted_at IS NULL
         ORDER BY e.occurred_on DESC NULLS LAST,e.created_at DESC`,
       [challengeId],
@@ -297,6 +299,8 @@ export async function listEntries(session: SessionContext, challengeId: string) 
     //   after_own — needs an entry of the same (item, type) from the viewer
     //   after_close — hidden until the round closes
     //   author_only — never surfaced here (aggregate metrics aside)
+    //   until_reveal — sealed until someone reveals the item (or the round closes); admins
+    //     wait like everyone else, or the reveal would be spoiled for whoever runs the group
     // A shared answer has no single author to gate by — it's the group's, so
     // it's always visible to every participant regardless of policy.
     const ownItemType = new Set(
@@ -305,6 +309,9 @@ export async function listEntries(session: SessionContext, challengeId: string) 
         .map((entry) => `${entry.entry_type_id}:${entry.item_id ?? entry.checkpoint_id ?? "-"}`),
     );
     const isVisible = (entry: (typeof result.rows)[number]) => {
+      if (entry.visibility_policy === "until_reveal" && entry.participant_user_id !== session.user.id && entry.answer_scope !== "shared") {
+        return closed || entry.item_revealed;
+      }
       if (access.canManage || entry.participant_user_id === session.user.id || entry.answer_scope === "shared") return true;
       switch (entry.visibility_policy) {
         case "author_only": return false;

@@ -45,6 +45,8 @@ export const entryTypes = pgTable(
     //   after_own      — only after the viewer has answered the same item
     //   after_close    — only the author + admins until the round closes
     //   author_only    — only the author + admins, ever (aggregate metrics aside)
+    //   until_reveal   — sealed for everyone but the author (admins too) until
+    //                    the item is revealed (`challenge_items.revealed_at`) or the round closes
     visibilityPolicy: text("visibility_policy").notNull().default("group_realtime"),
     // individual — each participant supplies their own value (default, unchanged
     // behavior). shared — the challenge item has one value for the whole group;
@@ -105,7 +107,7 @@ export const entryTypes = pgTable(
     ),
     check(
       "entry_types_visibility_policy_check",
-      sql`${table.visibilityPolicy} in ('group_realtime', 'after_own', 'after_close', 'author_only')`,
+      sql`${table.visibilityPolicy} in ('group_realtime', 'after_own', 'after_close', 'author_only', 'until_reveal')`,
     ),
     check("entry_types_answer_scope_check", sql`${table.answerScope} in ('individual', 'shared')`),
     check(
@@ -190,6 +192,9 @@ export const challengeItems = pgTable(
     // the instant, never whether entries can still be recorded (Phase 5).
     schedulePrecision: text("schedule_precision").notNull().default("datetime"),
     metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    // When the group opened this item's sealed (`until_reveal`) answers, and who tapped Reveal.
+    revealedAt: timestamptz("revealed_at"),
+    revealedByUserId: text("revealed_by_user_id").references(() => users.id, { onDelete: "set null" }),
     archivedAt: timestamptz("archived_at"),
     createdAt: timestamptz("created_at").defaultNow().notNull(),
     updatedAt: timestamptz("updated_at").defaultNow().notNull(),

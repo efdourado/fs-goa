@@ -62,6 +62,7 @@ async function detailItems(
     scheduled_precision: "date" | "datetime"; scheduled_time_zone: string | null;
     recommended_by_id: string | null; recommended_by_name: string | null;
     recommended_by_external_id: string | null; recommended_by_external_name: string | null;
+    revealed_at: Date | null; sealed_user_ids: string[] | null;
   }>(
     // A recommender who left the group (or whose account is gone) never shows
     // their name to the group again — `recommended_by_id` goes null right
@@ -76,7 +77,12 @@ async function detailItems(
             ci.scheduled_precision, ci.scheduled_time_zone,
             CASE WHEN active_recommender.user_id IS NOT NULL THEN i.recommended_by_user_id END AS recommended_by_id,
             CASE WHEN active_recommender.user_id IS NOT NULL THEN ru.display_name END AS recommended_by_name,
-            i.recommended_by_external_id, cr.display_name AS recommended_by_external_name
+            i.recommended_by_external_id, cr.display_name AS recommended_by_external_name,
+            i.revealed_at,
+            -- Who has answered a sealed (until_reveal) type for this item — ids only, never the value.
+            (SELECT array_agg(DISTINCT se.participant_user_id) FROM entries se
+               JOIN entry_types st ON st.id = se.entry_type_id AND st.visibility_policy = 'until_reveal'
+              WHERE se.item_id = i.id AND se.deleted_at IS NULL AND se.participant_user_id IS NOT NULL) AS sealed_user_ids
        FROM challenge_items i
        LEFT JOIN catalog_items ci ON ci.id = i.catalog_item_id
        LEFT JOIN users ru ON ru.id = i.recommended_by_user_id
@@ -105,6 +111,8 @@ async function detailItems(
     opensAt: item.opens_at?.toISOString() ?? null, dueAt: item.due_at?.toISOString() ?? null,
     schedulePrecision: item.schedule_precision,
     status: windowStatus(status, item.opens_at, item.due_at),
+    revealedAt: item.revealed_at?.toISOString() ?? null,
+    answeredUserIds: isPublic ? [] : item.sealed_user_ids ?? [],
     catalogItem: item.catalog_item_id
       ? {
           id: item.catalog_item_id,

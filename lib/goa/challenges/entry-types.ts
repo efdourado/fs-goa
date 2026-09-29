@@ -19,12 +19,12 @@ export type Cardinality =
   | "repeatable"
   | "once_per_day";
 export type SchedulePolicy = "free" | "while_active" | "checkpoint";
-export type VisibilityPolicy = "group_realtime" | "after_own" | "after_close" | "author_only";
+export type VisibilityPolicy = "group_realtime" | "after_own" | "after_close" | "author_only" | "until_reveal";
 export type AnswerScope = "individual" | "shared";
 export type SharedEditPolicy = "members_fill_admin_corrects" | "members_can_edit";
 
 export const VISIBILITY_POLICIES: readonly VisibilityPolicy[] = [
-  "group_realtime", "after_own", "after_close", "author_only",
+  "group_realtime", "after_own", "after_close", "author_only", "until_reveal",
 ];
 
 function isVisibilityPolicy(value: unknown): value is VisibilityPolicy {
