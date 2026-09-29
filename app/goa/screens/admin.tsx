@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { type FormEvent, type ReactNode, useMemo, useState } from "react";
+import { type FormEvent, useMemo, useState } from "react";
 
 import { ActionMenu, ActionMenuItem } from "../action-menu";
 import { CheckpointPlanner } from "../checkpoint-planner";
@@ -39,7 +39,6 @@ import {
   BackButton,
   Button,
   ChallengeStatusBadge,
-  CommentText,
   cx,
   Disclosure,
   EmptyState,
@@ -51,40 +50,9 @@ import {
   StatusMessage,
   Toggle,
 } from "../ui";
-import { formatRuntime, isLivingList, itemIdForEntry, valuesAsRecord } from "../utils";
-import { AdminMetrics } from "./metrics";
+import { formatRuntime, isLivingList, itemIdForEntry } from "../utils";
 import { SETUP_STEPS, SetupSummary, setupState, StepMarker, useChallengePreflight } from "../setup-progress";
 
-/** A curation list that shows its first `preview` rows, the rest behind a toggle. */
-function ShowMoreList<T>({
-  items,
-  preview,
-  className,
-  render,
-}: {
-  items: T[];
-  preview: number;
-  className?: string;
-  render: (item: T, index: number) => ReactNode;
-}) {
-  const t = useTranslations("adminChallenge");
-  const [open, setOpen] = useState(false);
-  const shown = open ? items : items.slice(0, preview);
-  return (
-    <>
-      <div className={className}>{shown.map((item, index) => render(item, index))}</div>
-      {items.length > preview ? (
-        <button
-          type="button"
-          className="mt-2 cursor-pointer text-xs font-light text-[var(--muted)] transition hover:text-[var(--ink)]"
-          onClick={() => setOpen((value) => !value)}
-        >
-          {open ? t("showLess") : t("showMoreItems", { count: items.length - preview })}
-        </button>
-      ) : null}
-    </>
-  );
-}
 interface DuplicateTargetGroup {
   id: Id;
   name: string;
@@ -1012,119 +980,6 @@ function AdminItems({
   );
 }
 
-interface CuratedCommentCandidate {
-  key: string;
-  entryId: Id;
-  fieldId: Id;
-  authorName: string;
-  itemTitle: string;
-  text: string;
-}
-
-function AdminResults({
-  challenge,
-  entries,
-  onSave,
-}: {
-  challenge: ChallengeDetail;
-  entries: Entry[];
-  onSave: (payload: Record<string, unknown>) => Promise<{ published?: boolean } | undefined>;
-}) {
-  const t = useTranslations("adminChallenge");
-  const tc = useTranslations("common");
-  const f = useGoaFormat();
-  const [headline, setHeadline] = useState(challenge.result?.headline ?? "");
-  const [summary, setSummary] = useState(challenge.result?.summary ?? "");
-  const [metricIds, setMetricIds] = useState<Id[]>(challenge.result?.metrics?.map((metric) => metric.id) ?? challenge.metrics.filter((metric) => metric.visibleInResults).map((metric) => metric.id));
-  const [commentKeys, setCommentKeys] = useState<string[]>(
-    challenge.result?.comments?.flatMap((comment) => comment.entryId && comment.fieldId ? [`${comment.entryId}:${comment.fieldId}`] : []) ?? [],
-  );
-  const [allComments, setAllComments] = useState(challenge.resultsAllComments === true);
-  const [anonymize, setAnonymize] = useState(challenge.resultsAnon === true);
-  const [includeRankings, setIncludeRankings] = useState((challenge.result?.personalRankings?.length ?? 0) > 0 || !challenge.result);
-  const [includeAffinity, setIncludeAffinity] = useState(Boolean(challenge.result?.affinity?.pairs.length) || !challenge.result);
-  const [showSchedule, setShowSchedule] = useState(challenge.showSchedule !== false);
-  const hasSchedule = challenge.checkpoints.some((cp) => cp.kind && cp.kind !== "day");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const textFields = useMemo(() => [...new Map([...challenge.fields, ...challenge.entryTypes.flatMap((type) => type.fields)].filter((field) => field.id && field.type === "text").map((field) => [field.id, field])).values()], [challenge.fields, challenge.entryTypes]);
-  const candidates = useMemo(() => {
-    const result: CuratedCommentCandidate[] = [];
-    for (const entry of entries) {
-      const values = valuesAsRecord(entry.values);
-      for (const field of textFields) {
-        if (!field.id || typeof values[field.id] !== "string" || !String(values[field.id]).trim()) continue;
-        const item = challenge.items.find((candidate) => candidate.id === itemIdForEntry(entry));
-        result.push({ key: `${entry.id}:${field.id}`, entryId: entry.id, fieldId: field.id, authorName: entry.participantName ?? t("participantFallback"), itemTitle: item?.title ?? t("entryFallback"), text: String(values[field.id]).trim() });
-      }
-    }
-    return result;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [challenge.items, entries, textFields]);
-
-  const isPublished = Boolean(challenge.result?.publishedAt);
-
-  async function save() {
-    setBusy(true); setError(null); setSuccess(null);
-    try {
-      await onSave({
-        headline: headline.trim(),
-        summary: summary.trim(),
-        metricIds,
-        comments: candidates.filter((candidate) => commentKeys.includes(candidate.key)).map(({ entryId, fieldId }) => ({ entryId, fieldId })),
-        allComments,
-        anonymizeParticipants: anonymize,
-        includeRankings,
-        includeAffinity,
-        ...(hasSchedule ? { showSchedule } : {}),
-      });
-      setSuccess(t("resultsSaved"));
-    } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
-  }
-
-  return (
-    <section className="mx-auto max-w-3xl">
-      <PageHeading title={t("resultsTitle")} description={t("resultsSubtitle")} />
-      <fieldset disabled={busy} className="min-w-0">
-        <div className="space-y-5 pb-7">
-          <Field label={t("headlineLabel")}><input className={inputClass} value={headline} onChange={(event) => setHeadline(event.target.value)} maxLength={160} placeholder={challenge.title} /></Field>
-          <Field label={t("summaryLabel")}><textarea className={inputClass} rows={4} value={summary} onChange={(event) => setSummary(event.target.value)} maxLength={1500} /></Field>
-        </div>
-
-        <Disclosure summary={t("highlightMetrics")} preview={challenge.metrics.length ? t("selectedOf", { selected: metricIds.length, total: challenge.metrics.length }) : undefined} defaultOpen>
-          {challenge.metrics.length ? <div className="pb-5 pt-1"><ShowMoreList items={challenge.metrics} preview={6} className="grid gap-2" render={(metric) => <label className="flex min-h-12 items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4 text-sm" key={metric.id}><input type="checkbox" aria-label={t("highlightMetricAria", { label: metric.label })} checked={metricIds.includes(metric.id)} onChange={(event) => setMetricIds((current) => event.target.checked ? [...current, metric.id] : current.filter((id) => id !== metric.id))} /><span><strong className="block">{metric.label}</strong><small className="text-[var(--muted)]">{metric.formattedValue ?? metric.value ?? t("metricNoValue")}</small></span></label>} /></div> : <p className="pb-5 pt-1 text-sm text-[var(--muted)]">{t("createMetricsFirst")}</p>}
-        </Disclosure>
-
-        <Disclosure summary={t("selectedComments")} preview={allComments ? t("allCommentsShown") : candidates.length ? t("selectedOf", { selected: commentKeys.length, total: candidates.length }) : undefined} defaultOpen={allComments || commentKeys.length > 0}>
-          <Toggle className="mt-1" checked={allComments} onChange={setAllComments} label={t("allCommentsLabel")} hint={t("allCommentsHint")} />
-          <p className="mt-3 rounded-xl border border-[var(--warn-line)] bg-[var(--warn-soft)] px-3 py-2 text-sm text-[var(--warn)]">{t("commentPrivacyWarning")}</p>
-          {allComments ? null : candidates.length ? <div className="mt-3 pb-5"><ShowMoreList items={candidates} preview={4} className="grid gap-2 sm:grid-cols-2" render={(candidate) => <label className="flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4 text-sm" key={candidate.key}><input className="mt-1" type="checkbox" aria-label={t("selectCommentAria", { author: candidate.authorName })} checked={commentKeys.includes(candidate.key)} onChange={(event) => setCommentKeys((current) => event.target.checked ? [...current, candidate.key] : current.filter((key) => key !== candidate.key))} /><span><span className="line-clamp-3 leading-6"><CommentText text={candidate.text} className="space-y-1" /></span><small className="mt-2 block font-light text-[var(--muted)]">{candidate.authorName} · {candidate.itemTitle}</small></span></label>} /></div> : <p className="mt-2 pb-5 text-sm text-[var(--muted)]">{t("noTextFields")}</p>}
-          {allComments ? <div className="pb-4" /> : null}
-        </Disclosure>
-
-        <Disclosure summary={t("wrappedBlocks")} preview={t("blocksOn", { count: Number(includeRankings) + Number(includeAffinity) })}>
-          <div className="grid gap-2 pb-5 pt-1 sm:grid-cols-2">
-            <Toggle checked={includeRankings} onChange={setIncludeRankings} label={t("includeRankings")} />
-            <Toggle checked={includeAffinity} onChange={setIncludeAffinity} label={t("includeAffinity")} />
-          </div>
-        </Disclosure>
-
-        <div className="space-y-3 border-t border-[var(--line)] py-7">
-          <Toggle checked={anonymize} onChange={setAnonymize} label={t("anonymizeParticipants")} hint={t("anonymizeHint")} />
-          {hasSchedule ? <Toggle checked={showSchedule} onChange={setShowSchedule} label={t("showScheduleLabel")} hint={t("showScheduleHint")} /> : null}
-        </div>
-
-        <div className="border-t border-[var(--line)] pt-7">
-          <StatusMessage error={error} success={success} />
-          <Button className="mt-5 w-full" disabled={busy} onClick={() => void save()}>{busy ? tc("saving") : t("saveResults")}</Button>
-          {isPublished ? <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{t("alreadyPublicHint")}</p> : null}
-        </div>
-      </fieldset>
-    </section>
-  );
-}
-
 export function AdminScreen({
   challenge,
   entries,
@@ -1158,10 +1013,6 @@ export function AdminScreen({
   onPreviewImport,
   onSaveCheckpoints,
   onAssignCheckpointItems,
-  onAddMetric,
-  onUpdateMetric,
-  onDeleteMetric,
-  onSaveResult,
   onPublishResult,
   onUnpublishResult,
   onArchiveChanged,
@@ -1199,10 +1050,6 @@ export function AdminScreen({
   onPreviewImport: (body: { json: string; mapping?: Record<string, string> }) => Promise<ImportPreview>;
   onSaveCheckpoints: (checkpoints: CheckpointInput[]) => Promise<void>;
   onAssignCheckpointItems: (assignments: Array<{ itemId: Id; checkpointId: Id | null; position?: number }>) => Promise<void>;
-  onAddMetric: (payload: Record<string, unknown>) => Promise<void>;
-  onUpdateMetric: (metricId: Id, payload: Record<string, unknown>) => Promise<void>;
-  onDeleteMetric: (metricId: Id) => Promise<void>;
-  onSaveResult: (payload: Record<string, unknown>) => Promise<{ published?: boolean } | undefined>;
   onPublishResult: (payload: Record<string, unknown>) => Promise<{ url?: string | null; publishedAt?: string; anonymized?: boolean } | undefined>;
   onUnpublishResult: () => Promise<void>;
   csrfToken: string;
@@ -1220,7 +1067,8 @@ export function AdminScreen({
     "overview",
     "fields", "items",
     ...(showCheckpoints ? (["checkpoints"] as const) : []),
-    "metrics", "results", "settings",
+    // Metrics and the showcase are built by Goa itself now (auto-metrics + the thread on Results) — no tabs to tend.
+    "settings",
   ];
   const requestedTab = tab === "participants" ? "overview" : tab;
   const activeTab = tabs.includes(requestedTab) ? requestedTab : "overview";
@@ -1266,8 +1114,6 @@ export function AdminScreen({
         {activeTab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.visibilityPolicy}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} onSaveVisibility={onSaveEntryTypeVisibility} onSetExpectation={onSetExpectation} onSaveEntryDate={onSaveEntryDate} onAddShared={onAddSharedResponse} onRemoveType={onRemoveEntryType} onSavePolicy={onSaveSharedPolicy} /> : null}
         {activeTab === "items" ? <AdminItems challenge={challenge} group={group} entries={entries} onAdd={onAddItems} onUpdate={onUpdateItem} onArchive={onArchiveItem} onPreviewImport={onPreviewImport} onLinkLibrary={onLinkLibrary} onUnlinkLibrary={onUnlinkLibrary} onLibraryChanged={onArchiveChanged} /> : null}
         {activeTab === "checkpoints" ? <CheckpointPlanner key={`${challenge.id}:${challenge.checkpoints.map((cp) => cp.id).join(",")}`} challenge={challenge} onSaveCheckpoints={onSaveCheckpoints} onAssign={onAssignCheckpointItems} /> : null}
-        {activeTab === "metrics" ? <AdminMetrics challenge={challenge} onAdd={onAddMetric} onUpdate={onUpdateMetric} onDelete={onDeleteMetric} /> : null}
-        {activeTab === "results" ? <AdminResults challenge={challenge} entries={entries} onSave={onSaveResult} /> : null}
         {activeTab === "settings" ? <ChallengeSettings challenge={challenge} duplicateTargets={duplicateTargets} onDuplicate={onDuplicate} onOpenCopy={onOpenCopy} onDelete={onDelete} isPlatformAdmin={isPlatformAdmin} onPublishTemplate={onPublishTemplate} onUnpublishTemplate={onUnpublishTemplate} onPublish={onPublishResult} onUnpublish={onUnpublishResult} /> : null}
       </div>
     </main>

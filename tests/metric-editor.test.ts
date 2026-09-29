@@ -1,9 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createElement } from "react";
-import { canRankItems, defaultRankingFieldIds, metricFields, metricGroupings, metricMinimum } from "../app/goa/metric-editor";
+import { canRankItems, metricGroupings, metricMinimum } from "../app/goa/metric-editor";
 import { MetricBlock } from "../app/goa/metrics-view";
-import { MetricEditor } from "../app/goa/screens/metrics";
 import type { ChallengeDetail, Metric } from "../app/goa/types";
 import { renderWithIntl } from "./helpers/intl";
 
@@ -15,18 +14,6 @@ const reading = {
     { name: "Terminei", purpose: "completion", fields: [{ id: "rating", label: "Nota", type: "rating" }, { id: "comment", label: "Comentário", type: "text" }] },
   ],
 } as unknown as ChallengeDetail;
-
-test("metric editing includes ratings from the completion form without duplicating primary fields", () => {
-  const fields = metricFields(reading);
-  assert.deepEqual(fields.map((field) => [field.id, field.source]), [["pages", "Progresso"], ["rating", "Terminei"]]);
-  const html = renderWithIntl(createElement(MetricEditor, {
-    challenge: reading, metric: { id: "ranking", label: "Ranking", operation: "bayesian_average", fieldId: "rating", groupBy: "item", minSample: 3 }, onCancel: () => undefined, onSave: async () => undefined,
-  }));
-  assert.match(html, /value="rating" selected=""/);
-  assert.match(html, /Nota · Terminei/);
-  assert.doesNotMatch(html, /<details open=""/);
-  assert.doesNotMatch(html, /type="submit"[^>]*disabled/);
-});
 
 test("grouping choices respect operation and personal context", () => {
   assert.deepEqual(metricGroupings(reading, "completion_rate"), ["none"]);
@@ -81,12 +68,3 @@ test("uma receita com itens (Tables, personalizada) também agrupa e ranqueia po
   assert.equal(canRankItems({ ...restaurants, fields: [], entryTypes: [] }), false, "sem nada numérico para ordenar também não");
 });
 
-test("ranking novo: as notas já vêm marcadas e o agrupamento é por item, sem perguntar", () => {
-  assert.deepEqual(defaultRankingFieldIds(metricFields(restaurants)), ["comida", "ambiente"], "só as notas — preço e texto ficam de fora");
-  const html = renderWithIntl(createElement(MetricEditor, { challenge: restaurants, ranking: true, onCancel: () => undefined, onSave: async () => undefined }));
-  assert.match(html, /value="Melhores itens"/, "nome de partida");
-  assert.match(html, /checked=""[^>]*/, "as notas começam marcadas");
-  assert.match(html, /Como pontuar/);
-  assert.doesNotMatch(html, /Agrupar por/, "o agrupamento fica travado em item");
-  assert.doesNotMatch(html, /type="submit"[^>]*disabled/, "já dá para adicionar sem mexer em nada");
-});

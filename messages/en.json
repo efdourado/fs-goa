@@ -2178,7 +2178,8 @@
     "surprises": {
       "eyebrow": "Expectation vs reality",
       "title": "{title} changed the most",
-      "note": "Average guess before pressing play, average rating after."
+      "expected": "expected",
+      "actual": "rated"
     },
     "property": {
       "eyebrow": "Favourite {label}",

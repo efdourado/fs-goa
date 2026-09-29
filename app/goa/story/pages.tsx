@@ -43,7 +43,7 @@ function PageFrame({ input, index, total, title, headline, dark, children }: {
           {headline ? <p className={cx("mt-4 text-2xl font-light leading-snug", dark ? "text-white/70" : "text-[var(--muted)]")}>{headline}</p> : null}
         </div>
       ) : null}
-      <div className="mt-12 flex flex-1 flex-col">{children}</div>
+      <div className="@container mt-12 flex flex-1 flex-col">{children}</div>
       <footer className={cx("mt-12 text-xs", dark ? "text-white/45" : "text-[var(--muted)]")}>goa</footer>
     </article>
   );
@@ -132,8 +132,8 @@ export function DownloadPagesButton({ input, story, metrics = [], tone = "hero" 
           tone === "hero" ? "border border-white/35 text-[var(--spotlight-ink)] hover:border-white/60 hover:bg-white/5" : "bg-[var(--ink)] font-medium text-[var(--canvas)] hover:opacity-90",
         )}
       >
-        <svg viewBox="0 0 20 20" className="size-4 flex-none" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
-          <rect x="3.5" y="3" width="9" height="11.5" rx="1.5" /><path d="M7.5 17h8a1 1 0 0 0 1-1V7" strokeLinecap="round" />
+        <svg viewBox="0 0 20 20" className="size-4 flex-none" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+          <path d="M10 3v10m0 0-4-4m4 4 4-4M4 16h12" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
         {t("button")}
       </button>

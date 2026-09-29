@@ -111,10 +111,10 @@ export function StoryView({ input, story, metrics = [] }: { input: StoryInput; s
       <ThreadPanel input={input} story={story} />
       <div className="mt-4 space-y-4 px-1">
         {pages.map((page) => (
-          <section key={page.id} className="border-t border-[var(--line)] pb-6 pt-8 first:border-t-0">
+          <section key={page.id} className="pb-2 pt-10">
             <h3 className="text-2xl font-light tracking-[-0.03em]">{page.title}</h3>
             <p className="mt-1 text-sm text-[var(--muted)]">{page.headline}</p>
-            <div className="mt-6">{page.body}</div>
+            <div className="@container mt-6">{page.body}</div>
           </section>
         ))}
       </div>

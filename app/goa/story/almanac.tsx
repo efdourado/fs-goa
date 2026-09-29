@@ -29,13 +29,47 @@ export interface AlmanacPage {
   body: ReactNode;
 }
 
-/** A titled block inside a page — no box, just a heading, the facts, and room around them. */
+/** The one card every fact sits in: paper on the canvas, a hairline, the same padding and corners everywhere. */
+const cardClass = "flex min-w-0 flex-col rounded-[20px] border border-[var(--line)] bg-[var(--paper)] p-5 sm:p-6";
+
+/** A titled card inside a page — a heading, the facts, nothing else. Cards in a row share one height. */
 function Block({ title, children, wide }: { title: string; children: ReactNode; wide?: boolean }) {
   return (
-    <div className={cx("min-w-0", wide && "[grid-column:1/-1]")}>
+    <div className={cx(cardClass, wide && "[grid-column:1/-1]")}>
       <h4 className="text-sm font-medium">{title}</h4>
-      <div className="mt-3">{children}</div>
+      <div className="mt-4 flex-1">{children}</div>
     </div>
+  );
+}
+
+/**
+ * Expectation against reality for one title, as a track: the hollow dot is the guess, the filled one where
+ * it landed, the bar between them the distance — and the difference written plainly at the end.
+ */
+function Shift({ title, expected, actual, min, max, fmt }: { title: string; expected: number; actual: number; min: number; max: number; fmt: (value: number) => string }) {
+  const at = (value: number) => ((value - min) / Math.max(1e-9, max - min)) * 100;
+  const up = actual >= expected;
+  const tone = up ? "var(--main)" : "var(--main-2)";
+  const low = Math.min(expected, actual);
+  const high = Math.max(expected, actual);
+  return (
+    <li>
+      <div className="flex items-baseline justify-between gap-3 text-sm">
+        <span className="min-w-0 truncate">{title}</span>
+        <span className="flex-none text-xs font-medium tabular-nums" style={{ color: tone }}>{up ? "+" : "−"}{fmt(Math.abs(actual - expected))}</span>
+      </div>
+      <div className="relative mt-2 h-4">
+        <span className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-[var(--line)]" />
+        <span className="absolute top-1/2 h-[3px] -translate-y-1/2 rounded-full" style={{ left: `${at(low)}%`, width: `${at(high) - at(low)}%`, background: tone, opacity: 0.55 }} />
+        <span className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 bg-[var(--paper)]" style={{ left: `${at(expected)}%`, borderColor: "var(--muted)" }} title={fmt(expected)} />
+        <span className="absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ left: `${at(actual)}%`, background: tone }} title={fmt(actual)} />
+      </div>
+      <div className="relative mt-1 h-4 text-[10px] tabular-nums text-[var(--muted)]">
+        {/* Two numbers too close to read apart: the rating speaks, the guess is in the dot. */}
+        {Math.abs(at(actual) - at(expected)) >= 9 ? <span className="absolute -translate-x-1/2" style={{ left: `${at(expected)}%` }}>{fmt(expected)}</span> : null}
+        <span className="absolute -translate-x-1/2 font-medium text-[var(--ink)]" style={{ left: `${at(actual)}%` }}>{fmt(actual)}</span>
+      </div>
+    </li>
   );
 }
 
@@ -55,32 +89,9 @@ function Avatar({ id, name, ids, size = 7 }: { id: Id; name: string; ids: Id[]; 
   return <span className="grid flex-none place-items-center rounded-full text-[10px] font-bold text-white" style={{ background: personTone(ids, id), width: size * 4, height: size * 4 }}>{initialsOf(name)}</span>;
 }
 
-/** The challenge's own metrics (the recipe's, Goa's automatic ones, whatever the owner made) — plain rows, top five each. */
-function MetricsPage({ metrics }: { metrics: Metric[] }) {
-  const t = useTranslations("story");
-  return (
-    <div className="grid gap-x-12 gap-y-8 [grid-template-columns:repeat(auto-fit,minmax(min(100%,14rem),1fr))]">
-      {metrics.map((metric) => (
-        <div key={metric.id} className="min-w-0 border-t border-[var(--line)] pt-3">
-          <p className="text-sm text-[var(--muted)]">{metric.label}</p>
-          {metric.series?.length ? (
-            <ol className="mt-2 space-y-1 text-sm">
-              {metric.series.slice(0, 5).map((row, index) => (
-                <li key={row.key} className="flex gap-2"><span className="w-4 tabular-nums text-[var(--muted)]">{index + 1}</span><span className="min-w-0 flex-1 truncate">{row.label}</span><strong className="font-medium tabular-nums">{row.formattedValue ?? row.value ?? "—"}</strong></li>
-              ))}
-              {metric.series.length > 5 ? <li className="text-xs text-[var(--muted)]">{t("metricsMore", { count: metric.series.length - 5 })}</li> : null}
-            </ol>
-          ) : (
-            <p className="mt-1 text-3xl font-light tabular-nums tracking-[-0.03em]">{metric.formattedValue ?? "—"}</p>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// Columns follow the width of the page they're on (the screen, or a downloaded page), not the viewport.
-const grid = "grid gap-x-14 gap-y-10 [grid-template-columns:repeat(auto-fit,minmax(min(100%,19rem),1fr))]";
+// Two columns at most, decided by the page's own width (a screen, or a downloaded page) — and a lone last card
+// takes the whole row instead of sitting next to a hole.
+const grid = "grid gap-4 @2xl:grid-cols-2 @2xl:[&>*:last-child:nth-child(odd)]:[grid-column:1/-1]";
 
 /**
  * Every page the almanac has for this story — only the ones its data can fill. `full` lists everything
@@ -96,12 +107,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
   const ids = input.people.map((person) => person.id);
   const noun = (count: number) => t(`noun.${input.noun}`, { count });
   const pages: AlmanacPage[] = [];
-  // A metric with nothing to show yet (no value, no rows) stays out rather than printing a dash.
-  const shownMetrics = metrics.filter((metric) => metric.visibleInResults !== false && metric.operation !== "completion_rate"
-    && ((metric.series?.length ?? 0) > 0 || (metric.formattedValue && metric.formattedValue !== "—")));
-  const metricsPage: AlmanacPage[] = shownMetrics.length
-    ? [{ id: "metrics", title: t("pages.metrics.title"), headline: t("pages.metrics.headline", { count: shownMetrics.length }), contents: shownMetrics.slice(0, 4).map((metric) => metric.label).join(" · "), body: <MetricsPage metrics={shownMetrics} /> }]
-    : [];
+  const metricsPage: AlmanacPage[] = [];
 
   if (story.kind === "rated") {
     const s: RatedStory = story;
@@ -130,7 +136,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
                 <div key={score.item.id} className="flex flex-col items-center text-center">
                   <TitleChip title={score.item.title} year={score.item.year} className={cx("w-full", index === 1 ? "max-w-[6.5rem]" : "max-w-[5.25rem]")} />
                   <p className="mt-2 line-clamp-1 text-xs">{score.item.title}</p>
-                  <div className={cx("mt-2 flex w-full flex-col items-center rounded-t-lg bg-[var(--wash)] pt-2", index === 1 ? "h-24" : index === 0 ? "h-16" : "h-12")}>
+                  <div className={cx("mt-2 flex w-full flex-col items-center rounded-lg bg-[var(--wash)] pt-2", index === 1 ? "h-24" : index === 0 ? "h-16" : "h-12")}>
                     <span className="text-lg font-medium tabular-nums">{fmt(score.average)}</span>
                     <span className="text-[10px] text-[var(--muted)]">#{index === 1 ? 1 : index === 0 ? 2 : 3}</span>
                   </div>
@@ -220,7 +226,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
                 <ul className="space-y-2">
                   {s.pairs.slice(0, 6).map((pair, index) => (
                     <li key={`${pair.a.id}-${pair.b.id}`}>
-                      <Bar label={<span className="flex items-center gap-1.5"><span className="flex -space-x-1.5"><Avatar id={pair.a.id} name={pair.a.name} ids={ids} size={5} /><Avatar id={pair.b.id} name={pair.b.name} ids={ids} size={5} /></span><span className="truncate">{firstName(pair.a.name)} & {firstName(pair.b.name)}</span></span>} value={pair.agreement} max={100} figure={`${pair.agreement}%`} strong={index === 0} tone={index === 0 ? "var(--tag-blue)" : "var(--main-line)"} />
+                      <Bar label={<span className="flex items-center gap-1.5"><span className="flex -space-x-1.5"><Avatar id={pair.a.id} name={pair.a.name} ids={ids} size={6} /><Avatar id={pair.b.id} name={pair.b.name} ids={ids} size={6} /></span><span className="truncate">{firstName(pair.a.name)} & {firstName(pair.b.name)}</span></span>} value={pair.agreement} max={100} figure={`${pair.agreement}%`} strong={index === 0} tone={index === 0 ? "var(--tag-blue)" : "var(--main-line)"} />
                     </li>
                   ))}
                 </ul>
@@ -279,17 +285,13 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
             ))}
             {s.surprises.length ? (
               <Block title={t("surprises.eyebrow")}>
-                <ul className="space-y-2.5">
-                  {s.surprises.map((row) => (
-                    <li key={row.item.id} className="flex items-center gap-3 text-sm">
-                      <span className="min-w-0 flex-1 truncate">{row.item.title}</span>
-                      <span className="tabular-nums text-[var(--muted)] line-through">{fmt(row.expected)}</span>
-                      <span className={row.actual >= row.expected ? "text-[var(--ok)]" : "text-[var(--danger)]"}>{row.actual >= row.expected ? "↗" : "↘"}</span>
-                      <strong className="w-8 text-right font-medium tabular-nums">{fmt(row.actual)}</strong>
-                    </li>
-                  ))}
+                <ul className="space-y-4">
+                  {s.surprises.map((row) => <Shift key={row.item.id} title={row.item.title} expected={row.expected} actual={row.actual} min={input.scale.min} max={input.scale.max} fmt={fmt} />)}
                 </ul>
-                <p className="mt-2 text-xs text-[var(--muted)]">{t("surprises.note")}</p>
+                <p className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--muted)]">
+                  <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full border-2 border-[var(--muted)]" />{t("surprises.expected")}</span>
+                  <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[var(--main)]" />{t("surprises.actual")}</span>
+                </p>
               </Block>
             ) : null}
           </div>
@@ -306,7 +308,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
         body: (
           <div className={grid}>
             {s.quotes.map((quote) => (
-              <figure key={`${quote.person.id}-${quote.item.id}`} className="border-l-2 pl-4" style={{ borderColor: personTone(ids, quote.person.id) }}>
+              <figure key={`${quote.person.id}-${quote.item.id}`} className={cx(cardClass, "border-l-[3px]")} style={{ borderLeftColor: personTone(ids, quote.person.id) }}>
                 <blockquote className="text-xl font-light leading-snug tracking-[-0.01em]">“{quote.text}”</blockquote>
                 <figcaption className="mt-2 text-xs text-[var(--muted)]">{t("quotes.by", { name: firstName(quote.person.name), title: quote.item.title, value: fmt(quote.value) })}</figcaption>
               </figure>
@@ -443,7 +445,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
         body: (
           <div className={grid}>
             {s.notes.map((note) => (
-              <figure key={`${note.person.id}-${note.day}`} className="border-l-2 pl-4" style={{ borderColor: personTone(ids, note.person.id) }}>
+              <figure key={`${note.person.id}-${note.day}`} className={cx(cardClass, "border-l-[3px]")} style={{ borderLeftColor: personTone(ids, note.person.id) }}>
                 <blockquote className="text-xl font-light leading-snug">“{note.text}”</blockquote>
                 <figcaption className="mt-2 text-xs text-[var(--muted)]">{firstName(note.person.name)} · {day(note.day)}</figcaption>
               </figure>

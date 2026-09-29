@@ -2178,7 +2178,8 @@
     "surprises": {
       "eyebrow": "Expectativa vs realidad",
       "title": "{title} fue la que más cambió",
-      "note": "Apuesta media antes del play, nota media después."
+      "expected": "expectativa",
+      "actual": "nota"
     },
     "property": {
       "eyebrow": "{label} favorito",
