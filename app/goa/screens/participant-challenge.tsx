@@ -1248,7 +1248,7 @@ export function ParticipantChallengeScreen({
   /** Read-only public view (a published template): drops the Today tab and every
    *  entry form, keeps the header + rules + schedule + the Results showcase. */
   preview?: boolean;
-  /** Replaces the "Manage" button in the header (the template's "Copiar" CTA). */
+  /** A template preview's own actions (duplicate, front page, unpublish) — shown as pills in the challenge card. */
   previewActions?: ReactNode;
 }) {
   const t = useTranslations("participant");
@@ -1531,7 +1531,7 @@ export function ParticipantChallengeScreen({
       <div className="mb-5 flex items-center justify-between gap-3">
         <BackButton onClick={onBack} label={backLabel ?? t("back")} />
         <div className="flex items-center gap-2">
-          {previewActions ?? (onAdmin ? (
+          {preview ? null : (onAdmin ? (
             <Button variant="secondary" onClick={onAdmin}>
               <svg viewBox="0 0 20 20" className="size-4 flex-none" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
                 <path d="M8.3 2.8h3.4l.5 2.1 1.5.9 2.1-.6 1.7 2.9-1.6 1.5v1.8l1.6 1.5-1.7 2.9-2.1-.6-1.5.9-.5 2.1H8.3l-.5-2.1-1.5-.9-2.1.6-1.7-2.9 1.6-1.5V9.6L2.5 8.1l1.7-2.9 2.1.6 1.5-.9Z" strokeLinejoin="round" />
@@ -1550,7 +1550,13 @@ export function ParticipantChallengeScreen({
           {!preview && !sessionSpec && sortedItems.length ? <div className="mt-8 max-w-2xl"><div className="mb-2 flex justify-between text-xs text-white/70"><span>{t.rich("entriesProgress", { done: doneCount, total: sortedItems.length, b: (chunks) => <strong className="text-white">{chunks}</strong> })}</span><span>{completion}%</span></div><div className="h-2 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-[var(--main-2)]" style={{ width: `${Math.min(100, completion)}%` }} /></div></div> : null}
           {!preview
             ? <ChallengeCardActions challengeId={challenge.id} shareToken={challenge.result?.shareToken} extra={<DownloadPagesButton input={storyInput} story={story} metrics={challenge.metrics ?? []} />} />
-            : previewStory ? <div className="mt-8"><DownloadPagesButton input={previewStory.input} story={previewStory.story} /></div> : null}
+            : (
+              // A template's own actions (duplicate, front page, unpublish) sit in the card as pills, like a challenge's.
+              <div className="mt-8 flex flex-wrap gap-2">
+                {previewActions}
+                {previewStory ? <DownloadPagesButton input={previewStory.input} story={previewStory.story} /> : null}
+              </div>
+            )}
         </div>
         <span className="absolute -right-28 -top-36 h-96 w-96 rounded-full border border-white/10" aria-hidden="true" />
       </section>

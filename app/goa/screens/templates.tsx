@@ -18,7 +18,7 @@ import type {
   TemplateSummary,
   User,
 } from "../types";
-import { BackButton, Brand, Button, EmptyState, inputClass, labelClass, PageHeading, StatusMessage } from "../ui";
+import { BackButton, Brand, Button, CirclePinIcon, cx, EmptyState, inputClass, labelClass, PageHeading, StatusMessage } from "../ui";
 import { ParticipantChallengeScreen } from "./participant-challenge";
 
 function PublicChrome({ user, onSignIn, children }: { user: User | null; onSignIn: () => void; children: ReactNode }) {
@@ -253,20 +253,28 @@ export function TemplateDetailScreen({
     }
   }
 
+  // Pills on the dark challenge card, the same family as a challenge's "Download PDF" / "Download pages".
+  const pill = "inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full px-4 text-sm transition disabled:cursor-default disabled:opacity-50";
+  const outline = "border border-white/35 text-[var(--spotlight-ink)] hover:border-white/60 hover:bg-white/5";
   const headerActions = (
     <>
-      <Button onClick={() => (user ? setShowCopy(true) : onSignIn())}>
-        {user ? t("duplicateCta") : t("signInToDuplicate")}
-      </Button>
+      <button type="button" className={cx(pill, "bg-[var(--spotlight-ink)] font-medium hover:opacity-90")} onClick={() => (user ? setShowCopy(true) : onSignIn())}>
+        <span className="inline-flex items-center gap-2 text-[var(--spotlight)]">
+          <svg viewBox="0 0 20 20" className="size-4 flex-none" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><rect x="7" y="7" width="9" height="9" rx="2" /><path d="M13 4H6a2 2 0 0 0-2 2v7" strokeLinecap="round" /></svg>
+          {user ? t("duplicateCta") : t("signInToDuplicate")}
+        </span>
+      </button>
       {canPublish ? (
-        <Button variant="secondary" disabled={featuring} onClick={() => void toggleFeatured()}>
+        <button type="button" className={cx(pill, outline)} disabled={featuring} onClick={() => void toggleFeatured()}>
+          <CirclePinIcon filled={Boolean(detail?.templateFeatured)} className="size-4 flex-none" />
           {detail?.templateFeatured ? t("unfeature") : t("feature")}
-        </Button>
+        </button>
       ) : null}
       {canPublish ? (
-        <Button variant="danger" disabled={unpublishing} onClick={() => void unpublish()}>
+        <button type="button" className={cx(pill, outline, "hover:border-[var(--main-2)] hover:text-[var(--main-2)]")} disabled={unpublishing} onClick={() => void unpublish()}>
+          <svg viewBox="0 0 20 20" className="size-4 flex-none" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M3 10s2.6-5 7-5 7 5 7 5-2.6 5-7 5-7-5-7-5Z" /><path d="M4 16 16 4" strokeLinecap="round" /></svg>
           {t("unpublish")}
-        </Button>
+        </button>
       ) : null}
     </>
   );

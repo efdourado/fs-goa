@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { firstName, initialsOf, personTone } from "../rating-scale";
 import type { Id, Metric } from "../types";
+import { PagedView } from "../paged-view";
 import { cx } from "../ui";
 import { useAlmanacPages } from "./almanac";
 import type { Story, StoryInput } from "./model";
@@ -103,8 +104,8 @@ export function ThreadPanel({ input, story, fit = false, interactive = true }: {
 }
 
 /**
- * "The thread" of a challenge on screen: the drawing, then the almanac as a few pages of plainly organised
- * facts — no cards, no per-block buttons. Downloading lives next to "Download PDF" (see `pages.tsx`).
+ * "The thread" of a challenge on screen: the drawing, then the almanac's pages in the paginator (named
+ * tabs, previous/next) — one theme at a time instead of one long scroll. Downloading lives next to "Download PDF" (see `pages.tsx`).
  */
 export function StoryView({ input, story, metrics = [] }: { input: StoryInput; story: Story; metrics?: Metric[] }) {
   const pages = useAlmanacPages(story, input, metrics);
@@ -112,14 +113,20 @@ export function StoryView({ input, story, metrics = [] }: { input: StoryInput; s
   return (
     <section>
       <ThreadPanel input={input} story={story} />
-      <div className="mt-4 space-y-4 px-1">
-        {pages.map((page) => (
-          <section key={page.id} className="pb-2 pt-10">
-            <h3 className="text-2xl font-light tracking-[-0.03em]">{page.title}</h3>
-            <p className="mt-1 text-sm text-[var(--muted)]">{page.headline}</p>
-            <div className="@container mt-6">{page.body}</div>
-          </section>
-        ))}
+      {/* Everything after the drawing is a page of the paginator — one theme at a time, named tabs on top. */}
+      <div className="mt-8 px-1">
+        <PagedView
+          pages={pages.map((page) => ({
+            id: `story-${page.id}`,
+            title: page.title,
+            body: (
+              <div>
+                <p className="text-sm text-[var(--muted)]">{page.headline}</p>
+                <div className="@container mt-5">{page.body}</div>
+              </div>
+            ),
+          }))}
+        />
       </div>
     </section>
   );
