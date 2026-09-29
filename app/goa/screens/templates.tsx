@@ -90,6 +90,10 @@ export function TemplatesScreen({
         <header className="mb-10 max-w-3xl">
           <h1 className="text-4xl font-medium leading-[1.02] tracking-[-0.05em] sm:text-6xl">{t("frontTitle")}</h1>
           <p className="mt-4 text-base leading-7 text-[var(--muted)]">{t("frontLede")}</p>
+          <a href="/demo" className="mt-6 inline-flex min-h-11 items-center gap-2.5 rounded-full bg-[var(--spotlight)] py-1.5 pl-1.5 pr-5 text-sm text-[var(--spotlight-ink)] transition hover:opacity-90">
+            <span className="grid h-8 w-8 place-items-center rounded-full bg-[var(--main-2)] text-xs text-white" aria-hidden="true">▶</span>
+            {t("frontDemo")}
+          </a>
         </header>
       )}
 
