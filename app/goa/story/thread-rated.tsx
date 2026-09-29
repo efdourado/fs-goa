@@ -5,11 +5,9 @@ import { type CSSProperties, useEffect, useRef, useState } from "react";
 
 import { firstName, personTone } from "../rating-scale";
 import type { Id } from "../types";
-import { cx } from "../ui";
 import type { RatedNote, RatedStory, StoryInput } from "./model";
 
-const HEIGHT = 340;
-const TOP = 70;
+const PLOT = 250;
 const BOTTOM = 34;
 const MIN_STEP = 96;
 
@@ -45,7 +43,7 @@ function smoothPaths(points: Array<{ x: number; y: number } | null>, low = -Infi
  * they didn't. Lines that braid are people who agree; where they fan out, the group split. Notes pinned
  * on top say what happened there. Tap a name in the legend to follow one line.
  */
-export function RatedThread({ story, input, focus, run }: { story: RatedStory; input: StoryInput; focus: Id | null; run: number }) {
+export function RatedThread({ story, input, focus, run, fit = false }: { story: RatedStory; input: StoryInput; focus: Id | null; run: number; fit?: boolean }) {
   const t = useTranslations("story");
   const nf = useFormatter();
   const fmt = (value: number) => nf.number(value, { maximumFractionDigits: 1 });
@@ -59,28 +57,38 @@ export function RatedThread({ story, input, focus, run }: { story: RatedStory; i
     return () => observer.disconnect();
   }, []);
 
+  const tn = useTranslations("story.note");
+  const personName = (id: Id) => firstName(input.people.find((person) => person.id === id)?.name ?? "");
   const count = story.stations.length;
-  const contentWidth = Math.max(width, count * MIN_STEP);
+  const contentWidth = fit ? width : Math.max(width, count * MIN_STEP);
   const step = contentWidth / Math.max(1, count);
   const range = Math.max(1e-9, input.scale.max - input.scale.min);
   const x = (index: number) => step * index + step / 2;
-  const y = (value: number) => TOP + (1 - (value - input.scale.min) / range) * (HEIGHT - TOP - BOTTOM);
   const ids = input.people.map((person) => person.id);
   const stationIndex = new Map(story.stations.map((station, index) => [station.item.id, index]));
   const ticks = Array.from({ length: Math.floor(range) + 1 }, (_, index) => input.scale.min + index).filter((tick) => range <= 10 || tick % Math.ceil(range / 5) === 0);
   const drawMs = 1800;
   const delay = (ms: number): CSSProperties => ({ animationDelay: `${ms}ms` });
 
-  // Notes: one bubble per note, stacked when two land on the same title.
-  const perStation = new Map<number, number>();
-  // Quotes read better in the almanac's wall than squeezed over the lines.
+  // Notes: each takes the first row where it doesn't run into another one (quotes stay in the almanac).
+  const rows: Array<Array<[number, number]>> = [];
   const bubbles = story.notes.filter((note) => note.kind !== "quote").flatMap((note) => {
     const index = stationIndex.get(note.itemId);
     if (index === undefined) return [];
-    const slot = perStation.get(index) ?? 0;
-    perStation.set(index, slot + 1);
-    return [{ note, index, slot }];
+    const text = noteText(note, tn, personName, fmt);
+    const bubbleWidth = Math.min(208, text.length * 6.2 + 24);
+    const edge: "start" | "middle" | "end" = index === 0 ? "start" : index === count - 1 ? "end" : "middle";
+    const left = edge === "start" ? x(index) - 12 : edge === "end" ? x(index) + 12 - bubbleWidth : x(index) - bubbleWidth / 2;
+    let row = 0;
+    while (rows[row]?.some(([from, to]) => left < to + 8 && left + bubbleWidth > from - 8)) row += 1;
+    (rows[row] ??= []).push([left, left + bubbleWidth]);
+    return [{ note, index, row, text, edge }];
   });
+  const top = 20 + Math.max(1, rows.length) * 30;
+  const height = top + PLOT;
+  const y = (value: number) => top + (1 - (value - input.scale.min) / range) * (PLOT - BOTTOM);
+  const HEIGHT = height;
+  const TOP = top;
 
   return (
     <div ref={ref} className="relative w-full overflow-x-auto overflow-y-hidden [scrollbar-width:thin]">
@@ -115,8 +123,8 @@ export function RatedThread({ story, input, focus, run }: { story: RatedStory; i
           })}
         </svg>
 
-        {bubbles.map(({ note, index, slot }) => (
-          <Bubble key={`${note.kind}-${index}`} note={note} input={input} left={x(index)} top={8 + slot * 30} at={drawMs * ((index + 1) / count) + 500 + slot * 200} fmt={fmt} edge={index === 0 ? "start" : index === count - 1 ? "end" : "middle"} />
+        {bubbles.map(({ note, index, row, text, edge }) => (
+          <Bubble key={`${note.kind}-${index}`} note={note} text={text} left={x(index)} top={8 + row * 30} at={drawMs * ((index + 1) / count) + 500 + row * 200} edge={edge} />
         ))}
 
         {/* The titles along the bottom, with the group's number. */}
@@ -131,25 +139,24 @@ export function RatedThread({ story, input, focus, run }: { story: RatedStory; i
   );
 }
 
-function Bubble({ note, input, left, top, at, fmt, edge }: {
-  note: RatedNote; input: StoryInput; left: number; top: number; at: number; fmt: (value: number) => string; edge: "start" | "middle" | "end";
+function noteText(note: RatedNote, t: ReturnType<typeof useTranslations>, name: (id: Id) => string, fmt: (value: number) => string): string {
+  switch (note.kind) {
+    case "favourite": return t("favourite", { value: fmt(note.value) });
+    case "split": return t("split", { low: fmt(note.low), high: fmt(note.high) });
+    case "surprise": return t("surprise", { expected: fmt(note.expected), actual: fmt(note.actual) });
+    case "flop": return t("flop", { value: fmt(note.value) });
+    case "loner": return t("loner", { name: name(note.personId), value: fmt(note.value) });
+    case "quote": return `“${note.text}” — ${name(note.personId)}`;
+  }
+}
+
+function Bubble({ note, text, left, top, at, edge }: {
+  note: RatedNote; text: string; left: number; top: number; at: number; edge: "start" | "middle" | "end";
 }) {
-  const t = useTranslations("story.note");
-  const name = (id: Id) => firstName(input.people.find((person) => person.id === id)?.name ?? "");
-  const text = (() => {
-    switch (note.kind) {
-      case "favourite": return t("favourite", { value: fmt(note.value) });
-      case "split": return t("split", { low: fmt(note.low), high: fmt(note.high) });
-      case "surprise": return t("surprise", { expected: fmt(note.expected), actual: fmt(note.actual) });
-      case "flop": return t("flop", { value: fmt(note.value) });
-      case "loner": return t("loner", { name: name(note.personId), value: fmt(note.value) });
-      case "quote": return `“${note.text}” — ${name(note.personId)}`;
-    }
-  })();
-  const accent = note.kind === "favourite" ? "var(--tag-green)" : note.kind === "flop" ? "var(--tag-coral)" : note.kind === "quote" ? "var(--spotlight-ink)" : "var(--main-2)";
+  const accent = note.kind === "favourite" ? "var(--tag-green)" : note.kind === "flop" ? "var(--tag-coral)" : "var(--main-2)";
   return (
     <div
-      className={cx("reveal-rise absolute z-10 w-max max-w-[13rem] rounded-lg bg-[var(--spotlight-ink)] px-2 py-1 text-[11px] leading-snug text-[var(--spotlight)] shadow-lg", note.kind === "quote" && "italic")}
+      className="reveal-rise absolute z-10 w-max max-w-[13rem] rounded-lg bg-[var(--spotlight-ink)] px-2 py-1 text-[11px] leading-snug text-[var(--spotlight)] shadow-lg"
       style={{ left, top, transform: edge === "start" ? "translateX(-12px)" : edge === "end" ? "translateX(calc(-100% + 12px))" : "translateX(-50%)", borderLeft: `3px solid ${accent}`, animationDelay: `${at}ms` }}
     >
       {text}

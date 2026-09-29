@@ -2072,7 +2072,6 @@
     "emptyBody": "Once you and someone else have rated {count} of the same titles — in any challenge in this group — they'll appear here, as close to you as your ratings are."
   },
   "demo": {
-    "label": "Example",
     "badge": "Example · an invented group",
     "clubName": "Friday Film Club",
     "title": "Five friends watched the same eight films.",
@@ -2102,18 +2101,11 @@
     }
   },
   "story": {
-    "eyebrow": "The thread",
     "threadAria": "{count} people's ratings across {items} titles",
     "lanesAria": "{count} people's check-ins over {days} days",
     "redraw": "Draw again",
     "readRated": "Each line is one person, rising and falling with their rating. Where lines braid, you agreed; where they fan out, you split. The thick faint line is the group.",
     "readDated": "Each lane is one person: solid where they kept going, gaps where they stopped, bigger beads for bigger days. The outlined stretch is their longest run.",
-    "almanac": "The almanac",
-    "almanacNote": "Every card downloads on its own.",
-    "downloadCard": "Download this card",
-    "downloadPoster": "Download the poster",
-    "downloading": "Preparing…",
-    "downloadHint": "The drawing and the almanac, as one image.",
     "showAll": "Show all {count}",
     "showLess": "Show less",
     "datedHeadline": "{count, plural, one {One person's days, drawn.} other {# people's days, drawn side by side.}}",
@@ -2249,6 +2241,56 @@
       "eyebrow": "By release year",
       "title": "From {first} to {last}",
       "note": "Column height is how many titles; the number on top is their average."
+    },
+    "title": "The thread",
+    "metricsMore": "+{count} more",
+    "ranking": {
+      "rest": "The rest of the ranking"
+    },
+    "pages": {
+      "cover": {
+        "title": "Cover",
+        "contents": "The name, the people and the key numbers"
+      },
+      "thread": {
+        "contentsRated": "Everyone's line through the titles",
+        "contentsDated": "Everyone's days — streaks and gaps"
+      },
+      "rankings": {
+        "title": "Rankings",
+        "headline": "{title} took it, at {value}."
+      },
+      "people": {
+        "title": "The people"
+      },
+      "details": {
+        "title": "Time, taste and surprises",
+        "headlineProperty": "Favourite {label}: {name}"
+      },
+      "words": {
+        "title": "In their words",
+        "headline": "{count, plural, one {One line worth keeping.} other {# lines worth keeping.}}"
+      },
+      "metrics": {
+        "title": "Metrics",
+        "headline": "{count, plural, one {The challenge's # metric.} other {The challenge's # metrics.}}"
+      },
+      "streaks": {
+        "title": "Streaks"
+      },
+      "volume": {
+        "title": "How much",
+        "headlineCount": "{count, plural, one {# check-in} other {# check-ins}}"
+      }
+    },
+    "download": {
+      "button": "Download pages",
+      "title": "Download pages",
+      "lede": "{count} pages made from this challenge — download one, or all of them.",
+      "one": "Download this page",
+      "all": "Download all {count}",
+      "preparing": "Preparing…",
+      "format": "PNG images, portrait (4:5)."
     }
   }
 }

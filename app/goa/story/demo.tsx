@@ -10,6 +10,7 @@ import { dateKeyInSaoPaulo } from "../utils";
 import { TitleChip } from "./almanac";
 import { DEMO_REVEAL_ITEM, demoFilmInput, demoReadingInput } from "./demo-data";
 import { buildStory } from "./model";
+import { DownloadPagesButton } from "./pages";
 import { StoryView } from "./view";
 
 const delay = (ms: number): CSSProperties => ({ animationDelay: `${ms}ms` });
@@ -56,7 +57,7 @@ export function DemoExperience() {
         </div>
 
         {/* 1 — one sealed film, revealed by the visitor. */}
-        <p className="mt-12 text-[11px] font-medium uppercase tracking-[0.16em] text-[var(--main)]">{t("step1")}</p>
+        <p className="mt-12 text-sm font-medium text-[var(--main)]">{t("step1")}</p>
         <section key={run} className="mt-3 max-w-3xl overflow-hidden rounded-[28px] bg-[var(--spotlight)] p-5 text-[var(--spotlight-ink)] sm:p-8">
           <div className="flex items-center gap-4">
             <TitleChip title={film.title} year={film.year} className="w-14 flex-none" />
@@ -108,14 +109,20 @@ export function DemoExperience() {
         </section>
 
         {/* 2 — the whole season, drawn. */}
-        <p className="mt-16 text-[11px] font-medium uppercase tracking-[0.16em] text-[var(--main)]">{t("step2")}</p>
-        <p className="mb-4 mt-2 max-w-2xl text-lg font-light leading-snug">{t("step2Body")}</p>
-        <StoryView input={films} story={filmStory} label={t("label")} />
+        <p className="mt-16 text-sm font-medium text-[var(--main)]">{t("step2")}</p>
+        <div className="mb-4 mt-2 flex flex-wrap items-end justify-between gap-4">
+          <p className="max-w-2xl text-lg font-light leading-snug">{t("step2Body")}</p>
+          <DownloadPagesButton input={films} story={filmStory} tone="plain" />
+        </div>
+        <StoryView input={films} story={filmStory} />
 
         {/* 3 — the same idea for a habit. */}
-        <p className="mt-16 text-[11px] font-medium uppercase tracking-[0.16em] text-[var(--main)]">{t("step3")}</p>
-        <p className="mb-4 mt-2 max-w-2xl text-lg font-light leading-snug">{t("step3Body")}</p>
-        <StoryView input={reading} story={readingStory} label={t("label")} />
+        <p className="mt-16 text-sm font-medium text-[var(--main)]">{t("step3")}</p>
+        <div className="mb-4 mt-2 flex flex-wrap items-end justify-between gap-4">
+          <p className="max-w-2xl text-lg font-light leading-snug">{t("step3Body")}</p>
+          <DownloadPagesButton input={reading} story={readingStory} tone="plain" />
+        </div>
+        <StoryView input={reading} story={readingStory} />
 
         <section className="mt-16 border-t border-[var(--line)] pt-8">
           <h2 className="text-2xl font-medium tracking-[-0.04em]">{t("ctaTitle")}</h2>

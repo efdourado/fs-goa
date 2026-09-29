@@ -2072,7 +2072,6 @@
     "emptyBody": "Cuando tú y otra persona hayan puntuado {count} títulos iguales — en cualquier reto de este grupo — aparecerá aquí, tan cerca de ti como sus notas."
   },
   "demo": {
-    "label": "Ejemplo",
     "badge": "Ejemplo · un grupo inventado",
     "clubName": "Cineclub del Viernes",
     "title": "Cinco amigos vieron las mismas ocho películas.",
@@ -2102,18 +2101,11 @@
     }
   },
   "story": {
-    "eyebrow": "El hilo",
     "threadAria": "Notas de {count} personas en {items} títulos",
     "lanesAria": "Registros de {count} personas en {days} días",
     "redraw": "Dibujar otra vez",
     "readRated": "Cada línea es una persona, subiendo y bajando con su nota. Donde las líneas se trenzan, coincidieron; donde se abren, discreparon. La línea gruesa y tenue es el grupo.",
     "readDated": "Cada carril es una persona: continuo donde siguió, con huecos donde paró, cuentas más grandes en los días más grandes. El tramo contorneado es su racha más larga.",
-    "almanac": "El almanaque",
-    "almanacNote": "Cada tarjeta se descarga por separado.",
-    "downloadCard": "Descargar esta tarjeta",
-    "downloadPoster": "Descargar el póster",
-    "downloading": "Preparando…",
-    "downloadHint": "El dibujo y el almanaque, en una sola imagen.",
     "showAll": "Ver los {count}",
     "showLess": "Ver menos",
     "datedHeadline": "{count, plural, one {Los días de una persona, dibujados.} other {Los días de # personas, lado a lado.}}",
@@ -2249,6 +2241,56 @@
       "eyebrow": "Por año de estreno",
       "title": "De {first} a {last}",
       "note": "La altura es cuántos títulos; el número de arriba es su media."
+    },
+    "title": "El hilo",
+    "metricsMore": "+{count} más",
+    "ranking": {
+      "rest": "El resto del ranking"
+    },
+    "pages": {
+      "cover": {
+        "title": "Portada",
+        "contents": "El nombre, las personas y los números clave"
+      },
+      "thread": {
+        "contentsRated": "La línea de cada uno por los títulos",
+        "contentsDated": "Los días de cada uno — rachas y huecos"
+      },
+      "rankings": {
+        "title": "Rankings",
+        "headline": "{title} se lo llevó, con {value}."
+      },
+      "people": {
+        "title": "Las personas"
+      },
+      "details": {
+        "title": "Tiempo, gusto y sorpresas",
+        "headlineProperty": "{label} favorito: {name}"
+      },
+      "words": {
+        "title": "En sus palabras",
+        "headline": "{count, plural, one {Una frase para guardar.} other {# frases para guardar.}}"
+      },
+      "metrics": {
+        "title": "Métricas",
+        "headline": "{count, plural, one {La # métrica del reto.} other {Las # métricas del reto.}}"
+      },
+      "streaks": {
+        "title": "Rachas"
+      },
+      "volume": {
+        "title": "Cuánto",
+        "headlineCount": "{count, plural, one {# registro} other {# registros}}"
+      }
+    },
+    "download": {
+      "button": "Descargar páginas",
+      "title": "Descargar páginas",
+      "lede": "{count} páginas hechas con este reto — descarga una o todas.",
+      "one": "Descargar esta página",
+      "all": "Descargar las {count}",
+      "preparing": "Preparando…",
+      "format": "Imágenes PNG, en vertical (4:5)."
     }
   }
 }

@@ -98,7 +98,7 @@ export function RatingScale({
     <div ref={ref} className="relative mx-5 sm:mx-7" style={{ height: `${tallest * SLOT + 34}px` }}>
       {average !== null && average !== undefined ? (
         <div className="reveal-fade absolute bottom-6 top-0 w-px -translate-x-1/2 border-l border-dashed border-white/35" style={{ left: `${((average - min) / range) * 100}%`, ...delay(done) }}>
-          <span className="absolute -top-1 left-1.5 whitespace-nowrap text-[10px] uppercase tracking-wider text-white/55">{averageLabel} {fmt(average)}</span>
+          <span className="absolute -top-1 left-1.5 whitespace-nowrap text-[10px] text-white/55">{averageLabel} {fmt(average)}</span>
         </div>
       ) : null}
       {placed.map(({ person, index, level, left }) => (

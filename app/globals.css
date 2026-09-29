@@ -256,3 +256,14 @@ button:focus-visible, a:focus-visible, textarea:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   .story-sweep { animation: none; }
 }
+
+/* A downloadable page (app/goa/story/pages.tsx) is the finished picture: nothing waits to animate in. */
+.story-still *, .story-still { animation: none !important; }
+.story-still .reveal-drop, .story-still .reveal-rise, .story-still .reveal-fade { opacity: 1 !important; }
+.story-still .taste-line { stroke-dashoffset: 0 !important; }
+
+/* A downloadable page is read as a picture, a little further away than a screen: everything one step larger. */
+.story-page .text-xs { font-size: 0.875rem; line-height: 1.3rem; }
+.story-page .text-sm { font-size: 1.0625rem; line-height: 1.6rem; }
+.story-page .text-\[10px\] { font-size: 12px; }
+.story-page .text-\[11px\] { font-size: 13px; }

@@ -2072,7 +2072,6 @@
     "emptyBody": "Quando você e outra pessoa tiverem avaliado {count} títulos iguais — em qualquer desafio deste grupo — ela aparece aqui, tão perto de você quanto as notas de vocês."
   },
   "demo": {
-    "label": "Exemplo",
     "badge": "Exemplo · um grupo inventado",
     "clubName": "Cineclube de Sexta",
     "title": "Cinco amigos viram os mesmos oito filmes.",
@@ -2102,18 +2101,11 @@
     }
   },
   "story": {
-    "eyebrow": "O fio",
     "threadAria": "Notas de {count} pessoas em {items} títulos",
     "lanesAria": "Registros de {count} pessoas em {days} dias",
     "redraw": "Desenhar de novo",
     "readRated": "Cada linha é uma pessoa, subindo e descendo com a nota dela. Onde as linhas se trançam, vocês concordaram; onde se abrem, discordaram. A linha grossa e clara é o grupo.",
     "readDated": "Cada faixa é uma pessoa: contínua onde ela seguiu, com buracos onde parou, contas maiores nos dias maiores. O trecho contornado é a maior sequência dela.",
-    "almanac": "O almanaque",
-    "almanacNote": "Cada cartão pode ser baixado sozinho.",
-    "downloadCard": "Baixar este cartão",
-    "downloadPoster": "Baixar o pôster",
-    "downloading": "Preparando…",
-    "downloadHint": "O desenho e o almanaque, numa imagem só.",
     "showAll": "Ver todos os {count}",
     "showLess": "Ver menos",
     "datedHeadline": "{count, plural, one {Os dias de uma pessoa, desenhados.} other {Os dias de # pessoas, lado a lado.}}",
@@ -2249,6 +2241,56 @@
       "eyebrow": "Por ano de lançamento",
       "title": "De {first} a {last}",
       "note": "A altura é quantos títulos; o número em cima é a média deles."
+    },
+    "title": "O fio",
+    "metricsMore": "+{count} outros",
+    "ranking": {
+      "rest": "O resto do ranking"
+    },
+    "pages": {
+      "cover": {
+        "title": "Capa",
+        "contents": "O nome, as pessoas e os números principais"
+      },
+      "thread": {
+        "contentsRated": "A linha de cada um pelos títulos",
+        "contentsDated": "Os dias de cada um — sequências e buracos"
+      },
+      "rankings": {
+        "title": "Rankings",
+        "headline": "{title} levou, com {value}."
+      },
+      "people": {
+        "title": "As pessoas"
+      },
+      "details": {
+        "title": "Tempo, gosto e surpresas",
+        "headlineProperty": "{label} favorito: {name}"
+      },
+      "words": {
+        "title": "Nas palavras deles",
+        "headline": "{count, plural, one {Uma frase para guardar.} other {# frases para guardar.}}"
+      },
+      "metrics": {
+        "title": "Métricas",
+        "headline": "{count, plural, one {A # métrica do desafio.} other {As # métricas do desafio.}}"
+      },
+      "streaks": {
+        "title": "Sequências"
+      },
+      "volume": {
+        "title": "Quanto",
+        "headlineCount": "{count, plural, one {# registro} other {# registros}}"
+      }
+    },
+    "download": {
+      "button": "Baixar páginas",
+      "title": "Baixar páginas",
+      "lede": "{count} páginas feitas com este desafio — baixe uma ou todas.",
+      "one": "Baixar esta página",
+      "all": "Baixar as {count}",
+      "preparing": "Preparando…",
+      "format": "Imagens PNG, em retrato (4:5)."
     }
   }
 }

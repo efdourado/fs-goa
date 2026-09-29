@@ -17,7 +17,7 @@ const MIN_DAY = 9;
  * stopped. A day with a number is a bead sized by it. Each lane's longest run is outlined and named.
  * It draws itself left to right, like the days did.
  */
-export function DatedThread({ story, input, focus, run }: { story: DatedStory; input: StoryInput; focus: Id | null; run: number }) {
+export function DatedThread({ story, input, focus, run, fit = false }: { story: DatedStory; input: StoryInput; focus: Id | null; run: number; fit?: boolean }) {
   const t = useTranslations("story");
   const f = useFormatter();
   const ref = useRef<HTMLDivElement>(null);
@@ -31,7 +31,7 @@ export function DatedThread({ story, input, focus, run }: { story: DatedStory; i
   }, []);
 
   const total = daysBetween(story.from, story.to) + 1;
-  const plotWidth = Math.max(width - LABEL - 12, total * MIN_DAY);
+  const plotWidth = fit ? Math.max(1, width - LABEL - 12) : Math.max(width - LABEL - 12, total * MIN_DAY);
   const dayWidth = plotWidth / total;
   const contentWidth = plotWidth + LABEL + 12;
   const x = (day: string) => LABEL + daysBetween(story.from, day) * dayWidth + dayWidth / 2;
