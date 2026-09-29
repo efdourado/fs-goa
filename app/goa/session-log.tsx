@@ -60,13 +60,8 @@ function ChevronIcon({ className }: { className?: string }) {
   );
 }
 
-function CloseIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
-      <path d="M4.5 4.5l7 7M11.5 4.5l-7 7" strokeLinecap="round" />
-    </svg>
-  );
-}
+/** How many items the tray shows before "Show more". */
+const TRAY_LIMIT = 8;
 
 /** One field of one record, sized for a card. */
 function CellInput({ field, value, disabled, id, onChange, className }: {
@@ -234,6 +229,7 @@ export function SessionLog({
   onSave,
   onDelete,
   onAddItem,
+  onRename,
 }: {
   challenge: ChallengeDetail;
   spec: SessionSpec;
@@ -245,6 +241,8 @@ export function SessionLog({
   onDelete?: (entryId: Id) => Promise<void>;
   /** Present for someone who may add items to the challenge — makes "New item" available in the tray. */
   onAddItem?: (title: string) => Promise<Id>;
+  /** Present for a manager — renames what one check-in is called ("Treino"). */
+  onRename?: (name: string) => Promise<void>;
 }) {
   const t = useTranslations("sessionLog");
   const tf = useTranslations("entryForm");
@@ -318,12 +316,17 @@ export function SessionLog({
   const [removing, setRemoving] = useState<Entry | null>(null);
   // "New item" being named in the tray. It never touches the rows until the item exists.
   const [creating, setCreating] = useState<{ title: string; busy: boolean; error: string | null } | null>(null);
+  const [renaming, setRenaming] = useState<{ name: string; busy: boolean; error: string | null } | null>(null);
+  const [trayOpen, setTrayOpen] = useState(false);
   // After a save, the check-in to reopen once the reload brings it back: the edited one, or the newest of that day.
   const [reopen, setReopen] = useState<{ day: string; visitId?: Id; known: Set<Id> } | null>(null);
   const newItemInput = useRef<HTMLInputElement>(null);
   const cardsRef = useRef<HTMLOListElement>(null);
   const isCreating = creating !== null;
   useEffect(() => { if (isCreating) newItemInput.current?.focus(); }, [isCreating]);
+  const renameInput = useRef<HTMLInputElement>(null);
+  const isRenaming = renaming !== null;
+  useEffect(() => { if (isRenaming) renameInput.current?.select(); }, [isRenaming]);
   const disabled = !canEdit || busy;
 
   function load(visit: Entry | null, onDay: string) {
@@ -357,6 +360,29 @@ export function SessionLog({
     const card = cardsRef.current?.querySelector<HTMLElement>(`[data-item="${itemId}"]`);
     card?.scrollIntoView({ behavior: "smooth", block: "center" });
     card?.querySelector<HTMLElement>("input, select, textarea")?.focus({ preventScroll: true });
+  }
+
+  /** The tray is a toggle: tapping an item in the check-in takes it (and its card) back out. */
+  function toggleItemRow(itemId: Id) {
+    if (rows.some((row) => row.itemId === itemId)) {
+      setRows((current) => current.filter((row) => row.itemId !== itemId));
+      setSuccess(null);
+      return;
+    }
+    addItemRow(itemId);
+  }
+
+  async function saveRename() {
+    if (!renaming || !onRename) return;
+    const name = renaming.name.trim();
+    if (!name || name === spec.visit.name) { setRenaming(null); return; }
+    setRenaming({ ...renaming, busy: true, error: null });
+    try {
+      await onRename(name);
+      setRenaming(null);
+    } catch (cause) {
+      setRenaming({ ...renaming, busy: false, error: f.error(cause) });
+    }
   }
 
   function addItemRow(itemId: Id) {
@@ -477,6 +503,11 @@ export function SessionLog({
     const uses = new Map(byItem.map((row) => [row.item.id, row.sessions]));
     return [...items].sort((a, b) => (uses.get(b.id) ?? 0) - (uses.get(a.id) ?? 0) || (a.position ?? 0) - (b.position ?? 0));
   }, [items, byItem]);
+  // The usual ones first; the rest behind "Show more". Whatever is already in this check-in stays in view
+  // so it can be tapped back out.
+  const picked = new Set(rows.map((row) => row.itemId));
+  const visibleTray = trayOpen ? trayItems : trayItems.filter((item, index) => index < TRAY_LIMIT || picked.has(item.id));
+  const hiddenTrayCount = trayItems.length - visibleTray.length;
 
   if (!items.length && !onAddItem) return <EmptyState title={t("noItems")} />;
 
@@ -504,17 +535,31 @@ export function SessionLog({
           unavailableMessage={unavailableMessage}
         >
           <form onSubmit={submit} noValidate>
-            <div className="mb-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
-              <h3 className="text-sm text-[var(--muted)]">
-                {editing ? t("editTitle", { name: spec.visit.name, date: f.date(editing.occurredOn, shortDate) }) : t("composerTitle", { name: spec.visit.name })}
-              </h3>
-              {editing ? (
-                <label className="flex items-center gap-2 text-xs text-[var(--muted)]">
-                  {t("dateLabel")}
-                  <input className={cx(inputClass, "w-40")} type="date" max={today} value={occurredOn} disabled={disabled} onChange={(event) => setOccurredOn(event.target.value || day)} />
-                </label>
-              ) : null}
-            </div>
+            {renaming ? (
+              <div className="mb-5 flex flex-wrap items-center gap-2">
+                <input
+                  ref={renameInput} className={cx(inputClass, "min-w-0 flex-1 sm:max-w-xs")} value={renaming.name} maxLength={60} disabled={renaming.busy}
+                  aria-label={t("renameLabel")}
+                  onChange={(event) => setRenaming({ ...renaming, name: event.target.value })}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") { event.preventDefault(); void saveRename(); }
+                    if (event.key === "Escape") { event.preventDefault(); setRenaming(null); }
+                  }}
+                />
+                <Button type="button" disabled={renaming.busy || !renaming.name.trim()} onClick={() => void saveRename()}>{renaming.busy ? tc("saving") : tc("save")}</Button>
+                <Button type="button" variant="ghost" disabled={renaming.busy} onClick={() => setRenaming(null)}>{tc("cancel")}</Button>
+                {renaming.error ? <span className="w-full"><StatusMessage error={renaming.error} /></span> : null}
+              </div>
+            ) : (
+              <div className="mb-5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <h3 className="text-sm text-[var(--muted)]">{t("composerTitle", { name: spec.visit.name })}</h3>
+                {onRename ? (
+                  <button type="button" className="cursor-pointer text-xs text-[var(--muted)] underline-offset-4 transition hover:text-[var(--ink)] hover:underline" onClick={() => setRenaming({ name: spec.visit.name, busy: false, error: null })}>
+                    {t("renameLabel")}
+                  </button>
+                ) : null}
+              </div>
+            )}
 
             {dayVisits.length > 1 || (editing && dayVisits.length) ? (
               <div className="mb-5 flex flex-wrap items-center gap-2 text-xs" role="group" aria-label={t("onThisDay")}>
@@ -538,14 +583,14 @@ export function SessionLog({
 
             <p className={cx("mb-2.5", sectionLabelClass)}>{t("trayLabel")}</p>
             <div className="flex flex-wrap gap-2" role="group" aria-label={itemsHeading}>
-              {trayItems.map((item) => {
+              {visibleTray.map((item) => {
                 const inside = rows.some((row) => row.itemId === item.id);
                 const last = lastRecordFor(item.id);
                 const lastLead = last && numberFields[0] ? numberValue(last.values[numberFields[0].id as Id]) : null;
                 return (
                   <button
                     key={item.id} type="button" aria-pressed={inside} disabled={disabled}
-                    onClick={() => addItemRow(item.id)}
+                    onClick={() => toggleItemRow(item.id)}
                     className={cx(
                       "inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border py-1.5 pl-1.5 pr-3 text-sm transition disabled:cursor-not-allowed disabled:opacity-50",
                       inside ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] bg-[var(--paper)] hover:border-[var(--main-line)]",
@@ -557,6 +602,11 @@ export function SessionLog({
                   </button>
                 );
               })}
+              {hiddenTrayCount > 0 || trayOpen ? (
+                <button type="button" onClick={() => setTrayOpen((open) => !open)} className="inline-flex min-h-10 cursor-pointer items-center rounded-full px-3 text-sm text-[var(--muted)] transition hover:bg-[var(--hover)] hover:text-[var(--ink)]">
+                  {trayOpen ? t("trayLess") : t("trayMore", { count: hiddenTrayCount })}
+                </button>
+              ) : null}
               {onAddItem && !creating ? (
                 <button type="button" disabled={disabled} onClick={() => setCreating({ title: "", busy: false, error: null })} className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border border-dashed border-[var(--main-line)] py-1.5 pl-1.5 pr-3 text-sm text-[var(--main-strong)] transition hover:bg-[var(--main-soft)] disabled:cursor-not-allowed disabled:opacity-50">
                   <span className="grid h-6 w-6 place-items-center rounded-full bg-[var(--main-soft)] text-xs" aria-hidden="true">+</span>{t("newItemPill")}
@@ -601,20 +651,12 @@ export function SessionLog({
                         {last ? (
                           <button
                             type="button" disabled={disabled}
-                            className="min-h-9 flex-none cursor-pointer rounded-full px-3 text-xs font-medium text-[var(--main-strong)] transition hover:bg-[var(--main-soft)] disabled:cursor-not-allowed disabled:opacity-50"
+                            className="min-h-9 flex-none cursor-pointer rounded-full px-3 text-xs font-medium text-[var(--ink)] transition hover:bg-[var(--hover)] disabled:cursor-not-allowed disabled:opacity-50"
                             onClick={() => patchRow(row.key, { values: { ...last.values } })}
                           >
                             {t("repeatLast")}
                           </button>
                         ) : null}
-                        <button
-                          type="button" disabled={disabled}
-                          className="grid h-9 w-9 flex-none cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--danger-soft)] hover:text-[var(--danger)] disabled:cursor-not-allowed disabled:opacity-40"
-                          aria-label={t("removeRow", { name: itemTitle(row.itemId) })} title={t("removeRow", { name: itemTitle(row.itemId) })}
-                          onClick={() => setRows((current) => current.filter((candidate) => candidate.key !== row.key))}
-                        >
-                          <CloseIcon className="h-4 w-4" />
-                        </button>
                       </div>
                       <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] items-start gap-3">
                         {recordFields.map((field) => {
@@ -652,9 +694,7 @@ export function SessionLog({
                   );
                 })}
               </ol>
-            ) : (
-              <p className="mt-5 rounded-2xl border border-dashed border-[var(--line)] px-4 py-5 text-center text-sm text-[var(--muted)]">{t("emptyRows", { name: spec.visit.name })}</p>
-            )}
+            ) : null}
 
             {visitFields.length ? (
               <div className="mt-6 space-y-3">

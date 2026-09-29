@@ -51,7 +51,8 @@ test("o registro de um treino: bandeja de itens para tocar, histórico só seu e
   // Cada item é um botão da bandeja, os mais usados primeiro; nenhum ainda neste treino.
   assert.ok(form.indexOf("Supino") < form.indexOf("Agachamento"), "o supino, usado duas vezes, vem antes");
   assert.ok((form.match(/aria-pressed="false"/g) ?? []).length >= 2);
-  assert.match(form, /Escolha acima o que entrou neste Treino/, "sem cartões, uma dica em vez de um formulário vazio");
+  assert.doesNotMatch(form, /Escolha acima/, "sem cartões, só a bandeja — nenhuma dica ocupando espaço");
+  assert.doesNotMatch(form, /Renomear/, "sem permissão, não há como renomear o check-in");
   assert.doesNotMatch(form, /Novo item/, "sem permissão, não há como criar item");
   assert.match(html, /<strong[^>]*>2<\/strong> de \d+ dias com registro/, "só os seus dois treinos contam na faixa de dias");
   assert.doesNotMatch(html, /<h2[^>]*>Seus check-ins<\/h2>/, "o histórico repetido embaixo da faixa saiu");
@@ -82,7 +83,8 @@ test("o treino de hoje já registrado abre para editar, com a última vez, a dif
     challenge, spec, entries: withToday, userId: "me", canEdit: true, onSave: async () => undefined, onDelete: async () => undefined,
   }));
   const form = html.slice(html.indexOf("<form"), html.indexOf("</form>"));
-  assert.match(form, /Editando Treino/);
+  assert.doesNotMatch(form, /Editando Treino/, "a data já está na faixa de dias — o formulário não a repete");
+  assert.doesNotMatch(form, /type="date"/, "nem um campo de data ao lado");
   assert.match(form, /data-item="bench"/, "o supino de hoje vira um cartão");
   assert.match(form, /\+2,5 vs\. última/, "a carga subiu 2,5 desde o último treino");
   assert.match(form, /Recorde de Carga \(kg\) · antes 57[,.]5/);
@@ -97,4 +99,21 @@ test("sem itens no desafio, o log avisa em vez de mostrar um formulário vazio",
   }));
   assert.match(html, /ainda não tem itens/);
   assert.doesNotMatch(html, /Registrar Treino/);
+});
+
+test("a bandeja mostra os oito mais usados e guarda o resto em Mostrar mais; quem administra pode renomear o check-in", () => {
+  const many = {
+    ...challenge,
+    items: Array.from({ length: 11 }, (_, index) => ({ id: `i${index}`, title: `Exercício ${index + 1}`, position: index })),
+  } as unknown as ChallengeDetail;
+  const spec = sessionSpecOf(many)!;
+  const html = renderWithIntl(createElement(SessionLog, {
+    challenge: many, spec, entries: [], userId: "me", canEdit: true,
+    onSave: async () => undefined, onDelete: async () => undefined, onRename: async () => undefined,
+  }));
+  const tray = html.slice(html.indexOf('role="group" aria-label="Item"'), html.indexOf("Mostrar mais"));
+  assert.equal((tray.match(/aria-pressed="false"/g) ?? []).length, 8, "oito itens à mão");
+  assert.match(html, /Mostrar mais \(3\)/);
+  assert.match(html, /Renomear/);
+  assert.doesNotMatch(html, /Remover Exercício/, "sem o botão de remover no cartão — tocar de novo na bandeja tira o item");
 });

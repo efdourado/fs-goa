@@ -190,7 +190,13 @@ export async function updateEntryTypeVisibility(
 ) {
   const wantsVisibility = body.visibilityPolicy !== undefined;
   const wantsEditPolicy = body.sharedEditPolicy !== undefined;
-  if (!wantsVisibility && !wantsEditPolicy) {
+  // A type's name is just what it's called on screen ("Treino", "Sessão") — renaming it touches no answer.
+  const wantsName = body.name !== undefined;
+  const name = typeof body.name === "string" ? body.name.trim() : "";
+  if (wantsName && (!name || Array.from(name).length > 60)) {
+    throw new ApiError(400, "invalid_entry_type_name", "Dê um nome de até 60 caracteres.");
+  }
+  if (!wantsVisibility && !wantsEditPolicy && !wantsName) {
     throw new ApiError(400, "invalid_visibility", "Política de visibilidade inválida.");
   }
   if (wantsVisibility && !isVisibilityPolicy(body.visibilityPolicy)) {
@@ -201,7 +207,7 @@ export async function updateEntryTypeVisibility(
   }
   return inTransaction(async (client) => {
     const access = await challengeAccess(session.user.id, challengeId, client, true);
-    if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores mudam a visibilidade.");
+    if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores mudam os tipos de registro.");
     if (access.challenge.status === "closed") {
       throw new ApiError(409, "challenge_closed", "Um desafio encerrado fica congelado.");
     }
@@ -219,6 +225,16 @@ export async function updateEntryTypeVisibility(
     }
     const visibilityPolicy = wantsVisibility ? (body.visibilityPolicy as VisibilityPolicy) : (type.visibility_policy as VisibilityPolicy);
     const sharedEditPolicy = wantsEditPolicy ? (body.sharedEditPolicy as SharedEditPolicy) : type.shared_edit_policy;
+    if (wantsName && name !== type.name) {
+      await client.query(
+        "UPDATE entry_types SET name = $3, updated_at = now() WHERE id = $1 AND challenge_id = $2",
+        [entryTypeId, challengeId, name],
+      );
+      await writeAudit(
+        client, access.challenge.group_id, challengeId, session.user.id,
+        "entry_type.renamed", "entry_type", entryTypeId, { name: type.name }, { name },
+      );
+    }
     if (visibilityPolicy !== type.visibility_policy) {
       await client.query(
         "UPDATE entry_types SET visibility_policy = $3, updated_at = now() WHERE id = $1 AND challenge_id = $2",

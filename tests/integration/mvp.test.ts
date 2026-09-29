@@ -8479,4 +8479,13 @@ test("métricas de treino: unidade no campo, contar check-ins ou dias e o record
   assert.equal(patched.response.status, 201, JSON.stringify(patched.body));
   const renamed = ((await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { metrics: MetricView[] }).metrics.find((metric) => metric.id === terraPr)!;
   assert.equal(renamed.formattedValue, "110 lb");
+
+  // o check-in pode ser renomeado de Treino para Sessão, sem mexer em nenhum registro
+  const renamedType = await call("PATCH", `/api/challenges/${cid}/entry-types/${visit.id}`, { session: owner, body: { name: "Sessão" } });
+  assert.equal(renamedType.response.status, 200, JSON.stringify(renamedType.body));
+  const emptyName = await call("PATCH", `/api/challenges/${cid}/entry-types/${visit.id}`, { session: owner, body: { name: "  " } });
+  assert.equal(emptyName.response.status, 400, JSON.stringify(emptyName.body));
+  const afterRename = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { entryTypes: Array<{ id: string; name: string }>; metrics: MetricView[] };
+  assert.equal(afterRename.entryTypes.find((type) => type.id === visit.id)?.name, "Sessão");
+  assert.equal(afterRename.metrics.find((metric) => metric.id === checkins)?.value, 3, "os check-ins continuam lá");
 });

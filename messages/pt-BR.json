@@ -1058,13 +1058,10 @@
   },
   "sessionLog": {
     "composerTitle": "Registrar {name}",
-    "editTitle": "Editando {name} de {date}",
-    "dateLabel": "Data",
     "itemColumn": "Item",
     "newItemPlaceholder": "Dê um nome ao novo item",
     "newItemAdd": "Adicionar",
     "repeatLast": "Repetir",
-    "removeRow": "Tirar {name} deste check-in",
     "save": "Salvar {name}",
     "saved": "Salvo.",
     "errNoRows": "Adicione pelo menos um item com seus números.",
@@ -1079,7 +1076,6 @@
     "groupCount": "{count, plural, one {# check-in} other {# check-ins}}",
     "trayLabel": "Toque para adicionar",
     "newItemPill": "Novo item",
-    "emptyRows": "Escolha acima o que entrou neste {name}. Cada item vira um cartão com os números da última vez à mão.",
     "firstTime": "Primeira vez neste desafio",
     "deltaSame": "= última vez",
     "deltaUp": "+{value} vs. última",
@@ -1100,7 +1096,10 @@
     "sameAsFirst": "igual ao primeiro",
     "sinceFirst": "{value} desde o primeiro",
     "bestLabel": "Melhor · {field}",
-    "historyToggle": "Histórico"
+    "historyToggle": "Histórico",
+    "renameLabel": "Renomear",
+    "trayMore": "Mostrar mais ({count})",
+    "trayLess": "Mostrar menos"
   },
   "checkinLog": {
     "title": "Seus check-ins",

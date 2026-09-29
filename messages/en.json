@@ -1058,13 +1058,10 @@
   },
   "sessionLog": {
     "composerTitle": "Log a {name}",
-    "editTitle": "Editing {name} of {date}",
-    "dateLabel": "Date",
     "itemColumn": "Item",
     "newItemPlaceholder": "Name the new item",
     "newItemAdd": "Add",
     "repeatLast": "Repeat",
-    "removeRow": "Take {name} out of this check-in",
     "save": "Save {name}",
     "saved": "Saved.",
     "errNoRows": "Add at least one item with its numbers.",
@@ -1079,7 +1076,6 @@
     "groupCount": "{count, plural, one {# check-in} other {# check-ins}}",
     "trayLabel": "Tap to add",
     "newItemPill": "New item",
-    "emptyRows": "Pick above what went into this {name}. Each one becomes a card with last time's numbers at hand.",
     "firstTime": "First time in this challenge",
     "deltaSame": "= last time",
     "deltaUp": "+{value} vs. last",
@@ -1100,7 +1096,10 @@
     "sameAsFirst": "same as the first",
     "sinceFirst": "{value} since the first",
     "bestLabel": "Best · {field}",
-    "historyToggle": "History"
+    "historyToggle": "History",
+    "renameLabel": "Rename",
+    "trayMore": "Show more ({count})",
+    "trayLess": "Show fewer"
   },
   "checkinLog": {
     "title": "Your check-ins",
