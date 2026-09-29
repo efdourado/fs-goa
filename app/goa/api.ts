@@ -99,6 +99,7 @@ export const API_PATHS = {
     `/api/groups/${encodeURIComponent(groupId)}/members/${encodeURIComponent(userId)}`,
   groupLeave: (groupId: Id) => `/api/groups/${encodeURIComponent(groupId)}/leave`,
   groupInvites: (groupId: Id) => `/api/groups/${encodeURIComponent(groupId)}/invites`,
+  groupTaste: (groupId: Id) => `/api/groups/${encodeURIComponent(groupId)}/taste`,
   memberRequestAccept: (id: Id) => `/api/member-requests/${encodeURIComponent(id)}/accept`,
   memberRequestDecline: (id: Id) => `/api/member-requests/${encodeURIComponent(id)}/decline`,
   memberRequestCancel: (id: Id) => `/api/member-requests/${encodeURIComponent(id)}/cancel`,

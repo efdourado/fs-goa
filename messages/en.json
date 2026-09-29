@@ -452,7 +452,8 @@
     "catalogEmptyTitle": "Start the catalogue",
     "catalogAddItem": "Add item",
     "catalogMoreIn": "more in {name}",
-    "catalogSeeAll": "See all"
+    "catalogSeeAll": "See all",
+    "tasteYou": "You"
   },
   "catalog": {
     "back": "Back",
@@ -2045,5 +2046,28 @@
     "inviteCopied": "Link copied — paste it in your group chat.",
     "inviteShared": "Sent.",
     "inviteFailed": "Couldn't make the link. Try again."
+  },
+  "taste": {
+    "title": "Who shares your taste",
+    "basis": "{count, plural, =0 {you haven't rated anything here yet} one {from the # title you've rated here} other {from the # titles you've rated here}}",
+    "replay": "Play again",
+    "personAria": "{name}: {agreement}% in agreement, {count} titles in common",
+    "withName": "You and {name}",
+    "verdict": {
+      "twins": "Practically the same taste.",
+      "close": "You usually agree.",
+      "mixed": "Sometimes yes, sometimes no.",
+      "apart": "You rarely agree — take their picks with a pinch of salt."
+    },
+    "inCommon": "{count, plural, one {Based on # title you both rated} other {Based on # titles you both rated}}",
+    "closestOn": "Closest on",
+    "furthestOn": "Furthest apart on",
+    "scores": "you {you}, {name} {them}",
+    "groupTwins": "{a} and {b} are the group's twins — {agreement}%.",
+    "groupOpposites": "{a} and {b} are the furthest apart — {agreement}%.",
+    "notYet": "Needs {count} titles in common before it's a real number:",
+    "sharedSoFar": "{name} · {count} so far",
+    "emptyTitle": "Your taste map draws itself as you rate.",
+    "emptyBody": "Once you and someone else have rated {count} of the same titles — in any challenge in this group — they'll appear here, as close to you as your ratings are."
   }
 }

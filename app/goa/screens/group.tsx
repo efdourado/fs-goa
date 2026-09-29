@@ -8,6 +8,7 @@ import { ActionMenu, ActionMenuItem } from "../action-menu";
 import { Dialog } from "../dialog";
 import { useGoaFormat } from "../format";
 import { CatalogShelfSkeleton } from "../catalog-shelf";
+import { TasteMap } from "../taste-map";
 import { CatalogTile, resolveCoverTop } from "../catalog-views";
 import { LibraryGlyph, useCatalogShelf, useLibraryName } from "../libraries";
 import { Rail, RailArrows, ShelfAddButton, useShelfRail } from "../shelf";
@@ -452,6 +453,8 @@ export function GroupScreen({
             )}
           </section>
         ) : null}
+
+        {memberCount > 1 ? <TasteMap groupId={group.id} youLabel={t("tasteYou")} /> : null}
 
         <section>
           <div className="mb-4 flex items-baseline gap-2.5">

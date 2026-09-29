@@ -452,7 +452,8 @@
     "catalogEmptyTitle": "Comece o acervo",
     "catalogAddItem": "Adicionar item",
     "catalogMoreIn": "mais em {name}",
-    "catalogSeeAll": "Ver tudo"
+    "catalogSeeAll": "Ver tudo",
+    "tasteYou": "Você"
   },
   "catalog": {
     "back": "Voltar",
@@ -2045,5 +2046,28 @@
     "inviteCopied": "Link copiado — cole no grupo de vocês.",
     "inviteShared": "Enviado.",
     "inviteFailed": "Não deu para criar o link. Tente de novo."
+  },
+  "taste": {
+    "title": "Quem tem o seu gosto",
+    "basis": "{count, plural, =0 {você ainda não deu nota a nada aqui} one {a partir do # título que você avaliou aqui} other {a partir dos # títulos que você avaliou aqui}}",
+    "replay": "Ver de novo",
+    "personAria": "{name}: {agreement}% de concordância, {count} títulos em comum",
+    "withName": "Você e {name}",
+    "verdict": {
+      "twins": "Praticamente o mesmo gosto.",
+      "close": "Vocês costumam concordar.",
+      "mixed": "Às vezes sim, às vezes não.",
+      "apart": "Vocês raramente concordam — aceite as indicações com um pé atrás."
+    },
+    "inCommon": "{count, plural, one {Com base em # título que os dois avaliaram} other {Com base em # títulos que os dois avaliaram}}",
+    "closestOn": "Mais perto em",
+    "furthestOn": "Mais longe em",
+    "scores": "você {you}, {name} {them}",
+    "groupTwins": "{a} e {b} são os gêmeos do grupo — {agreement}%.",
+    "groupOpposites": "{a} e {b} são os mais distantes — {agreement}%.",
+    "notYet": "Precisa de {count} títulos em comum antes de virar um número de verdade:",
+    "sharedSoFar": "{name} · {count} até agora",
+    "emptyTitle": "O seu mapa de gosto se desenha conforme você avalia.",
+    "emptyBody": "Quando você e outra pessoa tiverem avaliado {count} títulos iguais — em qualquer desafio deste grupo — ela aparece aqui, tão perto de você quanto as notas de vocês."
   }
 }
