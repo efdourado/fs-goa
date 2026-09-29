@@ -533,6 +533,8 @@ export function SessionLog({
           onSelectDay={selectDay}
           canEdit={canEdit}
           unavailableMessage={unavailableMessage}
+          openEnded={!challenge.startsOn && !challenge.endsOn}
+          streakBy="week"
         >
           <form onSubmit={submit} noValidate>
             {renaming ? (

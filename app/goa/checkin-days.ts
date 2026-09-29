@@ -60,6 +60,28 @@ export function logRange(input: {
   return { from, to };
 }
 
+/** The Monday that opens a day's week — weeks run Monday to Sunday. */
+function weekOf(day: string): string {
+  const weekday = new Date(`${day}T00:00:00Z`).getUTCDay();
+  return addDays(day, -((weekday + 6) % 7));
+}
+
+/**
+ * Consecutive weeks with at least one logged day, ending this week — or last week, while this one
+ * is still empty. What "in a row" means for something done a few times a week, like a workout.
+ */
+export function weekStreak(logged: ReadonlySet<string>, today: string): number {
+  const weeks = new Set([...logged].map(weekOf));
+  let week = weekOf(today);
+  if (!weeks.has(week)) week = addDays(week, -7);
+  let count = 0;
+  while (weeks.has(week)) {
+    count += 1;
+    week = addDays(week, -7);
+  }
+  return count;
+}
+
 /** Consecutive logged days ending today — or yesterday, while today is still open. */
 export function streak(logged: ReadonlySet<string>, today: string): number {
   let count = 0;

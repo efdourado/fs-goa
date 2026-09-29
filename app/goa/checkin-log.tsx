@@ -15,6 +15,7 @@ import {
   streak,
   sumAll,
   sumBefore,
+  weekStreak,
 } from "./checkin-days";
 import { useGoaFormat } from "./format";
 import { Segmented } from "./Segmented";
@@ -90,6 +91,8 @@ export function CheckinLog({
   counter,
   canEdit,
   unavailableMessage,
+  openEnded = false,
+  streakBy = "day",
   children,
 }: {
   from: string;
@@ -102,6 +105,10 @@ export function CheckinLog({
   onSelectDay: (day: string) => void;
   counter?: LogCounter | null;
   canEdit: boolean;
+  /** No dates at all: the strip is just "since the first check-in", so the count never reads as a target. */
+  openEnded?: boolean;
+  /** Days for a daily habit; weeks for something done a few times a week (a workout). */
+  streakBy?: "day" | "week";
   unavailableMessage?: string | null;
   children?: ReactNode;
 }) {
@@ -125,6 +132,9 @@ export function CheckinLog({
   const logged = useMemo(() => new Set(records.keys()), [records]);
   const pastDays = days.filter((day) => day <= today).length;
   const loggedInRange = days.filter((day) => logged.has(day)).length;
+  const firstLogged = useMemo(() => [...logged].sort()[0] ?? null, [logged]);
+  const formatDate = useGoaFormat();
+  const strong = (chunks: ReactNode) => <strong className="font-medium tabular-nums text-[var(--ink)]">{chunks}</strong>;
 
   function select(day: string) {
     if (day > today) return;
@@ -158,12 +168,15 @@ export function CheckinLog({
           <div className="min-w-0">
             <h3 className={sectionLabelClass}>{t("title")}</h3>
             <p className="text-xs text-[var(--muted)]">
-              {t.rich("meta", {
-                logged: loggedInRange,
-                days: pastDays,
-                streak: streak(logged, today),
-                b: (chunks) => <strong className="font-medium tabular-nums text-[var(--ink)]">{chunks}</strong>,
-              })}
+              {firstLogged === null && openEnded
+                ? t("loggedNone")
+                : openEnded
+                  ? t.rich("loggedSince", { logged: loggedInRange, date: formatDate.date(firstLogged), b: strong })
+                  : t.rich("loggedOf", { logged: loggedInRange, days: pastDays, b: strong })}
+              {" · "}
+              {streakBy === "week"
+                ? t.rich("streakWeeks", { streak: weekStreak(logged, today), b: strong })
+                : t.rich("streakDays", { streak: streak(logged, today), b: strong })}
               {counter && !counter.total && values.size ? <> · <TotalSoFar total={sumAll(values)} /></> : null}
             </p>
           </div>

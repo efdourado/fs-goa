@@ -1103,7 +1103,6 @@
   },
   "checkinLog": {
     "title": "Seus check-ins",
-    "meta": "<b>{logged}</b> de {days} dias com registro · <b>{streak}</b> seguidos",
     "totalSoFar": "total <b>{total}</b>",
     "viewAria": "Como ver os check-ins",
     "viewStrip": "Dias",
@@ -1164,7 +1163,12 @@
     "removeYes": "Remover",
     "removed": "Registro de {date} removido.",
     "optional": "opcional",
-    "readOnly": "Este registro não pode ser alterado agora."
+    "readOnly": "Este registro não pode ser alterado agora.",
+    "loggedOf": "<b>{logged}</b> de {days} dias com registro",
+    "loggedSince": "<b>{logged}</b> {logged, plural, one {dia com registro} other {dias com registro}} desde {date}",
+    "loggedNone": "Nenhum registro ainda",
+    "streakDays": "<b>{streak}</b> {streak, plural, one {dia seguido} other {dias seguidos}}",
+    "streakWeeks": "<b>{streak}</b> {streak, plural, one {semana seguida} other {semanas seguidas}}"
   },
   "entryForm": {
     "fillField": "Preencha o campo “{label}”.",

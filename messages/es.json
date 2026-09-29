@@ -1103,7 +1103,6 @@
   },
   "checkinLog": {
     "title": "Tus registros",
-    "meta": "<b>{logged}</b> de {days} días con registro · <b>{streak}</b> seguidos",
     "totalSoFar": "total <b>{total}</b>",
     "viewAria": "Cómo ver tus registros",
     "viewStrip": "Días",
@@ -1164,7 +1163,12 @@
     "removeYes": "Quitar",
     "removed": "Registro del {date} quitado.",
     "optional": "opcional",
-    "readOnly": "Este registro no se puede cambiar ahora."
+    "readOnly": "Este registro no se puede cambiar ahora.",
+    "loggedOf": "<b>{logged}</b> de {days} días con registro",
+    "loggedSince": "<b>{logged}</b> {logged, plural, one {día con registro} other {días con registro}} desde el {date}",
+    "loggedNone": "Todavía sin registros",
+    "streakDays": "<b>{streak}</b> {streak, plural, one {día seguido} other {días seguidos}}",
+    "streakWeeks": "<b>{streak}</b> {streak, plural, one {semana seguida} other {semanas seguidas}}"
   },
   "entryForm": {
     "fillField": "Completa el campo “{label}”.",

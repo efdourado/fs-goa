@@ -14,6 +14,7 @@ import {
   pace,
   streak,
   sumBefore,
+  weekStreak,
 } from "../app/goa/checkin-days";
 import { CheckinLog, type LogRecord } from "../app/goa/checkin-log";
 import type { ChallengeField, Entry } from "../app/goa/types";
@@ -141,4 +142,13 @@ test("um hábito sem número marca o dia com ✓ e deixa o formulário de sempre
   assert.match(html, /27 de setembro, registrado/);
   assert.match(html, /formulário do dia/);
   assert.doesNotMatch(html, /ritmo/);
+});
+
+test("semanas seguidas: toda semana com um registro conta, e a semana corrente ainda vazia não quebra a sequência", () => {
+  // 2026-09-28 é uma segunda-feira.
+  const logged = new Set(["2026-09-14", "2026-09-16", "2026-09-23", "2026-09-25"]);
+  assert.equal(weekStreak(logged, "2026-09-28"), 2, "semana de 21 e de 14 — esta semana ainda não teve treino");
+  assert.equal(weekStreak(new Set([...logged, "2026-09-29"]), "2026-09-30"), 3, "treinou nesta semana: três seguidas");
+  assert.equal(weekStreak(new Set(["2026-09-01"]), "2026-09-28"), 0, "semanas sem treino zeram a sequência");
+  assert.equal(weekStreak(new Set(), "2026-09-28"), 0);
 });

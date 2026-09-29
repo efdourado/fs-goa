@@ -1103,7 +1103,6 @@
   },
   "checkinLog": {
     "title": "Your check-ins",
-    "meta": "<b>{logged}</b> of {days} days logged · <b>{streak}</b> in a row",
     "totalSoFar": "total <b>{total}</b>",
     "viewAria": "How to show your check-ins",
     "viewStrip": "Days",
@@ -1164,7 +1163,12 @@
     "removeYes": "Remove",
     "removed": "Entry for {date} removed.",
     "optional": "optional",
-    "readOnly": "This entry can't be changed right now."
+    "readOnly": "This entry can't be changed right now.",
+    "loggedOf": "<b>{logged}</b> of {days} days logged",
+    "loggedSince": "<b>{logged}</b> {logged, plural, one {day logged} other {days logged}} since {date}",
+    "loggedNone": "Nothing logged yet",
+    "streakDays": "<b>{streak}</b> {streak, plural, one {day in a row} other {days in a row}}",
+    "streakWeeks": "<b>{streak}</b> {streak, plural, one {week in a row} other {weeks in a row}}"
   },
   "entryForm": {
     "fillField": "Fill in the “{label}” field.",

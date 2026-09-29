@@ -1587,6 +1587,7 @@ export function ParticipantChallengeScreen({
                     counter={logCounter}
                     canEdit={!unavailableMessage && Boolean(onSaveEntry)}
                     unavailableMessage={unavailableMessage}
+                    openEnded={!challenge.startsOn && !challenge.endsOn && !logOpensOn && !logDueOn}
                   >
                     {logItem ? (
                       <ItemEntryPanel key={`${logItem.id}-no-session`} challenge={challenge} item={logItem} entries={entries} ownEntries={ownEntries} timeZone={timeZone} onReload={onReload} occurredOn={occurredOn} onOccurredOnChange={setOccurredOn} offerOptionalDate={false} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} onSaveEntry={onSaveEntry!} onDeleteEntry={canDeleteEntry} />
