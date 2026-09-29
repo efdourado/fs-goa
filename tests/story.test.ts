@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { demoFilmInput, demoReadingInput } from "../app/goa/story/demo-data";
+import { demoFilmInput, demoReadingInput } from "../scripts/seed-showcase/data";
 import { buildStory, type DatedStory, type RatedStory, type StoryInput } from "../app/goa/story/model";
 
 const TODAY = "2026-09-29";

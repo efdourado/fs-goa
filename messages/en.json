@@ -1327,8 +1327,7 @@
     "storyInTune": "Most in tune",
     "storyCritic": "Toughest critic",
     "storyCriticNote": "average {average}",
-    "storyBadge": "Featured",
-    "frontDemo": "See it in 30 seconds — an example group"
+    "storyBadge": "Featured"
   },
   "invite": {
     "verifying": "Checking the invite…",
@@ -2070,35 +2069,6 @@
     "sharedSoFar": "{name} · {count} so far",
     "emptyTitle": "Your taste map draws itself as you rate.",
     "emptyBody": "Once you and someone else have rated {count} of the same titles — in any challenge in this group — they'll appear here, as close to you as your ratings are."
-  },
-  "demo": {
-    "badge": "Example · an invented group",
-    "clubName": "Friday Film Club",
-    "title": "Five friends watched the same eight films.",
-    "body": "Each one rated in secret. Nobody has seen anyone else's number yet — this is what Goa does next.",
-    "step1": "1 · The reveal",
-    "sealed": "Five ratings, sealed. Not even the person who runs the group can see them.",
-    "step2": "2 · The season, drawn",
-    "ctaTitle": "Now do it with your people.",
-    "ctaBody": "Pick a film, rate it blind, reveal it together. Three taps to start — the recap builds itself.",
-    "cta": "Try this with your group",
-    "comments": {
-      "tarCaio": "Two hours and forty minutes of a conductor being mean. I clapped when it ended.",
-      "tarAna": "I haven't stopped thinking about the last scene. A masterpiece.",
-      "pastLivesDuda": "I cried in the taxi home. Then again at breakfast.",
-      "megalopolisBruno": "I have questions. Mostly: why?",
-      "barbieLucas": "Went in to make fun of it. Came out rethinking my life."
-    },
-    "step2Body": "Eight Fridays in one picture: everyone's line through the films, and every fact their ratings can tell — the podium, the genres, who agrees with whom, and where two people who never agree still meet.",
-    "step3": "3 · Same idea, for a habit",
-    "step3Body": "Four friends, a month of reading. Streaks, gaps, comebacks and totals — nobody had to build a spreadsheet.",
-    "readingName": "30 days of reading",
-    "pagesLabel": "Pages",
-    "notes": {
-      "dudaBest": "Couldn't put it down — sixty pages on a Tuesday.",
-      "anaBack": "Back after a week off. Starting small.",
-      "lucasSmall": "Ten pages a day. It adds up."
-    }
   },
   "story": {
     "threadAria": "{count} people's ratings across {items} titles",

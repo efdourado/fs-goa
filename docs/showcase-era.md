@@ -36,8 +36,7 @@ Princípios que saíram das conversas:
 | **Quem tem o seu gosto** | `lib/goa/taste.ts`, `app/goa/taste-map.tsx` | Mapa em órbita na página do grupo: você no centro, cada amigo tão perto quanto as notas de vocês, somando todos os desafios do grupo; título em que mais concordam e o de maior distância. |
 | **O fio + o almanaque** | `app/goa/story/` | Aba Resultado: o desafio inteiro como um desenho — linhas das notas atravessando os títulos (desafios com nota) ou faixas de dias com sequências (hábitos, leitura, treinos) — e embaixo um almanaque com tudo que os dados contam. Pôster inteiro ou cada cartão baixa em PNG. |
 | **Métricas automáticas** | `lib/goa/challenges/auto-metrics.ts` | Todo campo de número ou nota que alguém cria ganha métricas na hora (média, ranking por item e por pessoa, por gênero/ano; total, placar, recorde). São métricas normais — dá para editar ou apagar, e apagada não volta. |
-| **Demo pública** | `/demo` | Grupo inventado e rotulado: revelar *Tár*, ler a temporada desenhada, e um mês de leitura de quatro amigos. Termina em "Fazer com o meu grupo". |
-| **Seed da vitrine** | `npm run db:seed-showcase [--reset]` | No banco local: "Cineclube de Sexta" com a Temporada 1 encerrada (o fio), a Temporada 2 com uma nota selada esperando a sua, e "30 dias de leitura". |
+| **Seed da vitrine** | `npm run db:seed-showcase [--reset]` | No banco local: "Cineclube de Sexta" com a Temporada 1 encerrada (o fio), a Temporada 2 com uma nota selada esperando a sua, "30 dias de leitura", a dupla "Nós dois" e os pessoais "Só eu" e "Correr". A demo pública (`/demo`) existiu e foi removida — o seed cumpre o papel de mostrar. |
 
 ### Dupla e solo têm o próprio desenho
 

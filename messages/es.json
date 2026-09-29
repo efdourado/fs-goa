@@ -1327,8 +1327,7 @@
     "storyInTune": "Más en sintonía",
     "storyCritic": "Crítico más exigente",
     "storyCriticNote": "promedio {average}",
-    "storyBadge": "Destacado",
-    "frontDemo": "Míralo en 30 segundos — un grupo de ejemplo"
+    "storyBadge": "Destacado"
   },
   "invite": {
     "verifying": "Verificando invitación…",
@@ -2070,35 +2069,6 @@
     "sharedSoFar": "{name} · {count} por ahora",
     "emptyTitle": "Tu mapa de gusto se dibuja mientras puntúas.",
     "emptyBody": "Cuando tú y otra persona hayan puntuado {count} títulos iguales — en cualquier reto de este grupo — aparecerá aquí, tan cerca de ti como sus notas."
-  },
-  "demo": {
-    "badge": "Ejemplo · un grupo inventado",
-    "clubName": "Cineclub del Viernes",
-    "title": "Cinco amigos vieron las mismas ocho películas.",
-    "body": "Cada uno puntuó en secreto. Nadie ha visto la nota de nadie todavía — aquí entra Goa.",
-    "step1": "1 · La revelación",
-    "sealed": "Cinco notas, selladas. Ni quien organiza el grupo puede verlas.",
-    "step2": "2 · La temporada, dibujada",
-    "ctaTitle": "Ahora hazlo con tu gente.",
-    "ctaBody": "Elige una película, puntúa a ciegas, revelen juntos. Tres toques para empezar — el resumen se arma solo.",
-    "cta": "Probar con mi grupo",
-    "comments": {
-      "tarCaio": "Dos horas y cuarenta de una directora siendo cruel. Aplaudí cuando terminó.",
-      "tarAna": "No dejo de pensar en la última escena. Una obra maestra.",
-      "pastLivesDuda": "Lloré en el taxi de vuelta. Y otra vez en el desayuno.",
-      "megalopolisBruno": "Tengo preguntas. Sobre todo: ¿por qué?",
-      "barbieLucas": "Fui a burlarme. Salí replanteándome la vida."
-    },
-    "step2Body": "Ocho viernes en una sola imagen: la línea de cada uno por las películas, y todo lo que cuentan sus notas — el podio, los géneros, quién coincide con quién, y dónde dos personas que nunca coinciden aún se encuentran.",
-    "step3": "3 · La misma idea, para un hábito",
-    "step3Body": "Cuatro amigos, un mes de lectura. Rachas, huecos, vueltas y totales — nadie tuvo que armar una hoja de cálculo.",
-    "readingName": "30 días de lectura",
-    "pagesLabel": "Páginas",
-    "notes": {
-      "dudaBest": "No pude soltarlo — sesenta páginas un martes.",
-      "anaBack": "De vuelta tras una semana parada. Empezando poco a poco.",
-      "lucasSmall": "Diez páginas al día. Se va sumando."
-    }
   },
   "story": {
     "threadAria": "Notas de {count} personas en {items} títulos",

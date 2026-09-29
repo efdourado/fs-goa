@@ -1327,8 +1327,7 @@
     "storyInTune": "Mais em sintonia",
     "storyCritic": "Crítico mais exigente",
     "storyCriticNote": "média {average}",
-    "storyBadge": "Destaque",
-    "frontDemo": "Veja em 30 segundos — um grupo de exemplo"
+    "storyBadge": "Destaque"
   },
   "invite": {
     "verifying": "Verificando convite…",
@@ -2070,35 +2069,6 @@
     "sharedSoFar": "{name} · {count} até agora",
     "emptyTitle": "O seu mapa de gosto se desenha conforme você avalia.",
     "emptyBody": "Quando você e outra pessoa tiverem avaliado {count} títulos iguais — em qualquer desafio deste grupo — ela aparece aqui, tão perto de você quanto as notas de vocês."
-  },
-  "demo": {
-    "badge": "Exemplo · um grupo inventado",
-    "clubName": "Cineclube de Sexta",
-    "title": "Cinco amigos viram os mesmos oito filmes.",
-    "body": "Cada um deu a sua nota em segredo. Ninguém viu a nota de ninguém ainda — é aqui que o Goa entra.",
-    "step1": "1 · A revelação",
-    "sealed": "Cinco notas, seladas. Nem quem organiza o grupo consegue ver.",
-    "step2": "2 · A temporada, desenhada",
-    "ctaTitle": "Agora faça com a sua turma.",
-    "ctaBody": "Escolha um filme, dê a nota às cegas, revelem juntos. Três toques para começar — a retrospectiva se monta sozinha.",
-    "cta": "Fazer com o meu grupo",
-    "comments": {
-      "tarCaio": "Duas horas e quarenta de uma maestrina sendo grossa. Aplaudi quando acabou.",
-      "tarAna": "Não paro de pensar na última cena. Obra-prima.",
-      "pastLivesDuda": "Chorei no táxi de volta. E de novo no café da manhã.",
-      "megalopolisBruno": "Tenho perguntas. Principalmente: por quê?",
-      "barbieLucas": "Fui para zoar. Saí repensando a vida."
-    },
-    "step2Body": "Oito sextas numa imagem só: a linha de cada um pelos filmes, e tudo o que as notas contam — o pódio, os gêneros, quem concorda com quem, e onde duas pessoas que nunca concordam ainda se encontram.",
-    "step3": "3 · A mesma ideia, para um hábito",
-    "step3Body": "Quatro amigos, um mês de leitura. Sequências, buracos, voltas e totais — ninguém precisou montar planilha.",
-    "readingName": "30 dias de leitura",
-    "pagesLabel": "Páginas",
-    "notes": {
-      "dudaBest": "Não consegui largar — sessenta páginas numa terça.",
-      "anaBack": "De volta depois de uma semana parada. Começando pequeno.",
-      "lucasSmall": "Dez páginas por dia. Vai somando."
-    }
   },
   "story": {
     "threadAria": "Notas de {count} pessoas em {items} títulos",

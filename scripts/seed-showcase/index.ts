@@ -7,11 +7,9 @@
  *     sealed with every friend's rating in and yours missing (rate it, then tap Reveal), one film ahead;
  *   · the group page's taste map is filled from both seasons.
  *
- * Same ratings as the public /demo, so what you record in the app matches the demo. You play "Ana".
+ * The ratings are written to tell a story (scripts/seed-showcase/data.ts). You play "Ana".
  * Goes through the domain services; refuses any non-local database; `--reset` removes only this group.
  */
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import process from "node:process";
 
 import { registerAccount, type SessionContext } from "../../lib/auth";
@@ -20,7 +18,7 @@ import { createChallenge, createGroup, createPersonalChallenge, requestGroupMemb
 import { revealItem, saveEntry, transitionChallenge } from "../../lib/goa-challenges";
 import { purgeChallengeRows, purgeGroupRows } from "../../lib/goa/purge";
 import { ApiError } from "../../lib/http";
-import { demoFilmInput, demoReadingInput } from "../../app/goa/story/demo-data";
+import { COMMENTS_PT, demoFilmInput, demoReadingInput, NOTES_PT } from "./data";
 
 import { addDays, backdateLifecycle, fail, isSeedError, looksRemote, readShape, resolveAccount, sessionFor } from "../seed-reading/helpers";
 import { DEMO_PASSWORD, FRIENDS } from "../seed-local/data";
@@ -83,7 +81,7 @@ async function main(): Promise<void> {
     console.log("grupo anterior removido");
   }
 
-  // The demo's five people, played by you and the four demo friends.
+  // The story's five people, played by you and the four demo friends.
   const friends = [await friend("vivi"), await friend("rafa"), await friend("lu"), await friend("theo")];
   const cast: Record<string, Person> = { ana: me, bruno: friends[0], caio: friends[1], duda: friends[2], lucas: friends[3] };
   const everyone = Object.values(cast);
@@ -98,9 +96,8 @@ async function main(): Promise<void> {
     if (request) await respondToMemberRequest(person.session, request.id, "accept");
   }
 
-  // ── Temporada 1: the demo's eight films, over and done ──
-  const demo = JSON.parse(readFileSync(path.join(process.cwd(), "messages", "pt-BR.json"), "utf8")).demo as { comments: Record<string, string>; notes: Record<string, string> };
-  const story = demoFilmInput("Temporada 1", (key) => demo.comments[key], today);
+  // ── Temporada 1: eight films, over and done ──
+  const story = demoFilmInput("Temporada 1", (key) => COMMENTS_PT[key], today);
   const s1Start = day(-63);
   const s1End = day(-4);
   const s1 = await createChallenge(me.session, group.id, {
@@ -166,8 +163,8 @@ async function main(): Promise<void> {
   }
   console.log("  · Temporada 2 (em andamento — dê a sua nota a Pobres Criaturas e toque em Revelar)");
 
-  // ── 30 dias de leitura: the demo's reading month, as a group habit ──
-  const month = demoReadingInput("30 dias de leitura", (key) => demo.notes[key], today);
+  // ── 30 dias de leitura: a reading month, as a group habit ──
+  const month = demoReadingInput("30 dias de leitura", (key) => NOTES_PT[key], today);
   const habit = await createChallenge(me.session, group.id, {
     recipe: "habit", title: "30 dias de leitura", description: "Um pouco todo dia. Quem para, volta.",
     startsOn: month.startsOn, endsOn: day(1),
@@ -187,7 +184,7 @@ async function main(): Promise<void> {
   }
   console.log("  · 30 dias de leitura (hábito em grupo — Resultado mostra o fio dos dias)");
 
-  // ── Nós dois: the same eight films, just you and Rafa (the demo's Ana and Caio — opposite tastes) ──
+  // ── Nós dois: the same eight films, just you and Rafa (the story's Ana and Caio — opposite tastes) ──
   const duoStart = day(-40);
   const duo = await createChallenge(me.session, group.id, {
     recipe: "cinema", title: "Nós dois", description: "Oito filmes, duas opiniões.", startsOn: duoStart, endsOn: day(-2),
@@ -254,7 +251,6 @@ async function main(): Promise<void> {
   console.log(`Nós dois (dupla):        ${ORIGIN}/challenges/${duo.challengeId}`);
   console.log(`Só eu (solo):            ${ORIGIN}/challenges/${solo.challengeId}`);
   console.log(`Correr (solo, dias):     ${ORIGIN}/challenges/${run.challengeId}`);
-  console.log(`Demo pública:            ${ORIGIN}/demo`);
   console.log(`\nAmigos: ${FRIENDS.map((row) => `@${row.username}`).join(", ")} — senha "${DEMO_PASSWORD}". Todos os dados são inventados.`);
   await getPool().end();
 }

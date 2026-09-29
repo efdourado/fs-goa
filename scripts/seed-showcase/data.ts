@@ -1,12 +1,13 @@
-import { addDaysKey, type StoryDay, type StoryInput } from "./model";
+import { addDaysKey, type StoryDay, type StoryInput } from "../../app/goa/story/model";
 
 /**
- * The public demo's two invented groups, written to tell a story — nothing here is real data.
+ * The showcase seed's invented groups (and the story tests' fixture), written to tell a story — nothing
+ * here is real data.
  *  · A movie club: one clear favourite, one film that split the room, a surprise, taste twins, a flop,
  *    a director they keep coming back to, and two people who disagree on everything but comedy.
  *  · A reading habit: four friends, a month of daily pages — one long streak, one weekend reader,
  *    one comeback.
- * Comments and notes are i18n keys (`demo.comments.*`, `demo.notes.*`) so the demo reads in the visitor's language.
+ * Comments and notes are looked up by key; `COMMENTS_PT` / `NOTES_PT` hold the Portuguese the seed writes.
  */
 const PEOPLE = [
   { id: "ana", name: "Ana" },
@@ -77,8 +78,19 @@ export function demoFilmInput(title: string, comment: (key: string) => string, t
   };
 }
 
-/** The one film the demo's reveal plays out — the one that split the room. */
-export const DEMO_REVEAL_ITEM = "tar";
+export const COMMENTS_PT: Record<string, string> = {
+  "tarCaio": "Duas horas e quarenta de uma maestrina sendo grossa. Aplaudi quando acabou.",
+  "tarAna": "Não paro de pensar na última cena. Obra-prima.",
+  "pastLivesDuda": "Chorei no táxi de volta. E de novo no café da manhã.",
+  "megalopolisBruno": "Tenho perguntas. Principalmente: por quê?",
+  "barbieLucas": "Fui para zoar. Saí repensando a vida."
+};
+
+export const NOTES_PT: Record<string, string> = {
+  "dudaBest": "Não consegui largar — sessenta páginas numa terça.",
+  "anaBack": "De volta depois de uma semana parada. Começando pequeno.",
+  "lucasSmall": "Dez páginas por dia. Vai somando."
+};
 
 /**
  * A month of pages, ending today. Each reader has a pattern: Duda almost never misses (a three-week run),
