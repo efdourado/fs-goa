@@ -1,16 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { useTranslations } from "next-intl";
-import { ActionMenu, ActionMenuItem } from "../action-menu";
 import { SkippedPropertiesNotice } from "../copy-notice";
 import { ConfirmDialog, Dialog } from "../dialog";
 import { useGoaFormat } from "../format";
 import { PreflightPanel } from "../preflight-panel";
 import type { ChallengeDetail, CopyResult, Id } from "../types";
-import { Button, ChallengeStatusBadge, inputClass, labelClass, SelectableCards, StatusMessage } from "../ui";
+import { Button, ChallengeStatusBadge, cx, inputClass, labelClass, PageHeading, SelectableCards, StatusMessage } from "../ui";
 import { isChallengeScheduled, isLivingList } from "../utils";
-import { PublicationDialog } from "./publication";
+import { PublicationPanel } from "./publication";
 
 type Target = { id: Id; name: string; challengeCount: number; challengeLimit: number };
 
@@ -54,7 +53,8 @@ function ChallengeStateDialog({ challenge, onTransition, onClose }: {
   </Dialog>;
 }
 
-function TemplatePublishSection({ challenge, onPublish, onUnpublish }: {
+/** Platform admins: put the challenge in (or take it out of) the public template gallery. */
+function TemplatePanel({ challenge, onPublish, onUnpublish }: {
   challenge: ChallengeDetail;
   onPublish: () => Promise<void>;
   onUnpublish: () => Promise<void>;
@@ -68,144 +68,151 @@ function TemplatePublishSection({ challenge, onPublish, onUnpublish }: {
   const published = Boolean(challenge.publishedAsTemplate);
 
   async function run(kind: "publish" | "unpublish", action: () => Promise<void>, ok: string) {
-    setBusy(kind);
-    setError(null);
-    setSuccess(null);
-    try {
-      await action();
-      setSuccess(ok);
-    } catch (cause) {
-      setError(f.error(cause));
-    } finally {
-      setBusy(null);
-    }
+    setBusy(kind); setError(null); setSuccess(null);
+    try { await action(); setSuccess(ok); } catch (cause) { setError(f.error(cause)); } finally { setBusy(null); }
   }
 
   return (
-    <section className="border-t border-[var(--line)] pt-10">
-      <h2 className="text-lg font-medium tracking-tight">{t("platformTemplateTitle")}</h2>
-      <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{t("platformTemplateHint")}</p>
+    <div>
       {published ? (
-        <div className="mt-4 grid gap-3 sm:max-w-xl">
+        <div className="flex flex-wrap items-center gap-3">
           <p className="text-sm text-[var(--ok)]">{t("platformTemplateOn")}</p>
-          <div>
-            <Button variant="danger" disabled={busy !== null} onClick={() => void run("unpublish", onUnpublish, t("platformTemplateRemoved"))}>{busy === "unpublish" ? tc("saving") : t("platformTemplateUnpublish")}</Button>
-          </div>
+          <Button variant="danger" disabled={busy !== null} onClick={() => void run("unpublish", onUnpublish, t("platformTemplateRemoved"))}>{busy === "unpublish" ? tc("saving") : t("platformTemplateUnpublish")}</Button>
         </div>
       ) : (
-        <div className="mt-4">
-          <Button disabled={busy !== null} onClick={() => void run("publish", onPublish, t("platformTemplatePublished"))}>{busy === "publish" ? tc("saving") : t("platformTemplatePublish")}</Button>
-        </div>
+        <Button disabled={busy !== null} onClick={() => void run("publish", onPublish, t("platformTemplatePublished"))}>{busy === "publish" ? tc("saving") : t("platformTemplatePublish")}</Button>
       )}
       <StatusMessage error={error} success={success} />
-    </section>
+    </div>
   );
 }
 
-
 export type CopyMode = "structure" | "structure_and_items";
 
-function CopyChallengeDialog({ challenge, duplicateTargets, onDuplicate, onOpenCopy, onClose }: {
+/** Copy the challenge into another group — a name, where it goes, and what comes along. */
+function CopyChallengePanel({ challenge, duplicateTargets, onDuplicate, onOpenCopy }: {
   challenge: ChallengeDetail; duplicateTargets: Target[];
   onDuplicate: (payload: { title: string; targetGroupId: Id; mode: CopyMode }) => Promise<CopyResult>;
   onOpenCopy: (challengeId: Id) => void;
-  onClose: () => void;
 }) {
   const t = useTranslations("adminChallenge");
   const tt = useTranslations("templates");
-  const tc = useTranslations("common");
   const f = useGoaFormat();
   const [mode, setMode] = useState<CopyMode>("structure_and_items");
   const [duplicateTitle, setDuplicateTitle] = useState(challenge.title);
   const availableTargets = duplicateTargets.filter((target) => target.challengeCount < target.challengeLimit);
   const [duplicateTargetGroupId, setDuplicateTargetGroupId] = useState<Id>(availableTargets[0]?.id ?? "");
-  const [busy, setBusy] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Set when the copy worked but had to leave properties out — shown before going to the copy.
   const [copied, setCopied] = useState<CopyResult | null>(null);
+
   async function copy() {
-    setBusy("duplicate"); setError(null);
+    if (!duplicateTargetGroupId) { setError(t("reusePickTarget")); return; }
+    setBusy(true); setError(null);
     try {
       const result = await onDuplicate({ title: duplicateTitle.trim(), targetGroupId: duplicateTargetGroupId, mode });
       if (result.skippedProperties.length) { setCopied(result); return; }
       if (result.challengeId) onOpenCopy(result.challengeId);
-      onClose();
-    }
-    catch (cause) { setError(f.error(cause)); } finally { setBusy(null); }
+    } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
   }
+
   if (copied) {
-    return <Dialog title={t("reuseDoneTitle")} onClose={() => { if (copied.challengeId) onOpenCopy(copied.challengeId); onClose(); }}>
-      <p className="text-sm leading-6 text-[var(--muted)]">{t("reuseDoneBody")}</p>
-      <SkippedPropertiesNotice skipped={copied.skippedProperties} onOpen={() => { if (copied.challengeId) onOpenCopy(copied.challengeId); onClose(); }} />
-    </Dialog>;
+    return (
+      <div>
+        <p className="text-sm leading-6 text-[var(--muted)]">{t("reuseDoneBody")}</p>
+        <SkippedPropertiesNotice skipped={copied.skippedProperties} onOpen={() => { if (copied.challengeId) onOpenCopy(copied.challengeId); }} />
+      </div>
+    );
   }
-  return <Dialog title={t("reuseTitle")} onClose={onClose} busy={Boolean(busy)}>
-    <p className="text-sm leading-6 text-[var(--muted)]">{t("reuseBody")}</p>
-        {duplicateTargets.length ? <form className="mt-5 grid gap-4 sm:grid-cols-2" onSubmit={(event) => { event.preventDefault(); if (!duplicateTargetGroupId) { setError(t("reusePickTarget")); return; } void copy(); }}>
-          <label>
-            <span className={labelClass}>{t("reuseTitleLabel")}</span>
-            <input
-              className={inputClass}
-              value={duplicateTitle}
-              onChange={(event) => setDuplicateTitle(event.target.value)}
-              required
-              maxLength={160} />
-          </label>
-
-          <label>
-            <span className={labelClass}>{t("reuseTargetLabel")}</span>
-
-            <select
-              className={inputClass}
-              value={duplicateTargetGroupId}
-              onChange={(event) => setDuplicateTargetGroupId(event.target.value)}
-              required
-            >
-              <option value="">{t("reuseTargetPlaceholder")}</option>
-
-              {duplicateTargets.map((target) => {
-                const full = target.challengeCount >= target.challengeLimit;
-
-                return (
-                  <option key={target.id} value={target.id} disabled={full}>
-                    {t("reuseTargetOption", {
-                      name: target.name,
-                      count: target.challengeCount,
-                      limit: target.challengeLimit,
-                    })}
-                    {full ? t("reuseTargetFull") : ""}
-                  </option>
-                );
-              })}
-            </select>
-          </label>
-            
-          <div className="sm:col-span-2">
-            <span className={labelClass}>{tt("copyModeLabel")}</span>
-            <SelectableCards
-              value={mode}
-              onChange={setMode}
-              options={[
-                { value: "structure_and_items", label: tt("copyModeItems"), hint: tt("copyModeItemsHint") },
-                { value: "structure", label: tt("copyModeStructure"), hint: tt("copyModeStructureHint") },
-              ]}
-            />
-            <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{tt("copyModeHint")}</p>
-          </div>
-          <div className="mb-1 sm:col-span-2"><Button type="submit" variant="secondary" disabled={busy === "duplicate" || !duplicateTargetGroupId || !availableTargets.length}>{busy === "duplicate" ? t("reuseCreating") : t("reuseSubmit")}</Button></div>
-        </form> : <div className="mt-5 rounded-2xl border border-dashed border-[var(--line)] bg-[var(--wash)]/60 p-5"><strong className="text-sm">{t("reuseNoneTitle")}</strong><p className="mt-1 text-sm leading-6 text-[var(--muted)]">{t("reuseNoneBody")}</p></div>}
-
-    <StatusMessage error={error} />
-    <div className="mt-5 flex justify-end"><Button variant="ghost" disabled={Boolean(busy)} onClick={onClose}>{tc("cancel")}</Button></div>
-  </Dialog>;
+  if (!duplicateTargets.length) {
+    return (
+      <div className="rounded-2xl border border-dashed border-[var(--line)] bg-[var(--wash)]/60 p-5">
+        <strong className="text-sm">{t("reuseNoneTitle")}</strong>
+        <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{t("reuseNoneBody")}</p>
+      </div>
+    );
+  }
+  return (
+    <form className="grid gap-4 sm:grid-cols-2" onSubmit={(event) => { event.preventDefault(); void copy(); }}>
+      <label>
+        <span className={labelClass}>{t("reuseTitleLabel")}</span>
+        <input className={inputClass} value={duplicateTitle} onChange={(event) => setDuplicateTitle(event.target.value)} required maxLength={160} />
+      </label>
+      <label>
+        <span className={labelClass}>{t("reuseTargetLabel")}</span>
+        <select className={inputClass} value={duplicateTargetGroupId} onChange={(event) => setDuplicateTargetGroupId(event.target.value)} required>
+          <option value="">{t("reuseTargetPlaceholder")}</option>
+          {duplicateTargets.map((target) => {
+            const full = target.challengeCount >= target.challengeLimit;
+            return (
+              <option key={target.id} value={target.id} disabled={full}>
+                {t("reuseTargetOption", { name: target.name, count: target.challengeCount, limit: target.challengeLimit })}
+                {full ? t("reuseTargetFull") : ""}
+              </option>
+            );
+          })}
+        </select>
+      </label>
+      <div className="sm:col-span-2">
+        <span className={labelClass}>{tt("copyModeLabel")}</span>
+        <SelectableCards
+          value={mode}
+          onChange={setMode}
+          options={[
+            { value: "structure_and_items", label: tt("copyModeItems"), hint: tt("copyModeItemsHint") },
+            { value: "structure", label: tt("copyModeStructure"), hint: tt("copyModeStructureHint") },
+          ]}
+        />
+        <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{tt("copyModeHint")}</p>
+      </div>
+      <div className="sm:col-span-2">
+        <Button type="submit" variant="secondary" disabled={busy || !duplicateTargetGroupId || !availableTargets.length}>{busy ? t("reuseCreating") : t("reuseSubmit")}</Button>
+        <StatusMessage error={error} />
+      </div>
+    </form>
+  );
 }
 
-export function ChallengeActions({ challenge, duplicateTargets, onDuplicate, onOpenCopy, onDelete, onTransition, isPlatformAdmin, onPublishTemplate, onUnpublishTemplate, onPublish, onUnpublish }: {
+/** The lifecycle button in Manage's header — activate a draft, close an active round, reopen a closed one. */
+export function ChallengeStateButton({ challenge, onTransition }: {
+  challenge: ChallengeDetail;
+  onTransition: (status: "active" | "closed") => Promise<void>;
+}) {
+  const t = useTranslations("adminChallenge");
+  const [open, setOpen] = useState(false);
+  const stateAction = isLivingList(challenge) ? null
+    : challenge.status === "draft" ? { label: t("activate"), variant: "primary" as const }
+    : challenge.status === "active" ? { label: t("close"), variant: "danger" as const }
+    : { label: t("reopen"), variant: "secondary" as const };
+  if (!stateAction) return null;
+  return <>
+    <Button variant={stateAction.variant} onClick={() => setOpen(true)}>{stateAction.label}</Button>
+    {open ? <ChallengeStateDialog challenge={challenge} onTransition={onTransition} onClose={() => setOpen(false)} /> : null}
+  </>;
+}
+
+/** One section of Settings: its name, a line on what it does, and its controls right there. */
+function SettingSection({ title, hint, danger = false, children }: { title: string; hint: string; danger?: boolean; children: ReactNode }) {
+  return (
+    <section className="py-8 first:pt-0">
+      <h2 className={cx("text-lg font-medium tracking-tight", danger && "text-[var(--danger)]")}>{title}</h2>
+      <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{hint}</p>
+      <div className="mt-4">{children}</div>
+    </section>
+  );
+}
+
+/**
+ * Manage's Settings tab: what applies to the challenge as a whole, each with its controls in place — the public
+ * page, copying it to another group, the template gallery (platform admins) and, last, deleting it (which still
+ * asks once, since it takes the challenge away).
+ */
+export function ChallengeSettings({ challenge, duplicateTargets, onDuplicate, onOpenCopy, onDelete, isPlatformAdmin, onPublishTemplate, onUnpublishTemplate, onPublish, onUnpublish }: {
   challenge: ChallengeDetail; duplicateTargets: Target[];
   onDuplicate: (payload: { title: string; targetGroupId: Id; mode: CopyMode }) => Promise<CopyResult>;
   onOpenCopy: (challengeId: Id) => void;
   onDelete?: () => Promise<void>;
-  onTransition: (status: "active" | "closed") => Promise<void>;
   isPlatformAdmin: boolean;
   onPublishTemplate: () => Promise<void>;
   onUnpublishTemplate: () => Promise<void>;
@@ -214,34 +221,38 @@ export function ChallengeActions({ challenge, duplicateTargets, onDuplicate, onO
 }) {
   const t = useTranslations("adminChallenge");
   const tx = useTranslations("managementUX");
-  const tc = useTranslations("common");
-  const [panel, setPanel] = useState<"state" | "copy" | "publication" | "template" | "delete" | null>(null);
-  const stateAction = isLivingList(challenge) ? null
-    : challenge.status === "draft" ? { label: t("activate"), variant: "primary" as const }
-    : challenge.status === "active" ? { label: t("close"), variant: "danger" as const }
-    : { label: t("reopen"), variant: "secondary" as const };
-  return <>
-    {stateAction ? <Button variant={stateAction.variant} onClick={() => setPanel("state")}>{stateAction.label}</Button> : null}
-    <ActionMenu label={tx("moreSettings")} iconOnly>
-      <ActionMenuItem onClick={() => setPanel("publication")}>{tx("publication")}</ActionMenuItem>
-      <ActionMenuItem onClick={() => setPanel("copy")}>{t("reuseTitle")}</ActionMenuItem>
-      {isPlatformAdmin ? <ActionMenuItem onClick={() => setPanel("template")}>{t("platformTemplateTitle")}</ActionMenuItem> : null}
-      {onDelete ? <div className="mt-1 border-t border-[var(--line)] pt-1"><ActionMenuItem danger onClick={() => setPanel("delete")}>{t("delete")}</ActionMenuItem></div> : null}
-    </ActionMenu>
-    {panel === "state" ? <ChallengeStateDialog challenge={challenge} onTransition={onTransition} onClose={() => setPanel(null)} /> : null}
-    {panel === "copy" ? <CopyChallengeDialog challenge={challenge} duplicateTargets={duplicateTargets} onDuplicate={onDuplicate} onOpenCopy={onOpenCopy} onClose={() => setPanel(null)} /> : null}
-    {panel === "publication" ? <PublicationDialog challenge={challenge} onPublish={onPublish} onUnpublish={onUnpublish} onClose={() => setPanel(null)} /> : null}
-    {panel === "template" && isPlatformAdmin ? <Dialog title={t("platformTemplateTitle")} onClose={() => setPanel(null)}><TemplatePublishSection challenge={challenge} onPublish={onPublishTemplate} onUnpublish={onUnpublishTemplate} /><div className="mt-5 flex justify-end"><Button variant="secondary" onClick={() => setPanel(null)}>{tc("close")}</Button></div></Dialog> : null}
-    {panel === "delete" && onDelete ? (
-      <ConfirmDialog
-        title={t("deleteTitle")}
-        body={challenge.publishedAsTemplate ? <>{t("deleteBody")} {t("deleteBodyTemplateWarning")}</> : t("deleteBody")}
-        confirmLabel={t("delete")}
-        danger
-        onClose={() => setPanel(null)}
-        onConfirm={async () => { await onDelete(); setPanel(null); }}
-      />
-    ) : null}
-  </>;
+  const [deleting, setDeleting] = useState(false);
+  return (
+    <div className="mx-auto max-w-3xl">
+      <PageHeading title={tx("settingsTitle")} description={tx("settingsSubtitle")} />
+      <div className="divide-y divide-[var(--line)]">
+        <SettingSection title={tx("menuPublicTitle")} hint={tx("menuPublicHint")}>
+          <PublicationPanel challenge={challenge} onPublish={onPublish} onUnpublish={onUnpublish} />
+        </SettingSection>
+        <SettingSection title={tx("menuCopyTitle")} hint={tx("menuCopyHint")}>
+          <CopyChallengePanel challenge={challenge} duplicateTargets={duplicateTargets} onDuplicate={onDuplicate} onOpenCopy={onOpenCopy} />
+        </SettingSection>
+        {isPlatformAdmin ? (
+          <SettingSection title={tx("menuTemplateTitle")} hint={tx("menuTemplateHint")}>
+            <TemplatePanel challenge={challenge} onPublish={onPublishTemplate} onUnpublish={onUnpublishTemplate} />
+          </SettingSection>
+        ) : null}
+        {onDelete ? (
+          <SettingSection title={t("delete")} hint={tx("menuDeleteHint")} danger>
+            <Button variant="danger" onClick={() => setDeleting(true)}>{tx("settingsDeleteAction")}</Button>
+          </SettingSection>
+        ) : null}
+      </div>
+      {deleting && onDelete ? (
+        <ConfirmDialog
+          title={t("deleteTitle")}
+          body={challenge.publishedAsTemplate ? <>{t("deleteBody")} {t("deleteBodyTemplateWarning")}</> : t("deleteBody")}
+          confirmLabel={t("delete")}
+          danger
+          onClose={() => setDeleting(false)}
+          onConfirm={async () => { await onDelete(); setDeleting(false); }}
+        />
+      ) : null}
+    </div>
+  );
 }
-

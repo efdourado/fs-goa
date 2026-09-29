@@ -110,3 +110,9 @@ test("todo deep-link tem um page.tsx no disco", async () => {
     assert.ok(existsSync(new URL(`../${page}`, import.meta.url)), `${page} existe`);
   }
 });
+
+test("a aba Configurações de Gerenciar tem URL própria e volta igual", () => {
+  const screen = screenFromUrl("/challenges/c-9/manage", "?tab=settings");
+  assert.deepEqual(screen, { kind: "admin", challengeId: "c-9", tab: "settings" });
+  assert.equal(urlForScreen(screen!), "/challenges/c-9/manage?tab=settings");
+});

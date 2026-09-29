@@ -9,6 +9,7 @@ const ADMIN_TABS = new Set<AdminTab>([
   "checkpoints",
   "metrics",
   "results",
+  "settings",
 ]);
 
 function decoded(value: string | undefined): string | null {

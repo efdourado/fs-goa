@@ -559,61 +559,73 @@ export function ResultView({
  * for every member (not just admins). On click the copy glyph fades out and a
  * circled checkmark draws itself in, then reverts after a couple of seconds.
  */
-/** Opens the printable log of the challenge — its own page, outside the app, ready to save as a PDF. */
-function ExportLogButton({ challengeId }: { challengeId: string }) {
-  const t = useTranslations("exportDoc");
-  return (
-    <a
-      href={`/challenges/${encodeURIComponent(challengeId)}/export`}
-      className="group inline-flex min-h-10 items-center gap-2 rounded-xl border border-[var(--line)] px-4 py-2 text-sm font-light text-[var(--ink)] transition-colors hover:bg-[var(--hover)]"
-    >
-      {t("button")}
-      <span aria-hidden="true" className="transition-transform group-hover:translate-x-0.5">→</span>
-    </a>
-  );
-}
-
-function SharePublicButton({ token }: { token: string }) {
-  const t = useTranslations("resultView");
+/**
+ * The challenge's outward actions, at the foot of its dark card: download the PDF log and, once the round
+ * has a public page, copy its link. Copying answers on the button itself — the squares give way to a
+ * check drawn inside a ring, the label slides to "Copied", and the pill fills with the brand green.
+ */
+function ChallengeCardActions({ challengeId, shareToken }: { challengeId: string; shareToken?: string | null }) {
+  const tr = useTranslations("resultView");
+  const te = useTranslations("exportDoc");
   const [copied, setCopied] = useState(false);
-  const url = typeof window === "undefined"
-    ? `/results/${token}`
-    : `${window.location.origin}/results/${encodeURIComponent(token)}`;
+  async function copyPublicLink() {
+    if (!shareToken) return;
+    try {
+      await copyText(`${window.location.origin}/results/${encodeURIComponent(shareToken)}`);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2200);
+    } catch { /* leave it as it was */ }
+  }
   return (
-    <button
-      type="button"
-      aria-live="polite"
-      onClick={async () => {
-        try { await copyText(url); setCopied(true); window.setTimeout(() => setCopied(false), 2200); }
-        catch { /* leave the button as it was */ }
-      }}
-      className={cx(
-        "inline-flex min-h-10 items-center gap-2 rounded-xl border px-4 py-2 text-sm font-light transition-colors",
-        copied ? "border-[var(--ok-line)] bg-[var(--ok-soft)] text-[var(--ok)]" : "border-[var(--line)] text-[var(--ink)] hover:bg-[var(--hover)]",
-      )}
-    >
-      <svg viewBox="0 0 20 20" className="size-4 flex-none" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
-        <g className={cx("transition-opacity duration-150", copied ? "opacity-0" : "opacity-100")}>
-          <rect x="7" y="7" width="9" height="9" rx="2" />
-          <path d="M13 4H6a2 2 0 0 0-2 2v7" strokeLinecap="round" />
-        </g>
-        <circle
-          cx="10" cy="10" r="8"
-          pathLength={1}
-          className="transition-[stroke-dashoffset] duration-500 ease-out"
-          style={{ strokeDasharray: 1, strokeDashoffset: copied ? 0 : 1 }}
-        />
-        <path
-          d="M6 10.3 9 13l5-5.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          pathLength={1}
-          className="transition-[stroke-dashoffset] duration-300 ease-out [transition-delay:180ms]"
-          style={{ strokeDasharray: 1, strokeDashoffset: copied ? 0 : 1 }}
-        />
-      </svg>
-      {copied ? t("shareCopied") : t("shareCopy")}
-    </button>
+    <div className="mt-8 flex flex-wrap gap-2">
+      <a
+        href={`/challenges/${encodeURIComponent(challengeId)}/export`}
+        className="inline-flex min-h-11 items-center rounded-full bg-[var(--spotlight-ink)] px-4 text-sm font-medium transition hover:opacity-90"
+      >
+        {/* globals.css makes every <a> inherit its colour, so the dark ink lives on the span. */}
+        <span className="inline-flex items-center gap-2 text-[var(--spotlight)]">
+          <svg viewBox="0 0 20 20" className="size-4 flex-none" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+            <path d="M10 3v10m0 0-4-4m4 4 4-4M4 16h12" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          {te("button")}
+        </span>
+      </a>
+      {shareToken ? (
+        <button
+          type="button"
+          onClick={() => void copyPublicLink()}
+          className={cx(
+            "inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border px-4 text-sm transition-[background-color,border-color,color,transform] duration-300",
+            copied
+              ? "scale-[1.03] border-transparent bg-[var(--main)] text-white"
+              : "border-white/35 text-[var(--spotlight-ink)] hover:border-white/60 hover:bg-white/5",
+          )}
+        >
+          <svg viewBox="0 0 20 20" className="size-4 flex-none" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+            <g className={cx("transition-opacity duration-150", copied ? "opacity-0" : "opacity-100")}>
+              <rect x="7" y="7" width="9" height="9" rx="2" />
+              <path d="M13 4H6a2 2 0 0 0-2 2v7" strokeLinecap="round" />
+            </g>
+            <circle
+              cx="10" cy="10" r="8" pathLength={1}
+              className="transition-[stroke-dashoffset] duration-500 ease-out"
+              style={{ strokeDasharray: 1, strokeDashoffset: copied ? 0 : 1 }}
+            />
+            <path
+              d="M6 10.3 9 13l5-5.5" strokeLinecap="round" strokeLinejoin="round" pathLength={1}
+              className="transition-[stroke-dashoffset] duration-300 ease-out [transition-delay:180ms]"
+              style={{ strokeDasharray: 1, strokeDashoffset: copied ? 0 : 1 }}
+            />
+          </svg>
+          {/* Both labels share one cell, so the pill keeps its width while one slides out and the other in. */}
+          <span className="grid overflow-hidden">
+            <span className={cx("col-start-1 row-start-1 transition duration-300", copied ? "-translate-y-full opacity-0" : "translate-y-0 opacity-100")}>{tr("shareCopy")}</span>
+            <span aria-hidden={!copied} className={cx("col-start-1 row-start-1 font-medium transition duration-300", copied ? "translate-y-0 opacity-100" : "translate-y-full opacity-0")}>{tr("shareCopied")}</span>
+          </span>
+          <span role="status" aria-live="polite" className="sr-only">{copied ? tr("shareCopied") : ""}</span>
+        </button>
+      ) : null}
+    </div>
   );
 }
 
@@ -1501,10 +1513,16 @@ export function ParticipantChallengeScreen({
     <main className="mx-auto max-w-7xl overflow-x-clip px-4 py-6 pb-28 sm:px-6 sm:py-10">
       <div className="mb-5 flex items-center justify-between gap-3">
         <BackButton onClick={onBack} label={backLabel ?? t("back")} />
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          {!preview && challenge.result?.shareToken ? <SharePublicButton token={challenge.result.shareToken} /> : null}
-          {!preview ? <ExportLogButton challengeId={challenge.id} /> : null}
-          {previewActions ?? (onAdmin ? <Button variant="secondary" onClick={onAdmin}>{t("manage")}</Button> : null)}
+        <div className="flex items-center gap-2">
+          {previewActions ?? (onAdmin ? (
+            <Button variant="secondary" onClick={onAdmin}>
+              <svg viewBox="0 0 20 20" className="size-4 flex-none" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+                <path d="M8.3 2.8h3.4l.5 2.1 1.5.9 2.1-.6 1.7 2.9-1.6 1.5v1.8l1.6 1.5-1.7 2.9-2.1-.6-1.5.9-.5 2.1H8.3l-.5-2.1-1.5-.9-2.1.6-1.7-2.9 1.6-1.5V9.6L2.5 8.1l1.7-2.9 2.1.6 1.5-.9Z" strokeLinejoin="round" />
+                <circle cx="10" cy="10.5" r="2.6" />
+              </svg>
+              {t("manage")}
+            </Button>
+          ) : null)}
         </div>
       </div>
       <section className="relative overflow-hidden rounded-[28px] bg-[var(--spotlight)] p-6 text-[var(--spotlight-ink)] sm:p-9">
@@ -1513,6 +1531,7 @@ export function ParticipantChallengeScreen({
           <h1 className="mt-10 max-w-3xl text-4xl font-medium leading-none tracking-[-0.055em] sm:text-6xl">{challenge.title}</h1>
           {challenge.description ? <p className="mt-4 max-w-2xl text-sm leading-6 text-white/70">{challenge.description}</p> : null}
           {!preview && !sessionSpec && sortedItems.length ? <div className="mt-8 max-w-2xl"><div className="mb-2 flex justify-between text-xs text-white/70"><span>{t.rich("entriesProgress", { done: doneCount, total: sortedItems.length, b: (chunks) => <strong className="text-white">{chunks}</strong> })}</span><span>{completion}%</span></div><div className="h-2 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-[var(--main-2)]" style={{ width: `${Math.min(100, completion)}%` }} /></div></div> : null}
+          {!preview ? <ChallengeCardActions challengeId={challenge.id} shareToken={challenge.result?.shareToken} /> : null}
         </div>
         <span className="absolute -right-28 -top-36 h-96 w-96 rounded-full border border-white/10" aria-hidden="true" />
       </section>

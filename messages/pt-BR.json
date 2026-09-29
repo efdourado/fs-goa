@@ -1,8 +1,5 @@
 {
   "managementUX": {
-    "moreSettings": "Mais configurações",
-    "publication": "Publicação",
-    "publicationBody": "Controle o acesso público à vitrine. Os registros privados do desafio continuam protegidos.",
     "publicOn": "Vitrine pública",
     "publicOff": "Vitrine privada",
     "privateUntilPublished": "Visível apenas dentro do desafio.",
@@ -10,7 +7,17 @@
     "groupActions": "Opções do grupo",
     "allTypes": "Todos os tipos",
     "personal": "Meu espaço",
-    "noMatches": "Nenhum item corresponde aos filtros."
+    "noMatches": "Nenhum item corresponde aos filtros.",
+    "menuPublicTitle": "Página pública",
+    "menuPublicHint": "Quem tiver o link vê o resultado do desafio.",
+    "menuCopyTitle": "Copiar desafio",
+    "menuCopyHint": "Reaproveite a estrutura em outro grupo.",
+    "menuTemplateTitle": "Galeria de modelos",
+    "menuTemplateHint": "Publique como modelo para qualquer pessoa usar.",
+    "menuDeleteHint": "Vai para a lixeira — dá para restaurar.",
+    "settingsTitle": "Configurações",
+    "settingsSubtitle": "O que vale para o desafio inteiro: quem vê de fora, cópias e exclusão.",
+    "settingsDeleteAction": "Deletar"
   },
   "common": {
     "home": "Início",
@@ -719,7 +726,8 @@
       "items": "Itens",
       "metrics": "Métricas",
       "results": "Vitrine",
-      "checkpoints": "Etapas"
+      "checkpoints": "Etapas",
+      "settings": "Configurações"
     },
     "errPeriod": "Preencha início e término, ou escolha um desafio sem prazo.",
     "errEndBeforeStart": "A data final deve ser igual ou posterior ao início.",
@@ -766,8 +774,6 @@
     "activate": "Ativar desafio",
     "reopen": "Reabrir desafio",
     "close": "Encerrar desafio",
-    "reuseTitle": "Copiar para outro grupo?",
-    "reuseBody": "Cria um rascunho em outro grupo com regras, campos, métricas e etapas. Participantes, registros, resultados e convites não são copiados.",
     "reusePickTarget": "Escolha um grupo de destino disponível.",
     "reuseTitleLabel": "Renomear título",
     "reuseTargetLabel": "Grupo de destino",
@@ -775,7 +781,7 @@
     "reuseTargetOption": "{name} · {count}/{limit}",
     "reuseTargetFull": " (limite atingido)",
     "reuseCreating": "Criando…",
-    "reuseSubmit": "➜",
+    "reuseSubmit": "Criar cópia",
     "reuseNoneTitle": "Nenhum outro grupo disponível",
     "reuseNoneBody": "Crie outro grupo ou torne-se responsável de um grupo para reutilizar este modelo.",
     "deleteTitle": "Deletar desafio?",
@@ -784,8 +790,6 @@
     "deleteConfirm": "Mover \"{title}\" para a lixeira?",
     "delete": "Deletar desafio",
     "deleting": "Apagando…",
-    "platformTemplateTitle": "Galeria pública de modelos",
-    "platformTemplateHint": "Só para a administração da plataforma. Listar este desafio em /modelos deixa qualquer pessoa duplicar a estrutura dele — nunca os registros.",
     "platformTemplateOn": "Está na galeria.",
     "platformTemplatePublish": "Publicar como modelo",
     "platformTemplateUnpublish": "Tirar da galeria",
@@ -1202,7 +1206,7 @@
   "resultView": {
     "emptyTitle": "A vitrine ainda está sendo preparada",
     "liveEmptyTitle": "Ainda sem números",
-    "shareCopy": "Copiar página pública",
+    "shareCopy": "Copiar link para compartilhar",
     "shareCopied": "Copiado"
   },
   "rules": {
@@ -1915,7 +1919,7 @@
     "challenge": "Desafio"
   },
   "exportDoc": {
-    "button": "Exportar PDF",
+    "button": "Baixar PDF",
     "fileTitle": "{title} — registro",
     "download": "Baixar PDF",
     "printHint": "Na janela de impressão, escolha “Salvar como PDF”.",

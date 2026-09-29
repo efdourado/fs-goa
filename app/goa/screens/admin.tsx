@@ -16,7 +16,7 @@ import { bodyFromValues, editableProperties, PropertyInputs, type PropertyValues
 import { ListImportPanel } from "../list-import-panel";
 import { recommenderBody, recommenderLine, RecommenderPicker, recommenderFromItem, type RecommenderValue, sameRecommender, useRecommenderSource } from "../recommender-picker";
 import { RuleSectionsEditor, visibleRuleSections } from "../rules";
-import { ChallengeActions, type CopyMode } from "./challenge-actions";
+import { ChallengeSettings, ChallengeStateButton, type CopyMode } from "./challenge-actions";
 import type {
   AdminTab,
   ChallengeDetail,
@@ -1220,7 +1220,7 @@ export function AdminScreen({
     "overview",
     "fields", "items",
     ...(showCheckpoints ? (["checkpoints"] as const) : []),
-    "metrics", "results",
+    "metrics", "results", "settings",
   ];
   const requestedTab = tab === "participants" ? "overview" : tab;
   const activeTab = tabs.includes(requestedTab) ? requestedTab : "overview";
@@ -1237,7 +1237,7 @@ export function AdminScreen({
           <span className="h-5 w-px flex-none bg-[var(--line)]" aria-hidden="true" />
           <ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />
           <h1 className="min-w-0 flex-1 truncate text-base font-semibold tracking-tight">{challenge.title}</h1>
-          <ChallengeActions challenge={challenge} duplicateTargets={duplicateTargets} onDuplicate={onDuplicate} onOpenCopy={onOpenCopy} onDelete={onDelete} onTransition={onTransition} isPlatformAdmin={isPlatformAdmin} onPublishTemplate={onPublishTemplate} onUnpublishTemplate={onUnpublishTemplate} onPublish={onPublishResult} onUnpublish={onUnpublishResult} />
+          <ChallengeStateButton challenge={challenge} onTransition={onTransition} />
         </div>
         <nav className="mx-auto max-w-5xl px-2 sm:px-5" aria-label={t("tabsAria")}>
           <div className="flex gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -1268,6 +1268,7 @@ export function AdminScreen({
         {activeTab === "checkpoints" ? <CheckpointPlanner key={`${challenge.id}:${challenge.checkpoints.map((cp) => cp.id).join(",")}`} challenge={challenge} onSaveCheckpoints={onSaveCheckpoints} onAssign={onAssignCheckpointItems} /> : null}
         {activeTab === "metrics" ? <AdminMetrics challenge={challenge} onAdd={onAddMetric} onUpdate={onUpdateMetric} onDelete={onDeleteMetric} /> : null}
         {activeTab === "results" ? <AdminResults challenge={challenge} entries={entries} onSave={onSaveResult} /> : null}
+        {activeTab === "settings" ? <ChallengeSettings challenge={challenge} duplicateTargets={duplicateTargets} onDuplicate={onDuplicate} onOpenCopy={onOpenCopy} onDelete={onDelete} isPlatformAdmin={isPlatformAdmin} onPublishTemplate={onPublishTemplate} onUnpublishTemplate={onUnpublishTemplate} onPublish={onPublishResult} onUnpublish={onUnpublishResult} /> : null}
       </div>
     </main>
   );

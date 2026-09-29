@@ -1,8 +1,5 @@
 {
   "managementUX": {
-    "moreSettings": "More settings",
-    "publication": "Publication",
-    "publicationBody": "Control public access to the showcase. Private challenge entries remain protected.",
     "publicOn": "Public showcase",
     "publicOff": "Private showcase",
     "privateUntilPublished": "Only visible within the challenge.",
@@ -10,7 +7,17 @@
     "groupActions": "Group options",
     "allTypes": "All types",
     "personal": "My space",
-    "noMatches": "No items match these filters."
+    "noMatches": "No items match these filters.",
+    "menuPublicTitle": "Public page",
+    "menuPublicHint": "Anyone with the link sees the challenge’s results.",
+    "menuCopyTitle": "Copy challenge",
+    "menuCopyHint": "Reuse its setup in another group.",
+    "menuTemplateTitle": "Template gallery",
+    "menuTemplateHint": "Publish it as a template anyone can use.",
+    "menuDeleteHint": "Goes to the bin — you can restore it.",
+    "settingsTitle": "Settings",
+    "settingsSubtitle": "What applies to the whole challenge: who sees it from outside, copies and deletion.",
+    "settingsDeleteAction": "Delete"
   },
   "common": {
     "home": "Home",
@@ -719,7 +726,8 @@
       "items": "Items",
       "metrics": "Metrics",
       "results": "Showcase",
-      "checkpoints": "Stages"
+      "checkpoints": "Stages",
+      "settings": "Settings"
     },
     "errPeriod": "Fill in the start and end, or choose a challenge with no deadline.",
     "errEndBeforeStart": "The end date must be the same as or after the start.",
@@ -766,8 +774,6 @@
     "activate": "Activate challenge",
     "reopen": "Reopen challenge",
     "close": "Close challenge",
-    "reuseTitle": "Copy to another group?",
-    "reuseBody": "Creates a draft in another group with rules, fields, metrics, and stages. Participants, entries, results, and invites are not copied.",
     "reusePickTarget": "Choose an available destination group.",
     "reuseTitleLabel": "Rename title",
     "reuseTargetLabel": "Destination group",
@@ -775,7 +781,7 @@
     "reuseTargetOption": "{name} · {count}/{limit}",
     "reuseTargetFull": " (limit reached)",
     "reuseCreating": "Creating…",
-    "reuseSubmit": "➜",
+    "reuseSubmit": "Create copy",
     "reuseNoneTitle": "No other group available",
     "reuseNoneBody": "Create another group or become an owner/admin of one to reuse this template.",
     "deleteTitle": "Delete challenge?",
@@ -784,8 +790,6 @@
     "deleteConfirm": "Move \"{title}\" to the bin?",
     "delete": "Delete challenge",
     "deleting": "Deleting…",
-    "platformTemplateTitle": "Public template gallery",
-    "platformTemplateHint": "Platform-admin only. Listing this challenge at /modelos lets anyone duplicate its structure — never its entries.",
     "platformTemplateOn": "Listed in the gallery.",
     "platformTemplatePublish": "Publish as a template",
     "platformTemplateUnpublish": "Remove from the gallery",
@@ -1202,7 +1206,7 @@
   "resultView": {
     "emptyTitle": "The showcase is still being prepared",
     "liveEmptyTitle": "No numbers yet",
-    "shareCopy": "Copy public page",
+    "shareCopy": "Copy share link",
     "shareCopied": "Copied"
   },
   "rules": {
@@ -1915,7 +1919,7 @@
     "challenge": "Challenge"
   },
   "exportDoc": {
-    "button": "Export PDF",
+    "button": "Download PDF",
     "fileTitle": "{title} — log",
     "download": "Download PDF",
     "printHint": "In the print window, choose “Save as PDF”.",

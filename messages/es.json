@@ -1,8 +1,5 @@
 {
   "managementUX": {
-    "moreSettings": "Más ajustes",
-    "publication": "Publicación",
-    "publicationBody": "Controla el acceso público a la presentación. Los registros privados del reto siguen protegidos.",
     "publicOn": "Presentación pública",
     "publicOff": "Presentación privada",
     "privateUntilPublished": "Visible solo dentro del reto.",
@@ -10,7 +7,17 @@
     "groupActions": "Opciones del grupo",
     "allTypes": "Todos los tipos",
     "personal": "Mi espacio",
-    "noMatches": "Ningún elemento coincide con los filtros."
+    "noMatches": "Ningún elemento coincide con los filtros.",
+    "menuPublicTitle": "Página pública",
+    "menuPublicHint": "Quien tenga el enlace ve el resultado del desafío.",
+    "menuCopyTitle": "Copiar desafío",
+    "menuCopyHint": "Reutiliza su estructura en otro grupo.",
+    "menuTemplateTitle": "Galería de plantillas",
+    "menuTemplateHint": "Publícalo como plantilla para que cualquiera lo use.",
+    "menuDeleteHint": "Va a la papelera — puedes restaurarlo.",
+    "settingsTitle": "Configuración",
+    "settingsSubtitle": "Lo que vale para todo el desafío: quién lo ve desde fuera, copias y eliminación.",
+    "settingsDeleteAction": "Eliminar"
   },
   "common": {
     "home": "Inicio",
@@ -719,7 +726,8 @@
       "items": "Ítems",
       "metrics": "Métricas",
       "results": "Vitrina",
-      "checkpoints": "Etapas"
+      "checkpoints": "Etapas",
+      "settings": "Configuración"
     },
     "errPeriod": "Completa el inicio y el fin, o elige un desafío sin plazo.",
     "errEndBeforeStart": "La fecha final debe ser igual o posterior al inicio.",
@@ -766,8 +774,6 @@
     "activate": "Activar desafío",
     "reopen": "Reabrir desafío",
     "close": "Cerrar desafío",
-    "reuseTitle": "¿Copiar a otro grupo?",
-    "reuseBody": "Crea un borrador en otro grupo con reglas, campos, métricas y etapas. Participantes, registros, resultados e invitaciones no se copian.",
     "reusePickTarget": "Elige un grupo de destino disponible.",
     "reuseTitleLabel": "Renombrar título",
     "reuseTargetLabel": "Grupo de destino",
@@ -775,7 +781,7 @@
     "reuseTargetOption": "{name} · {count}/{limit}",
     "reuseTargetFull": " (límite alcanzado)",
     "reuseCreating": "Creando…",
-    "reuseSubmit": "➜",
+    "reuseSubmit": "Crear copia",
     "reuseNoneTitle": "Ningún otro grupo disponible",
     "reuseNoneBody": "Crea otro grupo o vuélvete responsable de un grupo para reutilizar esta plantilla.",
     "deleteTitle": "¿Eliminar desafío?",
@@ -784,8 +790,6 @@
     "deleteConfirm": "¿Mover \"{title}\" a la papelera?",
     "delete": "Eliminar desafío",
     "deleting": "Borrando…",
-    "platformTemplateTitle": "Galería pública de plantillas",
-    "platformTemplateHint": "Solo para la administración de la plataforma. Listar este desafío en /modelos permite que cualquiera duplique su estructura — nunca los registros.",
     "platformTemplateOn": "Está en la galería.",
     "platformTemplatePublish": "Publicar como plantilla",
     "platformTemplateUnpublish": "Quitar de la galería",
@@ -1202,7 +1206,7 @@
   "resultView": {
     "emptyTitle": "La vitrina todavía se está preparando",
     "liveEmptyTitle": "Todavía sin números",
-    "shareCopy": "Copiar página pública",
+    "shareCopy": "Copiar enlace para compartir",
     "shareCopied": "Copiado"
   },
   "rules": {
@@ -1915,7 +1919,7 @@
     "challenge": "Desafío"
   },
   "exportDoc": {
-    "button": "Exportar PDF",
+    "button": "Descargar PDF",
     "fileTitle": "{title} — registro",
     "download": "Descargar PDF",
     "printHint": "En la ventana de impresión, elige «Guardar como PDF».",

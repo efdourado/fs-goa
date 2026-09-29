@@ -28,7 +28,8 @@ export type AdminTab =
   | "items"
   | "checkpoints"
   | "metrics"
-  | "results";
+  | "results"
+  | "settings";
 export type ParticipantTab = "today" | "grupo" | "results";
 
 export interface User {

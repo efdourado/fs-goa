@@ -3,17 +3,16 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { copyText } from "../clipboard";
-import { Dialog } from "../dialog";
 import { useGoaFormat } from "../format";
 import type { ChallengeDetail } from "../types";
 import { Button, StatusMessage, Toggle } from "../ui";
 import { isLivingList } from "../utils";
 
-export function PublicationDialog({ challenge, onPublish, onUnpublish, onClose }: {
+/** The public page's switch, its link (copy / new link) and the confirmation for each change — shown in place on Settings. */
+export function PublicationPanel({ challenge, onPublish, onUnpublish }: {
   challenge: ChallengeDetail;
   onPublish: (payload: Record<string, unknown>) => Promise<{ url?: string | null } | undefined>;
   onUnpublish: () => Promise<void>;
-  onClose: () => void;
 }) {
   const t = useTranslations("adminChallenge");
   const tx = useTranslations("managementUX");
@@ -37,10 +36,8 @@ export function PublicationDialog({ challenge, onPublish, onUnpublish, onClose }
       setConfirm(null);
     } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
   }
-  return <Dialog title={tx("publication")} onClose={onClose} busy={busy}>
-    <p className="text-sm leading-6 text-[var(--muted)]">{tx("publicationBody")}</p>
-
-    <div className="mt-5">
+  return <div>
+    <div>
       <Toggle
         checked={published}
         disabled={busy || !canPublish || confirm !== null}
@@ -76,6 +73,5 @@ export function PublicationDialog({ challenge, onPublish, onUnpublish, onClose }
       </div>
     ) : null}
     <StatusMessage error={error} success={success} />
-    <div className="mt-6 flex justify-end border-t border-[var(--line)] pt-4"><Button variant="secondary" onClick={onClose} disabled={busy}>{tc("close")}</Button></div>
-  </Dialog>;
+  </div>;
 }
