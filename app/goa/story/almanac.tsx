@@ -43,6 +43,44 @@ function Block({ title, children, wide }: { title: string; children: ReactNode; 
 }
 
 /**
+ * One exercise as a single row: its name, a tiny line of every session's number (the best dot filled),
+ * the range it covered and the gain — compact, no arrows, the line already goes up.
+ */
+function Progression({ title, row, unit, person, fmt, tone }: {
+  title: string;
+  row: { first: number; best: number; sessions: number; series: number[] };
+  unit: string;
+  person: string | null;
+  fmt: (value: number) => string;
+  tone: string;
+}) {
+  const t = useTranslations("story");
+  const width = 88;
+  const height = 22;
+  const low = Math.min(...row.series);
+  const high = Math.max(...row.series);
+  const span = Math.max(1e-9, high - low);
+  const x = (index: number) => (row.series.length === 1 ? width / 2 : 3 + (index * (width - 6)) / (row.series.length - 1));
+  const y = (value: number) => height - 3 - ((value - low) / span) * (height - 6);
+  const points = row.series.map((value, index) => `${x(index)},${y(value)}`).join(" ");
+  const gain = Math.round(((row.best - row.first) / Math.max(1e-9, row.first)) * 100);
+  return (
+    <li className="grid grid-cols-[minmax(0,1fr)_88px_6.5rem_3rem] items-center gap-3 py-2.5 text-sm first:pt-0 last:pb-0">
+      <span className="min-w-0">
+        <span className="block truncate">{title}</span>
+        <span className="block text-xs text-[var(--muted)]">{[person, t("records.sessions", { count: row.sessions })].filter(Boolean).join(" · ")}</span>
+      </span>
+      <svg viewBox={`0 0 ${width} ${height}`} width={width} height={height} aria-hidden="true">
+        <polyline points={points} fill="none" stroke={tone} strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round" />
+        <circle cx={x(row.series.indexOf(high))} cy={y(high)} r={2.6} fill={tone} />
+      </svg>
+      <span className="whitespace-nowrap text-right text-xs tabular-nums text-[var(--muted)]">{t("records.range", { first: fmt(row.first), best: fmt(row.best), unit })}</span>
+      <strong className="text-right font-medium tabular-nums" style={{ color: tone }}>+{gain}%</strong>
+    </li>
+  );
+}
+
+/**
  * Expectation against reality for one title, as a track: the hollow dot is the guess, the filled one where
  * it landed, the bar between them the distance — and the difference written plainly at the end.
  */
@@ -660,18 +698,14 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
       pages.push({
         id: "records",
         title: t("records.eyebrow"),
-        headline: t("records.title", { title: s.records[0].item.title, first: nf.number(s.records[0].first), best: nf.number(s.records[0].best) }),
+        headline: t("records.headline", { title: s.records[0].item.title, gain: Math.round(((s.records[0].best - s.records[0].first) / Math.max(1e-9, s.records[0].first)) * 100) }),
         contents: s.records.slice(0, 4).map((row) => row.item.title).join(" · "),
         body: (
           <div className={grid}>
-            <Block title={t("records.note", { label: input.recordLabel ?? "" })} wide>
-              <ul className="space-y-2">
+            <Block title={t("records.list", { label: input.recordLabel ?? "" })} wide>
+              <ul className="divide-y divide-[var(--line)]">
                 {s.records.map((row) => (
-                  <li key={`${row.person.id}-${row.item.id}`} className="flex items-center gap-3 text-sm">
-                    <span className="min-w-0 flex-1 truncate">{row.item.title}</span>
-                    <span className="tabular-nums text-[var(--muted)]">{nf.number(row.first)}</span><span aria-hidden="true">→</span><strong className="font-medium tabular-nums">{nf.number(row.best)}</strong>
-                    <span className="w-14 text-right text-xs text-[var(--ok)]">+{Math.round(((row.best - row.first) / Math.max(1e-9, row.first)) * 100)}%</span>
-                  </li>
+                  <Progression key={`${row.person.id}-${row.item.id}`} title={row.item.title} row={row} unit={input.recordUnit ?? ""} person={s.lanes.length > 1 ? firstName(row.person.name) : null} fmt={(value) => nf.number(value)} tone={personTone(ids, row.person.id)} />
                 ))}
               </ul>
             </Block>

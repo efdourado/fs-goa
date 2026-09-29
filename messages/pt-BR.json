@@ -2235,8 +2235,10 @@
     },
     "records": {
       "eyebrow": "Recordes pessoais",
-      "title": "{title}: {first} → {best}",
-      "note": "{label}: o primeiro treino contra o melhor."
+      "headline": "{title} subiu {gain}%.",
+      "range": "{first}–{best} {unit}",
+      "sessions": "{count, plural, one {# treino} other {# treinos}}",
+      "list": "{label}: o primeiro treino contra o melhor"
     },
     "notes": {
       "eyebrow": "Nas palavras deles"

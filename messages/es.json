@@ -2235,8 +2235,10 @@
     },
     "records": {
       "eyebrow": "Récords personales",
-      "title": "{title}: {first} → {best}",
-      "note": "{label}: la primera sesión contra la mejor."
+      "headline": "{title} subió un {gain}%.",
+      "range": "{first}–{best} {unit}",
+      "sessions": "{count, plural, one {# sesión} other {# sesiones}}",
+      "list": "{label}: la primera sesión contra la mejor"
     },
     "notes": {
       "eyebrow": "En sus palabras"

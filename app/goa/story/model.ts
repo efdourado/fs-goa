@@ -46,6 +46,8 @@ export interface StoryInput {
   /** The counted number's label and unit on a dated challenge ("Páginas", "km"). */
   counter?: { label: string; unit?: string | null } | null;
   recordLabel?: string | null;
+  /** The record's unit ("kg") — from the field, or read off a label like "Carga (kg)". */
+  recordUnit?: string | null;
   startsOn?: string | null;
   endsOn?: string | null;
   today: string;
@@ -143,7 +145,8 @@ export interface DatedStory {
   weekdays: number[];
   /** The weekdays that stand out (tied at the top, clearly above the rest); empty when the week is even. */
   bestWeekdays: number[];
-  records: Array<{ item: StoryItem; first: number; best: number; bestDay: string; person: StoryPerson; sessions: number }>;
+  /** Workouts: per exercise, where it started, the best it reached, and every session's number in order. */
+  records: Array<{ item: StoryItem; first: number; best: number; bestDay: string; person: StoryPerson; sessions: number; series: number[] }>;
   notes: Array<{ person: StoryPerson; day: string; text: string }>;
   /** Two people: the days both of them showed up. */
   together: number | null;
@@ -448,7 +451,10 @@ function buildDated(input: StoryInput): DatedStory | null {
     const best = ordered.reduce((top, row) => (row.value > top.value ? row : top));
     const item = input.items.find((candidate) => candidate.id === ordered[0].itemId);
     if (!item || best.value <= ordered[0].value) continue;
-    records.push({ item, first: ordered[0].value, best: best.value, bestDay: best.day, person: input.people.find((person) => person.id === ordered[0].personId)!, sessions: ordered.length });
+    // One number per day (the heaviest set that day), oldest first — the line a card draws.
+    const byDay = new Map<string, number>();
+    for (const row of ordered) byDay.set(row.day, Math.max(byDay.get(row.day) ?? -Infinity, row.value));
+    records.push({ item, first: ordered[0].value, best: best.value, bestDay: best.day, person: input.people.find((person) => person.id === ordered[0].personId)!, sessions: byDay.size, series: [...byDay.values()] });
   }
   records.sort((a, b) => (b.best - b.first) / Math.max(1e-9, b.first) - (a.best - a.first) / Math.max(1e-9, a.first));
 
@@ -554,7 +560,8 @@ export function storyFromChallenge(challenge: ChallengeDetail, entries: Entry[],
     days,
     records,
     counter: counterField ? { label: counterField.label, unit: counterField.config?.unit ?? null } : null,
-    recordLabel: recordField?.label ?? null,
+    recordLabel: recordField?.label?.replace(/\s*\([^)]*\)\s*$/, "") ?? null,
+    recordUnit: recordField?.config?.unit ?? recordField?.label?.match(/\(([^)]+)\)\s*$/)?.[1] ?? null,
     startsOn: challenge.startsOn ?? null,
     endsOn: challenge.endsOn ?? null,
     today,
