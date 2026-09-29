@@ -103,8 +103,40 @@ export function RatedThread({ story, input, focus, run, fit = false }: { story: 
           {story.stations.map((station, index) => (
             <line key={station.item.id} x1={x(index)} x2={x(index)} y1={TOP - 18} y2={HEIGHT - BOTTOM} stroke="currentColor" strokeOpacity={0.07} />
           ))}
-          {/* The group, as one faint line. */}
-          {smoothPaths(story.stations.map((station, index) => ({ x: x(index), y: y(station.average) })), y(input.scale.max), y(input.scale.min)).map((d, index) => (
+          {/* Two people: the space between their lines as a ribbon — thin where they met, wide where each brought
+              something. One person: the shape of their season, filled beneath the line. */}
+          {story.threads.length === 2 ? (() => {
+            const both = story.threads[0].values.flatMap((value, index) => {
+              const other = story.threads[1].values[index];
+              return value !== null && other !== null ? [{ x: x(index), a: y(value), b: y(other) }] : [];
+            });
+            if (both.length < 2) return null;
+            const low = y(input.scale.max);
+            const high = y(input.scale.min);
+            const upper = smoothPaths(both.map((point) => ({ x: point.x, y: point.a })), low, high)[0];
+            const lower = smoothPaths([...both].reverse().map((point) => ({ x: point.x, y: point.b })), low, high)[0];
+            return <path d={`${upper} ${lower.replace(/^M/, "L")} Z`} fill="currentColor" fillOpacity={0.09} className="reveal-fade" style={delay(drawMs)} />;
+          })() : null}
+          {story.threads.length === 1 ? (() => {
+            const points = story.threads[0].values.flatMap((value, index) => (value === null ? [] : [{ x: x(index), y: y(value) }]));
+            if (points.length < 2) return null;
+            const line = smoothPaths(points, y(input.scale.max), y(input.scale.min))[0];
+            const base = y(input.scale.min);
+            const tone = personTone(ids, story.threads[0].person.id);
+            return (
+              <>
+                <defs>
+                  <linearGradient id="solo-fill" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0%" stopColor={tone} stopOpacity={0.35} />
+                    <stop offset="100%" stopColor={tone} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <path d={`${line} L${points.at(-1)!.x},${base} L${points[0].x},${base} Z`} fill="url(#solo-fill)" className="reveal-fade" style={delay(drawMs * 0.6)} />
+              </>
+            );
+          })() : null}
+          {/* The group, as one faint line (a group only — two lines already say it, one line is it). */}
+          {story.threads.length > 2 && smoothPaths(story.stations.map((station, index) => ({ x: x(index), y: y(station.average) })), y(input.scale.max), y(input.scale.min)).map((d, index) => (
             <path key={`avg-${index}`} d={d} fill="none" stroke="currentColor" strokeOpacity={0.28} strokeWidth={7} strokeLinecap="round" pathLength={1} className="taste-line" style={{ ...delay(0), animationDuration: `${drawMs}ms` }} />
           ))}
           {story.threads.map((thread, order) => {

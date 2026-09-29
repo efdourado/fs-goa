@@ -16,17 +16,18 @@ export function useStoryFigures(story: Story, input: StoryInput): Array<{ value:
   const t = useTranslations("story");
   const f = useFormatter();
   if (story.kind === "rated") {
+    const solo = story.totals.people < 2;
     return [
-      { value: f.number(story.totals.people), label: t("figures.people", { count: story.totals.people }) },
+      ...(solo ? [] : [{ value: f.number(story.totals.people), label: t("figures.people", { count: story.totals.people }) }]),
       { value: f.number(story.totals.items), label: t(`figures.${input.noun}`, { count: story.totals.items }) },
       { value: f.number(story.totals.ratings), label: t("figures.ratings", { count: story.totals.ratings }) },
-      ...(story.totals.minutes ? [{ value: `${Math.round(story.totals.minutes / 60)} h`, label: t("figures.together") }] : []),
+      ...(story.totals.minutes ? [{ value: `${Math.round(story.totals.minutes / 60)} h`, label: t(solo ? "figures.togetherSolo" : "figures.together") }] : []),
       ...(story.totals.comments ? [{ value: f.number(story.totals.comments), label: t("figures.comments", { count: story.totals.comments }) }] : []),
     ];
   }
   if (story.kind === "dated") {
     return [
-      { value: f.number(story.totals.people), label: t("figures.people", { count: story.totals.people }) },
+      ...(story.totals.people < 2 ? [] : [{ value: f.number(story.totals.people), label: t("figures.people", { count: story.totals.people }) }]),
       { value: f.number(story.totals.days), label: t("figures.days", { count: story.totals.days }) },
       { value: f.number(story.totals.checkins), label: t("figures.checkins", { count: story.totals.checkins }) },
       ...(story.totals.total !== null ? [{ value: f.number(story.totals.total), label: input.counter?.unit || input.counter?.label || "" }] : []),
@@ -36,8 +37,9 @@ export function useStoryFigures(story: Story, input: StoryInput): Array<{ value:
 }
 
 export function storyHeadline(story: Story, input: StoryInput, t: ReturnType<typeof useTranslations>): string {
+  if (story.kind === "rated" && story.duo) return t("mood.duo", { a: firstName(story.duo.a.name), b: firstName(story.duo.b.name) });
   if (story.kind === "rated") return t(`mood.${input.people.length > 1 ? story.mood : "solo"}`);
-  if (story.kind === "dated") return t("datedHeadline", { count: story.lanes.length });
+  if (story.kind === "dated") return story.lanes.length === 1 ? t("datedHeadlineSolo") : t("datedHeadline", { count: story.lanes.length });
   return "";
 }
 
@@ -72,7 +74,8 @@ export function ThreadPanel({ input, story, fit = false, interactive = true }: {
       </div>
 
       <div className="flex flex-wrap items-center gap-2 px-5 pb-3 pt-3 sm:px-8">
-        {people.map((person) => (
+        {/* Following one line only means something with more than one. */}
+        {people.length > 1 && people.map((person) => (
           <button
             key={person.id}
             type="button"
@@ -94,7 +97,7 @@ export function ThreadPanel({ input, story, fit = false, interactive = true }: {
           ? <RatedThread story={story} input={input} focus={focus} run={run} fit={fit} />
           : <DatedThread story={story} input={input} focus={focus} run={run} fit={fit} />}
       </div>
-      <p className="px-5 pb-5 text-[11px] text-white/45 sm:px-8">{story.kind === "rated" ? t("readRated") : t("readDated")}</p>
+      <p className="px-5 pb-5 text-[11px] text-white/45 sm:px-8">{story.kind === "rated" ? t("readRated") : story.lanes.length === 1 ? t("readCalendar") : t("readDated")}</p>
     </div>
   );
 }

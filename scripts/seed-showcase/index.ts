@@ -16,9 +16,9 @@ import process from "node:process";
 
 import { registerAccount, type SessionContext } from "../../lib/auth";
 import { getPool, oneOrNull, withClient } from "../../lib/db";
-import { createChallenge, createGroup, requestGroupMember, respondToMemberRequest } from "../../lib/goa-domain";
+import { createChallenge, createGroup, createPersonalChallenge, requestGroupMember, respondToMemberRequest } from "../../lib/goa-domain";
 import { revealItem, saveEntry, transitionChallenge } from "../../lib/goa-challenges";
-import { purgeGroupRows } from "../../lib/goa/purge";
+import { purgeChallengeRows, purgeGroupRows } from "../../lib/goa/purge";
 import { ApiError } from "../../lib/http";
 import { demoFilmInput, demoReadingInput } from "../../app/goa/story/demo-data";
 
@@ -27,6 +27,7 @@ import { DEMO_PASSWORD, FRIENDS } from "../seed-local/data";
 
 const ORIGIN = (process.env.APP_ORIGIN ?? "http://localhost:3000").replace(/\/$/, "");
 const GROUP_NAME = "Cineclube de Sexta";
+const PERSONAL_TITLES = ["Só eu", "Correr"];
 const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
 const day = (offset: number) => addDays(today, offset);
 
@@ -61,6 +62,18 @@ async function main(): Promise<void> {
   const leftover = await withClient((client) => oneOrNull<{ id: string }>(
     client, "SELECT id FROM groups WHERE owner_user_id = $1 AND kind = 'standard' AND name = $2 AND deleted_at IS NULL", [me.id, GROUP_NAME],
   ));
+  const personalLeftovers = await withClient(async (client) => (await client.query<{ id: string }>(
+    `SELECT c.id FROM challenges c JOIN groups g ON g.id = c.group_id
+      WHERE g.owner_user_id = $1 AND g.kind = 'personal' AND c.title = ANY($2::text[])`,
+    [me.id, PERSONAL_TITLES],
+  )).rows);
+  if (personalLeftovers.length && !reset) fail(`Já existem desafios pessoais desta seed (${PERSONAL_TITLES.join(", ")}). Rode com --reset para recriá-los.`);
+  if (personalLeftovers.length) {
+    await withClient(async (client) => {
+      await client.query("BEGIN");
+      try { for (const row of personalLeftovers) await purgeChallengeRows(client, row.id); await client.query("COMMIT"); } catch (error) { await client.query("ROLLBACK"); throw error; }
+    });
+  }
   if (leftover) {
     if (!reset) fail(`O grupo "${GROUP_NAME}" já existe. Rode com --reset para recriá-lo.`);
     await withClient(async (client) => {
@@ -174,11 +187,73 @@ async function main(): Promise<void> {
   }
   console.log("  · 30 dias de leitura (hábito em grupo — Resultado mostra o fio dos dias)");
 
+  // ── Nós dois: the same eight films, just you and Rafa (the demo's Ana and Caio — opposite tastes) ──
+  const duoStart = day(-40);
+  const duo = await createChallenge(me.session, group.id, {
+    recipe: "cinema", title: "Nós dois", description: "Oito filmes, duas opiniões.", startsOn: duoStart, endsOn: day(-2),
+    participantIds: [cast.ana.id, cast.caio.id],
+    items: story.items.map((item) => ({ title: item.title, year: item.year, mainGenre: item.genre, runtimeMinutes: item.runtime, author: item.properties?.[0]?.value })),
+  });
+  const duoShape = await readShape(duo.challengeId);
+  await transitionChallenge(me.session, duo.challengeId, { status: "active" });
+  for (const rating of story.ratings.filter((row) => row.personId === "ana" || row.personId === "caio")) {
+    await rate(cast[rating.personId], duo.challengeId, {
+      itemId: duoShape.itemId(titleOf(rating.itemId)), entryTypeId: duoShape.typeByPurpose.get("rating"),
+      values: { nota: rating.value, ...(rating.comment ? { comentario: rating.comment } : {}) },
+    });
+  }
+  await transitionChallenge(me.session, duo.challengeId, { status: "closed" });
+  await backdateLifecycle(duo.challengeId, duoStart, day(-2));
+  console.log("  · Nós dois (dupla encerrada — Resultado mostra a mistura de vocês)");
+
+  // ── Só eu: a solo season with guesses ──
+  const solo = await createPersonalChallenge(me.session, {
+    recipe: "cinema", title: "Só eu", description: "Oito filmes, só eu, palpite antes.", startsOn: day(-50), endsOn: day(-3), expectation: true,
+    participantIds: [me.id],
+    items: story.items.map((item) => ({ title: item.title, year: item.year, mainGenre: item.genre, runtimeMinutes: item.runtime, author: item.properties?.[0]?.value })),
+  });
+  const soloShape = await readShape(solo.challengeId);
+  await transitionChallenge(me.session, solo.challengeId, { status: "active" }).catch(() => undefined);
+  for (const expectation of story.expectations.filter((row) => row.personId === "ana")) {
+    await rate(me, solo.challengeId, { itemId: soloShape.itemId(titleOf(expectation.itemId)), entryTypeId: soloShape.typeByPurpose.get("expectation"), values: { expectativa: expectation.value } });
+  }
+  for (const rating of story.ratings.filter((row) => row.personId === "ana")) {
+    await rate(me, solo.challengeId, { itemId: soloShape.itemId(titleOf(rating.itemId)), entryTypeId: soloShape.typeByPurpose.get("rating"), values: { nota: rating.value, ...(rating.comment ? { comentario: rating.comment } : {}) } });
+  }
+  await transitionChallenge(me.session, solo.challengeId, { status: "closed" }).catch(() => undefined);
+  console.log("  · Só eu (pessoal — Resultado mostra o seu gosto)");
+
+  // ── Correr: two months of running, alone — the calendar ──
+  const run = await createPersonalChallenge(me.session, {
+    recipe: "habit", title: "Correr", description: "Três vezes por semana, quando der.", startsOn: day(-62), endsOn: day(20), participantIds: [me.id],
+    fields: [
+      { key: "km", label: "Km", type: "number", required: true, config: { min: 0, step: 0.5, unit: "km" } },
+      { key: "nota_dia", label: "Como foi?", type: "text", required: false, config: { multiline: true, maxLength: 500 } },
+    ],
+  });
+  const runShape = await readShape(run.challengeId);
+  await transitionChallenge(me.session, run.challengeId, { status: "active" }).catch(() => undefined);
+  for (let offset = -62; offset <= 0; offset += 1) {
+    const weekday = new Date(`${day(offset)}T12:00:00Z`).getUTCDay();
+    const holiday = offset >= -35 && offset <= -27;
+    const streak = offset >= -16 && offset <= -3;
+    if (holiday || !(streak || [1, 3, 6].includes(weekday))) continue;
+    const km = 4 + ((offset * 7 + 62) % 5) + (weekday === 6 ? 4 : 0);
+    await rate(me, run.challengeId, {
+      entryTypeId: runShape.typeByPurpose.get("checkin"), occurredOn: day(offset),
+      values: { km, ...(offset === -26 ? { nota_dia: "Voltei depois da viagem. As pernas lembraram." } : offset === -3 ? { nota_dia: "Duas semanas sem falhar um dia." } : {}) },
+    });
+  }
+  console.log("  · Correr (hábito pessoal — Resultado mostra o calendário)");
+
   console.log("\n\x1b[1mPronto\x1b[0m");
   console.log(`Grupo (mapa de gosto):   ${ORIGIN}/groups/${group.id}`);
   console.log(`Temporada 1 (o fio):     ${ORIGIN}/challenges/${s1.challengeId}`);
   console.log(`Temporada 2 (revelação): ${ORIGIN}/challenges/${s2.challengeId}`);
   console.log(`30 dias de leitura:      ${ORIGIN}/challenges/${habit.challengeId}`);
+  console.log(`Nós dois (dupla):        ${ORIGIN}/challenges/${duo.challengeId}`);
+  console.log(`Só eu (solo):            ${ORIGIN}/challenges/${solo.challengeId}`);
+  console.log(`Correr (solo, dias):     ${ORIGIN}/challenges/${run.challengeId}`);
   console.log(`Demo pública:            ${ORIGIN}/demo`);
   console.log(`\nAmigos: ${FRIENDS.map((row) => `@${row.username}`).join(", ")} — senha "${DEMO_PASSWORD}". Todos os dados são inventados.`);
   await getPool().end();

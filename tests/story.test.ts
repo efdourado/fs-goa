@@ -80,3 +80,45 @@ test("workout records: where each exercise started and the best it reached", () 
   const story = buildStory(input) as DatedStory;
   assert.deepEqual(story.records.map((row) => [row.item.title, row.first, row.best]), [["Squat", 60, 70]], "no record without progress");
 });
+
+test("two people read as a mix: where they met, what each brought, the favourite and the argument", () => {
+  const duoInput: StoryInput = {
+    ...films,
+    people: films.people.filter((person) => person.id === "ana" || person.id === "caio"),
+    ratings: films.ratings.filter((rating) => rating.personId === "ana" || rating.personId === "caio"),
+    expectations: [],
+  };
+  const story = buildStory(duoInput) as RatedStory;
+  const duo = story.duo!;
+  assert.deepEqual([duo.a.name, duo.b.name], ["Ana", "Caio"]);
+  assert.equal(duo.met.length + duo.aBrought.length + duo.bBrought.length <= 8, true);
+  assert.ok(duo.aBrought.some((row) => row.item.title === "Tár"), "Ana brought Tár (5 against 1)");
+  assert.ok(duo.bBrought.some((row) => row.item.title === "Arrival" || row.item.title === "Dune: Part Two"), "Caio brought the sci-fi");
+  assert.equal(duo.argument?.item.title, "Tár");
+  assert.equal(duo.sharedFavourite?.item.title, "Barbie", "the one they both loved: 4.5 and 4.5");
+  assert.ok(duo.leanings.find((row) => row.genre === "Drama")!.a > duo.leanings.find((row) => row.genre === "Drama")!.b, "Ana leans drama");
+  assert.equal(story.solo, null);
+});
+
+test("one person reads as a taste: the scale they use, their perfect scores, their instincts", () => {
+  const soloInput: StoryInput = {
+    ...films,
+    people: films.people.slice(0, 1),
+    ratings: films.ratings.filter((rating) => rating.personId === "ana"),
+    expectations: films.expectations.filter((row) => row.personId === "ana"),
+  };
+  const story = buildStory(soloInput) as RatedStory;
+  const solo = story.solo!;
+  assert.equal(story.duo, null);
+  assert.equal(solo.distribution.reduce((sum, row) => sum + row.count, 0), 8);
+  assert.equal(solo.distribution.length, 11, "0 to 5 in half points");
+  assert.deepEqual(solo.perfect.map((row) => row.item.title).sort(), ["Past Lives", "Tár"]);
+  assert.equal(solo.lowest?.item.title, "Megalopolis");
+  assert.equal(solo.instincts?.total, 3);
+});
+
+test("two people's days: how often they showed up together", () => {
+  const reading = demoReadingInput("Reading", (key) => key, TODAY);
+  const story = buildStory({ ...reading, people: reading.people.filter((person) => person.id === "duda" || person.id === "lucas") }) as DatedStory;
+  assert.ok(story.together! > 10);
+});

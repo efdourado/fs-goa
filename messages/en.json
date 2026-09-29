@@ -2113,7 +2113,8 @@
       "sync": "Suspiciously in sync.",
       "mixed": "Mostly agreeing. Mostly.",
       "apart": "Same titles, very different takes.",
-      "solo": "Your season, drawn."
+      "solo": "Your season, drawn.",
+      "duo": "{a} and {b}, drawn together."
     },
     "figures": {
       "people": "{count, plural, one {person} other {people}}",
@@ -2125,7 +2126,8 @@
       "together": "each, watching",
       "comments": "{count, plural, one {comment} other {comments}}",
       "days": "{count, plural, one {day} other {days}}",
-      "checkins": "{count, plural, one {check-in} other {check-ins}}"
+      "checkins": "{count, plural, one {check-in} other {check-ins}}",
+      "togetherSolo": "of screen time"
     },
     "noun": {
       "film": "{count, plural, one {# film} other {# films}}",
@@ -2161,7 +2163,8 @@
       "longest": "Longest",
       "shortest": "Shortest",
       "worthIt": "Long ones averaged {long}, short ones {short} — the hours were worth it.",
-      "notWorth": "Long ones averaged {long}, short ones {short} — shorter was better."
+      "notWorth": "Long ones averaged {long}, short ones {short} — shorter was better.",
+      "titleSolo": "{hours} h {minutes} min"
     },
     "critics": {
       "eyebrow": "The critics",
@@ -2270,7 +2273,8 @@
       },
       "words": {
         "title": "In their words",
-        "headline": "{count, plural, one {One line worth keeping.} other {# lines worth keeping.}}"
+        "headline": "{count, plural, one {One line worth keeping.} other {# lines worth keeping.}}",
+        "titleSolo": "In your words"
       },
       "metrics": {
         "title": "Metrics",
@@ -2292,6 +2296,54 @@
       "all": "Download all {count}",
       "preparing": "Preparing…",
       "format": "PNG images, portrait (4:5)."
-    }
+    },
+    "duo": {
+      "title": "The two of you",
+      "mix": {
+        "title": "Your mix",
+        "line": "{things}: you met on {met}, {a} brought {aCount}, {b} brought {bCount}.",
+        "brought": "{name} brought {count}",
+        "met": "met on {count}",
+        "note": "Met: within half a point. Brought: one of you rated it clearly higher — the one who brought it to the other.{between, plural, =0 {} one { # title sits in between.} other { # titles sit in between.}}"
+      },
+      "met": "Where you met",
+      "brought": "What {name} brought",
+      "loved": "The one you both loved",
+      "argument": "The one you'll argue about",
+      "leanings": "Where each of you leans",
+      "scale": "How you each use the scale",
+      "sameScale": "You use the scale the same way.",
+      "higher": "{name} rates a little higher — {gap} on average.",
+      "broughtTitle": "What each one brought",
+      "broughtHeadline": "The titles {a} brought to {b}, and the other way round."
+    },
+    "solo": {
+      "title": "Your taste",
+      "headline": "You average {value}{count, plural, =0 {.} one { — and gave one perfect score.} other { — and gave # perfect scores.}}",
+      "scale": "Your scale",
+      "average": "Your average: {value}.",
+      "perfect": "Your perfect scores",
+      "lowest": "The lowest",
+      "instincts": "Your instincts",
+      "instinctsLine": "Your guesses missed by that much, on average — {close} of {total} landed within half a point."
+    },
+    "soloDays": {
+      "headline": "{count, plural, one {Your longest run: # day.} other {Your longest run: # days.}}",
+      "numbers": "Your numbers",
+      "longest": "longest run",
+      "current": "current run",
+      "days": "days logged",
+      "consistency": "{days} of {total} days.",
+      "comeback": "You stopped for {gap} days",
+      "perDay": "{value} {unit} per day you showed up."
+    },
+    "together": {
+      "title": "Together",
+      "line": "{a} and {b} both showed up on {count} of {days} days."
+    },
+    "calendarAria": "{days} days logged",
+    "calendarRun": "{count, plural, one {Outlined: your longest run, # day.} other {Outlined: your longest run, # days.}}",
+    "datedHeadlineSolo": "Your days, drawn.",
+    "readCalendar": "Each square is a day: filled where you showed up, stronger where the day was bigger. The outlined run is your longest; the ringed day your best."
   }
 }

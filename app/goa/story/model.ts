@@ -83,6 +83,43 @@ export interface RatedStory {
   commonGround: Array<{ a: StoryPerson; b: StoryPerson; agreement: number; genre: string; aAverage: number; bAverage: number }>;
   surprises: Array<{ item: StoryItem; expected: number; actual: number }>;
   quotes: Array<{ person: StoryPerson; item: StoryItem; value: number; text: string }>;
+  /** Exactly two people: what each brought, instead of how "in sync" they are. */
+  duo: Duo | null;
+  /** One person: how they use the scale, their perfect scores, how good their instincts are. */
+  solo: Solo | null;
+}
+
+/** A title seen by both, with each one's number. */
+export interface DuoTitle { item: StoryItem; a: number; b: number }
+
+/**
+ * Two people read as a mix, not a score: where they met, what each brought (titles one lifted above the
+ * other), the one they both loved most, the one they'll argue about, and how each leans by genre.
+ */
+export interface Duo {
+  a: StoryPerson;
+  b: StoryPerson;
+  met: DuoTitle[];
+  aBrought: DuoTitle[];
+  bBrought: DuoTitle[];
+  /** Titles both rated that fall in none of the three (a small difference, not a gift either way). */
+  between: number;
+  sharedFavourite: DuoTitle | null;
+  argument: DuoTitle | null;
+  aAverage: number;
+  bAverage: number;
+  leanings: Array<{ genre: string; a: number; b: number; count: number }>;
+}
+
+export interface Solo {
+  person: StoryPerson;
+  average: number;
+  /** How many ratings fell on each step of the scale, low to high. */
+  distribution: Array<{ value: number; count: number }>;
+  perfect: ItemScore[];
+  lowest: ItemScore | null;
+  /** Guess against rating, when there were guesses: the typical miss, and how many landed within half a point. */
+  instincts: { miss: number; close: number; total: number } | null;
 }
 
 export interface Lane {
@@ -108,6 +145,8 @@ export interface DatedStory {
   bestWeekdays: number[];
   records: Array<{ item: StoryItem; first: number; best: number; bestDay: string; person: StoryPerson; sessions: number }>;
   notes: Array<{ person: StoryPerson; day: string; text: string }>;
+  /** Two people: the days both of them showed up. */
+  together: number | null;
 }
 
 export type Story = RatedStory | DatedStory | { kind: "empty" };
@@ -273,6 +312,69 @@ function buildRated(input: StoryInput): RatedStory | null {
     commonGround: group ? meeting.slice(0, 3) : [],
     surprises: surprises.slice(0, 4),
     quotes,
+    duo: input.people.length === 2 ? buildDuo(input, stations, valueOf, range) : null,
+    solo: input.people.length === 1 ? buildSolo(input, stations, ratings, range) : null,
+  };
+}
+
+function buildDuo(input: StoryInput, stations: ItemScore[], valueOf: (personId: Id, itemId: Id) => number | null, range: number): Duo | null {
+  const [a, b] = input.people;
+  const both: DuoTitle[] = stations.flatMap((station) => {
+    const va = valueOf(a.id, station.item.id);
+    const vb = valueOf(b.id, station.item.id);
+    return va !== null && vb !== null ? [{ item: station.item, a: va, b: vb }] : [];
+  });
+  if (!both.length) return null;
+  // Within a tenth of the scale they met; beyond a fifth, one of them brought the title.
+  const gap = (row: DuoTitle) => (row.a - row.b) / range;
+  const byGap = (x: DuoTitle, y: DuoTitle) => Math.abs(gap(y)) - Math.abs(gap(x));
+  const leanings = new Map<string, Array<[number, number]>>();
+  for (const row of both) {
+    if (!row.item.genre) continue;
+    leanings.set(row.item.genre, [...(leanings.get(row.item.genre) ?? []), [row.a, row.b]]);
+  }
+  const argument = [...both].sort(byGap)[0];
+  const met = both.filter((row) => Math.abs(gap(row)) <= 0.1);
+  const aBrought = both.filter((row) => gap(row) >= 0.2).sort(byGap);
+  const bBrought = both.filter((row) => gap(row) <= -0.2).sort(byGap);
+  return {
+    a, b, met, aBrought, bBrought,
+    between: both.length - met.length - aBrought.length - bBrought.length,
+    sharedFavourite: [...both].sort((x, y) => Math.min(y.a, y.b) - Math.min(x.a, x.b) || (y.a + y.b) - (x.a + x.b))[0] ?? null,
+    argument: argument && Math.abs(gap(argument)) >= 0.3 ? argument : null,
+    aAverage: round1(mean(both.map((row) => row.a))),
+    bAverage: round1(mean(both.map((row) => row.b))),
+    leanings: [...leanings.entries()]
+      .map(([genre, rows]) => ({ genre, a: round1(mean(rows.map((row) => row[0]))), b: round1(mean(rows.map((row) => row[1]))), count: rows.length }))
+      .sort((x, y) => y.count - x.count || (y.a + y.b) - (x.a + x.b)),
+  };
+}
+
+function buildSolo(input: StoryInput, stations: ItemScore[], ratings: StoryRating[], range: number): Solo | null {
+  const person = input.people[0];
+  const mine = ratings.filter((rating) => rating.personId === person.id);
+  if (!mine.length) return null;
+  // Steps of half a point on a 0–5 scale, whole points on wider ones.
+  const step = range <= 5 ? 0.5 : range <= 10 ? 1 : range / 10;
+  const buckets = new Map<number, number>();
+  for (let value = input.scale.min; value <= input.scale.max + 1e-9; value += step) buckets.set(round1(value), 0);
+  for (const rating of mine) {
+    const key = round1(Math.round((rating.value - input.scale.min) / step) * step + input.scale.min);
+    buckets.set(key, (buckets.get(key) ?? 0) + 1);
+  }
+  const top = Math.max(...mine.map((rating) => rating.value));
+  const guesses = mine.flatMap((rating) => {
+    const guess = input.expectations.find((row) => row.personId === person.id && row.itemId === rating.itemId);
+    return guess ? [Math.abs(guess.value - rating.value)] : [];
+  });
+  const byValue = [...stations].sort((x, y) => x.average - y.average);
+  return {
+    person,
+    average: round1(mean(mine.map((rating) => rating.value))),
+    distribution: [...buckets.entries()].map(([value, count]) => ({ value, count })),
+    perfect: stations.filter((station) => station.average >= top && top >= input.scale.max - step),
+    lowest: byValue.length >= 3 ? byValue[0] : null,
+    instincts: guesses.length ? { miss: round1(mean(guesses)), close: guesses.filter((miss) => miss <= 0.5).length, total: guesses.length } : null,
   };
 }
 
@@ -359,6 +461,9 @@ function buildDated(input: StoryInput): DatedStory | null {
     weekdays,
     bestWeekdays,
     records: records.slice(0, 6),
+    together: lanes.length === 2
+      ? lanes[0].days.filter((row) => lanes[1].days.some((other) => other.day === row.day)).length
+      : null,
     notes: days
       .filter((row) => row.note && row.note.trim().length >= 12)
       .sort((a, b) => b.note!.length - a.note!.length)

@@ -30,6 +30,7 @@ export function DatedThread({ story, input, focus, run, fit = false }: { story: 
     return () => observer.disconnect();
   }, []);
 
+  if (story.lanes.length === 1) return <CalendarHeat story={story} input={input} run={run} />;
   const total = daysBetween(story.from, story.to) + 1;
   const plotWidth = fit ? Math.max(1, width - LABEL - 12) : Math.max(width - LABEL - 12, total * MIN_DAY);
   const dayWidth = plotWidth / total;
@@ -96,6 +97,84 @@ export function DatedThread({ story, input, focus, run, fit = false }: { story: 
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+/**
+ * One person's days as a calendar: a square per day in week columns, filled where they showed up — stronger
+ * where the day's number was bigger. Their longest run is outlined, their best day ringed.
+ */
+function CalendarHeat({ story, input, run }: { story: DatedStory; input: StoryInput; run: number }) {
+  const t = useTranslations("story");
+  const f = useFormatter();
+  const ref = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+  const lane = story.lanes[0];
+  const tone = personTone(input.people.map((person) => person.id), lane.person.id);
+  const byDay = new Map(lane.days.map((row) => [row.day, row.value]));
+  const maxValue = Math.max(1, ...lane.days.map((row) => row.value ?? 0));
+  // Weeks start on Sunday; the first column is padded back to it.
+  const startOffset = new Date(`${story.from}T12:00:00Z`).getUTCDay();
+  const first = addDaysKey(story.from, -startOffset);
+  const weeks = Math.ceil((daysBetween(first, story.to) + 1) / 7);
+  const left = 22;
+  // Squares grow to fill the card (up to a comfortable size), so a short challenge isn't a postage stamp.
+  const gap = 4;
+  const cell = Math.max(12, Math.min(44, width ? (width - left) / weeks - gap : 15));
+  const top = 18;
+  const svgWidth = left + weeks * (cell + gap);
+  const height = top + 7 * (cell + gap);
+  const inRun = (day: string) => Boolean(lane.longest && day >= lane.longest.from && day <= lane.longest.to);
+  const weekdayLetters = Array.from({ length: 7 }, (_, index) => f.dateTime(new Date(Date.UTC(2026, 0, 4 + index, 12)), { weekday: "narrow", timeZone: "UTC" }));
+  return (
+    <div ref={ref} className="w-full overflow-x-auto [scrollbar-width:thin]">
+      <svg key={run} width={svgWidth} height={height} className="story-sweep block" role="img" aria-label={t("calendarAria", { days: lane.days.length })}>
+        {weekdayLetters.map((letter, index) => index % 2 === 1 ? (
+          <text key={index} x={0} y={top + index * (cell + gap) + cell - 3} fontSize="10" fill="currentColor" fillOpacity={0.4}>{letter}</text>
+        ) : null)}
+        {Array.from({ length: weeks }, (_, week) => {
+          const monday = addDaysKey(first, week * 7);
+          const label = week === 0 || monday.slice(8, 10) <= "07" ? f.dateTime(new Date(`${addDaysKey(monday, 0)}T12:00:00Z`), { month: "short", timeZone: "UTC" }) : null;
+          return (
+            <g key={week}>
+              {label && (week === 0 || monday.slice(5, 7) !== addDaysKey(monday, -7).slice(5, 7)) ? <text x={left + week * (cell + gap)} y={10} fontSize="10" fill="currentColor" fillOpacity={0.45}>{label}</text> : null}
+              {Array.from({ length: 7 }, (_, weekday) => {
+                const day = addDaysKey(first, week * 7 + weekday);
+                if (day < story.from || day > story.to) return null;
+                const logged = byDay.has(day);
+                const value = byDay.get(day) ?? null;
+                const strength = !logged ? 0 : value === null ? 0.85 : 0.35 + 0.65 * (value / maxValue);
+                const best = lane.best?.day === day;
+                return (
+                  <rect
+                    key={day}
+                    x={left + week * (cell + gap)}
+                    y={top + weekday * (cell + gap)}
+                    width={cell}
+                    height={cell}
+                    rx={4}
+                    fill={logged ? tone : "currentColor"}
+                    fillOpacity={logged ? strength : 0.07}
+                    stroke={best ? "var(--spotlight-ink)" : inRun(day) ? tone : "none"}
+                    strokeWidth={best ? 2 : 1}
+                  >
+                    <title>{`${f.dateTime(new Date(`${day}T12:00:00Z`), { day: "numeric", month: "short", timeZone: "UTC" })}${value !== null ? ` · ${f.number(value)}` : ""}`}</title>
+                  </rect>
+                );
+              })}
+            </g>
+          );
+        })}
+      </svg>
+      {lane.longest ? <p className="mt-3 text-xs text-white/60">{t("calendarRun", { count: lane.longest.length })}</p> : null}
     </div>
   );
 }

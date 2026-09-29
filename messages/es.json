@@ -2113,7 +2113,8 @@
       "sync": "Sospechosamente en sintonía.",
       "mixed": "Casi siempre de acuerdo. Casi.",
       "apart": "Los mismos títulos, opiniones muy distintas.",
-      "solo": "Tu temporada, dibujada."
+      "solo": "Tu temporada, dibujada.",
+      "duo": "{a} y {b}, dibujados juntos."
     },
     "figures": {
       "people": "{count, plural, one {persona} other {personas}}",
@@ -2125,7 +2126,8 @@
       "together": "de pantalla, cada uno",
       "comments": "{count, plural, one {comentario} other {comentarios}}",
       "days": "{count, plural, one {día} other {días}}",
-      "checkins": "{count, plural, one {registro} other {registros}}"
+      "checkins": "{count, plural, one {registro} other {registros}}",
+      "togetherSolo": "de pantalla"
     },
     "noun": {
       "film": "{count, plural, one {# película} other {# películas}}",
@@ -2161,7 +2163,8 @@
       "longest": "La más larga",
       "shortest": "La más corta",
       "worthIt": "Las largas promediaron {long}, las cortas {short} — las horas valieron la pena.",
-      "notWorth": "Las largas promediaron {long}, las cortas {short} — menos fue más."
+      "notWorth": "Las largas promediaron {long}, las cortas {short} — menos fue más.",
+      "titleSolo": "{hours} h {minutes} min"
     },
     "critics": {
       "eyebrow": "Los críticos",
@@ -2270,7 +2273,8 @@
       },
       "words": {
         "title": "En sus palabras",
-        "headline": "{count, plural, one {Una frase para guardar.} other {# frases para guardar.}}"
+        "headline": "{count, plural, one {Una frase para guardar.} other {# frases para guardar.}}",
+        "titleSolo": "En tus palabras"
       },
       "metrics": {
         "title": "Métricas",
@@ -2292,6 +2296,54 @@
       "all": "Descargar las {count}",
       "preparing": "Preparando…",
       "format": "Imágenes PNG, en vertical (4:5)."
-    }
+    },
+    "duo": {
+      "title": "Ustedes dos",
+      "mix": {
+        "title": "Su mezcla",
+        "line": "{things}: coincidieron en {met}, {a} trajo {aCount}, {b} trajo {bCount}.",
+        "brought": "{name} trajo {count}",
+        "met": "coincidieron en {count}",
+        "note": "Coincidir: hasta medio punto de diferencia. Traer: uno de ustedes le dio una nota claramente más alta — quien se lo trajo al otro.{between, plural, =0 {} one { # título queda en medio.} other { # títulos quedan en medio.}}"
+      },
+      "met": "Donde coincidieron",
+      "brought": "Lo que trajo {name}",
+      "loved": "La que los dos amaron",
+      "argument": "La que dará para discutir",
+      "leanings": "Hacia dónde tira cada uno",
+      "scale": "Cómo usa cada uno la escala",
+      "sameScale": "Usan la escala de la misma manera.",
+      "higher": "{name} puntúa un poco más alto — {gap} de media.",
+      "broughtTitle": "Lo que trajo cada uno",
+      "broughtHeadline": "Los títulos que {a} le llevó a {b}, y al revés."
+    },
+    "solo": {
+      "title": "Tu gusto",
+      "headline": "Tu media es {value}{count, plural, =0 {.} one { — y diste una nota máxima.} other { — y diste # notas máximas.}}",
+      "scale": "Tu escala",
+      "average": "Tu media: {value}.",
+      "perfect": "Tus notas máximas",
+      "lowest": "La más baja",
+      "instincts": "Tu instinto",
+      "instinctsLine": "Tus apuestas fallaron por eso, de media — {close} de {total} quedaron a medio punto."
+    },
+    "soloDays": {
+      "headline": "{count, plural, one {Tu racha más larga: # día.} other {Tu racha más larga: # días.}}",
+      "numbers": "Tus números",
+      "longest": "racha más larga",
+      "current": "racha actual",
+      "days": "días con registro",
+      "consistency": "{days} de {total} días.",
+      "comeback": "Paraste {gap} días",
+      "perDay": "{value} {unit} por día que apareciste."
+    },
+    "together": {
+      "title": "Juntos",
+      "line": "{a} y {b} registraron el mismo día {count} de {days} días."
+    },
+    "calendarAria": "{days} días con registro",
+    "calendarRun": "{count, plural, one {Contorneada: tu racha más larga, # día.} other {Contorneada: tu racha más larga, # días.}}",
+    "datedHeadlineSolo": "Tus días, dibujados.",
+    "readCalendar": "Cada cuadrado es un día: lleno donde apareciste, más intenso en los días más grandes. El tramo contorneado es tu racha más larga; el día con anillo, tu mejor."
   }
 }

@@ -164,7 +164,9 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
               <div className="flex h-28 items-end gap-1.5">
                 {s.years.map((year) => {
                   const tallest = Math.max(...s.years.map((row) => row.count));
-                  const best = year.average === Math.max(...s.years.map((row) => row.average));
+                  // Only a year with two or more titles can be "the best" — one title is an anecdote.
+                  const contenders = s.years.filter((row) => row.count >= 2);
+                  const best = year.count >= 2 && year.average === Math.max(...contenders.map((row) => row.average));
                   return (
                     <div key={year.key} className="flex min-w-0 flex-1 flex-col items-center gap-1" title={year.items.join(" · ")}>
                       <span className="text-[10px] tabular-nums text-[var(--muted)]">{fmt(year.average)}</span>
@@ -181,7 +183,167 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
       ),
     });
 
-    if (s.critics.length || s.pairs.length) {
+    if (s.duo) {
+      const d = s.duo;
+      const toneA = personTone(ids, d.a.id);
+      const toneB = personTone(ids, d.b.id);
+      const nameA = firstName(d.a.name);
+      const nameB = firstName(d.b.name);
+      const titleRows = (rows: typeof d.met, lead: "a" | "b" | null) => (
+        <ul className="space-y-2 text-sm">
+          {rows.slice(0, 5).map((row) => (
+            <li key={row.item.id} className="flex items-center gap-3">
+              <TitleChip title={row.item.title} year={row.item.year} className="w-8 flex-none" />
+              <span className="min-w-0 flex-1 truncate">{row.item.title}</span>
+              <span className="flex-none tabular-nums text-xs">
+                <span className={lead === "b" ? "text-[var(--muted)]" : "font-medium"} style={lead === "a" ? { color: toneA } : undefined}>{fmt(row.a)}</span>
+                <span className="text-[var(--muted)]"> · </span>
+                <span className={lead === "a" ? "text-[var(--muted)]" : "font-medium"} style={lead === "b" ? { color: toneB } : undefined}>{fmt(row.b)}</span>
+              </span>
+            </li>
+          ))}
+          {rows.length > 5 ? <li className="text-xs text-[var(--muted)]">{t("metricsMore", { count: rows.length - 5 })}</li> : null}
+        </ul>
+      );
+      const argumentQuotes = d.argument ? s.quotes.filter((quote) => quote.item.id === d.argument!.item.id) : [];
+      const span = Math.max(1e-9, input.scale.max - input.scale.min);
+      pages.push({
+        id: "duo",
+        title: t("duo.title"),
+        headline: t("duo.mix.line", { total: d.met.length + d.aBrought.length + d.bBrought.length + d.between, things: noun(d.met.length + d.aBrought.length + d.bBrought.length + d.between), met: d.met.length, a: nameA, aCount: d.aBrought.length, b: nameB, bCount: d.bBrought.length }),
+        contents: [t("duo.mix.title"), t("duo.loved"), d.argument ? t("duo.argument") : null, t("duo.scale")].filter(Boolean).join(" · "),
+        body: (
+          <div className={grid}>
+            <Block title={t("duo.mix.title")} wide>
+              <div className="flex h-4 w-full overflow-hidden rounded-full">
+                {[
+                  { count: d.aBrought.length, color: toneA },
+                  { count: d.met.length, color: "var(--ink)" },
+                  { count: d.between, color: "var(--wash-strong)" },
+                  { count: d.bBrought.length, color: toneB },
+                ].filter((part) => part.count > 0).map((part, index) => (
+                  <span key={index} style={{ flexGrow: part.count, background: part.color }} className="h-full border-r-2 border-[var(--paper)] last:border-r-0" />
+                ))}
+              </div>
+              <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-sm">
+                <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: toneA }} />{t("duo.mix.brought", { name: nameA, count: d.aBrought.length })}</span>
+                <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[var(--ink)]" />{t("duo.mix.met", { count: d.met.length })}</span>
+                <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: toneB }} />{t("duo.mix.brought", { name: nameB, count: d.bBrought.length })}</span>
+              </div>
+              <p className="mt-3 text-xs text-[var(--muted)]">{t("duo.mix.note", { between: d.between })}</p>
+            </Block>
+            {d.sharedFavourite ? (
+              <Block title={t("duo.loved")}>
+                <div className="flex items-center gap-4">
+                  <TitleChip title={d.sharedFavourite.item.title} year={d.sharedFavourite.item.year} className="w-20 flex-none" />
+                  <div>
+                    <p className="text-2xl font-light tracking-[-0.03em]">{d.sharedFavourite.item.title}</p>
+                    <p className="mt-1 text-sm"><span style={{ color: toneA }}>{nameA} {fmt(d.sharedFavourite.a)}</span> <span className="text-[var(--muted)]">·</span> <span style={{ color: toneB }}>{nameB} {fmt(d.sharedFavourite.b)}</span></p>
+                  </div>
+                </div>
+              </Block>
+            ) : null}
+            {d.argument ? (
+              <Block title={t("duo.argument")}>
+                <div className="flex items-center gap-4">
+                  <TitleChip title={d.argument.item.title} year={d.argument.item.year} className="w-20 flex-none" />
+                  <div>
+                    <p className="text-2xl font-light tracking-[-0.03em]">{d.argument.item.title}</p>
+                    <p className="mt-1 text-sm"><span style={{ color: toneA }}>{nameA} {fmt(d.argument.a)}</span> <span className="text-[var(--muted)]">·</span> <span style={{ color: toneB }}>{nameB} {fmt(d.argument.b)}</span></p>
+                  </div>
+                </div>
+                {argumentQuotes.length ? (
+                  <div className="mt-4 space-y-2">
+                    {argumentQuotes.map((quote) => <p key={quote.person.id} className="border-l-2 pl-3 text-sm font-light leading-snug" style={{ borderColor: personTone(ids, quote.person.id) }}>“{quote.text}” <span className="text-xs text-[var(--muted)]">— {firstName(quote.person.name)}</span></p>)}
+                  </div>
+                ) : null}
+              </Block>
+            ) : null}
+            <Block title={t("duo.scale")}>
+              <div className="flex items-end gap-8">
+                <div><p className="text-4xl font-light tabular-nums tracking-[-0.04em]" style={{ color: toneA }}>{fmt(d.aAverage)}</p><p className="text-xs text-[var(--muted)]">{nameA}</p></div>
+                <div><p className="text-4xl font-light tabular-nums tracking-[-0.04em]" style={{ color: toneB }}>{fmt(d.bAverage)}</p><p className="text-xs text-[var(--muted)]">{nameB}</p></div>
+              </div>
+              <p className="mt-3 text-sm">{Math.abs(d.aAverage - d.bAverage) < 0.2 ? t("duo.sameScale") : t("duo.higher", { name: d.aAverage > d.bAverage ? nameA : nameB, gap: fmt(Math.abs(d.aAverage - d.bAverage)) })}</p>
+            </Block>
+          </div>
+        ),
+      });
+      pages.push({
+        id: "brought",
+        title: t("duo.broughtTitle"),
+        headline: t("duo.broughtHeadline", { a: nameA, b: nameB }),
+        contents: [t("duo.met"), t("duo.brought", { name: nameA }), t("duo.brought", { name: nameB }), d.leanings.length ? t("duo.leanings") : null].filter(Boolean).join(" · "),
+        body: (
+          <div className={grid}>
+            {d.met.length ? <Block title={t("duo.met")}>{titleRows(d.met, null)}</Block> : null}
+            {d.aBrought.length ? <Block title={t("duo.brought", { name: nameA })}>{titleRows(d.aBrought, "a")}</Block> : null}
+            {d.bBrought.length ? <Block title={t("duo.brought", { name: nameB })}>{titleRows(d.bBrought, "b")}</Block> : null}
+            {d.leanings.length ? (
+              <Block title={t("duo.leanings")}>
+                <div className="mb-2 flex justify-between text-xs"><span style={{ color: toneA }}>{nameA}</span><span style={{ color: toneB }}>{nameB}</span></div>
+                <ul className="space-y-2">
+                  {d.leanings.map((row) => (
+                    <li key={row.genre} className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-sm">
+                      <span className="flex h-2 justify-end overflow-hidden rounded-full bg-[var(--wash-strong)]"><span className="h-full rounded-full" style={{ width: `${((row.a - input.scale.min) / span) * 100}%`, background: toneA }} /></span>
+                      <span className="w-24 truncate text-center text-xs">{row.genre} <span className="text-[var(--muted)]">· {row.count}</span></span>
+                      <span className="flex h-2 overflow-hidden rounded-full bg-[var(--wash-strong)]"><span className="h-full rounded-full" style={{ width: `${((row.b - input.scale.min) / span) * 100}%`, background: toneB }} /></span>
+                    </li>
+                  ))}
+                </ul>
+              </Block>
+            ) : null}
+          </div>
+        ),
+      });
+    } else if (s.solo) {
+      const o = s.solo;
+      const tallest = Math.max(1, ...o.distribution.map((row) => row.count));
+      const tone = personTone(ids, o.person.id);
+      pages.push({
+        id: "solo",
+        title: t("solo.title"),
+        headline: t("solo.headline", { value: fmt(o.average), count: o.perfect.length }),
+        contents: [t("solo.scale"), o.perfect.length ? t("solo.perfect") : null, o.lowest ? t("solo.lowest") : null, o.instincts ? t("solo.instincts") : null].filter(Boolean).join(" · "),
+        body: (
+          <div className={grid}>
+            <Block title={t("solo.scale")} wide>
+              <div className="flex h-32 items-end gap-1.5">
+                {o.distribution.map((row) => (
+                  <div key={row.value} className="flex min-w-0 flex-1 flex-col items-center gap-1">
+                    <span className="text-[10px] tabular-nums text-[var(--muted)]">{row.count || ""}</span>
+                    <span className="w-full rounded-t" style={{ height: `${Math.max(2, (row.count / tallest) * 88)}px`, background: row.count ? tone : "var(--wash-strong)", opacity: row.count ? 0.4 + 0.6 * (row.count / tallest) : 1 }} />
+                    <span className="text-[10px] tabular-nums">{fmt(row.value)}</span>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-3 text-sm">{t("solo.average", { value: fmt(o.average) })}</p>
+            </Block>
+            {o.perfect.length ? (
+              <Block title={t("solo.perfect")}>
+                <ul className="flex flex-wrap gap-3">
+                  {o.perfect.map((score) => <li key={score.item.id} className="w-16"><TitleChip title={score.item.title} year={score.item.year} className="w-full" /><p className="mt-1 truncate text-xs">{score.item.title}</p></li>)}
+                </ul>
+              </Block>
+            ) : null}
+            {o.lowest ? (
+              <Block title={t("solo.lowest")}>
+                <div className="flex items-center gap-4">
+                  <TitleChip title={o.lowest.item.title} year={o.lowest.item.year} className="w-16 flex-none grayscale" />
+                  <div><p className="text-xl font-light">{o.lowest.item.title}</p><p className="text-3xl font-light tabular-nums">{fmt(o.lowest.average)}</p></div>
+                </div>
+              </Block>
+            ) : null}
+            {o.instincts ? (
+              <Block title={t("solo.instincts")}>
+                <p className="text-4xl font-light tabular-nums tracking-[-0.04em]">±{fmt(o.instincts.miss)}</p>
+                <p className="mt-2 text-sm">{t("solo.instinctsLine", { close: o.instincts.close, total: o.instincts.total })}</p>
+              </Block>
+            ) : null}
+          </div>
+        ),
+      });
+    } else if (s.critics.length || s.pairs.length) {
       pages.push({
         id: "people",
         title: t("pages.people.title"),
@@ -259,13 +421,13 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
           ? t("surprises.title", { title: s.surprises[0].item.title })
           : s.properties[0]
             ? t("pages.details.headlineProperty", { label: propertyLabel(s.properties[0].label), name: s.properties[0].best.key })
-            : t("time.title", { hours: Math.floor((s.totals.minutes ?? 0) / 60), minutes: Math.round((s.totals.minutes ?? 0) % 60) }),
+            : t(input.people.length === 1 ? "time.titleSolo" : "time.title", { hours: Math.floor((s.totals.minutes ?? 0) / 60), minutes: Math.round((s.totals.minutes ?? 0) % 60) }),
         contents: [s.totals.minutes ? t("time.eyebrow") : null, ...s.properties.map((property) => t("property.eyebrow", { label: propertyLabel(property.label) })), s.surprises.length ? t("surprises.eyebrow") : null].filter(Boolean).join(" · "),
         body: (
           <div className={grid}>
             {s.totals.minutes ? (
               <Block title={t("time.eyebrow")}>
-                <p className="text-3xl font-light tracking-[-0.03em]">{t("time.title", { hours: Math.floor(s.totals.minutes / 60), minutes: Math.round(s.totals.minutes % 60) })}</p>
+                <p className="text-3xl font-light tracking-[-0.03em]">{t(input.people.length === 1 ? "time.titleSolo" : "time.title", { hours: Math.floor(s.totals.minutes / 60), minutes: Math.round(s.totals.minutes % 60) })}</p>
                 {s.length ? (
                   <div className="mt-3 space-y-1.5 text-sm">
                     <p><span className="text-[var(--muted)]">{t("time.longest")}</span> · {s.length.longest.item.title} · {s.length.longest.item.runtime} min · <strong className="font-medium tabular-nums">{fmt(s.length.longest.average)}</strong></p>
@@ -302,7 +464,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
     if (s.quotes.length) {
       pages.push({
         id: "words",
-        title: t("pages.words.title"),
+        title: t(input.people.length === 1 ? "pages.words.titleSolo" : "pages.words.title"),
         headline: t("pages.words.headline", { count: s.quotes.length }),
         contents: s.quotes.map((quote) => firstName(quote.person.name)).join(" · "),
         body: (
@@ -330,7 +492,49 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
     const comebacks = s.lanes.filter((lane) => lane.comeback).sort((a, b) => b.comeback!.gap - a.comeback!.gap);
     const bests = s.lanes.filter((lane) => lane.best).sort((a, b) => b.best!.value - a.best!.value);
 
-    pages.push({
+    if (s.lanes.length === 1) {
+      const lane = s.lanes[0];
+      pages.push({
+        id: "streaks",
+        title: t("pages.streaks.title"),
+        headline: lane.longest ? t("soloDays.headline", { count: lane.longest.length }) : t("streaks.none"),
+        contents: [t("soloDays.numbers"), t("consistency.eyebrow"), comebacks.length ? t("comeback.eyebrow") : null].filter(Boolean).join(" · "),
+        body: (
+          <div className={grid}>
+            <Block title={t("soloDays.numbers")}>
+              <dl className="grid grid-cols-3 gap-4">
+                {[
+                  { value: lane.longest?.length ?? 1, label: t("soloDays.longest") },
+                  { value: lane.current, label: t("soloDays.current") },
+                  { value: lane.days.length, label: t("soloDays.days") },
+                ].map((row) => (
+                  <div key={row.label} className="flex flex-col-reverse"><dt className="text-xs text-[var(--muted)]">{row.label}</dt><dd className="text-4xl font-light tabular-nums tracking-[-0.04em]">{row.value}</dd></div>
+                ))}
+              </dl>
+            </Block>
+            <Block title={t("consistency.eyebrow")}>
+              <div className="flex items-center gap-5">
+                <span className="relative grid h-24 w-24 flex-none place-items-center">
+                  <svg viewBox="0 0 36 36" className="absolute inset-0 -rotate-90" aria-hidden="true">
+                    <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--wash-strong)" strokeWidth="2.6" />
+                    <circle cx="18" cy="18" r="15.9" fill="none" stroke={personTone(ids, lane.person.id)} strokeWidth="2.6" strokeDasharray={`${lane.consistency ?? 0} 100`} strokeLinecap="round" />
+                  </svg>
+                  <span className="text-xl font-light tabular-nums">{lane.consistency ?? 0}%</span>
+                </span>
+                <p className="text-sm">{t("soloDays.consistency", { days: lane.days.length, total: s.totals.days })}</p>
+              </div>
+            </Block>
+            {comebacks.length ? (
+              <Block title={t("comeback.eyebrow")}>
+                <p className="text-2xl font-light tracking-[-0.03em]">{t("soloDays.comeback", { gap: comebacks[0].comeback!.gap })}</p>
+                <p className="mt-1 text-sm">{t("comeback.line", { day: day(comebacks[0].comeback!.back) })}</p>
+                <p className="mt-2 text-xs text-[var(--muted)]">{t("comeback.note")}</p>
+              </Block>
+            ) : null}
+          </div>
+        ),
+      });
+    } else pages.push({
       id: "streaks",
       title: t("pages.streaks.title"),
       headline: byStreak[0].longest ? t("streaks.title", { name: firstName(byStreak[0].person.name), count: byStreak[0].longest.length }) : t("streaks.none"),
@@ -366,6 +570,12 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
             </div>
             <p className="mt-2 text-xs text-[var(--muted)]">{t("consistency.note", { days: s.totals.days })}</p>
           </Block>
+          {s.together !== null ? (
+            <Block title={t("together.title")}>
+              <p className="text-4xl font-light tabular-nums tracking-[-0.04em]">{s.together}</p>
+              <p className="mt-2 text-sm">{t("together.line", { a: firstName(s.lanes[0].person.name), b: firstName(s.lanes[1].person.name), count: s.together, days: s.totals.days })}</p>
+            </Block>
+          ) : null}
           {comebacks.length ? (
             <Block title={t("comeback.eyebrow")}>
               <p className="text-2xl font-light tracking-[-0.03em]">{t("comeback.title", { name: firstName(comebacks[0].person.name), gap: comebacks[0].comeback!.gap })}</p>
@@ -377,7 +587,41 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
       ),
     });
 
-    pages.push({
+    if (s.lanes.length === 1) {
+      const lane = s.lanes[0];
+      pages.push({
+        id: "volume",
+        title: t("pages.volume.title"),
+        headline: s.totals.total !== null ? t("totals.title", { total: nf.number(s.totals.total), unit }) : t("pages.volume.headlineCount", { count: s.totals.checkins }),
+        contents: [s.totals.total !== null ? input.counter?.label ?? null : null, lane.best ? t("bestDay.eyebrow") : null, t("weekdays.eyebrow")].filter(Boolean).join(" · "),
+        body: (
+          <div className={grid}>
+            {s.totals.total !== null ? (
+              <Block title={input.counter?.label ?? ""}>
+                <p className="text-5xl font-light tabular-nums tracking-[-0.04em]">{nf.number(s.totals.total)} <span className="text-xl text-[var(--muted)]">{unit}</span></p>
+                <p className="mt-2 text-sm">{t("soloDays.perDay", { value: nf.number(Math.round((s.totals.total / Math.max(1, lane.days.length)) * 10) / 10), unit })}</p>
+              </Block>
+            ) : null}
+            {lane.best ? (
+              <Block title={t("bestDay.eyebrow")}>
+                <p className="text-5xl font-light tabular-nums tracking-[-0.04em]">{nf.number(lane.best.value)} <span className="text-xl text-[var(--muted)]">{unit}</span></p>
+                <p className="mt-2 text-sm">{day(lane.best.day)}</p>
+              </Block>
+            ) : null}
+            <Block title={s.bestWeekdays.length ? t("weekdays.title", { day: s.bestWeekdays.map((index) => weekdayNames[index]).join(" & ") }) : t("weekdays.even")}>
+              <div className="flex h-24 items-end gap-2">
+                {s.weekdays.map((count, index) => (
+                  <div key={index} className="flex flex-1 flex-col items-center gap-1">
+                    <span className="w-full rounded-t" style={{ height: `${Math.max(4, (count / Math.max(1, ...s.weekdays)) * 72)}px`, background: s.bestWeekdays.includes(index) ? "var(--main)" : "var(--main-line)" }} />
+                    <span className="text-[10px] text-[var(--muted)]">{weekdayNames[index]}</span>
+                  </div>
+                ))}
+              </div>
+            </Block>
+          </div>
+        ),
+      });
+    } else pages.push({
       id: "volume",
       title: t("pages.volume.title"),
       headline: s.totals.total !== null ? t("totals.title", { total: nf.number(s.totals.total), unit }) : t("pages.volume.headlineCount", { count: s.totals.checkins }),
@@ -439,7 +683,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
     if (s.notes.length) {
       pages.push({
         id: "words",
-        title: t("pages.words.title"),
+        title: t(input.people.length === 1 ? "pages.words.titleSolo" : "pages.words.title"),
         headline: t("pages.words.headline", { count: s.notes.length }),
         contents: s.notes.map((note) => firstName(note.person.name)).join(" · "),
         body: (

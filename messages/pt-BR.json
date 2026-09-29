@@ -2113,7 +2113,8 @@
       "sync": "Suspeitosamente em sintonia.",
       "mixed": "Quase sempre de acordo. Quase.",
       "apart": "Os mesmos títulos, opiniões bem diferentes.",
-      "solo": "A sua temporada, desenhada."
+      "solo": "A sua temporada, desenhada.",
+      "duo": "{a} e {b}, desenhados juntos."
     },
     "figures": {
       "people": "{count, plural, one {pessoa} other {pessoas}}",
@@ -2125,7 +2126,8 @@
       "together": "de tela, cada um",
       "comments": "{count, plural, one {comentário} other {comentários}}",
       "days": "{count, plural, one {dia} other {dias}}",
-      "checkins": "{count, plural, one {registro} other {registros}}"
+      "checkins": "{count, plural, one {registro} other {registros}}",
+      "togetherSolo": "de tela"
     },
     "noun": {
       "film": "{count, plural, one {# filme} other {# filmes}}",
@@ -2161,7 +2163,8 @@
       "longest": "Mais longo",
       "shortest": "Mais curto",
       "worthIt": "Os longos tiveram média {long}, os curtos {short} — as horas valeram a pena.",
-      "notWorth": "Os longos tiveram média {long}, os curtos {short} — menos foi mais."
+      "notWorth": "Os longos tiveram média {long}, os curtos {short} — menos foi mais.",
+      "titleSolo": "{hours} h {minutes} min"
     },
     "critics": {
       "eyebrow": "Os críticos",
@@ -2270,7 +2273,8 @@
       },
       "words": {
         "title": "Nas palavras deles",
-        "headline": "{count, plural, one {Uma frase para guardar.} other {# frases para guardar.}}"
+        "headline": "{count, plural, one {Uma frase para guardar.} other {# frases para guardar.}}",
+        "titleSolo": "Nas suas palavras"
       },
       "metrics": {
         "title": "Métricas",
@@ -2292,6 +2296,54 @@
       "all": "Baixar as {count}",
       "preparing": "Preparando…",
       "format": "Imagens PNG, em retrato (4:5)."
-    }
+    },
+    "duo": {
+      "title": "Vocês dois",
+      "mix": {
+        "title": "A mistura de vocês",
+        "line": "{things}: vocês se encontraram em {met}, {a} trouxe {aCount}, {b} trouxe {bCount}.",
+        "brought": "{name} trouxe {count}",
+        "met": "se encontraram em {count}",
+        "note": "Encontro: até meio ponto de diferença. Trouxe: um de vocês deu uma nota bem maior — quem levou o título para o outro.{between, plural, =0 {} one { # título fica no meio.} other { # títulos ficam no meio.}}"
+      },
+      "met": "Onde vocês se encontraram",
+      "brought": "O que {name} trouxe",
+      "loved": "O que os dois amaram",
+      "argument": "O que vai render discussão",
+      "leanings": "Para onde cada um pende",
+      "scale": "Como cada um usa a escala",
+      "sameScale": "Vocês usam a escala do mesmo jeito.",
+      "higher": "{name} dá notas um pouco mais altas — {gap} em média.",
+      "broughtTitle": "O que cada um trouxe",
+      "broughtHeadline": "Os títulos que {a} levou para {b}, e o contrário."
+    },
+    "solo": {
+      "title": "O seu gosto",
+      "headline": "Sua média é {value}{count, plural, =0 {.} one { — e você deu uma nota máxima.} other { — e você deu # notas máximas.}}",
+      "scale": "A sua escala",
+      "average": "Sua média: {value}.",
+      "perfect": "As suas notas máximas",
+      "lowest": "A mais baixa",
+      "instincts": "O seu instinto",
+      "instinctsLine": "Seus palpites erraram por isso, em média — {close} de {total} caíram a meio ponto da nota."
+    },
+    "soloDays": {
+      "headline": "{count, plural, one {Sua maior sequência: # dia.} other {Sua maior sequência: # dias.}}",
+      "numbers": "Os seus números",
+      "longest": "maior sequência",
+      "current": "sequência atual",
+      "days": "dias com registro",
+      "consistency": "{days} de {total} dias.",
+      "comeback": "Você parou por {gap} dias",
+      "perDay": "{value} {unit} por dia em que você apareceu."
+    },
+    "together": {
+      "title": "Juntos",
+      "line": "{a} e {b} registraram no mesmo dia {count} de {days} dias."
+    },
+    "calendarAria": "{days} dias com registro",
+    "calendarRun": "{count, plural, one {Contornada: sua maior sequência, # dia.} other {Contornada: sua maior sequência, # dias.}}",
+    "datedHeadlineSolo": "Os seus dias, desenhados.",
+    "readCalendar": "Cada quadrado é um dia: preenchido onde você apareceu, mais forte nos dias maiores. O trecho contornado é sua maior sequência; o dia com anel, o seu melhor."
   }
 }
