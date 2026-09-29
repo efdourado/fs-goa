@@ -4859,6 +4859,66 @@ test("revelar juntos: a nota fica selada até alguém revelar, inclusive para o 
   assert.ok(sampleOf(await detail(owner)) > 0, "e as métricas passam a contar");
 });
 
+test("gosto em comum: concordância cruza os desafios do grupo pelo título do catálogo e ignora nota selada", async () => {
+  const owner = await register("Dona Gosto", "dona_gosto");
+  const ana = await register("Ana Gosto", "ana_gosto");
+  const caio = await register("Caio Gosto", "caio_gosto");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube Gosto" } })).body as { id: string }).id;
+  for (const member of [ana, caio]) {
+    const invite = (await call("POST", `/api/groups/${groupId}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
+    await call("POST", `/api/invites/${invite.token}`, { session: member, body: {} });
+  }
+  const everyone = [owner.user.id, ana.user.id, caio.user.id];
+  const makeRound = async (title: string, films: string[], revealTogether = false) => {
+    const created = await call("POST", `/api/groups/${groupId}/challenges`, {
+      session: owner, body: { recipe: "cinema", title, participantIds: everyone, revealTogether, items: films.map((film) => ({ title: film })) },
+    });
+    assert.equal(created.response.status, 201, JSON.stringify(created.body));
+    const cid = (created.body as { id: string }).id;
+    await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } });
+    const detail = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as {
+      entryTypes: Array<{ id: string; purpose: string; fields: Array<{ id: string; key: string }> }>; items: Array<{ id: string; title: string }>;
+    };
+    const rating = detail.entryTypes.find((type) => type.purpose === "rating")!;
+    const nota = rating.fields.find((field) => field.key === "nota")!.id;
+    return async (session: ClientSession, film: string, value: number) => {
+      const itemId = detail.items.find((item) => item.title === film)!.id;
+      const saved = await call("POST", `/api/challenges/${cid}/entries`, { session, body: { itemId, entryTypeId: rating.id, values: { [nota]: value } } });
+      assert.equal(saved.response.status, 201, JSON.stringify(saved.body));
+    };
+  };
+  // Dois desafios; o mesmo filme em ambos vira o mesmo título do catálogo.
+  const first = await makeRound("Primeira temporada", ["Aftersun", "Tár"]);
+  const second = await makeRound("Segunda temporada", ["Aftersun", "Her", "Drive"]);
+  const sealed = await makeRound("Às cegas", ["Alien"], true);
+  await first(owner, "Aftersun", 5); await first(ana, "Aftersun", 5); await first(caio, "Aftersun", 1);
+  await first(owner, "Tár", 4); await first(ana, "Tár", 4); await first(caio, "Tár", 1);
+  await second(owner, "Her", 3); await second(ana, "Her", 3.5); await second(caio, "Her", 5);
+  await second(owner, "Drive", 2); await second(ana, "Drive", 2);
+  await sealed(owner, "Alien", 5); await sealed(caio, "Alien", 5);
+
+  const taste = (await call("GET", `/api/groups/${groupId}/taste`, { session: owner })).body as {
+    ratedCount: number;
+    people: Array<{ userId: string; shared: number; agreement: number | null; twin: { title: string } | null; clash: { title: string; you: number; them: number } | null }>;
+    twins: { a: { userId: string }; b: { userId: string }; agreement: number } | null;
+    opposites: { agreement: number } | null;
+  };
+  assert.equal(taste.ratedCount, 4, "Aftersun conta uma vez só, e Alien selado não conta");
+  const withAna = taste.people.find((person) => person.userId === ana.user.id)!;
+  const withCaio = taste.people.find((person) => person.userId === caio.user.id)!;
+  assert.equal(withAna.shared, 4);
+  assert.equal(withCaio.shared, 3, "a nota selada de Caio em Alien fica de fora");
+  assert.ok(withAna.agreement! > 90, `Ana concorda quase sempre (${withAna.agreement})`);
+  assert.equal(withCaio.agreement, 40, `Caio discorda (${withCaio.agreement})`);
+  assert.equal(taste.people[0].userId, ana.user.id, "quem mais combina vem primeiro");
+  assert.equal(withCaio.clash?.title, "Aftersun");
+  assert.deepEqual([withCaio.clash!.you, withCaio.clash!.them], [5, 1]);
+  assert.ok(taste.twins && taste.opposites && taste.twins.agreement > taste.opposites.agreement);
+
+  const outsider = await register("Fora Gosto", "fora_gosto");
+  assert.equal((await call("GET", `/api/groups/${groupId}/taste`, { session: outsider })).response.status, 404);
+});
+
 test("métricas oficiais: mediana e consenso calculam pela fórmula, toda métrica traz explicação e amostra, e combinações inválidas caem", async () => {
   const owner = await register("Dona Métrica", "dona_metrica_v1");
   const b = await register("Beto Métrica", "beto_metrica_v1");

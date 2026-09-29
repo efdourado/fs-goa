@@ -74,6 +74,7 @@ import {
 } from "@/lib/goa/catalog-attributes";
 import type { CatalogKind } from "@/lib/goa/catalog";
 import { setHomeView } from "@/lib/goa/home-view";
+import { groupTaste } from "@/lib/goa/taste";
 
 function catalogKindParam(request: Request): CatalogKind | undefined {
   const raw = new URL(request.url).searchParams.get("kind");
@@ -203,6 +204,9 @@ export async function GET(request: Request): Promise<Response> {
     }
     if (path[0] === "groups" && path[2] === "catalog" && path[3] === "shelf" && path.length === 4) {
       return json(await groupCatalogShelf(await requireSession(request), path[1]));
+    }
+    if (path[0] === "groups" && path[2] === "taste" && path.length === 3) {
+      return json(await groupTaste(await requireSession(request), path[1]));
     }
     if (path[0] === "groups" && path[2] === "catalog" && path[3] === "libraries" && path.length === 4) {
       return json(await listGroupLibraries(await requireSession(request), path[1]));
