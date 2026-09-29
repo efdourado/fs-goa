@@ -1076,7 +1076,6 @@
     "deleteBody": "Vai para a lixeira junto com {count, plural, one {# registro} other {# registros}}. Dá para restaurar de lá.",
     "byItemTitle": "Por item",
     "latestOnly": "Mostrando os {count} mais recentes.",
-    "checkinsLogged": "{count, plural, one {# check-in registrado} other {# check-ins registrados}}",
     "groupCount": "{count, plural, one {# check-in} other {# check-ins}}",
     "trayLabel": "Toque para adicionar",
     "newItemPill": "Novo item",

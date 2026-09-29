@@ -1076,7 +1076,6 @@
     "deleteBody": "Va a la papelera junto con {count, plural, one {# registro} other {# registros}}. Puedes restaurarlo desde allí.",
     "byItemTitle": "Por ítem",
     "latestOnly": "Mostrando los {count} más recientes.",
-    "checkinsLogged": "{count, plural, one {# check-in registrado} other {# check-ins registrados}}",
     "groupCount": "{count, plural, one {# check-in} other {# check-ins}}",
     "trayLabel": "Toca para añadir",
     "newItemPill": "Nuevo ítem",

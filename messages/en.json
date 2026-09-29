@@ -1076,7 +1076,6 @@
     "deleteBody": "It goes to the bin together with its {count, plural, one {# record} other {# records}}. You can restore it from there.",
     "byItemTitle": "By item",
     "latestOnly": "Showing the latest {count}.",
-    "checkinsLogged": "{count, plural, one {# check-in} other {# check-ins}} logged",
     "groupCount": "{count, plural, one {# check-in} other {# check-ins}}",
     "trayLabel": "Tap to add",
     "newItemPill": "New item",

@@ -1294,9 +1294,6 @@ export function ParticipantChallengeScreen({
   // per-item picker and form on Today, and its progress is "check-ins logged", not "items done".
   const sessionSpec = useMemo(() => sessionSpecOf(challenge), [challenge]);
   const tSession = useTranslations("sessionLog");
-  const ownCheckinCount = sessionSpec
-    ? entries.filter((entry) => entry.entryTypeId === sessionSpec.visit.id && entry.userId === user?.id).length
-    : 0;
   const checkinCountFor = (participantUserId: Id | undefined) => sessionSpec
     ? entries.filter((entry) => entry.entryTypeId === sessionSpec.visit.id && entry.userId === participantUserId).length
     : 0;
@@ -1516,7 +1513,6 @@ export function ParticipantChallengeScreen({
           <div className="flex flex-wrap items-center justify-between gap-3">{livingList ? <span /> : <ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />}<span className="text-xs text-white/65">{livingList ? t("livingListMeta", { count: sortedItems.length }) : f.dateRange(challenge.startsOn, challenge.endsOn)}</span></div>
           <h1 className="mt-10 max-w-3xl text-4xl font-medium leading-none tracking-[-0.055em] sm:text-6xl">{challenge.title}</h1>
           {challenge.description ? <p className="mt-4 max-w-2xl text-sm leading-6 text-white/70">{challenge.description}</p> : null}
-          {!preview && sessionSpec ? <p className="mt-8 text-sm text-white/80">{tSession("checkinsLogged", { count: ownCheckinCount })}</p> : null}
           {!preview && !sessionSpec && sortedItems.length ? <div className="mt-8 max-w-2xl"><div className="mb-2 flex justify-between text-xs text-white/70"><span>{t.rich("entriesProgress", { done: doneCount, total: sortedItems.length, b: (chunks) => <strong className="text-white">{chunks}</strong> })}</span><span>{completion}%</span></div><div className="h-2 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-[var(--main-2)]" style={{ width: `${Math.min(100, completion)}%` }} /></div></div> : null}
         </div>
         <span className="absolute -right-28 -top-36 h-96 w-96 rounded-full border border-white/10" aria-hidden="true" />
