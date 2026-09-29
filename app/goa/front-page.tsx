@@ -1,13 +1,17 @@
 "use client";
 
-import { useLocale, useTranslations } from "next-intl";
-import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
+import { useEffect, useMemo, useState } from "react";
 
 import { API_PATHS, apiRequest } from "./api";
 import { useGoaFormat } from "./format";
 import { challengeShowcaseBlocks } from "./showcase-view";
 import type { ChallengeDetail, Id, TemplateSummary } from "./types";
-import { CirclePinIcon, CommentText, cx } from "./ui";
+import { buildStory, type Story, type StoryInput } from "./story/model";
+import { DatedThread } from "./story/thread-dated";
+import { RatedThread } from "./story/thread-rated";
+import { storyHeadline, useStoryFigures } from "./story/view";
+import { CirclePinIcon, cx } from "./ui";
 import { metricHasData } from "./utils";
 
 // ── picking and excerpting (pure, unit-tested) ─────────────────────────────
@@ -108,11 +112,15 @@ function StorySkeleton() {
   );
 }
 
-/** One featured template, laid out like a newspaper story: kicker, headline, lede, its numbers and a quote. */
+/**
+ * One featured template, told the new way: its name, the one-line read of how it went, a small drawing of
+ * the whole thing (everyone's line, or everyone's days) and its key numbers — from the same public-safe
+ * thread its preview shows (names masked, no words). Falls back to plain facts when there's nothing to draw.
+ */
 function Story({ template, onOpen }: { template: TemplateSummary; onOpen: (id: Id) => void }) {
   const t = useTranslations("templates");
+  const ts = useTranslations("story");
   const f = useGoaFormat();
-  const locale = useLocale();
   const [detail, setDetail] = useState<ChallengeDetail | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -126,23 +134,17 @@ function Story({ template, onOpen }: { template: TemplateSummary; onOpen: (id: I
     return () => controller.abort();
   }, [template.id]);
 
+  const input = detail?.publicStory ?? null;
+  const story = useMemo(() => (input ? buildStory(input) : null), [input]);
+  const drawable = input && story && story.kind !== "empty" ? { input, story } : null;
+
   if (!detail && !failed) return <StorySkeleton />;
 
-  const headline = detail?.result?.headline || template.title;
-  const lede = detail?.result?.summary || template.summary;
-  const labels: StoryLabels = {
-    inTune: t("storyInTune"),
-    critic: t("storyCritic"),
-    criticNote: (average) => t("storyCriticNote", { average }),
-    fmt: (value) => value.toLocaleString(locale, { maximumFractionDigits: 2 }),
-  };
-  const { stats, quote } = detail ? storyExcerpt(detail, 3, labels) : { stats: [], quote: null };
   const dates = detail ? f.dateRange(detail.startsOn, detail.endsOn) : "";
-  const kicker = [headline !== template.title ? template.title : null, dates || null, t(`mode.${template.submissionMode}`)].filter(Boolean).join(" · ");
+  const kicker = [dates || null, t(`mode.${template.submissionMode}`)].filter(Boolean).join(" · ");
   const facts = [
     template.participantCount ? t("cardPeople", { count: template.participantCount }) : null,
     template.itemCount ? t("cardItems", { count: template.itemCount }) : null,
-    template.metricCount ? t("cardMetrics", { count: template.metricCount }) : null,
   ].filter(Boolean).join(" · ");
 
   return (
@@ -153,36 +155,28 @@ function Story({ template, onOpen }: { template: TemplateSummary; onOpen: (id: I
           <CirclePinIcon filled className="h-3.5 w-3.5" />
           {t("storyBadge")}
         </span>
-        <p className="min-w-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">{kicker}</p>
+        {kicker ? <p className="min-w-0 text-xs text-[var(--muted)]">{kicker}</p> : null}
       </div>
       <h2 className="mt-3 min-w-0 text-4xl font-light leading-[1.1] tracking-[-0.05em] sm:text-5xl">
-        <button type="button" onClick={() => onOpen(template.id)} title={headline} className="line-clamp-2 w-full cursor-pointer break-words text-left hover:underline hover:decoration-1 hover:underline-offset-4 focus-visible:outline-none">
-          {headline}
+        <button type="button" onClick={() => onOpen(template.id)} title={template.title} className="line-clamp-2 w-full cursor-pointer break-words text-left hover:underline hover:decoration-1 hover:underline-offset-4 focus-visible:outline-none">
+          {template.title}
         </button>
       </h2>
-      {lede ? <p className="mt-4 line-clamp-4 max-w-2xl text-base leading-7 text-[var(--muted)]">{lede}</p> : null}
+      <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--muted)]">
+        {drawable ? storyHeadline(drawable.story, drawable.input, ts) : template.summary}
+      </p>
 
-      {stats.length ? (
-        <dl className={cx("mt-8 grid gap-x-6 gap-y-5 rounded-2xl bg-[var(--wash)] p-5", stats.length >= 3 ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2")}>
-          {stats.map((stat) => (
-            <div key={stat.label} className="min-w-0">
-              <dd title={stat.value} className={cx("truncate font-medium tracking-[-0.04em] tabular-nums", stat.note ? "text-xl leading-tight" : "text-4xl")}>{stat.value}</dd>
-              {stat.note ? <dd className="mt-0.5 text-sm tabular-nums text-[var(--main-strong)]">{stat.note}</dd> : null}
-              <dt className="mt-1 text-xs leading-5 text-[var(--muted)]">{stat.label}</dt>
-            </div>
-          ))}
-        </dl>
+      {drawable ? (
+        <>
+          <div className="mt-6 overflow-hidden rounded-[22px] bg-[var(--spotlight)] px-2 pb-3 pt-4 text-[var(--spotlight-ink)]">
+            {drawable.story.kind === "rated"
+              ? <RatedThread story={drawable.story} input={drawable.input} focus={null} run={0} fit />
+              : drawable.story.kind === "dated" ? <DatedThread story={drawable.story} input={drawable.input} focus={null} run={0} fit /> : null}
+          </div>
+          <StoryFigures story={drawable.story} input={drawable.input} />
+        </>
       ) : facts ? (
         <p className="mt-8 text-sm text-[var(--muted)]">{facts}</p>
-      ) : null}
-
-      {quote ? (
-        <figure className="mt-6 border-l-2 border-[var(--main)] pl-4">
-          <div className="line-clamp-4 overflow-hidden">
-            <CommentText text={quote.text} className="text-lg font-light" />
-          </div>
-          {quote.itemTitle ? <figcaption className="mt-2 text-xs text-[var(--muted)]">{quote.itemTitle}</figcaption> : null}
-        </figure>
       ) : null}
 
       <div className="mt-auto pt-8">
@@ -191,6 +185,20 @@ function Story({ template, onOpen }: { template: TemplateSummary; onOpen: (id: I
         </button>
       </div>
     </article>
+  );
+}
+
+function StoryFigures({ story, input }: { story: Story; input: StoryInput }) {
+  const figures = useStoryFigures(story, input).slice(0, 4);
+  return (
+    <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
+      {figures.map((figure) => (
+        <div key={figure.label} className="flex min-w-0 flex-col-reverse">
+          <dt className="truncate text-xs text-[var(--muted)]">{figure.label}</dt>
+          <dd className="text-3xl font-light tabular-nums tracking-[-0.04em]">{figure.value}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 

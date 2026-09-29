@@ -18,7 +18,11 @@ export function personTone(ids: readonly Id[], id: Id): string {
 }
 
 export const initialsOf = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "?";
-export const firstName = (name: string) => name.split(/\s+/).filter(Boolean)[0] ?? name;
+/** "Ana Lima" → "Ana"; a masked "Participante 3" keeps its number, or every masked person would read the same. */
+export const firstName = (name: string) => {
+  const parts = name.split(/\s+/).filter(Boolean);
+  return parts.length === 2 && /^\d+$/.test(parts[1]) ? name : parts[0] ?? name;
+};
 
 export interface ScalePerson {
   id: Id;

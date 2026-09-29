@@ -186,12 +186,16 @@ function Bubble({ note, text, left, top, at, edge }: {
   note: RatedNote; text: string; left: number; top: number; at: number; edge: "start" | "middle" | "end";
 }) {
   const accent = note.kind === "favourite" ? "var(--tag-green)" : note.kind === "flop" ? "var(--tag-coral)" : "var(--main-2)";
+  // The offset lives on the outer box and the fade-in on the inner one — an animation's transform would
+  // otherwise replace the offset and push end-of-line notes off the drawing.
   return (
-    <div
-      className="reveal-rise absolute z-10 w-max max-w-[13rem] rounded-lg bg-[var(--spotlight-ink)] px-2 py-1 text-[11px] leading-snug text-[var(--spotlight)] shadow-lg"
-      style={{ left, top, transform: edge === "start" ? "translateX(-12px)" : edge === "end" ? "translateX(calc(-100% + 12px))" : "translateX(-50%)", borderLeft: `3px solid ${accent}`, animationDelay: `${at}ms` }}
-    >
-      {text}
+    <div className="absolute z-10" style={{ left, top, transform: edge === "start" ? "translateX(-12px)" : edge === "end" ? "translateX(calc(-100% + 12px))" : "translateX(-50%)" }}>
+      <div
+        className="reveal-rise w-max max-w-[13rem] rounded-lg bg-[var(--spotlight-ink)] px-2 py-1 text-[11px] leading-snug text-[var(--spotlight)] shadow-lg"
+        style={{ borderLeft: `3px solid ${accent}`, animationDelay: `${at}ms` }}
+      >
+        {text}
+      </div>
     </div>
   );
 }

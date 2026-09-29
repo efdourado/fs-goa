@@ -5275,6 +5275,55 @@ test("publicação anônima mascara o nome de quem indicou o filme no ranking, n
   assert.match(dump, /"recommendedBy":"Participante \d+"/, "a indicação vira rótulo genérico");
 });
 
+test("o fio público: nomes mascarados pelas mesmas regras, nenhum id real e nenhuma palavra", async () => {
+  const owner = await register("Dona Fio", "dona_fio_pub");
+  const b = await register("Bela Fio", "bela_fio_pub");
+  const c = await register("Caio Fio", "caio_fio_pub");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube Fio" } })).body as { id: string }).id;
+  for (const member of [b, c]) {
+    const invite = (await call("POST", `/api/groups/${groupId}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
+    await call("POST", `/api/invites/${invite.token}`, { session: member, body: {} });
+  }
+  const challengeId = ((await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner,
+    body: { recipe: "cinema", title: "Fio público", participantIds: [owner.user.id, b.user.id, c.user.id], items: [{ title: "Filme A" }, { title: "Filme B" }, { title: "Filme C" }] },
+  })).body as { id: string }).id;
+  const detail = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    entryTypes: Array<{ id: string; purpose: string; fields: Array<{ id: string; key: string }> }>; items: Array<{ id: string; title: string }>;
+  };
+  const rating = detail.entryTypes.find((type) => type.purpose === "rating")!;
+  const nota = rating.fields.find((field) => field.key === "nota")!.id;
+  const comentario = rating.fields.find((field) => field.key === "comentario")!.id;
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });
+  await call("PATCH", `/api/challenges/${challengeId}/consent`, { session: b, body: { nameConsent: true } });
+  for (const [session, base] of [[owner, 4], [b, 3], [c, 1]] as const) {
+    for (const [index, item] of detail.items.entries()) {
+      await call("POST", `/api/challenges/${challengeId}/entries`, { session, body: { itemId: item.id, entryTypeId: rating.id, values: { [nota]: Math.min(5, base + index * 0.5), [comentario]: `segredo de ${session.user.username}` } } });
+    }
+  }
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "closed" } });
+
+  const token = ((await call("POST", `/api/challenges/${challengeId}/results/publish`, { session: owner, body: {} })).body as { url: string }).url.split("/results/")[1];
+  const read = async () => (await call("GET", `/api/results/${token}`)).body as { challenge: { story: { people: Array<{ id: string; name: string }>; ratings: Array<{ comment: string | null }> } } };
+  const anonymous = await read();
+  const raw = JSON.stringify(anonymous.challenge.story);
+  assert.equal(anonymous.challenge.story.people.length, 3);
+  assert.ok(anonymous.challenge.story.people.every((person) => /^Participante \d+$/.test(person.name)), "publicação anônima: todo mundo vira Participante N");
+  assert.equal(anonymous.challenge.story.ratings.length, 9, "as notas estão lá");
+  for (const secret of ["Dona Fio", "Bela Fio", "Caio Fio", owner.user.id, b.user.id, c.user.id, "segredo"]) {
+    assert.ok(!raw.includes(secret), `nada de "${secret}" no fio público`);
+  }
+
+  // Com nomes: só quem consentiu aparece — e nenhum comentário, ainda assim.
+  await call("POST", `/api/challenges/${challengeId}/results`, { session: owner, body: { anonymizeParticipants: false } });
+  const named = await read();
+  const names = named.challenge.story.people.map((person) => person.name);
+  assert.ok(names.includes("Bela Fio"));
+  assert.ok(!names.includes("Caio Fio") && !names.includes("Dona Fio"));
+  assert.ok(named.challenge.story.ratings.every((row) => row.comment === null));
+  assert.ok(!JSON.stringify(named.challenge.story).includes(b.user.id), "nem o id de quem consentiu");
+});
+
 test("vitrine é anônima por padrão, e consentimento nominal libera o nome só de quem autorizou", async () => {
   const owner = await register("Dona Wrapped", "dona_wrapped_v1");
   const b = await register("Bela Wrapped", "bela_wrapped_v1");

@@ -552,6 +552,8 @@ export interface ChallengeDetail extends ChallengeSummary {
   /** Dated sessions, always present (empty for undated rounds), independent of `items`. */
   checkpoints: ChallengeItem[];
   participants: Participant[];
+  /** Public pages only (template preview): the challenge's thread, built on the server with names masked and no words. */
+  publicStory?: import("./story/model").StoryInput | null;
   metrics: Metric[];
   result?: ChallengeResult | null;
   /** False for a retrospective list (e.g. Estante) — the entry form hides the "when" date. */

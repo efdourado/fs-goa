@@ -14,6 +14,13 @@ export function useChallengeStory(challenge: ChallengeDetail, entries: Entry[]):
   return { input, story };
 }
 
+/** A template preview's thread: built on the server (names masked, no words), drawn here. Null when it has none. */
+export function usePreviewStory(challenge: ChallengeDetail): { input: StoryInput; story: Story } | null {
+  const input = challenge.publicStory ?? null;
+  const story = useMemo(() => (input ? buildStory(input) : null), [input]);
+  return input && story && story.kind !== "empty" ? { input, story } : null;
+}
+
 /** The Results tab: the thread and its almanac (the challenge's metrics included); `fallback` only when there's nothing to draw yet. */
 export function ChallengeResults({ challenge, input, story, fallback }: { challenge: ChallengeDetail; input: StoryInput; story: Story; fallback: ReactNode }) {
   if (story.kind === "empty") return <>{fallback}</>;

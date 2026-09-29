@@ -6,6 +6,7 @@ import { publicResults } from "@/lib/goa-challenges";
 import { type Formatter, makeGoaFormat, type Translator } from "@/app/goa/format";
 import { SettingsMenu } from "@/app/goa/SettingsMenu";
 import { defaultShowcaseBlocks, ShowcaseView } from "@/app/goa/showcase-view";
+import { PublicStory } from "@/app/goa/story/public-view";
 import type { AffinityBlock, Metric, PersonalRanking, WrappedBlock } from "@/app/goa/types";
 
 export const runtime = "nodejs";
@@ -51,7 +52,7 @@ export default async function SharedResultsPage({ params }: { params: Promise<{ 
 
   return (
     <main className="min-h-screen bg-[var(--canvas)] px-4 py-8 text-[var(--ink)] sm:px-6 sm:py-14">
-      <div className="mx-auto max-w-5xl">
+      <div className="mx-auto max-w-6xl">
         <div className="mb-7 flex items-center justify-between gap-3">
           <Link className="inline-flex min-h-11 items-center gap-2 font-light" href="/">
             <span className="grid h-9 w-9 place-items-center rounded-[50%_50%_50%_16%] bg-[var(--ink)] text-[var(--canvas)]">g</span>
@@ -59,15 +60,19 @@ export default async function SharedResultsPage({ params }: { params: Promise<{ 
           </Link>
           <SettingsMenu />
         </div>
-        <ShowcaseView
-          variant="dark"
-          dateRange={f.dateRange(challenge.startsOn, challenge.endsOn)}
-          headline={result.headline || challenge.title}
-          summary={result.summary}
-          participantNames={challenge.participants}
-          totalEntries={result.totalEntries ?? null}
-          blocks={blocks}
-        />
+        {challenge.story && (challenge.story.ratings.length || challenge.story.days.length) ? (
+          <PublicStory input={challenge.story} title={challenge.title} dates={f.dateRange(challenge.startsOn, challenge.endsOn)} description={challenge.description} />
+        ) : (
+          <ShowcaseView
+            variant="dark"
+            dateRange={f.dateRange(challenge.startsOn, challenge.endsOn)}
+            headline={result.headline || challenge.title}
+            summary={result.summary}
+            participantNames={challenge.participants}
+            totalEntries={result.totalEntries ?? null}
+            blocks={blocks}
+          />
+        )}
         <p className="mt-10 text-center text-xs text-[var(--muted)]">{t("footer")}</p>
       </div>
     </main>

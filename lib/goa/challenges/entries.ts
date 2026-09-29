@@ -242,7 +242,7 @@ async function saveChildren(
   return saved;
 }
 
-async function entryValues(client: PoolClient, entryIds: string[]): Promise<Map<string, Record<string, unknown>>> {
+export async function entryValues(client: PoolClient, entryIds: string[]): Promise<Map<string, Record<string, unknown>>> {
   const byEntry = new Map<string, Record<string, unknown>>();
   if (!entryIds.length) return byEntry;
   const values = await client.query<{

@@ -8,6 +8,7 @@ import { copyChallengeStructure, readCopyMode } from "./copy";
 import { buildChallengeDetail, type DetailChallengeRow } from "./detail";
 import { isRecipeKey, RECIPES } from "./recipes";
 import { maskShowcaseIdentities, resultForChallenge } from "./results";
+import { publicStoryInput } from "./public-story";
 
 /**
  * Templates are ordinary challenges that a platform admin has flagged for the
@@ -130,7 +131,9 @@ export async function getTemplatePreview(challengeId: string) {
       { userId: null, role: null, isParticipant: false },
       { participants: [], result: publishedResult },
     );
-    return { ...detail, templateFeatured: row.template_featured_at !== null };
+    // A finished (or living-list) template also carries its thread — the same public-safe story as a results link.
+    const publicStory = row.status === "closed" || row.kind === "list" ? await publicStoryInput(client, row).catch(() => null) : null;
+    return { ...detail, templateFeatured: row.template_featured_at !== null, publicStory };
   });
 }
 

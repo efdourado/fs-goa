@@ -14,6 +14,8 @@ import { generateOpaqueToken, hashToken } from "../../security";
 import { primaryEntryType } from "./entry-types";
 import { computeRankings } from "./rankings";
 import { RATING_METRIC_OPERATIONS } from "./rating";
+import type { DetailChallengeRow } from "./detail";
+import { publicStoryInput } from "./public-story";
 import { unsealedEntrySql } from "./reveal";
 import type { MetricRow } from "./types";
 
@@ -1705,15 +1707,14 @@ export async function publicResults(token: string) {
   let hash: string;
   try { hash = await hashToken(token); } catch { throw new ApiError(404, "not_found", "Resultados não encontrados."); }
   return withClient(async (client) => {
-    const row = await oneOrNull<{
-      id: string; title: string; description: string | null;
-      start_date: string | null; end_date: string | null; results_anon: boolean;
-    }>(
+    const row = await oneOrNull<DetailChallengeRow>(
       client,
       // The parent group's state also gates the public link: a binned group
       // takes its challenges' showcases offline with it (ROADMAP §13).
-      `SELECT c.id, c.title, c.description, c.start_date::text AS start_date,
-              c.end_date::text AS end_date, c.results_anon
+      `SELECT c.id, c.group_id, c.title, c.description, c.rules, c.rule_sections,
+              c.start_date::text AS start_date, c.end_date::text AS end_date,
+              c.status, c.kind, c.recipe_key, g.kind AS group_kind, c.results_anon,
+              c.show_schedule, c.collects_entry_date, c.time_zone
          FROM challenges c
          JOIN groups g ON g.id = c.group_id AND g.deleted_at IS NULL
         WHERE c.result_share_token_hash=$1 AND c.results_published_at IS NOT NULL
@@ -1724,8 +1725,11 @@ export async function publicResults(token: string) {
     try {
       const result = await resultForChallenge(client, row.id, undefined, { liveRankings: true });
       const masked = await maskShowcaseIdentities(client, row.id, result, row.results_anon === true);
+      // The thread for the public page — names masked, no private answers, no words (see public-story.ts).
+      const story = await publicStoryInput(client, row);
       return {
         challenge: {
+          story,
           id: row.id,
           title: row.title,
           description: row.description,
