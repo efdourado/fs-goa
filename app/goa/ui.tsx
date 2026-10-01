@@ -336,9 +336,8 @@ export function CommentText({ text, className }: { text: string; className?: str
       {blocks.map((block, index) => block.kind === "divider" ? (
         <hr key={index} className="border-t border-[var(--line)] mt-6 pb-3" />
       ) : block.kind === "quote" ? (
-        // A quoted passage: no rule beside it — set on the page tone with a large opening mark.
-        <blockquote key={index} className="relative whitespace-pre-wrap rounded-xl bg-[var(--canvas)] py-2.5 pl-9 pr-3.5 leading-6 text-[var(--muted)]">
-          <span aria-hidden="true" className="absolute left-3 top-1 font-serif text-3xl leading-none text-[var(--ink)]">“</span>
+        // A quoted passage: no rule beside it — a rounded panel on the page tone.
+        <blockquote key={index} className="relative whitespace-pre-wrap rounded-xl bg-[var(--canvas)] py-3 pl-6 pr-3.5 leading-6 text-[var(--muted)]">
           {block.text}
         </blockquote>
       ) : (
