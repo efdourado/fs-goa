@@ -329,8 +329,8 @@ export function Field({
  * becomes a plain horizontal rule, for separating distinct thoughts.
  */
 /**
- * `soft`: for words that already sit inside a coloured frame (the almanac's quote cards) — a quoted passage
- * gets a quiet divider-coloured line and muted text instead of a second strong accent.
+ * `soft`: for the almanac's quote cards — a quoted passage becomes a softly tinted panel with a large
+ * opening mark instead of a rule beside it.
  */
 export function CommentText({ text, className, soft = false }: { text: string; className?: string; soft?: boolean }) {
   const blocks = parseCommentBlocks(text);
@@ -340,9 +340,17 @@ export function CommentText({ text, className, soft = false }: { text: string; c
       {blocks.map((block, index) => block.kind === "divider" ? (
         <hr key={index} className="border-t border-[var(--line)] mt-6 pb-3" />
       ) : block.kind === "quote" ? (
-        <blockquote key={index} className={cx("whitespace-pre-wrap pl-3 leading-6", soft ? "border-l-2 border-[var(--line)] text-[var(--muted)]" : "border-l-[3px] border-[var(--ink)]/60 text-[var(--ink)]/90")}>
-          {block.text}
-        </blockquote>
+        soft ? (
+          // No rule beside it: a softly tinted panel with a large opening mark, read as a cited excerpt.
+          <blockquote key={index} className="relative whitespace-pre-wrap rounded-xl bg-[var(--wash)] py-2.5 pl-9 pr-3.5 leading-6 text-[var(--muted)]">
+            <span aria-hidden="true" className="absolute left-3 top-1 font-serif text-3xl leading-none text-[var(--main-line)]">“</span>
+            {block.text}
+          </blockquote>
+        ) : (
+          <blockquote key={index} className="whitespace-pre-wrap border-l-[3px] border-[var(--ink)]/60 pl-3 leading-6 text-[var(--ink)]/90">
+            {block.text}
+          </blockquote>
+        )
       ) : (
         <p key={index} className="whitespace-pre-wrap leading-6">{block.text}</p>
       ))}
