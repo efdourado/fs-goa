@@ -295,7 +295,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
                   <div className="mt-4 space-y-2">
                     {argumentQuotes.map((quote) => (
                       <figure key={quote.person.id} className="border-l-2 pl-3" style={{ borderColor: personTone(ids, quote.person.id) }}>
-                        <CommentText text={quote.text} className="text-sm font-light" />
+                        <CommentText soft text={quote.text} className="text-sm font-light" />
                         <figcaption className="mt-1 text-xs text-[var(--muted)]">— {firstName(quote.person.name)}</figcaption>
                       </figure>
                     ))}
@@ -515,7 +515,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
           <div className={grid}>
             {s.quotes.map((quote) => (
               <figure key={`${quote.person.id}-${quote.item.id}`} className={cx(cardClass, "border-l-[3px]")} style={{ borderLeftColor: personTone(ids, quote.person.id) }}>
-                <CommentText text={quote.text} className="text-lg font-light" />
+                <CommentText soft text={quote.text} className="text-lg font-light" />
                 <figcaption className="mt-2 text-xs text-[var(--muted)]">{t("quotes.by", { name: firstName(quote.person.name), title: quote.item.title, value: fmt(quote.value) })}</figcaption>
               </figure>
             ))}
@@ -730,7 +730,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
           <div className={grid}>
             {s.notes.map((note) => (
               <figure key={`${note.person.id}-${note.day}`} className={cx(cardClass, "border-l-[3px]")} style={{ borderLeftColor: personTone(ids, note.person.id) }}>
-                <CommentText text={note.text} className="text-lg font-light" />
+                <CommentText soft text={note.text} className="text-lg font-light" />
                 <figcaption className="mt-2 text-xs text-[var(--muted)]">{firstName(note.person.name)} · {day(note.day)}</figcaption>
               </figure>
             ))}

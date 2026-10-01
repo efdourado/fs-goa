@@ -328,7 +328,11 @@ export function Field({
  * read as visibly different things with no extra label needed; a "---" line
  * becomes a plain horizontal rule, for separating distinct thoughts.
  */
-export function CommentText({ text, className }: { text: string; className?: string }) {
+/**
+ * `soft`: for words that already sit inside a coloured frame (the almanac's quote cards) — a quoted passage
+ * gets a quiet divider-coloured line and muted text instead of a second strong accent.
+ */
+export function CommentText({ text, className, soft = false }: { text: string; className?: string; soft?: boolean }) {
   const blocks = parseCommentBlocks(text);
   if (!blocks.length) return null;
   return (
@@ -336,7 +340,7 @@ export function CommentText({ text, className }: { text: string; className?: str
       {blocks.map((block, index) => block.kind === "divider" ? (
         <hr key={index} className="border-t border-[var(--line)] mt-6 pb-3" />
       ) : block.kind === "quote" ? (
-        <blockquote key={index} className="whitespace-pre-wrap border-l-[3px] border-[var(--ink)]/60 pl-3 leading-6 text-[var(--ink)]/90">
+        <blockquote key={index} className={cx("whitespace-pre-wrap pl-3 leading-6", soft ? "border-l-2 border-[var(--line)] text-[var(--muted)]" : "border-l-[3px] border-[var(--ink)]/60 text-[var(--ink)]/90")}>
           {block.text}
         </blockquote>
       ) : (
