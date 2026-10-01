@@ -328,11 +328,7 @@ export function Field({
  * read as visibly different things with no extra label needed; a "---" line
  * becomes a plain horizontal rule, for separating distinct thoughts.
  */
-/**
- * `soft`: for the almanac's quote cards — a quoted passage becomes a softly tinted panel with a large
- * opening mark instead of a rule beside it.
- */
-export function CommentText({ text, className, soft = false }: { text: string; className?: string; soft?: boolean }) {
+export function CommentText({ text, className }: { text: string; className?: string }) {
   const blocks = parseCommentBlocks(text);
   if (!blocks.length) return null;
   return (
@@ -340,17 +336,11 @@ export function CommentText({ text, className, soft = false }: { text: string; c
       {blocks.map((block, index) => block.kind === "divider" ? (
         <hr key={index} className="border-t border-[var(--line)] mt-6 pb-3" />
       ) : block.kind === "quote" ? (
-        soft ? (
-          // No rule beside it: a softly tinted panel with a large opening mark, read as a cited excerpt.
-          <blockquote key={index} className="relative whitespace-pre-wrap rounded-xl bg-[var(--canvas)] py-2.5 pl-9 pr-3.5 leading-6 text-[var(--muted)]">
-            <span aria-hidden="true" className="absolute left-3 top-1 font-serif text-3xl leading-none text-[var(--tag-blue)]">“</span>
-            {block.text}
-          </blockquote>
-        ) : (
-          <blockquote key={index} className="whitespace-pre-wrap border-l-[3px] border-[var(--ink)]/60 pl-3 leading-6 text-[var(--ink)]/90">
-            {block.text}
-          </blockquote>
-        )
+        // A quoted passage: no rule beside it — set on the page tone with a large opening mark.
+        <blockquote key={index} className="relative whitespace-pre-wrap rounded-xl bg-[var(--canvas)] py-2.5 pl-9 pr-3.5 leading-6 text-[var(--muted)]">
+          <span aria-hidden="true" className="absolute left-3 top-1 font-serif text-3xl leading-none text-[var(--ink)]">“</span>
+          {block.text}
+        </blockquote>
       ) : (
         <p key={index} className="whitespace-pre-wrap leading-6">{block.text}</p>
       ))}
