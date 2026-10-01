@@ -1327,7 +1327,10 @@
     "storyInTune": "Most in tune",
     "storyCritic": "Toughest critic",
     "storyCriticNote": "average {average}",
-    "storyBadge": "Featured"
+    "storyBadge": "Featured",
+    "factPeople": "{count, plural, one {person} other {people}}",
+    "factItems": "{count, plural, one {item} other {items}}",
+    "factFields": "{count, plural, one {field} other {fields}}"
   },
   "invite": {
     "verifying": "Checking the invite…",

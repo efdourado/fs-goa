@@ -1327,7 +1327,10 @@
     "storyInTune": "Mais em sintonia",
     "storyCritic": "Crítico mais exigente",
     "storyCriticNote": "média {average}",
-    "storyBadge": "Destaque"
+    "storyBadge": "Destaque",
+    "factPeople": "{count, plural, one {pessoa} other {pessoas}}",
+    "factItems": "{count, plural, one {item} other {itens}}",
+    "factFields": "{count, plural, one {campo} other {campos}}"
   },
   "invite": {
     "verifying": "Verificando convite…",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
 
 import { API_PATHS, apiRequest } from "./api";
@@ -8,9 +8,9 @@ import { useGoaFormat } from "./format";
 import { challengeShowcaseBlocks } from "./showcase-view";
 import type { ChallengeDetail, Id, TemplateSummary } from "./types";
 import { buildStory, type Story, type StoryInput } from "./story/model";
-import { DatedThread } from "./story/thread-dated";
-import { RatedThread } from "./story/thread-rated";
+import { firstName, personTone } from "./rating-scale";
 import { storyHeadline, useStoryFigures } from "./story/view";
+import { coverColors, coverToneOf } from "./catalog-cover";
 import { CirclePinIcon, cx } from "./ui";
 import { metricHasData } from "./utils";
 
@@ -113,13 +113,15 @@ function StorySkeleton() {
 }
 
 /**
- * One featured template, told the new way: its name, the one-line read of how it went, a small drawing of
- * the whole thing (everyone's line, or everyone's days) and its key numbers — from the same public-safe
- * thread its preview shows (names masked, no words). Falls back to plain facts when there's nothing to draw.
+ * One featured template as a newspaper story: kicker, headline, the one-line read of how it went, then a
+ * picture made of its results — the podium of its top three (films, books, places) or everyone's
+ * consistency (habits) — one standout line, and its numbers on a quiet panel. Built from the same
+ * public-safe story the preview shows (names masked, no words), so nothing private reaches the front page.
  */
 function Story({ template, onOpen }: { template: TemplateSummary; onOpen: (id: Id) => void }) {
   const t = useTranslations("templates");
   const ts = useTranslations("story");
+  const nf = useFormatter();
   const f = useGoaFormat();
   const [detail, setDetail] = useState<ChallengeDetail | null>(null);
   const [failed, setFailed] = useState(false);
@@ -136,16 +138,25 @@ function Story({ template, onOpen }: { template: TemplateSummary; onOpen: (id: I
 
   const input = detail?.publicStory ?? null;
   const story = useMemo(() => (input ? buildStory(input) : null), [input]);
-  const drawable = input && story && story.kind !== "empty" ? { input, story } : null;
+  const drawn = input && story && story.kind !== "empty" ? { input, story } : null;
 
   if (!detail && !failed) return <StorySkeleton />;
 
+  const fmt = (value: number) => nf.number(value, { maximumFractionDigits: 1 });
   const dates = detail ? f.dateRange(detail.startsOn, detail.endsOn) : "";
   const kicker = [dates || null, t(`mode.${template.submissionMode}`)].filter(Boolean).join(" · ");
-  const facts = [
-    template.participantCount ? t("cardPeople", { count: template.participantCount }) : null,
-    template.itemCount ? t("cardItems", { count: template.itemCount }) : null,
-  ].filter(Boolean).join(" · ");
+  // The one line worth reading out loud.
+  const standout = !drawn ? null
+    : drawn.story.kind === "rated"
+      ? drawn.story.duo
+        ? ts("duo.mix.line", { total: drawn.story.duo.met.length + drawn.story.duo.aBrought.length + drawn.story.duo.bBrought.length + drawn.story.duo.between, things: ts(`noun.${drawn.input.noun}`, { count: drawn.story.duo.met.length + drawn.story.duo.aBrought.length + drawn.story.duo.bBrought.length + drawn.story.duo.between }), met: drawn.story.duo.met.length, a: firstName(drawn.story.duo.a.name), aCount: drawn.story.duo.aBrought.length, b: firstName(drawn.story.duo.b.name), bCount: drawn.story.duo.bBrought.length })
+        : drawn.story.commonGround[0]
+          ? ts("common.title", { a: firstName(drawn.story.commonGround[0].a.name), b: firstName(drawn.story.commonGround[0].b.name), genre: drawn.story.commonGround[0].genre })
+          : drawn.story.surprises[0] ? ts("surprises.title", { title: drawn.story.surprises[0].item.title }) : null
+      : drawn.story.kind === "dated"
+        ? (() => { const best = [...drawn.story.lanes].sort((x, y) => (y.longest?.length ?? 0) - (x.longest?.length ?? 0))[0]; return best?.longest ? ts("streaks.title", { name: firstName(best.person.name), count: best.longest.length }) : null; })()
+        : null;
+  const ids = drawn ? drawn.input.people.map((person) => person.id) : [];
 
   return (
     <article className={storyCardClass}>
@@ -163,21 +174,58 @@ function Story({ template, onOpen }: { template: TemplateSummary; onOpen: (id: I
         </button>
       </h2>
       <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--muted)]">
-        {drawable ? storyHeadline(drawable.story, drawable.input, ts) : template.summary}
+        {drawn ? storyHeadline(drawn.story, drawn.input, ts) : template.summary}
       </p>
 
-      {drawable ? (
-        <>
-          <div className="mt-6 overflow-hidden rounded-[22px] bg-[var(--spotlight)] px-2 pb-3 pt-4 text-[var(--spotlight-ink)]">
-            {drawable.story.kind === "rated"
-              ? <RatedThread story={drawable.story} input={drawable.input} focus={null} run={0} fit />
-              : drawable.story.kind === "dated" ? <DatedThread story={drawable.story} input={drawable.input} focus={null} run={0} fit /> : null}
-          </div>
-          <StoryFigures story={drawable.story} input={drawable.input} />
-        </>
-      ) : facts ? (
-        <p className="mt-8 text-sm text-[var(--muted)]">{facts}</p>
+      {/* The picture: the podium of a rated challenge, everyone's consistency for a habit. */}
+      {drawn?.story.kind === "rated" && drawn.story.ranking.length >= 2 ? (
+        <ol className="mt-7 grid grid-cols-3 items-end gap-4">
+          {[drawn.story.ranking[1], drawn.story.ranking[0], drawn.story.ranking[2]].map((score, index) => score ? (
+            <li key={score.item.id} className={cx("flex min-w-0 flex-col items-center text-center", index === 1 ? "" : "pt-6")}>
+              <span className="relative w-full" style={{ maxWidth: index === 1 ? "8rem" : "6.5rem" }}>
+                <PodiumCover title={score.item.title} year={score.item.year} />
+                <span className="absolute -left-2 -top-2 grid h-7 w-7 place-items-center rounded-full bg-[var(--ink)] text-xs font-medium text-[var(--canvas)]">{index === 1 ? 1 : index === 0 ? 2 : 3}</span>
+              </span>
+              <span className="mt-2 text-2xl font-light tabular-nums tracking-[-0.03em]">{fmt(score.average)}</span>
+            </li>
+          ) : <li key={index} />)}
+        </ol>
+      ) : drawn?.story.kind === "dated" ? (
+        <ul className="mt-7 flex flex-wrap gap-5">
+          {[...drawn.story.lanes].sort((x, y) => (y.consistency ?? 0) - (x.consistency ?? 0)).slice(0, 5).map((lane) => (
+            <li key={lane.person.id} className="flex flex-col items-center gap-1.5">
+              <span className="relative grid h-16 w-16 place-items-center">
+                <svg viewBox="0 0 36 36" className="absolute inset-0 -rotate-90" aria-hidden="true">
+                  <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--wash-strong)" strokeWidth="2.8" />
+                  <circle cx="18" cy="18" r="15.9" fill="none" stroke={personTone(ids, lane.person.id)} strokeWidth="2.8" strokeDasharray={`${lane.consistency ?? 0} 100`} strokeLinecap="round" />
+                </svg>
+                <span className="text-sm font-medium tabular-nums">{lane.consistency ?? 0}%</span>
+              </span>
+              <span className="max-w-[5rem] truncate text-xs text-[var(--muted)]">{firstName(lane.person.name)}</span>
+            </li>
+          ))}
+        </ul>
       ) : null}
+
+      {standout ? (
+        <p className="mt-6 border-l-2 border-[var(--main)] pl-4 text-lg font-light leading-snug">{standout}</p>
+      ) : null}
+
+      {drawn ? <StoryFigures story={drawn.story} input={drawn.input} /> : (
+        // Still running (or nothing to draw yet): the template's own shape, on the same quiet panel.
+        <dl className="mt-7 grid grid-cols-3 gap-x-6 gap-y-4 rounded-2xl bg-[var(--wash)] p-5">
+          {[
+            { value: template.participantCount, label: t("factPeople", { count: template.participantCount }) },
+            { value: template.itemCount, label: t("factItems", { count: template.itemCount }) },
+            { value: template.fieldCount, label: t("factFields", { count: template.fieldCount }) },
+          ].filter((row) => row.value).map((row) => (
+            <div key={row.label} className="flex min-w-0 flex-col-reverse">
+              <dt className="truncate text-xs text-[var(--muted)]">{row.label}</dt>
+              <dd className="text-3xl font-light tabular-nums tracking-[-0.04em]">{row.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
 
       <div className="mt-auto pt-8">
         <button type="button" onClick={() => onOpen(template.id)} className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-full border border-[var(--main-line)] px-4 text-sm text-[var(--main-strong)] transition hover:bg-[var(--main-soft)] focus-visible:outline-none">
@@ -188,10 +236,22 @@ function Story({ template, onOpen }: { template: TemplateSummary; onOpen: (id: I
   );
 }
 
+/** A podium cover: the catalogue's tinted tile, its title sized to the tile so a phone never breaks a word. */
+function PodiumCover({ title, year }: { title: string; year?: number | null }) {
+  return (
+    <span className="relative flex aspect-[3/4] w-full flex-col overflow-hidden rounded-[18px] bg-[var(--cover-bg)] p-2.5 text-[var(--cover-ink)] shadow-[var(--elevate-card)] sm:p-3.5" style={coverColors(coverToneOf(title))}>
+      <span aria-hidden="true" className="absolute -bottom-10 -right-10 h-28 w-28 rounded-full border-[16px] border-[var(--cover-deco)]" />
+      <span className="relative text-[9px] tracking-[0.08em] sm:text-[10px]" style={{ fontFamily: "var(--font-geist-mono), ui-monospace, monospace" }}>{year ?? "\u00a0"}</span>
+      <span className="relative mt-1.5 line-clamp-4 hyphens-auto text-[13px] font-light leading-[1.08] tracking-[-0.02em] [overflow-wrap:anywhere] sm:mt-2 sm:text-[19px] sm:[overflow-wrap:normal]" lang="en">{title}</span>
+    </span>
+  );
+}
+
+/** The story's numbers on the quiet panel the front page always used. */
 function StoryFigures({ story, input }: { story: Story; input: StoryInput }) {
   const figures = useStoryFigures(story, input).slice(0, 4);
   return (
-    <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
+    <dl className="mt-7 grid grid-cols-2 gap-x-6 gap-y-4 rounded-2xl bg-[var(--wash)] p-5 sm:grid-cols-4">
       {figures.map((figure) => (
         <div key={figure.label} className="flex min-w-0 flex-col-reverse">
           <dt className="truncate text-xs text-[var(--muted)]">{figure.label}</dt>
