@@ -342,8 +342,8 @@ export function CommentText({ text, className, soft = false }: { text: string; c
       ) : block.kind === "quote" ? (
         soft ? (
           // No rule beside it: a softly tinted panel with a large opening mark, read as a cited excerpt.
-          <blockquote key={index} className="relative whitespace-pre-wrap rounded-xl bg-[var(--wash)] py-2.5 pl-9 pr-3.5 leading-6 text-[var(--muted)]">
-            <span aria-hidden="true" className="absolute left-3 top-1 font-serif text-3xl leading-none text-[var(--main-line)]">“</span>
+          <blockquote key={index} className="relative whitespace-pre-wrap rounded-xl bg-[var(--canvas)] py-2.5 pl-9 pr-3.5 leading-6 text-[var(--muted)]">
+            <span aria-hidden="true" className="absolute left-3 top-1 font-serif text-3xl leading-none text-[var(--tag-blue)]">“</span>
             {block.text}
           </blockquote>
         ) : (
