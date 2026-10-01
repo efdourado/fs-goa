@@ -16,13 +16,12 @@ export function PublicStory({ input, title, dates, description }: { input: Story
   if (story.kind === "empty") return null;
   return (
     <>
-      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-        <div className="min-w-0 max-w-3xl">
-          {dates ? <p className="text-sm text-[var(--muted)]">{dates}</p> : null}
-          <h1 className="mt-2 text-4xl font-medium leading-[1.02] tracking-[-0.05em] sm:text-6xl">{title}</h1>
-          {description ? <p className="mt-3 text-base leading-7 text-[var(--muted)]">{description}</p> : null}
-        </div>
-        <DownloadPagesButton input={input} story={story} tone="plain" />
+      {/* Centred like a cover: when it ran, what it was called, what it was about — then its pages. */}
+      <div className="mx-auto mb-10 flex max-w-3xl flex-col items-center text-center">
+        {dates ? <p className="text-sm text-[var(--muted)]">{dates}</p> : null}
+        <h1 className="mt-3 text-balance text-4xl font-medium leading-[1.02] tracking-[-0.05em] sm:text-6xl">{title}</h1>
+        {description ? <p className="mt-4 max-w-xl text-balance text-base leading-7 text-[var(--muted)]">{description}</p> : null}
+        <div className="mt-6"><DownloadPagesButton input={input} story={story} tone="plain" /></div>
       </div>
       <StoryView input={input} story={story} />
     </>

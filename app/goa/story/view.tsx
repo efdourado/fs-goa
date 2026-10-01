@@ -116,13 +116,15 @@ export function StoryView({ input, story, metrics = [] }: { input: StoryInput; s
       {/* Everything after the drawing is a page of the paginator — one theme at a time, named tabs on top. */}
       <div className="mt-8 px-1">
         <PagedView
+          centered
           pages={pages.map((page) => ({
             id: `story-${page.id}`,
             title: page.title,
             body: (
               <div>
-                <p className="text-sm text-[var(--muted)]">{page.headline}</p>
-                <div className="@container mt-5">{page.body}</div>
+                {/* The section's one-line read, centred like a newspaper standfirst. */}
+                <p className="mx-auto max-w-2xl text-balance text-center text-xl font-light leading-snug tracking-[-0.02em] text-[var(--ink)]/85 sm:text-2xl">{page.headline}</p>
+                <div className="@container mt-7">{page.body}</div>
               </div>
             ),
           }))}

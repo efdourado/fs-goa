@@ -37,7 +37,7 @@ const cardClass = "flex min-w-0 flex-col rounded-[20px] border border-[var(--lin
 function Block({ title, children, wide }: { title: string; children: ReactNode; wide?: boolean }) {
   return (
     <div className={cx(cardClass, wide && "[grid-column:1/-1]")}>
-      <h4 className="text-sm font-medium">{title}</h4>
+      <h4 className="text-[15px] font-medium tracking-[-0.01em]">{title}</h4>
       <div className="mt-4 flex-1">{children}</div>
     </div>
   );
@@ -173,11 +173,15 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
             <div className="grid max-w-md grid-cols-3 items-end gap-3">
               {[podium[1], podium[0], podium[2]].map((score, index) => score ? (
                 <div key={score.item.id} className="flex flex-col items-center text-center">
-                  <TitleChip bare title={score.item.title} year={score.item.year} className={cx("w-full", index === 1 ? "max-w-[6.5rem]" : "max-w-[5.25rem]")} />
+                  <span className={cx("relative w-full", index === 1 ? "max-w-[6.5rem]" : "max-w-[5.25rem]")}>
+                    <TitleChip bare title={score.item.title} year={score.item.year} className="w-full" />
+                    {/* The place, as a badge on the cover — the pedestal is for the number. */}
+                    <span className="absolute -left-2 -top-2 grid h-6 w-6 place-items-center rounded-full bg-[var(--ink)] text-[11px] font-medium text-[var(--canvas)]">{index === 1 ? 1 : index === 0 ? 2 : 3}</span>
+                  </span>
                   <p className="mt-2 line-clamp-1 text-xs">{score.item.title}</p>
-                  <div className={cx("mt-2 flex w-full flex-col items-center rounded-lg bg-[var(--wash)] pt-2", index === 1 ? "h-24" : index === 0 ? "h-16" : "h-12")}>
-                    <span className="text-lg font-medium tabular-nums">{fmt(score.average)}</span>
-                    <span className="text-[10px] text-[var(--muted)]">#{index === 1 ? 1 : index === 0 ? 2 : 3}</span>
+                  <div className={cx("mt-2 flex w-full flex-col items-center justify-start rounded-lg bg-[var(--wash)] pt-2.5", index === 1 ? "h-24" : index === 0 ? "h-[4.5rem]" : "h-14")}>
+                    <span className="text-2xl font-light tabular-nums leading-none tracking-[-0.03em]">{fmt(score.average)}</span>
+                    <span className="mt-1 text-[10px] text-[var(--muted)]">{t("podium.average")}</span>
                   </div>
                 </div>
               ) : <span key={index} />)}

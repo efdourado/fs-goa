@@ -2117,7 +2117,8 @@
       "loner": "{name}, sozinho no {value}"
     },
     "podium": {
-      "eyebrow": "O pódio"
+      "eyebrow": "O pódio",
+      "average": "média"
     },
     "common": {
       "eyebrow": "Terreno comum",

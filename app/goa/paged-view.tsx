@@ -25,11 +25,14 @@ export function PagedView({
   pages,
   initialPage = 0,
   contentAriaLabel,
+  centered = false,
 }: {
   header?: ReactNode;
   pages: PagedPage[];
   initialPage?: number;
   contentAriaLabel?: string;
+  /** Centre the section tabs (the paginator below is always centred). */
+  centered?: boolean;
 }) {
   const t = useTranslations("paginator");
   const [page, setPage] = useState(initialPage);
@@ -46,7 +49,7 @@ export function PagedView({
       {header}
       {pages.length ? (
         <div className="space-y-4" aria-label={contentAriaLabel}>
-          {paged && pages.length > 1 ? <nav className="flex gap-2 overflow-x-auto border-b border-[var(--line)] pb-3" aria-label={t("pages")}>
+          {paged && pages.length > 1 ? <nav className={cx("flex gap-2 overflow-x-auto border-b border-[var(--line)] pb-3", centered && "sm:justify-center")} aria-label={t("pages")}>
             {pages.map((item, index) => <button key={item.id} type="button" aria-current={bounded === index ? "page" : undefined} onClick={() => setPage(index)} className={cx("min-h-11 shrink-0 rounded-xl px-4 text-sm transition", bounded === index ? "bg-[var(--ink)] text-[var(--canvas)]" : "text-[var(--muted)] hover:bg-[var(--wash)]")}>{item.title}</button>)}
           </nav> : null}
           {pages.map((pageItem, index) => (
