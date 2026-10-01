@@ -6,7 +6,7 @@ import { type ReactNode, useState } from "react";
 import { coverColors, coverToneOf } from "../catalog-cover";
 import { firstName, initialsOf, personTone } from "../rating-scale";
 import type { Id, Metric } from "../types";
-import { cx } from "../ui";
+import { CommentText, cx } from "../ui";
 import type { DatedStory, GroupStat, RatedStory, Story, StoryInput } from "./model";
 
 /** A small typographic cover — the title is the artwork, tinted like the catalogue's. `bare` drops the title when it is printed beside it. */
@@ -293,7 +293,12 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
                 </div>
                 {argumentQuotes.length ? (
                   <div className="mt-4 space-y-2">
-                    {argumentQuotes.map((quote) => <p key={quote.person.id} className="border-l-2 pl-3 text-sm font-light leading-snug" style={{ borderColor: personTone(ids, quote.person.id) }}>“{quote.text}” <span className="text-xs text-[var(--muted)]">— {firstName(quote.person.name)}</span></p>)}
+                    {argumentQuotes.map((quote) => (
+                      <figure key={quote.person.id} className="border-l-2 pl-3" style={{ borderColor: personTone(ids, quote.person.id) }}>
+                        <CommentText text={quote.text} className="text-sm font-light" />
+                        <figcaption className="mt-1 text-xs text-[var(--muted)]">— {firstName(quote.person.name)}</figcaption>
+                      </figure>
+                    ))}
                   </div>
                 ) : null}
               </Block>
@@ -510,7 +515,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
           <div className={grid}>
             {s.quotes.map((quote) => (
               <figure key={`${quote.person.id}-${quote.item.id}`} className={cx(cardClass, "border-l-[3px]")} style={{ borderLeftColor: personTone(ids, quote.person.id) }}>
-                <blockquote className="text-xl font-light leading-snug tracking-[-0.01em]">“{quote.text}”</blockquote>
+                <CommentText text={quote.text} className="text-lg font-light" />
                 <figcaption className="mt-2 text-xs text-[var(--muted)]">{t("quotes.by", { name: firstName(quote.person.name), title: quote.item.title, value: fmt(quote.value) })}</figcaption>
               </figure>
             ))}
@@ -725,7 +730,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
           <div className={grid}>
             {s.notes.map((note) => (
               <figure key={`${note.person.id}-${note.day}`} className={cx(cardClass, "border-l-[3px]")} style={{ borderLeftColor: personTone(ids, note.person.id) }}>
-                <blockquote className="text-xl font-light leading-snug">“{note.text}”</blockquote>
+                <CommentText text={note.text} className="text-lg font-light" />
                 <figcaption className="mt-2 text-xs text-[var(--muted)]">{firstName(note.person.name)} · {day(note.day)}</figcaption>
               </figure>
             ))}
