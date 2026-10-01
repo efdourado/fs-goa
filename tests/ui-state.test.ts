@@ -310,7 +310,8 @@ test("comentário: editando mostra a dica de citação e o botão de inserir; j�
   }));
   assert.doesNotMatch(answered, /<textarea/, "campo respondido não mostra mais o textarea, e sim o texto renderizado");
   assert.match(answered, /<p[^>]*>Achei ótimo\.<\/p>/, "o trecho comum vira parágrafo normal");
-  assert.match(answered, /<blockquote[^>]*>Uma frase marcante do livro\.<\/blockquote>/, "o trecho entre aspas vira um bloco de citação");
+  // The quote block may open with its decorative mark (aria-hidden) before the quoted text.
+  assert.match(answered, /<blockquote[^>]*>(?:<span aria-hidden="true"[^>]*>[^<]*<\/span>)?Uma frase marcante do livro\.<\/blockquote>/, "o trecho entre aspas vira um bloco de citação");
 });
 
 test("limpar a nota não marca a nota 0 por engano (Number(null) e Number('') são 0 em JS)", () => {
