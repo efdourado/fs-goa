@@ -294,7 +294,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
                 {argumentQuotes.length ? (
                   <div className="mt-4 space-y-2">
                     {argumentQuotes.map((quote) => (
-                      <figure key={quote.person.id}>
+                      <figure key={quote.person.id} className="border-l-2 pl-3" style={{ borderColor: personTone(ids, quote.person.id) }}>
                         <CommentText soft text={quote.text} className="text-sm font-light" />
                         <figcaption className="mt-1.5 flex items-center gap-1.5 text-xs text-[var(--muted)]"><Avatar id={quote.person.id} name={quote.person.name} ids={ids} size={4} />{firstName(quote.person.name)}</figcaption>
                       </figure>
@@ -514,7 +514,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
         body: (
           <div className={grid}>
             {s.quotes.map((quote) => (
-              <figure key={`${quote.person.id}-${quote.item.id}`} className={cardClass}>
+              <figure key={`${quote.person.id}-${quote.item.id}`} className={cx(cardClass, "border-l-[3px]")} style={{ borderLeftColor: personTone(ids, quote.person.id) }}>
                 <CommentText soft text={quote.text} className="text-lg font-light" />
                 <figcaption className="mt-3 flex items-center gap-2 text-xs text-[var(--muted)]"><Avatar id={quote.person.id} name={quote.person.name} ids={ids} size={5} />{t("quotes.by", { name: firstName(quote.person.name), title: quote.item.title, value: fmt(quote.value) })}</figcaption>
               </figure>
@@ -729,7 +729,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
         body: (
           <div className={grid}>
             {s.notes.map((note) => (
-              <figure key={`${note.person.id}-${note.day}`} className={cardClass}>
+              <figure key={`${note.person.id}-${note.day}`} className={cx(cardClass, "border-l-[3px]")} style={{ borderLeftColor: personTone(ids, note.person.id) }}>
                 <CommentText soft text={note.text} className="text-lg font-light" />
                 <figcaption className="mt-3 flex items-center gap-2 text-xs text-[var(--muted)]"><Avatar id={note.person.id} name={note.person.name} ids={ids} size={5} />{firstName(note.person.name)} · {day(note.day)}</figcaption>
               </figure>
