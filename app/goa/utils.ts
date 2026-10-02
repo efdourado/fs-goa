@@ -209,30 +209,34 @@ export function valuesAsRecord(values: Entry["values"]): Record<Id, unknown> {
 }
 
 /**
- * How to read "the rating" an entry gave its item. When a metric is named the challenge's rating
- * (`ratingFieldIds`), it's the average of those fields the entry answered; otherwise the first rating field of a
- * rating-purpose, individually answered type — an expectation uses the same widget but is a different question.
+ * How to read "the rating" an entry gave its item: the average of the rating fields it answered — every rating
+ * field of a rating-purpose, individually answered type (food, ambience and value on a place all count), or the
+ * fields of the metric named the challenge's rating (`ratingFieldIds`). An expectation uses the same widget but is
+ * a different question, so it never counts. Each field counts on its own scale (a /5 and a /10 mix fairly); the
+ * result is on the scale of the type's first rating field. The server reads it the same way (`rating.ts`).
  */
 export function entryRatingReader(challenge: Pick<ChallengeDetail, "entryTypes" | "ratingFieldIds">): (entry: Entry) => number | null {
   const numeric = (raw: unknown) => (typeof raw === "number" ? raw : typeof raw === "string" && raw.trim() !== "" ? Number(raw) : NaN);
-  const named = challenge.ratingFieldIds?.length ? challenge.ratingFieldIds : null;
-  if (named) {
-    return (entry) => {
-      const values = valuesAsRecord(entry.values);
-      const answered = named.map((id) => numeric(values[id])).filter((value) => !Number.isNaN(value));
-      return answered.length ? answered.reduce((sum, value) => sum + value, 0) / answered.length : null;
-    };
-  }
-  const fieldByType = new Map(
+  const named = challenge.ratingFieldIds?.length ? new Set(challenge.ratingFieldIds) : null;
+  const ratingFields = new Map(
     (challenge.entryTypes ?? [])
       .filter((type) => type.purpose === "rating" && type.answerScope !== "shared")
-      .map((type) => [type.id, type.fields.find((field) => field.type === "rating")?.id ?? null]),
+      .map((type) => [type.id, type.fields.filter((field) => field.type === "rating" && field.id && (!named || named.has(field.id)))]),
   );
+  const range = (field: ChallengeField) => ({ min: field.config?.min ?? 0, max: field.config?.max ?? 5 });
   return (entry) => {
-    const fieldId = fieldByType.get(entry.entryTypeId ?? "");
-    if (!fieldId) return null;
-    const value = numeric(valuesAsRecord(entry.values)[fieldId]);
-    return Number.isNaN(value) ? null : value;
+    const fields = ratingFields.get(entry.entryTypeId ?? "") ?? [];
+    if (!fields.length) return null;
+    const values = valuesAsRecord(entry.values);
+    const shares = fields.flatMap((field) => {
+      const value = numeric(values[field.id!]);
+      const { min, max } = range(field);
+      return Number.isNaN(value) || max <= min ? [] : [(value - min) / (max - min)];
+    });
+    if (!shares.length) return null;
+    const { min, max } = range(fields[0]);
+    // Rounded past any float noise, so fields on one scale give exactly their plain average.
+    return Math.round((min + (shares.reduce((sum, share) => sum + share, 0) / shares.length) * (max - min)) * 1e9) / 1e9;
   };
 }
 

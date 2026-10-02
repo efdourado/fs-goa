@@ -959,7 +959,7 @@ test("front page story: a ranking's winner, the most in-tune pair and the toughe
   assert.equal(storyExcerpt(challenge, 2, labels).stats.length, 2);
 });
 
-test("today's rating: the challenge's rating metric averages its fields per entry; without one, the first rating field", async () => {
+test("today's rating: the average of the rating fields — the named metric's, or every rating field — each on its own scale", async () => {
   const { entryRatingReader } = await import("../app/goa/utils");
   const entryTypes = [
     { id: "t", purpose: "rating", answerScope: "individual", fields: [{ id: "food", type: "rating" }, { id: "vibe", type: "rating" }, { id: "value", type: "rating" }] },
@@ -973,6 +973,13 @@ test("today's rating: the challenge's rating metric averages its fields per entr
   assert.equal(combined(entry("x", { hope: 5 })), null);
 
   const plain = entryRatingReader({ entryTypes, ratingFieldIds: null });
-  assert.equal(plain(entry("t", { food: 2, vibe: 4, value: 3 })), 2, "no rating metric → the first rating field, as before");
+  assert.equal(plain(entry("t", { food: 2, vibe: 4, value: 3 })), 3, "no rating metric → every rating field counts, like the server");
   assert.equal(plain(entry("x", { hope: 5 })), null, "an expectation is a different question");
+
+  // A /10 field next to /5 ones counts on its own scale: 8/10 is a 4.
+  const mixed = entryRatingReader({
+    entryTypes: [{ id: "t", purpose: "rating", answerScope: "individual", fields: [{ id: "food", type: "rating" }, { id: "price", type: "rating", config: { min: 0, max: 10 } }] }] as unknown as import("../app/goa/types").ChallengeDetail["entryTypes"],
+    ratingFieldIds: null,
+  });
+  assert.equal(mixed(entry("t", { food: 2, price: 8 })), 3, "(2 + 4) / 2 on the first field's /5");
 });
