@@ -12,6 +12,7 @@ import { bayesianAverage, consensus, indicatorBias, mean, meanDelta, median, spr
 import { calculateMetric } from "../../metrics";
 import { generateOpaqueToken, hashToken } from "../../security";
 import { primaryEntryType } from "./entry-types";
+import { challengeItemScores, scoreFieldIds } from "./goa-score";
 import { computeRankings } from "./rankings";
 import { RATING_METRIC_OPERATIONS } from "./rating";
 import type { DetailChallengeRow } from "./detail";
@@ -525,10 +526,14 @@ async function computeValueMetric(client: PoolClient, metric: MetricRow): Promis
               : null;
   if (!keyFn) return overall;
 
+  const scores = await rankingScores(client, metric);
   const series: SeriesEntry[] = [];
   for (const [id, bucket] of groupBy(rows, keyFn)) {
     const values = bucket.rows.map((row) => row.value);
-    const grouped = aggregateValues(metric.operation, values, ctx);
+    const plain = aggregateValues(metric.operation, values, ctx);
+    // A ranking of titles by their rating ranks by the Goa score, not the plain average (see goa-score.ts).
+    const score = scores?.[id];
+    const grouped = score && plain.value !== null ? { ...plain, value: roundTo(score.value, dp) } : plain;
     // Every row in an item bucket shares the same item, so its recommender and
     // year are constant within the bucket — read them off the first row.
     const first = metric.group_by === "item" ? bucket.rows[0] : undefined;
@@ -547,6 +552,22 @@ async function computeValueMetric(client: PoolClient, metric: MetricRow): Promis
   }
   series.sort((a, b) => (b.value ?? Number.NEGATIVE_INFINITY) - (a.value ?? Number.NEGATIVE_INFINITY) || a.label.localeCompare(b.label, "pt-BR"));
   return { value: overall.value, sampleSize: overall.sampleSize, series };
+}
+
+const roundTo = (value: number, places: number) => Math.round(value * 10 ** places) / 10 ** places;
+
+/**
+ * The Goa scores a metric ranks its items by — only for an item-grouped average of exactly the fields the
+ * challenge's rating reads; anything else (one sub-score, a sum, a steadied average) keeps its own maths.
+ */
+async function rankingScores(client: PoolClient, metric: MetricRow) {
+  if (metric.group_by !== "item" || metric.operation !== "average") return null;
+  const composite = compositeFields(metric);
+  if (composite && composite.combineOp !== "average") return null;
+  const mine = new Set(composite?.fieldIds ?? (metric.field_id ? [metric.field_id] : []));
+  const rated = await scoreFieldIds(client, metric.challenge_id);
+  if (!rated.length || rated.length !== mine.size || rated.some((id) => !mine.has(id))) return null;
+  return challengeItemScores(client, metric.challenge_id, null);
 }
 
 /**

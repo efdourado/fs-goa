@@ -15,6 +15,7 @@ import { entryRatingSql } from "./challenges/rating";
 import { writeAudit } from "./domain/audit";
 import { eventScheduleColumns, eventScheduleJson, parseEventSchedule, scheduleVisibleSql } from "./domain/event-schedule";
 import { ensurePersonalWorkspace } from "./domain/challenges";
+import { catalogScores, roundKey } from "./challenges/goa-score";
 import { CATALOG_YEAR_MAX, CATALOG_YEAR_MIN, normalizeTitle, publicId } from "./domain/shared";
 import { moveToTrash } from "./trash";
 
@@ -480,10 +481,11 @@ async function listCatalogWithClient(client: Pick<PoolClient, "query">, workspac
         ORDER BY ${limited ? "ci.created_at DESC, ci.title" : "ci.title"}`,
     limited ? [workspaceId, options.perKind] : [workspaceId],
   );
-  const [items, attributesByItem, showRecommenders] = await Promise.all([
+  const [items, attributesByItem, showRecommenders, scores] = await Promise.all([
     itemsQuery,
     attributeValuesForWorkspace(client, workspaceId, options.perKind),
     recommendationsVisible(client, workspaceId),
+    catalogScores(client, workspaceId),
   ]);
   return {
     items: items.rows.map((item) => ({
@@ -505,7 +507,8 @@ async function listCatalogWithClient(client: Pick<PoolClient, "query">, workspac
           ? { kind: "external" as const, id: item.recommended_by_external_id, name: item.recommended_by_external_name ?? "" }
           : null,
       originNote: showRecommenders ? item.origin_note : null,
-      ratingAvg: item.rating_avg === null ? null : Number(item.rating_avg.toFixed(2)),
+      // Ranked by the Goa score (see goa-score.ts); the plain average only when it can't be scored.
+      ratingAvg: item.rating_avg === null ? null : Number((scores.byCatalogItem.get(item.id)?.score ?? item.rating_avg).toFixed(2)),
       ratingCount: item.rating_count,
       attributes: attributesByItem.get(item.id) ?? [],
     })),
@@ -578,13 +581,15 @@ async function catalogItemDetailWithClient(
 
   const attributes = (await attributeValuesForItems(client, [item.id])).get(item.id) ?? [];
   const showRecommenders = await recommendationsVisible(client, workspaceId);
-  // The group's overall rating for this item, across every round — a true
-  // weighted average (avg*count sums back to each round's total, so summing
-  // those and dividing by the total count is exact, not an average of averages).
+  const scores = await catalogScores(client, workspaceId);
+  // The group's overall rating for this item, across every round — its Goa score over all of them (see
+  // goa-score.ts), else a true weighted average (avg*count sums back to each round's total, so summing those
+  // and dividing by the total count is exact, not an average of averages).
   const ratedRounds = rounds.rows.filter((round) => round.rating_count > 0);
   const totalRatings = ratedRounds.reduce((sum, round) => sum + round.rating_count, 0);
   const ratingAvg = totalRatings > 0
-    ? Number((ratedRounds.reduce((sum, round) => sum + (round.rating_avg ?? 0) * round.rating_count, 0) / totalRatings).toFixed(2))
+    ? Number((scores.byCatalogItem.get(item.id)?.score
+      ?? ratedRounds.reduce((sum, round) => sum + (round.rating_avg ?? 0) * round.rating_count, 0) / totalRatings).toFixed(2))
     : null;
   return {
     id: item.id,
@@ -612,7 +617,7 @@ async function catalogItemDetailWithClient(
       startsOn: round.start_date,
       endsOn: round.end_date,
       recommendedBy: round.recommended_by,
-      ratingAvg: round.rating_avg === null ? null : Number(round.rating_avg.toFixed(2)),
+      ratingAvg: round.rating_avg === null ? null : Number((scores.byRound.get(roundKey(round.challenge_id, item.id))?.score ?? round.rating_avg).toFixed(2)),
       ratingCount: round.rating_count,
     })),
   };

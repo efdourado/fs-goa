@@ -41,6 +41,11 @@ export interface StoryInput {
   ratings: StoryRating[];
   expectations: StoryExpectation[];
   scale: { min: number; max: number };
+  /**
+   * Per item, the Goa score the ranking uses instead of the plain average (see `app/goa/score.ts`) and the
+   * ratings it counts — used only when every one of them is a rating this story can see.
+   */
+  scores?: Record<Id, { value: number; count: number }>;
   days: StoryDay[];
   records: StoryRecord[];
   /** The counted number's label and unit on a dated challenge ("Páginas", "km"). */
@@ -191,7 +196,9 @@ function buildRated(input: StoryInput): RatedStory | null {
     const landed = ratings.filter((rating) => rating.itemId === item.id).map((rating) => ({ personId: rating.personId, name: nameOf.get(rating.personId)!, value: rating.value }));
     if (!landed.length) continue;
     const values = landed.map((row) => row.value);
-    stations.push({ item, average: round1(mean(values)), ratings: landed, spread: (Math.max(...values) - Math.min(...values)) / range });
+    const score = input.scores?.[item.id];
+    const average = score && score.count === landed.length ? score.value : mean(values);
+    stations.push({ item, average: round1(average), ratings: landed, spread: (Math.max(...values) - Math.min(...values)) / range });
   }
   if (!stations.length) return null;
 
@@ -557,6 +564,7 @@ export function storyFromChallenge(challenge: ChallengeDetail, entries: Entry[],
     ratings,
     expectations,
     scale: { min: ratingField?.config?.min ?? 0, max: ratingField?.config?.max ?? 5 },
+    scores: challenge.itemScores,
     days,
     records,
     counter: counterField ? { label: counterField.label, unit: counterField.config?.unit ?? null } : null,

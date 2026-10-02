@@ -2244,7 +2244,9 @@ test("Tables: a Nota geral média as três notas por lugar, e sobrevive a uma c�
   assert.equal(notaGeral.value, 3.5, "média das duas notas combinadas, (5 + 2) / 2");
   assert.deepEqual(
     [...notaGeral.series ?? []].sort((a, b) => a.label.localeCompare(b.label)).map((entry) => [entry.label, entry.value]),
-    [["Boteco da Ana", 2], ["Cantina do Zé", 5]],
+    // Ranked by the Goa score: each place is weighed against the person's usual (the other place), so the 5 dips a
+    // little and the 2 rises a little — the plain average is 2 and 5.
+    [["Boteco da Ana", 2.1], ["Cantina do Zé", 4.87]],
   );
   // As três médias individuais continuam corretas e independentes da combinada.
   assert.equal(withEntries.metrics.find((metric) => metric.key === "media_comida")!.value, 3, "(5 + 1) / 2");
@@ -3729,7 +3731,7 @@ test("estante pessoal: só nota, sem data no registro, sem métricas de grupo, r
   const topRow = rated.metrics
     .find((metric) => metric.label.toLowerCase().includes("ranking"))!
     .series!.find((row) => row.value !== null)!;
-  assert.equal(topRow.value, 5, "com uma nota por livro, a média é a própria nota");
+  assert.equal(topRow.value, 4.91, "o ranking usa a pontuação Goa: o 5 pesa contra o costume de quem leu (o outro livro, 3)");
 
   const cannotClose = await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "closed" } });
   assert.equal(cannotClose.response.status, 409, "uma estante-lista não é encerrada");
@@ -4295,7 +4297,7 @@ test("amostra mínima de uma métrica é configurável — um grupo pequeno pode
   assert.equal(lowered.response.status, 200, JSON.stringify(lowered.body));
   const afterLowering = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { metrics: ApiMetric[] };
   const loweredSeries = afterLowering.metrics.find((entry) => entry.id === metricId)!.series!;
-  assert.equal(loweredSeries.find((row) => row.label === "Só um voto")!.value, 5, "com amostra mínima 1, o voto único já conta");
+  assert.equal(loweredSeries.find((row) => row.label === "Só um voto")!.value, 4.93, "com amostra mínima 1, o voto único já conta (pela pontuação Goa)");
 });
 
 test("um ranking por item traz quem indicou, o ano do catálogo e a média crua ao lado da nota ajustada", async () => {
@@ -8254,7 +8256,8 @@ test("ranking de itens: a média de várias notas é a nota geral de cada item, 
   const series = metrics.metrics.find((metric) => metric.id === (ranking.body as { id: string }).id)!.series!;
   // Cada registro vira uma nota só (a média das três); depois cada item é a média de quem o avaliou.
   // Padaria 5; Sushi ((4+4+4)/3 + (5+4+3)/3)/2 = 4; Cantina ((5+2+2)/3 + (5+3+1)/3)/2 = 3 — e a ordem segue a nota geral, não a comida sozinha.
-  assert.deepEqual(series.map((entry) => [entry.label, entry.value, entry.sampleSize]), [["Padaria", 5, 1], ["Sushi", 4, 2], ["Cantina", 3, 2]]);
+  // The ranking reads the Goa score of those averages — the order holds, the top dips a little from 5 and 4.
+  assert.deepEqual(series.map((entry) => [entry.label, entry.value, entry.sampleSize]), [["Padaria", 4.86, 1], ["Sushi", 3.96, 2], ["Cantina", 3, 2]]);
   const adjustedSeries = metrics.metrics.find((metric) => metric.id === (adjusted.body as { id: string }).id)!.series!;
   assert.deepEqual(adjustedSeries.map((entry) => entry.label), ["Padaria", "Sushi", "Cantina"], "a nota ajustada mantém a ordem com amostras parecidas");
   const padaria = adjustedSeries.find((entry) => entry.label === "Padaria")!;

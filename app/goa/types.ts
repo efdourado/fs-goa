@@ -540,6 +540,8 @@ export interface ChallengeLibraryRef {
 export interface ChallengeDetail extends ChallengeSummary {
   /** The fields "the rating" averages when a metric is named the challenge's rating; null → the first rating field. */
   ratingFieldIds?: Id[] | null;
+  /** Per item: its Goa score on the rating scale and how many ratings it counts — rankings use it, not the plain average. */
+  itemScores?: Record<Id, { value: number; count: number }>;
   /** Template preview only: whether it's on the front page. */
   templateFeatured?: boolean;
   fields: ChallengeField[];

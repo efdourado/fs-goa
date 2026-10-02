@@ -15,6 +15,7 @@ import {
   usesRoundItems,
 } from "./entry-types";
 import { fieldsForChallenge } from "./fields";
+import { challengeItemScores } from "./goa-score";
 import { attributeValuesForItems } from "../catalog-attributes";
 import { readChallengeLibraries } from "./libraries";
 import { generateDailyCheckpoints } from "./items";
@@ -305,6 +306,8 @@ export async function buildChallengeDetail(
     completionEntryTypeId,
     // What "the rating" of an item is read from, when a metric is named the challenge's rating (see rating.ts).
     ratingFieldIds: await challengeRatingFieldIds(client, challengeId),
+    // Each item's Goa score — what rankings and averages are calculated with (see goa-score.ts).
+    itemScores: await challengeItemScores(client, challengeId, viewer.userId),
     viewerRole: viewer.role,
     isParticipant: viewer.isParticipant,
     // The viewer's own name-in-publication consent for this challenge (V1 §12).
