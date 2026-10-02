@@ -115,7 +115,7 @@ test("uma pontuação que conta notas fora da tela não é usada", () => {
 /** A database stub answering the scoring query with `rows` (already in its column names). */
 const stub = (rows: Array<Record<string, unknown>>) => ({ query: async () => ({ rows }) }) as unknown as Parameters<typeof catalogScores>[0];
 const ratingRow = (over: Record<string, unknown>) => ({
-  challenge_id: "c1", item_id: "i1", catalog_item_id: "cat1", kind: "film", person_id: "a", value: 0.8, lo: 0, hi: 5,
+  challenge_id: "c1", item_id: "i1", entry_type_id: "t1", catalog_item_id: "cat1", kind: "film", person_id: "a", value: 0.8, lo: 0, hi: 5,
   nominated: false, visibility: "group_realtime", closed: true, genre: null, author: null, year: null, runtime: null, pages: null, ...over,
 });
 
@@ -138,5 +138,18 @@ test("nota oculta não entra nem como alvo nem como histórico de ninguém", asy
   assert.equal(await seenBy("a", 0), await seenBy("a", 1), "para outra pessoa, o histórico escondido não existe");
   assert.equal(await seenBy(null, 0), await seenBy(null, 1), "nem para uma página pública");
   assert.notEqual(await seenBy("b", 0), await seenBy("b", 1), "o próprio autor vê o seu");
-  assert.equal(visibleTo([ratingRow({}), ratingRow({ visibility: "after_close", closed: false })].map((row) => ({ personId: row.person_id, itemId: row.item_id, visibility: row.visibility, closed: row.closed })), "z").length, 1);
+  assert.equal(visibleTo([ratingRow({}), ratingRow({ visibility: "after_close", closed: false })].map(asVisibility), "z").length, 1);
+});
+
+const asVisibility = (row: ReturnType<typeof ratingRow>) => ({ personId: row.person_id, itemId: row.item_id, entryTypeId: row.entry_type_id, visibility: row.visibility, closed: row.closed });
+
+test("after_own abre só o mesmo formulário do mesmo item que a pessoa respondeu", () => {
+  const rows = [
+    ratingRow({ person_id: "z", entry_type_id: "nota" }),
+    ratingRow({ person_id: "b", entry_type_id: "nota", visibility: "after_own" }),
+    ratingRow({ person_id: "b", entry_type_id: "roteiro", visibility: "after_own" }),
+    ratingRow({ person_id: "b", item_id: "i2", entry_type_id: "nota", visibility: "after_own" }),
+  ].map(asVisibility);
+  const seen = visibleTo(rows, "z").map((row) => `${row.personId}:${row.entryTypeId}:${row.itemId}`);
+  assert.deepEqual(seen, ["z:nota:i1", "b:nota:i1"], "responder a nota não abre o outro formulário nem outro item");
 });

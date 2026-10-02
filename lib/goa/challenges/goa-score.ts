@@ -22,6 +22,7 @@ import { unsealedEntrySql } from "./reveal";
 interface ScoreRow extends NormalisedRating {
   challengeId: string;
   itemId: string;
+  entryTypeId: string;
   catalogItemId: string | null;
   kind: string | null;
   nominated: boolean;
@@ -35,11 +36,11 @@ interface ScoreRow extends NormalisedRating {
 
 async function groupRatingRows(client: Pick<PoolClient, "query">, groupId: string): Promise<ScoreRow[]> {
   const result = await client.query<{
-    challenge_id: string; item_id: string; catalog_item_id: string | null; kind: string | null; person_id: string;
+    challenge_id: string; item_id: string; entry_type_id: string; catalog_item_id: string | null; kind: string | null; person_id: string;
     value: number; lo: number; hi: number; nominated: boolean; visibility: string; closed: boolean;
     genre: string | null; author: string | null; year: number | null; runtime: number | null; pages: number | null;
   }>(
-    `SELECT c.id AS challenge_id, it.id AS item_id, cat.id AS catalog_item_id, cat.kind, e.participant_user_id AS person_id,
+    `SELECT c.id AS challenge_id, it.id AS item_id, e.entry_type_id, cat.id AS catalog_item_id, cat.kind, e.participant_user_id AS person_id,
             er.value, er.lo, er.hi, (it.recommended_by_user_id = e.participant_user_id) IS TRUE AS nominated,
             t.visibility_policy AS visibility, c.status = 'closed' AS closed,
             cat.main_genre AS genre, cat.author, cat.year, cat.runtime_minutes AS runtime, cat.page_count AS pages
@@ -65,6 +66,7 @@ async function groupRatingRows(client: Pick<PoolClient, "query">, groupId: strin
   return result.rows.map((row) => ({
     challengeId: row.challenge_id,
     itemId: row.item_id,
+    entryTypeId: row.entry_type_id,
     catalogItemId: row.catalog_item_id,
     kind: row.kind,
     personId: row.person_id,
@@ -124,10 +126,11 @@ function byKey<T>(rows: T[], keyOf: (row: T) => string): Map<string, T[]> {
  * The ratings `viewerId` may see (null: only what anyone may) — applied to everything, history included, before
  * any score is calculated: a hidden rating mustn't move a score through someone's usual or their taste either.
  */
-export function visibleTo<T extends Pick<ScoreRow, "personId" | "itemId" | "visibility" | "closed">>(rows: T[], viewerId: string | null): T[] {
-  const answered = new Set(rows.filter((row) => row.personId === viewerId).map((row) => row.itemId));
+export function visibleTo<T extends Pick<ScoreRow, "personId" | "itemId" | "entryTypeId" | "visibility" | "closed">>(rows: T[], viewerId: string | null): T[] {
+  // after_own opens a rating once the viewer answered the same form on the same item — the rule the entries list uses.
+  const answered = new Set(rows.filter((row) => row.personId === viewerId).map((row) => `${row.entryTypeId}:${row.itemId}`));
   return rows.filter((row) => row.personId === viewerId || (
-    row.visibility === "after_own" ? answered.has(row.itemId)
+    row.visibility === "after_own" ? answered.has(`${row.entryTypeId}:${row.itemId}`)
       : row.visibility === "after_close" ? row.closed
         : row.visibility !== "author_only"));
 }
