@@ -9,7 +9,7 @@ import { writeAudit, writeSystemAudit } from "./domain/audit";
 import { purgeChallengeRows, purgeGroupRows } from "./purge";
 
 /**
- * Recoverable deletion (ROADMAP §13). The four actions the product keeps apart:
+ * Recoverable deletion (docs/architecture.md › Lixeira e recuperação). The four actions the product keeps apart:
  *
  *   1. **Arquivar** (explicit) — `archived_at` on the row. Still part of history;
  *      shows under "Arquivados" in its own context, never in the bin.
@@ -710,7 +710,7 @@ export async function restoreTrashItem(session: SessionContext, body: Record<str
     }
     if (kind === "entry" && row.challengeStatus === "closed") {
       // A closed round's memory is frozen — bringing an entry back would rewrite
-      // its metrics and Wrapped after the fact (ROADMAP §13).
+      // its metrics and Wrapped after the fact (docs/architecture.md › Lixeira e recuperação).
       throw new ApiError(409, "challenge_closed", "Reabra o desafio ou use a correção administrativa para mexer nos registros.");
     }
     if (await parentTrashed(client, row)) {
@@ -803,7 +803,7 @@ export async function purgeTrashItem(session: SessionContext, body: Record<strin
   return inTransaction(async (client) => {
     const row = await locate(client, kind, id);
     await authorize(client, session, row, "purge");
-    // An object can only be destroyed for good *from the bin* (ROADMAP §13). A
+    // An object can only be destroyed for good *from the bin* (docs/architecture.md › Lixeira e recuperação). A
     // still-active group / challenge / structure is never a valid target, no
     // matter the role or the confirmation string.
     if (BIN_KINDS.includes(kind as BinKind)) {

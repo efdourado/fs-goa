@@ -108,7 +108,7 @@ export async function createGroup(session: SessionContext, body: Record<string, 
   return inTransaction(async (client) => {
     const owned = await oneOrNull<{ count: number }>(
       client,
-      // A binned group still occupies its slot (ROADMAP §13 — the bin has no
+      // A binned group still occupies its slot (docs/architecture.md › Lixeira e recuperação — the bin has no
       // expiry, so it cannot be a free way around the cap). Restore it or delete
       // it for good to free the slot.
       `SELECT count(*)::int AS count FROM groups

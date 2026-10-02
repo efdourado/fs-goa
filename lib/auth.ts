@@ -235,7 +235,7 @@ export async function loginAccount(body: Record<string, unknown>): Promise<{
 }
 
 // Self-service password reset is on hold for V1: it needs an e-mail channel to
-// deliver the link, and linking a mail provider is out of scope (ROADMAP §1).
+// deliver the link, and linking a mail provider is out of scope (docs/architecture.md › Fora de escopo).
 // The whole visible flow — the "forgot password" screen, `/api/auth/forgot`,
 // `/api/auth/reset`, the pending-request indicator in `/admin` and the operator
 // script — was removed on 2026-09-06. The `password_reset_tokens` table is left
@@ -391,7 +391,7 @@ export async function accountDeletionPreview(session: SessionContext): Promise<{
 }
 
 /**
- * Irreversible account removal (ROADMAP §13). Requires the password. Leaves no
+ * Irreversible account removal (docs/architecture.md › Lixeira e recuperação). Requires the password. Leaves no
  * orphan: the hidden personal workspace and any solo-owned standard group are
  * **physically purged**; a co-owned group transfers to its longest-tenured
  * admin/member; contributions in surviving groups stay but anonymised (the

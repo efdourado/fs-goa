@@ -38,7 +38,7 @@ export async function setChallengeParticipants(
     }
     if (body.replace === true) {
       // Consent is per-round and does not survive removal — a re-added person
-      // opts in again (ROADMAP §12). Clearing it here is what protects a
+      // opts in again (docs/architecture.md › Publicação e consentimento). Clearing it here is what protects a
       // dropped participant: any already-public showcase reads consent live,
       // so their identity masks on its very next view.
       await client.query(
@@ -94,7 +94,7 @@ export async function setParticipantNameConsent(
         "participant.name_consent_changed", "challenge_participant", session.user.id,
         null, null, { nameConsent: body.nameConsent });
       // A published showcase reads consent live, so this takes effect on its
-      // very next view — nothing to republish (ROADMAP §12).
+      // very next view — nothing to republish (docs/architecture.md › Publicação e consentimento).
     }
     return { challengeId, nameConsent: body.nameConsent };
   });

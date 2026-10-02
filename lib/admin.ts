@@ -6,7 +6,7 @@ import { ApiError, stringValue } from "./http";
 /**
  * Platform-admin console services. Deliberately metadata-only: counts, sizes,
  * timestamps and aggregate audit rows — never group or challenge *content*, and
- * never the power to delete a third party's content (ROADMAP §14). There is no
+ * never the power to delete a third party's content (docs/architecture.md › Administração e privacidade). There is no
  * global bin here: a binned object is the owner's to restore or destroy.
  */
 
@@ -289,7 +289,7 @@ export async function adminUsers() {
  *
  * An admin-issued link is account takeover: the admin sees the e-mail in this
  * very console and could manufacture any "the user asked first" proof, which
- * contradicts ROADMAP §14 ("o administrador não deve acessar conteúdo privado").
+ * contradicts docs/architecture.md › Administração e privacidade ("o administrador não deve acessar conteúdo privado").
  * A self-service flow needs an e-mail channel to deliver the link, and that is
  * out of scope for V1 (§1). So the whole visible flow — the "forgot password"
  * screen, `/api/auth/forgot`, `/api/auth/reset` and the pending-request
@@ -318,7 +318,7 @@ export async function adminAudit(query: URLSearchParams) {
     }>(
       // Personal-workspace audit rows carry private titles/comments/rules in
       // `before`/`after`/`metadata` — the platform admin sees that *something*
-      // happened (actor, action, when) but never the content (ROADMAP §14).
+      // happened (actor, action, when) but never the content (docs/architecture.md › Administração e privacidade).
       `SELECT a.id, a.action, a.entity_type, a.entity_id, a.created_at,
               u.username AS actor, a.group_id, a.challenge_id, a.before, a.after, a.metadata,
               (g.kind = 'personal') AS personal_scope
@@ -356,7 +356,7 @@ export async function adminAudit(query: URLSearchParams) {
 /**
  * Operational breadcrumbs for irreversible actions (permanent deletes, account
  * removal). Already content-free by construction — the id is only a hash — so
- * support can correlate a report without ever seeing private data (ROADMAP §14).
+ * support can correlate a report without ever seeing private data (docs/architecture.md › Administração e privacidade).
  */
 export async function adminSystemAudit(query: URLSearchParams) {
   const limitRaw = Number(query.get("limit") ?? 100);

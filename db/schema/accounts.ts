@@ -122,7 +122,7 @@ export const loginAttempts = pgTable(
 // DORMANT since 2026-09-06: the self-service reset flow (the "forgot password"
 // screen, `/api/auth/forgot`, `/api/auth/reset`) was withdrawn because there is
 // no e-mail channel to deliver the link and wiring a mail provider is out of
-// scope for V1 (ROADMAP §1). Nothing reads or writes this table right now — it
+// scope for V1 (docs/architecture.md › Fora de escopo). Nothing reads or writes this table right now — it
 // is kept so the flow can be switched back on as a code change only.
 export const passwordResetTokens = pgTable(
   "password_reset_tokens",

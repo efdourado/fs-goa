@@ -223,7 +223,7 @@ export async function saveChallengeFields(
       }
 
       // Once the round is live, a non-destructive edit is still allowed but it
-      // must not orphan an answer already given (ROADMAP §4).
+      // must not orphan an answer already given (docs/architecture.md › Edição e integridade).
       if (access.challenge.status !== "draft") {
         if (current.kind === "number") {
           const outOfRange = await oneOrNull<{ count: number }>(client,

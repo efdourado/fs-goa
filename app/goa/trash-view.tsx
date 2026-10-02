@@ -148,7 +148,7 @@ function PurgeDialog({
 }
 
 /**
- * The recoverable-deletion bin (ROADMAP §13). One list, three scopes: the
+ * The recoverable-deletion bin (docs/architecture.md › Lixeira e recuperação). One list, three scopes: the
  * personal workspace, a group, or a challenge's removed structure. Nothing here
  * expires — an item stays until it is restored or permanently deleted.
  */

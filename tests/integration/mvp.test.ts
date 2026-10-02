@@ -1338,7 +1338,7 @@ test("aplica limites de criação por dono e por grupo", async () => {
   );
   assert.equal(fullGroupCount.rows[0]?.count, 6, "falha de limite não deixa cópia parcial");
 
-  // A binned group keeps its slot — the bin never expires (ROADMAP §13).
+  // A binned group keeps its slot — the bin never expires (docs/architecture.md › Lixeira e recuperação).
   assert.equal((await call("DELETE", `/api/groups/${groupIds[5]}`, { session: owner })).response.status, 200);
   const stillCapped = await call("POST", "/api/groups", { session: owner, body: { name: "Ainda cheio" } });
   assert.equal(stillCapped.response.status, 403, "grupo na lixeira continua ocupando a vaga");
@@ -1413,7 +1413,7 @@ test("área de administração: acesso, painel agregado e contas (sem lixeira gl
   assert.equal((await call("GET", "/api/admin/users", { session: adminSession })).response.status, 200);
   assert.equal((await call("GET", "/api/admin/audit", { session: adminSession })).response.status, 200);
 
-  // The platform admin has NO global bin — not the list, not purge (ROADMAP §14).
+  // The platform admin has NO global bin — not the list, not purge (docs/architecture.md › Administração e privacidade).
   assert.equal((await call("GET", "/api/admin/trash", { session: adminSession })).response.status, 404, "sem lixeira global no /admin");
   assert.equal(
     (await call("POST", "/api/admin/trash/purge", { session: adminSession, body: { kind: "group", id: "x" } })).response.status,
@@ -1470,7 +1470,7 @@ test("e-mail, login por e-mail e edição de conta", async () => {
   assert.equal(relog.response.status, 200, "login por usuário");
 
   // Self-service password reset is withdrawn until there is an e-mail channel to
-  // deliver the link (ROADMAP §1). The routes simply do not exist.
+  // deliver the link (docs/architecture.md › Fora de escopo). The routes simply do not exist.
   assert.equal((await call("POST", "/api/auth/forgot", { body: { email: "carla@example.com" } })).response.status, 404, "sem rota de 'esqueci a senha'");
   assert.equal((await call("POST", "/api/auth/reset", { body: { token: "x".repeat(43), password: "nova senha bem forte 9" } })).response.status, 404, "sem rota de redefinição");
   const users = await call("GET", "/api/admin/users", { session: adminSession });
@@ -5543,7 +5543,7 @@ test("quem sai do grupo tem a identidade mascarada ao vivo, sem tirar a vitrine 
   assert.ok(afterNames.includes("Dona Saída"), "quem ficou continua visível normalmente");
 });
 
-// ── ROADMAP §13/§14 — recoverable deletion ────────────────────────────────
+// ── recoverable deletion — docs/architecture.md › Lixeira, Administração ────────────────────────────────
 
 test("lixeira: um desafio binado some das listas, aparece em /trash e restaura com o mesmo id", async () => {
   const owner = await register("Dona Bin", "dona_bin_v1");
@@ -5736,7 +5736,7 @@ test("conta: desativar é reversível e trava mutações; excluir de vez exige s
   assert.equal(groupGone.rowCount, 0, "grupo solo apagado de vez, sem órfão");
 });
 
-// ── ROADMAP §16 — cenário autossuficiente de aceitação (todos os 23 passos) ──
+// ── cenário autossuficiente de aceitação (todos os 23 passos) ──
 
 test("cenário de aceitação V1: grupo de 6, Cinema com semanas, JSON, expectativa, métricas, Wrapped, publicação, lixeira", async () => {
   // 1. Grupo com 6 participantes.

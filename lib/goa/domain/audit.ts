@@ -43,7 +43,7 @@ export async function writeSystemAudit(
   entityKind: string,
   entityId: string,
   // Numbers plus, for an administrative deletion, the required `reason` string
-  // (ROADMAP §14 "motivo de correção administrativa").
+  // (docs/architecture.md › Administração e privacidade "motivo de correção administrativa").
   counts: Record<string, number | string> = {},
 ): Promise<void> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(entityId));
@@ -56,7 +56,7 @@ export async function writeSystemAudit(
 }
 
 /**
- * Stricter redaction for the `/admin` boundary (ROADMAP §14 + the visual promise
+ * Stricter redaction for the `/admin` boundary (docs/architecture.md › Administração e privacidade + the visual promise
  * "nunca o conteúdo dos grupos"). The stored audit keeps the shape of a change;
  * the platform admin sees only **structural** values — a key must be on the
  * allowlist *and* the value short — everything else, of any length, is omitted.

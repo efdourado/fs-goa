@@ -1731,7 +1731,7 @@ export async function publicResults(token: string) {
     const row = await oneOrNull<DetailChallengeRow>(
       client,
       // The parent group's state also gates the public link: a binned group
-      // takes its challenges' showcases offline with it (ROADMAP §13).
+      // takes its challenges' showcases offline with it (docs/architecture.md › Lixeira e recuperação).
       `SELECT c.id, c.group_id, c.title, c.description, c.rules, c.rule_sections,
               c.start_date::text AS start_date, c.end_date::text AS end_date,
               c.status, c.kind, c.recipe_key, g.kind AS group_kind, c.results_anon,

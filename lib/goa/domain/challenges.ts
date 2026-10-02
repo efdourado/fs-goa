@@ -107,7 +107,7 @@ export async function createChallenge(
     const existing = await oneOrNull<{ count: number }>(
       client,
       // A challenge counts while it is live or sitting in a bin the owner can
-      // empty (the bin never expires — ROADMAP §13). A row that is soft-deleted
+      // empty (the bin never expires — docs/architecture.md › Lixeira e recuperação). A row that is soft-deleted
       // with no `trash_items` record is a ghost from before the bin registry
       // existed: it is invisible and unrecoverable, so it must not hold a slot.
       `SELECT count(*)::int AS count FROM challenges c

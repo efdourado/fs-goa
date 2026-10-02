@@ -335,7 +335,7 @@ export async function POST(request: Request): Promise<Response> {
       return json({ ok: true }, 200, { "set-cookie": result.setCookie });
     }
 
-    // Recoverable-deletion bin (ROADMAP §13). Scope lives in the URL; the
+    // Recoverable-deletion bin (docs/architecture.md › Lixeira e recuperação). Scope lives in the URL; the
     // service re-derives the caller's role from the object's group.
     if ((isPath(path, "personal", "trash", "preview")) ||
         (path[0] === "groups" && path[2] === "trash" && path[3] === "preview" && path.length === 4) ||

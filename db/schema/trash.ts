@@ -5,7 +5,7 @@ import { users } from "./accounts";
 import { timestamptz } from "./columns";
 
 /**
- * The recoverable-deletion registry (ROADMAP §13). Presence of a row here means
+ * The recoverable-deletion registry (docs/architecture.md › Lixeira e recuperação). Presence of a row here means
  * the object is **in the bin** — an explicit, user-initiated "move to trash",
  * distinct from `archived_at` (which stays reserved for "archive"). Deliberately
  * carries **no foreign key to a content table**: the row is removed in the same
