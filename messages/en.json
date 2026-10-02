@@ -2230,6 +2230,10 @@
     },
     "title": "The thread",
     "metricsMore": "+{count} more",
+    "dimension": {
+      "eyebrow": "By criterion",
+      "title": "{label}: {title} leads"
+    },
     "ranking": {
       "rest": "The rest of the ranking"
     },

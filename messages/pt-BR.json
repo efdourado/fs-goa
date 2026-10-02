@@ -2230,6 +2230,10 @@
     },
     "title": "O fio",
     "metricsMore": "+{count} outros",
+    "dimension": {
+      "eyebrow": "Por critério",
+      "title": "{label}: {title} na frente"
+    },
     "ranking": {
       "rest": "O resto do ranking"
     },

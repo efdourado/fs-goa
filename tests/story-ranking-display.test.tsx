@@ -31,3 +31,23 @@ test("the ranking shows the Goa score, two places, labelled — not three fives"
   assert.ok(!html.includes(">5<"), "no plain five on the podium or the bars");
   assert.ok(html.indexOf("4.74") < html.indexOf("4.72") || html.includes("LOTR took it, at 4.74"), "LOTR leads");
 });
+
+test("each criterion shows who leads it on the rankings page", () => {
+  const places: StoryInput = {
+    title: "Bars", noun: "place", people: [{ id: "me", name: "Me" }],
+    items: [{ id: "cantina", title: "Cantina" }, { id: "boteco", title: "Boteco" }],
+    ratings: [
+      { personId: "me", itemId: "cantina", value: 3.5, parts: { food: 5, vibe: 2 } },
+      { personId: "me", itemId: "boteco", value: 3.5, parts: { food: 2, vibe: 5 } },
+    ],
+    dimensions: [{ id: "food", label: "Food", min: 0, max: 5 }, { id: "vibe", label: "Vibe", min: 0, max: 5 }],
+    expectations: [], scale: { min: 0, max: 5 }, days: [], records: [], today: "2026-10-02",
+  };
+  function Page() {
+    const page = useAlmanacPages(buildStory(places), places, []).find((row) => row.id === "rankings")!;
+    return <div>{page.body}</div>;
+  }
+  const html = renderToStaticMarkup(<NextIntlClientProvider locale="en" messages={messages} timeZone="America/Sao_Paulo"><Page /></NextIntlClientProvider>);
+  assert.ok(html.includes("Food: Cantina leads"));
+  assert.ok(html.includes("Vibe: Boteco leads"));
+});

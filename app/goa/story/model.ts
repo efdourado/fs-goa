@@ -26,7 +26,10 @@ export interface StoryItem {
   /** Author/director and any custom text property the library defines. */
   properties?: StoryProperty[];
 }
-export interface StoryRating { personId: Id; itemId: Id; value: number; comment?: string | null }
+/** `parts`: the value of each rating field when the form has several (food, ambience, value…). */
+export interface StoryRating { personId: Id; itemId: Id; value: number; comment?: string | null; parts?: Record<Id, number> }
+/** One rating field of a form with several — what its own ranking is called and the scale it's given on. */
+export interface StoryDimension { id: Id; label: string; min: number; max: number }
 export interface StoryExpectation { personId: Id; itemId: Id; value: number }
 /** One dated check-in: a habit's day, a day's pages, a workout. `value` only when the day has a number. */
 export interface StoryDay { personId: Id; day: string; value?: number | null; note?: string | null }
@@ -46,6 +49,8 @@ export interface StoryInput {
    * ratings it counts — used only when every one of them is a rating this story can see.
    */
   scores?: Record<Id, { value: number; count: number }>;
+  /** The form's rating fields when it has two or more — each gets its own ranking. */
+  dimensions?: StoryDimension[];
   days: StoryDay[];
   records: StoryRecord[];
   /** The counted number's label and unit on a dated challenge ("Páginas", "km"). */
@@ -85,6 +90,8 @@ export interface RatedStory {
   totals: { people: number; items: number; ratings: number; comments: number; minutes: number | null };
   mood: "sync" | "mixed" | "apart";
   ranking: ItemScore[];
+  /** Per rating field (when the form has several): titles ranked by that field's plain average. */
+  dimensions: Array<{ dimension: StoryDimension; ranking: Array<{ item: StoryItem; average: number; count: number }> }>;
   genres: GroupStat[];
   /** Every release year with its titles, oldest first — shown once there are two different years. */
   years: GroupStat[];
@@ -322,6 +329,13 @@ function buildRated(input: StoryInput): RatedStory | null {
     },
     mood: typicalSpread < 0.15 ? "sync" : typicalSpread < 0.35 ? "mixed" : "apart",
     ranking,
+    dimensions: (input.dimensions ?? []).length >= 2 ? (input.dimensions ?? []).flatMap((dimension) => {
+      const rows = stations.flatMap((station) => {
+        const values = ratings.filter((rating) => rating.itemId === station.item.id && typeof rating.parts?.[dimension.id] === "number").map((rating) => rating.parts![dimension.id]);
+        return values.length ? [{ item: station.item, average: round1(mean(values)), exact: mean(values), count: values.length }] : [];
+      }).sort((a, b) => b.exact - a.exact || b.count - a.count);
+      return rows.length ? [{ dimension, ranking: rows.map(({ item, average, count }) => ({ item, average, count })) }] : [];
+    }) : [],
     genres: (() => { const stats = groupBy(stations, (item) => item.genre ?? null); return stats.length >= 2 ? stats : []; })(),
     years: (() => { const stats = groupBy(stations, (item) => (item.year ? String(item.year) : null)).sort((a, b) => a.key.localeCompare(b.key)); return stats.length >= 2 ? stats : []; })(),
     length,
@@ -525,6 +539,12 @@ export function storyFromChallenge(challenge: ChallengeDetail, entries: Entry[],
   const expectationField = expectationType?.fields.find((field) => field.type === "rating")?.id;
   const textFields = new Set(challenge.entryTypes.flatMap((type) => type.fields.filter((field) => field.type === "text").map((field) => field.id)));
   const ratingField = challenge.entryTypes.find((type) => ratingTypes.has(type.id))?.fields.find((field) => field.type === "rating");
+  // A form with several rating fields (food, ambience, value) ranks each one too.
+  const dimensionFields = challenge.entryTypes.filter((type) => ratingTypes.has(type.id))
+    .flatMap((type) => type.fields.filter((field) => field.type === "rating" && field.id));
+  const dimensions: StoryDimension[] = dimensionFields.length >= 2
+    ? dimensionFields.map((field) => ({ id: field.id!, label: field.label, min: field.config?.min ?? 0, max: field.config?.max ?? 5 }))
+    : [];
   // Dated types: anything recorded per day that isn't a rating or an expectation.
   const recordType = challenge.entryTypes.find((type) => type.parentTypeId);
   const datedTypes = challenge.entryTypes.filter((type) =>
@@ -545,7 +565,13 @@ export function storyFromChallenge(challenge: ChallengeDetail, entries: Entry[],
     const itemId = itemIdForEntry(entry);
     if (ratingTypes.has(entry.entryTypeId ?? "") && itemId) {
       const value = readRating(entry);
-      if (value !== null) ratings.push({ personId: entry.userId, itemId, value, comment: note ?? null });
+      const parts = dimensions.length
+        ? Object.fromEntries(dimensions.flatMap((dimension) => {
+          const part = Number(values[dimension.id]);
+          return values[dimension.id] !== null && values[dimension.id] !== undefined && values[dimension.id] !== "" && Number.isFinite(part) ? [[dimension.id, part]] : [];
+        }))
+        : undefined;
+      if (value !== null) ratings.push({ personId: entry.userId, itemId, value, comment: note ?? null, ...(parts ? { parts } : {}) });
     } else if (expectationType && entry.entryTypeId === expectationType.id && expectationField && itemId) {
       const value = Number(values[expectationField]);
       if (Number.isFinite(value)) expectations.push({ personId: entry.userId, itemId, value });
@@ -575,6 +601,7 @@ export function storyFromChallenge(challenge: ChallengeDetail, entries: Entry[],
     expectations,
     scale: { min: ratingField?.config?.min ?? 0, max: ratingField?.config?.max ?? 5 },
     scores: challenge.itemScores,
+    dimensions,
     days,
     records,
     counter: counterField ? { label: counterField.label, unit: counterField.config?.unit ?? null } : null,

@@ -122,3 +122,33 @@ test("two people's days: how often they showed up together", () => {
   const story = buildStory({ ...reading, people: reading.people.filter((person) => person.id === "duda" || person.id === "lucas") }) as DatedStory;
   assert.ok(story.together! > 10);
 });
+
+test("a form with several ratings: the overall ranking counts them all, and each one ranks on its own", async () => {
+  const { storyFromChallenge } = await import("../app/goa/story/model");
+  const challenge = {
+    title: "Bares", recipeKey: "tables", startsOn: null, endsOn: null,
+    participants: [{ userId: "ana", name: "Ana" }, { userId: "bia", name: "Bia" }],
+    items: [{ id: "cantina", title: "Cantina" }, { id: "boteco", title: "Boteco" }, { id: "padaria", title: "Padaria" }],
+    entryTypes: [{
+      id: "t", purpose: "rating", answerScope: "individual", cardinality: "once_per_item",
+      fields: [{ id: "food", label: "Comida", type: "rating" }, { id: "vibe", label: "Ambiente", type: "rating" }, { id: "price", label: "Preço", type: "rating" }],
+    }],
+  } as unknown as Parameters<typeof storyFromChallenge>[0];
+  const rows: Array<[string, string, number, number, number]> = [
+    ["ana", "cantina", 5, 2, 3], ["bia", "cantina", 5, 3, 3],
+    ["ana", "boteco", 2, 5, 4], ["bia", "boteco", 3, 5, 5],
+    ["ana", "padaria", 4, 4, 5],
+  ];
+  const entries = rows.map(([userId, itemId, food, vibe, price], index) => ({ id: `e${index}`, userId, itemId, entryTypeId: "t", values: { food, vibe, price } })) as unknown as Parameters<typeof storyFromChallenge>[1];
+  const input = storyFromChallenge(challenge, entries, TODAY);
+  const story = buildStory(input) as RatedStory;
+  // Overall: every field counts — Padaria (13/3) beats the food-only favourite Cantina (21/6).
+  assert.deepEqual(story.ranking.map((station) => station.item.id), ["padaria", "boteco", "cantina"]);
+  assert.deepEqual(story.dimensions.map((row) => [row.dimension.label, row.ranking[0].item.id]), [["Comida", "cantina"], ["Ambiente", "boteco"], ["Preço", "padaria"]]);
+  assert.equal(story.dimensions[0].ranking[0].average, 5);
+  assert.equal(story.dimensions[0].ranking[0].count, 2);
+});
+
+test("a single rating field has no per-criterion rankings", () => {
+  assert.deepEqual((buildStory(films) as RatedStory).dimensions, []);
+});

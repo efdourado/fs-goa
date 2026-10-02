@@ -168,7 +168,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
       id: "rankings",
       title: t("pages.rankings.title"),
       headline: t("pages.rankings.headline", { title: s.ranking[0].item.title, value: fmtScore(s.ranking[0].score) }),
-      contents: [t("podium.eyebrow"), rest.length ? t("ranking.rest") : null, s.genres.length ? t("genres.eyebrow") : null, s.years.length ? t("years.eyebrow") : null].filter(Boolean).join(" · "),
+      contents: [t("podium.eyebrow"), rest.length ? t("ranking.rest") : null, s.dimensions.length ? t("dimension.eyebrow") : null, s.genres.length ? t("genres.eyebrow") : null, s.years.length ? t("years.eyebrow") : null].filter(Boolean).join(" · "),
       body: (
         <div className={grid}>
           <Block title={t("podium.eyebrow")}>
@@ -203,6 +203,17 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
               ) : null}
             </Block>
           ) : null}
+          {/* A form with several ratings (food, ambience, value): who leads each one, beside the overall ranking. */}
+          {s.dimensions.map(({ dimension, ranking }) => (
+            <Block key={dimension.id} title={t("dimension.title", { label: dimension.label, title: ranking[0].item.title })}>
+              <ol className="space-y-2">
+                {ranking.slice(0, 3).map((row, index) => (
+                  <li key={row.item.id}><Bar label={<><span className="mr-1.5 tabular-nums text-[var(--muted)]">{index + 1}</span>{row.item.title}</>} value={row.average - dimension.min} max={dimension.max - dimension.min} strong={index === 0} figure={fmt(row.average)} tone={index === 0 ? "var(--main)" : "var(--main-line)"} /></li>
+                ))}
+              </ol>
+              {ranking.length > 3 ? <p className="mt-2 text-xs text-[var(--muted)]">{t("metricsMore", { count: ranking.length - 3 })}</p> : null}
+            </Block>
+          ))}
           {s.genres.length ? <Block title={t("genres.title", { genre: s.genres[0].key, value: fmt(s.genres[0].average) })}>{statBars(s.genres)}</Block> : null}
           {s.years.length ? (
             <Block title={t("years.title", { first: s.years[0].key, last: s.years.at(-1)!.key })}>
