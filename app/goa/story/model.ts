@@ -59,8 +59,13 @@ export interface StoryInput {
 }
 
 export interface Landed { personId: Id; name: string; value: number }
-export interface ItemScore { item: StoryItem; average: number; ratings: Landed[]; spread: number }
-export interface GroupStat { key: string; count: number; average: number; items: string[] }
+/**
+ * One title on the drawing. `average` is the plain average of what people gave (rounded, what's displayed as
+ * "average"); `score` is what it ranks by — the Goa score when there is one, at full precision, so 4.74 and 4.72
+ * stay apart even though both read 4.7.
+ */
+export interface ItemScore { item: StoryItem; average: number; score: number; ratings: Landed[]; spread: number }
+export interface GroupStat { key: string; count: number; average: number; score: number; items: string[] }
 
 /** A note pinned onto the drawing at one title (and optionally one person's point on it). */
 export type RatedNote =
@@ -181,9 +186,12 @@ function groupBy(scores: ItemScore[], keyOf: (item: StoryItem) => string | null,
   }
   return [...map.entries()]
     .filter(([, list]) => list.length >= minCount)
-    .map(([key, list]) => ({ key, count: list.length, average: round1(mean(list.map((score) => score.average))), items: list.map((score) => score.item.title) }))
+    .map(([key, list]) => ({
+      key, count: list.length, average: round1(mean(list.map((station) => station.average))),
+      score: mean(list.map((station) => station.score)), items: list.map((station) => station.item.title),
+    }))
     // One title is an anecdote, not a pattern: groups of two or more rank first.
-    .sort((a, b) => Number(b.count >= 2) - Number(a.count >= 2) || b.average - a.average || b.count - a.count);
+    .sort((a, b) => Number(b.count >= 2) - Number(a.count >= 2) || b.score - a.score || b.count - a.count);
 }
 
 function buildRated(input: StoryInput): RatedStory | null {
@@ -196,16 +204,17 @@ function buildRated(input: StoryInput): RatedStory | null {
     const landed = ratings.filter((rating) => rating.itemId === item.id).map((rating) => ({ personId: rating.personId, name: nameOf.get(rating.personId)!, value: rating.value }));
     if (!landed.length) continue;
     const values = landed.map((row) => row.value);
-    const score = input.scores?.[item.id];
-    const average = score && score.count === landed.length ? score.value : mean(values);
-    stations.push({ item, average: round1(average), ratings: landed, spread: (Math.max(...values) - Math.min(...values)) / range });
+    // The Goa score only when it counts exactly the ratings on screen; otherwise the plain average ranks.
+    const goa = input.scores?.[item.id];
+    const score = goa && goa.count === landed.length ? goa.value : mean(values);
+    stations.push({ item, average: round1(mean(values)), score, ratings: landed, spread: (Math.max(...values) - Math.min(...values)) / range });
   }
   if (!stations.length) return null;
 
   const group = input.people.length > 1;
   const shared = stations.filter((station) => station.ratings.length >= 2);
   const typicalSpread = shared.length ? mean(shared.map((station) => station.spread)) : 0;
-  const ranking = [...stations].sort((a, b) => b.average - a.average || b.ratings.length - a.ratings.length);
+  const ranking = [...stations].sort((a, b) => b.score - a.score || b.ratings.length - a.ratings.length);
   const valueOf = (personId: Id, itemId: Id) => ratings.find((rating) => rating.personId === personId && rating.itemId === itemId)?.value ?? null;
 
   // Pinned notes: each only when it tells something.
@@ -377,12 +386,13 @@ function buildSolo(input: StoryInput, stations: ItemScore[], ratings: StoryRatin
     const guess = input.expectations.find((row) => row.personId === person.id && row.itemId === rating.itemId);
     return guess ? [Math.abs(guess.value - rating.value)] : [];
   });
-  const byValue = [...stations].sort((x, y) => x.average - y.average);
+  const byValue = [...stations].sort((x, y) => x.score - y.score);
   return {
     person,
     average: round1(mean(mine.map((rating) => rating.value))),
     distribution: [...buckets.entries()].map(([value, count]) => ({ value, count })),
-    perfect: stations.filter((station) => station.average >= top && top >= input.scale.max - step),
+    // What they actually gave, never the score: a 5 they typed stays a 5 here.
+    perfect: stations.filter((station) => Math.max(...station.ratings.map((row) => row.value)) >= top && top >= input.scale.max - step),
     lowest: byValue.length >= 3 ? byValue[0] : null,
     instincts: guesses.length ? { miss: round1(mean(guesses)), close: guesses.filter((miss) => miss <= 0.5).length, total: guesses.length } : null,
   };

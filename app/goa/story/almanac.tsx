@@ -209,7 +209,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
                   const tallest = Math.max(...s.years.map((row) => row.count));
                   // Only a year with two or more titles can be "the best" — one title is an anecdote.
                   const contenders = s.years.filter((row) => row.count >= 2);
-                  const best = year.count >= 2 && year.average === Math.max(...contenders.map((row) => row.average));
+                  const best = year.count >= 2 && year.score === Math.max(...contenders.map((row) => row.score));
                   return (
                     <div key={year.key} className="flex min-w-0 flex-1 flex-col items-center gap-1" title={year.items.join(" · ")}>
                       <span className="text-[10px] tabular-nums text-[var(--muted)]">{fmt(year.average)}</span>
