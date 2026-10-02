@@ -142,6 +142,8 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
   const [expanded, setExpanded] = useState(false);
   const showAll = full || expanded;
   const fmt = (value: number) => nf.number(value, { maximumFractionDigits: 1 });
+  // The ranking's number is the Goa score, to two places: 4.74 and 4.72 are why it exists, and both read 4.7.
+  const fmtScore = (value: number) => nf.number(value, { maximumFractionDigits: 2 });
   const day = (key: string) => nf.dateTime(new Date(`${key}T12:00:00Z`), { day: "numeric", month: "short", timeZone: "UTC" });
   const ids = input.people.map((person) => person.id);
   const noun = (count: number) => t(`noun.${input.noun}`, { count });
@@ -165,7 +167,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
     pages.push({
       id: "rankings",
       title: t("pages.rankings.title"),
-      headline: t("pages.rankings.headline", { title: s.ranking[0].item.title, value: fmt(s.ranking[0].average) }),
+      headline: t("pages.rankings.headline", { title: s.ranking[0].item.title, value: fmtScore(s.ranking[0].score) }),
       contents: [t("podium.eyebrow"), rest.length ? t("ranking.rest") : null, s.genres.length ? t("genres.eyebrow") : null, s.years.length ? t("years.eyebrow") : null].filter(Boolean).join(" · "),
       body: (
         <div className={grid}>
@@ -180,8 +182,8 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
                   </span>
                   <p className="mt-2 line-clamp-1 text-xs">{score.item.title}</p>
                   <div className={cx("mt-2 flex w-full flex-col items-center justify-start rounded-lg bg-[var(--wash)] pt-2.5", index === 1 ? "h-24" : index === 0 ? "h-[4.5rem]" : "h-14")}>
-                    <span className="text-2xl font-light tabular-nums leading-none tracking-[-0.03em]">{fmt(score.average)}</span>
-                    <span className="mt-1 text-[10px] text-[var(--muted)]">{t("podium.average")}</span>
+                    <span className="text-2xl font-light tabular-nums leading-none tracking-[-0.03em]">{fmtScore(score.score)}</span>
+                    <span className="mt-1 text-[10px] text-[var(--muted)]">{t("podium.score")}</span>
                   </div>
                 </div>
               ) : <span key={index} />)}
@@ -191,7 +193,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
             <Block title={t("ranking.rest")}>
               <ol className="space-y-2">
                 {(showAll ? rest : rest.slice(0, 5)).map((score, index) => (
-                  <li key={score.item.id}><Bar label={<><span className="mr-1.5 tabular-nums text-[var(--muted)]">{index + 4}</span>{score.item.title}</>} value={score.average - input.scale.min} max={scaleSpan} figure={fmt(score.average)} tone="var(--main-line)" /></li>
+                  <li key={score.item.id}><Bar label={<><span className="mr-1.5 tabular-nums text-[var(--muted)]">{index + 4}</span>{score.item.title}</>} value={score.score - input.scale.min} max={scaleSpan} figure={fmtScore(score.score)} tone="var(--main-line)" /></li>
                 ))}
               </ol>
               {!full && rest.length > 5 ? (

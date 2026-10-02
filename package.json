@@ -13,7 +13,7 @@
     "vercel-build": "bash scripts/deploy.sh",
     "start": "next start",
     "test": "npm run test:unit && npm run build && node --test tests/rendered-html.test.mjs",
-    "test:unit": "node --import tsx --test tests/*.test.ts",
+    "test:unit": "node --import tsx --test tests/*.test.ts tests/*.test.tsx",
     "test:integration": "node --import tsx --test tests/integration/*.test.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",

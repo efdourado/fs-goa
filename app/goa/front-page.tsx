@@ -142,7 +142,8 @@ function Story({ template, onOpen }: { template: TemplateSummary; onOpen: (id: I
 
   if (!detail && !failed) return <StorySkeleton />;
 
-  const fmt = (value: number) => nf.number(value, { maximumFractionDigits: 1 });
+  // The podium's number is the Goa score (two places — see the story's ranking).
+  const fmtScore = (value: number) => nf.number(value, { maximumFractionDigits: 2 });
   const dates = detail ? f.dateRange(detail.startsOn, detail.endsOn) : "";
   const kicker = [dates || null, t(`mode.${template.submissionMode}`)].filter(Boolean).join(" · ");
   // The one line worth reading out loud.
@@ -186,7 +187,7 @@ function Story({ template, onOpen }: { template: TemplateSummary; onOpen: (id: I
                 <PodiumCover title={score.item.title} year={score.item.year} />
                 <span className="absolute -left-2 -top-2 grid h-7 w-7 place-items-center rounded-full bg-[var(--ink)] text-xs font-medium text-[var(--canvas)]">{index === 1 ? 1 : index === 0 ? 2 : 3}</span>
               </span>
-              <span className="mt-2 text-2xl font-light tabular-nums tracking-[-0.03em]">{fmt(score.average)}</span>
+              <span className="mt-2 text-2xl font-light tabular-nums tracking-[-0.03em]">{fmtScore(score.score)}</span>
             </li>
           ) : <li key={index} />)}
         </ol>
