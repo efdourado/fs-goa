@@ -168,6 +168,7 @@ export function LibraryPills({
   onPick,
   onNew,
   label,
+  lockedKinds = [],
 }: {
   choices: LibraryChoice[];
   /** The one chosen library, for a single-choice picker… */
@@ -177,26 +178,36 @@ export function LibraryPills({
   onPick: (choice: LibraryChoice) => void;
   onNew?: () => void;
   label: string;
+  /** Always part of the choice and not removable — a recipe's own library, shown so "also" has something to add to. */
+  lockedKinds?: readonly string[];
 }) {
   const t = useTranslations("libraries");
   const libraryName = useLibraryName();
   return (
     <div className="flex flex-wrap gap-2" role="group" aria-label={label}>
       {choices.map((choice) => {
-        const active = selectedKinds ? selectedKinds.includes(choice.kind) : choice.kind === kind;
+        const locked = lockedKinds.includes(choice.kind);
+        const active = locked || (selectedKinds ? selectedKinds.includes(choice.kind) : choice.kind === kind);
         return (
           <button
             key={choice.kind}
             type="button"
             aria-pressed={active}
+            disabled={locked}
+            title={locked ? t("included") : undefined}
             onClick={() => onPick(choice)}
             className={cx(
-              "inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border px-4 text-sm transition",
+              "inline-flex min-h-10 items-center gap-2 rounded-full border px-4 text-sm transition",
+              locked ? "cursor-default" : "cursor-pointer",
               active ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] hover:border-[var(--main-line)]",
             )}
           >
-            <LibraryGlyph source={choice.source} />
+            {/* The state is a check, never the library's round glyph — those read as radio buttons. */}
+            {active ? (
+              <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 flex-none" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            ) : null}
             {libraryName(choice)}
+            {locked ? <span className="text-xs text-[var(--main-strong)]/70">· {t("included")}</span> : null}
           </button>
         );
       })}

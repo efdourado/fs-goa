@@ -359,11 +359,13 @@ export function CreateChallengeScreen({
             <h2 className="text-xl font-light">{t("checkpointsTitle")}</h2>
             {needsTablesLibrary ? <div className="mt-4"><TablesLibraryPrompt scope={scope} onCreated={reloadLibraries} /></div> : null}
             {needsTablesLibrary || (libraryMode === "tables" && !libraries) ? null : <>
-            <p className="mt-1 mb-4 text-sm leading-6 text-[var(--muted)]">{recipe === "bookshelf" ? t("bookshelfItemsHint") : libraryMode === "tables" ? t("tablesItemsHint") : libraryMode === "pick" ? t("customItemsHint") : allBooks ? t("bookItemsHint") : t("cineItemsHint")}</p>
+            {/* The hint follows what the list can hold: with another library added it's no longer only films or books. */}
+            <p className="mt-1 mb-4 text-sm leading-6 text-[var(--muted)]">{libraryMode === "tables" ? t("tablesItemsHint") : libraryMode === "pick" ? t("customItemsHint") : extraLibraries.length ? t("mixedItemsHint") : recipe === "bookshelf" ? t("bookshelfItemsHint") : libraryMode === "book" ? t("bookItemsHint") : t("cineItemsHint")}</p>
             {libraryMode === "tables" ? null : (
               <Field label={libraryMode === "pick" ? t("libraryLabel") : t("moreLibrariesLabel")} hint={libraryMode === "pick" ? t("libraryHint") : t("moreLibrariesHint")} plain className="mb-5">
                 <LibraryPills
-                  choices={extraChoices}
+                  choices={libraryMode === "pick" || !ownLibrary ? extraChoices : [...choices.filter((choice) => choice.kind === ownLibrary.kind), ...extraChoices]}
+                  lockedKinds={libraryMode === "pick" || !ownLibrary ? [] : [ownLibrary.kind]}
                   selectedKinds={extraKinds}
                   label={libraryMode === "pick" ? t("libraryLabel") : t("moreLibrariesLabel")}
                   onPick={(choice) => toggleExtraLibrary(choice.kind)}
