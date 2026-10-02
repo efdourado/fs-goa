@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { combineParts, normalise, raterPart, scoreTitle, type NormalisedRating, type TitleTraits } from "../app/goa/score";
+import { buildStory, type RatedStory, type StoryInput } from "../app/goa/story/model";
+import { CATALOG_SCALE, catalogScores, roundKey, visibleTo } from "../lib/goa/challenges/goa-score";
 
 const on5 = (value: number) => normalise(value, 0, 5);
 const to5 = (value: number | null) => (value === null ? null : Math.round(value * 5 * 100) / 100);
@@ -78,4 +80,63 @@ test("quem indicou pesa 0,8 — sozinho, pesa 1", () => {
   assert.equal(scoreTitle([rows[0]], [], noTraits), 1);
   // Two entries by one person on the title count once, as their average.
   assert.equal(scoreTitle([{ personId: "a", titleKey: "x", value: 1 }, { personId: "a", titleKey: "x", value: 0.5 }], [], noTraits), 0.75);
+});
+
+// ── The recap and the catalogue read the score without losing what people actually gave ──
+
+const soloInput = (scores: StoryInput["scores"]): StoryInput => ({
+  title: "Só eu", noun: "film", people: [{ id: "me", name: "Eu" }],
+  items: [{ id: "lotr", title: "LOTR" }, { id: "hobbit", title: "Hobbit" }, { id: "romance", title: "Romance" }, { id: "meh", title: "Meh" }],
+  ratings: [{ personId: "me", itemId: "lotr", value: 5 }, { personId: "me", itemId: "hobbit", value: 5 }, { personId: "me", itemId: "romance", value: 5 }, { personId: "me", itemId: "meh", value: 2 }],
+  expectations: [], scale: { min: 0, max: 5 }, scores, days: [], records: [], today: "2026-10-01",
+});
+
+test("o recap ordena pela pontuação inteira, não pela arredondada — e mostra a média de verdade", () => {
+  // Hobbit first in the item list, LOTR ahead by two hundredths: both would read 4.7 rounded.
+  const input = soloInput({ hobbit: { value: 4.72, count: 1 }, lotr: { value: 4.74, count: 1 }, romance: { value: 4.61, count: 1 }, meh: { value: 2.2, count: 1 } });
+  input.items = [input.items[1], input.items[0], input.items[2], input.items[3]];
+  const story = buildStory(input) as RatedStory;
+  assert.deepEqual(story.ranking.map((station) => station.item.id), ["lotr", "hobbit", "romance", "meh"]);
+  assert.deepEqual(story.ranking.map((station) => station.average), [5, 5, 5, 2], "\"média\" continua sendo a média do que se deu");
+  assert.equal(story.ranking[0].score, 4.74);
+});
+
+test("as notas máximas do recap solo são as que a pessoa deu, não a pontuação", () => {
+  const story = buildStory(soloInput({ lotr: { value: 4.74, count: 1 }, hobbit: { value: 4.72, count: 1 }, romance: { value: 4.61, count: 1 }, meh: { value: 2.2, count: 1 } })) as RatedStory;
+  assert.deepEqual(story.solo!.perfect.map((station) => station.item.id).sort(), ["hobbit", "lotr", "romance"]);
+  assert.equal(story.solo!.lowest?.item.id, "meh");
+});
+
+test("uma pontuação que conta notas fora da tela não é usada", () => {
+  const story = buildStory(soloInput({ lotr: { value: 1, count: 3 } })) as RatedStory;
+  assert.equal(story.stations.find((station) => station.item.id === "lotr")!.score, 5);
+});
+
+/** A database stub answering the scoring query with `rows` (already in its column names). */
+const stub = (rows: Array<Record<string, unknown>>) => ({ query: async () => ({ rows }) }) as unknown as Parameters<typeof catalogScores>[0];
+const ratingRow = (over: Record<string, unknown>) => ({
+  challenge_id: "c1", item_id: "i1", catalog_item_id: "cat1", kind: "film", person_id: "a", value: 0.8, lo: 0, hi: 5,
+  nominated: false, visibility: "group_realtime", closed: true, genre: null, author: null, year: null, runtime: null, pages: null, ...over,
+});
+
+test("o acervo mostra tudo de 0 a 5, mesmo com desafios em /5 e /10", async () => {
+  // 4/5 and 8/10 are the same rating: the catalogue says 4, not the 6 that averaging the two scales gave.
+  const scores = await catalogScores(stub([
+    ratingRow({ challenge_id: "c1", item_id: "i1", person_id: "a", value: 0.8, hi: 5 }),
+    ratingRow({ challenge_id: "c2", item_id: "i2", person_id: "b", value: 0.8, hi: 10 }),
+  ]), "g", "a");
+  assert.equal(scores.byCatalogItem.get("cat1")!.score, CATALOG_SCALE * 0.8);
+  assert.equal(scores.byRound.get(roundKey("c2", "cat1"))!.score, 4);
+});
+
+test("nota oculta não entra nem como alvo nem como histórico de ninguém", async () => {
+  const rows = (hidden: number) => [
+    ratingRow({ item_id: "i1", catalog_item_id: "cat1", person_id: "b", value: 1 }),
+    ...["h1", "h2", "h3"].map((id) => ratingRow({ challenge_id: "c9", item_id: id, catalog_item_id: id, person_id: "b", value: hidden, visibility: "author_only" })),
+  ];
+  const seenBy = async (viewer: string | null, hidden: number) => (await catalogScores(stub(rows(hidden)), "g", viewer)).byCatalogItem.get("cat1")!.score;
+  assert.equal(await seenBy("a", 0), await seenBy("a", 1), "para outra pessoa, o histórico escondido não existe");
+  assert.equal(await seenBy(null, 0), await seenBy(null, 1), "nem para uma página pública");
+  assert.notEqual(await seenBy("b", 0), await seenBy("b", 1), "o próprio autor vê o seu");
+  assert.equal(visibleTo([ratingRow({}), ratingRow({ visibility: "after_close", closed: false })].map((row) => ({ personId: row.person_id, itemId: row.item_id, visibility: row.visibility, closed: row.closed })), "z").length, 1);
 });

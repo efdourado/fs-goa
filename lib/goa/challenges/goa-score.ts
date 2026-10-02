@@ -107,7 +107,7 @@ class GroupScores {
   }
 }
 
-/** Back from 0–1 to the scale the ratings were given on (the average of their fields' ranges). */
+/** Back from 0–1 to one challenge's scale (its rows share their fields, so their ranges agree). */
 function onScale(score: number, rows: ScoreRow[]): number {
   const lo = rows.reduce((sum, row) => sum + row.lo, 0) / rows.length;
   const hi = rows.reduce((sum, row) => sum + row.hi, 0) / rows.length;
@@ -120,48 +120,55 @@ function byKey<T>(rows: T[], keyOf: (row: T) => string): Map<string, T[]> {
   return groups;
 }
 
+/**
+ * The ratings `viewerId` may see (null: only what anyone may) — applied to everything, history included, before
+ * any score is calculated: a hidden rating mustn't move a score through someone's usual or their taste either.
+ */
+export function visibleTo<T extends Pick<ScoreRow, "personId" | "itemId" | "visibility" | "closed">>(rows: T[], viewerId: string | null): T[] {
+  const answered = new Set(rows.filter((row) => row.personId === viewerId).map((row) => row.itemId));
+  return rows.filter((row) => row.personId === viewerId || (
+    row.visibility === "after_own" ? answered.has(row.itemId)
+      : row.visibility === "after_close" ? row.closed
+        : row.visibility !== "author_only"));
+}
+
 /** A score on the rating's scale, and how many ratings of this title went into it. */
 export interface ItemScoreValue { value: number; count: number }
 
 /**
- * Each item's score in one challenge, on the challenge's rating scale (unrounded) — what its ranking, podium and
- * averages are calculated with — from the ratings `viewerId` may see (null: only what anyone may). Items nobody
- * rated are absent.
+ * Each item's score in one challenge, on the challenge's rating scale (unrounded) — what its ranking and podium are
+ * ordered by — from the ratings `viewerId` may see. Items nobody rated are absent.
  */
 export async function challengeItemScores(client: Pick<PoolClient, "query">, challengeId: string, viewerId: string | null): Promise<Record<string, ItemScoreValue>> {
   const groupId = (await client.query<{ group_id: string }>("SELECT group_id FROM challenges WHERE id = $1", [challengeId])).rows[0]?.group_id;
   if (!groupId) return {};
-  const scores = new GroupScores(await groupRatingRows(client, groupId));
+  const scores = new GroupScores(visibleTo(await groupRatingRows(client, groupId), viewerId));
   const result: Record<string, ItemScoreValue> = {};
-  const here = scores.rows.filter((row) => row.challengeId === challengeId);
-  const answered = new Set(here.filter((row) => row.personId === viewerId).map((row) => row.itemId));
-  // A title's score only counts ratings this viewer may already see — otherwise the number would give hidden ones away.
-  const visible = here.filter((row) => row.personId === viewerId || (
-    row.visibility === "after_own" ? answered.has(row.itemId)
-      : row.visibility === "after_close" ? row.closed
-        : row.visibility !== "author_only"));
-  for (const [itemId, rows] of byKey(visible, (row) => row.itemId)) {
+  for (const [itemId, rows] of byKey(scores.rows.filter((row) => row.challengeId === challengeId), (row) => row.itemId)) {
     const score = scores.score(rows);
     if (score !== null) result[itemId] = { value: onScale(score, rows), count: rows.length };
   }
   return result;
 }
 
+/** The catalogue shows every rating out of five (its ring says so), whatever scale each challenge used. */
+export const CATALOG_SCALE = 5;
+
 /**
- * The catalogue's view: every library title's score over all its challenges, on the scale it was rated on — plus
- * the score each challenge gave it (`byRound`, keyed by `roundKey`).
+ * The catalogue's view, from the ratings `viewerId` may see: every library title's score over all its challenges,
+ * out of `CATALOG_SCALE` — plus the score each challenge gave it (`byRound`, keyed by `roundKey`).
  */
-export async function catalogScores(client: Pick<PoolClient, "query">, groupId: string): Promise<{
+export async function catalogScores(client: Pick<PoolClient, "query">, groupId: string, viewerId: string | null): Promise<{
   byCatalogItem: Map<string, { score: number; count: number }>;
   byRound: Map<string, { score: number; count: number }>;
 }> {
-  const rows = await groupRatingRows(client, groupId);
+  const rows = visibleTo(await groupRatingRows(client, groupId), viewerId);
   const scores = new GroupScores(rows);
   const collect = (list: ScoreRow[], keyOf: (row: ScoreRow) => string) => {
     const out = new Map<string, { score: number; count: number }>();
     for (const [key, group] of byKey(list, keyOf)) {
       const score = scores.score(group);
-      if (score !== null) out.set(key, { score: onScale(score, group), count: group.length });
+      if (score !== null) out.set(key, { score: score * CATALOG_SCALE, count: group.length });
     }
     return out;
   };

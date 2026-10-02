@@ -11,7 +11,6 @@ import {
   updateAttributeDef,
   type CatalogAttributeType,
 } from "./catalog-attributes";
-import { entryRatingSql } from "./challenges/rating";
 import { writeAudit } from "./domain/audit";
 import { eventScheduleColumns, eventScheduleJson, parseEventSchedule, scheduleVisibleSql } from "./domain/event-schedule";
 import { ensurePersonalWorkspace } from "./domain/challenges";
@@ -419,7 +418,10 @@ export async function authorRequired(client: PoolClient, groupId: string, kind: 
  * Anything with a `query` works, and handing it the pool (not one checked-out connection) lets the three reads
  * below go out at the same moment.
  */
-async function listCatalogWithClient(client: Pick<PoolClient, "query">, workspaceId: string, options: { perKind?: number } = {}) {
+/** A catalogue rating as shown: two decimals, or null when nothing visible was rated. */
+const scoreOf = (score: { score: number } | undefined) => (score ? Number(score.score.toFixed(2)) : null);
+
+async function listCatalogWithClient(client: Pick<PoolClient, "query">, workspaceId: string, viewerId: string, options: { perKind?: number } = {}) {
   const limited = options.perKind !== undefined;
   const itemsQuery = client.query<{
     id: string;
@@ -436,8 +438,6 @@ async function listCatalogWithClient(client: Pick<PoolClient, "query">, workspac
     scheduled_time_zone: string | null;
     round_count: number;
     challenge_count: number;
-    rating_avg: number | null;
-    rating_count: number;
     recommended_by_user_id: string | null;
     recommended_by_user_name: string | null;
     recommended_by_external_id: string | null;
@@ -454,7 +454,6 @@ async function listCatalogWithClient(client: Pick<PoolClient, "query">, workspac
               (SELECT count(DISTINCT it.challenge_id)::int
                  FROM challenge_items it JOIN challenges c ON c.id = it.challenge_id AND c.deleted_at IS NULL
                 WHERE it.catalog_item_id = ci.id AND it.archived_at IS NULL) AS challenge_count,
-              agg.rating_avg, coalesce(agg.rating_count, 0)::int AS rating_count,
               CASE WHEN active_rec.user_id IS NOT NULL THEN ci.recommended_by_user_id END AS recommended_by_user_id,
               CASE WHEN active_rec.user_id IS NOT NULL THEN ru.display_name END AS recommended_by_user_name,
               ci.recommended_by_external_id, cr.display_name AS recommended_by_external_name,
@@ -467,16 +466,6 @@ async function listCatalogWithClient(client: Pick<PoolClient, "query">, workspac
          LEFT JOIN group_members active_rec ON active_rec.group_id = ci.group_id
           AND active_rec.user_id = ci.recommended_by_user_id AND active_rec.removed_at IS NULL
          LEFT JOIN catalog_recommenders cr ON cr.id = ci.recommended_by_external_id
-         -- Each entry's rating as its challenge defines it (see rating.ts), then averaged over entries.
-         LEFT JOIN LATERAL (
-           SELECT avg(er.value) AS rating_avg, count(er.value) AS rating_count
-             FROM challenge_items it
-             JOIN challenges c ON c.id = it.challenge_id AND c.deleted_at IS NULL AND c.status <> 'draft'
-             JOIN entries e ON e.item_id = it.id AND e.deleted_at IS NULL
-              AND e.entry_type_id IN (SELECT id FROM entry_types WHERE challenge_id = c.id AND purpose IN ('rating', 'completion') AND answer_scope = 'individual')
-             CROSS JOIN LATERAL (SELECT ${entryRatingSql("e", "c")} AS value) er
-            WHERE it.catalog_item_id = ci.id AND it.archived_at IS NULL
-         ) agg ON true
         WHERE ci.group_id = $1 AND ci.archived_at IS NULL${limited ? " AND ci.rn <= $2" : ""}
         ORDER BY ${limited ? "ci.created_at DESC, ci.title" : "ci.title"}`,
     limited ? [workspaceId, options.perKind] : [workspaceId],
@@ -485,7 +474,8 @@ async function listCatalogWithClient(client: Pick<PoolClient, "query">, workspac
     itemsQuery,
     attributeValuesForWorkspace(client, workspaceId, options.perKind),
     recommendationsVisible(client, workspaceId),
-    catalogScores(client, workspaceId),
+    // Each title's rating is its Goa score out of five, from the ratings this viewer may see (see goa-score.ts).
+    catalogScores(client, workspaceId, viewerId),
   ]);
   return {
     items: items.rows.map((item) => ({
@@ -507,9 +497,8 @@ async function listCatalogWithClient(client: Pick<PoolClient, "query">, workspac
           ? { kind: "external" as const, id: item.recommended_by_external_id, name: item.recommended_by_external_name ?? "" }
           : null,
       originNote: showRecommenders ? item.origin_note : null,
-      // Ranked by the Goa score (see goa-score.ts); the plain average only when it can't be scored.
-      ratingAvg: item.rating_avg === null ? null : Number((scores.byCatalogItem.get(item.id)?.score ?? item.rating_avg).toFixed(2)),
-      ratingCount: item.rating_count,
+      ratingAvg: scoreOf(scores.byCatalogItem.get(item.id)),
+      ratingCount: scores.byCatalogItem.get(item.id)?.count ?? 0,
       attributes: attributesByItem.get(item.id) ?? [],
     })),
   };
@@ -524,6 +513,7 @@ async function catalogItemDetailWithClient(
   client: PoolClient,
   workspaceId: string,
   catalogItemId: string,
+  viewerId: string,
 ) {
   const item = await oneOrNull<{
     id: string; kind: string; title: string; author: string | null;
@@ -554,15 +544,13 @@ async function catalogItemDetailWithClient(
   const rounds = await client.query<{
     challenge_id: string; title: string; status: string;
     start_date: string | null; end_date: string | null;
-    recommended_by: string | null; rating_avg: number | null; rating_count: number;
+    recommended_by: string | null;
   }>(
     // Same rule as the challenge detail: a recommender who is no longer an
     // active member of this group loses the byline, not just their name.
     `SELECT c.id AS challenge_id, c.title, c.status,
               c.start_date::text AS start_date, c.end_date::text AS end_date,
-              CASE WHEN active_recommender.user_id IS NOT NULL THEN ru.display_name END AS recommended_by,
-              avg(er.value) AS rating_avg,
-              count(er.value)::int AS rating_count
+              CASE WHEN active_recommender.user_id IS NOT NULL THEN ru.display_name END AS recommended_by
          FROM challenge_items it
          JOIN challenges c ON c.id = it.challenge_id AND c.deleted_at IS NULL AND c.status <> 'draft'
          LEFT JOIN users ru ON ru.id = it.recommended_by_user_id
@@ -570,9 +558,6 @@ async function catalogItemDetailWithClient(
            ON active_recommender.group_id = $2
           AND active_recommender.user_id = it.recommended_by_user_id
           AND active_recommender.removed_at IS NULL
-         LEFT JOIN entries e ON e.item_id = it.id AND e.deleted_at IS NULL
-          AND e.entry_type_id IN (SELECT id FROM entry_types WHERE challenge_id = c.id AND purpose IN ('rating', 'completion') AND answer_scope = 'individual')
-         LEFT JOIN LATERAL (SELECT ${entryRatingSql("e", "c")} AS value) er ON true
         WHERE it.catalog_item_id = $1 AND it.archived_at IS NULL
         GROUP BY c.id, c.title, c.status, c.start_date, c.end_date, active_recommender.user_id, ru.display_name, c.created_at
         ORDER BY c.start_date NULLS LAST, c.created_at`,
@@ -581,16 +566,10 @@ async function catalogItemDetailWithClient(
 
   const attributes = (await attributeValuesForItems(client, [item.id])).get(item.id) ?? [];
   const showRecommenders = await recommendationsVisible(client, workspaceId);
-  const scores = await catalogScores(client, workspaceId);
-  // The group's overall rating for this item, across every round — its Goa score over all of them (see
-  // goa-score.ts), else a true weighted average (avg*count sums back to each round's total, so summing those
-  // and dividing by the total count is exact, not an average of averages).
-  const ratedRounds = rounds.rows.filter((round) => round.rating_count > 0);
-  const totalRatings = ratedRounds.reduce((sum, round) => sum + round.rating_count, 0);
-  const ratingAvg = totalRatings > 0
-    ? Number((scores.byCatalogItem.get(item.id)?.score
-      ?? ratedRounds.reduce((sum, round) => sum + (round.rating_avg ?? 0) * round.rating_count, 0) / totalRatings).toFixed(2))
-    : null;
+  // The overall rating across every round and each round's own: Goa scores out of five, from the ratings this
+  // viewer may see (see goa-score.ts).
+  const scores = await catalogScores(client, workspaceId, viewerId);
+  const overall = scores.byCatalogItem.get(item.id);
   return {
     id: item.id,
     kind: item.kind,
@@ -607,8 +586,8 @@ async function catalogItemDetailWithClient(
         ? { kind: "external" as const, id: item.recommended_by_external_id, name: item.recommended_by_external_name ?? "" }
         : null,
     originNote: showRecommenders ? item.origin_note : null,
-    ratingAvg,
-    ratingCount: totalRatings,
+    ratingAvg: scoreOf(overall),
+    ratingCount: overall?.count ?? 0,
     attributes,
     rounds: rounds.rows.map((round) => ({
       challengeId: round.challenge_id,
@@ -617,8 +596,8 @@ async function catalogItemDetailWithClient(
       startsOn: round.start_date,
       endsOn: round.end_date,
       recommendedBy: round.recommended_by,
-      ratingAvg: round.rating_avg === null ? null : Number((scores.byRound.get(roundKey(round.challenge_id, item.id))?.score ?? round.rating_avg).toFixed(2)),
-      ratingCount: round.rating_count,
+      ratingAvg: scoreOf(scores.byRound.get(roundKey(round.challenge_id, item.id))),
+      ratingCount: scores.byRound.get(roundKey(round.challenge_id, item.id))?.count ?? 0,
     })),
   };
 }
@@ -654,7 +633,7 @@ async function personalWorkspaceId(client: Pick<PoolClient, "query">, userId: st
 export async function listGroupCatalog(session: SessionContext, groupId: string) {
   return withClient(async (client) => {
     await requireStandardWorkspace(client, session.user.id, groupId, ["owner", "admin", "participant"]);
-    return listCatalogWithClient(client, groupId);
+    return listCatalogWithClient(client, groupId, session.user.id);
   });
 }
 
@@ -666,9 +645,9 @@ export const SHELF_ITEMS_PER_LIBRARY = 10;
  * newest few of each. The shelf used to fetch the whole catalogue (and the libraries, separately) just to
  * draw ten covers; every extra request and every extra query was another wait on the database.
  */
-async function catalogShelf(db: Pick<PoolClient, "query">, workspaceId: string) {
+async function catalogShelf(db: Pick<PoolClient, "query">, workspaceId: string, viewerId: string) {
   const [list, libraries, counts] = await Promise.all([
-    listCatalogWithClient(db, workspaceId, { perKind: SHELF_ITEMS_PER_LIBRARY }),
+    listCatalogWithClient(db, workspaceId, viewerId, { perKind: SHELF_ITEMS_PER_LIBRARY }),
     listLibrariesWithClient(db, workspaceId),
     db.query<{ kind: string; total: number }>(
       "SELECT kind, count(*)::int AS total FROM catalog_items WHERE group_id = $1 AND archived_at IS NULL GROUP BY kind",
@@ -693,7 +672,7 @@ export async function groupCatalogShelf(session: SessionContext, groupId: string
       );
       if (!group || group.kind !== "standard") throw new ApiError(404, "not_found", "Grupo não encontrado.");
     })(),
-    catalogShelf(db, groupId),
+    catalogShelf(db, groupId, session.user.id),
   ]);
   return shelf;
 }
@@ -701,13 +680,13 @@ export async function groupCatalogShelf(session: SessionContext, groupId: string
 export async function personalCatalogShelf(session: SessionContext) {
   const db = getPool();
   const workspaceId = await personalWorkspaceId(db, session.user.id);
-  return workspaceId ? catalogShelf(db, workspaceId) : { libraries: [], counts: {}, items: [] };
+  return workspaceId ? catalogShelf(db, workspaceId, session.user.id) : { libraries: [], counts: {}, items: [] };
 }
 
 export async function catalogItemDetail(session: SessionContext, groupId: string, catalogItemId: string) {
   return withClient(async (client) => {
     await requireStandardWorkspace(client, session.user.id, groupId, ["owner", "admin", "participant"]);
-    return catalogItemDetailWithClient(client, groupId, catalogItemId);
+    return catalogItemDetailWithClient(client, groupId, catalogItemId, session.user.id);
   });
 }
 
@@ -715,7 +694,7 @@ export async function catalogItemDetail(session: SessionContext, groupId: string
 export async function listPersonalCatalog(session: SessionContext) {
   return withClient(async (client) => {
     const workspaceId = await personalWorkspaceId(client, session.user.id);
-    return workspaceId ? listCatalogWithClient(client, workspaceId) : { items: [] };
+    return workspaceId ? listCatalogWithClient(client, workspaceId, session.user.id) : { items: [] };
   });
 }
 
@@ -723,7 +702,7 @@ export async function personalCatalogItemDetail(session: SessionContext, catalog
   return withClient(async (client) => {
     const workspaceId = await personalWorkspaceId(client, session.user.id);
     if (!workspaceId) throw new ApiError(404, "not_found", "Item do acervo não encontrado.");
-    return catalogItemDetailWithClient(client, workspaceId, catalogItemId);
+    return catalogItemDetailWithClient(client, workspaceId, catalogItemId, session.user.id);
   });
 }
 

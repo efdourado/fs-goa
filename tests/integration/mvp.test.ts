@@ -5326,6 +5326,57 @@ test("o fio público: nomes mascarados pelas mesmas regras, nenhum id real e nen
   assert.ok(!JSON.stringify(named.challenge.story).includes(b.user.id), "nem o id de quem consentiu");
 });
 
+test("pontuação Goa: uma nota oculta no histórico não mexe na pontuação de ninguém — nem no desafio, nem no acervo", async () => {
+  const owner = await register("Dona Goa", "dona_goa_score");
+  const p = await register("Pedro Goa", "pedro_goa_score");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube Goa" } })).body as { id: string }).id;
+  const invite = (await call("POST", `/api/groups/${groupId}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
+  await call("POST", `/api/invites/${invite.token}`, { session: p, body: {} });
+  type Detail = {
+    entryTypes: Array<{ id: string; purpose: string; fields: Array<{ id: string; key: string }> }>;
+    items: Array<{ id: string; title: string; catalogItem: { id: string } | null }>;
+    itemScores?: Record<string, { value: number; count: number }>;
+  };
+  const open = async (title: string, items: string[]) => {
+    const id = ((await call("POST", `/api/groups/${groupId}/challenges`, {
+      session: owner,
+      body: { recipe: "cinema", title, participantIds: [owner.user.id, p.user.id], items: items.map((item) => ({ title: item })) },
+    })).body as { id: string }).id;
+    await call("POST", `/api/challenges/${id}/transition`, { session: owner, body: { status: "active" } });
+    const detail = (await call("GET", `/api/challenges/${id}`, { session: owner })).body as Detail;
+    const type = detail.entryTypes.find((row) => row.purpose === "rating")!;
+    return { id, detail, type: type.id, nota: type.fields.find((field) => field.key === "nota")!.id };
+  };
+  const rate = (challenge: Awaited<ReturnType<typeof open>>, session: typeof owner, title: string, value: number) =>
+    call("POST", `/api/challenges/${challenge.id}/entries`, {
+      session, body: { itemId: challenge.detail.items.find((item) => item.title === title)!.id, entryTypeId: challenge.type, values: { [challenge.nota]: value } },
+    });
+
+  const target = await open("Sessão alvo", ["Filme Alvo"]);
+  await rate(target, owner, "Filme Alvo", 4);
+  await rate(target, p, "Filme Alvo", 5);
+  const alvo = target.detail.items[0];
+  const read = async () => {
+    const detail = (await call("GET", `/api/challenges/${target.id}`, { session: owner })).body as Detail;
+    const catalogItem = (await call("GET", `/api/groups/${groupId}/catalog/${alvo.catalogItem!.id}`, { session: owner })).body as { ratingAvg: number | null };
+    return { challenge: detail.itemScores?.[alvo.id]?.value, catalog: catalogItem.ratingAvg };
+  };
+  const before = await read();
+  assert.ok(before.challenge !== undefined && before.catalog !== null, "o título avaliado tem pontuação");
+
+  // Pedro rates other films of the same library, in a challenge whose ratings only he and the admins see.
+  const history = await open("Sessão escondida", ["Filme H1", "Filme H2", "Filme H3"]);
+  assert.equal((await call("PATCH", `/api/challenges/${history.id}/entry-types/${history.type}`, { session: owner, body: { visibilityPolicy: "author_only" } })).response.status, 200);
+  for (const title of ["Filme H1", "Filme H2", "Filme H3"]) await rate(history, p, title, 1);
+  assert.deepEqual(await read(), before, "as notas ocultas de Pedro não mudam o costume dele aos olhos de ninguém");
+
+  // Once they're visible, the same history does count — so the check above isn't vacuous.
+  await call("PATCH", `/api/challenges/${history.id}/entry-types/${history.type}`, { session: owner, body: { visibilityPolicy: "group_realtime" } });
+  const after = await read();
+  assert.notEqual(after.challenge, before.challenge, "visível, o histórico entra no cálculo");
+  assert.notEqual(after.catalog, before.catalog);
+});
+
 test("vitrine é anônima por padrão, e consentimento nominal libera o nome só de quem autorizou", async () => {
   const owner = await register("Dona Wrapped", "dona_wrapped_v1");
   const b = await register("Bela Wrapped", "bela_wrapped_v1");
