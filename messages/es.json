@@ -1428,6 +1428,12 @@
       "Completado significa que las respuestas obligatorias del ítem están registradas, nada más. En un partido de fútbol puede ser solo “lo seguí”; no hace falta haberlo visto. Una respuesta que todos comparten, como el marcador final, se registra una vez para el grupo, mientras que las notas y los comentarios siguen siendo individuales. Si dos personas editan una respuesta compartida a la vez, a la segunda se le avisa y ve el valor más reciente en lugar de sobrescribirlo.",
       "Las recomendaciones dicen de dónde vino un ítem: un miembro, alguien de fuera del grupo guardado por nombre, o una nota corta. Cada grupo puede desactivarlas por completo. Los ítems también pueden tener una fecha opcional — un día entero, un intervalo o una hora exacta — que se muestra justo debajo del nombre del ítem."
     ],
+    "rankingTitle": "Cómo ordena Goa",
+    "ranking": [
+      "Tus notas se guardan tal como las diste. Los promedios — el tuyo, el de un título, el de una persona — son siempre los promedios reales. Solo el orden de los rankings y los podios sale de otra cuenta: la puntuación Goa.",
+      "Un promedio simple empata con demasiada facilidad: tres películas con 5 de la misma persona quedan lado a lado, y el ranking no dice nada. La puntuación Goa desempata con lo que tu propio historial ya muestra. Un 5 de quien casi nunca da 5 vale un poco más que el de quien lo da cada semana. Y lo que sueles amar — un género, un director o autor, una década, una duración — inclina el título un poco hacia arriba o hacia abajo. Así, los tres 5 pasan a ser 4,74, 4,72 y 4,61.",
+      "Es un ajuste, no una reescritura: tu nota siempre pesa más, y el historial solo cuenta cuando existe. Quien acaba de llegar, o un título sin historial alrededor, se queda con el promedio simple. En un grupo, quien recomendó el título pesa un poco menos en su puntuación. Cada grupo y cada biblioteca se calculan por separado, así que nada de un círculo se filtra a otro — y una nota que aún no puedes ver (sellada, privada o esperando el cierre) nunca mueve un número que se te muestra. El catálogo muestra toda puntuación de 0 a 5, sea cual sea la escala de cada desafío."
+    ],
     "feedbackNudge": "¿Tienes una idea o algo te molestó?",
     "feedbackLink": "Cuéntanos."
   },

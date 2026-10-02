@@ -1428,6 +1428,12 @@
       "Concluído significa que as respostas obrigatórias do item estão registradas — nada além disso. Num jogo de futebol, pode ser só “acompanhei este”; não é preciso tê-lo assistido. Uma resposta que todos compartilham, como o placar final, é registrada uma vez para o grupo, enquanto notas e comentários continuam individuais. Se duas pessoas editarem uma resposta compartilhada ao mesmo tempo, a segunda é avisada e vê o valor mais recente em vez de sobrescrevê-lo.",
       "As indicações dizem de onde veio um item: um membro, alguém de fora do grupo salvo pelo nome, ou uma nota curta. Cada grupo pode desligá-las por completo. Os itens também podem ter uma data opcional — um dia inteiro, um intervalo ou um horário exato — mostrada logo abaixo do nome do item."
     ],
+    "rankingTitle": "Como o Goa ranqueia",
+    "ranking": [
+      "Suas notas ficam exatamente como você deu. Médias — a sua, a de um título, a de uma pessoa — são sempre as médias de verdade. Só a ordem dos rankings e dos pódios vem de outra conta: a pontuação Goa.",
+      "Uma média simples empata fácil demais: três filmes com 5 da mesma pessoa ficam lado a lado, e o ranking não diz nada. A pontuação Goa desempata com o que o seu próprio histórico já mostra. Um 5 de quem quase nunca dá 5 vale um pouco mais que o de quem dá toda semana. E o que você costuma amar — um gênero, um diretor ou autor, uma década, uma duração — puxa o título um pouco pra cima ou pra baixo. Assim, os três 5 viram 4,74, 4,72 e 4,61.",
+      "É um ajuste, não uma reescrita: a sua nota sempre pesa mais, e o histórico só conta quando existe. Quem acabou de chegar, ou um título sem histórico por perto, fica com a média simples. Num grupo, quem indicou o título pesa um pouco menos na pontuação dele. Cada grupo e cada biblioteca são calculados à parte, então nada de um círculo vaza para outro — e uma nota que você ainda não pode ver (selada, privada ou esperando o encerramento) nunca mexe num número que aparece pra você. O acervo mostra toda pontuação de 0 a 5, qualquer que seja a escala de cada desafio."
+    ],
     "feedbackNudge": "Tem uma ideia ou algo te incomodou?",
     "feedbackLink": "Conte pra gente."
   },

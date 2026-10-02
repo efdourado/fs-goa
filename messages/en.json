@@ -1428,6 +1428,12 @@
       "Done means the item's required answers are in — nothing more. For a football match it can simply mean “I tracked this one”; you don't have to have watched it. An answer everyone shares, like a final score, is recorded once for the group, while ratings and comments stay individual. If two people edit a shared answer at once, the second is told and shown the latest value instead of overwriting it.",
       "Recommendations say where an item came from: a member, someone outside the group you've saved by name, or a short note. Groups can switch them off entirely. Items can also carry an optional date — a whole day, a range, or an exact time — shown right under the item's name."
     ],
+    "rankingTitle": "How Goa ranks",
+    "ranking": [
+      "Your ratings are kept exactly as you gave them. Averages — yours, a title's, a person's — are always the real averages. Only the order of rankings and podiums comes from something else: the Goa score.",
+      "A plain average ties too easily: three films rated 5 by the same person sit side by side, and the ranking says nothing. The Goa score breaks those ties with what your own history already shows. A 5 from someone who rarely gives one counts a little more than a 5 from someone who gives them every week. And what you tend to love — a genre, a director or author, a decade, a length — tips a title slightly up or down. So the three fives become 4.74, 4.72 and 4.61.",
+      "It's a nudge, not a rewrite: your own rating always carries most of the weight, and history only counts once there is some. Someone new, or a title nobody has history around, gets the simple average. In a group, whoever suggested a title weighs a little less in its score. Each group and each library is calculated on its own, so nothing from one circle leaks into another, and a rating you can't see yet — sealed, private or waiting for the close — never moves a number you're shown. The catalogue shows every score out of five, whatever scale each challenge used."
+    ],
     "feedbackNudge": "Have an idea, or did something bug you?",
     "feedbackLink": "Tell us."
   },
