@@ -72,8 +72,10 @@ const SIZES = {
  * a soft tint from the tag palette, the year in mono, the title set large, one quiet ring, and (on the
  * smaller sizes) the group rating in the corner.
  */
-export function ItemCover({ title, year, avg, ratingLabel, showBadge = true, size, className, children }: {
+export function ItemCover({ title, year, avg, ratingLabel, showBadge = true, showTitle = true, size, className, children }: {
   title: string;
+  /** Off where the name is already written right beside the cover (the item's own page); it still sets the tint. */
+  showTitle?: boolean;
   /** Whatever the library chose for the top slot — a year, a short attribute value, or blank. */
   year?: string | number | null;
   avg?: number | null;
@@ -94,7 +96,7 @@ export function ItemCover({ title, year, avg, ratingLabel, showBadge = true, siz
       <span aria-hidden="true" className={cx("absolute rounded-full border-[var(--cover-deco)]", spec.ring)} />
       <span aria-hidden="true" className="absolute right-3.5 top-3.5 h-2.5 w-2.5 rounded-full bg-[var(--cover-deco)]" />
       <span className={cx("relative truncate tracking-[0.08em]", spec.year)} style={{ fontFamily: "var(--font-geist-mono), ui-monospace, monospace" }}>{year ?? "\u00a0"}</span>
-      <span className={cx("relative break-words font-light leading-[1.05] tracking-[-0.04em]", spec.clamp, spec.title)}>{title}</span>
+      {showTitle ? <span className={cx("relative break-words font-light leading-[1.05] tracking-[-0.04em]", spec.clamp, spec.title)}>{title}</span> : null}
       {/* No rating yet: no badge at all, the cover stays clean. */}
       {spec.badge && showBadge && avg !== null && avg !== undefined ? (
         <span className={cx("absolute", spec.badgeInset)}>

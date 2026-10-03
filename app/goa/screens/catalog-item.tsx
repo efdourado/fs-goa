@@ -128,7 +128,7 @@ export function CatalogItemScreen({
 
       <div className="grid items-start gap-10 lg:grid-cols-[340px_minmax(0,1fr)] lg:gap-16">
         <div className="w-full max-w-[280px] sm:max-w-[340px]">
-          <ItemCover size="xl" title={item.title} year={item.year} />
+          <ItemCover size="xl" title={item.title} year={item.year} showTitle={false} />
           {editing ? (
             <div className="mt-5">
               <EditItemAction item={item} scope={scope} recommendationsEnabled={recommendationsEnabled} editing={editing} onSaved={() => setNonce((value) => value + 1)} onRemove={onDelete} />
