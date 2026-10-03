@@ -2367,5 +2367,31 @@
     "calendarRun": "{count, plural, one {Outlined: your longest run, # day.} other {Outlined: your longest run, # days.}}",
     "datedHeadlineSolo": "Your days, drawn.",
     "readCalendar": "Each square is a day: filled where you showed up, stronger where the day was bigger. The outlined run is your longest; the ringed day your best."
+  },
+  "organise": {
+    "button": "Organise",
+    "title": "Organise for the group",
+    "intro": "Pick what to spread out. Goa builds an order where the heavy, the long and the same kind don't pile up, and everyone's picks take turns. Nothing changes until you apply it.",
+    "spreadBy": "Spread out by",
+    "apply": "Apply this order",
+    "alreadyGood": "The list is already in a good order for these.",
+    "numberClashes": "{label}: {count, plural, one {one pair} other {# pairs}} of high values still side by side (not enough lower ones to separate them)",
+    "numberSpread": "{label}: no two of the highest side by side",
+    "takeTurns": "{names}{more, plural, =0 {} one { and one more} other { and # more}} take turns",
+    "categoryClashes": "{label}: {value} repeats {count, plural, one {once} other {# times}} (too many to keep apart)",
+    "categorySpread": "{label}: never the same twice in a row",
+    "preview": "New order",
+    "another": "Try another",
+    "stays": "already logged, stays",
+    "pickOne": "Pick at least one property to spread out.",
+    "applied": "New order saved.",
+    "property": {
+      "runtime": "Runtime",
+      "pages": "Pages",
+      "year": "Year",
+      "genre": "Genre",
+      "author": "Author or director",
+      "recommender": "Recommended by"
+    }
   }
 }

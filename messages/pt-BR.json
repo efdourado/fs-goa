@@ -2367,5 +2367,31 @@
     "calendarRun": "{count, plural, one {Contornada: sua maior sequência, # dia.} other {Contornada: sua maior sequência, # dias.}}",
     "datedHeadlineSolo": "Os seus dias, desenhados.",
     "readCalendar": "Cada quadrado é um dia: preenchido onde você apareceu, mais forte nos dias maiores. O trecho contornado é sua maior sequência; o dia com anel, o seu melhor."
+  },
+  "organise": {
+    "button": "Organizar",
+    "title": "Organizar para o grupo",
+    "intro": "Escolha o que espalhar. O Goa monta uma ordem em que os pesados, os longos e os do mesmo tipo não se acumulam, e as indicações de cada um se alternam. Nada muda até você aplicar.",
+    "spreadBy": "Espalhar por",
+    "apply": "Aplicar esta ordem",
+    "alreadyGood": "A lista já está numa boa ordem para isso.",
+    "numberClashes": "{label}: {count, plural, one {um par} other {# pares}} de valores altos ainda lado a lado (não há menores suficientes para separar)",
+    "numberSpread": "{label}: nenhum par dos maiores lado a lado",
+    "takeTurns": "{names}{more, plural, =0 {} one { e mais uma pessoa} other { e mais # pessoas}} se alternam",
+    "categoryClashes": "{label}: {value} se repete {count, plural, one {uma vez} other {# vezes}} (são muitos para separar)",
+    "categorySpread": "{label}: nunca o mesmo duas vezes seguidas",
+    "preview": "Nova ordem",
+    "another": "Tentar outra",
+    "stays": "já registrado, fica",
+    "pickOne": "Escolha ao menos uma propriedade para espalhar.",
+    "applied": "Nova ordem salva.",
+    "property": {
+      "runtime": "Duração",
+      "pages": "Páginas",
+      "year": "Ano",
+      "genre": "Gênero",
+      "author": "Autor ou diretor",
+      "recommender": "Indicado por"
+    }
   }
 }

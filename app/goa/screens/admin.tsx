@@ -14,6 +14,7 @@ import { LibraryPropertiesDialog } from "../library-dialogs";
 import { type CatalogScope, LibraryGlyph, LibraryPills, libraryChoices, useCatalogLibraries, useLibraryName } from "../libraries";
 import { bodyFromValues, editableProperties, PropertyInputs, type PropertyValues, propertiesHaveProblem, useLibraryProperties, valuesFromItem } from "../property-inputs";
 import { recommenderBody, recommenderLine, RecommenderPicker, recommenderFromItem, type RecommenderValue, sameRecommender, useRecommenderSource } from "../recommender-picker";
+import { canOrganise, OrganiseDialog, organiseFromItems } from "../organize-panel";
 import { RuleSectionsEditor, visibleRuleSections } from "../rules";
 import { ChallengeSettings, ChallengeStateButton, type CopyMode } from "./challenge-actions";
 import type {
@@ -786,10 +787,13 @@ function AdminItems({
   onLinkLibrary,
   onUnlinkLibrary,
   onLibraryChanged,
+  onReorder,
 }: {
   challenge: ChallengeDetail;
   group?: GroupSummary;
   entries: Entry[];
+  /** Saves a new order (positions, stages unchanged). */
+  onReorder: (assignments: Array<{ itemId: Id; checkpointId: Id | null; position: number }>) => Promise<void>;
   onAdd: (payload: Record<string, unknown>) => Promise<void>;
   onUpdate: (itemId: Id, payload: ItemUpdatePayload) => Promise<void>;
   onArchive: (itemId: Id) => Promise<void>;
@@ -829,6 +833,18 @@ function AdminItems({
   const [editing, setEditing] = useState<ChallengeItem | null>(null);
   const [archiving, setArchiving] = useState<ChallengeItem | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  // "Organise for the group": items someone already logged keep their place; the rest are spread out.
+  const tOrganise = useTranslations("organise");
+  const [organising, setOrganising] = useState(false);
+  const { properties: libraryProperties } = useLibraryProperties(linked[0] ?? null);
+  const organiseInput = challenge.submissionMode === "item" && linked.length
+    ? organiseFromItems(
+        [...challenge.items].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
+        libraryProperties ?? [],
+        new Set(entries.map((entry) => itemIdForEntry(entry)).filter((id): id is Id => Boolean(id))),
+        (key) => tOrganise(`property.${key}`),
+      )
+    : null;
 
   async function archive(item: ChallengeItem) {
     setError(null);
@@ -921,6 +937,27 @@ function AdminItems({
         </div>
       ) : null}
 
+      {organiseInput && canOrganise(organiseInput) && challenge.status !== "closed" ? (
+        <div className="mb-3 flex justify-end">
+          <Button variant="secondary" className="min-h-9" onClick={() => setOrganising(true)}>{tOrganise("button")}</Button>
+        </div>
+      ) : null}
+      {organising && organiseInput ? (
+        <OrganiseDialog
+          input={organiseInput}
+          busy={busy}
+          onClose={() => setOrganising(false)}
+          onApply={async (order) => {
+            setBusy(true); setError(null); setSuccess(null);
+            try {
+              const stageOf = new Map(challenge.items.map((item) => [item.id, item.checkpointId ?? null]));
+              await onReorder(order.map((itemId, position) => ({ itemId, checkpointId: stageOf.get(itemId) ?? null, position })));
+              setOrganising(false);
+              setSuccess(tOrganise("applied"));
+            } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
+          }}
+        />
+      ) : null}
       {challenge.items.length ? (
         <ol className="divide-y divide-[var(--line)]">
           {[...challenge.items].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)).map((item, index) => (
@@ -1118,7 +1155,7 @@ export function AdminScreen({
         {setup ? <div className="mx-auto max-w-2xl"><SetupSummary state={setup} activeTab={activeTab} onGo={onTab} /></div> : null}
         {activeTab === "overview" ? <AdminGeneral challenge={challenge} group={group} isPersonal={isPersonal} onSaveBasics={onSaveBasics} onSaveParticipants={onSaveParticipants} /> : null}
         {activeTab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.visibilityPolicy}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} onSaveVisibility={onSaveEntryTypeVisibility} onSetExpectation={onSetExpectation} onSaveEntryDate={onSaveEntryDate} onAddShared={onAddSharedResponse} onRemoveType={onRemoveEntryType} onSavePolicy={onSaveSharedPolicy} /> : null}
-        {activeTab === "items" ? <AdminItems challenge={challenge} group={group} entries={entries} onAdd={onAddItems} onUpdate={onUpdateItem} onArchive={onArchiveItem} onLinkLibrary={onLinkLibrary} onUnlinkLibrary={onUnlinkLibrary} onLibraryChanged={onArchiveChanged} /> : null}
+        {activeTab === "items" ? <AdminItems challenge={challenge} group={group} entries={entries} onAdd={onAddItems} onUpdate={onUpdateItem} onArchive={onArchiveItem} onLinkLibrary={onLinkLibrary} onUnlinkLibrary={onUnlinkLibrary} onLibraryChanged={onArchiveChanged} onReorder={onAssignCheckpointItems} /> : null}
         {activeTab === "checkpoints" ? <CheckpointPlanner key={`${challenge.id}:${challenge.checkpoints.map((cp) => cp.id).join(",")}`} challenge={challenge} onSaveCheckpoints={onSaveCheckpoints} onAssign={onAssignCheckpointItems} /> : null}
         {activeTab === "settings" ? <ChallengeSettings challenge={challenge} duplicateTargets={duplicateTargets} onDuplicate={onDuplicate} onOpenCopy={onOpenCopy} onDelete={onDelete} isPlatformAdmin={isPlatformAdmin} onPublishTemplate={onPublishTemplate} onUnpublishTemplate={onUnpublishTemplate} onPublish={onPublishResult} onUnpublish={onUnpublishResult} /> : null}
       </div>

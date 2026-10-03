@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { API_PATHS, apiRequest } from "./api";
 import { Dialog, FormDialog } from "./dialog";
+import { canOrganise, OrganiseDialog, organiseFromRows } from "./organize-panel";
 import { type CatalogScope } from "./libraries";
 import { bodyFromValues, editableProperties, PropertyInputs, type PropertyValues, propertiesHaveProblem, useLibrariesProperties } from "./property-inputs";
 import {
@@ -596,8 +597,12 @@ export function CineItemsEditor({
   onProblem?: (problem: "author" | "schedule" | null) => void;
 }) {
   const t = useTranslations("cineItems");
-  const { problemOf } = useEditorProperties(shared);
+  const { problemOf, loaded } = useEditorProperties(shared);
+  const tOrganise = useTranslations("organise");
+  const { recommenders } = useRecommenderSource(shared.scope, shared.recommendationsEnabled !== false);
   const summary = useRowSummary(shared.members, shared.timeZone);
+  const [organising, setOrganising] = useState(false);
+  const organiseInput = organiseFromRows(value, loaded.get(shared.libraries[0]?.kind ?? "") ?? [], shared.members, recommenders, (key) => tOrganise(`property.${key}`));
   const problem = problemOf(value);
   useEffect(() => { onProblem?.(problem); }, [problem, onProblem]);
   const [adding, setAdding] = useState(false);
@@ -612,7 +617,10 @@ export function CineItemsEditor({
     <div>
       <div className="mb-3 flex items-center justify-between gap-3">
         <p className="text-sm font-medium">{t("listCount", { count: value.length })}</p>
-        <Button className="min-h-9" onClick={() => { setDraft([]); setAdding(true); }}>＋ {t("addItems")}</Button>
+        <div className="flex items-center gap-2">
+          {canOrganise(organiseInput) ? <Button variant="secondary" className="min-h-9" onClick={() => setOrganising(true)}>{tOrganise("button")}</Button> : null}
+          <Button className="min-h-9" onClick={() => { setDraft([]); setAdding(true); }}>＋ {t("addItems")}</Button>
+        </div>
       </div>
       {value.length ? (
         <ol className="divide-y divide-[var(--line)] rounded-2xl border border-[var(--line)] bg-[var(--paper)]">
@@ -648,6 +656,18 @@ export function CineItemsEditor({
         >
           <ItemsAddBox {...shared} draft={draft} onDraftChange={setDraft} existing={value} onProblem={setDraftProblem} />
         </FormDialog>
+      ) : null}
+
+      {organising ? (
+        <OrganiseDialog
+          input={organiseInput}
+          onClose={() => setOrganising(false)}
+          onApply={(order) => {
+            const byKey = new Map(value.map((row) => [row.key, row]));
+            onChange(order.map((key) => byKey.get(key)!).filter(Boolean));
+            setOrganising(false);
+          }}
+        />
       ) : null}
 
       {editing ? (

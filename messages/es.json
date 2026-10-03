@@ -2367,5 +2367,31 @@
     "calendarRun": "{count, plural, one {Contorneada: tu racha más larga, # día.} other {Contorneada: tu racha más larga, # días.}}",
     "datedHeadlineSolo": "Tus días, dibujados.",
     "readCalendar": "Cada cuadrado es un día: lleno donde apareciste, más intenso en los días más grandes. El tramo contorneado es tu racha más larga; el día con anillo, tu mejor."
+  },
+  "organise": {
+    "button": "Organizar",
+    "title": "Organizar para el grupo",
+    "intro": "Elige qué repartir. Goa arma un orden en el que los pesados, los largos y los del mismo tipo no se amontonan, y las recomendaciones de cada uno se turnan. Nada cambia hasta que lo apliques.",
+    "spreadBy": "Repartir por",
+    "apply": "Aplicar este orden",
+    "alreadyGood": "La lista ya está en un buen orden para esto.",
+    "numberClashes": "{label}: {count, plural, one {un par} other {# pares}} de valores altos aún uno al lado del otro (no hay suficientes menores para separarlos)",
+    "numberSpread": "{label}: ningún par de los mayores uno al lado del otro",
+    "takeTurns": "{names}{more, plural, =0 {} one { y una persona más} other { y # personas más}} se turnan",
+    "categoryClashes": "{label}: {value} se repite {count, plural, one {una vez} other {# veces}} (son demasiados para separarlos)",
+    "categorySpread": "{label}: nunca el mismo dos veces seguidas",
+    "preview": "Nuevo orden",
+    "another": "Probar otro",
+    "stays": "ya registrado, se queda",
+    "pickOne": "Elige al menos una propiedad para repartir.",
+    "applied": "Nuevo orden guardado.",
+    "property": {
+      "runtime": "Duración",
+      "pages": "Páginas",
+      "year": "Año",
+      "genre": "Género",
+      "author": "Autor o director",
+      "recommender": "Recomendado por"
+    }
   }
 }
