@@ -76,7 +76,7 @@ function TemplatePanel({ challenge, onPublish, onUnpublish }: {
     <div>
       {published ? (
         <div className="flex flex-wrap items-center gap-3">
-          <p className="text-sm text-[var(--ok)]">{t("platformTemplateOn")}</p>
+          {/* No "Listed in the gallery" line: the remove button already says it's there. */}
           <Button variant="danger" disabled={busy !== null} onClick={() => void run("unpublish", onUnpublish, t("platformTemplateRemoved"))}>{busy === "unpublish" ? tc("saving") : t("platformTemplateUnpublish")}</Button>
         </div>
       ) : (
