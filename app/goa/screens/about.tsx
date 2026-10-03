@@ -34,9 +34,9 @@ export function AboutScreen({ onBack, backLabel }: { onBack: () => void; backLab
       <PageHeading title={t("title")} description={t("lede")} />
 
       <Section title={t("stepsTitle")}>
-        <ol className="grid gap-3 sm:grid-cols-3">
+        <ol className="grid gap-6 sm:grid-cols-3">
           {steps.map((step, index) => (
-            <li key={step.title} className="rounded-2xl bg-[var(--wash)] p-4">
+            <li key={step.title}>
               <span className="grid h-7 w-7 place-items-center rounded-full bg-[var(--main-soft)] text-xs font-medium text-[var(--main-strong)]">{index + 1}</span>
               <p className="mt-3 font-medium">{step.title}</p>
               <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{step.body}</p>
@@ -46,9 +46,9 @@ export function AboutScreen({ onBack, backLabel }: { onBack: () => void; backLab
       </Section>
 
       <Section title={t("featuresTitle")}>
-        <ul className="grid gap-3 sm:grid-cols-2">
+        <ul className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
           {features.map((feature) => (
-            <li key={feature.title} className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-4">
+            <li key={feature.title}>
               <p className="font-medium">{feature.title}</p>
               <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{feature.body}</p>
             </li>
