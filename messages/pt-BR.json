@@ -296,7 +296,6 @@
       "running": "Desafios que você conduz"
     },
     "filter": {
-      "all": "Tudo",
       "reorder": "Reorganizar",
       "reorderDone": "Concluir",
       "context": "Limpar ({count})",

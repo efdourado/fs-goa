@@ -296,7 +296,6 @@
       "running": "Challenges you run"
     },
     "filter": {
-      "all": "All",
       "reorder": "Reorder",
       "reorderDone": "Done",
       "context": "Clear ({count})",

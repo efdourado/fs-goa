@@ -191,19 +191,7 @@ export function OrganizeBar({ colorFilter, onColorFilter, reorderMode, onReorder
   const t = useTranslations("dashboard");
   return (
     <div className="mb-6 flex flex-wrap items-center gap-2 border-b border-[var(--line)] pb-4">
-      <button
-        type="button"
-        onClick={() => onColorFilter(null)}
-        aria-pressed={colorFilter === null}
-        className={cx(
-          "inline-flex min-h-9 items-center rounded-full border px-3.5 text-[13px] transition",
-          colorFilter === null
-            ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]"
-            : "border-[var(--line)] text-[var(--muted)] hover:border-[var(--main-line)]",
-        )}
-      >
-        {t("filter.all")}
-      </button>
+      {/* No "All": tapping the chosen colour again clears the filter. */}
       {CHALLENGE_COLOR_TAGS.map((tag) => (
         <button
           key={tag}
