@@ -3,7 +3,7 @@
     "publicOn": "Public showcase",
     "publicOff": "Private showcase",
     "privateUntilPublished": "Only visible within the challenge.",
-    "savedVersionOnly": "Publication uses the latest curation. Any change you save here appears on the link as soon as you save it — no need to republish.",
+    "savedVersionOnly": "Publication uses the latest curation. Any change you save here appears on the link as soon as you save it, no need to republish.",
     "allTypes": "All types",
     "personal": "My space",
     "noMatches": "No items match these filters.",
@@ -13,7 +13,7 @@
     "menuCopyHint": "Reuse its setup in another group.",
     "menuTemplateTitle": "Template gallery",
     "menuTemplateHint": "Publish it as a template anyone can use.",
-    "menuDeleteHint": "Goes to the bin — you can restore it.",
+    "menuDeleteHint": "Goes to the bin, you can restore it.",
     "settingsTitle": "Settings",
     "settingsSubtitle": "What applies to the whole challenge: who sees it from outside, copies and deletion.",
     "settingsDeleteAction": "Delete"
@@ -105,7 +105,7 @@
   "dates": {
     "none": "No date",
     "noDeadline": "No deadline",
-    "range": "{start} — {end}",
+    "range": "{start} to {end}",
     "since": "Since {date}",
     "until": "Until {date}"
   },
@@ -163,20 +163,20 @@
       "internal_error": "We couldn't complete that.",
       "rate_limited": "Too many attempts in a short time. Wait a moment.",
       "shared_conflict": "Someone changed this shared answer first. Look at the latest value before saving again.",
-      "shared_locked": "That answer is already filled in — only an admin can correct it.",
+      "shared_locked": "That answer is already filled in, only an admin can correct it.",
       "entry_type_has_entries": "This response has answers. Confirm to delete them together with it.",
       "entry_type_has_metrics": "Some metrics read this response. Confirm to remove them together.",
       "last_entry_type": "A challenge needs at least one response.",
       "recommendations_disabled": "This group turned recommendations off. Turn them on in the group settings to record who recommended something.",
-      "invalid_recommender": "Choose one source: a member, a saved name, or a note — not more than one.",
+      "invalid_recommender": "Choose one source: a member, a saved name, or a note (not more than one).",
       "invalid_library": "That library wasn't found.",
-      "invalid_schedule": "Check the dates — an end can't be before its start, and days and times can't be mixed.",
+      "invalid_schedule": "Check the dates (an end can't be before its start, and days and times can't be mixed).",
       "not_shared": "Only a shared response has a rule for who can fill it in.",
-      "attribute_has_data": "That property already has values on items, so it can't be removed — hide it instead.",
+      "attribute_has_data": "That property already has values on items, so it can't be removed (hide it instead).",
       "title_required": "An item always needs a name, so its title can't be hidden.",
       "catalog_item_in_use": "That item is in a challenge that's still running. Take it out of the challenge first.",
       "shared_unsupported": "A shared response needs a challenge with items.",
-      "library_required": "This challenge draws from more than one library — choose which one each item comes from.",
+      "library_required": "This challenge draws from more than one library, choose which one each item comes from.",
       "library_not_linked": "That library isn't part of this challenge. Add it to the challenge first.",
       "library_in_use": "Some items in this challenge come from that library. Remove them before taking the library out.",
       "library_missing": "Create the Tables library first, then set up the challenge.",
@@ -184,7 +184,7 @@
       "library_has_items": "This library still has items. Confirm to delete it together with them.",
       "library_busy": "Some of this library's items are in challenges that are still running. Take them out of those challenges first.",
       "item_not_open": "Answers for this item haven't opened yet.",
-      "invalid_timezone": "That time zone isn't recognised — pick one from the list, like America/Sao_Paulo.",
+      "invalid_timezone": "That time zone isn't recognised (pick one from the list, like America/Sao_Paulo).",
       "invalid_answer_scope": "Choose who fills in the response: each participant or once for the group.",
       "invalid_setting": "Choose whether the form asks when each response happened.",
       "invalid_shared_edit_policy": "Choose who can fill in or correct the shared response.",
@@ -259,7 +259,7 @@
       "usernameHint": "Letters, numbers, dot, hyphen, or underscore.",
       "nameLabel": "Your name",
       "emailLabel": "Email (optional)",
-      "emailHint": "Recommended — password reset options are coming soon.",
+      "emailHint": "Recommended, password reset options are coming soon.",
       "passwordConfirmLabel": "Confirm password"
     },
     "passwordLabel": "Password",
@@ -268,7 +268,7 @@
     "goRegister": "Sign up",
     "goLogin": "Sign in",
     "back": "Back",
-    "reassure": "Go ahead and create an account — there's already a delete-account button in settings (heh). Kick the tyres.",
+    "reassure": "Go ahead and create an account, there's already a delete-account button in settings (heh). Kick the tyres.",
     "browseFirst": "Want a peek before you decide? ",
     "showTemplates": "Browse the ready-made templates"
   },
@@ -334,7 +334,7 @@
       "show": "Show {section} on Home",
       "lastVisible": "At least one section stays on Home.",
       "automatic": "Back to automatic",
-      "automaticNow": "Automatic — shows what you use, busiest first",
+      "automaticNow": "Automatic (shows what you use, busiest first)",
       "sectionPersonal": "Just me",
       "sectionGroups": "Groups",
       "chip": "{section} · {count}",
@@ -352,12 +352,12 @@
     }
   },
   "welcome": {
-    "lede": "Nothing here yet. Start with one challenge — the rest can come later.",
+    "lede": "Nothing here yet. Start with one challenge, the rest can come later.",
     "flowTitle": "How a round comes together",
     "steps": {
       "library": {
         "title": "Choose what you track",
-        "body": "Films, books, places, matches — kept in a library that remembers every item."
+        "body": "Films, books, places, matches (kept in a library that remembers every item)."
       },
       "challenge": {
         "title": "Set a challenge",
@@ -365,11 +365,11 @@
       },
       "group": {
         "title": "Bring your people",
-        "body": "A private group for the club, the friends, the family — or keep it just yours."
+        "body": "A private group for the club, the friends, the family (or keep it just yours)."
       },
       "showcase": {
         "title": "Read the showcase",
-        "body": "Goa does the maths — averages, rankings, who's on schedule — and turns the round into a story."
+        "body": "Goa does the maths (averages, rankings, who's on schedule) and turns the round into a story."
       }
     },
     "starts": {
@@ -378,7 +378,7 @@
       },
       "quick": {
         "title": "Start a challenge",
-        "body": "Three quick questions, all of them taps — no way to get it wrong.",
+        "body": "Three quick questions, all of them taps (no way to get it wrong).",
         "cta": "Get started"
       },
       "templates": {
@@ -447,7 +447,7 @@
     "leaveToggle": "Leave group",
     "leaveConfirm": "Leave this group? You stop seeing it and its challenges. Your entries stay (the group's history stays intact) but show as \"left the group\" instead of your name.",
     "recommendationsLabel": "Recommendations",
-    "recommendationsHint": "Ask who recommended each item and show it. Turn off to hide it everywhere in this group — what's already recorded is kept.",
+    "recommendationsHint": "Ask who recommended each item and show it. Turn off to hide it everywhere in this group, what's already recorded is kept.",
     "catalogEmptyTitle": "Start the catalogue",
     "catalogMoreIn": "more in {name}",
     "catalogSeeAll": "See all",
@@ -490,7 +490,7 @@
   "personalCatalog": {
     "back": "Back",
     "title": "My catalogue",
-    "subtitle": "Everything you track, organised in libraries — with the rating you gave.",
+    "subtitle": "Everything you track, organised in libraries (with the rating you gave).",
     "loading": "Loading the catalogue…",
     "loadError": "Couldn't load the catalogue.",
     "rounds": "{count, plural, =0 {no rounds} one {# round} other {# rounds}}",
@@ -508,7 +508,7 @@
     "averageRating": "average {value}",
     "reusedNotice": "Using the item that was already there.",
     "addedNotice": "Item added.",
-    "emptyHint": "Add your first item — Screens for films and series, Pages for books, or make a library of your own.",
+    "emptyHint": "Add your first item (Screens for films and series, Pages for books, or make a library of your own).",
     "recommenderFilterLabel": "Filter by recommender",
     "recommenderAll": "Everyone",
     "recommenderNone": "No recommender",
@@ -580,7 +580,7 @@
     "pasteJsonPlaceholderBook": "[\n  { \"title\": \"Dune\", \"author\": \"Frank Herbert\", \"year\": 1965, \"pageCount\": 688, \"mainGenre\": \"sci-fi\" }\n]",
     "jsonInvalid": "That text isn't valid JSON.",
     "jsonMustBeArray": "Paste a list in brackets, e.g. [ {\"title\": \"...\"} ].",
-    "jsonNoItems": "The list is empty — paste at least one object with a \"title\".",
+    "jsonNoItems": "The list is empty, paste at least one object with a \"title\".",
     "pasteSummary": "{total} entries read · {added} added · {invalid} without a title or not an object · {duplicates} already on the list.",
     "pasteSummaryNone": "Nothing was added: every entry was a repeat, had no \"title\" or wasn't an object.",
     "pasteUnknownKeys": "Keys ignored because they matched nothing: {keys}. Fill that data in on each item's own fields.",
@@ -613,7 +613,7 @@
     "title": "Build the next experience",
     "subtitle": "Start with a preset and adjust only what your group needs.",
     "personalTitle": "New personal challenge",
-    "personalSubtitle": "Just yours — no group, no invites. Start with a preset and adjust the essentials.",
+    "personalSubtitle": "Just yours (no group, no invites). Start with a preset and adjust the essentials.",
     "startTitle": "Choose a starting point",
     "recipes": {
       "cinema": {
@@ -624,7 +624,7 @@
       "bookshelf": {
         "name": "Pages",
         "tagline": "Rate what you've read",
-        "body": "A list of books you just rate and comment on — no pages, no deadline, no \"when\". Great for logging what you've already read."
+        "body": "A list of books you just rate and comment on (no pages, no deadline, no \"when\"). Great for logging what you've already read."
       },
       "library": {
         "name": "Reading club",
@@ -634,17 +634,17 @@
       "habit": {
         "name": "Habit",
         "tagline": "One check-in a day",
-        "body": "No film, no book — just a daily check-in. Add whatever fields the habit needs and build your own metrics on them."
+        "body": "No film, no book (just a daily check-in). Add whatever fields the habit needs and build your own metrics on them."
       },
       "tables": {
         "name": "Tables",
         "tagline": "Rate places to eat",
-        "body": "Rate restaurants, bars and cafés on food, atmosphere and value — one rating each, no combined score."
+        "body": "Rate restaurants, bars and cafés on food, atmosphere and value (one rating each, no combined score)."
       },
       "custom": {
         "name": "Custom",
         "tagline": "You decide what to log",
-        "body": "Pick any library — matches, games, anything — and decide exactly what everyone records."
+        "body": "Pick any library (matches, games, anything) and decide exactly what everyone records."
       }
     },
     "titleLabel": "Title",
@@ -686,38 +686,38 @@
     "expectationHint": "Participants rate how much they expect to like each title before watching. It locks once they send the real rating. You can also toggle this later.",
     "errPickLibrary": "Choose the library the items come from.",
     "errTablesLibrary": "Create the Tables library first.",
-    "tablesItemsHint": "Add the places to rate — one per line.",
-    "customItemsHint": "Add the items to track — one per line. Each item becomes something everyone can record.",
+    "tablesItemsHint": "Add the places to rate (one per line).",
+    "customItemsHint": "Add the items to track (one per line). Each item becomes something everyone can record.",
     "libraryLabel": "Library",
     "libraryHint": "Which list of things this challenge draws from.",
     "pickLibraryFirst": "Choose a library to start adding items",
     "moreLibrariesLabel": "Libraries in this challenge",
-    "moreLibrariesHint": "Optional: add more to mix them in one challenge — Movies and TV Shows, say. Each item still belongs to exactly one.",
+    "moreLibrariesHint": "Optional: add more to mix them in one challenge (Movies and TV Shows, say). Each item still belongs to exactly one.",
     "recordingLabel": "How is each entry recorded?",
     "recordingHint": "Pick how people log their progress on the items in this challenge.",
     "recordingSingle": "One response per item",
-    "recordingSingleHint": "Each person answers once for every item — a rating, a score, a note.",
+    "recordingSingleHint": "Each person answers once for every item (a rating, a score, a note).",
     "recordingSession": "A check-in with several items",
-    "recordingSessionHint": "One visit holds a record for each item you pick — a workout of exercises, a study session of subjects. Each record keeps its own history.",
+    "recordingSessionHint": "One visit holds a record for each item you pick (a workout of exercises, a study session of subjects). Each record keeps its own history.",
     "sessionNameLabel": "What do you call one check-in?",
-    "sessionNameHint": "Shown on the form and in the history — a Workout, a Study session, a Game night.",
+    "sessionNameHint": "Shown on the form and in the history (a Workout, a Study session, a Game night).",
     "sessionNamePlaceholder": "e.g. Workout",
     "sessionNameDefault": "Session",
     "scopeLabel": "Who fills in this response?",
     "scopeHint": "This is the main thing people record on each item.",
     "scopeIndividual": "Each participant",
-    "scopeIndividualHint": "Everyone answers for themselves — a rating, a guess, a note.",
+    "scopeIndividualHint": "Everyone answers for themselves (a rating, a guess, a note).",
     "scopeShared": "Once for the group",
-    "scopeSharedHint": "One answer per item that everyone sees — a final score, an agreed verdict.",
+    "scopeSharedHint": "One answer per item that everyone sees (a final score, an agreed verdict).",
     "entryDateLabel": "Ask when each response happened",
     "entryDateHint": "Adds an optional “When did it happen?” date to the form. Leave it off when the date belongs to the item itself, like a match's kick-off.",
     "itemDatesLabel": "Each item has its own date and time",
     "itemDatesHint": "Like a match's kick-off or a screening. It's kept on the item, so every challenge that uses it shows the same date.",
-    "errItemSchedule": "Check the date — the end, the time or the time zone doesn't look right."
+    "errItemSchedule": "Check the date (the end, the time or the time zone doesn't look right)."
   },
   "adminChallenge": {
     "back": "Back",
-    "subtitle": "Set it up, review it, and present it — admin controls stay validated on the server.",
+    "subtitle": "Set it up, review it, and present it (admin controls stay validated on the server).",
     "tabsAria": "Admin areas",
     "tabs": {
       "overview": "General",
@@ -764,7 +764,7 @@
     "descriptionLabel": "Description",
     "rulesLabel": "Titled rules",
     "rulesHint": "Each rule gets its own spotlight so nobody has to hunt for the agreement.",
-    "livingListBody": "No dates — add titles and rate them whenever.",
+    "livingListBody": "No dates, add titles and rate them whenever.",
     "stateTitle": "Challenge state",
     "stateDraft": "Only admins see this draft. Check fields, stages, and participants before activating.",
     "stateScheduled": "The challenge is already active but scheduled for {date}. Entries open once it starts.",
@@ -786,7 +786,7 @@
     "reuseNoneBody": "Create another group or become an owner/admin of one to reuse this template.",
     "deleteTitle": "Delete challenge?",
     "deleteBody": "Moves the challenge and its entries to the bin.",
-    "deleteBodyTemplateWarning": "It's also published as a template in the gallery — deleting the challenge removes the template too.",
+    "deleteBodyTemplateWarning": "It's also published as a template in the gallery, deleting the challenge removes the template too.",
     "deleteConfirm": "Move \"{title}\" to the bin?",
     "delete": "Delete challenge",
     "deleting": "Deleting…",
@@ -802,7 +802,7 @@
     "noMembersTitle": "Member list unavailable",
     "fieldsTitle": "Entry fields",
     "fieldsHintDraft": "Types and order can be adjusted freely before activation.",
-    "fieldsHintActive": "Add, rename, or reorder fields at any time. The type of a saved field is fixed, and a field with answers can't be removed — history stays intact.",
+    "fieldsHintActive": "Add, rename, or reorder fields at any time. The type of a saved field is fixed, and a field with answers can't be removed (history stays intact).",
     "fieldsHintClosed": "The fields were frozen at closing to preserve the result.",
     "fieldsTypeLegend": "Entry type",
     "fieldsSaved": "Fields saved.",
@@ -825,7 +825,7 @@
     "itemTitleLabel": "Title",
     "itemDescriptionLabel": "Description",
     "itemDescriptionPlaceholder": "Optional context",
-    "itemWindow": "{opens} — {due}",
+    "itemWindow": "{opens} to {due}",
     "edit": "Edit",
     "removing": "Removing…",
     "remove": "Remove",
@@ -863,7 +863,7 @@
     "metricOperationLabel": "Operation",
     "metricFieldLabel": "Field",
     "metricCombineLabel": "Combine more than one field",
-    "metricCombineHint": "Fold two or more fields into one number per entry — a total score from several ratings, say — before this calculation runs.",
+    "metricCombineHint": "Fold two or more fields into one number per entry (a total score from several ratings, say) before this calculation runs.",
     "metricFieldsLabel": "Fields to combine",
     "metricFieldsHint": "Pick two or more, from the same form.",
     "metricPickTwoFields": "Pick at least two fields.",
@@ -887,14 +887,14 @@
     "createMetricsFirst": "Create metrics before selecting them.",
     "selectedComments": "Selected comments",
     "allCommentsLabel": "Show every comment automatically",
-    "allCommentsHint": "Instead of picking one by one, the showcase shows every comment that's filled in — including a new one, as soon as it's logged, with nothing to resave.",
+    "allCommentsHint": "Instead of picking one by one, the showcase shows every comment that's filled in (including a new one, as soon as it's logged, with nothing to resave).",
     "selectCommentAria": "Select comment from {author}",
     "noTextFields": "No filled-in text field is available for curation.",
     "saveResults": "Save showcase",
     "anonymizeParticipants": "Anonymise participants on the public page",
-    "anonymizeHint": "On the public showcase (/results) and the template, names become Participant 1, 2… — including per-person and indicator-bias series. Screens inside the group keep real names. Changing this updates who appears publicly as soon as you save.",
+    "anonymizeHint": "On the public showcase (/results) and the template, names become Participant 1, 2… (including per-person and indicator-bias series). Screens inside the group keep real names. Changing this updates who appears publicly as soon as you save.",
     "showScheduleLabel": "Show the schedule",
-    "showScheduleHint": "The stages grid stops appearing on the challenge, result and template pages. The stages stay — metrics and the stage editor are unaffected.",
+    "showScheduleHint": "The stages grid stops appearing on the challenge, result and template pages. The stages stay, metrics and the stage editor are unaffected.",
     "publishShowcase": "Publish showcase",
     "publishConfirmNoAnon": "Publish the showcase with participants' real names on the public page?",
     "publishConfirmAnon": "Publish the showcase? Participants will appear anonymised on the public page.",
@@ -916,14 +916,14 @@
     "expectationHint": "An optional pre-watch 0–5 rating. It locks the moment the participant sends their real rating for that title. Draft only.",
     "expectationOn": "Expectation rating enabled.",
     "expectationOff": "Expectation rating removed.",
-    "expectationLockedNote": "The challenge is live — the expectation type stays as it is.",
+    "expectationLockedNote": "The challenge is live, the expectation type stays as it is.",
     "metricCumulativeLabel": "Cumulative",
     "wrappedBlocks": "Wrapped sections",
     "includeRankings": "Personal rankings",
     "includeAffinity": "Affinities",
     "showMoreItems": "Show {count} more",
     "showLess": "Show less",
-    "commentPrivacyWarning": "Anonymising drops the authorship, but the text is published verbatim — reread each comment and drop any that names people, shares contacts, or gives away something the writer would not want public.",
+    "commentPrivacyWarning": "Anonymising drops the authorship, but the text is published verbatim (reread each comment and drop any that names people, shares contacts, or gives away something the writer would not want public).",
     "metricHidden": "Hidden from both views",
     "metricWhere": "Where it appears",
     "metricCalculation": "Calculation settings",
@@ -936,7 +936,7 @@
     "fieldsEmptyBody": "Add a field for the participant to fill in on every entry.",
     "descRulesTitle": "Description & rules",
     "moreActions": "More actions",
-    "alreadyPublicHint": "This showcase is already public — any change you save here appears on the link and the template immediately.",
+    "alreadyPublicHint": "This showcase is already public, any change you save here appears on the link and the template immediately.",
     "itemOriginLine": "via {text}",
     "errPickLibrary": "Choose the library the items come from.",
     "libraryLabel": "Library",
@@ -947,13 +947,13 @@
     "librariesHint": "Where this challenge's items come from. You can add more libraries at any time.",
     "librariesCombined": "Items can come from any of these. A library can be removed once none of its items are in the challenge.",
     "entryDateTitle": "Ask when each response happened",
-    "entryDateHint": "Adds an optional “When did it happen?” date to the response form. Off, the form only asks for what you set up — every response is still timestamped when it's saved.",
+    "entryDateHint": "Adds an optional “When did it happen?” date to the response form. Off, the form only asks for what you set up (every response is still timestamped when it's saved).",
     "entryDateOn": "The form now asks when each response happened.",
     "entryDateOff": "The form no longer asks for a date.",
     "libraryProperties": "Properties of {name}",
     "reuseDoneTitle": "Copy created",
     "reuseDoneBody": "The copy is ready, but some properties couldn't come across.",
-    "eventScheduleInvalid": "Check the date — the end, the time or the time zone doesn't look right.",
+    "eventScheduleInvalid": "Check the date (the end, the time or the time zone doesn't look right).",
     "selectedOf": "{selected} of {total} selected",
     "allCommentsShown": "all shown",
     "blocksOn": "{count} on",
@@ -966,11 +966,11 @@
     "metricDaysPreview": "days logged",
     "metricItemLabel": "One item only",
     "metricItemAll": "Every item",
-    "metricItemHint": "Shows the number for a single item — your deadlift record, say."
+    "metricItemHint": "Shows the number for a single item (your deadlift record, say)."
   },
   "visibility": {
     "title": "Who sees these answers",
-    "hint": "Applies to each participant seeing others' answers of this type. Admins and the author always see everything — except a sealed rating, which waits for the reveal like everyone else.",
+    "hint": "Applies to each participant seeing others' answers of this type. Admins and the author always see everything (except a sealed rating, which waits for the reveal like everyone else).",
     "saved": "Visibility updated.",
     "policy": {
       "group_realtime": "The group, in real time",
@@ -983,8 +983,8 @@
       "group_realtime": "Every participant sees everyone's answer while the round runs.",
       "after_own": "You only see someone else's answer for an item after you've submitted your own.",
       "after_close": "During the round only you and the admins see your answer; the group sees it in the result.",
-      "author_only": "Your answer never shows up collectively — only aggregate metrics can include it.",
-      "until_reveal": "Nobody — admins included — sees another rating until someone who has rated taps Reveal on that item."
+      "author_only": "Your answer never shows up collectively, only aggregate metrics can include it.",
+      "until_reveal": "Nobody (admins included) sees another rating until someone who has rated taps Reveal on that item."
     },
     "note": {
       "after_close": "Only the admins see your answer until the round closes.",
@@ -1006,20 +1006,20 @@
       "no_entry_type": "The challenge has no record type.",
       "no_items": "This recipe records per item, but no items have been added.",
       "no_checkpoints": "The period needs days and none were generated.",
-      "no_way_to_register": "There's no valid way to record participation — an item or a day is missing.",
+      "no_way_to_register": "There's no valid way to record participation, an item or a day is missing.",
       "primary_type_no_fields": "The main record type has no fields.",
       "choice_without_options": "A choice field has no options.",
       "metric_field_archived": "A metric points at a field that no longer exists.",
       "metric_needs_field": "A numeric metric has no field to compute over.",
       "metric_field_not_numeric": "A metric runs a numeric operation over a field that isn't a number.",
       "checkpoint_outside_period": "A stage falls outside the challenge period.",
-      "no_metrics": "No metrics configured — the retrospective will be empty.",
-      "no_comment_source": "No text field — there'll be no comments to feature in the retrospective.",
-      "many_required_fields": "The form has a lot of required fields — consider making some optional.",
-      "many_items_for_period": "That's a lot of items for the number of stages — it may be tight.",
+      "no_metrics": "No metrics configured, the retrospective will be empty.",
+      "no_comment_source": "No text field, there'll be no comments to feature in the retrospective.",
+      "many_required_fields": "The form has a lot of required fields, consider making some optional.",
+      "many_items_for_period": "That's a lot of items for the number of stages, it may be tight.",
       "ranking_min_sample_unreachable": "A ranking needs more ratings per item than the challenge has participants.",
       "metric_on_optional_field": "A metric depends on an optional field, which may end up with no data.",
-      "expectation_visible_early": "An expectation is visible to the group before the rating — consider \"after your own answer\"."
+      "expectation_visible_early": "An expectation is visible to the group before the rating, consider \"after your own answer\"."
     }
   },
   "participant": {
@@ -1074,7 +1074,7 @@
     "saved": "Saved.",
     "errNoRows": "Add at least one item with its numbers.",
     "lastTime": "Last time: {values} · {date}",
-    "noItems": "This challenge has no items yet — add them in Manage.",
+    "noItems": "This challenge has no items yet, add them in Manage.",
     "itemCount": "{count, plural, one {# item} other {# items}}",
     "remove": "Delete",
     "deleteTitle": "Delete this {name}?",
@@ -1153,7 +1153,7 @@
     "positionResult": "That's <b>{value}</b> on this day.",
     "previewBook": "The book moves to <b>p. {page}</b> · <b>{percent}%</b>",
     "previewTotal": "The total moves to <b>{total}</b>",
-    "overTotal": "The book has {total} pages and this goes past that. You can still save it — editions differ.",
+    "overTotal": "The book has {total} pages and this goes past that. You can still save it (editions differ).",
     "errorNotWhole": "Use a whole number.",
     "errorNotPositive": "Log a number above zero.",
     "errorBelowStartBook": "Before this day you were already on p. {before}. Enter a page after that.",
@@ -1285,7 +1285,7 @@
     "back": "Back",
     "allTemplates": "All templates",
     "title": "Ready-made templates",
-    "subtitle": "Example challenges to see how Goa works. Open one to explore the rules, the form, and the metrics — and duplicate it to one of your groups whenever you want to start.",
+    "subtitle": "Example challenges to see how Goa works. Open one to explore the rules, the form, and the metrics (and duplicate it to one of your groups whenever you want to start).",
     "loading": "Loading templates…",
     "emptyTitle": "No templates yet",
     "cardItems": "{count, plural, one {# item} other {# items}}",
@@ -1313,12 +1313,12 @@
       "free": "free"
     },
     "copyModeItemsHint": "The round's items come along, ready to use.",
-    "copyModeStructureHint": "Fields, rules and metrics only — you add your own items.",
+    "copyModeStructureHint": "Fields, rules and metrics only (you add your own items).",
     "cardPeople": "{count, plural, one {# person} other {# people}}",
     "cardRules": "{count, plural, one {# rule} other {# rules}}",
     "cardFields": "{count, plural, one {# field} other {# fields}}",
     "frontTitle": "Challenges with your people, or just you.",
-    "frontLede": "Track films, books, habits — anything — and watch it add up to a result worth sharing. These are real ones.",
+    "frontLede": "Track films, books, habits (anything) and watch it add up to a result worth sharing. These are real ones.",
     "moreTitle": "More templates",
     "seeResult": "See the whole result",
     "feature": "Feature on the front page",
@@ -1378,7 +1378,7 @@
     "trashBody": "Groups and challenges you deleted stay here until you restore them or delete them for good. Nothing expires on its own.",
     "trashOpen": "Open the bin",
     "nameConsentTitle": "Your name in publications",
-    "nameConsentBody": "When a challenge closes, the admin may publish a retrospective. It's anonymous by default — tick the challenges where you're happy to appear by your real name.",
+    "nameConsentBody": "When a challenge closes, the admin may publish a retrospective. It's anonymous by default, tick the challenges where you're happy to appear by your real name.",
     "nameConsentEmpty": "You're not in any group challenge yet.",
     "nameConsentStatus": {
       "draft": "draft",
@@ -1386,7 +1386,7 @@
       "closed": "closed"
     },
     "dangerTitle": "Danger!",
-    "deleteBody": "Deleting your account disables access and removes your personal data. Groups where you're the only person go to the bin. A group with other people in it never gets stuck on you — ownership passes automatically to its oldest admin, or its oldest member if it has no other admin.",
+    "deleteBody": "Deleting your account disables access and removes your personal data. Groups where you're the only person go to the bin. A group with other people in it never gets stuck on you (ownership passes automatically to its oldest admin, or its oldest member if it has no other admin).",
     "deleteConfirm": "Delete your account? Access ends and your personal data is removed.",
     "deleteAccount": "Delete my account",
     "deleting": "Deleting…",
@@ -1405,7 +1405,7 @@
     "consequencePublications": "{count, plural, one {# published showcase of yours goes offline} other {# published showcases of yours go offline}}.",
     "consequencesLoading": "Working out what gets deleted…",
     "consequencesFailed": "Couldn't work out what gets deleted. Deletion only continues once this list loads.",
-    "consequenceContributions": "Your ratings and comments stay in the group without your name — but the text you wrote isn't rewritten.",
+    "consequenceContributions": "Your ratings and comments stay in the group without your name, but the text you wrote isn't rewritten.",
     "deleteDialogTitle": "Permanently delete your account?"
   },
   "publicResults": {
@@ -1414,7 +1414,7 @@
   "about": {
     "back": "Back",
     "title": "About Goa",
-    "lede": "Private challenges for friends — or just you. Everyone logs; Goa does the maths and turns the round into a memory.",
+    "lede": "Private challenges for friends (or just you). Everyone logs; Goa does the maths and turns the round into a memory.",
     "stepsTitle": "How it works",
     "steps": [
       {
@@ -1423,7 +1423,7 @@
       },
       {
         "title": "Everyone logs",
-        "body": "Ratings, pages, check-ins — each person on their own, from any phone."
+        "body": "Ratings, pages, check-ins (each person on their own, from any phone)."
       },
       {
         "title": "Goa tells the story",
@@ -1452,15 +1452,15 @@
     "rankingTitle": "How Goa ranks",
     "ranking": [
       "Your ratings are never changed, and averages are always real averages.",
-      "Only the order uses the Goa score: it breaks ties using each person's own history — a 5 from someone who rarely gives one counts a little more.",
+      "Only the order uses the Goa score: it breaks ties using each person's own history, a 5 from someone who rarely gives one counts a little more.",
       "New people and new titles simply get the average. Hidden ratings never move a number you see."
     ],
     "factsTitle": "Good to know",
     "facts": [
       "You decide what one item is: a trilogy can be one item or three.",
-      "Done means the required answers are in — nothing more.",
+      "Done means the required answers are in (nothing more).",
       "Some answers belong to the whole group, like a final score.",
-      "A challenge can mix libraries — Movies and TV Shows in one list."
+      "A challenge can mix libraries, Movies and TV Shows in one list."
     ],
     "byline": "A personal project by Eduardo Dourado, grown out of the spreadsheets of a film club and a reading club.",
     "feedbackNudge": "Have an idea, or did something bug you?",
@@ -1468,7 +1468,7 @@
   },
   "feedbackPage": {
     "title": "How can we improve?",
-    "lede": "Takes a minute. Your answers help decide what to build first — we keep nothing from your entries, ratings, or comments.",
+    "lede": "Takes a minute. Your answers help decide what to build first (we keep nothing from your entries, ratings, or comments).",
     "q1": "Which part of Goa were you in?",
     "q1Placeholder": "e.g. creating a challenge, logging the day, viewing the result…",
     "q2": "What were you trying to do?",
@@ -1506,7 +1506,7 @@
   },
   "checkpointPlanner": {
     "title": "Stages",
-    "subtitle": "Split the challenge into stages — a week, a session, a group stage, whatever fits. Stages don't have to be consecutive — leave a gap for a break.",
+    "subtitle": "Split the challenge into stages (a week, a session, a group stage, whatever fits). Stages don't have to be consecutive, leave a gap for a break.",
     "dailyAutoNote": "This challenge has one entry per day, generated from its period. Adjust the dates on the General tab.",
     "noItemsNote": "This challenge has no items to organise into stages.",
     "lockedNote": "A closed challenge is frozen.",
@@ -1558,7 +1558,7 @@
     "reanalyse": "Analyse again",
     "summary": "{total} rows · {importable} to import · {invalid} invalid · {dupChallenge} already in the challenge · {dupCatalog} known from the catalogue",
     "unknownKeysTitle": "Unrecognised keys",
-    "unknownKeysNote": "Unmapped keys are ignored — they never touch the database.",
+    "unknownKeysNote": "Unmapped keys are ignored, they never touch the database.",
     "ignoreKey": "ignore",
     "field": {
       "title": "Title",
@@ -1600,10 +1600,10 @@
     },
     "affinity": {
       "title": "Affinities",
-      "explanation": "Similarity of ratings in this challenge — 100 × (1 − mean absolute difference ÷ scale). Not a personal compatibility score.",
+      "explanation": "Similarity of ratings in this challenge, 100 × (1 − mean absolute difference ÷ scale). Not a personal compatibility score.",
       "sample": "{n} shared items",
       "composite": "Composite",
-      "compositeNote": "Composite affinity needs enough shared items per genre, year and length — shown once the data is there.",
+      "compositeNote": "Composite affinity needs enough shared items per genre, year and length (shown once the data is there).",
       "dimItems": "shared items",
       "dimGenre": "genre",
       "dimYearBand": "year band",
@@ -1642,9 +1642,9 @@
       "completion_rate": "Completed records divided by everything expected, times 100.",
       "bayesian_average": "A fair average for ranking. An item with only a few ratings is pulled toward the overall average of the whole list, so a single enthusiastic vote can't put it on top. The more ratings it has, the closer it gets to its own simple average (the plain figure is shown underneath). Formula: (n × item average + {weight} × overall average) ÷ (n + {weight}), where n is the item's number of ratings.",
       "spread": "How much the ratings disagree (population standard deviation): the higher it is, the more the group was divided.",
-      "consensus": "How much the group agrees, from 0 to 100 — 100 means everyone gave the same rating.",
+      "consensus": "How much the group agrees, from 0 to 100 (100 means everyone gave the same rating).",
       "surprise": "Rating minus expectation, using pairs where the same person gave both for the same item. Positive means it beat expectations.",
-      "indicator_bias": "The average of the items each person recommended minus the overall average — how well their recommendations landed."
+      "indicator_bias": "The average of the items each person recommended minus the overall average, how well their recommendations landed."
     },
     "explainMinimum": "Only shown once there are at least {minimum, plural, one {# record} other {# records}}."
   },
@@ -1664,7 +1664,7 @@
     "personalTitle": "My bin",
     "personalSubtitle": "Groups, challenges and catalogue items you removed. They stay here until you restore them or delete them for good.",
     "groupTitle": "Group bin",
-    "groupSubtitle": "Removed challenges and catalogue items. Restore or delete for good — nothing disappears on its own.",
+    "groupSubtitle": "Removed challenges and catalogue items. Restore or delete for good, nothing disappears on its own.",
     "emptyTitle": "The bin is empty",
     "restore": "Restore",
     "purge": "Delete permanently",
@@ -1744,22 +1744,22 @@
       "custom": "Library"
     },
     "newTitle": "New library",
-    "newBody": "A library is a list of things you track together — places, matches, games, anything. Give it a name; you shape what each item can hold afterwards.",
+    "newBody": "A library is a list of things you track together (places, matches, games, anything). Give it a name; you shape what each item can hold afterwards.",
     "nameLabel": "Name",
     "nameHint": "What you'll call this library.",
     "namePlaceholder": "e.g. Matches",
     "nameRequired": "Give the library a name.",
     "create": "Create library",
     "tablesPromptTitle": "Start with a Tables library",
-    "tablesPromptBody": "A library keeps what you track in one place. Tables is the one for restaurants, bars and cafés — the places you add here are saved in it, ready to rate again in later challenges.",
+    "tablesPromptBody": "A library keeps what you track in one place. Tables is the one for restaurants, bars and cafés (the places you add here are saved in it, ready to rate again in later challenges).",
     "tablesPromptCreate": "Create Tables library",
     "tablesPromptCreating": "Creating…",
-    "tablesPromptMore": "You can create more libraries any time — Bars, Coffee shops, Matches — from the catalogue.",
+    "tablesPromptMore": "You can create more libraries any time (Bars, Coffee shops, Matches) from the catalogue.",
     "renameTitle": "Rename library",
-    "renameHint": "Only the name changes — its items and properties stay as they are.",
+    "renameHint": "Only the name changes, its items and properties stay as they are.",
     "rename": "Rename",
     "propertiesTitle": "{name} · properties",
-    "propertiesBody": "Rename, hide or reorder what each item in this library can hold. Hiding a property keeps what's already saved — it just stops appearing.",
+    "propertiesBody": "Rename, hide or reorder what each item in this library can hold. Hiding a property keeps what's already saved, it just stops appearing.",
     "propertiesReadOnly": "What each item in this library can hold.",
     "loading": "Loading…",
     "noProperties": "No properties yet",
@@ -1833,9 +1833,9 @@
     "titlePlaceholder": "What are you adding?",
     "titleRequired": "Type a title.",
     "matchesTitle": "Already in this library?",
-    "matchesBody": "These have a similar title. Use one to avoid a duplicate — or keep going to create a new item.",
+    "matchesBody": "These have a similar title. Use one to avoid a duplicate, or keep going to create a new item.",
     "matchesAutoTitle": "Looks familiar",
-    "matchesAutoBody": "Screens and Pages match a repeated title on their own, so adding it again just reuses — and fills in — the one already there.",
+    "matchesAutoBody": "Screens and Pages match a repeated title on their own, so adding it again just reuses (and fills in) the one already there.",
     "useThis": "Use this one",
     "orCreateNew": "Otherwise, fill in the rest and add it as a new item.",
     "loadingProperties": "Loading the fields…",
@@ -1846,7 +1846,7 @@
     "badge": "Shared",
     "addShort": "Shared response",
     "addTitle": "Add a shared response",
-    "addBody": "One answer for the whole group on each item — a final score, an agreed verdict. Ratings and comments stay individual.",
+    "addBody": "One answer for the whole group on each item (a final score, an agreed verdict). Ratings and comments stay individual.",
     "nameLabel": "Response name",
     "nameHint": "How it appears on each item, e.g. Final score.",
     "namePlaceholder": "Final score",
@@ -1887,9 +1887,9 @@
       "members_fill_admin_corrects": "Anyone fills it once · admins correct it",
       "members_can_edit": "Anyone taking part can edit it"
     },
-    "lockedByPolicy": "This answer is already filled in — only an admin can correct it.",
-    "conflictShort": "Someone changed this answer while you were editing. The latest version is showing — nothing of yours was saved.",
-    "conflictBody": "{name} changed this answer while you were editing, so your change wasn't saved. The latest version is shown — review it and edit again if you still need to.",
+    "lockedByPolicy": "This answer is already filled in, only an admin can correct it.",
+    "conflictShort": "Someone changed this answer while you were editing. The latest version is showing, nothing of yours was saved.",
+    "conflictBody": "{name} changed this answer while you were editing, so your change wasn't saved. The latest version is shown, review it and edit again if you still need to.",
     "someone": "Someone",
     "dismiss": "Dismiss",
     "lastEdited": "Last changed by {name} · {when}",
@@ -1909,11 +1909,11 @@
     "time": "Time",
     "endTime": "End time",
     "zone": "Time zone",
-    "errZone": "That time zone isn't recognised — use a name like America/Sao_Paulo.",
+    "errZone": "That time zone isn't recognised, use a name like America/Sao_Paulo.",
     "errEndOrder": "The end can't be before the start.",
     "errTime": "Add a time, or switch the time off.",
     "clear": "Remove the date",
-    "invalid": "Check the date — the end, the time or the time zone doesn't look right.",
+    "invalid": "Check the date (the end, the time or the time zone doesn't look right).",
     "addEnd": "End date",
     "removeEnd": "Remove end date"
   },
@@ -1932,7 +1932,7 @@
   },
   "quickCreate": {
     "title": "Start a challenge",
-    "subtitle": "Three quick taps — no group, no library, no field to fill in wrong.",
+    "subtitle": "Three quick taps (no group, no library, no field to fill in wrong).",
     "q1": "What would you like to track?",
     "q2": "Just for you, or with a group?",
     "q3": "What should we call it?",
@@ -1956,7 +1956,7 @@
     "modeReveal": "Reveal together",
     "modeRevealHint": "Everyone rates blind; one tap shows them all at once.",
     "modeGuess": "Guess first, then reveal",
-    "modeGuessHint": "Say what you expect before, rate after — see who got surprised.",
+    "modeGuessHint": "Say what you expect before, rate after (see who got surprised).",
     "modeOpen": "As you go",
     "modeOpenHint": "Each rating shows up for the group as soon as it's in."
   },
@@ -1971,7 +1971,7 @@
   },
   "exportDoc": {
     "button": "Download PDF",
-    "fileTitle": "{title} — log",
+    "fileTitle": "{title} (log)",
     "download": "Download PDF",
     "printHint": "In the print window, choose “Save as PDF”.",
     "sectionsLabel": "What goes in the PDF",
@@ -2010,7 +2010,7 @@
     "itemsLede": "{items, plural, one {# item} other {# items}}{chapters, plural, =0 {} one {} other {, in # parts}}. Each card keeps everything written about it.",
     "chapter": "Part {n}",
     "recommendedBy": "Picked by",
-    "about": "About —",
+    "about": "About:",
     "tiles": {
       "rating": "Score",
       "entries": "Entries",
@@ -2026,7 +2026,7 @@
     "diaryLede": "{entries, plural, one {# entry} other {# entries}} over {days, plural, one {# day} other {# days}}.",
     "monthDays": "{count, plural, one {# day logged} other {# days logged}}",
     "undated": "Undated",
-    "onlyMarks": "Only check-marks this month — no notes.",
+    "onlyMarks": "Only check-marks this month (no notes).",
     "scoreboardTitle": "Scoreboard",
     "scoreboardLede": "Every score side by side, in the challenge's order.",
     "scoreboardLedePlain": "Every item, in the challenge's order.",
@@ -2046,7 +2046,7 @@
     "ratingsCount": "{count, plural, one {# score} other {# scores}}",
     "recordsTitle": "Records",
     "recordsLede": "The best for each item, across every entry.",
-    "colophon": "Made with Goa on {date}. The data is yours — this PDF is just a nice way to keep it.",
+    "colophon": "Made with Goa on {date}. The data is yours, this PDF is just a nice way to keep it.",
     "footer": "goa · {title} · page ",
     "streakValue": "{count, plural, one {# day} other {# days}}",
     "showWhen": "Dates on cards"
@@ -2054,7 +2054,7 @@
   "reveal": {
     "sealedTitle": "Sealed ratings",
     "revealedTitle": "Already revealed",
-    "sealedBody": "Nobody sees anyone's rating — not even the admins — until someone taps Reveal. Then everyone sees them all at once.",
+    "sealedBody": "Nobody sees anyone's rating (not even the admins) until someone taps Reveal. Then everyone sees them all at once.",
     "rateBeforeLooking": "The group has revealed its ratings. Give yours first, so theirs don't sway you.",
     "countRated": "{done} of {total} rated",
     "whoRated": "Who has rated",
@@ -2065,7 +2065,7 @@
     "showAnyway": "Show me anyway",
     "stillMissing": "Still missing: {names}",
     "confirmTitle": "Reveal without everyone?",
-    "confirmBody": "{names} haven't rated yet. Once it's revealed, everyone sees every rating — theirs will land after.",
+    "confirmBody": "{names} haven't rated yet. Once it's revealed, everyone sees every rating (theirs will land after).",
     "confirmAction": "Reveal now",
     "replay": "Play again",
     "average": "Average",
@@ -2082,7 +2082,7 @@
     "inviteMore": "Invite someone else",
     "inviteHint": "The link brings them into the group and straight to this challenge.",
     "inviteMessage": "We're rating “{title}” blind and revealing together. Yours is missing:",
-    "inviteCopied": "Link copied — paste it in your group chat.",
+    "inviteCopied": "Link copied, paste it in your group chat.",
     "inviteShared": "Sent.",
     "inviteFailed": "Couldn't make the link. Try again."
   },
@@ -2096,18 +2096,18 @@
       "twins": "Practically the same taste.",
       "close": "You usually agree.",
       "mixed": "Sometimes yes, sometimes no.",
-      "apart": "You rarely agree — take their picks with a pinch of salt."
+      "apart": "You rarely agree, take their picks with a pinch of salt."
     },
     "inCommon": "{count, plural, one {Based on # title you both rated} other {Based on # titles you both rated}}",
     "closestOn": "Closest on",
     "furthestOn": "Furthest apart on",
     "scores": "you {you}, {name} {them}",
-    "groupTwins": "{a} and {b} are the group's twins — {agreement}%.",
-    "groupOpposites": "{a} and {b} are the furthest apart — {agreement}%.",
+    "groupTwins": "{a} and {b} are the group's twins ({agreement}%).",
+    "groupOpposites": "{a} and {b} are the furthest apart ({agreement}%).",
     "notYet": "Needs {count} titles in common before it's a real number:",
     "sharedSoFar": "{name} · {count} so far",
     "emptyTitle": "Your taste map draws itself as you rate.",
-    "emptyBody": "Once you and someone else have rated {count} of the same titles — in any challenge in this group — they'll appear here, as close to you as your ratings are."
+    "emptyBody": "Once you and someone else have rated {count} of the same titles (in any challenge in this group) they'll appear here, as close to you as your ratings are."
   },
   "story": {
     "threadAria": "{count} people's ratings across {items} titles",
@@ -2159,7 +2159,7 @@
     "common": {
       "eyebrow": "Common ground",
       "title": "{a} and {b} meet at {genre}",
-      "line": "{a} & {b} agree {agreement}% overall — but on {genre} it's {aValue} and {bValue}.",
+      "line": "{a} & {b} agree {agreement}% overall, but on {genre} it's {aValue} and {bValue}.",
       "hint": "Next time they pick together, start there."
     },
     "genres": {
@@ -2172,8 +2172,8 @@
       "title": "{hours} h {minutes} min each",
       "longest": "Longest",
       "shortest": "Shortest",
-      "worthIt": "Long ones averaged {long}, short ones {short} — the hours were worth it.",
-      "notWorth": "Long ones averaged {long}, short ones {short} — shorter was better.",
+      "worthIt": "Long ones averaged {long}, short ones {short} (the hours were worth it).",
+      "notWorth": "Long ones averaged {long}, short ones {short} (shorter was better).",
       "titleSolo": "{hours} h {minutes} min"
     },
     "critics": {
@@ -2274,7 +2274,7 @@
       },
       "thread": {
         "contentsRated": "Everyone's line through the titles",
-        "contentsDated": "Everyone's days — streaks and gaps"
+        "contentsDated": "Everyone's days (streaks and gaps)"
       },
       "rankings": {
         "title": "Rankings",
@@ -2307,7 +2307,7 @@
     "download": {
       "button": "Download pages",
       "title": "Download pages",
-      "lede": "{count} pages made from this challenge — download one, or all of them.",
+      "lede": "{count} pages made from this challenge (download one, or all of them).",
       "one": "Download this page",
       "all": "Download all {count}",
       "preparing": "Preparing…",
@@ -2320,7 +2320,7 @@
         "line": "{things}: you met on {met}, {a} brought {aCount}, {b} brought {bCount}.",
         "brought": "{name} brought {count}",
         "met": "met on {count}",
-        "note": "Met: within half a point. Brought: one of you rated it clearly higher — the one who brought it to the other.{between, plural, =0 {} one { # title sits in between.} other { # titles sit in between.}}"
+        "note": "Met: within half a point. Brought: one of you rated it clearly higher (the one who brought it to the other).{between, plural, =0 {} one { # title sits in between.} other { # titles sit in between.}}"
       },
       "met": "Where you met",
       "brought": "What {name} brought",
@@ -2329,19 +2329,19 @@
       "leanings": "Where each of you leans",
       "scale": "How you each use the scale",
       "sameScale": "You use the scale the same way.",
-      "higher": "{name} rates a little higher — {gap} on average.",
+      "higher": "{name} rates a little higher ({gap} on average).",
       "broughtTitle": "What each one brought",
       "broughtHeadline": "The titles {a} brought to {b}, and the other way round."
     },
     "solo": {
       "title": "Your taste",
-      "headline": "You average {value}{count, plural, =0 {.} one { — and gave one perfect score.} other { — and gave # perfect scores.}}",
+      "headline": "You average {value}{count, plural, =0 {.} one {, and gave one perfect score.} other {, and gave # perfect scores.}}",
       "scale": "Your scale",
       "average": "Your average: {value}.",
       "perfect": "Your perfect scores",
       "lowest": "The lowest",
       "instincts": "Your instincts",
-      "instinctsLine": "Your guesses missed by that much, on average — {close} of {total} landed within half a point."
+      "instinctsLine": "Your guesses missed by that much, on average ({close} of {total} landed within half a point)."
     },
     "soloDays": {
       "headline": "{count, plural, one {Your longest run: # day.} other {Your longest run: # days.}}",

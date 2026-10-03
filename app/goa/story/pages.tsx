@@ -151,7 +151,7 @@ function PagesDialog({ input, story, metrics, onClose }: { input: StoryInput; st
   async function save(id: string, index: number) {
     const node = refs.current.get(id)?.firstElementChild as HTMLElement | null;
     if (!node) return;
-    await downloadNode(node, `${input.title} — ${index + 1} ${pages[index].title}`);
+    await downloadNode(node, `${input.title} (${index + 1} ${pages[index].title})`);
   }
   async function saveOne(id: string, index: number) {
     setBusy(id);

@@ -120,7 +120,7 @@ async function main(): Promise<void> {
   }
   await transitionChallenge(me.session, s1.challengeId, { status: "closed" });
   await backdateLifecycle(s1.challengeId, s1Start, s1End);
-  console.log("  · Temporada 1 (encerrada — a aba Resultado mostra o fio e o almanaque)");
+  console.log("  · Temporada 1 (encerrada, a aba Resultado mostra o fio e o almanaque)");
 
   // ── Temporada 2: running, reveal together ──
   const s2 = await createChallenge(me.session, group.id, {
@@ -161,7 +161,7 @@ async function main(): Promise<void> {
     await s2Guess(person, "Pobres Criaturas", guess);
     await s2Rating(person, "Pobres Criaturas", nota, comment);
   }
-  console.log("  · Temporada 2 (em andamento — dê a sua nota a Pobres Criaturas e toque em Revelar)");
+  console.log("  · Temporada 2 (em andamento, dê a sua nota a Pobres Criaturas e toque em Revelar)");
 
   // ── 30 dias de leitura: a reading month, as a group habit ──
   const month = demoReadingInput("30 dias de leitura", (key) => NOTES_PT[key], today);
@@ -182,7 +182,7 @@ async function main(): Promise<void> {
       values: { paginas: row.value ?? 0, ...(row.note ? { nota_dia: row.note } : {}) },
     });
   }
-  console.log("  · 30 dias de leitura (hábito em grupo — Resultado mostra o fio dos dias)");
+  console.log("  · 30 dias de leitura (hábito em grupo, Resultado mostra o fio dos dias)");
 
   // ── Nós dois: the same eight films, just you and Rafa (the story's Ana and Caio — opposite tastes) ──
   const duoStart = day(-40);
@@ -201,7 +201,7 @@ async function main(): Promise<void> {
   }
   await transitionChallenge(me.session, duo.challengeId, { status: "closed" });
   await backdateLifecycle(duo.challengeId, duoStart, day(-2));
-  console.log("  · Nós dois (dupla encerrada — Resultado mostra a mistura de vocês)");
+  console.log("  · Nós dois (dupla encerrada, Resultado mostra a mistura de vocês)");
 
   // ── Só eu: a solo season with guesses ──
   const solo = await createPersonalChallenge(me.session, {
@@ -218,7 +218,7 @@ async function main(): Promise<void> {
     await rate(me, solo.challengeId, { itemId: soloShape.itemId(titleOf(rating.itemId)), entryTypeId: soloShape.typeByPurpose.get("rating"), values: { nota: rating.value, ...(rating.comment ? { comentario: rating.comment } : {}) } });
   }
   await transitionChallenge(me.session, solo.challengeId, { status: "closed" }).catch(() => undefined);
-  console.log("  · Só eu (pessoal — Resultado mostra o seu gosto)");
+  console.log("  · Só eu (pessoal, Resultado mostra o seu gosto)");
 
   // ── Correr: two months of running, alone — the calendar ──
   const run = await createPersonalChallenge(me.session, {
@@ -241,7 +241,7 @@ async function main(): Promise<void> {
       values: { km, ...(offset === -26 ? { nota_dia: "Voltei depois da viagem. As pernas lembraram." } : offset === -3 ? { nota_dia: "Duas semanas sem falhar um dia." } : {}) },
     });
   }
-  console.log("  · Correr (hábito pessoal — Resultado mostra o calendário)");
+  console.log("  · Correr (hábito pessoal, Resultado mostra o calendário)");
 
   console.log("\n\x1b[1mPronto\x1b[0m");
   console.log(`Grupo (mapa de gosto):   ${ORIGIN}/groups/${group.id}`);
@@ -251,7 +251,7 @@ async function main(): Promise<void> {
   console.log(`Nós dois (dupla):        ${ORIGIN}/challenges/${duo.challengeId}`);
   console.log(`Só eu (solo):            ${ORIGIN}/challenges/${solo.challengeId}`);
   console.log(`Correr (solo, dias):     ${ORIGIN}/challenges/${run.challengeId}`);
-  console.log(`\nAmigos: ${FRIENDS.map((row) => `@${row.username}`).join(", ")} — senha "${DEMO_PASSWORD}". Todos os dados são inventados.`);
+  console.log(`\nAmigos: ${FRIENDS.map((row) => `@${row.username}`).join(", ")}, senha "${DEMO_PASSWORD}". Todos os dados são inventados.`);
   await getPool().end();
 }
 

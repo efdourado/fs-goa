@@ -1022,7 +1022,7 @@ function EntryPicker({
                 type="button"
                 disabled={option.soon}
                 aria-pressed={active}
-                aria-label={`${index + 1}. ${option.label}${option.statusLabel ? ` — ${option.statusLabel}` : ""}`}
+                aria-label={`${index + 1}. ${option.label}${option.statusLabel ? ` (${option.statusLabel})` : ""}`}
                 onClick={() => onSelect(option.id)}
                 className={cx(
                   "flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition disabled:opacity-45",

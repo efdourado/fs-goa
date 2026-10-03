@@ -144,10 +144,11 @@ export function AffinityBlockView({ affinity }: { affinity: AffinityBlock }) {
             {pair.composite !== null && pair.dimensions.length > 1 ? (
               <p className="mt-1 text-xs text-[var(--muted)]">
                 {t("affinity.composite")}: <strong className="text-[var(--ink)]">{fmt(pair.composite)}</strong>
-                {" — "}
+                {" ("}
                 {pair.dimensions
-                  .map((dimension) => `${t(`affinity.${DIMENSION_KEY[dimension.key] ?? "dimItems"}`)} ${fmt(dimension.value)} (${Math.round(dimension.weight * 100)}%)`)
+                  .map((dimension) => `${t(`affinity.${DIMENSION_KEY[dimension.key] ?? "dimItems"}`)} ${fmt(dimension.value)} ${Math.round(dimension.weight * 100)}%`)
                   .join(", ")}
+                {")"}
               </p>
             ) : null}
           </li>

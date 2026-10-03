@@ -96,7 +96,7 @@ async function cinemaRounds(me: Person, people: People, groupId: string): Promis
     recipe: "cinema", title: ROUND_01.title, description: ROUND_01.description, startsOn: r1Start, endsOn: r1End, expectation: true,
     ruleSections: [
       { title: "A ordem tem lógica.", description: "Cada filme conversa com o anterior e prepara o próximo." },
-      { title: "Cada um dá uma nota de 0 a 5 no fim,", description: "sem consultar o outro — só depois revelam.", topics: [{ title: "Expectativa", description: "Antes do play, um palpite de 0 a 5." }] },
+      { title: "Cada um dá uma nota de 0 a 5 no fim,", description: "sem consultar o outro, só depois revelam.", topics: [{ title: "Expectativa", description: "Antes do play, um palpite de 0 a 5." }] },
       { title: "Pular não invalida a rodada.", description: "Filme pesado demais? Fica pra outra hora." },
     ],
     participantIds: pair.map((person) => person.id),
@@ -307,7 +307,7 @@ async function habits(me: Person): Promise<void> {
     startsOn: day(9), endsOn: day(95), participantIds: [me.id],
   });
   await transitionChallenge(me.session, run.challengeId, { status: "active" }).catch(() => undefined);
-  created.push({ label: "Correr 5 km (hábito, agendado — começa em 9 dias)", id: run.challengeId });
+  created.push({ label: "Correr 5 km (hábito, agendado, começa em 9 dias)", id: run.challengeId });
   log("Correr 5 km");
 }
 
@@ -429,7 +429,7 @@ async function main(): Promise<void> {
   for (const row of created) {
     console.log(`${row.label}\n    ${ORIGIN}/challenges/${row.id}${row.share ? `\n    vitrine: ${ORIGIN}/results/${row.share}` : ""}`);
   }
-  console.log(`\nAmigos: ${FRIENDS.map((row) => `@${row.username}`).join(", ")} — senha "${DEMO_PASSWORD}". Todos os dados são inventados.`);
+  console.log(`\nAmigos: ${FRIENDS.map((row) => `@${row.username}`).join(", ")}, senha "${DEMO_PASSWORD}". Todos os dados são inventados.`);
   await getPool().end();
 }
 

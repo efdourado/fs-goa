@@ -49,21 +49,21 @@ export async function seedFieldMetrics(client: PoolClient, challengeId: string, 
     const byItem = field.target_policy !== "none";
     const plans: Plan[] = field.kind === "rating"
       ? [
-          { operation: "average", groupBy: "none", label: `${field.label} — média`, suffix: "media" },
-          ...(byItem ? [{ operation: "average" as const, groupBy: "item" as const, label: `${field.label} — ranking`, suffix: "ranking" }] : []),
-          { operation: "average", groupBy: "participant", label: `${field.label} — por pessoa`, suffix: "pessoa" },
-          ...(byItem && genres >= 2 ? [{ operation: "average" as const, groupBy: "catalog_genre" as const, label: `${field.label} — por gênero`, suffix: "genero" }] : []),
-          ...(byItem && years >= 2 ? [{ operation: "average" as const, groupBy: "catalog_year" as const, label: `${field.label} — por ano`, suffix: "ano" }] : []),
+          { operation: "average", groupBy: "none", label: `${field.label} (média)`, suffix: "media" },
+          ...(byItem ? [{ operation: "average" as const, groupBy: "item" as const, label: `${field.label} (ranking)`, suffix: "ranking" }] : []),
+          { operation: "average", groupBy: "participant", label: `${field.label} (por pessoa)`, suffix: "pessoa" },
+          ...(byItem && genres >= 2 ? [{ operation: "average" as const, groupBy: "catalog_genre" as const, label: `${field.label} (por gênero)`, suffix: "genero" }] : []),
+          ...(byItem && years >= 2 ? [{ operation: "average" as const, groupBy: "catalog_year" as const, label: `${field.label} (por ano)`, suffix: "ano" }] : []),
         ]
       : [
           // A workout's load isn't something to add up — its story is the best it reached, per exercise.
           ...(field.is_record ? [] : [
-            { operation: "sum" as const, groupBy: "none" as const, label: `${field.label} — total`, suffix: "total" },
-            { operation: "sum" as const, groupBy: "participant" as const, label: `${field.label} — por pessoa`, suffix: "pessoa" },
+            { operation: "sum" as const, groupBy: "none" as const, label: `${field.label} (total)`, suffix: "total" },
+            { operation: "sum" as const, groupBy: "participant" as const, label: `${field.label} (por pessoa)`, suffix: "pessoa" },
           ]),
-          { operation: "max", groupBy: "none", label: `${field.label} — recorde`, suffix: "recorde" },
-          ...(byItem ? [{ operation: "max" as const, groupBy: "item" as const, label: `${field.label} — recorde por item`, suffix: "recorde_item" }] : []),
-          ...(field.is_record ? [{ operation: "max" as const, groupBy: "participant" as const, label: `${field.label} — recorde por pessoa`, suffix: "recorde_pessoa" }] : []),
+          { operation: "max", groupBy: "none", label: `${field.label} (recorde)`, suffix: "recorde" },
+          ...(byItem ? [{ operation: "max" as const, groupBy: "item" as const, label: `${field.label} (recorde por item)`, suffix: "recorde_item" }] : []),
+          ...(field.is_record ? [{ operation: "max" as const, groupBy: "participant" as const, label: `${field.label} (recorde por pessoa)`, suffix: "recorde_pessoa" }] : []),
         ];
     for (const plan of plans) {
       await client.query(

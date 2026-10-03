@@ -13,7 +13,7 @@
 | mutação | sessão + `x-csrf-token` ligado a ela + `Origin` exata |
 | admin | conta `platform_admin`; as demais recebem `404` |
 
-Corpo sempre JSON e `no-store`. Erros: `{ error, message, details? }` — a interface
+Corpo sempre JSON e `no-store`. Erros: `{ error, message, details? }`, a interface
 traduz pelo `error` (`errors.byCode`); erros inesperados trazem `requestId`.
 Mutações de conta desativada respondem `403 account_deactivated`. Papéis de grupo:
 `owner` > `admin` > `participant`; "dono" abaixo é quem gerencia o espaço.
@@ -33,9 +33,9 @@ Todas montam a SPA (`GoaApp`), salvo as marcadas **servidor**.
 | `/catalog[/:itemId]` · `/groups/:id/catalog[/:itemId]` | acervo pessoal · do grupo |
 | `/groups/:id` · `/groups/:id/trash` | grupo · lixeira do grupo |
 | `/challenges/new` · `/challenges/:id` · `/challenges/:id/manage` | criar · participar · gerenciar |
-| `/challenges/:id/export` | **servidor** — o documento imprimível (salvar como PDF) |
-| `/results/:token` | **servidor** — o fio público, anônimo por padrão |
-| `/admin` | **servidor** — console do `platform_admin` |
+| `/challenges/:id/export` | **servidor**, o documento imprimível (salvar como PDF) |
+| `/results/:token` | **servidor**, o fio público, anônimo por padrão |
+| `/admin` | **servidor**, console do `platform_admin` |
 
 ## Conta
 
@@ -76,7 +76,7 @@ Sem redefinição por link: `/api/auth/forgot` e `/reset` respondem `404` até h
 | `GET /api/challenges/:id/preflight` | sessão (owner/admin) | erros que bloqueiam a ativação e avisos |
 | `POST /api/challenges/:id/transition` | mutação (owner/admin) | `{ status: "active" \| "closed" }`; reabrir é permitido |
 | `POST /api/challenges/:id/participants` | mutação (owner/admin) | `{ replace, participantIds }` |
-| `POST /api/challenges/:id/duplicate` | mutação | `{ targetGroupId, mode }` — só estrutura, nunca registros |
+| `POST /api/challenges/:id/duplicate` | mutação | `{ targetGroupId, mode }`, só estrutura, nunca registros |
 | `PATCH /api/challenges/:id/prefs` · `/api/challenges/prefs/order` | mutação | fixar, cor e ordem no **seu** Início |
 | `PATCH /api/challenges/:id/consent` | mutação (participante) | `{ nameConsent }` |
 | `PATCH /api/challenges/:id/expectation` | mutação (owner/admin) | liga a expectativa (rascunho) |
@@ -106,7 +106,7 @@ Sem redefinição por link: `/api/auth/forgot` e `/reset` respondem `404` até h
 
 | Rota | Acesso | |
 | --- | --- | --- |
-| `POST …/results` | mutação (owner/admin) | curadoria (anonimato, destaques) — nunca publica sozinha |
+| `POST …/results` | mutação (owner/admin) | curadoria (anonimato, destaques), nunca publica sozinha |
 | `PATCH …/results/blocks` | mutação (owner/admin) | ordem e visibilidade dos blocos |
 | `POST …/results/publish` · `DELETE …/results` | mutação (owner/admin) | ligar (ou `rotateLink`) · desligar o link |
 | `GET /api/results/:token` | público | o fio público: nomes mascarados, sem comentários |
@@ -121,7 +121,7 @@ mesmas rotas; rotas por objeto (`/api/catalog/…`) derivam o espaço do objeto.
 
 | Rota | |
 | --- | --- |
-| `GET …/catalog` · `…/catalog/shelf` | acervo inteiro · a prateleira (bibliotecas, contagens, últimos de cada uma) — `ratingAvg` é a pontuação Goa de 0 a 5 |
+| `GET …/catalog` · `…/catalog/shelf` | acervo inteiro · a prateleira (bibliotecas, contagens, últimos de cada uma), `ratingAvg` é a pontuação Goa de 0 a 5 |
 | `GET …/catalog/:itemId` · `…/catalog/search` | ficha com o histórico nas rodadas · busca para "usar o existente" |
 | `POST …/catalog/items` · `PATCH` · `DELETE /api/catalog/:itemId` | criar · editar · lixeira (`409` se um desafio ativo usa) |
 | `POST …/catalog/remove` | remoção em lote, pulando o que está em uso |
@@ -140,5 +140,5 @@ só a partir da lixeira, com confirmação proporcional.
 ## Admin
 
 `GET /api/admin/{overview,insights,users,feedback,audit,system-audit}` e
-`POST /api/admin/users/{disable,set-admin,revoke-sessions}` — só metadados, nunca
+`POST /api/admin/users/{disable,set-admin,revoke-sessions}`, só metadados, nunca
 conteúdo de grupos ou desafios.

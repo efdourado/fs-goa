@@ -183,7 +183,7 @@ export async function previewListImport(
     throw new ApiError(400, "invalid_json", "O texto colado não é um JSON válido.");
   }
   if (!Array.isArray(parsed)) {
-    throw new ApiError(400, "json_not_array", "Cole uma lista JSON — um array de objetos.");
+    throw new ApiError(400, "json_not_array", "Cole uma lista JSON (um array de objetos).");
   }
   if (parsed.length === 0) {
     throw new ApiError(400, "json_empty", "A lista está vazia.");

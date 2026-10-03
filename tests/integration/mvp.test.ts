@@ -4936,7 +4936,7 @@ test("métricas automáticas: todo número ou nota que alguém cria ganha métri
   const cid = (created.body as { id: string }).id;
   type M = { id: string; label: string; operation: string; groupBy: string };
   const metrics = async () => ((await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { metrics: M[] }).metrics;
-  const auto = (list: M[]) => list.filter((metric) => metric.label.startsWith("Km —")).map((metric) => `${metric.operation}/${metric.groupBy}`).sort();
+  const auto = (list: M[]) => list.filter((metric) => metric.label.startsWith("Km (")).map((metric) => `${metric.operation}/${metric.groupBy}`).sort();
   assert.deepEqual(auto(await metrics()), ["max/none", "sum/none", "sum/participant"], "total, leaderboard and record from the start");
 
   // A field added later gets its own; deleting one of the automatic ones sticks across the next save.
@@ -4945,18 +4945,18 @@ test("métricas automáticas: todo número ou nota que alguém cria ganha métri
     session: owner, body: { replace: true, fields: [...detail.fields.map((field) => ({ id: field.id, label: field.label, type: field.type, required: field.required, config: field.config })), { key: "humor", label: "Humor", type: "rating", required: false, config: { min: 0, max: 5, step: 1 } }] },
   });
   assert.equal(saved.response.status, 201, JSON.stringify(saved.body));
-  const humor = (await metrics()).filter((metric) => metric.label.startsWith("Humor —"));
+  const humor = (await metrics()).filter((metric) => metric.label.startsWith("Humor ("));
   assert.deepEqual(humor.map((metric) => `${metric.operation}/${metric.groupBy}`).sort(), ["average/none", "average/participant"], "a habit's rating: average and per person (no items to rank)");
-  const total = (await metrics()).find((metric) => metric.label === "Km — total")!;
+  const total = (await metrics()).find((metric) => metric.label === "Km (total)")!;
   assert.equal((await call("DELETE", `/api/challenges/${cid}/metrics/${total.id}`, { session: owner })).response.status, 200);
   const again = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { fields: Array<{ id: string; label: string; type: string; required: boolean; config?: unknown }> };
   await call("POST", `/api/challenges/${cid}/fields`, { session: owner, body: { replace: true, fields: again.fields.map((field) => ({ id: field.id, label: field.label, type: field.type, required: field.required, config: field.config })) } });
-  assert.ok(!(await metrics()).some((metric) => metric.label === "Km — total"), "the deleted automatic metric does not grow back");
+  assert.ok(!(await metrics()).some((metric) => metric.label === "Km (total)"), "the deleted automatic metric does not grow back");
 
   // A recipe's own rating is already covered — no duplicates.
   const cinema = await call("POST", `/api/groups/${groupId}/challenges`, { session: owner, body: { recipe: "cinema", title: "Filmes", participantIds: [owner.user.id], items: [{ title: "Filme" }] } });
   const cinemaMetrics = ((await call("GET", `/api/challenges/${(cinema.body as { id: string }).id}`, { session: owner })).body as { metrics: M[] }).metrics;
-  assert.ok(!cinemaMetrics.some((metric) => metric.label.includes(" — ")), "cinema's nota already has its recipe metrics");
+  assert.ok(!cinemaMetrics.some((metric) => / \((média|ranking|por pessoa|por gênero|por ano)\)$/.test(metric.label)), "cinema's nota already has its recipe metrics");
 });
 
 test("métricas oficiais: mediana e consenso calculam pela fórmula, toda métrica traz explicação e amostra, e combinações inválidas caem", async () => {

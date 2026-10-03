@@ -87,7 +87,7 @@ export const COMMENTS_PT: Record<string, string> = {
 };
 
 export const NOTES_PT: Record<string, string> = {
-  "dudaBest": "Não consegui largar — sessenta páginas numa terça.",
+  "dudaBest": "Não consegui largar, sessenta páginas numa terça.",
   "anaBack": "De volta depois de uma semana parada. Começando pequeno.",
   "lucasSmall": "Dez páginas por dia. Vai somando."
 };

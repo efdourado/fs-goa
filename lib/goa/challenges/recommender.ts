@@ -29,7 +29,7 @@ export async function resolveItemRecommender(
   const external = typeof raw.recommendedByExternalId === "string" ? raw.recommendedByExternalId : "";
   const note = typeof raw.originNote === "string" ? raw.originNote.trim().slice(0, 200) : "";
   if ([user, external, note].filter(Boolean).length > 1) {
-    throw new ApiError(400, "invalid_recommender", "Escolha apenas uma origem: um membro, um nome salvo ou uma nota — não mais de uma.");
+    throw new ApiError(400, "invalid_recommender", "Escolha apenas uma origem: um membro, um nome salvo ou uma nota (não mais de uma).");
   }
   if (!user && !external && !note) return NO_ITEM_RECOMMENDER;
   await assertRecommendationsAllowed(client, groupId);

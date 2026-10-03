@@ -421,7 +421,7 @@ export async function updateChallengeItem(
         const wantedExternal = typeof body.recommendedByExternalId === "string" ? body.recommendedByExternalId : "";
         const wantedNote = typeof body.originNote === "string" ? body.originNote.trim() : "";
         if ([wantedUser, wantedExternal, wantedNote].filter(Boolean).length > 1) {
-          throw new ApiError(400, "invalid_recommender", "Escolha apenas uma origem: um membro, um nome salvo ou uma nota — não mais de uma.");
+          throw new ApiError(400, "invalid_recommender", "Escolha apenas uma origem: um membro, um nome salvo ou uma nota (não mais de uma).");
         }
         if (wantedUser || wantedExternal || wantedNote) await assertRecommendationsAllowed(client, access.challenge.group_id);
         recommendedBy = null;

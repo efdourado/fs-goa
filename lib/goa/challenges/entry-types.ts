@@ -355,7 +355,7 @@ export async function setExpectationEnabled(
       [active.id],
     );
     if (withEntries && withEntries.count > 0) {
-      throw new ApiError(409, "expectation_has_entries", "Já há expectativas registradas — não dá para remover o tipo.");
+      throw new ApiError(409, "expectation_has_entries", "Já há expectativas registradas, não dá para remover o tipo.");
     }
     await client.query("UPDATE challenge_fields SET archived_at=now(), updated_at=now() WHERE entry_type_id=$1", [active.id]);
     await client.query("UPDATE entry_types SET archived_at=now(), updated_at=now() WHERE id=$1", [active.id]);
@@ -450,7 +450,7 @@ export async function archiveEntryType(
     if (!type) throw new ApiError(404, "not_found", "Tipo de registro não encontrado.");
     const pair = sessionPairOf(types);
     if (pair && (pair.parent.id === entryTypeId || pair.child.id === entryTypeId)) {
-      throw new ApiError(409, "session_type_locked", "O registro com vários itens é a estrutura deste desafio — para mudar isso, crie outro desafio.");
+      throw new ApiError(409, "session_type_locked", "O registro com vários itens é a estrutura deste desafio. Para mudar isso, crie outro desafio.");
     }
     const remaining = types.filter((candidate) => candidate.id !== entryTypeId);
     if (!remaining.some((candidate) => purposeOf(candidate) !== "expectation")) {

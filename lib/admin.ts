@@ -189,15 +189,15 @@ export async function adminInsights(params: URLSearchParams) {
       includesStaff: includeStaff,
       definitions: {
         confirmed: "Cada número conta uma ação que o servidor confirmou (registros e desafios gravados; eventos de auditoria escritos junto com a mudança). Tentativas que falharam ou foram abandonadas não são registradas: um número baixo significa menos ações concluídas, não necessariamente menos tentativas.",
-        staff: "Contas de administração da plataforma ficam de fora por padrão — elas também rodam seeds, demonstrações e testes manuais.",
+        staff: "Contas de administração da plataforma ficam de fora por padrão (elas também rodam seeds, demonstrações e testes manuais).",
         inProgress: "Desafio não excluído com status ativo. Um desafio não excluído pode ser rascunho, encerrado ou parado há meses.",
         usedRecently: "Desafio (ou grupo) com pelo menos um registro gravado dentro da janela.",
         created: "Desafios criados na janela, contando os que depois foram excluídos.",
-        copied: "Desafios criados por cópia — de um modelo público ou de outro desafio — em vez de do zero.",
+        copied: "Desafios criados por cópia (de um modelo público ou de outro desafio) em vez de do zero.",
         firstRecord: "Dos desafios criados na janela, quantos já receberam o primeiro registro. Os mais recentes ainda podem estar esperando: leia junto com a mediana.",
         returnUsage: "Pessoas com registros em pelo menos dois dias diferentes dentro da janela.",
         customization: "Uso de recursos além do modelo padrão: bibliotecas criadas (inclui a Tables criada sozinha), respostas compartilhadas, nomes de indicadores externos salvos e itens com agenda.",
-        feedback: "Feedbacks enviados na janela. Mostram atrito, não provam se as pessoas gostam do produto — isso continua pedindo conversa.",
+        feedback: "Feedbacks enviados na janela. Mostram atrito, não provam se as pessoas gostam do produto, isso continua pedindo conversa.",
         privacy: "Somente contagens e medianas estruturais. Nenhum título, nome, nota, comentário ou conteúdo de formulário entra aqui.",
       },
       overview: {

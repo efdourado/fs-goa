@@ -398,7 +398,7 @@ export async function saveEntry(
     // A record on its own has nothing to hang from, so it is refused rather than left orphaned.
     const sessionPair = sessionPairOf(await entryTypesForChallenge(client, challengeId));
     if (sessionPair?.child.id === entryType.id) {
-      throw new ApiError(400, "record_needs_visit", "Esse registro faz parte de um check-in — salve pelo check-in.");
+      throw new ApiError(400, "record_needs_visit", "Esse registro faz parte de um check-in, salve pelo check-in.");
     }
     const visitChildType = sessionPair?.parent.id === entryType.id ? sessionPair.child : null;
     const children = visitChildType ? parseChildren(body.children) : null;
@@ -534,7 +534,7 @@ export async function saveEntry(
 
     if (answerScope === "shared" && existing) {
       if (entryType.shared_edit_policy === "members_fill_admin_corrects" && !access.canManage) {
-        throw new ApiError(403, "shared_locked", "Essa resposta já foi preenchida — só um administrador pode corrigi-la.");
+        throw new ApiError(403, "shared_locked", "Essa resposta já foi preenchida, só um administrador pode corrigi-la.");
       }
       assertSharedNotChanged(body, existing.updated_at);
     }
@@ -591,7 +591,7 @@ export async function updateEntry(
       // Members_can_edit: any eligible member may — same participant check as
       // below, just without the "only the original author" restriction.
       if (entry.shared_edit_policy === "members_fill_admin_corrects" && !canManage) {
-        throw new ApiError(403, "shared_locked", "Essa resposta já foi preenchida — só um administrador pode corrigi-la.");
+        throw new ApiError(403, "shared_locked", "Essa resposta já foi preenchida, só um administrador pode corrigi-la.");
       }
       if (!canManage) {
         const participant = await oneOrNull<{ user_id: string }>(client,
@@ -606,7 +606,7 @@ export async function updateEntry(
     }
     if (entry.status !== "active") throw new ApiError(409, "challenge_not_active", "O desafio não aceita correções agora.");
     if (entry.parent_entry_id) {
-      throw new ApiError(400, "record_edit_via_visit", "Esse registro faz parte de um check-in — edite pelo check-in.");
+      throw new ApiError(400, "record_edit_via_visit", "Esse registro faz parte de um check-in, edite pelo check-in.");
     }
     // A check-in that holds records: the visit's own fields, its date, and the full list of records it should now have.
     const childType = await childEntryType(client, entry.challenge_id, entry.entry_type_id);
@@ -684,7 +684,7 @@ export async function deleteEntry(
       throw new ApiError(409, "challenge_not_active", "Registros só podem ser excluídos com o desafio ativo.");
     }
     if (entry.parent_entry_id) {
-      throw new ApiError(400, "record_edit_via_visit", "Esse registro faz parte de um check-in — tire-o editando o check-in.");
+      throw new ApiError(400, "record_edit_via_visit", "Esse registro faz parte de um check-in, tire-o editando o check-in.");
     }
     // Moves the entry to the bin: `deleted_at` (so it leaves listings, metrics
     // and the showcase, and frees the partial unique indexes) plus the explicit

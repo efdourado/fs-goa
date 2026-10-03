@@ -3,7 +3,7 @@
     "publicOn": "Vitrine pública",
     "publicOff": "Vitrine privada",
     "privateUntilPublished": "Visível apenas dentro do desafio.",
-    "savedVersionOnly": "A publicação usa a curadoria mais recente. Qualquer alteração salva aqui aparece no link assim que você salvar — não precisa republicar.",
+    "savedVersionOnly": "A publicação usa a curadoria mais recente. Qualquer alteração salva aqui aparece no link assim que você salvar (não precisa republicar).",
     "allTypes": "Todos os tipos",
     "personal": "Meu espaço",
     "noMatches": "Nenhum item corresponde aos filtros.",
@@ -13,7 +13,7 @@
     "menuCopyHint": "Reaproveite a estrutura em outro grupo.",
     "menuTemplateTitle": "Galeria de modelos",
     "menuTemplateHint": "Publique como modelo para qualquer pessoa usar.",
-    "menuDeleteHint": "Vai para a lixeira — dá para restaurar.",
+    "menuDeleteHint": "Vai para a lixeira (dá para restaurar).",
     "settingsTitle": "Configurações",
     "settingsSubtitle": "O que vale para o desafio inteiro: quem vê de fora, cópias e exclusão.",
     "settingsDeleteAction": "Deletar"
@@ -105,7 +105,7 @@
   "dates": {
     "none": "Sem data",
     "noDeadline": "Sem datas",
-    "range": "{start} — {end}",
+    "range": "{start} a {end}",
     "since": "Desde {date}",
     "until": "Até {date}"
   },
@@ -163,20 +163,20 @@
       "internal_error": "Não foi possível concluir a operação.",
       "rate_limited": "Muitas tentativas em pouco tempo. Espere um instante.",
       "shared_conflict": "Alguém mudou esta resposta compartilhada antes. Veja o valor mais recente antes de salvar de novo.",
-      "shared_locked": "Essa resposta já foi preenchida — só um admin pode corrigi-la.",
+      "shared_locked": "Essa resposta já foi preenchida, só um admin pode corrigi-la.",
       "entry_type_has_entries": "Esta resposta já tem respostas dadas. Confirme para apagá-las junto.",
       "entry_type_has_metrics": "Algumas métricas leem esta resposta. Confirme para removê-las junto.",
       "last_entry_type": "Um desafio precisa de pelo menos uma resposta.",
       "recommendations_disabled": "Este grupo desligou as indicações. Ligue-as nas configurações do grupo para registrar quem indicou.",
-      "invalid_recommender": "Escolha uma só origem: um membro, um nome salvo ou uma nota — não mais de uma.",
+      "invalid_recommender": "Escolha uma só origem: um membro, um nome salvo ou uma nota (não mais de uma).",
       "invalid_library": "Essa biblioteca não foi encontrada.",
-      "invalid_schedule": "Confira as datas — o fim não pode vir antes do início, e não dá para misturar dias com horários.",
+      "invalid_schedule": "Confira as datas (o fim não pode vir antes do início, e não dá para misturar dias com horários).",
       "not_shared": "Só uma resposta compartilhada tem regra de quem pode preencher.",
-      "attribute_has_data": "Essa propriedade já tem valores em itens e não pode ser removida — oculte-a.",
+      "attribute_has_data": "Essa propriedade já tem valores em itens e não pode ser removida (oculte-a).",
       "title_required": "Todo item precisa de um nome, então o título não pode ser ocultado.",
       "catalog_item_in_use": "Esse item está num desafio em andamento. Tire-o do desafio primeiro.",
       "shared_unsupported": "Uma resposta compartilhada precisa de um desafio com itens.",
-      "library_required": "Este desafio usa mais de uma biblioteca — escolha de qual vem cada item.",
+      "library_required": "Este desafio usa mais de uma biblioteca, escolha de qual vem cada item.",
       "library_not_linked": "Essa biblioteca não faz parte deste desafio. Adicione-a ao desafio primeiro.",
       "library_in_use": "Há itens deste desafio que vêm dessa biblioteca. Remova-os antes de tirar a biblioteca.",
       "library_missing": "Crie primeiro a biblioteca Tables e depois monte o desafio.",
@@ -184,7 +184,7 @@
       "library_has_items": "Esta biblioteca ainda tem itens. Confirme para excluí-la junto com eles.",
       "library_busy": "Alguns itens desta biblioteca estão em desafios ainda em andamento. Tire-os desses desafios primeiro.",
       "item_not_open": "As respostas para este item ainda não abriram.",
-      "invalid_timezone": "Esse fuso horário não foi reconhecido — escolha um da lista, como America/Sao_Paulo.",
+      "invalid_timezone": "Esse fuso horário não foi reconhecido (escolha um da lista, como America/Sao_Paulo).",
       "invalid_answer_scope": "Escolha quem preenche o registro: cada participante ou uma vez para o grupo.",
       "invalid_setting": "Escolha se o formulário pergunta quando cada registro aconteceu.",
       "invalid_shared_edit_policy": "Escolha quem pode preencher ou corrigir a resposta compartilhada.",
@@ -259,7 +259,7 @@
       "usernameHint": "Letras, números, ponto, hífen ou sublinhado.",
       "nameLabel": "Seu nome",
       "emailLabel": "E-mail (opcional)",
-      "emailHint": "Recomendado — as opções de redefinição de senha chegam em breve.",
+      "emailHint": "Recomendado, as opções de redefinição de senha chegam em breve.",
       "passwordConfirmLabel": "Confirme a senha"
     },
     "passwordLabel": "Senha",
@@ -334,7 +334,7 @@
       "show": "Mostrar {section} no Início",
       "lastVisible": "Pelo menos uma seção fica no Início.",
       "automatic": "Voltar ao automático",
-      "automaticNow": "Automático — mostra o que você usa, o mais movimentado primeiro",
+      "automaticNow": "Automático (mostra o que você usa, o mais movimentado primeiro)",
       "sectionPersonal": "Só eu",
       "sectionGroups": "Grupos",
       "chip": "{section} · {count}",
@@ -352,12 +352,12 @@
     }
   },
   "welcome": {
-    "lede": "Nada por aqui ainda. Comece por um desafio — o resto vem depois.",
+    "lede": "Nada por aqui ainda. Comece por um desafio, o resto vem depois.",
     "flowTitle": "Como uma rodada se monta",
     "steps": {
       "library": {
         "title": "Escolha o que você acompanha",
-        "body": "Filmes, livros, lugares, partidas — guardados numa biblioteca que lembra de cada item."
+        "body": "Filmes, livros, lugares, partidas (guardados numa biblioteca que lembra de cada item)."
       },
       "challenge": {
         "title": "Monte um desafio",
@@ -365,11 +365,11 @@
       },
       "group": {
         "title": "Traga sua turma",
-        "body": "Um grupo privado para o clube, os amigos, a família — ou fique só com o seu espaço."
+        "body": "Um grupo privado para o clube, os amigos, a família (ou fique só com o seu espaço)."
       },
       "showcase": {
         "title": "Leia a vitrine",
-        "body": "O Goa faz as contas — médias, rankings, quem está em dia — e transforma a rodada numa história."
+        "body": "O Goa faz as contas (médias, rankings, quem está em dia) e transforma a rodada numa história."
       }
     },
     "starts": {
@@ -378,7 +378,7 @@
       },
       "quick": {
         "title": "Comece um desafio",
-        "body": "Três perguntas rápidas, tudo por toque — sem como errar.",
+        "body": "Três perguntas rápidas, tudo por toque (sem como errar).",
         "cta": "Começar"
       },
       "templates": {
@@ -447,7 +447,7 @@
     "leaveToggle": "Sair do grupo",
     "leaveConfirm": "Sair deste grupo? Você deixa de vê-lo e a seus desafios. Seus registros continuam (a história do grupo fica intacta), mas passam a mostrar \"saiu do grupo\" no lugar do seu nome.",
     "recommendationsLabel": "Indicações",
-    "recommendationsHint": "Pergunta quem indicou cada item e mostra isso. Desligue para esconder em todo o grupo — o que já foi registrado fica guardado.",
+    "recommendationsHint": "Pergunta quem indicou cada item e mostra isso. Desligue para esconder em todo o grupo, o que já foi registrado fica guardado.",
     "catalogEmptyTitle": "Comece o acervo",
     "catalogMoreIn": "mais em {name}",
     "catalogSeeAll": "Ver tudo",
@@ -490,7 +490,7 @@
   "personalCatalog": {
     "back": "Voltar",
     "title": "Meu acervo",
-    "subtitle": "Tudo o que você acompanha, organizado em bibliotecas — com a nota que você deu.",
+    "subtitle": "Tudo o que você acompanha, organizado em bibliotecas (com a nota que você deu).",
     "loading": "Carregando o acervo…",
     "loadError": "Não foi possível carregar o acervo.",
     "rounds": "{count, plural, =0 {sem rodadas} one {# rodada} other {# rodadas}}",
@@ -508,7 +508,7 @@
     "averageRating": "média {value}",
     "reusedNotice": "Usando o item que já estava lá.",
     "addedNotice": "Item adicionado.",
-    "emptyHint": "Adicione o primeiro item — Screens para filmes e séries, Pages para livros, ou crie uma biblioteca sua.",
+    "emptyHint": "Adicione o primeiro item (Screens para filmes e séries, Pages para livros, ou crie uma biblioteca sua).",
     "recommenderFilterLabel": "Filtrar por quem indicou",
     "recommenderAll": "Todo mundo",
     "recommenderNone": "Sem indicação",
@@ -580,7 +580,7 @@
     "pasteJsonPlaceholderBook": "[\n  { \"title\": \"Duna\", \"author\": \"Frank Herbert\", \"year\": 1965, \"pageCount\": 688, \"mainGenre\": \"ficção científica\" }\n]",
     "jsonInvalid": "Esse texto não é um JSON válido.",
     "jsonMustBeArray": "Cole uma lista entre colchetes, ex.: [ {\"title\": \"...\"} ].",
-    "jsonNoItems": "A lista está vazia — cole ao menos um objeto com \"title\".",
+    "jsonNoItems": "A lista está vazia, cole ao menos um objeto com \"title\".",
     "pasteSummary": "{total} entradas lidas · {added} adicionadas · {invalid} sem título ou fora do formato · {duplicates} já na lista.",
     "pasteSummaryNone": "Nenhuma entrada foi adicionada: todas estavam repetidas, sem \"title\" ou fora do formato de objeto.",
     "pasteUnknownKeys": "Chaves ignoradas por não terem correspondência: {keys}. Preencha esses dados nos campos de cada item.",
@@ -613,7 +613,7 @@
     "title": "Monte a próxima experiência",
     "subtitle": "Comece com um preset e ajuste somente o que seu grupo precisa.",
     "personalTitle": "Novo desafio pessoal",
-    "personalSubtitle": "Só seu — sem grupo, sem convites. Comece com um preset e ajuste o essencial.",
+    "personalSubtitle": "Só seu (sem grupo, sem convites). Comece com um preset e ajuste o essencial.",
     "startTitle": "Escolha um ponto de partida",
     "recipes": {
       "cinema": {
@@ -624,7 +624,7 @@
       "bookshelf": {
         "name": "Pages",
         "tagline": "Avalie o que você já leu",
-        "body": "Uma lista de livros que você só avalia e comenta — sem páginas, sem prazo, sem \"quando\". Ótimo pra registrar o que já leu."
+        "body": "Uma lista de livros que você só avalia e comenta (sem páginas, sem prazo, sem \"quando\"). Ótimo pra registrar o que já leu."
       },
       "library": {
         "name": "Clube de leitura",
@@ -634,17 +634,17 @@
       "habit": {
         "name": "Hábito",
         "tagline": "Um check-in por dia",
-        "body": "Sem filme, sem livro — só um registro diário. Adicione os campos que o hábito precisar e crie suas próprias métricas a partir deles."
+        "body": "Sem filme, sem livro (só um registro diário). Adicione os campos que o hábito precisar e crie suas próprias métricas a partir deles."
       },
       "tables": {
         "name": "Tables",
         "tagline": "Avalie lugares para comer",
-        "body": "Avalie restaurantes, bares e cafés em comida, ambiente e custo-benefício — uma nota para cada, sem nota geral."
+        "body": "Avalie restaurantes, bares e cafés em comida, ambiente e custo-benefício (uma nota para cada, sem nota geral)."
       },
       "custom": {
         "name": "Personalizado",
         "tagline": "Você define o que registrar",
-        "body": "Escolha qualquer biblioteca — jogos, partidas, o que for — e decida exatamente o que cada pessoa registra."
+        "body": "Escolha qualquer biblioteca (jogos, partidas, o que for) e decida exatamente o que cada pessoa registra."
       }
     },
     "titleLabel": "Título",
@@ -686,38 +686,38 @@
     "expectationHint": "Os participantes dão uma nota de quanto esperam gostar de cada título antes de assistir. Ela trava quando enviam a avaliação real. Dá para ligar isso depois também.",
     "errPickLibrary": "Escolha a biblioteca de onde vêm os itens.",
     "errTablesLibrary": "Crie primeiro a biblioteca Tables.",
-    "tablesItemsHint": "Adicione os lugares para avaliar — um por linha.",
-    "customItemsHint": "Adicione os itens a acompanhar — um por linha. Cada item vira algo que todos podem registrar.",
+    "tablesItemsHint": "Adicione os lugares para avaliar (um por linha).",
+    "customItemsHint": "Adicione os itens a acompanhar (um por linha). Cada item vira algo que todos podem registrar.",
     "libraryLabel": "Biblioteca",
     "libraryHint": "De qual lista de coisas este desafio parte.",
     "pickLibraryFirst": "Escolha uma biblioteca para começar a adicionar itens",
     "moreLibrariesLabel": "Bibliotecas deste desafio",
-    "moreLibrariesHint": "Opcional: adicione outras para misturá-las num desafio só — Filmes e Séries, por exemplo. Cada item continua pertencendo a uma só.",
+    "moreLibrariesHint": "Opcional: adicione outras para misturá-las num desafio só (Filmes e Séries, por exemplo). Cada item continua pertencendo a uma só.",
     "recordingLabel": "Como cada registro é feito?",
     "recordingHint": "Escolha como as pessoas registram o progresso nos itens deste desafio.",
     "recordingSingle": "Uma resposta por item",
-    "recordingSingleHint": "Cada pessoa responde uma vez para cada item — uma nota, um placar, um comentário.",
+    "recordingSingleHint": "Cada pessoa responde uma vez para cada item (uma nota, um placar, um comentário).",
     "recordingSession": "Um check-in com vários itens",
-    "recordingSessionHint": "Uma ida guarda um registro para cada item escolhido — um treino de exercícios, uma sessão de estudo de matérias. Cada registro mantém o próprio histórico.",
+    "recordingSessionHint": "Uma ida guarda um registro para cada item escolhido (um treino de exercícios, uma sessão de estudo de matérias). Cada registro mantém o próprio histórico.",
     "sessionNameLabel": "Como você chama um check-in?",
-    "sessionNameHint": "Aparece no formulário e no histórico — Treino, Sessão de estudo, Noite de jogos.",
+    "sessionNameHint": "Aparece no formulário e no histórico (Treino, Sessão de estudo, Noite de jogos).",
     "sessionNamePlaceholder": "ex.: Treino",
     "sessionNameDefault": "Sessão",
     "scopeLabel": "Quem preenche este registro?",
     "scopeHint": "É o principal que as pessoas registram em cada item.",
     "scopeIndividual": "Cada participante",
-    "scopeIndividualHint": "Cada pessoa responde por si — uma nota, um palpite, um comentário.",
+    "scopeIndividualHint": "Cada pessoa responde por si (uma nota, um palpite, um comentário).",
     "scopeShared": "Uma vez para o grupo",
-    "scopeSharedHint": "Uma resposta por item que todo mundo vê — um placar final, um veredito combinado.",
+    "scopeSharedHint": "Uma resposta por item que todo mundo vê (um placar final, um veredito combinado).",
     "entryDateLabel": "Perguntar quando cada registro aconteceu",
     "entryDateHint": "Adiciona ao formulário uma data opcional “Quando aconteceu?”. Deixe desligado quando a data pertence ao próprio item, como o início de uma partida.",
     "itemDatesLabel": "Cada item tem data e hora próprias",
     "itemDatesHint": "Como o início de uma partida ou uma sessão. Fica guardada no item, então todo desafio que o usa mostra a mesma data.",
-    "errItemSchedule": "Confira a data — o fim, a hora ou o fuso horário não parecem certos."
+    "errItemSchedule": "Confira a data (o fim, a hora ou o fuso horário não parecem certos)."
   },
   "adminChallenge": {
     "back": "Voltar",
-    "subtitle": "Configure, revise e apresente — controles administrativos continuam validados no servidor.",
+    "subtitle": "Configure, revise e apresente (controles administrativos continuam validados no servidor).",
     "tabsAria": "Áreas administrativas",
     "tabs": {
       "overview": "Geral",
@@ -764,7 +764,7 @@
     "descriptionLabel": "Descrição",
     "rulesLabel": "Regras com título",
     "rulesHint": "Cada regra ganha destaque próprio para ninguém precisar procurar o combinado.",
-    "livingListBody": "Sem datas — adicione títulos e avalie quando quiser.",
+    "livingListBody": "Sem datas, adicione títulos e avalie quando quiser.",
     "stateTitle": "Estado do desafio",
     "stateDraft": "Somente administradores veem este rascunho. Confira campos, etapas e participantes antes de ativar.",
     "stateScheduled": "O desafio já está ativado, mas está agendado para {date}. Os registros serão liberados quando ele começar.",
@@ -786,7 +786,7 @@
     "reuseNoneBody": "Crie outro grupo ou torne-se responsável de um grupo para reutilizar este modelo.",
     "deleteTitle": "Deletar desafio?",
     "deleteBody": "O desafio e seus registros vão para a lixeira.",
-    "deleteBodyTemplateWarning": "Ele também está publicado como modelo na galeria — apagar o desafio remove o modelo de lá também.",
+    "deleteBodyTemplateWarning": "Ele também está publicado como modelo na galeria, apagar o desafio remove o modelo de lá também.",
     "deleteConfirm": "Mover \"{title}\" para a lixeira?",
     "delete": "Deletar desafio",
     "deleting": "Apagando…",
@@ -802,7 +802,7 @@
     "noMembersTitle": "Lista de membros indisponível",
     "fieldsTitle": "Campos do registro",
     "fieldsHintDraft": "Tipos e ordem podem ser ajustados livremente antes da ativação.",
-    "fieldsHintActive": "Adicione, renomeie ou reordene campos a qualquer momento. O tipo de um campo já salvo é fixo, e um campo com respostas não pode ser removido — o histórico fica intacto.",
+    "fieldsHintActive": "Adicione, renomeie ou reordene campos a qualquer momento. O tipo de um campo já salvo é fixo, e um campo com respostas não pode ser removido (o histórico fica intacto).",
     "fieldsHintClosed": "Os campos foram congelados no encerramento para preservar o resultado.",
     "fieldsTypeLegend": "Tipo de registro",
     "fieldsSaved": "Campos salvos.",
@@ -825,7 +825,7 @@
     "itemTitleLabel": "Título",
     "itemDescriptionLabel": "Descrição",
     "itemDescriptionPlaceholder": "Contexto opcional",
-    "itemWindow": "{opens} — {due}",
+    "itemWindow": "{opens} a {due}",
     "edit": "Editar",
     "removing": "Removendo…",
     "remove": "Remover",
@@ -863,7 +863,7 @@
     "metricOperationLabel": "Operação",
     "metricFieldLabel": "Campo",
     "metricCombineLabel": "Combinar mais de um campo",
-    "metricCombineHint": "Junta dois ou mais campos num só número por registro — uma nota geral a partir de várias notas, por exemplo — antes de este cálculo rodar.",
+    "metricCombineHint": "Junta dois ou mais campos num só número por registro (uma nota geral a partir de várias notas, por exemplo) antes de este cálculo rodar.",
     "metricFieldsLabel": "Campos para combinar",
     "metricFieldsHint": "Escolha dois ou mais, do mesmo formulário.",
     "metricPickTwoFields": "Escolha pelo menos dois campos.",
@@ -887,14 +887,14 @@
     "createMetricsFirst": "Crie métricas antes de selecioná-las.",
     "selectedComments": "Comentários selecionados",
     "allCommentsLabel": "Mostrar todos os comentários automaticamente",
-    "allCommentsHint": "Em vez de selecionar um por um, a vitrine mostra todo comentário preenchido — inclusive um novo, assim que ele for registrado, sem precisar salvar a curadoria de novo.",
+    "allCommentsHint": "Em vez de selecionar um por um, a vitrine mostra todo comentário preenchido (inclusive um novo, assim que ele for registrado, sem precisar salvar a curadoria de novo).",
     "selectCommentAria": "Selecionar comentário de {author}",
     "noTextFields": "Nenhum campo de texto preenchido está disponível para curadoria.",
     "saveResults": "Salvar vitrine",
     "anonymizeParticipants": "Anonimizar participantes na página pública",
-    "anonymizeHint": "Na vitrine pública (/results) e no modelo os nomes viram Participante 1, 2… — inclusive nas séries por pessoa e de viés do indicador. As telas dentro do grupo mantêm os nomes reais. Mudar isto atualiza quem aparece publicamente assim que você salvar.",
+    "anonymizeHint": "Na vitrine pública (/results) e no modelo os nomes viram Participante 1, 2… (inclusive nas séries por pessoa e de viés do indicador). As telas dentro do grupo mantêm os nomes reais. Mudar isto atualiza quem aparece publicamente assim que você salvar.",
     "showScheduleLabel": "Mostrar o cronograma",
-    "showScheduleHint": "O quadro de etapas deixa de aparecer na página do desafio, no resultado e no modelo. As etapas continuam existindo — as métricas e o editor de etapas não mudam.",
+    "showScheduleHint": "O quadro de etapas deixa de aparecer na página do desafio, no resultado e no modelo. As etapas continuam existindo, as métricas e o editor de etapas não mudam.",
     "publishShowcase": "Publicar vitrine",
     "publishConfirmNoAnon": "Publicar a vitrine com os nomes reais dos participantes na página pública?",
     "publishConfirmAnon": "Publicar a vitrine? Os participantes aparecerão anonimizados na página pública.",
@@ -916,14 +916,14 @@
     "expectationHint": "Uma nota opcional de 0 a 5 registrada antes de assistir. Trava assim que o participante envia a avaliação real daquele título. Só no rascunho.",
     "expectationOn": "Nota de expectativa ativada.",
     "expectationOff": "Nota de expectativa removida.",
-    "expectationLockedNote": "O desafio já está ativo — o tipo de expectativa fica como está.",
+    "expectationLockedNote": "O desafio já está ativo, o tipo de expectativa fica como está.",
     "metricCumulativeLabel": "Acumulado",
     "wrappedBlocks": "Blocos do Wrapped",
     "includeRankings": "Rankings pessoais",
     "includeAffinity": "Afinidades",
     "showMoreItems": "Ver mais {count}",
     "showLess": "Ver menos",
-    "commentPrivacyWarning": "A anonimização tira a autoria, mas o texto é publicado como está — releia cada comentário e descarte os que citam nomes, contatos ou detalhes que a pessoa não quer em público.",
+    "commentPrivacyWarning": "A anonimização tira a autoria, mas o texto é publicado como está (releia cada comentário e descarte os que citam nomes, contatos ou detalhes que a pessoa não quer em público).",
     "metricHidden": "Oculta nas duas visualizações",
     "metricWhere": "Onde aparece",
     "metricCalculation": "Configurar cálculo",
@@ -936,7 +936,7 @@
     "fieldsEmptyBody": "Adicione um campo para o participante preencher a cada registro.",
     "descRulesTitle": "Descrição e regras",
     "moreActions": "Mais ações",
-    "alreadyPublicHint": "Esta vitrine já está pública — qualquer alteração salva aqui aparece no link e no modelo imediatamente.",
+    "alreadyPublicHint": "Esta vitrine já está pública, qualquer alteração salva aqui aparece no link e no modelo imediatamente.",
     "itemOriginLine": "via {text}",
     "errPickLibrary": "Escolha a biblioteca de onde vêm os itens.",
     "libraryLabel": "Biblioteca",
@@ -947,13 +947,13 @@
     "librariesHint": "De onde vêm os itens deste desafio. Você pode incluir mais bibliotecas a qualquer momento.",
     "librariesCombined": "Os itens podem vir de qualquer uma delas. Uma biblioteca só pode ser retirada quando nenhum item dela estiver no desafio.",
     "entryDateTitle": "Perguntar quando cada registro aconteceu",
-    "entryDateHint": "Adiciona ao formulário uma data opcional “Quando aconteceu?”. Desligado, o formulário só pergunta o que você configurou — cada registro continua com o horário em que foi salvo.",
+    "entryDateHint": "Adiciona ao formulário uma data opcional “Quando aconteceu?”. Desligado, o formulário só pergunta o que você configurou (cada registro continua com o horário em que foi salvo).",
     "entryDateOn": "O formulário agora pergunta quando cada registro aconteceu.",
     "entryDateOff": "O formulário não pergunta mais uma data.",
     "libraryProperties": "Propriedades de {name}",
     "reuseDoneTitle": "Cópia criada",
     "reuseDoneBody": "A cópia está pronta, mas algumas propriedades não puderam vir junto.",
-    "eventScheduleInvalid": "Confira a data — o fim, a hora ou o fuso horário não parecem certos.",
+    "eventScheduleInvalid": "Confira a data (o fim, a hora ou o fuso horário não parecem certos).",
     "selectedOf": "{selected} de {total} selecionados",
     "allCommentsShown": "todos aparecem",
     "blocksOn": "{count} ligados",
@@ -966,11 +966,11 @@
     "metricDaysPreview": "dias com registro",
     "metricItemLabel": "Só um item",
     "metricItemAll": "Todos os itens",
-    "metricItemHint": "Mostra o número de um item só — o recorde do levantamento terra, por exemplo."
+    "metricItemHint": "Mostra o número de um item só (o recorde do levantamento terra, por exemplo)."
   },
   "visibility": {
     "title": "Quem vê estas respostas",
-    "hint": "Vale para cada participante ver as respostas dos outros deste tipo. Admins e o autor sempre veem tudo — menos uma nota selada, que espera a revelação como todo mundo.",
+    "hint": "Vale para cada participante ver as respostas dos outros deste tipo. Admins e o autor sempre veem tudo (menos uma nota selada, que espera a revelação como todo mundo).",
     "saved": "Visibilidade atualizada.",
     "policy": {
       "group_realtime": "O grupo, em tempo real",
@@ -983,8 +983,8 @@
       "group_realtime": "Todo participante vê a resposta de todo mundo enquanto a rodada corre.",
       "after_own": "Você só vê a resposta de outra pessoa para um item depois de enviar a sua.",
       "after_close": "Durante a rodada, só você e os admins veem sua resposta; o grupo vê no resultado.",
-      "author_only": "Sua resposta nunca aparece coletivamente — só métricas agregadas podem incluí-la.",
-      "until_reveal": "Ninguém — nem os admins — vê a nota dos outros até alguém que já avaliou tocar em Revelar naquele item."
+      "author_only": "Sua resposta nunca aparece coletivamente, só métricas agregadas podem incluí-la.",
+      "until_reveal": "Ninguém (nem os admins) vê a nota dos outros até alguém que já avaliou tocar em Revelar naquele item."
     },
     "note": {
       "after_close": "Só os admins veem sua resposta até a rodada encerrar.",
@@ -1006,20 +1006,20 @@
       "no_entry_type": "O desafio não tem nenhum tipo de registro.",
       "no_items": "A receita registra por item, mas nenhum item foi adicionado.",
       "no_checkpoints": "O período precisa de dias e nenhum foi gerado.",
-      "no_way_to_register": "Não há forma válida de registrar participação — falta um item ou um dia.",
+      "no_way_to_register": "Não há forma válida de registrar participação, falta um item ou um dia.",
       "primary_type_no_fields": "O tipo de registro principal não tem nenhum campo.",
       "choice_without_options": "Um campo de escolha está sem opções.",
       "metric_field_archived": "Uma métrica aponta para um campo que não existe mais.",
       "metric_needs_field": "Uma métrica numérica não tem campo para calcular.",
       "metric_field_not_numeric": "Uma métrica usa operação numérica sobre um campo que não é numérico.",
       "checkpoint_outside_period": "Há uma etapa fora do período do desafio.",
-      "no_metrics": "Nenhuma métrica configurada — a retrospectiva ficará vazia.",
-      "no_comment_source": "Nenhum campo de texto — não haverá comentários para a retrospectiva.",
-      "many_required_fields": "O formulário tem muitos campos obrigatórios — considere tornar alguns opcionais.",
-      "many_items_for_period": "São muitos itens para o número de etapas — pode ficar apertado.",
+      "no_metrics": "Nenhuma métrica configurada, a retrospectiva ficará vazia.",
+      "no_comment_source": "Nenhum campo de texto, não haverá comentários para a retrospectiva.",
+      "many_required_fields": "O formulário tem muitos campos obrigatórios, considere tornar alguns opcionais.",
+      "many_items_for_period": "São muitos itens para o número de etapas (pode ficar apertado).",
       "ranking_min_sample_unreachable": "Um ranking exige mais avaliações por item do que o desafio tem participantes.",
       "metric_on_optional_field": "Uma métrica depende de um campo opcional, que pode ficar sem dados.",
-      "expectation_visible_early": "A expectativa está visível para o grupo antes da avaliação — considere \"depois da própria resposta\"."
+      "expectation_visible_early": "A expectativa está visível para o grupo antes da avaliação, considere \"depois da própria resposta\"."
     }
   },
   "participant": {
@@ -1074,7 +1074,7 @@
     "saved": "Salvo.",
     "errNoRows": "Adicione pelo menos um item com seus números.",
     "lastTime": "Da última vez: {values} · {date}",
-    "noItems": "Este desafio ainda não tem itens — adicione em Gerenciar.",
+    "noItems": "Este desafio ainda não tem itens (adicione em Gerenciar).",
     "itemCount": "{count, plural, one {# item} other {# itens}}",
     "remove": "Excluir",
     "deleteTitle": "Excluir {name}?",
@@ -1153,7 +1153,7 @@
     "positionResult": "São <b>{value}</b> neste dia.",
     "previewBook": "O livro vai para a <b>p. {page}</b> · <b>{percent}%</b>",
     "previewTotal": "O total vai para <b>{total}</b>",
-    "overTotal": "O livro tem {total} páginas e este registro passa disso. Dá para salvar mesmo assim — edições variam.",
+    "overTotal": "O livro tem {total} páginas e este registro passa disso. Dá para salvar mesmo assim (edições variam).",
     "errorNotWhole": "Use um número inteiro.",
     "errorNotPositive": "Registre um número maior que zero.",
     "errorBelowStartBook": "Antes deste dia você já estava na p. {before}. Informe uma página depois dessa.",
@@ -1285,7 +1285,7 @@
     "back": "Voltar",
     "allTemplates": "Todos os modelos",
     "title": "Modelos prontos",
-    "subtitle": "Desafios de exemplo para ver como o Goa funciona. Abra um para conhecer as regras, o formulário e as métricas — e duplique para um grupo seu quando quiser começar.",
+    "subtitle": "Desafios de exemplo para ver como o Goa funciona. Abra um para conhecer as regras, o formulário e as métricas (e duplique para um grupo seu quando quiser começar).",
     "loading": "Carregando modelos…",
     "emptyTitle": "Ainda não há modelos",
     "cardItems": "{count, plural, one {# item} other {# itens}}",
@@ -1313,12 +1313,12 @@
       "free": "livre"
     },
     "copyModeItemsHint": "Os itens da rodada vão junto, prontos para usar.",
-    "copyModeStructureHint": "Só campos, regras e métricas — você adiciona os seus itens.",
+    "copyModeStructureHint": "Só campos, regras e métricas (você adiciona os seus itens).",
     "cardPeople": "{count, plural, one {# pessoa} other {# pessoas}}",
     "cardRules": "{count, plural, one {# regra} other {# regras}}",
     "cardFields": "{count, plural, one {# campo} other {# campos}}",
     "frontTitle": "Desafios com a sua turma, ou só você.",
-    "frontLede": "Acompanhe filmes, livros, hábitos — o que quiser — e veja tudo virar um resultado que dá vontade de compartilhar. Estes são de verdade.",
+    "frontLede": "Acompanhe filmes, livros, hábitos (o que quiser) e veja tudo virar um resultado que dá vontade de compartilhar. Estes são de verdade.",
     "moreTitle": "Mais modelos",
     "seeResult": "Ver o resultado completo",
     "feature": "Destacar na capa",
@@ -1378,7 +1378,7 @@
     "trashBody": "Grupos e desafios que você apagou ficam aqui até você restaurá-los ou excluí-los em definitivo. Nada expira sozinho.",
     "trashOpen": "Abrir a lixeira",
     "nameConsentTitle": "Nome em publicações",
-    "nameConsentBody": "Quando um desafio encerra, o admin pode publicar uma retrospectiva. Ela é anônima por padrão — marque aqui os desafios em que você aceita aparecer com o nome real.",
+    "nameConsentBody": "Quando um desafio encerra, o admin pode publicar uma retrospectiva. Ela é anônima por padrão, marque aqui os desafios em que você aceita aparecer com o nome real.",
     "nameConsentEmpty": "Você ainda não participa de nenhum desafio de grupo.",
     "nameConsentStatus": {
       "draft": "rascunho",
@@ -1386,7 +1386,7 @@
       "closed": "encerrado"
     },
     "dangerTitle": "Perigo!",
-    "deleteBody": "Apagar a conta desativa o acesso e remove seus dados pessoais. Grupos onde você é a única pessoa vão para a lixeira. Um grupo com outras pessoas nunca fica travado em você — a posse passa automaticamente para o admin mais antigo ou, se não houver outro admin, para o membro mais antigo.",
+    "deleteBody": "Apagar a conta desativa o acesso e remove seus dados pessoais. Grupos onde você é a única pessoa vão para a lixeira. Um grupo com outras pessoas nunca fica travado em você (a posse passa automaticamente para o admin mais antigo ou, se não houver outro admin, para o membro mais antigo).",
     "deleteConfirm": "Apagar sua conta? O acesso é encerrado e os dados pessoais são removidos.",
     "deleteAccount": "Apagar minha conta",
     "deleting": "Apagando…",
@@ -1405,7 +1405,7 @@
     "consequencePublications": "{count, plural, one {# vitrine publicada sua sai do ar} other {# vitrines publicadas suas saem do ar}}.",
     "consequencesLoading": "Calculando o que será apagado…",
     "consequencesFailed": "Não deu para calcular o que será apagado. A exclusão só continua depois que essa lista aparecer.",
-    "consequenceContributions": "Suas notas e comentários ficam no grupo, sem o seu nome — mas o texto que você escreveu não é reescrito.",
+    "consequenceContributions": "Suas notas e comentários ficam no grupo, sem o seu nome (mas o texto que você escreveu não é reescrito).",
     "deleteDialogTitle": "Excluir sua conta permanentemente?"
   },
   "publicResults": {
@@ -1414,7 +1414,7 @@
   "about": {
     "back": "Voltar",
     "title": "Sobre o Goa",
-    "lede": "Desafios privados para amigos — ou só para você. Cada um registra; o Goa faz as contas e transforma a rodada em memória.",
+    "lede": "Desafios privados para amigos, ou só para você. Cada um registra; o Goa faz as contas e transforma a rodada em memória.",
     "stepsTitle": "Como funciona",
     "steps": [
       {
@@ -1423,7 +1423,7 @@
       },
       {
         "title": "Cada um registra",
-        "body": "Notas, páginas, check-ins — cada pessoa no seu tempo, de qualquer celular."
+        "body": "Notas, páginas, check-ins (cada pessoa no seu tempo, de qualquer celular)."
       },
       {
         "title": "O Goa conta a história",
@@ -1452,15 +1452,15 @@
     "rankingTitle": "Como o Goa ranqueia",
     "ranking": [
       "Suas notas nunca mudam, e as médias são sempre médias de verdade.",
-      "Só a ordem usa a pontuação Goa: ela desempata pelo histórico de cada pessoa — um 5 de quem quase nunca dá 5 pesa um pouco mais.",
+      "Só a ordem usa a pontuação Goa: ela desempata pelo histórico de cada pessoa, um 5 de quem quase nunca dá 5 pesa um pouco mais.",
       "Quem acabou de chegar e títulos novos ficam com a média simples. Notas ocultas nunca mexem num número que você vê."
     ],
     "factsTitle": "Bom saber",
     "facts": [
       "Você decide o que é um item: uma trilogia pode ser um item ou três.",
-      "Feito quer dizer que as respostas obrigatórias estão lá — só isso.",
+      "Feito quer dizer que as respostas obrigatórias estão lá (só isso).",
       "Algumas respostas são do grupo inteiro, como um placar final.",
-      "Um desafio pode misturar bibliotecas — Filmes e Séries numa lista só."
+      "Um desafio pode misturar bibliotecas, Filmes e Séries numa lista só."
     ],
     "byline": "Um projeto pessoal de Eduardo Dourado, nascido das planilhas de um clube de cinema e de um clube de leitura.",
     "feedbackNudge": "Teve uma ideia ou algo te incomodou?",
@@ -1468,7 +1468,7 @@
   },
   "feedbackPage": {
     "title": "Como podemos melhorar?",
-    "lede": "Leva um minuto. Suas respostas ajudam a decidir o que construir primeiro — não guardamos nada dos seus registros, notas ou comentários.",
+    "lede": "Leva um minuto. Suas respostas ajudam a decidir o que construir primeiro (não guardamos nada dos seus registros, notas ou comentários).",
     "q1": "Em que parte do Goa você estava?",
     "q1Placeholder": "Ex.: criando um desafio, registrando o dia, vendo o resultado…",
     "q2": "O que você estava tentando fazer?",
@@ -1506,7 +1506,7 @@
   },
   "checkpointPlanner": {
     "title": "Etapas",
-    "subtitle": "Divida o desafio em etapas — uma semana, uma sessão, uma fase de grupos, o que fizer sentido. As etapas não precisam ser seguidas — deixe um intervalo para uma pausa.",
+    "subtitle": "Divida o desafio em etapas (uma semana, uma sessão, uma fase de grupos, o que fizer sentido). As etapas não precisam ser seguidas, deixe um intervalo para uma pausa.",
     "dailyAutoNote": "Este desafio tem um registro por dia, gerado a partir do período. Ajuste as datas na aba Geral.",
     "noItemsNote": "Este desafio não tem itens para organizar em etapas.",
     "lockedNote": "Um desafio encerrado fica congelado.",
@@ -1558,7 +1558,7 @@
     "reanalyse": "Analisar de novo",
     "summary": "{total} linhas · {importable} a importar · {invalid} inválidas · {dupChallenge} já no desafio · {dupCatalog} conhecidas do acervo",
     "unknownKeysTitle": "Chaves não reconhecidas",
-    "unknownKeysNote": "Chaves não mapeadas são ignoradas — nunca entram no banco.",
+    "unknownKeysNote": "Chaves não mapeadas são ignoradas, nunca entram no banco.",
     "ignoreKey": "ignorar",
     "field": {
       "title": "Título",
@@ -1600,10 +1600,10 @@
     },
     "affinity": {
       "title": "Afinidades",
-      "explanation": "Semelhança nas avaliações deste desafio — 100 × (1 − média das diferenças absolutas ÷ amplitude). Não é uma nota de compatibilidade pessoal.",
+      "explanation": "Semelhança nas avaliações deste desafio, 100 × (1 − média das diferenças absolutas ÷ amplitude). Não é uma nota de compatibilidade pessoal.",
       "sample": "{n} itens em comum",
       "composite": "Composta",
-      "compositeNote": "A afinidade composta exige itens em comum suficientes por gênero, ano e duração — aparece quando há dados.",
+      "compositeNote": "A afinidade composta exige itens em comum suficientes por gênero, ano e duração (aparece quando há dados).",
       "dimItems": "itens em comum",
       "dimGenre": "gênero",
       "dimYearBand": "faixa de ano",
@@ -1642,9 +1642,9 @@
       "completion_rate": "Registros concluídos divididos pelo total esperado, vezes 100.",
       "bayesian_average": "Uma média justa para classificar. Um item com poucas notas é puxado em direção à média geral da lista inteira, então um único voto empolgado não o coloca no topo. Quanto mais notas ele tem, mais perto fica da própria média simples (o número simples aparece logo abaixo). Fórmula: (n × média do item + {weight} × média geral) ÷ (n + {weight}), onde n é o número de notas do item.",
       "spread": "O quanto as notas divergem (desvio-padrão populacional): quanto maior, mais o grupo se dividiu.",
-      "consensus": "O quanto o grupo concorda, de 0 a 100 — 100 significa que todos deram a mesma nota.",
+      "consensus": "O quanto o grupo concorda, de 0 a 100 (100 significa que todos deram a mesma nota).",
       "surprise": "Nota menos expectativa, em pares em que a mesma pessoa deu as duas respostas para o mesmo item. Positivo quer dizer que superou a expectativa.",
-      "indicator_bias": "A média dos itens que cada pessoa indicou menos a média geral — o quanto as indicações agradaram."
+      "indicator_bias": "A média dos itens que cada pessoa indicou menos a média geral, o quanto as indicações agradaram."
     },
     "explainMinimum": "Só aparece a partir de {minimum, plural, one {# registro} other {# registros}}."
   },
@@ -1664,7 +1664,7 @@
     "personalTitle": "Minha lixeira",
     "personalSubtitle": "Grupos, desafios e itens do acervo que você removeu. Ficam aqui até você restaurar ou excluir em definitivo.",
     "groupTitle": "Lixeira do grupo",
-    "groupSubtitle": "Desafios e itens do acervo removidos. Restaure ou exclua em definitivo — nada some sozinho.",
+    "groupSubtitle": "Desafios e itens do acervo removidos. Restaure ou exclua em definitivo (nada some sozinho).",
     "emptyTitle": "A lixeira está vazia",
     "restore": "Restaurar",
     "purge": "Excluir permanentemente",
@@ -1744,22 +1744,22 @@
       "custom": "Biblioteca"
     },
     "newTitle": "Nova biblioteca",
-    "newBody": "Uma biblioteca é uma lista de coisas que você acompanha junto — lugares, partidas, jogos, qualquer coisa. Dê um nome; depois você define o que cada item guarda.",
+    "newBody": "Uma biblioteca é uma lista de coisas que você acompanha junto (lugares, partidas, jogos, qualquer coisa). Dê um nome; depois você define o que cada item guarda.",
     "nameLabel": "Nome",
     "nameHint": "Como você vai chamar esta biblioteca.",
     "namePlaceholder": "ex.: Jogos",
     "nameRequired": "Dê um nome à biblioteca.",
     "create": "Criar biblioteca",
     "tablesPromptTitle": "Comece com uma biblioteca Tables",
-    "tablesPromptBody": "Uma biblioteca guarda num só lugar o que você acompanha. Tables é a dos restaurantes, bares e cafés — os lugares que você adiciona ficam guardados nela, prontos para avaliar de novo em outros desafios.",
+    "tablesPromptBody": "Uma biblioteca guarda num só lugar o que você acompanha. Tables é a dos restaurantes, bares e cafés (os lugares que você adiciona ficam guardados nela, prontos para avaliar de novo em outros desafios).",
     "tablesPromptCreate": "Criar biblioteca Tables",
     "tablesPromptCreating": "Criando…",
-    "tablesPromptMore": "Você pode criar outras bibliotecas quando quiser — Bares, Cafeterias, Partidas — pelo acervo.",
+    "tablesPromptMore": "Você pode criar outras bibliotecas quando quiser (Bares, Cafeterias, Partidas) pelo acervo.",
     "renameTitle": "Renomear biblioteca",
-    "renameHint": "Só o nome muda — os itens e as propriedades continuam como estão.",
+    "renameHint": "Só o nome muda, os itens e as propriedades continuam como estão.",
     "rename": "Renomear",
     "propertiesTitle": "{name} · propriedades",
-    "propertiesBody": "Renomeie, oculte ou reordene o que cada item desta biblioteca pode guardar. Ocultar uma propriedade mantém o que já foi salvo — ela só deixa de aparecer.",
+    "propertiesBody": "Renomeie, oculte ou reordene o que cada item desta biblioteca pode guardar. Ocultar uma propriedade mantém o que já foi salvo, ela só deixa de aparecer.",
     "propertiesReadOnly": "O que cada item desta biblioteca pode guardar.",
     "loading": "Carregando…",
     "noProperties": "Ainda sem propriedades",
@@ -1833,9 +1833,9 @@
     "titlePlaceholder": "O que você está adicionando?",
     "titleRequired": "Digite um título.",
     "matchesTitle": "Já está nesta biblioteca?",
-    "matchesBody": "Estes têm um título parecido. Use um deles para evitar duplicar — ou continue para criar um item novo.",
+    "matchesBody": "Estes têm um título parecido. Use um deles para evitar duplicar, ou continue para criar um item novo.",
     "matchesAutoTitle": "Parece familiar",
-    "matchesAutoBody": "Screens e Pages reconhecem um título repetido sozinhas, então adicionar de novo só reaproveita — e completa — o que já existe.",
+    "matchesAutoBody": "Screens e Pages reconhecem um título repetido sozinhas, então adicionar de novo só reaproveita (e completa) o que já existe.",
     "useThis": "Usar este",
     "orCreateNew": "Se não, preencha o resto e adicione como um item novo.",
     "loadingProperties": "Carregando os campos…",
@@ -1846,7 +1846,7 @@
     "badge": "Compartilhada",
     "addShort": "Resposta compartilhada",
     "addTitle": "Adicionar uma resposta compartilhada",
-    "addBody": "Uma resposta para o grupo inteiro em cada item — um placar final, um veredito combinado. Notas e comentários continuam individuais.",
+    "addBody": "Uma resposta para o grupo inteiro em cada item (um placar final, um veredito combinado). Notas e comentários continuam individuais.",
     "nameLabel": "Nome da resposta",
     "nameHint": "Como aparece em cada item, ex.: Placar final.",
     "namePlaceholder": "Placar final",
@@ -1887,9 +1887,9 @@
       "members_fill_admin_corrects": "Qualquer um preenche uma vez · admins corrigem",
       "members_can_edit": "Quem participa pode editar"
     },
-    "lockedByPolicy": "Esta resposta já foi preenchida — só um admin pode corrigi-la.",
-    "conflictShort": "Alguém mudou esta resposta enquanto você editava. A versão mais recente está aparecendo — nada seu foi salvo.",
-    "conflictBody": "{name} mudou esta resposta enquanto você editava, então a sua alteração não foi salva. A versão mais recente está aí — confira e edite de novo se ainda precisar.",
+    "lockedByPolicy": "Esta resposta já foi preenchida, só um admin pode corrigi-la.",
+    "conflictShort": "Alguém mudou esta resposta enquanto você editava. A versão mais recente está aparecendo, nada seu foi salvo.",
+    "conflictBody": "{name} mudou esta resposta enquanto você editava, então a sua alteração não foi salva. A versão mais recente está aí, confira e edite de novo se ainda precisar.",
     "someone": "Alguém",
     "dismiss": "Dispensar",
     "lastEdited": "Última alteração de {name} · {when}",
@@ -1909,11 +1909,11 @@
     "time": "Hora",
     "endTime": "Hora de término",
     "zone": "Fuso horário",
-    "errZone": "Esse fuso horário não foi reconhecido — use um nome como America/Sao_Paulo.",
+    "errZone": "Esse fuso horário não foi reconhecido, use um nome como America/Sao_Paulo.",
     "errEndOrder": "O fim não pode vir antes do início.",
     "errTime": "Informe a hora ou desligue o horário.",
     "clear": "Remover a data",
-    "invalid": "Confira a data — o fim, a hora ou o fuso horário não parecem certos.",
+    "invalid": "Confira a data (o fim, a hora ou o fuso horário não parecem certos).",
     "addEnd": "Data final",
     "removeEnd": "Remover data final"
   },
@@ -1932,7 +1932,7 @@
   },
   "quickCreate": {
     "title": "Comece um desafio",
-    "subtitle": "Três toques rápidos — sem biblioteca, sem grupo, sem campo pra errar.",
+    "subtitle": "Três toques rápidos (sem biblioteca, sem grupo, sem campo pra errar).",
     "q1": "O que você quer acompanhar?",
     "q2": "Só pra você, ou com um grupo?",
     "q3": "Como vamos chamar isso?",
@@ -1956,7 +1956,7 @@
     "modeReveal": "Revelar juntos",
     "modeRevealHint": "Todo mundo dá nota às cegas; um toque mostra todas de uma vez.",
     "modeGuess": "Palpite antes, revelação depois",
-    "modeGuessHint": "Diga o que espera antes, dê a nota depois — veja quem se surpreendeu.",
+    "modeGuessHint": "Diga o que espera antes, dê a nota depois (veja quem se surpreendeu).",
     "modeOpen": "Na hora",
     "modeOpenHint": "Cada nota aparece para o grupo assim que é dada."
   },
@@ -1971,7 +1971,7 @@
   },
   "exportDoc": {
     "button": "Baixar PDF",
-    "fileTitle": "{title} — registro",
+    "fileTitle": "{title} (registro)",
     "download": "Baixar PDF",
     "printHint": "Na janela de impressão, escolha “Salvar como PDF”.",
     "sectionsLabel": "O que entra no PDF",
@@ -2010,7 +2010,7 @@
     "itemsLede": "{items, plural, one {# item} other {# itens}}{chapters, plural, =0 {} one {} other {, em # blocos}}. Cada cartão guarda tudo o que foi escrito sobre ele.",
     "chapter": "Bloco {n}",
     "recommendedBy": "Indicou",
-    "about": "Sobre —",
+    "about": "Sobre:",
     "tiles": {
       "rating": "Nota",
       "entries": "Registros",
@@ -2026,7 +2026,7 @@
     "diaryLede": "{entries, plural, one {# registro} other {# registros}} em {days, plural, one {# dia} other {# dias}}.",
     "monthDays": "{count, plural, one {# dia com registro} other {# dias com registro}}",
     "undated": "Sem data",
-    "onlyMarks": "Só marcações neste mês — nenhuma anotação.",
+    "onlyMarks": "Só marcações neste mês (nenhuma anotação).",
     "scoreboardTitle": "Placar",
     "scoreboardLede": "Todas as notas lado a lado, na ordem do desafio.",
     "scoreboardLedePlain": "Todos os itens, na ordem do desafio.",
@@ -2046,7 +2046,7 @@
     "ratingsCount": "{count, plural, one {# nota} other {# notas}}",
     "recordsTitle": "Recordes",
     "recordsLede": "O melhor de cada item, somando todos os registros.",
-    "colophon": "Gerado pelo Goa em {date}. Os dados são seus — este PDF é só uma forma bonita de guardá-los.",
+    "colophon": "Gerado pelo Goa em {date}. Os dados são seus, este PDF é só uma forma bonita de guardá-los.",
     "footer": "goa · {title} · página ",
     "streakValue": "{count, plural, one {# dia} other {# dias}}",
     "showWhen": "Datas nos cartões"
@@ -2054,7 +2054,7 @@
   "reveal": {
     "sealedTitle": "Notas seladas",
     "revealedTitle": "Já revelado",
-    "sealedBody": "Ninguém vê a nota de ninguém — nem os admins — até alguém tocar em Revelar. Aí todo mundo vê tudo de uma vez.",
+    "sealedBody": "Ninguém vê a nota de ninguém (nem os admins) até alguém tocar em Revelar. Aí todo mundo vê tudo de uma vez.",
     "rateBeforeLooking": "O grupo já revelou as notas. Dê a sua antes, para a dos outros não te influenciar.",
     "countRated": "{done} de {total} deram nota",
     "whoRated": "Quem já deu nota",
@@ -2065,7 +2065,7 @@
     "showAnyway": "Mostrar mesmo assim",
     "stillMissing": "Falta: {names}",
     "confirmTitle": "Revelar sem todo mundo?",
-    "confirmBody": "{names} ainda não deram nota. Depois de revelar, todo mundo vê todas as notas — as que faltam aparecem depois.",
+    "confirmBody": "{names} ainda não deram nota. Depois de revelar, todo mundo vê todas as notas (as que faltam aparecem depois).",
     "confirmAction": "Revelar agora",
     "replay": "Ver de novo",
     "average": "Média",
@@ -2082,7 +2082,7 @@
     "inviteMore": "Chamar mais alguém",
     "inviteHint": "O link traz a pessoa para o grupo e direto para este desafio.",
     "inviteMessage": "A gente está dando nota às cegas para “{title}” e vai revelar junto. Falta a sua:",
-    "inviteCopied": "Link copiado — cole no grupo de vocês.",
+    "inviteCopied": "Link copiado, cole no grupo de vocês.",
     "inviteShared": "Enviado.",
     "inviteFailed": "Não deu para criar o link. Tente de novo."
   },
@@ -2096,18 +2096,18 @@
       "twins": "Praticamente o mesmo gosto.",
       "close": "Vocês costumam concordar.",
       "mixed": "Às vezes sim, às vezes não.",
-      "apart": "Vocês raramente concordam — aceite as indicações com um pé atrás."
+      "apart": "Vocês raramente concordam, aceite as indicações com um pé atrás."
     },
     "inCommon": "{count, plural, one {Com base em # título que os dois avaliaram} other {Com base em # títulos que os dois avaliaram}}",
     "closestOn": "Mais perto em",
     "furthestOn": "Mais longe em",
     "scores": "você {you}, {name} {them}",
-    "groupTwins": "{a} e {b} são os gêmeos do grupo — {agreement}%.",
-    "groupOpposites": "{a} e {b} são os mais distantes — {agreement}%.",
+    "groupTwins": "{a} e {b} são os gêmeos do grupo ({agreement}%).",
+    "groupOpposites": "{a} e {b} são os mais distantes ({agreement}%).",
     "notYet": "Precisa de {count} títulos em comum antes de virar um número de verdade:",
     "sharedSoFar": "{name} · {count} até agora",
     "emptyTitle": "O seu mapa de gosto se desenha conforme você avalia.",
-    "emptyBody": "Quando você e outra pessoa tiverem avaliado {count} títulos iguais — em qualquer desafio deste grupo — ela aparece aqui, tão perto de você quanto as notas de vocês."
+    "emptyBody": "Quando você e outra pessoa tiverem avaliado {count} títulos iguais (em qualquer desafio deste grupo) ela aparece aqui, tão perto de você quanto as notas de vocês."
   },
   "story": {
     "threadAria": "Notas de {count} pessoas em {items} títulos",
@@ -2159,7 +2159,7 @@
     "common": {
       "eyebrow": "Terreno comum",
       "title": "{a} e {b} se encontram em {genre}",
-      "line": "{a} & {b} concordam {agreement}% no geral — mas em {genre} é {aValue} e {bValue}.",
+      "line": "{a} & {b} concordam {agreement}% no geral, mas em {genre} é {aValue} e {bValue}.",
       "hint": "Na próxima escolha a dois, comecem por aí."
     },
     "genres": {
@@ -2172,8 +2172,8 @@
       "title": "{hours} h {minutes} min cada um",
       "longest": "Mais longo",
       "shortest": "Mais curto",
-      "worthIt": "Os longos tiveram média {long}, os curtos {short} — as horas valeram a pena.",
-      "notWorth": "Os longos tiveram média {long}, os curtos {short} — menos foi mais.",
+      "worthIt": "Os longos tiveram média {long}, os curtos {short} (as horas valeram a pena).",
+      "notWorth": "Os longos tiveram média {long}, os curtos {short} (menos foi mais).",
       "titleSolo": "{hours} h {minutes} min"
     },
     "critics": {
@@ -2274,7 +2274,7 @@
       },
       "thread": {
         "contentsRated": "A linha de cada um pelos títulos",
-        "contentsDated": "Os dias de cada um — sequências e buracos"
+        "contentsDated": "Os dias de cada um (sequências e buracos)"
       },
       "rankings": {
         "title": "Rankings",
@@ -2307,7 +2307,7 @@
     "download": {
       "button": "Baixar páginas",
       "title": "Baixar páginas",
-      "lede": "{count} páginas feitas com este desafio — baixe uma ou todas.",
+      "lede": "{count} páginas feitas com este desafio, baixe uma ou todas.",
       "one": "Baixar esta página",
       "all": "Baixar as {count}",
       "preparing": "Preparando…",
@@ -2320,7 +2320,7 @@
         "line": "{things}: vocês se encontraram em {met}, {a} trouxe {aCount}, {b} trouxe {bCount}.",
         "brought": "{name} trouxe {count}",
         "met": "se encontraram em {count}",
-        "note": "Encontro: até meio ponto de diferença. Trouxe: um de vocês deu uma nota bem maior — quem levou o título para o outro.{between, plural, =0 {} one { # título fica no meio.} other { # títulos ficam no meio.}}"
+        "note": "Encontro: até meio ponto de diferença. Trouxe: um de vocês deu uma nota bem maior (quem levou o título para o outro).{between, plural, =0 {} one { # título fica no meio.} other { # títulos ficam no meio.}}"
       },
       "met": "Onde vocês se encontraram",
       "brought": "O que {name} trouxe",
@@ -2329,19 +2329,19 @@
       "leanings": "Para onde cada um pende",
       "scale": "Como cada um usa a escala",
       "sameScale": "Vocês usam a escala do mesmo jeito.",
-      "higher": "{name} dá notas um pouco mais altas — {gap} em média.",
+      "higher": "{name} dá notas um pouco mais altas ({gap} em média).",
       "broughtTitle": "O que cada um trouxe",
       "broughtHeadline": "Os títulos que {a} levou para {b}, e o contrário."
     },
     "solo": {
       "title": "O seu gosto",
-      "headline": "Sua média é {value}{count, plural, =0 {.} one { — e você deu uma nota máxima.} other { — e você deu # notas máximas.}}",
+      "headline": "Sua média é {value}{count, plural, =0 {.} one {, e você deu uma nota máxima.} other {, e você deu # notas máximas.}}",
       "scale": "A sua escala",
       "average": "Sua média: {value}.",
       "perfect": "As suas notas máximas",
       "lowest": "A mais baixa",
       "instincts": "O seu instinto",
-      "instinctsLine": "Seus palpites erraram por isso, em média — {close} de {total} caíram a meio ponto da nota."
+      "instinctsLine": "Seus palpites erraram por isso, em média ({close} de {total} caíram a meio ponto da nota)."
     },
     "soloDays": {
       "headline": "{count, plural, one {Sua maior sequência: # dia.} other {Sua maior sequência: # dias.}}",

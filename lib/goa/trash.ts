@@ -293,7 +293,7 @@ async function permanentGuard(client: PoolClient, row: RowContext): Promise<{ co
         `SELECT count(*)::int AS count FROM challenge_items it JOIN challenges c ON c.id=it.challenge_id
           WHERE it.catalog_item_id=$1 AND c.deleted_at IS NULL AND c.status <> 'draft'`, [row.id]);
       return used && used.count > 0
-        ? { code: "catalog_in_use", message: "Enquanto desafios usam este item, ele fica arquivado — não pode ser apagado em definitivo." }
+        ? { code: "catalog_in_use", message: "Enquanto desafios usam este item, ele fica arquivado e não pode ser apagado em definitivo." }
         : null;
     }
     case "entry":

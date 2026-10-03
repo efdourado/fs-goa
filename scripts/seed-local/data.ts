@@ -17,7 +17,7 @@ export type PersonKey = FriendKey | "me";
 export const GROUPS = {
   cine: { name: "Cine Dupla", description: "Um filme por noite, dois palpites, uma nota de cada.", members: ["vivi"] as FriendKey[] },
   books: { name: "Clube do Livro de Quinta", description: "Um livro por mês, encontro na última quinta.", members: ["vivi", "rafa", "lu"] as FriendKey[] },
-  food: { name: "Rolê de Quinta", description: "Onde comer depois do trabalho — e se vale voltar.", members: ["theo", "lu"] as FriendKey[] },
+  food: { name: "Rolê de Quinta", description: "Onde comer depois do trabalho, e se vale voltar.", members: ["theo", "lu"] as FriendKey[] },
 } as const;
 
 export interface Film { title: string; year: number; runtime: number; genre: string; by: PersonKey }
@@ -89,7 +89,7 @@ export const ROUND_03: { title: string; description: string; films: Film[] } = {
 export const FILM_COMMENTS = [
   "'Sabe quando você ri de uma coisa que não devia?'\nFoi isso o filme inteiro.",
   "Coreografia absurda. O começo quase me fez desistir.",
-  "Mais divertido do que eu esperava — as regras são frouxas, mas o clima segura.",
+  "Mais divertido do que eu esperava, as regras são frouxas, mas o clima segura.",
   "Desenhamos o esquema num guardanapo e ainda discordamos no fim.",
   "Pesado, lento no começo, e aí a revelação muda tudo.",
   "Curtinho e humano. Virou meu preferido secreto.",
@@ -128,7 +128,7 @@ export const BOOK_COMMENTS = [
   "Terminei de madrugada e fiquei um tempo olhando pro teto.",
   "O começo arrasta, depois não larguei mais.",
   "Queria que tivesse mais cem páginas.",
-  "Precisei de pausas — é duro, mas necessário.",
+  "Precisei de pausas, é duro, mas necessário.",
   "A melhor conversa que o clube já teve.",
   "Bonito, mas não me pegou como pegou vocês.",
 ];
@@ -140,7 +140,7 @@ export const PLACES = [
   { title: "Izakaya Hachi", comment: "Caro, mas a experiência é outra." },
   { title: "Bar do Ferreira", comment: "Petisco generoso, cerveja gelada, barulhento." },
   { title: "Ramen Kazu", comment: "Caldo fundo, fila longa." },
-  { title: "Vegana da Vila", comment: "Me surpreendeu — voltaria sem pensar." },
+  { title: "Vegana da Vila", comment: "Me surpreendeu, voltaria sem pensar." },
 ];
 
 export const MEDITATION_NOTES = [
@@ -149,14 +149,14 @@ export const MEDITATION_NOTES = [
   "Chuva lá fora ajudou.",
   "Dormi mal, meditação curta.",
   "Respiração 4-7-8 funcionou.",
-  "Fiz no parque, com barulho de criança — valeu mesmo assim.",
+  "Fiz no parque, com barulho de criança, valeu mesmo assim.",
 ];
 
 export const SUGAR_NOTES = [
   "Primeiro dia difícil: bolo no escritório.",
   "Troquei a sobremesa por fruta.",
   "Café sem açúcar já não parece castigo.",
-  "Aniversário de alguém — resisti.",
+  "Aniversário de alguém, resisti.",
   "Menos sono depois do almoço, juro.",
 ];
 

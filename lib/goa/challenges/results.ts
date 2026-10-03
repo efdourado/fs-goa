@@ -252,7 +252,7 @@ function explainMetric(
           sample: `elegível a partir de ${minSample} avaliação(ões) por item.`,
         };
       case "spread":
-        return { formula: "Desvio-padrão populacional das avaliações — quanto maior, mais o grupo divergiu.", sample: `mínimo ${Math.max(2, minSample)} avaliações.` };
+        return { formula: "Desvio-padrão populacional das avaliações (quanto maior, mais o grupo divergiu).", sample: `mínimo ${Math.max(2, minSample)} avaliações.` };
       case "consensus":
         return { formula: "consenso = max(0, 1 − desvio ÷ (amplitude ÷ 2)) × 100.", sample: `mínimo ${Math.max(2, minSample)} avaliações; 100 = unanimidade.` };
       case "surprise":
@@ -357,7 +357,7 @@ async function calculateMetricRow(
       explainExtra = {
         expected,
         expectedNote: context.answer_scope === "shared"
-          ? `uma resposta compartilhada por item — ${unit}`
+          ? `uma resposta compartilhada por item (${unit})`
           : `${context.participants} participante(s) × ${per} = ${unit} por pessoa`,
       };
     }
@@ -1098,7 +1098,7 @@ async function resolveMetricField(
     }
     const entryTypeId = rows.rows[0].entry_type_id;
     if (rows.rows.some((row) => row.entry_type_id !== entryTypeId)) {
-      throw new ApiError(400, "invalid_metric", "Combine campos do mesmo tipo de registro — misturar tipos deixaria a maioria dos registros de fora.");
+      throw new ApiError(400, "invalid_metric", "Combine campos do mesmo tipo de registro, misturar tipos deixaria a maioria dos registros de fora.");
     }
     await assertNotSharedScope(client, entryTypeId, operation, groupBy);
     return { entryTypeId, fieldId: fieldIds[0], fieldIds };

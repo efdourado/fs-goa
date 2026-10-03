@@ -143,7 +143,7 @@ export async function resolveItemLibrary(
   } else if (linked.length === 0) {
     throw new ApiError(400, "library_required", "Este desafio ainda não tem uma biblioteca. Vincule uma antes de adicionar itens.");
   } else {
-    throw new ApiError(400, "library_required", "Este desafio usa mais de uma biblioteca — escolha de qual vem cada item.");
+    throw new ApiError(400, "library_required", "Este desafio usa mais de uma biblioteca, escolha de qual vem cada item.");
   }
   if (!linked.some((library) => library.kind === kind)) {
     throw new ApiError(400, "library_not_linked", "Essa biblioteca não faz parte deste desafio. Vincule-a antes de adicionar itens dela.");

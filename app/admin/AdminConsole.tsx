@@ -237,7 +237,7 @@ export default function AdminConsole({ viewerId, viewerName, csrfToken }: { view
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-      <p className={cx("mb-8 text-sm", muted)}>Gestão interna · Somente metadados — nunca o conteúdo dos grupos.</p>
+      <p className={cx("mb-8 text-sm", muted)}>Gestão interna · Somente metadados, nunca o conteúdo dos grupos.</p>
 
       <nav className="mb-6 flex gap-1 overflow-x-auto rounded-2xl bg-black/[0.04] p-1" aria-label="Seções da administração">
         {tabs.map((item) => (
@@ -325,7 +325,7 @@ function UsageTab({ overview, insights }: { overview: Overview | null; insights:
         <Stat label="Registros" value={overview.entries.active} hint={`${overview.entries.trashed} na lixeira`} />
       </div>
       <p className={cx("text-xs", muted)}>
-        Um desafio não excluído pode ser rascunho, encerrado ou parado há meses — “em andamento” e “com registro recente” dizem mais sobre uso de verdade.
+        Um desafio não excluído pode ser rascunho, encerrado ou parado há meses. “Em andamento” e “com registro recente” dizem mais sobre uso de verdade.
       </p>
       {insights ? (
         <section className={cx(card, "p-5 sm:p-6")}>
@@ -548,7 +548,7 @@ function FeedbackTab({ items, problems }: { items: FeedbackItem[] | null; proble
       <h2 className="text-lg font-light">Dificuldades relatadas</h2>
       <p className={cx("mt-1 text-xs", muted)}>
         Só o que as pessoas contaram no feedback: mostra atrito, não prova se gostam do produto. Operações que falharam não são
-        registradas — este painel ainda não mostra erros do servidor.
+        registradas (este painel ainda não mostra erros do servidor).
       </p>
       <ul className="mt-2 divide-y divide-[var(--line)]">
         <InsightRow label="Feedbacks na janela" value={problems.feedbackCount} />

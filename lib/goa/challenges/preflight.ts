@@ -210,18 +210,18 @@ export async function computePreflight(
 
   // --- warnings --------------------------------------------------------
 
-  if (metrics === 0) warn("no_metrics", "Nenhuma métrica configurada — a retrospectiva ficará vazia.");
-  if (text_fields === 0) warn("no_comment_source", "Nenhum campo de texto — não haverá comentários para a retrospectiva.");
+  if (metrics === 0) warn("no_metrics", "Nenhuma métrica configurada, a retrospectiva ficará vazia.");
+  if (text_fields === 0) warn("no_comment_source", "Nenhum campo de texto, não haverá comentários para a retrospectiva.");
 
   const requiredOnPrimary = primaryType
     ? liveFields.filter((field) => field.entry_type_id === primaryType.id && field.required).length
     : 0;
   if (requiredOnPrimary > 5) {
-    warn("many_required_fields", `O formulário tem ${requiredOnPrimary} campos obrigatórios — considere tornar alguns opcionais.`);
+    warn("many_required_fields", `O formulário tem ${requiredOnPrimary} campos obrigatórios, considere tornar alguns opcionais.`);
   }
 
   if (needsItems && hasPeriod && items > 0 && checkpoints > 0 && items / checkpoints > 3) {
-    warn("many_items_for_period", `São ${items} itens para ${checkpoints} checkpoint(s) — pode ser apertado.`);
+    warn("many_items_for_period", `São ${items} itens para ${checkpoints} checkpoint(s) (pode ser apertado).`);
   }
 
   // An expectation everyone can see in real time colours the others' guesses —
@@ -230,7 +230,7 @@ export async function computePreflight(
     (type) => type.purpose === "expectation" && type.visibility_policy === "group_realtime",
   );
   if (openExpectation) {
-    warn("expectation_visible_early", "A expectativa está visível para o grupo antes da avaliação — considere 'depois da própria resposta'.");
+    warn("expectation_visible_early", "A expectativa está visível para o grupo antes da avaliação, considere 'depois da própria resposta'.");
   }
 
   return { ready: errors.length === 0, errors, warnings };

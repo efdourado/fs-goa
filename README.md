@@ -1,6 +1,6 @@
 # Goa
 
-Desafios privados para grupos de amigos — e para você sozinho. Um clube de cinema,
+Desafios privados para grupos de amigos, e para você sozinho. Um clube de cinema,
 30 dias de leitura, um hábito, os bares da cidade. Cada pessoa registra; o Goa
 calcula, ranqueia e desenha o fio da rodada; no fim, o resultado vira memória.
 
@@ -10,21 +10,21 @@ localmente.
 
 ## O que tem dentro
 
-- **Grupos e Meu espaço** — grupos privados com convites; um espaço só seu para
+- **Grupos e Meu espaço**, grupos privados com convites; um espaço só seu para
   desafios pessoais e listas vivas.
-- **Desafios por receita** — Screens (filmes e séries), Pages (livros), hábitos,
+- **Desafios por receita**, Screens (filmes e séries), Pages (livros), hábitos,
   Tables (lugares) e personalizados. Quem cria escolhe o que se registra; o sistema
   impede estruturas incoerentes.
-- **Bibliotecas** — o acervo de cada espaço, com identidade estável entre rodadas,
+- **Bibliotecas**, o acervo de cada espaço, com identidade estável entre rodadas,
   capas tipográficas e propriedades editáveis.
-- **Revelação** — notas seladas até o grupo revelar o título; só revela quem já
+- **Revelação**, notas seladas até o grupo revelar o título; só revela quem já
   respondeu, então ninguém espia antes de se comprometer.
-- **O fio** — a rodada desenhada (uma linha por pessoa) e um almanaque de páginas:
+- **O fio**, a rodada desenhada (uma linha por pessoa) e um almanaque de páginas:
   pódio, gêneros, críticos, pares, surpresas, sequências e recordes, para baixar
   como imagem.
-- **Pontuação Goa** — rankings que desempatam cinco estrelas pelo histórico de quem
+- **Pontuação Goa**, rankings que desempatam cinco estrelas pelo histórico de quem
   avaliou, sem reescrever nenhuma nota (ver [arquitetura](docs/architecture.md#pontuação-goa)).
-- **Publicação e modelos** — link público anônimo por padrão, consentimento de nome
+- **Publicação e modelos**, link público anônimo por padrão, consentimento de nome
   por pessoa; modelos públicos em `/modelos` para copiar a estrutura.
 
 ## Rodar
@@ -66,10 +66,10 @@ build em produção. Variáveis: `DATABASE_URL` (pooled), `APP_ORIGIN`,
 
 ## Documentação
 
-- [docs/architecture.md](docs/architecture.md) — como o código está organizado,
+- [docs/architecture.md](docs/architecture.md), como o código está organizado,
   o modelo de domínio, as regras do produto e a segurança.
-- [docs/api.md](docs/api.md) — as páginas e os endpoints.
-- [CONTRIBUTING.md](CONTRIBUTING.md) — como contribuir.
+- [docs/api.md](docs/api.md), as páginas e os endpoints.
+- [CONTRIBUTING.md](CONTRIBUTING.md), como contribuir.
 
 ## Licença
 

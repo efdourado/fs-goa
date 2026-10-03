@@ -57,7 +57,7 @@ async function main(): Promise<void> {
     console.log("  · métricas: páginas lidas, ritmo acumulado, páginas por semana, média por dia,");
     console.log("    páginas por gênero, ranking pelas minhas notas, nota média, taxa de conclusão.");
     console.log("  · encerra, gera o Wrapped, publica o resultado" + (account.platformAdmin ? " e publica como modelo." : "."));
-    if (existing) console.log(`\n(já existe um desafio "${existing.title}" nesta conta — rode com --reset para recriá-lo.)`);
+    if (existing) console.log(`\n(já existe um desafio "${existing.title}" nesta conta, rode com --reset para recriá-lo.)`);
     await getPool().end();
     return;
   }

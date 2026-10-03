@@ -178,7 +178,7 @@ function noteText(note: RatedNote, t: ReturnType<typeof useTranslations>, name: 
     case "surprise": return t("surprise", { expected: fmt(note.expected), actual: fmt(note.actual) });
     case "flop": return t("flop", { value: fmt(note.value) });
     case "loner": return t("loner", { name: name(note.personId), value: fmt(note.value) });
-    case "quote": return `“${note.text}” — ${name(note.personId)}`;
+    case "quote": return `“${note.text}” (${name(note.personId)})`;
   }
 }
 

@@ -1178,7 +1178,7 @@ export async function updateCatalogLibraryProperty(
 
     if (isNative) {
       if (propertyKey === "title" && hidden === true) {
-        throw new ApiError(400, "title_required", "O nome do item não pode ser ocultado — todo item precisa de um nome.");
+        throw new ApiError(400, "title_required", "O nome do item não pode ser ocultado, todo item precisa de um nome.");
       }
       const current = await oneOrNull<{ label: string | null; hidden: boolean; position: number | null }>(
         client,
@@ -1343,7 +1343,7 @@ export async function assertRecommendationsAllowed(client: PoolClient, groupId: 
     client, "SELECT recommendations_enabled FROM groups WHERE id = $1", [groupId],
   );
   if (group && !group.recommendations_enabled) {
-    throw new ApiError(409, "recommendations_disabled", "Este grupo desativou as indicações — ative-as nas configurações do grupo para registrar quem indicou.");
+    throw new ApiError(409, "recommendations_disabled", "Este grupo desativou as indicações. Ative-as nas configurações do grupo para registrar quem indicou.");
   }
 }
 
@@ -1408,7 +1408,7 @@ export async function applyCatalogItemUpdate(
     const wantedExternal = typeof body.catalogRecommendedByExternalId === "string" ? body.catalogRecommendedByExternalId : "";
     const wantedNote = typeof body.catalogOriginNote === "string" ? body.catalogOriginNote.trim() : "";
     if ([wantedUser, wantedExternal, wantedNote].filter(Boolean).length > 1) {
-      throw new ApiError(400, "invalid_recommender", "Escolha apenas uma origem: membro, nome salvo ou nota — não mais de uma.");
+      throw new ApiError(400, "invalid_recommender", "Escolha apenas uma origem: membro, nome salvo ou nota (não mais de uma).");
     }
     if (wantedUser || wantedExternal || wantedNote) await assertRecommendationsAllowed(client, groupId);
     let recommendedByUserId: string | null = null;
