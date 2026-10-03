@@ -615,12 +615,10 @@ export function CineItemsEditor({
 
   return (
     <div>
-      <div className="mb-3 flex items-center justify-between gap-3">
+      <Button className="mb-4 min-h-11 w-full" onClick={() => { setDraft([]); setAdding(true); }}>＋ {t("addItems")}</Button>
+      <div className="mb-3 flex min-h-9 items-center justify-between gap-3">
         <p className="text-sm font-medium">{t("listCount", { count: value.length })}</p>
-        <div className="flex items-center gap-2">
-          {canOrganise(organiseInput) ? <Button variant="secondary" className="min-h-9" onClick={() => setOrganising(true)}>{tOrganise("button")}</Button> : null}
-          <Button className="min-h-9" onClick={() => { setDraft([]); setAdding(true); }}>＋ {t("addItems")}</Button>
-        </div>
+        {canOrganise(organiseInput) ? <Button variant="secondary" className="min-h-9" onClick={() => setOrganising(true)}>{tOrganise("button")}</Button> : null}
       </div>
       {value.length ? (
         <ol className="divide-y divide-[var(--line)] rounded-2xl border border-[var(--line)] bg-[var(--paper)]">
@@ -638,9 +636,7 @@ export function CineItemsEditor({
           ))}
         </ol>
       ) : (
-        <button type="button" onClick={() => { setDraft([]); setAdding(true); }} className="w-full cursor-pointer rounded-2xl border border-dashed border-[var(--line)] px-4 py-8 text-sm text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)]">
-          {t("emptyList")}
-        </button>
+        <p className="rounded-2xl border border-dashed border-[var(--line)] px-4 py-8 text-center text-sm text-[var(--muted)]">{t("emptyList")}</p>
       )}
 
       {adding ? (

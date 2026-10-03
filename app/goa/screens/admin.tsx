@@ -239,12 +239,12 @@ function AdminGeneral({
           </section>
         ) : null}
 
-        <div className={cx("z-10 mt-8 border-[var(--line)] px-4 py-3", dirty && "sticky bottom-0 -mx-4 border-t bg-[color-mix(in_srgb,var(--canvas)_92%,transparent)] backdrop-blur-md sm:mx-0 sm:rounded-2xl sm:border")}>
+        <div className={cx("z-10 mt-8 border-[var(--line)] py-3", dirty ? "sticky bottom-0 -mx-4 border-t bg-[color-mix(in_srgb,var(--canvas)_92%,transparent)] px-4 backdrop-blur-md sm:mx-0 sm:rounded-2xl sm:border" : "px-0")}>
           <StatusMessage error={error} success={success} />
           {locked ? null : (
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-xs text-[var(--muted)]" aria-live="polite">{dirty ? t("unsavedChanges") : t("nothingToSave")}</span>
-              <Button type="submit" className="min-h-11 px-6" disabled={saving || !dirty}>{saving ? tc("saving") : t("saveChanges")}</Button>
+            <div className="space-y-2">
+              <span className="block text-xs text-[var(--muted)]" aria-live="polite">{dirty ? t("unsavedChanges") : t("nothingToSave")}</span>
+              <Button type="submit" className="min-h-11 w-full px-6" disabled={saving || !dirty}>{saving ? tc("saving") : t("saveChanges")}</Button>
             </div>
           )}
         </div>
@@ -349,8 +349,8 @@ function AdminFields({
       <PageHeading
         title={t("fieldsTitle")}
         description={challenge.status === "draft" ? t("fieldsHintDraft") : challenge.status === "active" ? t("fieldsHintActive") : t("fieldsHintClosed")}
-        action={!locked ? <Button onClick={() => { setError(null); setEditing("new"); }}>＋ {t("addField")}</Button> : undefined}
       />
+      {!locked ? <Button className="mb-6 min-h-11 w-full" onClick={() => { setError(null); setEditing("new"); }}>＋ {t("addField")}</Button> : null}
       {types.length > 1 || canAddShared ? (
         <div className="mb-6 flex flex-wrap items-center gap-2" role="group" aria-label={t("fieldsTypeLegend")}>
           {types.map((type) => {
@@ -880,12 +880,12 @@ function AdminItems({
       <PageHeading
         title={t("itemsTitle")}
         description={undatedDaily ? t("itemsHintUndatedDaily") : datedDaily ? t("itemsHintDatedDaily") : challenge.status === "closed" ? t("itemsHintClosed") : t("itemsHintDefault")}
-        action={canShowAdd ? (() => {
-          // Adding items happens in a dialog, so the button never turns into "Close" for it.
-          const inline = !(challenge.submissionMode === "item" && linked.length);
-          return <Button variant={showAdd && inline ? "secondary" : "primary"} onClick={() => setShowAdd((open) => !open)}>{showAdd && inline ? tc("close") : challenge.submissionMode === "daily" ? t("generateCheckpoints") : `＋ ${t("add")}`}</Button>;
-        })() : undefined}
       />
+      {canShowAdd ? (() => {
+        // Adding items happens in a dialog, so the button never turns into "Close" for it.
+        const inline = !(challenge.submissionMode === "item" && linked.length);
+        return <Button className="mb-6 min-h-11 w-full" variant={showAdd && inline ? "secondary" : "primary"} onClick={() => setShowAdd((open) => !open)}>{showAdd && inline ? tc("close") : challenge.submissionMode === "daily" ? t("generateCheckpoints") : `＋ ${tCine("addItems")}`}</Button>;
+      })() : null}
       {challenge.submissionMode === "item" ? <ChallengeLibrariesBar challenge={challenge} scope={scope} onLink={onLinkLibrary} onUnlink={onUnlinkLibrary} onChanged={onLibraryChanged} /> : null}
       <div className="mb-5"><StatusMessage error={error} success={success} /></div>
 
