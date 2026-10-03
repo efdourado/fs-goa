@@ -243,7 +243,7 @@ function AdminGeneral({
           <StatusMessage error={error} success={success} />
           {locked ? null : (
             <div className="space-y-2">
-              <span className="block text-xs text-[var(--muted)]" aria-live="polite">{dirty ? t("unsavedChanges") : t("nothingToSave")}</span>
+              <span className="block text-xs text-[var(--muted)]" aria-live="polite">{dirty ? t("unsavedChanges") : null}</span>
               <Button type="submit" className="min-h-11 w-full px-6" disabled={saving || !dirty}>{saving ? tc("saving") : t("saveChanges")}</Button>
             </div>
           )}

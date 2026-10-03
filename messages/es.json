@@ -745,7 +745,6 @@
     "saveChanges": "Guardar cambios",
     "changesSaved": "Cambios guardados.",
     "unsavedChanges": "Cambios sin guardar",
-    "nothingToSave": "Todo guardado",
     "savedDetailsOnly": "Se guardaron los datos básicos, pero no los participantes: {error}",
     "stat": {
       "participants": "Participantes",
@@ -819,7 +818,7 @@
     "errNoItem": "Agrega al menos un ítem.",
     "dailyGenerated": "Días generados.",
     "itemsAdded": "Ítems agregados.",
-    "itemsTitle": "Ítems y etapas",
+    "itemsTitle": "Ítems",
     "itemsHintUndatedDaily": "Este hábito no necesita días preparados de antemano: cada fecha recibe un check-in cuando alguien registra.",
     "itemsHintDatedDaily": "Los títulos y las descripciones de los días pueden corregirse en cualquier momento. Para agregar o quitar días, ajusta el período en la pestaña General.",
     "itemsHintClosed": "Edición solo de lectura: el historial de este desafío está bloqueado.",

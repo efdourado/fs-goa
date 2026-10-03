@@ -745,7 +745,6 @@
     "saveChanges": "Save changes",
     "changesSaved": "Changes saved.",
     "unsavedChanges": "Unsaved changes",
-    "nothingToSave": "All saved",
     "savedDetailsOnly": "The details were saved, but the participants weren't: {error}",
     "stat": {
       "participants": "Participants",
@@ -819,7 +818,7 @@
     "errNoItem": "Add at least one item.",
     "dailyGenerated": "Days generated.",
     "itemsAdded": "Items added.",
-    "itemsTitle": "Items and stages",
+    "itemsTitle": "Items",
     "itemsHintUndatedDaily": "This habit needs no days set up ahead of time: each date gets a check-in when someone logs an entry.",
     "itemsHintDatedDaily": "The titles and descriptions of the days can be corrected at any time. To add or remove days, adjust the period on the General tab.",
     "itemsHintClosed": "Read-only editing: this challenge's history is locked.",
