@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript (Next regenerates next-env.d.ts on every dev / build)
 *.tsbuildinfo
 next-env.d.ts
+
+# local one-off seeds, run from the terminal, never committed
+scripts/seed-workout/
