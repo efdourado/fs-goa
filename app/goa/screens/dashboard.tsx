@@ -568,7 +568,7 @@ export function DashboardScreen({
   });
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
+    <main className="px-4 py-8 pb-24 sm:px-6 sm:py-12 lg:px-20">
       <PageHeading
         title={t("greeting", { name: user.name.split(" ")[0] })}
         description={brandNew ? tWelcome("lede") : t("subtitle")}
