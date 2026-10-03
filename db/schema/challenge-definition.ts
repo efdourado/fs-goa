@@ -127,9 +127,8 @@ export const entryTypes = pgTable(
 
 /**
  * The libraries a challenge draws its items from — retained on their own, not
- * inferred from whichever items happen to exist. A challenge can combine several
- * (Movies and TV Shows in one list); each item still belongs to exactly one, via
- * its catalog item's `kind`. Keyed by the library's `(group_id, kind)` — the same
+ * inferred from whichever items happen to exist. A challenge has exactly one;
+ * each item belongs to it via its catalog item's `kind`. Keyed by the library's `(group_id, kind)` — the same
  * identity `catalog_items` uses — so a link can never point at another
  * workspace's library. `position` is the order libraries were linked in.
  */
@@ -155,6 +154,8 @@ export const challengeLibraries = pgTable(
       foreignColumns: [catalogLibraries.groupId, catalogLibraries.kind],
     }).onDelete("cascade"),
     index("challenge_libraries_library_idx").on(table.groupId, table.kind),
+    // One library per challenge (multi-library challenges were dropped; see docs/architecture.md).
+    unique("challenge_libraries_one_per_challenge").on(table.challengeId),
     check("challenge_libraries_position_check", sql`${table.position} >= 0`),
   ],
 );

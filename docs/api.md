@@ -91,7 +91,7 @@ Sem redefinição por link: `/api/auth/forgot` e `/reset` respondem `404` até h
 | `POST …/items` · `PATCH` · `DELETE …/items/:itemId` | itens (ou geração diária) |
 | `POST …/items/preview` | prévia de uma lista colada, sem gravar |
 | `POST …/items/assign` · `POST …/checkpoints` | etapas e itens nelas |
-| `POST …/libraries` · `DELETE …/libraries/:id` | bibliotecas do desafio |
+| `POST …/libraries` · `DELETE …/libraries/:id` | a biblioteca do desafio (uma só; trocar só enquanto não há itens, `409 one_library`) |
 
 **Registros e revelação**:
 

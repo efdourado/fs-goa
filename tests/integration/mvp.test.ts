@@ -7356,84 +7356,63 @@ test("duplicar leva a biblioteca com propriedades, valores e agenda dos itens �
   assert.deepEqual(mergedDefs.rows.map((row) => row.label), ["Estádio", "Etapa"], "a propriedade que o destino tinha fica como está; só falta a que ele não tinha");
 });
 
-test("um desafio combina bibliotecas: vínculo guardado à parte, escolha por item, e a biblioteca não some quando os itens saem", async () => {
+test("um desafio usa uma biblioteca só: duas são recusadas, a escolhida fica guardada e só troca enquanto vazia", async () => {
   const owner = await register("Iara", "iara_combina");
   const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Maratona" } })).body as { id: string }).id;
   const make = async (label: string) => (await call("POST", `/api/groups/${gid}/catalog/libraries`, { session: owner, body: { label } })).body as { id: string; kind: string };
   const movies = await make("Filmes");
   const shows = await make("Séries");
-  const podcasts = await make("Podcasts");
+
+  const two = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner, body: { recipe: "custom", title: "Tudo junto", participantIds: [owner.user.id], libraries: [{ libraryId: movies.id }, { libraryId: shows.id }], items: [{ title: "Aftersun" }] },
+  });
+  assert.equal(two.response.status, 400, JSON.stringify(two.body));
+  assert.equal((two.body as { error: string }).error, "one_library");
 
   const created = await call("POST", `/api/groups/${gid}/challenges`, {
-    session: owner,
-    body: {
-      recipe: "custom", title: "Tudo junto", participantIds: [owner.user.id],
-      libraries: [{ libraryId: movies.id }, { libraryId: shows.id }],
-      items: [{ title: "Aftersun", libraryId: movies.id }, { title: "Severance", libraryId: shows.id }],
-    },
+    session: owner, body: { recipe: "custom", title: "Filmes", participantIds: [owner.user.id], libraryId: movies.id, items: [{ title: "Aftersun" }] },
   });
   assert.equal(created.response.status, 201, JSON.stringify(created.body));
   const cid = (created.body as { id: string }).id;
   const detail = async () => (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as {
-    libraries: Array<{ id: string; kind: string; label: string | null }>; items: Array<{ id: string; title: string }>;
+    libraries: Array<{ id: string; label: string | null }>; items: Array<{ id: string; title: string }>;
   };
-  assert.deepEqual((await detail()).libraries.map((library) => library.label), ["Filmes", "Séries"], "as duas bibliotecas, na ordem em que foram vinculadas");
-  const kinds = await adminPool.query<{ title: string; kind: string }>(
-    `SELECT it.title, ci.kind FROM challenge_items it JOIN catalog_items ci ON ci.id = it.catalog_item_id WHERE it.challenge_id = $1 ORDER BY it.position`, [cid],
-  );
-  assert.deepEqual(kinds.rows.map((row) => [row.title, row.kind]), [["Aftersun", movies.kind], ["Severance", shows.kind]], "cada item veio da sua biblioteca");
+  assert.deepEqual((await detail()).libraries.map((library) => library.label), ["Filmes"]);
 
-  // com duas bibliotecas, é preciso dizer de qual; uma que o desafio não usa é recusada
-  const ambiguous = await call("POST", `/api/challenges/${cid}/items`, { session: owner, body: { title: "Solaris" } });
-  assert.equal(ambiguous.response.status, 400, JSON.stringify(ambiguous.body));
-  assert.equal((ambiguous.body as { error: string }).error, "library_required");
-  const foreign = await call("POST", `/api/challenges/${cid}/items`, { session: owner, body: { title: "Serial", libraryId: podcasts.id } });
-  assert.equal(foreign.response.status, 400);
+  // an item from another library, or a second link, is refused
+  const foreign = await call("POST", `/api/challenges/${cid}/items`, { session: owner, body: { title: "Severance", libraryId: shows.id } });
   assert.equal((foreign.body as { error: string }).error, "library_not_linked");
-  const batch = await call("POST", `/api/challenges/${cid}/items`, {
-    session: owner, body: { items: [{ title: "Solaris", libraryId: movies.id }, { title: "Andor", libraryId: shows.id }] },
-  });
-  assert.equal(batch.response.status, 201, JSON.stringify(batch.body));
+  const second = await call("POST", `/api/challenges/${cid}/libraries`, { session: owner, body: { libraryId: shows.id } });
+  assert.equal(second.response.status, 409, JSON.stringify(second.body));
+  assert.equal((second.body as { error: string }).error, "one_library");
 
-  // vincular outra biblioteca é uma ação própria, e passa a valer
-  const linked = await call("POST", `/api/challenges/${cid}/libraries`, { session: owner, body: { libraryId: podcasts.id } });
-  assert.equal(linked.response.status, 201, JSON.stringify(linked.body));
-  assert.equal((await detail()).libraries.length, 3);
-  assert.equal((await call("POST", `/api/challenges/${cid}/items`, { session: owner, body: { title: "Serial", libraryId: podcasts.id } })).response.status, 201);
-  // não vincula biblioteca de outro espaço
-  const otherGid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Outro" } })).body as { id: string }).id;
-  const stranger = (await call("POST", `/api/groups/${otherGid}/catalog/libraries`, { session: owner, body: { label: "Alheia" } })).body as { id: string };
-  assert.equal((await call("POST", `/api/challenges/${cid}/libraries`, { session: owner, body: { libraryId: stranger.id } })).response.status, 400);
-
-  // desvincular: recusado enquanto houver itens dela; liberado depois — e o vínculo não vem dos itens
-  const inUse = await call("DELETE", `/api/challenges/${cid}/libraries/${podcasts.id}`, { session: owner });
-  assert.equal(inUse.response.status, 409, JSON.stringify(inUse.body));
+  // unlinking waits until no item comes from it; then another can be picked
+  const inUse = await call("DELETE", `/api/challenges/${cid}/libraries/${movies.id}`, { session: owner });
   assert.equal((inUse.body as { error: string }).error, "library_in_use");
-  const serial = (await detail()).items.find((item) => item.title === "Serial")!;
-  assert.equal((await call("DELETE", `/api/challenges/${cid}/items/${serial.id}`, { session: owner })).response.status, 200);
-  const stillLinked = await detail();
-  assert.ok(stillLinked.libraries.some((library) => library.id === podcasts.id), "tirar os itens não desvincula a biblioteca");
-  assert.equal((await call("DELETE", `/api/challenges/${cid}/libraries/${podcasts.id}`, { session: owner })).response.status, 200);
-  assert.equal((await detail()).libraries.length, 2);
+  const aftersun = (await detail()).items[0];
+  assert.equal((await call("DELETE", `/api/challenges/${cid}/items/${aftersun.id}`, { session: owner })).response.status, 200);
+  assert.equal((await call("DELETE", `/api/challenges/${cid}/libraries/${movies.id}`, { session: owner })).response.status, 200);
+  assert.equal((await call("POST", `/api/challenges/${cid}/libraries`, { session: owner, body: { libraryId: shows.id } })).response.status, 201);
+  assert.equal((await call("POST", `/api/challenges/${cid}/items`, { session: owner, body: { title: "Severance" } })).response.status, 201, "with one library, items need no choice");
+  assert.deepEqual((await detail()).libraries.map((library) => library.label), ["Séries"]);
 
-  // a cópia leva as duas bibliotecas, cada item na sua
+  // the copy keeps its one library
   const dst = ((await call("POST", "/api/groups", { session: owner, body: { name: "Cópia" } })).body as { id: string }).id;
   const copy = await call("POST", `/api/challenges/${cid}/duplicate`, { session: owner, body: { targetGroupId: dst, mode: "structure_and_items" } });
   assert.equal(copy.response.status, 201, JSON.stringify(copy.body));
   const copyDetail = (await call("GET", `/api/challenges/${(copy.body as { id: string }).id}`, { session: owner })).body as { libraries: Array<{ label: string | null }> };
-  assert.deepEqual(copyDetail.libraries.map((library) => library.label), ["Filmes", "Séries"]);
+  assert.deepEqual(copyDetail.libraries.map((library) => library.label), ["Séries"]);
 
-  // um desafio anterior à tabela (sem vínculos guardados) continua funcionando e se conserta na primeira escrita
+  // a challenge from before the table (no stored link) still reads, and stores its link on the first write
   await adminPool.query("DELETE FROM challenge_libraries WHERE challenge_id = $1", [cid]);
-  assert.deepEqual((await detail()).libraries.map((library) => library.label), ["Filmes", "Séries"], "o que os itens implicam continua valendo na leitura");
-  assert.equal((await call("POST", `/api/challenges/${cid}/items`, { session: owner, body: { title: "Perfect Days", libraryId: movies.id } })).response.status, 201);
-  const healed = await adminPool.query("SELECT kind FROM challenge_libraries WHERE challenge_id = $1", [cid]);
-  assert.equal(healed.rowCount, 2, "os vínculos foram gravados");
+  assert.deepEqual((await detail()).libraries.map((library) => library.label), ["Séries"], "what the items imply still reads");
+  assert.equal((await call("POST", `/api/challenges/${cid}/items`, { session: owner, body: { title: "Andor" } })).response.status, 201);
+  assert.equal((await adminPool.query("SELECT kind FROM challenge_libraries WHERE challenge_id = $1", [cid])).rowCount, 1);
 
-  // o desafio fechado não muda de bibliotecas
+  // a closed challenge doesn't change its library
   assert.equal((await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } })).response.status, 200);
   assert.equal((await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "closed" } })).response.status, 200);
-  assert.equal((await call("POST", `/api/challenges/${cid}/libraries`, { session: owner, body: { libraryId: podcasts.id } })).response.status, 409);
+  assert.equal((await call("DELETE", `/api/challenges/${cid}/libraries/${shows.id}`, { session: owner })).response.status, 409);
 });
 
 test("a migração 0049 liga desafios antigos às bibliotecas dos seus itens e da sua receita", async () => {
@@ -7454,6 +7433,8 @@ test("a migração 0049 liga desafios antigos às bibliotecas dos seus itens e d
   let rows: { rows: Array<{ challenge_id: string; kind: string }> };
   try {
     await client.query("BEGIN");
+    // 0049 predates the one-library rule (0061): replay it in that older world, rolled back below.
+    await client.query("ALTER TABLE challenge_libraries DROP CONSTRAINT challenge_libraries_one_per_challenge");
     await client.query("DELETE FROM challenge_libraries");
     for (const statement of backfill) await client.query(statement);
     rows = await client.query<{ challenge_id: string; kind: string }>(
@@ -7494,77 +7475,49 @@ test("esconder o autor na biblioteca de livros tira a exigência do autor nos it
   assert.equal(other.response.status, 201, JSON.stringify(other.body));
 });
 
-test("qualquer receita aceita bibliotecas a mais na criação; Tables não se duplica; o item do desafio edita as propriedades da sua biblioteca", async () => {
+test("receitas não aceitam biblioteca a mais; o item do desafio edita as propriedades da sua biblioteca", async () => {
   const owner = await register("Lia", "lia_extras");
   const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Sala" } })).body as { id: string }).id;
   const shows = (await call("POST", `/api/groups/${gid}/catalog/libraries`, { session: owner, body: { label: "Séries" } })).body as { id: string; kind: string };
   const network = (await call("POST", `/api/groups/${gid}/catalog-attributes`, { session: owner, body: { libraryId: shows.id, label: "Canal", type: "text" } })).body as { id: string; key: string };
 
-  // Cinema + Séries na mesma lista: a biblioteca própria da receita (Screens) e mais uma
+  // a recipe with its own library (Screens) plus another: refused
+  const extra = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner, body: { recipe: "cinema", title: "Telas", participantIds: [owner.user.id], libraries: [{ libraryId: shows.id }], items: [{ title: "Aftersun" }] },
+  });
+  assert.equal(extra.response.status, 400, JSON.stringify(extra.body));
+  assert.equal((extra.body as { error: string }).error, "one_library");
+  assert.equal((await call("POST", `/api/groups/${gid}/catalog/libraries`, { session: owner, body: { source: "tables" } })).response.status, 201);
+  const tablesExtra = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner, body: { recipe: "tables", title: "Comer e ver", participantIds: [owner.user.id], libraries: [{ libraryId: shows.id }], items: [{ title: "Cantina" }] },
+  });
+  assert.equal((tablesExtra.body as { error: string }).error, "one_library");
+
   const created = await call("POST", `/api/groups/${gid}/challenges`, {
     session: owner,
-    body: {
-      recipe: "cinema", title: "Telas", participantIds: [owner.user.id], libraries: [{ libraryId: shows.id }],
-      items: [{ title: "Aftersun", libraryKind: "film" }, { title: "Severance", libraryId: shows.id, attributes: { [network.key]: "Apple TV+" } }],
-    },
+    body: { recipe: "custom", title: "Séries", participantIds: [owner.user.id], libraryId: shows.id, items: [{ title: "Severance", attributes: { [network.key]: "Apple TV+" } }] },
   });
   assert.equal(created.response.status, 201, JSON.stringify(created.body));
   const cid = (created.body as { id: string }).id;
   const detail = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as {
-    libraries: Array<{ kind: string; label: string | null }>;
     items: Array<{ id: string; title: string; catalogItem: { kind: string; attributes: Array<{ label: string; value: string }> } }>;
   };
-  assert.deepEqual(detail.libraries.map((library) => library.kind), ["film", shows.kind]);
   const severance = detail.items.find((item) => item.title === "Severance")!;
   assert.equal(severance.catalogItem.kind, shows.kind);
   assert.deepEqual(severance.catalogItem.attributes.map((a) => [a.label, a.value]), [["Canal", "Apple TV+"]]);
 
-  // o item do desafio edita as propriedades da biblioteca dele (nativas e personalizadas)
+  // the challenge's item edits its library's properties (native and custom)
   const edited = await call("PATCH", `/api/challenges/${cid}/items/${severance.id}`, { session: owner, body: { attributes: { [network.key]: "Apple TV" } } });
   assert.equal(edited.response.status, 200, JSON.stringify(edited.body));
   const again = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { items: Array<{ title: string; catalogItem: { attributes: Array<{ value: string }> } }> };
   assert.equal(again.items.find((item) => item.title === "Severance")?.catalogItem.attributes[0].value, "Apple TV");
 
-  // um item sem biblioteca, com duas ligadas: precisa escolher
-  const ambiguous = await call("POST", `/api/groups/${gid}/challenges`, {
-    session: owner, body: { recipe: "cinema", title: "Sem escolha", participantIds: [owner.user.id], libraries: [{ libraryId: shows.id }], items: [{ title: "Sem biblioteca" }] },
-  });
-  assert.equal(ambiguous.response.status, 400, JSON.stringify(ambiguous.body));
-  assert.equal((ambiguous.body as { error: string }).error, "library_required");
-
-  // Tables + uma biblioteca a mais: a Tables da receita é ligada uma vez só — e precisa existir antes
-  const noTables = await call("POST", `/api/groups/${gid}/challenges`, {
-    session: owner,
-    body: { recipe: "tables", title: "Comer e ver", participantIds: [owner.user.id], libraries: [{ libraryId: shows.id }], items: [{ title: "Serial", libraryId: shows.id }] },
-  });
-  assert.equal(noTables.response.status, 409, "sem a biblioteca Tables não há rodada Tables");
-  assert.equal((noTables.body as { error: string }).error, "library_missing");
-  const tablesLib = (await call("POST", `/api/groups/${gid}/catalog/libraries`, { session: owner, body: { source: "tables" } }));
-  assert.equal(tablesLib.response.status, 201, JSON.stringify(tablesLib.body));
-  assert.equal((tablesLib.body as { label: string | null }).label, null, "Tables sem nome guardado mostra o nome padrão");
-  const tables = await call("POST", `/api/groups/${gid}/challenges`, {
-    session: owner,
-    body: { recipe: "tables", title: "Comer e ver", participantIds: [owner.user.id], libraries: [{ libraryId: shows.id }], items: [{ title: "Sem biblioteca" }] },
-  });
-  assert.equal(tables.response.status, 400, "com duas bibliotecas, o item de Tables também precisa dizer de onde vem");
-  assert.equal((tables.body as { error: string }).error, "library_required");
-  const withTables = await call("POST", `/api/groups/${gid}/challenges`, {
-    session: owner,
-    body: {
-      recipe: "tables", title: "Comer e ver", participantIds: [owner.user.id], libraries: [{ libraryId: shows.id }],
-      items: [{ title: "Cantina", libraryId: (tablesLib.body as { id: string }).id }, { title: "Serial", libraryId: shows.id }],
-    },
-  });
-  assert.equal(withTables.response.status, 201, JSON.stringify(withTables.body));
-  const twoLibs = (await call("GET", `/api/challenges/${(withTables.body as { id: string }).id}`, { session: owner })).body as { libraries: Array<{ source: string }> };
-  assert.deepEqual(twoLibs.libraries.map((library) => library.source).sort(), ["custom", "tables"], "uma Tables e a outra — sem Tables duplicada");
-
-  // o modelo público não expõe valores de propriedades personalizadas
+  // the public template doesn't expose custom property values
   await adminPool.query("UPDATE users SET platform_admin = true WHERE id = $1", [owner.user.id]);
   const platform = await login("lia_extras");
   assert.equal((await call("POST", `/api/challenges/${cid}/template`, { session: platform, body: {} })).response.status, 200);
   const preview = await call("GET", `/api/templates/${cid}`);
-  assert.equal(JSON.stringify(preview.body).includes("Apple TV"), false, "valores personalizados não vazam no modelo público");
+  assert.equal(JSON.stringify(preview.body).includes("Apple TV"), false, "custom values don't leak into the public template");
 });
 
 test("desafio personalizado: sem \"quando aconteceu\" por padrão, com opção para ligar, e a cópia leva a escolha", async () => {
@@ -7940,7 +7893,6 @@ test("a migração 0051 tira dos Screens os livros que uma versão antiga guardo
     for (const title of ["Ficciones", "Perfume", "Dom Casmurro", "Repetido", "Solaris"]) {
       await client.query("UPDATE catalog_items SET kind = 'film' WHERE id = $1", [item(title)]);
     }
-    await client.query("INSERT INTO challenge_libraries (challenge_id, group_id, kind, position) SELECT $1, $2, 'film', 1 ON CONFLICT DO NOTHING", [shelf, gid]);
     // já existe um livro com o mesmo título e autor: mexer no filme colidiria com ele
     await client.query(
       `INSERT INTO catalog_items (id, group_id, kind, title, normalized_title, author, created_by_user_id)
@@ -7962,8 +7914,7 @@ test("a migração 0051 tira dos Screens os livros que uma versão antiga guardo
     assert.equal(kinds.get("Aftersun"), "film", "filmes de verdade não mudam");
 
     const links = async (id: string) => (await client.query<{ kind: string }>("SELECT kind FROM challenge_libraries WHERE challenge_id = $1 ORDER BY position", [id])).rows.map((row) => row.kind);
-    // Repetido ainda é um filme nesta estante, então o vínculo com Screens continua fazendo sentido
-    assert.deepEqual((await links(shelf)).sort(), ["book", "film"]);
+    assert.deepEqual(await links(shelf), ["book"]);
     assert.deepEqual(await links(club), ["book"]);
     assert.deepEqual(await links(cinema), ["film"], "desafio de cinema não é tocado");
     assert.deepEqual(await links(both), ["film"], "sem livros movidos, o vínculo não muda");

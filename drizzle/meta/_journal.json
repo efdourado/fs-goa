@@ -428,6 +428,13 @@
       "when": 1790702922159,
       "tag": "0060_rating_reveal",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1791028029166,
+      "tag": "0061_one_library_per_challenge",
+      "breakpoints": true
     }
   ]
 }

@@ -23,7 +23,7 @@ import { seedFieldMetrics } from "../challenges/auto-metrics";
 import { parseRuleSections, rulesCompatibilityText } from "./rules";
 import { asRecord, dateRange, publicId, semanticKey, timeZoneValue } from "./shared";
 
-/** The libraries a create request names: `libraryIds` (+ optional matching `libraryKinds`), or the older single `libraryId` / `libraryKind`. */
+/** The libraries a create request names (`libraries[]`, or the single `libraryId` / `libraryKind`); more than one is refused. */
 function namedLibraries(body: Record<string, unknown>): Array<{ libraryId?: string; libraryKind?: string }> {
   const specs: Array<{ libraryId?: string; libraryKind?: string }> = [];
   const push = (spec: { libraryId?: unknown; libraryKind?: unknown }) => {
@@ -216,38 +216,37 @@ export async function createChallenge(
               )
             ).rows.map((row) => row.user_id),
           );
-      // The libraries this challenge draws from, stored on the challenge itself.
-      // Cinema/Estante/Library track their fixed one; Tables the workspace's own
-      // Tables library (which the person creates first — never on their behalf);
-      // `custom` only what the caller names. Any recipe can also be given more libraries — Movies and TV Shows
-      // in one list — via `libraryIds` (or the older single `libraryId`).
-      const linkedKinds: string[] = [];
-      const link = async (kind: string) => {
-        if (linkedKinds.includes(kind)) return;
-        await linkChallengeLibrary(client, id, groupId, kind, session.user.id);
-        linkedKinds.push(kind);
-      };
-      const named = namedLibraries(body);
-      if (recipe.catalogKind) await link(recipe.catalogKind);
+      // The one library this challenge draws from, stored on the challenge itself (one per challenge, see
+      // docs/architecture.md). Cinema/Estante/Library track their fixed one; Tables the workspace's own Tables
+      // library (which the person creates first, never on their behalf); `custom` the one the caller names.
       const namedKinds: string[] = [];
-      for (const spec of named) namedKinds.push(await resolveItemKind(client, groupId, { libraryId: spec.libraryId, kind: spec.libraryKind }));
-      if (recipe.defaultLibrarySource) {
-        // The preset's own library — unless the caller already picked one of that kind themselves.
-        const picked = namedKinds.length
+      for (const spec of namedLibraries(body)) {
+        const kind = await resolveItemKind(client, groupId, { libraryId: spec.libraryId, kind: spec.libraryKind });
+        if (!namedKinds.includes(kind)) namedKinds.push(kind);
+      }
+      if (namedKinds.length > 1) throw new ApiError(400, "one_library", "Um desafio usa uma biblioteca só.");
+      let libraryKind: string | null = namedKinds[0] ?? null;
+      if (recipe.catalogKind) {
+        if (libraryKind && libraryKind !== recipe.catalogKind) throw new ApiError(400, "one_library", "Um desafio usa uma biblioteca só.");
+        libraryKind = recipe.catalogKind;
+      } else if (recipe.defaultLibrarySource) {
+        // The preset's own library, or one of that kind the caller picked themselves.
+        const picked = libraryKind
           ? await oneOrNull<{ id: string }>(
-              client,
-              "SELECT id FROM catalog_libraries WHERE group_id = $1 AND kind = ANY($2::text[]) AND source = $3 LIMIT 1",
-              [groupId, namedKinds, recipe.defaultLibrarySource],
+              client, "SELECT id FROM catalog_libraries WHERE group_id = $1 AND kind = $2 AND source = $3",
+              [groupId, libraryKind, recipe.defaultLibrarySource],
             )
           : null;
-        if (!picked) {
+        if (libraryKind && !picked) throw new ApiError(400, "one_library", "Um desafio usa uma biblioteca só.");
+        if (!libraryKind) {
           const own = await findLibraryBySource(client, groupId, recipe.defaultLibrarySource);
           if (!own) throw new ApiError(409, "library_missing", "Crie a biblioteca Tables antes de criar esta rodada.");
-          await link(own);
+          libraryKind = own;
         }
       }
-      for (const kind of namedKinds) await link(kind);
-      if (!linkedKinds.length) throw new ApiError(400, "invalid_library", "Escolha a biblioteca de onde vêm os itens.");
+      if (!libraryKind) throw new ApiError(400, "invalid_library", "Escolha a biblioteca de onde vêm os itens.");
+      await linkChallengeLibrary(client, id, groupId, libraryKind, session.user.id);
+      const linkedKinds = [libraryKind];
       // "Each item has its own date and time" (a match's kickoff): the libraries this challenge draws
       // from start asking for it. A property of the library, so other challenges on it read the same date.
       if (body.itemDates === true) {

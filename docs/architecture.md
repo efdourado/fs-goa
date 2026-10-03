@@ -57,7 +57,7 @@ Espaço, um grupo, ou o espaço pessoal (groups.kind = 'personal', oculto, de um
 ├── Bibliotecas (catalog_libraries), Screens (film), Pages (book), Tables, personalizadas
 │   └── Acervo (catalog_items), identidade estável entre rodadas; propriedades nativas + atributos tipados
 └── Desafio (challenges), receita, período opcional, draft → active → closed
-    ├── challenge_libraries, de quais bibliotecas tira itens
+    ├── challenge_libraries, a biblioteca de onde vêm os itens (uma por desafio)
     ├── challenge_items, o item nesta rodada (+ quem indicou, etapa, revelado em)
     ├── challenge_checkpoints, etapas (dia, semana, sessão, marco)
     ├── entry_types, o que se registra, em eixos independentes:
@@ -73,6 +73,9 @@ Espaço, um grupo, ou o espaço pessoal (groups.kind = 'personal', oculto, de um
 - **Receitas** (`recipes.ts`) montam a estrutura inicial: `cinema` (Screens),
   `bookshelf` (Pages), `library` (leitura por dia), `habit`, `tables` e `custom`.
   Depois de criada, a estrutura é do desafio, a receita não manda mais.
+- **Uma biblioteca por desafio** (migração `0061`): a receita define a sua (ou, em `custom`, quem cria
+  escolhe), e ela só pode ser trocada enquanto o desafio não tem itens. Misturar bibliotecas foi removido
+  de propósito: uma biblioteca já pode ser qualquer coisa, e as próximas features contam com isso.
 - **Identidade do acervo**: filme e livro casam por título (+autor/ano); outras
   bibliotecas nunca fundem por título, a pessoa escolhe.
 - **Visibilidade** é por tipo de registro e aplicada em `listEntries`: autor e

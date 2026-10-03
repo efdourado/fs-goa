@@ -85,6 +85,10 @@ export async function linkChallengeLibrary(
   kind: string,
   actorUserId: string,
 ): Promise<void> {
+  // One library per challenge: linking a second is refused (the database enforces it too).
+  const current = await oneOrNull<{ kind: string }>(client, "SELECT kind FROM challenge_libraries WHERE challenge_id = $1", [challengeId]);
+  if (current && current.kind !== kind) throw new ApiError(409, "one_library", "Um desafio usa uma biblioteca só.");
+  if (current) return;
   if (kind === "film" || kind === "book") {
     await ensureCatalogLibrary(client, groupId, kind, actorUserId);
   } else {
@@ -95,7 +99,7 @@ export async function linkChallengeLibrary(
   }
   await client.query(
     `INSERT INTO challenge_libraries (challenge_id, group_id, kind, position)
-     VALUES ($1, $2, $3, (SELECT coalesce(max(position), -1) + 1 FROM challenge_libraries WHERE challenge_id = $1))
+     VALUES ($1, $2, $3, 0)
      ON CONFLICT (challenge_id, kind) DO NOTHING`,
     [challengeId, groupId, kind],
   );
@@ -118,8 +122,8 @@ export async function ensureChallengeLibraries(
 /**
  * Which linked library an item belongs to. An explicit choice (`libraryId`, or
  * `libraryKind` for a built-in with no id yet) or the library of a catalog item
- * being reused wins; otherwise a challenge with one library uses it and one with
- * several asks. It must be a library the challenge has linked — items are never
+ * being reused wins; otherwise the challenge's one library. It must be the library
+ * the challenge has linked, items are never
  * silently pulled from a library the challenge doesn't use.
  */
 export async function resolveItemLibrary(
@@ -138,12 +142,10 @@ export async function resolveItemLibrary(
       client, "SELECT kind FROM catalog_items WHERE id = $1 AND group_id = $2 AND archived_at IS NULL", [catalogItemId, challenge.group_id],
     ))?.kind ?? null;
     if (!kind) throw new ApiError(400, "invalid_catalog_item", "Item do acervo não pertence a este grupo.");
-  } else if (linked.length === 1) {
+  } else if (linked.length) {
     kind = linked[0].kind;
-  } else if (linked.length === 0) {
-    throw new ApiError(400, "library_required", "Este desafio ainda não tem uma biblioteca. Vincule uma antes de adicionar itens.");
   } else {
-    throw new ApiError(400, "library_required", "Este desafio usa mais de uma biblioteca, escolha de qual vem cada item.");
+    throw new ApiError(400, "library_required", "Este desafio ainda não tem uma biblioteca. Vincule uma antes de adicionar itens.");
   }
   if (!linked.some((library) => library.kind === kind)) {
     throw new ApiError(400, "library_not_linked", "Essa biblioteca não faz parte deste desafio. Vincule-a antes de adicionar itens dela.");
@@ -151,7 +153,7 @@ export async function resolveItemLibrary(
   return kind;
 }
 
-/** `POST /challenges/:id/libraries` — another workspace library the challenge may draw items from. */
+/** `POST /challenges/:id/libraries`: the library a challenge with none yet draws its items from. */
 export async function addChallengeLibrary(session: SessionContext, challengeId: string, body: Record<string, unknown>) {
   return inTransaction(async (client) => {
     const access = await challengeAccess(session.user.id, challengeId, client, true);
@@ -170,7 +172,7 @@ export async function addChallengeLibrary(session: SessionContext, challengeId: 
   });
 }
 
-/** `DELETE /challenges/:id/libraries/:libraryId` — only while none of the challenge's items come from it. */
+/** `DELETE /challenges/:id/libraries/:libraryId`: only while no item comes from it, so a wrong pick can be swapped. */
 export async function removeChallengeLibrary(session: SessionContext, challengeId: string, libraryId: string) {
   return inTransaction(async (client) => {
     const access = await challengeAccess(session.user.id, challengeId, client, true);
