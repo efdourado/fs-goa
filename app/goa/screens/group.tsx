@@ -4,7 +4,6 @@ import { useTranslations } from "next-intl";
 import { type FormEvent, useRef, useState } from "react";
 
 import { copyText } from "../clipboard";
-import { ActionMenu, ActionMenuItem } from "../action-menu";
 import { Dialog } from "../dialog";
 import { useGoaFormat } from "../format";
 import { CatalogShelfSkeleton } from "../catalog-shelf";
@@ -67,7 +66,6 @@ export function GroupScreen({
   const tQuick = useTranslations("quickCreate");
   const tCat = useTranslations("catalog");
   const tl = useTranslations("libraries");
-  const tx = useTranslations("managementUX");
   const tc = useTranslations("common");
   const tr = useTranslations("roles");
   const f = useGoaFormat();
@@ -267,12 +265,6 @@ export function GroupScreen({
           <h1 className="text-3xl font-semibold tracking-[-0.03em] sm:text-[2rem]">{group.name}</h1>
           {groupHeaderDescription ? <p className="mt-2 max-w-[52ch] text-sm leading-6 text-[var(--muted)]">{groupHeaderDescription}</p> : null}
         </div>
-        {canManage(group.role) ? (
-          <ActionMenu label={tx("groupActions")} iconOnly>
-            <ActionMenuItem onClick={toggleGroupEdit}>{t("editToggleClosed")}</ActionMenuItem>
-            <ActionMenuItem onClick={() => setShowInvite(true)}>{t("inviteTitle")}</ActionMenuItem>
-          </ActionMenu>
-        ) : null}
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-3 border-b border-[var(--line)] pb-5">
@@ -283,10 +275,30 @@ export function GroupScreen({
             </span>
           ))}
           {memberCount > 5 ? <span className="-ml-2 grid h-7 w-7 place-items-center rounded-full border-2 border-[var(--paper)] bg-[var(--wash-strong)] text-[10px] font-black text-[var(--muted)]">+{memberCount - 5}</span> : null}
+          {/* An empty seat at the end of the faces: the quiet way in to inviting someone. */}
+          {canManage(group.role) ? (
+            <button type="button" onClick={() => setShowInvite(true)} aria-label={t("inviteTitle")} title={t("inviteTitle")} className="-ml-2 grid h-7 w-7 cursor-pointer place-items-center rounded-full border-2 border-[var(--paper)] bg-[var(--canvas)] text-[var(--muted)] outline-1 outline-dashed -outline-offset-[3px] outline-[var(--line)] transition hover:text-[var(--main-strong)] hover:outline-[var(--main-line)]">
+              <svg viewBox="0 0 16 16" className="h-3 w-3" aria-hidden="true"><path d="M8 3.5v9M3.5 8h9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
+            </button>
+          ) : null}
         </div>
         <span className="text-xs text-[var(--muted)]">{t("peopleCount", { count: memberCount })} · {tr(group.role)}</span>
         <span className="flex-1" />
-        {canManage(group.role) ? <Button variant="secondary" className="min-h-9" onClick={() => setShowInvite(true)}>{t("inviteTitle")}</Button> : null}
+        {canManage(group.role) ? (
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setShowInvite(true)} className="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-full bg-[var(--main-soft)] pl-3 pr-4 text-sm text-[var(--main-strong)] transition hover:bg-[var(--main-line)]/60 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25">
+              <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true">
+                <circle cx="6.5" cy="5.5" r="2.5" /><path d="M2 13.5c.6-2.3 2.4-3.5 4.5-3.5s3.9 1.2 4.5 3.5M12.5 4.5v4M10.5 6.5h4" />
+              </svg>
+              {t("inviteTitle")}
+            </button>
+            <button type="button" onClick={toggleGroupEdit} aria-label={t("editToggleClosed")} title={t("editToggleClosed")} className="grid h-9 w-9 cursor-pointer place-items-center rounded-full border border-[var(--line)] text-[var(--muted)] transition hover:bg-[var(--hover)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25">
+              <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M10.5 2.8l2.7 2.7-7.6 7.6H2.9v-2.7z" /><path d="M9 4.3l2.7 2.7" />
+              </svg>
+            </button>
+          </div>
+        ) : null}
       </div>
 
       {showGroupEdit ? (
