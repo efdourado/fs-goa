@@ -156,15 +156,18 @@ export function CatalogItemScreen({
             </dl>
           ) : null}
 
-          <section className={cx(cardClass, "mt-7 flex flex-wrap items-center gap-x-8 gap-y-5 p-6 sm:p-7")} aria-label={t("ratingTitle")}>
-            <ScoreRing value={item.ratingAvg} size={132} strokeWidth={2} label={rated ? t("ratedAria", { value: item.ratingAvg ?? 0 }) : t("notRatedYet")} caption={rated ? t("outOfFive") : undefined} textClassName="text-[44px] font-light leading-none tracking-[-0.05em]" />
-            <div className="min-w-0 flex-1 basis-56">
-              <h2 className="text-xs uppercase tracking-[0.08em] text-[var(--muted)]">{t("ratingTitle")}</h2>
-              <p className="mt-2 text-xl font-light leading-snug tracking-[-0.03em] sm:text-2xl">
-                {rated ? t("ratingSummary", { ratings: item.ratingCount ?? 0, rounds: item.rounds.length }) : t("notRatedYet")}
-              </p>
-            </div>
-          </section>
+          {/* Not rated (yet, or a library that isn't rated at all): no rating block. */}
+          {rated ? (
+            <section className={cx(cardClass, "mt-7 flex flex-wrap items-center gap-x-8 gap-y-5 p-6 sm:p-7")} aria-label={t("ratingTitle")}>
+              <ScoreRing value={item.ratingAvg} size={132} strokeWidth={2} label={t("ratedAria", { value: item.ratingAvg ?? 0 })} caption={t("outOfFive")} textClassName="text-[44px] font-light leading-none tracking-[-0.05em]" />
+              <div className="min-w-0 flex-1 basis-56">
+                <h2 className="text-xs uppercase tracking-[0.08em] text-[var(--muted)]">{t("ratingTitle")}</h2>
+                <p className="mt-2 text-xl font-light leading-snug tracking-[-0.03em] sm:text-2xl">
+                  {t("ratingSummary", { ratings: item.ratingCount ?? 0, rounds: item.rounds.length })}
+                </p>
+              </div>
+            </section>
+          ) : null}
 
           <section className="mt-10">
             <h2 className="text-xl font-light tracking-[-0.03em] sm:text-2xl">{t("historyTitle")}</h2>
@@ -186,11 +189,12 @@ export function CatalogItemScreen({
                         </div>
                       ) : null}
                     </div>
-                    <div className="flex-none text-right">
-                      {round.ratingAvg === null
-                        ? <span className="text-xl text-[var(--muted)]">—</span>
-                        : <><strong className="block text-2xl font-light tracking-[-0.04em]">{round.ratingAvg}</strong><span className="text-xs text-[var(--muted)]">{t("roundRatings", { count: round.ratingCount })}</span></>}
-                    </div>
+                    {round.ratingAvg === null ? null : (
+                      <div className="flex-none text-right">
+                        <strong className="block text-2xl font-light tracking-[-0.04em]">{round.ratingAvg}</strong>
+                        <span className="text-xs text-[var(--muted)]">{t("roundRatings", { count: round.ratingCount })}</span>
+                      </div>
+                    )}
                   </li>
                 ))}
               </ol>

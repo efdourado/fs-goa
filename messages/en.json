@@ -479,7 +479,6 @@
     "ratingTitle": "Group rating",
     "outOfFive": "out of 5",
     "ratingSummary": "{ratings, plural, one {# rating} other {# ratings}} across {rounds, plural, one {# challenge} other {# challenges}}.",
-    "notRatedYet": "Nobody has rated it yet.",
     "notRated": "Not rated yet",
     "ratedAria": "Rated {value} out of 5",
     "roundRatings": "{count, plural, one {# rating} other {# ratings}}",
