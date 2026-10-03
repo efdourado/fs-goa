@@ -411,16 +411,6 @@ export function GroupScreen({
                   ) : <span />}
                 </div>
                 <Rail railRef={catalogRailRef} showFade={catalogShowFade} onScroll={onCatalogScroll}>
-                  {canManage(group.role) ? (
-                    <button
-                      type="button"
-                      onClick={onOpenCatalog}
-                      className="flex aspect-[3/4] w-44 flex-none cursor-pointer snap-start flex-col items-center justify-center gap-2.5 self-start rounded-[20px] border border-dashed border-[var(--main-line)] text-[var(--main-strong)] transition hover:bg-[var(--main-soft)]"
-                    >
-                      <span aria-hidden="true" className="grid h-10 w-10 place-items-center rounded-full bg-[var(--main-soft)] text-lg">＋</span>
-                      <span className="text-[13px]">{t("catalogAddItem")}</span>
-                    </button>
-                  ) : null}
                   {visibleCatalog.map((item) => (
                     <CatalogTile
                       key={item.id}

@@ -450,7 +450,6 @@
     "recommendationsLabel": "Recomendaciones",
     "recommendationsHint": "Pregunta quién recomendó cada ítem y lo muestra. Desactívalo para ocultarlo en todo el grupo — lo ya registrado se conserva.",
     "catalogEmptyTitle": "Empieza el catálogo",
-    "catalogAddItem": "Añadir ítem",
     "catalogMoreIn": "más en {name}",
     "catalogSeeAll": "Ver todo",
     "tasteYou": "Tú"

@@ -3,7 +3,6 @@
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 
-import { AddCardTile } from "./add-tile";
 import { CatalogTile, resolveCoverTop } from "./catalog-views";
 import { useGoaFormat } from "./format";
 import { type CatalogScope, LibraryGlyph, useCatalogShelf, useLibraryName } from "./libraries";
@@ -111,7 +110,6 @@ export function CatalogShelf({ scope, canManage, onOpenCatalog, onOpenItem }: {
             </div>
           ) : null}
           <Rail railRef={railRef} showFade={showFade} onScroll={onScroll}>
-            {canManage ? <AddCardTile label={t("catalogAddItem")} onClick={onOpenCatalog} className="aspect-[3/4] w-44 flex-none snap-start self-start" /> : null}
             {visible.map((item) => (
               <CatalogTile
                 key={item.id}

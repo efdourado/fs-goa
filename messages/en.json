@@ -450,7 +450,6 @@
     "recommendationsLabel": "Recommendations",
     "recommendationsHint": "Ask who recommended each item and show it. Turn off to hide it everywhere in this group — what's already recorded is kept.",
     "catalogEmptyTitle": "Start the catalogue",
-    "catalogAddItem": "Add item",
     "catalogMoreIn": "more in {name}",
     "catalogSeeAll": "See all",
     "tasteYou": "You"
