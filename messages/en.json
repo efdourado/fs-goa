@@ -1239,6 +1239,8 @@
     "empty": "No rules added. They're optional, but each rule can have its own title and topics."
   },
   "fields": {
+    "inRankingLabel": "Counts toward the ranking",
+    "inRankingHint": "Averaged into each title's score, podium and catalogue rating. Off: it's still recorded and gets its own chart, but doesn't rank the titles.",
     "type": {
       "text": "Text",
       "number": "Number",

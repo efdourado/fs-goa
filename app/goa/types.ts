@@ -115,6 +115,8 @@ export interface FieldConfig {
   options?: FieldOption[];
   /** Number fields only: what the number is in — "kg", "km", "min". Shown after every value. */
   unit?: string;
+  /** Rating fields only: this rating ranks the titles (the Goa score, podiums, the catalogue). Off unless switched on. */
+  inRanking?: boolean;
 }
 
 export interface ChallengeField {

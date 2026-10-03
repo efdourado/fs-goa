@@ -942,7 +942,7 @@ test("front page story: a ranking's winner, the most in-tune pair and the toughe
 test("today's rating: the average of the rating fields — the named metric's, or every rating field — each on its own scale", async () => {
   const { entryRatingReader } = await import("../app/goa/utils");
   const entryTypes = [
-    { id: "t", purpose: "rating", answerScope: "individual", fields: [{ id: "food", type: "rating" }, { id: "vibe", type: "rating" }, { id: "value", type: "rating" }] },
+    { id: "t", purpose: "rating", answerScope: "individual", fields: [{ id: "food", type: "rating", config: { inRanking: true } }, { id: "vibe", type: "rating", config: { inRanking: true } }, { id: "value", type: "rating", config: { inRanking: true } }] },
     { id: "x", purpose: "expectation", answerScope: "individual", fields: [{ id: "hope", type: "rating" }] },
   ] as unknown as import("../app/goa/types").ChallengeDetail["entryTypes"];
   const entry = (entryTypeId: string, values: Record<string, unknown>) => ({ id: "e", entryTypeId, values }) as unknown as import("../app/goa/types").Entry;
@@ -958,8 +958,16 @@ test("today's rating: the average of the rating fields — the named metric's, o
 
   // A /10 field next to /5 ones counts on its own scale: 8/10 is a 4.
   const mixed = entryRatingReader({
-    entryTypes: [{ id: "t", purpose: "rating", answerScope: "individual", fields: [{ id: "food", type: "rating" }, { id: "price", type: "rating", config: { min: 0, max: 10 } }] }] as unknown as import("../app/goa/types").ChallengeDetail["entryTypes"],
+    entryTypes: [{ id: "t", purpose: "rating", answerScope: "individual", fields: [{ id: "food", type: "rating", config: { inRanking: true } }, { id: "price", type: "rating", config: { min: 0, max: 10, inRanking: true } }] }] as unknown as import("../app/goa/types").ChallengeDetail["entryTypes"],
     ratingFieldIds: null,
   });
   assert.equal(mixed(entry("t", { food: 2, price: 8 })), 3, "(2 + 4) / 2 on the first field's /5");
+
+  // A rating switched off ("Attention", say) is recorded but doesn't count toward the ranking.
+  const withAside = entryRatingReader({
+    entryTypes: [{ id: "t", purpose: "rating", answerScope: "individual", fields: [{ id: "nota", type: "rating", config: { inRanking: true } }, { id: "attention", type: "rating", config: { inRanking: false } }] }] as unknown as import("../app/goa/types").ChallengeDetail["entryTypes"],
+    ratingFieldIds: null,
+  });
+  assert.equal(withAside(entry("t", { nota: 4, attention: 1 })), 4, "only the ranking ratings count");
+  assert.equal(withAside(entry("t", { attention: 1 })), null, "an entry with only an off rating has no rating");
 });

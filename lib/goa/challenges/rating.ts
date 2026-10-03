@@ -20,14 +20,15 @@ export function ratingFieldsSql(challengeAlias: string): string {
 
 /**
  * SQL: one entry's rating — the average of the rating metric's fields, or, with no rating metric, of every rating
- * field it answered. NULL when it answered none of them.
+ * field it answered that counts toward the ranking (`settings.inRanking`). NULL when it answered none of them.
  */
 export function entryRatingSql(entryAlias: string, challengeAlias: string): string {
   return `(SELECT avg(rev.number_scaled::float8 / (10 ^ rf.number_scale))
              FROM entry_values rev
              JOIN challenge_fields rf ON rf.id = rev.field_id AND rf.kind = 'rating'
             WHERE rev.entry_id = ${entryAlias}.id AND rev.number_scaled IS NOT NULL
-              AND (${ratingFieldsSql(challengeAlias)} IS NULL OR rev.field_id = ANY((${ratingFieldsSql(challengeAlias)})::text[])))`;
+              AND (${ratingFieldsSql(challengeAlias)} IS NULL AND rf.settings->>'inRanking' = 'true'
+                   OR rev.field_id = ANY((${ratingFieldsSql(challengeAlias)})::text[])))`;
 }
 
 /** The fields the challenge's rating metric averages, or null when it names none. */

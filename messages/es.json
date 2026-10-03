@@ -1239,6 +1239,8 @@
     "empty": "Ninguna regla agregada. Son opcionales, pero cada regla puede tener su propio título y temas."
   },
   "fields": {
+    "inRankingLabel": "Cuenta para el ranking",
+    "inRankingHint": "Entra en el promedio de la puntuación de cada título, el podio y la nota del catálogo. Apagado: se sigue registrando y tiene su propio gráfico, pero no ordena los títulos.",
     "type": {
       "text": "Texto",
       "number": "Número",

@@ -11,7 +11,7 @@ const words = { yes: "Sim", no: "Não", group: "Grupo" };
 const rating = {
   id: "rate", name: "Avaliação", semanticKey: "avaliacao", purpose: "rating", answerScope: "individual", parentTypeId: null,
   fields: [
-    { id: "nota", key: "nota", label: "Nota", type: "rating", required: true, config: { min: 0, max: 5 } },
+    { id: "nota", key: "nota", label: "Nota", type: "rating", required: true, config: { min: 0, max: 5, inRanking: true } },
     { id: "comentario", key: "comentario", label: "Comentário", type: "text", required: false, config: { multiline: true } },
   ],
 };

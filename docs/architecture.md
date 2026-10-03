@@ -95,7 +95,10 @@ Espaço, um grupo, ou o espaço pessoal (groups.kind = 'personal', oculto, de um
   todo campo de número ou nota ganha as métricas óbvias uma vez; apagadas, não
   voltam.
 - **"A nota"** de um desafio (`rating.ts`): uma métrica marcada `isRating` diz quais
-  campos formam a nota de cada registro; sem ela, a média dos campos de nota.
+  campos formam a nota de cada registro; sem ela, a média dos campos de nota que **contam para o
+  ranking** (`settings.inRanking`, migração `0062`). As notas da receita contam; uma nota que alguém
+  acrescenta (uma "Atenção", por exemplo) não conta até ser ligada no editor de campos, mas continua
+  registrada e ganha o seu próprio gráfico por critério.
 - **Rankings pessoais e afinidade** (`rankings.ts`): por pessoa e por par, sempre ao
   vivo.
 

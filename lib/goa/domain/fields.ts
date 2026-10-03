@@ -71,7 +71,9 @@ export async function insertField(
       scale, min, max, step, maxLength, JSON.stringify(
         clientKind === "text" ? { multiline: config.multiline === true }
           : clientKind === "number" && fieldUnit(config.unit) ? { unit: fieldUnit(config.unit) }
-            : {},
+            // A rating counts toward the ranking only when asked to (a recipe's own ratings are; see createChallenge).
+            : clientKind === "rating" ? { inRanking: config.inRanking === true }
+              : {},
       )],
   );
   if (clientKind === "choice") {

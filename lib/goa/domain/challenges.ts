@@ -165,8 +165,16 @@ export async function createChallenge(
           shared ? "shared" : "individual", shared ? sharedEditPolicy : null],
       );
       if (type.purpose === "completion") completionTypeId = typeId;
+      // The recipe's own ratings (Screens/Pages "nota", Tables' three) count toward the ranking unless the
+      // creator said otherwise; any rating they added themselves doesn't, until they switch it on.
+      const ownRatings = new Set(type.fields.filter((field) => field.type === "rating").map((field) => field.key));
       for (let index = 0; index < typeFields.length; index += 1) {
-        const field = await insertField(client, id, typeId, typeFields[index], index);
+        const given = typeFields[index];
+        const config = asRecord(given.config);
+        const fieldInput = given.type === "rating" && config.inRanking === undefined && type.purpose !== "expectation"
+          ? { ...given, config: { ...config, inRanking: typeof given.key === "string" && ownRatings.has(given.key) } }
+          : given;
+        const field = await insertField(client, id, typeId, fieldInput, index);
         if (!fieldByKey.has(field.semanticKey)) {
           fieldByKey.set(field.semanticKey, { id: field.id, kind: field.kind, entryTypeId: typeId });
         }

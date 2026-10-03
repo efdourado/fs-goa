@@ -58,7 +58,8 @@ async function groupRatingRows(client: Pick<PoolClient, "query">, groupId: strin
            FROM entry_values rev
            JOIN challenge_fields rf ON rf.id = rev.field_id AND rf.kind = 'rating'
           WHERE rev.entry_id = e.id AND rev.number_scaled IS NOT NULL AND rf.max_scaled > rf.min_scaled
-            AND (${ratingFieldsSql("c")} IS NULL OR rev.field_id = ANY((${ratingFieldsSql("c")})::text[]))
+            AND (${ratingFieldsSql("c")} IS NULL AND rf.settings->>'inRanking' = 'true'
+                 OR rev.field_id = ANY((${ratingFieldsSql("c")})::text[]))
        ) er
       WHERE c.group_id = $1 AND c.deleted_at IS NULL AND c.status <> 'draft' AND er.value IS NOT NULL`,
     [groupId],
@@ -184,7 +185,7 @@ export async function catalogScores(client: Pick<PoolClient, "query">, groupId: 
 
 export const roundKey = (challengeId: string, catalogItemId: string) => `${challengeId}:${catalogItemId}`;
 
-/** The fields a challenge's scores read: its rating metric's, or every individual rating field. */
+/** The fields a challenge's scores read: its rating metric's, or every rating field that counts toward the ranking. */
 export async function scoreFieldIds(client: Pick<PoolClient, "query">, challengeId: string): Promise<string[]> {
   const result = await client.query<{ id: string }>(
     `SELECT f.id FROM challenge_fields f
@@ -192,7 +193,7 @@ export async function scoreFieldIds(client: Pick<PoolClient, "query">, challenge
        JOIN entry_types t ON t.id = f.entry_type_id
       WHERE f.challenge_id = $1 AND f.archived_at IS NULL AND f.kind = 'rating'
         AND t.purpose IN ('rating', 'completion') AND t.answer_scope = 'individual'
-        AND (${ratingFieldsSql("c")} IS NULL OR f.id = ANY((${ratingFieldsSql("c")})::text[]))`,
+        AND (${ratingFieldsSql("c")} IS NULL AND f.settings->>'inRanking' = 'true' OR f.id = ANY((${ratingFieldsSql("c")})::text[]))`,
     [challengeId],
   );
   return result.rows.map((row) => row.id);

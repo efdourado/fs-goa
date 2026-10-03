@@ -435,6 +435,13 @@
       "when": 1791028029166,
       "tag": "0061_one_library_per_challenge",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1791029948426,
+      "tag": "0062_ratings_in_ranking",
+      "breakpoints": true
     }
   ]
 }

@@ -131,7 +131,7 @@ test("a form with several ratings: the overall ranking counts them all, and each
     items: [{ id: "cantina", title: "Cantina" }, { id: "boteco", title: "Boteco" }, { id: "padaria", title: "Padaria" }],
     entryTypes: [{
       id: "t", purpose: "rating", answerScope: "individual", cardinality: "once_per_item",
-      fields: [{ id: "food", label: "Comida", type: "rating" }, { id: "vibe", label: "Ambiente", type: "rating" }, { id: "price", label: "Preço", type: "rating" }],
+      fields: [{ id: "food", label: "Comida", type: "rating", config: { inRanking: true } }, { id: "vibe", label: "Ambiente", type: "rating", config: { inRanking: true } }, { id: "price", label: "Preço", type: "rating", config: { inRanking: true } }],
     }],
   } as unknown as Parameters<typeof storyFromChallenge>[0];
   const rows: Array<[string, string, number, number, number]> = [

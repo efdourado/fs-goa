@@ -27,9 +27,9 @@ export function presetFields(recipe: CreatableRecipeKey, label: PresetLabels): C
   if (recipe === "tables") {
     // Three separate 0–5 ratings, no combined score — the recipe's metrics read these keys.
     return [
-      { key: "comida", label: label("comida"), type: "rating", required: true, config: { min: 0, max: 5, step: 0.5 } },
-      { key: "ambiente_atendimento", label: label("ambienteAtendimento"), type: "rating", required: true, config: { min: 0, max: 5, step: 0.5 } },
-      { key: "custo_beneficio", label: label("custoBeneficio"), type: "rating", required: true, config: { min: 0, max: 5, step: 0.5 } },
+      { key: "comida", label: label("comida"), type: "rating", required: true, config: { min: 0, max: 5, step: 0.5, inRanking: true } },
+      { key: "ambiente_atendimento", label: label("ambienteAtendimento"), type: "rating", required: true, config: { min: 0, max: 5, step: 0.5, inRanking: true } },
+      { key: "custo_beneficio", label: label("custoBeneficio"), type: "rating", required: true, config: { min: 0, max: 5, step: 0.5, inRanking: true } },
       { key: "comentario", label: label("comentario"), type: "text", required: false, config: { multiline: true, maxLength: 500 } },
     ];
   }
@@ -42,7 +42,7 @@ export function presetFields(recipe: CreatableRecipeKey, label: PresetLabels): C
     ];
   }
   return [
-    { key: "nota", label: label("nota"), type: "rating", required: true, config: { min: 0, max: 5, step: 0.5 } },
+    { key: "nota", label: label("nota"), type: "rating", required: true, config: { min: 0, max: 5, step: 0.5, inRanking: true } },
     { key: "comentario", label: label("comentario"), type: "text", required: false, config: { multiline: true, maxLength: 500 } },
   ];
 }
@@ -111,8 +111,13 @@ export function FieldConfigInputs({
   const t = useTranslations("fields");
   const patchConfig = (patch: Partial<FieldConfig>) => onChange({ config: { ...field.config, ...patch } });
   if (field.type === "rating") {
-    // A rating's bounds are fixed (0–5, half steps) — nothing to configure.
-    return <p className="text-xs leading-5 text-[var(--muted)]">{t("ratingFixed")}</p>;
+    // A rating's bounds are fixed (0–5, half steps); what's left to decide is whether it ranks the titles.
+    return (
+      <div className="space-y-2">
+        <Toggle checked={field.config?.inRanking === true} onChange={(inRanking) => patchConfig({ inRanking })} label={t("inRankingLabel")} hint={t("inRankingHint")} />
+        <p className="text-xs leading-5 text-[var(--muted)]">{t("ratingFixed")}</p>
+      </div>
+    );
   }
   if (field.type === "number") {
     return (

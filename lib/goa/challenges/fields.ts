@@ -134,6 +134,7 @@ export async function fieldsForChallenge(
       maxLength: field.max_length ?? undefined,
       options: optionsByField.get(field.id) ?? [],
       unit: field.kind === "number" && typeof field.settings?.unit === "string" && field.settings.unit ? field.settings.unit : undefined,
+      ...(field.kind === "rating" ? { inRanking: field.settings?.inRanking === true } : {}),
     },
   }));
 }
@@ -220,6 +221,8 @@ export async function saveChallengeFields(
       } else if (current.kind === "text") {
         maxLength = integerValue(config.maxLength, current.max_length ?? 5_000, 1, 20_000);
         settings = { ...settings, multiline: config.multiline === true };
+      } else if (current.kind === "rating" && typeof config.inRanking === "boolean") {
+        settings = { ...settings, inRanking: config.inRanking };
       }
 
       // Once the round is live, a non-destructive edit is still allowed but it

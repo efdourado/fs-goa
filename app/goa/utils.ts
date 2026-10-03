@@ -210,8 +210,8 @@ export function valuesAsRecord(values: Entry["values"]): Record<Id, unknown> {
 
 /**
  * How to read "the rating" an entry gave its item: the average of the rating fields it answered — every rating
- * field of a rating-purpose, individually answered type (food, ambience and value on a place all count), or the
- * fields of the metric named the challenge's rating (`ratingFieldIds`). An expectation uses the same widget but is
+ * field of a rating-purpose, individually answered type that counts toward the ranking (`config.inRanking`: food,
+ * ambience and value on a place all do), or the fields of the metric named the challenge's rating (`ratingFieldIds`). An expectation uses the same widget but is
  * a different question, so it never counts. Each field counts on its own scale (a /5 and a /10 mix fairly); the
  * result is on the scale of the type's first rating field. The server reads it the same way (`rating.ts`).
  */
@@ -221,7 +221,7 @@ export function entryRatingReader(challenge: Pick<ChallengeDetail, "entryTypes" 
   const ratingFields = new Map(
     (challenge.entryTypes ?? [])
       .filter((type) => type.purpose === "rating" && type.answerScope !== "shared")
-      .map((type) => [type.id, type.fields.filter((field) => field.type === "rating" && field.id && (!named || named.has(field.id)))]),
+      .map((type) => [type.id, type.fields.filter((field) => field.type === "rating" && field.id && (named ? named.has(field.id) : field.config?.inRanking === true))]),
   );
   const range = (field: ChallengeField) => ({ min: field.config?.min ?? 0, max: field.config?.max ?? 5 });
   return (entry) => {

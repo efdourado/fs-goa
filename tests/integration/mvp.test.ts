@@ -5326,6 +5326,37 @@ test("o fio público: nomes mascarados pelas mesmas regras, nenhum id real e nen
   assert.ok(!JSON.stringify(named.challenge.story).includes(b.user.id), "nem o id de quem consentiu");
 });
 
+test("conta para o ranking: a nota da receita conta, uma nota acrescentada não, até alguém ligar", async () => {
+  const owner = await register("Rui Ranking", "rui_inranking");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Atenção" } })).body as { id: string }).id;
+  const cid = ((await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner, body: { recipe: "cinema", title: "Filmes", participantIds: [owner.user.id], items: [{ title: "Aftersun" }] },
+  })).body as { id: string }).id;
+  type Field = { id: string; key: string; label: string; type: string; required: boolean; config?: { inRanking?: boolean } };
+  type Detail = { fields: Field[]; entryTypes: Array<{ id: string; purpose: string; fields: Field[] }>; items: Array<{ id: string }>; itemScores?: Record<string, { value: number }> };
+  const detail = async () => (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as Detail;
+  const first = await detail();
+  assert.equal(first.fields.find((field) => field.key === "nota")?.config?.inRanking, true, "the recipe's own rating counts");
+
+  const save = (fields: Array<Record<string, unknown>>) => call("POST", `/api/challenges/${cid}/fields`, {
+    session: owner, body: { replace: true, fields },
+  });
+  const keep = first.fields.map((field) => ({ id: field.id, label: field.label, type: field.type, required: field.required, config: field.config }));
+  assert.equal((await save([...keep, { key: "atencao", label: "Atenção", type: "rating", required: false }])).response.status, 201);
+  const added = (await detail()).fields.find((field) => field.key === "atencao")!;
+  assert.equal(added.config?.inRanking, false, "a rating added later doesn't count until switched on");
+
+  await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } });
+  const ratingType = first.entryTypes.find((type) => type.purpose === "rating")!;
+  const nota = first.fields.find((field) => field.key === "nota")!.id;
+  await call("POST", `/api/challenges/${cid}/entries`, { session: owner, body: { itemId: first.items[0].id, entryTypeId: ratingType.id, values: { [nota]: 5, [added.id]: 1 } } });
+  assert.equal((await detail()).itemScores?.[first.items[0].id]?.value, 5, "only the nota ranks the title");
+
+  const now = (await detail()).fields.map((field) => ({ id: field.id, label: field.label, type: field.type, required: field.required, config: field.key === "atencao" ? { ...field.config, inRanking: true } : field.config }));
+  assert.equal((await save(now)).response.status, 201);
+  assert.equal((await detail()).itemScores?.[first.items[0].id]?.value, 3, "switched on, it counts: (5 + 1) / 2");
+});
+
 test("pontuação Goa: uma nota oculta no histórico não mexe na pontuação de ninguém — nem no desafio, nem no acervo", async () => {
   const owner = await register("Dona Goa", "dona_goa_score");
   const p = await register("Pedro Goa", "pedro_goa_score");
@@ -8212,7 +8243,8 @@ test("ranking de itens: a média de várias notas é a nota geral de cada item, 
   await call("POST", `/api/invites/${(invite.body as { token: string }).token}`, { session: guest, body: {} });
   const library = (await call("POST", `/api/groups/${gid}/catalog/libraries`, { session: owner, body: { label: "Restaurantes" } })).body as { id: string };
 
-  const rating = (key: string, label: string) => ({ key, label, type: "rating", required: true, config: { min: 0, max: 5, step: 0.5 } });
+  // Ratings the creator adds don't rank titles until switched on; these three are.
+  const rating = (key: string, label: string) => ({ key, label, type: "rating", required: true, config: { min: 0, max: 5, step: 0.5, inRanking: true } });
   const created = await call("POST", `/api/groups/${gid}/challenges`, {
     session: owner,
     body: {

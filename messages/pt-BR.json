@@ -1239,6 +1239,8 @@
     "empty": "Nenhuma regra adicionada. Elas são opcionais, mas cada regra pode ter seu próprio título e tópicos."
   },
   "fields": {
+    "inRankingLabel": "Conta para o ranking",
+    "inRankingHint": "Entra na média da pontuação de cada título, no pódio e na nota do acervo. Desligado: continua registrado e ganha seu próprio gráfico, mas não ordena os títulos.",
     "type": {
       "text": "Texto",
       "number": "Número",
