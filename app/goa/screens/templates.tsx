@@ -88,7 +88,7 @@ export function TemplatesScreen({
       ) : (
         // Signed out, this is goa's front door: say what it is, then show real results; Sign in waits in the header.
         <header className="mb-10 max-w-3xl">
-          <h1 className="text-4xl font-medium leading-[1.02] tracking-[-0.05em] sm:text-6xl">{t("frontTitle")}</h1>
+          <h1 className="text-3xl font-medium leading-[1.02] tracking-[-0.05em] sm:text-4xl">{t("frontTitle")}</h1>
           <p className="mt-4 text-base leading-7 text-[var(--muted)]">{t("frontLede")}</p>
         </header>
       )}
