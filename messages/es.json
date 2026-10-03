@@ -1413,26 +1413,56 @@
   },
   "about": {
     "back": "Volver",
-    "title": "Acerca de Goa",
-    "lede": "Goa nació de planillas — las que un grupo de amigos mantenía para organizar un club de cine y uno de lectura. Automatiza ese trabajo: el participante registra, el sistema calcula y el resultado se vuelve recuerdo.",
-    "body": [
-      "La idea es simple. Un grupo elige un desafío — ver una lista de películas, leer durante 90 días, mantener un hábito — y cada persona registra su progreso. Goa se encarga del resto: sigue quién está al día, calcula medias y rankings, y al final arma una vitrina que cuenta la historia de esa ronda.",
-      "Nada es público por defecto. Cada grupo es privado, el acceso viene siempre de pertenecer a él, y los registros ya enviados se preservan — solo la curaduría y la presentación siguen siendo editables.",
-      "Goa es un proyecto personal en evolución, hecho por Eduardo Dourado. Las planillas originales se volvieron la especificación del dominio; la app poco a poco alcanza todo lo que ellas hacían, con mucho menos trabajo manual."
+    "title": "Sobre Goa",
+    "lede": "Desafíos privados para amigos — o solo para ti. Cada uno registra; Goa hace las cuentas y convierte la ronda en recuerdo.",
+    "stepsTitle": "Cómo funciona",
+    "steps": [
+      {
+        "title": "Elige un desafío",
+        "body": "Un club de cine, 30 días de lectura, un hábito, los bares de la ciudad."
+      },
+      {
+        "title": "Cada uno registra",
+        "body": "Notas, páginas, check-ins — cada persona a su ritmo, desde cualquier móvil."
+      },
+      {
+        "title": "Goa cuenta la historia",
+        "body": "Rankings, el hilo y una página de destacados, para guardar o compartir."
+      }
     ],
-    "librariesTitle": "Cómo organiza Goa lo que sigues",
-    "libraries": [
-      "Cada espacio personal y cada grupo tiene sus propias bibliotecas: las listas de las cosas que sigues. Screens es la evolución más amplia de Películas: películas, series, temporadas, episodios, documentales o la unidad que elijas. Pages es la evolución más amplia de Libros, y también sirve para artículos y otras lecturas. Tables es un punto de partida configurable para lugares como restaurantes, bares y cafés. Puedes crear bibliotecas más específicas, como Partidos o Series — y renombrar, ocultar o reordenar cada propiedad de cualquiera de ellas. Un mismo desafío puede buscar ítems en varias bibliotecas a la vez — Películas y Series en una sola lista.",
-      "Quien crea decide qué representa un ítem. Una trilogía puede ser un ítem o tres; una temporada puede ser un ítem o cada episodio. Goa no adivina: completa duración, páginas o año solo cuando los sepas. La duración media de un episodio y la duración total son números distintos, y mezclarlos dejaría mal los totales de tiempo.",
-      "Completado significa que las respuestas obligatorias del ítem están registradas, nada más. En un partido de fútbol puede ser solo “lo seguí”; no hace falta haberlo visto. Una respuesta que todos comparten, como el marcador final, se registra una vez para el grupo, mientras que las notas y los comentarios siguen siendo individuales. Si dos personas editan una respuesta compartida a la vez, a la segunda se le avisa y ve el valor más reciente en lugar de sobrescribirlo.",
-      "Las recomendaciones dicen de dónde vino un ítem: un miembro, alguien de fuera del grupo guardado por nombre, o una nota corta. Cada grupo puede desactivarlas por completo. Los ítems también pueden tener una fecha opcional — un día entero, un intervalo o una hora exacta — que se muestra justo debajo del nombre del ítem."
+    "featuresTitle": "Qué hay dentro",
+    "features": [
+      {
+        "title": "Bibliotecas",
+        "body": "Películas, libros, lugares o tus propias listas. Cada ítem guarda su historial entre rondas."
+      },
+      {
+        "title": "Notas selladas",
+        "body": "Las notas quedan ocultas hasta que el grupo las revela junto."
+      },
+      {
+        "title": "El hilo",
+        "body": "La ronda dibujada, una línea por persona, con páginas para descargar."
+      },
+      {
+        "title": "Privado por defecto",
+        "body": "Los grupos son privados. Un enlace público es anónimo salvo que cada persona lo autorice."
+      }
     ],
     "rankingTitle": "Cómo ordena Goa",
     "ranking": [
-      "Tus notas se guardan tal como las diste. Los promedios — el tuyo, el de un título, el de una persona — son siempre los promedios reales. Solo el orden de los rankings y los podios sale de otra cuenta: la puntuación Goa.",
-      "Un promedio simple empata con demasiada facilidad: tres películas con 5 de la misma persona quedan lado a lado, y el ranking no dice nada. La puntuación Goa desempata con lo que tu propio historial ya muestra. Un 5 de quien casi nunca da 5 vale un poco más que el de quien lo da cada semana. Y lo que sueles amar — un género, un director o autor, una década, una duración — inclina el título un poco hacia arriba o hacia abajo. Así, los tres 5 pasan a ser 4,74, 4,72 y 4,61.",
-      "Es un ajuste, no una reescritura: tu nota siempre pesa más, y el historial solo cuenta cuando existe. Quien acaba de llegar, o un título sin historial alrededor, se queda con el promedio simple. En un grupo, quien recomendó el título pesa un poco menos en su puntuación. Cada grupo y cada biblioteca se calculan por separado, así que nada de un círculo se filtra a otro — y una nota que aún no puedes ver (sellada, privada o esperando el cierre) nunca mueve un número que se te muestra. El catálogo muestra toda puntuación de 0 a 5, sea cual sea la escala de cada desafío."
+      "Tus notas nunca cambian, y los promedios son siempre promedios reales.",
+      "Solo el orden usa la puntuación Goa: desempata con el historial de cada persona — un 5 de quien casi nunca da 5 pesa un poco más.",
+      "Quien acaba de llegar y los títulos nuevos se quedan con el promedio simple. Las notas ocultas nunca mueven un número que ves."
     ],
+    "factsTitle": "Bueno saber",
+    "facts": [
+      "Tú decides qué es un ítem: una trilogía puede ser un ítem o tres.",
+      "Hecho significa que las respuestas obligatorias están — nada más.",
+      "Algunas respuestas son de todo el grupo, como un marcador final.",
+      "Un desafío puede mezclar bibliotecas — Películas y Series en una lista."
+    ],
+    "byline": "Un proyecto personal de Eduardo Dourado, nacido de las planillas de un club de cine y uno de lectura.",
     "feedbackNudge": "¿Tienes una idea o algo te molestó?",
     "feedbackLink": "Cuéntanos."
   },
