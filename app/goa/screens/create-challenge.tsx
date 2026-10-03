@@ -379,7 +379,6 @@ export function CreateChallengeScreen({
                 onProblem={setItemProblem}
               />
             ) : <EmptyState title={t("pickLibraryFirst")} />}
-            <p className="mt-3 text-xs font-medium text-[var(--muted)]">{t("itemsCount", { count: itemInputs.length })}</p>
             </>}
           </div>
         ) : null}

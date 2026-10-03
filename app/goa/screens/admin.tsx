@@ -6,14 +6,13 @@ import { type FormEvent, useMemo, useState } from "react";
 import { ActionMenu, ActionMenuItem } from "../action-menu";
 import { CheckpointPlanner } from "../checkpoint-planner";
 import { useGoaFormat } from "../format";
-import { CineItemsEditor, type CineRow, cineRowsToInput } from "../cine-items";
+import { type CineRow, cineRowsToInput, ItemsAddBox } from "../cine-items";
 import { ConfirmDialog, FormDialog } from "../dialog";
 import { AddSharedResponseDialog, RemoveResponseDialog, SharedGlyph, SharedResponsePanel } from "../shared-responses";
 import { cleanFields, FIELD_TYPES, FieldConfigInputs, newFieldConfig, uniqueFieldKey } from "../fields";
 import { LibraryPropertiesDialog } from "../library-dialogs";
 import { type CatalogScope, LibraryGlyph, LibraryPills, libraryChoices, useCatalogLibraries, useLibraryName } from "../libraries";
 import { bodyFromValues, editableProperties, PropertyInputs, type PropertyValues, propertiesHaveProblem, useLibraryProperties, valuesFromItem } from "../property-inputs";
-import { ListImportPanel } from "../list-import-panel";
 import { recommenderBody, recommenderLine, RecommenderPicker, recommenderFromItem, type RecommenderValue, sameRecommender, useRecommenderSource } from "../recommender-picker";
 import { RuleSectionsEditor, visibleRuleSections } from "../rules";
 import { ChallengeSettings, ChallengeStateButton, type CopyMode } from "./challenge-actions";
@@ -22,7 +21,6 @@ import type {
   ChallengeDetail,
   ChallengeField,
   ChallengeItem,
-  ChallengeItemInput,
   CatalogLibrary,
   ChallengeLibraryRef,
   ChallengeSummary,
@@ -31,7 +29,6 @@ import type {
   Entry,
   GroupSummary,
   Id,
-  ImportPreview,
   Member,
   SharedEditPolicy,
 } from "../types";
@@ -786,7 +783,6 @@ function AdminItems({
   onAdd,
   onUpdate,
   onArchive,
-  onPreviewImport,
   onLinkLibrary,
   onUnlinkLibrary,
   onLibraryChanged,
@@ -797,7 +793,6 @@ function AdminItems({
   onAdd: (payload: Record<string, unknown>) => Promise<void>;
   onUpdate: (itemId: Id, payload: ItemUpdatePayload) => Promise<void>;
   onArchive: (itemId: Id) => Promise<void>;
-  onPreviewImport: (body: { json: string; mapping?: Record<string, string> }) => Promise<ImportPreview>;
   onLinkLibrary: (spec: { libraryId?: Id; libraryKind?: string }) => Promise<void>;
   onUnlinkLibrary: (libraryId: Id) => Promise<void>;
   onLibraryChanged: () => void;
@@ -818,7 +813,6 @@ function AdminItems({
   const itemLibrary = (item: ChallengeItem) => linked.find((library) => library.kind === item.catalogItem?.kind) ?? null;
   const [newItemRows, setNewItemRows] = useState<CineRow[]>([]);
   const [itemProblem, setItemProblem] = useState<"author" | "schedule" | null>(null);
-  const [importTarget, setImportTarget] = useState<Pick<ChallengeLibraryRef, "id" | "kind"> | null>(null);
   const startsOn = challenge.startsOn ?? "";
   const endsOn = challenge.endsOn ?? "";
   const undatedDaily = challenge.submissionMode === "daily" && !challenge.startsOn && !challenge.endsOn;
@@ -870,45 +864,60 @@ function AdminItems({
       <PageHeading
         title={t("itemsTitle")}
         description={undatedDaily ? t("itemsHintUndatedDaily") : datedDaily ? t("itemsHintDatedDaily") : challenge.status === "closed" ? t("itemsHintClosed") : t("itemsHintDefault")}
-        action={canShowAdd ? <Button variant={showAdd ? "secondary" : "primary"} onClick={() => setShowAdd((open) => !open)}>{showAdd ? tc("close") : challenge.submissionMode === "daily" ? t("generateCheckpoints") : `＋ ${t("add")}`}</Button> : undefined}
+        action={canShowAdd ? (() => {
+          // Adding items happens in a dialog, so the button never turns into "Close" for it.
+          const inline = !(challenge.submissionMode === "item" && linked.length);
+          return <Button variant={showAdd && inline ? "secondary" : "primary"} onClick={() => setShowAdd((open) => !open)}>{showAdd && inline ? tc("close") : challenge.submissionMode === "daily" ? t("generateCheckpoints") : `＋ ${t("add")}`}</Button>;
+        })() : undefined}
       />
       {challenge.submissionMode === "item" ? <ChallengeLibrariesBar challenge={challenge} scope={scope} onLink={onLinkLibrary} onUnlink={onUnlinkLibrary} onChanged={onLibraryChanged} /> : null}
       <div className="mb-5"><StatusMessage error={error} success={success} /></div>
 
-      {showAdd && canShowAdd ? (
+      {/* Items are added in their own box, like when the challenge was created; a daily schedule or a challenge
+          with no library yet keeps its short inline form. */}
+      {showAdd && canShowAdd && challenge.submissionMode === "item" && linked.length ? (
+        <FormDialog
+          title={tCine("addItems")}
+          dirty={newItemRows.length > 0}
+          busy={busy}
+          error={error ?? (itemProblem === "author" ? tCine("authorRequired") : itemProblem === "schedule" ? t("eventScheduleInvalid") : null)}
+          onCancel={() => { setShowAdd(false); setNewItemRows([]); setError(null); }}
+          submitDisabled={!canAddItems || !newItemRows.length || itemProblem !== null}
+          submitLabel={tCine("addCount", { count: newItemRows.length })}
+          busyLabel={tc("saving")}
+          onSubmit={async () => {
+            setBusy(true); setError(null); setSuccess(null);
+            try {
+              await onAdd({ items: cineRowsToInput(newItemRows) });
+              setNewItemRows([]);
+              setShowAdd(false);
+              setSuccess(t("itemsAdded"));
+            } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
+          }}
+        >
+          <ItemsAddBox draft={newItemRows} onDraftChange={setNewItemRows} existing={[]} members={members} scope={scope} libraries={linked} recommendationsEnabled={recommendationsEnabled} timeZone={timeZone} onProblem={setItemProblem} />
+          {challenge.status === "active" ? <p className="mt-3 text-xs leading-5 text-[var(--muted)]">{t("activeItemsNote")}</p> : null}
+        </FormDialog>
+      ) : showAdd && canShowAdd ? (
         <div className="mb-8 rounded-2xl border border-[var(--line)] p-5">
           <form className="space-y-5" onSubmit={submit}>
             {challenge.submissionMode === "daily"
               ? <><p className="text-xs leading-5 text-[var(--muted)]">{t("dailyGenNote")}</p><Field label={t("firstDay")}><input className={inputClass} type="date" value={startsOn} readOnly required /></Field><Field label={t("lastDay")}><input className={inputClass} type="date" min={startsOn} value={endsOn} readOnly required /></Field></>
-              : <>
-                  {linked.length ? (
-                    <CineItemsEditor value={newItemRows} onChange={setNewItemRows} members={members} scope={scope} libraries={linked} recommendationsEnabled={recommendationsEnabled} onProblem={setItemProblem} onTargetChange={setImportTarget} />
-                  ) : (
-                    <Field label={t("libraryLabel")} hint={t("libraryHint")} plain>
-                      <LibraryPills
-                        choices={libraryChoices(workspaceLibraries ?? [])}
-                        selectedKinds={[]}
-                        label={t("libraryLabel")}
-                        onPick={(choice) => {
-                          setError(null);
-                          void onLinkLibrary(choice.id ? { libraryId: choice.id } : { libraryKind: choice.kind }).catch((cause: unknown) => setError(f.error(cause)));
-                        }}
-                      />
-                    </Field>
-                  )}
-                  {challenge.status === "active" ? <p className="text-xs leading-5 text-[var(--muted)]">{t("activeItemsNote")}</p> : null}
-                </>}
-            <Button type="submit" disabled={busy || (challenge.submissionMode === "daily" ? challenge.status !== "draft" : !canAddItems || !newItemRows.length)}>{busy ? tc("saving") : challenge.submissionMode === "daily" ? t("generateCheckpoints") : t("add")}</Button>
+              : (
+                <Field label={t("libraryLabel")} hint={t("libraryHint")} plain>
+                  <LibraryPills
+                    choices={libraryChoices(workspaceLibraries ?? [])}
+                    selectedKinds={[]}
+                    label={t("libraryLabel")}
+                    onPick={(choice) => {
+                      setError(null);
+                      void onLinkLibrary(choice.id ? { libraryId: choice.id } : { libraryKind: choice.kind }).catch((cause: unknown) => setError(f.error(cause)));
+                    }}
+                  />
+                </Field>
+              )}
+            {challenge.submissionMode === "daily" ? <Button type="submit" disabled={busy || challenge.status !== "draft"}>{busy ? tc("saving") : t("generateCheckpoints")}</Button> : null}
           </form>
-          {challenge.submissionMode === "item" && linked.length ? (
-            <div className="mt-5 border-t border-[var(--line)] pt-5">
-              <ListImportPanel
-                library={importTarget}
-                onPreview={onPreviewImport}
-                onCommit={(items: ChallengeItemInput[]) => onAdd({ items })}
-              />
-            </div>
-          ) : null}
         </div>
       ) : null}
 
@@ -1009,7 +1018,6 @@ export function AdminScreen({
   onUnlinkLibrary,
   onUpdateItem,
   onArchiveItem,
-  onPreviewImport,
   onSaveCheckpoints,
   onAssignCheckpointItems,
   onPublishResult,
@@ -1046,7 +1054,6 @@ export function AdminScreen({
   onUnlinkLibrary: (libraryId: Id) => Promise<void>;
   onUpdateItem: (itemId: Id, payload: ItemUpdatePayload) => Promise<void>;
   onArchiveItem: (itemId: Id) => Promise<void>;
-  onPreviewImport: (body: { json: string; mapping?: Record<string, string> }) => Promise<ImportPreview>;
   onSaveCheckpoints: (checkpoints: CheckpointInput[]) => Promise<void>;
   onAssignCheckpointItems: (assignments: Array<{ itemId: Id; checkpointId: Id | null; position?: number }>) => Promise<void>;
   onPublishResult: (payload: Record<string, unknown>) => Promise<{ url?: string | null; publishedAt?: string; anonymized?: boolean } | undefined>;
@@ -1111,7 +1118,7 @@ export function AdminScreen({
         {setup ? <div className="mx-auto max-w-2xl"><SetupSummary state={setup} activeTab={activeTab} onGo={onTab} /></div> : null}
         {activeTab === "overview" ? <AdminGeneral challenge={challenge} group={group} isPersonal={isPersonal} onSaveBasics={onSaveBasics} onSaveParticipants={onSaveParticipants} /> : null}
         {activeTab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.visibilityPolicy}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} onSaveVisibility={onSaveEntryTypeVisibility} onSetExpectation={onSetExpectation} onSaveEntryDate={onSaveEntryDate} onAddShared={onAddSharedResponse} onRemoveType={onRemoveEntryType} onSavePolicy={onSaveSharedPolicy} /> : null}
-        {activeTab === "items" ? <AdminItems challenge={challenge} group={group} entries={entries} onAdd={onAddItems} onUpdate={onUpdateItem} onArchive={onArchiveItem} onPreviewImport={onPreviewImport} onLinkLibrary={onLinkLibrary} onUnlinkLibrary={onUnlinkLibrary} onLibraryChanged={onArchiveChanged} /> : null}
+        {activeTab === "items" ? <AdminItems challenge={challenge} group={group} entries={entries} onAdd={onAddItems} onUpdate={onUpdateItem} onArchive={onArchiveItem} onLinkLibrary={onLinkLibrary} onUnlinkLibrary={onUnlinkLibrary} onLibraryChanged={onArchiveChanged} /> : null}
         {activeTab === "checkpoints" ? <CheckpointPlanner key={`${challenge.id}:${challenge.checkpoints.map((cp) => cp.id).join(",")}`} challenge={challenge} onSaveCheckpoints={onSaveCheckpoints} onAssign={onAssignCheckpointItems} /> : null}
         {activeTab === "settings" ? <ChallengeSettings challenge={challenge} duplicateTargets={duplicateTargets} onDuplicate={onDuplicate} onOpenCopy={onOpenCopy} onDelete={onDelete} isPlatformAdmin={isPlatformAdmin} onPublishTemplate={onPublishTemplate} onUnpublishTemplate={onUnpublishTemplate} onPublish={onPublishResult} onUnpublish={onUnpublishResult} /> : null}
       </div>

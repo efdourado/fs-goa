@@ -4,10 +4,9 @@ import test from "node:test";
 
 import { CheckpointPlanner } from "../app/goa/checkpoint-planner";
 import { parseJsonItemsPaste } from "../app/goa/cine-items";
-import { ListImportPanel } from "../app/goa/list-import-panel";
 import { RuleSectionsView } from "../app/goa/rules";
 import { DynamicEntryForm, itemEntryTypes, ParticipantChallengeScreen, ResultView } from "../app/goa/screens/participant-challenge";
-import type { ChallengeDetail, ChallengeField, ImportPreview } from "../app/goa/types";
+import type { ChallengeDetail, ChallengeField } from "../app/goa/types";
 import { AppHeader, ChallengeStatusBadge, SchedulePeriodFields } from "../app/goa/ui";
 import { NewLibraryDialog, TablesLibraryPrompt } from "../app/goa/library-dialogs";
 import { WelcomePanel } from "../app/goa/welcome";
@@ -621,25 +620,6 @@ test("planejador de etapas: um desafio diário com período mas SEM dias automá
   }));
   assert.doesNotMatch(html, /um registro por dia/i);
   assert.match(html, /Adicionar etapa/);
-});
-
-test("painel de importação: analisa e depois lista chaves desconhecidas e badges por linha", async () => {
-  const preview: ImportPreview = {
-    limit: 200,
-    catalogKind: "film",
-    summary: { total: 3, importable: 1, invalid: 1, duplicatesInCatalog: 0, duplicatesInChallenge: 1, unknownKeys: ["vibe"] },
-    rows: [
-      { index: 0, title: "Aftersun", valid: true, errors: [], mapped: { author: null, year: 2022, pageCount: null, runtimeMinutes: null, mainGenre: null }, recommendation: { kind: "participant", userId: "u1", name: "Ana" }, existingCatalogItemId: null, duplicateInChallenge: false, unknownKeys: ["vibe"] },
-      { index: 1, title: "Filme Repetido", valid: true, errors: [], mapped: { author: null, year: null, pageCount: null, runtimeMinutes: null, mainGenre: null }, recommendation: null, existingCatalogItemId: null, duplicateInChallenge: true, unknownKeys: [] },
-      { index: 2, title: "", valid: false, errors: ["Sem título."], mapped: { author: null, year: null, pageCount: null, runtimeMinutes: null, mainGenre: null }, recommendation: null, existingCatalogItemId: null, duplicateInChallenge: false, unknownKeys: [] },
-    ],
-  };
-  const empty = renderWithIntl(createElement(ListImportPanel, {
-    onPreview: async () => preview,
-    onCommit: async () => undefined,
-  }));
-  assert.match(empty, /Importar uma lista \(JSON\)/);
-  assert.match(empty, /Analisar/);
 });
 
 test("expectativa vem antes da avaliação no formulário do item, independente da ordem de criação", () => {

@@ -1,9 +1,11 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { useFormatter } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
 
 import { API_PATHS, apiRequest } from "./api";
+import { Dialog, FormDialog } from "./dialog";
 import { type CatalogScope } from "./libraries";
 import { bodyFromValues, editableProperties, PropertyInputs, type PropertyValues, propertiesHaveProblem, useLibrariesProperties } from "./property-inputs";
 import {
@@ -293,48 +295,149 @@ function CatalogPicker({ items, used, onAdd }: { items: CatalogItem[] | null; us
   );
 }
 
-/**
- * The list of items a challenge starts with (or is adding to), for any mix of its
- * libraries. Each row belongs to one library and offers exactly that library's
- * properties — renamed, hidden, or added by its owners — whether it is Screens,
- * Pages, Tables or one made from scratch. New rows go to the library chosen in
- * "Add to" (there is nothing to choose while the challenge has just one).
- */
-export function CineItemsEditor({
-  value,
-  onChange,
-  members,
-  scope,
-  libraries,
-  recommendationsEnabled = true,
-  refreshKey = 0,
-  onProblem,
-  onTargetChange,
-  timeZone,
-  showSchedule = false,
-}: {
-  value: CineRow[];
-  onChange: (rows: CineRow[]) => void;
+interface EditorShared {
   members: Member[];
   /** Whose catalogue the "from catalogue" picker reads — a group's or the caller's own. */
   scope: CatalogScope;
-  /** Every library the challenge draws from; at least one. */
+  /** The challenge's library (one per challenge); the first entry is used. */
   libraries: readonly EditorLibrary[];
   recommendationsEnabled?: boolean;
-  /** Bump to re-read the libraries' properties after they were edited elsewhere. */
+  /** Bump to re-read the library's properties after they were edited elsewhere. */
   refreshKey?: number;
-  /** Reports what would block saving these rows: a missing book author, or an event date that can't be saved. */
-  onProblem?: (problem: "author" | "schedule" | null) => void;
   /** The zone a new event date starts in — the browser's when left out. */
   timeZone?: string;
   /** Ask for each item's own date and time even where the library hasn't switched that property on yet (a challenge being created). */
   showSchedule?: boolean;
+}
+
+/** The library's properties as the editor offers them, and what would block saving a set of rows. */
+function useEditorProperties({ libraries, refreshKey = 0, showSchedule = false }: Pick<EditorShared, "libraries" | "refreshKey" | "showSchedule">) {
+  const loaded = useLibrariesProperties(libraries, refreshKey);
+  const propertiesFor = (library: Pick<EditorLibrary, "id" | "kind">): LibraryProperty[] | undefined => {
+    const properties = loaded.get(library.kind);
+    if (!showSchedule || !properties) return properties;
+    // Switched on for the challenge being made: the library's own (hidden) property, or a stand-in where it has none yet.
+    return properties.some((property) => property.type === "schedule")
+      ? properties.map((property) => (property.type === "schedule" ? { ...property, hidden: false } : property))
+      : [...properties, { key: "scheduled_at", storage: "native", label: null, type: "schedule", hidden: false, position: 999, canHide: true }];
+  };
+  const problemOf = (rows: CineRow[]): "author" | "schedule" | null =>
+    rows.some((row) => authorMissing(row, loaded.get(row.libraryKind))) ? "author"
+      : rows.some((row) => propertiesHaveProblem(propertiesFor({ id: row.libraryId, kind: row.libraryKind }) ?? [], rowValues(row))) ? "schedule"
+        : null;
+  return { loaded, propertiesFor, problemOf };
+}
+
+/** Every property of the given rows, one card each: title, author or who recommended it, the date, then details. */
+function RowCards({ rows, onChange, onRemove, shared, openByDefault = false }: {
+  rows: CineRow[];
+  onChange: (row: CineRow) => void;
+  onRemove?: (key: string) => void;
+  shared: EditorShared;
+  /** Show every property straight away (editing one item), instead of behind "details". */
+  openByDefault?: boolean;
+}) {
+  const t = useTranslations("cineItems");
+  const { members, scope, recommendationsEnabled = true, timeZone } = shared;
+  const { propertiesFor } = useEditorProperties(shared);
+  const source: RecommenderSource = useRecommenderSource(scope, recommendationsEnabled);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const target = shared.libraries[0];
+  const update = (row: CineRow, patch: Partial<CineRow>) => onChange({ ...row, ...patch });
+  function setRowProperty(row: CineRow, propertyKey: string, propertyValue: string) {
+    const nativeField = NATIVE_ROW_FIELD[propertyKey as keyof typeof NATIVE_ROW_FIELD];
+    if (nativeField) {
+      update(row, { [nativeField]: propertyValue });
+      return;
+    }
+    const custom = (propertiesFor({ id: row.libraryId, kind: row.libraryKind }) ?? []).filter((property) => property.storage === "attribute" && !property.hidden);
+    const extra = { ...row.extra, [propertyKey]: propertyValue };
+    update(row, { extra, attributes: bodyFromValues(custom, extra, "create").attributes as CineRow["attributes"] });
+  }
+  if (!target || !rows.length) return null;
+  return (
+    <ol className="space-y-2">
+      {rows.map((row, index) => {
+        const open = openByDefault || expanded.has(row.key);
+        const properties = propertiesFor({ id: row.libraryId, kind: row.libraryKind || target.kind });
+        const authorInline = row.libraryKind === "book" && properties?.find((property) => property.key === "author")?.hidden !== true;
+        // An item's own date is what most of these rows are about — asked inline, not behind "details".
+        const scheduleProperty = editableProperties(properties ?? []).find((property) => property.type === "schedule") ?? null;
+        const detailProperties = editableProperties(properties ?? []).filter((property) => property.type !== "schedule" && !(authorInline && property.key === "author"));
+        const recommenderInline = !authorInline && recommendationsEnabled;
+        const hasDetails = !openByDefault && (detailProperties.length > 0 || (authorInline && recommendationsEnabled));
+        const topRight = authorInline ? (
+          <label>
+            <span className="sr-only">{t("author")}</span>
+            <input className={cx(inputClass, authorMissing(row, properties) ? "border-[var(--danger)]" : "")} value={row.author} maxLength={200} placeholder={t("authorPlaceholder")} onChange={(event) => update(row, { author: event.target.value })} />
+          </label>
+        ) : recommenderInline ? (
+          <RecommenderPicker compact value={row.recommender} onChange={(recommender) => update(row, { recommender })} members={members} source={source} />
+        ) : <span />;
+        return (
+          <li className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-3" key={row.key}>
+            <div className={cx("grid gap-2", onRemove || hasDetails ? "sm:grid-cols-[1.6fr_1fr_auto]" : "sm:grid-cols-[1.6fr_1fr]")}>
+              <label>
+                <span className="sr-only">{t("titleLabel")}</span>
+                <input className={inputClass} value={row.title} maxLength={200} placeholder={t("titlePlaceholder")} onChange={(event) => update(row, { title: event.target.value, catalogItemId: undefined })} />
+              </label>
+              {topRight}
+              {onRemove || hasDetails ? (
+                <div className="flex items-start gap-1">
+                  {hasDetails ? <button type="button" className="min-h-11 rounded-lg px-2 text-xs text-[var(--muted)] hover:text-[var(--ink)]" aria-expanded={open} onClick={() => setExpanded((current) => { const next = new Set(current); if (next.has(row.key)) next.delete(row.key); else next.add(row.key); return next; })}>
+                    {open ? t("hideDetails") : t("details")}
+                  </button> : null}
+                  {onRemove ? <button type="button" className="min-h-11 cursor-pointer rounded-lg px-2 text-xs text-[var(--danger)] hover:underline" onClick={() => onRemove(row.key)}>{t("remove")}</button> : null}
+                </div>
+              ) : null}
+            </div>
+            {scheduleProperty ? (
+              <div className="mt-3">
+                <PropertyInputs properties={[scheduleProperty]} values={rowValues(row)} timeZone={timeZone} onChange={(propertyKey, propertyValue) => setRowProperty(row, propertyKey, propertyValue)} />
+              </div>
+            ) : null}
+            {open ? (
+              <div className="mt-2 space-y-3">
+                {detailProperties.length ? (
+                  <PropertyInputs properties={detailProperties} values={rowValues(row)} timeZone={timeZone} onChange={(propertyKey, propertyValue) => setRowProperty(row, propertyKey, propertyValue)} />
+                ) : null}
+                {authorInline && recommendationsEnabled ? (
+                  <RecommenderPicker value={row.recommender} onChange={(recommender) => update(row, { recommender })} members={members} source={source} />
+                ) : null}
+              </div>
+            ) : null}
+            <span className="sr-only">{index + 1}</span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+/**
+ * The "add items" box: paste titles (or a detailed JSON list), or pick from the catalogue, then fill in each
+ * new item's library properties right below. Works on a draft; the caller decides when it joins the list.
+ */
+export function ItemsAddBox({
+  draft,
+  onDraftChange,
+  existing = [],
+  onProblem,
+  onTargetChange,
+  ...shared
+}: EditorShared & {
+  draft: CineRow[];
+  onDraftChange: (rows: CineRow[]) => void;
+  /** Items already in the list — a pasted title or a catalogue pick that's already there is skipped. */
+  existing?: CineRow[];
+  /** Reports what would block saving the draft: a missing book author, or an event date that can't be saved. */
+  onProblem?: (problem: "author" | "schedule" | null) => void;
   /** Reports which library new rows are going to (for a caller that shows it, e.g. the list import). */
   onTargetChange?: (library: EditorLibrary) => void;
 }) {
   const t = useTranslations("cineItems");
   // A challenge has one library: every item added here goes to it.
-  const target = libraries[0];
+  const target = shared.libraries[0];
   const isFilmTarget = target?.kind === "film";
   const isBookTarget = target?.kind === "book";
   const [paste, setPaste] = useState("");
@@ -343,25 +446,11 @@ export function CineItemsEditor({
   const [pasteSummary, setPasteSummary] = useState<JsonPasteSummary | null>(null);
   const [catalog, setCatalog] = useState<CatalogItem[] | null>(null);
   const [showCatalog, setShowCatalog] = useState(false);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const source: RecommenderSource = useRecommenderSource(scope, recommendationsEnabled);
-  const loaded = useLibrariesProperties(libraries, refreshKey);
-  const scheduleOn = (properties: LibraryProperty[] | undefined): LibraryProperty[] | undefined => {
-    if (!showSchedule || !properties) return properties;
-    // Switched on for the challenge being made: the library's own (hidden) property, or a stand-in where it has none yet.
-    return properties.some((property) => property.type === "schedule")
-      ? properties.map((property) => (property.type === "schedule" ? { ...property, hidden: false } : property))
-      : [...properties, { key: "scheduled_at", storage: "native", label: null, type: "schedule", hidden: false, position: 999, canHide: true }];
-  };
-  const propertiesFor = (library: Pick<EditorLibrary, "id" | "kind">): LibraryProperty[] | undefined =>
-    scheduleOn(loaded.get(library.kind));
-  const libraryOf = (row: CineRow) => libraries.find((library) => library.kind === row.libraryKind);
-
-  const problem = value.some((row) => authorMissing(row, loaded.get(row.libraryKind))) ? "author"
-    : value.some((row) => propertiesHaveProblem(propertiesFor({ id: row.libraryId, kind: row.libraryKind }) ?? [], rowValues(row))) ? "schedule"
-      : null;
+  const { problemOf } = useEditorProperties(shared);
+  const problem = problemOf(draft);
   useEffect(() => { onProblem?.(problem); }, [problem, onProblem]);
   useEffect(() => { if (target) onTargetChange?.(target); }, [target, onTargetChange]);
+  const { scope, timeZone } = shared;
 
   useEffect(() => {
     if (!showCatalog || !target) return;
@@ -371,56 +460,33 @@ export function CineItemsEditor({
       .catch(() => setCatalog([]));
     return () => controller.abort();
   }, [showCatalog, target, scope]);
-  const catalogInTarget = useMemo(
-    () => (catalog ?? []).filter((item) => item.kind === target?.kind),
-    [catalog, target?.kind],
-  );
-
-  const usedCatalogIds = useMemo(
-    () => new Set(value.map((row) => row.catalogItemId).filter(Boolean)),
-    [value],
-  );
-
+  const catalogInTarget = useMemo(() => (catalog ?? []).filter((item) => item.kind === target?.kind), [catalog, target?.kind]);
+  const everyRow = [...existing, ...draft];
+  const usedCatalogIds = new Set(everyRow.map((row) => row.catalogItemId).filter(Boolean));
   const stamp = (rows: CineRow[]): CineRow[] => rows.map((row) => ({ ...row, libraryKind: target?.kind ?? "", libraryId: target?.id ?? null }));
 
-  function update(key: string, patch: Partial<CineRow>) {
-    onChange(value.map((row) => (row.key === key ? { ...row, ...patch } : row)));
-  }
-  function remove(key: string) {
-    onChange(value.filter((row) => row.key !== key));
-  }
-  function setRowProperty(row: CineRow, propertyKey: string, propertyValue: string) {
-    const nativeField = NATIVE_ROW_FIELD[propertyKey as keyof typeof NATIVE_ROW_FIELD];
-    if (nativeField) {
-      update(row.key, { [nativeField]: propertyValue });
-      return;
-    }
-    const custom = (propertiesFor({ id: row.libraryId, kind: row.libraryKind }) ?? []).filter((property) => property.storage === "attribute" && !property.hidden);
-    const extra = { ...row.extra, [propertyKey]: propertyValue };
-    update(row.key, { extra, attributes: bodyFromValues(custom, extra, "create").attributes as CineRow["attributes"] });
-  }
   function appendPaste() {
     setPasteError(null);
     setPasteSummary(null);
+    const known = new Set(everyRow.map((row) => row.title.trim().toLowerCase()));
     if (pasteMode === "json") {
-      const known = new Set(value.map((row) => row.title.trim().toLowerCase()));
       try {
         const { rows, summary } = parseJsonItemsPaste(paste, known);
         // Always report what came in — including entries dropped as invalid or
         // duplicated — so nothing disappears without the person being told.
         setPasteSummary(summary);
         if (rows.length) {
-          onChange([...value, ...stamp(rows)]);
+          onDraftChange([...draft, ...stamp(rows)]);
           setPaste("");
         }
       } catch (cause) {
-        setPasteError(t(cause instanceof Error ? cause.message : "jsonInvalid"));
+        // Raw: these messages quote JSON, and its braces would read as placeholders.
+        setPasteError(String(t.raw(cause instanceof Error ? cause.message : "jsonInvalid")));
       }
       return;
     }
     const titles = paste.split("\n").map((line) => line.trim()).filter(Boolean);
     if (!titles.length) return;
-    const known = new Set(value.map((row) => row.title.trim().toLowerCase()));
     const fresh = titles
       .filter((title) => {
         if (known.has(title.toLowerCase())) return false;
@@ -428,78 +494,14 @@ export function CineItemsEditor({
         return true;
       })
       .map((title) => newCineRow(title));
-    onChange([...value, ...stamp(fresh)]);
-    setPasteSummary({
-      total: titles.length,
-      added: fresh.length,
-      invalid: 0,
-      duplicates: titles.length - fresh.length,
-      unknownKeys: [],
-    });
+    onDraftChange([...draft, ...stamp(fresh)]);
+    setPasteSummary({ total: titles.length, added: fresh.length, invalid: 0, duplicates: titles.length - fresh.length, unknownKeys: [] });
     setPaste("");
   }
 
   if (!target) return null;
-
   return (
     <div className="space-y-4">
-      {value.length ? (
-        <ol className="space-y-2">
-          {value.map((row, index) => {
-            const open = expanded.has(row.key);
-            const rowLibrary = libraryOf(row) ?? target;
-            const properties = propertiesFor(rowLibrary);
-            const authorInline = row.libraryKind === "book" && properties?.find((property) => property.key === "author")?.hidden !== true;
-            // An item's own date is what most of these rows are about — asked inline, not behind "details".
-            const scheduleProperty = editableProperties(properties ?? []).find((property) => property.type === "schedule") ?? null;
-            const detailProperties = editableProperties(properties ?? []).filter((property) => property.type !== "schedule" && !(authorInline && property.key === "author"));
-            const recommenderInline = !authorInline && recommendationsEnabled;
-            const hasDetails = detailProperties.length > 0 || (authorInline && recommendationsEnabled);
-            const topRight = authorInline ? (
-              <label>
-                <span className="sr-only">{t("author")}</span>
-                <input className={cx(inputClass, authorMissing(row, properties) ? "border-[var(--danger)]" : "")} value={row.author} maxLength={200} placeholder={t("authorPlaceholder")} onChange={(event) => update(row.key, { author: event.target.value })} />
-              </label>
-            ) : recommenderInline ? (
-              <RecommenderPicker compact value={row.recommender} onChange={(recommender) => update(row.key, { recommender })} members={members} source={source} />
-            ) : <span />;
-            return (
-              <li className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-3" key={row.key}>
-                <div className="grid gap-2 sm:grid-cols-[1.6fr_1fr_auto]">
-                  <label>
-                    <span className="sr-only">{t("titleLabel")}</span>
-                    <input className={inputClass} value={row.title} maxLength={200} placeholder={t("titlePlaceholder")} onChange={(event) => update(row.key, { title: event.target.value, catalogItemId: undefined })} />
-                  </label>
-                  {topRight}
-                  <div className="flex items-start gap-1">
-                    {hasDetails ? <button type="button" className="min-h-11 rounded-lg px-2 text-xs text-[var(--muted)] hover:text-[var(--ink)]" aria-expanded={open} onClick={() => setExpanded((current) => { const next = new Set(current); if (next.has(row.key)) next.delete(row.key); else next.add(row.key); return next; })}>
-                      {open ? t("hideDetails") : t("details")}
-                    </button> : null}
-                    <button type="button" className="min-h-11 cursor-pointer rounded-lg px-2 text-xs text-[var(--danger)] hover:underline" onClick={() => remove(row.key)}>{t("remove")}</button>
-                  </div>
-                </div>
-                {scheduleProperty ? (
-                  <div className="mt-3">
-                    <PropertyInputs properties={[scheduleProperty]} values={rowValues(row)} timeZone={timeZone} onChange={(propertyKey, propertyValue) => setRowProperty(row, propertyKey, propertyValue)} />
-                  </div>
-                ) : null}
-                {open ? (
-                  <div className="mt-2 space-y-3">
-                    {detailProperties.length ? (
-                      <PropertyInputs properties={detailProperties} values={rowValues(row)} timeZone={timeZone} onChange={(propertyKey, propertyValue) => setRowProperty(row, propertyKey, propertyValue)} />
-                    ) : null}
-                    {authorInline && recommendationsEnabled ? (
-                      <RecommenderPicker value={row.recommender} onChange={(recommender) => update(row.key, { recommender })} members={members} source={source} />
-                    ) : null}
-                  </div>
-                ) : null}
-                <span className="sr-only">{index + 1}</span>
-              </li>
-            );
-          })}
-        </ol>
-      ) : null}
-
       <div className="rounded-2xl border border-dashed border-[var(--main-line)] bg-[var(--main-soft)]/50 p-3">
         {isFilmTarget || isBookTarget ? <div className="mb-2 flex gap-1 rounded-full bg-[var(--paper)] p-1 text-xs" role="tablist" aria-label={t("pasteModeAria")}>
           {(["simple", "json"] as const).map((mode) => (
@@ -516,7 +518,7 @@ export function CineItemsEditor({
           ))}
         </div> : null}
         <label className="block"><span className={labelClass}>{pasteMode === "json" && (isFilmTarget || isBookTarget) ? t("pasteJsonLabel") : t("pasteLabel")}</span>
-          <textarea className={cx(inputClass, pasteMode === "json" && (isFilmTarget || isBookTarget) ? "font-mono text-xs" : "")} rows={pasteMode === "json" && (isFilmTarget || isBookTarget) ? 8 : 4} value={paste} onChange={(event) => setPaste(event.target.value)} placeholder={pasteMode === "json" && (isFilmTarget || isBookTarget) ? t(isBookTarget ? "pasteJsonPlaceholderBook" : "pasteJsonPlaceholderFilm") : t("pastePlaceholder")} />
+          <textarea className={cx(inputClass, pasteMode === "json" && (isFilmTarget || isBookTarget) ? "font-mono text-xs" : "")} rows={pasteMode === "json" && (isFilmTarget || isBookTarget) ? 8 : 4} value={paste} onChange={(event) => setPaste(event.target.value)} placeholder={pasteMode === "json" && (isFilmTarget || isBookTarget) ? String(t.raw(isBookTarget ? "pasteJsonPlaceholderBook" : "pasteJsonPlaceholderFilm")) : t("pastePlaceholder")} />
         </label>
         {pasteMode === "json" && (isFilmTarget || isBookTarget) ? <p className="mb-2 text-xs leading-5 text-[var(--muted)]">{t("pasteJsonHint")}</p> : null}
         <StatusMessage error={pasteError} />
@@ -525,18 +527,11 @@ export function CineItemsEditor({
             <StatusMessage
               error={pasteSummary.added ? null : t("pasteSummaryNone")}
               success={pasteSummary.added
-                ? t("pasteSummary", {
-                    total: pasteSummary.total,
-                    added: pasteSummary.added,
-                    invalid: pasteSummary.invalid,
-                    duplicates: pasteSummary.duplicates,
-                  })
+                ? t("pasteSummary", { total: pasteSummary.total, added: pasteSummary.added, invalid: pasteSummary.invalid, duplicates: pasteSummary.duplicates })
                 : null}
             />
             {pasteSummary.unknownKeys.length ? (
-              <p className="text-[11px] leading-4 text-[var(--muted)]">
-                {t("pasteUnknownKeys", { keys: pasteSummary.unknownKeys.join(", ") })}
-              </p>
+              <p className="text-[11px] leading-4 text-[var(--muted)]">{t("pasteUnknownKeys", { keys: pasteSummary.unknownKeys.join(", ") })}</p>
             ) : null}
           </div>
         ) : null}
@@ -548,10 +543,119 @@ export function CineItemsEditor({
           <CatalogPicker
             items={catalog === null ? null : catalogInTarget}
             used={usedCatalogIds}
-            onAdd={(picked) => onChange([...value, ...stamp(picked.map((item) => rowFromCatalog(item, timeZone)))])}
+            onAdd={(picked) => onDraftChange([...draft, ...stamp(picked.map((item) => rowFromCatalog(item, timeZone)))])}
           />
         ) : null}
       </div>
+      {draft.length ? <p className="text-[13px] font-medium">{t("draftTitle", { count: draft.length })}</p> : null}
+      <RowCards
+        rows={draft}
+        shared={shared}
+        onChange={(row) => onDraftChange(draft.map((candidate) => (candidate.key === row.key ? row : candidate)))}
+        onRemove={(key) => onDraftChange(draft.filter((row) => row.key !== key))}
+      />
+    </div>
+  );
+}
+
+/** One line about an item under its title in the list: author, year, length, genre, who recommended it, its date. */
+function useRowSummary(members: Member[], timeZone?: string) {
+  const f = useFormatter();
+  const t = useTranslations("cineItems");
+  return (row: CineRow): string => {
+    const bits: string[] = [];
+    if (row.author) bits.push(row.author);
+    if (row.year) bits.push(row.year);
+    const runtime = formatRuntime(Number(row.runtimeMinutes) || null);
+    if (runtime) bits.push(runtime);
+    if (row.pages) bits.push(t("pagesCount", { count: Number(row.pages) }));
+    if (row.mainGenre) bits.push(row.mainGenre);
+    if (row.recommender.kind === "member") {
+      const name = members.find((member) => member.id === (row.recommender as { userId: Id }).userId)?.name;
+      if (name) bits.push(t("pickedBy", { name }));
+    }
+    const day = row.scheduled ? decodeEventForm(row.scheduled, timeZone ?? "America/Sao_Paulo").date : "";
+    if (/^\d{4}-\d{2}-\d{2}$/.test(day)) bits.push(f.dateTime(new Date(`${day}T12:00:00Z`), { day: "numeric", month: "short", timeZone: "UTC" }));
+    return bits.join(" · ");
+  };
+}
+
+/**
+ * The items of a challenge being created: the list itself first (one line per item, edit or remove), and
+ * adding in its own box — paste, the detailed list or the catalogue, with each new item's properties.
+ */
+export function CineItemsEditor({
+  value,
+  onChange,
+  onProblem,
+  ...shared
+}: EditorShared & {
+  value: CineRow[];
+  onChange: (rows: CineRow[]) => void;
+  /** Reports what would block saving these rows: a missing book author, or an event date that can't be saved. */
+  onProblem?: (problem: "author" | "schedule" | null) => void;
+}) {
+  const t = useTranslations("cineItems");
+  const { problemOf } = useEditorProperties(shared);
+  const summary = useRowSummary(shared.members, shared.timeZone);
+  const problem = problemOf(value);
+  useEffect(() => { onProblem?.(problem); }, [problem, onProblem]);
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState<CineRow[]>([]);
+  const [draftProblem, setDraftProblem] = useState<"author" | "schedule" | null>(null);
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const editing = value.find((row) => row.key === editingKey) ?? null;
+  const flagged = (row: CineRow) => problemOf([row]) !== null;
+  if (!shared.libraries[0]) return null;
+
+  return (
+    <div>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <p className="text-sm font-medium">{t("listCount", { count: value.length })}</p>
+        <Button className="min-h-9" onClick={() => { setDraft([]); setAdding(true); }}>＋ {t("addItems")}</Button>
+      </div>
+      {value.length ? (
+        <ol className="divide-y divide-[var(--line)] rounded-2xl border border-[var(--line)] bg-[var(--paper)]">
+          {value.map((row, index) => (
+            <li key={row.key} className="flex items-center gap-3 px-4 py-2.5">
+              <span className="w-6 flex-none text-right text-xs tabular-nums text-[var(--muted)]">{index + 1}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm">{row.title || t("untitled")}</span>
+                {summary(row) ? <span className="block truncate text-xs text-[var(--muted)]">{summary(row)}</span> : null}
+                {flagged(row) ? <span className="block text-xs text-[var(--danger)]">{t("needsAttention")}</span> : null}
+              </span>
+              <button type="button" className="min-h-9 cursor-pointer rounded-lg px-2 text-xs text-[var(--muted)] hover:text-[var(--ink)]" onClick={() => setEditingKey(row.key)}>{t("edit")}</button>
+              <button type="button" className="min-h-9 cursor-pointer rounded-lg px-2 text-xs text-[var(--danger)] hover:underline" onClick={() => onChange(value.filter((candidate) => candidate.key !== row.key))}>{t("remove")}</button>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <button type="button" onClick={() => { setDraft([]); setAdding(true); }} className="w-full cursor-pointer rounded-2xl border border-dashed border-[var(--line)] px-4 py-8 text-sm text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)]">
+          {t("emptyList")}
+        </button>
+      )}
+
+      {adding ? (
+        <FormDialog
+          title={t("addItems")}
+          dirty={draft.length > 0}
+          busy={false}
+          error={draftProblem === "author" ? t("authorRequired") : null}
+          onCancel={() => setAdding(false)}
+          submitDisabled={!draft.length || draftProblem !== null}
+          submitLabel={t("addCount", { count: draft.length })}
+          onSubmit={() => { onChange([...value, ...draft]); setAdding(false); }}
+        >
+          <ItemsAddBox {...shared} draft={draft} onDraftChange={setDraft} existing={value} onProblem={setDraftProblem} />
+        </FormDialog>
+      ) : null}
+
+      {editing ? (
+        <Dialog title={editing.title || t("untitled")} onClose={() => setEditingKey(null)}>
+          <RowCards rows={[editing]} shared={shared} openByDefault onChange={(row) => onChange(value.map((candidate) => (candidate.key === row.key ? row : candidate)))} />
+          <div className="mt-4 flex justify-end"><Button onClick={() => setEditingKey(null)}>{t("doneEditing")}</Button></div>
+        </Dialog>
+      ) : null}
     </div>
   );
 }
