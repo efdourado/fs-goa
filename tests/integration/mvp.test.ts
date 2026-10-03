@@ -8644,6 +8644,27 @@ test("capa dos modelos: só a administração da plataforma destaca, o destaque 
   await call("POST", `/api/challenges/${challengeId}/template`, { session: adminSession, body: {} });
   const republished = ((await call("GET", "/api/templates")).body as { templates: Array<{ id: string; featuredAt: string | null }> }).templates;
   assert.equal(republished.find((template) => template.id === challengeId)?.featuredAt, null, "despublicar tira da capa; republicar não recoloca");
+
+  // The front page holds two: featuring a third takes the mark off the oldest, so its page stops offering to remove it.
+  const template = async (title: string) => {
+    const id = ((await call("POST", `/api/groups/${groupId}/challenges`, {
+      session: adminSession,
+      body: { title, startsOn: "2026-09-01", endsOn: "2026-09-30", submissionMode: "item", participantIds: [admin.user.id], items: [{ title: "Filme" }], fields: [{ key: "nota", label: "Nota", type: "rating", required: true }] },
+    })).body as { id: string }).id;
+    await call("POST", `/api/challenges/${id}/template`, { session: adminSession, body: {} });
+    return id;
+  };
+  const isFeatured = async (id: string) => ((await call("GET", `/api/templates/${id}`)).body as { templateFeatured: boolean }).templateFeatured;
+  await adminPool.query("UPDATE challenges SET template_featured_at = NULL");
+  const first = challengeId;
+  const second = await template("Capa dois");
+  const third = await template("Capa três");
+  for (const id of [first, second, third]) {
+    assert.equal((await call("POST", `/api/challenges/${id}/template/featured`, { session: adminSession, body: { featured: true } })).response.status, 200);
+  }
+  assert.equal(await isFeatured(first), false, "the oldest fell off the front page, and so did its mark");
+  assert.equal(await isFeatured(second), true);
+  assert.equal(await isFeatured(third), true);
 });
 
 test("métricas de treino: unidade no campo, contar check-ins ou dias e o recorde de um item só", async () => {

@@ -287,6 +287,9 @@ export async function duplicateTemplate(
  * Puts a published template on the public front page, or takes it off. Platform admins only — the same people
  * who publish templates. The front page leads with the two most recently featured.
  */
+/** How many featured templates lead the front page (`pickFrontPage` shows the same number). */
+export const FRONT_PAGE_SLOTS = 2;
+
 export async function setTemplateFeatured(session: SessionContext, challengeId: string, body: Record<string, unknown>) {
   if (!session.user.platformAdmin) {
     throw new ApiError(403, "forbidden", "Somente a administração da plataforma destaca modelos.");
@@ -314,6 +317,21 @@ export async function setTemplateFeatured(session: SessionContext, challengeId: 
       null,
       null,
     );
+    if (featured) {
+      // The front page has room for FRONT_PAGE_SLOTS: featuring one takes the mark off whatever falls out of it,
+      // so a template is only ever "featured" while it's really on the front page.
+      const bumped = await client.query<{ id: string; group_id: string }>(
+        `UPDATE challenges SET template_featured_at = NULL, updated_at = now()
+          WHERE template_featured_at IS NOT NULL
+            AND id NOT IN (SELECT id FROM challenges WHERE template_featured_at IS NOT NULL
+                            ORDER BY template_featured_at DESC LIMIT $1)
+        RETURNING id, group_id`,
+        [FRONT_PAGE_SLOTS],
+      );
+      for (const row of bumped.rows) {
+        await writeAudit(client, row.group_id, row.id, session.user.id, "challenge.template_unfeatured", "challenge", row.id, null, null);
+      }
+    }
     return { id: challengeId, featured, featuredAt: updated.template_featured_at?.toISOString() ?? null };
   });
 }
