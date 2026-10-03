@@ -690,9 +690,8 @@ export function ItemEditorDialog({
 }
 
 /**
- * The libraries this challenge draws its items from. Each can be dropped while none of
- * its items are in the challenge, and any workspace library can be linked — that is
- * how one challenge combines Movies and TV Shows.
+ * The one library this challenge draws its items from, with its properties. While no item
+ * comes from it, it can be unlinked so a wrong pick can be swapped for another.
  */
 function ChallengeLibrariesBar({
   challenge,
@@ -763,7 +762,7 @@ function ChallengeLibrariesBar({
             </span>
           );
         })}
-        {!locked && available.length ? (
+        {!locked && !linked.length && available.length ? (
           <ActionMenu label={t("linkLibrary")}>
             {available.map((choice) => (
               <ActionMenuItem key={choice.kind} disabled={busy} onClick={() => void run(() => onLink(choice.id ? { libraryId: choice.id } : { libraryKind: choice.kind }))}>
@@ -773,7 +772,7 @@ function ChallengeLibrariesBar({
           </ActionMenu>
         ) : null}
       </div>
-      <p className="mt-1.5 text-xs leading-5 text-[var(--muted)]">{linked.length > 1 ? t("librariesCombined") : t("librariesHint")}</p>
+      <p className="mt-1.5 text-xs leading-5 text-[var(--muted)]">{t("librariesHint")}</p>
       {error ? <div className="mt-2"><StatusMessage error={error} /></div> : null}
       {propertiesOf ? <LibraryPropertiesDialog scope={scope} library={propertiesOf} canEdit={!locked} onClose={() => setPropertiesOf(null)} onChanged={onChanged} /> : null}
     </div>

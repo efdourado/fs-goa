@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
 
 import { API_PATHS, apiRequest } from "./api";
-import { type CatalogScope, LibraryGlyph, LibraryPills, useLibraryName } from "./libraries";
+import { type CatalogScope } from "./libraries";
 import { bodyFromValues, editableProperties, PropertyInputs, type PropertyValues, propertiesHaveProblem, useLibrariesProperties } from "./property-inputs";
 import {
   NO_RECOMMENDER,
@@ -333,10 +333,8 @@ export function CineItemsEditor({
   onTargetChange?: (library: EditorLibrary) => void;
 }) {
   const t = useTranslations("cineItems");
-  const libraryName = useLibraryName();
-  const [targetKind, setTargetKind] = useState(libraries[0]?.kind ?? "");
-  const target = libraries.find((library) => library.kind === targetKind) ?? libraries[0];
-  const many = libraries.length > 1;
+  // A challenge has one library: every item added here goes to it.
+  const target = libraries[0];
   const isFilmTarget = target?.kind === "film";
   const isBookTarget = target?.kind === "book";
   const [paste, setPaste] = useState("");
@@ -480,11 +478,6 @@ export function CineItemsEditor({
                     <button type="button" className="min-h-11 cursor-pointer rounded-lg px-2 text-xs text-[var(--danger)] hover:underline" onClick={() => remove(row.key)}>{t("remove")}</button>
                   </div>
                 </div>
-                {many ? (
-                  <span className="mt-1 inline-flex items-center gap-1.5 text-[11px] text-[var(--muted)]">
-                    <LibraryGlyph source={rowLibrary.source} className="h-3 w-3" />{libraryName(rowLibrary)}
-                  </span>
-                ) : null}
                 {scheduleProperty ? (
                   <div className="mt-3">
                     <PropertyInputs properties={[scheduleProperty]} values={rowValues(row)} timeZone={timeZone} onChange={(propertyKey, propertyValue) => setRowProperty(row, propertyKey, propertyValue)} />
@@ -508,17 +501,6 @@ export function CineItemsEditor({
       ) : null}
 
       <div className="rounded-2xl border border-dashed border-[var(--main-line)] bg-[var(--main-soft)]/50 p-3">
-        {many ? (
-          <div className="mb-3">
-            <span className={labelClass}>{t("addTo")}</span>
-            <LibraryPills
-              choices={libraries.map((library) => ({ id: library.id, kind: library.kind, source: library.source, label: library.label }))}
-              kind={target.kind}
-              label={t("addTo")}
-              onPick={(choice) => { setTargetKind(choice.kind); setCatalog(null); }}
-            />
-          </div>
-        ) : null}
         {isFilmTarget || isBookTarget ? <div className="mb-2 flex gap-1 rounded-full bg-[var(--paper)] p-1 text-xs" role="tablist" aria-label={t("pasteModeAria")}>
           {(["simple", "json"] as const).map((mode) => (
             <button
