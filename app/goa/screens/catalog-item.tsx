@@ -10,7 +10,7 @@ import { useGoaFormat } from "../format";
 import { type CatalogScope, LibraryGlyph, useCatalogLibraries, useLibraryName } from "../libraries";
 import { useRecommenderSource } from "../recommender-picker";
 import type { CatalogItemDetail, CatalogLibrary, Id, Member } from "../types";
-import { BackButton, Button, cardClass, cx, EmptyState, LoadingView } from "../ui";
+import { BackButton, Button, cardClass, cx, EmptyState, LoadingView, SlidersIcon } from "../ui";
 import { formatRuntime } from "../utils";
 
 interface CatalogItemEditing {
@@ -25,13 +25,16 @@ function EditItemAction({ item, scope, recommendationsEnabled, editing, onSaved,
   const [open, setOpen] = useState(false);
   return (
     <>
+      {/* Settings on the cover itself: shown on hover (always on touch screens, which have none), opens the edit dialog. */}
       <button
         type="button"
         disabled={!libraries}
         onClick={() => setOpen(true)}
-        className="inline-flex min-h-12 w-full cursor-pointer items-center justify-center rounded-[28px] border border-[var(--line)] px-5 text-sm font-light text-[var(--ink)] transition hover:bg-[var(--hover)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 disabled:cursor-not-allowed disabled:opacity-55"
+        aria-label={t("edit")}
+        title={t("edit")}
+        className="absolute bottom-6 right-6 grid h-12 w-12 cursor-pointer place-items-center rounded-full bg-[var(--paper)]/70 text-[var(--ink)] shadow-[0_8px_24px_rgba(32,36,31,0.18)] ring-1 ring-[var(--paper)] backdrop-blur-md transition duration-200 hover:scale-105 hover:bg-[var(--paper)]/90 focus-visible:scale-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/30 disabled:cursor-not-allowed disabled:opacity-0 sm:scale-90 sm:opacity-0 sm:group-hover:scale-100 sm:group-hover:opacity-100"
       >
-        {t("edit")}
+        <SlidersIcon className="h-[18px] w-[18px]" />
       </button>
       {open && libraries ? (
         <EditCatalogItemDialog
@@ -127,12 +130,10 @@ export function CatalogItemScreen({
       <BackButton onClick={onBack} label={backLabel ?? t("back")} className="mb-8" />
 
       <div className="grid items-start gap-10 lg:grid-cols-[340px_minmax(0,1fr)] lg:gap-16">
-        <div className="w-full max-w-[280px] sm:max-w-[340px]">
-          <ItemCover size="xl" title={item.title} year={item.year} showTitle={false} />
+        <div className="group relative mx-auto w-full max-w-[260px] transition duration-300 sm:mx-0 sm:max-w-[340px] sm:hover:-translate-y-1">
+          <ItemCover size="xl" title={item.title} year={item.year} showTitle={false} className="transition-shadow duration-300 sm:group-hover:shadow-[0_24px_48px_rgba(32,36,31,0.16)]" />
           {editing ? (
-            <div className="mt-5">
-              <EditItemAction item={item} scope={scope} recommendationsEnabled={recommendationsEnabled} editing={editing} onSaved={() => setNonce((value) => value + 1)} onRemove={onDelete} />
-            </div>
+            <EditItemAction item={item} scope={scope} recommendationsEnabled={recommendationsEnabled} editing={editing} onSaved={() => setNonce((value) => value + 1)} onRemove={onDelete} />
           ) : null}
         </div>
 
