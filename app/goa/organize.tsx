@@ -4,7 +4,6 @@ import { useTranslations } from "next-intl";
 import { type DragEvent, useRef, useState } from "react";
 
 import { API_PATHS, apiRequest } from "./api";
-import { RecipeIcon } from "./recipe-icons";
 import { CHALLENGE_COLOR_TAGS, type ChallengeColorTag, type ChallengeSummary, type Id } from "./types";
 import { CircleMinusIcon, cx } from "./ui";
 
@@ -140,8 +139,47 @@ export function useChallengeOrganizer<K extends string>({ challenges, csrfToken,
 }
 
 /** The colour filter and the Reorder switch above a page's challenges. */
-export function OrganizeBar({ colorFilter, onColorFilter, reorderMode, onReorderMode, filteredCount, allowReorder = true }: {
+/** View: two stacked rows, the layout of Home. */
+function ViewIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
+      <rect x="2.5" y="3" width="11" height="4" rx="1.3" /><rect x="2.5" y="9" width="11" height="4" rx="1.3" />
+    </svg>
+  );
+}
+
+/** Reorder: an arrow up beside an arrow down. */
+function ReorderIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M5.5 13V3M3 5.5 5.5 3 8 5.5M10.5 3v10M8 10.5l2.5 2.5 2.5-2.5" />
+    </svg>
+  );
+}
+
+/** One of Home's two tools (View, Reorder): a quiet label with its icon, filled while it's on. */
+export function HomeTool({ icon, label, on, onClick }: { icon: "view" | "reorder"; label: string; on: boolean; onClick: () => void }) {
+  const Icon = icon === "view" ? ViewIcon : ReorderIcon;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={on}
+      className={cx(
+        "inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full px-3 text-[13px] transition",
+        on ? "bg-[var(--main-soft)] text-[var(--main-strong)]" : "text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--ink)]",
+      )}
+    >
+      <Icon className="h-4 w-4" />
+      {label}
+    </button>
+  );
+}
+
+export function OrganizeBar({ colorFilter, onColorFilter, reorderMode, onReorderMode, filteredCount, allowReorder = true, view }: {
   colorFilter: ChallengeColorTag | null;
+  /** The View tool, sitting beside Reorder (absent when the app is locked). */
+  view?: { open: boolean; onToggle: () => void };
   /** False when the viewer locked the app — the Reorder switch goes away. */
   allowReorder?: boolean;
   onColorFilter: (tag: ChallengeColorTag | null) => void;
@@ -187,22 +225,12 @@ export function OrganizeBar({ colorFilter, onColorFilter, reorderMode, onReorder
           <CircleMinusIcon className="h-4 w-4" />
           {t("filter.context", { count: filteredCount })}
         </button>
-      ) : allowReorder ? (
-        <button
-          type="button"
-          onClick={() => onReorderMode(!reorderMode)}
-          aria-pressed={reorderMode}
-          className={cx(
-            "inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3.5 text-[13px] transition",
-            reorderMode
-              ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]"
-              : "border-dashed border-[var(--line)] text-[var(--muted)] hover:border-[var(--main-line)]",
-          )}
-        >
-          <RecipeIcon name="custom" className="h-4 w-4" />
-          {reorderMode ? t("filter.reorderDone") : t("filter.reorder")}
-        </button>
-      ) : null}
+      ) : (
+        <div className="flex items-center gap-1">
+          {view ? <HomeTool icon="view" label={t("home.view")} on={view.open} onClick={view.onToggle} /> : null}
+          {allowReorder ? <HomeTool icon="reorder" label={reorderMode ? t("filter.reorderDone") : t("filter.reorder")} on={reorderMode} onClick={() => onReorderMode(!reorderMode)} /> : null}
+        </div>
+      )}
     </div>
   );
 }

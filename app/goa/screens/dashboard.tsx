@@ -10,10 +10,9 @@ import { API_PATHS, apiRequest } from "../api";
 import { CatalogShelf } from "../catalog-shelf";
 import { useAppLocked } from "../home-prefs";
 import { HomeSideLink, HomeViewPanel, resolveHomeView, visibleSections } from "../home-view";
-import { applyColorFilter, OrganizeBar, useChallengeOrganizer } from "../organize";
+import { applyColorFilter, HomeTool, OrganizeBar, useChallengeOrganizer } from "../organize";
 import { Segmented } from "../Segmented";
 import { Shelf, ShelfAddButton } from "../shelf";
-import { RecipeIcon } from "../recipe-icons";
 import { WelcomePanel } from "../welcome";
 import {
   CHALLENGE_COLOR_TAGS,
@@ -565,7 +564,7 @@ export function DashboardScreen({
     }
     return personalChallenges.length
       ? <HomeSideLink key={section} label={th("showPersonal", { count: personalChallenges.length })} onClick={() => showSection("personal")} />
-      : <HomeSideLink key={section} label={th("invitePersonal")} onClick={onQuickCreatePersonal} />;
+      : null;
   });
 
   return (
@@ -573,21 +572,9 @@ export function DashboardScreen({
       <PageHeading
         title={t("greeting", { name: user.name.split(" ")[0] })}
         description={brandNew ? tWelcome("lede") : t("subtitle")}
-        action={brandNew || locked ? undefined : (
-          <button
-            type="button"
-            onClick={() => setShowViewPanel((open) => !open)}
-            aria-expanded={showViewPanel}
-            className={cx(
-              "inline-flex min-h-9 cursor-pointer items-center gap-1.5 self-start rounded-full border px-3.5 text-[13px] transition sm:self-auto",
-              showViewPanel
-                ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]"
-                : "border-[var(--line)] text-[var(--muted)] hover:border-[var(--main-line)] hover:text-[var(--ink)]",
-            )}
-          >
-            <RecipeIcon name="library" className="h-4 w-4" />
-            {th("view")}
-          </button>
+        // View sits beside Reorder in the organise row; with nothing to organise yet, it stays up here.
+        action={brandNew || locked || hasAnyChallenge ? undefined : (
+          <HomeTool icon="view" label={th("view")} on={showViewPanel} onClick={() => setShowViewPanel((open) => !open)} />
         )}
       />
 
@@ -601,10 +588,6 @@ export function DashboardScreen({
         />
       ) : null}
 
-      {showViewPanel && !brandNew ? (
-        <HomeViewPanel view={view} automatic={saved === null} onChange={(next) => void saveView(next)} onReset={() => void saveView(null)} />
-      ) : null}
-      <StatusMessage error={viewError} />
 
       {mixed && hasAnyChallenge ? (
         <Segmented
@@ -621,8 +604,17 @@ export function DashboardScreen({
       ) : null}
 
       {hasAnyChallenge ? (
-        <OrganizeBar colorFilter={colorFilter} onColorFilter={setColorFilter} reorderMode={reorderMode} onReorderMode={setReorderMode} filteredCount={filteredCount} allowReorder={!locked} />
+        <OrganizeBar
+          colorFilter={colorFilter} onColorFilter={setColorFilter} reorderMode={reorderMode} onReorderMode={setReorderMode} filteredCount={filteredCount} allowReorder={!locked}
+          view={brandNew || locked ? undefined : { open: showViewPanel, onToggle: () => setShowViewPanel((open) => !open) }}
+        />
       ) : null}
+
+      {/* View's panel opens right under the row its button sits in. */}
+      {showViewPanel && !brandNew ? (
+        <HomeViewPanel view={view} automatic={saved === null} onChange={(next) => void saveView(next)} onReset={() => void saveView(null)} />
+      ) : null}
+      <StatusMessage error={viewError} />
 
       <StatusMessage error={error} />
 
