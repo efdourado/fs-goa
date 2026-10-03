@@ -148,7 +148,7 @@ export function CatalogRow({ title, year, avg, ratingLabel, badgeHidden, meta, s
         <strong className="block truncate font-light">{title}{year ? <span className="ml-1.5 text-[var(--muted)]">{year}</span> : null}</strong>
         <small className="mt-1 block truncate text-[var(--muted)]">{meta}</small>
       </span>
-      {badgeHidden ? null : <ScoreRing value={avg} size={38} label={ratingLabel} strokeWidth={3} textClassName="text-[11px] font-medium" />}
+      {badgeHidden || avg === null || avg === undefined ? null : <ScoreRing value={avg} size={38} label={ratingLabel} strokeWidth={3} textClassName="text-[11px] font-medium" />}
     </>
   );
   const shared = "flex w-full items-center gap-4 px-4 py-3 text-left transition hover:bg-[var(--wash)] sm:px-5";

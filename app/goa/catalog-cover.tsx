@@ -24,7 +24,7 @@ export function coverColors(tone: CoverTone): CSSProperties {
   } as CSSProperties;
 }
 
-/** A 0–5 average as a ring with the number inside; a dashed empty ring when nothing is rated yet. */
+/** A 0–5 average as a ring with the number inside; a dashed empty ring (nothing inside) when nothing is rated yet. */
 export function ScoreRing({ value, size, label, strokeWidth = 2.6, className, textClassName, caption }: {
   value: number | null | undefined;
   size: number;
@@ -45,7 +45,7 @@ export function ScoreRing({ value, size, label, strokeWidth = 2.6, className, te
         {rated ? <circle cx="18" cy="18" r="15.9155" fill="none" stroke="var(--main)" strokeWidth={strokeWidth} strokeLinecap="round" strokeDasharray={`${percent} 100`} /> : null}
       </svg>
       <span className="relative flex flex-col items-center tabular-nums">
-        <span className={textClassName ?? "text-[13px] font-medium"}>{rated ? value.toFixed(1) : "—"}</span>
+        {rated ? <span className={textClassName ?? "text-[13px] font-medium"}>{value.toFixed(1)}</span> : null}
         {caption ? <span className="mt-1 text-xs text-[var(--muted)]">{caption}</span> : null}
       </span>
     </span>
@@ -95,7 +95,8 @@ export function ItemCover({ title, year, avg, ratingLabel, showBadge = true, siz
       <span aria-hidden="true" className="absolute right-3.5 top-3.5 h-2.5 w-2.5 rounded-full bg-[var(--cover-deco)]" />
       <span className={cx("relative truncate tracking-[0.08em]", spec.year)} style={{ fontFamily: "var(--font-geist-mono), ui-monospace, monospace" }}>{year ?? "\u00a0"}</span>
       <span className={cx("relative break-words font-light leading-[1.05] tracking-[-0.04em]", spec.clamp, spec.title)}>{title}</span>
-      {spec.badge && showBadge ? (
+      {/* No rating yet: no badge at all, the cover stays clean. */}
+      {spec.badge && showBadge && avg !== null && avg !== undefined ? (
         <span className={cx("absolute", spec.badgeInset)}>
           <ScoreRing value={avg} size={spec.badge} label={ratingLabel ?? ""} className="bg-[var(--paper)] shadow-[0_2px_8px_rgba(32,36,31,0.14)]" textClassName={spec.badgeText} />
         </span>
