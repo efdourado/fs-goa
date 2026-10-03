@@ -43,7 +43,7 @@
   "settings": {
     "legend": "Preferencias",
     "homeLegend": "Inicio",
-    "lockApp": "Bloquear app"
+    "customizeHome": "Personalizar inicio"
   },
   "theme": {
     "legend": "Tema",

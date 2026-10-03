@@ -47,14 +47,17 @@ export function useAppLocked(): boolean {
   return useSyncExternalStore(subscribe, read, () => true);
 }
 
-/** The switch, for the header's preferences menu. */
+/**
+ * The switch, for the header's preferences menu: "Customise home". Off by default (Home is locked); on shows
+ * View and Reorder. Stored the other way round, as the lock, so earlier choices still hold.
+ */
 export function LockAppToggle() {
   const t = useTranslations("settings");
   const locked = useAppLocked();
   return (
-    <label className="flex min-h-10 cursor-pointer items-center justify-between gap-3 text-sm">
-      <span>{t("lockApp")}</span>
-      <Toggle checked={locked} onChange={write} />
-    </label>
+    <div className="flex min-h-10 items-center justify-between gap-3 text-sm">
+      <span>{t("customizeHome")}</span>
+      <Toggle checked={!locked} onChange={(customize) => write(!customize)} ariaLabel={t("customizeHome")} />
+    </div>
   );
 }

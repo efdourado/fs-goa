@@ -43,7 +43,7 @@
   "settings": {
     "legend": "Preferences",
     "homeLegend": "Home",
-    "lockApp": "Lock app"
+    "customizeHome": "Customise home"
   },
   "theme": {
     "legend": "Theme",

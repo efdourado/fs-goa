@@ -366,6 +366,7 @@ export function Toggle({
   hint,
   disabled,
   className,
+  ariaLabel,
 }: {
   checked: boolean;
   onChange: (next: boolean) => void;
@@ -373,13 +374,15 @@ export function Toggle({
   hint?: ReactNode;
   disabled?: boolean;
   className?: string;
+  /** The switch's name when its words sit outside it (no `label`). */
+  ariaLabel?: string;
 }) {
   const control = (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
-      aria-label={typeof label === "string" ? label : undefined}
+      aria-label={typeof label === "string" ? label : ariaLabel}
       disabled={disabled}
       onClick={() => onChange(!checked)}
       className={cx(
