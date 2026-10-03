@@ -12,7 +12,7 @@ import { CatalogTile, resolveCoverTop } from "../catalog-views";
 import { LibraryGlyph, useCatalogShelf, useLibraryName } from "../libraries";
 import { Rail, RailArrows, ShelfAddButton, useShelfRail } from "../shelf";
 import type { CatalogItem, ChallengeSummary, GroupInviteResult, GroupSummary, Id, Member, PendingGroupRequest } from "../types";
-import { BackButton, Button, cx, EmptyState, Field, inputClass, StatusMessage, Toggle } from "../ui";
+import { BackButton, Button, CircleEditIcon, cx, EmptyState, Field, inputClass, StatusMessage, Toggle } from "../ui";
 import { canManage, formatRuntime } from "../utils";
 import { ActiveChallengeCard } from "./dashboard";
 
@@ -292,10 +292,8 @@ export function GroupScreen({
               </svg>
               {t("inviteTitle")}
             </button>
-            <button type="button" onClick={toggleGroupEdit} aria-label={t("editToggleClosed")} title={t("editToggleClosed")} className="grid h-9 w-9 cursor-pointer place-items-center rounded-full border border-[var(--line)] text-[var(--muted)] transition hover:bg-[var(--hover)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25">
-              <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M10.5 2.8l2.7 2.7-7.6 7.6H2.9v-2.7z" /><path d="M9 4.3l2.7 2.7" />
-              </svg>
+            <button type="button" onClick={toggleGroupEdit} aria-label={t("editToggleClosed")} title={t("editToggleClosed")} className="grid h-9 w-9 cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--hover)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25">
+              <CircleEditIcon className="h-[22px] w-[22px]" />
             </button>
           </div>
         ) : null}

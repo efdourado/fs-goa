@@ -140,6 +140,18 @@ export function CircleChevronIcon({ className, dir }: { className?: string; dir:
   );
 }
 
+/** Edit / settings, as a circle like the others — the header's sliders glyph inside a ring. No pencil. */
+export function CircleEditIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+      <circle cx="10" cy="10" r="7.5" />
+      <path d="M6.2 8h7.6M6.2 12h7.6" strokeLinecap="round" />
+      <circle cx="11.6" cy="8" r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="8.4" cy="12" r="1.4" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
 /** A 2×3 dot grid — the drag handle shown in reorder mode. */
 export function DragDotsIcon({ className }: { className?: string }) {
   return (
