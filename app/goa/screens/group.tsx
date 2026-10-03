@@ -12,7 +12,7 @@ import { CatalogTile, resolveCoverTop } from "../catalog-views";
 import { LibraryGlyph, useCatalogShelf, useLibraryName } from "../libraries";
 import { Rail, RailArrows, ShelfAddButton, useShelfRail } from "../shelf";
 import type { CatalogItem, ChallengeSummary, GroupInviteResult, GroupSummary, Id, Member, PendingGroupRequest } from "../types";
-import { BackButton, Button, CircleEditIcon, cx, EmptyState, Field, inputClass, StatusMessage, Toggle } from "../ui";
+import { BackButton, Button, cx, EmptyState, Field, inputClass, SlidersIcon, StatusMessage, Toggle } from "../ui";
 import { canManage, formatRuntime } from "../utils";
 import { ActiveChallengeCard } from "./dashboard";
 
@@ -293,7 +293,7 @@ export function GroupScreen({
               {t("inviteTitle")}
             </button>
             <button type="button" onClick={toggleGroupEdit} aria-label={t("editToggleClosed")} title={t("editToggleClosed")} className="grid h-9 w-9 cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--hover)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25">
-              <CircleEditIcon className="h-[22px] w-[22px]" />
+              <SlidersIcon className="h-[18px] w-[18px]" />
             </button>
           </div>
         ) : null}

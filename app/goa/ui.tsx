@@ -140,14 +140,13 @@ export function CircleChevronIcon({ className, dir }: { className?: string; dir:
   );
 }
 
-/** Edit / settings, as a circle like the others — the header's sliders glyph inside a ring. No pencil. */
-export function CircleEditIcon({ className }: { className?: string }) {
+/** Edit / settings — the header's sliders glyph. */
+export function SlidersIcon({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 20 20" className={className} fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
-      <circle cx="10" cy="10" r="7.5" />
-      <path d="M6.2 8h7.6M6.2 12h7.6" strokeLinecap="round" />
-      <circle cx="11.6" cy="8" r="1.4" fill="currentColor" stroke="none" />
-      <circle cx="8.4" cy="12" r="1.4" fill="currentColor" stroke="none" />
+    <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true">
+      <path d="M2 4.5h12M2 11.5h12" />
+      <circle cx="11" cy="4.5" r="2" fill="currentColor" stroke="none" />
+      <circle cx="5" cy="11.5" r="2" fill="currentColor" stroke="none" />
     </svg>
   );
 }
