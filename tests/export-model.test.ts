@@ -98,3 +98,21 @@ test("o documento mostra capa, regras, cartões e placar preenchido", () => {
   assert.doesNotMatch(html, /Legenda/, "a legenda dos campos saiu do PDF");
   assert.doesNotMatch(solo, /Como funciona/, "sem regras, a seção some — e o botão dela também");
 });
+
+test("num cartão, cada pessoa aparece uma vez: as notas numa linha, os comentários embaixo, sem tipo nem data", () => {
+  const expectation = {
+    id: "exp", name: "Expectativa", semanticKey: "expectativa", purpose: "expectation", answerScope: "individual", parentTypeId: null,
+    fields: [{ id: "expectativa", key: "expectativa", label: "Expectativa", type: "rating", required: true, config: { min: 0, max: 5 } }],
+  };
+  const solo = { ...challenge, ruleSections: [], participants: [challenge.participants[1]], entryTypes: [rating, expectation], items: challenge.items.slice(0, 1) } as unknown as ChallengeDetail;
+  const html = renderWithIntl(createElement(ExportDocument, {
+    challenge: solo, userId: "dudu", fontClassName: "", entries: [
+      entry({ id: "r", userId: "dudu", participantName: "Dudu", entryTypeId: "rate", itemId: "f0", occurredOn: "2026-09-07", values: { nota: 5, comentario: "A virada no meio." } }),
+      entry({ id: "x", userId: "dudu", participantName: "Dudu", entryTypeId: "exp", itemId: "f0", occurredOn: "2026-09-07", values: { expectativa: 4.5 } }),
+    ],
+  }));
+  const card = html.slice(html.indexOf('class="xd-rows"'), html.indexOf("</dl>", html.indexOf('class="xd-rows"')));
+  assert.equal(card.match(/<dt>/g)?.length, 1, "uma linha só para a mesma pessoa");
+  assert.ok(card.indexOf("Expectativa") < card.indexOf("Nota") && card.indexOf("Nota") < card.indexOf("A virada no meio."));
+  assert.doesNotMatch(card, /Avaliação|set\./, "sem o nome do tipo e sem a data");
+});

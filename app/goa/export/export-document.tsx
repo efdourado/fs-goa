@@ -72,22 +72,20 @@ function answerText(value: DocEntry["values"][number], doc: Doc): string {
 }
 
 /** One answer: the short values on a line, the comments as paragraphs underneath. */
-function EntryBody({ entry, doc, showType }: { entry: DocEntry; doc: Doc; showType: boolean }) {
+function EntryBody({ entry, doc }: { entry: DocEntry; doc: Doc }) {
   const short = entry.values.filter((value) => !value.long);
   const long = entry.values.filter((value) => value.long);
   const shown = (value: DocEntry["values"][number]) => answerText(value, doc);
   return (
     <>
-      {showType || short.length || entry.day ? (
+      {short.length ? (
         <div className="xd-line">
-          {showType && entry.typeName ? <span className="xd-type">{entry.typeName}</span> : null}
           {short.map((value, index) => (
             <span className="xd-kv" key={index}>
               <span>{value.label} </span>
               <b>{shown(value)}</b>
             </span>
           ))}
-          {entry.day ? <span className="xd-kv"><span>{doc.day(entry.day, { day: "numeric", month: "short" })}</span></span> : null}
         </div>
       ) : null}
       {long.map((value, index) => (
@@ -189,11 +187,29 @@ function HowItWorks({ challenge, doc }: { challenge: ChallengeDetail; doc: Doc }
   );
 }
 
+/**
+ * One row per person on an item card: their scores on one line (the expectation first, it came first) and
+ * their comments under it. The entry types and days are left out: the field label already says "Nota",
+ * and when it happened lives in the "When" tile and the diary.
+ */
+function byPerson(entries: DocEntry[]): DocEntry[] {
+  const rows = new Map<string, DocEntry[]>();
+  for (const entry of entries) rows.set(entry.personKey, [...(rows.get(entry.personKey) ?? []), entry]);
+  return [...rows.values()].map((own) => {
+    const ordered = [...own].sort((a, b) => Number(b.purpose === "expectation") - Number(a.purpose === "expectation"));
+    const values = ordered.flatMap((entry) => entry.values);
+    return {
+      ...ordered[0],
+      values: [...values.filter((value) => !value.long), ...values.filter((value) => value.long)],
+      children: ordered.flatMap((entry) => entry.children),
+    };
+  });
+}
+
 function ItemCard({ item, chapter, model, doc, people, showWhen }: {
   item: DocItem; chapter: DocChapter; model: ExportModel; doc: Doc; people: Map<string, DocPerson>; showWhen: boolean;
 }) {
   const multiPeople = model.people.length > 1;
-  const types = new Set(item.entries.map((entry) => entry.typeName));
   const recommender = item.recommender;
   const by = recommender ? (
     <div className={`xd-by ${tone(people.get(recommender.personKey ?? "")?.color ?? chapter.color)}`}>
@@ -242,12 +258,12 @@ function ItemCard({ item, chapter, model, doc, people, showWhen }: {
       </div>
       {item.note ? <p className="xd-lead"><b>{doc.t("about")} </b>{item.note}</p> : null}
       <dl className="xd-rows">
-        {item.entries.map((entry) => {
+        {byPerson(item.entries).map((entry) => {
           const person = people.get(entry.personKey);
           return (
             <div className={`xd-row ${tone(person?.color)}`} key={entry.id}>
               <dt>{person?.name ?? "—"}</dt>
-              <dd><EntryBody entry={entry} doc={doc} showType={types.size > 1} /></dd>
+              <dd><EntryBody entry={entry} doc={doc} /></dd>
             </div>
           );
         })}
@@ -342,7 +358,7 @@ function Diary({ model, doc, people }: { model: ExportModel; doc: Doc; people: M
                       </div>
                       <div className={tone(person?.color)}>
                         {multiPeople ? <p className="xd-who">{person?.name}</p> : null}
-                        <EntryBody entry={{ ...entry, day: null }} doc={doc} showType={false} />
+                        <EntryBody entry={entry} doc={doc} />
                         {entry.children.length ? (
                           <table className="xd-sets">
                             <tbody>

@@ -341,7 +341,6 @@
 .xd-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 1mm 3.5mm; }
 .xd-kv span { color: var(--xd-muted); }
 .xd-kv b { font-weight: 700; }
-.xd-type { font-size: 7.5pt; letter-spacing: 0.08em; text-transform: uppercase; color: var(--xd-muted); }
 .xd-text { margin-top: 1.2mm; color: #2b2a27; line-height: 1.6; white-space: pre-wrap; }
 .xd-text + .xd-text { margin-top: 1.8mm; }
 .xd-text blockquote {
