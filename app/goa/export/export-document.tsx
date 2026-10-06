@@ -71,9 +71,14 @@ function answerText(value: DocEntry["values"][number], doc: Doc): string {
   return value.text;
 }
 
+/** Dates are opt-in ("Dates" in the toolbar): an optional date field is left out unless they're asked for. */
+function printed(value: DocEntry["values"][number], showDates: boolean): boolean {
+  return showDates || value.type !== "date" || value.required;
+}
+
 /** One answer: the short values on a line, the comments as paragraphs underneath. */
-function EntryBody({ entry, doc }: { entry: DocEntry; doc: Doc }) {
-  const short = entry.values.filter((value) => !value.long);
+function EntryBody({ entry, doc, showDates }: { entry: DocEntry; doc: Doc; showDates: boolean }) {
+  const short = entry.values.filter((value) => !value.long && printed(value, showDates));
   const long = entry.values.filter((value) => value.long);
   const shown = (value: DocEntry["values"][number]) => answerText(value, doc);
   return (
@@ -263,7 +268,7 @@ function ItemCard({ item, chapter, model, doc, people, showWhen }: {
           return (
             <div className={`xd-row ${tone(person?.color)}`} key={entry.id}>
               <dt>{person?.name ?? "—"}</dt>
-              <dd><EntryBody entry={entry} doc={doc} /></dd>
+              <dd><EntryBody entry={entry} doc={doc} showDates={showWhen} /></dd>
             </div>
           );
         })}
@@ -312,7 +317,7 @@ function Items({ model, doc, people, showWhen }: { model: ExportModel; doc: Doc;
 
 const WEEK = [0, 1, 2, 3, 4, 5, 6];
 
-function Diary({ model, doc, people }: { model: ExportModel; doc: Doc; people: Map<string, DocPerson> }) {
+function Diary({ model, doc, people, showDates }: { model: ExportModel; doc: Doc; people: Map<string, DocPerson>; showDates: boolean }) {
   const entryCount = model.diary.reduce((sum, month) => sum + month.entries.length, 0);
   const dayCount = model.diary.reduce((sum, month) => sum + month.days.length, 0);
   const multiPeople = model.people.length > 1;
@@ -358,14 +363,14 @@ function Diary({ model, doc, people }: { model: ExportModel; doc: Doc; people: M
                       </div>
                       <div className={tone(person?.color)}>
                         {multiPeople ? <p className="xd-who">{person?.name}</p> : null}
-                        <EntryBody entry={entry} doc={doc} />
+                        <EntryBody entry={entry} doc={doc} showDates={showDates} />
                         {entry.children.length ? (
                           <table className="xd-sets">
                             <tbody>
                               {entry.children.map((child) => (
                                 <tr key={child.id}>
                                   <td>{child.itemTitle ?? child.typeName}</td>
-                                  <td>{child.values.filter((value) => !value.long).map((value) => `${value.label} ${answerText(value, doc)}`).join(" · ")}</td>
+                                  <td>{child.values.filter((value) => !value.long && printed(value, showDates)).map((value) => `${value.label} ${answerText(value, doc)}`).join(" · ")}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -385,7 +390,7 @@ function Diary({ model, doc, people }: { model: ExportModel; doc: Doc; people: M
   );
 }
 
-function Scoreboard({ model, doc }: { model: ExportModel; doc: Doc }) {
+function Scoreboard({ model, doc, showDates }: { model: ExportModel; doc: Doc; showDates: boolean }) {
   const items = model.chapters.flatMap((chapter) => chapter.items.map((item) => ({ item, chapter })));
   const raters = model.people.filter((person) => person.ratingAvg !== null).slice(0, 4);
   const perPerson = raters.length > 1;
@@ -406,7 +411,7 @@ function Scoreboard({ model, doc }: { model: ExportModel; doc: Doc }) {
               {showBy ? <th>{doc.t("recommendedBy")}</th> : null}
               {model.hasRatings && perPerson ? raters.map((person) => <th className={`score ${tone(person.color)}`} style={{ color: "var(--c)" }} key={person.key}>{person.name.split(" ")[0]}</th>) : null}
               {model.hasRatings ? <th className="score">{doc.t(perPerson ? "col.avg" : "col.rating")}</th> : <th className="score">{doc.t("col.entries")}</th>}
-              <th>{doc.t("col.date")}</th>
+              {showDates ? <th>{doc.t("col.date")}</th> : null}
             </tr>
           </thead>
           <tbody>
@@ -423,7 +428,7 @@ function Scoreboard({ model, doc }: { model: ExportModel; doc: Doc }) {
                 {model.hasRatings
                   ? <td className="score avg">{item.ratingAvg !== null ? doc.n(item.ratingAvg) : <span className="muted">—</span>}</td>
                   : <td className="score">{doc.n(item.entries.length + item.progress.reduce((sum, row) => sum + row.points.length, 0))}</td>}
-                <td className="small muted">{item.lastDay ? doc.day(item.lastDay, { day: "2-digit", month: "2-digit", year: "2-digit" }) : "—"}</td>
+                {showDates ? <td className="small muted">{item.lastDay ? doc.day(item.lastDay, { day: "2-digit", month: "2-digit", year: "2-digit" }) : "—"}</td> : null}
               </tr>
             ))}
           </tbody>
@@ -452,7 +457,7 @@ function Scoreboard({ model, doc }: { model: ExportModel; doc: Doc }) {
   );
 }
 
-function Records({ model, doc }: { model: ExportModel; doc: Doc }) {
+function Records({ model, doc, showDates }: { model: ExportModel; doc: Doc; showDates: boolean }) {
   return (
     <section className="xd-page">
       <h2 className="xd-h2">{doc.t("recordsTitle")}</h2>
@@ -465,7 +470,7 @@ function Records({ model, doc }: { model: ExportModel; doc: Doc }) {
               <th>{doc.t("col.item")}</th>
               <th className="score">{doc.t("col.sessions")}</th>
               <th>{doc.t("col.best")}</th>
-              <th>{doc.t("col.date")}</th>
+              {showDates ? <th>{doc.t("col.date")}</th> : null}
             </tr>
           </thead>
           <tbody>
@@ -475,7 +480,7 @@ function Records({ model, doc }: { model: ExportModel; doc: Doc }) {
                 <td className="title">{record.title}</td>
                 <td className="score">{doc.n(record.sessions)}</td>
                 <td className="small">{record.bests.map((best) => `${best.label} ${doc.n(best.value)}${best.unit ? ` ${best.unit}` : ""}`).join(" · ") || "—"}</td>
-                <td className="small muted">{record.lastDay ? doc.day(record.lastDay, { day: "2-digit", month: "2-digit", year: "2-digit" }) : "—"}</td>
+                {showDates ? <td className="small muted">{record.lastDay ? doc.day(record.lastDay, { day: "2-digit", month: "2-digit", year: "2-digit" }) : "—"}</td> : null}
               </tr>
             ))}
           </tbody>
@@ -507,7 +512,7 @@ export function ExportDocument({ challenge, entries, userId, fontClassName }: {
   const doc = useDoc();
   const tc = useTranslations("common");
   const [onlyMine, setOnlyMine] = useState(false);
-  const [showWhen, setShowWhen] = useState(true);
+  const [showWhen, setShowWhen] = useState(false);
   const words = { yes: tc("yes"), no: tc("no"), group: doc.t("group") };
   const everyone = useMemo(() => buildExportModel({ challenge, entries, userId, words }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -586,8 +591,8 @@ export function ExportDocument({ challenge, entries, userId, fontClassName }: {
           {shown("cover") ? <Cover challenge={challenge} model={model} doc={doc} /> : null}
           {shown("rules") ? <HowItWorks challenge={challenge} doc={doc} /> : null}
           {shown("items") ? <Items model={model} doc={doc} people={people} showWhen={showWhen} /> : null}
-          {shown("diary") ? <Diary model={model} doc={doc} people={people} /> : null}
-          {shown("scoreboard") ? (model.sessionMode ? <Records model={model} doc={doc} /> : <Scoreboard model={model} doc={doc} />) : null}
+          {shown("diary") ? <Diary model={model} doc={doc} people={people} showDates={showWhen} /> : null}
+          {shown("scoreboard") ? (model.sessionMode ? <Records model={model} doc={doc} showDates={showWhen} /> : <Scoreboard model={model} doc={doc} showDates={showWhen} />) : null}
           <p className="xd-colophon">{doc.t("colophon", { date: doc.day(dateKeyInSaoPaulo(new Date())) })}</p>
         </article>
       </div>

@@ -2053,7 +2053,7 @@
     "colophon": "Generado con Goa el {date}. Los datos son tuyos, este PDF es solo una forma bonita de guardarlos.",
     "footer": "goa · {title} · página ",
     "streakValue": "{count, plural, one {# día} other {# días}}",
-    "showWhen": "Fechas en las tarjetas"
+    "showWhen": "Fechas"
   },
   "reveal": {
     "sealedTitle": "Notas selladas",

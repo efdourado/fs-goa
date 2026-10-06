@@ -2053,7 +2053,7 @@
     "colophon": "Made with Goa on {date}. The data is yours, this PDF is just a nice way to keep it.",
     "footer": "goa · {title} · page ",
     "streakValue": "{count, plural, one {# day} other {# days}}",
-    "showWhen": "Dates on cards"
+    "showWhen": "Dates"
   },
   "reveal": {
     "sealedTitle": "Sealed ratings",

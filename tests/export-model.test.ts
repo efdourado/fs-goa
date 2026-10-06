@@ -116,3 +116,16 @@ test("num cartão, cada pessoa aparece uma vez: as notas numa linha, os comentá
   assert.ok(card.indexOf("Expectativa") < card.indexOf("Nota") && card.indexOf("Nota") < card.indexOf("A virada no meio."));
   assert.doesNotMatch(card, /Avaliação|set\./, "sem o nome do tipo e sem a data");
 });
+
+test("sem pedir datas, o PDF não mostra data: nem coluna no placar, nem campo de data opcional", () => {
+  const watched = {
+    ...rating,
+    fields: [...rating.fields, { id: "quando", key: "quando", label: "Assisti em", type: "date", required: false, config: {} }],
+  };
+  const html = renderWithIntl(createElement(ExportDocument, {
+    challenge: { ...challenge, entryTypes: [watched, progress] } as unknown as ChallengeDetail, userId: "dudu", fontClassName: "",
+    entries: [entry({ id: "w", userId: "dudu", participantName: "Dudu", entryTypeId: "rate", itemId: "f0", occurredOn: "2026-09-07", values: { nota: 4, quando: "2026-09-07" } })],
+  }));
+  assert.doesNotMatch(html, /Assisti em/, "a data opcional fica de fora");
+  assert.doesNotMatch(html, /<th>Data<\/th>/, "o placar não tem coluna de data");
+});

@@ -35,6 +35,8 @@ export interface DocValue {
   unit: string | null;
   /** Worth its own paragraph (a comment), rather than a chip in a line. */
   long: boolean;
+  /** An optional date only prints when the reader asks for dates; a required one is part of the answer. */
+  required: boolean;
 }
 
 export interface DocEntry {
@@ -225,6 +227,7 @@ export function buildExportModel(input: {
       values.push({
         label: field.label, text, type: field.type, number: numeric, unit: field.config?.unit ?? null,
         long: field.type === "text" && (Boolean(field.config?.multiline) || text.length > 48),
+        required: Boolean(field.required),
       });
     }
     const children = (childrenOf.get(entry.id) ?? [])
