@@ -2119,7 +2119,6 @@
     "redraw": "Desenhar de novo",
     "readRated": "Cada linha é uma pessoa, subindo e descendo com a nota dela. Onde as linhas se trançam, vocês concordaram; onde se abrem, discordaram. A linha grossa e clara é o grupo.",
     "readDated": "Cada faixa é uma pessoa: contínua onde ela seguiu, com buracos onde parou, contas maiores nos dias maiores. O trecho contornado é a maior sequência dela.",
-    "showAll": "Ver todos os {count}",
     "showMore": "Ver mais {count}",
     "showMoreComment": "Ver mais",
     "showLess": "Ver menos",

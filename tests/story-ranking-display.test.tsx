@@ -125,6 +125,15 @@ test("long genre and year charts stay paired, horizontal and independently expan
   assert.ok(html.includes("2001–03"));
   assert.equal(html.match(/Show 2 more/g)?.length, 2, "both long horizontal charts get their own show-more action");
   assert.ok(!html.includes("See every year") && !html.includes("data-scrollable-year-chart"));
-  assert.ok(html.includes("Show all 19"));
+  assert.ok(html.includes("+ 11") && html.includes("+ 9"), "the rest of the ranking says how many titles are left out");
   assert.ok(!html.includes("text-[var(--main-strong)]"), "the ranking action uses the same quiet treatment as comment actions");
+
+  function Downloaded() {
+    const page = useAlmanacPages(buildStory(longRange), longRange, [], true).find((row) => row.id === "rankings")!;
+    return <div>{page.body}</div>;
+  }
+  const downloaded = renderToStaticMarkup(<NextIntlClientProvider locale="en" messages={messages} timeZone="America/Sao_Paulo"><Downloaded /></NextIntlClientProvider>);
+  assert.ok(!downloaded.includes("Film 19"), "a downloaded page is a preview, not the whole ranking");
+  assert.ok(!downloaded.includes("<button"));
+  assert.ok(downloaded.includes("+ 11") && downloaded.includes('data-chart-rows="5"'));
 });

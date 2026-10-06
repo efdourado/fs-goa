@@ -146,10 +146,16 @@ function ScoreTile({ score, ratingLabel }: { score: ItemScore; ratingLabel: stri
   );
 }
 
-/** A heading with a count over a rail of covers — the homepage's "My catalogue" shelf, filtered. `full` (a downloaded page) wraps instead of scrolling. */
-function ScoreShelf({ title, scores, ratingLabel, full, scrolls = true }: { title: string; scores: ItemScore[]; ratingLabel: (score: ItemScore) => string; full: boolean; scrolls?: boolean }) {
+/**
+ * A heading with a count over a rail of covers — the homepage's "My catalogue" shelf, filtered. On a
+ * downloaded page (`pageTiles`) it keeps one row of covers and says how many more there are: the page is
+ * a preview, the PDF has everything.
+ */
+function ScoreShelf({ title, scores, ratingLabel, pageTiles, scrolls = true }: { title: string; scores: ItemScore[]; ratingLabel: (score: ItemScore) => string; pageTiles?: number; scrolls?: boolean }) {
   const { railRef, showFade, onScroll, nudge } = useShelfRail();
-  const tiles = scores.map((score) => <ScoreTile key={score.item.id} score={score} ratingLabel={ratingLabel(score)} />);
+  const page = pageTiles !== undefined;
+  const hidden = page ? Math.max(0, scores.length - pageTiles) : 0;
+  const tiles = (page ? scores.slice(0, pageTiles) : scores).map((score) => <ScoreTile key={score.item.id} score={score} ratingLabel={ratingLabel(score)} />);
   return (
     <section className={cx("min-w-0", outlineClass)} data-score-shelf={title}>
       <div className="mb-4 flex min-h-8 items-center justify-between gap-3">
@@ -157,9 +163,10 @@ function ScoreShelf({ title, scores, ratingLabel, full, scrolls = true }: { titl
           <h4 className={sectionTitleClass}>{title}</h4>
           {scrolls ? <span className="text-xs text-[var(--muted)]">{scores.length}</span> : null}
         </div>
-        {scrolls && !full && scores.length > 1 ? <RailArrows nudge={nudge} /> : null}
+        {scrolls && !page && scores.length > 1 ? <RailArrows nudge={nudge} /> : null}
+        {hidden ? <span className="text-sm tabular-nums text-[var(--muted)]">{more(hidden)}</span> : null}
       </div>
-      {full || !scrolls ? <div className="flex flex-wrap gap-4 pt-1">{tiles}</div> : <Rail railRef={railRef} showFade={showFade} onScroll={onScroll}>{tiles}</Rail>}
+      {page || !scrolls ? <div className="flex flex-wrap gap-4 pt-1">{tiles}</div> : <Rail railRef={railRef} showFade={showFade} onScroll={onScroll}>{tiles}</Rail>}
     </section>
   );
 }
@@ -168,6 +175,11 @@ const COLLAPSED_COMMENT_HEIGHT = 232;
 const textActionClass = "cursor-pointer py-1.5 text-xs font-medium text-[var(--muted)] transition hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--main)]";
 const MAX_YEAR_GROUPS = 8;
 const CHART_PREVIEW_ROWS = 5;
+const RANKING_PREVIEW_ROWS = 5;
+const PAGE_QUOTES = 4;
+/** What's left out of a preview list: "+ 70", and folding it away again: "− 70". */
+const more = (count: number) => `+ ${count}`;
+const less = (count: number) => `− ${count}`;
 
 /** Long timelines start as a few weighted periods; the detailed view restores every individual year. */
 function summarizeYears(years: GroupStat[]): GroupStat[] {
@@ -250,8 +262,9 @@ function ExpandableComment({ text }: { text: string }) {
 const grid = "grid gap-4 @2xl:grid-cols-2 @2xl:[&>*:last-child:nth-child(odd)]:[grid-column:1/-1]";
 
 /**
- * Every page the almanac has for this story — only the ones its data can fill. `full` lists everything
- * (the downloadable pages have no "show all" to press).
+ * Every page the almanac has for this story — only the ones its data can fill. `full` is a downloaded
+ * page: no buttons to press, so long lists stay at their preview and say "+ N" for the rest (a page is a
+ * preview and must keep its shape; the PDF has everything).
  */
 export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric[], full = false): AlmanacPage[] {
   const t = useTranslations("story");
@@ -259,7 +272,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
   const [rankingExpanded, setRankingExpanded] = useState(false);
   const [genresExpanded, setGenresExpanded] = useState(false);
   const [yearGroupsExpanded, setYearGroupsExpanded] = useState(false);
-  const showAll = full || rankingExpanded;
+  const showAll = !full && rankingExpanded;
   const fmt = (value: number) => nf.number(value, { maximumFractionDigits: 1 });
   // The ranking's number is the Goa score, to two places: 4.74 and 4.72 are why it exists, and both read 4.7.
   const fmtScore = (value: number) => nf.number(value, { maximumFractionDigits: 2 });
@@ -286,8 +299,8 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
     const compactRest = s.ranking.slice(3);
     const fullRest = s.ranking.slice(5);
     const yearGroups = summarizeYears(s.years);
-    const displayedGenres = full || genresExpanded ? s.genres : s.genres.slice(0, CHART_PREVIEW_ROWS);
-    const displayedYearGroups = full || yearGroupsExpanded ? yearGroups : yearGroups.slice(0, CHART_PREVIEW_ROWS);
+    const displayedGenres = !full && genresExpanded ? s.genres : s.genres.slice(0, CHART_PREVIEW_ROWS);
+    const displayedYearGroups = !full && yearGroupsExpanded ? yearGroups : yearGroups.slice(0, CHART_PREVIEW_ROWS);
     const tallestYearCount = Math.max(...yearGroups.map((row) => row.count));
     const bestYearScore = yearGroups.length ? Math.max(...yearGroups.map((row) => row.score)) : null;
     const restRankLabel = (place: number) => s.ranking.length > 10 && place < 10 ? `0${place}` : String(place);
@@ -319,7 +332,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
     const renderRest = (rows: typeof compactRest, startAt: number, mode: "compact" | "full", className: string) => (
       <div className={className} data-ranking-mode={mode}>
         <ol className="space-y-2.5">
-          {(showAll ? rows : rows.slice(0, 5)).map((score, index) => {
+          {(showAll ? rows : rows.slice(0, RANKING_PREVIEW_ROWS)).map((score, index) => {
             const place = index + startAt;
             return (
               <li key={score.item.id} className="grid grid-cols-[1.5rem_minmax(0,1fr)_auto] items-baseline gap-2 text-xs" data-rank={restRankLabel(place)}>
@@ -330,16 +343,19 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
             );
           })}
         </ol>
-        {!full && rows.length > 5 ? (
-          <button type="button" className={cx("mt-3", textActionClass)} onClick={() => setRankingExpanded((value) => !value)}>
-            {rankingExpanded ? t("showLess") : t("showAll", { count: s.ranking.length })}
+        {rows.length > RANKING_PREVIEW_ROWS ? (full ? (
+          <p className="mt-3 text-xs tabular-nums text-[var(--muted)]">{more(rows.length - RANKING_PREVIEW_ROWS)}</p>
+        ) : (
+          <button type="button" className={cx("mt-3 tabular-nums", textActionClass)} aria-label={rankingExpanded ? t("showLess") : undefined} onClick={() => setRankingExpanded((value) => !value)}>
+            {rankingExpanded ? less(rows.length - RANKING_PREVIEW_ROWS) : more(rows.length - RANKING_PREVIEW_ROWS)}
           </button>
-        ) : null}
+        )) : null}
       </div>
     );
     const genresCard = s.genres.length ? (
       <Block title={t("genres.title", { genre: s.genres[0].key, value: fmt(s.genres[0].average) })}>
         <div data-horizontal-chart="genres" data-chart-rows={displayedGenres.length}>{statBars(displayedGenres)}</div>
+        {full && s.genres.length > CHART_PREVIEW_ROWS ? <p className="mt-3 text-xs tabular-nums text-[var(--muted)]">{more(s.genres.length - CHART_PREVIEW_ROWS)}</p> : null}
         {!full && s.genres.length > CHART_PREVIEW_ROWS ? (
           <button type="button" className={cx("mt-3", textActionClass)} onClick={() => setGenresExpanded((value) => !value)}>
             {genresExpanded ? t("showLess") : t("showMore", { count: s.genres.length - CHART_PREVIEW_ROWS })}
@@ -362,6 +378,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
             />
           ))}
         </div>
+        {full && yearGroups.length > CHART_PREVIEW_ROWS ? <p className="mt-2 text-xs tabular-nums text-[var(--muted)]">{more(yearGroups.length - CHART_PREVIEW_ROWS)}</p> : null}
         {!full && yearGroups.length > CHART_PREVIEW_ROWS ? (
           <button type="button" className={cx("mt-2", textActionClass)} onClick={() => setYearGroupsExpanded((value) => !value)}>
             {yearGroupsExpanded ? t("showLess") : t("showMore", { count: yearGroups.length - CHART_PREVIEW_ROWS })}
@@ -560,8 +577,8 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
             {o.perfect.length || o.lowest ? (
               // The perfect scores scroll, the lowest is one cover beside them.
               <div className={cx("grid min-w-0 gap-4 [grid-column:1/-1]", o.perfect.length > 0 && o.lowest && "@2xl:grid-cols-[minmax(0,1fr)_auto]")}>
-                {o.perfect.length ? <ScoreShelf title={t("solo.perfect")} scores={o.perfect} full={full} ratingLabel={ratingFor} /> : null}
-                {o.lowest ? <ScoreShelf title={t("solo.lowest")} scores={[o.lowest]} full={full} scrolls={false} ratingLabel={ratingFor} /> : null}
+                {o.perfect.length ? <ScoreShelf title={t("solo.perfect")} scores={o.perfect} pageTiles={full ? (o.lowest ? 2 : 3) : undefined} ratingLabel={ratingFor} /> : null}
+                {o.lowest ? <ScoreShelf title={t("solo.lowest")} scores={[o.lowest]} pageTiles={full ? 1 : undefined} scrolls={false} ratingLabel={ratingFor} /> : null}
               </div>
             ) : null}
             {o.instincts ? (
@@ -696,10 +713,10 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
         headline: t("pages.words.headline", { count: s.quotes.length }),
         body: (
           <div className={grid}>
-            {s.quotes.map((quote) => (
+            {(full ? s.quotes.slice(0, PAGE_QUOTES) : s.quotes).map((quote) => (
               <figure key={`${quote.person.id}-${quote.item.id}`} className={cx(cardClass, "border-l-[3px]")} style={{ borderLeftColor: personTone(ids, quote.person.id) }}>
                 {full
-                  ? <CommentText text={quote.text} className="text-lg font-light" />
+                  ? <CommentText text={quote.text} className="max-h-[11.25rem] overflow-hidden text-lg font-light" />
                   : <ExpandableComment text={quote.text} />}
                 <figcaption className="mt-3 flex items-center gap-2 text-xs text-[var(--muted)]"><Avatar id={quote.person.id} name={quote.person.name} ids={ids} size={5} />{t("quotes.by", { name: firstName(quote.person.name), title: quote.item.title, value: fmt(quote.value) })}</figcaption>
               </figure>
