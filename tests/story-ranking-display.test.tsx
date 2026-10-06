@@ -51,3 +51,25 @@ test("each criterion shows who leads it on the rankings page", () => {
   assert.ok(html.includes("Food: Cantina leads"));
   assert.ok(html.includes("Vibe: Boteco leads"));
 });
+
+test("interactive words pages have fixed-height comments while downloadable pages keep the full text", () => {
+  const withComments: StoryInput = {
+    ...input,
+    ratings: input.ratings.map((rating, index) => ({
+      ...rating,
+      comment: `A complete opinion ${index + 1} with enough words to belong on the words page.`,
+    })),
+  };
+  function Words({ full = false }: { full?: boolean }) {
+    const page = useAlmanacPages(buildStory(withComments), withComments, [], full).find((row) => row.id === "words")!;
+    return <div>{page.body}</div>;
+  }
+
+  const interactive = renderToStaticMarkup(<NextIntlClientProvider locale="en" messages={messages} timeZone="America/Sao_Paulo"><Words /></NextIntlClientProvider>);
+  assert.ok(interactive.includes('data-collapsible-comment="true"'));
+  assert.ok(interactive.includes("min-height:160px;max-height:160px"));
+
+  const downloadable = renderToStaticMarkup(<NextIntlClientProvider locale="en" messages={messages} timeZone="America/Sao_Paulo"><Words full /></NextIntlClientProvider>);
+  assert.ok(!downloadable.includes("data-collapsible-comment"));
+  assert.ok(downloadable.includes("A complete opinion 1"));
+});

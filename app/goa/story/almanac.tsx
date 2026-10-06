@@ -1,7 +1,7 @@
 "use client";
 
 import { useFormatter, useTranslations } from "next-intl";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 
 import { coverColors, coverToneOf } from "../catalog-cover";
 import { firstName, initialsOf, personTone } from "../rating-scale";
@@ -126,6 +126,65 @@ function Bar({ value, max, tone, label, figure, strong }: { value: number; max: 
 
 function Avatar({ id, name, ids, size = 7 }: { id: Id; name: string; ids: Id[]; size?: number }) {
   return <span className="grid flex-none place-items-center rounded-full text-[10px] font-bold text-white" style={{ background: personTone(ids, id), width: size * 4, height: size * 4 }}>{initialsOf(name)}</span>;
+}
+
+const COLLAPSED_COMMENT_HEIGHT = 160;
+
+/** A steady-height comment card that opens in place only when its words need the room. */
+function ExpandableComment({ text }: { text: string }) {
+  const t = useTranslations("story");
+  const contentId = useId();
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [contentHeight, setContentHeight] = useState(COLLAPSED_COMMENT_HEIGHT);
+
+  useEffect(() => {
+    const content = contentRef.current;
+    if (!content) return;
+    const measure = () => setContentHeight(Math.ceil(content.scrollHeight));
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, [text]);
+
+  const overflows = contentHeight > COLLAPSED_COMMENT_HEIGHT;
+  return (
+    <div className="relative" data-collapsible-comment="true">
+      <div
+        id={contentId}
+        className="overflow-hidden transition-[max-height] duration-300 ease-out motion-reduce:transition-none"
+        style={{
+          minHeight: expanded ? undefined : COLLAPSED_COMMENT_HEIGHT,
+          maxHeight: expanded ? contentHeight : COLLAPSED_COMMENT_HEIGHT,
+        }}
+      >
+        <div ref={contentRef}>
+          <CommentText text={text} className="text-lg font-light" />
+        </div>
+      </div>
+      {overflows ? (
+        <div className={cx(
+          "flex justify-center",
+          expanded ? "mt-3" : "absolute inset-x-0 bottom-0 h-16 items-end bg-gradient-to-t from-[var(--paper)] via-[var(--paper)] to-transparent",
+        )}>
+          <button
+            type="button"
+            aria-controls={contentId}
+            aria-expanded={expanded}
+            onClick={() => setExpanded((value) => !value)}
+            className="group inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-[var(--line)] bg-[var(--paper)] px-3 py-1.5 text-[11px] font-medium text-[var(--muted)] shadow-sm transition hover:border-[var(--main-line)] hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--main)]"
+          >
+            {expanded ? t("showLess") : t("showMoreComment")}
+            <svg viewBox="0 0 12 12" className={cx("size-3 transition-transform", expanded && "rotate-180")} fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+              <path d="m3 4.5 3 3 3-3" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 // Two columns at most, decided by the page's own width (a screen, or a downloaded page) — and a lone last card
@@ -532,7 +591,9 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
           <div className={grid}>
             {s.quotes.map((quote) => (
               <figure key={`${quote.person.id}-${quote.item.id}`} className={cx(cardClass, "border-l-[3px]")} style={{ borderLeftColor: personTone(ids, quote.person.id) }}>
-                <CommentText text={quote.text} className="text-lg font-light" />
+                {full
+                  ? <CommentText text={quote.text} className="text-lg font-light" />
+                  : <ExpandableComment text={quote.text} />}
                 <figcaption className="mt-3 flex items-center gap-2 text-xs text-[var(--muted)]"><Avatar id={quote.person.id} name={quote.person.name} ids={ids} size={5} />{t("quotes.by", { name: firstName(quote.person.name), title: quote.item.title, value: fmt(quote.value) })}</figcaption>
               </figure>
             ))}

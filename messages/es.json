@@ -2117,6 +2117,7 @@
     "readRated": "Cada línea es una persona, subiendo y bajando con su nota. Donde las líneas se trenzan, coincidieron; donde se abren, discreparon. La línea gruesa y tenue es el grupo.",
     "readDated": "Cada carril es una persona: continuo donde siguió, con huecos donde paró, cuentas más grandes en los días más grandes. El tramo contorneado es su racha más larga.",
     "showAll": "Ver los {count}",
+    "showMoreComment": "Ver más",
     "showLess": "Ver menos",
     "datedHeadline": "{count, plural, one {Los días de una persona, dibujados.} other {Los días de # personas, lado a lado.}}",
     "mood": {

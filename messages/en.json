@@ -2117,6 +2117,7 @@
     "readRated": "Each line is one person, rising and falling with their rating. Where lines braid, you agreed; where they fan out, you split. The thick faint line is the group.",
     "readDated": "Each lane is one person: solid where they kept going, gaps where they stopped, bigger beads for bigger days. The outlined stretch is their longest run.",
     "showAll": "Show all {count}",
+    "showMoreComment": "Show more",
     "showLess": "Show less",
     "datedHeadline": "{count, plural, one {One person's days, drawn.} other {# people's days, drawn side by side.}}",
     "mood": {
