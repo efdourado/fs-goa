@@ -2274,13 +2274,9 @@
     },
     "pages": {
       "cover": {
-        "title": "Capa",
-        "contents": "O nome, as pessoas e os números principais"
+        "title": "Capa"
       },
-      "thread": {
-        "contentsRated": "A linha de cada um pelos títulos",
-        "contentsDated": "Os dias de cada um (sequências e buracos)"
-      },
+      "thread": {},
       "rankings": {
         "title": "Rankings",
         "headline": "{title} levou, com {value}."
@@ -2313,7 +2309,7 @@
       "button": "Baixar páginas",
       "title": "Baixar páginas",
       "lede": "{count} páginas feitas com este desafio, baixe uma ou todas.",
-      "one": "Baixar esta página",
+      "one": "Baixar {title}",
       "all": "Baixar as {count} (.zip)",
       "preparing": "Preparando…",
       "format": "Imagens PNG, em retrato (4:5). Todas vêm num único .zip."

@@ -2274,13 +2274,9 @@
     },
     "pages": {
       "cover": {
-        "title": "Portada",
-        "contents": "El nombre, las personas y los números clave"
+        "title": "Portada"
       },
-      "thread": {
-        "contentsRated": "La línea de cada uno por los títulos",
-        "contentsDated": "Los días de cada uno (rachas y huecos)"
-      },
+      "thread": {},
       "rankings": {
         "title": "Rankings",
         "headline": "{title} se lo llevó, con {value}."
@@ -2313,7 +2309,7 @@
       "button": "Descargar páginas",
       "title": "Descargar páginas",
       "lede": "{count} páginas hechas con este reto, descarga una o todas.",
-      "one": "Descargar esta página",
+      "one": "Descargar {title}",
       "all": "Descargar las {count} (.zip)",
       "preparing": "Preparando…",
       "format": "Imágenes PNG, en vertical (4:5). Todas vienen en un único .zip."

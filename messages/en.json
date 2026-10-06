@@ -2274,13 +2274,9 @@
     },
     "pages": {
       "cover": {
-        "title": "Cover",
-        "contents": "The name, the people and the key numbers"
+        "title": "Cover"
       },
-      "thread": {
-        "contentsRated": "Everyone's line through the titles",
-        "contentsDated": "Everyone's days (streaks and gaps)"
-      },
+      "thread": {},
       "rankings": {
         "title": "Rankings",
         "headline": "{title} took it, at {value}."
@@ -2313,7 +2309,7 @@
       "button": "Download pages",
       "title": "Download pages",
       "lede": "{count} pages made from this challenge (download one, or all of them).",
-      "one": "Download this page",
+      "one": "Download {title}",
       "all": "Download all {count} (.zip)",
       "preparing": "Preparing…",
       "format": "PNG images, portrait (4:5). All of them come in one .zip."

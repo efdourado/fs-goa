@@ -23,12 +23,11 @@ export function TitleChip({ title, year, className, bare = false, prominentYear 
   );
 }
 
-/** One page of the almanac: its name, its one-line headline, what's on it (for the download list), and the page itself. */
+/** One page of the almanac: its name, its one-line headline and the page itself. */
 export interface AlmanacPage {
   id: string;
   title: string;
   headline: string;
-  contents: string;
   body: ReactNode;
 }
 
@@ -375,7 +374,6 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
       id: "rankings",
       title: t("pages.rankings.title"),
       headline: t("pages.rankings.headline", { title: s.ranking[0].item.title, value: fmtScore(s.ranking[0].score) }),
-      contents: [t("podium.eyebrow"), compactRest.length ? t("ranking.rest") : null, s.dimensions.length ? t("dimension.eyebrow") : null, s.genres.length ? t("genres.eyebrow") : null, s.years.length ? t("years.eyebrow") : null].filter(Boolean).join(" · "),
       body: (
         <div className={grid}>
           <div className={cx("min-w-0 [grid-column:1/-1]", outlineClass)} data-ranking-layout="podium-with-rest">
@@ -448,7 +446,6 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
         id: "duo",
         title: t("duo.title"),
         headline: t("duo.mix.line", { total: d.met.length + d.aBrought.length + d.bBrought.length + d.between, things: noun(d.met.length + d.aBrought.length + d.bBrought.length + d.between), met: d.met.length, a: nameA, aCount: d.aBrought.length, b: nameB, bCount: d.bBrought.length }),
-        contents: [t("duo.mix.title"), t("duo.loved"), d.argument ? t("duo.argument") : null, t("duo.scale")].filter(Boolean).join(" · "),
         body: (
           <div className={grid}>
             <Block title={t("duo.mix.title")} wide>
@@ -515,7 +512,6 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
         id: "brought",
         title: t("duo.broughtTitle"),
         headline: t("duo.broughtHeadline", { a: nameA, b: nameB }),
-        contents: [t("duo.met"), t("duo.brought", { name: nameA }), t("duo.brought", { name: nameB }), d.leanings.length ? t("duo.leanings") : null].filter(Boolean).join(" · "),
         body: (
           <div className={grid}>
             {d.met.length ? <Block title={t("duo.met")}>{titleRows(d.met, null)}</Block> : null}
@@ -547,7 +543,6 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
         id: "solo",
         title: t("solo.title"),
         headline: t("solo.headline", { value: fmt(o.average), count: o.perfect.length }),
-        contents: [t("solo.scale"), o.perfect.length ? t("solo.perfect") : null, o.lowest ? t("solo.lowest") : null, o.instincts ? t("solo.instincts") : null].filter(Boolean).join(" · "),
         body: (
           <div className={grid}>
             <Block title={t("solo.scale")} wide>
@@ -587,7 +582,6 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
           : s.pairs[0]
             ? t("pairs.title", { a: firstName(s.pairs[0].a.name), b: firstName(s.pairs[0].b.name), agreement: s.pairs[0].agreement })
             : t("critics.title", { name: firstName(s.critics[0].person.name), value: fmt(s.critics[0].average) }),
-        contents: [t("critics.eyebrow"), t("favourites.eyebrow"), s.pairs.length ? t("pairs.eyebrow") : null, s.commonGround.length ? t("common.eyebrow") : null].filter(Boolean).join(" · "),
         body: (
           <div className={grid}>
             {s.critics.length ? (
@@ -657,7 +651,6 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
           : s.properties[0]
             ? t("pages.details.headlineProperty", { label: propertyLabel(s.properties[0].label), name: s.properties[0].best.key })
             : t(input.people.length === 1 ? "time.titleSolo" : "time.title", { hours: Math.floor((s.totals.minutes ?? 0) / 60), minutes: Math.round((s.totals.minutes ?? 0) % 60) }),
-        contents: [s.totals.minutes ? t("time.eyebrow") : null, ...s.properties.map((property) => t("property.eyebrow", { label: propertyLabel(property.label) })), s.surprises.length ? t("surprises.eyebrow") : null].filter(Boolean).join(" · "),
         body: (
           <div className={grid}>
             {s.totals.minutes ? (
@@ -701,7 +694,6 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
         id: "words",
         title: t(input.people.length === 1 ? "pages.words.titleSolo" : "pages.words.title"),
         headline: t("pages.words.headline", { count: s.quotes.length }),
-        contents: s.quotes.map((quote) => firstName(quote.person.name)).join(" · "),
         body: (
           <div className={grid}>
             {s.quotes.map((quote) => (
@@ -735,7 +727,6 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
         id: "streaks",
         title: t("pages.streaks.title"),
         headline: lane.longest ? t("soloDays.headline", { count: lane.longest.length }) : t("streaks.none"),
-        contents: [t("soloDays.numbers"), t("consistency.eyebrow"), comebacks.length ? t("comeback.eyebrow") : null].filter(Boolean).join(" · "),
         body: (
           <div className={grid}>
             <Block title={t("soloDays.numbers")}>
@@ -775,7 +766,6 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
       id: "streaks",
       title: t("pages.streaks.title"),
       headline: byStreak[0].longest ? t("streaks.title", { name: firstName(byStreak[0].person.name), count: byStreak[0].longest.length }) : t("streaks.none"),
-      contents: [t("streaks.eyebrow"), t("consistency.eyebrow"), comebacks.length ? t("comeback.eyebrow") : null].filter(Boolean).join(" · "),
       body: (
         <div className={grid}>
           <Block title={t("streaks.eyebrow")}>
@@ -830,7 +820,6 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
         id: "volume",
         title: t("pages.volume.title"),
         headline: s.totals.total !== null ? t("totals.title", { total: nf.number(s.totals.total), unit }) : t("pages.volume.headlineCount", { count: s.totals.checkins }),
-        contents: [s.totals.total !== null ? input.counter?.label ?? null : null, lane.best ? t("bestDay.eyebrow") : null, t("weekdays.eyebrow")].filter(Boolean).join(" · "),
         body: (
           <div className={grid}>
             {s.totals.total !== null ? (
@@ -862,7 +851,6 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
       id: "volume",
       title: t("pages.volume.title"),
       headline: s.totals.total !== null ? t("totals.title", { total: nf.number(s.totals.total), unit }) : t("pages.volume.headlineCount", { count: s.totals.checkins }),
-      contents: [byTotal.length ? input.counter?.label ?? null : null, t("weekdays.eyebrow"), bests.length ? t("bestDay.eyebrow") : null].filter(Boolean).join(" · "),
       body: (
         <div className={grid}>
           {byTotal.length ? (
@@ -898,7 +886,6 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
         id: "records",
         title: t("records.eyebrow"),
         headline: t("records.headline", { title: s.records[0].item.title, gain: Math.round(((s.records[0].best - s.records[0].first) / Math.max(1e-9, s.records[0].first)) * 100) }),
-        contents: s.records.slice(0, 4).map((row) => row.item.title).join(" · "),
         body: (
           <div className={grid}>
             <Block title={t("records.list", { label: input.recordLabel ?? "" })} wide>
@@ -918,7 +905,6 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
         id: "words",
         title: t(input.people.length === 1 ? "pages.words.titleSolo" : "pages.words.title"),
         headline: t("pages.words.headline", { count: s.notes.length }),
-        contents: s.notes.map((note) => firstName(note.person.name)).join(" · "),
         body: (
           <div className={grid}>
             {s.notes.map((note) => (

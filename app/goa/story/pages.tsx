@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { type ReactNode, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { Dialog } from "../dialog";
 import { firstName, initialsOf, personTone } from "../rating-scale";
@@ -14,7 +14,7 @@ import { storyHeadline, ThreadPanel, useStoryFigures } from "./view";
 
 const PAGE_WIDTH = 800;
 const PAGE_HEIGHT = 1000;
-const PREVIEW = 0.2;
+const GRID_GAP = 16;
 
 function Mark({ dark }: { dark?: boolean }) {
   return <span className={cx("grid h-7 w-7 place-items-center rounded-[50%_50%_50%_16%] text-[12px] font-black", dark ? "bg-[var(--spotlight-ink)] text-[var(--spotlight)]" : "bg-[var(--ink)] text-[var(--canvas)]")}>g</span>;
@@ -49,7 +49,7 @@ function PageFrame({ input, index, total, title, headline, dark, children }: {
   );
 }
 
-interface Designed { id: string; title: string; contents: string; node: (index: number, total: number) => ReactNode }
+interface Designed { id: string; title: string; node: (index: number, total: number) => ReactNode }
 
 /** Every page there is to download, cover first: the cover, the drawing, then the almanac's pages. */
 function useDesignedPages(input: StoryInput, story: Story, metrics: Metric[]): Designed[] {
@@ -63,7 +63,6 @@ function useDesignedPages(input: StoryInput, story: Story, metrics: Metric[]): D
     {
       id: "cover",
       title: t("pages.cover.title"),
-      contents: t("pages.cover.contents"),
       node: (index, total) => (
         <PageFrame input={input} index={index} total={total} dark>
           <div className="flex flex-1 flex-col justify-between">
@@ -96,7 +95,6 @@ function useDesignedPages(input: StoryInput, story: Story, metrics: Metric[]): D
     {
       id: "thread",
       title: t("title"),
-      contents: story.kind === "rated" ? t("pages.thread.contentsRated") : t("pages.thread.contentsDated"),
       node: (index, total) => (
         <PageFrame input={input} index={index} total={total}>
           <ThreadPanel input={input} story={story} fit interactive={false} />
@@ -106,7 +104,6 @@ function useDesignedPages(input: StoryInput, story: Story, metrics: Metric[]): D
     ...almanac.map((page) => ({
       id: page.id,
       title: page.title,
-      contents: page.contents,
       node: (index: number, total: number) => (
         <PageFrame input={input} index={index} total={total} title={page.title} headline={page.headline}>{page.body}</PageFrame>
       ),
@@ -116,7 +113,7 @@ function useDesignedPages(input: StoryInput, story: Story, metrics: Metric[]): D
 
 /**
  * "Download pages": sits next to "Download PDF". Opens the list of designed pages — each with a small
- * preview, what's on it, and its own download — plus one "download all".
+ * preview two to a row and its own download — plus one "download all" as a zip.
  */
 export function DownloadPagesButton({ input, story, metrics = [], tone = "hero" }: { input: StoryInput; story: Story; metrics?: Metric[]; tone?: "hero" | "plain" }) {
   const t = useTranslations("story.download");
@@ -147,6 +144,16 @@ function PagesDialog({ input, story, metrics, onClose }: { input: StoryInput; st
   const pages = useDesignedPages(input, story, metrics);
   const refs = useRef(new Map<string, HTMLElement | null>());
   const [busy, setBusy] = useState<string | null>(null);
+  // Two pages side by side at whatever width the dialog has (wide on a desktop, narrow on a phone).
+  const grid = useRef<HTMLOListElement>(null);
+  const [scale, setScale] = useState(0.2);
+  useEffect(() => {
+    const node = grid.current;
+    if (!node) return;
+    const observer = new ResizeObserver(([entry]) => setScale((entry.contentRect.width - GRID_GAP) / 2 / PAGE_WIDTH));
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
 
   async function save(id: string, index: number) {
     const node = refs.current.get(id)?.firstElementChild as HTMLElement | null;
@@ -174,28 +181,40 @@ function PagesDialog({ input, story, metrics, onClose }: { input: StoryInput; st
   }
 
   return (
-    <Dialog title={t("title")} onClose={onClose} busy={busy !== null}>
+    <Dialog title={t("title")} onClose={onClose} busy={busy !== null} wide>
       <p className="text-sm text-[var(--muted)]">{t("lede", { count: pages.length })}</p>
-      <ol className="mt-5 max-h-[60vh] space-y-4 overflow-y-auto pr-1">
+      <ol ref={grid} className="mt-5 grid grid-cols-2" style={{ gap: GRID_GAP }}>
         {pages.map((page, index) => (
-          <li key={page.id} className="flex items-center gap-4">
+          <li key={page.id}>
             {/* The real page, shrunk: what you see is what downloads. */}
-            <div className="flex-none overflow-hidden rounded-md border border-[var(--line)]" style={{ width: PAGE_WIDTH * PREVIEW, height: PAGE_HEIGHT * PREVIEW }}>
-              <div ref={(node) => { refs.current.set(page.id, node); }} style={{ transform: `scale(${PREVIEW})`, transformOrigin: "top left", width: PAGE_WIDTH }}>
+            <div className="overflow-hidden rounded-md border border-[var(--line)]" style={{ aspectRatio: `${PAGE_WIDTH} / ${PAGE_HEIGHT}` }}>
+              <div ref={(node) => { refs.current.set(page.id, node); }} style={{ transform: `scale(${scale})`, transformOrigin: "top left", width: PAGE_WIDTH }}>
                 {page.node(index, pages.length)}
               </div>
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium"><span className="mr-1.5 tabular-nums text-[var(--muted)]">{index + 1}</span>{page.title}</p>
-              <p className="mt-0.5 line-clamp-2 text-xs text-[var(--muted)]">{page.contents}</p>
-              <button type="button" disabled={busy !== null} onClick={() => void saveOne(page.id, index)} className="mt-2 cursor-pointer text-xs font-medium text-[var(--main-strong)] disabled:opacity-50">
-                {busy === page.id ? t("preparing") : t("one")}
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <p className="min-w-0 truncate text-sm font-medium"><span className="mr-1.5 tabular-nums text-[var(--muted)]">{index + 1}</span>{page.title}</p>
+              <button
+                type="button"
+                disabled={busy !== null}
+                onClick={() => void saveOne(page.id, index)}
+                aria-label={t("one", { title: page.title })}
+                title={t("one", { title: page.title })}
+                className="grid size-9 flex-none cursor-pointer place-items-center rounded-full text-[var(--main-strong)] transition hover:bg-[var(--main-soft)] disabled:opacity-50"
+              >
+                {busy === page.id ? (
+                  <span aria-hidden="true" className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                ) : (
+                  <svg viewBox="0 0 20 20" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+                    <path d="M10 3v10m0 0-4-4m4 4 4-4M4 16h12" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
               </button>
             </div>
           </li>
         ))}
       </ol>
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--line)] pt-4">
+      <div className="sticky bottom-0 -mx-6 -mb-6 mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--line)] bg-[var(--paper)] px-6 py-4">
         <span className="text-xs text-[var(--muted)]">{t("format")}</span>
         <button type="button" disabled={busy !== null} onClick={() => void saveAll()} className="inline-flex min-h-10 cursor-pointer items-center rounded-xl bg-[var(--main)] px-4 text-sm font-medium text-white disabled:opacity-55">
           {busy === "all" ? t("preparing") : t("all", { count: pages.length })}

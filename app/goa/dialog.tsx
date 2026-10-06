@@ -7,8 +7,8 @@ import { useGoaFormat } from "./format";
 import { Button, cx, StatusMessage } from "./ui";
 
 /** Native modal supplies background inertness, focus containment and restoration. */
-export function Dialog({ title, children, onClose, busy = false }: {
-  title: string; children: ReactNode; onClose: () => void; busy?: boolean;
+export function Dialog({ title, children, onClose, busy = false, wide = false }: {
+  title: string; children: ReactNode; onClose: () => void; busy?: boolean; wide?: boolean;
 }) {
   const tc = useTranslations("common");
   const ref = useRef<HTMLDialogElement>(null);
@@ -32,7 +32,7 @@ export function Dialog({ title, children, onClose, busy = false }: {
       onCancel={(event) => { event.preventDefault(); if (!busy) onClose(); }}
       onMouseDown={(event) => { downOnBackdrop.current = event.target === ref.current; }}
       onClick={(event) => { if (!busy && downOnBackdrop.current && event.target === ref.current) onClose(); }}
-      className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-xl overflow-y-auto rounded-3xl border border-[var(--line)] bg-[var(--paper)] p-0 text-[var(--ink)] shadow-2xl backdrop:bg-black/45"
+      className={`fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] ${wide ? "max-w-3xl" : "max-w-xl"} overflow-y-auto rounded-3xl border border-[var(--line)] bg-[var(--paper)] p-0 text-[var(--ink)] shadow-2xl backdrop:bg-black/45`}
     >
       <div className="flex items-center justify-between gap-4 border-b border-[var(--line)] px-6 py-4">
         <h2 id={titleId} className="text-lg font-semibold tracking-tight">{title}</h2>
