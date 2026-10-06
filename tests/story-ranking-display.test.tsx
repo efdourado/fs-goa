@@ -67,9 +67,33 @@ test("interactive words pages have fixed-height comments while downloadable page
 
   const interactive = renderToStaticMarkup(<NextIntlClientProvider locale="en" messages={messages} timeZone="America/Sao_Paulo"><Words /></NextIntlClientProvider>);
   assert.ok(interactive.includes('data-collapsible-comment="true"'));
-  assert.ok(interactive.includes("min-height:288px;max-height:288px"));
+  assert.ok(interactive.includes("min-height:232px;max-height:232px"));
 
   const downloadable = renderToStaticMarkup(<NextIntlClientProvider locale="en" messages={messages} timeZone="America/Sao_Paulo"><Words full /></NextIntlClientProvider>);
   assert.ok(!downloadable.includes("data-collapsible-comment"));
   assert.ok(downloadable.includes("A complete opinion 1"));
+});
+
+test("a long run of years stays readable instead of squeezing every column", () => {
+  const items = Array.from({ length: 16 }, (_, index) => ({
+    id: `film-${index}`,
+    title: `Film ${index + 1}`,
+    year: 1995 + index,
+  }));
+  const longRange: StoryInput = {
+    ...input,
+    items,
+    ratings: items.map((item, index) => ({ personId: "me", itemId: item.id, value: 2.5 + (index % 5) * 0.5 })),
+    scores: undefined,
+  };
+  function Page() {
+    const page = useAlmanacPages(buildStory(longRange), longRange, []).find((row) => row.id === "rankings")!;
+    return <div>{page.body}</div>;
+  }
+
+  const html = renderToStaticMarkup(<NextIntlClientProvider locale="en" messages={messages} timeZone="America/Sao_Paulo"><Page /></NextIntlClientProvider>);
+  assert.ok(html.includes('data-scrollable-year-chart="true"'));
+  assert.ok(html.includes("min-width:704px"), "each of the sixteen years keeps a readable 44px column");
+  assert.ok(html.includes("Show all 16"));
+  assert.ok(!html.includes("text-[var(--main-strong)]"), "the ranking action uses the same quiet treatment as comment actions");
 });

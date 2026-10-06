@@ -129,6 +129,7 @@ function Avatar({ id, name, ids, size = 7 }: { id: Id; name: string; ids: Id[]; 
 }
 
 const COLLAPSED_COMMENT_HEIGHT = 232;
+const textActionClass = "cursor-pointer py-1.5 text-xs font-medium text-[var(--muted)] transition hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--main)]";
 
 /** A steady-height comment card that opens in place only when its words need the room. */
 function ExpandableComment({ text }: { text: string }) {
@@ -174,7 +175,7 @@ function ExpandableComment({ text }: { text: string }) {
             aria-controls={contentId}
             aria-expanded={expanded}
             onClick={() => setExpanded((value) => !value)}
-            className="cursor-pointer py-1.5 text-xs font-medium text-[var(--muted)] transition hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--main)]"
+            className={textActionClass}
           >
             {expanded ? t("showLess") : t("showMoreComment")}
           </button>
@@ -218,6 +219,10 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
     );
     const podium = s.ranking.slice(0, 3);
     const rest = s.ranking.slice(3);
+    const yearsScrollable = s.years.length > 10;
+    const tallestYearCount = Math.max(...s.years.map((row) => row.count));
+    const yearContenders = s.years.filter((row) => row.count >= 2);
+    const bestYearScore = yearContenders.length ? Math.max(...yearContenders.map((row) => row.score)) : null;
     const propertyLabel = (label: string) => (t.has(`property.labels.${label}`) ? t(`property.labels.${label}`) : label);
 
     pages.push({
@@ -253,7 +258,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
                 ))}
               </ol>
               {!full && rest.length > 5 ? (
-                <button type="button" className="mt-3 cursor-pointer text-xs text-[var(--main-strong)]" onClick={() => setExpanded((value) => !value)}>
+                <button type="button" className={cx("mt-3", textActionClass)} onClick={() => setExpanded((value) => !value)}>
                   {expanded ? t("showLess") : t("showAll", { count: s.ranking.length })}
                 </button>
               ) : null}
@@ -272,21 +277,27 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
           ))}
           {s.genres.length ? <Block title={t("genres.title", { genre: s.genres[0].key, value: fmt(s.genres[0].average) })}>{statBars(s.genres)}</Block> : null}
           {s.years.length ? (
-            <Block title={t("years.title", { first: s.years[0].key, last: s.years.at(-1)!.key })}>
-              <div className="flex h-28 items-end gap-1.5">
-                {s.years.map((year) => {
-                  const tallest = Math.max(...s.years.map((row) => row.count));
-                  // Only a year with two or more titles can be "the best" — one title is an anecdote.
-                  const contenders = s.years.filter((row) => row.count >= 2);
-                  const best = year.count >= 2 && year.score === Math.max(...contenders.map((row) => row.score));
-                  return (
-                    <div key={year.key} className="flex min-w-0 flex-1 flex-col items-center gap-1" title={year.items.join(" · ")}>
-                      <span className="text-[10px] tabular-nums text-[var(--muted)]">{fmt(year.average)}</span>
-                      <span className="w-full rounded-t" style={{ height: `${(year.count / tallest) * 70}px`, background: best ? "var(--main)" : "var(--main-line)" }} />
-                      <span className="text-[10px] tabular-nums">{year.key}</span>
-                    </div>
-                  );
-                })}
+            <Block wide={yearsScrollable} title={t("years.title", { first: s.years[0].key, last: s.years.at(-1)!.key })}>
+              <div
+                className={cx("-mx-1 px-1 pb-2", yearsScrollable && "overflow-x-auto overscroll-x-contain")}
+                data-scrollable-year-chart={yearsScrollable ? "true" : undefined}
+                role={yearsScrollable ? "region" : undefined}
+                aria-label={yearsScrollable ? t("years.eyebrow") : undefined}
+                tabIndex={yearsScrollable ? 0 : undefined}
+              >
+                <div className="flex h-32 w-full items-end gap-2" style={yearsScrollable ? { minWidth: `${s.years.length * 44}px` } : undefined}>
+                  {s.years.map((year) => {
+                    // Only a year with two or more titles can be "the best" — one title is an anecdote.
+                    const best = year.count >= 2 && year.score === bestYearScore;
+                    return (
+                      <div key={year.key} className="flex min-w-0 flex-1 flex-col items-center gap-1" title={year.items.join(" · ")}>
+                        <span className="text-[10px] tabular-nums text-[var(--muted)]">{fmt(year.average)}</span>
+                        <span className="w-full max-w-8 rounded-t" style={{ height: `${(year.count / tallestYearCount) * 82}px`, background: best ? "var(--main)" : "var(--main-line)" }} />
+                        <span className="text-[10px] tabular-nums">{year.key}</span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
               <p className="mt-2 text-xs text-[var(--muted)]">{t("years.note")}</p>
             </Block>
