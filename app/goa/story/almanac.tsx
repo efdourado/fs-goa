@@ -32,16 +32,19 @@ export interface AlmanacPage {
   body: ReactNode;
 }
 
-/** The card a quoted comment sits in: paper on the canvas, a hairline (everything else on a page is unboxed). */
+/** The card a quoted comment sits in: paper on the canvas, a hairline (other sections are only outlined). */
 const cardClass = "flex min-w-0 flex-col rounded-[20px] border border-[var(--line)] bg-[var(--paper)] p-5 sm:p-6";
 
 /** A section's heading, the homepage shelves' own: the page needs no boxes to tell its parts apart. */
 const sectionTitleClass = "text-lg font-semibold tracking-[-0.02em]";
 
-/** A titled section of a page, straight on the canvas — a heading, the facts, nothing else. */
+/** A section's outline: a hairline on the canvas, no paper fill. */
+const outlineClass = "rounded-[20px] border border-[var(--line)] p-5 sm:p-6";
+
+/** A titled, outlined section of a page — a heading, the facts, nothing else. Sections in a row share one height. */
 function Block({ title, children, wide }: { title: string; children: ReactNode; wide?: boolean }) {
   return (
-    <section className={cx("flex min-w-0 flex-col", wide && "[grid-column:1/-1]")}>
+    <section className={cx("flex min-w-0 flex-col", outlineClass, wide && "[grid-column:1/-1]")}>
       <h4 className={sectionTitleClass}>{title}</h4>
       <div className="mt-4 min-w-0 flex-1">{children}</div>
     </section>
@@ -245,7 +248,7 @@ function ExpandableComment({ text }: { text: string }) {
 
 // Two columns at most, decided by the page's own width (a screen, or a downloaded page) — and a lone last section
 // takes the whole row instead of sitting next to a hole.
-const grid = "grid gap-x-8 gap-y-12 @2xl:grid-cols-2 @2xl:[&>*:last-child:nth-child(odd)]:[grid-column:1/-1]";
+const grid = "grid gap-4 @2xl:grid-cols-2 @2xl:[&>*:last-child:nth-child(odd)]:[grid-column:1/-1]";
 
 /**
  * Every page the almanac has for this story — only the ones its data can fill. `full` lists everything
@@ -375,7 +378,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
       contents: [t("podium.eyebrow"), compactRest.length ? t("ranking.rest") : null, s.dimensions.length ? t("dimension.eyebrow") : null, s.genres.length ? t("genres.eyebrow") : null, s.years.length ? t("years.eyebrow") : null].filter(Boolean).join(" · "),
       body: (
         <div className={grid}>
-          <div className="min-w-0 [grid-column:1/-1]" data-ranking-layout="podium-with-rest">
+          <div className={cx("min-w-0 [grid-column:1/-1]", outlineClass)} data-ranking-layout="podium-with-rest">
             <div className={cx("grid items-start gap-6", fullRest.length > 0 && "@2xl:grid-cols-[minmax(0,1fr)_15rem]")}>
               <section>
                 <h4 className={sectionTitleClass}>{t("podium.eyebrow")}</h4>
@@ -397,7 +400,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
             </div>
           </div>
           {genresCard && yearsCard ? (
-            <div className="grid gap-x-8 gap-y-12 [grid-column:1/-1] @2xl:grid-cols-2" data-chart-pair="genres-years">
+            <div className="grid gap-4 [grid-column:1/-1] @2xl:grid-cols-2" data-chart-pair="genres-years">
               {genresCard}
               {yearsCard}
             </div>
@@ -561,7 +564,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
             </Block>
             {o.perfect.length || o.lowest ? (
               // The perfect scores scroll, the lowest is one cover beside them.
-              <div className={cx("grid min-w-0 gap-y-12 [grid-column:1/-1]", o.perfect.length > 0 && o.lowest && "@2xl:grid-cols-[minmax(0,1fr)_11rem] @2xl:gap-x-8")}>
+              <div className={cx("grid min-w-0 gap-y-8 py-4 [grid-column:1/-1]", o.perfect.length > 0 && o.lowest && "@2xl:grid-cols-[minmax(0,1fr)_11rem] @2xl:gap-x-8")}>
                 {o.perfect.length ? <ScoreShelf title={t("solo.perfect")} scores={o.perfect} full={full} ratingLabel={ratingFor} /> : null}
                 {o.lowest ? <ScoreShelf title={t("solo.lowest")} scores={[o.lowest]} full={full} scrolls={false} ratingLabel={ratingFor} /> : null}
               </div>
