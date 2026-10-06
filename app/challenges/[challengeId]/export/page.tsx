@@ -57,7 +57,7 @@ export default async function ChallengeExportPage({ params }: { params: Promise<
   const t = await getTranslations("exportDoc");
   const footer = cssString(t("footer", { title: challenge.title }));
   const pageCss = `
-@page { size: A4; margin: 18mm 16mm 20mm; background: #faf8f3;
+@page { size: A4; margin: 18mm 0 20mm; background: #faf8f3;
   @bottom-center { content: ${footer} counter(page); font-family: ${display.style.fontFamily}; font-size: 7.5pt; letter-spacing: 0.04em; color: #a8a498; }
 }
 @page :first { @bottom-center { content: none; } }`;

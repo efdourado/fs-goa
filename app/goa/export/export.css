@@ -476,6 +476,9 @@
   body { min-height: 0 !important; }
   .xd-toolbar { display: none !important; }
   .xd-stage { padding: 0; }
-  .xd { width: auto; padding: 0; border-radius: 0; box-shadow: none; }
+  /* The side margins are the sheet's own padding, not @page's: a print dialog set to "Margins: None"
+     (or a browser that ignores @page) would otherwise print edge to edge. Top and bottom stay on @page,
+     where the page number lives. */
+  .xd { width: auto; padding: 0 16mm; border-radius: 0; box-shadow: none; }
   .xd-page + .xd-page, .xd-cover + .xd-page { margin-top: 0; }
 }
