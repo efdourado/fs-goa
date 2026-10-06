@@ -181,7 +181,7 @@ function PagesDialog({ input, story, metrics, onClose }: { input: StoryInput; st
   }
 
   return (
-    <Dialog title={t("title")} onClose={onClose} busy={busy !== null} wide>
+    <Dialog title={t("title")} onClose={onClose} busy={busy !== null} wide closeIcon="minus">
       <p className="text-sm text-[var(--muted)]">{t("lede", { count: pages.length })}</p>
       <ol ref={grid} className="mt-5 grid grid-cols-2" style={{ gap: GRID_GAP }}>
         {pages.map((page, index) => (

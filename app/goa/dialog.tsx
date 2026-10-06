@@ -7,8 +7,8 @@ import { useGoaFormat } from "./format";
 import { Button, cx, StatusMessage } from "./ui";
 
 /** Native modal supplies background inertness, focus containment and restoration. */
-export function Dialog({ title, children, onClose, busy = false, wide = false }: {
-  title: string; children: ReactNode; onClose: () => void; busy?: boolean; wide?: boolean;
+export function Dialog({ title, children, onClose, busy = false, wide = false, closeIcon = "cross" }: {
+  title: string; children: ReactNode; onClose: () => void; busy?: boolean; wide?: boolean; closeIcon?: "cross" | "minus";
 }) {
   const tc = useTranslations("common");
   const ref = useRef<HTMLDialogElement>(null);
@@ -43,7 +43,11 @@ export function Dialog({ title, children, onClose, busy = false, wide = false }:
           aria-label={tc("close")}
           className={cx("-mr-1.5 grid h-8 w-8 flex-none place-items-center rounded-lg text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)] disabled:opacity-40")}
         >
-          <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" strokeLinecap="round" /></svg>
+          {closeIcon === "minus" ? (
+            <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><circle cx="10" cy="10" r="7.5" /><path d="M6.75 10h6.5" strokeLinecap="round" /></svg>
+          ) : (
+            <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" strokeLinecap="round" /></svg>
+          )}
         </button>
       </div>
       <div className="p-6">{children}</div>
