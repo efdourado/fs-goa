@@ -152,7 +152,7 @@ function ScoreShelf({ title, scores, ratingLabel, full, scrolls = true }: { titl
   const { railRef, showFade, onScroll, nudge } = useShelfRail();
   const tiles = scores.map((score) => <ScoreTile key={score.item.id} score={score} ratingLabel={ratingLabel(score)} />);
   return (
-    <section className="min-w-0" data-score-shelf={title}>
+    <section className={cx("min-w-0", outlineClass)} data-score-shelf={title}>
       <div className="mb-4 flex min-h-8 items-center justify-between gap-3">
         <div className="flex items-baseline gap-2.5">
           <h4 className={sectionTitleClass}>{title}</h4>
@@ -160,7 +160,7 @@ function ScoreShelf({ title, scores, ratingLabel, full, scrolls = true }: { titl
         </div>
         {scrolls && !full && scores.length > 1 ? <RailArrows nudge={nudge} /> : null}
       </div>
-      {full || !scrolls ? <div className="flex flex-wrap gap-4">{tiles}</div> : <Rail railRef={railRef} showFade={showFade} onScroll={onScroll}>{tiles}</Rail>}
+      {full || !scrolls ? <div className="flex flex-wrap gap-4 pt-1">{tiles}</div> : <Rail railRef={railRef} showFade={showFade} onScroll={onScroll}>{tiles}</Rail>}
     </section>
   );
 }
@@ -564,7 +564,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
             </Block>
             {o.perfect.length || o.lowest ? (
               // The perfect scores scroll, the lowest is one cover beside them.
-              <div className={cx("grid min-w-0 gap-y-8 py-4 [grid-column:1/-1]", o.perfect.length > 0 && o.lowest && "@2xl:grid-cols-[minmax(0,1fr)_11rem] @2xl:gap-x-8")}>
+              <div className={cx("grid min-w-0 gap-4 [grid-column:1/-1]", o.perfect.length > 0 && o.lowest && "@2xl:grid-cols-[minmax(0,1fr)_auto]")}>
                 {o.perfect.length ? <ScoreShelf title={t("solo.perfect")} scores={o.perfect} full={full} ratingLabel={ratingFor} /> : null}
                 {o.lowest ? <ScoreShelf title={t("solo.lowest")} scores={[o.lowest]} full={full} scrolls={false} ratingLabel={ratingFor} /> : null}
               </div>
