@@ -128,7 +128,7 @@ function Avatar({ id, name, ids, size = 7 }: { id: Id; name: string; ids: Id[]; 
   return <span className="grid flex-none place-items-center rounded-full text-[10px] font-bold text-white" style={{ background: personTone(ids, id), width: size * 4, height: size * 4 }}>{initialsOf(name)}</span>;
 }
 
-const COLLAPSED_COMMENT_HEIGHT = 160;
+const COLLAPSED_COMMENT_HEIGHT = 232;
 
 /** A steady-height comment card that opens in place only when its words need the room. */
 function ExpandableComment({ text }: { text: string }) {
@@ -166,7 +166,7 @@ function ExpandableComment({ text }: { text: string }) {
       </div>
       {overflows ? (
         <div className={cx(
-          "flex justify-center",
+          "flex justify-start",
           expanded ? "mt-3" : "absolute inset-x-0 bottom-0 h-16 items-end bg-gradient-to-t from-[var(--paper)] via-[var(--paper)] to-transparent",
         )}>
           <button
@@ -174,12 +174,9 @@ function ExpandableComment({ text }: { text: string }) {
             aria-controls={contentId}
             aria-expanded={expanded}
             onClick={() => setExpanded((value) => !value)}
-            className="group inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-[var(--line)] bg-[var(--paper)] px-3 py-1.5 text-[11px] font-medium text-[var(--muted)] shadow-sm transition hover:border-[var(--main-line)] hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--main)]"
+            className="cursor-pointer py-1.5 text-xs font-medium text-[var(--muted)] transition hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--main)]"
           >
             {expanded ? t("showLess") : t("showMoreComment")}
-            <svg viewBox="0 0 12 12" className={cx("size-3 transition-transform", expanded && "rotate-180")} fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-              <path d="m3 4.5 3 3 3-3" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
           </button>
         </div>
       ) : null}

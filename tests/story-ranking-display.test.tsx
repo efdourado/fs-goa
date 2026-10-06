@@ -67,7 +67,7 @@ test("interactive words pages have fixed-height comments while downloadable page
 
   const interactive = renderToStaticMarkup(<NextIntlClientProvider locale="en" messages={messages} timeZone="America/Sao_Paulo"><Words /></NextIntlClientProvider>);
   assert.ok(interactive.includes('data-collapsible-comment="true"'));
-  assert.ok(interactive.includes("min-height:160px;max-height:160px"));
+  assert.ok(interactive.includes("min-height:288px;max-height:288px"));
 
   const downloadable = renderToStaticMarkup(<NextIntlClientProvider locale="en" messages={messages} timeZone="America/Sao_Paulo"><Words full /></NextIntlClientProvider>);
   assert.ok(!downloadable.includes("data-collapsible-comment"));
