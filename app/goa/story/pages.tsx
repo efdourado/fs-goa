@@ -8,7 +8,7 @@ import { firstName, initialsOf, personTone } from "../rating-scale";
 import type { Metric } from "../types";
 import { cx } from "../ui";
 import { type AlmanacPage, useAlmanacPages } from "./almanac";
-import { downloadNode } from "./download";
+import { downloadNode, downloadZip, renderPng, slug } from "./download";
 import type { Story, StoryInput } from "./model";
 import { storyHeadline, ThreadPanel, useStoryFigures } from "./view";
 
@@ -160,10 +160,14 @@ function PagesDialog({ input, story, metrics, onClose }: { input: StoryInput; st
   async function saveAll() {
     setBusy("all");
     try {
+      const files: { name: string; blob: Blob }[] = [];
       for (const [index, page] of pages.entries()) {
-        await save(page.id, index);
-        await new Promise((resolve) => window.setTimeout(resolve, 350));
+        const node = refs.current.get(page.id)?.firstElementChild as HTMLElement | null;
+        if (!node) continue;
+        const number = String(index + 1).padStart(2, "0");
+        files.push({ name: `${number}-${slug(page.title)}.png`, blob: await renderPng(node) });
       }
+      await downloadZip(files, input.title);
     } finally {
       setBusy(null);
     }
