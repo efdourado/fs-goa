@@ -19,11 +19,18 @@ export function useShelfRail() {
     setShowFade(rail ? rail.scrollWidth - rail.clientWidth - rail.scrollLeft > 4 : false);
   }
 
-  // Re-check after every render (children can change) and on viewport resize.
+  // Re-check after every render (children can change) and whenever the rail's size changes — which also
+  // catches a rail mounted while hidden (a pager's inactive page) and only laid out once it is shown.
   useEffect(updateFade);
   useEffect(() => {
-    window.addEventListener("resize", updateFade);
-    return () => window.removeEventListener("resize", updateFade);
+    const rail = railRef.current;
+    if (!rail || typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", updateFade);
+      return () => window.removeEventListener("resize", updateFade);
+    }
+    const observer = new ResizeObserver(updateFade);
+    observer.observe(rail);
+    return () => observer.disconnect();
   }, []);
 
   function nudge(direction: -1 | 1) {
