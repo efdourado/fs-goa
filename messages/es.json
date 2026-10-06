@@ -2341,6 +2341,7 @@
       "scale": "Tu escala",
       "average": "Tu media: {value}.",
       "perfect": "Tus notas máximas",
+      "ratingAria": "{title}, puntuación {value}",
       "lowest": "La más baja",
       "instincts": "Tu instinto",
       "instinctsLine": "Tus apuestas fallaron por eso, de media ({close} de {total} quedaron a medio punto)."

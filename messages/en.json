@@ -2341,6 +2341,7 @@
       "scale": "Your scale",
       "average": "Your average: {value}.",
       "perfect": "Your perfect scores",
+      "ratingAria": "{title}, rated {value}",
       "lowest": "The lowest",
       "instincts": "Your instincts",
       "instinctsLine": "Your guesses missed by that much, on average ({close} of {total} landed within half a point)."

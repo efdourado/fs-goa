@@ -3,11 +3,13 @@
 import { useFormatter, useTranslations } from "next-intl";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 
-import { coverColors, coverToneOf } from "../catalog-cover";
+import { coverColors, coverToneOf, ItemCover } from "../catalog-cover";
 import { firstName, initialsOf, personTone } from "../rating-scale";
+import { Rail, RailArrows, useShelfRail } from "../shelf";
 import type { Id, Metric } from "../types";
 import { CommentText, cx } from "../ui";
-import type { DatedStory, GroupStat, RatedStory, Story, StoryInput } from "./model";
+import { formatRuntime } from "../utils";
+import type { DatedStory, GroupStat, ItemScore, RatedStory, Story, StoryInput } from "./model";
 
 /** A small typographic cover — the title is the artwork, tinted like the catalogue's. `bare` drops the title when it is printed beside it. */
 export function TitleChip({ title, year, className, bare = false, prominentYear = false }: { title: string; year?: number | null; className?: string; bare?: boolean; prominentYear?: boolean }) {
@@ -30,16 +32,19 @@ export interface AlmanacPage {
   body: ReactNode;
 }
 
-/** The one card every fact sits in: paper on the canvas, a hairline, the same padding and corners everywhere. */
+/** The card a quoted comment sits in: paper on the canvas, a hairline (everything else on a page is unboxed). */
 const cardClass = "flex min-w-0 flex-col rounded-[20px] border border-[var(--line)] bg-[var(--paper)] p-5 sm:p-6";
 
-/** A titled card inside a page — a heading, the facts, nothing else. Cards in a row share one height. */
+/** A section's heading, the homepage shelves' own: the page needs no boxes to tell its parts apart. */
+const sectionTitleClass = "text-lg font-semibold tracking-[-0.02em]";
+
+/** A titled section of a page, straight on the canvas — a heading, the facts, nothing else. */
 function Block({ title, children, wide }: { title: string; children: ReactNode; wide?: boolean }) {
   return (
-    <div className={cx(cardClass, wide && "[grid-column:1/-1]")}>
-      <h4 className="text-[15px] font-medium tracking-[-0.01em]">{title}</h4>
-      <div className="mt-4 flex-1">{children}</div>
-    </div>
+    <section className={cx("flex min-w-0 flex-col", wide && "[grid-column:1/-1]")}>
+      <h4 className={sectionTitleClass}>{title}</h4>
+      <div className="mt-4 min-w-0 flex-1">{children}</div>
+    </section>
   );
 }
 
@@ -128,6 +133,35 @@ function Avatar({ id, name, ids, size = 7 }: { id: Id; name: string; ids: Id[]; 
   return <span className="grid flex-none place-items-center rounded-full text-[10px] font-bold text-white" style={{ background: personTone(ids, id), width: size * 4, height: size * 4 }}>{initialsOf(name)}</span>;
 }
 
+/** One catalogue cover with its caption, as the homepage shelf draws it (nothing to open here). */
+function ScoreTile({ score, ratingLabel }: { score: ItemScore; ratingLabel: string }) {
+  const caption = [score.item.properties?.[0]?.value, score.item.genre, formatRuntime(score.item.runtime)].filter(Boolean).slice(0, 2).join(" · ");
+  return (
+    <div className="flex w-44 min-w-0 flex-none snap-start flex-col gap-2.5">
+      <ItemCover title={score.item.title} year={score.item.year} avg={score.average} ratingLabel={ratingLabel} size="sm" />
+      <span className="truncate text-xs text-[var(--muted)]">{caption || "\u00a0"}</span>
+    </div>
+  );
+}
+
+/** A heading with a count over a rail of covers — the homepage's "My catalogue" shelf, filtered. `full` (a downloaded page) wraps instead of scrolling. */
+function ScoreShelf({ title, scores, ratingLabel, full, scrolls = true }: { title: string; scores: ItemScore[]; ratingLabel: (score: ItemScore) => string; full: boolean; scrolls?: boolean }) {
+  const { railRef, showFade, onScroll, nudge } = useShelfRail();
+  const tiles = scores.map((score) => <ScoreTile key={score.item.id} score={score} ratingLabel={ratingLabel(score)} />);
+  return (
+    <section className="min-w-0" data-score-shelf={title}>
+      <div className="mb-4 flex min-h-8 items-center justify-between gap-3">
+        <div className="flex items-baseline gap-2.5">
+          <h4 className={sectionTitleClass}>{title}</h4>
+          {scrolls ? <span className="text-xs text-[var(--muted)]">{scores.length}</span> : null}
+        </div>
+        {scrolls && !full && scores.length > 1 ? <RailArrows nudge={nudge} /> : null}
+      </div>
+      {full || !scrolls ? <div className="flex flex-wrap gap-4">{tiles}</div> : <Rail railRef={railRef} showFade={showFade} onScroll={onScroll}>{tiles}</Rail>}
+    </section>
+  );
+}
+
 const COLLAPSED_COMMENT_HEIGHT = 232;
 const textActionClass = "cursor-pointer py-1.5 text-xs font-medium text-[var(--muted)] transition hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--main)]";
 const MAX_YEAR_GROUPS = 8;
@@ -209,9 +243,9 @@ function ExpandableComment({ text }: { text: string }) {
   );
 }
 
-// Two columns at most, decided by the page's own width (a screen, or a downloaded page) — and a lone last card
+// Two columns at most, decided by the page's own width (a screen, or a downloaded page) — and a lone last section
 // takes the whole row instead of sitting next to a hole.
-const grid = "grid gap-4 @2xl:grid-cols-2 @2xl:[&>*:last-child:nth-child(odd)]:[grid-column:1/-1]";
+const grid = "grid gap-x-8 gap-y-12 @2xl:grid-cols-2 @2xl:[&>*:last-child:nth-child(odd)]:[grid-column:1/-1]";
 
 /**
  * Every page the almanac has for this story — only the ones its data can fill. `full` lists everything
@@ -341,10 +375,10 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
       contents: [t("podium.eyebrow"), compactRest.length ? t("ranking.rest") : null, s.dimensions.length ? t("dimension.eyebrow") : null, s.genres.length ? t("genres.eyebrow") : null, s.years.length ? t("years.eyebrow") : null].filter(Boolean).join(" · "),
       body: (
         <div className={grid}>
-          <div className={cx(cardClass, "[grid-column:1/-1]")} data-ranking-layout="podium-with-rest">
+          <div className="min-w-0 [grid-column:1/-1]" data-ranking-layout="podium-with-rest">
             <div className={cx("grid items-start gap-6", fullRest.length > 0 && "@2xl:grid-cols-[minmax(0,1fr)_15rem]")}>
               <section>
-                <h4 className="text-[15px] font-medium tracking-[-0.01em]">{t("podium.eyebrow")}</h4>
+                <h4 className={sectionTitleClass}>{t("podium.eyebrow")}</h4>
                 {renderPodium(compactPodiumLayout, "compact", "grid @2xl:hidden")}
                 {renderPodium(fullPodiumLayout, "full", "hidden @2xl:grid")}
               </section>
@@ -353,7 +387,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
                   "border-t border-[var(--line)] pt-5 @2xl:border-l @2xl:border-t-0 @2xl:pl-5 @2xl:pt-0",
                   fullRest.length === 0 && "@2xl:hidden",
                 )} data-ranking-rest="inline">
-                  <h4 className="text-[15px] font-medium tracking-[-0.01em]">{t("ranking.rest")}</h4>
+                  <h4 className={sectionTitleClass}>{t("ranking.rest")}</h4>
                   <div className="mt-4">
                     {renderRest(compactRest, 4, "compact", "@2xl:hidden")}
                     {fullRest.length ? renderRest(fullRest, 6, "full", "hidden @2xl:block") : null}
@@ -363,7 +397,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
             </div>
           </div>
           {genresCard && yearsCard ? (
-            <div className="grid gap-4 [grid-column:1/-1] @2xl:grid-cols-2" data-chart-pair="genres-years">
+            <div className="grid gap-x-8 gap-y-12 [grid-column:1/-1] @2xl:grid-cols-2" data-chart-pair="genres-years">
               {genresCard}
               {yearsCard}
             </div>
@@ -505,6 +539,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
       const o = s.solo;
       const tallest = Math.max(1, ...o.distribution.map((row) => row.count));
       const tone = personTone(ids, o.person.id);
+      const ratingFor = (score: ItemScore) => t("solo.ratingAria", { title: score.item.title, value: fmt(score.average) });
       pages.push({
         id: "solo",
         title: t("solo.title"),
@@ -524,20 +559,12 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
               </div>
               <p className="mt-3 text-sm">{t("solo.average", { value: fmt(o.average) })}</p>
             </Block>
-            {o.perfect.length ? (
-              <Block title={t("solo.perfect")}>
-                <ul className="flex flex-wrap gap-3">
-                  {o.perfect.map((score) => <li key={score.item.id} className="w-16"><TitleChip bare title={score.item.title} year={score.item.year} className="w-full" /><p className="mt-1 truncate text-xs">{score.item.title}</p></li>)}
-                </ul>
-              </Block>
-            ) : null}
-            {o.lowest ? (
-              <Block title={t("solo.lowest")}>
-                <div className="flex items-center gap-4">
-                  <TitleChip bare title={o.lowest.item.title} year={o.lowest.item.year} className="w-16 flex-none grayscale" />
-                  <div><p className="text-xl font-light">{o.lowest.item.title}</p><p className="text-3xl font-light tabular-nums">{fmt(o.lowest.average)}</p></div>
-                </div>
-              </Block>
+            {o.perfect.length || o.lowest ? (
+              // The perfect scores scroll, the lowest is one cover beside them.
+              <div className={cx("grid min-w-0 gap-y-12 [grid-column:1/-1]", o.perfect.length > 0 && o.lowest && "@2xl:grid-cols-[minmax(0,1fr)_11rem] @2xl:gap-x-8")}>
+                {o.perfect.length ? <ScoreShelf title={t("solo.perfect")} scores={o.perfect} full={full} ratingLabel={ratingFor} /> : null}
+                {o.lowest ? <ScoreShelf title={t("solo.lowest")} scores={[o.lowest]} full={full} scrolls={false} ratingLabel={ratingFor} /> : null}
+              </div>
             ) : null}
             {o.instincts ? (
               <Block title={t("solo.instincts")}>

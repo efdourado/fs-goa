@@ -32,6 +32,21 @@ test("the podium shows Goa scores to two places without repeating a label", () =
   assert.ok(html.indexOf("4.74") < html.indexOf("4.72") || html.includes("LOTR took it, at 4.74"), "LOTR leads");
 });
 
+test("perfect scores and the lowest are catalogue shelves, the perfect ones scrolling", () => {
+  function Solo({ full = false }: { full?: boolean }) {
+    const page = useAlmanacPages(buildStory(input), input, [], full).find((row) => row.id === "solo")!;
+    return <div>{page.body}</div>;
+  }
+
+  const interactive = renderToStaticMarkup(<NextIntlClientProvider locale="en" messages={messages} timeZone="America/Sao_Paulo"><Solo /></NextIntlClientProvider>);
+  assert.ok(interactive.includes('data-score-shelf="Your perfect scores"'));
+  assert.ok(interactive.includes('data-score-shelf="The lowest"'));
+  assert.ok(interactive.includes("snap-x snap-proximity"));
+
+  const downloadable = renderToStaticMarkup(<NextIntlClientProvider locale="en" messages={messages} timeZone="America/Sao_Paulo"><Solo full /></NextIntlClientProvider>);
+  assert.ok(!downloadable.includes("snap-x"));
+});
+
 test("each criterion shows who leads it on the rankings page", () => {
   const places: StoryInput = {
     title: "Bars", noun: "place", people: [{ id: "me", name: "Me" }],
