@@ -10,11 +10,11 @@ import { CommentText, cx } from "../ui";
 import type { DatedStory, GroupStat, RatedStory, Story, StoryInput } from "./model";
 
 /** A small typographic cover — the title is the artwork, tinted like the catalogue's. `bare` drops the title when it is printed beside it. */
-export function TitleChip({ title, year, className, bare = false }: { title: string; year?: number | null; className?: string; bare?: boolean }) {
+export function TitleChip({ title, year, className, bare = false, prominentYear = false }: { title: string; year?: number | null; className?: string; bare?: boolean; prominentYear?: boolean }) {
   return (
     <span className={cx("relative flex aspect-[3/4] flex-col justify-between overflow-hidden rounded-lg bg-[var(--cover-bg)] p-1.5 text-[var(--cover-ink)]", className)} style={coverColors(coverToneOf(title))}>
       <span aria-hidden="true" className="absolute -bottom-5 -right-5 h-12 w-12 rounded-full border-[8px] border-[var(--cover-deco)]" />
-      <span className="relative text-[7px] tracking-[0.08em]" style={{ fontFamily: "var(--font-geist-mono), ui-monospace, monospace" }}>{year ?? " "}</span>
+      <span className={cx("relative tracking-[0.08em]", prominentYear ? "text-[10px] font-medium" : "text-[7px]")} style={{ fontFamily: "var(--font-geist-mono), ui-monospace, monospace" }}>{year ?? " "}</span>
       {/* Bare: the title is already written right next to the cover — don't say it twice. */}
       {bare ? null : <span className="relative line-clamp-3 break-words text-[10px] font-light leading-[1.05]">{title}</span>}
     </span>
@@ -130,6 +130,30 @@ function Avatar({ id, name, ids, size = 7 }: { id: Id; name: string; ids: Id[]; 
 
 const COLLAPSED_COMMENT_HEIGHT = 232;
 const textActionClass = "cursor-pointer py-1.5 text-xs font-medium text-[var(--muted)] transition hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--main)]";
+const MAX_YEAR_GROUPS = 8;
+const CHART_PREVIEW_ROWS = 5;
+
+/** Long timelines start as a few weighted periods; the detailed view restores every individual year. */
+function summarizeYears(years: GroupStat[]): GroupStat[] {
+  if (years.length <= MAX_YEAR_GROUPS) return years;
+  const chunkSize = Math.ceil(years.length / MAX_YEAR_GROUPS);
+  const groups: GroupStat[] = [];
+  for (let index = 0; index < years.length; index += chunkSize) {
+    const chunk = years.slice(index, index + chunkSize);
+    const count = chunk.reduce((sum, year) => sum + year.count, 0);
+    const first = chunk[0].key;
+    const last = chunk.at(-1)!.key;
+    const shortLast = first.slice(0, 2) === last.slice(0, 2) ? last.slice(2) : last;
+    groups.push({
+      key: first === last ? first : `${first}–${shortLast}`,
+      count,
+      average: Math.round((chunk.reduce((sum, year) => sum + year.average * year.count, 0) / count) * 10) / 10,
+      score: chunk.reduce((sum, year) => sum + year.score * year.count, 0) / count,
+      items: chunk.flatMap((year) => year.items),
+    });
+  }
+  return groups;
+}
 
 /** A steady-height comment card that opens in place only when its words need the room. */
 function ExpandableComment({ text }: { text: string }) {
@@ -196,8 +220,10 @@ const grid = "grid gap-4 @2xl:grid-cols-2 @2xl:[&>*:last-child:nth-child(odd)]:[
 export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric[], full = false): AlmanacPage[] {
   const t = useTranslations("story");
   const nf = useFormatter();
-  const [expanded, setExpanded] = useState(false);
-  const showAll = full || expanded;
+  const [rankingExpanded, setRankingExpanded] = useState(false);
+  const [genresExpanded, setGenresExpanded] = useState(false);
+  const [yearGroupsExpanded, setYearGroupsExpanded] = useState(false);
+  const showAll = full || rankingExpanded;
   const fmt = (value: number) => nf.number(value, { maximumFractionDigits: 1 });
   // The ranking's number is the Goa score, to two places: 4.74 and 4.72 are why it exists, and both read 4.7.
   const fmtScore = (value: number) => nf.number(value, { maximumFractionDigits: 2 });
@@ -217,54 +243,132 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
         ))}
       </div>
     );
-    const podium = s.ranking.slice(0, 3);
-    const rest = s.ranking.slice(3);
-    const yearsScrollable = s.years.length > 10;
-    const tallestYearCount = Math.max(...s.years.map((row) => row.count));
-    const yearContenders = s.years.filter((row) => row.count >= 2);
-    const bestYearScore = yearContenders.length ? Math.max(...yearContenders.map((row) => row.score)) : null;
+    const compactPodium = s.ranking.slice(0, 3);
+    const compactPodiumLayout = [1, 0, 2].flatMap((index) => compactPodium[index] ? [{ score: compactPodium[index], place: index + 1 }] : []);
+    const fullPodium = s.ranking.slice(0, 5);
+    const fullPodiumLayout = [3, 1, 0, 2, 4].flatMap((index) => fullPodium[index] ? [{ score: fullPodium[index], place: index + 1 }] : []);
+    const compactRest = s.ranking.slice(3);
+    const fullRest = s.ranking.slice(5);
+    const yearGroups = summarizeYears(s.years);
+    const displayedGenres = full || genresExpanded ? s.genres : s.genres.slice(0, CHART_PREVIEW_ROWS);
+    const displayedYearGroups = full || yearGroupsExpanded ? yearGroups : yearGroups.slice(0, CHART_PREVIEW_ROWS);
+    const tallestYearCount = Math.max(...yearGroups.map((row) => row.count));
+    const bestYearScore = yearGroups.length ? Math.max(...yearGroups.map((row) => row.score)) : null;
+    const restRankLabel = (place: number) => s.ranking.length > 10 && place < 10 ? `0${place}` : String(place);
     const propertyLabel = (label: string) => (t.has(`property.labels.${label}`) ? t(`property.labels.${label}`) : label);
+    const renderPodium = (layout: typeof fullPodiumLayout, mode: "compact" | "full", className: string) => (
+      <div
+        className={cx("mt-4 items-end gap-2 sm:gap-3", className)}
+        data-podium-mode={mode}
+        data-podium-size={layout.length}
+        style={{ gridTemplateColumns: `repeat(${layout.length}, minmax(0, 1fr))` }}
+      >
+        {layout.map(({ score, place }) => (
+          <div key={score.item.id} className="flex min-w-0 flex-col items-center text-center" data-podium-place={place}>
+            <span className={cx("relative w-full", place === 1 ? "max-w-[6.5rem]" : place <= 3 ? "max-w-[5.25rem]" : "max-w-[4.5rem]")}>
+              <TitleChip bare prominentYear title={score.item.title} year={score.item.year} className="w-full" />
+              <span className="absolute -left-1.5 -top-1.5 grid h-6 w-6 place-items-center rounded-full bg-[var(--ink)] text-[9px] font-medium text-[var(--canvas)] sm:-left-2 sm:-top-2 sm:text-[10px]">{place}</span>
+            </span>
+            <p className="mt-2 line-clamp-1 text-xs sm:text-sm">{score.item.title}</p>
+            <div className={cx(
+              "mt-2 flex w-full flex-col items-center justify-start rounded-lg bg-[var(--wash)] pt-2.5",
+              place === 1 ? "h-24" : place === 2 ? "h-20" : place === 3 ? "h-16" : place === 4 ? "h-14" : "h-12",
+            )}>
+              <span className="text-xl font-light tabular-nums leading-none tracking-[-0.03em] sm:text-2xl">{fmtScore(score.score)}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+    const renderRest = (rows: typeof compactRest, startAt: number, mode: "compact" | "full", className: string) => (
+      <div className={className} data-ranking-mode={mode}>
+        <ol className="space-y-2.5">
+          {(showAll ? rows : rows.slice(0, 5)).map((score, index) => {
+            const place = index + startAt;
+            return (
+              <li key={score.item.id} className="grid grid-cols-[1.5rem_minmax(0,1fr)_auto] items-baseline gap-2 text-xs" data-rank={restRankLabel(place)}>
+                <span className="tabular-nums text-[var(--muted)]">{restRankLabel(place)}</span>
+                <span className="truncate text-sm">{score.item.title}</span>
+                <span className="tabular-nums text-[var(--muted)]">{fmtScore(score.score)}</span>
+              </li>
+            );
+          })}
+        </ol>
+        {!full && rows.length > 5 ? (
+          <button type="button" className={cx("mt-3", textActionClass)} onClick={() => setRankingExpanded((value) => !value)}>
+            {rankingExpanded ? t("showLess") : t("showAll", { count: s.ranking.length })}
+          </button>
+        ) : null}
+      </div>
+    );
+    const genresCard = s.genres.length ? (
+      <Block title={t("genres.title", { genre: s.genres[0].key, value: fmt(s.genres[0].average) })}>
+        <div data-horizontal-chart="genres" data-chart-rows={displayedGenres.length}>{statBars(displayedGenres)}</div>
+        {!full && s.genres.length > CHART_PREVIEW_ROWS ? (
+          <button type="button" className={cx("mt-3", textActionClass)} onClick={() => setGenresExpanded((value) => !value)}>
+            {genresExpanded ? t("showLess") : t("showMore", { count: s.genres.length - CHART_PREVIEW_ROWS })}
+          </button>
+        ) : null}
+      </Block>
+    ) : null;
+    const yearsCard = s.years.length ? (
+      <Block title={t("years.title", { first: s.years[0].key, last: s.years.at(-1)!.key })}>
+        <div className="space-y-2.5" data-horizontal-chart="years" data-chart-rows={displayedYearGroups.length}>
+          {displayedYearGroups.map((year) => (
+            <Bar
+              key={year.key}
+              label={<>{year.key} <span className="text-xs text-[var(--muted)]">· {year.count}</span></>}
+              value={year.count}
+              max={tallestYearCount}
+              strong={year.count >= 2 && year.score === bestYearScore}
+              figure={fmt(year.average)}
+              tone={year.count >= 2 && year.score === bestYearScore ? "var(--main)" : "var(--main-line)"}
+            />
+          ))}
+        </div>
+        {!full && yearGroups.length > CHART_PREVIEW_ROWS ? (
+          <button type="button" className={cx("mt-2", textActionClass)} onClick={() => setYearGroupsExpanded((value) => !value)}>
+            {yearGroupsExpanded ? t("showLess") : t("showMore", { count: yearGroups.length - CHART_PREVIEW_ROWS })}
+          </button>
+        ) : null}
+      </Block>
+    ) : null;
 
     pages.push({
       id: "rankings",
       title: t("pages.rankings.title"),
       headline: t("pages.rankings.headline", { title: s.ranking[0].item.title, value: fmtScore(s.ranking[0].score) }),
-      contents: [t("podium.eyebrow"), rest.length ? t("ranking.rest") : null, s.dimensions.length ? t("dimension.eyebrow") : null, s.genres.length ? t("genres.eyebrow") : null, s.years.length ? t("years.eyebrow") : null].filter(Boolean).join(" · "),
+      contents: [t("podium.eyebrow"), compactRest.length ? t("ranking.rest") : null, s.dimensions.length ? t("dimension.eyebrow") : null, s.genres.length ? t("genres.eyebrow") : null, s.years.length ? t("years.eyebrow") : null].filter(Boolean).join(" · "),
       body: (
         <div className={grid}>
-          <Block title={t("podium.eyebrow")}>
-            <div className="grid max-w-md grid-cols-3 items-end gap-3">
-              {[podium[1], podium[0], podium[2]].map((score, index) => score ? (
-                <div key={score.item.id} className="flex flex-col items-center text-center">
-                  <span className={cx("relative w-full", index === 1 ? "max-w-[6.5rem]" : "max-w-[5.25rem]")}>
-                    <TitleChip bare title={score.item.title} year={score.item.year} className="w-full" />
-                    {/* The place, as a badge on the cover — the pedestal is for the number. */}
-                    <span className="absolute -left-2 -top-2 grid h-6 w-6 place-items-center rounded-full bg-[var(--ink)] text-[11px] font-medium text-[var(--canvas)]">{index === 1 ? 1 : index === 0 ? 2 : 3}</span>
-                  </span>
-                  <p className="mt-2 line-clamp-1 text-xs">{score.item.title}</p>
-                  <div className={cx("mt-2 flex w-full flex-col items-center justify-start rounded-lg bg-[var(--wash)] pt-2.5", index === 1 ? "h-24" : index === 0 ? "h-[4.5rem]" : "h-14")}>
-                    <span className="text-2xl font-light tabular-nums leading-none tracking-[-0.03em]">{fmtScore(score.score)}</span>
-                    <span className="mt-1 text-[10px] text-[var(--muted)]">{t("podium.score")}</span>
+          <div className={cx(cardClass, "[grid-column:1/-1]")} data-ranking-layout="podium-with-rest">
+            <div className={cx("grid items-start gap-6", fullRest.length > 0 && "@2xl:grid-cols-[minmax(0,1fr)_15rem]")}>
+              <section>
+                <h4 className="text-[15px] font-medium tracking-[-0.01em]">{t("podium.eyebrow")}</h4>
+                {renderPodium(compactPodiumLayout, "compact", "grid @2xl:hidden")}
+                {renderPodium(fullPodiumLayout, "full", "hidden @2xl:grid")}
+              </section>
+              {compactRest.length ? (
+                <aside className={cx(
+                  "border-t border-[var(--line)] pt-5 @2xl:border-l @2xl:border-t-0 @2xl:pl-5 @2xl:pt-0",
+                  fullRest.length === 0 && "@2xl:hidden",
+                )} data-ranking-rest="inline">
+                  <h4 className="text-[15px] font-medium tracking-[-0.01em]">{t("ranking.rest")}</h4>
+                  <div className="mt-4">
+                    {renderRest(compactRest, 4, "compact", "@2xl:hidden")}
+                    {fullRest.length ? renderRest(fullRest, 6, "full", "hidden @2xl:block") : null}
                   </div>
-                </div>
-              ) : <span key={index} />)}
-            </div>
-          </Block>
-          {rest.length ? (
-            <Block title={t("ranking.rest")}>
-              <ol className="space-y-2">
-                {(showAll ? rest : rest.slice(0, 5)).map((score, index) => (
-                  <li key={score.item.id}><Bar label={<><span className="mr-1.5 tabular-nums text-[var(--muted)]">{index + 4}</span>{score.item.title}</>} value={score.score - input.scale.min} max={scaleSpan} figure={fmtScore(score.score)} tone="var(--main-line)" /></li>
-                ))}
-              </ol>
-              {!full && rest.length > 5 ? (
-                <button type="button" className={cx("mt-3", textActionClass)} onClick={() => setExpanded((value) => !value)}>
-                  {expanded ? t("showLess") : t("showAll", { count: s.ranking.length })}
-                </button>
+                </aside>
               ) : null}
-            </Block>
-          ) : null}
-          {/* A form with several ratings (food, ambience, value): who leads each one, beside the overall ranking. */}
+            </div>
+          </div>
+          {genresCard && yearsCard ? (
+            <div className="grid gap-4 [grid-column:1/-1] @2xl:grid-cols-2" data-chart-pair="genres-years">
+              {genresCard}
+              {yearsCard}
+            </div>
+          ) : genresCard ?? yearsCard}
+          {/* A form with several ratings (food, ambience, value): who leads each one, after the paired genre/year cards. */}
           {s.dimensions.map(({ dimension, ranking }) => (
             <Block key={dimension.id} title={t("dimension.title", { label: dimension.label, title: ranking[0].item.title })}>
               <ol className="space-y-2">
@@ -275,33 +379,6 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
               {ranking.length > 3 ? <p className="mt-2 text-xs text-[var(--muted)]">{t("metricsMore", { count: ranking.length - 3 })}</p> : null}
             </Block>
           ))}
-          {s.genres.length ? <Block title={t("genres.title", { genre: s.genres[0].key, value: fmt(s.genres[0].average) })}>{statBars(s.genres)}</Block> : null}
-          {s.years.length ? (
-            <Block wide={yearsScrollable} title={t("years.title", { first: s.years[0].key, last: s.years.at(-1)!.key })}>
-              <div
-                className={cx("-mx-1 px-1 pb-2", yearsScrollable && "overflow-x-auto overscroll-x-contain")}
-                data-scrollable-year-chart={yearsScrollable ? "true" : undefined}
-                role={yearsScrollable ? "region" : undefined}
-                aria-label={yearsScrollable ? t("years.eyebrow") : undefined}
-                tabIndex={yearsScrollable ? 0 : undefined}
-              >
-                <div className="flex h-32 w-full items-end gap-2" style={yearsScrollable ? { minWidth: `${s.years.length * 44}px` } : undefined}>
-                  {s.years.map((year) => {
-                    // Only a year with two or more titles can be "the best" — one title is an anecdote.
-                    const best = year.count >= 2 && year.score === bestYearScore;
-                    return (
-                      <div key={year.key} className="flex min-w-0 flex-1 flex-col items-center gap-1" title={year.items.join(" · ")}>
-                        <span className="text-[10px] tabular-nums text-[var(--muted)]">{fmt(year.average)}</span>
-                        <span className="w-full max-w-8 rounded-t" style={{ height: `${(year.count / tallestYearCount) * 82}px`, background: best ? "var(--main)" : "var(--main-line)" }} />
-                        <span className="text-[10px] tabular-nums">{year.key}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-              <p className="mt-2 text-xs text-[var(--muted)]">{t("years.note")}</p>
-            </Block>
-          ) : null}
         </div>
       ),
     });

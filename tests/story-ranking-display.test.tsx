@@ -22,12 +22,12 @@ function Rankings() {
   return <div><p>{page.headline}</p>{page.body}</div>;
 }
 
-test("the ranking shows the Goa score, two places, labelled — not three fives", () => {
+test("the podium shows Goa scores to two places without repeating a label", () => {
   const html = renderToStaticMarkup(
     <NextIntlClientProvider locale="en" messages={messages} timeZone="America/Sao_Paulo"><Rankings /></NextIntlClientProvider>,
   );
   for (const value of ["4.74", "4.72", "4.61", "2.2"]) assert.ok(html.includes(value), `shows ${value}`);
-  assert.ok(html.includes("Goa score"), "the podium says what the number is");
+  assert.ok(!html.includes("Goa score"), "the podium does not repeat a label under every score");
   assert.ok(!html.includes(">5<"), "no plain five on the podium or the bars");
   assert.ok(html.indexOf("4.74") < html.indexOf("4.72") || html.includes("LOTR took it, at 4.74"), "LOTR leads");
 });
@@ -74,16 +74,18 @@ test("interactive words pages have fixed-height comments while downloadable page
   assert.ok(downloadable.includes("A complete opinion 1"));
 });
 
-test("a long run of years stays readable instead of squeezing every column", () => {
-  const items = Array.from({ length: 16 }, (_, index) => ({
+test("long genre and year charts stay paired, horizontal and independently expandable", () => {
+  const genres = ["Suspense", "Drama", "Comedy", "Sci-Fi", "Action", "Romance", "Horror"];
+  const items = Array.from({ length: 19 }, (_, index) => ({
     id: `film-${index}`,
     title: `Film ${index + 1}`,
-    year: 1995 + index,
+    year: 2001 + index,
+    genre: genres[Math.min(Math.floor(index / 3), genres.length - 1)],
   }));
   const longRange: StoryInput = {
     ...input,
     items,
-    ratings: items.map((item, index) => ({ personId: "me", itemId: item.id, value: 2.5 + (index % 5) * 0.5 })),
+    ratings: items.map((item, index) => ({ personId: "me", itemId: item.id, value: 5 - index * 0.15 })),
     scores: undefined,
   };
   function Page() {
@@ -92,8 +94,22 @@ test("a long run of years stays readable instead of squeezing every column", () 
   }
 
   const html = renderToStaticMarkup(<NextIntlClientProvider locale="en" messages={messages} timeZone="America/Sao_Paulo"><Page /></NextIntlClientProvider>);
-  assert.ok(html.includes('data-scrollable-year-chart="true"'));
-  assert.ok(html.includes("min-width:704px"), "each of the sixteen years keeps a readable 44px column");
-  assert.ok(html.includes("Show all 16"));
+  assert.ok(html.includes('data-podium-mode="compact" data-podium-size="3"'));
+  assert.ok(html.includes('data-podium-mode="full" data-podium-size="5"'));
+  assert.deepEqual([...html.matchAll(/data-podium-place="(\d+)"/g)].map((match) => match[1]), ["2", "1", "3", "4", "2", "1", "3", "5"]);
+  assert.ok(!html.includes('data-podium-place="04"') && !html.includes('data-podium-place="05"'), "podium places are never zero-padded");
+  assert.ok(html.includes('data-ranking-layout="podium-with-rest"'));
+  assert.ok(html.includes('data-ranking-rest="inline"'), "the remaining titles share the podium card instead of getting another white box");
+  assert.deepEqual([...html.matchAll(/data-rank="(\d+)"/g)].map((match) => match[1]), ["04", "05", "06", "07", "08", "06", "07", "08", "09", "10"]);
+  assert.ok(html.indexOf("Film 5") < html.indexOf("The rest of the ranking"));
+  assert.ok(html.indexOf("The rest of the ranking") < html.indexOf("Film 6"), "the remaining ranking starts with number six");
+  assert.ok(html.indexOf("Suspense wins") < html.indexOf("From 2001 to 2019"), "genre and year cards are consecutive grid columns");
+  assert.ok(html.includes('data-chart-pair="genres-years"'));
+  assert.ok(html.includes('data-horizontal-chart="genres" data-chart-rows="5"'));
+  assert.ok(html.includes('data-horizontal-chart="years" data-chart-rows="5"'));
+  assert.ok(html.includes("2001–03"));
+  assert.equal(html.match(/Show 2 more/g)?.length, 2, "both long horizontal charts get their own show-more action");
+  assert.ok(!html.includes("See every year") && !html.includes("data-scrollable-year-chart"));
+  assert.ok(html.includes("Show all 19"));
   assert.ok(!html.includes("text-[var(--main-strong)]"), "the ranking action uses the same quiet treatment as comment actions");
 });

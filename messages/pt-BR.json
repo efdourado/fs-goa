@@ -2117,6 +2117,7 @@
     "readRated": "Cada linha é uma pessoa, subindo e descendo com a nota dela. Onde as linhas se trançam, vocês concordaram; onde se abrem, discordaram. A linha grossa e clara é o grupo.",
     "readDated": "Cada faixa é uma pessoa: contínua onde ela seguiu, com buracos onde parou, contas maiores nos dias maiores. O trecho contornado é a maior sequência dela.",
     "showAll": "Ver todos os {count}",
+    "showMore": "Ver mais {count}",
     "showMoreComment": "Ver mais",
     "showLess": "Ver menos",
     "datedHeadline": "{count, plural, one {Os dias de uma pessoa, desenhados.} other {Os dias de # pessoas, lado a lado.}}",
@@ -2257,8 +2258,7 @@
     },
     "years": {
       "eyebrow": "Por ano de lançamento",
-      "title": "De {first} a {last}",
-      "note": "A altura é quantos títulos; o número em cima é a média deles."
+      "title": "De {first} a {last}"
     },
     "title": "O fio",
     "metricsMore": "+{count} outros",
