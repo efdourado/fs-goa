@@ -1466,7 +1466,10 @@
     ],
     "byline": "Um projeto pessoal de Eduardo Dourado, nascido das planilhas de um clube de cinema e de um clube de leitura.",
     "feedbackNudge": "Teve uma ideia ou algo te incomodou?",
-    "feedbackLink": "Conta pra gente."
+    "feedbackLink": "Conta pra gente.",
+    "contactTitle": "Vamos conversar",
+    "contactBody": "Uma ideia, um bug, uma parceria ou só um oi: escreve pra gente, a resposta vem de uma pessoa.",
+    "contactButton": "Fale conosco"
   },
   "feedbackPage": {
     "title": "Como podemos melhorar?",
@@ -2311,9 +2314,9 @@
       "title": "Baixar páginas",
       "lede": "{count} páginas feitas com este desafio, baixe uma ou todas.",
       "one": "Baixar esta página",
-      "all": "Baixar as {count}",
+      "all": "Baixar as {count} (.zip)",
       "preparing": "Preparando…",
-      "format": "Imagens PNG, em retrato (4:5)."
+      "format": "Imagens PNG, em retrato (4:5). Todas vêm num único .zip."
     },
     "duo": {
       "title": "Vocês dois",

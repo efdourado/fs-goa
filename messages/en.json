@@ -1466,7 +1466,10 @@
     ],
     "byline": "A personal project by Eduardo Dourado, grown out of the spreadsheets of a film club and a reading club.",
     "feedbackNudge": "Have an idea, or did something bug you?",
-    "feedbackLink": "Tell us."
+    "feedbackLink": "Tell us.",
+    "contactTitle": "Let's talk",
+    "contactBody": "An idea, a bug, a partnership or just hello: write to us, a person will answer.",
+    "contactButton": "Contact us"
   },
   "feedbackPage": {
     "title": "How can we improve?",
@@ -2311,9 +2314,9 @@
       "title": "Download pages",
       "lede": "{count} pages made from this challenge (download one, or all of them).",
       "one": "Download this page",
-      "all": "Download all {count}",
+      "all": "Download all {count} (.zip)",
       "preparing": "Preparing…",
-      "format": "PNG images, portrait (4:5)."
+      "format": "PNG images, portrait (4:5). All of them come in one .zip."
     },
     "duo": {
       "title": "The two of you",
