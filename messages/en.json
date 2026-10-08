@@ -945,7 +945,11 @@
     "metricDaysPreview": "days logged",
     "metricItemLabel": "One item only",
     "metricItemAll": "Every item",
-    "metricItemHint": "Shows the number for a single item (your deadlift record, say)."
+    "metricItemHint": "Shows the number for a single item (your deadlift record, say).",
+    "pageCountTitle": "Count pages",
+    "pageCountHint": "Each book shows where you are and how much is left, no dates. Off, it's just a bookshelf; pages already saved are kept.",
+    "pageCountOn": "Page count on.",
+    "pageCountOff": "Page count off."
   },
   "visibility": {
     "title": "Who sees these answers",
@@ -1041,7 +1045,9 @@
     "deletingEntry": "Deleting…",
     "checkpointEmpty": "No items yet.",
     "origin": "via {text}",
-    "groupSealed": "Rated · sealed"
+    "groupSealed": "Rated · sealed",
+    "bookProgress": "p. {page, number} of {total, number} · {left, number} to go",
+    "bookDone": "Finished"
   },
   "sessionLog": {
     "composerTitle": "Log a {name}",
@@ -1155,7 +1161,22 @@
     "loggedSince": "<b>{logged}</b> {logged, plural, one {day logged} other {days logged}} since {date}",
     "loggedNone": "Nothing logged yet",
     "streakDays": "<b>{streak}</b> {streak, plural, one {day in a row} other {days in a row}}",
-    "streakWeeks": "<b>{streak}</b> {streak, plural, one {week in a row} other {weeks in a row}}"
+    "streakWeeks": "<b>{streak}</b> {streak, plural, one {week in a row} other {weeks in a row}}",
+    "savedNewUndated": "Logged: {value}.",
+    "savedChangeUndated": "Changed: {value}.",
+    "positionHintBookUndated": "You were on p. {before}.",
+    "positionHintUndated": "The total was {before}.",
+    "correct": "Correct it",
+    "finishedOn": "on {date}",
+    "goalReached": "Goal reached",
+    "countLabel": "Where you are",
+    "percentGoal": "{percent}% of the goal",
+    "countAria": "{page} of {total}, {percent}% of the goal",
+    "paceMarkCount": "pace · {value}",
+    "aheadCount": "{count} ahead of pace",
+    "behindCount": "{count} behind pace",
+    "leftPerDayCount": "<b>{left}</b>{unit} to go · <b>{perDay}</b> a day until {date}",
+    "leftCount": "<b>{left}</b>{unit} to go"
   },
   "entryForm": {
     "fillField": "Fill in the “{label}” field.",
@@ -2373,5 +2394,18 @@
   },
   "you": {
     "stats": "{challenges, plural, one {# challenge} other {# challenges}} · {groups, plural, one {# group} other {# groups}}"
+  },
+  "countSettings": {
+    "title": "Count it as a road",
+    "hint": "Shows where you are, how much is left and the way to the goal, like the pages of a book.",
+    "goal": "Goal",
+    "goalNone": "No goal",
+    "goalValue": "A number",
+    "goalPageCount": "The book's pages",
+    "entry": "How to log it",
+    "entryAmount": "How much you did",
+    "entryPosition": "Where you are (the total so far)",
+    "showDates": "Show the dates",
+    "showDatesHint": "Off, only the progress shows; each entry's day is kept without showing."
   }
 }

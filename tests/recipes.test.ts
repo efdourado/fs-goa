@@ -40,7 +40,7 @@ describe("current challenge recipes", () => {
     assert.equal(recipe.entryTypes[1].cardinality, "once_per_item");
   });
 
-  test("Bookshelf rates a list of books with no pages, period, or entry date", () => {
+  test("Bookshelf rates a list of books and counts each one's pages, with no period or entry date", () => {
     const recipe = resolveRecipe({ recipe: "bookshelf" });
 
     assert.equal(recipe.key, "bookshelf");
@@ -50,7 +50,10 @@ describe("current challenge recipes", () => {
     assert.equal(recipeCollectsEntryDate("bookshelf"), false);
     assert.equal(recipeCollectsEntryDate("cinema"), true);
     assert.equal(recipeCollectsEntryDate(null), true);
-    assert.deepEqual(recipe.entryTypes.map((type) => type.purpose), ["rating"]);
+    assert.deepEqual(recipe.entryTypes.map((type) => type.purpose), ["rating", "progress"]);
+    const pages = recipe.entryTypes[1];
+    assert.equal(pages.cardinality, "once_per_item_day", "each update is saved on its day (never shown)");
+    assert.deepEqual(pages.fields[0].config, { min: 0, step: 1, count: { goal: { from: "page_count" }, entry: "position", showDates: false } });
     assert.deepEqual(recipe.entryTypes[0].fields.map((field) => field.key), ["nota", "comentario"]);
     assert.equal(recipe.metrics.some((metric) => metric.fieldKey === "paginas"), false);
     assert.equal(recipe.metrics.some((metric) => metric.needsGroup), true);

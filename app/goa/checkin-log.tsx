@@ -34,8 +34,14 @@ export interface LogCounter {
   field: ChallengeField;
   /** Optional text fields saved alongside the number (a note on the day). */
   notes: ChallengeField[];
-  /** The book's page count — draws the progress bar, "p. X de N" and the pace. Null for any other counter. */
+  /** Where the road ends — a book's page count, or a count's own goal. Draws the bar, "X de N" and the pace. Null: no goal. */
   total: number | null;
+  /** The goal is a book's page count: the road speaks in pages ("p. 212"); otherwise in the field's own number and unit. */
+  book: boolean;
+  /** The field's unit ("km"), for a count that isn't a book. */
+  unit?: string | null;
+  /** How the editor opens: the amount done, or where you are now. */
+  entry?: "amount" | "position";
   /** The window an even pace is measured over; no `paceTo` means no pace. */
   paceFrom: string;
   paceTo: string | null;
@@ -92,6 +98,7 @@ export function CheckinLog({
   canEdit,
   unavailableMessage,
   openEnded = false,
+  compact = false,
   streakBy = "day",
   children,
 }: {
@@ -107,6 +114,11 @@ export function CheckinLog({
   canEdit: boolean;
   /** No dates at all: the strip is just "since the first check-in", so the count never reads as a target. */
   openEnded?: boolean;
+  /**
+   * The count's dates stay out of sight (`showDates: false`): just the road and the editor. The day is always
+   * today and saved quietly — it's how a start and a finish are known — but never shown or picked.
+   */
+  compact?: boolean;
   /** Days for a daily habit; weeks for something done a few times a week (a workout). */
   streakBy?: "day" | "week";
   unavailableMessage?: string | null;
@@ -117,7 +129,9 @@ export function CheckinLog({
   // Private browsing can refuse to store it — the choice still holds for this visit.
   const [pickedView, setPickedView] = useState<LogView | null>(null);
   const view = pickedView ?? storedView;
-  const [mode, setMode] = useState<EntryMode>("amount");
+  const [mode, setMode] = useState<EntryMode>(counter?.entry ?? "amount");
+  // A finished road keeps its bar; the editor folds away behind "Corrigir".
+  const [correcting, setCorrecting] = useState(false);
   // What the editor would save right now — drawn as a striped segment on the bar before it's saved.
   const [draft, setDraft] = useState<number | null>(null);
   // Survives the reload a save triggers (the editor remounts with the new entry), cleared on another day.
@@ -133,11 +147,12 @@ export function CheckinLog({
   const pastDays = days.filter((day) => day <= today).length;
   const loggedInRange = days.filter((day) => logged.has(day)).length;
   const firstLogged = useMemo(() => [...logged].sort()[0] ?? null, [logged]);
+  const counterFinished = Boolean(counter?.total) && sumAll(values) >= (counter?.total ?? Infinity);
   const formatDate = useGoaFormat();
   const strong = (chunks: ReactNode) => <strong className="font-medium tabular-nums text-[var(--ink)]">{chunks}</strong>;
 
   function select(day: string) {
-    if (day > today) return;
+    if (day > today || compact) return;
     if (day !== selectedDay) {
       setNotice(null);
       setDraft(null);
@@ -163,39 +178,45 @@ export function CheckinLog({
         />
       ) : null}
 
-      <div>
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-          <div className="min-w-0">
-            <h3 className={sectionLabelClass}>{t("title")}</h3>
-            <p className="text-xs text-[var(--muted)]">
-              {firstLogged === null && openEnded
-                ? t("loggedNone")
-                : openEnded
-                  ? t.rich("loggedSince", { logged: loggedInRange, date: formatDate.date(firstLogged), b: strong })
-                  : t.rich("loggedOf", { logged: loggedInRange, days: pastDays, b: strong })}
-              {" · "}
-              {streakBy === "week"
-                ? t.rich("streakWeeks", { streak: weekStreak(logged, today), b: strong })
-                : t.rich("streakDays", { streak: streak(logged, today), b: strong })}
-              {counter && !counter.total && values.size ? <> · <TotalSoFar total={sumAll(values)} /></> : null}
-            </p>
+      {compact ? null : (
+        <div>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <div className="min-w-0">
+              <h3 className={sectionLabelClass}>{t("title")}</h3>
+              <p className="text-xs text-[var(--muted)]">
+                {firstLogged === null && openEnded
+                  ? t("loggedNone")
+                  : openEnded
+                    ? t.rich("loggedSince", { logged: loggedInRange, date: formatDate.date(firstLogged), b: strong })
+                    : t.rich("loggedOf", { logged: loggedInRange, days: pastDays, b: strong })}
+                {" · "}
+                {streakBy === "week"
+                  ? t.rich("streakWeeks", { streak: weekStreak(logged, today), b: strong })
+                  : t.rich("streakDays", { streak: streak(logged, today), b: strong })}
+                {counter && !counter.total && values.size ? <> · <TotalSoFar total={sumAll(values)} /></> : null}
+              </p>
+            </div>
+            <Segmented
+              className="w-40 flex-none"
+              ariaLabel={t("viewAria")}
+              value={view}
+              onChange={changeView}
+              options={[{ value: "strip", label: t("viewStrip") }, { value: "month", label: t("viewMonth") }]}
+            />
           </div>
-          <Segmented
-            className="w-40 flex-none"
-            ariaLabel={t("viewAria")}
-            value={view}
-            onChange={changeView}
-            options={[{ value: "strip", label: t("viewStrip") }, { value: "month", label: t("viewMonth") }]}
-          />
+          {view === "strip" ? (
+            <DayStrip days={days} today={today} deadline={deadline} records={records} selectedDay={selectedDay} onSelect={select} />
+          ) : (
+            <MonthGrid from={from} to={to} today={today} deadline={deadline} records={records} values={values} selectedDay={selectedDay} onSelect={select} />
+          )}
         </div>
-        {view === "strip" ? (
-          <DayStrip days={days} today={today} deadline={deadline} records={records} selectedDay={selectedDay} onSelect={select} />
-        ) : (
-          <MonthGrid from={from} to={to} today={today} deadline={deadline} records={records} values={values} selectedDay={selectedDay} onSelect={select} />
-        )}
-      </div>
+      )}
 
-      {counter ? (
+      {counter && counterFinished && !correcting ? (
+        <button type="button" onClick={() => setCorrecting(true)} className="cursor-pointer text-xs text-[var(--muted)] underline decoration-dotted underline-offset-4 hover:text-[var(--ink)]">
+          {t("correct")}
+        </button>
+      ) : counter ? (
         <CounterEditor
           key={`${selectedDay}-${records.get(selectedDay)?.entry.id ?? "new"}-${records.get(selectedDay)?.entry.updatedAt ?? ""}`}
           counter={counter}
@@ -210,6 +231,7 @@ export function CheckinLog({
           unavailableMessage={unavailableMessage}
           notice={notice}
           onNotice={setNotice}
+          compact={compact}
         />
       ) : (
         <div className="border-t border-[var(--line)] pt-6">
@@ -450,21 +472,45 @@ function BookProgress({
   const progress = pace({ total, from: counter.paceFrom, to: counter.paceTo, today, done, loggedToday: values.has(today) });
   const percent = Math.min(100, Math.round((done / total) * 100));
   const finished = done >= total;
-  const page = (value: number) => nf.number(value, { maximumFractionDigits: 0 });
+  const page = (value: number) => nf.number(value, { maximumFractionDigits: counter.book ? 0 : 2 });
+  // A book speaks in pages ("p. 212 de 340"); any other count in its own number and unit ("8.400 de 10.000 passos").
+  const unit = counter.unit ? ` ${counter.unit}` : "";
+  const value = (amount: number) => (counter.book ? t("pageShort", { page: page(amount) }) : `${page(amount)}${unit}`);
+  const key = (bookKey: string, countKey: string) => (counter.book ? bookKey : countKey);
+  // The day the road reached its end — the update that crossed the goal.
+  let running = 0;
+  let finishedOn: string | null = null;
+  for (const [day, amount] of [...values.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    running += amount;
+    if (running >= total) { finishedOn = day; break; }
+  }
 
   return (
     <div className="space-y-3.5">
       <div className="flex items-end justify-between gap-4">
-        <p className="text-xs text-[var(--muted)]">{t("bookLabel")}</p>
+        {finished ? (
+          // The end of the road: a check and the day it was reached, where "where you are" used to be.
+          <div className="flex items-center gap-3">
+            <span className="grid h-10 w-10 flex-none place-items-center rounded-full bg-[var(--main)] text-white" aria-hidden="true">
+              <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m5 10.5 3.2 3.2L15 7" /></svg>
+            </span>
+            <span>
+              <strong className="block text-lg font-medium tracking-[-0.02em]">{t(key("finished", "goalReached"))}</strong>
+              {finishedOn ? <span className="block text-xs text-[var(--muted)]">{t("finishedOn", { date: f.date(finishedOn, { day: "numeric", month: "long", year: "numeric" }) })}</span> : null}
+            </span>
+          </div>
+        ) : (
+          <p className="text-xs text-[var(--muted)]">{t(key("bookLabel", "countLabel"))}</p>
+        )}
         <div className="text-right">
           <p className="text-3xl font-light leading-none tracking-[-0.04em] tabular-nums">
-            {t("pageShort", { page: page(done) })} <small className="text-sm tracking-normal text-[var(--muted)]">{t("pageOf", { total: page(total) })}</small>
+            {value(done)} <small className="text-sm tracking-normal text-[var(--muted)]">{t("pageOf", { total: counter.book ? page(total) : `${page(total)}${unit}` })}</small>
           </p>
-          <p className="mt-1 text-xs text-[var(--main-strong)]">{t("percentRead", { percent })}</p>
+          <p className="mt-1 text-xs text-[var(--main-strong)]">{t(key("percentRead", "percentGoal"), { percent })}</p>
         </div>
       </div>
       <div>
-        <div className="relative h-8 rounded-lg bg-[var(--wash)]" role="img" aria-label={t("progressAria", { page: page(done), total: page(total), percent })}>
+        <div className="relative h-8 rounded-lg bg-[var(--wash)]" role="img" aria-label={t(key("progressAria", "countAria"), { page: page(done), total: page(total), percent })}>
           <div className="flex h-full gap-0.5 overflow-hidden rounded-lg" style={{ width: `${Math.min(100, (shown / scale) * 100)}%` }}>
             {segments.map(([day, value], index) => {
               const ghost = draft !== null && day === selectedDay && draft !== values.get(day);
@@ -497,29 +543,27 @@ function BookProgress({
                 style={{ left: `calc(${at}% - 1px)` }}
                 aria-hidden="true"
               >
-                <span className={cx("absolute top-[calc(100%+4px)] whitespace-nowrap text-[11px] text-[var(--main-2)]", label)}>{t("paceMark", { page: page(progress.expected) })}</span>
+                <span className={cx("absolute top-[calc(100%+4px)] whitespace-nowrap text-[11px] text-[var(--main-2)]", label)}>{counter.book ? t("paceMark", { page: page(progress.expected) }) : t("paceMarkCount", { value: value(progress.expected) })}</span>
               </span>
             );
           })() : null}
         </div>
         <div className={cx("flex justify-between text-[11px] tabular-nums text-[var(--muted)]", progress ? "mt-6" : "mt-1.5")}>
-          <span>{t("pageShort", { page: 1 })}</span>
-          <span>{t("pageShort", { page: page(total) })}</span>
+          <span>{counter.book ? t("pageShort", { page: 1 }) : value(0)}</span>
+          <span>{value(total)}</span>
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px] text-[var(--muted)]">
-        {finished ? (
-          <span className="rounded-full bg-[var(--ok-soft)] px-2.5 py-0.5 text-xs font-medium text-[var(--ok)]">{t("finished")}</span>
-        ) : progress ? (
+        {finished ? null : progress ? (
           <span className={cx("rounded-full px-2.5 py-0.5 text-xs font-medium", progress.ahead >= 0 ? "bg-[var(--ok-soft)] text-[var(--ok)]" : "bg-[var(--warn-soft)] text-[var(--warn)]")}>
-            {progress.ahead === 0 ? t("onPace") : progress.ahead > 0 ? t("ahead", { count: progress.ahead }) : t("behind", { count: -progress.ahead })}
+            {progress.ahead === 0 ? t("onPace") : progress.ahead > 0 ? t(key("ahead", "aheadCount"), { count: progress.ahead }) : t(key("behind", "behindCount"), { count: -progress.ahead })}
           </span>
         ) : null}
         {!finished ? (
           <span>
             {progress?.perDay && counter.paceTo
-              ? t.rich("leftPerDay", { left: page(total - done), perDay: page(progress.perDay), date: f.date(counter.paceTo), b: (chunks) => <strong className="font-medium tabular-nums text-[var(--ink)]">{chunks}</strong> })
-              : t.rich("left", { left: page(total - done), b: (chunks) => <strong className="font-medium tabular-nums text-[var(--ink)]">{chunks}</strong> })}
+              ? t.rich(key("leftPerDay", "leftPerDayCount"), { left: page(total - done), perDay: page(progress.perDay), unit, date: f.date(counter.paceTo), b: (chunks) => <strong className="font-medium tabular-nums text-[var(--ink)]">{chunks}</strong> })
+              : t.rich(key("left", "leftCount"), { left: page(total - done), unit, b: (chunks) => <strong className="font-medium tabular-nums text-[var(--ink)]">{chunks}</strong> })}
           </span>
         ) : null}
         {finished && counter.onFinish ? (
@@ -549,6 +593,7 @@ function CounterEditor({
   unavailableMessage,
   notice,
   onNotice,
+  compact = false,
 }: {
   counter: LogCounter;
   day: string;
@@ -562,13 +607,15 @@ function CounterEditor({
   unavailableMessage?: string | null;
   notice: string | null;
   onNotice: (notice: string | null) => void;
+  /** Dates out of sight: the editor is always today's and never names the day. */
+  compact?: boolean;
 }) {
   const t = useTranslations("checkinLog");
   const tc = useTranslations("common");
   const f = useGoaFormat();
   const nf = useFormatter();
   const { field, notes, total } = counter;
-  const isBook = Boolean(total);
+  const isBook = counter.book && Boolean(total);
   const saved = record?.value ?? null;
   const before = sumBefore(values, day);
   const initial = saved === null ? "" : String(mode === "amount" ? saved : before + saved);
@@ -620,7 +667,9 @@ function CounterEditor({
     try {
       const noteEntries = notes.map((note) => [note.id as Id, noteValues[note.id as Id] ?? ""] as const);
       await counter.onSave(day, { ...Object.fromEntries(noteEntries), [field.id as Id]: amount }, record?.entry);
-      onNotice(t(record ? "savedChange" : "savedNew", { value: shown(amount), date: f.date(day) }));
+      onNotice(compact
+        ? t(record ? "savedChangeUndated" : "savedNewUndated", { value: shown(amount) })
+        : t(record ? "savedChange" : "savedNew", { value: shown(amount), date: f.date(day) }));
     } catch (cause) {
       setError(f.error(cause));
     } finally {
@@ -663,11 +712,13 @@ function CounterEditor({
 
   return (
     <form className="space-y-4 border-t border-[var(--line)] pt-6" onSubmit={submit} noValidate>
-      <DayHeading
-        day={day}
-        today={today}
-        state={saved !== null ? t("stateValue", { value: shown(saved) }) : day === today ? t("stateEmptyToday") : t("stateEmpty")}
-      />
+      {compact ? null : (
+        <DayHeading
+          day={day}
+          today={today}
+          state={saved !== null ? t("stateValue", { value: shown(saved) }) : day === today ? t("stateEmptyToday") : t("stateEmpty")}
+        />
+      )}
       <Segmented
         className="max-w-xs"
         ariaLabel={t("modeAria")}
@@ -713,7 +764,8 @@ function CounterEditor({
               : t.rich("previewTotal", { total: format(after), b: (chunks) => <strong className="font-medium tabular-nums text-[var(--ink)]">{chunks}</strong> })}
           </>
         ) : mode === "position" ? (
-          isBook ? t("positionHintBook", { before: format(before) }) : t("positionHint", { before: format(before) })
+          compact ? t(isBook ? "positionHintBookUndated" : "positionHintUndated", { before: format(before) })
+            : isBook ? t("positionHintBook", { before: format(before) }) : t("positionHint", { before: format(before) })
         ) : null}
       </p>
       {exceeds ? <p className="rounded-xl bg-[var(--warn-soft)] px-3.5 py-2.5 text-[13px] text-[var(--warn)]">{t("overTotal", { total: format(total ?? 0) })}</p> : null}

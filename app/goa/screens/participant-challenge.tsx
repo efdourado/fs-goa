@@ -766,6 +766,20 @@ function SharedAnswerSection({
  * progress / completion / rating. A plain Cine round renders a single form.
  */
 
+/**
+ * Where a count's road ends: its own goal (a fixed number, or the item's page count) — or, for a field saved
+ * before counts had settings, the old rule: a book's page count when the field is its pages.
+ */
+function countGoal(field: ChallengeField, pageCount: number | null, kind?: string | null): { total: number | null; book: boolean } {
+  const goal = field.config?.count?.goal;
+  if (field.config?.count) {
+    if (!goal) return { total: null, book: false };
+    return "from" in goal ? { total: pageCount, book: true } : { total: goal.value, book: false };
+  }
+  const legacyBook = Boolean(pageCount) && (field.key === "paginas" || kind === "book");
+  return { total: legacyBook ? pageCount : null, book: legacyBook };
+}
+
 function ItemEntryPanel({
   challenge,
   item,
@@ -1435,7 +1449,9 @@ export function ParticipantChallengeScreen({
   const logCounter: LogCounter | null = logCounterField ? {
     field: logCounterField,
     notes: logFields.filter((field) => field.id && field !== logCounterField),
-    total: pageCount && (logCounterField.key === "paginas" || logItem?.catalogItem?.kind === "book") ? pageCount : null,
+    ...countGoal(logCounterField, pageCount, logItem?.catalogItem?.kind),
+    unit: logCounterField.config?.unit ?? null,
+    entry: logCounterField.config?.count?.entry,
     paceFrom: logOpensOn ?? challenge.startsOn ?? logBounds.from,
     paceTo: logDueOn ?? challenge.endsOn ?? null,
     onSave: (day, values, entry) => onSaveEntry!(logItem?.id ?? null, values, entry, entry ? undefined : day, logDayType?.id || undefined),
@@ -1447,6 +1463,20 @@ export function ParticipantChallengeScreen({
       section?.querySelector<HTMLElement>("button, input, textarea")?.focus({ preventScroll: true });
     } : undefined,
   } : null;
+
+  // A count whose dates are out of sight: just the road and today's editor (the day is still saved quietly).
+  const countHidesDates = logCounterField?.config?.count?.showDates === false;
+  // How far each book is, for the list of books: the pages counted so far against its page count.
+  const pagesByItem = new Map<Id, number>();
+  const bookCount = logDayType && logCounterField?.id && countGoal(logCounterField, 1, "book").book ? logCounterField : null;
+  if (bookCount) {
+    for (const entry of ownEntries) {
+      const itemId = itemIdForEntry(entry);
+      if (entry.entryTypeId !== logDayType?.id || !itemId) continue;
+      const amount = Number(valuesAsRecord(entry.values)[bookCount.id as Id]);
+      if (Number.isFinite(amount)) pagesByItem.set(itemId, (pagesByItem.get(itemId) ?? 0) + amount);
+    }
+  }
 
   // The Grupo tab shows everyone's status for whichever item/session is
   // currently selected in the shared "Checkpoints" picker, plus two
@@ -1524,7 +1554,11 @@ export function ParticipantChallengeScreen({
         const done = doneByItem.has(item.id);
         const soon = item.status === "scheduled" && !entriesByItem.has(item.id);
         const label = item.catalogItem?.year ? `${item.title} (${item.catalogItem.year})` : item.title;
-        return { id: item.id, label, done, soon, statusLabel: done ? "" : soon ? t("checkpointSoonLabel") : undefined, meta: metaForItem(item), rating: ratingByItem.get(item.id) ?? null };
+        // A book being counted says how far you are ("p. 212 de 340 · faltam 128"), or that it's done.
+        const read = pagesByItem.get(item.id);
+        const pages = item.catalogItem?.pageCount;
+        const progress = read === undefined || !pages ? null : read >= pages ? t("bookDone") : t("bookProgress", { page: read, total: pages, left: pages - read });
+        return { id: item.id, label, done, soon, statusLabel: done ? "" : soon ? t("checkpointSoonLabel") : undefined, meta: progress ?? metaForItem(item), rating: ratingByItem.get(item.id) ?? null };
       })}
     />
   ) : null;
@@ -1631,9 +1665,10 @@ export function ParticipantChallengeScreen({
                     today={today}
                     deadline={logDeadline}
                     records={logRecords}
-                    selectedDay={effectiveOccurredOn}
+                    selectedDay={countHidesDates ? today : effectiveOccurredOn}
                     onSelectDay={setOccurredOn}
                     counter={logCounter}
+                    compact={countHidesDates}
                     canEdit={!unavailableMessage && Boolean(onSaveEntry)}
                     unavailableMessage={unavailableMessage}
                     openEnded={!challenge.startsOn && !challenge.endsOn && !logOpensOn && !logDueOn}

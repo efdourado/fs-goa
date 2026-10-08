@@ -31,6 +31,39 @@ export function fieldUnit(value: unknown): string | null {
   return unit;
 }
 
+/**
+ * "Contagem": a number field counted along a road to a goal (pages of a book, steps, km).
+ * `goal` is where the road ends — the item's page count, a fixed number, or none; `entry` is how it's typed
+ * (the amount done, or where you are now); `showDates` false keeps the days out of sight (still saved).
+ */
+export interface FieldCount {
+  goal: { from: "page_count" } | { value: number } | null;
+  entry: "amount" | "position";
+  showDates: boolean;
+}
+
+/** Checks a number field's count settings; `null` when it isn't counted. */
+export function fieldCount(value: unknown): FieldCount | null {
+  if (value === undefined || value === null || value === false) return null;
+  const raw = asRecord(value);
+  const goalRaw = raw.goal === null || raw.goal === undefined ? null : asRecord(raw.goal);
+  let goal: FieldCount["goal"] = null;
+  if (goalRaw?.from === "page_count") goal = { from: "page_count" };
+  else if (goalRaw && goalRaw.value !== undefined) {
+    const target = Number(goalRaw.value);
+    if (!Number.isFinite(target) || target <= 0 || target > 1e9) throw new ApiError(400, "invalid_field_config", "A meta precisa ser um número positivo.");
+    goal = { value: target };
+  } else if (goalRaw) throw new ApiError(400, "invalid_field_config", "Meta da contagem inválida.");
+  return { goal, entry: raw.entry === "position" ? "position" : "amount", showDates: raw.showDates !== false };
+}
+
+/** A number field's stored settings: its unit and, when it's counted, the count. */
+function numberSettings(config: Record<string, unknown>): Record<string, unknown> {
+  const unit = fieldUnit(config.unit);
+  const count = fieldCount(config.count);
+  return { ...(unit ? { unit } : {}), ...(count ? { count } : {}) };
+}
+
 export async function insertField(
   client: PoolClient,
   challengeId: string,
@@ -70,7 +103,7 @@ export async function insertField(
     [id, challengeId, entryTypeId, key, label, clientKind, field.required === true, position,
       scale, min, max, step, maxLength, JSON.stringify(
         clientKind === "text" ? { multiline: config.multiline === true }
-          : clientKind === "number" && fieldUnit(config.unit) ? { unit: fieldUnit(config.unit) }
+          : clientKind === "number" ? numberSettings(config)
             // A rating counts toward the ranking only when asked to (a recipe's own ratings are; see createChallenge).
             : clientKind === "rating" ? { inRanking: config.inRanking === true }
               : {},

@@ -4,6 +4,7 @@ import { inTransaction, oneOrNull } from "../../db";
 import {
   asRecord,
   challengeAccess,
+  fieldCount,
   fieldUnit,
   insertField,
   integerValue,
@@ -134,6 +135,7 @@ export async function fieldsForChallenge(
       maxLength: field.max_length ?? undefined,
       options: optionsByField.get(field.id) ?? [],
       unit: field.kind === "number" && typeof field.settings?.unit === "string" && field.settings.unit ? field.settings.unit : undefined,
+      ...(field.kind === "number" && field.settings?.count ? { count: field.settings.count } : {}),
       ...(field.kind === "rating" ? { inRanking: field.settings?.inRanking === true } : {}),
     },
   }));
@@ -217,7 +219,9 @@ export async function saveChallengeFields(
         }
         // The unit is a label only — renaming "kg" never touches a stored value.
         const unit = fieldUnit(config.unit);
-        settings = { ...settings, unit: unit ?? undefined };
+        // An edit that doesn't mention the count keeps it; `count: null` turns it off.
+        const count = "count" in config ? fieldCount(config.count) : (settings as { count?: unknown }).count ?? null;
+        settings = { ...settings, unit: unit ?? undefined, count: count ?? undefined };
       } else if (current.kind === "text") {
         maxLength = integerValue(config.maxLength, current.max_length ?? 5_000, 1, 20_000);
         settings = { ...settings, multiline: config.multiline === true };

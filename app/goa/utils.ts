@@ -367,3 +367,6 @@ export function displayAnswer(field: ChallengeField, raw: unknown, words: { yes:
   if (field.type === "number" && field.config?.unit) return `${raw} ${field.config.unit}`;
   return String(raw);
 }
+
+/** Pages' optional per-book page count (mirrors the server recipe's key). */
+export const PAGE_COUNT_KEY = "paginas_livro";

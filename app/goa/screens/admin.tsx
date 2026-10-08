@@ -28,6 +28,7 @@ import type {
   CheckpointInput,
   CopyResult,
   Entry,
+  FieldCount,
   GroupSummary,
   Id,
   Member,
@@ -48,7 +49,7 @@ import {
   StatusMessage,
   Toggle,
 } from "../ui";
-import { formatRuntime, isLivingList, itemIdForEntry } from "../utils";
+import { formatRuntime, isLivingList, itemIdForEntry, PAGE_COUNT_KEY, recipeCatalogKind } from "../utils";
 import { SETUP_STEPS, SetupSummary, setupState, StepMarker, useChallengePreflight } from "../setup-progress";
 
 interface DuplicateTargetGroup {
@@ -260,6 +261,7 @@ function AdminFields({
   onSave,
   onSaveVisibility,
   onSetExpectation,
+  onSetPageCount,
   onSaveEntryDate,
   onAddShared,
   onRemoveType,
@@ -269,6 +271,7 @@ function AdminFields({
   onSave: (entryTypeId: Id, fields: ChallengeField[]) => Promise<void>;
   onSaveVisibility: (entryTypeId: Id, visibilityPolicy: string) => Promise<void>;
   onSetExpectation: (enabled: boolean) => Promise<void>;
+  onSetPageCount: (enabled: boolean) => Promise<void>;
   onSaveEntryDate: (enabled: boolean) => Promise<void>;
   onAddShared: (payload: { name: string; sharedEditPolicy: SharedEditPolicy; field: ChallengeField }) => Promise<void>;
   onRemoveType: (entryTypeId: Id, confirmed: { archiveMetrics: boolean; deleteAnswers: boolean }) => Promise<void>;
@@ -285,6 +288,13 @@ function AdminFields({
     && challenge.submissionMode === "item"
     && challenge.entryTypes.some((type) => type.purpose === "rating");
   const [expectationBusy, setExpectationBusy] = useState(false);
+  // Pages' page count: on by default, off makes it a plain bookshelf. Only for books, and never where the
+  // challenge already counts pages its own way (a reading club's "Páginas lidas").
+  const countsPages = challenge.entryTypes.some((type) => type.semanticKey === PAGE_COUNT_KEY);
+  const otherPageCount = challenge.entryTypes.some((type) => type.semanticKey !== PAGE_COUNT_KEY
+    && type.fields.some((field) => field.config?.count?.goal && "from" in field.config.count.goal));
+  const canTogglePageCount = recipeCatalogKind(challenge.recipeKey) === "book" && challenge.status !== "closed" && !otherPageCount;
+  const [pageCountBusy, setPageCountBusy] = useState(false);
   // A day-by-day response always needs its day, so the choice only exists for the other kinds.
   const canToggleEntryDate = challenge.status !== "closed"
     && !challenge.entryTypes.some((type) => type.cardinality === "once_per_day" || type.cardinality === "once_per_item_day");
@@ -421,6 +431,7 @@ function AdminFields({
           field={editing === "new" ? undefined : editing}
           takenKeys={fields.filter((candidate) => candidate !== editing).map((candidate) => candidate.key)}
           lockType={challenge.status !== "draft" && editing !== "new" && Boolean(editing.id)}
+          countable={activeType && (activeType.cardinality === "once_per_day" || activeType.cardinality === "once_per_item_day") ? { bookGoal: recipeCatalogKind(challenge.recipeKey) === "book" } : undefined}
           onCancel={() => setEditing(null)}
           onSave={async (built) => {
             const next = editing === "new"
@@ -462,7 +473,7 @@ function AdminFields({
         />
       ) : null}
 
-      {(selectedTypeId && challenge.status !== "closed") || canToggleExpectation || hasExpectation || canToggleEntryDate ? (
+      {(selectedTypeId && challenge.status !== "closed") || canToggleExpectation || hasExpectation || canToggleEntryDate || canTogglePageCount ? (
         <div className="mt-8 divide-y divide-[var(--line)] overflow-hidden rounded-2xl border border-[var(--line)]">
           {selectedTypeId && challenge.status !== "closed" ? (
             <div className="p-5">
@@ -509,6 +520,24 @@ function AdminFields({
               />
             </div>
           ) : null}
+          {canTogglePageCount ? (
+            <div className="p-5">
+              <Toggle
+                checked={countsPages}
+                disabled={pageCountBusy}
+                onChange={(next) => {
+                  setPageCountBusy(true);
+                  setError(null);
+                  onSetPageCount(next)
+                    .then(() => setSuccess(next ? t("pageCountOn") : t("pageCountOff")))
+                    .catch((cause: unknown) => setError(f.error(cause)))
+                    .finally(() => setPageCountBusy(false));
+                }}
+                label={t("pageCountTitle")}
+                hint={t("pageCountHint")}
+              />
+            </div>
+          ) : null}
           {canToggleExpectation || hasExpectation ? (
             <div className="p-5">
               <Toggle
@@ -533,16 +562,58 @@ function AdminFields({
   );
 }
 
+/**
+ * "Contagem" for a number field: count it along a road to a goal. Only where a count can be drawn — a form
+ * answered day by day — and the book's page count is offered only when the items are books.
+ */
+function CountSettings({ field, bookGoal, onChange }: { field: ChallengeField; bookGoal: boolean; onChange: (count: FieldCount | undefined) => void }) {
+  const t = useTranslations("countSettings");
+  const count = field.config?.count;
+  const goalKind = !count?.goal ? "none" : "from" in count.goal ? "page_count" : "value";
+  const set = (patch: Partial<FieldCount>) => onChange({ goal: null, entry: "amount", showDates: true, ...count, ...patch });
+  return (
+    <div className="space-y-4 rounded-2xl border border-[var(--line)] p-4">
+      <Toggle checked={Boolean(count)} onChange={(on) => onChange(on ? { goal: bookGoal ? { from: "page_count" } : null, entry: bookGoal ? "position" : "amount", showDates: true } : undefined)} label={t("title")} hint={t("hint")} />
+      {count ? (
+        <>
+          <Field label={t("goal")}>
+            <div className="flex flex-wrap items-center gap-2">
+              <select className={cx(inputClass, "w-auto")} value={goalKind} onChange={(event) => set({ goal: event.target.value === "page_count" ? { from: "page_count" } : event.target.value === "value" ? { value: 100 } : null })}>
+                <option value="none">{t("goalNone")}</option>
+                <option value="value">{t("goalValue")}</option>
+                {bookGoal || goalKind === "page_count" ? <option value="page_count">{t("goalPageCount")}</option> : null}
+              </select>
+              {count.goal && "value" in count.goal ? (
+                <input className={cx(inputClass, "w-32")} type="number" min={1} step="any" aria-label={t("goalValue")} value={count.goal.value} onChange={(event) => set({ goal: { value: Math.max(1, Number(event.target.value) || 1) } })} />
+              ) : null}
+            </div>
+          </Field>
+          <Field label={t("entry")}>
+            <select className={cx(inputClass, "w-auto")} value={count.entry} onChange={(event) => set({ entry: event.target.value === "position" ? "position" : "amount" })}>
+              <option value="amount">{t("entryAmount")}</option>
+              <option value="position">{t("entryPosition")}</option>
+            </select>
+          </Field>
+          <Toggle checked={count.showDates} onChange={(on) => set({ showDates: on })} label={t("showDates")} hint={t("showDatesHint")} />
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 export function FieldEditorDialog({
   field,
   takenKeys,
   lockType,
+  countable,
   onCancel,
   onSave,
 }: {
   field?: ChallengeField;
   takenKeys: string[];
   lockType: boolean;
+  /** The form is answered day by day, so a number on it can be a count; `bookGoal` when the items are books. */
+  countable?: { bookGoal: boolean };
   onCancel: () => void;
   onSave: (field: ChallengeField) => Promise<void>;
 }) {
@@ -584,6 +655,9 @@ export function FieldEditorDialog({
         <select className={inputClass} value={draft.type} disabled={lockType} onChange={(event) => { const type = event.target.value as ChallengeField["type"]; setDraft((current) => ({ ...current, type, config: newFieldConfig(type) })); }}>{FIELD_TYPES.map((value) => <option value={value} key={value}>{tf(`type.${value}`)}</option>)}</select>
       </Field>
       {hasConfig ? <FieldConfigInputs field={draft} onChange={(patch) => setDraft((current) => ({ ...current, ...patch }))} /> : null}
+      {countable && draft.type === "number" ? (
+        <CountSettings field={draft} bookGoal={countable.bookGoal} onChange={(count) => setDraft((current) => ({ ...current, config: { ...current.config, count } }))} />
+      ) : null}
       <Toggle checked={draft.required} onChange={(next) => setDraft((current) => ({ ...current, required: next }))} label={tf("required")} hint={tf("requiredHint")} />
     </FormDialog>
   );
@@ -1046,6 +1120,7 @@ export function AdminScreen({
   onSaveFields,
   onSaveEntryTypeVisibility,
   onSetExpectation,
+  onSetPageCount,
   onSaveEntryDate,
   onAddSharedResponse,
   onRemoveEntryType,
@@ -1082,6 +1157,7 @@ export function AdminScreen({
   onSaveFields: (entryTypeId: Id, fields: ChallengeField[]) => Promise<void>;
   onSaveEntryTypeVisibility: (entryTypeId: Id, visibilityPolicy: string) => Promise<void>;
   onSetExpectation: (enabled: boolean) => Promise<void>;
+  onSetPageCount: (enabled: boolean) => Promise<void>;
   onSaveEntryDate: (enabled: boolean) => Promise<void>;
   onAddSharedResponse: (payload: { name: string; sharedEditPolicy: SharedEditPolicy; field: ChallengeField }) => Promise<void>;
   onRemoveEntryType: (entryTypeId: Id, confirmed: { archiveMetrics: boolean; deleteAnswers: boolean }) => Promise<void>;
@@ -1154,7 +1230,7 @@ export function AdminScreen({
       <div className="mx-auto max-w-5xl px-4 pt-8 sm:px-6 sm:pt-10">
         {setup ? <div className="mx-auto max-w-2xl"><SetupSummary state={setup} activeTab={activeTab} onGo={onTab} /></div> : null}
         {activeTab === "overview" ? <AdminGeneral challenge={challenge} group={group} isPersonal={isPersonal} onSaveBasics={onSaveBasics} onSaveParticipants={onSaveParticipants} /> : null}
-        {activeTab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.visibilityPolicy}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} onSaveVisibility={onSaveEntryTypeVisibility} onSetExpectation={onSetExpectation} onSaveEntryDate={onSaveEntryDate} onAddShared={onAddSharedResponse} onRemoveType={onRemoveEntryType} onSavePolicy={onSaveSharedPolicy} /> : null}
+        {activeTab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.visibilityPolicy}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} onSaveVisibility={onSaveEntryTypeVisibility} onSetExpectation={onSetExpectation} onSetPageCount={onSetPageCount} onSaveEntryDate={onSaveEntryDate} onAddShared={onAddSharedResponse} onRemoveType={onRemoveEntryType} onSavePolicy={onSaveSharedPolicy} /> : null}
         {activeTab === "items" ? <AdminItems challenge={challenge} group={group} entries={entries} onAdd={onAddItems} onUpdate={onUpdateItem} onArchive={onArchiveItem} onLinkLibrary={onLinkLibrary} onUnlinkLibrary={onUnlinkLibrary} onLibraryChanged={onArchiveChanged} onReorder={onAssignCheckpointItems} /> : null}
         {activeTab === "checkpoints" ? <CheckpointPlanner key={`${challenge.id}:${challenge.checkpoints.map((cp) => cp.id).join(",")}`} challenge={challenge} onSaveCheckpoints={onSaveCheckpoints} onAssign={onAssignCheckpointItems} /> : null}
         {activeTab === "settings" ? <ChallengeSettings challenge={challenge} duplicateTargets={duplicateTargets} onDuplicate={onDuplicate} onOpenCopy={onOpenCopy} onDelete={onDelete} isPlatformAdmin={isPlatformAdmin} onPublishTemplate={onPublishTemplate} onUnpublishTemplate={onUnpublishTemplate} onPublish={onPublishResult} onUnpublish={onUnpublishResult} /> : null}

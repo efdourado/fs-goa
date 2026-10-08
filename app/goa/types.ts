@@ -117,6 +117,19 @@ export interface FieldConfig {
   unit?: string;
   /** Rating fields only: this rating ranks the titles (the Goa score, podiums, the catalogue). Off unless switched on. */
   inRanking?: boolean;
+  /** Number fields only: counted along a road to a goal (see `FieldCount`). Absent when it isn't counted. */
+  count?: FieldCount;
+}
+
+/**
+ * "Contagem": a number counted along a road to a goal — a book's pages, steps, km. `goal` ends the road (the
+ * item's page count, a fixed number, or none); `entry` is how it's typed (the amount done, or where you are
+ * now); `showDates` false keeps the days out of sight — still saved, they're how a start and a finish are known.
+ */
+export interface FieldCount {
+  goal: { from: "page_count" } | { value: number } | null;
+  entry: "amount" | "position";
+  showDates: boolean;
 }
 
 export interface ChallengeField {

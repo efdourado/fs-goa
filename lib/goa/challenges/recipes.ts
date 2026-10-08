@@ -152,9 +152,27 @@ const progressoDia: RecipeEntryType = {
   cardinality: "once_per_item_day",
   schedulePolicy: "while_active",
   fields: [
-    { key: "paginas", label: "Páginas lidas", type: "number", required: true, config: { min: 0, step: 1 } },
+    // A count with the book's page count as its goal; a club reads together, so the days stay in view.
+    { key: "paginas", label: "Páginas lidas", type: "number", required: true, config: { min: 0, step: 1, count: { goal: { from: "page_count" }, entry: "amount", showDates: true } } },
   ],
   primary: true,
+};
+
+// Pages' own count: where you are in each book, against its page count. The day is saved quietly (it's how we
+// know when a book was started and finished) but never shown — a shelf has no deadline, only progress.
+// Optional: switched off in Manage, Pages is a plain bookshelf again.
+export const PAGE_COUNT_KEY = "paginas_livro";
+export const pageCountType: RecipeEntryType = {
+  semanticKey: PAGE_COUNT_KEY,
+  name: "Páginas",
+  purpose: "progress",
+  submissionMode: "daily",
+  targetPolicy: "required",
+  cardinality: "once_per_item_day",
+  schedulePolicy: "while_active",
+  fields: [
+    { key: "paginas", label: "Páginas lidas", type: "number", required: true, config: { min: 0, step: 1, count: { goal: { from: "page_count" }, entry: "position", showDates: false } } },
+  ],
 };
 
 // "Terminei o livro" — the entry existing means done; nota and comentário are
@@ -302,7 +320,7 @@ export const RECIPES: Record<RecipeKey, Recipe> = {
     catalogKind: "book",
     scheduleMode: "none",
     collectsEntryDate: false,
-    entryTypes: [avaliacao(true)],
+    entryTypes: [avaliacao(true), pageCountType],
     metrics: [
       { key: "media_nota", label: "Nota média", operation: "average", fieldKey: "nota", groupBy: "none" },
       {

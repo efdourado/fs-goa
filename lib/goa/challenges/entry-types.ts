@@ -9,6 +9,7 @@ import { writeAudit } from "../domain/audit";
 import { publicId, semanticKey } from "../domain/shared";
 import { insertField } from "../domain/fields";
 import { ApiError } from "../../http";
+import { PAGE_COUNT_KEY, pageCountType } from "./recipes";
 
 export type SubmissionMode = "item" | "daily" | "free";
 export type Purpose = "progress" | "completion" | "expectation" | "rating" | "checkin";
@@ -530,4 +531,82 @@ export function recipeCatalogKind(recipeKey: string | null): "film" | "book" | n
   if (recipeKey === "cinema" || recipeKey === "cine_free" || recipeKey === "cine_curated") return "film";
   if (recipeKey === "library" || recipeKey === "bookshelf" || recipeKey === "reading_club" || recipeKey === "reading_daily") return "book";
   return null;
+}
+
+/** Whether a challenge's active types already count something toward a book's page count. */
+async function countsPages(client: PoolClient, challengeId: string, exceptTypeId?: string): Promise<boolean> {
+  const row = await oneOrNull<{ found: boolean }>(
+    client,
+    `SELECT EXISTS (
+       SELECT 1 FROM challenge_fields f JOIN entry_types t ON t.id = f.entry_type_id
+        WHERE f.challenge_id = $1 AND f.archived_at IS NULL AND t.archived_at IS NULL
+          AND f.settings->'count'->'goal'->>'from' = 'page_count' AND ($2::text IS NULL OR t.id <> $2)
+     ) AS found`,
+    [challengeId, exceptTypeId ?? null],
+  );
+  return row?.found === true;
+}
+
+/**
+ * Pages' count on or off: each book's pages against its page count (see `pageCountType`). Off archives the
+ * type — the pages already saved stay, and come back when it's switched on again; on adds it to a book
+ * challenge that never had it. A challenge that already counts pages its own way (a reading club) is left alone.
+ */
+export async function setPageCountEnabled(
+  session: SessionContext,
+  challengeId: string,
+  body: Record<string, unknown>,
+) {
+  if (typeof body.enabled !== "boolean") {
+    throw new ApiError(400, "invalid_request", "Informe se a contagem de páginas fica ligada ou desligada.");
+  }
+  return inTransaction(async (client) => {
+    const access = await challengeAccess(session.user.id, challengeId, client, true);
+    if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores mudam os tipos de registro.");
+    if (access.challenge.status === "closed") {
+      throw new ApiError(409, "challenge_locked", "Reabra o desafio para mudar a contagem de páginas.");
+    }
+    const types = await entryTypesForChallenge(client, challengeId);
+    const active = types.find((type) => type.semantic_key === PAGE_COUNT_KEY);
+    if (body.enabled) {
+      if (active) return { enabled: true, entryTypeId: active.id };
+      if (recipeCatalogKind(access.challenge.recipe_key) !== "book" || !usesRoundItems(types)) {
+        throw new ApiError(409, "page_count_unsupported", "A contagem de páginas existe nos desafios de livros.");
+      }
+      if (await countsPages(client, challengeId)) {
+        throw new ApiError(409, "page_count_exists", "Este desafio já conta páginas.");
+      }
+      const archived = await oneOrNull<{ id: string }>(
+        client,
+        "SELECT id FROM entry_types WHERE challenge_id=$1 AND semantic_key=$2 AND archived_at IS NOT NULL ORDER BY created_at DESC LIMIT 1",
+        [challengeId, PAGE_COUNT_KEY],
+      );
+      let entryTypeId: string;
+      if (archived) {
+        entryTypeId = archived.id;
+        await client.query("UPDATE entry_types SET archived_at=NULL, updated_at=now() WHERE id=$1", [entryTypeId]);
+        await client.query("UPDATE challenge_fields SET archived_at=NULL, updated_at=now() WHERE entry_type_id=$1", [entryTypeId]);
+      } else {
+        entryTypeId = publicId();
+        await client.query(
+          `INSERT INTO entry_types
+             (id, challenge_id, semantic_key, name, submission_mode, purpose, target_policy,
+              cardinality, schedule_policy, is_primary, created_at, updated_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,false,now(),now())`,
+          [entryTypeId, challengeId, PAGE_COUNT_KEY, pageCountType.name, pageCountType.submissionMode, pageCountType.purpose,
+            pageCountType.targetPolicy, pageCountType.cardinality, pageCountType.schedulePolicy],
+        );
+        for (const [index, field] of pageCountType.fields.entries()) await insertField(client, challengeId, entryTypeId, field, index);
+      }
+      await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
+        "entry_type.created", "entry_type", entryTypeId, null, { purpose: "progress", semanticKey: PAGE_COUNT_KEY });
+      return { enabled: true, entryTypeId };
+    }
+    if (!active) return { enabled: false, entryTypeId: null };
+    await client.query("UPDATE challenge_fields SET archived_at=now(), updated_at=now() WHERE entry_type_id=$1", [active.id]);
+    await client.query("UPDATE entry_types SET archived_at=now(), updated_at=now() WHERE id=$1", [active.id]);
+    await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
+      "entry_type.archived", "entry_type", active.id, null, { purpose: "progress", semanticKey: PAGE_COUNT_KEY });
+    return { enabled: false, entryTypeId: null };
+  });
 }

@@ -119,7 +119,7 @@ test("o log de um livro mostra a página, o ritmo e um dia por chip, com hoje ai
   const html = renderWithIntl(createElement(CheckinLog, {
     from: "2026-09-14", to: "2026-10-07", today: "2026-09-28", deadline: "2026-10-07",
     records, selectedDay: "2026-09-28", onSelectDay: () => undefined, canEdit: true,
-    counter: { field: pages, notes: [], total: 352, paceFrom: "2026-09-14", paceTo: "2026-10-07", onSave: async () => undefined },
+    counter: { field: pages, notes: [], total: 352, book: true, paceFrom: "2026-09-14", paceTo: "2026-10-07", onSave: async () => undefined },
   }));
   assert.match(html, /p\. 65/);
   assert.match(html, /de 352/);
@@ -151,4 +151,45 @@ test("semanas seguidas: toda semana com um registro conta, e a semana corrente a
   assert.equal(weekStreak(new Set([...logged, "2026-09-29"]), "2026-09-30"), 3, "treinou nesta semana: três seguidas");
   assert.equal(weekStreak(new Set(["2026-09-01"]), "2026-09-28"), 0, "semanas sem treino zeram a sequência");
   assert.equal(weekStreak(new Set(), "2026-09-28"), 0);
+});
+
+test("contagem com as datas escondidas: a estrada e 'parei na página', sem faixa de dias, título do dia nem ritmo", () => {
+  const records = new Map([book("2026-09-14", 22), book("2026-09-15", 18)]);
+  const html = renderWithIntl(createElement(CheckinLog, {
+    from: "2026-09-14", to: "2026-09-28", today: "2026-09-28",
+    records, selectedDay: "2026-09-28", onSelectDay: () => undefined, canEdit: true, compact: true, openEnded: true,
+    counter: { field: pages, notes: [], total: 352, book: true, entry: "position", paceFrom: "2026-09-14", paceTo: null, onSave: async () => undefined },
+  }));
+  assert.match(html, /p\. 40/);
+  assert.doesNotMatch(html, /data-day=/, "sem a faixa de dias");
+  assert.doesNotMatch(html, /Hoje, 28 de setembro/, "sem o dia por extenso");
+  assert.doesNotMatch(html, /ritmo/);
+  assert.match(html, /aria-pressed="true"[^>]*>Parei na página/, "abre em 'parei na página'");
+});
+
+test("ao chegar ao fim, a estrada fica com 'livro terminado' e o dia; o editor se recolhe atrás de 'corrigir'", () => {
+  const records = new Map([book("2026-09-14", 200), book("2026-09-20", 152)]);
+  const html = renderWithIntl(createElement(CheckinLog, {
+    from: "2026-09-14", to: "2026-09-28", today: "2026-09-28",
+    records, selectedDay: "2026-09-28", onSelectDay: () => undefined, canEdit: true, compact: true,
+    counter: { field: pages, notes: [], total: 352, book: true, entry: "position", paceFrom: "2026-09-14", paceTo: null, onSave: async () => undefined },
+  }));
+  assert.match(html, /Livro terminado/);
+  assert.match(html, /em 20 de setembro de 2026/, "o dia em que a contagem cruzou o total");
+  assert.match(html, /role="img"/, "a estrada continua");
+  assert.match(html, />Corrigir</);
+  assert.doesNotMatch(html, /Parei na página/, "sem o editor");
+});
+
+test("uma contagem que não é livro fala no próprio número e unidade, com meta fixa", () => {
+  const steps = { ...pages, key: "passos", label: "Passos", config: { unit: "passos", count: { goal: { value: 10000 }, entry: "amount" as const, showDates: true } } };
+  const html = renderWithIntl(createElement(CheckinLog, {
+    from: "2026-09-26", to: "2026-09-28", today: "2026-09-28",
+    records: new Map([book("2026-09-26", 3000), book("2026-09-27", 4200)]), selectedDay: "2026-09-28", onSelectDay: () => undefined, canEdit: true,
+    counter: { field: steps, notes: [], total: 10000, book: false, unit: "passos", paceFrom: "2026-09-26", paceTo: null, onSave: async () => undefined },
+  }));
+  assert.match(html, /7\.200 passos/);
+  assert.match(html, /de 10\.000 passos/);
+  assert.match(html, /72% da meta/);
+  assert.doesNotMatch(html, /p\. 7/, "nada de 'p.' fora de um livro");
 });

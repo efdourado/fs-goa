@@ -3703,13 +3703,13 @@ test("estante pessoal: só nota, sem data no registro, sem métricas de grupo, r
   };
   assert.equal(detail.scope, "personal");
   assert.equal(detail.collectsEntryDate, false, "a estante não coleta data por registro");
-  assert.deepEqual(detail.entryTypes.map((type) => type.purpose), ["rating"], "só avaliação — sem progresso, sem conclusão");
+  assert.deepEqual(detail.entryTypes.map((type) => type.purpose), ["rating", "progress"], "avaliação e a contagem de páginas (datas escondidas) — sem conclusão");
   assert.equal(detail.metrics.some((metric) => metric.operation === "indicator_bias"), false, "sem viés do indicador num desafio solo");
   assert.equal(detail.metrics.some((metric) => metric.operation === "spread"), false, "sem polarização num desafio solo");
   const ranking = detail.metrics.find((metric) => metric.label.toLowerCase().includes("ranking"))!;
   assert.equal(ranking.operation, "average", "ranking solo é média simples, sem encolhimento bayesiano");
 
-  const ratingEntryType = detail.entryTypes[0];
+  const ratingEntryType = detail.entryTypes.find((type) => type.purpose === "rating")!;
   const notaField = ratingEntryType.fields.find((field) => field.key === "nota")!.id;
   const ratingType = ratingEntryType.id;
   for (const [item, nota] of [[detail.items[0], 5], [detail.items[1], 3]] as const) {
@@ -8726,4 +8726,58 @@ test("métricas de treino: unidade no campo, contar check-ins ou dias e o record
   const afterRename = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { entryTypes: Array<{ id: string; name: string }>; metrics: MetricView[] };
   assert.equal(afterRename.entryTypes.find((type) => type.id === visit.id)?.name, "Sessão");
   assert.equal(afterRename.metrics.find((metric) => metric.id === checkins)?.value, 3, "os check-ins continuam lá");
+});
+
+test("contagem: Pages conta as páginas de cada livro (datas escondidas), desliga e religa sem perder; o clube de leitura e os filmes não ganham outra", async () => {
+  const owner = await register("Leitora Contagem", "leitora_contagem");
+  const created = await call("POST", "/api/personal/challenges", {
+    session: owner,
+    body: { recipe: "bookshelf", title: "Estante", startsOn: null, endsOn: null, items: [{ title: "Torto Arado", author: "Itamar Vieira Junior", position: 0 }] },
+  });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const challengeId = (created.body as { id: string }).id;
+  type CountType = DetailType & { fields: Array<{ id: string; key: string; config?: { count?: unknown } }> };
+  const load = async () => (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { entryTypes: CountType[]; items: DetailItem[] };
+
+  let detail = await load();
+  const pages = detail.entryTypes.find((type) => type.semanticKey === "paginas_livro")!;
+  assert.ok(pages, "Pages nasce contando páginas");
+  assert.equal(pages.cardinality, "once_per_item_day");
+  assert.deepEqual(pages.fields[0].config?.count, { goal: { from: "page_count" }, entry: "position", showDates: false });
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+  const saved = await call("POST", `/api/challenges/${challengeId}/entries`, { session: owner, body: { itemId: detail.items[0].id, entryTypeId: pages.id, occurredOn: today, values: { [pages.fields[0].id]: 60 } } });
+  assert.equal(saved.response.status, 201, JSON.stringify(saved.body));
+
+  assert.equal((await call("PATCH", `/api/challenges/${challengeId}/page-count`, { session: owner, body: { enabled: false } })).response.status, 200);
+  detail = await load();
+  assert.ok(!detail.entryTypes.some((type) => type.semanticKey === "paginas_livro"), "desligado, é só uma estante");
+  assert.equal((await call("PATCH", `/api/challenges/${challengeId}/page-count`, { session: owner, body: { enabled: true } })).response.status, 200);
+  const kept = await adminPool.query("SELECT deleted_at FROM entries WHERE id = $1", [(saved.body as { id: string }).id]);
+  assert.equal(kept.rows[0]?.deleted_at, null, "a página salva continua lá");
+
+  const club = await call("POST", "/api/personal/challenges", { session: owner, body: { recipe: "library", title: "Clube", startsOn: "2026-01-01", endsOn: "2026-12-31", items: [{ title: "Duna", author: "Frank Herbert", position: 0 }] } });
+  assert.equal(club.response.status, 201, JSON.stringify(club.body));
+  const clubTwice = await call("PATCH", `/api/challenges/${(club.body as { id: string }).id}/page-count`, { session: owner, body: { enabled: true } });
+  assert.equal(clubTwice.response.status, 409, "o clube já conta páginas do seu jeito");
+  const films = await call("POST", "/api/personal/challenges", { session: owner, body: { recipe: "cinema", title: "Filmes", startsOn: null, endsOn: null, items: [{ title: "Aguirre", position: 0 }] } });
+  assert.equal((await call("PATCH", `/api/challenges/${(films.body as { id: string }).id}/page-count`, { session: owner, body: { enabled: true } })).response.status, 409);
+});
+
+test("contagem num hábito: um campo numérico guarda a meta fixa, a forma de registrar e se mostra as datas", async () => {
+  const owner = await register("Caminhante", "caminhante_contagem");
+  const created = await call("POST", "/api/personal/challenges", {
+    session: owner,
+    body: { recipe: "habit", title: "Passos", startsOn: null, endsOn: null,
+      fields: [{ key: "passos", label: "Passos", type: "number", required: true, config: { step: 1, unit: "passos", count: { goal: { value: 10000 }, entry: "amount", showDates: true } } }] },
+  });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const detail = (await call("GET", `/api/challenges/${(created.body as { id: string }).id}`, { session: owner })).body as { fields: Array<{ key: string; config?: { unit?: string; count?: unknown } }> };
+  const passos = detail.fields.find((field) => field.key === "passos")!;
+  assert.equal(passos.config?.unit, "passos");
+  assert.deepEqual(passos.config?.count, { goal: { value: 10000 }, entry: "amount", showDates: true });
+  const bad = await call("POST", "/api/personal/challenges", {
+    session: owner,
+    body: { recipe: "habit", title: "Ruim", startsOn: null, endsOn: null, fields: [{ key: "x", label: "X", type: "number", required: true, config: { count: { goal: { value: -5 } } } }] },
+  });
+  assert.equal(bad.response.status, 400, "meta precisa ser positiva");
 });

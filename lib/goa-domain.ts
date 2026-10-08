@@ -3,7 +3,7 @@ export type { ChallengeAccess, ChallengeStatus } from "./goa/domain/access";
 export { writeAudit } from "./goa/domain/audit";
 export { bootstrap } from "./goa/domain/bootstrap";
 export { createChallenge, createPersonalChallenge } from "./goa/domain/challenges";
-export { fieldUnit, insertField } from "./goa/domain/fields";
+export { fieldCount, fieldUnit, insertField, type FieldCount } from "./goa/domain/fields";
 export {
   cancelMemberRequest,
   createGroup,

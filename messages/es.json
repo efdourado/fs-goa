@@ -945,7 +945,11 @@
     "metricDaysPreview": "días con registro",
     "metricItemLabel": "Solo un ítem",
     "metricItemAll": "Todos los ítems",
-    "metricItemHint": "Muestra el número de un solo ítem (tu récord de peso muerto, por ejemplo)."
+    "metricItemHint": "Muestra el número de un solo ítem (tu récord de peso muerto, por ejemplo).",
+    "pageCountTitle": "Contar páginas",
+    "pageCountHint": "Cada libro muestra dónde estás y cuánto falta, sin fechas. Apagado, es solo una estantería; las páginas ya guardadas se conservan.",
+    "pageCountOn": "Conteo de páginas activado.",
+    "pageCountOff": "Conteo de páginas desactivado."
   },
   "visibility": {
     "title": "Quién ve estas respuestas",
@@ -1041,7 +1045,9 @@
     "deletingEntry": "Eliminando…",
     "checkpointEmpty": "Nada todavía.",
     "origin": "vía {text}",
-    "groupSealed": "Puntuó · sellada"
+    "groupSealed": "Puntuó · sellada",
+    "bookProgress": "p. {page, number} de {total, number} · faltan {left, number}",
+    "bookDone": "Terminado"
   },
   "sessionLog": {
     "composerTitle": "Registrar {name}",
@@ -1155,7 +1161,22 @@
     "loggedSince": "<b>{logged}</b> {logged, plural, one {día con registro} other {días con registro}} desde el {date}",
     "loggedNone": "Todavía sin registros",
     "streakDays": "<b>{streak}</b> {streak, plural, one {día seguido} other {días seguidos}}",
-    "streakWeeks": "<b>{streak}</b> {streak, plural, one {semana seguida} other {semanas seguidas}}"
+    "streakWeeks": "<b>{streak}</b> {streak, plural, one {semana seguida} other {semanas seguidas}}",
+    "savedNewUndated": "Registrado: {value}.",
+    "savedChangeUndated": "Cambiado: {value}.",
+    "positionHintBookUndated": "Estabas en la p. {before}.",
+    "positionHintUndated": "El total era {before}.",
+    "correct": "Corregir",
+    "finishedOn": "el {date}",
+    "goalReached": "Meta alcanzada",
+    "countLabel": "Dónde estás",
+    "percentGoal": "{percent}% de la meta",
+    "countAria": "{page} de {total}, {percent}% de la meta",
+    "paceMarkCount": "ritmo · {value}",
+    "aheadCount": "{count} por delante del ritmo",
+    "behindCount": "{count} por detrás del ritmo",
+    "leftPerDayCount": "Faltan <b>{left}</b>{unit} · <b>{perDay}</b> por día hasta el {date}",
+    "leftCount": "Faltan <b>{left}</b>{unit}"
   },
   "entryForm": {
     "fillField": "Completa el campo “{label}”.",
@@ -2373,5 +2394,18 @@
   },
   "you": {
     "stats": "{challenges, plural, one {# desafío} other {# desafíos}} · {groups, plural, one {# grupo} other {# grupos}}"
+  },
+  "countSettings": {
+    "title": "Contar como un camino",
+    "hint": "Muestra dónde estás, cuánto falta y el camino hasta la meta, como las páginas de un libro.",
+    "goal": "Meta",
+    "goalNone": "Sin meta",
+    "goalValue": "Un número",
+    "goalPageCount": "Las páginas del libro",
+    "entry": "Cómo registrar",
+    "entryAmount": "Cuánto hiciste",
+    "entryPosition": "Dónde estás (el total hasta ahora)",
+    "showDates": "Mostrar las fechas",
+    "showDatesHint": "Apagado, solo se ve el progreso; el día de cada registro se guarda sin mostrarse."
   }
 }
