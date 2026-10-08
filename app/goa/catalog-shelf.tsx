@@ -1,11 +1,10 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useState } from "react";
 
 import { catalogCardHeight, CatalogTile, resolveCoverTop } from "./catalog-views";
 import { useGoaFormat } from "./format";
-import { type CatalogScope, LibraryGlyph, useCatalogShelf, useLibraryName } from "./libraries";
+import { type CatalogScope, useCatalogShelf } from "./libraries";
 import { Rail, RailArrows, shelfCardWidth, useShelfRail } from "./shelf";
 import type { Id } from "./types";
 import { cx, EmptyState } from "./ui";
@@ -32,8 +31,8 @@ export function CatalogShelfSkeleton({ title }: { title: string }) {
 }
 
 /**
- * The catalogue as a preview on a page: the newest items of one library as a rail of covers, with the
- * libraries as tabs when more than one has items, an "Add item" tile, and a "N more" tile at the end.
+ * The catalogue as a preview on a page: the newest items of every library together, as one rail of cards with a
+ * "N more" card at the end — no library tabs; the catalogue page is where they're told apart.
  * One request brings all of it (the server sends only the newest few of each library, plus the counts), and
  * the last answer is painted straight away when the page is opened again.
  */
@@ -44,31 +43,22 @@ export function CatalogShelf({ scope, canManage, onOpenCatalog, onOpenItem }: {
   onOpenItem: (itemId: Id) => void;
 }) {
   const t = useTranslations("group");
-  const tl = useTranslations("libraries");
   const tCat = useTranslations("catalog");
   const f = useGoaFormat();
-  const libraryName = useLibraryName();
   const data = useCatalogShelf(scope);
-  const [activeKind, setActiveKind] = useState<string | null>(null);
   const { railRef, showFade, onScroll, nudge } = useShelfRail();
   const title = scope === "personal" ? t("myCatalogTitle") : t("catalogTitle");
 
-  // Each library is its own shelf — one sorted list never mixes them.
+  // Every library together, newest first; each card still follows its own library's cover settings.
   const counts = data?.counts ?? {};
   const all = data?.items ?? [];
-  const shelves = (data?.libraries ?? []).filter((library) => (counts[library.kind] ?? 0) > 0);
+  const libraryOf = new Map((data?.libraries ?? []).map((library) => [library.kind, library]));
   const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
-  const tabbed = shelves.length > 1;
-  const kind = activeKind && shelves.some((library) => library.kind === activeKind) ? activeKind : shelves[0]?.kind ?? null;
   const addedAt = (item: (typeof all)[number]) => (item.createdAt ? Date.parse(item.createdAt) : 0);
-  const sorted = all
-    .filter((item) => !tabbed || item.kind === kind)
-    .sort((a, b) => addedAt(b) - addedAt(a) || a.title.localeCompare(b.title));
+  const sorted = [...all].sort((a, b) => addedAt(b) - addedAt(a) || a.title.localeCompare(b.title));
   const visible = sorted.slice(0, PREVIEW_COUNT);
-  const shelf = shelves.find((library) => library.kind === kind) ?? null;
   // The server sends only the newest few of each library, so how many more there are comes from the counts.
-  const inShelf = kind ? counts[kind] ?? sorted.length : sorted.length;
-  const remaining = Math.max(0, inShelf - visible.length);
+  const remaining = Math.max(0, Math.max(total, sorted.length) - visible.length);
 
   if (data === null) return <CatalogShelfSkeleton title={title} />;
   if (!sorted.length && !canManage) return null;
@@ -77,6 +67,7 @@ export function CatalogShelf({ scope, canManage, onOpenCatalog, onOpenItem }: {
     <section>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-baseline gap-2.5">
+          <span aria-hidden="true" className="h-2 w-2 flex-none -translate-y-0.5 self-center rounded-full bg-[var(--main)]" />
           <button type="button" onClick={onOpenCatalog} className="cursor-pointer text-lg font-semibold tracking-[-0.02em] hover:underline">
             {title}
           </button>
@@ -86,38 +77,15 @@ export function CatalogShelf({ scope, canManage, onOpenCatalog, onOpenItem }: {
       </div>
       {sorted.length ? (
         <>
-          {tabbed && kind ? (
-            <div role="group" aria-label={tl("tabsLabel")} className="mb-4 flex max-w-full gap-0.5 self-start overflow-x-auto rounded-full bg-[var(--wash-strong)]/70 p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:w-fit">
-              {shelves.map((library) => {
-                const active = library.kind === kind;
-                return (
-                  <button
-                    key={library.id}
-                    type="button"
-                    aria-pressed={active}
-                    onClick={() => setActiveKind(library.kind)}
-                    className={cx(
-                      "inline-flex min-h-9 flex-none cursor-pointer items-center gap-2 rounded-full px-3.5 text-[13px] transition",
-                      active ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]",
-                    )}
-                  >
-                    <LibraryGlyph source={library.source} className="h-4 w-4" />
-                    {libraryName(library)}
-                    <span className="text-[11px] opacity-70">{counts[library.kind] ?? 0}</span>
-                  </button>
-                );
-              })}
-            </div>
-          ) : null}
           <Rail railRef={railRef} showFade={showFade} onScroll={onScroll}>
             {visible.map((item) => (
               <CatalogTile
                 key={item.id}
                 className={shelfCardWidth}
                 title={item.title}
-                year={resolveCoverTop(item, shelf?.coverTopProperty, f)}
+                year={resolveCoverTop(item, libraryOf.get(item.kind)?.coverTopProperty, f)}
                 avg={item.ratingAvg}
-                badgeHidden={shelf?.coverBadgeHidden}
+                badgeHidden={libraryOf.get(item.kind)?.coverBadgeHidden}
                 ratingLabel={item.ratingAvg === null || item.ratingAvg === undefined ? tCat("notRated") : tCat("ratedAria", { value: item.ratingAvg })}
                 caption={[item.scheduledAt ? f.eventWhen(item.scheduledAt) : item.author, item.mainGenre, formatRuntime(item.runtimeMinutes)].filter(Boolean).slice(0, 2).join(" · ")}
                 onOpen={() => onOpenItem(item.id)}
@@ -130,7 +98,7 @@ export function CatalogShelf({ scope, canManage, onOpenCatalog, onOpenItem }: {
                 className={cx(shelfCardWidth, catalogCardHeight, "flex cursor-pointer items-center gap-3 self-start rounded-[20px] border border-[var(--line)] bg-[var(--paper)] px-4 text-left transition hover:border-[var(--main-line)]")}
               >
                 <span className="text-2xl font-light tracking-[-0.04em]">{remaining}</span>
-                <span className="min-w-0 flex-1 truncate text-xs text-[var(--muted)]">{t("catalogMoreIn", { name: shelf ? libraryName(shelf) : title })}</span>
+                <span className="min-w-0 flex-1 truncate text-xs text-[var(--muted)]">{t("catalogMoreIn", { name: title })}</span>
                 <span className="flex-none text-[13px] text-[var(--main-strong)]">{t("catalogSeeAll")} →</span>
               </button>
             ) : null}
