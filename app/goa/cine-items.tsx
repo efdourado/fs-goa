@@ -21,6 +21,7 @@ import { decodeEventForm, encodeEventForm, eventBodyOf, eventFormOf } from "./sc
 import type { CatalogItem, ChallengeItemInput, ChallengeLibraryRef, Id, LibraryProperty, Member } from "./types";
 import { Button, cx, inputClass, labelClass, StatusMessage } from "./ui";
 import { formatRuntime } from "./utils";
+import { useGoaFormat } from "./format";
 
 export interface CineRow {
   key: string;
@@ -585,6 +586,51 @@ function useRowSummary(members: Member[], timeZone?: string) {
  * The items of a challenge being created: the list itself first (one line per item, edit or remove), and
  * adding in its own box — paste, the detailed list or the catalogue, with each new item's properties.
  */
+/**
+ * "Add items" as a dialog: the same box as when the challenge was created (type, paste or pick from the
+ * catalogue, each row with its library's details), saved in one go. Used by Manage › Items and by Today.
+ */
+export function AddItemsDialog({ onAdd, onClose, note, ...shared }: EditorShared & {
+  onAdd: (items: ChallengeItemInput[]) => Promise<void>;
+  onClose: () => void;
+  /** A line under the box — e.g. that new items open for entries straight away. */
+  note?: string;
+}) {
+  const t = useTranslations("cineItems");
+  const ta = useTranslations("adminChallenge");
+  const tc = useTranslations("common");
+  const f = useGoaFormat();
+  const [draft, setDraft] = useState<CineRow[]>([]);
+  const [problem, setProblem] = useState<"author" | "schedule" | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <FormDialog
+      title={t("addItems")}
+      dirty={draft.length > 0}
+      busy={busy}
+      error={error ?? (problem === "author" ? t("authorRequired") : problem === "schedule" ? ta("eventScheduleInvalid") : null)}
+      onCancel={onClose}
+      submitDisabled={!draft.length || problem !== null}
+      submitLabel={t("addCount", { count: draft.length })}
+      busyLabel={tc("saving")}
+      onSubmit={async () => {
+        setBusy(true);
+        setError(null);
+        try {
+          await onAdd(cineRowsToInput(draft));
+        } catch (cause) {
+          setError(f.error(cause));
+          setBusy(false);
+        }
+      }}
+    >
+      <ItemsAddBox {...shared} draft={draft} onDraftChange={setDraft} existing={[]} onProblem={setProblem} />
+      {note ? <p className="mt-3 text-xs leading-5 text-[var(--muted)]">{note}</p> : null}
+    </FormDialog>
+  );
+}
+
 export function CineItemsEditor({
   value,
   onChange,

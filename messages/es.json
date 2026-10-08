@@ -576,7 +576,8 @@
     "clearSelection": "Limpiar",
     "catalogNoMatch": "Nada coincide con esa búsqueda.",
     "catalogTally": "{picked} marcados · {total} en el acervo",
-    "addSelected": "{count, plural, =0 {Añadir seleccionados} one {Añadir # ítem} other {Añadir # ítems}}"
+    "addSelected": "{count, plural, =0 {Añadir seleccionados} one {Añadir # ítem} other {Añadir # ítems}}",
+    "addShort": "Añadir"
   },
   "createChallenge": {
     "errPickTemplate": "Elige una plantilla y completa el título.",
@@ -949,26 +950,11 @@
     "pageCountTitle": "Contar páginas",
     "pageCountHint": "Cada libro muestra dónde estás y cuánto falta, sin fechas. Apagado, es solo una estantería; las páginas ya guardadas se conservan.",
     "pageCountOn": "Conteo de páginas activado.",
-    "pageCountOff": "Conteo de páginas desactivado."
+    "pageCountOff": "Conteo de páginas desactivado.",
+    "moreDetailsInLibrary": "¿Quieres guardar otros datos (como cocina o director)? Se crean en la biblioteca.",
+    "openLibrary": "Abrir la biblioteca"
   },
   "visibility": {
-    "title": "Quién ve estas respuestas",
-    "hint": "Vale para que cada participante vea las respuestas de los demás de este tipo. Los administradores y el autor siempre ven todo (salvo una nota sellada, que espera la revelación como todos).",
-    "saved": "Visibilidad actualizada.",
-    "policy": {
-      "group_realtime": "El grupo, en tiempo real",
-      "after_own": "Los demás, después de que respondas",
-      "after_close": "El grupo, solo después de cerrar",
-      "author_only": "Solo tú y los administradores",
-      "until_reveal": "Selladas hasta que el grupo revele"
-    },
-    "explain": {
-      "group_realtime": "Cada participante ve la respuesta de todos mientras la ronda transcurre.",
-      "after_own": "Solo ves la respuesta de otra persona para un ítem después de enviar la tuya.",
-      "after_close": "Durante la ronda, solo tú y los administradores ven tu respuesta; el grupo la ve en el resultado.",
-      "author_only": "Tu respuesta nunca aparece de forma colectiva, solo las métricas agregadas pueden incluirla.",
-      "until_reveal": "Nadie (ni los admins) ve la nota de otros hasta que alguien que ya puntuó toque Revelar en ese ítem."
-    },
     "note": {
       "after_close": "Solo los administradores ven tu respuesta hasta que la ronda cierre.",
       "author_only": "Solo tú y los administradores ven esta respuesta.",
@@ -1013,7 +999,6 @@
     },
     "back": "Volver",
     "manage": "Gestionar",
-    "livingListMeta": "{count, plural, =0 {lista vacía} one {# título} other {# títulos}}",
     "recommendedBy": "Recomendado por {name}",
     "byAuthor": "por {name}",
     "groupCompletion": "{done} de {total} completados",

@@ -6,7 +6,7 @@ import { type FormEvent, useMemo, useState } from "react";
 import { ActionMenu, ActionMenuItem } from "../action-menu";
 import { CheckpointPlanner } from "../checkpoint-planner";
 import { useGoaFormat } from "../format";
-import { type CineRow, cineRowsToInput, ItemsAddBox } from "../cine-items";
+import { AddItemsDialog } from "../cine-items";
 import { ConfirmDialog, FormDialog } from "../dialog";
 import { AddSharedResponseDialog, RemoveResponseDialog, SharedGlyph, SharedResponsePanel } from "../shared-responses";
 import { cleanFields, FIELD_TYPES, FieldConfigInputs, newFieldConfig, uniqueFieldKey } from "../fields";
@@ -254,12 +254,9 @@ function AdminGeneral({
   );
 }
 
-const VISIBILITY_POLICIES = ["group_realtime", "after_own", "after_close", "author_only", "until_reveal"] as const;
-
 function AdminFields({
   challenge,
   onSave,
-  onSaveVisibility,
   onSetExpectation,
   onSetPageCount,
   onSaveEntryDate,
@@ -269,7 +266,6 @@ function AdminFields({
 }: {
   challenge: ChallengeDetail;
   onSave: (entryTypeId: Id, fields: ChallengeField[]) => Promise<void>;
-  onSaveVisibility: (entryTypeId: Id, visibilityPolicy: string) => Promise<void>;
   onSetExpectation: (enabled: boolean) => Promise<void>;
   onSetPageCount: (enabled: boolean) => Promise<void>;
   onSaveEntryDate: (enabled: boolean) => Promise<void>;
@@ -279,7 +275,6 @@ function AdminFields({
 }) {
   const t = useTranslations("adminChallenge");
   const tf = useTranslations("fields");
-  const tv = useTranslations("visibility");
   const tSr = useTranslations("sharedResponses");
   const f = useGoaFormat();
   const hasExpectation = challenge.entryTypes.some((type) => type.purpose === "expectation");
@@ -299,17 +294,17 @@ function AdminFields({
   const canToggleEntryDate = challenge.status !== "closed"
     && !challenge.entryTypes.some((type) => type.cardinality === "once_per_day" || type.cardinality === "once_per_item_day");
   const [entryDateBusy, setEntryDateBusy] = useState(false);
-  const types = challenge.entryTypes.length
-    ? challenge.entryTypes
+  // Pages' page count is the "Contar páginas" switch below, not fields of your own — it isn't listed here.
+  const ownTypes = challenge.entryTypes.filter((type) => type.semanticKey !== PAGE_COUNT_KEY);
+  const types = ownTypes.length
+    ? ownTypes
     : [{ id: "", name: "", fields: challenge.fields } as ChallengeDetail["entryTypes"][number]];
   const [selectedTypeId, setSelectedTypeId] = useState(
     types.find((type) => type.isPrimary)?.id ?? types[0]?.id ?? "",
   );
   const activeType = types.find((type) => type.id === selectedTypeId) ?? types[0];
   const [fields, setFields] = useState(activeType?.fields ?? []);
-  const [visibility, setVisibility] = useState<string>(activeType?.visibilityPolicy ?? "group_realtime");
   const [busy, setBusy] = useState(false);
-  const [visibilityBusy, setVisibilityBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -326,7 +321,6 @@ function AdminFields({
     setSelectedTypeId(id);
     const type = types.find((candidate) => candidate.id === id);
     setFields(type?.fields ?? []);
-    setVisibility(type?.visibilityPolicy ?? "group_realtime");
     setError(null);
     setSuccess(null);
   }
@@ -473,35 +467,8 @@ function AdminFields({
         />
       ) : null}
 
-      {(selectedTypeId && challenge.status !== "closed") || canToggleExpectation || hasExpectation || canToggleEntryDate || canTogglePageCount ? (
+      {canToggleExpectation || hasExpectation || canToggleEntryDate || canTogglePageCount ? (
         <div className="mt-8 divide-y divide-[var(--line)] overflow-hidden rounded-2xl border border-[var(--line)]">
-          {selectedTypeId && challenge.status !== "closed" ? (
-            <div className="p-5">
-              <h3 className="text-sm font-semibold">{tv("title")}</h3>
-              <p className="mb-3 mt-1 text-xs leading-5 text-[var(--muted)]">{tv("hint")}</p>
-              <select
-                className={inputClass}
-                aria-label={tv("title")}
-                value={visibility}
-                onChange={(event) => {
-                  const next = event.target.value;
-                  setVisibility(next);
-                  setVisibilityBusy(true);
-                  setError(null);
-                  onSaveVisibility(selectedTypeId, next)
-                    .then(() => setSuccess(tv("saved")))
-                    .catch((cause: unknown) => { setError(f.error(cause)); setVisibility(activeType?.visibilityPolicy ?? "group_realtime"); })
-                    .finally(() => setVisibilityBusy(false));
-                }}
-                disabled={visibilityBusy}
-              >
-                {VISIBILITY_POLICIES.map((policy) => (
-                  <option key={policy} value={policy}>{tv(`policy.${policy}`)}</option>
-                ))}
-              </select>
-              <p className="mt-2 text-xs text-[var(--muted)]">{tv(`explain.${visibility}`)}</p>
-            </div>
-          ) : null}
           {canToggleEntryDate ? (
             <div className="p-5">
               <Toggle
@@ -515,6 +482,7 @@ function AdminFields({
                     .catch((cause: unknown) => setError(f.error(cause)))
                     .finally(() => setEntryDateBusy(false));
                 }}
+                bare
                 label={t("entryDateTitle")}
                 hint={t("entryDateHint")}
               />
@@ -533,6 +501,7 @@ function AdminFields({
                     .catch((cause: unknown) => setError(f.error(cause)))
                     .finally(() => setPageCountBusy(false));
                 }}
+                bare
                 label={t("pageCountTitle")}
                 hint={t("pageCountHint")}
               />
@@ -551,6 +520,7 @@ function AdminFields({
                     .catch((cause: unknown) => setError(f.error(cause)))
                     .finally(() => setExpectationBusy(false));
                 }}
+                bare
                 label={t("expectationTitle")}
                 hint={!canToggleExpectation && hasExpectation ? t("expectationLockedNote") : t("expectationHint")}
               />
@@ -674,6 +644,7 @@ export function ItemEditorDialog({
   recommendationsEnabled,
   onCancel,
   onSave,
+  onOpenLibrary,
 }: {
   item: ChallengeItem;
   challenge: ChallengeDetail;
@@ -683,6 +654,8 @@ export function ItemEditorDialog({
   scope: CatalogScope;
   recommendationsEnabled: boolean;
   onCancel: () => void;
+  /** Where new kinds of details are made: the library. The dialog only fills the ones it already has. */
+  onOpenLibrary?: () => void;
   onSave: (payload: ItemUpdatePayload) => Promise<void>;
 }) {
   const t = useTranslations("adminChallenge");
@@ -756,6 +729,12 @@ export function ItemEditorDialog({
             <PropertyInputs properties={factProperties} values={values} onChange={(key, value) => setEditedValues({ ...values, [key]: value })} />
           </div>
         </Disclosure>
+      ) : null}
+      {catalogItem && onOpenLibrary ? (
+        <p className="text-xs leading-5 text-[var(--muted)]">
+          {t("moreDetailsInLibrary")}{" "}
+          <button type="button" onClick={onOpenLibrary} className="cursor-pointer font-medium text-[var(--main-strong)] underline-offset-2 hover:underline">{t("openLibrary")}</button>
+        </p>
       ) : null}
     </FormDialog>
   );
@@ -889,13 +868,10 @@ function AdminItems({
   const { data: workspaceLibraries } = useCatalogLibraries(scope);
   const linked = challenge.libraries ?? [];
   const itemLibrary = (item: ChallengeItem) => linked.find((library) => library.kind === item.catalogItem?.kind) ?? null;
-  const [newItemRows, setNewItemRows] = useState<CineRow[]>([]);
-  const [itemProblem, setItemProblem] = useState<"author" | "schedule" | null>(null);
   const startsOn = challenge.startsOn ?? "";
   const endsOn = challenge.endsOn ?? "";
   const undatedDaily = challenge.submissionMode === "daily" && !challenge.startsOn && !challenge.endsOn;
   const datedDaily = challenge.submissionMode === "daily" && !undatedDaily;
-  const canAddItems = challenge.submissionMode === "item" && challenge.status !== "closed";
   const canArchiveItems = challenge.submissionMode === "item" && challenge.status !== "closed";
   const canShowAdd = challenge.status !== "closed"
     && !(challenge.submissionMode === "free")
@@ -937,14 +913,8 @@ function AdminItems({
         setSuccess(t("dailyGenerated"));
         setShowAdd(false);
       } else {
-        const items = cineRowsToInput(newItemRows);
-        if (!items.length) { setError(t("errNoItem")); setBusy(false); return; }
-        if (itemProblem === "author") { setError(tCine("authorRequired")); setBusy(false); return; }
-        if (itemProblem === "schedule") { setError(t("eventScheduleInvalid")); setBusy(false); return; }
-        await onAdd({ items });
-        setNewItemRows([]);
-        setSuccess(t("itemsAdded"));
-        setShowAdd(false);
+        // Items themselves are added in their dialog (once the challenge has its library); nothing to save here.
+        setError(t("errNoItem"));
       }
     } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
   }
@@ -966,28 +936,21 @@ function AdminItems({
       {/* Items are added in their own box, like when the challenge was created; a daily schedule or a challenge
           with no library yet keeps its short inline form. */}
       {showAdd && canShowAdd && challenge.submissionMode === "item" && linked.length ? (
-        <FormDialog
-          title={tCine("addItems")}
-          dirty={newItemRows.length > 0}
-          busy={busy}
-          error={error ?? (itemProblem === "author" ? tCine("authorRequired") : itemProblem === "schedule" ? t("eventScheduleInvalid") : null)}
-          onCancel={() => { setShowAdd(false); setNewItemRows([]); setError(null); }}
-          submitDisabled={!canAddItems || !newItemRows.length || itemProblem !== null}
-          submitLabel={tCine("addCount", { count: newItemRows.length })}
-          busyLabel={tc("saving")}
-          onSubmit={async () => {
-            setBusy(true); setError(null); setSuccess(null);
-            try {
-              await onAdd({ items: cineRowsToInput(newItemRows) });
-              setNewItemRows([]);
-              setShowAdd(false);
-              setSuccess(t("itemsAdded"));
-            } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
+        <AddItemsDialog
+          members={members}
+          scope={scope}
+          libraries={linked}
+          recommendationsEnabled={recommendationsEnabled}
+          timeZone={timeZone}
+          note={challenge.status === "active" ? t("activeItemsNote") : undefined}
+          onClose={() => setShowAdd(false)}
+          onAdd={async (items) => {
+            setSuccess(null);
+            await onAdd({ items });
+            setShowAdd(false);
+            setSuccess(t("itemsAdded"));
           }}
-        >
-          <ItemsAddBox draft={newItemRows} onDraftChange={setNewItemRows} existing={[]} members={members} scope={scope} libraries={linked} recommendationsEnabled={recommendationsEnabled} timeZone={timeZone} onProblem={setItemProblem} />
-          {challenge.status === "active" ? <p className="mt-3 text-xs leading-5 text-[var(--muted)]">{t("activeItemsNote")}</p> : null}
-        </FormDialog>
+        />
       ) : showAdd && canShowAdd ? (
         <div className="mb-8 rounded-2xl border border-[var(--line)] p-5">
           <form className="space-y-5" onSubmit={submit}>
@@ -1118,7 +1081,6 @@ export function AdminScreen({
   onDelete,
   onSaveParticipants,
   onSaveFields,
-  onSaveEntryTypeVisibility,
   onSetExpectation,
   onSetPageCount,
   onSaveEntryDate,
@@ -1155,7 +1117,6 @@ export function AdminScreen({
   onDelete?: () => Promise<void>;
   onSaveParticipants: (ids: Id[]) => Promise<void>;
   onSaveFields: (entryTypeId: Id, fields: ChallengeField[]) => Promise<void>;
-  onSaveEntryTypeVisibility: (entryTypeId: Id, visibilityPolicy: string) => Promise<void>;
   onSetExpectation: (enabled: boolean) => Promise<void>;
   onSetPageCount: (enabled: boolean) => Promise<void>;
   onSaveEntryDate: (enabled: boolean) => Promise<void>;
@@ -1230,7 +1191,7 @@ export function AdminScreen({
       <div className="mx-auto max-w-5xl px-4 pt-8 sm:px-6 sm:pt-10">
         {setup ? <div className="mx-auto max-w-2xl"><SetupSummary state={setup} activeTab={activeTab} onGo={onTab} /></div> : null}
         {activeTab === "overview" ? <AdminGeneral challenge={challenge} group={group} isPersonal={isPersonal} onSaveBasics={onSaveBasics} onSaveParticipants={onSaveParticipants} /> : null}
-        {activeTab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.visibilityPolicy}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} onSaveVisibility={onSaveEntryTypeVisibility} onSetExpectation={onSetExpectation} onSetPageCount={onSetPageCount} onSaveEntryDate={onSaveEntryDate} onAddShared={onAddSharedResponse} onRemoveType={onRemoveEntryType} onSavePolicy={onSaveSharedPolicy} /> : null}
+        {activeTab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.visibilityPolicy}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} onSetExpectation={onSetExpectation} onSetPageCount={onSetPageCount} onSaveEntryDate={onSaveEntryDate} onAddShared={onAddSharedResponse} onRemoveType={onRemoveEntryType} onSavePolicy={onSaveSharedPolicy} /> : null}
         {activeTab === "items" ? <AdminItems challenge={challenge} group={group} entries={entries} onAdd={onAddItems} onUpdate={onUpdateItem} onArchive={onArchiveItem} onLinkLibrary={onLinkLibrary} onUnlinkLibrary={onUnlinkLibrary} onLibraryChanged={onArchiveChanged} onReorder={onAssignCheckpointItems} /> : null}
         {activeTab === "checkpoints" ? <CheckpointPlanner key={`${challenge.id}:${challenge.checkpoints.map((cp) => cp.id).join(",")}`} challenge={challenge} onSaveCheckpoints={onSaveCheckpoints} onAssign={onAssignCheckpointItems} /> : null}
         {activeTab === "settings" ? <ChallengeSettings challenge={challenge} duplicateTargets={duplicateTargets} onDuplicate={onDuplicate} onOpenCopy={onOpenCopy} onDelete={onDelete} isPlatformAdmin={isPlatformAdmin} onPublishTemplate={onPublishTemplate} onUnpublishTemplate={onUnpublishTemplate} onPublish={onPublishResult} onUnpublish={onUnpublishResult} /> : null}

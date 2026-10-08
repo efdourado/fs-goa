@@ -24,14 +24,19 @@ import type {
   ChallengeDetail,
   ChallengeField,
   ChallengeItem,
+  ChallengeItemInput,
   Entry,
   EntryTypeView,
   FieldConfig,
   Id,
+  Member,
   Metric,
   ParticipantTab,
   User,
 } from "../types";
+import { AddItemsDialog } from "../cine-items";
+import type { CatalogScope } from "../libraries";
+import { ItemEditorDialog } from "./admin";
 import {
   BackButton,
   Button,
@@ -43,6 +48,7 @@ import {
   inputClass,
   labelClass,
   sectionLabelClass,
+  SlidersIcon,
   StatusMessage,
 } from "../ui";
 import {
@@ -571,7 +577,7 @@ export function ResultView({
  * has a public page, copy its link. Copying answers on the button itself — the squares give way to a
  * check drawn inside a ring, the label slides to "Copied", and the pill fills with the brand green.
  */
-function ChallengeCardActions({ challengeId, shareToken, extra }: { challengeId: string; shareToken?: string | null; extra?: ReactNode }) {
+function ChallengeCardActions({ challengeId, shareToken, extra, end }: { challengeId: string; shareToken?: string | null; extra?: ReactNode; end?: ReactNode }) {
   const tr = useTranslations("resultView");
   const te = useTranslations("exportDoc");
   const [copied, setCopied] = useState(false);
@@ -584,17 +590,20 @@ function ChallengeCardActions({ challengeId, shareToken, extra }: { challengeId:
     } catch { /* leave it as it was */ }
   }
   return (
+    // On a phone the three are round icons in one row (their names stay for screen readers and on hover);
+    // from `sm:` up each carries its label.
     <div className="mt-8 flex flex-wrap gap-2">
       <a
         href={`/challenges/${encodeURIComponent(challengeId)}/export`}
-        className="inline-flex min-h-11 items-center rounded-full bg-[var(--spotlight-ink)] px-4 text-sm font-medium transition hover:opacity-90"
+        aria-label={te("button")}
+        title={te("button")}
+        className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[var(--spotlight-ink)] text-sm font-medium transition hover:opacity-90 sm:w-auto sm:px-4"
       >
-        {/* globals.css makes every <a> inherit its colour, so the dark ink lives on the span. */}
         <span className="inline-flex items-center gap-2 text-[var(--spotlight)]">
-          <svg viewBox="0 0 20 20" className="size-4 flex-none" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+          <svg viewBox="0 0 20 20" className="size-[18px] flex-none sm:size-4" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
             <path d="M10 3v10m0 0-4-4m4 4 4-4M4 16h12" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          {te("button")}
+          <span className="hidden sm:inline">{te("button")}</span>
         </span>
       </a>
       {extra}
@@ -602,8 +611,10 @@ function ChallengeCardActions({ challengeId, shareToken, extra }: { challengeId:
         <button
           type="button"
           onClick={() => void copyPublicLink()}
+          aria-label={copied ? tr("shareCopied") : tr("shareCopy")}
+          title={tr("shareCopy")}
           className={cx(
-            "inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border px-4 text-sm transition-[background-color,border-color,color,transform] duration-300",
+            "inline-flex h-11 w-11 cursor-pointer items-center justify-center gap-2 rounded-full border text-sm transition-[background-color,border-color,color,transform] duration-300 sm:w-auto sm:px-4",
             copied
               ? "scale-[1.03] border-transparent bg-[var(--main)] text-white"
               : "border-white/35 text-[var(--spotlight-ink)] hover:border-white/60 hover:bg-white/5",
@@ -626,13 +637,14 @@ function ChallengeCardActions({ challengeId, shareToken, extra }: { challengeId:
             />
           </svg>
           {/* Both labels share one cell, so the pill keeps its width while one slides out and the other in. */}
-          <span className="grid overflow-hidden">
+          <span className="hidden overflow-hidden sm:grid">
             <span className={cx("col-start-1 row-start-1 transition duration-300", copied ? "-translate-y-full opacity-0" : "translate-y-0 opacity-100")}>{tr("shareCopy")}</span>
             <span aria-hidden={!copied} className={cx("col-start-1 row-start-1 font-medium transition duration-300", copied ? "translate-y-0 opacity-100" : "translate-y-full opacity-0")}>{tr("shareCopied")}</span>
           </span>
           <span role="status" aria-live="polite" className="sr-only">{copied ? tr("shareCopied") : ""}</span>
         </button>
       ) : null}
+      {end}
     </div>
   );
 }
@@ -1013,19 +1025,32 @@ function EntryPicker({
   options,
   selectedId,
   onSelect,
+  onAdd,
+  onEdit,
 }: {
   title: string;
   tally?: string;
   options: PickerOption[];
   selectedId: Id | null;
   onSelect: (id: Id) => void;
+  /** A quiet "+ Add" beside the heading — there when you need it, never in the way. */
+  onAdd?: () => void;
+  /** The settings sliders on the picked row, to fix its details. */
+  onEdit?: (id: Id) => void;
 }) {
   const nf = useFormatter();
+  const tCine = useTranslations("cineItems");
+  const tAdmin = useTranslations("adminChallenge");
   return (
     <div>
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <p className={sectionLabelClass}>{title}</p>
-        {tally ? <span className="text-xs text-[var(--muted)]">{tally}</span> : null}
+        <span className="flex items-baseline gap-3">
+          {tally ? <span className="text-xs text-[var(--muted)]">{tally}</span> : null}
+          {onAdd ? (
+            <button type="button" onClick={onAdd} className="min-h-9 cursor-pointer text-sm font-medium text-[var(--main-strong)] hover:underline">＋ {tCine("addShort")}</button>
+          ) : null}
+        </span>
       </div>
       <section className={cx(cardClass, "p-4 sm:p-5")}>
       <ol className="max-h-60 space-y-1.5 overflow-y-auto pr-0.5">
@@ -1034,7 +1059,7 @@ function EntryPicker({
           const rating = typeof option.rating === "number" ? option.rating : null;
           const caption = [option.statusLabel, option.meta].filter(Boolean).join(" · ");
           return (
-            <li key={option.id}>
+            <li key={option.id} className="flex items-center gap-1.5">
               <button
                 type="button"
                 disabled={option.soon}
@@ -1073,6 +1098,11 @@ function EntryPicker({
                   <span className="flex-none text-sm font-medium tabular-nums text-[var(--ink)]">{nf.number(rating, { maximumFractionDigits: 1 })}</span>
                 ) : null}
               </button>
+              {onEdit && active ? (
+                <button type="button" onClick={() => onEdit(option.id)} aria-label={tAdmin("editItem")} title={tAdmin("editItem")} className="grid h-10 w-10 flex-none cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)]">
+                  <SlidersIcon className="h-[18px] w-[18px]" />
+                </button>
+              ) : null}
             </li>
           );
         })}
@@ -1238,6 +1268,7 @@ export function ParticipantChallengeScreen({
   onCreateChallengeInvite,
   preview = false,
   previewActions,
+  itemTools,
 }: {
   challenge: ChallengeDetail;
   entries: Entry[];
@@ -1267,6 +1298,18 @@ export function ParticipantChallengeScreen({
   preview?: boolean;
   /** A template preview's own actions (duplicate, front page, unpublish) — shown as pills in the challenge card. */
   previewActions?: ReactNode;
+  /**
+   * For whoever manages the challenge: add items and edit an item's details right from Today — the same
+   * dialogs as Manage › Items. New kinds of details are made in the library (`onOpenLibrary`).
+   */
+  itemTools?: {
+    members: Member[];
+    scope: CatalogScope;
+    recommendationsEnabled: boolean;
+    onAdd: (items: ChallengeItemInput[]) => Promise<void>;
+    onUpdate: (itemId: Id, payload: Record<string, unknown>) => Promise<void>;
+    onOpenLibrary: () => void;
+  };
 }) {
   const t = useTranslations("participant");
   const tNav = useTranslations("nav");
@@ -1275,6 +1318,10 @@ export function ParticipantChallengeScreen({
   const longDate: Intl.DateTimeFormatOptions = { day: "2-digit", month: "long", year: "numeric" };
   const timeZone = challenge.timeZone ?? "America/Sao_Paulo";
   const showRecommenders = challenge.recommendationsEnabled !== false;
+  // Adding and editing items from Today: only on a running list with its library, for whoever manages it.
+  const canAddItems = Boolean(itemTools) && !preview && challenge.submissionMode === "item" && challenge.status !== "closed" && Boolean(challenge.libraries?.length);
+  const [addingItems, setAddingItems] = useState(false);
+  const [editingItem, setEditingItem] = useState<ChallengeItem | null>(null);
   // A shared answer has no author (`userId` is null), so it rides along with every person's own.
   const ownEntries = entries.filter((entry) => !entry.userId || entry.userId === user?.id);
   const sharedTypes = challenge.entryTypes.filter((type) => type.answerScope === "shared");
@@ -1546,8 +1593,10 @@ export function ParticipantChallengeScreen({
           label: boundItem?.catalogItem?.year ? `${label} (${boundItem.catalogItem.year})` : label, soon, statusLabel: soon ? t("checkpointSoonLabel") : undefined, meta: boundItem ? metaForItem(boundItem) : undefined, rating: boundItem ? ratingByItem.get(boundItem.id) ?? null : null };
       })}
     />
-  ) : sortedItems.length > 1 ? (
+  ) : sortedItems.length > 1 || (canAddItems && sortedItems.length) ? (
     <EntryPicker
+      onAdd={canAddItems ? () => setAddingItems(true) : undefined}
+      onEdit={itemTools && !preview ? (id) => setEditingItem(sortedItems.find((item) => item.id === id) ?? null) : undefined}
       title={t("checkpointsTitle")}
       tally={t("checkpointTally", { done: doneCount, pending: Math.max(0, sortedItems.length - doneCount) })}
       selectedId={selectedItem?.id ?? null}
@@ -1570,29 +1619,34 @@ export function ParticipantChallengeScreen({
 
   return (
     <main className="mx-auto max-w-7xl overflow-x-clip px-4 py-6 pb-28 sm:px-6 sm:py-10">
-      <div className="mb-5 flex items-center justify-between gap-3">
-        {/* On a phone the dock's ‹ is the way back; the button stays for computers (and a template preview, which has no dock). */}
-        <BackButton onClick={onBack} label={backLabel ?? t("back")} className={tabs.length > 1 ? "invisible sm:visible" : undefined} />
-        <div className="flex items-center gap-2">
-          {preview ? null : (onAdmin ? (
-            <Button variant="secondary" onClick={onAdmin}>
-              <svg viewBox="0 0 20 20" className="size-4 flex-none" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
-                <path d="M8.3 2.8h3.4l.5 2.1 1.5.9 2.1-.6 1.7 2.9-1.6 1.5v1.8l1.6 1.5-1.7 2.9-2.1-.6-1.5.9-.5 2.1H8.3l-.5-2.1-1.5-.9-2.1.6-1.7-2.9 1.6-1.5V9.6L2.5 8.1l1.7-2.9 2.1.6 1.5-.9Z" strokeLinejoin="round" />
-                <circle cx="10" cy="10.5" r="2.6" />
-              </svg>
-              {t("manage")}
-            </Button>
-          ) : null)}
-        </div>
+      {/* On a phone the dock's ‹ is the way back, so this row is a computer's (and a template preview's, which has no dock). */}
+      <div className={cx("mb-5 flex items-center", tabs.length > 1 && "max-sm:hidden")}>
+        <BackButton onClick={onBack} label={backLabel ?? t("back")} />
       </div>
       <section className="relative overflow-hidden rounded-[28px] bg-[var(--spotlight)] p-6 text-[var(--spotlight-ink)] sm:p-9">
         <div className="relative z-10">
-          <div className="flex flex-wrap items-center justify-between gap-3">{livingList ? <span /> : <ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />}<span className="text-xs text-white/65">{livingList ? t("livingListMeta", { count: sortedItems.length }) : f.dateRange(challenge.startsOn, challenge.endsOn)}</span></div>
+          <div className="flex items-center justify-between gap-3">
+            {livingList ? <span /> : <ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />}
+            {livingList ? null : <span className="text-xs text-white/65">{f.dateRange(challenge.startsOn, challenge.endsOn)}</span>}
+          </div>
           <h1 className="mt-10 max-w-3xl text-4xl font-medium leading-none tracking-[-0.055em] sm:text-6xl">{challenge.title}</h1>
           {challenge.description ? <p className="mt-4 max-w-2xl text-sm leading-6 text-white/70">{challenge.description}</p> : null}
           {!preview && !sessionSpec && sortedItems.length ? <div className="mt-8 max-w-2xl"><div className="mb-2 flex justify-between text-xs text-white/70"><span>{t.rich("entriesProgress", { done: doneCount, total: sortedItems.length, b: (chunks) => <strong className="text-white">{chunks}</strong> })}</span><span>{completion}%</span></div><div className="h-2 overflow-hidden rounded-full bg-white/10"><span className="block h-full rounded-full bg-[var(--main-2)]" style={{ width: `${Math.min(100, completion)}%` }} /></div></div> : null}
           {!preview
-            ? <ChallengeCardActions challengeId={challenge.id} shareToken={challenge.result?.shareToken} extra={<DownloadPagesButton input={storyInput} story={story} metrics={challenge.metrics ?? []} />} />
+            ? (
+              <ChallengeCardActions
+                challengeId={challenge.id}
+                shareToken={challenge.result?.shareToken}
+                extra={<DownloadPagesButton input={storyInput} story={story} metrics={challenge.metrics ?? []} />}
+                // Manage: the app's settings sliders, on the right of the same row, dressed like "Download pages".
+                end={onAdmin ? (
+                  <button type="button" onClick={onAdmin} aria-label={t("manage")} title={t("manage")} className="ml-auto inline-flex h-11 w-11 cursor-pointer items-center justify-center gap-2 rounded-full border border-white/35 text-sm text-[var(--spotlight-ink)] transition hover:border-white/60 hover:bg-white/5 sm:w-auto sm:px-4">
+                    <SlidersIcon className="h-[18px] w-[18px] flex-none sm:h-4 sm:w-4" />
+                    <span className="hidden sm:inline">{t("manage")}</span>
+                  </button>
+                ) : undefined}
+              />
+            )
             : (
               // A template's own actions (duplicate, front page, unpublish) sit in the card as pills, like a challenge's.
               <div className="mt-8 flex flex-wrap gap-2">
@@ -1801,6 +1855,30 @@ export function ParticipantChallengeScreen({
           backLabel={backLabel ? tNav("dockBack", { label: backLabel }) : t("back")}
           label={t("navMobileAria")}
           tabLabel={(tab) => t(`tabs.${tab}`)}
+        />
+      ) : null}
+      {addingItems && itemTools ? (
+        <AddItemsDialog
+          members={itemTools.members}
+          scope={itemTools.scope}
+          libraries={challenge.libraries ?? []}
+          recommendationsEnabled={itemTools.recommendationsEnabled}
+          timeZone={timeZone}
+          onClose={() => setAddingItems(false)}
+          onAdd={async (items) => { await itemTools.onAdd(items); setAddingItems(false); }}
+        />
+      ) : null}
+      {editingItem && itemTools ? (
+        <ItemEditorDialog
+          item={editingItem}
+          challenge={challenge}
+          members={itemTools.members}
+          library={(challenge.libraries ?? []).find((library) => library.kind === editingItem.catalogItem?.kind) ?? null}
+          scope={itemTools.scope}
+          recommendationsEnabled={itemTools.recommendationsEnabled}
+          onCancel={() => setEditingItem(null)}
+          onSave={async (payload) => { await itemTools.onUpdate(editingItem.id, payload); setEditingItem(null); }}
+          onOpenLibrary={() => { setEditingItem(null); itemTools.onOpenLibrary(); }}
         />
       ) : null}
     </main>

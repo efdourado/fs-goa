@@ -358,6 +358,7 @@ export function Toggle({
   disabled,
   className,
   ariaLabel,
+  bare = false,
 }: {
   checked: boolean;
   onChange: (next: boolean) => void;
@@ -365,6 +366,8 @@ export function Toggle({
   hint?: ReactNode;
   disabled?: boolean;
   className?: string;
+  /** No frame of its own — for a switch that already sits in a bordered box. */
+  bare?: boolean;
   /** The switch's name when its words sit outside it (no `label`). */
   ariaLabel?: string;
 }) {
@@ -386,7 +389,7 @@ export function Toggle({
   );
   if (!label && !hint) return <span className={className}>{control}</span>;
   return (
-    <div className={cx("flex items-start gap-3 rounded-xl border border-[var(--line)] px-4 py-3.5", className)}>
+    <div className={cx("flex items-start gap-3", !bare && "rounded-xl border border-[var(--line)] px-4 py-3.5", className)}>
       <span className="min-w-0 flex-1">
         {label ? <strong className="block text-sm font-medium">{label}</strong> : null}
         {hint ? <span className="mt-0.5 block text-xs leading-5 text-[var(--muted)]">{hint}</span> : null}

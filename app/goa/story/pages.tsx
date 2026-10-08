@@ -124,15 +124,18 @@ export function DownloadPagesButton({ input, story, metrics = [], tone = "hero" 
       <button
         type="button"
         onClick={() => setOpen(true)}
+        aria-label={t("button")}
+        title={t("button")}
         className={cx(
-          "inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full px-4 text-sm transition",
-          tone === "hero" ? "border border-white/35 text-[var(--spotlight-ink)] hover:border-white/60 hover:bg-white/5" : "bg-[var(--ink)] font-medium text-[var(--canvas)] hover:opacity-90",
+          "inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-full text-sm transition",
+          // In the challenge card a phone shows it as a round icon beside the PDF one; elsewhere it keeps its label.
+          tone === "hero" ? "w-11 border border-white/35 text-[var(--spotlight-ink)] hover:border-white/60 hover:bg-white/5 sm:w-auto sm:px-4" : "bg-[var(--ink)] px-4 font-medium text-[var(--canvas)] hover:opacity-90",
         )}
       >
-        <svg viewBox="0 0 20 20" className="size-4 flex-none" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+        <svg viewBox="0 0 20 20" className={cx("flex-none", tone === "hero" ? "size-[18px] sm:size-4" : "size-4")} fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
           <path d="M10 3v10m0 0-4-4m4 4 4-4M4 16h12" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-        {t("button")}
+        <span className={tone === "hero" ? "hidden sm:inline" : undefined}>{t("button")}</span>
       </button>
       {open ? <PagesDialog input={input} story={story} metrics={metrics} onClose={() => setOpen(false)} /> : null}
     </>
