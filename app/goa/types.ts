@@ -687,7 +687,10 @@ export type Screen =
   | { kind: "template"; challengeId: Id }
   /** `into` skips the "where" question when the chat is started from a group page or My space. */
   | { kind: "quick-create"; into?: { groupId: Id } | "personal" }
-  | { kind: "about" };
+  | { kind: "about" }
+  /** The dock's own pages: the member-request inbox, and everything about you (account, preferences, sign out). */
+  | { kind: "activity" }
+  | { kind: "you" };
 
 /** A library property a copy had to leave out — the destination defines the same key differently (or removed it). */
 export interface SkippedProperty {

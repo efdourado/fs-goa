@@ -55,12 +55,14 @@ describe("Back goes up the hierarchy, never to wherever you were", () => {
     assert.deepEqual(backTargetFor({ kind: "quick-create", into: "personal" }, lookup())!.label, { kind: "home" });
   });
 
-  test("the personal bin is opened from the account page, so Back returns there", () => {
-    assert.deepEqual(backTargetFor({ kind: "personal-trash" }, lookup()), { screen: { kind: "account" }, label: { kind: "account" } });
+  test("your account and your bin live under You, so Back returns there", () => {
+    for (const screen of [{ kind: "account" }, { kind: "personal-trash" }] as Screen[]) {
+      assert.deepEqual(backTargetFor(screen, lookup()), { screen: { kind: "you" }, label: { kind: "you" } }, screen.kind);
+    }
   });
 
-  test("account, about, templates and invites go Home when signed in, and to sign-in when not", () => {
-    for (const screen of [{ kind: "account" }, { kind: "about" }, { kind: "templates" }, { kind: "invite", token: "t" }] as Screen[]) {
+  test("You, Updates, about, templates and invites go Home when signed in, and to sign-in when not", () => {
+    for (const screen of [{ kind: "you" }, { kind: "activity" }, { kind: "about" }, { kind: "templates" }, { kind: "invite", token: "t" }] as Screen[]) {
       assert.deepEqual(backTargetFor(screen, lookup())!.screen, { kind: "dashboard" }, screen.kind);
     }
     for (const screen of [{ kind: "about" }, { kind: "templates" }, { kind: "invite", token: "t" }] as Screen[]) {

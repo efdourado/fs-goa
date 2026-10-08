@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { useGoaFormat } from "./format";
-import { MobileHeaderMenu, SettingsMenu } from "./SettingsMenu";
+import { SettingsMenu } from "./SettingsMenu";
 import type { ChallengeStatus, Id, MemberRequest, SubmissionMode, User } from "./types";
 import {
   dateKeyInSaoPaulo,
@@ -578,7 +578,7 @@ export function AppHeader({
   user,
   notifications,
   onHome,
-  onAccount,
+  onOpenYou,
   onOpenTemplates,
   onOpenAbout,
   onLogout,
@@ -588,7 +588,7 @@ export function AppHeader({
   user: User;
   notifications: MemberRequest[];
   onHome: () => void;
-  onAccount: () => void;
+  onOpenYou: () => void;
   onOpenTemplates: () => void;
   onOpenAbout: () => void;
   onLogout: () => Promise<void>;
@@ -610,10 +610,10 @@ export function AppHeader({
             <Link className={cx(navLink, "hidden items-center sm:inline-flex")} href="/admin">{t("admin")}</Link>
           ) : null}
           <button
-            className="flex shrink-0 cursor-pointer items-center gap-2.5 rounded-xl p-1 pr-1 text-left hover:bg-[var(--wash)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 sm:pr-2"
+            className="hidden shrink-0 cursor-pointer items-center gap-2.5 rounded-xl p-1 pr-2 text-left hover:bg-[var(--wash)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 sm:flex"
             type="button"
-            onClick={onAccount}
-            aria-label={t("account")}
+            onClick={onOpenYou}
+            aria-label={t("you")}
           >
             <span className="grid h-9 w-9 place-items-center rounded-full border-2 border-[var(--paper)] bg-[var(--main-line)] text-xs font-black" aria-hidden="true">
               {user.name.split(/\s+/).slice(0, 1).map((part) => part[0]).join("")}
@@ -631,12 +631,6 @@ export function AppHeader({
             />
             <SettingsMenu homeOptions />
           </div>
-          <MobileHeaderMenu
-            homeOptions
-            notifications={notifications}
-            onAcceptRequest={onAcceptRequest}
-            onDeclineRequest={onDeclineRequest}
-          />
           <button
             className={cx(navLink, "hidden shrink-0 disabled:opacity-50 sm:inline-flex sm:items-center")}
             type="button"
@@ -645,85 +639,9 @@ export function AppHeader({
           >
             {busy ? t("signingOut") : t("signOut")}
           </button>
-          <HeaderOverflowMenu isPlatformAdmin={Boolean(user.platformAdmin)} busy={busy} onHome={onHome} onOpenTemplates={onOpenTemplates} onOpenAbout={onOpenAbout} onLogout={async () => { setBusy(true); try { await onLogout(); } finally { setBusy(false); } }} />
         </div>
       </div>
     </header>
-  );
-}
-
-/**
- * Phone-only overflow for the header's secondary links + sign out. On `sm:` and
- * up those live inline and this collapses away, so the small-screen header stays
- * down to the account, notifications and settings glyphs.
- */
-function HeaderOverflowMenu({
-  isPlatformAdmin,
-  busy,
-  onHome,
-  onOpenTemplates,
-  onOpenAbout,
-  onLogout,
-}: {
-  isPlatformAdmin: boolean;
-  busy: boolean;
-  onHome: () => void;
-  onOpenTemplates: () => void;
-  onOpenAbout: () => void;
-  onLogout: () => Promise<void>;
-}) {
-  const t = useTranslations("nav");
-  const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
-    const onPointerDown = (event: PointerEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) setOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    document.addEventListener("pointerdown", onPointerDown);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.removeEventListener("pointerdown", onPointerDown);
-    };
-  }, [open]);
-
-  const itemClass = "block min-h-11 rounded-xl px-3 py-2.5 text-sm text-[var(--ink)] hover:bg-[var(--wash)]";
-  return (
-    <div className="relative sm:hidden" ref={containerRef}>
-      <button
-        className="grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-xl text-[var(--muted)] hover:bg-[var(--wash)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        aria-label={t("menu")}
-        aria-expanded={open}
-      >
-        <svg viewBox="0 0 16 16" className="h-[18px] w-[18px]" fill="currentColor" aria-hidden="true">
-          <circle cx="8" cy="3" r="1.5" />
-          <circle cx="8" cy="8" r="1.5" />
-          <circle cx="8" cy="13" r="1.5" />
-        </svg>
-      </button>
-      {open ? (
-        <div className="absolute right-0 z-50 mt-2 w-52 rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-1.5 shadow-[var(--elevate-2)]" role="dialog" aria-label={t("menu")}>
-          <button className={cx(itemClass, "w-full text-left")} type="button" onClick={() => { onHome(); setOpen(false); }}>{t("home")}</button>
-          <button className={cx(itemClass, "w-full text-left")} type="button" onClick={() => { onOpenTemplates(); setOpen(false); }}>{t("templates")}</button>
-          <button className={cx(itemClass, "w-full text-left")} type="button" onClick={() => { onOpenAbout(); setOpen(false); }}>{t("about")}</button>
-          {isPlatformAdmin ? <Link className={itemClass} href="/admin" onClick={() => setOpen(false)}>{t("admin")}</Link> : null}
-          <div className="my-1 border-t border-[var(--line)]" />
-          <button
-            className={cx(itemClass, "w-full text-left disabled:opacity-50")}
-            type="button"
-            disabled={busy}
-            onClick={async () => { await onLogout(); setOpen(false); }}
-          >
-            {busy ? t("signingOut") : t("signOut")}
-          </button>
-        </div>
-      ) : null}
-    </div>
   );
 }
 

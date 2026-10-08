@@ -21,6 +21,7 @@ import {
   shiftDateKey,
 } from "../app/goa/utils";
 import { ptFormat, renderWithIntl } from "./helpers/intl";
+import { BottomDock, dockTabFor } from "../app/goa/bottom-dock";
 
 test("f.error não quebra com um fetch abortado — DOMException carrega um código numérico legado, não string", () => {
   const aborted = new DOMException("The operation was aborted.", "AbortError");
@@ -536,7 +537,7 @@ test("header sinaliza logo, perfil e sair como clicáveis", () => {
     user: { id: "user-1", name: "Pessoa Teste", username: "pessoa" },
     notifications: [],
     onHome: () => undefined,
-    onAccount: () => undefined,
+    onOpenYou: () => undefined,
     onOpenTemplates: () => undefined,
     onOpenAbout: () => undefined,
     onLogout: async () => undefined,
@@ -545,7 +546,7 @@ test("header sinaliza logo, perfil e sair como clicáveis", () => {
   }));
   const pointerCount = header.match(/cursor-pointer/g)?.length ?? 0;
   assert.ok(pointerCount >= 3, `esperava cursor clicável nos três controles; recebeu ${pointerCount}`);
-  assert.match(header, /aria-label="Sua conta"/);
+  assert.match(header, /aria-label="Você"/, "o avatar abre a página Você");
   assert.match(header, /aria-label="Novidades"/);
   assert.match(header, />Sair<\/button>/);
   assert.match(header, />Início<\/button>/, "há um link 'Início' explícito, não só o logo");
@@ -737,7 +738,7 @@ test("header lista convites de grupo pendentes no menu de novidades", () => {
       { id: "req-1", groupId: "g1", groupName: "Clube do Sofá", role: "participant", invitedBy: "Ana", createdAt: "2026-08-30T12:00:00.000Z" },
     ],
     onHome: () => undefined,
-    onAccount: () => undefined,
+    onOpenYou: () => undefined,
     onOpenTemplates: () => undefined,
     onOpenAbout: () => undefined,
     onLogout: async () => undefined,
@@ -970,4 +971,19 @@ test("today's rating: the average of the rating fields — the named metric's, o
   });
   assert.equal(withAside(entry("t", { nota: 4, attention: 1 })), 4, "only the ranking ratings count");
   assert.equal(withAside(entry("t", { attention: 1 })), null, "an entry with only an off rating has no rating");
+});
+
+test("doca do celular: quatro abas, a acesa segue a tela e some dentro de um desafio", () => {
+  assert.equal(dockTabFor({ kind: "group", groupId: "g1" }), "home");
+  assert.equal(dockTabFor({ kind: "template", challengeId: "c1" }), "templates");
+  assert.equal(dockTabFor({ kind: "account" }), "you", "a conta fica debaixo de Você");
+  assert.equal(dockTabFor({ kind: "challenge", challengeId: "c1", tab: "today" }), null, "o desafio tem a própria barra");
+  assert.equal(dockTabFor({ kind: "admin", challengeId: "c1", tab: "overview" }), null);
+
+  const dock = renderWithIntl(createElement(BottomDock, { active: "home", notificationCount: 2, onSelect: () => undefined }));
+  assert.match(dock, /aria-label="Navegação principal"/);
+  assert.match(dock, /aria-current="page"[^>]*>.*Início/);
+  assert.match(dock, /aria-label="Novidades \(2\)"/);
+  assert.match(dock, />Você</);
+  assert.match(dock, /sm:hidden/, "só no celular; no computador o cabeçalho continua");
 });

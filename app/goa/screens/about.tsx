@@ -8,7 +8,7 @@ import { BackButton, PageHeading } from "../ui";
 
 interface Point { title: string; body: string }
 
-const CONTACT_EMAIL = "ed320819@gmail.com";
+export const CONTACT_EMAIL = "ed320819@gmail.com";
 
 /** One section of the page: a small heading and whatever it holds. */
 function Section({ title, children }: { title: string; children: ReactNode }) {

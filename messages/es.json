@@ -66,10 +66,11 @@
     "about": "Acerca de",
     "admin": "Gestión",
     "account": "Tu cuenta",
-    "menu": "Menú",
     "signOut": "Salir",
     "signingOut": "Saliendo…",
-    "signIn": "Entrar"
+    "signIn": "Entrar",
+    "you": "Tú",
+    "dockAria": "Navegación principal"
   },
   "roles": {
     "owner": "Responsable",
@@ -1062,7 +1063,8 @@
     "deletingEntry": "Eliminando…",
     "checkpointEmpty": "Nada todavía.",
     "origin": "vía {text}",
-    "groupSealed": "Puntuó · sellada"
+    "groupSealed": "Puntuó · sellada",
+    "dockBack": "Volver a {label}"
   },
   "sessionLog": {
     "composerTitle": "Registrar {name}",
@@ -1971,7 +1973,8 @@
     "account": "Tu cuenta",
     "myCatalogue": "Mi acervo",
     "catalogue": "Acervo",
-    "challenge": "Desafío"
+    "challenge": "Desafío",
+    "you": "Tú"
   },
   "exportDoc": {
     "button": "Descargar PDF",

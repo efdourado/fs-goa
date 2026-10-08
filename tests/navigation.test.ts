@@ -86,6 +86,8 @@ test("toda tela roteável volta de urlForScreen → screenFromUrl com o mesmo ti
     { kind: "templates" },
     { kind: "template", challengeId: "c1" },
     { kind: "about" },
+    { kind: "activity" },
+    { kind: "you" },
     { kind: "invite", token: "t1" },
   ] as const;
   for (const screen of screens) {
@@ -103,7 +105,7 @@ test("todo deep-link tem um page.tsx no disco", async () => {
     "app/groups/[groupId]/catalog/page.tsx", "app/groups/[groupId]/catalog/[itemId]/page.tsx", "app/personal/page.tsx", "app/personal/trash/page.tsx",
     "app/catalog/page.tsx", "app/catalog/[itemId]/page.tsx", "app/challenges/[challengeId]/page.tsx",
     "app/challenges/[challengeId]/manage/page.tsx", "app/challenges/new/page.tsx",
-    "app/modelos/page.tsx", "app/modelos/[challengeId]/page.tsx", "app/sobre/page.tsx",
+    "app/modelos/page.tsx", "app/modelos/[challengeId]/page.tsx", "app/sobre/page.tsx", "app/voce/page.tsx", "app/atividade/page.tsx",
     "app/invites/[token]/page.tsx", "app/results/[token]/page.tsx",
   ];
   for (const page of pages) {

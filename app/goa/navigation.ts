@@ -39,6 +39,8 @@ export function screenFromUrl(pathname: string, search = ""): Screen | null {
     return token ? { kind: "invite", token } : null;
   }
   if (parts[0] === "sobre" && parts.length === 1) return { kind: "about" };
+  if (parts[0] === "atividade" && parts.length === 1) return { kind: "activity" };
+  if (parts[0] === "voce" && parts.length === 1) return { kind: "you" };
   if (parts[0] === "start" && parts.length === 1) {
     const groupId = params.get("group");
     if (groupId) return { kind: "quick-create", into: { groupId } };
@@ -145,6 +147,10 @@ export function urlForScreen(screen: Screen): string | null {
       return `/modelos/${encodeURIComponent(screen.challengeId)}`;
     case "about":
       return "/sobre";
+    case "activity":
+      return "/atividade";
+    case "you":
+      return "/voce";
     case "quick-create":
       if (screen.into === "personal") return "/start?personal=1";
       return screen.into ? `/start?group=${encodeURIComponent(screen.into.groupId)}` : "/start";
@@ -168,7 +174,7 @@ export function urlForScreen(screen: Screen): string | null {
 
 /** What a Back button reads: a fixed name, or the name of the group / challenge it leads to. */
 export type BackLabel =
-  | { kind: "home" | "signIn" | "templates" | "account" | "myCatalogue" | "catalogue" | "challenge" }
+  | { kind: "home" | "signIn" | "templates" | "account" | "you" | "myCatalogue" | "catalogue" | "challenge" }
   | { kind: "named"; name: string };
 
 interface BackTarget {
@@ -204,9 +210,12 @@ export function backTargetFor(screen: Screen, lookup: BackLookup): BackTarget | 
     case "account-deactivated":
     case "invite-success":
       return null;
-    case "account":
     case "group":
+    case "activity":
+    case "you":
       return HOME;
+    case "account":
+      return { screen: { kind: "you" }, label: { kind: "you" } };
     case "quick-create":
       return screen.into && screen.into !== "personal" ? toGroup(screen.into.groupId) : HOME;
     case "about":
@@ -225,7 +234,7 @@ export function backTargetFor(screen: Screen, lookup: BackLookup): BackTarget | 
     case "create-personal-challenge":
       return HOME;
     case "personal-trash":
-      return { screen: { kind: "account" }, label: { kind: "account" } };
+      return { screen: { kind: "you" }, label: { kind: "you" } };
     case "personal-catalog-item":
       return { screen: { kind: "personal-catalog" }, label: { kind: "myCatalogue" } };
     case "challenge": {

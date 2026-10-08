@@ -66,10 +66,11 @@
     "about": "About",
     "admin": "Console",
     "account": "Your account",
-    "menu": "Menu",
     "signOut": "Sign out",
     "signingOut": "Signing out…",
-    "signIn": "Sign in"
+    "signIn": "Sign in",
+    "you": "You",
+    "dockAria": "Main navigation"
   },
   "roles": {
     "owner": "Owner",
@@ -1062,7 +1063,8 @@
     "deletingEntry": "Deleting…",
     "checkpointEmpty": "No items yet.",
     "origin": "via {text}",
-    "groupSealed": "Rated · sealed"
+    "groupSealed": "Rated · sealed",
+    "dockBack": "Back to {label}"
   },
   "sessionLog": {
     "composerTitle": "Log a {name}",
@@ -1971,7 +1973,8 @@
     "account": "Your account",
     "myCatalogue": "My catalogue",
     "catalogue": "Catalogue",
-    "challenge": "Challenge"
+    "challenge": "Challenge",
+    "you": "You"
   },
   "exportDoc": {
     "button": "Download PDF",

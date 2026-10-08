@@ -49,7 +49,18 @@ import { CACHE_KEYS, clearCache, readCache, writeCache } from "./goa/cache";
 import { challengeRequestBody } from "./goa/challenge-request";
 import { prefetchCatalogShelf } from "./goa/libraries";
 import { AppHeader, BackButton, Brand, Button, cardClass, cx, EmptyState, LoadingView, PageHeading } from "./goa/ui";
+import { BottomDock, type DockTab, dockTabFor } from "./goa/bottom-dock";
+import { ActivityScreen } from "./goa/screens/activity";
+import { YouScreen } from "./goa/screens/you";
 import { canManage, isPersonalChallenge } from "./goa/utils";
+
+/** Where each dock tab leads — tapping the lit one again goes back to its top. */
+const DOCK_ROOTS: Record<DockTab, Screen> = {
+  home: { kind: "dashboard" },
+  templates: { kind: "templates" },
+  activity: { kind: "activity" },
+  you: { kind: "you" },
+};
 
 export default function GoaApp() {
   const t = useTranslations("app");
@@ -655,6 +666,10 @@ export default function GoaApp() {
     content = <TemplateDetailScreen key={screen.challengeId} user={user} challengeId={screen.challengeId} groups={bootstrap.groups.filter((candidate) => candidate.kind !== "personal")} csrfToken={bootstrap.csrfToken} autoCopy={resumeTemplateCopy === screen.challengeId} onBack={() => { setResumeTemplateCopy(null); goUp(); }} backLabel={backLabel} onSignIn={() => undefined} onDuplicated={async (result) => { setResumeTemplateCopy(null); await refreshBootstrap(); openAdmin(result.challengeId); }} onUnpublished={async () => { await refreshBootstrap(); setScreen({ kind: "templates" }); }} />;
   } else if (screen.kind === "about") {
     content = <AboutScreen onBack={goUp} backLabel={backLabel} />;
+  } else if (screen.kind === "you") {
+    content = <YouScreen user={user} onBack={goUp} backLabel={backLabel} onAccount={() => setScreen({ kind: "account" })} onCatalog={() => setScreen({ kind: "personal-catalog" })} onTrash={() => setScreen({ kind: "personal-trash" })} onAbout={() => setScreen({ kind: "about" })} onLogout={logout} />;
+  } else if (screen.kind === "activity") {
+    content = <ActivityScreen notifications={bootstrap.memberRequests ?? []} onBack={goUp} backLabel={backLabel} onAcceptRequest={(id) => respondToMemberRequest(id, "accept")} onDeclineRequest={(id) => respondToMemberRequest(id, "decline")} />;
   } else if (screen.kind === "quick-create") {
     content = <QuickCreateScreen currentUserId={user.id} groups={bootstrap.groups} into={screen.into} onBack={goUp} backLabel={backLabel} onCreateGroup={createGroupAndGetId} onSubmit={(target, input) => createChallenge(target, input, { launch: true })} />;
   } else if (screen.kind === "group" && selectedGroup) {
@@ -686,11 +701,14 @@ export default function GoaApp() {
     content = <DashboardScreen user={user} groups={bootstrap.groups} challenges={bootstrap.challenges} personalWorkspaceId={bootstrap.personalWorkspaceId} homeView={bootstrap.homeView} limits={bootstrap.limits} csrfToken={bootstrap.csrfToken} onOpenGroup={(groupId) => setScreen({ kind: "group", groupId })} onOpenChallenge={(id) => openParticipant(id)} onOpenAdmin={(id) => openAdmin(id)} onCreateGroup={createGroup} onQuickCreate={() => setScreen({ kind: "quick-create" })} onQuickCreatePersonal={() => setScreen({ kind: "quick-create", into: "personal" })} onCreatePersonalChallenge={() => setScreen({ kind: "create-personal-challenge" })} onOpenPersonalCatalog={() => setScreen({ kind: "personal-catalog" })} onOpenPersonalCatalogItem={(itemId) => setScreen({ kind: "personal-catalog-item", itemId })} onOpenTemplates={() => setScreen({ kind: "templates" })} onChanged={() => { void refreshBootstrap(); }} />;
   }
 
+  const dockTab = user.deactivated ? null : dockTabFor(screen);
+
   return (
     <CsrfProvider token={bootstrap.csrfToken}>
     <div className="flex min-h-screen flex-col bg-[var(--canvas)] text-[var(--ink)]">
-      <AppHeader user={user} notifications={bootstrap.memberRequests} onHome={() => setScreen({ kind: "dashboard" })} onAccount={() => setScreen({ kind: "account" })} onOpenTemplates={() => setScreen({ kind: "templates" })} onOpenAbout={() => setScreen({ kind: "about" })} onLogout={logout} onAcceptRequest={(id) => respondToMemberRequest(id, "accept")} onDeclineRequest={(id) => respondToMemberRequest(id, "decline")} />
-      <div className="flex-1">{content}</div>
+      <AppHeader user={user} notifications={bootstrap.memberRequests} onHome={() => setScreen({ kind: "dashboard" })} onOpenYou={() => setScreen({ kind: "you" })} onOpenTemplates={() => setScreen({ kind: "templates" })} onOpenAbout={() => setScreen({ kind: "about" })} onLogout={logout} onAcceptRequest={(id) => respondToMemberRequest(id, "accept")} onDeclineRequest={(id) => respondToMemberRequest(id, "decline")} />
+      <div className={cx("flex-1", dockTab && "pb-[calc(env(safe-area-inset-bottom)+1.5rem)] sm:pb-0")}>{content}</div>
+      {dockTab ? <BottomDock active={dockTab} notificationCount={(bootstrap.memberRequests ?? []).length} onSelect={(tab) => setScreen(DOCK_ROOTS[tab])} /> : null}
     </div>
     </CsrfProvider>
   );

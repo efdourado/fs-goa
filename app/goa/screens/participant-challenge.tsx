@@ -14,6 +14,7 @@ import { isSealed, RevealPanel, sealedRatingType } from "../reveal";
 import { ChallengeResults, useChallengeStory, usePreviewStory } from "../story/for-challenge";
 import { StoryView } from "../story/view";
 import { DownloadPagesButton } from "../story/pages";
+import { ChallengeDock } from "../bottom-dock";
 import { SharedGlyph } from "../shared-responses";
 import { SessionLog, type SessionPayload, sessionSpecOf } from "../session-log";
 import { challengeShowcaseBlocks, hasShowcaseContent, ShowcaseView } from "../showcase-view";
@@ -1529,7 +1530,8 @@ export function ParticipantChallengeScreen({
   return (
     <main className="mx-auto max-w-7xl overflow-x-clip px-4 py-6 pb-28 sm:px-6 sm:py-10">
       <div className="mb-5 flex items-center justify-between gap-3">
-        <BackButton onClick={onBack} label={backLabel ?? t("back")} />
+        {/* On a phone the dock's ‹ is the way back; the button stays for computers (and a template preview, which has no dock). */}
+        <BackButton onClick={onBack} label={backLabel ?? t("back")} className={tabs.length > 1 ? "invisible sm:visible" : undefined} />
         <div className="flex items-center gap-2">
           {preview ? null : (onAdmin ? (
             <Button variant="secondary" onClick={onAdmin}>
@@ -1749,9 +1751,15 @@ export function ParticipantChallengeScreen({
       </div>
 
       {tabs.length > 1 ? (
-        <nav className={cx("safe-area-bottom fixed inset-x-0 bottom-0 z-40 grid h-[72px] border-t border-[var(--line)] bg-[var(--paper)]/95 px-2 backdrop-blur-xl sm:hidden", tabs.length === 3 ? "grid-cols-3" : "grid-cols-2")} aria-label={t("navMobileAria")}>
-          {tabs.map((item) => <button className={cx("flex min-h-12 flex-col items-center justify-center gap-1 text-[10px] font-light", activeTab === item.id ? "text-[var(--main-strong)]" : "text-[var(--muted)]")} type="button" onClick={() => onTab(item.id)} key={item.id}><span className="text-base" aria-hidden="true">{item.id === "today" ? "◉" : item.id === "grupo" ? "◎" : "〇"}</span>{t(`tabs.${item.id}`)}</button>)}
-        </nav>
+        <ChallengeDock
+          tabs={tabs.map((item) => item.id)}
+          active={activeTab}
+          onTab={onTab}
+          onBack={onBack}
+          backLabel={backLabel ? t("dockBack", { label: backLabel }) : t("back")}
+          label={t("navMobileAria")}
+          tabLabel={(tab) => t(`tabs.${tab}`)}
+        />
       ) : null}
     </main>
   );
