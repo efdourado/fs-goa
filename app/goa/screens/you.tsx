@@ -7,7 +7,7 @@ import { type ReactNode, useState } from "react";
 import { LanguageSegmented } from "../SettingsMenu";
 import { ThemeToggle } from "../ThemeToggle";
 import type { User } from "../types";
-import { BackButton, cx } from "../ui";
+import { BackButton, cx, UserAvatar } from "../ui";
 import { CONTACT_EMAIL } from "./about";
 
 const rowClass = "flex min-h-[52px] w-full cursor-pointer items-center gap-3 px-4 text-left text-[15px] transition hover:bg-[var(--wash)]";
@@ -48,14 +48,13 @@ export function YouScreen({ user, onBack, backLabel, onAccount, onCatalog, onTra
   const tTrash = useTranslations("trash");
   const tAbout = useTranslations("about");
   const [signingOut, setSigningOut] = useState(false);
-  const initial = user.name.trim().charAt(0).toUpperCase() || "?";
 
   return (
     <main className="mx-auto max-w-xl px-4 py-6 pb-24 sm:px-6 sm:py-12">
       {/* On a phone the dock is the way back; a computer has no dock, so it keeps the button. */}
       <BackButton onClick={onBack} label={backLabel ?? tNav("home")} className="mb-6 hidden sm:inline-flex" />
       <button type="button" onClick={onAccount} className="flex w-full cursor-pointer items-center gap-4 rounded-2xl p-1 text-left transition hover:bg-[var(--wash)]">
-        <span className="grid h-14 w-14 flex-none place-items-center rounded-full bg-[var(--main-line)] text-xl font-black" aria-hidden="true">{initial}</span>
+        <UserAvatar name={user.name} large />
         <span className="min-w-0 flex-1">
           <strong className="block truncate text-2xl font-medium tracking-[-0.04em]">{user.name}</strong>
           <span className="block truncate text-sm text-[var(--muted)]">@{user.username}</span>

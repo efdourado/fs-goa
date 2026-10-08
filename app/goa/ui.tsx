@@ -565,6 +565,21 @@ export function SchedulePeriodFields({
   );
 }
 
+/** The person's initial in a soft disc — the header's avatar; `large` is the same disc on the You page. */
+export function UserAvatar({ name, large = false }: { name: string; large?: boolean }) {
+  return (
+    <span
+      className={cx(
+        "grid flex-none place-items-center rounded-full border-2 border-[var(--paper)] bg-[var(--main-line)] font-black",
+        large ? "h-14 w-14 text-xl" : "h-9 w-9 text-xs",
+      )}
+      aria-hidden="true"
+    >
+      {name.split(/\s+/).slice(0, 1).map((part) => part[0]).join("")}
+    </span>
+  );
+}
+
 export function AppHeader({
   user,
   notifications,
@@ -606,9 +621,7 @@ export function AppHeader({
             onClick={onOpenYou}
             aria-label={t("you")}
           >
-            <span className="grid h-9 w-9 place-items-center rounded-full border-2 border-[var(--paper)] bg-[var(--main-line)] text-xs font-black" aria-hidden="true">
-              {user.name.split(/\s+/).slice(0, 1).map((part) => part[0]).join("")}
-            </span>
+            <UserAvatar name={user.name} />
             <span className="hidden leading-tight sm:block">
               <strong className="block text-sm">{user.name}</strong>
               <span className="block text-xs text-[var(--muted)]">@{user.username}</span>

@@ -190,9 +190,10 @@ body {
     color: inherit;
     font: inherit;
   }
+  /* In the base layer so a link's own colour class (`text-white` on a filled button) still wins. */
+  a { color: inherit; text-decoration: none; }
 }
 
-a { color: inherit; text-decoration: none; }
 button, a, textarea { -webkit-tap-highlight-color: transparent; }
 
 button:focus-visible, a:focus-visible, textarea:focus-visible {
