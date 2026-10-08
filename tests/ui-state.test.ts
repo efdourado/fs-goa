@@ -955,10 +955,13 @@ test("doca do celular: quatro abas, a acesa segue a tela e some dentro de um des
   assert.equal(dockTabFor({ kind: "challenge", challengeId: "c1", tab: "today" }), null, "o desafio tem a própria barra");
   assert.equal(dockTabFor({ kind: "admin", challengeId: "c1", tab: "overview" }), null);
 
-  const dock = renderWithIntl(createElement(BottomDock, { active: "home", notificationCount: 2, onSelect: () => undefined }));
+  const dock = renderWithIntl(createElement(BottomDock, { active: "home", notificationCount: 2, onSelect: () => undefined, backLabel: "Voltar" }));
   assert.match(dock, /aria-label="Navegação principal"/);
   assert.match(dock, /aria-current="page"[^>]*>.*Início/);
   assert.match(dock, /aria-label="Novidades \(2\)"/);
   assert.match(dock, />Você</);
   assert.match(dock, /sm:hidden/, "só no celular; no computador o cabeçalho continua");
+  assert.doesNotMatch(dock, /aria-label="Voltar"/, "nas páginas das abas a doca é só as quatro abas, sem ‹");
+  const deeper = renderWithIntl(createElement(BottomDock, { active: "home", notificationCount: 0, onSelect: () => undefined, onBack: () => undefined, backLabel: "Voltar para Início" }));
+  assert.match(deeper, /aria-label="Voltar para Início"/, "abaixo de uma aba, o ‹ sobe um nível");
 });

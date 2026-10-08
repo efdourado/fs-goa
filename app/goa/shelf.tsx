@@ -4,6 +4,12 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { cx } from "./ui";
 
+/** How wide one card is on a sideways shelf: small on a phone so the next one peeks in, a fixed 19rem from `sm:` up. */
+export const shelfCardWidth = "w-[60vw] max-w-[15rem] shrink-0 snap-start sm:w-[19rem] sm:max-w-[19rem]";
+
+/** How wide one catalogue cover is on a sideways shelf: smaller on a phone, 11rem from `sm:` up. */
+export const shelfCoverWidth = "w-32 flex-none snap-start sm:w-44";
+
 /**
  * One horizontal "shelf" on the homepage — a heading with a count and a
  * sideways-scrolling rail of cards. Used for every dashboard section so the

@@ -20,7 +20,7 @@ import {
 import { useLibraryProperties } from "../property-inputs";
 import { recommenderLine, useRecommenderSource } from "../recommender-picker";
 import { Segmented } from "../Segmented";
-import { Rail, useShelfRail } from "../shelf";
+import { Rail, shelfCardWidth, useShelfRail } from "../shelf";
 import type { CatalogItem, CatalogLibrary, Id, Member } from "../types";
 import { BackButton, Button, cardClass, cx, EmptyState, StatusMessage } from "../ui";
 import { formatRuntime } from "../utils";
@@ -46,6 +46,18 @@ function ChipSelect({ label, value, onChange, active, children }: { label: strin
         )}
       >
         {children}
+      </select>
+    </label>
+  );
+}
+
+/** A phone's Group by / Sort by: a small pill with its name and a native picker, instead of a wide segmented bar. */
+function CompactSelect<T extends string>({ label, value, onChange, options }: { label: string; value: T; onChange: (value: T) => void; options: Array<{ value: T; label: string }> }) {
+  return (
+    <label className="inline-flex min-h-10 min-w-0 items-center gap-1.5 rounded-full border border-[var(--line)] bg-[var(--paper)] pl-3.5 pr-2 text-sm transition focus-within:ring-4 focus-within:ring-[var(--main)]/25 hover:border-[var(--main-line)]">
+      <span className="flex-none text-xs text-[var(--muted)]">{label}</span>
+      <select value={value} onChange={(event) => onChange(event.target.value as T)} className="min-w-0 cursor-pointer bg-transparent pr-1 text-[var(--ink)] outline-none">
+        {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
       </select>
     </label>
   );
@@ -246,6 +258,18 @@ export function CatalogWorkspaceScreen({
     reloadAll();
   }
 
+  const groupOptions: Array<{ value: CatalogGroupBy; label: string }> = [
+    { value: "none", label: t("group.none") },
+    { value: "genre", label: t("group.genre") },
+    { value: "decade", label: t("group.decade") },
+    { value: "year", label: t("group.year") },
+  ];
+  const sortOptions: Array<{ value: Sort; label: string }> = [
+    { value: "recent", label: t("sortRecent") },
+    { value: "title", label: t("sortTitle") },
+    { value: "rating", label: t("sortRating") },
+    ...(hasDates ? [{ value: "date" as const, label: t("sortDate") }] : []),
+  ];
   const groupLabel = (label: string) => label || (groupBy === "genre" ? t("noGenre") : t("undated"));
   const narrowed = Boolean(activeFilter || onlyUnused);
 
@@ -268,22 +292,22 @@ export function CatalogWorkspaceScreen({
               const active = entry.kind === kind;
               const counts = countByKind.get(entry.kind) ?? { total: 0, unused: 0 };
               return (
-                <div key={entry.id} className="group relative w-64 flex-none snap-start">
+                <div key={entry.id} className={cx("group relative", shelfCardWidth)}>
                   <button
                     type="button"
                     aria-pressed={active}
                     onClick={() => chooseLibrary(entry.kind)}
                     className={cx(
-                      "relative flex min-h-[4.75rem] w-full cursor-pointer items-center gap-3.5 overflow-hidden rounded-[20px] border px-4 text-left shadow-[var(--elevate-card)] transition duration-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25",
+                      "relative flex min-h-[4rem] w-full cursor-pointer items-center gap-3 overflow-hidden rounded-[20px] border px-3.5 text-left sm:min-h-[4.75rem] sm:gap-3.5 sm:px-4 shadow-[var(--elevate-card)] transition duration-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25",
                       active ? "border-[var(--main)] bg-[var(--main-soft)] ring-1 ring-inset ring-[var(--main)]" : "border-[var(--line)] bg-[var(--paper)] hover:-translate-y-0.5 hover:border-[var(--main-line)]",
                     )}
                   >
                     <span aria-hidden="true" className={cx("pointer-events-none absolute -bottom-10 -right-10 h-24 w-24 rounded-full border-[14px]", active ? "border-[var(--main)]/[0.13]" : "border-[var(--main)]/[0.07]")} />
-                    <span className={cx("relative grid h-11 w-11 flex-none place-items-center rounded-full", active ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-[var(--elevate-1)]" : "bg-[var(--wash)] text-[var(--muted)] ring-1 ring-inset ring-[var(--line)]")} aria-hidden="true">
-                      <LibraryGlyph source={entry.source} className="h-6 w-6" />
+                    <span className={cx("relative grid h-9 w-9 flex-none place-items-center rounded-full sm:h-11 sm:w-11", active ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-[var(--elevate-1)]" : "bg-[var(--wash)] text-[var(--muted)] ring-1 ring-inset ring-[var(--line)]")} aria-hidden="true">
+                      <LibraryGlyph source={entry.source} className="h-5 w-5 sm:h-6 sm:w-6" />
                     </span>
                     <span className="relative min-w-0">
-                      <strong className={cx("block truncate pr-6 text-base font-medium tracking-[-0.02em]", active && "text-[var(--main-strong)]")}>{libraryName(entry)}</strong>
+                      <strong className={cx("block truncate pr-6 text-sm font-medium tracking-[-0.02em] sm:text-base", active && "text-[var(--main-strong)]")}>{libraryName(entry)}</strong>
                       <small className={cx("mt-0.5 block truncate text-xs", active ? "text-[var(--main-strong)]/85" : "text-[var(--muted)]")}>
                         {t("libraryStats", { count: counts.total })}
                         {canManage && counts.unused > 0 ? <span className="text-[var(--warn)]"> · {t("libraryUnused", { count: counts.unused })}</span> : null}
@@ -308,7 +332,7 @@ export function CatalogWorkspaceScreen({
               <button
                 type="button"
                 onClick={() => setDialog("new")}
-                className="flex min-h-[4.75rem] w-64 flex-none cursor-pointer snap-start items-center justify-center gap-2 rounded-[20px] border border-dashed border-[var(--muted)] px-4 text-sm font-light text-[var(--muted)] transition hover:border-[var(--ink)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
+                className="flex min-h-[4rem] w-[60vw] max-w-[15rem] flex-none cursor-pointer snap-start items-center justify-center gap-2 rounded-[20px] border sm:min-h-[4.75rem] sm:w-[19rem] sm:max-w-[19rem] border-dashed border-[var(--muted)] px-4 text-sm font-light text-[var(--muted)] transition hover:border-[var(--ink)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
               >
                 ＋ {tl("newLibrary")}
               </button>
@@ -386,39 +410,22 @@ export function CatalogWorkspaceScreen({
                 <strong className="font-medium text-[var(--ink)]">{narrowed ? t("resultOf", { shown: sorted.length, total: scoped.length }) : t("resultCount", { count: scoped.length })}</strong>
                 {average !== null ? ` · ${t("averageRating", { value: average })}` : ""}
               </p>
-              <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+              {/* From `sm:` up: segmented bars. A phone gets two compact pickers side by side. */}
+              <div className="hidden flex-wrap items-center gap-x-5 gap-y-2 sm:flex">
                 {isBuiltIn ? (
                   <div className="flex items-center gap-2.5 text-xs text-[var(--muted)]">
                     {t("groupByLabel")}
-                    <Segmented<CatalogGroupBy>
-                      className="w-64"
-                      ariaLabel={t("groupByLabel")}
-                      value={groupBy}
-                      onChange={setGroupBy}
-                      options={[
-                        { value: "none", label: t("group.none") },
-                        { value: "genre", label: t("group.genre") },
-                        { value: "decade", label: t("group.decade") },
-                        { value: "year", label: t("group.year") },
-                      ]}
-                    />
+                    <Segmented<CatalogGroupBy> className="w-64" ariaLabel={t("groupByLabel")} value={groupBy} onChange={setGroupBy} options={groupOptions} />
                   </div>
                 ) : null}
                 <div className="flex items-center gap-2.5 text-xs text-[var(--muted)]">
                   {t("sortLabel")}
-                  <Segmented<Sort>
-                    className={hasDates ? "w-64" : "w-48"}
-                    ariaLabel={t("sortLabel")}
-                    value={activeSort}
-                    onChange={setSort}
-                    options={[
-                      { value: "recent", label: t("sortRecent") },
-                      { value: "title", label: t("sortTitle") },
-                      { value: "rating", label: t("sortRating") },
-                      ...(hasDates ? [{ value: "date" as const, label: t("sortDate") }] : []),
-                    ]}
-                  />
+                  <Segmented<Sort> className={hasDates ? "w-64" : "w-48"} ariaLabel={t("sortLabel")} value={activeSort} onChange={setSort} options={sortOptions} />
                 </div>
+              </div>
+              <div className="flex w-full gap-2 sm:hidden">
+                {isBuiltIn ? <CompactSelect<CatalogGroupBy> label={t("groupByLabel")} value={groupBy} onChange={setGroupBy} options={groupOptions} /> : null}
+                <CompactSelect<Sort> label={t("sortLabel")} value={activeSort} onChange={setSort} options={sortOptions} />
               </div>
             </div>
           ) : null}
@@ -453,7 +460,7 @@ export function CatalogWorkspaceScreen({
                       </h2>
                     ) : null}
                     {layout === "covers" ? (
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-7 sm:grid-cols-3 sm:gap-x-5 lg:grid-cols-4 xl:grid-cols-5">
+                      <div className="grid grid-cols-3 gap-x-3 gap-y-5 sm:gap-x-5 sm:gap-y-7 lg:grid-cols-4 xl:grid-cols-5">
                         {canManage && !selecting && index === 0 ? <AddItemTile label={t("addItem")} onClick={() => { setNotice(null); setDialog("add"); }} /> : null}
                         {group.items.map((item) => {
                           const unused = isUnused(item);

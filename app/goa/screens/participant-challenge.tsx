@@ -1253,6 +1253,7 @@ export function ParticipantChallengeScreen({
   previewActions?: ReactNode;
 }) {
   const t = useTranslations("participant");
+  const tNav = useTranslations("nav");
   const trules = useTranslations("rules");
   const f = useGoaFormat();
   const longDate: Intl.DateTimeFormatOptions = { day: "2-digit", month: "long", year: "numeric" };
@@ -1756,7 +1757,7 @@ export function ParticipantChallengeScreen({
           active={activeTab}
           onTab={onTab}
           onBack={onBack}
-          backLabel={backLabel ? t("dockBack", { label: backLabel }) : t("back")}
+          backLabel={backLabel ? tNav("dockBack", { label: backLabel }) : t("back")}
           label={t("navMobileAria")}
           tabLabel={(tab) => t(`tabs.${tab}`)}
         />

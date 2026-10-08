@@ -64,20 +64,40 @@ const tabClass = (on: boolean) => cx(
   on ? "bg-[var(--main-soft)] font-medium text-[var(--main-strong)]" : "text-[var(--muted)] hover:text-[var(--ink)]",
 );
 
+/** The dock's way up — the ‹ at its left, the same in both docks. */
+function DockBackButton({ onBack, label }: { onBack: () => void; label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onBack}
+      aria-label={label}
+      title={label}
+      className="my-3.5 mr-1.5 grid cursor-pointer place-items-center border-r border-[var(--line)] text-[var(--muted)] transition hover:text-[var(--ink)]"
+    >
+      <svg viewBox="0 0 24 24" className={icon} fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5" /></svg>
+    </button>
+  );
+}
+
 /**
- * The phone's one navigation: a floating dock at the thumb with Home, Templates, Updates and You. It replaces
+ * The phone's one navigation: a floating dock at the thumb with ‹ (up one level), Home, Templates, Updates and You. It replaces
  * the header's avatar, bell, sliders and "⋯" on small screens; from `sm:` up the header keeps its links.
  */
-export function BottomDock({ active, notificationCount, onSelect }: {
+export function BottomDock({ active, notificationCount, onSelect, onBack, backLabel }: {
   active: DockTab;
   notificationCount: number;
   onSelect: (tab: DockTab) => void;
+  /** Up one level, like the Back link; absent on the four tabs' own pages, where the dock is just the tabs. */
+  onBack?: () => void;
+  /** Where ‹ leads, said out loud: "Back to Cineclube". */
+  backLabel: string;
 }) {
   const t = useTranslations("nav");
   const tNotify = useTranslations("notifications");
   const labels: Record<DockTab, string> = { home: t("home"), templates: t("templates"), activity: tNotify("label"), you: t("you") };
   return (
-    <nav aria-label={t("dockAria")} className={cx(dockClass, "grid-cols-4")}>
+    <nav aria-label={t("dockAria")} className={cx(dockClass, onBack ? "grid-cols-[3.25rem_repeat(4,minmax(0,1fr))]" : "grid-cols-4")}>
+      {onBack ? <DockBackButton onBack={onBack} label={backLabel} /> : null}
       {(["home", "templates", "activity", "you"] as const).map((tab) => {
         const on = tab === active;
         return (
@@ -125,9 +145,7 @@ export function ChallengeDock({ tabs, active, onTab, onBack, backLabel, label, t
 }) {
   return (
     <nav aria-label={label} className={dockClass} style={{ gridTemplateColumns: `3.25rem repeat(${tabs.length}, minmax(0, 1fr))` }}>
-      <button type="button" onClick={onBack} aria-label={backLabel} title={backLabel} className="my-3.5 mr-1.5 grid cursor-pointer place-items-center border-r border-[var(--line)] text-[var(--muted)] transition hover:text-[var(--ink)]">
-        <svg viewBox="0 0 24 24" className={icon} fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14.5 5.5 8 12l6.5 6.5" /></svg>
-      </button>
+      <DockBackButton onBack={onBack} label={backLabel} />
       {tabs.map((tab) => (
         <button key={tab} type="button" onClick={() => onTab(tab)} aria-current={tab === active ? "page" : undefined} className={tabClass(tab === active)}>
           {TAB_ICONS[tab]}

@@ -89,7 +89,7 @@ export function CatalogTile({ title, year, avg, ratingLabel, badgeHidden, captio
   caption: string;
   note?: string;
   noteTone?: "muted" | "warn";
-  size?: "sm" | "md";
+  size?: "sm" | "rail" | "md";
   /** Sizes the tile inside a rail; a grid leaves it out. */
   className?: string;
   selecting?: boolean;

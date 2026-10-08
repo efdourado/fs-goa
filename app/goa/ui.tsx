@@ -45,6 +45,8 @@ export function BackButton({ onClick, label, className, labelClassName }: { onCl
       className={cx(
         "inline-flex min-h-9 cursor-pointer items-center gap-1.5 text-sm text-[var(--muted)] transition hover:text-[var(--ink)]",
         className,
+        // Under the phone dock its ‹ does this job (GoaApp marks the page `has-dock`).
+        "max-sm:[.has-dock_&]:hidden",
       )}
     >
       <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 flex-none" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">

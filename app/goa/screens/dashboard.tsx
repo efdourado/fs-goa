@@ -9,7 +9,7 @@ import { useGoaFormat } from "../format";
 import { CatalogShelf } from "../catalog-shelf";
 import { applyColorFilter, OrganizeBar, useChallengeOrganizer } from "../organize";
 import { NewChallengeTile } from "../add-tile";
-import { Shelf, ShelfAddButton } from "../shelf";
+import { Shelf, ShelfAddButton, shelfCardWidth } from "../shelf";
 import { WelcomePanel } from "../welcome";
 import {
   CHALLENGE_COLOR_TAGS,
@@ -190,12 +190,22 @@ export function ActiveChallengeCard({
   const done = challenge.completedCount ?? 0;
   const livingList = isLivingList(challenge);
   const interactive = Boolean(onTogglePin || onSetColor);
+  const menu = interactive ? (
+    <CardMenu
+      challenge={challenge}
+      canManageIt={canManage(challenge.viewerRole)}
+      onTogglePin={() => onTogglePin?.(challenge.id)}
+      onSetColor={(tag) => onSetColor?.(challenge.id, tag)}
+      onOpen={() => onOpen(challenge.id)}
+      onManage={() => onManage?.(challenge.id)}
+    />
+  ) : null;
 
   return (
     <article
       className={cx(
         "group relative flex flex-col overflow-hidden rounded-[20px] border bg-[var(--paper)] shadow-[var(--elevate-1)] transition",
-        fluid ? "w-full" : "w-[78vw] max-w-[19rem] shrink-0 snap-start sm:w-[19rem]",
+        fluid ? "w-full" : shelfCardWidth,
         "hover:-translate-y-0.5",
         livingList ? "border-[var(--line)]" : tone.border,
         "has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-[var(--main)]/25",
@@ -205,10 +215,11 @@ export function ActiveChallengeCard({
         <span className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: `var(--tag-${challenge.colorTag})` }} aria-hidden="true" />
       ) : null}
 
-      <div className={cx("flex flex-1 flex-col p-4 sm:p-5", challenge.colorTag && "pl-5 sm:pl-6")}>
+      <div className={cx("flex flex-1 flex-col p-3.5 sm:p-5", challenge.colorTag && "pl-4.5 sm:pl-6")}>
+        {/* A phone-sized card keeps the status dot and the menu; the date or count and the pin come in from `sm:` up. */}
         <div className="flex items-center justify-between gap-2">
           {livingList ? <span /> : <ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />}
-          <span className="min-w-0 flex-1 truncate text-right text-[11px] text-[var(--muted)] sm:text-xs">
+          <span className="hidden min-w-0 flex-1 truncate text-right text-xs text-[var(--muted)] sm:block">
             {livingList
               ? t("listMeta", { count: total })
               : isChallengeScheduled(challenge.status, challenge.startsOn, challenge.submissionMode)
@@ -227,7 +238,7 @@ export function ActiveChallengeCard({
                   title={challenge.pinned ? t("card.unpin") : t("card.pin")}
                   aria-pressed={challenge.pinned}
                   className={cx(
-                    "grid h-7 w-7 place-items-center rounded-full transition",
+                    "hidden h-7 w-7 place-items-center rounded-full transition sm:grid",
                     challenge.pinned
                       ? "text-[var(--main)] opacity-100"
                       : "text-[var(--muted)] opacity-0 hover:bg-[var(--wash)] hover:text-[var(--ink)] focus-visible:opacity-100 group-hover:opacity-100",
@@ -236,36 +247,28 @@ export function ActiveChallengeCard({
                   <CirclePinIcon className="h-[18px] w-[18px]" filled={challenge.pinned} />
                 </button>
               ) : null}
-              {interactive ? (
-                <CardMenu
-                  challenge={challenge}
-                  canManageIt={canManage(challenge.viewerRole)}
-                  onTogglePin={() => onTogglePin?.(challenge.id)}
-                  onSetColor={(tag) => onSetColor?.(challenge.id, tag)}
-                  onOpen={() => onOpen(challenge.id)}
-                  onManage={() => onManage?.(challenge.id)}
-                />
-              ) : null}
+              {menu}
             </div>
           ) : null}
         </div>
 
-        <h3 className="mt-4 text-lg font-light leading-tight tracking-[-0.03em] sm:mt-5 sm:text-2xl sm:tracking-[-0.04em]">
+        <h3 className="mt-2.5 text-base font-light leading-tight tracking-[-0.03em] sm:mt-5 sm:text-2xl sm:tracking-[-0.04em]">
           <button type="button" onClick={() => onOpen(challenge.id)} className="cursor-pointer text-left after:absolute after:inset-0 after:content-[''] focus-visible:outline-none">
             {challenge.title}
           </button>
         </h3>
         {context ? <p className="mt-1 truncate text-xs text-[var(--muted)]">{context}</p> : null}
-        {challenge.description ? <p className="mt-1.5 line-clamp-1 text-sm leading-6 text-[var(--muted)]">{challenge.description}</p> : null}
+        {/* A phone-sized card has no room for the description; the title says enough. */}
+        {challenge.description ? <p className="mt-1.5 line-clamp-1 hidden text-sm leading-6 text-[var(--muted)] sm:block">{challenge.description}</p> : null}
 
         {total > 0 ? (
-          <div className="mt-4 sm:mt-5">
+          <div className="mt-3 sm:mt-5">
             <div className="mb-2 flex justify-between text-[11px] text-[var(--muted)] sm:text-xs"><span>{t("progress", { done, total })}</span><span>{Math.round((done / total) * 100)}%</span></div>
             <div className="h-2 overflow-hidden rounded-full bg-[var(--wash-strong)]"><span className="block h-full rounded-full bg-[var(--main-2)]" style={{ width: `${Math.min(100, (done / total) * 100)}%` }} /></div>
           </div>
         ) : null}
       </div>
-      {!challenge.colorTag ? <span className={cx("block w-full px-5 py-2.5", livingList ? "bg-[var(--line)]" : tone.solid)} /> : null}
+      {!challenge.colorTag ? <span className={cx("block w-full px-5 py-1.5 sm:py-2.5", livingList ? "bg-[var(--line)]" : tone.solid)} /> : null}
     </article>
   );
 }
@@ -281,7 +284,7 @@ function ArchiveChallengeRow({
     <button
       type="button"
       onClick={onOpen}
-      className={cx(cardClass, "relative flex w-[78vw] max-w-[19rem] shrink-0 snap-start items-center gap-2.5 overflow-hidden px-4 py-4 text-left text-sm hover:border-[var(--muted)] sm:w-[19rem]")}
+      className={cx(cardClass, shelfCardWidth, "relative flex items-center gap-2.5 overflow-hidden px-3.5 py-3.5 text-left text-sm hover:border-[var(--muted)] sm:px-4 sm:py-4")}
     >
       {challenge.colorTag ? <span className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: `var(--tag-${challenge.colorTag})` }} aria-hidden="true" /> : null}
       <ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />
@@ -432,7 +435,7 @@ export function DashboardScreen({
                 key={group.id}
                 type="button"
                 onClick={() => onOpenGroup(group.id)}
-                className={cx(cardClass, "flex min-h-[5.5rem] w-[78vw] max-w-[19rem] shrink-0 snap-start flex-col justify-center gap-1 p-4 text-left transition hover:-translate-y-0.5 hover:border-[var(--muted)] sm:w-[19rem]")}
+                className={cx(cardClass, shelfCardWidth, "flex min-h-[4.5rem] flex-col justify-center gap-1 p-3.5 text-left transition hover:-translate-y-0.5 sm:min-h-[5.5rem] sm:p-4 hover:border-[var(--muted)] sm:w-[19rem]")}
               >
                 <span className="text-sm">{group.name}</span>
                 <small className="text-[var(--muted)]">{t("peopleCount", { count })} · {tr(group.role)}</small>

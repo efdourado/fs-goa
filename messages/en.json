@@ -68,7 +68,8 @@
     "signingOut": "Signing out…",
     "signIn": "Sign in",
     "you": "You",
-    "dockAria": "Main navigation"
+    "dockAria": "Main navigation",
+    "dockBack": "Back to {label}"
   },
   "roles": {
     "owner": "Owner",
@@ -1040,8 +1041,7 @@
     "deletingEntry": "Deleting…",
     "checkpointEmpty": "No items yet.",
     "origin": "via {text}",
-    "groupSealed": "Rated · sealed",
-    "dockBack": "Back to {label}"
+    "groupSealed": "Rated · sealed"
   },
   "sessionLog": {
     "composerTitle": "Log a {name}",

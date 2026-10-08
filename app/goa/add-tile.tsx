@@ -1,5 +1,6 @@
 "use client";
 
+import { shelfCardWidth } from "./shelf";
 import { cx } from "./ui";
 
 /**
@@ -34,12 +35,12 @@ export function NewChallengeTile({ label, chatLabel, onCreate, onChat, fluid = f
   onChat: () => void;
   fluid?: boolean;
 }) {
-  const half = "flex min-h-[11rem] cursor-pointer flex-col items-center justify-center gap-2.5 px-3 text-center text-[13px] text-[var(--main-strong)] transition hover:bg-[var(--main-soft)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-[var(--main)]/25";
+  const half = "flex min-h-[8.5rem] sm:min-h-[11rem] cursor-pointer flex-col items-center justify-center gap-2.5 px-3 text-center text-[13px] text-[var(--main-strong)] transition hover:bg-[var(--main-soft)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-[var(--main)]/25";
   const circle = "grid h-10 w-10 place-items-center rounded-full bg-[var(--main-soft)]";
   return (
     <div className={cx(
       "grid grid-cols-2 divide-x divide-dashed divide-[var(--main-line)] overflow-hidden rounded-[20px] border border-dashed border-[var(--main-line)]",
-      fluid ? "w-full" : "w-[78vw] max-w-[19rem] shrink-0 snap-start sm:w-[19rem]",
+      fluid ? "w-full" : shelfCardWidth,
     )}>
       <button type="button" onClick={onCreate} className={half}>
         <span aria-hidden="true" className={cx(circle, "text-lg")}>＋</span>

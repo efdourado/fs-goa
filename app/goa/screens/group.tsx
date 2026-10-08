@@ -11,7 +11,7 @@ import { CatalogShelfSkeleton } from "../catalog-shelf";
 import { TasteMap } from "../taste-map";
 import { CatalogTile, resolveCoverTop } from "../catalog-views";
 import { LibraryGlyph, useCatalogShelf, useLibraryName } from "../libraries";
-import { Rail, RailArrows, useShelfRail } from "../shelf";
+import { Rail, RailArrows, shelfCoverWidth, useShelfRail } from "../shelf";
 import type { CatalogItem, ChallengeSummary, GroupInviteResult, GroupSummary, Id, Member, PendingGroupRequest } from "../types";
 import { BackButton, Button, cx, EmptyState, Field, inputClass, SlidersIcon, StatusMessage, Toggle } from "../ui";
 import { canManage, formatRuntime } from "../utils";
@@ -358,7 +358,7 @@ export function GroupScreen({
             </div>
           </div>
           {challenges.length || canCreateChallenge ? (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
               {challenges.map((challenge) => <ActiveChallengeCard key={challenge.id} challenge={challenge} onOpen={onOpenChallenge} fluid />)}
               {canCreateChallenge ? <NewChallengeTile fluid label={t("createChallengeCta")} chatLabel={tQuick("entryCta")} onCreate={onCreateChallenge} onChat={onQuickCreate} /> : null}
             </div>
@@ -417,8 +417,8 @@ export function GroupScreen({
                   {visibleCatalog.map((item) => (
                     <CatalogTile
                       key={item.id}
-                      size="sm"
-                      className="w-44 flex-none snap-start"
+                      size="rail"
+                      className={shelfCoverWidth}
                       title={item.title}
                       year={resolveCoverTop(item, activeCatalogLibrary?.coverTopProperty, f)}
                       avg={item.ratingAvg}
@@ -432,7 +432,7 @@ export function GroupScreen({
                     <button
                       type="button"
                       onClick={onOpenCatalog}
-                      className="flex aspect-[3/4] w-44 flex-none cursor-pointer snap-start flex-col items-center justify-center gap-1.5 self-start rounded-[20px] border border-[var(--line)] bg-[var(--paper)] transition hover:border-[var(--main-line)]"
+                      className="flex aspect-[3/4] w-32 flex-none cursor-pointer snap-start flex-col sm:w-44 items-center justify-center gap-1.5 self-start rounded-[20px] border border-[var(--line)] bg-[var(--paper)] transition hover:border-[var(--main-line)]"
                     >
                       <span className="text-3xl font-light tracking-[-0.04em]">{remainingCatalog}</span>
                       <span className="px-3 text-center text-xs text-[var(--muted)]">{t("catalogMoreIn", { name: activeCatalogLibrary ? libraryName(activeCatalogLibrary) : t("catalogTitle") })}</span>

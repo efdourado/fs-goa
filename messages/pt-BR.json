@@ -68,7 +68,8 @@
     "signingOut": "Saindo…",
     "signIn": "Entrar",
     "you": "Você",
-    "dockAria": "Navegação principal"
+    "dockAria": "Navegação principal",
+    "dockBack": "Voltar para {label}"
   },
   "roles": {
     "owner": "Responsável",
@@ -1040,8 +1041,7 @@
     "deletingEntry": "Excluindo…",
     "checkpointEmpty": "Nada ainda.",
     "origin": "via {text}",
-    "groupSealed": "Deu nota · selada",
-    "dockBack": "Voltar para {label}"
+    "groupSealed": "Deu nota · selada"
   },
   "sessionLog": {
     "composerTitle": "Registrar {name}",

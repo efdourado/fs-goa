@@ -62,9 +62,13 @@ const DOCK_ROOTS: Record<DockTab, Screen> = {
   you: { kind: "you" },
 };
 
+/** The tabs' own pages: there the dock is just the four tabs, no ‹. */
+const DOCK_ROOT_KINDS = new Set<Screen["kind"]>(Object.values(DOCK_ROOTS).map((root) => root.kind));
+
 export default function GoaApp() {
   const t = useTranslations("app");
   const tc = useTranslations("common");
+  const tNav = useTranslations("nav");
   const tTrash = useTranslations("trash");
   const tPersonalCatalog = useTranslations("personalCatalog");
   const tBack = useTranslations("backTo");
@@ -704,8 +708,9 @@ export default function GoaApp() {
     <CsrfProvider token={bootstrap.csrfToken}>
     <div className="flex min-h-screen flex-col bg-[var(--canvas)] text-[var(--ink)]">
       <AppHeader user={user} notifications={bootstrap.memberRequests} onHome={() => setScreen({ kind: "dashboard" })} onOpenYou={() => setScreen({ kind: "you" })} onOpenTemplates={() => setScreen({ kind: "templates" })} onOpenAbout={() => setScreen({ kind: "about" })} onLogout={logout} onAcceptRequest={(id) => respondToMemberRequest(id, "accept")} onDeclineRequest={(id) => respondToMemberRequest(id, "decline")} />
-      <div className={cx("flex-1", dockTab && "pb-[calc(env(safe-area-inset-bottom)+1.5rem)] sm:pb-0")}>{content}</div>
-      {dockTab ? <BottomDock active={dockTab} notificationCount={(bootstrap.memberRequests ?? []).length} onSelect={(tab) => setScreen(DOCK_ROOTS[tab])} /> : null}
+      {/* `has-dock`: on a phone the dock's ‹ is the way back, so the top Back links step aside (see BackButton). */}
+      <div className={cx("flex-1", dockTab && "has-dock pb-[calc(env(safe-area-inset-bottom)+1.5rem)] sm:pb-0")}>{content}</div>
+      {dockTab ? <BottomDock active={dockTab} notificationCount={(bootstrap.memberRequests ?? []).length} onSelect={(tab) => setScreen(DOCK_ROOTS[tab])} onBack={backTarget && !DOCK_ROOT_KINDS.has(screen.kind) ? goUp : undefined} backLabel={backTarget ? tNav("dockBack", { label: backLabel }) : tc("back")} /> : null}
     </div>
     </CsrfProvider>
   );

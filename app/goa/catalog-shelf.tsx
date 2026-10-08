@@ -6,7 +6,7 @@ import { useState } from "react";
 import { CatalogTile, resolveCoverTop } from "./catalog-views";
 import { useGoaFormat } from "./format";
 import { type CatalogScope, LibraryGlyph, useCatalogShelf, useLibraryName } from "./libraries";
-import { Rail, RailArrows, useShelfRail } from "./shelf";
+import { Rail, RailArrows, shelfCoverWidth, useShelfRail } from "./shelf";
 import type { Id } from "./types";
 import { cx, EmptyState } from "./ui";
 import { formatRuntime } from "./utils";
@@ -24,7 +24,7 @@ export function CatalogShelfSkeleton({ title }: { title: string }) {
       </div>
       <div className="flex gap-4 overflow-hidden" aria-hidden="true">
         {[0, 1, 2, 3, 4, 5].map((index) => (
-          <span key={index} className="block aspect-[3/4] w-44 flex-none animate-pulse rounded-[20px] bg-[var(--wash)]" style={{ animationDelay: `${index * 90}ms` }} />
+          <span key={index} className="block aspect-[3/4] w-32 flex-none animate-pulse sm:w-44 rounded-[20px] bg-[var(--wash)]" style={{ animationDelay: `${index * 90}ms` }} />
         ))}
       </div>
     </section>
@@ -113,8 +113,8 @@ export function CatalogShelf({ scope, canManage, onOpenCatalog, onOpenItem }: {
             {visible.map((item) => (
               <CatalogTile
                 key={item.id}
-                size="sm"
-                className="w-44 flex-none snap-start"
+                size="rail"
+                className={shelfCoverWidth}
                 title={item.title}
                 year={resolveCoverTop(item, shelf?.coverTopProperty, f)}
                 avg={item.ratingAvg}
@@ -128,7 +128,7 @@ export function CatalogShelf({ scope, canManage, onOpenCatalog, onOpenItem }: {
               <button
                 type="button"
                 onClick={onOpenCatalog}
-                className="flex aspect-[3/4] w-44 flex-none cursor-pointer snap-start flex-col items-center justify-center gap-1.5 self-start rounded-[20px] border border-[var(--line)] bg-[var(--paper)] transition hover:border-[var(--main-line)]"
+                className="flex aspect-[3/4] w-32 flex-none cursor-pointer snap-start flex-col sm:w-44 items-center justify-center gap-1.5 self-start rounded-[20px] border border-[var(--line)] bg-[var(--paper)] transition hover:border-[var(--main-line)]"
               >
                 <span className="text-3xl font-light tracking-[-0.04em]">{remaining}</span>
                 <span className="px-3 text-center text-xs text-[var(--muted)]">{t("catalogMoreIn", { name: shelf ? libraryName(shelf) : title })}</span>
