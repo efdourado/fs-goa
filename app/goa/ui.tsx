@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from "react";
 
 import { useGoaFormat } from "./format";
 import { SettingsMenu } from "./SettingsMenu";
@@ -58,6 +58,9 @@ export function BackButton({ onClick, label, className, labelClassName }: { onCl
   );
 }
 
+/** Set by a modal (dialog, bottom sheet): its buttons are pills. */
+export const InModal = createContext(false);
+
 export function Button({
   children,
   variant = "primary",
@@ -73,6 +76,7 @@ export function Button({
   onClick?: () => void;
   className?: string;
 }) {
+  const inModal = useContext(InModal);
   const tones = {
     primary: "border-transparent bg-[var(--main)] font-medium text-white shadow-[var(--elevate-1)] hover:opacity-90",
     secondary: "border-[var(--line)] bg-transparent font-light text-[var(--ink)] hover:bg-[var(--hover)]",
@@ -82,7 +86,8 @@ export function Button({
   return (
     <button
       className={cx(
-        "cursor-pointer inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 disabled:cursor-not-allowed disabled:opacity-55",
+        "cursor-pointer inline-flex min-h-10 items-center justify-center gap-2 border px-4 py-2 text-sm transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 disabled:cursor-not-allowed disabled:opacity-55",
+        inModal ? "rounded-full" : "rounded-xl",
         tones[variant],
         className,
       )}
