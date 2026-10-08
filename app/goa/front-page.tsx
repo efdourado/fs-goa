@@ -99,7 +99,7 @@ export function storyExcerpt(
 
 /** A featured story's frame: a large paper card that lifts on hover, like the gallery's smaller cards. */
 const storyCardClass =
-  "relative flex min-w-0 flex-col rounded-[28px] border border-[var(--line)] bg-[var(--paper)] p-6 shadow-[var(--elevate-1)] transition hover:-translate-y-0.5 hover:shadow-[var(--elevate-card)] has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-[var(--main)]/25 sm:p-9";
+  "relative flex min-w-0 flex-col rounded-[28px] border border-[var(--line)] bg-[var(--paper)] p-4 shadow-[var(--elevate-1)] transition hover:-translate-y-0.5 hover:shadow-[var(--elevate-card)] has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-[var(--main)]/25 sm:p-9";
 
 function StorySkeleton() {
   return (
@@ -169,38 +169,38 @@ function Story({ template, onOpen }: { template: TemplateSummary; onOpen: (id: I
         </span>
         {kicker ? <p className="min-w-0 text-xs text-[var(--muted)]">{kicker}</p> : null}
       </div>
-      <h2 className="mt-3 min-w-0 text-4xl font-light leading-[1.1] tracking-[-0.05em] sm:text-5xl">
-        <button type="button" onClick={() => onOpen(template.id)} title={template.title} className="line-clamp-2 w-full cursor-pointer break-words text-left hover:underline hover:decoration-1 hover:underline-offset-4 focus-visible:outline-none">
+      <h2 className="mt-2.5 min-w-0 text-2xl font-light leading-[1.1] tracking-[-0.05em] sm:mt-3 sm:text-5xl">
+        <button type="button" onClick={() => onOpen(template.id)} title={template.title} className="block w-full cursor-pointer truncate text-left hover:underline hover:decoration-1 hover:underline-offset-4 focus-visible:outline-none">
           {template.title}
         </button>
       </h2>
-      <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--muted)]">
+      <p className="mt-2 line-clamp-2 max-w-2xl text-sm leading-6 text-[var(--muted)] sm:mt-3 sm:line-clamp-none sm:text-base sm:leading-7">
         {drawn ? storyHeadline(drawn.story, drawn.input, ts) : template.summary}
       </p>
 
       {/* The picture: the podium of a rated challenge, everyone's consistency for a habit. */}
       {drawn?.story.kind === "rated" && drawn.story.ranking.length >= 2 ? (
-        <ol className="mt-7 grid grid-cols-3 items-end gap-4">
+        <ol className="mx-auto mt-5 grid max-w-[16rem] grid-cols-3 items-end gap-3 sm:mt-7 sm:max-w-none sm:gap-4">
           {[drawn.story.ranking[1], drawn.story.ranking[0], drawn.story.ranking[2]].map((score, index) => score ? (
             <li key={score.item.id} className={cx("flex min-w-0 flex-col items-center text-center", index === 1 ? "" : "pt-6")}>
               <span className="relative w-full" style={{ maxWidth: index === 1 ? "8rem" : "6.5rem" }}>
                 <PodiumCover title={score.item.title} year={score.item.year} />
-                <span className="absolute -left-2 -top-2 grid h-7 w-7 place-items-center rounded-full bg-[var(--ink)] text-xs font-medium text-[var(--canvas)]">{index === 1 ? 1 : index === 0 ? 2 : 3}</span>
+                <span className="absolute -left-1.5 -top-1.5 grid h-6 w-6 place-items-center rounded-full bg-[var(--ink)] text-[11px] font-medium text-[var(--canvas)] sm:-left-2 sm:-top-2 sm:h-7 sm:w-7 sm:text-xs">{index === 1 ? 1 : index === 0 ? 2 : 3}</span>
               </span>
-              <span className="mt-2 text-2xl font-light tabular-nums tracking-[-0.03em]">{fmtScore(score.score)}</span>
+              <span className="mt-1.5 text-lg font-light tabular-nums tracking-[-0.03em] sm:mt-2 sm:text-2xl">{fmtScore(score.score)}</span>
             </li>
           ) : <li key={index} />)}
         </ol>
       ) : drawn?.story.kind === "dated" ? (
-        <ul className="mt-7 flex flex-wrap gap-5">
+        <ul className="mt-5 flex flex-wrap gap-4 sm:mt-7 sm:gap-5">
           {[...drawn.story.lanes].sort((x, y) => (y.consistency ?? 0) - (x.consistency ?? 0)).slice(0, 5).map((lane) => (
             <li key={lane.person.id} className="flex flex-col items-center gap-1.5">
-              <span className="relative grid h-16 w-16 place-items-center">
+              <span className="relative grid h-12 w-12 place-items-center sm:h-16 sm:w-16">
                 <svg viewBox="0 0 36 36" className="absolute inset-0 -rotate-90" aria-hidden="true">
                   <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--wash-strong)" strokeWidth="2.8" />
                   <circle cx="18" cy="18" r="15.9" fill="none" stroke={personTone(ids, lane.person.id)} strokeWidth="2.8" strokeDasharray={`${lane.consistency ?? 0} 100`} strokeLinecap="round" />
                 </svg>
-                <span className="text-sm font-medium tabular-nums">{lane.consistency ?? 0}%</span>
+                <span className="text-xs font-medium tabular-nums sm:text-sm">{lane.consistency ?? 0}%</span>
               </span>
               <span className="max-w-[5rem] truncate text-xs text-[var(--muted)]">{firstName(lane.person.name)}</span>
             </li>
@@ -209,26 +209,26 @@ function Story({ template, onOpen }: { template: TemplateSummary; onOpen: (id: I
       ) : null}
 
       {standout ? (
-        <p className="mt-6 border-l-2 border-[var(--main)] pl-4 text-lg font-light leading-snug">{standout}</p>
+        <p className="mt-4 border-l-2 border-[var(--main)] pl-3 text-base font-light leading-snug sm:mt-6 sm:pl-4 sm:text-lg">{standout}</p>
       ) : null}
 
       {drawn ? <StoryFigures story={drawn.story} input={drawn.input} /> : (
         // Still running (or nothing to draw yet): the template's own shape, on the same quiet panel.
-        <dl className="mt-7 grid grid-cols-3 gap-x-6 gap-y-4 rounded-2xl bg-[var(--wash)] p-5">
+        <dl className="mt-5 grid auto-cols-fr grid-flow-col gap-x-3 rounded-2xl bg-[var(--wash)] p-3.5 sm:mt-7 sm:grid-flow-row sm:grid-cols-3 sm:gap-x-6 sm:gap-y-4 sm:p-5">
           {[
             { value: template.participantCount, label: t("factPeople", { count: template.participantCount }) },
             { value: template.itemCount, label: t("factItems", { count: template.itemCount }) },
             { value: template.fieldCount, label: t("factFields", { count: template.fieldCount }) },
           ].filter((row) => row.value).map((row) => (
             <div key={row.label} className="flex min-w-0 flex-col-reverse">
-              <dt className="truncate text-xs text-[var(--muted)]">{row.label}</dt>
-              <dd className="text-3xl font-light tabular-nums tracking-[-0.04em]">{row.value}</dd>
+              <dt className="truncate text-[10px] text-[var(--muted)] sm:text-xs">{row.label}</dt>
+              <dd className="truncate text-lg font-light tabular-nums tracking-[-0.04em] sm:text-3xl">{row.value}</dd>
             </div>
           ))}
         </dl>
       )}
 
-      <div className="mt-auto pt-8">
+      <div className="mt-auto pt-5 sm:pt-8">
         <button type="button" onClick={() => onOpen(template.id)} className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-full border border-[var(--main-line)] px-4 text-sm text-[var(--main-strong)] transition hover:bg-[var(--main-soft)] focus-visible:outline-none">
           {t("seeResult")} <span aria-hidden="true">→</span>
         </button>
@@ -252,11 +252,12 @@ function PodiumCover({ title, year }: { title: string; year?: number | null }) {
 function StoryFigures({ story, input }: { story: Story; input: StoryInput }) {
   const figures = useStoryFigures(story, input).slice(0, 4);
   return (
-    <dl className="mt-7 grid grid-cols-2 gap-x-6 gap-y-4 rounded-2xl bg-[var(--wash)] p-5 sm:grid-cols-4">
+    // One row on a phone (each figure gets an equal share), the grid of four from `sm:` up.
+    <dl className="mt-5 grid auto-cols-fr grid-flow-col gap-x-3 rounded-2xl bg-[var(--wash)] p-3.5 sm:mt-7 sm:grid-flow-row sm:grid-cols-4 sm:gap-x-6 sm:gap-y-4 sm:p-5">
       {figures.map((figure) => (
         <div key={figure.label} className="flex min-w-0 flex-col-reverse">
-          <dt className="truncate text-xs text-[var(--muted)]">{figure.label}</dt>
-          <dd className="text-3xl font-light tabular-nums tracking-[-0.04em]">{figure.value}</dd>
+          <dt className="truncate text-[10px] text-[var(--muted)] sm:text-xs">{figure.label}</dt>
+          <dd className="truncate text-lg font-light tabular-nums tracking-[-0.04em] sm:text-3xl">{figure.value}</dd>
         </div>
       ))}
     </dl>
@@ -267,7 +268,7 @@ function StoryFigures({ story, input }: { story: Story; input: StoryInput }) {
 export function FrontPageStories({ featured, onOpen }: { featured: TemplateSummary[]; onOpen: (id: Id) => void }) {
   if (!featured.length) return null;
   return (
-    <section className="grid gap-5 lg:grid-cols-2">
+    <section className="grid gap-4 sm:gap-5 lg:grid-cols-2">
       {featured.map((template) => <Story key={template.id} template={template} onOpen={onOpen} />)}
     </section>
   );

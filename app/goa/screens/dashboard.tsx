@@ -253,7 +253,7 @@ export function ActiveChallengeCard({
         </div>
 
         <h3 className="mt-2.5 text-base font-light leading-tight tracking-[-0.03em] sm:mt-5 sm:text-2xl sm:tracking-[-0.04em]">
-          <button type="button" onClick={() => onOpen(challenge.id)} className="cursor-pointer text-left after:absolute after:inset-0 after:content-[''] focus-visible:outline-none">
+          <button type="button" onClick={() => onOpen(challenge.id)} title={challenge.title} className="block w-full cursor-pointer truncate text-left after:absolute after:inset-0 after:content-[''] focus-visible:outline-none">
             {challenge.title}
           </button>
         </h3>

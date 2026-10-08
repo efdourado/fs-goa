@@ -103,24 +103,25 @@ export function TemplatesScreen({
         <>
         <FrontPageStories featured={front.featured} onOpen={onOpen} />
         {front.rest.length ? (
-          <h2 className="mb-5 mt-14 border-t border-[var(--line)] pt-6 text-lg font-medium tracking-[-0.03em] sm:text-xl">{t("moreTitle")}</h2>
+          <h2 className="mb-4 mt-10 border-t border-[var(--line)] pt-5 text-lg font-medium tracking-[-0.03em] sm:mb-5 sm:mt-14 sm:pt-6 sm:text-xl">{t("moreTitle")}</h2>
         ) : null}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
           {front.rest.map((template) => (
             <article
               key={template.id}
               className="relative flex flex-col overflow-hidden rounded-[20px] border border-[var(--main-line)] bg-[var(--paper)] shadow-[var(--elevate-1)] transition hover:-translate-y-0.5 has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-[var(--main)]/25"
             >
-              <div className="flex flex-1 flex-col p-5">
+              <div className="flex flex-1 flex-col p-3.5 sm:p-5">
                 <div className="flex items-center justify-between gap-3">
                   <span className="inline-block h-2.5 w-2.5 flex-none rounded-full bg-[var(--main-line)] ring-1 ring-inset ring-[var(--edge)]" aria-hidden="true" />
-                  <span className="text-xs text-[var(--muted)]">{t(`mode.${template.submissionMode}`)}</span>
+                  <span className="truncate text-[11px] text-[var(--muted)] sm:text-xs">{t(`mode.${template.submissionMode}`)}</span>
                 </div>
-                <h3 className="mt-5 text-2xl font-light tracking-[-0.04em]">
-                  <button type="button" className="cursor-pointer text-left after:absolute after:inset-0 after:content-[''] focus-visible:outline-none" onClick={() => onOpen(template.id)}>{template.title}</button>
+                <h3 className="mt-3 text-base font-light leading-tight tracking-[-0.03em] sm:mt-5 sm:text-2xl sm:tracking-[-0.04em]">
+                  <button type="button" title={template.title} className="block w-full cursor-pointer truncate text-left after:absolute after:inset-0 after:content-[''] focus-visible:outline-none" onClick={() => onOpen(template.id)}>{template.title}</button>
                 </h3>
-                {template.summary ? <p className="mt-2 line-clamp-2 text-sm leading-6 text-[var(--muted)]">{template.summary}</p> : null}
-                <p className="mt-4 text-xs text-[var(--muted)]">
+                {/* A phone-sized card keeps just the title, like a challenge card. */}
+                {template.summary ? <p className="mt-2 line-clamp-2 hidden text-sm leading-6 text-[var(--muted)] sm:block">{template.summary}</p> : null}
+                <p className="mt-4 hidden text-xs text-[var(--muted)] sm:block">
                   {[
                     template.participantCount ? t("cardPeople", { count: template.participantCount }) : null,
                     template.ruleCount ? t("cardRules", { count: template.ruleCount }) : null,
@@ -130,7 +131,7 @@ export function TemplatesScreen({
                   ].filter(Boolean).join(" · ")}
                 </p>
               </div>
-              <span className="block w-full bg-[var(--main-line)] px-5 py-3.5" aria-hidden="true" />
+              <span className="block w-full bg-[var(--main-line)] px-5 py-1.5 sm:py-3.5" aria-hidden="true" />
             </article>
           ))}
         </div>
