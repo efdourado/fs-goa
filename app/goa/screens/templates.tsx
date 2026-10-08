@@ -120,7 +120,7 @@ export function TemplatesScreen({
                   <button type="button" title={template.title} className="block w-full cursor-pointer truncate text-left after:absolute after:inset-0 after:content-[''] focus-visible:outline-none" onClick={() => onOpen(template.id)}>{template.title}</button>
                 </h3>
                 {/* A phone-sized card keeps just the title, like a challenge card. */}
-                {template.summary ? <p className="mt-2 line-clamp-2 hidden text-sm leading-6 text-[var(--muted)] sm:block">{template.summary}</p> : null}
+                {template.summary ? <p className="mt-2 hidden text-sm leading-6 text-[var(--muted)] sm:line-clamp-2">{template.summary}</p> : null}
                 <p className="mt-4 hidden text-xs text-[var(--muted)] sm:block">
                   {[
                     template.participantCount ? t("cardPeople", { count: template.participantCount }) : null,

@@ -446,6 +446,8 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
         {fields.map((field) => {
           if (!field.id) return null;
           if (!field.required && !showOptional) return null;
+          // A saved answer shows only what was written: an optional field left empty (no comment) isn't drawn at all.
+          if (!field.required && !interactive && isBlank(field.id ? values[field.id] : undefined)) return null;
           const id = `entry-field-${field.id}`;
           const value = values[field.id];
           const fieldId = field.id;
@@ -494,7 +496,7 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
             </div>
           );
         })}
-        {dateField && showOptional ? (
+        {dateField && showOptional && (interactive || dateField.value) ? (
           <div>
             <label className={labelClass} htmlFor="entry-occurred-on">{dateField.label}<small className="ml-2 font-light text-[var(--muted)]">{t("optional")}</small></label>
             <input id="entry-occurred-on" className={inputClass} type="date" max={dateField.max} value={dateField.value} disabled={!interactive || busy} onChange={(event) => dateField.onChange(event.target.value)} />

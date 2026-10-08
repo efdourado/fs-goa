@@ -259,7 +259,7 @@ export function ActiveChallengeCard({
         </h3>
         {context ? <p className="mt-1 truncate text-xs text-[var(--muted)]">{context}</p> : null}
         {/* A phone-sized card has no room for the description; the title says enough. */}
-        {challenge.description ? <p className="mt-1.5 line-clamp-1 hidden text-sm leading-6 text-[var(--muted)] sm:block">{challenge.description}</p> : null}
+        {challenge.description ? <p className="mt-1.5 hidden text-sm leading-6 text-[var(--muted)] sm:line-clamp-2">{challenge.description}</p> : null}
 
         {total > 0 ? (
           <div className="mt-3 sm:mt-5">
