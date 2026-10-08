@@ -50,8 +50,8 @@ function ChipSelect({ label, value, onChange, active, children }: { label: strin
   );
 }
 
-/** Libraries and items share one grid: the cards stretch to fill the row, two on a phone up to four on a wide screen. */
-const catalogGrid = "grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4";
+/** Libraries and items share one grid: the cards stretch to fill the row, one on a phone up to four on a wide screen. */
+const catalogGrid = "grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4";
 
 /** A phone's Group by / Sort by: a small pill with its name and a native picker, instead of a wide segmented bar. */
 function CompactSelect<T extends string>({ label, value, onChange, options }: { label: string; value: T; onChange: (value: T) => void; options: Array<{ value: T; label: string }> }) {
