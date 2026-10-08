@@ -668,7 +668,7 @@ export default function GoaApp() {
   } else if (screen.kind === "about") {
     content = <AboutScreen onBack={goUp} backLabel={backLabel} />;
   } else if (screen.kind === "you") {
-    content = <YouScreen user={user} onBack={goUp} backLabel={backLabel} onAccount={() => setScreen({ kind: "account" })} onCatalog={() => setScreen({ kind: "personal-catalog" })} onTrash={() => setScreen({ kind: "personal-trash" })} onAbout={() => setScreen({ kind: "about" })} onLogout={logout} />;
+    content = <YouScreen user={user} challengeCount={bootstrap.challenges.length} groupCount={bootstrap.groups.filter((group) => group.kind !== "personal").length} onBack={goUp} backLabel={backLabel} onAccount={() => setScreen({ kind: "account" })} onCatalog={() => setScreen({ kind: "personal-catalog" })} onTrash={() => setScreen({ kind: "personal-trash" })} onAbout={() => setScreen({ kind: "about" })} onLogout={logout} />;
   } else if (screen.kind === "activity") {
     content = <ActivityScreen notifications={bootstrap.memberRequests ?? []} onBack={goUp} backLabel={backLabel} onAcceptRequest={(id) => respondToMemberRequest(id, "accept")} onDeclineRequest={(id) => respondToMemberRequest(id, "decline")} />;
   } else if (screen.kind === "quick-create") {

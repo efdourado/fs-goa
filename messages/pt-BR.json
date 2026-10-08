@@ -45,15 +45,15 @@
   },
   "theme": {
     "legend": "Tema",
-    "system": "Sistema",
+    "system": "Sist.",
     "light": "Claro",
     "dark": "Escuro"
   },
   "language": {
     "legend": "Idioma",
-    "pt-BR": "Português",
-    "en": "English",
-    "es": "Español"
+    "pt-BR": "PT-BR",
+    "en": "EN",
+    "es": "ES"
   },
   "meta": {
     "description": "Desafios privados e personalizáveis para grupos registrarem progresso e guardarem suas histórias."
@@ -2368,5 +2368,8 @@
       "author": "Autor ou diretor",
       "recommender": "Indicado por"
     }
+  },
+  "you": {
+    "stats": "{challenges, plural, one {# desafio} other {# desafios}} · {groups, plural, one {# grupo} other {# grupos}}"
   }
 }

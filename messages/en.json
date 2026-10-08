@@ -45,15 +45,15 @@
   },
   "theme": {
     "legend": "Theme",
-    "system": "System",
+    "system": "Sys.",
     "light": "Light",
     "dark": "Dark"
   },
   "language": {
     "legend": "Language",
-    "pt-BR": "Português",
-    "en": "English",
-    "es": "Español"
+    "pt-BR": "PT-BR",
+    "en": "EN",
+    "es": "ES"
   },
   "meta": {
     "description": "Private, customisable challenges for groups to track progress and keep their stories."
@@ -2368,5 +2368,8 @@
       "author": "Author or director",
       "recommender": "Recommended by"
     }
+  },
+  "you": {
+    "stats": "{challenges, plural, one {# challenge} other {# challenges}} · {groups, plural, one {# group} other {# groups}}"
   }
 }
