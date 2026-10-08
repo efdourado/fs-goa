@@ -1941,7 +1941,9 @@
     "modeGuess": "Guess first, then reveal",
     "modeGuessHint": "Say what you expect before, rate after (see who got surprised).",
     "modeOpen": "As you go",
-    "modeOpenHint": "Each rating shows up for the group as soon as it's in."
+    "modeOpenHint": "Each rating shows up for the group as soon as it's in.",
+    "authorLabel": "Author",
+    "authorPlaceholder": "Author, e.g. Susanna Clarke"
   },
   "backTo": {
     "home": "Home",

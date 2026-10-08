@@ -105,6 +105,7 @@ export function QuickCreateScreen({
   const [title, setTitle] = useState<string | null>(null);
   const [titleDraft, setTitleDraft] = useState("");
   const [itemTitle, setItemTitle] = useState("");
+  const [itemAuthor, setItemAuthor] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -120,6 +121,7 @@ export function QuickCreateScreen({
     setTitle(null);
     setTitleDraft("");
     setItemTitle("");
+    setItemAuthor("");
     setError(null);
   }
 
@@ -141,6 +143,9 @@ export function QuickCreateScreen({
     }
   }
 
+  // A book is known by its title and author — the catalogue asks for both.
+  const isBook = recipe === "bookshelf";
+
   async function create(name: string, firstItem: string) {
     if (!recipe || !where) return;
     setBusy(true);
@@ -154,7 +159,7 @@ export function QuickCreateScreen({
         startsOn: null,
         endsOn: null,
         fields: [],
-        items: firstItem ? [{ title: firstItem, position: 0 }] : [],
+        items: firstItem ? [{ title: firstItem, position: 0, ...(isBook ? { author: itemAuthor.trim() } : {}) }] : [],
         generateDaily: false,
         ...(asksMode && mode !== "open" ? { revealTogether: true } : {}),
         ...(asksMode && mode === "guess" ? { expectation: true } : {}),
@@ -178,7 +183,7 @@ export function QuickCreateScreen({
   function submitItem(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const name = itemTitle.trim();
-    if (title === null || !name) return;
+    if (title === null || !name || (isBook && !itemAuthor.trim())) return;
     void create(title, name);
   }
 
@@ -296,10 +301,22 @@ export function QuickCreateScreen({
                 value={itemTitle}
                 onChange={(event) => setItemTitle(event.target.value)}
                 placeholder={t(recipe === "cinema" ? "itemPlaceholderCinema" : "itemPlaceholderBookshelf")}
+                aria-label={t(recipe === "cinema" ? "q4Cinema" : "q4Bookshelf")}
                 maxLength={300}
                 disabled={busy}
               />
-              <Button type="submit" disabled={busy || !itemTitle.trim()}>{busy ? tc("saving") : t("create")}</Button>
+              {isBook ? (
+                <input
+                  className={cx(inputClass, "max-w-xs flex-1")}
+                  value={itemAuthor}
+                  onChange={(event) => setItemAuthor(event.target.value)}
+                  placeholder={t("authorPlaceholder")}
+                  aria-label={t("authorLabel")}
+                  maxLength={300}
+                  disabled={busy}
+                />
+              ) : null}
+              <Button type="submit" disabled={busy || !itemTitle.trim() || (isBook && !itemAuthor.trim())}>{busy ? tc("saving") : t("create")}</Button>
             </form>
             {error ? <div className="ml-10"><StatusMessage error={error} /></div> : null}
           </div>

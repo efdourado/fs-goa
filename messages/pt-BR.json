@@ -1941,7 +1941,9 @@
     "modeGuess": "Palpite antes, revelação depois",
     "modeGuessHint": "Diga o que espera antes, dê a nota depois (veja quem se surpreendeu).",
     "modeOpen": "Na hora",
-    "modeOpenHint": "Cada nota aparece para o grupo assim que é dada."
+    "modeOpenHint": "Cada nota aparece para o grupo assim que é dada.",
+    "authorLabel": "Autor",
+    "authorPlaceholder": "Autor, ex.: Susanna Clarke"
   },
   "backTo": {
     "home": "Início",
