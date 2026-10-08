@@ -8,6 +8,7 @@ import { Dialog } from "../dialog";
 import { useGoaFormat } from "../format";
 import { CatalogShelf } from "../catalog-shelf";
 import { applyColorFilter, OrganizeBar, useChallengeOrganizer } from "../organize";
+import { NewChallengeTile } from "../add-tile";
 import { Shelf, ShelfAddButton } from "../shelf";
 import { WelcomePanel } from "../welcome";
 import {
@@ -412,11 +413,9 @@ export function DashboardScreen({
 
   const emptyRail = (title: string) => <div className="w-full max-w-xl"><EmptyState title={colorFilter ? t("filter.empty") : title} /></div>;
 
-  const personalAdd = (
-    <div className="flex flex-wrap items-center justify-end gap-2">
-      <ShelfAddButton label={tQuick("entryCta")} onClick={onQuickCreatePersonal} />
-      <ShelfAddButton label={th("newChallenge")} onClick={onCreatePersonalChallenge} />
-    </div>
+  // The way to start a challenge of your own: a card at the end of the row (hidden while a colour filters it).
+  const newPersonalTile = colorFilter ? null : (
+    <NewChallengeTile label={th("newChallenge")} chatLabel={tQuick("entryCta")} onCreate={onCreatePersonalChallenge} onChat={onQuickCreatePersonal} />
   );
 
   const groupsShelf = colorFilter ? null : (
@@ -486,15 +485,15 @@ export function DashboardScreen({
           ) : null}
 
           <HomeSectionBlock first={!filtered.pinned.length} title={th("sectionPersonal")}>
-            <Shelf title={th("personalRunning")} count={filtered.personal.length} actions={personalAdd}>
-              {filtered.personal.length ? renderRail(filtered.personal, false) : emptyRail(th("personalEmpty"))}
+            <Shelf title={th("personalRunning")} count={filtered.personal.length}>
+              {filtered.personal.length || newPersonalTile ? <>{renderRail(filtered.personal, false)}{newPersonalTile}</> : emptyRail(th("personalEmpty"))}
             </Shelf>
             {personalLibrary}
           </HomeSectionBlock>
 
           {hasGroups ? (
             <HomeSectionBlock first={false} title={th("sectionGroups")}>
-              <Shelf title={t("shelf.running")} count={filtered.group.length} actions={<ShelfAddButton label={tQuick("entryCta")} onClick={onQuickCreate} />}>
+              <Shelf title={t("shelf.running")} count={filtered.group.length}>
                 {filtered.group.length ? renderRail(filtered.group, false) : emptyRail(t("noChallengesTitle"))}
               </Shelf>
               {groupsShelf}

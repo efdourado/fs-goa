@@ -6,11 +6,12 @@ import { type FormEvent, useRef, useState } from "react";
 import { copyText } from "../clipboard";
 import { Dialog } from "../dialog";
 import { useGoaFormat } from "../format";
+import { NewChallengeTile } from "../add-tile";
 import { CatalogShelfSkeleton } from "../catalog-shelf";
 import { TasteMap } from "../taste-map";
 import { CatalogTile, resolveCoverTop } from "../catalog-views";
 import { LibraryGlyph, useCatalogShelf, useLibraryName } from "../libraries";
-import { Rail, RailArrows, ShelfAddButton, useShelfRail } from "../shelf";
+import { Rail, RailArrows, useShelfRail } from "../shelf";
 import type { CatalogItem, ChallengeSummary, GroupInviteResult, GroupSummary, Id, Member, PendingGroupRequest } from "../types";
 import { BackButton, Button, cx, EmptyState, Field, inputClass, SlidersIcon, StatusMessage, Toggle } from "../ui";
 import { canManage, formatRuntime } from "../utils";
@@ -64,6 +65,7 @@ export function GroupScreen({
 }) {
   const t = useTranslations("group");
   const tQuick = useTranslations("quickCreate");
+  const canCreateChallenge = canManage(group.role) && challenges.length < challengeLimit;
   const tCat = useTranslations("catalog");
   const tl = useTranslations("libraries");
   const tc = useTranslations("common");
@@ -354,20 +356,13 @@ export function GroupScreen({
               <h2 className="text-lg font-semibold tracking-[-0.02em]">{t("challengesTitle")}</h2>
               <span className="text-xs text-[var(--muted)]">{challenges.length}</span>
             </div>
-            {canManage(group.role) && challenges.length < challengeLimit ? (
-              <div className="flex flex-wrap items-center gap-2">
-                <ShelfAddButton label={tQuick("entryCta")} onClick={onQuickCreate} />
-                <ShelfAddButton label={t("createChallengeCta")} onClick={onCreateChallenge} />
-              </div>
-            ) : null}
           </div>
-          {challenges.length ? (
+          {challenges.length || canCreateChallenge ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {challenges.map((challenge) => <ActiveChallengeCard key={challenge.id} challenge={challenge} onOpen={onOpenChallenge} fluid />)}
+              {canCreateChallenge ? <NewChallengeTile fluid label={t("createChallengeCta")} chatLabel={tQuick("entryCta")} onCreate={onCreateChallenge} onChat={onQuickCreate} /> : null}
             </div>
-          ) : canManage(group.role) && challenges.length < challengeLimit
-            ? <EmptyState title={t("noChallengesTitle")} onClick={onCreateChallenge} />
-            : <EmptyState title={t("noChallengesTitle")} hint={canManage(group.role) ? t("challengeLimitReached", { limit: challengeLimit }) : t("noChallengesMember")} />}
+          ) : <EmptyState title={t("noChallengesTitle")} hint={canManage(group.role) ? t("challengeLimitReached", { limit: challengeLimit }) : t("noChallengesMember")} />}
         </section>
 
         {shelfData === null ? <CatalogShelfSkeleton title={t("catalogTitle")} /> : sortedCatalog.length || canManage(group.role) ? (
