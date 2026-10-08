@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { type FormEvent, type ReactNode, useId, useState } from "react";
+import { type FormEvent, type ReactNode, useState } from "react";
 
 import { KebabMenu, menuRowClass } from "../card-menu";
 import { Dialog } from "../dialog";
@@ -293,41 +293,12 @@ function ArchiveChallengeRow({
 // ── the screen ──────────────────────────────────────────────────────────
 
 /** A side of Home — the person's own challenges or their groups' — under one big heading. */
-function readSectionOpen(id: string): boolean {
-  try {
-    return window.localStorage.getItem(`goa-home-section-${id}`) !== "closed";
-  } catch {
-    return true;
-  }
-}
-
-/**
- * A side of Home — the person's own challenges or their groups' — under one big heading that folds it away:
- * tapping the name closes or opens the section. Open by default; the choice is remembered on this device.
- */
-function HomeSectionBlock({ id, title, first, children }: { id: "personal" | "groups"; title: string; first: boolean; children: ReactNode }) {
-  const [open, setOpen] = useState(() => readSectionOpen(id));
-  const bodyId = useId();
-  function toggle() {
-    const next = !open;
-    setOpen(next);
-    try {
-      window.localStorage.setItem(`goa-home-section-${id}`, next ? "open" : "closed");
-    } catch {
-      // Blocked storage: the section still folds, just for this visit.
-    }
-  }
+/** A side of Home — the person's own challenges or their groups' — under one big heading. */
+function HomeSectionBlock({ title, first, children }: { title: string; first: boolean; children: ReactNode }) {
   return (
     <section className={first ? "" : "mt-12 border-t border-[var(--line)] pt-8"}>
-      <h2 className={cx("text-2xl font-light tracking-[-0.04em] sm:text-3xl", open && "mb-6")}>
-        <button type="button" onClick={toggle} aria-expanded={open} aria-controls={bodyId} className="inline-flex min-h-11 cursor-pointer items-center gap-2 text-left">
-          {title}
-          <svg viewBox="0 0 12 12" className={cx("h-3 w-3 flex-none text-[var(--muted)] transition-transform", open && "rotate-180")} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M3 4.5 6 7.5l3-3" />
-          </svg>
-        </button>
-      </h2>
-      <div id={bodyId} hidden={!open}>{children}</div>
+      <h2 className="mb-6 text-2xl font-light tracking-[-0.04em] sm:text-3xl">{title}</h2>
+      {children}
     </section>
   );
 }
@@ -347,8 +318,7 @@ function HomeSideLink({ label, onClick }: { label: string; onClick: () => void }
 }
 
 /**
- * Home: the person's own challenges first, then their groups' — each side under its own heading, which folds
- * the side away. Pinned
+ * Home: the person's own challenges first, then their groups' — each side under its own heading. Pinned
  * challenges sit above both; closed ones and drafts below. Someone with no group sees one line inviting them
  * to start one instead of an empty groups side.
  */
@@ -515,7 +485,7 @@ export function DashboardScreen({
             </div>
           ) : null}
 
-          <HomeSectionBlock id="personal" first={!filtered.pinned.length} title={th("sectionPersonal")}>
+          <HomeSectionBlock first={!filtered.pinned.length} title={th("sectionPersonal")}>
             <Shelf title={th("personalRunning")} count={filtered.personal.length} actions={personalAdd}>
               {filtered.personal.length ? renderRail(filtered.personal, false) : emptyRail(th("personalEmpty"))}
             </Shelf>
@@ -523,7 +493,7 @@ export function DashboardScreen({
           </HomeSectionBlock>
 
           {hasGroups ? (
-            <HomeSectionBlock id="groups" first={false} title={th("sectionGroups")}>
+            <HomeSectionBlock first={false} title={th("sectionGroups")}>
               <Shelf title={t("shelf.running")} count={filtered.group.length} actions={<ShelfAddButton label={tQuick("entryCta")} onClick={onQuickCreate} />}>
                 {filtered.group.length ? renderRail(filtered.group, false) : emptyRail(t("noChallengesTitle"))}
               </Shelf>
