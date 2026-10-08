@@ -96,7 +96,6 @@ export function RuleSectionsEditor({
         );
       })}
       {!disabled && value.length < MAX_RULES ? <Button variant="secondary" onClick={() => onChange([...value, { title: "", description: "" }])}><span aria-hidden="true">+</span>{t("addRule")}</Button> : null}
-      {!value.length ? <p className="rounded-xl border border-dashed border-[var(--line)] px-4 py-3 text-sm text-[var(--muted)]">{t("empty")}</p> : null}
     </div>
   );
 }

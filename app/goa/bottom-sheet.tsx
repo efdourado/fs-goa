@@ -1,5 +1,6 @@
 "use client";
 
+import { cx, InModal } from "./ui";
 import { type ReactNode, useEffect, useId, useRef } from "react";
 import { createPortal } from "react-dom";
 
@@ -14,10 +15,13 @@ export function BottomSheet({
   title,
   onClose,
   children,
+  tall = false,
 }: {
   title: string;
   onClose: () => void;
   children: ReactNode;
+  /** Nearly the whole screen on a phone — for work done inside it (logging a workout), not a short menu. */
+  tall?: boolean;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
@@ -45,7 +49,7 @@ export function BottomSheet({
   /* eslint-disable jsx-a11y/no-static-element-interactions */
   return createPortal(
     <div
-      className="fixed inset-0 z-[60] flex flex-col justify-end bg-black/45"
+      className="fixed inset-0 z-[60] flex flex-col justify-end bg-black/45 sm:items-center sm:justify-center sm:p-6"
       onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}
     >
       <div
@@ -53,7 +57,12 @@ export function BottomSheet({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="safe-area-bottom max-h-[85dvh] overflow-y-auto rounded-t-[26px] border-t border-[var(--line)] bg-[var(--paper)] px-5 pb-8 pt-2 shadow-[var(--elevate-2)]"
+        className={cx(
+          "safe-area-bottom overflow-y-auto rounded-t-[26px] border-t border-[var(--line)] bg-[var(--paper)] px-5 pb-8 pt-2 shadow-[var(--elevate-2)]",
+          // From `sm:` up it's a card in the middle of the screen rather than a panel from the edge.
+          "sm:w-full sm:max-w-2xl sm:rounded-[26px] sm:border",
+          tall ? "max-h-[92dvh] min-h-[70dvh] sm:min-h-0" : "max-h-[85dvh]",
+        )}
       >
         <div className="mx-auto mb-3 mt-1.5 h-1.5 w-10 rounded-full bg-[var(--wash-strong)]" aria-hidden="true" />
         <div className="mb-4 flex items-center justify-between">
@@ -64,10 +73,10 @@ export function BottomSheet({
             aria-label={title}
             className="grid h-9 w-9 place-items-center rounded-full text-[var(--muted)] hover:bg-[var(--wash)] hover:text-[var(--ink)]"
           >
-            <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" strokeLinecap="round" /></svg>
+            <svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><circle cx="10" cy="10" r="7.5" /><path d="M6.75 10h6.5" strokeLinecap="round" /></svg>
           </button>
         </div>
-        {children}
+        <InModal.Provider value>{children}</InModal.Provider>
       </div>
     </div>,
     document.body,

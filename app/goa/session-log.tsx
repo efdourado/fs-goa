@@ -1,16 +1,17 @@
 "use client";
 
 import { useFormatter, useTranslations } from "next-intl";
-import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { logRange } from "./checkin-days";
 import { CheckinLog, type LogRecord } from "./checkin-log";
 
+import { BottomSheet } from "./bottom-sheet";
 import { ConfirmDialog } from "./dialog";
 import { useGoaFormat } from "./format";
 import { useLibraryName } from "./libraries";
 import type { ChallengeDetail, ChallengeField, Entry, EntryTypeView, FieldConfig, Id } from "./types";
-import { Button, cardClass, cx, EmptyState, inputClass, labelClass, sectionLabelClass, StatusMessage } from "./ui";
+import { Button, cardClass, cx, EmptyState, inputClass, labelClass, StatusMessage } from "./ui";
 import { dateKeyInSaoPaulo, displayAnswer, findMissingRequiredField, valuesAsRecord } from "./utils";
 
 /** The check-in and the type of record it holds — a workout and its exercise records. */
@@ -41,6 +42,13 @@ interface Row {
 }
 
 let rowCounter = 0;
+/** What this device keeps of a check-in being logged, until it's saved whole. */
+interface WorkoutDraft {
+  visitId: Id | null;
+  rows: Array<{ id?: Id; itemId: Id | ""; values: Record<Id, unknown> }>;
+  visitValues: Record<Id, unknown>;
+}
+
 /** A stable React key for a row of the form — rows come and go, so an index would mix their inputs up. */
 const newRowKey = () => `row-${(rowCounter += 1)}`;
 
@@ -271,9 +279,7 @@ export function SessionLog({
   const [occurredOn, setOccurredOn] = useState(today);
   const [visitValues, setVisitValues] = useState<Record<Id, unknown>>(() => (editing ? valuesAsRecord(editing.values) : {}));
   const [rows, setRows] = useState<Row[]>(() => (editing ? sortedRecords(editing.id).map((record) => ({ key: newRowKey(), id: record.id, itemId: record.itemId ?? "", values: valuesAsRecord(record.values) })) : []));
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [removing, setRemoving] = useState<Entry | null>(null);
   // "New item" being named in the tray. It never touches the rows until the item exists.
   const [creating, setCreating] = useState<{ title: string; busy: boolean; error: string | null } | null>(null);
@@ -290,7 +296,7 @@ export function SessionLog({
   const renameInput = useRef<HTMLInputElement>(null);
   const isRenaming = renaming !== null;
   useEffect(() => { if (isRenaming) renameInput.current?.select(); }, [isRenaming]);
-  const disabled = !canEdit || busy;
+  const disabled = !canEdit;
 
   function load(visit: Entry | null, onDay: string) {
     setEditing(visit);
@@ -309,13 +315,130 @@ export function SessionLog({
       : visits.find((visit) => !reopen.known.has(visit.id));
     if (!found) return;
     setReopen(null);
-    load(found, reopen.day);
+    adopt(found);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reopen, visitsByDay]);
 
+  // ── Logging in the sheet, saved as you go ───────────────────────────────
+  // Every change is kept on this device at once (a draft), and a moment later the rows that are complete are
+  // saved for real — so a dropped connection at the gym never loses a set, and there's no Save to remember.
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "incomplete" | "error">("idle");
+  const saving = useRef(false);
+  const retry = useRef(false);
+  // A new check-in was saved and is on its way back with its id; another save now would make a second one.
+  const awaiting = useRef(false);
+  // A change made by loading or adopting a check-in, not by the person — nothing to save.
+  const skipNextChange = useRef(true);
+  const latest = useRef({ rows, visitValues, editing, occurredOn, day, visitsByDay });
+  useEffect(() => { latest.current = { rows, visitValues, editing, occurredOn, day, visitsByDay }; });
+
+  const draftKey = (onDay: string) => `goa.workout.${challenge.id}.${onDay}`;
+  function readDraft(onDay: string): WorkoutDraft | null {
+    try {
+      const raw = window.localStorage.getItem(draftKey(onDay));
+      return raw ? (JSON.parse(raw) as WorkoutDraft) : null;
+    } catch {
+      return null;
+    }
+  }
+  function writeDraft(onDay: string, draft: WorkoutDraft) {
+    try { window.localStorage.setItem(draftKey(onDay), JSON.stringify(draft)); } catch { /* storage refused: the server save still runs */ }
+  }
+  function clearDraft(onDay: string) {
+    try { window.localStorage.removeItem(draftKey(onDay)); } catch { /* nothing to clear */ }
+  }
+
+  /** The saved check-in came back: keep what's on screen, just learn the ids its rows were given. */
+  function adopt(visit: Entry) {
+    skipNextChange.current = true;
+    setEditing(visit);
+    const records = sortedRecords(visit.id);
+    const used = new Set(latest.current.rows.map((row) => row.id).filter(Boolean));
+    const next = latest.current.rows.map((row) => {
+      if (row.id) return row;
+      const match = records.find((record) => record.itemId === row.itemId && !used.has(record.id));
+      if (!match) return row;
+      used.add(match.id);
+      return { ...row, id: match.id };
+    });
+    setRows(next);
+    if (next.some((row) => findMissingRequiredField(recordFields, row.values))) {
+      writeDraft(latest.current.day, { visitId: visit.id, rows: next.map(({ id, itemId, values }) => ({ id, itemId, values })), visitValues: latest.current.visitValues });
+    }
+    awaiting.current = false;
+    if (retry.current) {
+      retry.current = false;
+      window.setTimeout(() => { void autosave(); }, 0);
+    }
+  }
+
+  async function autosave() {
+    if (!canEdit) return;
+    if (saving.current || awaiting.current) { retry.current = true; return; }
+    const { rows: current, visitValues: values, editing: visit, occurredOn: on, day: onDay, visitsByDay: byDay } = latest.current;
+    if (!current.length) { setSaveState("idle"); return; }
+    const complete = current.filter((row) => row.itemId && !findMissingRequiredField(recordFields, row.values));
+    if (!complete.length || findMissingRequiredField(visitFields, values)) { setSaveState("incomplete"); return; }
+    saving.current = true;
+    setSaveState("saving");
+    try {
+      const target = on || onDay;
+      const known = new Set((byDay.get(target) ?? []).map((candidate) => candidate.id));
+      await onSave({
+        occurredOn: target,
+        values,
+        children: complete.map((row) => ({ ...(row.id ? { id: row.id } : {}), itemId: row.itemId as Id, values: row.values })),
+      }, visit ?? undefined);
+      if (!visit) awaiting.current = true;
+      setReopen({ day: target, visitId: visit?.id, known });
+      const allSaved = complete.length === current.length;
+      setSaveState(allSaved ? "saved" : "incomplete");
+      if (allSaved) clearDraft(onDay);
+    } catch (cause) {
+      setSaveState("error");
+      setError(f.error(cause));
+    } finally {
+      saving.current = false;
+      if (retry.current && !awaiting.current) {
+        retry.current = false;
+        void autosave();
+      }
+    }
+  }
+
+  // Each change: kept on the device now, saved for real a moment after the typing stops.
+  useEffect(() => {
+    if (!sheetOpen) return;
+    if (skipNextChange.current) { skipNextChange.current = false; return; }
+    writeDraft(day, { visitId: editing?.id ?? null, rows: rows.map(({ id, itemId, values }) => ({ id, itemId, values })), visitValues });
+    const timer = window.setTimeout(() => { void autosave(); }, 900);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, visitValues]);
+
+  /** Opens the sheet on a check-in (or a new one), with whatever this device kept of it. */
+  function openSheet(visit: Entry | null) {
+    skipNextChange.current = true;
+    load(visit, day);
+    const draft = readDraft(day);
+    if (draft && draft.visitId === (visit?.id ?? null)) {
+      skipNextChange.current = false;
+      setRows(draft.rows.map((row) => ({ ...row, key: newRowKey() })));
+      setVisitValues(draft.visitValues);
+    }
+    setSaveState(visit ? "saved" : "idle");
+    setSheetOpen(true);
+  }
+
+  function closeSheet() {
+    setSheetOpen(false);
+    // Whatever was typed last gets its save now rather than waiting for the timer.
+    void autosave();
+  }
+
   function selectDay(next: string) {
     setDay(next);
-    setSuccess(null);
     setCreating(null);
     load(visitsByDay.get(next)?.[0] ?? null, next);
   }
@@ -330,7 +453,6 @@ export function SessionLog({
   function toggleItemRow(itemId: Id) {
     if (rows.some((row) => row.itemId === itemId)) {
       setRows((current) => current.filter((row) => row.itemId !== itemId));
-      setSuccess(null);
       return;
     }
     addItemRow(itemId);
@@ -352,7 +474,6 @@ export function SessionLog({
   function addItemRow(itemId: Id) {
     if (rows.some((row) => row.itemId === itemId)) { focusCard(itemId); return; }
     setRows((current) => [...current, { key: newRowKey(), itemId, values: {} }]);
-    setSuccess(null);
     setError(null);
     requestAnimationFrame(() => focusCard(itemId));
   }
@@ -375,7 +496,6 @@ export function SessionLog({
 
   function patchRow(key: string, patch: Partial<Row>) {
     setRows((current) => current.map((row) => (row.key === key ? { ...row, ...patch } : row)));
-    setSuccess(null);
   }
 
   /** The most recent record of an item, before the check-in being edited — "last time: 55 kg × 8" — and its values. */
@@ -393,41 +513,6 @@ export function SessionLog({
     const values = valuesAsRecord(latest.values);
     const summary = recordFields.map((field) => showValue(field, values[field.id as Id])).filter(Boolean).join(" · ");
     return { text: t("lastTime", { values: summary, date: f.date(latest.occurredOn, shortDate) }), values };
-  }
-
-  const missingCount = rows.filter((row) => findMissingRequiredField(recordFields, row.values)).length;
-
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError(null);
-    setSuccess(null);
-    if (!rows.length) { setError(t("errNoRows")); return; }
-    for (const row of rows) {
-      const missing = findMissingRequiredField(recordFields, row.values);
-      if (missing) {
-        setError(tf("fillField", { label: `${itemTitle(row.itemId)} · ${missing.label}` }));
-        focusCard(row.itemId as Id);
-        return;
-      }
-    }
-    const missingVisit = findMissingRequiredField(visitFields, visitValues);
-    if (missingVisit) { setError(tf("fillField", { label: missingVisit.label })); return; }
-    setBusy(true);
-    try {
-      const target = occurredOn || day;
-      await onSave({
-        occurredOn: target,
-        values: visitValues,
-        children: rows.map((row) => ({ ...(row.id ? { id: row.id } : {}), itemId: row.itemId as Id, values: row.values })),
-      }, editing ?? undefined);
-      setSuccess(editing ? t("savedChanges") : t("saved"));
-      setDay(target);
-      setReopen({ day: target, visitId: editing?.id, known: new Set((visitsByDay.get(target) ?? []).map((visit) => visit.id)) });
-    } catch (cause) {
-      setError(f.error(cause));
-    } finally {
-      setBusy(false);
-    }
   }
 
   // How many of your check-ins each item was in — the tray lists the usual ones first.
@@ -455,6 +540,20 @@ export function SessionLog({
   if (!items.length && !onAddItem) return <EmptyState title={t("noItems")} />;
 
   const dayVisits = visitsByDay.get(day) ?? [];
+  // A check-in started on this device but not saved yet (its items still missing a number).
+  const draftWaiting = !sheetOpen && !dayVisits.length && Boolean(readDraft(day)?.rows.length);
+  /** "62,5 kg · 8" — a saved record in one line. */
+  const recordSummary = (record: Entry) => {
+    const values = valuesAsRecord(record.values);
+    return recordFields.map((field) => {
+      const value = numberValue(values[field.id as Id]);
+      return value !== null ? `${nf.number(value, { maximumFractionDigits: 2 })}${field.config?.unit ? ` ${field.config.unit}` : ""}` : showValue(field, values[field.id as Id]);
+    }).filter(Boolean).join(" · ");
+  };
+  // What the draft still needs, said plainly: "Supino · Repetições".
+  const firstGap = rows.map((row) => ({ row, missing: findMissingRequiredField(recordFields, row.values) })).find((candidate) => candidate.missing);
+  const visitGap = findMissingRequiredField(visitFields, visitValues);
+  const missingText = firstGap?.missing ? `${itemTitle(firstGap.row.itemId)} · ${firstGap.missing.label}` : visitGap?.label ?? "";
   // One thing at a time: an empty check-in starts by picking its items; once it has some, more wait behind "+ Add".
   const showTray = adding || !rows.length;
   const lastNumber = (last: { values: Record<Id, unknown> } | null, field: ChallengeField) => (last ? numberValue(last.values[field.id as Id]) : null);
@@ -481,9 +580,62 @@ export function SessionLog({
           openEnded={!challenge.startsOn && !challenge.endsOn}
           streakBy="week"
         >
-          <form onSubmit={submit} noValidate>
+          {/* The picked day: what's been logged, and one clear way in. Logging itself happens in the sheet. */}
+          <div className="space-y-3">
+            {dayVisits.slice().reverse().map((visit, index) => {
+              const records = sortedRecords(visit.id);
+              return (
+                <div key={visit.id} className="rounded-2xl border border-[var(--line)] p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <strong className="text-sm font-medium">{t("visitHeading", { name: spec.visit.name, number: index + 1, count: records.length })}</strong>
+                    {canEdit ? <Button variant="secondary" className="min-h-9 rounded-full px-3 text-xs" onClick={() => openSheet(visit)}>{t("continueVisit")}</Button> : null}
+                  </div>
+                  {records.length ? (
+                    <ul className="mt-3 space-y-1.5 text-sm">
+                      {records.map((record) => (
+                        <li key={record.id} className="flex items-baseline justify-between gap-3">
+                          <span className="min-w-0 truncate">{itemTitle(record.itemId)}</span>
+                          <span className="flex-none tabular-nums text-[var(--muted)]">{recordSummary(record)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+              );
+            })}
+            {draftWaiting ? (
+              <button type="button" onClick={() => openSheet(null)} className="w-full cursor-pointer rounded-2xl border border-dashed border-[var(--warn-line)] bg-[var(--warn-soft)] px-4 py-3 text-left text-sm text-[var(--warn)]">
+                {t("draftWaiting")}
+              </button>
+            ) : null}
+            {canEdit ? (
+              <Button className="min-h-12 w-full rounded-full" onClick={() => openSheet(null)}>
+                ＋ {dayVisits.length ? t("newVisitOnDay", { name: spec.visit.name.toLowerCase() }) : day === today ? t("logToday", { name: spec.visit.name.toLowerCase() }) : t("logOnDay", { name: spec.visit.name.toLowerCase(), date: f.date(day, { day: "numeric", month: "short" }) })}
+              </Button>
+            ) : unavailableMessage ? <p className="rounded-xl border border-[var(--line)] bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{unavailableMessage}</p> : null}
+          </div>
+        </CheckinLog>
+      </section>
+
+      {sheetOpen ? (
+        <BottomSheet tall title={day === today ? t("sheetToday", { name: spec.visit.name }) : t("sheetOnDay", { name: spec.visit.name, date: f.date(day, { day: "numeric", month: "short" }) })} onClose={closeSheet}>
+          {/* One even rhythm: status, today's items, the rest to pick from, the check-in's own fields. */}
+          <div className="space-y-6">
+            <div className="flex items-center justify-between gap-3">
+              {/* Saving happens on its own: this line says where it stands. */}
+              <p className={cx("flex min-w-0 items-center gap-2 text-xs", saveState === "error" ? "text-[var(--danger)]" : saveState === "incomplete" ? "text-[var(--warn)]" : "text-[var(--muted)]")} role="status" aria-live="polite">
+                <span className={cx("h-2 w-2 flex-none rounded-full", saveState === "saved" ? "bg-[var(--ok)]" : saveState === "saving" ? "animate-pulse bg-[var(--main)]" : saveState === "error" ? "bg-[var(--danger)]" : saveState === "incomplete" ? "bg-[var(--warn)]" : "bg-[var(--line)]")} aria-hidden="true" />
+                <span className="min-w-0">{saveState === "saving" ? t("autoSaving") : saveState === "saved" ? t("autoSaved") : saveState === "error" ? t("autoError") : saveState === "incomplete" ? t("autoDraft", { what: missingText }) : t("autoIdle")}</span>
+              </p>
+              {onRename && !renaming ? (
+                <button type="button" className="flex-none cursor-pointer text-xs text-[var(--muted)] underline-offset-4 transition hover:text-[var(--ink)] hover:underline" onClick={() => setRenaming({ name: spec.visit.name, busy: false, error: null })}>
+                  {t("renameLabel")}
+                </button>
+              ) : null}
+            </div>
+            {saveState === "error" && error ? <StatusMessage error={error} /> : null}
             {renaming ? (
-              <div className="mb-5 flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <input
                   ref={renameInput} className={cx(inputClass, "min-w-0 flex-1 sm:max-w-xs")} value={renaming.name} maxLength={60} disabled={renaming.busy}
                   aria-label={t("renameLabel")}
@@ -497,188 +649,151 @@ export function SessionLog({
                 <Button type="button" variant="ghost" disabled={renaming.busy} onClick={() => setRenaming(null)}>{tc("cancel")}</Button>
                 {renaming.error ? <span className="w-full"><StatusMessage error={renaming.error} /></span> : null}
               </div>
-            ) : (
-              <div className="mb-5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <h3 className="text-sm text-[var(--muted)]">{t("composerTitle", { name: spec.visit.name })}</h3>
-                {onRename ? (
-                  <button type="button" className="cursor-pointer text-xs text-[var(--muted)] underline-offset-4 transition hover:text-[var(--ink)] hover:underline" onClick={() => setRenaming({ name: spec.visit.name, busy: false, error: null })}>
-                    {t("renameLabel")}
-                  </button>
-                ) : null}
-              </div>
-            )}
-
-            {dayVisits.length > 1 || (editing && dayVisits.length) ? (
-              <div className="mb-5 flex flex-wrap items-center gap-2 text-xs" role="group" aria-label={t("onThisDay")}>
-                <span className="text-[var(--muted)]">{t("onThisDay")}</span>
-                {dayVisits.slice().reverse().map((visit, index) => (
-                  <button
-                    key={visit.id} type="button" aria-pressed={editing?.id === visit.id} disabled={busy}
-                    onClick={() => { setSuccess(null); load(visit, day); }}
-                    className={cx("min-h-8 cursor-pointer rounded-full border px-3", editing?.id === visit.id ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] hover:border-[var(--main-line)]")}
-                  >
-                    {index + 1} · {t("itemCount", { count: recordsByVisit.get(visit.id)?.length ?? 0 })}
-                  </button>
-                ))}
-                {canEdit ? (
-                  <button type="button" disabled={busy} onClick={() => { setSuccess(null); load(null, day); }} className={cx("min-h-8 cursor-pointer rounded-full border border-dashed px-3", !editing ? "border-[var(--main)] text-[var(--main-strong)]" : "border-[var(--main-line)] text-[var(--main-strong)] hover:bg-[var(--main-soft)]")}>
-                    + {t("newVisitOnDay", { name: spec.visit.name })}
-                  </button>
-                ) : null}
-              </div>
             ) : null}
 
+          {rows.length ? (
+            <ol ref={cardsRef} className="divide-y divide-[var(--line)] rounded-2xl border border-[var(--line)] px-4">
+              {rows.map((row) => {
+                const last = row.itemId ? lastRecordFor(row.itemId) : null;
+                const best = row.itemId ? bestValues(ownRecords, row.itemId, recordFields.filter((field) => field.type === "number" || field.type === "rating"), editing?.id ?? null) : new Map<Id, number>();
+                const newBests = recordFields.filter((field) => {
+                  const value = numberValue(row.values[field.id as Id]);
+                  const previous = best.get(field.id as Id);
+                  return value !== null && previous !== undefined && value > previous;
+                });
+                return (
+                  <li key={row.key} data-item={row.itemId} className="py-4">
+                    <div className="flex items-start gap-2">
+                      <div className="min-w-0 flex-1">
+                        <strong className="block truncate text-[15px] font-medium">{itemTitle(row.itemId)}</strong>
+                        {last ? (
+                          // Last time's numbers, one tap away: tapping them fills this row in.
+                          <button type="button" disabled={disabled} title={t("repeatLast")} onClick={() => patchRow(row.key, { values: { ...last.values } })} className="cursor-pointer text-left text-xs text-[var(--muted)] underline-offset-2 hover:text-[var(--ink)] hover:underline disabled:cursor-not-allowed">
+                            {last.text}
+                          </button>
+                        ) : <span className="block text-xs text-[var(--muted)]">{t("firstTime")}</span>}
+                      </div>
+                      <button type="button" disabled={disabled} aria-label={t("removeRow", { item: itemTitle(row.itemId) })} title={t("removeRow", { item: itemTitle(row.itemId) })} onClick={() => setRows((current) => current.filter((candidate) => candidate.key !== row.key))} className="grid h-9 w-9 flex-none cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)] disabled:opacity-50">
+                        <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
+                      </button>
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 items-start gap-2.5 sm:grid-cols-[repeat(auto-fit,minmax(9rem,1fr))]">
+                      {recordFields.map((field) => {
+                        const id = `${row.key}-${field.id}`;
+                        const current = numberValue(row.values[field.id as Id]);
+                        const previous = lastNumber(last, field);
+                        const delta = field.type === "number" && current !== null && previous !== null ? deltaText(field, current, previous) : null;
+                        return (
+                          <div key={field.id} className="min-w-0">
+                            <label className="mb-1 block truncate text-[11px] font-medium text-[var(--muted)]" htmlFor={id}>
+                              {field.label}{field.config?.unit ? ` (${field.config.unit})` : ""}{field.required ? <span className="ml-1 text-[var(--main-2)]" aria-label={tf("required")}>*</span> : null}
+                            </label>
+                            {field.type === "number" ? (
+                              <NumberStepper id={id} field={field} value={row.values[field.id as Id]} last={previous} disabled={disabled} onChange={(value) => patchRow(row.key, { values: { ...row.values, [field.id as Id]: value } })} />
+                            ) : (
+                              <CellInput id={id} field={field} disabled={disabled} value={row.values[field.id as Id]} className={cx(inputClass, "text-base")} onChange={(value) => patchRow(row.key, { values: { ...row.values, [field.id as Id]: value } })} />
+                            )}
+                            {delta ? (
+                              <span className={cx("mt-1 block text-[11px] tabular-nums", delta.tone === "up" ? "text-[var(--ok)]" : delta.tone === "down" ? "text-[var(--warn)]" : "text-[var(--muted)]")}>{delta.text}</span>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {newBests.length ? (
+                      <p className="mt-2.5 flex flex-wrap gap-1.5">
+                        {newBests.map((field) => (
+                          <span key={field.id} className="rounded-full bg-[var(--main-2)]/15 px-2.5 py-1 text-xs font-medium text-[var(--main-2)]">
+                            {t("newBest", { field: field.label, value: showValue(field, best.get(field.id as Id)) })}
+                          </span>
+                        ))}
+                      </p>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ol>
+          ) : null}
             {showTray ? (
-              <div className="mb-5">
-            <p className={cx("mb-2.5", sectionLabelClass)}>{t("trayLabel")}</p>
-              <div className="flex flex-wrap gap-2" role="group" aria-label={itemsHeading}>
-                {visibleTray.map((item) => {
-                  const inside = rows.some((row) => row.itemId === item.id);
-                  const last = lastRecordFor(item.id);
-                  const lastLead = last && numberFields[0] ? numberValue(last.values[numberFields[0].id as Id]) : null;
-                  return (
-                    <button
-                      key={item.id} type="button" aria-pressed={inside} disabled={disabled}
-                      onClick={() => toggleItemRow(item.id)}
-                      className={cx(
-                        "inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border py-1.5 pl-1.5 pr-3 text-sm transition disabled:cursor-not-allowed disabled:opacity-50",
-                        inside ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] bg-[var(--paper)] hover:border-[var(--main-line)]",
-                      )}
-                    >
-                      <span className={cx("grid h-6 w-6 place-items-center rounded-full text-xs", inside ? "bg-[var(--main)] text-white" : "bg-[var(--wash)] text-[var(--muted)]")} aria-hidden="true">{inside ? "✓" : "+"}</span>
-                      {item.title}
-                      {lastLead !== null ? <span className="text-[11px] tabular-nums text-[var(--muted)]">{nf.number(lastLead, { maximumFractionDigits: 2 })}</span> : null}
-                    </button>
-                  );
-                })}
-                {hiddenTrayCount > 0 || trayOpen ? (
-                  <button type="button" onClick={() => setTrayOpen((open) => !open)} className="inline-flex min-h-10 cursor-pointer items-center rounded-full px-3 text-sm text-[var(--muted)] transition hover:bg-[var(--hover)] hover:text-[var(--ink)]">
-                    {trayOpen ? t("trayLess") : t("trayMore", { count: hiddenTrayCount })}
-                  </button>
-                ) : null}
-                {onAddItem && !creating ? (
-                  <button type="button" disabled={disabled} onClick={() => setCreating({ title: "", busy: false, error: null })} className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border border-dashed border-[var(--main-line)] py-1.5 pl-1.5 pr-3 text-sm text-[var(--main-strong)] transition hover:bg-[var(--main-soft)] disabled:cursor-not-allowed disabled:opacity-50">
-                    <span className="grid h-6 w-6 place-items-center rounded-full bg-[var(--main-soft)] text-xs" aria-hidden="true">+</span>{t("newItemPill")}
-                  </button>
-                ) : null}
-              </div>
-              {creating ? (
-                <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-[var(--wash)] p-2.5">
-                  <input
-                    ref={newItemInput} className={cx(inputClass, "min-w-0 flex-1")} value={creating.title} maxLength={200} disabled={creating.busy}
-                    placeholder={t("newItemPlaceholder")} aria-label={t("newItemPlaceholder")}
-                    onChange={(event) => setCreating({ ...creating, title: event.target.value })}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") { event.preventDefault(); void createItem(); }
-                      if (event.key === "Escape") { event.preventDefault(); setCreating(null); }
-                    }}
-                  />
-                  <Button type="button" disabled={creating.busy || !creating.title.trim()} onClick={() => void createItem()}>{creating.busy ? tc("saving") : t("newItemAdd")}</Button>
-                  <Button type="button" variant="ghost" disabled={creating.busy} onClick={() => setCreating(null)}>{tc("cancel")}</Button>
-                  {creating.error ? <span className="w-full"><StatusMessage error={creating.error} /></span> : null}
-                </div>
-              ) : null}
-              </div>
-            ) : null}
-
-            {rows.length ? (
-              <ol ref={cardsRef} className="divide-y divide-[var(--line)] border-y border-[var(--line)]">
-                {rows.map((row) => {
-                  const last = row.itemId ? lastRecordFor(row.itemId) : null;
-                  const best = row.itemId ? bestValues(ownRecords, row.itemId, recordFields.filter((field) => field.type === "number" || field.type === "rating"), editing?.id ?? null) : new Map<Id, number>();
-                  const newBests = recordFields.filter((field) => {
-                    const value = numberValue(row.values[field.id as Id]);
-                    const previous = best.get(field.id as Id);
-                    return value !== null && previous !== undefined && value > previous;
-                  });
-                  return (
-                    <li key={row.key} data-item={row.itemId} className="py-4">
-                      <div className="flex items-start gap-2">
-                        <div className="min-w-0 flex-1">
-                          <strong className="block truncate text-[15px] font-medium">{itemTitle(row.itemId)}</strong>
-                          {last ? (
-                            // Last time's numbers, one tap away: tapping them fills this row in.
-                            <button type="button" disabled={disabled} title={t("repeatLast")} onClick={() => patchRow(row.key, { values: { ...last.values } })} className="cursor-pointer text-left text-xs text-[var(--muted)] underline-offset-2 hover:text-[var(--ink)] hover:underline disabled:cursor-not-allowed">
-                              {last.text}
-                            </button>
-                          ) : <span className="block text-xs text-[var(--muted)]">{t("firstTime")}</span>}
-                        </div>
-                        <button type="button" disabled={disabled} aria-label={t("removeRow", { item: itemTitle(row.itemId) })} title={t("removeRow", { item: itemTitle(row.itemId) })} onClick={() => setRows((current) => current.filter((candidate) => candidate.key !== row.key))} className="grid h-9 w-9 flex-none cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)] disabled:opacity-50">
-                          <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
+              // The items to pick from: one roomy row each (big enough for a thumb at the gym), the usual ones first.
+              <section>
+                <h3 className="mb-2 text-xs font-medium text-[var(--muted)]">{itemsHeading}</h3>
+                <ul className="divide-y divide-[var(--line)] overflow-hidden rounded-2xl border border-[var(--line)]">
+                  {visibleTray.map((item) => {
+                    const inside = rows.some((row) => row.itemId === item.id);
+                    const last = lastRecordFor(item.id);
+                    const lastLead = last && numberFields[0] ? numberValue(last.values[numberFields[0].id as Id]) : null;
+                    return (
+                      <li key={item.id}>
+                        <button
+                          type="button" aria-pressed={inside} disabled={disabled}
+                          onClick={() => toggleItemRow(item.id)}
+                          className={cx("flex min-h-14 w-full cursor-pointer items-center gap-3 px-4 text-left transition disabled:cursor-not-allowed disabled:opacity-50", inside ? "bg-[var(--main-soft)]" : "hover:bg-[var(--wash)]")}
+                        >
+                          <span className="min-w-0 flex-1">
+                            <span className={cx("block truncate text-[15px]", inside && "font-medium text-[var(--main-strong)]")}>{item.title}</span>
+                            {lastLead !== null ? <span className="block text-xs tabular-nums text-[var(--muted)]">{nf.number(lastLead, { maximumFractionDigits: 2 })}{numberFields[0]?.config?.unit ? ` ${numberFields[0].config.unit}` : ""}</span> : null}
+                          </span>
+                          <span className={cx("grid h-8 w-8 flex-none place-items-center rounded-full text-sm", inside ? "bg-[var(--main)] text-white" : "border border-[var(--line)] text-[var(--muted)]")} aria-hidden="true">{inside ? "✓" : "+"}</span>
                         </button>
-                      </div>
-                      <div className="mt-3 grid grid-cols-2 items-start gap-2.5 sm:grid-cols-[repeat(auto-fit,minmax(9rem,1fr))]">
-                        {recordFields.map((field) => {
-                          const id = `${row.key}-${field.id}`;
-                          const current = numberValue(row.values[field.id as Id]);
-                          const previous = lastNumber(last, field);
-                          const delta = field.type === "number" && current !== null && previous !== null ? deltaText(field, current, previous) : null;
-                          return (
-                            <div key={field.id} className="min-w-0">
-                              <label className="mb-1 block truncate text-[11px] font-medium text-[var(--muted)]" htmlFor={id}>
-                                {field.label}{field.config?.unit ? ` (${field.config.unit})` : ""}{field.required ? <span className="ml-1 text-[var(--main-2)]" aria-label={tf("required")}>*</span> : null}
-                              </label>
-                              {field.type === "number" ? (
-                                <NumberStepper id={id} field={field} value={row.values[field.id as Id]} last={previous} disabled={disabled} onChange={(value) => patchRow(row.key, { values: { ...row.values, [field.id as Id]: value } })} />
-                              ) : (
-                                <CellInput id={id} field={field} disabled={disabled} value={row.values[field.id as Id]} className={cx(inputClass, "text-base")} onChange={(value) => patchRow(row.key, { values: { ...row.values, [field.id as Id]: value } })} />
-                              )}
-                              {delta ? (
-                                <span className={cx("mt-1 block text-[11px] tabular-nums", delta.tone === "up" ? "text-[var(--ok)]" : delta.tone === "down" ? "text-[var(--warn)]" : "text-[var(--muted)]")}>{delta.text}</span>
-                              ) : null}
-                            </div>
-                          );
-                        })}
-                      </div>
-                      {newBests.length ? (
-                        <p className="mt-2.5 flex flex-wrap gap-1.5">
-                          {newBests.map((field) => (
-                            <span key={field.id} className="rounded-full bg-[var(--main-2)]/15 px-2.5 py-1 text-xs font-medium text-[var(--main-2)]">
-                              {t("newBest", { field: field.label, value: showValue(field, best.get(field.id as Id)) })}
-                            </span>
-                          ))}
-                        </p>
-                      ) : null}
-                    </li>
-                  );
-                })}
-              </ol>
-            ) : null}
-            {rows.length && !showTray && canEdit ? (
-              <button type="button" disabled={disabled} onClick={() => setAdding(true)} className="mt-3 min-h-10 cursor-pointer text-sm font-medium text-[var(--main-strong)] hover:underline disabled:opacity-50">
+                      </li>
+                    );
+                  })}
+                </ul>
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                  {hiddenTrayCount > 0 || trayOpen ? (
+                    <button type="button" onClick={() => setTrayOpen((open) => !open)} className="min-h-10 cursor-pointer px-1 text-sm text-[var(--muted)] transition hover:text-[var(--ink)]">
+                      {trayOpen ? t("trayLess") : t("trayMore", { count: hiddenTrayCount })}
+                    </button>
+                  ) : <span />}
+                  {onAddItem && !creating ? (
+                    <button type="button" disabled={disabled} onClick={() => setCreating({ title: "", busy: false, error: null })} className="min-h-10 cursor-pointer px-1 text-sm font-medium text-[var(--main-strong)] hover:underline disabled:opacity-50">
+                      ＋ {t("newItemPill")}
+                    </button>
+                  ) : null}
+                </div>
+                {creating ? (
+                  <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-[var(--wash)] p-2.5">
+                    <input
+                      ref={newItemInput} className={cx(inputClass, "min-w-0 flex-1")} value={creating.title} maxLength={200} disabled={creating.busy}
+                      placeholder={t("newItemPlaceholder")} aria-label={t("newItemPlaceholder")}
+                      onChange={(event) => setCreating({ ...creating, title: event.target.value })}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") { event.preventDefault(); void createItem(); }
+                        if (event.key === "Escape") { event.preventDefault(); setCreating(null); }
+                      }}
+                    />
+                    <Button type="button" disabled={creating.busy || !creating.title.trim()} onClick={() => void createItem()}>{creating.busy ? tc("saving") : t("newItemAdd")}</Button>
+                    <Button type="button" variant="ghost" disabled={creating.busy} onClick={() => setCreating(null)}>{tc("cancel")}</Button>
+                    {creating.error ? <span className="w-full"><StatusMessage error={creating.error} /></span> : null}
+                  </div>
+                ) : null}
+              </section>
+            ) : canEdit ? (
+              <button type="button" disabled={disabled} onClick={() => setAdding(true)} className="flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-[var(--main-line)] text-sm font-medium text-[var(--main-strong)] transition hover:bg-[var(--main-soft)] disabled:opacity-50">
                 ＋ {t("addRows")}
               </button>
             ) : null}
 
             {visitFields.length ? (
-              <div className="mt-6 space-y-3">
+              <div className="space-y-3">
                 {visitFields.map((field) => (
                   <label className="block" key={field.id}>
                     <span className={labelClass}>{field.label}{field.required ? <span className="ml-1 text-[var(--main-2)]" aria-label={tf("required")}>*</span> : <small className="ml-2 font-light text-[var(--muted)]">{tf("optional")}</small>}</span>
-                    <CellInput id={`visit-${field.id}`} field={field} disabled={disabled} value={visitValues[field.id as Id]} onChange={(value) => { setVisitValues((current) => ({ ...current, [field.id as Id]: value })); setSuccess(null); }} />
+                    <CellInput id={`visit-${field.id}`} field={field} disabled={disabled} value={visitValues[field.id as Id]} onChange={(value) => { setVisitValues((current) => ({ ...current, [field.id as Id]: value })); }} />
                   </label>
                 ))}
               </div>
             ) : null}
-
-            <div className="mt-5"><StatusMessage error={error} success={success} /></div>
-            {!canEdit && unavailableMessage ? <p className="mt-3 rounded-xl border border-[var(--line)] bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{unavailableMessage}</p> : null}
-            {canEdit ? (
-              <div className="sticky bottom-[calc(84px+env(safe-area-inset-bottom,0px))] z-20 mt-5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-2.5 pl-4 shadow-[var(--elevate-card)] sm:bottom-4">
-                <span className="min-w-0 flex-1 text-sm text-[var(--muted)]">
-                  {rows.length
-                    ? <>{t.rich("summary", { count: rows.length, b: (chunks) => <strong className="font-medium text-[var(--ink)]">{chunks}</strong> })} · {missingCount ? t("summaryMissing", { count: missingCount }) : t("summaryReady")}</>
-                    : t("summaryEmpty")}
-                </span>
-                {editing && onDelete ? <button type="button" className="min-h-11 cursor-pointer px-3 text-sm text-[var(--muted)] hover:text-[var(--danger)]" disabled={busy} onClick={() => setRemoving(editing)}>{t("remove")}</button> : null}
-                <Button type="submit" className="min-h-11" disabled={disabled || !rows.length}>
-                  {busy ? tc("saving") : editing ? tc("saveChanges") : t("save", { name: spec.visit.name })}<span aria-hidden="true">→</span>
-                </Button>
-              </div>
-            ) : null}
-          </form>
-        </CheckinLog>
-      </section>
+          </div>
+          {/* The bar stays at the bottom, clear of the phone's home area. */}
+          <div className="sticky bottom-0 -mx-5 mt-6 flex items-center gap-3 border-t border-[var(--line)] bg-[var(--paper)] px-5 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4">
+            {editing && onDelete ? <Button variant="ghost" className="text-[var(--danger)]" onClick={() => setRemoving(editing)}>{t("remove")}</Button> : null}
+            <span className="flex-1" />
+            <Button className="min-h-11 px-6" onClick={closeSheet}>{t("done")}</Button>
+          </div>
+        </BottomSheet>
+      ) : null}
 
       {removing && onDelete ? (
         <ConfirmDialog

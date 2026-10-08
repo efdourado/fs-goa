@@ -6,12 +6,10 @@ import { type FormEvent, useMemo, useState } from "react";
 import { ActionMenu, ActionMenuItem } from "../action-menu";
 import { CheckpointPlanner } from "../checkpoint-planner";
 import { useGoaFormat } from "../format";
-import { AddItemsDialog } from "../cine-items";
 import { ConfirmDialog, FormDialog } from "../dialog";
 import { AddSharedResponseDialog, RemoveResponseDialog, SharedGlyph, SharedResponsePanel } from "../shared-responses";
 import { cleanFields, FIELD_TYPES, FieldConfigInputs, newFieldConfig, uniqueFieldKey } from "../fields";
-import { LibraryPropertiesDialog } from "../library-dialogs";
-import { type CatalogScope, LibraryGlyph, LibraryPills, libraryChoices, useCatalogLibraries, useLibraryName } from "../libraries";
+import { type CatalogScope } from "../libraries";
 import { bodyFromValues, editableProperties, PropertyInputs, type PropertyValues, propertiesHaveProblem, useLibraryProperties, valuesFromItem } from "../property-inputs";
 import { recommenderBody, RecommenderPicker, recommenderFromItem, type RecommenderValue, sameRecommender, useRecommenderSource } from "../recommender-picker";
 import { canOrganise, OrganiseDialog, organiseFromItems } from "../organize-panel";
@@ -22,7 +20,6 @@ import type {
   ChallengeDetail,
   ChallengeField,
   ChallengeItem,
-  CatalogLibrary,
   ChallengeLibraryRef,
   ChallengeSummary,
   CheckpointInput,
@@ -716,6 +713,9 @@ export function ItemEditorDialog({
       onCancel={onCancel}
       onSubmit={submit}
       submitLabel={tc("saveChanges")}
+      footerStart={onRemove ? (
+        <Button type="button" variant="ghost" className="text-[var(--danger)]" disabled={busy} onClick={() => setRemoving(true)}>{t("removeItem")}</Button>
+      ) : undefined}
     >
       <Field label={t("itemTitleLabel")}>
         <input className={inputClass} value={draft.title} onChange={(event) => set({ title: event.target.value })} required maxLength={challenge.submissionMode === "daily" ? 160 : 200} />
@@ -737,15 +737,7 @@ export function ItemEditorDialog({
         </Disclosure>
       ) : null}
       {catalogItem && onOpenLibrary ? (
-        <p className="text-xs leading-5 text-[var(--muted)]">
-          {t("moreDetailsInLibrary")}{" "}
-          <button type="button" onClick={onOpenLibrary} className="cursor-pointer font-medium text-[var(--main-strong)] underline-offset-2 hover:underline">{t("openLibrary")}</button>
-        </p>
-      ) : null}
-      {onRemove ? (
-        <div className="border-t border-[var(--line)] pt-4">
-          <button type="button" onClick={() => setRemoving(true)} className="min-h-10 cursor-pointer text-sm text-[var(--danger)] hover:underline">{t("removeItem")}</button>
-        </div>
+        <button type="button" onClick={onOpenLibrary} className="cursor-pointer text-left text-xs font-medium text-[var(--main-strong)] underline-offset-2 hover:underline">{t("openLibrary")}</button>
       ) : null}
       {removing && onRemove ? (
         <ConfirmDialog
@@ -763,147 +755,24 @@ export function ItemEditorDialog({
 }
 
 /**
- * The one library this challenge draws its items from, with its properties. While no item
- * comes from it, it can be unlinked so a wrong pick can be swapped for another.
+ * Manage › General's one item job: "Organise" — spreading the items so similar ones don't bunch up. Only when it
+ * applies (three items or more, with a library detail to spread); everything else about items lives on Today.
  */
-function ChallengeLibrariesBar({
-  challenge,
-  scope,
-  onLink,
-  onUnlink,
-  onChanged,
-}: {
+export function AdminItemsSection({ challenge, entries, onReorder }: {
   challenge: ChallengeDetail;
-  scope: CatalogScope;
-  onLink: (spec: { libraryId?: Id; libraryKind?: string }) => Promise<void>;
-  onUnlink: (libraryId: Id) => Promise<void>;
-  /** A library's properties changed (say, the event date was switched on) — reload what depends on them. */
-  onChanged: () => void;
-}) {
-  const t = useTranslations("adminChallenge");
-  const f = useGoaFormat();
-  const libraryName = useLibraryName();
-  const { data: workspaceLibraries } = useCatalogLibraries(scope);
-  const linked = challenge.libraries ?? [];
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [propertiesOf, setPropertiesOf] = useState<CatalogLibrary | null>(null);
-  const locked = challenge.status === "closed";
-  const available = libraryChoices(workspaceLibraries ?? []).filter((choice) => !linked.some((library) => library.kind === choice.kind));
-  const itemsIn = (kind: string) => challenge.items.filter((item) => item.catalogItem?.kind === kind).length;
-
-  async function run(work: () => Promise<void>) {
-    setBusy(true);
-    setError(null);
-    try { await work(); } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
-  }
-
-  return (
-    <div className="mb-6">
-      <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t("librariesLabel")}>
-        <span className="mr-1 text-[13px] font-medium">{t("librariesLabel")}</span>
-        {linked.map((library) => {
-          const removable = !locked && library.id !== null && itemsIn(library.kind) === 0;
-          return (
-            <span key={library.kind} className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-[var(--main-line)] bg-[var(--main-soft)] pl-3 pr-1 text-sm text-[var(--main-strong)]">
-              <LibraryGlyph source={library.source} />
-              {libraryName(library)}
-              <span className="text-[11px] text-[var(--muted)]">{itemsIn(library.kind)}</span>
-              {library.id !== null ? (
-                <button
-                  type="button"
-                  aria-label={t("libraryProperties", { name: libraryName(library) })}
-                  title={t("libraryProperties", { name: libraryName(library) })}
-                  className="ml-0.5 grid h-6 w-6 cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--main)]/15 hover:text-[var(--ink)]"
-                  onClick={() => setPropertiesOf((workspaceLibraries ?? []).find((candidate) => candidate.kind === library.kind) ?? { id: library.id!, kind: library.kind, source: library.source, label: library.label, position: 0, coverTopProperty: null, coverBadgeHidden: false })}
-                >
-                  <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M2.5 4.5h7M12.5 4.5h1M2.5 11.5h1M6.5 11.5h7" strokeLinecap="round" /><circle cx="11" cy="4.5" r="1.5" /><circle cx="5" cy="11.5" r="1.5" /></svg>
-                </button>
-              ) : null}
-              {removable ? (
-                <button
-                  type="button"
-                  disabled={busy}
-                  aria-label={t("unlinkLibrary", { name: libraryName(library) })}
-                  title={t("unlinkLibrary", { name: libraryName(library) })}
-                  className="ml-0.5 grid h-6 w-6 cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--main)]/15 hover:text-[var(--ink)] disabled:opacity-50"
-                  onClick={() => void run(() => onUnlink(library.id!))}
-                >
-                  <svg viewBox="0 0 16 16" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" strokeLinecap="round" /></svg>
-                </button>
-              ) : <span className="w-2" />}
-            </span>
-          );
-        })}
-        {!locked && !linked.length && available.length ? (
-          <ActionMenu label={t("linkLibrary")}>
-            {available.map((choice) => (
-              <ActionMenuItem key={choice.kind} disabled={busy} onClick={() => void run(() => onLink(choice.id ? { libraryId: choice.id } : { libraryKind: choice.kind }))}>
-                <span className="inline-flex items-center gap-2"><LibraryGlyph source={choice.source} />{libraryName(choice)}</span>
-              </ActionMenuItem>
-            ))}
-          </ActionMenu>
-        ) : null}
-      </div>
-      <p className="mt-1.5 text-xs leading-5 text-[var(--muted)]">{t("librariesHint")}</p>
-      {error ? <div className="mt-2"><StatusMessage error={error} /></div> : null}
-      {propertiesOf ? <LibraryPropertiesDialog scope={scope} library={propertiesOf} canEdit={!locked} onClose={() => setPropertiesOf(null)} onChanged={onChanged} /> : null}
-    </div>
-  );
-}
-
-/**
- * Manage › General's "Items": what only fits here — the challenge's library, adding items (a draft opens here,
- * before Today), "Organise" and, for a daily challenge, generating its days. The items themselves are seen,
- * edited and removed on Today.
- */
-function AdminItemsSection({
-  challenge,
-  group,
-  entries,
-  onAdd,
-  onLinkLibrary,
-  onUnlinkLibrary,
-  onLibraryChanged,
-  onReorder,
-}: {
-  challenge: ChallengeDetail;
-  group?: GroupSummary;
   entries: Entry[];
   /** Saves a new order (positions, stages unchanged). */
   onReorder: (assignments: Array<{ itemId: Id; checkpointId: Id | null; position: number }>) => Promise<void>;
-  onAdd: (payload: Record<string, unknown>) => Promise<void>;
-  onLinkLibrary: (spec: { libraryId?: Id; libraryKind?: string }) => Promise<void>;
-  onUnlinkLibrary: (libraryId: Id) => Promise<void>;
-  onLibraryChanged: () => void;
 }) {
   const t = useTranslations("adminChallenge");
-  const tCine = useTranslations("cineItems");
-  const tc = useTranslations("common");
+  const tOrganise = useTranslations("organise");
   const f = useGoaFormat();
-  const members = group?.members ?? [];
-  const scope: CatalogScope = group ? { groupId: group.id } : "personal";
-  const recommendationsEnabled = group ? group.recommendationsEnabled !== false : true;
-  const timeZone = challenge.timeZone ?? "America/Sao_Paulo";
-  // The libraries the challenge is linked to, stored on the challenge. One with none yet (a custom
-  // challenge, or one whose libraries were all unlinked) links its first here, below.
-  const { data: workspaceLibraries } = useCatalogLibraries(scope);
   const linked = challenge.libraries ?? [];
-  const startsOn = challenge.startsOn ?? "";
-  const endsOn = challenge.endsOn ?? "";
-  const undatedDaily = challenge.submissionMode === "daily" && !challenge.startsOn && !challenge.endsOn;
-  const datedDaily = challenge.submissionMode === "daily" && !undatedDaily;
-  const canShowAdd = challenge.status !== "closed"
-    && !(challenge.submissionMode === "free")
-    && !(undatedDaily)
-    && !(datedDaily && challenge.status === "active");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [showAdd, setShowAdd] = useState(false);
-  // "Organise for the group": items someone already logged keep their place; the rest are spread out.
-  const tOrganise = useTranslations("organise");
   const [organising, setOrganising] = useState(false);
+  // Items someone already logged keep their place; the rest are spread out.
   const { properties: libraryProperties } = useLibraryProperties(linked[0] ?? null);
   const organiseInput = challenge.submissionMode === "item" && linked.length
     ? organiseFromItems(
@@ -913,84 +782,17 @@ function AdminItemsSection({
         (key) => tOrganise(`property.${key}`),
       )
     : null;
-
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setBusy(true); setError(null); setSuccess(null);
-    try {
-      if (challenge.submissionMode === "daily") {
-        await onAdd({ generate: { frequency: "daily", startsOn, endsOn } });
-        setSuccess(t("dailyGenerated"));
-        setShowAdd(false);
-      } else {
-        // Items themselves are added in their dialog (once the challenge has its library); nothing to save here.
-        setError(t("errNoItem"));
-      }
-    } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
-  }
+  if (!organiseInput || !canOrganise(organiseInput) || challenge.status === "closed") return null;
 
   return (
     <section className="mt-12 border-t border-[var(--line)] pt-8">
-      <div className="mb-4 flex items-baseline justify-between gap-3">
-        <h2 className="text-xl font-light tracking-[-0.02em]">{t("itemsTitle")}</h2>
-        <span className="text-xs text-[var(--muted)]">{t("itemsOnToday", { count: challenge.items.length })}</span>
-      </div>
-      <p className="mb-5 text-sm leading-6 text-[var(--muted)]">{undatedDaily ? t("itemsHintUndatedDaily") : datedDaily ? t("itemsHintDatedDaily") : challenge.status === "closed" ? t("itemsHintClosed") : t("itemsHintToday")}</p>
-      {canShowAdd ? (() => {
-        // Adding items happens in a dialog, so the button never turns into "Close" for it.
-        const inline = !(challenge.submissionMode === "item" && linked.length);
-        return <Button className="mb-6 min-h-11 w-full" variant={showAdd && inline ? "secondary" : "primary"} onClick={() => setShowAdd((open) => !open)}>{showAdd && inline ? tc("close") : challenge.submissionMode === "daily" ? t("generateCheckpoints") : `＋ ${tCine("addItems")}`}</Button>;
-      })() : null}
-      {challenge.submissionMode === "item" ? <ChallengeLibrariesBar challenge={challenge} scope={scope} onLink={onLinkLibrary} onUnlink={onUnlinkLibrary} onChanged={onLibraryChanged} /> : null}
-      <div className="mb-5"><StatusMessage error={error} success={success} /></div>
-
-      {/* Items are added in their own box, like when the challenge was created; a daily schedule or a challenge
-          with no library yet keeps its short inline form. */}
-      {showAdd && canShowAdd && challenge.submissionMode === "item" && linked.length ? (
-        <AddItemsDialog
-          members={members}
-          scope={scope}
-          libraries={linked}
-          recommendationsEnabled={recommendationsEnabled}
-          timeZone={timeZone}
-          note={challenge.status === "active" ? t("activeItemsNote") : undefined}
-          onClose={() => setShowAdd(false)}
-          onAdd={async (items) => {
-            setSuccess(null);
-            await onAdd({ items });
-            setShowAdd(false);
-            setSuccess(t("itemsAdded"));
-          }}
-        />
-      ) : showAdd && canShowAdd ? (
-        <div className="mb-8 rounded-2xl border border-[var(--line)] p-5">
-          <form className="space-y-5" onSubmit={submit}>
-            {challenge.submissionMode === "daily"
-              ? <><p className="text-xs leading-5 text-[var(--muted)]">{t("dailyGenNote")}</p><Field label={t("firstDay")}><input className={inputClass} type="date" value={startsOn} readOnly required /></Field><Field label={t("lastDay")}><input className={inputClass} type="date" min={startsOn} value={endsOn} readOnly required /></Field></>
-              : (
-                <Field label={t("libraryLabel")} hint={t("libraryHint")} plain>
-                  <LibraryPills
-                    choices={libraryChoices(workspaceLibraries ?? [])}
-                    selectedKinds={[]}
-                    label={t("libraryLabel")}
-                    onPick={(choice) => {
-                      setError(null);
-                      void onLinkLibrary(choice.id ? { libraryId: choice.id } : { libraryKind: choice.kind }).catch((cause: unknown) => setError(f.error(cause)));
-                    }}
-                  />
-                </Field>
-              )}
-            {challenge.submissionMode === "daily" ? <Button type="submit" disabled={busy || challenge.status !== "draft"}>{busy ? tc("saving") : t("generateCheckpoints")}</Button> : null}
-          </form>
-        </div>
-      ) : null}
-
-      {organiseInput && canOrganise(organiseInput) && challenge.status !== "closed" ? (
-        <div className="mb-3 flex justify-end">
-          <Button variant="secondary" className="min-h-9" onClick={() => setOrganising(true)}>{tOrganise("button")}</Button>
-        </div>
-      ) : null}
-      {organising && organiseInput ? (
+      <Button variant="secondary" className="min-h-12 w-full rounded-full" onClick={() => setOrganising(true)}>
+        {/* A small chart: the order being worked out. */}
+        <svg viewBox="0 0 20 20" className="h-[18px] w-[18px] flex-none" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true"><path d="M4.5 16v-5M10 16V4M15.5 16V8" /></svg>
+        {t("organiseItems")}
+      </Button>
+      <div className="mt-3"><StatusMessage error={error} success={success} /></div>
+      {organising ? (
         <OrganiseDialog
           input={organiseInput}
           busy={busy}
@@ -1035,14 +837,10 @@ export function AdminScreen({
   onAddSharedResponse,
   onRemoveEntryType,
   onSaveSharedPolicy,
-  onAddItems,
-  onLinkLibrary,
-  onUnlinkLibrary,
   onSaveCheckpoints,
   onAssignCheckpointItems,
   onPublishResult,
   onUnpublishResult,
-  onArchiveChanged,
 }: {
   challenge: ChallengeDetail;
   entries: Entry[];
@@ -1069,15 +867,11 @@ export function AdminScreen({
   onAddSharedResponse: (payload: { name: string; sharedEditPolicy: SharedEditPolicy; field: ChallengeField }) => Promise<void>;
   onRemoveEntryType: (entryTypeId: Id, confirmed: { archiveMetrics: boolean; deleteAnswers: boolean }) => Promise<void>;
   onSaveSharedPolicy: (entryTypeId: Id, policy: SharedEditPolicy) => Promise<void>;
-  onAddItems: (payload: Record<string, unknown>) => Promise<void>;
-  onLinkLibrary: (spec: { libraryId?: Id; libraryKind?: string }) => Promise<void>;
-  onUnlinkLibrary: (libraryId: Id) => Promise<void>;
   onSaveCheckpoints: (checkpoints: CheckpointInput[]) => Promise<void>;
   onAssignCheckpointItems: (assignments: Array<{ itemId: Id; checkpointId: Id | null; position?: number }>) => Promise<void>;
   onPublishResult: (payload: Record<string, unknown>) => Promise<{ url?: string | null; publishedAt?: string; anonymized?: boolean } | undefined>;
   onUnpublishResult: () => Promise<void>;
   csrfToken: string;
-  onArchiveChanged: () => void;
 }) {
   const t = useTranslations("adminChallenge");
   const tc = useTranslations("common");
@@ -1138,7 +932,7 @@ export function AdminScreen({
           <>
             <AdminGeneral challenge={challenge} group={group} isPersonal={isPersonal} onSaveBasics={onSaveBasics} onSaveParticipants={onSaveParticipants} />
             <div className="mx-auto max-w-2xl">
-              <AdminItemsSection challenge={challenge} group={group} entries={entries} onAdd={onAddItems} onLinkLibrary={onLinkLibrary} onUnlinkLibrary={onUnlinkLibrary} onLibraryChanged={onArchiveChanged} onReorder={onAssignCheckpointItems} />
+              <AdminItemsSection challenge={challenge} entries={entries} onReorder={onAssignCheckpointItems} />
             </div>
           </>
         ) : null}
