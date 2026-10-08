@@ -92,7 +92,7 @@ export function screenFromUrl(pathname: string, search = ""): Screen | null {
     return {
       kind: "challenge",
       challengeId,
-      tab: requested && PARTICIPANT_TABS.has(requested) ? requested : "results",
+      tab: requested && PARTICIPANT_TABS.has(requested) ? requested : "today",
     };
   }
   if (pathname === "/" || pathname === "") return { kind: "dashboard" };
@@ -138,7 +138,7 @@ export function urlForScreen(screen: Screen): string | null {
     case "create-personal-challenge":
       return "/challenges/new";
     case "challenge":
-      return `/challenges/${encodeURIComponent(screen.challengeId)}${screen.tab === "results" ? "" : `?tab=${screen.tab}`}`;
+      return `/challenges/${encodeURIComponent(screen.challengeId)}${screen.tab === "today" ? "" : `?tab=${screen.tab}`}`;
     case "admin":
       return `/challenges/${encodeURIComponent(screen.challengeId)}/manage${screen.tab === "overview" ? "" : `?tab=${screen.tab}`}`;
     case "templates":
@@ -243,6 +243,6 @@ export function backTargetFor(screen: Screen, lookup: BackLookup): BackTarget | 
       return HOME;
     }
     case "admin":
-      return { screen: { kind: "challenge", challengeId: screen.challengeId, tab: "results" }, label: { kind: "challenge" } };
+      return { screen: { kind: "challenge", challengeId: screen.challengeId, tab: "today" }, label: { kind: "challenge" } };
   }
 }

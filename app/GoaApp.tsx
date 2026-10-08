@@ -380,9 +380,9 @@ export default function GoaApp() {
   }
 
   function openParticipant(challengeId: Id, requestedTab?: ParticipantTab) {
-    // Land on Results by default — it shows the live standings for an active round
-    // and the full showcase once closed. "Today" is one tap away.
-    setScreen({ kind: "challenge", challengeId, tab: requestedTab ?? "results" });
+    // Land on Today — where you log. A closed challenge has nothing left to log, so it opens on its Results.
+    const closed = bootstrap?.challenges.find((challenge) => challenge.id === challengeId)?.status === "closed";
+    setScreen({ kind: "challenge", challengeId, tab: requestedTab ?? (closed ? "results" : "today") });
   }
 
   function openAdmin(challengeId: Id, tab: AdminTab = "overview") {
@@ -509,7 +509,7 @@ export default function GoaApp() {
       }
     }
     // The finished form gives way to the new challenge — Back never returns to an empty wizard.
-    replaceScreen(isList ? { kind: "challenge", challengeId, tab: "results" } : { kind: "admin", challengeId, tab: "overview" });
+    replaceScreen(isList ? { kind: "challenge", challengeId, tab: "today" } : { kind: "admin", challengeId, tab: "overview" });
   }
 
   async function mutateChallenge(path: string, body: unknown, method: "POST" | "PATCH" | "DELETE" = "POST") {

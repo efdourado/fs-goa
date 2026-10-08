@@ -37,8 +37,8 @@ test("resolve links de desafio, gestão e abas válidas", () => {
   assert.deepEqual(screenFromUrl("/challenges/ch-1", "?tab=invalid"), {
     kind: "challenge",
     challengeId: "ch-1",
-    tab: "results",
-  });
+    tab: "today",
+  }, "a challenge opens on Today");
 });
 
 test("gera URLs compartilháveis sem expor estado transitório", () => {

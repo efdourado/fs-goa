@@ -15,7 +15,7 @@ describe("Back goes up the hierarchy, never to wherever you were", () => {
   test("Manage → its challenge → its group → Home, so settings and challenge can't bounce", () => {
     const manage: Screen = { kind: "admin", challengeId: "c1", tab: "metrics" };
     const first = backTargetFor(manage, lookup())!;
-    assert.deepEqual(first.screen, { kind: "challenge", challengeId: "c1", tab: "results" });
+    assert.deepEqual(first.screen, { kind: "challenge", challengeId: "c1", tab: "today" });
     assert.deepEqual(first.label, { kind: "challenge" });
     const second = backTargetFor(first.screen, lookup())!;
     assert.deepEqual(second.screen, { kind: "group", groupId: "g1" });
