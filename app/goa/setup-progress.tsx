@@ -18,8 +18,9 @@ const ISSUE_TAB: Record<string, AdminTab> = {
   many_required_fields: "fields",
   no_comment_source: "fields",
   expectation_visible_early: "fields",
-  no_items: "items",
-  no_way_to_register: "items",
+  // Items are added in Manage › General (a draft) or on Today.
+  no_items: "overview",
+  no_way_to_register: "overview",
   no_checkpoints: "checkpoints",
   checkpoint_outside_period: "checkpoints",
   many_items_for_period: "checkpoints",
@@ -32,7 +33,7 @@ const ISSUE_TAB: Record<string, AdminTab> = {
 };
 
 /** The tabs that have to be in order before a challenge can start, in the order to work through them. */
-export const SETUP_STEPS: readonly AdminTab[] = ["overview", "fields", "items", "checkpoints"];
+export const SETUP_STEPS: readonly AdminTab[] = ["overview", "fields", "checkpoints"];
 
 export interface SetupState {
   /** Blocking problems per tab. */

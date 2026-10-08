@@ -952,7 +952,10 @@
     "pageCountOn": "Page count on.",
     "pageCountOff": "Page count off.",
     "moreDetailsInLibrary": "Want to keep other details (like cuisine or director)? They are created in the library.",
-    "openLibrary": "Open the library"
+    "openLibrary": "Open the library",
+    "itemsOnToday": "{count, plural, =0 {no items} one {# item} other {# items}}",
+    "itemsHintToday": "Items show up on Today, where you see, edit and remove each one. Here is the library they come from.",
+    "removeItem": "Remove this item"
   },
   "visibility": {
     "note": {

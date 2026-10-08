@@ -952,7 +952,10 @@
     "pageCountOn": "Conteo de páginas activado.",
     "pageCountOff": "Conteo de páginas desactivado.",
     "moreDetailsInLibrary": "¿Quieres guardar otros datos (como cocina o director)? Se crean en la biblioteca.",
-    "openLibrary": "Abrir la biblioteca"
+    "openLibrary": "Abrir la biblioteca",
+    "itemsOnToday": "{count, plural, =0 {ningún elemento} one {# elemento} other {# elementos}}",
+    "itemsHintToday": "Los elementos aparecen en Hoy, donde ves, editas y quitas cada uno. Aquí está la biblioteca de donde vienen.",
+    "removeItem": "Quitar este elemento"
   },
   "visibility": {
     "note": {

@@ -1054,7 +1054,7 @@ function EntryPicker({
   const pull = useRef({ distance: 0, at: 0, touchY: null as number | null });
   // Open for the list as it was when pulled; adding an item (a new length) folds it away again.
   const [shownAt, setShownAt] = useState<number | null>(null);
-  const addShown = shownAt === options.length;
+  const addShown = !options.length || shownAt === options.length;
   function pulled(distance: number, needed: number) {
     const list = listRef.current;
     if (!onAdd || !list) return;
@@ -1383,6 +1383,7 @@ export function ParticipantChallengeScreen({
     recommendationsEnabled: boolean;
     onAdd: (items: ChallengeItemInput[]) => Promise<void>;
     onUpdate: (itemId: Id, payload: Record<string, unknown>) => Promise<void>;
+    onRemove: (itemId: Id) => Promise<void>;
     onOpenLibrary: () => void;
   };
 }) {
@@ -1672,7 +1673,7 @@ export function ParticipantChallengeScreen({
           label: boundItem?.catalogItem?.year ? `${label} (${boundItem.catalogItem.year})` : label, soon, statusLabel: soon ? t("checkpointSoonLabel") : undefined, meta: boundItem ? metaForItem(boundItem) : undefined, rating: boundItem ? ratingByItem.get(boundItem.id) ?? null : null };
       })}
     />
-  ) : sortedItems.length > 1 || (canAddItems && sortedItems.length) ? (
+  ) : sortedItems.length > 1 || canAddItems ? (
     <EntryPicker
       onAdd={canAddItems ? () => setAddingItems(true) : undefined}
       onEdit={itemTools && !preview ? (id) => setEditingItem(sortedItems.find((item) => item.id === id) ?? null) : undefined}
@@ -1958,6 +1959,8 @@ export function ParticipantChallengeScreen({
           onCancel={() => setEditingItem(null)}
           onSave={async (payload) => { await itemTools.onUpdate(editingItem.id, payload); setEditingItem(null); }}
           onOpenLibrary={() => { setEditingItem(null); itemTools.onOpenLibrary(); }}
+          entryCount={entries.filter((entry) => itemIdForEntry(entry) === editingItem.id).length}
+          onRemove={challenge.status !== "closed" ? async () => { await itemTools.onRemove(editingItem.id); setEditingItem(null); } : undefined}
         />
       ) : null}
     </main>

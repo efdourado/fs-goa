@@ -13,7 +13,7 @@ import { cleanFields, FIELD_TYPES, FieldConfigInputs, newFieldConfig, uniqueFiel
 import { LibraryPropertiesDialog } from "../library-dialogs";
 import { type CatalogScope, LibraryGlyph, LibraryPills, libraryChoices, useCatalogLibraries, useLibraryName } from "../libraries";
 import { bodyFromValues, editableProperties, PropertyInputs, type PropertyValues, propertiesHaveProblem, useLibraryProperties, valuesFromItem } from "../property-inputs";
-import { recommenderBody, recommenderLine, RecommenderPicker, recommenderFromItem, type RecommenderValue, sameRecommender, useRecommenderSource } from "../recommender-picker";
+import { recommenderBody, RecommenderPicker, recommenderFromItem, type RecommenderValue, sameRecommender, useRecommenderSource } from "../recommender-picker";
 import { canOrganise, OrganiseDialog, organiseFromItems } from "../organize-panel";
 import { RuleSectionsEditor, visibleRuleSections } from "../rules";
 import { ChallengeSettings, ChallengeStateButton, type CopyMode } from "./challenge-actions";
@@ -49,7 +49,7 @@ import {
   StatusMessage,
   Toggle,
 } from "../ui";
-import { formatRuntime, isLivingList, itemIdForEntry, PAGE_COUNT_KEY, recipeCatalogKind } from "../utils";
+import { isLivingList, itemIdForEntry, PAGE_COUNT_KEY, recipeCatalogKind } from "../utils";
 import { SETUP_STEPS, SetupSummary, setupState, StepMarker, useChallengePreflight } from "../setup-progress";
 
 interface DuplicateTargetGroup {
@@ -645,6 +645,8 @@ export function ItemEditorDialog({
   onCancel,
   onSave,
   onOpenLibrary,
+  onRemove,
+  entryCount = 0,
 }: {
   item: ChallengeItem;
   challenge: ChallengeDetail;
@@ -656,11 +658,15 @@ export function ItemEditorDialog({
   onCancel: () => void;
   /** Where new kinds of details are made: the library. The dialog only fills the ones it already has. */
   onOpenLibrary?: () => void;
+  /** Takes the item out (with its entries, to the bin); `entryCount` warns how many go with it. */
+  onRemove?: () => Promise<void>;
+  entryCount?: number;
   onSave: (payload: ItemUpdatePayload) => Promise<void>;
 }) {
   const t = useTranslations("adminChallenge");
   const tCine = useTranslations("cineItems");
   const tc = useTranslations("common");
+  const [removing, setRemoving] = useState(false);
   const f = useGoaFormat();
   const catalogItem = item.catalogItem ?? null;
   const isItem = challenge.submissionMode === "item";
@@ -735,6 +741,22 @@ export function ItemEditorDialog({
           {t("moreDetailsInLibrary")}{" "}
           <button type="button" onClick={onOpenLibrary} className="cursor-pointer font-medium text-[var(--main-strong)] underline-offset-2 hover:underline">{t("openLibrary")}</button>
         </p>
+      ) : null}
+      {onRemove ? (
+        <div className="border-t border-[var(--line)] pt-4">
+          <button type="button" onClick={() => setRemoving(true)} className="min-h-10 cursor-pointer text-sm text-[var(--danger)] hover:underline">{t("removeItem")}</button>
+        </div>
+      ) : null}
+      {removing && onRemove ? (
+        <ConfirmDialog
+          title={t("remove")}
+          body={entryCount > 0 ? t("itemRemoveConfirmWithEntries", { title: item.title, count: entryCount }) : t("itemRemoveConfirm", { title: item.title })}
+          confirmLabel={t("remove")}
+          busyLabel={t("removing")}
+          danger
+          onClose={() => setRemoving(false)}
+          onConfirm={onRemove}
+        />
       ) : null}
     </FormDialog>
   );
@@ -830,13 +852,16 @@ function ChallengeLibrariesBar({
   );
 }
 
-function AdminItems({
+/**
+ * Manage › General's "Items": what only fits here — the challenge's library, adding items (a draft opens here,
+ * before Today), "Organise" and, for a daily challenge, generating its days. The items themselves are seen,
+ * edited and removed on Today.
+ */
+function AdminItemsSection({
   challenge,
   group,
   entries,
   onAdd,
-  onUpdate,
-  onArchive,
   onLinkLibrary,
   onUnlinkLibrary,
   onLibraryChanged,
@@ -848,8 +873,6 @@ function AdminItems({
   /** Saves a new order (positions, stages unchanged). */
   onReorder: (assignments: Array<{ itemId: Id; checkpointId: Id | null; position: number }>) => Promise<void>;
   onAdd: (payload: Record<string, unknown>) => Promise<void>;
-  onUpdate: (itemId: Id, payload: ItemUpdatePayload) => Promise<void>;
-  onArchive: (itemId: Id) => Promise<void>;
   onLinkLibrary: (spec: { libraryId?: Id; libraryKind?: string }) => Promise<void>;
   onUnlinkLibrary: (libraryId: Id) => Promise<void>;
   onLibraryChanged: () => void;
@@ -858,7 +881,6 @@ function AdminItems({
   const tCine = useTranslations("cineItems");
   const tc = useTranslations("common");
   const f = useGoaFormat();
-  const libraryName = useLibraryName();
   const members = group?.members ?? [];
   const scope: CatalogScope = group ? { groupId: group.id } : "personal";
   const recommendationsEnabled = group ? group.recommendationsEnabled !== false : true;
@@ -867,12 +889,10 @@ function AdminItems({
   // challenge, or one whose libraries were all unlinked) links its first here, below.
   const { data: workspaceLibraries } = useCatalogLibraries(scope);
   const linked = challenge.libraries ?? [];
-  const itemLibrary = (item: ChallengeItem) => linked.find((library) => library.kind === item.catalogItem?.kind) ?? null;
   const startsOn = challenge.startsOn ?? "";
   const endsOn = challenge.endsOn ?? "";
   const undatedDaily = challenge.submissionMode === "daily" && !challenge.startsOn && !challenge.endsOn;
   const datedDaily = challenge.submissionMode === "daily" && !undatedDaily;
-  const canArchiveItems = challenge.submissionMode === "item" && challenge.status !== "closed";
   const canShowAdd = challenge.status !== "closed"
     && !(challenge.submissionMode === "free")
     && !(undatedDaily)
@@ -880,8 +900,6 @@ function AdminItems({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [editing, setEditing] = useState<ChallengeItem | null>(null);
-  const [archiving, setArchiving] = useState<ChallengeItem | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   // "Organise for the group": items someone already logged keep their place; the rest are spread out.
   const tOrganise = useTranslations("organise");
@@ -895,14 +913,6 @@ function AdminItems({
         (key) => tOrganise(`property.${key}`),
       )
     : null;
-
-  async function archive(item: ChallengeItem) {
-    setError(null);
-    setSuccess(null);
-    await onArchive(item.id);
-    setArchiving(null);
-    setSuccess(t("itemRemoved"));
-  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -920,11 +930,12 @@ function AdminItems({
   }
 
   return (
-    <section className="mx-auto max-w-2xl">
-      <PageHeading
-        title={t("itemsTitle")}
-        description={undatedDaily ? t("itemsHintUndatedDaily") : datedDaily ? t("itemsHintDatedDaily") : challenge.status === "closed" ? t("itemsHintClosed") : t("itemsHintDefault")}
-      />
+    <section className="mt-12 border-t border-[var(--line)] pt-8">
+      <div className="mb-4 flex items-baseline justify-between gap-3">
+        <h2 className="text-xl font-light tracking-[-0.02em]">{t("itemsTitle")}</h2>
+        <span className="text-xs text-[var(--muted)]">{t("itemsOnToday", { count: challenge.items.length })}</span>
+      </div>
+      <p className="mb-5 text-sm leading-6 text-[var(--muted)]">{undatedDaily ? t("itemsHintUndatedDaily") : datedDaily ? t("itemsHintDatedDaily") : challenge.status === "closed" ? t("itemsHintClosed") : t("itemsHintToday")}</p>
       {canShowAdd ? (() => {
         // Adding items happens in a dialog, so the button never turns into "Close" for it.
         const inline = !(challenge.submissionMode === "item" && linked.length);
@@ -995,69 +1006,6 @@ function AdminItems({
           }}
         />
       ) : null}
-      {challenge.items.length ? (
-        <ol className="divide-y divide-[var(--line)]">
-          {[...challenge.items].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)).map((item, index) => (
-            <li className="flex items-start justify-between gap-4 py-4" key={item.id}>
-              <div className="flex min-w-0 gap-4">
-                <span className="w-6 shrink-0 pt-0.5 text-sm tabular-nums text-[var(--muted)]">{String(index + 1).padStart(2, "0")}</span>
-                <span className="min-w-0">
-                  <strong className="block text-base font-medium">{item.title}{item.catalogItem?.year ? ` (${item.catalogItem.year})` : ""}</strong>
-                  {linked.length > 1 && itemLibrary(item) ? <small className="mt-1 inline-flex items-center gap-1.5 text-[var(--muted)]"><LibraryGlyph source={itemLibrary(item)!.source} className="h-3 w-3" />{libraryName(itemLibrary(item)!)}</small> : null}
-                  {item.description ? <span className="mt-1 block text-sm leading-6 text-[var(--muted)]">{item.description}</span> : null}
-                  {(recommendationsEnabled && (item.recommendedBy || item.originNote)) || item.catalogItem?.author || item.catalogItem?.mainGenre || item.catalogItem?.runtimeMinutes ? <small className="mt-1 block text-[var(--muted)]">{[item.catalogItem?.author ? tCine("byAuthor", { name: item.catalogItem.author }) : null, recommendationsEnabled ? recommenderLine(item.recommendedBy, item.originNote, (name) => t("itemRecommendedByLine", { name }), (text) => t("itemOriginLine", { text })) : null, item.catalogItem?.mainGenre || null, formatRuntime(item.catalogItem?.runtimeMinutes)].filter(Boolean).join(" · ")}</small> : null}
-                  {item.catalogItem?.scheduledAt ? <small className="mt-1 inline-flex items-center gap-1.5 text-[var(--ink)]"><svg viewBox="0 0 16 16" className="h-3.5 w-3.5 flex-none text-[var(--muted)]" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><rect x="2.2" y="3.2" width="11.6" height="10.6" rx="2" /><path d="M2.2 6.6h11.6M5.4 1.9v2.6M10.6 1.9v2.6" strokeLinecap="round" /></svg>{f.eventWhen(item.catalogItem.scheduledAt)}</small> : null}
-                  {item.date ? <small className="mt-1 block text-[var(--muted)]">{f.date(item.date)}</small> : f.itemWindow(item, timeZone) ? <small className="mt-1 inline-flex items-center gap-1.5 text-[var(--muted)]"><svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><circle cx="8" cy="8" r="5.8" /><path d="M8 5v3.2l2 1.2" strokeLinecap="round" /></svg>{f.itemWindow(item, timeZone)}</small> : null}
-                </span>
-              </div>
-              <div className="flex flex-none items-center gap-2">
-                {item.status !== "open" ? <span className="rounded-full bg-[var(--wash)] px-2 py-1 text-[10px] font-light text-[var(--muted)]">{f.itemStatusLabel(item.status)}</span> : null}
-                {challenge.status !== "closed" ? (
-                  <ActionMenu label={t("moreActions")} iconOnly>
-                    <ActionMenuItem onClick={() => { setError(null); setEditing(item); }}>{t("edit")}</ActionMenuItem>
-                    {canArchiveItems ? <ActionMenuItem danger onClick={() => { setError(null); setArchiving(item); }}>{t("remove")}</ActionMenuItem> : null}
-                  </ActionMenu>
-                ) : null}
-              </div>
-            </li>
-          ))}
-        </ol>
-      ) : undatedDaily
-        ? <EmptyState title={t("noItemsUndatedTitle")} />
-        : canShowAdd && !showAdd
-          ? <EmptyState title={t("noItemsTitle")} onClick={() => { setError(null); setShowAdd(true); }} />
-          : <EmptyState title={t("noItemsTitle")} hint={t("noItemsBody")} />}
-
-      {editing ? (
-        <ItemEditorDialog
-          item={editing}
-          challenge={challenge}
-          members={members}
-          library={itemLibrary(editing)}
-          scope={scope}
-          recommendationsEnabled={recommendationsEnabled}
-          onCancel={() => setEditing(null)}
-          onSave={async (payload) => {
-            await onUpdate(editing.id, payload);
-            setEditing(null);
-            setSuccess(challenge.submissionMode === "daily" ? t("checkpointUpdated") : t("itemUpdated"));
-          }}
-        />
-      ) : null}
-
-      {archiving ? (
-        <ConfirmDialog
-          title={challenge.submissionMode === "daily" ? t("editCheckpoint") : t("remove")}
-          body={entries.filter((entry) => itemIdForEntry(entry) === archiving.id).length > 0
-            ? t("itemRemoveConfirmWithEntries", { title: archiving.title, count: entries.filter((entry) => itemIdForEntry(entry) === archiving.id).length })
-            : t("itemRemoveConfirm", { title: archiving.title })}
-          confirmLabel={t("remove")}
-          busyLabel={t("removing")}
-          danger
-          onClose={() => setArchiving(null)}
-          onConfirm={() => archive(archiving)}
-        />
-      ) : null}
     </section>
   );
 }
@@ -1090,8 +1038,6 @@ export function AdminScreen({
   onAddItems,
   onLinkLibrary,
   onUnlinkLibrary,
-  onUpdateItem,
-  onArchiveItem,
   onSaveCheckpoints,
   onAssignCheckpointItems,
   onPublishResult,
@@ -1126,8 +1072,6 @@ export function AdminScreen({
   onAddItems: (payload: Record<string, unknown>) => Promise<void>;
   onLinkLibrary: (spec: { libraryId?: Id; libraryKind?: string }) => Promise<void>;
   onUnlinkLibrary: (libraryId: Id) => Promise<void>;
-  onUpdateItem: (itemId: Id, payload: ItemUpdatePayload) => Promise<void>;
-  onArchiveItem: (itemId: Id) => Promise<void>;
   onSaveCheckpoints: (checkpoints: CheckpointInput[]) => Promise<void>;
   onAssignCheckpointItems: (assignments: Array<{ itemId: Id; checkpointId: Id | null; position?: number }>) => Promise<void>;
   onPublishResult: (payload: Record<string, unknown>) => Promise<{ url?: string | null; publishedAt?: string; anonymized?: boolean } | undefined>;
@@ -1145,7 +1089,7 @@ export function AdminScreen({
   const isPersonal = challenge.scope === "personal";
   const tabs: AdminTab[] = [
     "overview",
-    "fields", "items",
+    "fields",
     ...(showCheckpoints ? (["checkpoints"] as const) : []),
     // Metrics and the showcase are built by Goa itself now (auto-metrics + the thread on Results) — no tabs to tend.
     "settings",
@@ -1190,9 +1134,15 @@ export function AdminScreen({
 
       <div className="mx-auto max-w-5xl px-4 pt-8 sm:px-6 sm:pt-10">
         {setup ? <div className="mx-auto max-w-2xl"><SetupSummary state={setup} activeTab={activeTab} onGo={onTab} /></div> : null}
-        {activeTab === "overview" ? <AdminGeneral challenge={challenge} group={group} isPersonal={isPersonal} onSaveBasics={onSaveBasics} onSaveParticipants={onSaveParticipants} /> : null}
+        {activeTab === "overview" ? (
+          <>
+            <AdminGeneral challenge={challenge} group={group} isPersonal={isPersonal} onSaveBasics={onSaveBasics} onSaveParticipants={onSaveParticipants} />
+            <div className="mx-auto max-w-2xl">
+              <AdminItemsSection challenge={challenge} group={group} entries={entries} onAdd={onAddItems} onLinkLibrary={onLinkLibrary} onUnlinkLibrary={onUnlinkLibrary} onLibraryChanged={onArchiveChanged} onReorder={onAssignCheckpointItems} />
+            </div>
+          </>
+        ) : null}
         {activeTab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.visibilityPolicy}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} onSetExpectation={onSetExpectation} onSetPageCount={onSetPageCount} onSaveEntryDate={onSaveEntryDate} onAddShared={onAddSharedResponse} onRemoveType={onRemoveEntryType} onSavePolicy={onSaveSharedPolicy} /> : null}
-        {activeTab === "items" ? <AdminItems challenge={challenge} group={group} entries={entries} onAdd={onAddItems} onUpdate={onUpdateItem} onArchive={onArchiveItem} onLinkLibrary={onLinkLibrary} onUnlinkLibrary={onUnlinkLibrary} onLibraryChanged={onArchiveChanged} onReorder={onAssignCheckpointItems} /> : null}
         {activeTab === "checkpoints" ? <CheckpointPlanner key={`${challenge.id}:${challenge.checkpoints.map((cp) => cp.id).join(",")}`} challenge={challenge} onSaveCheckpoints={onSaveCheckpoints} onAssign={onAssignCheckpointItems} /> : null}
         {activeTab === "settings" ? <ChallengeSettings challenge={challenge} duplicateTargets={duplicateTargets} onDuplicate={onDuplicate} onOpenCopy={onOpenCopy} onDelete={onDelete} isPlatformAdmin={isPlatformAdmin} onPublishTemplate={onPublishTemplate} onUnpublishTemplate={onUnpublishTemplate} onPublish={onPublishResult} onUnpublish={onUnpublishResult} /> : null}
       </div>

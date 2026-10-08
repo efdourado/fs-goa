@@ -15,9 +15,9 @@ test("o progresso da configuração agrupa os bloqueios por aba e aponta a prime
     warnings: [issue("no_metrics", "warning")],
   };
   const state = setupState(report, SETUP_STEPS);
-  assert.deepEqual(state.errors, { overview: 1, items: 1, metrics: 1 }, "um código desconhecido conta no total, mas não aponta para aba nenhuma");
+  assert.deepEqual(state.errors, { overview: 2, metrics: 1 }, "participantes e itens se resolvem em Geral; um código desconhecido conta no total, mas não aponta para aba nenhuma");
   assert.equal(state.errorCount, 4);
-  assert.equal(state.todoCount, 4, "uma coisa a fazer por aba com problema, mais o que não aponta para aba nenhuma");
+  assert.equal(state.todoCount, 3, "uma coisa a fazer por aba com problema, mais o que não aponta para aba nenhuma");
   assert.equal(state.firstTodo, "overview", "a primeira etapa, na ordem de trabalho");
 
   // Dois problemas na mesma aba são um serviço só, com um só motivo na tela.
@@ -27,8 +27,8 @@ test("o progresso da configuração agrupa os bloqueios por aba e aponta a prime
   assert.deepEqual(sameTab.reasons.map((reason) => reason.code), ["no_items"]);
 
   const onlyLater = setupState({ ready: false, errors: [issue("no_items"), issue("no_checkpoints")], warnings: [] }, SETUP_STEPS);
-  assert.equal(onlyLater.firstTodo, "items");
-  const noStages = setupState({ ready: false, errors: [issue("no_checkpoints")], warnings: [] }, ["overview", "fields", "items"]);
+  assert.equal(onlyLater.firstTodo, "overview", "items are added from Manage › General (and Today) now");
+  const noStages = setupState({ ready: false, errors: [issue("no_checkpoints")], warnings: [] }, ["overview", "fields"]);
   assert.equal(noStages.firstTodo, null, "uma aba que este desafio não tem nunca é a próxima");
 });
 
@@ -43,7 +43,7 @@ test("sem bloqueios só há avisos: a configuração está pronta e o desafio po
 });
 
 test("o resumo diz o que falta e leva à próxima coisa a fazer, sem oferecer ir para onde já se está", () => {
-  const report: PreflightReport = { ready: false, errors: [issue("no_participants"), issue("no_items")], warnings: [] };
+  const report: PreflightReport = { ready: false, errors: [issue("no_participants"), issue("choice_without_options")], warnings: [] };
   const state = setupState(report, SETUP_STEPS);
   const elsewhere = renderWithIntl(createElement(SetupSummary, { state, activeTab: "fields", onGo: () => undefined }));
   assert.match(elsewhere, /Faltam 2 coisas para poder começar/);
