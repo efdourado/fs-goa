@@ -193,3 +193,16 @@ test("uma contagem que não é livro fala no próprio número e unidade, com met
   assert.match(html, /72% da meta/);
   assert.doesNotMatch(html, /p\. 7/, "nada de 'p.' fora de um livro");
 });
+
+test("um livro já terminado de outro jeito (com nota) mostra a estrada cheia, sem inventar dia", () => {
+  const html = renderWithIntl(createElement(CheckinLog, {
+    from: "2026-09-14", to: "2026-09-28", today: "2026-09-28",
+    records: new Map(), selectedDay: "2026-09-28", onSelectDay: () => undefined, canEdit: true, compact: true,
+    counter: { field: pages, notes: [], total: 352, book: true, entry: "position", done: true, paceFrom: "2026-09-14", paceTo: null, onSave: async () => undefined },
+  }));
+  assert.match(html, /Livro terminado/);
+  assert.match(html, /p\. 352/, "a estrada cheia");
+  assert.match(html, /100% lido/);
+  assert.doesNotMatch(html, /em \d+ de/, "sem data, porque não sabemos quando terminou");
+  assert.match(html, />Corrigir</);
+});

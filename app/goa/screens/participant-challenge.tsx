@@ -1450,6 +1450,8 @@ export function ParticipantChallengeScreen({
     field: logCounterField,
     notes: logFields.filter((field) => field.id && field !== logCounterField),
     ...countGoal(logCounterField, pageCount, logItem?.catalogItem?.kind),
+    // Already finished another way (rated on a shelf, "Terminei" in a club): the road shows full.
+    done: Boolean(logItem && doneByItem.has(logItem.id)),
     unit: logCounterField.config?.unit ?? null,
     entry: logCounterField.config?.count?.entry,
     paceFrom: logOpensOn ?? challenge.startsOn ?? logBounds.from,
@@ -1557,7 +1559,9 @@ export function ParticipantChallengeScreen({
         // A book being counted says how far you are ("p. 212 de 340 · faltam 128"), or that it's done.
         const read = pagesByItem.get(item.id);
         const pages = item.catalogItem?.pageCount;
-        const progress = read === undefined || !pages ? null : read >= pages ? t("bookDone") : t("bookProgress", { page: read, total: pages, left: pages - read });
+        const progress = !pages || !bookCount ? null
+          : done || (read ?? 0) >= pages ? t("bookDone")
+            : read === undefined ? null : t("bookProgress", { page: read, total: pages, left: pages - read });
         return { id: item.id, label, done, soon, statusLabel: done ? "" : soon ? t("checkpointSoonLabel") : undefined, meta: progress ?? metaForItem(item), rating: ratingByItem.get(item.id) ?? null };
       })}
     />

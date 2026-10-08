@@ -42,6 +42,8 @@ export interface LogCounter {
   unit?: string | null;
   /** How the editor opens: the amount done, or where you are now. */
   entry?: "amount" | "position";
+  /** Finished another way (a shelf's rating, a club's "Terminei"): the road shows full even short of the goal. */
+  done?: boolean;
   /** The window an even pace is measured over; no `paceTo` means no pace. */
   paceFrom: string;
   paceTo: string | null;
@@ -147,7 +149,7 @@ export function CheckinLog({
   const pastDays = days.filter((day) => day <= today).length;
   const loggedInRange = days.filter((day) => logged.has(day)).length;
   const firstLogged = useMemo(() => [...logged].sort()[0] ?? null, [logged]);
-  const counterFinished = Boolean(counter?.total) && sumAll(values) >= (counter?.total ?? Infinity);
+  const counterFinished = Boolean(counter?.total) && (Boolean(counter?.done) || sumAll(values) >= (counter?.total ?? Infinity));
   const formatDate = useGoaFormat();
   const strong = (chunks: ReactNode) => <strong className="font-medium tabular-nums text-[var(--ink)]">{chunks}</strong>;
 
@@ -470,8 +472,10 @@ function BookProgress({
   const shown = sumAll(withDraft);
   const scale = Math.max(total, shown);
   const progress = pace({ total, from: counter.paceFrom, to: counter.paceTo, today, done, loggedToday: values.has(today) });
-  const percent = Math.min(100, Math.round((done / total) * 100));
-  const finished = done >= total;
+  const finished = done >= total || Boolean(counter.done);
+  // Finished another way, short of the goal: drawn as a full road, one solid stretch (we don't know its days).
+  const markedDone = finished && done < total;
+  const percent = markedDone ? 100 : Math.min(100, Math.round((done / total) * 100));
   const page = (value: number) => nf.number(value, { maximumFractionDigits: counter.book ? 0 : 2 });
   // A book speaks in pages ("p. 212 de 340"); any other count in its own number and unit ("8.400 de 10.000 passos").
   const unit = counter.unit ? ` ${counter.unit}` : "";
@@ -504,14 +508,15 @@ function BookProgress({
         )}
         <div className="text-right">
           <p className="text-3xl font-light leading-none tracking-[-0.04em] tabular-nums">
-            {value(done)} <small className="text-sm tracking-normal text-[var(--muted)]">{t("pageOf", { total: counter.book ? page(total) : `${page(total)}${unit}` })}</small>
+            {value(markedDone ? total : done)} <small className="text-sm tracking-normal text-[var(--muted)]">{t("pageOf", { total: counter.book ? page(total) : `${page(total)}${unit}` })}</small>
           </p>
           <p className="mt-1 text-xs text-[var(--main-strong)]">{t(key("percentRead", "percentGoal"), { percent })}</p>
         </div>
       </div>
       <div>
         <div className="relative h-8 rounded-lg bg-[var(--wash)]" role="img" aria-label={t(key("progressAria", "countAria"), { page: page(done), total: page(total), percent })}>
-          <div className="flex h-full gap-0.5 overflow-hidden rounded-lg" style={{ width: `${Math.min(100, (shown / scale) * 100)}%` }}>
+          {markedDone ? <div className="h-full rounded-lg bg-[var(--main)]" /> : null}
+          <div className={cx("flex h-full gap-0.5 overflow-hidden rounded-lg", markedDone && "hidden")} style={{ width: `${Math.min(100, (shown / scale) * 100)}%` }}>
             {segments.map(([day, value], index) => {
               const ghost = draft !== null && day === selectedDay && draft !== values.get(day);
               return (
