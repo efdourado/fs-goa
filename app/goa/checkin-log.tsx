@@ -487,15 +487,20 @@ function BookProgress({
               );
             })}
           </div>
-          {progress ? (
-            <span
-              className="absolute -bottom-1.5 -top-1.5 w-0.5 rounded bg-[var(--main-2)]"
-              style={{ left: `calc(${Math.min(100, (progress.expected / scale) * 100)}% - 1px)` }}
-              aria-hidden="true"
-            >
-              <span className="absolute left-1/2 top-[calc(100%+4px)] -translate-x-1/2 whitespace-nowrap text-[11px] text-[var(--main-2)]">{t("paceMark", { page: page(progress.expected) })}</span>
-            </span>
-          ) : null}
+          {progress ? (() => {
+            const at = Math.min(100, (progress.expected / scale) * 100);
+            // Centred under its mark, except near either end, where it hangs inward so it never spills out of the box.
+            const label = at > 80 ? "right-0" : at < 20 ? "left-0" : "left-1/2 -translate-x-1/2";
+            return (
+              <span
+                className="absolute -bottom-1.5 -top-1.5 w-0.5 rounded bg-[var(--main-2)]"
+                style={{ left: `calc(${at}% - 1px)` }}
+                aria-hidden="true"
+              >
+                <span className={cx("absolute top-[calc(100%+4px)] whitespace-nowrap text-[11px] text-[var(--main-2)]", label)}>{t("paceMark", { page: page(progress.expected) })}</span>
+              </span>
+            );
+          })() : null}
         </div>
         <div className={cx("flex justify-between text-[11px] tabular-nums text-[var(--muted)]", progress ? "mt-6" : "mt-1.5")}>
           <span>{t("pageShort", { page: 1 })}</span>
