@@ -52,14 +52,6 @@ function ratingChoices(config?: FieldConfig): number[] {
   return Array.from({ length: Math.max(0, count) }, (_, index) => Number((min + index * step).toFixed(4)));
 }
 
-function ChevronIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
-      <path d="M4 6l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
 /** How many items the tray shows before "Show more". */
 const TRAY_LIMIT = 8;
 
@@ -182,42 +174,11 @@ function NumberStepper({ id, field, value, last, disabled, onChange }: {
   );
 }
 
-/** The best of the first number field in each check-in an item was in, oldest to newest, with the peak marked. */
-/**
- * An item's numbers over time, full width: the line and its wash stretch with the card, while the latest
- * point sits on top as a plain dot — positioned in percent, so it stays round at any width.
- */
-function TrendChart({ values }: { values: number[] }) {
-  if (values.length < 2) return null;
-  const width = 300;
-  const height = 64;
-  const pad = 6;
-  const high = Math.max(...values);
-  const low = Math.min(...values);
-  const x = (index: number) => (index * width) / (values.length - 1);
-  const y = (value: number) => (high === low ? height / 2 : height - pad - ((value - low) / (high - low)) * (height - 2 * pad));
-  const line = values.map((value, index) => `${index ? "L" : "M"}${x(index).toFixed(1)} ${y(value).toFixed(1)}`).join(" ");
-  const area = `${line} L${width} ${height} L0 ${height} Z`;
-  const last = values[values.length - 1];
-  return (
-    <div className="relative mt-3 h-16" aria-hidden="true">
-      <svg viewBox={`0 0 ${width} ${height}`} className="h-full w-full overflow-visible" preserveAspectRatio="none">
-        <path d={area} fill="var(--main-soft)" />
-        <path d={line} fill="none" stroke="var(--main)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-      </svg>
-      <span
-        className="absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--main-2)] ring-[3px] ring-[var(--paper)]"
-        style={{ left: "100%", top: `${(y(last) / height) * 100}%` }}
-      />
-    </div>
-  );
-}
-
 /**
  * A workout-style challenge on Today: the days you checked in (the same strip / month as a daily log, each day
- * showing how many items it held), and the check-in of the picked day — a tray of the challenge's items to tap
- * in, a card per item with last time's numbers at hand, and one Save. Below, your check-ins and, per item, the
- * history and the bests that fall out of it. Nothing here asks for a "current best": it's read off what was logged.
+ * showing how many items it held), and the check-in of the picked day: pick its items, then each is one row —
+ * last time's numbers a tap away, its fields, a new best marked — with more items behind "+ Add". One Save.
+ * How each item went over time is Results' job, not this screen's.
  */
 export function SessionLog({
   challenge,
@@ -318,6 +279,8 @@ export function SessionLog({
   const [creating, setCreating] = useState<{ title: string; busy: boolean; error: string | null } | null>(null);
   const [renaming, setRenaming] = useState<{ name: string; busy: boolean; error: string | null } | null>(null);
   const [trayOpen, setTrayOpen] = useState(false);
+  // "+ Add" opened the list of items (it's folded away while there's a check-in to repeat).
+  const [adding, setAdding] = useState(false);
   // After a save, the check-in to reopen once the reload brings it back: the edited one, or the newest of that day.
   const [reopen, setReopen] = useState<{ day: string; visitId?: Id; known: Set<Id> } | null>(null);
   const newItemInput = useRef<HTMLInputElement>(null);
@@ -331,6 +294,7 @@ export function SessionLog({
 
   function load(visit: Entry | null, onDay: string) {
     setEditing(visit);
+    setAdding(false);
     setOccurredOn(visit?.occurredOn ?? onDay);
     setVisitValues(visit ? valuesAsRecord(visit.values) : {});
     setRows(visit ? sortedRecords(visit.id).map((record) => ({ key: newRowKey(), id: record.id, itemId: record.itemId ?? "", values: valuesAsRecord(record.values) })) : []);
@@ -466,43 +430,22 @@ export function SessionLog({
     }
   }
 
-  // Per item: how many check-ins it appeared in, the best of each numeric field, its trend and its latest records.
-  const byItem = useMemo(() => {
-    const groups = new Map<Id, Array<{ entry: Entry; values: Record<Id, unknown> }>>();
-    for (const records of recordsByVisit.values()) {
-      for (const entry of records) {
-        if (!entry.itemId) continue;
-        const list = groups.get(entry.itemId) ?? [];
-        list.push({ entry, values: valuesAsRecord(entry.values) });
-        groups.set(entry.itemId, list);
-      }
+  // How many of your check-ins each item was in — the tray lists the usual ones first.
+  const usage = useMemo(() => {
+    const visitsOf = new Map<Id, Set<Id>>();
+    for (const record of ownRecords) {
+      if (!record.itemId || !record.parentEntryId) continue;
+      const set = visitsOf.get(record.itemId) ?? new Set<Id>();
+      set.add(record.parentEntryId);
+      visitsOf.set(record.itemId, set);
     }
-    const trendField = numberFields[0];
-    return items
-      .filter((item) => groups.has(item.id))
-      .map((item) => {
-        const list = (groups.get(item.id) ?? []).sort((a, b) => (b.entry.occurredOn ?? "").localeCompare(a.entry.occurredOn ?? "") || (b.entry.submittedAt ?? "").localeCompare(a.entry.submittedAt ?? ""));
-        const records = recordFields.filter((field) => field.type === "number" || field.type === "rating").flatMap((field) => {
-          let best: { value: number; on: string | null } | null = null;
-          for (const row of list) {
-            const value = numberValue(row.values[field.id as Id]);
-            if (value !== null && (!best || value > best.value)) best = { value, on: row.entry.occurredOn ?? null };
-          }
-          return best ? [{ field, ...best }] : [];
-        });
-        const trend = trendField
-          ? list.slice().reverse().map((row) => numberValue(row.values[trendField.id as Id])).filter((value): value is number => value !== null)
-          : [];
-        return { item, list, records, trend, sessions: new Set(list.map((row) => row.entry.parentEntryId)).size };
-      })
-      .sort((a, b) => b.sessions - a.sessions);
-  }, [recordsByVisit, items, recordFields, numberFields]);
-
+    return new Map([...visitsOf].map(([itemId, visits]) => [itemId, visits.size]));
+  }, [ownRecords]);
   // The tray lists the items used most first, so the usual ones are always at hand.
-  const trayItems = useMemo(() => {
-    const uses = new Map(byItem.map((row) => [row.item.id, row.sessions]));
-    return [...items].sort((a, b) => (uses.get(b.id) ?? 0) - (uses.get(a.id) ?? 0) || (a.position ?? 0) - (b.position ?? 0));
-  }, [items, byItem]);
+  const trayItems = useMemo(
+    () => [...items].sort((a, b) => (usage.get(b.id) ?? 0) - (usage.get(a.id) ?? 0) || (a.position ?? 0) - (b.position ?? 0)),
+    [items, usage],
+  );
   // The usual ones first; the rest behind "Show more". Whatever is already in this check-in stays in view
   // so it can be tapped back out.
   const picked = new Set(rows.map((row) => row.itemId));
@@ -512,6 +455,8 @@ export function SessionLog({
   if (!items.length && !onAddItem) return <EmptyState title={t("noItems")} />;
 
   const dayVisits = visitsByDay.get(day) ?? [];
+  // One thing at a time: an empty check-in starts by picking its items; once it has some, more wait behind "+ Add".
+  const showTray = adding || !rows.length;
   const lastNumber = (last: { values: Record<Id, unknown> } | null, field: ChallengeField) => (last ? numberValue(last.values[field.id as Id]) : null);
   const deltaText = (field: ChallengeField, current: number, previous: number) => {
     const diff = Number((current - previous).toFixed(4));
@@ -583,58 +528,62 @@ export function SessionLog({
               </div>
             ) : null}
 
+            {showTray ? (
+              <div className="mb-5">
             <p className={cx("mb-2.5", sectionLabelClass)}>{t("trayLabel")}</p>
-            <div className="flex flex-wrap gap-2" role="group" aria-label={itemsHeading}>
-              {visibleTray.map((item) => {
-                const inside = rows.some((row) => row.itemId === item.id);
-                const last = lastRecordFor(item.id);
-                const lastLead = last && numberFields[0] ? numberValue(last.values[numberFields[0].id as Id]) : null;
-                return (
-                  <button
-                    key={item.id} type="button" aria-pressed={inside} disabled={disabled}
-                    onClick={() => toggleItemRow(item.id)}
-                    className={cx(
-                      "inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border py-1.5 pl-1.5 pr-3 text-sm transition disabled:cursor-not-allowed disabled:opacity-50",
-                      inside ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] bg-[var(--paper)] hover:border-[var(--main-line)]",
-                    )}
-                  >
-                    <span className={cx("grid h-6 w-6 place-items-center rounded-full text-xs", inside ? "bg-[var(--main)] text-white" : "bg-[var(--wash)] text-[var(--muted)]")} aria-hidden="true">{inside ? "✓" : "+"}</span>
-                    {item.title}
-                    {lastLead !== null ? <span className="text-[11px] tabular-nums text-[var(--muted)]">{nf.number(lastLead, { maximumFractionDigits: 2 })}</span> : null}
+              <div className="flex flex-wrap gap-2" role="group" aria-label={itemsHeading}>
+                {visibleTray.map((item) => {
+                  const inside = rows.some((row) => row.itemId === item.id);
+                  const last = lastRecordFor(item.id);
+                  const lastLead = last && numberFields[0] ? numberValue(last.values[numberFields[0].id as Id]) : null;
+                  return (
+                    <button
+                      key={item.id} type="button" aria-pressed={inside} disabled={disabled}
+                      onClick={() => toggleItemRow(item.id)}
+                      className={cx(
+                        "inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border py-1.5 pl-1.5 pr-3 text-sm transition disabled:cursor-not-allowed disabled:opacity-50",
+                        inside ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] bg-[var(--paper)] hover:border-[var(--main-line)]",
+                      )}
+                    >
+                      <span className={cx("grid h-6 w-6 place-items-center rounded-full text-xs", inside ? "bg-[var(--main)] text-white" : "bg-[var(--wash)] text-[var(--muted)]")} aria-hidden="true">{inside ? "✓" : "+"}</span>
+                      {item.title}
+                      {lastLead !== null ? <span className="text-[11px] tabular-nums text-[var(--muted)]">{nf.number(lastLead, { maximumFractionDigits: 2 })}</span> : null}
+                    </button>
+                  );
+                })}
+                {hiddenTrayCount > 0 || trayOpen ? (
+                  <button type="button" onClick={() => setTrayOpen((open) => !open)} className="inline-flex min-h-10 cursor-pointer items-center rounded-full px-3 text-sm text-[var(--muted)] transition hover:bg-[var(--hover)] hover:text-[var(--ink)]">
+                    {trayOpen ? t("trayLess") : t("trayMore", { count: hiddenTrayCount })}
                   </button>
-                );
-              })}
-              {hiddenTrayCount > 0 || trayOpen ? (
-                <button type="button" onClick={() => setTrayOpen((open) => !open)} className="inline-flex min-h-10 cursor-pointer items-center rounded-full px-3 text-sm text-[var(--muted)] transition hover:bg-[var(--hover)] hover:text-[var(--ink)]">
-                  {trayOpen ? t("trayLess") : t("trayMore", { count: hiddenTrayCount })}
-                </button>
+                ) : null}
+                {onAddItem && !creating ? (
+                  <button type="button" disabled={disabled} onClick={() => setCreating({ title: "", busy: false, error: null })} className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border border-dashed border-[var(--main-line)] py-1.5 pl-1.5 pr-3 text-sm text-[var(--main-strong)] transition hover:bg-[var(--main-soft)] disabled:cursor-not-allowed disabled:opacity-50">
+                    <span className="grid h-6 w-6 place-items-center rounded-full bg-[var(--main-soft)] text-xs" aria-hidden="true">+</span>{t("newItemPill")}
+                  </button>
+                ) : null}
+              </div>
+              {creating ? (
+                <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-[var(--wash)] p-2.5">
+                  <input
+                    ref={newItemInput} className={cx(inputClass, "min-w-0 flex-1")} value={creating.title} maxLength={200} disabled={creating.busy}
+                    placeholder={t("newItemPlaceholder")} aria-label={t("newItemPlaceholder")}
+                    onChange={(event) => setCreating({ ...creating, title: event.target.value })}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") { event.preventDefault(); void createItem(); }
+                      if (event.key === "Escape") { event.preventDefault(); setCreating(null); }
+                    }}
+                  />
+                  <Button type="button" disabled={creating.busy || !creating.title.trim()} onClick={() => void createItem()}>{creating.busy ? tc("saving") : t("newItemAdd")}</Button>
+                  <Button type="button" variant="ghost" disabled={creating.busy} onClick={() => setCreating(null)}>{tc("cancel")}</Button>
+                  {creating.error ? <span className="w-full"><StatusMessage error={creating.error} /></span> : null}
+                </div>
               ) : null}
-              {onAddItem && !creating ? (
-                <button type="button" disabled={disabled} onClick={() => setCreating({ title: "", busy: false, error: null })} className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border border-dashed border-[var(--main-line)] py-1.5 pl-1.5 pr-3 text-sm text-[var(--main-strong)] transition hover:bg-[var(--main-soft)] disabled:cursor-not-allowed disabled:opacity-50">
-                  <span className="grid h-6 w-6 place-items-center rounded-full bg-[var(--main-soft)] text-xs" aria-hidden="true">+</span>{t("newItemPill")}
-                </button>
-              ) : null}
-            </div>
-            {creating ? (
-              <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-[var(--wash)] p-2.5">
-                <input
-                  ref={newItemInput} className={cx(inputClass, "min-w-0 flex-1")} value={creating.title} maxLength={200} disabled={creating.busy}
-                  placeholder={t("newItemPlaceholder")} aria-label={t("newItemPlaceholder")}
-                  onChange={(event) => setCreating({ ...creating, title: event.target.value })}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") { event.preventDefault(); void createItem(); }
-                    if (event.key === "Escape") { event.preventDefault(); setCreating(null); }
-                  }}
-                />
-                <Button type="button" disabled={creating.busy || !creating.title.trim()} onClick={() => void createItem()}>{creating.busy ? tc("saving") : t("newItemAdd")}</Button>
-                <Button type="button" variant="ghost" disabled={creating.busy} onClick={() => setCreating(null)}>{tc("cancel")}</Button>
-                {creating.error ? <span className="w-full"><StatusMessage error={creating.error} /></span> : null}
               </div>
             ) : null}
 
             {rows.length ? (
-              <ol ref={cardsRef} className="mt-5 space-y-3">
-                {rows.map((row, index) => {
+              <ol ref={cardsRef} className="divide-y divide-[var(--line)] border-y border-[var(--line)]">
+                {rows.map((row) => {
                   const last = row.itemId ? lastRecordFor(row.itemId) : null;
                   const best = row.itemId ? bestValues(ownRecords, row.itemId, recordFields.filter((field) => field.type === "number" || field.type === "rating"), editing?.id ?? null) : new Map<Id, number>();
                   const newBests = recordFields.filter((field) => {
@@ -643,33 +592,31 @@ export function SessionLog({
                     return value !== null && previous !== undefined && value > previous;
                   });
                   return (
-                    <li key={row.key} data-item={row.itemId} className="rounded-2xl border border-[var(--line)] bg-[var(--canvas)]/50 p-4 sm:p-5">
-                      <div className="flex items-start gap-3">
-                        <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-[var(--main-soft)] text-xs font-medium text-[var(--main-strong)]" aria-hidden="true">{index + 1}</span>
+                    <li key={row.key} data-item={row.itemId} className="py-4">
+                      <div className="flex items-start gap-2">
                         <div className="min-w-0 flex-1">
-                          <strong className="block text-base font-medium">{itemTitle(row.itemId)}</strong>
-                          <span className="block text-xs text-[var(--muted)]">{last ? last.text : t("firstTime")}</span>
+                          <strong className="block truncate text-[15px] font-medium">{itemTitle(row.itemId)}</strong>
+                          {last ? (
+                            // Last time's numbers, one tap away: tapping them fills this row in.
+                            <button type="button" disabled={disabled} title={t("repeatLast")} onClick={() => patchRow(row.key, { values: { ...last.values } })} className="cursor-pointer text-left text-xs text-[var(--muted)] underline-offset-2 hover:text-[var(--ink)] hover:underline disabled:cursor-not-allowed">
+                              {last.text}
+                            </button>
+                          ) : <span className="block text-xs text-[var(--muted)]">{t("firstTime")}</span>}
                         </div>
-                        {last ? (
-                          <button
-                            type="button" disabled={disabled}
-                            className="min-h-9 flex-none cursor-pointer rounded-full px-3 text-xs font-medium text-[var(--ink)] transition hover:bg-[var(--hover)] disabled:cursor-not-allowed disabled:opacity-50"
-                            onClick={() => patchRow(row.key, { values: { ...last.values } })}
-                          >
-                            {t("repeatLast")}
-                          </button>
-                        ) : null}
+                        <button type="button" disabled={disabled} aria-label={t("removeRow", { item: itemTitle(row.itemId) })} title={t("removeRow", { item: itemTitle(row.itemId) })} onClick={() => setRows((current) => current.filter((candidate) => candidate.key !== row.key))} className="grid h-9 w-9 flex-none cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)] disabled:opacity-50">
+                          <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
+                        </button>
                       </div>
-                      <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] items-start gap-3">
+                      <div className="mt-3 grid grid-cols-2 items-start gap-2.5 sm:grid-cols-[repeat(auto-fit,minmax(9rem,1fr))]">
                         {recordFields.map((field) => {
                           const id = `${row.key}-${field.id}`;
                           const current = numberValue(row.values[field.id as Id]);
                           const previous = lastNumber(last, field);
                           const delta = field.type === "number" && current !== null && previous !== null ? deltaText(field, current, previous) : null;
                           return (
-                            <div key={field.id}>
-                              <label className="mb-1 block text-xs font-medium leading-tight text-[var(--muted)]" htmlFor={id}>
-                                {field.label}{field.required ? <span className="ml-1 text-[var(--main-2)]" aria-label={tf("required")}>*</span> : null}
+                            <div key={field.id} className="min-w-0">
+                              <label className="mb-1 block truncate text-[11px] font-medium text-[var(--muted)]" htmlFor={id}>
+                                {field.label}{field.config?.unit ? ` (${field.config.unit})` : ""}{field.required ? <span className="ml-1 text-[var(--main-2)]" aria-label={tf("required")}>*</span> : null}
                               </label>
                               {field.type === "number" ? (
                                 <NumberStepper id={id} field={field} value={row.values[field.id as Id]} last={previous} disabled={disabled} onChange={(value) => patchRow(row.key, { values: { ...row.values, [field.id as Id]: value } })} />
@@ -684,7 +631,7 @@ export function SessionLog({
                         })}
                       </div>
                       {newBests.length ? (
-                        <p className="mt-3 flex flex-wrap gap-1.5">
+                        <p className="mt-2.5 flex flex-wrap gap-1.5">
                           {newBests.map((field) => (
                             <span key={field.id} className="rounded-full bg-[var(--main-2)]/15 px-2.5 py-1 text-xs font-medium text-[var(--main-2)]">
                               {t("newBest", { field: field.label, value: showValue(field, best.get(field.id as Id)) })}
@@ -696,6 +643,11 @@ export function SessionLog({
                   );
                 })}
               </ol>
+            ) : null}
+            {rows.length && !showTray && canEdit ? (
+              <button type="button" disabled={disabled} onClick={() => setAdding(true)} className="mt-3 min-h-10 cursor-pointer text-sm font-medium text-[var(--main-strong)] hover:underline disabled:opacity-50">
+                ＋ {t("addRows")}
+              </button>
             ) : null}
 
             {visitFields.length ? (
@@ -727,81 +679,6 @@ export function SessionLog({
           </form>
         </CheckinLog>
       </section>
-
-      {byItem.length ? (
-        <section className={cx(cardClass, "min-w-0 p-5 sm:p-7")}>
-          <div className="mb-4 flex items-baseline justify-between gap-3">
-            <h2 className={sectionLabelClass}>{t("byItemTitle")}</h2>
-            <span className="text-xs text-[var(--muted)]">{t("byItemCount", { count: byItem.length })}</span>
-          </div>
-          <ul className="grid items-start gap-3 md:grid-cols-2">
-            {byItem.map(({ item, list, records, trend, sessions }) => {
-              const trendField = numberFields[0];
-              const latest = trend.at(-1);
-              const change = trend.length > 1 && latest !== undefined ? Number((latest - trend[0]).toFixed(4)) : null;
-              const number = (value: number) => nf.number(value, { maximumFractionDigits: 2 });
-              const answer = (field: ChallengeField, raw: unknown) => {
-                const value = field.type === "number" ? numberValue(raw) : null;
-                return value !== null ? `${number(value)}${field.config?.unit ? ` ${field.config.unit}` : ""}` : showValue(field, raw);
-              };
-              return (
-                <li key={item.id} className="flex min-w-0 flex-col rounded-2xl border border-[var(--line)] bg-[var(--canvas)]/50 p-4 sm:p-5">
-                  <div className="flex items-baseline justify-between gap-3">
-                    <strong className="min-w-0 truncate text-base font-medium">{item.title}</strong>
-                    <span className="flex-none text-xs text-[var(--muted)]">{t("checkinCountShort", { count: sessions })}</span>
-                  </div>
-
-                  {trendField && latest !== undefined ? (
-                    <div className="mt-3">
-                      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                        <span className="text-3xl font-light tabular-nums tracking-[-0.03em]">{number(latest)}{trendField.config?.unit ? <span className="ml-1 text-base text-[var(--muted)]">{trendField.config.unit}</span> : null}</span>
-                        {change === null ? (
-                          <span className="text-xs text-[var(--muted)]">{t("firstRecord")}</span>
-                        ) : (
-                          <span className={cx("text-xs font-medium tabular-nums", change > 0 ? "text-[var(--ok)]" : change < 0 ? "text-[var(--warn)]" : "text-[var(--muted)]")}>
-                            {change === 0 ? t("sameAsFirst") : t("sinceFirst", { value: `${change > 0 ? "+" : "−"}${number(Math.abs(change))}${trendField.config?.unit ? ` ${trendField.config.unit}` : ""}` })}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ) : null}
-                  {trend.length > 1 ? <TrendChart values={trend} /> : null}
-
-                  <dl className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(6.5rem,1fr))] gap-x-4 gap-y-3 border-t border-[var(--line)] pt-3">
-                    {records.map((record) => (
-                      <div key={record.field.id} className="min-w-0">
-                        <dt className="truncate text-[11px] text-[var(--muted)]">{t("bestLabel", { field: record.field.label })}</dt>
-                        <dd className="text-sm font-medium tabular-nums">{number(record.value)}{record.field.config?.unit ? ` ${record.field.config.unit}` : ""}</dd>
-                      </div>
-                    ))}
-                  </dl>
-
-                  <details className="group mt-3">
-                    <summary className="flex min-h-10 cursor-pointer list-none items-center gap-1.5 text-xs text-[var(--muted)] transition hover:text-[var(--ink)] [&::-webkit-details-marker]:hidden">
-                      {t("historyToggle")}
-                      <ChevronIcon className="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
-                    </summary>
-                    <ol className="mt-1 divide-y divide-[var(--line)] text-sm">
-                      {list.slice(0, 8).map((row) => (
-                        <li key={row.entry.id} className="flex items-baseline justify-between gap-4 py-2">
-                          <span className="flex-none text-xs text-[var(--muted)]">{f.date(row.entry.occurredOn)}</span>
-                          <span className="min-w-0 truncate text-right tabular-nums">
-                            {recordFields.map((field) => {
-                              const text = answer(field, row.values[field.id as Id]);
-                              return text ? <span key={field.id} className="ml-3 first:ml-0">{text} <span className="text-xs text-[var(--muted)]">{field.label}</span></span> : null;
-                            })}
-                          </span>
-                        </li>
-                      ))}
-                    </ol>
-                    {list.length > 8 ? <p className="mt-1 text-xs text-[var(--muted)]">{t("latestOnly", { count: 8 })}</p> : null}
-                  </details>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      ) : null}
 
       {removing && onDelete ? (
         <ConfirmDialog

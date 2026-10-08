@@ -577,7 +577,7 @@
     "catalogNoMatch": "Nada coincide con esa búsqueda.",
     "catalogTally": "{picked} marcados · {total} en el acervo",
     "addSelected": "{count, plural, =0 {Añadir seleccionados} one {Añadir # ítem} other {Añadir # ítems}}",
-    "addShort": "Añadir"
+    "addItemRow": "Añadir un elemento"
   },
   "createChallenge": {
     "errPickTemplate": "Elige una plantilla y completa el título.",
@@ -1049,8 +1049,6 @@
     "remove": "Eliminar",
     "deleteTitle": "¿Eliminar {name}?",
     "deleteBody": "Va a la papelera junto con {count, plural, one {# registro} other {# registros}}. Puedes restaurarlo desde allí.",
-    "byItemTitle": "Por ítem",
-    "latestOnly": "Mostrando los {count} más recientes.",
     "groupCount": "{count, plural, one {# check-in} other {# check-ins}}",
     "trayLabel": "Toca para añadir",
     "newItemPill": "Nuevo ítem",
@@ -1068,16 +1066,11 @@
     "onThisDay": "Este día",
     "newVisitOnDay": "Nuevo {name}",
     "savedChanges": "Cambios guardados.",
-    "byItemCount": "{count, plural, one {# ítem} other {# ítems}}",
-    "checkinCountShort": "{count, plural, one {# check-in} other {# check-ins}}",
-    "firstRecord": "primer registro",
-    "sameAsFirst": "igual que el primero",
-    "sinceFirst": "{value} desde el primero",
-    "bestLabel": "Mejor · {field}",
-    "historyToggle": "Historial",
     "renameLabel": "Renombrar",
     "trayMore": "Mostrar más ({count})",
-    "trayLess": "Mostrar menos"
+    "trayLess": "Mostrar menos",
+    "removeRow": "Quitar {item}",
+    "addRows": "Añadir"
   },
   "checkinLog": {
     "title": "Tus registros",

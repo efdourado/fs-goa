@@ -608,7 +608,8 @@ export function AppHeader({
   const [busy, setBusy] = useState(false);
   const navLink = "min-h-11 cursor-pointer rounded-xl px-2 text-xs text-[var(--muted)] hover:bg-[var(--wash)] hover:text-[var(--ink)] disabled:cursor-not-allowed sm:px-3";
   return (
-    <header className="sticky top-0 z-30 border-b border-[var(--edge)] bg-[var(--canvas)]/92 backdrop-blur-xl">
+    // A phone navigates by the dock, so it has no header at all (the logo lives on the About page).
+    <header className="sticky top-0 z-30 hidden border-b border-[var(--edge)] bg-[var(--canvas)]/92 backdrop-blur-xl sm:block">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:h-[76px] sm:px-6">
         <button className="cursor-pointer rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25" type="button" onClick={onHome}><Brand /></button>
         <div className="flex min-w-0 items-center gap-0.5 sm:gap-2">

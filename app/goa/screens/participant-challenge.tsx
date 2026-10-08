@@ -1,6 +1,7 @@
 "use client";
 
 import { useFormatter, useTranslations } from "next-intl";
+import { flushSync } from "react-dom";
 import { type FormEvent, forwardRef, type ReactNode, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 
 import { ApiError } from "../api";
@@ -600,8 +601,11 @@ function ChallengeCardActions({ challengeId, shareToken, extra, end }: { challen
         className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[var(--spotlight-ink)] text-sm font-medium transition hover:opacity-90 sm:w-auto sm:px-4"
       >
         <span className="inline-flex items-center gap-2 text-[var(--spotlight)]">
-          <svg viewBox="0 0 20 20" className="size-[18px] flex-none sm:size-4" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
-            <path d="M10 3v10m0 0-4-4m4 4 4-4M4 16h12" strokeLinecap="round" strokeLinejoin="round" />
+          {/* A film strip: the challenge's whole log as one PDF (the arrow is "Download pages"). */}
+          <svg viewBox="0 0 20 20" className="size-[18px] flex-none sm:size-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" aria-hidden="true">
+            <rect x="3" y="2.75" width="14" height="14.5" rx="2" />
+            <path d="M6.75 2.75v14.5M13.25 2.75v14.5" />
+            <path d="M3 6.25h3.75M3 10h3.75M3 13.75h3.75M13.25 6.25H17M13.25 10H17M13.25 13.75H17" strokeLinecap="round" />
           </svg>
           <span className="hidden sm:inline">{te("button")}</span>
         </span>
@@ -1017,6 +1021,8 @@ interface PickerOption {
   meta?: string;
   /** The rating this participant gave the item, shown at the end of the row. */
   rating?: number | null;
+  /** Its place in the list, when the rows aren't shown in that order (newest first). */
+  number?: number;
 }
 
 function EntryPicker({
@@ -1041,30 +1047,99 @@ function EntryPicker({
   const nf = useFormatter();
   const tCine = useTranslations("cineItems");
   const tAdmin = useTranslations("adminChallenge");
+  // "Add item" waits folded above the first row until you insist: at the top of the list, keep pulling down
+  // (a finger or the wheel) in one go, and it opens. A pause starts the count again, so scrolling past never does.
+  const listRef = useRef<HTMLOListElement>(null);
+  const addRef = useRef<HTMLLIElement>(null);
+  const pull = useRef({ distance: 0, at: 0, touchY: null as number | null });
+  // Open for the list as it was when pulled; adding an item (a new length) folds it away again.
+  const [shownAt, setShownAt] = useState<number | null>(null);
+  const addShown = shownAt === options.length;
+  function pulled(distance: number, needed: number) {
+    const list = listRef.current;
+    if (!onAdd || !list) return;
+    // Open: a list too short to scroll folds it when pushed back up (a longer one scrolls it away — see onScroll).
+    if (addShown) {
+      if (distance < -8 && list.scrollHeight <= list.clientHeight + 1) setShownAt(null);
+      return;
+    }
+    const now = Date.now();
+    const fresh = now - pull.current.at < 400;
+    pull.current.at = now;
+    pull.current.distance = list.scrollTop <= 0 && distance > 0 ? (fresh ? pull.current.distance : 0) + distance : 0;
+    if (pull.current.distance > needed) {
+      pull.current.distance = 0;
+      setShownAt(options.length);
+    }
+  }
+  // A phone's other gesture: swipe an item right to left to fix its details.
+  const swipe = useRef<{ x: number; y: number } | null>(null);
   return (
     <div>
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <p className={sectionLabelClass}>{title}</p>
         <span className="flex items-baseline gap-3">
           {tally ? <span className="text-xs text-[var(--muted)]">{tally}</span> : null}
-          {onAdd ? (
-            <button type="button" onClick={onAdd} className="min-h-9 cursor-pointer text-sm font-medium text-[var(--main-strong)] hover:underline">＋ {tCine("addShort")}</button>
-          ) : null}
         </span>
       </div>
       <section className={cx(cardClass, "p-4 sm:p-5")}>
-      <ol className="max-h-60 space-y-1.5 overflow-y-auto pr-0.5">
+      <ol
+        ref={listRef}
+        className="max-h-60 space-y-1.5 overflow-y-auto pr-0.5"
+        onWheel={(event) => pulled(-event.deltaY, 260)}
+        onScroll={() => {
+          // Once the open row has scrolled fully out of view, fold it — instantly, with the scroll moved back by
+          // the same height, so nothing on screen shifts.
+          const list = listRef.current;
+          const add = addRef.current;
+          if (!addShown || !list || !add) return;
+          const height = add.offsetHeight + 6;
+          if (list.scrollTop < height) return;
+          flushSync(() => setShownAt(null));
+          list.scrollTop -= height;
+        }}
+        onTouchStart={(event) => { pull.current.touchY = event.touches[0]?.clientY ?? null; }}
+        onTouchMove={(event) => {
+          const y = event.touches[0]?.clientY;
+          if (y === undefined || pull.current.touchY === null) return;
+          pulled(y - pull.current.touchY, 110);
+          pull.current.touchY = y;
+        }}
+      >
+        {onAdd ? (
+          // Folded away until pulled out (or tabbed to).
+          // Opening glides; folding is instant (it only happens out of sight, or on a list too short to scroll).
+          <li ref={addRef} className={cx("grid focus-within:grid-rows-[1fr] focus-within:opacity-100", addShown ? "grid-rows-[1fr] opacity-100 transition-[grid-template-rows,opacity] duration-300 ease-out" : "mb-0 grid-rows-[0fr] opacity-0")}>
+            <div className="min-h-0 overflow-hidden">
+              <button type="button" onClick={onAdd} className="flex min-h-12 w-full cursor-pointer items-center gap-3 rounded-xl border border-dashed border-[var(--main-line)] px-3 py-2.5 text-left text-sm text-[var(--main-strong)] transition hover:bg-[var(--main-soft)]">
+                <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-[var(--main-soft)]" aria-hidden="true">＋</span>
+                {tCine("addItemRow")}
+              </button>
+            </div>
+          </li>
+        ) : null}
         {options.map((option, index) => {
           const active = option.id === selectedId;
           const rating = typeof option.rating === "number" ? option.rating : null;
           const caption = [option.statusLabel, option.meta].filter(Boolean).join(" · ");
           return (
-            <li key={option.id} className="flex items-center gap-1.5">
+            <li
+              key={option.id}
+              className="flex items-center gap-1.5"
+              onTouchStart={onEdit ? (event) => { const touch = event.touches[0]; swipe.current = touch ? { x: touch.clientX, y: touch.clientY } : null; } : undefined}
+              onTouchEnd={onEdit ? (event) => {
+                const start = swipe.current;
+                const touch = event.changedTouches[0];
+                swipe.current = null;
+                // Clearly sideways, right to left: a list scrolled up and down never counts.
+                if (start && touch && start.x - touch.clientX > 70 && Math.abs(touch.clientY - start.y) < 30) onEdit(option.id);
+              } : undefined}
+            >
               <button
                 type="button"
                 disabled={option.soon}
                 aria-pressed={active}
-                aria-label={`${index + 1}. ${option.label}${option.statusLabel ? ` (${option.statusLabel})` : ""}`}
+                aria-label={`${option.number ?? index + 1}. ${option.label}${option.statusLabel ? ` (${option.statusLabel})` : ""}`}
                 onClick={() => onSelect(option.id)}
                 className={cx(
                   "flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition disabled:opacity-45",
@@ -1083,7 +1158,7 @@ function EntryPicker({
                         : "bg-[var(--wash)] text-[var(--muted)]",
                   )}
                 >
-                  {option.done ? <CheckGlyph /> : index + 1}
+                  {option.done ? <CheckGlyph /> : option.number ?? index + 1}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className={cx("block truncate text-sm", active ? "font-medium text-[var(--main-strong)]" : "font-light")}>{option.label}</span>
@@ -1377,6 +1452,10 @@ export function ParticipantChallengeScreen({
     return map;
   }, [entries, user?.id, readRating]);
   const sortedItems = useMemo(() => [...challenge.items].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)), [challenge.items]);
+  // The list on Today: newest first when nothing schedules the items (the latest added is what you're on);
+  // a planned order — weeks, sessions, due dates — keeps its own.
+  const scheduledItems = sortedItems.some((item) => item.checkpointId || item.opensAt || item.dueAt);
+  const pickerItems = useMemo(() => (scheduledItems ? sortedItems : [...sortedItems].reverse()), [sortedItems, scheduledItems]);
   // A workout-style challenge: one check-in that holds a record for each of several items. It replaces the
   // per-item picker and form on Today, and its progress is "check-ins logged", not "items done".
   const sessionSpec = useMemo(() => sessionSpecOf(challenge), [challenge]);
@@ -1601,7 +1680,7 @@ export function ParticipantChallengeScreen({
       tally={t("checkpointTally", { done: doneCount, pending: Math.max(0, sortedItems.length - doneCount) })}
       selectedId={selectedItem?.id ?? null}
       onSelect={(id) => setSelectedItemId(id)}
-      options={sortedItems.map((item) => {
+      options={pickerItems.map((item) => {
         const done = doneByItem.has(item.id);
         const soon = item.status === "scheduled" && !entriesByItem.has(item.id);
         const label = item.catalogItem?.year ? `${item.title} (${item.catalogItem.year})` : item.title;
@@ -1611,7 +1690,7 @@ export function ParticipantChallengeScreen({
         const progress = !pages || !bookCount ? null
           : done || (read ?? 0) >= pages ? t("bookDone")
             : read === undefined ? null : t("bookProgress", { page: read, total: pages, left: pages - read });
-        return { id: item.id, label, done, soon, statusLabel: done ? "" : soon ? t("checkpointSoonLabel") : undefined, meta: progress ?? metaForItem(item), rating: ratingByItem.get(item.id) ?? null };
+        return { id: item.id, number: sortedItems.indexOf(item) + 1, label, done, soon, statusLabel: done ? "" : soon ? t("checkpointSoonLabel") : undefined, meta: progress ?? metaForItem(item), rating: ratingByItem.get(item.id) ?? null };
       })}
     />
   ) : null;

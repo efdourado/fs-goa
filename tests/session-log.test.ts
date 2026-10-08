@@ -40,39 +40,33 @@ test("um check-in que guarda registros por item é reconhecido pelos tipos; um d
   assert.equal(sessionSpecOf({ entryTypes: [{ ...visitType, parentTypeId: null }] } as unknown as ChallengeDetail), null);
 });
 
-test("o registro de um treino: bandeja de itens para tocar, histórico só seu e o melhor de cada campo por exercício", () => {
+test("o registro de um treino: um dia vazio começa escolhendo os itens; nada de 'repetir', nada de 'por item'", () => {
   const spec = sessionSpecOf(challenge)!;
   const html = renderWithIntl(createElement(SessionLog, {
     challenge, spec, entries, userId: "me", canEdit: true, onSave: async () => undefined, onDelete: async () => undefined,
   }));
   assert.match(html, /Registrar Treino/, "o título usa o nome que o criador deu");
-  assert.match(html, /Toque para adicionar/);
   const form = html.slice(html.indexOf("<form"), html.indexOf("</form>"));
-  // Cada item é um botão da bandeja, os mais usados primeiro; nenhum ainda neste treino.
-  assert.ok(form.indexOf("Supino") < form.indexOf("Agachamento"), "o supino, usado duas vezes, vem antes");
-  assert.ok((form.match(/aria-pressed="false"/g) ?? []).length >= 2);
-  assert.doesNotMatch(form, /Escolha acima/, "sem cartões, só a bandeja — nenhuma dica ocupando espaço");
+  assert.match(form, /Toque para adicionar/, "o treino de hoje começa escolhendo o que fazer, mesmo com treinos anteriores");
+  assert.ok(form.indexOf("Supino") < form.indexOf("Agachamento"), "os mais usados primeiro");
+  assert.doesNotMatch(form, /Repetir o último/, "ninguém repete um treino inteiro");
   assert.doesNotMatch(form, /Renomear/, "sem permissão, não há como renomear o check-in");
-  assert.doesNotMatch(form, /Novo item/, "sem permissão, não há como criar item");
-  assert.match(html, /<strong[^>]*>2<\/strong> dias com registro desde/, "só os seus dois treinos contam — e sem datas, o total é desde o primeiro, não de uma meta");
+  assert.match(html, /<strong[^>]*>2<\/strong> dias com registro desde/, "só os seus dois treinos contam");
   assert.match(html, /semanas? seguidas?/, "um treino conta semanas seguidas, não dias");
-  assert.doesNotMatch(html, /<h2[^>]*>Seus check-ins<\/h2>/, "o histórico repetido embaixo da faixa saiu");
-  assert.doesNotMatch(html, /100(?!%)/, "o treino de outra pessoa não entra no seu histórico nem nos recordes");
-  assert.match(html, /Melhor · Carga \(kg\)<\/dt><dd[^>]*>57,5<\/dd>/, "o recorde do supino sai do histórico, sem ninguém digitá-lo");
-  assert.match(html, /Supino<\/strong><span[^>]*>2 check-ins<\/span>/, "o supino apareceu nos dois treinos");
-  assert.doesNotMatch(html, /· último/, "o número grande fala por si, sem rótulo em cima");
-  assert.match(html, /\+2,5 desde o primeiro/, "e diz quanto mudou desde o primeiro");
+  assert.doesNotMatch(html, /100(?!%)/, "o treino de outra pessoa não entra no seu log");
+  assert.doesNotMatch(html, /Melhor ·|desde o primeiro|check-ins<\/span>/, "o 'por item' saiu: isso é dos Resultados");
 });
 
-test("quem pode criar itens ganha o botão Novo item na bandeja", () => {
+test("sem treino para repetir, a bandeja aparece; quem pode criar itens ganha o Novo item", () => {
   const spec = sessionSpecOf(challenge)!;
   const html = renderWithIntl(createElement(SessionLog, {
-    challenge, spec, entries, userId: "me", canEdit: true, onSave: async () => undefined, onAddItem: async () => "new",
+    challenge, spec, entries: [], userId: "me", canEdit: true, onSave: async () => undefined, onAddItem: async () => "new",
   }));
+  assert.match(html, /Toque para adicionar/);
   assert.match(html, /Novo item/);
 });
 
-test("o treino de hoje já registrado abre para editar, com a última vez, a diferença e o recorde", () => {
+test("o treino de hoje já registrado abre para editar: uma linha por item, com a última vez, a diferença e o recorde", () => {
   const spec = sessionSpecOf(challenge)!;
   const today = dateKeyInSaoPaulo(new Date());
   const withToday = [
@@ -84,12 +78,13 @@ test("o treino de hoje já registrado abre para editar, com a última vez, a dif
     challenge, spec, entries: withToday, userId: "me", canEdit: true, onSave: async () => undefined, onDelete: async () => undefined,
   }));
   const form = html.slice(html.indexOf("<form"), html.indexOf("</form>"));
-  assert.doesNotMatch(form, /Editando Treino/, "a data já está na faixa de dias — o formulário não a repete");
-  assert.doesNotMatch(form, /type="date"/, "nem um campo de data ao lado");
-  assert.match(form, /data-item="bench"/, "o supino de hoje vira um cartão");
+  assert.doesNotMatch(form, /type="date"/, "a data está na faixa de dias, não no formulário");
+  assert.match(form, /data-item="bench"/, "o supino de hoje é uma linha");
+  assert.match(form, /title="Repetir"[^>]*>Da última vez: 57[,.]5 · 8/, "a última vez à mão: tocar nela repete os números");
   assert.match(form, /\+2,5 vs\. última/, "a carga subiu 2,5 desde o último treino");
   assert.match(form, /Recorde de Carga \(kg\) · antes 57[,.]5/);
-  assert.match(form, /aria-pressed="true"[^>]*>(?:(?!<\/button>)[\s\S])*Supino/, "o supino aparece marcado na bandeja");
+  assert.match(form, /aria-label="Tirar Supino"/, "cada linha sai com um toque");
+  assert.match(form, />＋ Adicionar</, "mais itens esperam atrás de '+ Adicionar'");
   assert.match(form, />Excluir</, "um treino salvo pode ser excluído dali mesmo");
 });
 
