@@ -2,8 +2,7 @@
 
 import type { ReactNode } from "react";
 
-import { AddCardTile } from "./add-tile";
-import { CoverSwatch, ItemCover, ScoreRing } from "./catalog-cover";
+import { CoverSwatch, coverColors, coverToneOf, ScoreRing } from "./catalog-cover";
 import type { GoaFormat } from "./format";
 import type { CatalogAttributeValue, CatalogLibrary, EventSchedule } from "./types";
 import { cx } from "./ui";
@@ -78,52 +77,88 @@ export function resolveCoverTop(
   }
 }
 
-/** One cover in the grid — a button that opens the item, or a checkbox while items are being picked. */
-export function CatalogTile({ title, year, avg, ratingLabel, badgeHidden, caption, note, noteTone = "muted", size = "md", className, selecting, picked, onPick, onOpen }: {
+/** The fixed height of a catalogue card (and a library card): one line of title, never taller. */
+export const catalogCardHeight = "h-16 sm:h-[4.75rem]";
+
+/**
+ * One catalogue item as a card the width of a challenge card and one line tall: the title's own tint, the title
+ * cut with "…" when it runs long, and — from `sm:` up — the library's top value (a year) and the rating ring on
+ * the same line. A button that opens the item, or a checkbox while items are being picked. A caption (author,
+ * genre, runtime) shows under it from `sm:` up; a note always does.
+ */
+export function CatalogTile({ title, year, avg, ratingLabel, badgeHidden, caption, note, noteTone = "muted", className, selecting, picked, onPick, onOpen }: {
   title: string;
   year?: string | number | null;
   avg?: number | null;
-  /** Turns off the rating ring badge regardless of `avg` — the library's own choice, not "no rating yet". */
+  /** Turns off the rating ring regardless of `avg` — the library's own choice, not "no rating yet". */
   badgeHidden?: boolean;
   ratingLabel: string;
   caption: string;
   note?: string;
   noteTone?: "muted" | "warn";
-  size?: "sm" | "rail" | "md";
-  /** Sizes the tile inside a rail; a grid leaves it out. */
+  /** Sizes the card inside a rail; a grid leaves it out. */
   className?: string;
   selecting?: boolean;
   picked?: boolean;
   onPick?: (on: boolean) => void;
   onOpen: () => void;
 }) {
+  const rated = !badgeHidden && avg !== null && avg !== undefined;
   const body = (
     <>
-      <ItemCover title={title} year={year} avg={avg} ratingLabel={ratingLabel} showBadge={!badgeHidden} size={size} className={cx("transition duration-200", picked ? "ring-[3px] ring-[var(--main)] ring-offset-2 ring-offset-[var(--canvas)]" : "group-hover:-translate-y-0.5 group-hover:shadow-[var(--elevate-2)]")}>
+      <span
+        className={cx(
+          "relative flex items-center gap-3 overflow-hidden rounded-[20px] bg-[var(--cover-bg)] px-4 text-[var(--cover-ink)] shadow-[var(--elevate-1)] transition duration-200",
+          catalogCardHeight,
+          picked ? "ring-[3px] ring-[var(--main)] ring-offset-2 ring-offset-[var(--canvas)]" : "group-hover:-translate-y-0.5 group-hover:shadow-[var(--elevate-2)]",
+        )}
+        style={coverColors(coverToneOf(title))}
+      >
+        <span aria-hidden="true" className="pointer-events-none absolute -bottom-9 -right-7 h-20 w-20 rounded-full border-[12px] border-[var(--cover-deco)]" />
         {selecting ? (
-          <span aria-hidden="true" className={cx("absolute bottom-3 left-3 grid h-6 w-6 place-items-center rounded-full border-2 text-xs", picked ? "border-[var(--main)] bg-[var(--main)] text-white" : "border-[var(--cover-ink)] bg-[var(--paper)]/70")}>{picked ? "✓" : ""}</span>
+          <span aria-hidden="true" className={cx("relative grid h-6 w-6 flex-none place-items-center rounded-full border-2 text-xs", picked ? "border-[var(--main)] bg-[var(--main)] text-white" : "border-[var(--cover-ink)] bg-[var(--paper)]/70")}>{picked ? "✓" : ""}</span>
         ) : null}
-      </ItemCover>
-      <span className="flex flex-col gap-0.5 text-xs text-[var(--muted)] sm:flex-row sm:items-baseline sm:justify-between sm:gap-2">
-        <span className="min-w-0 truncate">{caption}</span>
-        {note ? <span className={cx("flex-none", noteTone === "warn" && "text-[var(--warn)]")}>{note}</span> : null}
+        <span className="relative min-w-0 flex-1 truncate text-[15px] font-light tracking-[-0.02em] sm:text-lg">{title}</span>
+        {year ? <span className="relative hidden flex-none text-[11px] tracking-[0.08em] sm:block" style={{ fontFamily: "var(--font-geist-mono), ui-monospace, monospace" }}>{year}</span> : null}
+        {rated ? (
+          <ScoreRing value={avg} size={34} label={ratingLabel} strokeWidth={3} className="relative hidden bg-[var(--paper)] shadow-[0_2px_8px_rgba(32,36,31,0.14)] sm:inline-grid" textClassName="text-[11px] font-medium" />
+        ) : null}
       </span>
+      {caption || note ? (
+        <span className={cx("flex-col gap-0.5 px-1 text-xs text-[var(--muted)] sm:flex sm:flex-row sm:items-baseline sm:justify-between sm:gap-2", note ? "flex" : "hidden")}>
+          <span className="hidden min-w-0 truncate sm:block">{caption}</span>
+          {note ? <span className={cx("flex-none", noteTone === "warn" && "text-[var(--warn)]")}>{note}</span> : null}
+        </span>
+      ) : null}
     </>
   );
-  const shared = cx("group flex min-w-0 flex-col gap-2.5 text-left focus-visible:outline-none", className);
+  const shared = cx("group flex min-w-0 flex-col gap-2 text-left focus-visible:outline-none", className);
   return selecting ? (
     <label className={cx(shared, "cursor-pointer")}>
       <input type="checkbox" className="peer sr-only" checked={Boolean(picked)} aria-label={title} onChange={(event) => onPick?.(event.target.checked)} />
-      <span className="flex flex-col gap-2.5 rounded-[22px] peer-focus-visible:ring-4 peer-focus-visible:ring-[var(--main)]/25">{body}</span>
+      <span className="flex flex-col gap-2 rounded-[22px] peer-focus-visible:ring-4 peer-focus-visible:ring-[var(--main)]/25">{body}</span>
     </label>
   ) : (
-    <button type="button" onClick={onOpen} className={cx(shared, "cursor-pointer rounded-[22px] focus-visible:ring-4 focus-visible:ring-[var(--main)]/25")}>{body}</button>
+    <button type="button" onClick={onOpen} title={title} className={cx(shared, "cursor-pointer rounded-[22px] focus-visible:ring-4 focus-visible:ring-[var(--main)]/25")}>{body}</button>
   );
 }
 
-/** The dashed "+ Add item" cell that opens the add dialog — the same tile the group page's shelf starts with, sized like a cover. */
-export function AddItemTile({ label, onClick }: { label: string; onClick: () => void }) {
-  return <AddCardTile label={label} onClick={onClick} className="aspect-[3/4] w-full self-start" />;
+/** The dashed "＋ Add item" card that opens the add dialog — one line tall, like the item cards beside it. */
+export function AddItemTile({ label, onClick, className }: { label: string; onClick: () => void; className?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cx(
+        "flex cursor-pointer items-center justify-center gap-2.5 self-start rounded-[20px] border border-dashed border-[var(--main-line)] px-4 text-[13px] text-[var(--main-strong)] transition hover:bg-[var(--main-soft)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25",
+        catalogCardHeight,
+        className ?? "w-full",
+      )}
+    >
+      <span aria-hidden="true" className="grid h-8 w-8 place-items-center rounded-full bg-[var(--main-soft)]">＋</span>
+      {label}
+    </button>
+  );
 }
 
 /** One row of the list layout: a small cover swatch, the title and its details, the rating ring. */

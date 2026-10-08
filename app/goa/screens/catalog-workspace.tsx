@@ -6,7 +6,7 @@ import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { API_PATHS, apiRequest } from "../api";
 import { AddCatalogItemDialog } from "../catalog-item-dialogs";
 import { KebabMenu, menuRowClass } from "../card-menu";
-import { AddItemTile, CatalogRow, CatalogTile, type CatalogGroupBy, groupCatalogItems, LayoutToggle, resolveCoverTop } from "../catalog-views";
+import { AddItemTile, catalogCardHeight, CatalogRow, CatalogTile, type CatalogGroupBy, groupCatalogItems, LayoutToggle, resolveCoverTop } from "../catalog-views";
 import { useCsrf } from "../csrf";
 import { ConfirmDialog } from "../dialog";
 import { useGoaFormat } from "../format";
@@ -20,7 +20,6 @@ import {
 import { useLibraryProperties } from "../property-inputs";
 import { recommenderLine, useRecommenderSource } from "../recommender-picker";
 import { Segmented } from "../Segmented";
-import { Rail, shelfCardWidth, useShelfRail } from "../shelf";
 import type { CatalogItem, CatalogLibrary, Id, Member } from "../types";
 import { BackButton, Button, cardClass, cx, EmptyState, StatusMessage } from "../ui";
 import { formatRuntime } from "../utils";
@@ -50,6 +49,9 @@ function ChipSelect({ label, value, onChange, active, children }: { label: strin
     </label>
   );
 }
+
+/** Libraries and items share one grid: the cards stretch to fill the row, two on a phone up to four on a wide screen. */
+const catalogGrid = "grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4";
 
 /** A phone's Group by / Sort by: a small pill with its name and a native picker, instead of a wide segmented bar. */
 function CompactSelect<T extends string>({ label, value, onChange, options }: { label: string; value: T; onChange: (value: T) => void; options: Array<{ value: T; label: string }> }) {
@@ -113,7 +115,6 @@ export function CatalogWorkspaceScreen({
   const [selecting, setSelecting] = useState(false);
   const [picked, setPicked] = useState<ReadonlySet<Id>>(new Set());
   const [confirmingRemoval, setConfirmingRemoval] = useState(false);
-  const { railRef: libraryRailRef, showFade: libraryShowFade, onScroll: onLibraryScroll } = useShelfRail();
   const csrf = useCsrf();
   const source = useRecommenderSource(scope, recommendationsEnabled);
   const scopeId = scope === "personal" ? "personal" : scope.groupId;
@@ -285,20 +286,21 @@ export function CatalogWorkspaceScreen({
       <StatusMessage error={librariesError ?? itemsError} success={notice} />
 
       {!loading && tabs.length ? (
-        // -mx-1 / px-1 (and scroll-px-1, so snapping keeps it): room for a focus ring at the ends of the rail without moving the first card.
+        // Every library at once, in the same grid as the items below (no sideways scroll); -mx-1 / p-1 leave room for a focus ring.
         <nav className="-mx-1 mb-4" aria-label={tl("tabsLabel")}>
-          <Rail railRef={libraryRailRef} showFade={libraryShowFade} onScroll={onLibraryScroll} className="scroll-px-1 px-1">
+          <div className={cx(catalogGrid, "p-1")}>
             {tabs.map((entry) => {
               const active = entry.kind === kind;
               const counts = countByKind.get(entry.kind) ?? { total: 0, unused: 0 };
               return (
-                <div key={entry.id} className={cx("group relative", shelfCardWidth)}>
+                <div key={entry.id} className="group relative min-w-0">
                   <button
                     type="button"
                     aria-pressed={active}
                     onClick={() => chooseLibrary(entry.kind)}
                     className={cx(
-                      "relative flex min-h-[4rem] w-full cursor-pointer items-center gap-3 overflow-hidden rounded-[20px] border px-3.5 text-left sm:min-h-[4.75rem] sm:gap-3.5 sm:px-4 shadow-[var(--elevate-card)] transition duration-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25",
+                      catalogCardHeight,
+                      "relative flex w-full cursor-pointer items-center gap-3 overflow-hidden rounded-[20px] border px-3.5 text-left sm:gap-3.5 sm:px-4 shadow-[var(--elevate-card)] transition duration-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25",
                       active ? "border-[var(--main)] bg-[var(--main-soft)] ring-1 ring-inset ring-[var(--main)]" : "border-[var(--line)] bg-[var(--paper)] hover:-translate-y-0.5 hover:border-[var(--main-line)]",
                     )}
                   >
@@ -314,7 +316,7 @@ export function CatalogWorkspaceScreen({
                       </small>
                     </span>
                   </button>
-                  <div className="absolute right-2.5 top-2.5">
+                  <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
                     <KebabMenu label={tl("libraryActions")}>
                       {(close) => (
                         <>
@@ -332,12 +334,12 @@ export function CatalogWorkspaceScreen({
               <button
                 type="button"
                 onClick={() => setDialog("new")}
-                className="flex min-h-[4rem] w-[60vw] max-w-[15rem] flex-none cursor-pointer snap-start items-center justify-center gap-2 rounded-[20px] border sm:min-h-[4.75rem] sm:w-[19rem] sm:max-w-[19rem] border-dashed border-[var(--muted)] px-4 text-sm font-light text-[var(--muted)] transition hover:border-[var(--ink)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
+                className={cx(catalogCardHeight, "flex min-w-0 cursor-pointer items-center justify-center gap-2 rounded-[20px] border border-dashed border-[var(--muted)] px-4 text-sm font-light text-[var(--muted)] transition hover:border-[var(--ink)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25")}
               >
                 ＋ {tl("newLibrary")}
               </button>
             ) : null}
-          </Rail>
+          </div>
         </nav>
       ) : null}
 
@@ -460,7 +462,7 @@ export function CatalogWorkspaceScreen({
                       </h2>
                     ) : null}
                     {layout === "covers" ? (
-                      <div className="grid grid-cols-3 gap-x-3 gap-y-5 sm:gap-x-5 sm:gap-y-7 lg:grid-cols-4 xl:grid-cols-5">
+                      <div className={catalogGrid}>
                         {canManage && !selecting && index === 0 ? <AddItemTile label={t("addItem")} onClick={() => { setNotice(null); setDialog("add"); }} /> : null}
                         {group.items.map((item) => {
                           const unused = isUnused(item);

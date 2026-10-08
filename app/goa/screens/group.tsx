@@ -9,9 +9,9 @@ import { useGoaFormat } from "../format";
 import { NewChallengeTile } from "../add-tile";
 import { CatalogShelfSkeleton } from "../catalog-shelf";
 import { TasteMap } from "../taste-map";
-import { CatalogTile, resolveCoverTop } from "../catalog-views";
+import { catalogCardHeight, CatalogTile, resolveCoverTop } from "../catalog-views";
 import { LibraryGlyph, useCatalogShelf, useLibraryName } from "../libraries";
-import { Rail, RailArrows, shelfCoverWidth, useShelfRail } from "../shelf";
+import { Rail, RailArrows, shelfCardWidth, useShelfRail } from "../shelf";
 import type { CatalogItem, ChallengeSummary, GroupInviteResult, GroupSummary, Id, Member, PendingGroupRequest } from "../types";
 import { BackButton, Button, cx, EmptyState, Field, inputClass, SlidersIcon, StatusMessage, Toggle } from "../ui";
 import { canManage, formatRuntime } from "../utils";
@@ -417,8 +417,7 @@ export function GroupScreen({
                   {visibleCatalog.map((item) => (
                     <CatalogTile
                       key={item.id}
-                      size="rail"
-                      className={shelfCoverWidth}
+                      className={shelfCardWidth}
                       title={item.title}
                       year={resolveCoverTop(item, activeCatalogLibrary?.coverTopProperty, f)}
                       avg={item.ratingAvg}
@@ -432,11 +431,11 @@ export function GroupScreen({
                     <button
                       type="button"
                       onClick={onOpenCatalog}
-                      className="flex aspect-[3/4] w-32 flex-none cursor-pointer snap-start flex-col sm:w-44 items-center justify-center gap-1.5 self-start rounded-[20px] border border-[var(--line)] bg-[var(--paper)] transition hover:border-[var(--main-line)]"
+                      className={cx(shelfCardWidth, catalogCardHeight, "flex cursor-pointer items-center gap-3 self-start rounded-[20px] border border-[var(--line)] bg-[var(--paper)] px-4 text-left transition hover:border-[var(--main-line)]")}
                     >
-                      <span className="text-3xl font-light tracking-[-0.04em]">{remainingCatalog}</span>
-                      <span className="px-3 text-center text-xs text-[var(--muted)]">{t("catalogMoreIn", { name: activeCatalogLibrary ? libraryName(activeCatalogLibrary) : t("catalogTitle") })}</span>
-                      <span className="mt-2.5 text-[13px] text-[var(--main-strong)]">{t("catalogSeeAll")} →</span>
+                      <span className="text-2xl font-light tracking-[-0.04em]">{remainingCatalog}</span>
+                      <span className="min-w-0 flex-1 truncate text-xs text-[var(--muted)]">{t("catalogMoreIn", { name: activeCatalogLibrary ? libraryName(activeCatalogLibrary) : t("catalogTitle") })}</span>
+                      <span className="flex-none text-[13px] text-[var(--main-strong)]">{t("catalogSeeAll")} →</span>
                     </button>
                   ) : null}
                 </Rail>

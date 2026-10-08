@@ -63,10 +63,6 @@ export function CoverSwatch({ title, className }: { title: string; className?: s
 
 const SIZES = {
   sm: { clamp: "line-clamp-4 pr-5", pad: "p-[15px]", year: "text-[10px]", title: "text-[21px]", ring: "-right-[46px] -bottom-[46px] h-[148px] w-[148px] border-[19px]", badge: 40, badgeText: "text-[12px] font-medium", badgeInset: "bottom-2.5 right-2.5" },
-  // A cover on a Home or group shelf: smaller type, ring and badge on a phone, `sm` from `sm:` up.
-  rail: { clamp: "line-clamp-4 pr-4 sm:pr-5", pad: "p-3 sm:p-[15px]", year: "text-[9px] sm:text-[10px]", title: "text-[16px] sm:text-[21px]", ring: "-right-[34px] -bottom-[34px] h-[108px] w-[108px] border-[14px] sm:-right-[46px] sm:-bottom-[46px] sm:h-[148px] sm:w-[148px] sm:border-[19px]", badge: 40, badgeText: "text-[12px] font-medium", badgeInset: "bottom-2 right-2 sm:bottom-2.5 sm:right-2.5" },
-  // The catalogue page's grid: three across on a phone, so the same small cover as a shelf's; from `sm:` up as designed.
-  md: { clamp: "line-clamp-4 pr-4 sm:pr-5", pad: "p-3 sm:p-[18px]", year: "text-[9px] sm:text-[11px]", title: "text-[16px] sm:text-[25px]", ring: "-right-[34px] -bottom-[34px] h-[108px] w-[108px] border-[14px] sm:-right-[54px] sm:-bottom-[54px] sm:h-[176px] sm:w-[176px] sm:border-[22px]", badge: 46, badgeText: "text-[13px] font-medium", badgeInset: "bottom-2.5 right-2.5 sm:bottom-3 sm:right-3" },
   xl: { clamp: "line-clamp-5", pad: "p-7", year: "text-[13px]", title: "text-[54px]", ring: "-right-[90px] -bottom-[90px] h-[300px] w-[300px] border-[38px]", badge: 0, badgeText: "", badgeInset: "" },
 } as const;
 
@@ -91,8 +87,6 @@ export function ItemCover({ title, year, avg, ratingLabel, showBadge = true, sho
   children?: ReactNode;
 }) {
   const spec = SIZES[size];
-  // A phone-sized cover (a shelf's, or the catalogue grid's three across) is just the title: no year, no rating ring.
-  const phoneBare = size === "rail" || size === "md";
   return (
     <span
       className={cx("relative flex aspect-[3/4] w-full flex-col overflow-hidden bg-[var(--cover-bg)] text-[var(--cover-ink)]", size === "xl" ? "justify-between rounded-[28px] shadow-[var(--elevate-2)]" : "gap-2.5 rounded-[20px] shadow-[var(--elevate-1)]", spec.pad, className)}
@@ -100,11 +94,11 @@ export function ItemCover({ title, year, avg, ratingLabel, showBadge = true, sho
     >
       <span aria-hidden="true" className={cx("absolute rounded-full border-[var(--cover-deco)]", spec.ring)} />
       <span aria-hidden="true" className="absolute right-3.5 top-3.5 h-2.5 w-2.5 rounded-full bg-[var(--cover-deco)]" />
-      <span className={cx("relative truncate tracking-[0.08em]", spec.year, phoneBare && "hidden sm:block")} style={{ fontFamily: "var(--font-geist-mono), ui-monospace, monospace" }}>{year ?? "\u00a0"}</span>
+      <span className={cx("relative truncate tracking-[0.08em]", spec.year)} style={{ fontFamily: "var(--font-geist-mono), ui-monospace, monospace" }}>{year ?? "\u00a0"}</span>
       {showTitle ? <span className={cx("relative break-words font-light leading-[1.05] tracking-[-0.04em]", spec.clamp, spec.title)}>{title}</span> : null}
       {/* No rating yet: no badge at all, the cover stays clean. */}
       {spec.badge && showBadge && avg !== null && avg !== undefined ? (
-        <span className={cx("absolute", spec.badgeInset, phoneBare && "hidden sm:block")}>
+        <span className={cx("absolute", spec.badgeInset)}>
           <ScoreRing value={avg} size={spec.badge} label={ratingLabel ?? ""} className="bg-[var(--paper)] shadow-[0_2px_8px_rgba(32,36,31,0.14)]" textClassName={spec.badgeText} />
         </span>
       ) : null}
