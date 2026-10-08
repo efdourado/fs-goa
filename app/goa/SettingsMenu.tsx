@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 
 import { locales } from "@/i18n/config";
 import { setUserLocale } from "@/i18n/locale";
-import { LockAppToggle } from "./home-prefs";
 import { Segmented } from "./Segmented";
 import { ThemeToggle } from "./ThemeToggle";
 import { cx } from "./ui";
@@ -48,11 +47,7 @@ export function LanguageSegmented({ className }: { className?: string }) {
  * No account needed: the choices are a cookie + localStorage, so it works on the
  * public pages (sign-in, templates, a shared results link) too.
  */
-export function SettingsMenu({ className, homeOptions = false }: {
-  className?: string;
-  /** Signed in: also the "Lock app" switch for Home. */
-  homeOptions?: boolean;
-}) {
+export function SettingsMenu({ className }: { className?: string }) {
   const t = useTranslations("settings");
   const tTheme = useTranslations("theme");
   const tLang = useTranslations("language");
@@ -110,12 +105,6 @@ export function SettingsMenu({ className, homeOptions = false }: {
             {label(tLang("legend"))}
             <LanguageSegmented className="mt-2" />
           </div>
-          {homeOptions ? (
-            <div>
-              {label(t("homeLegend"))}
-              <div className="mt-1"><LockAppToggle /></div>
-            </div>
-          ) : null}
         </div>
       ) : null}
     </div>

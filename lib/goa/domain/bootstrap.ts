@@ -15,7 +15,6 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
         pendingInvitesPerUser: LIMITS.pendingInvitesPerUser,
       },
       personalWorkspaceId: null,
-      homeView: null,
       groups: [],
       challenges: [],
       memberRequests: [],
@@ -33,8 +32,6 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
         LIMIT 1`,
       [session.user.id],
     );
-
-    const homeViewQuery = pool.query<{ home_view: unknown }>("SELECT home_view FROM users WHERE id = $1", [session.user.id]);
 
     const groupsQuery = pool.query<{
       id: string;
@@ -95,13 +92,12 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
       group_kind: "standard" | "personal";
       pinned: boolean | null;
       color_tag: string | null;
-      sort_index: number | null;
     }>(
       `SELECT c.id, c.group_id, c.title, c.description, c.status, c.kind AS challenge_kind,
               c.start_date::text AS start_date, c.end_date::text AS end_date,
               g.kind AS group_kind,
               gm.role,
-              p.pinned, p.color_tag, p.sort_index,
+              p.pinned, p.color_tag,
               (CASE
                 WHEN EXISTS (SELECT 1 FROM entry_types et WHERE et.challenge_id = c.id
                               AND et.archived_at IS NULL
@@ -165,13 +161,12 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
         WHERE c.deleted_at IS NULL
           AND (g.kind = 'standard' OR (g.kind = 'personal' AND g.owner_user_id = $1))
           AND (c.status <> 'draft' OR gm.role IN ('owner','admin'))
-        ORDER BY p.sort_index ASC NULLS LAST,
-                 CASE c.status WHEN 'active' THEN 0 WHEN 'draft' THEN 1 ELSE 2 END, c.created_at DESC`,
+        ORDER BY CASE c.status WHEN 'active' THEN 0 WHEN 'draft' THEN 1 ELSE 2 END, c.created_at DESC`,
       [session.user.id],
     );
 
-    const [personalWorkspace, homeViewResult, groupsResult, memberRequestsResult, challengesResult] = await Promise.all([
-      personalWorkspaceQuery, homeViewQuery, groupsQuery, memberRequestsQuery, challengesQuery,
+    const [personalWorkspace, groupsResult, memberRequestsResult, challengesResult] = await Promise.all([
+      personalWorkspaceQuery, groupsQuery, memberRequestsQuery, challengesQuery,
     ]);
     const personalWorkspaceId = personalWorkspace.rows[0]?.id ?? null;
 
@@ -236,7 +231,6 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
         pendingInvitesPerUser: LIMITS.pendingInvitesPerUser,
       },
       personalWorkspaceId,
-      homeView: homeViewResult.rows[0]?.home_view ?? null,
       groups: groupsResult.rows.map((group) => ({
         id: group.id,
         name: group.name,
@@ -268,7 +262,6 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
         totalCount: challenge.total_count,
         pinned: challenge.pinned ?? false,
         colorTag: challenge.color_tag,
-        sortIndex: challenge.sort_index,
       })),
       memberRequests: memberRequestsResult.rows.map((request) => ({
         id: request.id,

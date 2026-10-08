@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { type ReactNode, useState } from "react";
 
-import { LockAppToggle } from "../home-prefs";
 import { LanguageSegmented } from "../SettingsMenu";
 import { ThemeToggle } from "../ThemeToggle";
 import type { User } from "../types";
@@ -28,7 +27,7 @@ function Group({ children }: { children: ReactNode }) {
 
 /**
  * "Você" — the dock's last tab: who you are, then everything that used to hide in the header's
- * avatar, sliders and "⋯" menus (account, my catalogue, bin, theme, language, Home options, about,
+ * avatar, sliders and "⋯" menus (account, my catalogue, bin, theme, language, about,
  * contact, sign out). One page on every screen size; on a computer the avatar opens it.
  */
 export function YouScreen({ user, onBack, backLabel, onAccount, onCatalog, onTrash, onAbout, onLogout }: {
@@ -81,9 +80,6 @@ export function YouScreen({ user, onBack, backLabel, onAccount, onCatalog, onTra
             <div className="space-y-2 px-4 py-3">
               <p className="text-sm">{tLang("legend")}</p>
               <LanguageSegmented />
-            </div>
-            <div className="px-4 py-2">
-              <LockAppToggle />
             </div>
           </Group>
         </section>

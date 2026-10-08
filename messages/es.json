@@ -41,9 +41,7 @@
     "wait": "Espera…"
   },
   "settings": {
-    "legend": "Preferencias",
-    "homeLegend": "Inicio",
-    "customizeHome": "Personalizar inicio"
+    "legend": "Preferencias"
   },
   "theme": {
     "legend": "Tema",
@@ -297,8 +295,6 @@
       "running": "Desafíos que conduces"
     },
     "filter": {
-      "reorder": "Reorganizar",
-      "reorderDone": "Listo",
       "context": "Limpiar ({count})",
       "empty": "Nada en este color"
     },
@@ -314,8 +310,6 @@
       "pin": "Fijar arriba",
       "unpin": "Quitar fijado",
       "color": "Color",
-      "moveUp": "Mover arriba",
-      "moveDown": "Mover abajo",
       "open": "Abrir",
       "manage": "Gestionar"
     },
@@ -324,30 +318,13 @@
       "group": "Nuevo grupo"
     },
     "home": {
-      "view": "Vista",
-      "viewTitle": "Cómo se organiza el Inicio",
-      "layoutLabel": "Disposición",
-      "separated": "Separado",
-      "mixed": "Mezclado",
-      "separatedHint": "Tus desafíos y los de tus grupos en dos secciones, una debajo de la otra. Elige el orden y cuáles mostrar.",
-      "mixedHint": "Tus desafíos y los de tus grupos en una sola lista, cada tarjeta dice de quién es.",
-      "show": "Mostrar {section} en el Inicio",
-      "lastVisible": "Al menos una sección queda en el Inicio.",
-      "automatic": "Volver a automático",
-      "automaticNow": "Automático (muestra lo que usas, lo más activo primero)",
       "sectionPersonal": "Solo yo",
       "sectionGroups": "Grupos",
-      "chip": "{section} · {count}",
       "justYou": "Solo tú",
       "personalRunning": "En marcha",
       "personalEmpty": "Nada tuyo en marcha",
-      "inProgress": "En marcha",
       "newChallenge": "Nuevo desafío",
-      "showGroups": "Mostrar tus grupos ({count})",
-      "showPersonal": "Mostrar tus desafíos ({count})",
-      "inviteGroups": "¿Lo haces con amigos? Crea un grupo",
-      "both": "Ambos",
-      "worldLabel": "De quién mostrar los desafíos"
+      "inviteGroups": "¿Lo haces con amigos? Crea un grupo"
     }
   },
   "welcome": {

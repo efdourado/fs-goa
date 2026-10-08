@@ -30,7 +30,6 @@ export const API_PATHS = {
     logout: "/api/auth/logout",
   },
   account: "/api/account",
-  homeView: "/api/account/home-view",
   accountDeactivate: "/api/account/deactivate",
   accountReactivate: "/api/account/reactivate",
   accountDelete: "/api/account/delete",
@@ -147,7 +146,6 @@ export const API_PATHS = {
     `/api/challenges/${encodeURIComponent(challengeId)}/duplicate`,
   challengePrefs: (challengeId: Id) =>
     `/api/challenges/${encodeURIComponent(challengeId)}/prefs`,
-  challengeOrder: "/api/challenges/prefs/order",
 } as const;
 
 export class ApiError extends Error {
@@ -217,7 +215,6 @@ export function normalizeBootstrap(raw: BootstrapData | { bootstrap: BootstrapDa
     user: data.user ?? null,
     limits: { ...DEFAULT_LIMITS, ...data.limits },
     personalWorkspaceId: data.personalWorkspaceId ?? null,
-    homeView: data.homeView ?? null,
     groups: data.groups ?? [],
     challenges: data.challenges ?? [],
     memberRequests: data.memberRequests ?? [],

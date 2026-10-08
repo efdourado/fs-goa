@@ -4,8 +4,8 @@ import { ApiError } from "../../http";
 import { challengeAccess } from "../domain/access";
 
 /**
- * Per-viewer homepage organisation (`challenge_user_prefs`): a pin, a colour
- * tag and a manual sort position. Private to the caller — no audit, no admin
+ * Per-viewer homepage organisation (`challenge_user_prefs`): a pin and a
+ * colour tag. Private to the caller — no audit, no admin
  * gate; anyone who can see a challenge can organise it for themselves.
  */
 
@@ -53,41 +53,3 @@ export async function setChallengePref(
   });
 }
 
-/**
- * Rewrite the caller's manual order. `ids` is the full challenge list in the
- * desired order; ids the viewer cannot see are ignored, the rest get
- * `sort_index` 0..n in the given order.
- */
-export async function setChallengeOrder(session: SessionContext, body: Record<string, unknown>) {
-  const ids = Array.isArray(body.ids)
-    ? [...new Set(body.ids.filter((id): id is string => typeof id === "string" && id.length > 0 && id.length <= 100))]
-    : null;
-  if (!ids) throw new ApiError(400, "invalid_request", "Envie a ordem em `ids`.");
-  if (ids.length > 500) throw new ApiError(400, "too_many", "Lista grande demais.");
-
-  return inTransaction(async (client) => {
-    const visible = await client.query<{ id: string }>(
-      `SELECT c.id
-         FROM challenges c
-         JOIN groups g ON g.id = c.group_id AND g.deleted_at IS NULL AND g.archived_at IS NULL
-         JOIN group_members gm ON gm.group_id = c.group_id AND gm.user_id = $1 AND gm.removed_at IS NULL
-        WHERE c.id = ANY($2::text[]) AND c.deleted_at IS NULL
-          AND (g.kind = 'standard' OR (g.kind = 'personal' AND g.owner_user_id = $1))
-          AND (c.status <> 'draft' OR gm.role IN ('owner','admin'))`,
-      [session.user.id, ids],
-    );
-    const allowed = new Set(visible.rows.map((row) => row.id));
-    const ordered = ids.filter((id) => allowed.has(id));
-    if (ordered.length) {
-      await client.query(
-        `INSERT INTO challenge_user_prefs (user_id, challenge_id, sort_index, updated_at)
-         SELECT $1, id, (ord - 1)::int, now()
-           FROM unnest($2::text[]) WITH ORDINALITY AS t(id, ord)
-         ON CONFLICT (user_id, challenge_id) DO UPDATE SET
-           sort_index = EXCLUDED.sort_index, updated_at = now()`,
-        [session.user.id, ordered],
-      );
-    }
-    return { ordered };
-  });
-}

@@ -854,34 +854,9 @@ test("dashboard: shelves split by pin, side and status; a mixed Home pools both 
   assert.deepEqual(ids(separated.group), ["run", "run2"], "pinned + personal are pulled out of the groups' shelf");
   assert.deepEqual(ids(separated.personal), ["solo"]);
   assert.deepEqual(ids(separated.archive), ["old", "soloDraft"]);
-  assert.deepEqual(separated.mixed, []);
-
-  const mixed = splitShelves(challenges, "ws", { mixed: true });
-  assert.deepEqual(ids(mixed.mixed), ["run", "solo", "run2"], "both sides in one shelf, the viewer's order kept");
-  assert.deepEqual([...mixed.personal, ...mixed.group], []);
-
-  const onlyMine = splitShelves(challenges, "ws", { sections: ["personal"] });
-  assert.deepEqual(ids(onlyMine.pinned), [], "a pinned group challenge stays off a Home showing only the person's side");
-  assert.deepEqual(ids(onlyMine.personal), ["solo"]);
-  assert.deepEqual(ids(onlyMine.archive), ["soloDraft"]);
-  assert.deepEqual(onlyMine.group, []);
 
   assert.deepEqual(ids(applyColorFilter(separated.group, "green")), ["run"]);
   assert.deepEqual(ids(applyColorFilter(separated.group, null)), ["run", "run2"]);
-});
-
-test("home view: until the person picks, Home shows the side they use, busiest first; a saved view wins", async () => {
-  const { resolveHomeView, visibleSections } = await import("../app/goa/home-view");
-  const usage = (personal: number, personalActive: number, groups: number, groupActive: number) => ({ personal, personalActive, groups, groupActive });
-
-  assert.deepEqual(visibleSections(resolveHomeView(null, usage(10, 8, 0, 0))), ["personal"], "solo only → just their side");
-  assert.deepEqual(visibleSections(resolveHomeView(null, usage(0, 0, 2, 1))), ["groups"], "groups only → just groups");
-  assert.deepEqual(visibleSections(resolveHomeView(null, usage(10, 8, 2, 2))), ["personal", "groups"], "both → the busier side first");
-  assert.deepEqual(visibleSections(resolveHomeView(null, usage(1, 1, 2, 5))), ["groups", "personal"]);
-
-  const saved = { layout: "separated" as const, order: ["groups" as const, "personal" as const], hidden: ["personal" as const] };
-  assert.deepEqual(resolveHomeView(saved, usage(10, 8, 0, 0)), saved, "the person's choice is kept even against their usage");
-  assert.deepEqual(visibleSections({ layout: "mixed", order: ["personal", "groups"], hidden: ["groups"] }), ["personal", "groups"], "mixed always shows both");
 });
 
 test("front page: featured templates lead, most recently featured first, topped up with the newest; the rest go below", async () => {

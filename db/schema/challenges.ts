@@ -195,10 +195,9 @@ export const challengeParticipants = pgTable(
 );
 
 /**
- * Per-person homepage organisation: a pin, a colour tag and a manual sort
- * position, private to each user (challenge admins never see or set these).
- * A missing row means "no preference"; `sort_index` null falls to the default
- * order. Keyed by (user, challenge) like `challengeParticipants`.
+ * Per-person homepage organisation: a pin and a colour tag, private to each
+ * user (challenge admins never see or set these). A missing row means "no
+ * preference". Keyed by (user, challenge) like `challengeParticipants`.
  */
 export const challengeUserPrefs = pgTable(
   "challenge_user_prefs",
@@ -211,7 +210,6 @@ export const challengeUserPrefs = pgTable(
       .references(() => challenges.id, { onDelete: "cascade" }),
     pinned: boolean("pinned").notNull().default(false),
     colorTag: text("color_tag"),
-    sortIndex: integer("sort_index"),
     updatedAt: timestamptz("updated_at").defaultNow().notNull(),
   },
   (table) => [

@@ -449,6 +449,13 @@
       "when": 1791052232950,
       "tag": "0063_front_page_two_featured",
       "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1791420483799,
+      "tag": "0064_drop_home_view_and_manual_order",
+      "breakpoints": true
     }
   ]
 }

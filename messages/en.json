@@ -41,9 +41,7 @@
     "wait": "Please wait…"
   },
   "settings": {
-    "legend": "Preferences",
-    "homeLegend": "Home",
-    "customizeHome": "Customise home"
+    "legend": "Preferences"
   },
   "theme": {
     "legend": "Theme",
@@ -297,8 +295,6 @@
       "running": "Challenges you run"
     },
     "filter": {
-      "reorder": "Reorder",
-      "reorderDone": "Done",
       "context": "Clear ({count})",
       "empty": "Nothing in this colour"
     },
@@ -314,8 +310,6 @@
       "pin": "Pin to top",
       "unpin": "Unpin",
       "color": "Colour",
-      "moveUp": "Move up",
-      "moveDown": "Move down",
       "open": "Open",
       "manage": "Manage"
     },
@@ -324,30 +318,13 @@
       "group": "New group"
     },
     "home": {
-      "view": "View",
-      "viewTitle": "How Home is arranged",
-      "layoutLabel": "Layout",
-      "separated": "Separated",
-      "mixed": "Mixed",
-      "separatedHint": "Your own challenges and your groups' in two sections, one below the other. Pick the order and which to show.",
-      "mixedHint": "Your own challenges and your groups' in one list, each card saying whose it is.",
-      "show": "Show {section} on Home",
-      "lastVisible": "At least one section stays on Home.",
-      "automatic": "Back to automatic",
-      "automaticNow": "Automatic (shows what you use, busiest first)",
       "sectionPersonal": "Just me",
       "sectionGroups": "Groups",
-      "chip": "{section} · {count}",
       "justYou": "Just you",
       "personalRunning": "In progress",
       "personalEmpty": "Nothing of your own in progress",
-      "inProgress": "In progress",
       "newChallenge": "New challenge",
-      "showGroups": "Show your groups ({count})",
-      "showPersonal": "Show your own challenges ({count})",
-      "inviteGroups": "Doing this with friends? Create a group",
-      "both": "Both",
-      "worldLabel": "Whose challenges to show"
+      "inviteGroups": "Doing this with friends? Create a group"
     }
   },
   "welcome": {

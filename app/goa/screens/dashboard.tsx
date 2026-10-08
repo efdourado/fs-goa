@@ -1,17 +1,13 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { type DragEvent, type FormEvent, type ReactNode, useState } from "react";
+import { type FormEvent, type ReactNode, useId, useState } from "react";
 
 import { KebabMenu, menuRowClass } from "../card-menu";
 import { Dialog } from "../dialog";
 import { useGoaFormat } from "../format";
-import { API_PATHS, apiRequest } from "../api";
 import { CatalogShelf } from "../catalog-shelf";
-import { useAppLocked } from "../home-prefs";
-import { HomeSideLink, HomeViewPanel, resolveHomeView, visibleSections } from "../home-view";
-import { applyColorFilter, HomeTool, OrganizeBar, useChallengeOrganizer } from "../organize";
-import { Segmented } from "../Segmented";
+import { applyColorFilter, OrganizeBar, useChallengeOrganizer } from "../organize";
 import { Shelf, ShelfAddButton } from "../shelf";
 import { WelcomePanel } from "../welcome";
 import {
@@ -19,8 +15,6 @@ import {
   type ChallengeColorTag,
   type ChallengeSummary,
   type GroupSummary,
-  type HomeSection,
-  type HomeView,
   type Id,
   type Limits,
   type User,
@@ -30,11 +24,9 @@ import {
   cardClass,
   challengeStatusTone,
   ChallengeStatusBadge,
-  CircleChevronIcon,
   CircleMinusIcon,
   CirclePinIcon,
   cx,
-  DragDotsIcon,
   EmptyState,
   Field,
   inputClass,
@@ -45,28 +37,19 @@ import { canManage, isChallengeScheduled, isLivingList, isPersonalChallenge } fr
 
 // ── shelf helpers (pure, unit-tested) ────────────────────────────────────
 
-type ShelfKey = "pinned" | "personal" | "group" | "mixed" | "archive";
-const CHALLENGE_SHELF_ORDER: ShelfKey[] = ["pinned", "personal", "group", "mixed", "archive"];
+type ShelfKey = "pinned" | "personal" | "group" | "archive";
 
 /**
- * Split the viewer's challenges into Home's shelves. Only the sides in `sections` are kept. A pinned challenge
- * shows only in "pinned"; the rest go by status — running ones into their side's shelf ("personal"/"group"), or
- * into one "mixed" shelf when Home mixes both — and everything closed or still a draft into "archive". Order
- * within each shelf is preserved.
+ * Split the viewer's challenges into Home's shelves. A pinned challenge shows only in "pinned"; the rest go by
+ * status — running ones into their side's shelf ("personal"/"group") and everything closed or still a draft into
+ * "archive". Order within each shelf is preserved.
  */
-export function splitShelves(
-  challenges: ChallengeSummary[],
-  personalWorkspaceId: Id | null,
-  { mixed = false, sections = ["personal", "groups"] }: { mixed?: boolean; sections?: HomeSection[] } = {},
-): Record<ShelfKey, ChallengeSummary[]> {
-  const out: Record<ShelfKey, ChallengeSummary[]> = { pinned: [], personal: [], group: [], mixed: [], archive: [] };
+export function splitShelves(challenges: ChallengeSummary[], personalWorkspaceId: Id | null): Record<ShelfKey, ChallengeSummary[]> {
+  const out: Record<ShelfKey, ChallengeSummary[]> = { pinned: [], personal: [], group: [], archive: [] };
   for (const challenge of challenges) {
-    const personal = isPersonalChallenge(challenge, personalWorkspaceId);
-    if (!sections.includes(personal ? "personal" : "groups")) continue;
     if (challenge.pinned) out.pinned.push(challenge);
     else if (challenge.status !== "active") out.archive.push(challenge);
-    else if (mixed) out.mixed.push(challenge);
-    else out[personal ? "personal" : "group"].push(challenge);
+    else out[isPersonalChallenge(challenge, personalWorkspaceId) ? "personal" : "group"].push(challenge);
   }
   return out;
 }
@@ -137,15 +120,12 @@ function ColorSwatch({ tag, selected, onClick, label }: {
 }
 
 function CardMenu({
-  challenge, canManageIt, canMoveUp, canMoveDown, onTogglePin, onSetColor, onMove, onOpen, onManage,
+  challenge, canManageIt, onTogglePin, onSetColor, onOpen, onManage,
 }: {
   challenge: ChallengeSummary;
   canManageIt: boolean;
-  canMoveUp: boolean;
-  canMoveDown: boolean;
   onTogglePin: () => void;
   onSetColor: (tag: ChallengeColorTag | null) => void;
-  onMove: (dir: -1 | 1) => void;
   onOpen: () => void;
   onManage: () => void;
 }) {
@@ -170,16 +150,6 @@ function CardMenu({
               <CirclePinIcon className="h-[18px] w-[18px] text-[var(--muted)]" filled={challenge.pinned} />
               {challenge.pinned ? t("card.unpin") : t("card.pin")}
             </button>
-            {canMoveUp ? (
-              <button type="button" className={rowClass} onClick={() => { onMove(-1); close(); }}>
-                <CircleChevronIcon className="h-[18px] w-[18px] text-[var(--muted)]" dir="up" />{t("card.moveUp")}
-              </button>
-            ) : null}
-            {canMoveDown ? (
-              <button type="button" className={rowClass} onClick={() => { onMove(1); close(); }}>
-                <CircleChevronIcon className="h-[18px] w-[18px] text-[var(--muted)]" dir="down" />{t("card.moveDown")}
-              </button>
-            ) : null}
           </div>
           <div className="border-t border-[var(--line)] pt-1">
             <button type="button" className="flex min-h-10 w-full items-center rounded-xl px-3 hover:bg-[var(--wash)]" onClick={() => { onOpen(); close(); }}>{t("card.open")}</button>
@@ -198,34 +168,19 @@ export function ActiveChallengeCard({
   onOpen,
   onTogglePin,
   onSetColor,
-  onMove,
   onManage,
-  canMoveUp = true,
-  canMoveDown = true,
-  reorderMode = false,
   fluid = false,
   context,
-  dragHandlers,
 }: {
   challenge: ChallengeSummary;
   onOpen: (id: Id) => void;
   onTogglePin?: (id: Id) => void;
   onSetColor?: (id: Id, tag: ChallengeColorTag | null) => void;
-  onMove?: (id: Id, dir: -1 | 1) => void;
   onManage?: (id: Id) => void;
-  canMoveUp?: boolean;
-  canMoveDown?: boolean;
-  reorderMode?: boolean;
   /** Fill the container instead of the fixed shelf width (a group's grid). */
   fluid?: boolean;
-  /** Whose challenge it is — "Just you" or the group's name — where Home mixes both sides. */
+  /** Whose challenge it is — "Just you" or the group's name — on the pinned shelf, which holds both sides. */
   context?: string;
-  dragHandlers?: {
-    onDragStart: () => void;
-    onDragOver: (event: DragEvent) => void;
-    onDrop: () => void;
-    onDragEnd: () => void;
-  };
 }) {
   const t = useTranslations("dashboard");
   const f = useGoaFormat();
@@ -233,19 +188,14 @@ export function ActiveChallengeCard({
   const total = challenge.totalCount ?? 0;
   const done = challenge.completedCount ?? 0;
   const livingList = isLivingList(challenge);
-  const interactive = Boolean(onTogglePin || onSetColor || onMove);
+  const interactive = Boolean(onTogglePin || onSetColor);
 
   return (
     <article
-      draggable={reorderMode}
-      onDragStart={dragHandlers?.onDragStart}
-      onDragOver={dragHandlers?.onDragOver}
-      onDrop={dragHandlers?.onDrop}
-      onDragEnd={dragHandlers?.onDragEnd}
       className={cx(
         "group relative flex flex-col overflow-hidden rounded-[20px] border bg-[var(--paper)] shadow-[var(--elevate-1)] transition",
         fluid ? "w-full" : "w-[78vw] max-w-[19rem] shrink-0 snap-start sm:w-[19rem]",
-        reorderMode ? "cursor-grab active:cursor-grabbing" : "hover:-translate-y-0.5",
+        "hover:-translate-y-0.5",
         livingList ? "border-[var(--line)]" : tone.border,
         "has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-[var(--main)]/25",
       )}
@@ -253,11 +203,8 @@ export function ActiveChallengeCard({
       {challenge.colorTag ? (
         <span className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: `var(--tag-${challenge.colorTag})` }} aria-hidden="true" />
       ) : null}
-      {reorderMode ? (
-        <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[var(--muted)]" aria-hidden="true"><DragDotsIcon className="h-4 w-4" /></span>
-      ) : null}
 
-      <div className={cx("flex flex-1 flex-col p-4 sm:p-5", challenge.colorTag && "pl-5 sm:pl-6", reorderMode && "pl-7")}>
+      <div className={cx("flex flex-1 flex-col p-4 sm:p-5", challenge.colorTag && "pl-5 sm:pl-6")}>
         <div className="flex items-center justify-between gap-2">
           {livingList ? <span /> : <ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />}
           <span className="min-w-0 flex-1 truncate text-right text-[11px] text-[var(--muted)] sm:text-xs">
@@ -269,7 +216,7 @@ export function ActiveChallengeCard({
                   ? t("endsOn", { date: f.date(challenge.endsOn) })
                   : t("noDeadline")}
           </span>
-          {interactive && !reorderMode ? (
+          {interactive ? (
             <div className="relative z-10 flex flex-none items-center gap-0.5">
               {onTogglePin ? (
                 <button
@@ -292,11 +239,8 @@ export function ActiveChallengeCard({
                 <CardMenu
                   challenge={challenge}
                   canManageIt={canManage(challenge.viewerRole)}
-                  canMoveUp={Boolean(onMove) && canMoveUp}
-                  canMoveDown={Boolean(onMove) && canMoveDown}
                   onTogglePin={() => onTogglePin?.(challenge.id)}
                   onSetColor={(tag) => onSetColor?.(challenge.id, tag)}
-                  onMove={(dir) => onMove?.(challenge.id, dir)}
                   onOpen={() => onOpen(challenge.id)}
                   onManage={() => onManage?.(challenge.id)}
                 />
@@ -349,29 +293,70 @@ function ArchiveChallengeRow({
 // ── the screen ──────────────────────────────────────────────────────────
 
 /** A side of Home — the person's own challenges or their groups' — under one big heading. */
-function HomeSectionBlock({ title, first, children }: { title: string; first: boolean; children: ReactNode }) {
+function readSectionOpen(id: string): boolean {
+  try {
+    return window.localStorage.getItem(`goa-home-section-${id}`) !== "closed";
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * A side of Home — the person's own challenges or their groups' — under one big heading that folds it away:
+ * tapping the name closes or opens the section. Open by default; the choice is remembered on this device.
+ */
+function HomeSectionBlock({ id, title, first, children }: { id: "personal" | "groups"; title: string; first: boolean; children: ReactNode }) {
+  const [open, setOpen] = useState(() => readSectionOpen(id));
+  const bodyId = useId();
+  function toggle() {
+    const next = !open;
+    setOpen(next);
+    try {
+      window.localStorage.setItem(`goa-home-section-${id}`, next ? "open" : "closed");
+    } catch {
+      // Blocked storage: the section still folds, just for this visit.
+    }
+  }
   return (
     <section className={first ? "" : "mt-12 border-t border-[var(--line)] pt-8"}>
-      <h2 className="mb-6 text-2xl font-light tracking-[-0.04em] sm:text-3xl">{title}</h2>
-      {children}
+      <h2 className={cx("text-2xl font-light tracking-[-0.04em] sm:text-3xl", open && "mb-6")}>
+        <button type="button" onClick={toggle} aria-expanded={open} aria-controls={bodyId} className="inline-flex min-h-11 cursor-pointer items-center gap-2 text-left">
+          {title}
+          <svg viewBox="0 0 12 12" className={cx("h-3 w-3 flex-none text-[var(--muted)] transition-transform", open && "rotate-180")} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M3 4.5 6 7.5l3-3" />
+          </svg>
+        </button>
+      </h2>
+      <div id={bodyId} hidden={!open}>{children}</div>
     </section>
   );
 }
 
-type WorldFilter = "all" | HomeSection;
+/** The one line the groups side shrinks to while someone has no group yet — never an empty shelf. */
+function HomeSideLink({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex min-h-12 w-full cursor-pointer items-center justify-between gap-3 rounded-2xl border border-dashed border-[var(--line)] px-4 text-left text-sm text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)]"
+    >
+      <span>{label}</span>
+      <span aria-hidden="true">→</span>
+    </button>
+  );
+}
 
 /**
- * Home: the person's own challenges and their groups' on one page. How the two sides sit is theirs to pick
- * (`HomeView`, saved on the account): separated — two sections in the order they chose, either one hideable — or
- * mixed into one list with each card labelled. Until they pick, Home shows the side they use, busiest first; a
- * side that is hidden or unused shrinks to one line at the bottom instead of an empty shelf.
+ * Home: the person's own challenges first, then their groups' — each side under its own heading, which folds
+ * the side away. Pinned
+ * challenges sit above both; closed ones and drafts below. Someone with no group sees one line inviting them
+ * to start one instead of an empty groups side.
  */
 export function DashboardScreen({
   user,
   groups,
   challenges,
   personalWorkspaceId,
-  homeView,
   limits,
   csrfToken,
   onOpenGroup,
@@ -390,7 +375,6 @@ export function DashboardScreen({
   groups: GroupSummary[];
   challenges: ChallengeSummary[];
   personalWorkspaceId: Id | null;
-  homeView: HomeView | null;
   limits: Limits;
   csrfToken: string;
   onOpenGroup: (id: Id) => void;
@@ -411,58 +395,19 @@ export function DashboardScreen({
   const tr = useTranslations("roles");
   const tQuick = useTranslations("quickCreate");
 
-  const locked = useAppLocked();
   const [showGroupDialog, setShowGroupDialog] = useState(false);
-  const [viewPanelOpen, setShowViewPanel] = useState(false);
-  // "Lock app" (header preferences) takes the View button away; the arrangement stays as it is.
-  const showViewPanel = viewPanelOpen && !locked;
-  const [world, setWorld] = useState<WorldFilter>("all");
-  const [saved, setSaved] = useState<HomeView | null>(homeView);
-  const [viewError, setViewError] = useState<string | null>(null);
 
   const standardGroups = groups.filter((group) => group.kind !== "personal");
   const ownedGroups = standardGroups.filter((group) => group.role === "owner").length;
   const atGroupLimit = ownedGroups >= limits.groupsPerOwner;
   const groupName = new Map(standardGroups.map((group) => [group.id, group.name]));
 
-  const personalChallenges = challenges.filter((challenge) => isPersonalChallenge(challenge, personalWorkspaceId));
-  const groupChallenges = challenges.filter((challenge) => !isPersonalChallenge(challenge, personalWorkspaceId));
-  const view = resolveHomeView(saved, {
-    personal: personalChallenges.length,
-    personalActive: personalChallenges.filter((challenge) => challenge.status === "active").length,
-    groups: standardGroups.length,
-    groupActive: groupChallenges.filter((challenge) => challenge.status === "active").length,
-  });
-  const mixed = view.layout === "mixed";
-  const shownSections: HomeSection[] = mixed ? (world === "all" ? ["personal", "groups"] : [world]) : visibleSections(view);
-  const hiddenSections: HomeSection[] = mixed ? [] : view.order.filter((section) => view.hidden.includes(section));
-
-  const { shelves, colorFilter, setColorFilter, reorderMode, setReorderMode, error, cardProps } = useChallengeOrganizer({
+  const { shelves, colorFilter, setColorFilter, error, cardProps } = useChallengeOrganizer({
     challenges,
     csrfToken,
     onChanged,
-    keys: CHALLENGE_SHELF_ORDER,
-    split: (ordered) => splitShelves(ordered, personalWorkspaceId, { mixed, sections: shownSections }),
-    orderLocked: locked,
+    split: (all) => splitShelves(all, personalWorkspaceId),
   });
-
-  async function saveView(next: HomeView | null) {
-    const previous = saved;
-    setSaved(next);
-    setViewError(null);
-    try {
-      await apiRequest(API_PATHS.homeView, { method: "PATCH", csrfToken, body: { view: next } });
-      onChanged?.();
-    } catch (cause) {
-      setSaved(previous);
-      setViewError((cause as Error).message || t("prefError"));
-    }
-  }
-
-  /** Bring a hidden side back — from the automatic view too, which then becomes the saved one. */
-  function showSection(section: HomeSection) {
-    void saveView({ ...view, hidden: view.hidden.filter((entry) => entry !== section) });
-  }
 
   function openChallenge(challenge: ChallengeSummary) {
     if (challenge.status === "draft" && canManage(challenge.viewerRole)) onOpenAdmin(challenge.id);
@@ -476,7 +421,6 @@ export function DashboardScreen({
     pinned: applyColorFilter(shelves.pinned, colorFilter),
     personal: applyColorFilter(shelves.personal, colorFilter),
     group: applyColorFilter(shelves.group, colorFilter),
-    mixed: applyColorFilter(shelves.mixed, colorFilter),
     archive: applyColorFilter(shelves.archive, colorFilter),
   };
   const filteredCount = Object.values(filtered).reduce((sum, list) => sum + list.length, 0);
@@ -484,14 +428,14 @@ export function DashboardScreen({
   // Brand new = nothing anywhere: no challenge of their own, no group.
   const brandNew = challenges.length === 0 && !standardGroups.length;
 
-  function renderRail(shelfKey: ShelfKey, list: ChallengeSummary[], labelled: boolean): ReactNode {
+  function renderRail(list: ChallengeSummary[], labelled: boolean): ReactNode {
     return list.map((challenge) => (
       <ActiveChallengeCard
         key={challenge.id}
         challenge={challenge}
         onOpen={() => openChallenge(challenge)}
         context={labelled ? contextOf(challenge) : undefined}
-        {...cardProps(shelfKey, challenge, onOpenAdmin)}
+        {...cardProps(onOpenAdmin)}
       />
     ));
   }
@@ -536,85 +480,26 @@ export function DashboardScreen({
     </div>
   );
 
-  const sectionContent: Record<HomeSection, ReactNode> = {
-    personal: (
-      <>
-        <Shelf title={th("personalRunning")} count={filtered.personal.length} actions={personalAdd}>
-          {filtered.personal.length ? renderRail("personal", filtered.personal, false) : emptyRail(th("personalEmpty"))}
-        </Shelf>
-        {personalLibrary}
-      </>
-    ),
-    groups: (
-      <>
-        <Shelf title={t("shelf.running")} count={filtered.group.length} actions={<ShelfAddButton label={tQuick("entryCta")} onClick={onQuickCreate} />}>
-          {filtered.group.length ? renderRail("group", filtered.group, false) : emptyRail(t("noChallengesTitle"))}
-        </Shelf>
-        {groupsShelf}
-      </>
-    ),
-  };
-
-  // What a hidden side shrinks to: a way back to it, or — if it was never used — a nudge to start.
-  const sideLinks = (mixed ? [] : hiddenSections).map((section) => {
-    if (section === "groups") {
-      return standardGroups.length
-        ? <HomeSideLink key={section} label={th("showGroups", { count: standardGroups.length })} onClick={() => showSection("groups")} />
-        : atGroupLimit ? null : <HomeSideLink key={section} label={th("inviteGroups")} onClick={() => setShowGroupDialog(true)} />;
-    }
-    return personalChallenges.length
-      ? <HomeSideLink key={section} label={th("showPersonal", { count: personalChallenges.length })} onClick={() => showSection("personal")} />
-      : null;
-  });
+  const hasGroups = standardGroups.length > 0;
 
   return (
     <main className="px-4 py-8 pb-24 sm:px-6 sm:py-12 lg:px-20">
       <PageHeading
         title={t("greeting", { name: user.name.split(" ")[0] })}
         description={brandNew ? tWelcome("lede") : t("subtitle")}
-        // View sits beside Reorder in the organise row; with nothing to organise yet, it stays up here.
-        action={brandNew || locked || hasAnyChallenge ? undefined : (
-          <HomeTool icon="view" label={th("view")} on={showViewPanel} onClick={() => setShowViewPanel((open) => !open)} />
-        )}
       />
 
       {showGroupDialog ? (
         <GroupCreateDialog
           onClose={() => setShowGroupDialog(false)}
-          onCreate={async (name) => {
-            await onCreateGroup(name);
-            if (saved?.hidden.includes("groups")) showSection("groups");
-          }}
+          onCreate={onCreateGroup}
         />
       ) : null}
 
-
-      {mixed && hasAnyChallenge ? (
-        <Segmented
-          className="mb-4 max-w-md"
-          ariaLabel={th("worldLabel")}
-          value={world}
-          onChange={setWorld}
-          options={[
-            { value: "all", label: th("chip", { section: th("both"), count: challenges.length }) },
-            { value: "personal", label: th("chip", { section: th("sectionPersonal"), count: personalChallenges.length }) },
-            { value: "groups", label: th("chip", { section: th("sectionGroups"), count: groupChallenges.length }) },
-          ]}
-        />
-      ) : null}
 
       {hasAnyChallenge ? (
-        <OrganizeBar
-          colorFilter={colorFilter} onColorFilter={setColorFilter} reorderMode={reorderMode} onReorderMode={setReorderMode} filteredCount={filteredCount} allowReorder={!locked}
-          view={brandNew || locked ? undefined : { open: showViewPanel, onToggle: () => setShowViewPanel((open) => !open) }}
-        />
+        <OrganizeBar colorFilter={colorFilter} onColorFilter={setColorFilter} filteredCount={filteredCount} />
       ) : null}
-
-      {/* View's panel opens right under the row its button sits in. */}
-      {showViewPanel && !brandNew ? (
-        <HomeViewPanel view={view} automatic={saved === null} onChange={(next) => void saveView(next)} onReset={() => void saveView(null)} />
-      ) : null}
-      <StatusMessage error={viewError} />
 
       <StatusMessage error={error} />
 
@@ -625,30 +510,26 @@ export function DashboardScreen({
           {filtered.pinned.length ? (
             <div className="mb-12">
               <Shelf title={t("shelf.pinned")} count={filtered.pinned.length}>
-                {renderRail("pinned", filtered.pinned, true)}
+                {renderRail(filtered.pinned, true)}
               </Shelf>
             </div>
           ) : null}
 
-          {mixed ? (
-            <>
-              <Shelf
-                title={th("inProgress")}
-                count={filtered.mixed.length}
-                actions={<ShelfAddButton label={tQuick("entryCta")} onClick={world === "personal" ? onQuickCreatePersonal : onQuickCreate} />}
-              >
-                {filtered.mixed.length ? renderRail("mixed", filtered.mixed, true) : emptyRail(t("noChallengesTitle"))}
+          <HomeSectionBlock id="personal" first={!filtered.pinned.length} title={th("sectionPersonal")}>
+            <Shelf title={th("personalRunning")} count={filtered.personal.length} actions={personalAdd}>
+              {filtered.personal.length ? renderRail(filtered.personal, false) : emptyRail(th("personalEmpty"))}
+            </Shelf>
+            {personalLibrary}
+          </HomeSectionBlock>
+
+          {hasGroups ? (
+            <HomeSectionBlock id="groups" first={false} title={th("sectionGroups")}>
+              <Shelf title={t("shelf.running")} count={filtered.group.length} actions={<ShelfAddButton label={tQuick("entryCta")} onClick={onQuickCreate} />}>
+                {filtered.group.length ? renderRail(filtered.group, false) : emptyRail(t("noChallengesTitle"))}
               </Shelf>
-              {shownSections.includes("groups") ? groupsShelf : null}
-              {shownSections.includes("personal") ? personalLibrary : null}
-            </>
-          ) : (
-            shownSections.map((section, index) => (
-              <HomeSectionBlock key={section} first={index === 0 && !filtered.pinned.length} title={section === "personal" ? th("sectionPersonal") : th("sectionGroups")}>
-                {sectionContent[section]}
-              </HomeSectionBlock>
-            ))
-          )}
+              {groupsShelf}
+            </HomeSectionBlock>
+          ) : null}
 
           {filtered.archive.length ? (
             <div className="mt-12">
@@ -660,7 +541,9 @@ export function DashboardScreen({
             </div>
           ) : null}
 
-          {sideLinks.some(Boolean) ? <div className="mt-12 space-y-3">{sideLinks}</div> : null}
+          {!hasGroups && !atGroupLimit && !colorFilter ? (
+            <div className="mt-12"><HomeSideLink label={th("inviteGroups")} onClick={() => setShowGroupDialog(true)} /></div>
+          ) : null}
         </>
       )}
     </main>

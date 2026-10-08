@@ -521,7 +521,6 @@ export interface ChallengeSummary {
   /** Per-viewer homepage organisation (private; see `challenge_user_prefs`). */
   pinned?: boolean;
   colorTag?: ChallengeColorTag | null;
-  sortIndex?: number | null;
 }
 
 /** The fixed set of homepage colour tags a viewer can assign to a challenge. */
@@ -582,25 +581,12 @@ export interface MemberRequest {
   createdAt: string;
 }
 
-/** One side of Home: the person's own challenges, or their groups'. */
-export type HomeSection = "personal" | "groups";
-
-/** How the person arranged Home — saved on their account; `null` until they pick, and Home decides. */
-export interface HomeView {
-  layout: "mixed" | "separated";
-  /** Separated only: which side comes first. */
-  order: HomeSection[];
-  /** Separated only: sides left off Home (never both). */
-  hidden: HomeSection[];
-}
-
 export interface BootstrapData {
   csrfToken: string;
   user: User | null;
   limits: Limits;
   /** The caller's personal-workspace group id, or null until they create one. */
   personalWorkspaceId: Id | null;
-  homeView: HomeView | null;
   groups: GroupSummary[];
   challenges: ChallengeSummary[];
   memberRequests: MemberRequest[];

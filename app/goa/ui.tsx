@@ -151,17 +151,6 @@ export function SlidersIcon({ className }: { className?: string }) {
   );
 }
 
-/** A 2×3 dot grid — the drag handle shown in reorder mode. */
-export function DragDotsIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 16 16" className={className} fill="currentColor" aria-hidden="true">
-      <circle cx="6" cy="4" r="1.3" /><circle cx="10" cy="4" r="1.3" />
-      <circle cx="6" cy="8" r="1.3" /><circle cx="10" cy="8" r="1.3" />
-      <circle cx="6" cy="12" r="1.3" /><circle cx="10" cy="12" r="1.3" />
-    </svg>
-  );
-}
-
 export function StatusMessage({
   error,
   success,
@@ -629,7 +618,7 @@ export function AppHeader({
               onAcceptRequest={onAcceptRequest}
               onDeclineRequest={onDeclineRequest}
             />
-            <SettingsMenu homeOptions />
+            <SettingsMenu />
           </div>
           <button
             className={cx(navLink, "hidden shrink-0 disabled:opacity-50 sm:inline-flex sm:items-center")}

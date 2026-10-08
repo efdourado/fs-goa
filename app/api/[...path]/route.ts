@@ -73,7 +73,6 @@ import {
   listPersonalCatalogAttributes,
 } from "@/lib/goa/catalog-attributes";
 import type { CatalogKind } from "@/lib/goa/catalog";
-import { setHomeView } from "@/lib/goa/home-view";
 import { groupTaste } from "@/lib/goa/taste";
 
 function catalogKindParam(request: Request): CatalogKind | undefined {
@@ -108,7 +107,6 @@ import {
   publishResults,
   reorderResultBlocks,
   saveCheckpoints,
-  setChallengeOrder,
   setChallengePref,
   setExpectationEnabled,
   setParticipantNameConsent,
@@ -494,9 +492,6 @@ export async function PATCH(request: Request): Promise<Response> {
     if (isPath(path, "account")) {
       return json(await updateAccount(session, body));
     }
-    if (isPath(path, "account", "home-view")) {
-      return json(await setHomeView(session, body));
-    }
     if (path[0] === "catalog" && path.length === 2) {
       return json(await updateCatalogItem(session, path[1], body));
     }
@@ -526,9 +521,6 @@ export async function PATCH(request: Request): Promise<Response> {
     }
     if (path[0] === "challenges" && path[2] === "expectation" && path.length === 3) {
       return json(await setExpectationEnabled(session, path[1], body));
-    }
-    if (isPath(path, "challenges", "prefs", "order")) {
-      return json(await setChallengeOrder(session, body));
     }
     if (path[0] === "challenges" && path[2] === "prefs" && path[1] !== "prefs" && path.length === 3) {
       return json(await setChallengePref(session, path[1], body));

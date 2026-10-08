@@ -5,7 +5,6 @@ import {
   foreignKey,
   index,
   integer,
-  jsonb,
   pgTable,
   text,
   unique,
@@ -31,8 +30,6 @@ export const users = pgTable(
     // (an admin ban) so logging back in reactivates without lifting a ban.
     deactivatedAt: timestamptz("deactivated_at"),
     deletedAt: timestamptz("deleted_at"),
-    // How Home arranges the person's own challenges and their groups' — null means "decide from what they use".
-    homeView: jsonb("home_view"),
     createdAt: timestamptz("created_at").defaultNow().notNull(),
     updatedAt: timestamptz("updated_at").defaultNow().notNull(),
   },

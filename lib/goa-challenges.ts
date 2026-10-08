@@ -26,7 +26,7 @@ export { addChallengeLibrary, removeChallengeLibrary } from "./goa/challenges/li
 export { challengePreflight } from "./goa/challenges/preflight";
 export type { PreflightIssue, PreflightReport } from "./goa/challenges/preflight";
 export { setChallengeParticipants, setParticipantNameConsent } from "./goa/challenges/participants";
-export { setChallengePref, setChallengeOrder } from "./goa/challenges/user-prefs";
+export { setChallengePref } from "./goa/challenges/user-prefs";
 export {
   duplicateTemplate,
   getTemplatePreview,

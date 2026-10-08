@@ -41,9 +41,7 @@
     "wait": "Aguarde…"
   },
   "settings": {
-    "legend": "Preferências",
-    "homeLegend": "Início",
-    "customizeHome": "Personalizar o início"
+    "legend": "Preferências"
   },
   "theme": {
     "legend": "Tema",
@@ -297,8 +295,6 @@
       "running": "Desafios que você conduz"
     },
     "filter": {
-      "reorder": "Reorganizar",
-      "reorderDone": "Concluir",
       "context": "Limpar ({count})",
       "empty": "Nada nesta cor"
     },
@@ -314,8 +310,6 @@
       "pin": "Fixar no topo",
       "unpin": "Desafixar",
       "color": "Cor",
-      "moveUp": "Mover para cima",
-      "moveDown": "Mover para baixo",
       "open": "Abrir",
       "manage": "Gerenciar"
     },
@@ -324,30 +318,13 @@
       "group": "Novo grupo"
     },
     "home": {
-      "view": "Exibição",
-      "viewTitle": "Como o Início se organiza",
-      "layoutLabel": "Disposição",
-      "separated": "Separado",
-      "mixed": "Misturado",
-      "separatedHint": "Seus desafios e os dos grupos em duas seções, uma abaixo da outra. Escolha a ordem e quais mostrar.",
-      "mixedHint": "Seus desafios e os dos grupos numa lista só, cada cartão dizendo de quem é.",
-      "show": "Mostrar {section} no Início",
-      "lastVisible": "Pelo menos uma seção fica no Início.",
-      "automatic": "Voltar ao automático",
-      "automaticNow": "Automático (mostra o que você usa, o mais movimentado primeiro)",
       "sectionPersonal": "Só eu",
       "sectionGroups": "Grupos",
-      "chip": "{section} · {count}",
       "justYou": "Só você",
       "personalRunning": "Em andamento",
       "personalEmpty": "Nada seu em andamento",
-      "inProgress": "Em andamento",
       "newChallenge": "Novo desafio",
-      "showGroups": "Mostrar seus grupos ({count})",
-      "showPersonal": "Mostrar seus desafios ({count})",
-      "inviteGroups": "Quer fazer isso com amigos? Crie um grupo",
-      "both": "Ambos",
-      "worldLabel": "De quem mostrar os desafios"
+      "inviteGroups": "Quer fazer isso com amigos? Crie um grupo"
     }
   },
   "welcome": {

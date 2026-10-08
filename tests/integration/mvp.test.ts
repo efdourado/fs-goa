@@ -3513,7 +3513,7 @@ test("homepage: fixar, marcar cor e reordenar são preferências privadas do usu
   );
 
   const home = (await call("GET", "/api/bootstrap", { session: owner })).body as {
-    challenges: Array<{ id: string; pinned?: boolean; colorTag?: string | null; sortIndex?: number | null }>;
+    challenges: Array<{ id: string; pinned?: boolean; colorTag?: string | null }>;
   };
   assert.equal(home.challenges.find((x) => x.id === a)?.pinned, true);
   assert.equal(home.challenges.find((x) => x.id === b)?.colorTag, "green");
@@ -3525,15 +3525,8 @@ test("homepage: fixar, marcar cor e reordenar são preferências privadas do usu
   assert.equal(strangerHome.challenges.length, 0);
   assert.equal((await call("PATCH", `/api/challenges/${a}/prefs`, { session: stranger, body: { pinned: true } })).response.status, 404);
 
-  // Reorder: c, a, b.
-  assert.equal((await call("PATCH", "/api/challenges/prefs/order", { session: owner, body: { ids: [c, a, b] } })).response.status, 200);
-  const reordered = (await call("GET", "/api/bootstrap", { session: owner })).body as {
-    challenges: Array<{ id: string; sortIndex?: number | null }>;
-  };
-  const byId = new Map(reordered.challenges.map((x) => [x.id, x.sortIndex]));
-  assert.equal(byId.get(c), 0);
-  assert.equal(byId.get(a), 1);
-  assert.equal(byId.get(b), 2);
+  // There is no manual order any more: the endpoint is gone.
+  assert.equal((await call("PATCH", "/api/challenges/prefs/order", { session: owner, body: { ids: [c, a, b] } })).response.status, 404);
 
   // Purging the challenge drops its pref rows.
   await call("POST", `/api/challenges/${a}/transition`, { session: owner, body: { status: "active" } });
@@ -8579,33 +8572,12 @@ test("sessão: a última atividade só é regravada depois de 15 minutos, mas a 
   assert.ok(Date.now() - later.last_seen_at.getTime() < 5 * 60 * 1000, "voltou a ser recente");
 });
 
-test("home view: salvo na conta, volta no bootstrap, validado, e null devolve ao automático", async () => {
+test("o Início não guarda mais uma visualização: o endpoint sumiu e o bootstrap não traz homeView", async () => {
   const owner = await register("Hana", "hana_home");
-  const boot = async () => ((await call("GET", "/api/bootstrap", { session: owner })).body as { homeView: unknown }).homeView;
-  assert.equal(await boot(), null, "nada escolhido: o Início decide");
-
-  const view = { layout: "separated", order: ["groups", "personal"], hidden: ["personal"] };
-  const saved = await call("PATCH", "/api/account/home-view", { session: owner, body: { view } });
-  assert.equal(saved.response.status, 200, JSON.stringify(saved.body));
-  assert.deepEqual(await boot(), view);
-
-  for (const bad of [
-    { layout: "grid", order: ["personal", "groups"], hidden: [] },
-    { layout: "separated", order: ["personal"], hidden: [] },
-    { layout: "separated", order: ["personal", "personal"], hidden: [] },
-    { layout: "separated", order: ["personal", "groups"], hidden: ["personal", "groups"] },
-    { layout: "separated", order: ["personal", "groups"], hidden: ["notes"] },
-  ]) {
-    const refused = await call("PATCH", "/api/account/home-view", { session: owner, body: { view: bad } });
-    assert.equal(refused.response.status, 400, JSON.stringify(bad));
-  }
-  assert.deepEqual(await boot(), view, "uma escolha inválida não mexe na salva");
-
-  const other = await register("Ivo", "ivo_home");
-  assert.equal(((await call("GET", "/api/bootstrap", { session: other })).body as { homeView: unknown }).homeView, null, "é de cada pessoa");
-
-  await call("PATCH", "/api/account/home-view", { session: owner, body: { view: null } });
-  assert.equal(await boot(), null);
+  const boot = (await call("GET", "/api/bootstrap", { session: owner })).body as Record<string, unknown>;
+  assert.ok(!("homeView" in boot));
+  const gone = await call("PATCH", "/api/account/home-view", { session: owner, body: { view: null } });
+  assert.equal(gone.response.status, 404);
 });
 
 test("capa dos modelos: só a administração da plataforma destaca, o destaque aparece na lista e no detalhe, e despublicar tira da capa", async () => {
