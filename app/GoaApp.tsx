@@ -48,7 +48,7 @@ import type {
 import { CACHE_KEYS, clearCache, readCache, writeCache } from "./goa/cache";
 import { challengeRequestBody } from "./goa/challenge-request";
 import { prefetchCatalogShelf } from "./goa/libraries";
-import { AppHeader, BackButton, Brand, Button, cardClass, cx, EmptyState, LoadingView, PageHeading } from "./goa/ui";
+import { AppHeader, BackButton, Button, cardClass, cx, EmptyState, LoadingView, PageHeading } from "./goa/ui";
 import { BottomDock, type DockTab, dockTabFor } from "./goa/bottom-dock";
 import { ActivityScreen } from "./goa/screens/activity";
 import { YouScreen } from "./goa/screens/you";
@@ -607,10 +607,7 @@ export default function GoaApp() {
     return (
       <main className="grid min-h-screen place-items-center px-5">
         <section className={cx(cardClass, "max-w-lg p-7 text-center")}>
-          <Brand />
-          <h1 className="mt-6 text-2xl font-light">{t("bootTitle")}</h1>
-          <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{bootError}</p>
-          <Button className="mt-6" onClick={() => window.location.reload()}>{t("retry")}</Button>
+          <h1 className="text-2xl font-light">{t("bootTitle")}</h1>
         </section>
       </main>
     );
