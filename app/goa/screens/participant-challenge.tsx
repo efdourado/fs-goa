@@ -1016,8 +1016,6 @@ interface PickerOption {
   meta?: string;
   /** The rating this participant gave the item, shown at the end of the row. */
   rating?: number | null;
-  /** Its place in the list, when the rows aren't shown in that order (newest first). */
-  number?: number;
 }
 
 function EntryPicker({
@@ -1136,7 +1134,7 @@ function EntryPicker({
                 type="button"
                 disabled={option.soon}
                 aria-pressed={active}
-                aria-label={`${option.number ?? index + 1}. ${option.label}${option.statusLabel ? ` (${option.statusLabel})` : ""}`}
+                aria-label={`${index + 1}. ${option.label}${option.statusLabel ? ` (${option.statusLabel})` : ""}`}
                 onClick={() => onSelect(option.id)}
                 className={cx(
                   "flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition disabled:opacity-45",
@@ -1155,7 +1153,7 @@ function EntryPicker({
                         : "bg-[var(--wash)] text-[var(--muted)]",
                   )}
                 >
-                  {option.done ? <CheckGlyph /> : String(option.number ?? index + 1).padStart(digits, "0")}
+                  {option.done ? <CheckGlyph /> : String(index + 1).padStart(digits, "0")}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className={cx("block truncate text-sm", active ? "font-medium text-[var(--main-strong)]" : "font-light")}>{option.label}</span>
@@ -1450,7 +1448,7 @@ export function ParticipantChallengeScreen({
     return map;
   }, [entries, user?.id, readRating]);
   const sortedItems = useMemo(() => [...challenge.items].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)), [challenge.items]);
-  // The list on Today: always newest first, number 1 at the bottom (the latest added is what you're on).
+  // The list on Today: always newest first, numbered from the top (the latest added is 01, what you're on).
   const pickerItems = useMemo(() => [...sortedItems].reverse(), [sortedItems]);
   // A workout-style challenge: one check-in that holds a record for each of several items. It replaces the
   // per-item picker and form on Today, and its progress is "check-ins logged", not "items done".
@@ -1686,7 +1684,7 @@ export function ParticipantChallengeScreen({
         const progress = !pages || !bookCount ? null
           : done || (read ?? 0) >= pages ? t("bookDone")
             : read === undefined ? null : t("bookProgress", { page: read, total: pages, left: pages - read });
-        return { id: item.id, number: sortedItems.indexOf(item) + 1, label, done, soon, statusLabel: done ? "" : soon ? t("checkpointSoonLabel") : undefined, meta: progress ?? metaForItem(item), rating: ratingByItem.get(item.id) ?? null };
+        return { id: item.id, label, done, soon, statusLabel: done ? "" : soon ? t("checkpointSoonLabel") : undefined, meta: progress ?? metaForItem(item), rating: ratingByItem.get(item.id) ?? null };
       })}
     />
   ) : null;
