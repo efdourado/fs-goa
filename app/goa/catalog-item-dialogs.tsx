@@ -260,9 +260,8 @@ export function EditCatalogItemDialog({
         error={error ?? propertiesError}
         onCancel={onCancel}
         onSubmit={submit}
-        submitLabel={t("saveChanges")}
         submitDisabled={!properties}
-        footerStart={onRemove ? <Button variant="danger" disabled={busy} onClick={() => setConfirmingRemoval(true)}>{tCat("remove")}</Button> : null}
+        footerStart={onRemove ? <Button variant="danger" disabled={busy} onClick={() => setConfirmingRemoval(true)}>{tc("delete")}</Button> : null}
       >
         <Field label={t("titleLabel")}>
           <input className={inputClass} value={title} maxLength={300} required onChange={(event) => setTitle(event.target.value)} />
@@ -278,7 +277,6 @@ export function EditCatalogItemDialog({
         <ConfirmDialog
           title={tCat("removeTitle", { title: item.title })}
           body={tCat("removeHint")}
-          confirmLabel={tCat("remove")}
           busyLabel={tc("saving")}
           danger
           onClose={() => setConfirmingRemoval(false)}

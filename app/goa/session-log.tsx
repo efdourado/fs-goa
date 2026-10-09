@@ -788,7 +788,7 @@ export function SessionLog({
           </div>
           {/* The bar stays at the bottom, clear of the phone's home area. */}
           <div className="sticky bottom-0 -mx-5 mt-6 flex items-center gap-3 border-t border-[var(--line)] bg-[var(--paper)] px-5 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4">
-            {editing && onDelete ? <Button variant="ghost" className="text-[var(--danger)]" onClick={() => setRemoving(editing)}>{t("remove")}</Button> : null}
+            {editing && onDelete ? <Button variant="ghost" className="text-[var(--danger)]" onClick={() => setRemoving(editing)}>{tc("delete")}</Button> : null}
             <span className="flex-1" />
             <Button className="min-h-11 px-6" onClick={closeSheet}>{t("done")}</Button>
           </div>
@@ -799,7 +799,6 @@ export function SessionLog({
         <ConfirmDialog
           title={t("deleteTitle", { name: spec.visit.name })}
           body={t("deleteBody", { count: (recordsByVisit.get(removing.id) ?? []).length })}
-          confirmLabel={t("remove")}
           danger
           onClose={() => setRemoving(null)}
           onConfirm={async () => {

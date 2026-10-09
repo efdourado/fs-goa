@@ -31,8 +31,8 @@
     "keepEditing": "Seguir editando",
     "discardChanges": "Descartar cambios",
     "save": "Guardar",
+    "delete": "Eliminar",
     "saving": "Guardando…",
-    "saveChanges": "Guardar cambios",
     "retry": "Reintentar",
     "yes": "Sí",
     "no": "No",
@@ -380,8 +380,6 @@
     "nameLabel": "Nombre",
     "descriptionLabel": "Descripción",
     "descriptionPlaceholder": "¿Qué reúne a este grupo?",
-    "saveGroup": "Guardar grupo",
-    "deleteGroup": "Eliminar grupo",
     "inviteTitle": "Invitar personas",
     "inviteBody": "Invita por @usuario (la persona aprueba) o genera un enlace para compartir.",
     "inviteUsernameLabel": "Invitar por @usuario",
@@ -438,7 +436,6 @@
     "historyTitle": "Historial",
     "recommendedBy": "recomendado por {name}",
     "noRounds": "Este ítem aún no ha entrado en ninguna ronda visible.",
-    "remove": "Quitar del acervo",
     "removeHint": "Sale del acervo y va a la papelera, de donde se puede restaurar. Las rondas que ya lo usaron quedan intactas.",
     "status": {
       "draft": "borrador",
@@ -500,7 +497,6 @@
     "removePicked": "{count, plural, =0 {Quitar} one {Quitar #} other {Quitar #}}",
     "removeManyTitle": "{count, plural, one {¿Quitar # ítem?} other {¿Quitar # ítems?}}",
     "removeManyBody": "Salen del acervo y van a la papelera, de donde se pueden restaurar. Un ítem que un desafío en curso aún usa se omite.",
-    "removeManyConfirm": "{count, plural, one {Quitar # ítem} other {Quitar # ítems}}",
     "removedMany": "{count, plural, one {# ítem quitado.} other {# ítems quitados.}}",
     "removedSome": "{removed, plural, one {# ítem quitado} other {# ítems quitados}}; {skipped, plural, one {# omitido porque un desafío en curso lo usa} other {# omitidos porque desafíos en curso los usan}}.",
     "viewCovers": "Portadas",
@@ -721,7 +717,6 @@
       "stepDone": "en orden",
       "stepTodo": "necesita atención"
     },
-    "saveChanges": "Guardar cambios",
     "changesSaved": "Cambios guardados.",
     "unsavedChanges": "Cambios sin guardar",
     "savedDetailsOnly": "Se guardaron los datos básicos, pero no los participantes: {error}",
@@ -929,7 +924,6 @@
     "pageCountOn": "Conteo de páginas activado.",
     "pageCountOff": "Conteo de páginas desactivado.",
     "openLibrary": "Más campos en la biblioteca.",
-    "removeItem": "Quitar este elemento",
     "organiseItems": "Organizar elementos"
   },
   "visibility": {
@@ -1022,7 +1016,6 @@
     "saved": "Guardado.",
     "lastTime": "La última vez: {values} · {date}",
     "noItems": "Este desafío aún no tiene ítems (añádelos en Gestionar).",
-    "remove": "Eliminar",
     "deleteTitle": "¿Eliminar {name}?",
     "deleteBody": "Va a la papelera junto con {count, plural, one {# registro} other {# registros}}. Puedes restaurarlo desde allí.",
     "newItemPill": "Nuevo ítem",
@@ -1357,7 +1350,6 @@
     "deletePermanentTitle": "Eliminar la cuenta permanentemente",
     "deletePermanentBody": "Irreversible. El espacio personal y los grupos solo tuyos se borran; los grupos con otras personas cambian de dueño; tus contribuciones quedan anónimas.",
     "deletePermanent": "Eliminar permanentemente",
-    "deletePermanentConfirm": "Eliminar para siempre",
     "deletePasswordLabel": "Confirma con tu contraseña",
     "consequenceTransfer": "El grupo “{name}” cambia de dueño.",
     "consequencePurgeGroup": "El grupo “{name}” se borra definitivamente.",
@@ -1632,14 +1624,12 @@
     "restore": "Restaurar",
     "purge": "Eliminar permanentemente",
     "purging": "Eliminando…",
-    "cancel": "Cancelar",
     "deletedAt": "quitado el {date}",
     "deletedBy": "por {who}",
     "reasonShown": "Motivo: {reason}",
     "parentTrashed": "Restaura primero el ítem que lo contiene.",
     "purgeTitle": "Eliminar permanentemente",
     "purgeBody": "“{label}” se eliminará para siempre. Esto no se puede deshacer.",
-    "purgeConfirm": "Eliminar para siempre",
     "purgeNoDeps": "Nada más depende de este ítem.",
     "confirmName": "Escribe {name} para confirmar",
     "confirmCount": "Escribe {count} para confirmar que se borrarán {count} registros",
@@ -1647,7 +1637,6 @@
     "empty": "Vaciar la papelera",
     "emptyConfirmTitle": "¿Vaciar la papelera?",
     "emptyConfirmBody": "Todo lo que está en la papelera se eliminará para siempre. Esto no se puede deshacer. Lo que aún no se pueda eliminar se queda aquí.",
-    "emptyConfirm": "Eliminar todo",
     "emptying": "Vaciando…",
     "emptyKept": "{count, plural, one {# ítem no se pudo eliminar y quedó en la papelera.} other {# ítems no se pudieron eliminar y quedaron en la papelera.}}",
     "kind": {
@@ -1695,7 +1684,6 @@
     "deleteBodyEmpty": "Esta biblioteca está vacía. Desaparece junto con sus propiedades.",
     "deleteBodyItems": "{count, plural, one {Su # ítem va} other {Sus # ítems van}} a la papelera junto con la biblioteca. Restaurar un ítem de la papelera trae la biblioteca de vuelta. Los desafíos que solo apuntan a esta biblioteca quedan desvinculados.",
     "deleteConfirm": "Eliminar biblioteca",
-    "deleteWithItems": "{count, plural, one {Eliminar biblioteca y # ítem} other {Eliminar biblioteca y # ítems}}",
     "deleteBusy": "Algunos de sus ítems están en desafíos aún en curso: {names}. Sácalos de esos desafíos primero.",
     "deleted": "\"{name}\" eliminada.",
     "emptyLibrary": "{name} está vacía",
@@ -1719,7 +1707,6 @@
     "tablesPromptMore": "Puedes crear más bibliotecas cuando quieras (Bares, Cafeterías, Partidos) desde el acervo.",
     "renameTitle": "Renombrar biblioteca",
     "renameHint": "Solo cambia el nombre, los ítems y las propiedades siguen igual.",
-    "rename": "Renombrar",
     "propertiesTitle": "{name} · propiedades",
     "propertiesBody": "Renombra, oculta o reordena lo que puede guardar cada ítem de esta biblioteca. Ocultar una propiedad conserva lo ya guardado, solo deja de aparecer.",
     "propertiesReadOnly": "Lo que puede guardar cada ítem de esta biblioteca.",
@@ -1801,8 +1788,7 @@
     "useThis": "Usar este",
     "orCreateNew": "Si no, completa el resto y añádelo como un ítem nuevo.",
     "loadingProperties": "Cargando los campos…",
-    "editTitle": "Editar ítem",
-    "saveChanges": "Guardar cambios"
+    "editTitle": "Editar ítem"
   },
   "sharedResponses": {
     "badge": "Compartida",
@@ -1831,7 +1817,6 @@
     "removeBody": "Esta respuesta desaparece de todos los ítems.",
     "removeMetricsBody": "Estas métricas leen esta respuesta y se quitarán con ella:",
     "removeMetricsPrompt": "Algunas métricas leen esta respuesta. Confirma otra vez para quitarlas también.",
-    "removeWithMetrics": "Quitar respuesta y métricas",
     "remove": "Quitar respuesta",
     "panelTitle": "Compartida con el grupo",
     "panelBody": "Hay una única respuesta por ítem, visible para todos junto con quién la cambió por última vez.",
@@ -1840,8 +1825,7 @@
     "removeLastHint": "Un desafío necesita al menos una respuesta, así que esta no se puede quitar.",
     "removeHintIndividual": "Saca esta respuesta del desafío. Las respuestas ya dadas se eliminan con ella.",
     "removeAnswersBody": "{count, plural, one {Ya se dio # respuesta} other {Ya se dieron # respuestas}} a este registro. Se eliminarán junto con él, y no se puede deshacer.",
-    "removeAnswersPrompt": "Confirma de nuevo para eliminar las respuestas y quitar el registro.",
-    "removeWithAnswers": "Eliminar respuestas y quitar"
+    "removeAnswersPrompt": "Confirma de nuevo para eliminar las respuestas y quitar el registro."
   },
   "sharedAnswers": {
     "badge": "Compartida con el grupo",

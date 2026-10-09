@@ -62,7 +62,6 @@ export { applyColorFilter };
 /** Group creation lives in a modal — the "+ New group" button in the groups shelf header opens it. */
 function GroupCreateDialog({ onClose, onCreate }: { onClose: () => void; onCreate: (name: string) => Promise<void> }) {
   const t = useTranslations("dashboard");
-  const tc = useTranslations("common");
   const f = useGoaFormat();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -90,7 +89,6 @@ function GroupCreateDialog({ onClose, onCreate }: { onClose: () => void; onCreat
         </Field>
         <StatusMessage error={error} />
         <div className="flex justify-end gap-3 border-t border-[var(--line)] pt-4">
-          <Button variant="secondary" type="button" disabled={busy} onClick={onClose}>{tc("cancel")}</Button>
           <Button type="submit" disabled={busy}>{busy ? t("creating") : t("create")}</Button>
         </div>
       </form>

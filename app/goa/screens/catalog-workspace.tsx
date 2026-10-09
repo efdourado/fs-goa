@@ -559,7 +559,6 @@ export function CatalogWorkspaceScreen({
         <ConfirmDialog
           title={t("removeManyTitle", { count: pickedHere.length })}
           body={t("removeManyBody")}
-          confirmLabel={t("removeManyConfirm", { count: pickedHere.length })}
           busyLabel={tc("saving")}
           danger
           onClose={() => setConfirmingRemoval(false)}

@@ -298,9 +298,8 @@ export function AccountScreen({
               </Field>
               <StatusMessage error={deleteError} />
               <div className="flex justify-end gap-3 border-t border-[var(--line)] pt-4">
-                <Button variant="secondary" onClick={closeDelete} disabled={deleteBusy}>{tc("cancel")}</Button>
                 <Button variant="danger" disabled={deleteBusy || deletePassword.length === 0 || !preview} onClick={() => void deletePermanently()}>
-                  {deleteBusy ? t("deleting") : t("deletePermanentConfirm")}
+                  {deleteBusy ? t("deleting") : tc("delete")}
                 </Button>
               </div>
             </div>
@@ -312,7 +311,6 @@ export function AccountScreen({
             <p className="text-sm leading-6">{t("deactivateConfirm")}</p>
             <StatusMessage error={deleteError} />
             <div className="mt-6 flex justify-end gap-3 border-t border-[var(--line)] pt-4">
-              <Button variant="secondary" disabled={deactivateBusy} onClick={() => setShowDeactivate(false)}>{tc("cancel")}</Button>
               <Button disabled={deactivateBusy} onClick={() => void deactivate()}>{deactivateBusy ? tc("saving") : t("deactivate")}</Button>
             </div>
           </Dialog>

@@ -138,7 +138,6 @@ export function DeleteLibraryDialog({
     <ConfirmDialog
       title={t("deleteTitle", { name })}
       body={itemCount ? t("deleteBodyItems", { count: itemCount }) : t("deleteBodyEmpty")}
-      confirmLabel={itemCount ? t("deleteWithItems", { count: itemCount }) : t("deleteConfirm")}
       danger
       onClose={onCancel}
       onConfirm={async () => {
@@ -198,7 +197,6 @@ export function RenameLibraryDialog({
       error={error}
       onCancel={onCancel}
       onSubmit={submit}
-      submitLabel={t("rename")}
     >
       <Field label={t("nameLabel")} hint={t("renameHint")}>
         <input className={inputClass} value={label} maxLength={80} required onChange={(event) => setLabel(event.target.value)} />
@@ -516,9 +514,8 @@ export function LibraryPropertiesDialog({
 
       {properties && !properties.length ? <div className="mt-4"><EmptyState title={t("noProperties")} /></div> : null}
 
-      <div className="mt-6 flex items-center justify-between gap-3 border-t border-[var(--line)] pt-4">
+      <div className="mt-6 border-t border-[var(--line)] pt-4">
         <span className="inline-flex items-center gap-1.5 text-xs text-[var(--muted)]"><LibraryGlyph source={library.source} />{libraryName(library)}</span>
-        <Button variant="secondary" onClick={onClose}>{tc("close")}</Button>
       </div>
     </Dialog>
   );

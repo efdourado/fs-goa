@@ -709,7 +709,7 @@ function CounterEditor({
   const saveLabel = busy
     ? tc("saving")
     : amount === null || problem
-      ? (record ? tc("saveChanges") : t("saveIdle"))
+      ? (record ? tc("save") : t("saveIdle"))
       : unchanged
         ? t("noChanges")
         : record ? t("saveChange", { value: shown(amount) }) : t("saveNew", { value: shown(amount) });

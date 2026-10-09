@@ -31,8 +31,8 @@
     "keepEditing": "Keep editing",
     "discardChanges": "Discard changes",
     "save": "Save",
+    "delete": "Delete",
     "saving": "Saving…",
-    "saveChanges": "Save changes",
     "retry": "Try again",
     "yes": "Yes",
     "no": "No",
@@ -380,8 +380,6 @@
     "nameLabel": "Name",
     "descriptionLabel": "Description",
     "descriptionPlaceholder": "What brings this group together?",
-    "saveGroup": "Save group",
-    "deleteGroup": "Delete group",
     "inviteTitle": "Invite people",
     "inviteBody": "Invite by @username (they approve) or generate a link to share.",
     "inviteUsernameLabel": "Invite by @username",
@@ -438,7 +436,6 @@
     "historyTitle": "History",
     "recommendedBy": "recommended by {name}",
     "noRounds": "This item hasn't been in any visible round yet.",
-    "remove": "Remove from catalogue",
     "removeHint": "It leaves the catalogue and goes to the bin, where you can restore it. Rounds that already used it stay intact.",
     "status": {
       "draft": "draft",
@@ -500,7 +497,6 @@
     "removePicked": "{count, plural, =0 {Remove} one {Remove #} other {Remove #}}",
     "removeManyTitle": "{count, plural, one {Remove # item?} other {Remove # items?}}",
     "removeManyBody": "They leave the catalogue and go to the bin, where you can restore them. An item that a running challenge still uses is skipped.",
-    "removeManyConfirm": "{count, plural, one {Remove # item} other {Remove # items}}",
     "removedMany": "{count, plural, one {# item removed.} other {# items removed.}}",
     "removedSome": "{removed, plural, one {# item removed} other {# items removed}}; {skipped, plural, one {# skipped because a running challenge uses it} other {# skipped because running challenges use them}}.",
     "viewCovers": "Covers",
@@ -721,7 +717,6 @@
       "stepDone": "in order",
       "stepTodo": "needs attention"
     },
-    "saveChanges": "Save changes",
     "changesSaved": "Changes saved.",
     "unsavedChanges": "Unsaved changes",
     "savedDetailsOnly": "The details were saved, but the participants weren't: {error}",
@@ -929,7 +924,6 @@
     "pageCountOn": "Page count on.",
     "pageCountOff": "Page count off.",
     "openLibrary": "More fields in the library.",
-    "removeItem": "Remove this item",
     "organiseItems": "Organise items"
   },
   "visibility": {
@@ -1022,7 +1016,6 @@
     "saved": "Saved.",
     "lastTime": "Last time: {values} · {date}",
     "noItems": "This challenge has no items yet, add them in Manage.",
-    "remove": "Delete",
     "deleteTitle": "Delete this {name}?",
     "deleteBody": "It goes to the bin together with its {count, plural, one {# record} other {# records}}. You can restore it from there.",
     "newItemPill": "New item",
@@ -1357,7 +1350,6 @@
     "deletePermanentTitle": "Delete the account permanently",
     "deletePermanentBody": "Irreversible. Your personal space and solo groups are deleted; groups with other people transfer ownership; your contributions are anonymised.",
     "deletePermanent": "Delete permanently",
-    "deletePermanentConfirm": "Delete for good",
     "deletePasswordLabel": "Confirm with your password",
     "consequenceTransfer": "The group “{name}” transfers ownership.",
     "consequencePurgeGroup": "The group “{name}” is deleted for good.",
@@ -1632,14 +1624,12 @@
     "restore": "Restore",
     "purge": "Delete permanently",
     "purging": "Deleting…",
-    "cancel": "Cancel",
     "deletedAt": "removed on {date}",
     "deletedBy": "by {who}",
     "reasonShown": "Reason: {reason}",
     "parentTrashed": "Restore the item that contains this one first.",
     "purgeTitle": "Delete permanently",
     "purgeBody": "“{label}” will be gone for good. This cannot be undone.",
-    "purgeConfirm": "Delete for good",
     "purgeNoDeps": "Nothing else depends on this item.",
     "confirmName": "Type {name} to confirm",
     "confirmCount": "Type {count} to confirm that {count} records will be deleted",
@@ -1647,7 +1637,6 @@
     "empty": "Empty the bin",
     "emptyConfirmTitle": "Empty the bin?",
     "emptyConfirmBody": "Everything in the bin will be deleted for good. This cannot be undone. Anything that still can't be deleted stays here.",
-    "emptyConfirm": "Delete everything",
     "emptying": "Emptying…",
     "emptyKept": "{count, plural, one {# item could not be deleted and stayed in the bin.} other {# items could not be deleted and stayed in the bin.}}",
     "kind": {
@@ -1695,7 +1684,6 @@
     "deleteBodyEmpty": "This library is empty. It goes away with its properties.",
     "deleteBodyItems": "{count, plural, one {Its # item goes} other {Its # items go}} to the bin along with the library. Restoring an item from the bin brings the library back. Challenges that only link to this library are unlinked.",
     "deleteConfirm": "Delete library",
-    "deleteWithItems": "{count, plural, one {Delete library and # item} other {Delete library and # items}}",
     "deleteBusy": "Some of its items are in challenges still running: {names}. Take them out of those challenges first.",
     "deleted": "\"{name}\" deleted.",
     "emptyLibrary": "{name} is empty",
@@ -1719,7 +1707,6 @@
     "tablesPromptMore": "You can create more libraries any time (Bars, Coffee shops, Matches) from the catalogue.",
     "renameTitle": "Rename library",
     "renameHint": "Only the name changes, its items and properties stay as they are.",
-    "rename": "Rename",
     "propertiesTitle": "{name} · properties",
     "propertiesBody": "Rename, hide or reorder what each item in this library can hold. Hiding a property keeps what's already saved, it just stops appearing.",
     "propertiesReadOnly": "What each item in this library can hold.",
@@ -1801,8 +1788,7 @@
     "useThis": "Use this one",
     "orCreateNew": "Otherwise, fill in the rest and add it as a new item.",
     "loadingProperties": "Loading the fields…",
-    "editTitle": "Edit item",
-    "saveChanges": "Save changes"
+    "editTitle": "Edit item"
   },
   "sharedResponses": {
     "badge": "Shared",
@@ -1831,7 +1817,6 @@
     "removeBody": "This response goes away from every item.",
     "removeMetricsBody": "These metrics read this response and will be removed with it:",
     "removeMetricsPrompt": "Some metrics read this response. Confirm again to remove them too.",
-    "removeWithMetrics": "Remove response and metrics",
     "remove": "Remove response",
     "panelTitle": "Shared with the group",
     "panelBody": "There is a single answer per item, shown to everyone along with who last changed it.",
@@ -1840,8 +1825,7 @@
     "removeLastHint": "A challenge needs at least one response, so this one can't be removed.",
     "removeHintIndividual": "Take this response out of the challenge. Any answers already given to it are deleted with it.",
     "removeAnswersBody": "{count, plural, one {# answer has} other {# answers have}} already been given to this response. They will be deleted along with it, and that can't be undone.",
-    "removeAnswersPrompt": "Confirm again to delete the answers and remove the response.",
-    "removeWithAnswers": "Delete answers and remove response"
+    "removeAnswersPrompt": "Confirm again to delete the answers and remove the response."
   },
   "sharedAnswers": {
     "badge": "Shared with the group",

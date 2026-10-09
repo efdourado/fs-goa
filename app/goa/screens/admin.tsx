@@ -242,7 +242,7 @@ function AdminGeneral({
           {locked ? null : (
             <div className="space-y-2">
               <span className="block text-xs text-[var(--muted)]" aria-live="polite">{dirty ? t("unsavedChanges") : null}</span>
-              <Button type="submit" className="min-h-11 w-full px-6" disabled={saving || !dirty}>{saving ? tc("saving") : t("saveChanges")}</Button>
+              <Button type="submit" className="min-h-11 w-full px-6" disabled={saving || !dirty}>{saving ? tc("saving") : tc("save")}</Button>
             </div>
           )}
         </div>
@@ -586,7 +586,6 @@ export function FieldEditorDialog({
 }) {
   const t = useTranslations("adminChallenge");
   const tf = useTranslations("fields");
-  const tc = useTranslations("common");
   const f = useGoaFormat();
   const initial = field ?? { key: "", label: "", type: "text" as const, required: true, config: newFieldConfig("text") };
   const [draft, setDraft] = useState<ChallengeField>(initial);
@@ -613,7 +612,7 @@ export function FieldEditorDialog({
       error={error}
       onCancel={onCancel}
       onSubmit={submit}
-      submitLabel={field ? tc("saveChanges") : t("addField")}
+      submitLabel={field ? undefined : t("addField")}
     >
       <Field label={tf("labelLabel")}>
         <input className={inputClass} value={draft.label} maxLength={100} required onChange={(event) => setDraft((current) => ({ ...current, label: event.target.value }))} />
@@ -712,9 +711,8 @@ export function ItemEditorDialog({
       error={error}
       onCancel={onCancel}
       onSubmit={submit}
-      submitLabel={tc("saveChanges")}
       footerStart={onRemove ? (
-        <Button type="button" variant="ghost" className="text-[var(--danger)]" disabled={busy} onClick={() => setRemoving(true)}>{t("removeItem")}</Button>
+        <Button type="button" variant="ghost" className="text-[var(--danger)]" disabled={busy} onClick={() => setRemoving(true)}>{tc("delete")}</Button>
       ) : undefined}
     >
       <Field label={t("itemTitleLabel")}>
@@ -743,7 +741,6 @@ export function ItemEditorDialog({
         <ConfirmDialog
           title={t("remove")}
           body={entryCount > 0 ? t("itemRemoveConfirmWithEntries", { title: item.title, count: entryCount }) : t("itemRemoveConfirm", { title: item.title })}
-          confirmLabel={t("remove")}
           busyLabel={t("removing")}
           danger
           onClose={() => setRemoving(false)}

@@ -308,12 +308,11 @@ export function GroupScreen({
             <Field label={t("descriptionLabel")} optional><textarea className={inputClass} rows={3} value={groupDescription} onChange={(event) => setGroupDescription(event.target.value)} maxLength={1000} placeholder={t("descriptionPlaceholder")} /></Field>
             <Toggle checked={groupRecommendations} onChange={setGroupRecommendations} label={t("recommendationsLabel")} hint={t("recommendationsHint")} />
             <StatusMessage error={groupError} success={groupSuccess} />
-            {/* One footer: delete on the left, away from Save; cancel and save on the right. */}
+            {/* One footer: delete on the left, away from Save on the right. */}
             <div className="flex flex-wrap items-center gap-3 border-t border-[var(--line)] pt-4">
-              {onDeleteGroup ? <Button variant="danger" type="button" disabled={groupBusy} onClick={() => void deleteGroup()}>{t("deleteGroup")}</Button> : null}
+              {onDeleteGroup ? <Button variant="danger" type="button" disabled={groupBusy} onClick={() => void deleteGroup()}>{tc("delete")}</Button> : null}
               <span className="flex-1" />
-              <Button variant="secondary" type="button" disabled={groupBusy} onClick={toggleGroupEdit}>{tc("cancel")}</Button>
-              <Button type="submit" disabled={groupBusy}>{groupBusy ? tc("saving") : t("saveGroup")}</Button>
+              <Button type="submit" disabled={groupBusy}>{groupBusy ? tc("saving") : tc("save")}</Button>
             </div>
           </form>
         </Dialog>

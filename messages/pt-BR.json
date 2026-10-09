@@ -31,8 +31,8 @@
     "keepEditing": "Continuar editando",
     "discardChanges": "Descartar alterações",
     "save": "Salvar",
+    "delete": "Excluir",
     "saving": "Salvando…",
-    "saveChanges": "Salvar alterações",
     "retry": "Tentar novamente",
     "yes": "Sim",
     "no": "Não",
@@ -380,8 +380,6 @@
     "nameLabel": "Nome",
     "descriptionLabel": "Descrição",
     "descriptionPlaceholder": "O que reúne este grupo?",
-    "saveGroup": "Salvar grupo",
-    "deleteGroup": "Apagar grupo",
     "inviteTitle": "Convidar pessoas",
     "inviteBody": "Convide por @usuário (a pessoa aprova) ou gere um link para compartilhar.",
     "inviteUsernameLabel": "Convidar por @usuário",
@@ -438,7 +436,6 @@
     "historyTitle": "Histórico",
     "recommendedBy": "indicado por {name}",
     "noRounds": "Este item ainda não entrou em nenhuma rodada visível.",
-    "remove": "Excluir do acervo",
     "removeHint": "O item sai do acervo e vai para a lixeira, de onde dá para restaurar. As rodadas que já o usaram continuam intactas.",
     "status": {
       "draft": "rascunho",
@@ -500,7 +497,6 @@
     "removePicked": "{count, plural, =0 {Remover} one {Remover #} other {Remover #}}",
     "removeManyTitle": "{count, plural, one {Remover # item?} other {Remover # itens?}}",
     "removeManyBody": "Eles saem do acervo e vão para a lixeira, de onde dá para restaurar. Um item que um desafio em andamento ainda usa é pulado.",
-    "removeManyConfirm": "{count, plural, one {Remover # item} other {Remover # itens}}",
     "removedMany": "{count, plural, one {# item removido.} other {# itens removidos.}}",
     "removedSome": "{removed, plural, one {# item removido} other {# itens removidos}}; {skipped, plural, one {# pulado porque um desafio em andamento o usa} other {# pulados porque desafios em andamento os usam}}.",
     "viewCovers": "Capas",
@@ -721,7 +717,6 @@
       "stepDone": "em ordem",
       "stepTodo": "precisa de atenção"
     },
-    "saveChanges": "Salvar alterações",
     "changesSaved": "Alterações salvas.",
     "unsavedChanges": "Alterações não salvas",
     "savedDetailsOnly": "Os dados básicos foram salvos, mas os participantes não: {error}",
@@ -929,7 +924,6 @@
     "pageCountOn": "Contagem de páginas ligada.",
     "pageCountOff": "Contagem de páginas desligada.",
     "openLibrary": "Mais campos na biblioteca.",
-    "removeItem": "Remover este item",
     "organiseItems": "Organizar itens"
   },
   "visibility": {
@@ -1022,7 +1016,6 @@
     "saved": "Salvo.",
     "lastTime": "Da última vez: {values} · {date}",
     "noItems": "Este desafio ainda não tem itens (adicione em Gerenciar).",
-    "remove": "Excluir",
     "deleteTitle": "Excluir {name}?",
     "deleteBody": "Vai para a lixeira junto com {count, plural, one {# registro} other {# registros}}. Dá para restaurar de lá.",
     "newItemPill": "Novo item",
@@ -1357,7 +1350,6 @@
     "deletePermanentTitle": "Excluir a conta permanentemente",
     "deletePermanentBody": "Irreversível. Espaço pessoal e grupos só seus são apagados; grupos com outras pessoas trocam de dono; suas contribuições ficam anônimas.",
     "deletePermanent": "Excluir permanentemente",
-    "deletePermanentConfirm": "Excluir para sempre",
     "deletePasswordLabel": "Confirme com sua senha",
     "consequenceTransfer": "O grupo “{name}” troca de dono.",
     "consequencePurgeGroup": "O grupo “{name}” é apagado de vez.",
@@ -1632,14 +1624,12 @@
     "restore": "Restaurar",
     "purge": "Excluir permanentemente",
     "purging": "Excluindo…",
-    "cancel": "Cancelar",
     "deletedAt": "removido em {date}",
     "deletedBy": "por {who}",
     "reasonShown": "Motivo: {reason}",
     "parentTrashed": "Restaure primeiro o item que contém este.",
     "purgeTitle": "Excluir permanentemente",
     "purgeBody": "“{label}” será removido para sempre. Isto não pode ser desfeito.",
-    "purgeConfirm": "Excluir para sempre",
     "purgeNoDeps": "Nada mais depende deste item.",
     "confirmName": "Digite {name} para confirmar",
     "confirmCount": "Digite {count} para confirmar que {count} registros serão apagados",
@@ -1647,7 +1637,6 @@
     "empty": "Esvaziar a lixeira",
     "emptyConfirmTitle": "Esvaziar a lixeira?",
     "emptyConfirmBody": "Tudo o que está na lixeira será excluído para sempre. Isto não pode ser desfeito. O que ainda não puder ser excluído continua aqui.",
-    "emptyConfirm": "Excluir tudo",
     "emptying": "Esvaziando…",
     "emptyKept": "{count, plural, one {# item não pôde ser excluído e continua na lixeira.} other {# itens não puderam ser excluídos e continuam na lixeira.}}",
     "kind": {
@@ -1695,7 +1684,6 @@
     "deleteBodyEmpty": "Esta biblioteca está vazia. Ela some junto com as propriedades.",
     "deleteBodyItems": "{count, plural, one {O # item dela vai} other {Os # itens dela vão}} para a lixeira junto com a biblioteca. Restaurar um item da lixeira traz a biblioteca de volta. Desafios que só apontam para esta biblioteca são desvinculados.",
     "deleteConfirm": "Excluir biblioteca",
-    "deleteWithItems": "{count, plural, one {Excluir biblioteca e # item} other {Excluir biblioteca e # itens}}",
     "deleteBusy": "Alguns itens dela estão em desafios ainda em andamento: {names}. Tire-os desses desafios primeiro.",
     "deleted": "\"{name}\" excluída.",
     "emptyLibrary": "{name} está vazia",
@@ -1719,7 +1707,6 @@
     "tablesPromptMore": "Você pode criar outras bibliotecas quando quiser (Bares, Cafeterias, Partidas) pelo acervo.",
     "renameTitle": "Renomear biblioteca",
     "renameHint": "Só o nome muda, os itens e as propriedades continuam como estão.",
-    "rename": "Renomear",
     "propertiesTitle": "{name} · propriedades",
     "propertiesBody": "Renomeie, oculte ou reordene o que cada item desta biblioteca pode guardar. Ocultar uma propriedade mantém o que já foi salvo, ela só deixa de aparecer.",
     "propertiesReadOnly": "O que cada item desta biblioteca pode guardar.",
@@ -1801,8 +1788,7 @@
     "useThis": "Usar este",
     "orCreateNew": "Se não, preencha o resto e adicione como um item novo.",
     "loadingProperties": "Carregando os campos…",
-    "editTitle": "Editar item",
-    "saveChanges": "Salvar alterações"
+    "editTitle": "Editar item"
   },
   "sharedResponses": {
     "badge": "Compartilhada",
@@ -1831,7 +1817,6 @@
     "removeBody": "Esta resposta sai de todos os itens.",
     "removeMetricsBody": "Estas métricas leem esta resposta e serão removidas junto:",
     "removeMetricsPrompt": "Algumas métricas leem esta resposta. Confirme de novo para removê-las também.",
-    "removeWithMetrics": "Remover resposta e métricas",
     "remove": "Remover resposta",
     "panelTitle": "Compartilhada com o grupo",
     "panelBody": "Existe uma única resposta por item, mostrada a todos junto com quem mudou por último.",
@@ -1840,8 +1825,7 @@
     "removeLastHint": "Um desafio precisa de pelo menos uma resposta, então esta não pode ser removida.",
     "removeHintIndividual": "Tire esta resposta do desafio. As respostas já dadas a ela são apagadas junto.",
     "removeAnswersBody": "{count, plural, one {# resposta já foi dada} other {# respostas já foram dadas}} a este registro. Elas serão apagadas junto, e isso não pode ser desfeito.",
-    "removeAnswersPrompt": "Confirme de novo para apagar as respostas e remover o registro.",
-    "removeWithAnswers": "Apagar respostas e remover"
+    "removeAnswersPrompt": "Confirme de novo para apagar as respostas e remover o registro."
   },
   "sharedAnswers": {
     "badge": "Compartilhada com o grupo",

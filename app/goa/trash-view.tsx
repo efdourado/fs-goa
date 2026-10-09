@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { API_PATHS, apiRequest } from "./api";
-import { ConfirmDialog } from "./dialog";
+import { ConfirmDialog, Dialog } from "./dialog";
 import type { Id, TrashActionPreview, TrashItem } from "./types";
 import { Button, cardClass, cx, EmptyState, LoadingView, StatusMessage } from "./ui";
 
@@ -54,96 +54,65 @@ function PurgeDialog({
   onCancel: () => void;
 }) {
   const t = useTranslations("trash");
+  const tc = useTranslations("common");
   const [confirmation, setConfirmation] = useState("");
   const [reason, setReason] = useState("");
-  const closeRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
   const entries = preview.dependencies.find((dep) => dep.type === "entries")?.count ?? 0;
   const needsReason = preview.kind === "entry";
 
-  useEffect(() => {
-    const opener = document.activeElement as HTMLElement | null;
-    closeRef.current?.focus();
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !busy) { onCancel(); return; }
-      if (event.key !== "Tab") return;
-      // Keep focus inside the dialog.
-      const focusables = panelRef.current?.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
-      );
-      if (!focusables || focusables.length === 0) return;
-      const first = focusables[0];
-      const last = focusables[focusables.length - 1];
-      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-    };
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      opener?.focus?.();
-    };
-  }, [busy, onCancel]);
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-label={t("purgeTitle")}>
-      <div ref={panelRef} className={cx(cardClass, "w-full max-w-md p-5 sm:p-6")}>
-        <h2 className="text-lg font-light text-[var(--danger)]">{t("purgeTitle")}</h2>
-        <p className="mt-2 text-sm text-[var(--muted)]">{t("purgeBody", { label: preview.label })}</p>
+    <Dialog title={t("purgeTitle")} busy={busy} onClose={onCancel}>
+      <p className="text-sm text-[var(--muted)]">{t("purgeBody", { label: preview.label })}</p>
 
-        {preview.blocked ? (
-          <p className="mt-3 rounded-md border border-[var(--danger-line)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]">
-            {preview.blocked.message}
-          </p>
-        ) : (
-          <>
-            {preview.dependencies.length ? (
-              <ul className="mt-3 space-y-1 text-sm">
-                {preview.dependencies.map((dep) => (
-                  <li key={dep.type} className="flex justify-between border-b border-[var(--line)] py-1">
-                    <span className="text-[var(--muted)]">{t(`dependency.${dep.type}`, { count: dep.count })}</span>
-                    <span className="tabular-nums">{dep.count}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-3 text-sm text-[var(--muted)]">{t("purgeNoDeps")}</p>
-            )}
-
-            {preview.confirmation === "name" ? (
-              <label className="mt-4 block">
-                <span className="mb-1 block text-sm">{t("confirmName", { name: preview.label })}</span>
-                <input className="w-full rounded-md border border-[var(--line)] bg-transparent px-3 py-2 text-sm" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} aria-label={t("confirmName", { name: preview.label })} />
-              </label>
-            ) : preview.confirmation === "count" ? (
-              <label className="mt-4 block">
-                <span className="mb-1 block text-sm">{t("confirmCount", { count: entries })}</span>
-                <input className="w-full rounded-md border border-[var(--line)] bg-transparent px-3 py-2 text-sm" inputMode="numeric" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} aria-label={t("confirmCount", { count: entries })} />
-              </label>
-            ) : null}
-
-            {needsReason ? (
-              <label className="mt-3 block">
-                <span className="mb-1 block text-sm">{t("reasonLabel")}</span>
-                <input className="w-full rounded-md border border-[var(--line)] bg-transparent px-3 py-2 text-sm" value={reason} onChange={(event) => setReason(event.target.value)} aria-label={t("reasonLabel")} />
-              </label>
-            ) : null}
-          </>
-        )}
-
-        <div className="mt-4"><StatusMessage error={error} /></div>
-        <div className="mt-4 flex justify-end gap-2">
-          <button ref={closeRef} type="button" onClick={onCancel} disabled={busy}
-            className="cursor-pointer inline-flex min-h-10 items-center rounded-xl px-4 py-2 text-sm font-light text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--ink)] disabled:opacity-55">
-            {t("cancel")}
-          </button>
-          {!preview.blocked && (
-            <Button variant="danger" onClick={() => onConfirm(confirmation.trim(), reason.trim())} disabled={busy}>
-              {busy ? t("purging") : t("purgeConfirm")}
-            </Button>
+      {preview.blocked ? (
+        <p className="mt-3 rounded-md border border-[var(--danger-line)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]">
+          {preview.blocked.message}
+        </p>
+      ) : (
+        <>
+          {preview.dependencies.length ? (
+            <ul className="mt-3 space-y-1 text-sm">
+              {preview.dependencies.map((dep) => (
+                <li key={dep.type} className="flex justify-between border-b border-[var(--line)] py-1">
+                  <span className="text-[var(--muted)]">{t(`dependency.${dep.type}`, { count: dep.count })}</span>
+                  <span className="tabular-nums">{dep.count}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-3 text-sm text-[var(--muted)]">{t("purgeNoDeps")}</p>
           )}
+
+          {preview.confirmation === "name" ? (
+            <label className="mt-4 block">
+              <span className="mb-1 block text-sm">{t("confirmName", { name: preview.label })}</span>
+              <input className="w-full rounded-md border border-[var(--line)] bg-transparent px-3 py-2 text-sm" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} aria-label={t("confirmName", { name: preview.label })} />
+            </label>
+          ) : preview.confirmation === "count" ? (
+            <label className="mt-4 block">
+              <span className="mb-1 block text-sm">{t("confirmCount", { count: entries })}</span>
+              <input className="w-full rounded-md border border-[var(--line)] bg-transparent px-3 py-2 text-sm" inputMode="numeric" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} aria-label={t("confirmCount", { count: entries })} />
+            </label>
+          ) : null}
+
+          {needsReason ? (
+            <label className="mt-3 block">
+              <span className="mb-1 block text-sm">{t("reasonLabel")}</span>
+              <input className="w-full rounded-md border border-[var(--line)] bg-transparent px-3 py-2 text-sm" value={reason} onChange={(event) => setReason(event.target.value)} aria-label={t("reasonLabel")} />
+            </label>
+          ) : null}
+        </>
+      )}
+
+      <div className="mt-4"><StatusMessage error={error} /></div>
+      {!preview.blocked && (
+        <div className="mt-6 flex justify-end border-t border-[var(--line)] pt-4">
+          <Button variant="danger" onClick={() => onConfirm(confirmation.trim(), reason.trim())} disabled={busy}>
+            {busy ? t("purging") : tc("delete")}
+          </Button>
         </div>
-      </div>
-    </div>
+      )}
+    </Dialog>
   );
 }
 
@@ -326,7 +295,6 @@ export function TrashView({
         <ConfirmDialog
           title={t("emptyConfirmTitle")}
           body={t("emptyConfirmBody")}
-          confirmLabel={t("emptyConfirm")}
           busyLabel={t("emptying")}
           danger
           onConfirm={emptyBin}

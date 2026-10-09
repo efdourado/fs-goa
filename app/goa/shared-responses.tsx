@@ -133,7 +133,6 @@ export function RemoveResponseDialog({
           ) : null}
         </>
       ) : t("removeBody")}
-      confirmLabel={warning ? (warning.answers ? t("removeWithAnswers") : t("removeWithMetrics")) : t("remove")}
       danger
       onClose={onClose}
       onConfirm={async () => {

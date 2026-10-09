@@ -49,7 +49,6 @@ function ChallengeStateDialog({ challenge, onTransition, onClose }: {
       <div className="mt-6 border-t border-[var(--line)] pt-6"><PreflightPanel challengeId={challenge.id} onReady={setPreflightReady} /></div>
     ) : null}
     <StatusMessage error={error} />
-    <div className="mt-6 flex justify-end border-t border-[var(--line)] pt-4"><Button variant="secondary" onClick={onClose} disabled={busy}>{tc("close")}</Button></div>
   </Dialog>;
 }
 
@@ -247,7 +246,6 @@ export function ChallengeSettings({ challenge, duplicateTargets, onDuplicate, on
         <ConfirmDialog
           title={t("deleteTitle")}
           body={challenge.publishedAsTemplate ? <>{t("deleteBody")} {t("deleteBodyTemplateWarning")}</> : t("deleteBody")}
-          confirmLabel={t("delete")}
           danger
           onClose={() => setDeleting(false)}
           onConfirm={async () => { await onDelete(); setDeleting(false); }}

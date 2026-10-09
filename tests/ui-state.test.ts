@@ -283,7 +283,7 @@ test("uma resposta já salva mantém os mesmos campos (desabilitados) e troca os
   }));
   assert.match(answered, /aria-label="Editar resposta"/, "um ícone de cadeado reabre a resposta para edição");
   assert.match(answered, /aria-pressed="true" aria-label="Nota 4,5" disabled/, "o campo continua com o mesmo controle, só que desabilitado");
-  assert.doesNotMatch(answered, /Salvar alterações/, "sem a resposta aberta, os botões salvar/cancelar não aparecem");
+  assert.doesNotMatch(answered, /type="submit">Salvar/, "sem a resposta aberta, os botões salvar/cancelar não aparecem");
   assert.doesNotMatch(answered, />Cancelar</, "sem a resposta aberta, os botões salvar/cancelar não aparecem");
 });
 
@@ -341,7 +341,7 @@ test("sem botão de excluir: o rótulo 'Excluir registro' não aparece mais em l
     onDelete: async () => undefined,
   }));
   assert.doesNotMatch(editing, /Excluir registro/, "o botão de excluir dedicado não existe mais");
-  assert.match(editing, /Salvar alterações/, "salvar continua presente");
+  assert.match(editing, /type="submit">Salvar/, "salvar continua presente");
 });
 
 test("Terminei (alwaysEditable, só campos opcionais): fica recolhido num botão até o participante abrir", () => {
@@ -372,7 +372,7 @@ test("Terminei (alwaysEditable, só campos opcionais): fica recolhido num botão
     onSave: async () => undefined,
   }));
   assert.match(filled, /<form/, "já tendo algo preenchido, abre direto");
-  assert.match(filled, /Salvar alterações/, "o botão de salvar aparece junto com os campos");
+  assert.match(filled, /type="submit">Salvar/, "o botão de salvar aparece junto com os campos");
 });
 
 test("limpar o campo obrigatório e salvar apaga o registro, em vez de bloquear com um erro", () => {

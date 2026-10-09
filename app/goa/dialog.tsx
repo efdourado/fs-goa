@@ -56,9 +56,10 @@ export function Dialog({ title, children, onClose, busy = false, wide = false }:
 /**
  * The shared shell for every editing modal (field, item, metric, correction, …):
  * a `Dialog`, the "unsaved changes" guard, a `<form>` with a disabled-while-busy
- * `<fieldset>`, an inline error, and a right-aligned Cancel · Save footer (with an
- * optional `footerStart` action pinned to its left). A caller passes only the
- * fields and the save action.
+ * `<fieldset>`, an inline error, and a right-aligned Save (with an optional
+ * `footerStart` action, Delete say, pinned to its left). No Cancel: the circled
+ * minus in the corner closes every modal. A caller passes only the fields and
+ * the save action.
  */
 export function FormDialog({
   title,
@@ -80,11 +81,12 @@ export function FormDialog({
   error?: string | null;
   onCancel: () => void;
   onSubmit: () => void | Promise<void>;
-  submitLabel: string;
+  /** "Save" unless the action is something else (adding, applying). */
+  submitLabel?: string;
   busyLabel?: string;
   danger?: boolean;
   submitDisabled?: boolean;
-  /** An action at the footer's left edge, apart from Cancel · Save (a destructive one, say). */
+  /** An action at the footer's left edge, apart from Save (Delete, say). */
   footerStart?: ReactNode;
   children: ReactNode;
 }) {
@@ -107,9 +109,8 @@ export function FormDialog({
         <StatusMessage error={error} />
         <div className="flex flex-wrap items-center justify-end gap-3 border-t border-[var(--line)] pt-4">
           {footerStart ? <div className="mr-auto">{footerStart}</div> : null}
-          <Button variant="secondary" disabled={busy} onClick={close}>{tc("cancel")}</Button>
           <Button type="submit" variant={danger ? "danger" : "primary"} disabled={busy || submitDisabled}>
-            {busy ? busyLabel ?? tc("saving") : submitLabel}
+            {busy ? busyLabel ?? tc("saving") : submitLabel ?? tc("save")}
           </Button>
         </div>
       </form>
@@ -119,7 +120,7 @@ export function FormDialog({
 
 /**
  * A styled replacement for `window.confirm` — a `Dialog` with an explanation and
- * a Cancel / Confirm footer. Owns its own busy + error so callers only pass the
+ * one Confirm button (the circled minus is the way out). Owns its own busy + error so callers only pass the
  * action. Matches the "remove" dialog in the metrics editor.
  */
 export function ConfirmDialog({
@@ -133,7 +134,8 @@ export function ConfirmDialog({
 }: {
   title: string;
   body: ReactNode;
-  confirmLabel: string;
+  /** "Delete" for a destructive dialog unless given; the title and body say what goes. */
+  confirmLabel?: string;
   busyLabel?: string;
   danger?: boolean;
   onConfirm: () => Promise<void> | void;
@@ -148,7 +150,6 @@ export function ConfirmDialog({
       <p className="text-sm leading-6">{body}</p>
       <StatusMessage error={error} />
       <div className="mt-6 flex justify-end gap-3 border-t border-[var(--line)] pt-4">
-        <Button variant="secondary" disabled={busy} onClick={onClose}>{tc("cancel")}</Button>
         <Button
           variant={danger ? "danger" : "primary"}
           disabled={busy}
@@ -163,7 +164,7 @@ export function ConfirmDialog({
             }
           }}
         >
-          {busy ? busyLabel ?? tc("saving") : confirmLabel}
+          {busy ? busyLabel ?? tc("saving") : confirmLabel ?? tc("delete")}
         </Button>
       </div>
     </Dialog>
