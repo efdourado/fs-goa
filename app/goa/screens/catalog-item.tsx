@@ -25,14 +25,14 @@ function EditItemAction({ item, scope, recommendationsEnabled, editing, onSaved,
   const [open, setOpen] = useState(false);
   return (
     <>
-      {/* Settings on the cover itself: shown on hover (always on touch screens, which have none), opens the edit dialog. */}
+      {/* Settings on the cover itself, centred on its height: shown on hover (always on touch screens, which have none), opens the edit dialog. */}
       <button
         type="button"
         disabled={!libraries}
         onClick={() => setOpen(true)}
         aria-label={t("edit")}
         title={t("edit")}
-        className="absolute bottom-6 right-6 grid h-12 w-12 cursor-pointer place-items-center rounded-full bg-[var(--paper)]/70 text-[var(--ink)] shadow-[0_8px_24px_rgba(32,36,31,0.18)] ring-1 ring-[var(--paper)] backdrop-blur-md transition duration-200 hover:scale-105 hover:bg-[var(--paper)]/90 focus-visible:scale-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/30 disabled:cursor-not-allowed disabled:opacity-0 sm:scale-90 sm:opacity-0 sm:group-hover:scale-100 sm:group-hover:opacity-100"
+        className="absolute inset-y-0 right-5 my-auto grid h-12 w-12 cursor-pointer place-items-center rounded-full bg-[var(--paper)]/70 text-[var(--ink)] shadow-[0_8px_24px_rgba(32,36,31,0.18)] ring-1 ring-[var(--paper)] backdrop-blur-md transition duration-200 hover:scale-105 hover:bg-[var(--paper)]/90 focus-visible:scale-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/30 disabled:cursor-not-allowed disabled:opacity-0 sm:scale-90 sm:opacity-0 sm:group-hover:scale-100 sm:group-hover:opacity-100"
       >
         <SlidersIcon className="h-[18px] w-[18px]" />
       </button>
@@ -129,15 +129,15 @@ export function CatalogItemScreen({
     <main className="mx-auto max-w-6xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
       <BackButton onClick={onBack} label={backLabel ?? t("back")} className="mb-8" />
 
-      <div className="grid items-start gap-10 lg:grid-cols-[340px_minmax(0,1fr)] lg:gap-16">
-        <div className="group relative mx-auto w-full max-w-[260px] transition duration-300 sm:mx-0 sm:max-w-[340px] sm:hover:-translate-y-1">
-          <ItemCover size="xl" title={item.title} year={item.year} showTitle={false} className="transition-shadow duration-300 sm:group-hover:shadow-[0_24px_48px_rgba(32,36,31,0.16)]" />
+      <div>
+        <div className="group relative w-full">
+          <ItemCover size="banner" title={item.title} year={item.year} showTitle={false} className="transition-shadow duration-300 sm:group-hover:shadow-[0_24px_48px_rgba(32,36,31,0.16)]" />
           {editing ? (
             <EditItemAction item={item} scope={scope} recommendationsEnabled={recommendationsEnabled} editing={editing} onSaved={() => setNonce((value) => value + 1)} onRemove={onDelete} />
           ) : null}
         </div>
 
-        <div className="min-w-0">
+        <div className="mt-8 min-w-0">
           {library ? (
             <p className="flex items-center gap-2.5 text-xs uppercase tracking-[0.12em] text-[var(--muted)]" style={{ fontFamily: "var(--font-geist-mono), ui-monospace, monospace" }}>
               <span className="grid h-8 w-8 place-items-center rounded-full bg-[var(--main-soft)] text-[var(--main-strong)]" aria-hidden="true"><LibraryGlyph source={library.source} className="h-[18px] w-[18px]" /></span>

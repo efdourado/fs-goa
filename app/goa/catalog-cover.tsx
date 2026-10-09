@@ -63,7 +63,8 @@ export function CoverSwatch({ title, className }: { title: string; className?: s
 
 const SIZES = {
   sm: { clamp: "line-clamp-4 pr-5", pad: "p-[15px]", year: "text-[10px]", title: "text-[21px]", ring: "-right-[46px] -bottom-[46px] h-[148px] w-[148px] border-[19px]", badge: 40, badgeText: "text-[12px] font-medium", badgeInset: "bottom-2.5 right-2.5" },
-  xl: { clamp: "line-clamp-5", pad: "p-7", year: "text-[13px]", title: "text-[54px]", ring: "-right-[90px] -bottom-[90px] h-[300px] w-[300px] border-[38px]", badge: 0, badgeText: "", badgeInset: "" },
+  // The item page's cover: a short band across the whole width, the title written below it.
+  banner: { clamp: "line-clamp-2", pad: "px-6 py-5 sm:px-8 sm:py-6", year: "text-[13px]", title: "text-[32px]", ring: "-right-[40px] -bottom-[150px] h-[260px] w-[260px] border-[34px]", badge: 0, badgeText: "", badgeInset: "" },
 } as const;
 
 /**
@@ -89,7 +90,12 @@ export function ItemCover({ title, year, avg, ratingLabel, showBadge = true, sho
   const spec = SIZES[size];
   return (
     <span
-      className={cx("relative flex aspect-[3/4] w-full flex-col overflow-hidden bg-[var(--cover-bg)] text-[var(--cover-ink)]", size === "xl" ? "justify-between rounded-[28px] shadow-[var(--elevate-2)]" : "gap-2.5 rounded-[20px] shadow-[var(--elevate-1)]", spec.pad, className)}
+      className={cx(
+        "relative flex w-full flex-col overflow-hidden bg-[var(--cover-bg)] text-[var(--cover-ink)]",
+        size === "banner" ? "h-28 sm:h-36" : "aspect-[3/4]",
+        size === "sm" ? "gap-2.5 rounded-[20px] shadow-[var(--elevate-1)]" : "justify-between rounded-[28px] shadow-[var(--elevate-2)]",
+        spec.pad, className,
+      )}
       style={coverColors(coverToneOf(title))}
     >
       <span aria-hidden="true" className={cx("absolute rounded-full border-[var(--cover-deco)]", spec.ring)} />
