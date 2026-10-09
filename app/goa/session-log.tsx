@@ -7,7 +7,7 @@ import { logRange } from "./checkin-days";
 import { CheckinLog, type LogRecord } from "./checkin-log";
 
 import { BottomSheet } from "./bottom-sheet";
-import { ConfirmDialog } from "./dialog";
+import { DeleteButton, DeleteConfirm } from "./dialog";
 import { useGoaFormat } from "./format";
 import { useLibraryName } from "./libraries";
 import type { ChallengeDetail, ChallengeField, Entry, EntryTypeView, FieldConfig, Id } from "./types";
@@ -280,7 +280,7 @@ export function SessionLog({
   const [visitValues, setVisitValues] = useState<Record<Id, unknown>>(() => (editing ? valuesAsRecord(editing.values) : {}));
   const [rows, setRows] = useState<Row[]>(() => (editing ? sortedRecords(editing.id).map((record) => ({ key: newRowKey(), id: record.id, itemId: record.itemId ?? "", values: valuesAsRecord(record.values) })) : []));
   const [error, setError] = useState<string | null>(null);
-  const [removing, setRemoving] = useState<Entry | null>(null);
+  const [removing, setRemoving] = useState(false);
   // "New item" being named in the tray. It never touches the rows until the item exists.
   const [creating, setCreating] = useState<{ title: string; busy: boolean; error: string | null } | null>(null);
   const [renaming, setRenaming] = useState<{ name: string; busy: boolean; error: string | null } | null>(null);
@@ -301,6 +301,7 @@ export function SessionLog({
   function load(visit: Entry | null, onDay: string) {
     setEditing(visit);
     setAdding(false);
+    setRemoving(false);
     setOccurredOn(visit?.occurredOn ?? onDay);
     setVisitValues(visit ? valuesAsRecord(visit.values) : {});
     setRows(visit ? sortedRecords(visit.id).map((record) => ({ key: newRowKey(), id: record.id, itemId: record.itemId ?? "", values: valuesAsRecord(record.values) })) : []);
@@ -786,28 +787,24 @@ export function SessionLog({
               </div>
             ) : null}
           </div>
+          {removing && editing && onDelete ? (
+            <div className="mt-6">
+              <DeleteConfirm
+                body={t("deleteBody", { count: (recordsByVisit.get(editing.id) ?? []).length })}
+                onConfirm={async () => {
+                  await onDelete(editing.id);
+                  load(null, day);
+                  setSheetOpen(false);
+                }}
+              />
+            </div>
+          ) : null}
           {/* The bar stays at the bottom, clear of the phone's home area. */}
           <div className="sticky bottom-0 -mx-5 mt-6 flex items-center gap-3 border-t border-[var(--line)] bg-[var(--paper)] px-5 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4">
-            {editing && onDelete ? <Button variant="ghost" className="text-[var(--danger)]" onClick={() => setRemoving(editing)}>{tc("delete")}</Button> : null}
-            <span className="flex-1" />
+            {editing && onDelete ? <DeleteButton open={removing} onClick={() => setRemoving((open) => !open)} /> : <span className="flex-1" />}
             <Button className="min-h-11 px-6" onClick={closeSheet}>{t("done")}</Button>
           </div>
         </BottomSheet>
-      ) : null}
-
-      {removing && onDelete ? (
-        <ConfirmDialog
-          title={t("deleteTitle", { name: spec.visit.name })}
-          body={t("deleteBody", { count: (recordsByVisit.get(removing.id) ?? []).length })}
-          danger
-          onClose={() => setRemoving(null)}
-          onConfirm={async () => {
-            const wasOpen = editing?.id === removing.id;
-            await onDelete(removing.id);
-            if (wasOpen) load(null, day);
-            setRemoving(null);
-          }}
-        />
       ) : null}
     </div>
   );

@@ -6,7 +6,7 @@ import { type FormEvent, useMemo, useState } from "react";
 import { ActionMenu, ActionMenuItem } from "../action-menu";
 import { CheckpointPlanner } from "../checkpoint-planner";
 import { useGoaFormat } from "../format";
-import { ConfirmDialog, FormDialog } from "../dialog";
+import { FormDialog } from "../dialog";
 import { AddSharedResponseDialog, RemoveResponseDialog, SharedGlyph, SharedResponsePanel } from "../shared-responses";
 import { cleanFields, FIELD_TYPES, FieldConfigInputs, newFieldConfig, uniqueFieldKey } from "../fields";
 import { type CatalogScope } from "../libraries";
@@ -661,8 +661,6 @@ export function ItemEditorDialog({
 }) {
   const t = useTranslations("adminChallenge");
   const tCine = useTranslations("cineItems");
-  const tc = useTranslations("common");
-  const [removing, setRemoving] = useState(false);
   const f = useGoaFormat();
   const catalogItem = item.catalogItem ?? null;
   const isItem = challenge.submissionMode === "item";
@@ -711,9 +709,11 @@ export function ItemEditorDialog({
       error={error}
       onCancel={onCancel}
       onSubmit={submit}
-      footerStart={onRemove ? (
-        <Button type="button" variant="ghost" className="text-[var(--danger)]" disabled={busy} onClick={() => setRemoving(true)}>{tc("delete")}</Button>
-      ) : undefined}
+      onDelete={onRemove ? {
+        body: entryCount > 0 ? t("itemRemoveConfirmWithEntries", { title: item.title, count: entryCount }) : t("itemRemoveConfirm", { title: item.title }),
+        busyLabel: t("removing"),
+        onConfirm: onRemove,
+      } : undefined}
     >
       <Field label={t("itemTitleLabel")}>
         <input className={inputClass} value={draft.title} onChange={(event) => set({ title: event.target.value })} required maxLength={challenge.submissionMode === "daily" ? 160 : 200} />
@@ -736,16 +736,6 @@ export function ItemEditorDialog({
       ) : null}
       {catalogItem && onOpenLibrary ? (
         <button type="button" onClick={onOpenLibrary} className="cursor-pointer text-left text-xs font-medium text-[var(--main-strong)] underline-offset-2 hover:underline">{t("openLibrary")}</button>
-      ) : null}
-      {removing && onRemove ? (
-        <ConfirmDialog
-          title={t("remove")}
-          body={entryCount > 0 ? t("itemRemoveConfirmWithEntries", { title: item.title, count: entryCount }) : t("itemRemoveConfirm", { title: item.title })}
-          busyLabel={t("removing")}
-          danger
-          onClose={() => setRemoving(false)}
-          onConfirm={onRemove}
-        />
       ) : null}
     </FormDialog>
   );

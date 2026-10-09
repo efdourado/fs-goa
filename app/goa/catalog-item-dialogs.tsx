@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { API_PATHS, apiRequest } from "./api";
 import { useCsrf } from "./csrf";
-import { ConfirmDialog, FormDialog } from "./dialog";
+import { FormDialog } from "./dialog";
 import { useGoaFormat } from "./format";
 import { type CatalogScope, LibraryPills, libraryChoices } from "./libraries";
 import {
@@ -209,7 +209,6 @@ export function EditCatalogItemDialog({
 }) {
   const t = useTranslations("catalogAdd");
   const tCat = useTranslations("catalog");
-  const tc = useTranslations("common");
   const tEvent = useTranslations("eventSchedule");
   const f = useGoaFormat();
   const csrf = useCsrf();
@@ -223,7 +222,6 @@ export function EditCatalogItemDialog({
   const values = edited ?? initialValues;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [confirmingRemoval, setConfirmingRemoval] = useState(false);
   const dirty = title.trim() !== item.title || edited !== null || !sameRecommender(recommender, initialRecommender);
 
   async function submit() {
@@ -261,7 +259,7 @@ export function EditCatalogItemDialog({
         onCancel={onCancel}
         onSubmit={submit}
         submitDisabled={!properties}
-        footerStart={onRemove ? <Button variant="danger" disabled={busy} onClick={() => setConfirmingRemoval(true)}>{tc("delete")}</Button> : null}
+        onDelete={onRemove ? { body: tCat("removeBody", { title: item.title }), onConfirm: onRemove } : undefined}
       >
         <Field label={t("titleLabel")}>
           <input className={inputClass} value={title} maxLength={300} required onChange={(event) => setTitle(event.target.value)} />
@@ -273,16 +271,6 @@ export function EditCatalogItemDialog({
         )}
         {recommendationsEnabled ? <RecommenderPicker value={recommender} onChange={setRecommender} members={members} source={source} /> : null}
       </FormDialog>
-      {confirmingRemoval && onRemove ? (
-        <ConfirmDialog
-          title={tCat("removeTitle", { title: item.title })}
-          body={tCat("removeHint")}
-          busyLabel={tc("saving")}
-          danger
-          onClose={() => setConfirmingRemoval(false)}
-          onConfirm={onRemove}
-        />
-      ) : null}
     </>
   );
 }

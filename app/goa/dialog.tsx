@@ -73,6 +73,7 @@ export function FormDialog({
   danger = false,
   submitDisabled = false,
   footerStart,
+  onDelete,
   children,
 }: {
   title: string;
@@ -86,12 +87,15 @@ export function FormDialog({
   busyLabel?: string;
   danger?: boolean;
   submitDisabled?: boolean;
-  /** An action at the footer's left edge, apart from Save (Delete, say). */
+  /** An action at the footer's left edge, apart from Save. */
   footerStart?: ReactNode;
+  /** A Delete button at the footer's left edge, confirmed in a panel under the footer (see `DeleteConfirm`). */
+  onDelete?: { body: ReactNode; onConfirm: () => Promise<void> | void; busyLabel?: string };
   children: ReactNode;
 }) {
   const tc = useTranslations("common");
   const [discard, setDiscard] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const close = () => { if (dirty) setDiscard(true); else onCancel(); };
   return (
     <Dialog title={title} busy={busy} onClose={close}>
@@ -108,13 +112,64 @@ export function FormDialog({
         <fieldset disabled={busy} className="min-w-0 space-y-5">{children}</fieldset>
         <StatusMessage error={error} />
         <div className="flex flex-wrap items-center justify-end gap-3 border-t border-[var(--line)] pt-4">
+          {onDelete ? <DeleteButton open={deleting} disabled={busy} onClick={() => setDeleting((open) => !open)} /> : null}
           {footerStart ? <div className="mr-auto">{footerStart}</div> : null}
           <Button type="submit" variant={danger ? "danger" : "primary"} disabled={busy || submitDisabled}>
             {busy ? busyLabel ?? tc("saving") : submitLabel ?? tc("save")}
           </Button>
         </div>
+        {onDelete && deleting ? <DeleteConfirm {...onDelete} /> : null}
       </form>
     </Dialog>
+  );
+}
+
+/** The Delete button of a modal's footer: it opens (and closes again) the `DeleteConfirm` panel. */
+export function DeleteButton({ open, disabled, onClick }: { open: boolean; disabled?: boolean; onClick: () => void }) {
+  const tc = useTranslations("common");
+  return (
+    <Button variant="danger" className="mr-auto" aria-expanded={open} disabled={disabled} onClick={onClick}>{tc("delete")}</Button>
+  );
+}
+
+/**
+ * Deleting, confirmed inside the same modal: the footer's Delete opens this panel under it (what goes, then one
+ * "Confirm deletion" in the same red) instead of stacking a second modal on top. Owns its busy + error.
+ */
+export function DeleteConfirm({ body, onConfirm, busyLabel }: {
+  body: ReactNode;
+  onConfirm: () => Promise<void> | void;
+  busyLabel?: string;
+}) {
+  const tc = useTranslations("common");
+  const f = useGoaFormat();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  // It opens at the bottom of the modal, maybe below the fold on a phone.
+  useEffect(() => { panelRef.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" }); }, []);
+  return (
+    <div ref={panelRef} className="space-y-3 rounded-2xl border border-[var(--danger-line)] p-4">
+      <div className="text-sm leading-6">{body}</div>
+      <StatusMessage error={error} />
+      <Button
+        variant="danger"
+        className="w-full"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          setError(null);
+          try {
+            await onConfirm();
+          } catch (cause) {
+            setError(f.error(cause));
+            setBusy(false);
+          }
+        }}
+      >
+        {busy ? busyLabel ?? tc("deleting") : tc("confirmDelete")}
+      </Button>
+    </div>
   );
 }
 

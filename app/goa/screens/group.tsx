@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import { type FormEvent, useRef, useState } from "react";
 
 import { copyText } from "../clipboard";
-import { Dialog } from "../dialog";
+import { DeleteButton, DeleteConfirm, Dialog } from "../dialog";
 import { useGoaFormat } from "../format";
 import { NewChallengeTile } from "../add-tile";
 import { CatalogShelfSkeleton } from "../catalog-shelf";
@@ -73,6 +73,7 @@ export function GroupScreen({
   const f = useGoaFormat();
   const [showInvite, setShowInvite] = useState(false);
   const [showGroupEdit, setShowGroupEdit] = useState(false);
+  const [deletingGroup, setDeletingGroup] = useState(false);
   const [groupName, setGroupName] = useState(group.name);
   const [groupDescription, setGroupDescription] = useState(group.description ?? "");
   const [groupRecommendations, setGroupRecommendations] = useState(group.recommendationsEnabled !== false);
@@ -153,6 +154,7 @@ export function GroupScreen({
       setGroupRecommendations(group.recommendationsEnabled !== false);
       setGroupError(null);
       setGroupSuccess(null);
+      setDeletingGroup(false);
     }
     setShowGroupEdit(!showGroupEdit);
   }
@@ -172,18 +174,6 @@ export function GroupScreen({
     }
   }
 
-  async function deleteGroup() {
-    if (!onDeleteGroup) return;
-    if (!window.confirm(t("deleteConfirm", { name: group.name }))) return;
-    setGroupBusy(true);
-    setGroupError(null);
-    try {
-      await onDeleteGroup();
-    } catch (cause) {
-      setGroupError(f.error(cause));
-      setGroupBusy(false);
-    }
-  }
 
   async function createInvite(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -310,10 +300,10 @@ export function GroupScreen({
             <StatusMessage error={groupError} success={groupSuccess} />
             {/* One footer: delete on the left, away from Save on the right. */}
             <div className="flex flex-wrap items-center gap-3 border-t border-[var(--line)] pt-4">
-              {onDeleteGroup ? <Button variant="danger" type="button" disabled={groupBusy} onClick={() => void deleteGroup()}>{tc("delete")}</Button> : null}
-              <span className="flex-1" />
+              {onDeleteGroup ? <DeleteButton open={deletingGroup} disabled={groupBusy} onClick={() => setDeletingGroup((open) => !open)} /> : <span className="flex-1" />}
               <Button type="submit" disabled={groupBusy}>{groupBusy ? tc("saving") : tc("save")}</Button>
             </div>
+            {onDeleteGroup && deletingGroup ? <DeleteConfirm body={t("deleteConfirm", { name: group.name })} onConfirm={onDeleteGroup} /> : null}
           </form>
         </Dialog>
       ) : null}
