@@ -1448,8 +1448,8 @@ export function ParticipantChallengeScreen({
     return map;
   }, [entries, user?.id, readRating]);
   const sortedItems = useMemo(() => [...challenge.items].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)), [challenge.items]);
-  // The list on Today: always newest first, numbered from the top (the latest added is 01, what you're on).
-  const pickerItems = useMemo(() => [...sortedItems].reverse(), [sortedItems]);
+  // The list on Today: in the order items were added, 01 at the top and the newest at the bottom with the next number.
+  const pickerItems = sortedItems;
   // A workout-style challenge: one check-in that holds a record for each of several items. It replaces the
   // per-item picker and form on Today, and its progress is "check-ins logged", not "items done".
   const sessionSpec = useMemo(() => sessionSpecOf(challenge), [challenge]);
