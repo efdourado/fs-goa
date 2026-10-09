@@ -677,7 +677,7 @@ export function SessionLog({
                         <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
                       </button>
                     </div>
-                    <div className="mt-3 grid grid-cols-2 items-start gap-2.5 sm:grid-cols-[repeat(auto-fit,minmax(9rem,1fr))]">
+                    <div className="mt-3 grid grid-cols-2 items-start gap-2.5 sm:grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] [&>*:last-child:nth-child(odd)]:col-span-2 sm:[&>*:last-child:nth-child(odd)]:col-span-1">
                       {recordFields.map((field) => {
                         const id = `${row.key}-${field.id}`;
                         const current = numberValue(row.values[field.id as Id]);

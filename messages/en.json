@@ -1040,7 +1040,7 @@
     "removeRow": "Remove {item}",
     "addRows": "Add",
     "visitHeading": "{name} {number} · {count, plural, one {# item} other {# items}}",
-    "continueVisit": "Continue",
+    "continueVisit": "Edit",
     "draftWaiting": "There is an unsaved entry on this device. Tap to continue.",
     "logToday": "Log today's {name}",
     "logOnDay": "Log the {name} of {date}",

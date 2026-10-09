@@ -67,7 +67,7 @@ test("o treino de hoje já registrado aparece resumido, com Continuar e um novo 
   }));
   assert.match(html, /Treino 1 · 1 item/);
   assert.match(html, /Supino<\/span><span[^>]*>60 · 8<\/span>/, "cada exercício numa linha, com os números");
-  assert.match(html, />Continuar</);
+  assert.match(html, />Editar</);
   assert.match(html, /＋ Novo treino/, "outro treino no mesmo dia");
 });
 

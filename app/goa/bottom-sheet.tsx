@@ -25,12 +25,17 @@ export function BottomSheet({
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
+  // The latest onClose, without making the effect below run again: a caller's handler is often a new function on
+  // every render, and re-running would pull focus back to the first button (closing a phone's keyboard mid-typing).
+  const close = useRef(onClose);
+  useEffect(() => { close.current = onClose; }, [onClose]);
 
+  // Once, on open: focus moves in, Escape closes, the page behind stops scrolling.
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
     panelRef.current?.querySelector<HTMLElement>("button, [href], input, select, textarea")?.focus();
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") close.current();
     };
     document.addEventListener("keydown", onKey);
     const previousOverflow = document.body.style.overflow;
@@ -40,7 +45,7 @@ export function BottomSheet({
       document.body.style.overflow = previousOverflow;
       opener?.focus?.();
     };
-  }, [onClose]);
+  }, []);
 
   if (typeof document === "undefined") return null;
 

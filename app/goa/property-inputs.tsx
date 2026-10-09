@@ -195,7 +195,8 @@ export function PropertyInputs({
   const defaultZone = timeZone ?? browserZone;
   if (!visible.length) return null;
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
+    // Two columns from `sm:` up; an odd last one takes the whole row instead of leaving an empty cell beside it.
+    <div className="grid gap-4 sm:grid-cols-2 sm:[&>*:last-child:nth-child(odd)]:col-span-2">
       {visible.map((property) => {
         const value = values[property.key] ?? "";
         const label = name(property);

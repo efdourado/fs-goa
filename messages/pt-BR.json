@@ -1040,7 +1040,7 @@
     "removeRow": "Tirar {item}",
     "addRows": "Adicionar",
     "visitHeading": "{name} {number} · {count, plural, one {# item} other {# itens}}",
-    "continueVisit": "Continuar",
+    "continueVisit": "Editar",
     "draftWaiting": "Há um registro não salvo neste aparelho. Toque para continuar.",
     "logToday": "Registrar o {name} de hoje",
     "logOnDay": "Registrar o {name} de {date}",

@@ -1040,7 +1040,7 @@
     "removeRow": "Quitar {item}",
     "addRows": "Añadir",
     "visitHeading": "{name} {number} · {count, plural, one {# elemento} other {# elementos}}",
-    "continueVisit": "Continuar",
+    "continueVisit": "Editar",
     "draftWaiting": "Hay un registro sin guardar en este dispositivo. Toca para continuar.",
     "logToday": "Registrar el {name} de hoy",
     "logOnDay": "Registrar el {name} del {date}",
