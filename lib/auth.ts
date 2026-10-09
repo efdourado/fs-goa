@@ -3,6 +3,7 @@ import { inTransaction, oneOrNull, withClient } from "./db";
 import { writeSystemAudit } from "./goa/domain/audit";
 import { purgeGroupRows } from "./goa/purge";
 import { ApiError, cookieValue, requireMutationOrigin } from "./http";
+import { rateLimitWrites } from "./rate-limit";
 import {
   clearSessionCookie,
   deriveCsrfToken,
@@ -554,6 +555,7 @@ export async function requireMutationSession(
   if (!(await verifyCsrfToken(session.rawToken, request.headers.get("x-csrf-token")))) {
     throw new ApiError(403, "invalid_csrf", "Token de segurança inválido.");
   }
+  await rateLimitWrites(session.user.id);
   return session;
 }
 

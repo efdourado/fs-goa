@@ -87,6 +87,20 @@ export const sessions = pgTable(
   ],
 );
 
+/**
+ * Fixed-window counters behind `lib/rate-limit.ts`: one row per key ("ip:login:1.2.3.4", "user:write:<id>") — the
+ * window it started and how many requests landed in it. Rows of finished windows are pruned as it goes.
+ */
+export const rateLimits = pgTable(
+  "rate_limits",
+  {
+    key: text("key").primaryKey(),
+    windowStartedAt: timestamptz("window_started_at").defaultNow().notNull(),
+    hits: integer("hits").notNull().default(0),
+  },
+  (table) => [index("rate_limits_window_started_at_idx").on(table.windowStartedAt)],
+);
+
 // This table deliberately does not reference users: unknown identifiers must be
 // rate-limited exactly like existing ones, without leaking account existence.
 // The key is a normalized username OR e-mail (login accepts either), so the

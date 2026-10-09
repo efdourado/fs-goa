@@ -5,6 +5,8 @@ import pg from "pg";
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("DATABASE_URL é obrigatória para o teste de integração.");
 process.env.APP_ORIGIN = "http://goa.test";
+// Hundreds of quick writes from the same few accounts: the per-account limit has its own test below.
+process.env.GOA_RATE_LIMITS = "off";
 
 const { DELETE, GET, PATCH, POST } = await import("../../app/api/[...path]/route");
 const { dateKeyInTimeZone } = await import("../../lib/goa/domain/shared");
@@ -8780,4 +8782,238 @@ test("contagem num hábito: um campo numérico guarda a meta fixa, a forma de re
     body: { recipe: "habit", title: "Ruim", startsOn: null, endsOn: null, fields: [{ key: "x", label: "X", type: "number", required: true, config: { count: { goal: { value: -5 } } } }] },
   });
   assert.equal(bad.response.status, 400, "meta precisa ser positiva");
+});
+
+test("varredura de vazamento: nenhuma porta pública traz username, e-mail, id de pessoa, comentário ou nome sem consentimento", async () => {
+  const owner = await register("Zelda Vazamento", "zelda_vaza");
+  await adminPool.query("UPDATE users SET platform_admin = true, email = 'zelda.vaza@example.com' WHERE id = $1", [owner.user.id]);
+  const zelda = await login("zelda_vaza");
+  const bruno = await register("Bruno Consente", "bruno_vaza");
+  const clara = await register("Clara Sigilo", "clara_vaza");
+  const davi = await register("Davi Partiu", "davi_vaza");
+  await adminPool.query("UPDATE users SET email = username || '@example.com' WHERE id = ANY($1::text[])", [[bruno.user.id, clara.user.id, davi.user.id]]);
+  const people = [zelda, bruno, clara, davi];
+  const gid = ((await call("POST", "/api/groups", { session: zelda, body: { name: "Clube Vaza" } })).body as { id: string }).id;
+  for (const member of [bruno, clara, davi]) {
+    const invite = (await call("POST", `/api/groups/${gid}/invites`, { session: zelda, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
+    await call("POST", `/api/invites/${invite.token}`, { session: member, body: {} });
+  }
+  const external = (await call("POST", `/api/groups/${gid}/catalog/recommenders`, { session: zelda, body: { displayName: "Tia Externa" } })).body as { id: string };
+  const created = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: zelda,
+    body: {
+      recipe: "cinema", title: "Cine Vaza", participantIds: people.map((person) => person.user.id),
+      items: [{ title: "Filme Um", recommendedByUserId: clara.user.id }, { title: "Filme Dois" }, { title: "Filme Tres", recommendedByUserId: davi.user.id }],
+    },
+  });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const cid = (created.body as { id: string }).id;
+  type Detail = { entryTypes: Array<{ id: string; purpose: string; fields: Array<{ id: string; key: string }> }>; items: Array<{ id: string; title: string }> };
+  const detail = (await call("GET", `/api/challenges/${cid}`, { session: zelda })).body as Detail;
+  const second = detail.items.find((item) => item.title === "Filme Dois")!;
+  await call("PATCH", `/api/challenges/${cid}/items/${second.id}`, { session: zelda, body: { recommendedByExternalId: external.id, originNote: "origem-secreta" } });
+  const rating = detail.entryTypes.find((type) => type.purpose === "rating")!;
+  const nota = rating.fields.find((field) => field.key === "nota")!.id;
+  const comentario = rating.fields.find((field) => field.key === "comentario")!.id;
+  await call("POST", `/api/challenges/${cid}/transition`, { session: zelda, body: { status: "active" } });
+  const shared = (await call("POST", `/api/challenges/${cid}/entry-types`, {
+    session: zelda,
+    body: { name: "Placar", sharedEditPolicy: "members_can_edit", field: { key: "placar", label: "Placar", type: "number", required: true, config: { min: 0, max: 20, step: 1 } } },
+  })).body as { id: string; fields?: Array<{ id: string }> };
+  const placar = ((await call("GET", `/api/challenges/${cid}`, { session: zelda })).body as Detail).entryTypes.find((type) => type.id === shared.id)?.fields[0]?.id;
+  if (placar) await call("POST", `/api/challenges/${cid}/entries`, { session: clara, body: { entryTypeId: shared.id, itemId: second.id, values: { [placar]: 7 } } });
+  await call("PATCH", `/api/challenges/${cid}/consent`, { session: bruno, body: { nameConsent: true } });
+  for (const [index, person] of people.entries()) {
+    for (const item of detail.items) {
+      const saved = await call("POST", `/api/challenges/${cid}/entries`, {
+        session: person, body: { itemId: item.id, entryTypeId: rating.id, values: { [nota]: 2 + (index % 3), [comentario]: `segredo-${person.user.username}` } },
+      });
+      assert.equal(saved.response.status, 201, JSON.stringify(saved.body));
+    }
+  }
+  for (const groupBy of ["participant", "item"]) {
+    await call("POST", `/api/challenges/${cid}/metrics`, { session: zelda, body: { label: `Por ${groupBy}`, operation: "average", fieldId: nota, groupBy, minSample: 1 } });
+  }
+  assert.equal((await call("POST", `/api/groups/${gid}/leave`, { session: davi, body: {} })).response.status, 200);
+  await call("POST", `/api/challenges/${cid}/transition`, { session: zelda, body: { status: "closed" } });
+
+  // Whatever an anonymous visitor can read: the challenge's public pages, the gallery, an invite link, the app shell.
+  const always = [
+    ...people.flatMap((person) => [person.user.id, person.user.username]),
+    "@example.com", "segredo-", "origem-secreta", "Tia Externa",
+  ];
+  const publicDump = async (label: string, path: string) => {
+    const read = await call("GET", path);
+    assert.equal(read.response.status, 200, `${label}: ${JSON.stringify(read.body)}`);
+    return JSON.stringify(read.body);
+  };
+  const assertClean = (label: string, dump: string, forbidden: string[]) => {
+    for (const secret of forbidden) {
+      const at = dump.indexOf(secret);
+      assert.ok(at < 0, `${label} traz "${secret}": …${dump.slice(Math.max(0, at - 300), at + 80)}…`);
+    }
+  };
+
+  await call("POST", `/api/challenges/${cid}/results`, { session: zelda, body: { metricIds: [], comments: [], anonymizeParticipants: true } });
+  const token = ((await call("POST", `/api/challenges/${cid}/results/publish`, { session: zelda, body: {} })).body as { url: string }).url.split("/results/")[1];
+  const anonymous = await publicDump("vitrine anônima", `/api/results/${token}`);
+  assertClean("vitrine anônima", anonymous, [...always, ...people.map((person) => person.user.name)]);
+  assert.match(anonymous, /Participante \d/, "as pessoas aparecem como Participante N");
+
+  await call("POST", `/api/challenges/${cid}/results`, { session: zelda, body: { anonymizeParticipants: false } });
+  const named = await publicDump("vitrine com nomes", `/api/results/${token}`);
+  assertClean("vitrine com nomes", named, [...always, zelda.user.name, clara.user.name, davi.user.name]);
+  assert.ok(named.includes(bruno.user.name), "quem consentiu aparece pelo nome");
+
+  assert.equal((await call("POST", `/api/challenges/${cid}/template`, { session: zelda, body: {} })).response.status < 300, true);
+  const everyone = [...always, ...people.map((person) => person.user.name)];
+  assertClean("galeria de modelos", await publicDump("galeria", "/api/templates"), everyone);
+  // The template shows the same retrospective as the link: only who consented, and only there.
+  assertClean("modelo público", await publicDump("modelo", `/api/templates/${cid}`), [...always, zelda.user.name, clara.user.name, davi.user.name]);
+
+  const invite = (await call("POST", `/api/groups/${gid}/invites`, { session: zelda, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
+  // The invite says who invited (that is the point of the link), never anyone's account handle, e-mail or id.
+  assertClean("prévia do convite", await publicDump("convite", `/api/invites/${invite.token}`), always);
+  assertClean("app sem sessão", await publicDump("bootstrap", "/api/bootstrap"), everyone);
+});
+
+test("resposta compartilhada: dois primeiros salvamentos ao mesmo tempo e edição de uma resposta apagada viram conflito, não erro nem ressurreição", async () => {
+  const owner = await register("Ivo Corrida", "ivo_corrida");
+  const friend = await register("Lia Corrida", "lia_corrida");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Corrida" } })).body as { id: string }).id;
+  const invite = (await call("POST", `/api/groups/${gid}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
+  await call("POST", `/api/invites/${invite.token}`, { session: friend, body: {} });
+  const cid = ((await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner, body: { recipe: "cinema", title: "Final", participantIds: [owner.user.id, friend.user.id], items: [{ title: "Jogo" }] },
+  })).body as { id: string }).id;
+  const itemId = ((await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { items: Array<{ id: string }> }).items[0].id;
+  await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } });
+  const typeId = ((await call("POST", `/api/challenges/${cid}/entry-types`, {
+    session: owner,
+    body: { name: "Placar", sharedEditPolicy: "members_can_edit", field: { key: "placar", label: "Placar", type: "number", required: true, config: { min: 0, max: 20, step: 1 } } },
+  })).body as { id: string }).id;
+  const fieldId = ((await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { entryTypes: Array<{ id: string; fields: Array<{ id: string }> }> })
+    .entryTypes.find((type) => type.id === typeId)!.fields[0].id;
+  const save = (session: ClientSession, value: number, expectedUpdatedAt: string | null) =>
+    call("POST", `/api/challenges/${cid}/entries`, { session, body: { entryTypeId: typeId, itemId, values: { [fieldId]: value }, expectedUpdatedAt } });
+
+  const [a, b] = await Promise.all([save(owner, 1, null), save(friend, 2, null)]);
+  const statuses = [a.response.status, b.response.status].sort();
+  assert.deepEqual(statuses, [201, 409], `um vence, o outro ouve conflito: ${JSON.stringify([a.body, b.body])}`);
+  const loser = a.response.status === 409 ? a : b;
+  assert.equal((loser.body as { error: string }).error, "shared_conflict");
+
+  const entries = (await call("GET", `/api/challenges/${cid}/entries`, { session: owner })).body as { entries: Array<{ id: string; entryTypeId: string; updatedAt: string }> };
+  const current = entries.entries.find((entry) => entry.entryTypeId === typeId)!;
+  assert.equal((await call("DELETE", `/api/entries/${current.id}`, { session: owner })).response.status < 300, true);
+  const revived = await save(friend, 9, current.updatedAt);
+  assert.equal(revived.response.status, 409, JSON.stringify(revived.body));
+  assert.equal((revived.body as { error: string }).error, "shared_conflict", "editar o que foi apagado avisa, não recria em silêncio");
+  assert.equal((await save(friend, 9, null)).response.status, 201, "começar de novo, sabendo que não há nada, funciona");
+});
+
+test("limites de ritmo: a janela conta por chave, recusa com 429 e Retry-After, e cada chave tem a sua", async () => {
+  const { rateLimit, RATE_LIMITS } = await import("../../lib/rate-limit");
+  const previous = process.env.GOA_RATE_LIMITS;
+  process.env.GOA_RATE_LIMITS = "on";
+  try {
+    const subject = `teste-${crypto.randomUUID()}`;
+    for (let index = 0; index < RATE_LIMITS.register.limit; index += 1) await rateLimit("register", subject);
+    await assert.rejects(rateLimit("register", subject), (error: { status?: number; code?: string; details?: { retryAfterSeconds?: number } }) =>
+      error.status === 429 && error.code === "rate_limited" && (error.details?.retryAfterSeconds ?? 0) > 0);
+    await rateLimit("register", `${subject}-outro`);
+    await rateLimit("login", subject);
+    await rateLimit("register", null);
+
+    // A whole window later the same key starts again from one.
+    await adminPool.query("UPDATE rate_limits SET window_started_at = now() - interval '2 hours' WHERE key = $1", [`register:${subject}`]);
+    await rateLimit("register", subject);
+  } finally {
+    process.env.GOA_RATE_LIMITS = previous;
+  }
+});
+
+test("varredura de acesso: quem é de fora não lê nem muda nada, e um participante comum não mexe no que é do admin", async () => {
+  const owner = await register("Olga Dona", "olga_acesso");
+  const member = await register("Mateus Membro", "mateus_acesso");
+  const stranger = await register("Estela Estranha", "estela_acesso");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Grupo Fechado" } })).body as { id: string }).id;
+  const invite = (await call("POST", `/api/groups/${gid}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
+  await call("POST", `/api/invites/${invite.token}`, { session: member, body: {} });
+  const cid = ((await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner, body: { recipe: "bookshelf", title: "Leituras Fechadas", participantIds: [owner.user.id, member.user.id], items: [{ title: "Livro Fechado", author: "Autora" }] },
+  })).body as { id: string }).id;
+  type Detail = { entryTypes: Array<{ id: string; purpose: string; fields: Array<{ id: string; key: string }> }>; items: Array<{ id: string; catalogItem?: { id: string } | null }>; metrics: Array<{ id: string }> };
+  const before = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as Detail;
+  const itemId = before.items[0].id;
+  const catalogItemId = before.items[0].catalogItem?.id ?? "x";
+  await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } });
+  const rating = before.entryTypes.find((type) => type.purpose === "rating")!;
+  const nota = rating.fields.find((field) => field.key === "nota")!.id;
+  const ownerEntry = (await call("POST", `/api/challenges/${cid}/entries`, { session: owner, body: { itemId, entryTypeId: rating.id, values: { [nota]: 5 } } })).body as { id: string };
+
+  const snapshot = async () => JSON.stringify([
+    (await call("GET", `/api/challenges/${cid}`, { session: owner })).body,
+    (await call("GET", `/api/challenges/${cid}/entries`, { session: owner })).body,
+    (await call("GET", `/api/groups/${gid}/catalog`, { session: owner })).body,
+    (await adminPool.query("SELECT role, removed_at FROM group_members WHERE group_id = $1 ORDER BY user_id", [gid])).rows,
+    (await adminPool.query("SELECT published_as_template_at, results_published_at, deleted_at, status FROM challenges WHERE id = $1", [cid])).rows,
+  ]);
+  const start = await snapshot();
+
+  const reads = [
+    `/api/challenges/${cid}`, `/api/challenges/${cid}/entries`, `/api/challenges/${cid}/preflight`, `/api/challenges/${cid}/archive`,
+    `/api/groups/${gid}/catalog`, `/api/groups/${gid}/catalog/shelf`, `/api/groups/${gid}/taste`, `/api/groups/${gid}/catalog/libraries`,
+    `/api/groups/${gid}/catalog/recommenders`, `/api/groups/${gid}/catalog/${catalogItemId}`, `/api/groups/${gid}/catalog-attributes`, `/api/groups/${gid}/trash`,
+  ];
+  for (const path of reads) {
+    const read = await call("GET", path, { session: stranger });
+    assert.ok([403, 404].includes(read.response.status), `estranha lê ${path}: ${read.response.status}`);
+    assert.ok(!JSON.stringify(read.body).includes("Livro Fechado") && !JSON.stringify(read.body).includes("Leituras Fechadas"), `nada vaza em ${path}`);
+  }
+
+  const adminWrites: Array<["POST" | "PATCH" | "DELETE", string, unknown]> = [
+    ["PATCH", `/api/challenges/${cid}`, { title: "Invadido" }],
+    ["POST", `/api/challenges/${cid}/transition`, { status: "closed" }],
+    ["POST", `/api/challenges/${cid}/items`, { items: [{ title: "Intruso" }] }],
+    ["PATCH", `/api/challenges/${cid}/items/${itemId}`, { title: "Intruso" }],
+    ["DELETE", `/api/challenges/${cid}/items/${itemId}`, undefined],
+    ["POST", `/api/challenges/${cid}/fields`, { fields: [{ key: "x", label: "X", type: "text" }] }],
+    ["POST", `/api/challenges/${cid}/entry-types`, { name: "X", field: { key: "x", label: "X", type: "number" } }],
+    ["POST", `/api/challenges/${cid}/metrics`, { label: "X", operation: "average", fieldId: nota, groupBy: "item" }],
+    ["PATCH", `/api/challenges/${cid}/page-count`, { enabled: true }],
+    ["POST", `/api/challenges/${cid}/participants`, { userIds: [stranger.user.id] }],
+    ["POST", `/api/challenges/${cid}/results`, { anonymizeParticipants: false }],
+    ["POST", `/api/challenges/${cid}/results/publish`, {}],
+    ["POST", `/api/challenges/${cid}/template`, {}],
+    ["DELETE", `/api/challenges/${cid}`, undefined],
+    ["PATCH", `/api/groups/${gid}`, { name: "Invadido" }],
+    ["DELETE", `/api/groups/${gid}`, undefined],
+    ["POST", `/api/groups/${gid}/invites`, { expiresInDays: 7, maxUses: 5 }],
+    ["PATCH", `/api/groups/${gid}/members/${member.user.id}`, { role: "admin" }],
+    ["DELETE", `/api/groups/${gid}/members/${owner.user.id}`, undefined],
+    ["POST", `/api/groups/${gid}/catalog/remove`, { itemIds: [catalogItemId] }],
+    ["DELETE", `/api/groups/${gid}/catalog/${catalogItemId}`, undefined],
+    ["PATCH", `/api/entries/${ownerEntry.id}`, { values: { [nota]: 1 } }],
+    ["DELETE", `/api/entries/${ownerEntry.id}`, undefined],
+  ];
+  for (const session of [stranger, member]) {
+    for (const [method, path, body] of adminWrites) {
+      const write = await call(method, path, { session, ...(body === undefined ? {} : { body }) });
+      assert.ok(write.response.status >= 400, `${session.user.username} ${method} ${path}: ${write.response.status} ${JSON.stringify(write.body)}`);
+    }
+  }
+  const stranded = [
+    ["POST", `/api/challenges/${cid}/entries`, { itemId, entryTypeId: rating.id, values: { [nota]: 1 } }],
+    ["POST", `/api/challenges/${cid}/items/${itemId}/reveal`, {}],
+    ["PATCH", `/api/challenges/${cid}/consent`, { nameConsent: true }],
+    ["POST", `/api/groups/${gid}/catalog/items`, { title: "Intruso" }],
+    ["POST", `/api/groups/${gid}/leave`, {}],
+  ] as const;
+  for (const [method, path, body] of stranded) {
+    const write = await call(method, path, { session: stranger, body });
+    assert.ok(write.response.status >= 400, `estranha ${method} ${path}: ${write.response.status}`);
+  }
+
+  assert.equal(await snapshot(), start, "nada mudou depois de todas as tentativas");
 });

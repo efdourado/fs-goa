@@ -538,6 +538,11 @@ export async function saveEntry(
       }
       assertSharedNotChanged(body, existing.updated_at);
     }
+    // The answer this person was editing is gone (someone deleted it meanwhile): say so rather than quietly
+    // bringing it back as a new one with only their half of the story.
+    if (answerScope === "shared" && !existing && typeof body.expectedUpdatedAt === "string") {
+      throw new ApiError(409, "shared_conflict", "Essa resposta compartilhada foi apagada enquanto você editava.", { currentUpdatedAt: null });
+    }
 
     const entryId = existing?.id ?? publicId();
     if (existing) {

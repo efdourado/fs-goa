@@ -188,6 +188,15 @@ app nativo, feed social, fórmulas livres.
 - Validação estrita dos valores de campo; métricas são enums, nunca SQL.
 - Cabeçalhos de segurança em `next.config.ts` (frame, nosniff, CSP sem scripts,
   nonces de script ainda pendentes); páginas públicas sem dados privados.
+- Limites de ritmo (`lib/rate-limit.ts`, tabela `rate_limits`): por IP no cadastro,
+  login, feedback e links públicos; por conta em toda escrita (por minuto e por dia).
+  429 com `Retry-After`; se o contador falhar, a requisição passa.
+- Uma visita sem sessão nunca recebe as métricas cruas: só a cópia mascarada da
+  vitrine (nomes só de quem consentiu, ids opacos). `varredura de vazamento` e
+  `varredura de acesso` nos testes de integração vigiam isso.
+- Resposta compartilhada: trava de linha + versão vista (`expectedUpdatedAt`); dois
+  primeiros salvamentos simultâneos ou editar uma resposta apagada viram
+  `shared_conflict`, nunca erro nem ressurreição.
 
 ## Testes
 

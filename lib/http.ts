@@ -110,10 +110,20 @@ export async function handleApi(
     return await work();
   } catch (error) {
     if (error instanceof ApiError) {
-      return json({ error: error.code, message: error.message, details: error.details }, error.status);
+      const retryAfter = (error.details as { retryAfterSeconds?: number } | undefined)?.retryAfterSeconds;
+      return json(
+        { error: error.code, message: error.message, details: error.details },
+        error.status,
+        error.status === 429 && retryAfter ? { "retry-after": String(retryAfter) } : undefined,
+      );
     }
 
     const databaseError = error as { code?: string; constraint?: string };
+    // Two people saving the first shared answer for an item at the same instant: the second loses the race on the
+    // one-per-item index, and hears it the same way as any other shared-answer conflict.
+    if (databaseError?.code === "23505" && databaseError.constraint === "entries_one_active_shared_item_response_uidx") {
+      return json({ error: "shared_conflict", message: "Alguém acabou de salvar essa resposta compartilhada. Veja o valor atual antes de salvar de novo." }, 409);
+    }
     if (databaseError?.code === "23505") {
       return json({ error: "conflict", message: "Já existe um registro com esses dados." }, 409);
     }

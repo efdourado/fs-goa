@@ -205,6 +205,20 @@ type ParticipantRow = { id: string; display_name: string; username: string; name
  * feeds it the in-group view (real participants, live result); `getTemplatePreview`
  * feeds it the public view (no participants, the showcase computed for a visitor).
  */
+/** A metric with nothing that names a person: no per-person series, no recommender beside an item. */
+function publicMetric<T extends Record<string, unknown>>(metric: T): T {
+  if (!Array.isArray(metric.series)) return metric;
+  if (metric.groupBy === "participant") return { ...metric, series: [] };
+  return {
+    ...metric,
+    series: (metric.series as Array<Record<string, unknown>>).map((row) => {
+      const copy = { ...row };
+      delete copy.recommendedBy;
+      return copy;
+    }),
+  };
+}
+
 export async function buildChallengeDetail(
   client: PoolClient,
   ch: DetailChallengeRow,
@@ -250,12 +264,18 @@ export async function buildChallengeDetail(
   }));
   const primaryEntryTypeId = primaryType?.id ?? null;
   const completionEntryTypeId = completionType?.id ?? null;
-  const metrics = await metricsForChallenge(client, challengeId);
+  const liveMetrics = await metricsForChallenge(client, challengeId);
   // Rankings + affinity are computed live from the entries; `result_blocks` only
   // decides which of them show. The template preview passes its own `result`.
   const result = "result" in opts
     ? opts.result
-    : await resultForChallenge(client, challengeId, metrics, { liveRankings: true });
+    : await resultForChallenge(client, challengeId, liveMetrics, { liveRankings: true });
+  // A visitor (no viewer) never gets the raw metrics: their per-person rows carry real names and ids, and item
+  // rows say which member recommended what. The masked copy inside the public `result` when there is one,
+  // otherwise only what names nobody.
+  const metrics = viewer.userId !== null
+    ? liveMetrics
+    : (result as { metrics?: typeof liveMetrics } | null)?.metrics ?? liveMetrics.map(publicMetric);
   // The client's `submissionMode` answers "how does a participant pick what to
   // log". A round with catalog items is "item" even when its primary type
   // (a reading club's daily progress) is `daily`.

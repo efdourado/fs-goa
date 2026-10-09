@@ -145,6 +145,7 @@ import {
   updateGroup,
 } from "@/lib/goa-domain";
 import { getPool } from "@/lib/db";
+import { clientIp, rateLimit } from "@/lib/rate-limit";
 import {
   ApiError,
   handleApi,
@@ -182,6 +183,10 @@ export async function GET(request: Request): Promise<Response> {
       if (isPath(path, "admin", "audit")) return json(await adminAudit(new URL(request.url).searchParams));
       if (isPath(path, "admin", "system-audit")) return json(await adminSystemAudit(new URL(request.url).searchParams));
       return notFound();
+    }
+    // The doors anyone can knock on without an account: counted per address.
+    if ((path[0] === "invites" || path[0] === "templates" || path[0] === "results") && path.length <= 2) {
+      await rateLimit("publicRead", clientIp(request));
     }
     if (path[0] === "invites" && path.length === 2) {
       return json(await previewInvite(path[1], await sessionFromRequest(request)));
@@ -277,11 +282,13 @@ export async function POST(request: Request): Promise<Response> {
     const path = segments(request);
     if (isPath(path, "auth", "register")) {
       requireMutationOrigin(request);
+      await rateLimit("register", clientIp(request));
       const result = await registerAccount(await readJsonObject(request));
       return json({ user: result.user, csrfToken: result.csrfToken }, 201, { "set-cookie": result.setCookie });
     }
     if (isPath(path, "auth", "login")) {
       requireMutationOrigin(request);
+      await rateLimit("login", clientIp(request));
       const result = await loginAccount(await readJsonObject(request));
       return json({ user: result.user, csrfToken: result.csrfToken }, 200, { "set-cookie": result.setCookie });
     }
@@ -296,6 +303,7 @@ export async function POST(request: Request): Promise<Response> {
 
     if (isPath(path, "feedback")) {
       requireMutationOrigin(request);
+      await rateLimit("feedback", clientIp(request));
       const result = await submitFeedback(
         await sessionFromRequest(request),
         await readJsonObject(request),
