@@ -1157,7 +1157,8 @@
       "scheduled": "Las respuestas para este ítem aún no se han abierto. Se abren en la fecha programada.",
       "itemClosed": "El registro aquí está cerrado. Solo lectura."
     },
-    "optionArchived": "(quitada)"
+    "optionArchived": "(quitada)",
+    "clearRating": "Borrar"
   },
   "resultView": {
     "emptyTitle": "La vitrina todavía se está preparando",

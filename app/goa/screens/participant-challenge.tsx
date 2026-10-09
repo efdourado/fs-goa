@@ -11,6 +11,7 @@ import { copyText } from "../clipboard";
 import { useGoaFormat } from "../format";
 import { useDoneItems } from "../use-done-items";
 import { recommenderLine } from "../recommender-picker";
+import { RatingSlider } from "../rating-slider";
 import { isSealed, RevealPanel, sealedRatingType } from "../reveal";
 import { ChallengeResults, useChallengeStory, usePreviewStory } from "../story/for-challenge";
 import { StoryView } from "../story/view";
@@ -75,12 +76,10 @@ function ratingChoices(config?: FieldConfig): number[] {
 }
 
 /**
- * On desktop this is one clean row of equal pills (`sm:grid-cols-11`). On a phone
- * an odd count would wrap into a lopsided 6-over-5, so it becomes a single
- * horizontal snap-scroller of same-size pills, pre-scrolled to the current pick.
- * Tapping the already-picked pill clears it — the field goes blank, same as
- * never having answered, which on a required field lets a re-save delete the
- * entry instead of needing a separate delete button.
+ * On desktop one clean row of equal pills (`sm:grid-cols-11`); on a phone, where eleven pills only fit by
+ * scrolling sideways, a track to drag or tap (`RatingSlider`). Tapping the picked pill (or "Clear" under the
+ * slider) blanks the field, same as never having answered, which on a required field lets a re-save delete
+ * the entry instead of needing a separate delete button.
  */
 function RatingField({
   id,
@@ -97,43 +96,39 @@ function RatingField({
   ariaLabel: (rating: string) => string;
   onPick: (rating: number | null) => void;
 }) {
-  const scroller = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    scroller.current?.querySelector<HTMLElement>('[aria-pressed="true"]')
-      ?.scrollIntoView({ inline: "center", block: "nearest" });
-  }, []);
+  const t = useTranslations("entryForm");
+  const choices = ratingChoices(field.config);
+  // `Number(null)` and `Number("")` are both 0 — without this guard, a cleared field wrongly lights up "0".
+  const current = value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value)) ? Number(value) : null;
   return (
-    <div
-      ref={scroller}
-      id={id}
-      tabIndex={-1}
-      className="flex w-full min-w-0 snap-x gap-1.5 overflow-x-auto pb-2 sm:grid sm:grid-cols-11 sm:overflow-visible sm:pb-0 [scrollbar-width:thin]"
-    >
-      {ratingChoices(field.config).map((rating) => {
-        // `Number(null)` and `Number("")` are both 0 — without this guard, a
-        // cleared field wrongly re-lights the "0" pill instead of showing
-        // nothing picked.
-        const picked = value !== null && value !== undefined && value !== "" && Number(value) === rating;
-        const text = String(rating).replace(".", ",");
-        return (
-          <button
-            key={rating}
-            type="button"
-            aria-pressed={picked}
-            aria-label={ariaLabel(text)}
-            disabled={disabled}
-            onClick={() => onPick(picked ? null : rating)}
-            className={cx(
-              "h-10 w-10 flex-none snap-center rounded-xl border text-sm font-light tabular-nums sm:h-11 sm:w-auto sm:text-xs",
-              picked
-                ? "border-[var(--main)] bg-[var(--main)] text-white"
-                : "border-transparent bg-[var(--wash)] hover:border-[var(--main-line)]",
-            )}
-          >
-            {text}
-          </button>
-        );
-      })}
+    <div id={id} tabIndex={-1}>
+      <div className="sm:hidden">
+        <RatingSlider choices={choices} value={current} disabled={disabled} label={field.label} clearLabel={t("clearRating")} onPick={onPick} />
+      </div>
+      <div className="hidden grid-cols-11 gap-1.5 sm:grid">
+        {choices.map((rating) => {
+          const picked = current === rating;
+          const text = String(rating).replace(".", ",");
+          return (
+            <button
+              key={rating}
+              type="button"
+              aria-pressed={picked}
+              aria-label={ariaLabel(text)}
+              disabled={disabled}
+              onClick={() => onPick(picked ? null : rating)}
+              className={cx(
+                "h-11 rounded-xl border text-xs font-light tabular-nums",
+                picked
+                  ? "border-[var(--main)] bg-[var(--main)] text-white"
+                  : "border-transparent bg-[var(--wash)] hover:border-[var(--main-line)]",
+              )}
+            >
+              {text}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1074,6 +1069,8 @@ function EntryPicker({
   }
   // A phone's other gesture: swipe an item right to left to fix its details.
   const swipe = useRef<{ x: number; y: number } | null>(null);
+  // From ten items on, every number has the same width: 01, 02 … 10, 11.
+  const digits = options.length >= 10 ? String(options.length).length : 1;
   return (
     <div>
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
@@ -1158,7 +1155,7 @@ function EntryPicker({
                         : "bg-[var(--wash)] text-[var(--muted)]",
                   )}
                 >
-                  {option.done ? <CheckGlyph /> : option.number ?? index + 1}
+                  {option.done ? <CheckGlyph /> : String(option.number ?? index + 1).padStart(digits, "0")}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className={cx("block truncate text-sm", active ? "font-medium text-[var(--main-strong)]" : "font-light")}>{option.label}</span>
@@ -1453,10 +1450,8 @@ export function ParticipantChallengeScreen({
     return map;
   }, [entries, user?.id, readRating]);
   const sortedItems = useMemo(() => [...challenge.items].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)), [challenge.items]);
-  // The list on Today: newest first when nothing schedules the items (the latest added is what you're on);
-  // a planned order — weeks, sessions, due dates — keeps its own.
-  const scheduledItems = sortedItems.some((item) => item.checkpointId || item.opensAt || item.dueAt);
-  const pickerItems = useMemo(() => (scheduledItems ? sortedItems : [...sortedItems].reverse()), [sortedItems, scheduledItems]);
+  // The list on Today: always newest first, number 1 at the bottom (the latest added is what you're on).
+  const pickerItems = useMemo(() => [...sortedItems].reverse(), [sortedItems]);
   // A workout-style challenge: one check-in that holds a record for each of several items. It replaces the
   // per-item picker and form on Today, and its progress is "check-ins logged", not "items done".
   const sessionSpec = useMemo(() => sessionSpecOf(challenge), [challenge]);

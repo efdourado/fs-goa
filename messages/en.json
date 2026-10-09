@@ -1157,7 +1157,8 @@
       "scheduled": "Answers for this item haven't opened yet. They open on the scheduled date.",
       "itemClosed": "Logging is closed here. It's read-only."
     },
-    "optionArchived": "(removed)"
+    "optionArchived": "(removed)",
+    "clearRating": "Clear"
   },
   "resultView": {
     "emptyTitle": "The showcase is still being prepared",
