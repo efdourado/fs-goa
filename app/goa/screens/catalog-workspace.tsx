@@ -5,12 +5,11 @@ import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 import { API_PATHS, apiRequest } from "../api";
 import { AddCatalogItemDialog } from "../catalog-item-dialogs";
-import { KebabMenu, menuRowClass } from "../card-menu";
 import { AddItemTile, catalogCardHeight, CatalogRow, CatalogTile, type CatalogGroupBy, groupCatalogItems, LayoutToggle, resolveCoverTop } from "../catalog-views";
 import { useCsrf } from "../csrf";
 import { ConfirmDialog } from "../dialog";
 import { useGoaFormat } from "../format";
-import { DeleteLibraryDialog, NewLibraryDialog, LibraryPropertiesDialog, RenameLibraryDialog } from "../library-dialogs";
+import { NewLibraryDialog, LibraryPropertiesDialog } from "../library-dialogs";
 import {
   type CatalogScope,
   LibraryGlyph,
@@ -21,7 +20,7 @@ import { useLibraryProperties } from "../property-inputs";
 import { recommenderLine, useRecommenderSource } from "../recommender-picker";
 import { Segmented } from "../Segmented";
 import type { CatalogItem, CatalogLibrary, Id, Member } from "../types";
-import { BackButton, Button, cardClass, cx, EmptyState, StatusMessage } from "../ui";
+import { BackButton, Button, cardClass, cx, EmptyState, SlidersIcon, StatusMessage } from "../ui";
 import { formatRuntime } from "../utils";
 
 type Layout = "covers" | "list";
@@ -106,8 +105,8 @@ export function CatalogWorkspaceScreen({
   const [layout, setLayout] = useState<Layout>("covers");
   const [sort, setSort] = useState<Sort>("recent");
   const [groupBy, setGroupBy] = useState<CatalogGroupBy>("none");
-  const [dialog, setDialog] = useState<"add" | "new" | "rename" | "delete" | "properties" | null>(null);
-  // The library a rename / properties / delete dialog is about — not always the one on screen.
+  const [dialog, setDialog] = useState<"add" | "new" | "properties" | null>(null);
+  // The library the settings dialog is about — not always the one on screen.
   const [dialogKind, setDialogKind] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   // Tidying up: show only what no challenge holds, tick items, remove them together.
@@ -160,10 +159,10 @@ export function CatalogWorkspaceScreen({
   const { properties: libraryProperties } = useLibraryProperties(library ? { id: library.id, kind: library.kind } : null, itemsNonce);
   const hidden = useMemo(() => new Set((libraryProperties ?? []).filter((property) => property.hidden).map((property) => property.key)), [libraryProperties]);
 
-  function openLibraryDialog(entry: CatalogLibrary, which: "rename" | "delete" | "properties") {
+  function openLibraryDialog(entry: CatalogLibrary) {
     setNotice(null);
     setDialogKind(entry.kind);
-    setDialog(which);
+    setDialog("properties");
   }
 
   function chooseLibrary(next: string) {
@@ -317,15 +316,15 @@ export function CatalogWorkspaceScreen({
                     </span>
                   </button>
                   <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
-                    <KebabMenu label={tl("libraryActions")}>
-                      {(close) => (
-                        <>
-                          <button type="button" className={menuRowClass} onClick={() => { openLibraryDialog(entry, "properties"); close(); }}>{canManage ? tl("editProperties") : tl("viewProperties")}</button>
-                          {canManage ? <button type="button" className={menuRowClass} onClick={() => { openLibraryDialog(entry, "rename"); close(); }}>{tl("renameLibrary")}</button> : null}
-                          {canManage && entry.source !== "screens" && entry.source !== "pages" ? <button type="button" className={cx(menuRowClass, "text-[var(--danger)]")} onClick={() => { openLibraryDialog(entry, "delete"); close(); }}>{tl("deleteLibrary")}</button> : null}
-                        </>
-                      )}
-                    </KebabMenu>
+                    <button
+                      type="button"
+                      aria-label={tl("libraryActions")}
+                      title={tl("libraryActions")}
+                      onClick={() => openLibraryDialog(entry)}
+                      className="grid h-9 w-9 cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
+                    >
+                      <SlidersIcon className="h-[18px] w-[18px]" />
+                    </button>
                   </div>
                 </div>
               );
@@ -535,24 +534,21 @@ export function CatalogWorkspaceScreen({
           onCreated={(made) => { setDialog(null); chooseLibrary(made.kind); reloadAll(); }}
         />
       ) : null}
-      {dialog === "rename" && dialogLibrary ? (
-        <RenameLibraryDialog library={dialogLibrary} onCancel={() => setDialog(null)} onRenamed={() => { setDialog(null); reloadLibraries(); }} />
-      ) : null}
-      {dialog === "delete" && dialogLibrary ? (
-        <DeleteLibraryDialog
+      {dialog === "properties" && dialogLibrary ? (
+        <LibraryPropertiesDialog
+          scope={scope}
           library={dialogLibrary}
+          canEdit={canManage}
           itemCount={countByKind.get(dialogLibrary.kind)?.total ?? 0}
-          onCancel={() => setDialog(null)}
-          onDeleted={(name) => {
+          onClose={() => setDialog(null)}
+          onChanged={reloadAll}
+          onDeleted={dialogLibrary.source !== "screens" && dialogLibrary.source !== "pages" ? (name) => {
             setDialog(null);
             if (dialogLibrary.kind === kind) { chooseLibrary(""); stopSelecting(); }
             setNotice(tl("deleted", { name }));
             reloadAll();
-          }}
+          } : undefined}
         />
-      ) : null}
-      {dialog === "properties" && dialogLibrary ? (
-        <LibraryPropertiesDialog scope={scope} library={dialogLibrary} canEdit={canManage} onClose={() => setDialog(null)} onChanged={reloadAll} />
       ) : null}
       {confirmingRemoval ? (
         <ConfirmDialog
