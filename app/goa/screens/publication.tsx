@@ -25,7 +25,8 @@ export function PublicationPanel({ challenge, onPublish, onUnpublish }: {
   const [newUrl, setNewUrl] = useState<string | null>(null);
   const published = Boolean(challenge.result?.publishedAt);
   // A list has no round to close — it can be published any time, live.
-  const canPublish = challenge.status === "closed" || isLivingList(challenge);
+  // A personal list publishes while it runs, with or without an end date; anything else once it has closed.
+  const canPublish = challenge.status === "closed" || challenge.kind === "list" || isLivingList(challenge);
   const token = challenge.result?.shareToken;
   const publicUrl = newUrl ?? (token && typeof window !== "undefined" ? `${window.location.origin}/results/${encodeURIComponent(token)}` : null);
   async function apply() {

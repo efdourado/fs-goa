@@ -748,7 +748,7 @@
     "descriptionLabel": "Descrição",
     "rulesLabel": "Regras com título",
     "rulesHint": "Cada regra ganha destaque próprio para ninguém precisar procurar o combinado.",
-    "livingListBody": "Sem datas, adicione títulos e avalie quando quiser.",
+    "livingListBody": "Nunca encerra.",
     "stateTitle": "Estado do desafio",
     "stateDraft": "Somente administradores veem este rascunho. Confira campos, etapas e participantes antes de ativar.",
     "stateScheduled": "O desafio já está ativado, mas está agendado para {date}. Os registros serão liberados quando ele começar.",
@@ -930,7 +930,12 @@
     "pageCountOn": "Contagem de páginas ligada.",
     "pageCountOff": "Contagem de páginas desligada.",
     "openLibrary": "Mais campos na biblioteca.",
-    "organiseItems": "Organizar itens"
+    "organiseItems": "Organizar itens",
+    "scheduleEnd": "Com data final",
+    "scheduleEndHint": "Termina no dia que você escolher.",
+    "scheduleEndLabel": "Termina em",
+    "errEnd": "Escolha a data final.",
+    "changesSavedNewLink": "Alterações salvas. O link público mudou: copie o novo."
   },
   "visibility": {
     "note": {

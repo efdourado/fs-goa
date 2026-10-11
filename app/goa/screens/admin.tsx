@@ -71,7 +71,8 @@ function AdminGeneral({
   challenge: ChallengeDetail;
   group?: GroupSummary;
   isPersonal: boolean;
-  onSaveBasics: (payload: Partial<ChallengeSummary>) => Promise<void>;
+  /** Resolves with `linkRotated` when new dates replaced a published results link. */
+  onSaveBasics: (payload: Partial<ChallengeSummary>) => Promise<{ linkRotated?: boolean } | undefined | void>;
   onSaveParticipants: (participantIds: Id[]) => Promise<void>;
 }) {
   const t = useTranslations("adminChallenge");
@@ -102,6 +103,9 @@ function AdminGeneral({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const livingList = isLivingList(challenge);
+  // Already under way with no dates (a personal list, an open-ended round): it can be given an end, and only
+  // an end — its start is the first day it has, which the server fills in.
+  const endOnly = challenge.status === "active" && !challenge.startsOn;
   const locked = challenge.status === "closed";
   const saving = busy;
   const canPickParticipants = !isPersonal && Boolean(group?.members?.length);
@@ -125,11 +129,15 @@ function AdminGeneral({
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (basicsDirty && scheduleMode === "period" && (!startsOn || !endsOn)) {
+    if (basicsDirty && scheduleMode === "period" && endOnly && !endsOn) {
+      setError(t("errEnd"));
+      return;
+    }
+    if (basicsDirty && scheduleMode === "period" && !endOnly && (!startsOn || !endsOn)) {
       setError(t("errPeriod"));
       return;
     }
-    if (basicsDirty && scheduleMode === "period" && endsOn < startsOn) {
+    if (basicsDirty && scheduleMode === "period" && !endOnly && endsOn < startsOn) {
       setError(t("errEndBeforeStart"));
       return;
     }
@@ -137,19 +145,21 @@ function AdminGeneral({
     setError(null);
     setSuccess(null);
     let basicsSaved = false;
+    let linkRotated = false;
     try {
       if (basicsDirty) {
-        await onSaveBasics({
+        const saved = await onSaveBasics({
           title: title.trim(),
           description: description.trim(),
           ruleSections: rulesPayload(ruleSections),
-          startsOn: scheduleMode === "period" ? startsOn : null,
+          startsOn: scheduleMode === "period" && !endOnly ? startsOn : null,
           endsOn: scheduleMode === "period" ? endsOn : null,
         });
+        linkRotated = saved?.linkRotated === true;
         basicsSaved = true;
       }
       if (participantsDirty) await onSaveParticipants(selected);
-      setSuccess(t("changesSaved"));
+      setSuccess(linkRotated ? t("changesSavedNewLink") : t("changesSaved"));
     } catch (cause) {
       setError(basicsSaved ? t("savedDetailsOnly", { error: f.error(cause) }) : f.error(cause));
     } finally {
@@ -167,8 +177,24 @@ function AdminGeneral({
           </Field>
 
           <Field label={t("scheduleLegend")} plain>
-            {livingList ? (
-              <p className="rounded-xl bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{t("livingListBody")}</p>
+            {endOnly ? (
+              <>
+                <SelectableCards
+                  value={scheduleMode}
+                  onChange={setScheduleMode}
+                  options={[
+                    { value: "none", label: t("scheduleNone"), hint: livingList ? t("livingListBody") : t("scheduleNoneHint") },
+                    { value: "period", label: t("scheduleEnd"), hint: t("scheduleEndHint") },
+                  ]}
+                />
+                {scheduleMode === "period" ? (
+                  <div className="mt-3">
+                    <Field label={t("scheduleEndLabel")}>
+                      <input className={inputClass} type="date" value={endsOn} onChange={(event) => setEndsOn(event.target.value)} />
+                    </Field>
+                  </div>
+                ) : null}
+              </>
             ) : (
               <>
                 <SelectableCards
@@ -839,7 +865,8 @@ export function AdminScreen({
   onBack: () => void;
   /** What the button says — the parent screen's name; falls back to plain "Back". */
   backLabel?: string;
-  onSaveBasics: (payload: Partial<ChallengeSummary>) => Promise<void>;
+  /** Resolves with `linkRotated` when new dates replaced a published results link. */
+  onSaveBasics: (payload: Partial<ChallengeSummary>) => Promise<{ linkRotated?: boolean } | undefined | void>;
   onTransition: (status: "active" | "closed") => Promise<void>;
   onDuplicate: (payload: { title: string; targetGroupId: Id; mode: CopyMode }) => Promise<CopyResult>;
   onOpenCopy: (challengeId: Id) => void;

@@ -9184,3 +9184,48 @@ test("apagar a conta apaga também o que era da pessoa nos grupos dos outros", a
   assert.deepEqual(left.rows[0], { entries: 0, parts: 0 });
   assert.ok(!JSON.stringify((await call("GET", `/api/challenges/${cid}/entries`, { session: owner })).body).includes("Conta removida"), "nem um rótulo anônimo sobra");
 });
+
+test("uma lista pessoal sem datas ganha só a data final: o início vem do primeiro dia, os registros ficam, o link público troca, e ela passa a poder encerrar", async () => {
+  const owner = await register("Dalva Data", "dalva_data_final");
+  const created = await call("POST", "/api/personal/challenges", {
+    session: owner, body: { recipe: "cinema", title: "Filmes que vi", items: [{ title: "Aftersun" }, { title: "Persona" }] },
+  });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const cid = (created.body as { id: string }).id;
+  type Detail = { kind: string; status: string; startsOn: string | null; endsOn: string | null; entryTypes: Array<{ id: string; purpose: string; fields: Array<{ id: string; key: string }> }>; items: Array<{ id: string }> };
+  const detail = async () => (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as Detail;
+  const first = await detail();
+  assert.deepEqual([first.kind, first.status, first.startsOn, first.endsOn], ["list", "active", null, null]);
+  const rating = first.entryTypes.find((type) => type.purpose === "rating")!;
+  const nota = rating.fields.find((field) => field.key === "nota")!.id;
+  // Avaliações sem data nenhuma (um filme visto "algum dia") e a lista já publicada.
+  for (const item of first.items) {
+    assert.equal((await call("POST", `/api/challenges/${cid}/entries`, { session: owner, body: { itemId: item.id, entryTypeId: rating.id, values: { [nota]: 4 } } })).response.status, 201);
+  }
+  assert.equal((await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "closed" } })).response.status, 409, "sem data final, a lista não encerra");
+  const published = await call("POST", `/api/challenges/${cid}/results/publish`, { session: owner, body: {} });
+  assert.equal(published.response.status, 200, JSON.stringify(published.body));
+  const oldToken = (published.body as { url: string }).url.split("/results/")[1];
+
+  const today = dateKeyInTimeZone(new Date(), "America/Sao_Paulo");
+  const end = `${Number(today.slice(0, 4)) + 1}${today.slice(4)}`;
+  const dated = await call("PATCH", `/api/challenges/${cid}`, { session: owner, body: { startsOn: null, endsOn: end } });
+  assert.equal(dated.response.status, 200, JSON.stringify(dated.body));
+  const saved = dated.body as { startsOn: string; endsOn: string; linkRotated: boolean };
+  assert.equal(saved.endsOn, end);
+  assert.ok(saved.startsOn <= today, "o início é o primeiro dia que o desafio tem");
+  assert.equal(saved.linkRotated, true);
+  const entries = (await call("GET", `/api/challenges/${cid}/entries`, { session: owner })).body as { entries: unknown[] };
+  assert.equal(entries.entries.length, 2, "os registros de antes continuam, com ou sem data");
+
+  assert.equal((await call("GET", `/api/results/${oldToken}`)).response.status, 404, "o link antigo deixa de valer");
+  const token = (await adminPool.query<{ result_share_token: string }>("SELECT result_share_token FROM challenges WHERE id = $1", [cid])).rows[0].result_share_token;
+  assert.notEqual(token, oldToken);
+  assert.equal((await call("GET", `/api/results/${token}`)).response.status, 200, "o link novo já funciona");
+
+  const closed = await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "closed" } });
+  assert.equal(closed.response.status, 200, JSON.stringify(closed.body));
+  const after = await detail();
+  assert.deepEqual([after.kind, after.status], ["round", "closed"], "com data final ela encerra como qualquer desafio");
+  assert.equal((await call("GET", `/api/results/${token}`)).response.status, 200, "e a vitrine publicada continua no ar");
+});

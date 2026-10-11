@@ -143,7 +143,8 @@ export function isLivingList(challenge: {
   endsOn?: string | null;
   status: ChallengeStatus;
 }): boolean {
-  if (challenge.kind) return challenge.kind === "list";
+  // A list given an end date behaves like any dated challenge: it has a period and can be closed.
+  if (challenge.kind) return challenge.kind === "list" && !challenge.endsOn;
   return challenge.scope === "personal"
     && !challenge.startsOn
     && !challenge.endsOn

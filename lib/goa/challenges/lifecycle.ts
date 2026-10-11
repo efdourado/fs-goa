@@ -18,10 +18,9 @@ export async function transitionChallenge(
   return inTransaction(async (client) => {
     const access = await challengeAccess(session.user.id, challengeId, client, true);
     if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores podem mudar o estado.");
-    // A list has no round to end — it just grows. Delete it if it is no longer
-    // wanted. `kind` is decided once at creation (see `createChallenge`), not
-    // re-derived from whether dates exist today.
-    if (access.challenge.kind === "list" && target === "closed") {
+    // A list has no round to end — it just grows. Delete it if it is no longer wanted. One that was later
+    // given an end date does end: closing it turns it into an ordinary round (below).
+    if (access.challenge.kind === "list" && target === "closed" && access.challenge.end_date === null) {
       throw new ApiError(409, "living_list_no_close", "Uma lista pessoal não é encerrada. Apague-a se não precisar mais dela.");
     }
     const reopening = access.challenge.status === "closed" && target === "active";
@@ -59,7 +58,14 @@ export async function transitionChallenge(
       }
       await client.query("UPDATE challenges SET status='active', activated_at=now(), updated_at=now() WHERE id=$1", [challengeId]);
     } else {
-      await client.query("UPDATE challenges SET status='closed', closed_at=now(), updated_at=now() WHERE id=$1", [challengeId]);
+      // A list that got an end date closes as a round (only a round may be closed), and a showcase it had
+      // already published is stamped at the close, as the database asks of any closed challenge's.
+      await client.query(
+        `UPDATE challenges SET status='closed', closed_at=now(), kind='round',
+                results_published_at = CASE WHEN results_published_at IS NULL THEN NULL ELSE now() END, updated_at=now()
+          WHERE id=$1`,
+        [challengeId],
+      );
       // Rebuilds the showcase every time — cheap (delete + re-insert) and it's the
       // only way a re-close after `reopening` picks up whatever changed meanwhile.
       await generateShowcase(client, challengeId, session.user.id);

@@ -748,7 +748,7 @@
     "descriptionLabel": "Description",
     "rulesLabel": "Titled rules",
     "rulesHint": "Each rule gets its own spotlight so nobody has to hunt for the agreement.",
-    "livingListBody": "No dates, add titles and rate them whenever.",
+    "livingListBody": "Never ends.",
     "stateTitle": "Challenge state",
     "stateDraft": "Only admins see this draft. Check fields, stages, and participants before activating.",
     "stateScheduled": "The challenge is already active but scheduled for {date}. Entries open once it starts.",
@@ -930,7 +930,12 @@
     "pageCountOn": "Page count on.",
     "pageCountOff": "Page count off.",
     "openLibrary": "More fields in the library.",
-    "organiseItems": "Organise items"
+    "organiseItems": "Organise items",
+    "scheduleEnd": "With an end date",
+    "scheduleEndHint": "Ends on the day you pick.",
+    "scheduleEndLabel": "Ends on",
+    "errEnd": "Pick the end date.",
+    "changesSavedNewLink": "Changes saved. The public link changed: copy the new one."
   },
   "visibility": {
     "note": {

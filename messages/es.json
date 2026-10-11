@@ -748,7 +748,7 @@
     "descriptionLabel": "Descripción",
     "rulesLabel": "Reglas con título",
     "rulesHint": "Cada regla gana su propio destaque para que nadie tenga que buscar el acuerdo.",
-    "livingListBody": "Sin fechas, agrega títulos y valóralos cuando quieras.",
+    "livingListBody": "Nunca termina.",
     "stateTitle": "Estado del desafío",
     "stateDraft": "Solo los administradores ven este borrador. Revisa campos, etapas y participantes antes de activarlo.",
     "stateScheduled": "El desafío ya está activado, pero está programado para {date}. Los registros se liberarán cuando empiece.",
@@ -930,7 +930,12 @@
     "pageCountOn": "Conteo de páginas activado.",
     "pageCountOff": "Conteo de páginas desactivado.",
     "openLibrary": "Más campos en la biblioteca.",
-    "organiseItems": "Organizar elementos"
+    "organiseItems": "Organizar elementos",
+    "scheduleEnd": "Con fecha final",
+    "scheduleEndHint": "Termina el día que elijas.",
+    "scheduleEndLabel": "Termina el",
+    "errEnd": "Elige la fecha final.",
+    "changesSavedNewLink": "Cambios guardados. El enlace público cambió: copia el nuevo."
   },
   "visibility": {
     "note": {

@@ -4,6 +4,7 @@ import type { SessionContext } from "../../auth";
 import { inTransaction, oneOrNull, withClient } from "../../db";
 import { challengeAccess, dateRange, writeAudit } from "../../goa-domain";
 import { ApiError, stringValue } from "../../http";
+import { generateOpaqueToken, hashToken } from "../../security";
 import {
   cardinalityOf,
   completionEntryType,
@@ -400,7 +401,23 @@ export async function updateChallenge(
       : Object.hasOwn(body, "endDate")
         ? body.endDate
         : access.challenge.end_date;
-    const { startDate, endDate } = dateRange(rawStartDate, rawEndDate);
+    // A challenge already under way that only now gets an end: its start is the first day it has —
+    // the day it was made, or its earliest entry if one is dated before that. Nobody is asked for it.
+    const givenEnd = rawEndDate !== undefined && rawEndDate !== null && rawEndDate !== "";
+    const givenStart = rawStartDate !== undefined && rawStartDate !== null && rawStartDate !== "";
+    const firstDay = givenEnd && !givenStart
+      ? (await oneOrNull<{ day: string }>(
+          client,
+          `SELECT least(
+                    (c.created_at AT TIME ZONE coalesce(c.time_zone, 'UTC'))::date,
+                    (SELECT min(e.occurred_on) FROM entries e WHERE e.challenge_id = c.id AND e.deleted_at IS NULL),
+                    (SELECT min((e.submitted_at AT TIME ZONE coalesce(c.time_zone, 'UTC'))::date) FROM entries e WHERE e.challenge_id = c.id AND e.deleted_at IS NULL)
+                  )::text AS day
+             FROM challenges c WHERE c.id = $1`,
+          [challengeId],
+        ))?.day ?? null
+      : null;
+    const { startDate, endDate } = dateRange(firstDay ?? rawStartDate, rawEndDate);
     const scheduleChanged =
       startDate !== access.challenge.start_date || endDate !== access.challenge.end_date;
     const allTypes = await entryTypesForChallenge(client, challengeId);
@@ -463,6 +480,17 @@ export async function updateChallenge(
         );
       }
     }
+    // New dates are a different challenge to look at from outside: a published link is replaced, so an old
+    // one never shows a period nobody shared. The person copies the new link (the client says so).
+    let linkRotated = false;
+    if (scheduleChanged && access.challenge.results_published_at !== null) {
+      const shareToken = generateOpaqueToken();
+      await client.query(
+        "UPDATE challenges SET result_share_token_hash = $2, result_share_token = $3, updated_at = now() WHERE id = $1",
+        [challengeId, await hashToken(shareToken), shareToken],
+      );
+      linkRotated = true;
+    }
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
       "challenge.updated", "challenge", challengeId,
       { title: access.challenge.title, description: access.challenge.description,
@@ -472,6 +500,7 @@ export async function updateChallenge(
     return {
       id: challengeId, title, description, rules, ruleSections, startsOn: startDate, endsOn: endDate,
       collectsEntryDate: collectsEntryDate ?? recipeCollectsEntryDate(access.challenge.recipe_key),
+      linkRotated,
     };
   });
 }
