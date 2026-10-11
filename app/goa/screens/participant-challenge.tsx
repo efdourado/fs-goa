@@ -1106,8 +1106,8 @@ function EntryPicker({
           // Opening glides; folding is instant (it only happens out of sight, or on a list too short to scroll).
           <li ref={addRef} className={cx("grid focus-within:grid-rows-[1fr] focus-within:opacity-100", addShown ? "grid-rows-[1fr] opacity-100 transition-[grid-template-rows,opacity] duration-300 ease-out" : "mb-0 grid-rows-[0fr] opacity-0")}>
             <div className="min-h-0 overflow-hidden">
-              <button type="button" onClick={onAdd} className="flex min-h-12 w-full cursor-pointer items-center gap-3 rounded-xl border border-dashed border-[var(--main-line)] px-3 py-2.5 text-left text-sm text-[var(--main-strong)] transition hover:bg-[var(--main-soft)]">
-                <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-[var(--main-soft)]" aria-hidden="true">＋</span>
+              <button type="button" onClick={onAdd} className="flex min-h-12 w-full cursor-pointer items-center gap-3 rounded-xl border border-dashed border-[var(--line)] px-3 py-2.5 text-left text-sm text-[var(--ink)] transition hover:border-[var(--muted)] hover:text-[var(--ink-strong)]">
+                <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-[var(--wash)]" aria-hidden="true">＋</span>
                 {tCine("addItemRow")}
               </button>
             </div>
@@ -1747,7 +1747,7 @@ export function ParticipantChallengeScreen({
 
       {tabs.length > 1 ? (
         <nav className="mt-5 hidden gap-1 rounded-2xl bg-[var(--wash-strong)]/70 p-1 sm:flex" aria-label={t("navAria")}>
-          {tabs.map((item) => <button className={cx("min-h-11 flex-1 rounded-xl px-3 text-sm font-light", activeTab === item.id ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]")} type="button" onClick={() => onTab(item.id)} key={item.id}>{t(`tabs.${item.id}`)}</button>)}
+          {tabs.map((item) => <button className={cx("min-h-11 flex-1 rounded-xl px-3 text-sm font-light", activeTab === item.id ? "bg-[var(--paper)] text-[var(--ink-strong)] shadow-sm" : "text-[var(--muted)] transition hover:text-[var(--ink-strong)]")} type="button" onClick={() => onTab(item.id)} key={item.id}>{t(`tabs.${item.id}`)}</button>)}
         </nav>
       ) : null}
 

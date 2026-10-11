@@ -348,7 +348,6 @@ export function CatalogWorkspaceScreen({
       ) : !tabs.length ? (
         <EmptyState
           title={t("emptyTitle")}
-          hint={canManage ? t("emptyHint") : undefined}
           action={canManage ? (
             <div className="flex flex-wrap justify-center gap-2">
               <Button onClick={() => setDialog("add")}>＋ {t("addItem")}</Button>

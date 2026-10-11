@@ -6,7 +6,8 @@ import { type FormEvent, type ReactNode, useState } from "react";
 import { KebabMenu, menuRowClass } from "../card-menu";
 import { Dialog } from "../dialog";
 import { useGoaFormat } from "../format";
-import { CatalogShelf } from "../catalog-shelf";
+import { CatalogShelfView } from "../catalog-shelf";
+import { useCatalogShelf } from "../libraries";
 import { applyColorFilter, OrganizeBar, useChallengeOrganizer } from "../organize";
 import { NewChallengeTile } from "../add-tile";
 import { Shelf, ShelfAddButton, shelfCardWidth } from "../shelf";
@@ -305,16 +306,16 @@ function HomeSectionBlock({ title, first, children }: { title: string; first: bo
   );
 }
 
-/** The one line the groups side shrinks to while someone has no group yet — never an empty shelf. */
+/** The one quiet line a side of Home shrinks to while it has nothing (no group yet, nothing of your own) — never an empty shelf. */
 function HomeSideLink({ label, onClick }: { label: string; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex min-h-12 w-full cursor-pointer items-center justify-between gap-3 rounded-2xl border border-dashed border-[var(--line)] px-4 text-left text-sm text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)]"
+      className="inline-flex min-h-11 cursor-pointer items-center gap-2 text-sm text-[var(--muted)] transition hover:text-[var(--ink-strong)]"
     >
+      <span aria-hidden="true">＋</span>
       <span>{label}</span>
-      <span aria-hidden="true">→</span>
     </button>
   );
 }
@@ -364,6 +365,7 @@ export function DashboardScreen({
   const t = useTranslations("dashboard");
   const th = useTranslations("dashboard.home");
   const tWelcome = useTranslations("welcome");
+  const personalShelf = useCatalogShelf("personal");
   const tr = useTranslations("roles");
   const tQuick = useTranslations("quickCreate");
 
@@ -446,11 +448,18 @@ export function DashboardScreen({
 
   const personalLibrary = colorFilter ? null : (
     <div className="mt-8">
-      <CatalogShelf scope="personal" canManage onOpenCatalog={onOpenPersonalCatalog} onOpenItem={onOpenPersonalCatalogItem} />
+      <CatalogShelfView scope="personal" canManage data={personalShelf} onOpenCatalog={onOpenPersonalCatalog} onOpenItem={onOpenPersonalCatalogItem} />
     </div>
   );
 
   const hasGroups = standardGroups.length > 0;
+  // Nothing of their own at all (no personal challenge, an empty catalogue): the "Just me" side steps aside for
+  // one quiet line under the groups. Not everyone wants challenges of their own. While the catalogue is still
+  // loading the side simply isn't drawn yet, so it never flashes in and out.
+  const hasPersonalChallenge = challenges.some((challenge) => isPersonalChallenge(challenge, personalWorkspaceId));
+  const personalItems = personalShelf ? personalShelf.items.length + Object.values(personalShelf.counts).reduce((sum, count) => sum + count, 0) : 0;
+  const personalBlank = !hasPersonalChallenge && personalItems === 0;
+  const showPersonalSide = !personalBlank || Boolean(colorFilter);
 
   return (
     <main className="px-4 py-8 pb-24 sm:px-6 sm:py-12 lg:px-20">
@@ -485,15 +494,17 @@ export function DashboardScreen({
             </div>
           ) : null}
 
-          <HomeSectionBlock first={!filtered.pinned.length} title={th("sectionPersonal")}>
-            <Shelf title={th("personalRunning")} count={filtered.personal.length}>
-              {filtered.personal.length || newPersonalTile ? <>{renderRail(filtered.personal, false)}{newPersonalTile}</> : emptyRail(th("personalEmpty"))}
-            </Shelf>
-            {personalLibrary}
-          </HomeSectionBlock>
+          {showPersonalSide ? (
+            <HomeSectionBlock first={!filtered.pinned.length} title={th("sectionPersonal")}>
+              <Shelf title={th("personalRunning")} count={filtered.personal.length}>
+                {filtered.personal.length || newPersonalTile ? <>{renderRail(filtered.personal, false)}{newPersonalTile}</> : emptyRail(th("personalEmpty"))}
+              </Shelf>
+              {personalLibrary}
+            </HomeSectionBlock>
+          ) : null}
 
           {hasGroups ? (
-            <HomeSectionBlock first={false} title={th("sectionGroups")}>
+            <HomeSectionBlock first={!showPersonalSide && !filtered.pinned.length} title={th("sectionGroups")}>
               <Shelf title={t("shelf.running")} count={filtered.group.length}>
                 {filtered.group.length ? renderRail(filtered.group, false) : emptyRail(t("noChallengesTitle"))}
               </Shelf>
@@ -511,8 +522,11 @@ export function DashboardScreen({
             </div>
           ) : null}
 
-          {!hasGroups && !atGroupLimit && !colorFilter ? (
-            <div className="mt-12"><HomeSideLink label={th("inviteGroups")} onClick={() => setShowGroupDialog(true)} /></div>
+          {!colorFilter && ((!hasGroups && !atGroupLimit) || (personalBlank && personalShelf !== null)) ? (
+            <div className="mt-12 flex flex-col items-start gap-1">
+              {personalBlank && personalShelf !== null ? <HomeSideLink label={th("startPersonal")} onClick={onCreatePersonalChallenge} /> : null}
+              {!hasGroups && !atGroupLimit ? <HomeSideLink label={th("inviteGroups")} onClick={() => setShowGroupDialog(true)} /> : null}
+            </div>
           ) : null}
         </>
       )}

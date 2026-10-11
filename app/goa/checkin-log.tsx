@@ -751,7 +751,7 @@ function CounterEditor({
         {mode === "amount" ? (
           <div className="flex flex-wrap gap-1.5">
             {quick.map((value) => (
-              <button key={value} type="button" disabled={disabled} onClick={() => nudge(value)} className="min-h-8 cursor-pointer rounded-full border border-[var(--line)] bg-[var(--paper)] px-3 text-[13px] tabular-nums hover:border-[var(--main-line)] hover:text-[var(--main-strong)] disabled:cursor-not-allowed disabled:opacity-50">
+              <button key={value} type="button" disabled={disabled} onClick={() => nudge(value)} className="min-h-8 cursor-pointer rounded-full border border-[var(--line)] bg-[var(--paper)] px-3 text-[13px] tabular-nums hover:border-[var(--main-line)] hover:text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-50">
                 +{format(value)}
               </button>
             ))}

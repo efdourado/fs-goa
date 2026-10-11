@@ -30,15 +30,15 @@ test("failed initial bin loads show an error and retry, never an empty bin", () 
   }));
   assert.match(html, /Não foi possível abrir a lixeira/);
   assert.match(html, /Tentar novamente/);
-  assert.doesNotMatch(html, /A lixeira está vazia/);
+  assert.doesNotMatch(html, /Lixeira vazia/);
 });
 
 test("loading and a successfully loaded empty bin remain distinct states", () => {
   const render = (loading: boolean) => renderWithIntl(createElement(TrashLoadState, {
     loading, error: null, onRetry: () => undefined,
   }));
-  assert.doesNotMatch(render(true), /A lixeira está vazia/);
-  assert.match(render(false), /A lixeira está vazia/);
+  assert.doesNotMatch(render(true), /Lixeira vazia/);
+  assert.match(render(false), /Lixeira vazia/);
   for (const scope of ["personal", "group", "challenge"] as const) {
     assert.deepEqual(trashRows(scope, {}), []);
   }

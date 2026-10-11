@@ -527,7 +527,7 @@ test("aba Resultados sem números ainda só informa — sem botão de registrar"
   } as unknown as ChallengeDetail;
 
   const html = renderWithIntl(createElement(ResultView, { challenge, live: true }));
-  assert.match(html, /Ainda sem números/);
+  assert.match(html, /Sem números ainda/);
   assert.doesNotMatch(html, /Fazer um registro/);
   assert.doesNotMatch(html, /<button/);
 });

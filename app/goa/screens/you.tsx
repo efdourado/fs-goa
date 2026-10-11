@@ -10,7 +10,7 @@ import type { User } from "../types";
 import { BackButton, cx, UserAvatar } from "../ui";
 import { CONTACT_EMAIL } from "./about";
 
-const rowClass = "flex min-h-14 w-full cursor-pointer items-center gap-3.5 text-left text-[15px] transition hover:text-[var(--main-strong)]";
+const rowClass = "flex min-h-14 w-full cursor-pointer items-center gap-3.5 text-left text-[15px] transition hover:text-[var(--ink-strong)]";
 const iconClass = "h-5 w-5 flex-none text-[var(--muted)]";
 const stroke = { fill: "none", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true } as const;
 

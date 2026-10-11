@@ -414,7 +414,7 @@ function AdminFields({
           ))}
         </ul>
       ) : locked
-        ? <EmptyState title={t("fieldsEmptyTitle")} hint={t("fieldsEmptyBody")} />
+        ? <EmptyState title={t("fieldsEmptyTitle")} />
         : <EmptyState title={t("fieldsEmptyTitle")} onClick={() => { setError(null); setEditing("new"); }} />}
 
       {editing ? (

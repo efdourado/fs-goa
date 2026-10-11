@@ -30,6 +30,8 @@
   color-scheme: light;
 
   --ink: #20241f;
+  /* Where plain text goes on hover: further the way it already leans (blacker on light, whiter on dark). */
+  --ink-strong: #000000;
   /* WCAG AA for small text: ≥ 4.5:1 on --paper / --canvas. */
   --muted: #676960;
   --canvas: #f5f1e8;
@@ -79,6 +81,8 @@
     color-scheme: dark;
 
     --ink: #ece6d8;
+
+    --ink-strong: #ffffff;
     --muted: #9c978a;
     --canvas: #16150f;
     --paper: #201e17;
@@ -126,6 +130,8 @@
   color-scheme: dark;
 
   --ink: #ece6d8;
+
+  --ink-strong: #ffffff;
   --muted: #9c978a;
   --canvas: #16150f;
   --paper: #201e17;

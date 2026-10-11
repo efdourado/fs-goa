@@ -211,14 +211,12 @@ export function EmptyState({
   /** One short line, only for context the title can't carry (a limit reached, an error message). */
   hint?: ReactNode;
 }) {
-  const shell = "w-full rounded-2xl border border-dashed border-[var(--line)] bg-[var(--wash)]/70 px-5 py-10 text-center";
+  // Quiet on purpose: one short line in a thin dashed frame. No icon, no paragraph.
+  const shell = "w-full rounded-2xl border border-dashed border-[var(--line)] px-4 py-5 text-center";
   const body = (
     <>
-      <span className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-[var(--main-soft)] text-xl text-[var(--main-strong)]" aria-hidden="true">
-        ᴖ̈
-      </span>
-      <h3 className="text-lg font-light tracking-[-0.02em]">{title}</h3>
-      {hint ? <p className="mx-auto mt-1.5 max-w-md text-[13px] leading-5 text-[var(--muted)]">{hint}</p> : null}
+      <h3 className="text-sm font-light text-[var(--muted)]">{onClick ? <span aria-hidden="true" className="mr-1.5">＋</span> : null}{title}</h3>
+      {hint ? <p className="mx-auto mt-1 max-w-md text-xs leading-5 text-[var(--muted)]">{hint}</p> : null}
     </>
   );
   if (onClick) {
@@ -226,7 +224,7 @@ export function EmptyState({
       <button
         type="button"
         onClick={onClick}
-        className={cx(shell, "block cursor-pointer transition hover:border-[var(--main-line)] hover:bg-[var(--main-soft)]/40 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/20")}
+        className={cx(shell, "group block cursor-pointer transition hover:border-[var(--main-line)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/20 [&_h3]:transition hover:[&_h3]:text-[var(--ink-strong)]")}
       >
         {body}
       </button>
@@ -235,7 +233,7 @@ export function EmptyState({
   return (
     <div className={shell}>
       {body}
-      {action ? <div className="mt-5">{action}</div> : null}
+      {action ? <div className="mt-3">{action}</div> : null}
     </div>
   );
 }

@@ -269,7 +269,7 @@ export function GroupScreen({
           {memberCount > 5 ? <span className="-ml-2 grid h-7 w-7 place-items-center rounded-full border-2 border-[var(--paper)] bg-[var(--wash-strong)] text-[10px] font-black text-[var(--muted)]">+{memberCount - 5}</span> : null}
           {/* An empty seat at the end of the faces: the quiet way in to inviting someone. */}
           {canManage(group.role) ? (
-            <button type="button" onClick={() => setShowInvite(true)} aria-label={t("inviteTitle")} title={t("inviteTitle")} className="-ml-2 grid h-7 w-7 cursor-pointer place-items-center rounded-full border-2 border-[var(--paper)] bg-[var(--canvas)] text-[var(--muted)] outline-1 outline-dashed -outline-offset-[3px] outline-[var(--line)] transition hover:text-[var(--main-strong)] hover:outline-[var(--main-line)]">
+            <button type="button" onClick={() => setShowInvite(true)} aria-label={t("inviteTitle")} title={t("inviteTitle")} className="-ml-2 grid h-7 w-7 cursor-pointer place-items-center rounded-full border-2 border-[var(--paper)] bg-[var(--canvas)] text-[var(--muted)] outline-1 outline-dashed -outline-offset-[3px] outline-[var(--line)] transition hover:text-[var(--ink-strong)] hover:outline-[var(--main-line)]">
               <svg viewBox="0 0 16 16" className="h-3 w-3" aria-hidden="true"><path d="M8 3.5v9M3.5 8h9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
             </button>
           ) : null}

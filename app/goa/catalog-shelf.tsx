@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 
 import { catalogCardHeight, CatalogTile, resolveCoverTop } from "./catalog-views";
 import { useGoaFormat } from "./format";
-import { type CatalogScope, useCatalogShelf } from "./libraries";
+import { type CatalogScope, type CatalogShelfData, useCatalogShelf } from "./libraries";
 import { Rail, RailArrows, shelfCardWidth, useShelfRail } from "./shelf";
 import type { Id } from "./types";
 import { cx, EmptyState } from "./ui";
@@ -36,16 +36,26 @@ export function CatalogShelfSkeleton({ title }: { title: string }) {
  * One request brings all of it (the server sends only the newest few of each library, plus the counts), and
  * the last answer is painted straight away when the page is opened again.
  */
-export function CatalogShelf({ scope, canManage, onOpenCatalog, onOpenItem }: {
+export function CatalogShelf(props: {
   scope: CatalogScope;
   canManage: boolean;
   onOpenCatalog: () => void;
   onOpenItem: (itemId: Id) => void;
 }) {
+  return <CatalogShelfView {...props} data={useCatalogShelf(props.scope)} />;
+}
+
+/** The shelf drawn from an answer the page already holds (Home reads it to know whether there's anything at all). */
+export function CatalogShelfView({ scope, canManage, onOpenCatalog, onOpenItem, data }: {
+  scope: CatalogScope;
+  canManage: boolean;
+  onOpenCatalog: () => void;
+  onOpenItem: (itemId: Id) => void;
+  data: CatalogShelfData | null;
+}) {
   const t = useTranslations("group");
   const tCat = useTranslations("catalog");
   const f = useGoaFormat();
-  const data = useCatalogShelf(scope);
   const { railRef, showFade, onScroll, nudge } = useShelfRail();
   const title = scope === "personal" ? t("myCatalogTitle") : t("catalogTitle");
 

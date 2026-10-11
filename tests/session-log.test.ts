@@ -85,6 +85,6 @@ test("sem itens no desafio, o log avisa em vez de mostrar um formulário vazio",
   const html = renderWithIntl(createElement(SessionLog, {
     challenge: { ...challenge, items: [] } as ChallengeDetail, spec, entries: [], userId: "me", canEdit: true, onSave: async () => undefined,
   }));
-  assert.match(html, /ainda não tem itens/);
+  assert.match(html, /Nenhum item ainda/);
   assert.doesNotMatch(html, /Registrar Treino/);
 });
