@@ -115,7 +115,7 @@ export const catalogNativePropertyConfigs = pgTable(
     unique("catalog_native_property_configs_library_key_unique").on(table.libraryId, table.propertyKey),
     check(
       "catalog_native_property_configs_key_check",
-      sql`${table.propertyKey} in ('title', 'year', 'main_genre', 'runtime_minutes', 'author', 'page_count', 'scheduled_at')`,
+      sql`${table.propertyKey} in ('title', 'year', 'main_genre', 'runtime_minutes', 'author', 'page_count', 'scheduled_at', 'recommended_by')`,
     ),
     check(
       "catalog_native_property_configs_label_check",

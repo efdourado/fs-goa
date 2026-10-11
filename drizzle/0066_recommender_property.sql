@@ -1,0 +1,3 @@
+-- "Who recommended it" becomes a library property that can be switched off like any other.
+ALTER TABLE "catalog_native_property_configs" DROP CONSTRAINT "catalog_native_property_configs_key_check";--> statement-breakpoint
+ALTER TABLE "catalog_native_property_configs" ADD CONSTRAINT "catalog_native_property_configs_key_check" CHECK ("catalog_native_property_configs"."property_key" in ('title', 'year', 'main_genre', 'runtime_minutes', 'author', 'page_count', 'scheduled_at', 'recommended_by'));

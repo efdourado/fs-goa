@@ -15,7 +15,7 @@ import { writeAudit } from "./domain/audit";
 import { eventScheduleColumns, eventScheduleJson, parseEventSchedule, scheduleVisibleSql } from "./domain/event-schedule";
 import { ensurePersonalWorkspace } from "./domain/challenges";
 import { catalogScores, roundKey } from "./challenges/goa-score";
-import { CATALOG_YEAR_MAX, CATALOG_YEAR_MIN, normalizeTitle, publicId } from "./domain/shared";
+import { CATALOG_YEAR_MAX, CATALOG_YEAR_MIN, normalizeTitle, publicId, recommenderVisibleSql } from "./domain/shared";
 import { moveToTrash } from "./trash";
 
 export type CatalogKind = "film" | "book" | "other";
@@ -443,11 +443,13 @@ async function listCatalogWithClient(client: Pick<PoolClient, "query">, workspac
     recommended_by_external_id: string | null;
     recommended_by_external_name: string | null;
     origin_note: string | null;
+    recommender_visible: boolean;
     created_at: Date;
   }>(
     `SELECT ci.id, ci.kind, ci.title, ci.author, ci.year, ci.main_genre, ci.page_count, ci.runtime_minutes, ci.created_at,
               CASE WHEN ${scheduleVisibleSql("ci")} THEN ci.scheduled_at END AS scheduled_at,
               CASE WHEN ${scheduleVisibleSql("ci")} THEN ci.scheduled_end_at END AS scheduled_end_at,
+            ${recommenderVisibleSql("ci")} AS recommender_visible,
               ci.scheduled_precision, ci.scheduled_time_zone,
               (SELECT count(DISTINCT it.challenge_id)::int FROM challenge_items it WHERE it.catalog_item_id = ci.id) AS round_count,
               -- Challenges that still hold it: a removed item or a deleted challenge no longer counts.
@@ -491,12 +493,12 @@ async function listCatalogWithClient(client: Pick<PoolClient, "query">, workspac
       roundCount: item.round_count,
       challengeCount: item.challenge_count,
       createdAt: item.created_at.toISOString(),
-      recommendedBy: !showRecommenders ? null : item.recommended_by_user_id
+      recommendedBy: !(showRecommenders && item.recommender_visible) ? null : item.recommended_by_user_id
         ? { kind: "member" as const, id: item.recommended_by_user_id, name: item.recommended_by_user_name ?? "" }
         : item.recommended_by_external_id
           ? { kind: "external" as const, id: item.recommended_by_external_id, name: item.recommended_by_external_name ?? "" }
           : null,
-      originNote: showRecommenders ? item.origin_note : null,
+      originNote: showRecommenders && item.recommender_visible ? item.origin_note : null,
       ratingAvg: scoreOf(scores.byCatalogItem.get(item.id)),
       ratingCount: scores.byCatalogItem.get(item.id)?.count ?? 0,
       attributes: attributesByItem.get(item.id) ?? [],
@@ -522,11 +524,13 @@ async function catalogItemDetailWithClient(
     scheduled_precision: "date" | "datetime"; scheduled_time_zone: string | null;
     recommended_by_user_id: string | null; recommended_by_user_name: string | null;
     recommended_by_external_id: string | null; recommended_by_external_name: string | null; origin_note: string | null;
+    recommender_visible: boolean;
   }>(
     client,
     `SELECT ci.id, ci.kind, ci.title, ci.author, ci.year, ci.main_genre, ci.page_count, ci.runtime_minutes,
             CASE WHEN ${scheduleVisibleSql("ci")} THEN ci.scheduled_at END AS scheduled_at,
             CASE WHEN ${scheduleVisibleSql("ci")} THEN ci.scheduled_end_at END AS scheduled_end_at,
+            ${recommenderVisibleSql("ci")} AS recommender_visible,
             ci.scheduled_precision, ci.scheduled_time_zone,
             CASE WHEN active_rec.user_id IS NOT NULL THEN ci.recommended_by_user_id END AS recommended_by_user_id,
             CASE WHEN active_rec.user_id IS NOT NULL THEN ru.display_name END AS recommended_by_user_name,
@@ -580,12 +584,12 @@ async function catalogItemDetailWithClient(
     pageCount: item.page_count,
     runtimeMinutes: item.runtime_minutes,
     scheduledAt: eventScheduleJson(item),
-    recommendedBy: !showRecommenders ? null : item.recommended_by_user_id
+    recommendedBy: !(showRecommenders && item.recommender_visible) ? null : item.recommended_by_user_id
       ? { kind: "member" as const, id: item.recommended_by_user_id, name: item.recommended_by_user_name ?? "" }
       : item.recommended_by_external_id
         ? { kind: "external" as const, id: item.recommended_by_external_id, name: item.recommended_by_external_name ?? "" }
         : null,
-    originNote: showRecommenders ? item.origin_note : null,
+    originNote: showRecommenders && item.recommender_visible ? item.origin_note : null,
     ratingAvg: scoreOf(overall),
     ratingCount: overall?.count ?? 0,
     attributes,
@@ -595,7 +599,7 @@ async function catalogItemDetailWithClient(
       status: round.status,
       startsOn: round.start_date,
       endsOn: round.end_date,
-      recommendedBy: round.recommended_by,
+      recommendedBy: item.recommender_visible ? round.recommended_by : null,
       ratingAvg: scoreOf(scores.byRound.get(roundKey(round.challenge_id, item.id))),
       ratingCount: scores.byRound.get(roundKey(round.challenge_id, item.id))?.count ?? 0,
     })),
@@ -1048,19 +1052,21 @@ export async function deleteCatalogLibrary(session: SessionContext, libraryId: s
  * the title — the rest of its properties are attribute definitions. Keys are
  * stable: metrics and storage key off these, never off a label.
  */
-type NativePropertyType = CatalogAttributeType | "schedule";
+type NativePropertyType = CatalogAttributeType | "schedule" | "recommender";
 const SCHEDULE_PROPERTY = { key: "scheduled_at", type: "schedule" as NativePropertyType };
+/** "Who recommended it": on every library, shown unless the library hides it (see `recommenderVisibleSql`). */
+const RECOMMENDER_PROPERTY = { key: "recommended_by", type: "recommender" as NativePropertyType };
 const NATIVE_PROPERTIES: Record<string, Array<{ key: string; type: NativePropertyType }>> = {
   film: [
     { key: "title", type: "text" }, { key: "year", type: "number" },
-    { key: "main_genre", type: "text" }, { key: "runtime_minutes", type: "number" }, SCHEDULE_PROPERTY,
+    { key: "main_genre", type: "text" }, { key: "runtime_minutes", type: "number" }, SCHEDULE_PROPERTY, RECOMMENDER_PROPERTY,
   ],
   book: [
     { key: "title", type: "text" }, { key: "author", type: "text" }, { key: "year", type: "number" },
-    { key: "main_genre", type: "text" }, { key: "page_count", type: "number" }, SCHEDULE_PROPERTY,
+    { key: "main_genre", type: "text" }, { key: "page_count", type: "number" }, SCHEDULE_PROPERTY, RECOMMENDER_PROPERTY,
   ],
 };
-const TITLE_ONLY: Array<{ key: string; type: NativePropertyType }> = [{ key: "title", type: "text" }, SCHEDULE_PROPERTY];
+const TITLE_ONLY: Array<{ key: string; type: NativePropertyType }> = [{ key: "title", type: "text" }, SCHEDULE_PROPERTY, RECOMMENDER_PROPERTY];
 function nativePropertiesFor(kind: string) {
   return NATIVE_PROPERTIES[kind] ?? TITLE_ONLY;
 }

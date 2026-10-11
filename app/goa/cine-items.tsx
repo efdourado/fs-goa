@@ -8,7 +8,7 @@ import { API_PATHS, apiRequest } from "./api";
 import { Dialog, FormDialog } from "./dialog";
 import { canOrganise, OrganiseDialog, organiseFromRows } from "./organize-panel";
 import { type CatalogScope } from "./libraries";
-import { bodyFromValues, editableProperties, PropertyInputs, type PropertyValues, propertiesHaveProblem, useLibrariesProperties } from "./property-inputs";
+import { bodyFromValues, editableProperties, PropertyInputs, type PropertyValues, propertiesHaveProblem, showsRecommender, useLibrariesProperties } from "./property-inputs";
 import {
   NO_RECOMMENDER,
   recommenderBody,
@@ -366,8 +366,10 @@ function RowCards({ rows, onChange, onRemove, shared, openByDefault = false }: {
         // An item's own date is what most of these rows are about — asked inline, not behind "details".
         const scheduleProperty = editableProperties(properties ?? []).find((property) => property.type === "schedule") ?? null;
         const detailProperties = editableProperties(properties ?? []).filter((property) => property.type !== "schedule" && !(authorInline && property.key === "author"));
-        const recommenderInline = !authorInline && recommendationsEnabled;
-        const hasDetails = !openByDefault && (detailProperties.length > 0 || (authorInline && recommendationsEnabled));
+        // The group's switch, then the library's own: either can turn "who recommended it" off.
+        const askRecommender = recommendationsEnabled && showsRecommender(properties);
+        const recommenderInline = !authorInline && askRecommender;
+        const hasDetails = !openByDefault && (detailProperties.length > 0 || (authorInline && askRecommender));
         const topRight = authorInline ? (
           <label>
             <span className="sr-only">{t("author")}</span>
@@ -403,7 +405,7 @@ function RowCards({ rows, onChange, onRemove, shared, openByDefault = false }: {
                 {detailProperties.length ? (
                   <PropertyInputs properties={detailProperties} values={rowValues(row)} timeZone={timeZone} onChange={(propertyKey, propertyValue) => setRowProperty(row, propertyKey, propertyValue)} />
                 ) : null}
-                {authorInline && recommendationsEnabled ? (
+                {authorInline && askRecommender ? (
                   <RecommenderPicker value={row.recommender} onChange={(recommender) => update(row, { recommender })} members={members} source={source} />
                 ) : null}
               </div>

@@ -178,8 +178,11 @@ export interface LibraryProperty {
   key: string;
   storage: "native" | "attribute";
   label: string | null;
-  /** `schedule` is the built-in "Scheduled date and time" of the thing itself (a match's kickoff). */
-  type: "text" | "number" | "date" | "boolean" | "schedule";
+  /**
+   * `schedule` is the built-in "Scheduled date and time" of the thing itself (a match's kickoff); `recommender`
+   * is "who recommended it" — a property like any other, so a library can switch it off.
+   */
+  type: "text" | "number" | "date" | "boolean" | "schedule" | "recommender";
   hidden: boolean;
   position: number;
   canHide: boolean;

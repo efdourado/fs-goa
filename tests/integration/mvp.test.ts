@@ -2512,7 +2512,7 @@ test("propriedades da biblioteca: renomear e ocultar, nativa ou personalizada, p
     };
 
   const initial = await props(screens.id);
-  assert.deepEqual(initial.properties.map((property) => property.key), ["title", "year", "main_genre", "runtime_minutes", "scheduled_at"]);
+  assert.deepEqual(initial.properties.map((property) => property.key), ["title", "year", "main_genre", "runtime_minutes", "scheduled_at", "recommended_by"]);
   assert.equal(initial.properties.every((property) => property.storage === "native" && property.label === null), true);
   assert.deepEqual(initial.properties.filter((property) => property.hidden).map((property) => property.key), ["scheduled_at"], "só a data do evento nasce desligada");
   assert.equal(initial.properties[0].canHide, false, "o nome do item nunca fica oculto");
@@ -2628,7 +2628,7 @@ test("propriedades da biblioteca: Tables nasce só com o nome e cada biblioteca 
 
   const starter = await list(tables.id);
   assert.deepEqual(starter.properties.filter((p) => p.storage === "attribute"), [], "nenhuma propriedade de partida além das nativas");
-  assert.deepEqual(starter.properties.filter((p) => p.storage === "native").map((p) => p.key), ["title", "scheduled_at"], "fora film/book só o título e a data do evento são nativos");
+  assert.deepEqual(starter.properties.filter((p) => p.storage === "native").map((p) => p.key), ["title", "scheduled_at", "recommended_by"], "fora film/book só o título, a data do evento e quem indicou são nativos");
 
   // "Kickoff" numa biblioteca Matches não aparece em Tables
   const kickoff = await call("POST", `/api/groups/${gid}/catalog-attributes`, { session: owner, body: { libraryId: matches.id, label: "Kickoff", type: "date" } });
@@ -9016,4 +9016,46 @@ test("varredura de acesso: quem é de fora não lê nem muda nada, e um particip
   }
 
   assert.equal(await snapshot(), start, "nada mudou depois de todas as tentativas");
+});
+
+test("quem indicou é uma propriedade da biblioteca: desligada, some do item, do acervo e do ranking, sem apagar nada", async () => {
+  const owner = await register("Nara Indica", "nara_indica_prop");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Indica ou não" } })).body as { id: string }).id;
+  const cid = ((await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner, body: { recipe: "cinema", title: "Com indicação", participantIds: [owner.user.id], items: [{ title: "Filme Indicado", recommendedByUserId: owner.user.id }] },
+  })).body as { id: string }).id;
+  type Detail = { items: Array<{ id: string; recommendedBy: { name: string } | null; catalogItem: { id: string } }> };
+  const detail = async () => (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as Detail;
+  await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } });
+  const first = await detail();
+  assert.equal(first.items[0].recommendedBy?.name, "Nara Indica");
+  // The catalogue item keeps its own "who recommended it", apart from the round's.
+  const catalogItemId = first.items[0].catalogItem.id;
+  const added = await call("POST", `/api/groups/${gid}/catalog/items`, { session: owner, body: { kind: "film", title: "Persona", catalogRecommendedByUserId: owner.user.id } });
+  assert.equal(added.response.status, 201, JSON.stringify(added.body));
+  const personaId = (added.body as { id: string }).id;
+  type CatalogItem = { recommendedBy: { name: string } | null; rounds: Array<{ recommendedBy: string | null }> };
+  const catalogItem = async (id: string) => (await call("GET", `/api/groups/${gid}/catalog/${id}`, { session: owner })).body as CatalogItem;
+  assert.equal((await catalogItem(personaId)).recommendedBy?.name, "Nara Indica");
+  assert.equal((await catalogItem(catalogItemId)).rounds[0].recommendedBy, "Nara Indica");
+
+  const film = ((await call("GET", `/api/groups/${gid}/catalog/libraries`, { session: owner })).body as { libraries: Array<{ id: string; kind: string }> })
+    .libraries.find((library) => library.kind === "film")!;
+  type Props = { properties: Array<{ key: string; type: string; hidden: boolean; canHide: boolean }> };
+  const property = async () => ((await call("GET", `/api/catalog/libraries/${film.id}/properties`, { session: owner })).body as Props).properties.find((entry) => entry.key === "recommended_by")!;
+  assert.deepEqual({ ...(await property()) }.hidden, false, "nasce ligada");
+  assert.equal((await property()).canHide, true);
+
+  const hide = await call("PATCH", `/api/catalog/libraries/${film.id}/properties/recommended_by`, { session: owner, body: { hidden: true } });
+  assert.equal(hide.response.status, 200, JSON.stringify(hide.body));
+  assert.equal((await property()).hidden, true);
+  const hiddenDetail = await detail();
+  assert.equal(hiddenDetail.items[0].recommendedBy, null, "o item do desafio não diz mais quem indicou");
+  assert.equal((await catalogItem(personaId)).recommendedBy, null, "nem o acervo");
+  const item = await catalogItem(catalogItemId);
+  assert.ok(item.rounds.every((round) => round.recommendedBy === null), "nem o histórico do item");
+
+  assert.equal((await call("PATCH", `/api/catalog/libraries/${film.id}/properties/recommended_by`, { session: owner, body: { hidden: false } })).response.status, 200);
+  assert.equal((await detail()).items[0].recommendedBy?.name, "Nara Indica", "religar traz de volta: nada foi apagado");
+  assert.equal((await catalogItem(personaId)).recommendedBy?.name, "Nara Indica");
 });

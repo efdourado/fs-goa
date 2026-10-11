@@ -6,7 +6,7 @@ import { inTransaction, oneOrNull, withClient } from "../../db";
 // through the barrel here would form an import cycle.
 import { challengeAccess } from "../domain/access";
 import { writeAudit } from "../domain/audit";
-import { asRecord, publicId, semanticKey } from "../domain/shared";
+import { asRecord, challengeHidesRecommender, publicId, semanticKey } from "../domain/shared";
 import { ApiError, stringValue } from "../../http";
 import { bayesianAverage, consensus, indicatorBias, mean, meanDelta, median, spread } from "../analysis";
 import { calculateMetric } from "../../metrics";
@@ -153,6 +153,10 @@ async function ratingRows(client: PoolClient, metric: MetricRow): Promise<Rating
         : ""}`,
     [metric.challenge_id, fieldIds ?? metric.field_id, metricScope(metric).itemId],
   );
+  // A library that switched "who recommended it" off shows no recommender beside its items here either.
+  if (result.rows.some((row) => row.recommended_by_name) && await challengeHidesRecommender(client, metric.challenge_id)) {
+    return result.rows.map((row) => ({ ...row, recommended_by_name: null }));
+  }
   return result.rows;
 }
 

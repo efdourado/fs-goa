@@ -36,7 +36,7 @@ export function builtInProperties(kind: string): LibraryProperty[] {
     : kind === "book"
       ? [["title", "text"], ["author", "text"], ["year", "number"], ["main_genre", "text"], ["page_count", "number"]]
       : [["title", "text"]];
-  return [...keys, ["scheduled_at", "schedule"]].map(([key, type], position) => ({
+  return [...keys, ["scheduled_at", "schedule"], ["recommended_by", "recommender"]].map(([key, type], position) => ({
     key, type: type as LibraryProperty["type"], storage: "native" as const, label: null,
     // The event date is opt-in: a library has to switch it on before its items ask for one.
     hidden: key === "scheduled_at", position, canHide: key !== "title",
@@ -108,7 +108,13 @@ function useNativePropertyName(): (property: Pick<LibraryProperty, "key" | "labe
 
 /** The editable, visible properties of a library — everything except the title, which has its own field. */
 export function editableProperties(properties: LibraryProperty[]): LibraryProperty[] {
-  return properties.filter((property) => !property.hidden && property.key !== "title");
+  // "Who recommended it" has its own picker (`RecommenderPicker`), asked for apart from these inputs.
+  return properties.filter((property) => !property.hidden && property.key !== "title" && property.type !== "recommender");
+}
+
+/** Whether the library asks who recommended an item. On unless it switched the property off (or while loading). */
+export function showsRecommender(properties: LibraryProperty[] | null | undefined): boolean {
+  return properties?.find((property) => property.type === "recommender")?.hidden !== true;
 }
 
 export function valuesFromItem(

@@ -13,6 +13,7 @@ import {
   PropertyInputs,
   propertiesHaveProblem,
   type PropertyValues,
+  showsRecommender,
   useLibraryProperties,
   valuesFromItem,
 } from "./property-inputs";
@@ -71,6 +72,8 @@ export function AddCatalogItemDialog({
   const [kind, setKind] = useState(() => (initialKind && choices.some((choice) => choice.kind === initialKind) ? initialKind : choices[0]?.kind ?? "film"));
   const choice = choices.find((entry) => entry.kind === kind) ?? null;
   const { properties, error: propertiesError } = useLibraryProperties(choice);
+  // The group's switch, then the library's own: either can turn "who recommended it" off.
+  const askRecommender = recommendationsEnabled && showsRecommender(properties);
   const [title, setTitle] = useState("");
   const [values, setValues] = useState<PropertyValues>({});
   const [recommender, setRecommender] = useState<RecommenderValue>(NO_RECOMMENDER);
@@ -111,7 +114,7 @@ export function AddCatalogItemDialog({
         ...(choice.id ? { libraryId: choice.id } : { kind: choice.kind }),
         title: name || matches.find((match) => match.id === useExistingId)?.title,
         ...(useExistingId ? { useExistingId } : { ...native, ...(Object.keys(attributes).length ? { attributes } : {}) }),
-        ...(!useExistingId && recommendationsEnabled ? recommenderBody(recommender, "catalog", false) : {}),
+        ...(!useExistingId && askRecommender ? recommenderBody(recommender, "catalog", false) : {}),
       };
       const created = await apiRequest<{ id: Id }>(API_PATHS.catalogWorkspace(scope).items, { method: "POST", body, csrfToken: csrf });
       onAdded({ id: created.id, reused: Boolean(useExistingId) });
@@ -179,7 +182,7 @@ export function AddCatalogItemDialog({
         <p className="text-sm text-[var(--muted)]">{t("loadingProperties")}</p>
       )}
 
-      {recommendationsEnabled ? <RecommenderPicker value={recommender} onChange={setRecommender} members={members} source={source} /> : null}
+      {askRecommender ? <RecommenderPicker value={recommender} onChange={setRecommender} members={members} source={source} /> : null}
     </FormDialog>
   );
 }
@@ -214,6 +217,8 @@ export function EditCatalogItemDialog({
   const csrf = useCsrf();
   const choice = libraryChoices(libraries).find((entry) => entry.kind === item.kind) ?? null;
   const { properties, error: propertiesError } = useLibraryProperties(choice);
+  // The group's switch, then the library's own: either can turn "who recommended it" off.
+  const askRecommender = recommendationsEnabled && showsRecommender(properties);
   const [title, setTitle] = useState(item.title);
   const initialRecommender = useMemo(() => recommenderFromItem(item.recommendedBy, item.originNote), [item]);
   const [recommender, setRecommender] = useState<RecommenderValue>(initialRecommender);
@@ -238,7 +243,7 @@ export function EditCatalogItemDialog({
           title: name,
           ...native,
           ...(Object.keys(attributes).length ? { attributes } : {}),
-          ...(recommendationsEnabled && !sameRecommender(recommender, initialRecommender) ? recommenderBody(recommender, "catalog", true) : {}),
+          ...(askRecommender && !sameRecommender(recommender, initialRecommender) ? recommenderBody(recommender, "catalog", true) : {}),
         },
         csrfToken: csrf,
       });
@@ -269,7 +274,7 @@ export function EditCatalogItemDialog({
         ) : (
           <p className="text-sm text-[var(--muted)]">{t("loadingProperties")}</p>
         )}
-        {recommendationsEnabled ? <RecommenderPicker value={recommender} onChange={setRecommender} members={members} source={source} /> : null}
+        {askRecommender ? <RecommenderPicker value={recommender} onChange={setRecommender} members={members} source={source} /> : null}
       </FormDialog>
     </>
   );

@@ -146,3 +146,28 @@ export function asRecord(value: unknown): Record<string, unknown> {
     ? (value as Record<string, unknown>)
     : {};
 }
+
+/**
+ * SQL that yields `true` unless "who recommended it" is switched off for the library the item belongs to
+ * (the `recommended_by` property, on by default — only an explicit "hidden" row turns it off). An item with
+ * no catalogue row behind it has no library to say no. `itemAlias` is the catalog_items alias in the query.
+ */
+export function recommenderVisibleSql(itemAlias: string): string {
+  return `NOT EXISTS (
+    SELECT 1 FROM catalog_libraries rl
+      JOIN catalog_native_property_configs rc ON rc.library_id = rl.id AND rc.property_key = 'recommended_by'
+     WHERE rl.group_id = ${itemAlias}.group_id AND rl.kind = ${itemAlias}.kind AND rc.hidden = true)`;
+}
+
+/** Whether a challenge's items come from a library that switched "who recommended it" off. */
+export async function challengeHidesRecommender(
+  client: { query: (text: string, values: unknown[]) => Promise<{ rows: unknown[] }> },
+  challengeId: string,
+): Promise<boolean> {
+  const hidden = await client.query(
+    `SELECT 1 FROM challenge_items it JOIN catalog_items ci ON ci.id = it.catalog_item_id
+      WHERE it.challenge_id = $1 AND NOT ${recommenderVisibleSql("ci")} LIMIT 1`,
+    [challengeId],
+  );
+  return hidden.rows.length > 0;
+}

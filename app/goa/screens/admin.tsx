@@ -10,7 +10,7 @@ import { FormDialog } from "../dialog";
 import { AddSharedResponseDialog, RemoveResponseDialog, SharedGlyph, SharedResponsePanel } from "../shared-responses";
 import { cleanFields, FIELD_TYPES, FieldConfigInputs, newFieldConfig, uniqueFieldKey } from "../fields";
 import { type CatalogScope } from "../libraries";
-import { bodyFromValues, editableProperties, PropertyInputs, type PropertyValues, propertiesHaveProblem, useLibraryProperties, valuesFromItem } from "../property-inputs";
+import { bodyFromValues, editableProperties, PropertyInputs, type PropertyValues, propertiesHaveProblem, showsRecommender, useLibraryProperties, valuesFromItem } from "../property-inputs";
 import { recommenderBody, RecommenderPicker, recommenderFromItem, type RecommenderValue, sameRecommender, useRecommenderSource } from "../recommender-picker";
 import { canOrganise, OrganiseDialog, organiseFromItems } from "../organize-panel";
 import { RuleSectionsEditor, visibleRuleSections } from "../rules";
@@ -673,7 +673,9 @@ export function ItemEditorDialog({
   const initialValues = useMemo(() => (catalogItem && properties ? valuesFromItem(properties, catalogItem) : {}), [catalogItem, properties]);
   const [editedValues, setEditedValues] = useState<PropertyValues | null>(null);
   const values = editedValues ?? initialValues;
-  const source = useRecommenderSource(scope, recommendationsEnabled && isItem);
+  // The group's switch, then the library's own: either can turn "who recommended it" off.
+  const askRecommender = recommendationsEnabled && isItem && showsRecommender(properties);
+  const source = useRecommenderSource(scope, askRecommender);
   const set = (patch: Partial<typeof draft>) => setDraft((current) => ({ ...current, ...patch }));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -695,7 +697,7 @@ export function ItemEditorDialog({
       await onSave({
         title: draft.title.trim(),
         description: draft.description.trim(),
-        ...(isItem && recommendationsEnabled && recommenderChanged ? recommenderBody(recommender, "item", true) : {}),
+        ...(askRecommender && recommenderChanged ? recommenderBody(recommender, "item", true) : {}),
         ...(facts ? { ...facts.native, ...(Object.keys(facts.attributes).length ? { attributes: facts.attributes } : {}) } : {}),
       });
     } catch (cause) { setError(f.error(cause)); setBusy(false); }
@@ -721,7 +723,7 @@ export function ItemEditorDialog({
       <Field label={t("itemDescriptionLabel")} optional>
         <textarea className={inputClass} rows={3} value={draft.description} onChange={(event) => set({ description: event.target.value })} maxLength={2000} placeholder={t("itemDescriptionPlaceholder")} />
       </Field>
-      {isItem && recommendationsEnabled ? (
+      {askRecommender ? (
         <RecommenderPicker value={recommender} onChange={setRecommender} members={members} source={source} />
       ) : null}
       {catalogItem && scheduleProperty ? (

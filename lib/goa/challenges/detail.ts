@@ -23,6 +23,7 @@ import { challengeRatingFieldIds } from "./rating";
 import { recipeCollectsEntryDate } from "./recipes";
 import { metricsForChallenge, resultForChallenge } from "./results";
 import { eventScheduleJson, scheduleVisibleSql } from "../domain/event-schedule";
+import { recommenderVisibleSql } from "../domain/shared";
 import { parseRuleSections, rulesCompatibilityText } from "../domain/rules";
 
 function windowStatus(
@@ -64,6 +65,7 @@ async function detailItems(
     recommended_by_id: string | null; recommended_by_name: string | null;
     recommended_by_external_id: string | null; recommended_by_external_name: string | null;
     revealed_at: Date | null; sealed_user_ids: string[] | null;
+    recommender_visible: boolean;
   }>(
     // A recommender who left the group (or whose account is gone) never shows
     // their name to the group again — `recommended_by_id` goes null right
@@ -75,6 +77,7 @@ async function detailItems(
             ci.main_genre AS catalog_main_genre, ci.page_count AS catalog_pages, ci.runtime_minutes AS catalog_runtime_minutes,
             CASE WHEN ${scheduleVisibleSql("ci")} THEN ci.scheduled_at END AS scheduled_at,
             CASE WHEN ${scheduleVisibleSql("ci")} THEN ci.scheduled_end_at END AS scheduled_end_at,
+            ${recommenderVisibleSql("ci")} AS recommender_visible,
             ci.scheduled_precision, ci.scheduled_time_zone,
             CASE WHEN active_recommender.user_id IS NOT NULL THEN i.recommended_by_user_id END AS recommended_by_id,
             CASE WHEN active_recommender.user_id IS NOT NULL THEN ru.display_name END AS recommended_by_name,
@@ -108,7 +111,7 @@ async function detailItems(
     description: item.description, position: item.position,
     checkpointId: item.checkpoint_id ?? null,
     // Whatever was recorded stays stored, just unseen.
-    originNote: showWho ? item.origin_note ?? null : null,
+    originNote: showWho && item.recommender_visible ? item.origin_note ?? null : null,
     opensAt: item.opens_at?.toISOString() ?? null, dueAt: item.due_at?.toISOString() ?? null,
     schedulePrecision: item.schedule_precision,
     status: windowStatus(status, item.opens_at, item.due_at),
@@ -128,7 +131,7 @@ async function detailItems(
           attributes: attributes.get(item.catalog_item_id) ?? [],
         }
       : null,
-    recommendedBy: !showWho ? null : item.recommended_by_id
+    recommendedBy: !(showWho && item.recommender_visible) ? null : item.recommended_by_id
       ? { kind: "member" as const, id: item.recommended_by_id, name: item.recommended_by_name ?? "" }
       : item.recommended_by_external_id
         ? { kind: "external" as const, id: item.recommended_by_external_id, name: item.recommended_by_external_name ?? "" }

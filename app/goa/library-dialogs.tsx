@@ -424,10 +424,14 @@ export function LibraryPropertiesDialog({
                   <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.4">
                     <rect x="2.2" y="3.2" width="11.6" height="10.6" rx="2" /><path d="M2.2 6.6h11.6M5.4 1.9v2.6M10.6 1.9v2.6" strokeLinecap="round" />
                   </svg>
+                ) : property.type === "recommender" ? (
+                  <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.4">
+                    <circle cx="8" cy="5.6" r="2.6" /><path d="M3 13.6c.6-2.6 2.6-4 5-4s4.400 1.400 5 4" strokeLinecap="round" />
+                  </svg>
                 ) : property.type === "number" ? "123" : property.type === "date" ? "31" : property.type === "boolean" ? "✓" : "Aa"}
               </span>
               <div className="min-w-0 flex-1">
-                {canEdit ? (
+                {canEdit && property.type !== "recommender" ? (
                   <input
                     className="w-full rounded-lg border border-transparent bg-transparent px-2 py-1 text-sm font-medium outline-none transition hover:border-[var(--line)] focus:border-[var(--main)] focus:bg-[var(--paper)] disabled:opacity-60"
                     value={drafts[property.key] ?? property.label ?? ""}
@@ -497,7 +501,7 @@ export function LibraryPropertiesDialog({
               <select className={inputClass} value={coverTop} disabled={coverBusy} onChange={(event) => void saveCoverTop(event.target.value)}>
                 <option value={DEFAULT_COVER_TOP}>{t("coverTopDefault")}</option>
                 <option value="none">{t("coverTopNone")}</option>
-                {properties.filter((property) => property.key !== "title").map((property) => (
+                {properties.filter((property) => property.key !== "title" && property.type !== "recommender").map((property) => (
                   <option key={property.key} value={property.attributeKey ?? property.key}>{nameOf(property)}</option>
                 ))}
               </select>

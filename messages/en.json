@@ -1719,7 +1719,8 @@
       "number": "Number",
       "date": "Date",
       "boolean": "Yes or no",
-      "schedule": "Date"
+      "schedule": "Date",
+      "recommender": "Person"
     },
     "builtIn": "built in",
     "hidden": "hidden",
@@ -1755,7 +1756,8 @@
       "main_genre": "Main genre",
       "runtime_minutes": "Runtime (minutes)",
       "page_count": "Pages",
-      "scheduled_at": "Date"
+      "scheduled_at": "Date",
+      "recommended_by": "Recommended by"
     },
     "scheduleHint": "When the item itself happens, like a match's day. Switch it on and every challenge using these items shows the same date."
   },
