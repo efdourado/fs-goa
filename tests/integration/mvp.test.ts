@@ -9059,3 +9059,46 @@ test("quem indicou é uma propriedade da biblioteca: desligada, some do item, do
   assert.equal((await detail()).items[0].recommendedBy?.name, "Nara Indica", "religar traz de volta: nada foi apagado");
   assert.equal((await catalogItem(personaId)).recommendedBy?.name, "Nara Indica");
 });
+
+test("o chat de criação: treino numa lista nova e hábito que conta rumo a uma meta nascem prontos, no espaço pessoal", async () => {
+  const owner = await register("Caio Chat", "caio_chat_cria");
+  // Treino: a lista é criada com o nome que a pessoa deu, depois o desafio a usa com um check-in por treino.
+  const library = await call("POST", "/api/personal/catalog/libraries", { session: owner, body: { label: "Exercícios" } });
+  assert.equal(library.response.status, 201, JSON.stringify(library.body));
+  const libraryId = (library.body as { id: string }).id;
+  const workout = await call("POST", "/api/personal/challenges", {
+    session: owner,
+    body: {
+      recipe: "custom", title: "Treino ABC", description: "", ruleSections: [], startsOn: null, endsOn: null,
+      fields: [
+        { key: "carga", label: "Carga", type: "number", required: true, config: { min: 0, step: 0.5 } },
+        { key: "repeticoes", label: "Repetições", type: "number", required: true, config: { min: 0, step: 1 } },
+      ],
+      libraries: [{ libraryId }], recordingMode: "session", sessionName: "Treino", sessionNoteLabel: "Como foi?",
+      items: [{ title: "Agachamento", position: 0 }], generateDaily: false, participantIds: [],
+    },
+  });
+  assert.equal(workout.response.status, 201, JSON.stringify(workout.body));
+  type Detail = { status: string; items: Array<{ title: string }>; entryTypes: Array<{ name: string; parentTypeId: string | null; fields: Array<{ key: string; config?: { count?: { goal: { value: number } | null } } }> }> };
+  const workoutDetail = (await call("GET", `/api/challenges/${(workout.body as { id: string }).id}`, { session: owner })).body as Detail;
+  assert.deepEqual(workoutDetail.items.map((item) => item.title), ["Agachamento"]);
+  assert.ok(workoutDetail.entryTypes.some((type) => type.name === "Treino"), "o check-in se chama Treino");
+  assert.ok(workoutDetail.entryTypes.some((type) => type.parentTypeId && type.fields.some((field) => field.key === "carga")), "cada exercício guarda carga e repetições");
+
+  // Hábito que conta: um número por dia com meta, mais a nota opcional do dia.
+  const habit = await call("POST", "/api/personal/challenges", {
+    session: owner,
+    body: {
+      recipe: "habit", title: "Correr", description: "", ruleSections: [], startsOn: null, endsOn: null,
+      fields: [
+        { key: "quantidade", label: "Km", type: "number", required: true, config: { min: 0, count: { goal: { value: 100 }, entry: "amount", showDates: true } } },
+        { key: "nota_dia", label: "Como foi?", type: "text", required: false, config: { multiline: true, maxLength: 500 } },
+      ],
+      items: [], generateDaily: false, participantIds: [],
+    },
+  });
+  assert.equal(habit.response.status, 201, JSON.stringify(habit.body));
+  const habitDetail = (await call("GET", `/api/challenges/${(habit.body as { id: string }).id}`, { session: owner })).body as Detail;
+  const counted = habitDetail.entryTypes.flatMap((type) => type.fields).find((field) => field.key === "quantidade");
+  assert.equal(counted?.config?.count?.goal?.value, 100, "a meta fica guardada no campo");
+});

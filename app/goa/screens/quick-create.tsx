@@ -3,27 +3,42 @@
 import { useTranslations } from "next-intl";
 import { type FormEvent, type ReactNode, useState } from "react";
 
-import { RecipeIcon } from "../recipe-icons";
-import type { ChallengeCreationInput, GroupSummary, Id } from "../types";
-import { BackButton, Button, cardClass, cx, inputClass, PageHeading, StatusMessage } from "../ui";
+import { API_PATHS, apiRequest } from "../api";
+import { useCsrf } from "../csrf";
+import { sessionPresetFields } from "../fields";
 import { useGoaFormat } from "../format";
+import { type CatalogScope, useCatalogLibraries, useLibraryName } from "../libraries";
+import { RecipeIcon, type RecipeIconName } from "../recipe-icons";
+import type { CatalogLibrary, ChallengeCreationInput, ChallengeField, CreatableRecipeKey, GroupSummary, Id } from "../types";
+import { BackButton, Button, cardClass, cx, inputClass, PageHeading, StatusMessage } from "../ui";
 import { canManage } from "../utils";
 
 /**
- * The three recipes that need nothing set up first: Screens and Pages draw from their own always-there
- * library, and a habit has no catalogue at all. `custom` and `tables` both need a library picked or made
- * before a challenge can hold items — one more decision this flow is built to avoid.
+ * What the chat can start, each a preset of the app's general capabilities:
+ *  · Screens / Pages — rate films or books, from their always-there library;
+ *  · the reading club — pages a day toward each book's end;
+ *  · a habit — a check-in a day, or a number counted toward a goal;
+ *  · a workout — one check-in holding a record per exercise, from a library of the person's own.
+ * Tables and a fully custom challenge still need the wizard (several ratings, your own fields).
  */
-const SAFE_RECIPES = ["cinema", "bookshelf", "habit"] as const;
-type SafeRecipe = (typeof SAFE_RECIPES)[number];
-/** Screens and Pages need at least one item to open with; a habit has no catalogue to seed. */
-const NEEDS_ITEM: Record<SafeRecipe, boolean> = { cinema: true, bookshelf: true, habit: false };
+const KINDS = ["cinema", "bookshelf", "library", "habit", "workout"] as const;
+type Kind = (typeof KINDS)[number];
+const RECIPE_OF: Record<Kind, CreatableRecipeKey> = { cinema: "cinema", bookshelf: "bookshelf", library: "library", habit: "habit", workout: "custom" };
+const ICON_OF: Record<Kind, RecipeIconName> = { cinema: "cinema", bookshelf: "bookshelf", library: "library", habit: "habit", workout: "custom" };
+/** Everything but a habit opens with a first item. */
+const NEEDS_ITEM: Record<Kind, boolean> = { cinema: true, bookshelf: true, library: true, habit: false, workout: true };
+/** A book is known by its title and author — the catalogue asks for both. */
+const IS_BOOK: Record<Kind, boolean> = { cinema: false, bookshelf: true, library: true, habit: false, workout: false };
 
 type Where = { kind: "personal" } | { kind: "group"; groupId: Id; name: string; participantIds: Id[] };
 /** How a group's ratings come out: sealed until revealed, sealed with a guess first, or live. */
 const RATING_MODES = ["reveal", "guess", "open"] as const;
 type RatingMode = (typeof RATING_MODES)[number];
 const MODE_KEY: Record<RatingMode, string> = { reveal: "modeReveal", guess: "modeGuess", open: "modeOpen" };
+/** A habit: just "did it today", or a number counted along a road (toward a goal, when it has one). */
+type HabitShape = { kind: "check" } | { kind: "count"; label: string; goal: number | null };
+/** A workout's exercises live in a library of the person's own: one they already have, or a new one they name. */
+type LibraryPick = { id: Id; name: string };
 
 /** goa's own turn in the exchange — a small mark, then the question, in a quiet bubble. */
 function Ask({ children }: { children: ReactNode }) {
@@ -60,9 +75,53 @@ function OptionCard({ onClick, icon, title, hint }: { onClick: () => void; icon?
   );
 }
 
+/** The workout's library: the space's own lists to pick from, or a new one named here (never made on its own). */
+function LibraryStep({ scope, onPick }: { scope: CatalogScope; onPick: (library: LibraryPick) => void }) {
+  const t = useTranslations("quickCreate");
+  const tc = useTranslations("common");
+  const f = useGoaFormat();
+  const csrf = useCsrf();
+  const libraryName = useLibraryName();
+  const { data } = useCatalogLibraries(scope);
+  const own = (data ?? []).filter((library) => library.source === "custom");
+  const [name, setName] = useState(t("libraryDefault"));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function make(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const label = name.trim();
+    if (!label) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const made = await apiRequest<CatalogLibrary>(API_PATHS.catalogWorkspace(scope).libraries, { method: "POST", body: { label }, csrfToken: csrf });
+      onPick({ id: made.id, name: label });
+    } catch (cause) {
+      setError(f.error(cause));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="ml-10 space-y-3">
+      {own.length ? (
+        <div className="grid gap-3 sm:grid-cols-3">
+          {own.map((library) => <OptionCard key={library.id} onClick={() => onPick({ id: library.id, name: libraryName(library) })} title={libraryName(library)} />)}
+        </div>
+      ) : null}
+      <form onSubmit={make} className="flex flex-wrap items-center gap-2.5">
+        <input className={cx(inputClass, "max-w-xs flex-1")} value={name} onChange={(event) => setName(event.target.value)} aria-label={t("libraryNew")} placeholder={t("libraryDefault")} maxLength={80} disabled={busy} />
+        <Button type="submit" disabled={busy || !name.trim()}>{busy ? tc("saving") : t("libraryNew")}</Button>
+      </form>
+      {error ? <StatusMessage error={error} /> : null}
+    </div>
+  );
+}
+
 /**
- * A short, guided way to start a challenge — three questions, every answer a tap (a title and, for a new
- * group, its name are the only typing). The fast path with no way to end up somewhere half-configured, for
+ * A short, guided way to start a challenge — a few questions, nearly every answer a tap (a title, a first
+ * item and a new group's or list's name are the only typing). The fast path with no way to end up somewhere half-configured, for
  * a first challenge or the fifth — not a replacement for the full wizard, which is always still one tap
  * away from wherever this lands.
  */
@@ -88,6 +147,7 @@ export function QuickCreateScreen({
   const t = useTranslations("quickCreate");
   const tr = useTranslations("createChallenge");
   const tc = useTranslations("common");
+  const tp = useTranslations("fields.preset");
   const f = useGoaFormat();
   const standardGroups = groups.filter((group) => group.kind !== "personal" && canManage(group.role));
   const presetWhere = (): Where | null => {
@@ -95,7 +155,12 @@ export function QuickCreateScreen({
     const target = into ? standardGroups.find((group) => group.id === into.groupId) : null;
     return target ? { kind: "group", groupId: target.id, name: target.name, participantIds: target.members?.map((member) => member.id) ?? [currentUserId] } : null;
   };
-  const [recipe, setRecipe] = useState<SafeRecipe | null>(null);
+  const [recipe, setRecipe] = useState<Kind | null>(null);
+  const [habit, setHabit] = useState<HabitShape | null>(null);
+  const [countingHabit, setCountingHabit] = useState(false);
+  const [countLabel, setCountLabel] = useState("");
+  const [countGoal, setCountGoal] = useState("");
+  const [library, setLibrary] = useState<LibraryPick | null>(null);
   const [where, setWhere] = useState<Where | null>(presetWhere);
   const [pickingNewGroup, setPickingNewGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
@@ -110,12 +175,15 @@ export function QuickCreateScreen({
   const [error, setError] = useState<string | null>(null);
 
   // Only a group rating something together has a reveal to plan.
-  const asksMode = Boolean(recipe && NEEDS_ITEM[recipe] && where?.kind === "group");
-  const modeSettled = !asksMode || mode !== null;
+  const asksMode = Boolean((recipe === "cinema" || recipe === "bookshelf") && where?.kind === "group");
+  // A habit says what a day's check-in is; a workout says which list its exercises come from.
+  const asksHabit = recipe === "habit";
+  const asksLibrary = recipe === "workout";
+  const modeSettled = (!asksMode || mode !== null) && (!asksHabit || habit !== null) && (!asksLibrary || library !== null);
 
   function resetFrom(step: "recipe" | "where" | "mode" | "title") {
     if (step === "recipe") setRecipe(null);
-    if (step !== "title") setMode(null);
+    if (step !== "title") { setMode(null); setHabit(null); setCountingHabit(false); setCountLabel(""); setCountGoal(""); setLibrary(null); }
     // Changing the recipe keeps a destination the chat was opened into; changing the destination itself clears it.
     if (step === "recipe" || step === "where") { setWhere(step === "recipe" ? presetWhere() : null); setPickingNewGroup(false); setNewGroupName(""); setGroupError(null); }
     setTitle(null);
@@ -143,8 +211,30 @@ export function QuickCreateScreen({
     }
   }
 
-  // A book is known by its title and author — the catalogue asks for both.
-  const isBook = recipe === "bookshelf";
+  const isBook = recipe ? IS_BOOK[recipe] : false;
+
+  function confirmCount(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const label = countLabel.trim();
+    const goal = Number(countGoal);
+    if (!label) return;
+    setHabit({ kind: "count", label, goal: countGoal.trim() && Number.isFinite(goal) && goal > 0 ? goal : null });
+  }
+
+  /** What the check-in asks, when the preset's own fields aren't it: a counted number, or a workout's weight and reps. */
+  function fieldsFor(): ChallengeField[] {
+    if (recipe === "workout") return sessionPresetFields((key) => tp(key));
+    if (recipe === "habit" && habit?.kind === "count") {
+      return [
+        {
+          key: "quantidade", label: habit.label, type: "number", required: true,
+          config: { min: 0, count: { goal: habit.goal === null ? null : { value: habit.goal }, entry: "amount", showDates: true } },
+        },
+        { key: "nota_dia", label: tp("comoFoi"), type: "text", required: false, config: { multiline: true, maxLength: 500 } },
+      ];
+    }
+    return [];
+  }
 
   async function create(name: string, firstItem: string) {
     if (!recipe || !where) return;
@@ -152,13 +242,16 @@ export function QuickCreateScreen({
     setError(null);
     try {
       const input: ChallengeCreationInput = {
-        recipe,
+        recipe: RECIPE_OF[recipe],
         title: name,
         description: "",
         ruleSections: [],
         startsOn: null,
         endsOn: null,
-        fields: [],
+        fields: fieldsFor(),
+        ...(recipe === "workout" && library
+          ? { libraries: [{ libraryId: library.id }], recordingMode: "session" as const, sessionName: t("workoutSession"), sessionNoteLabel: tp("comoFoi") }
+          : {}),
         items: firstItem ? [{ title: firstItem, position: 0, ...(isBook ? { author: itemAuthor.trim() } : {}) }] : [],
         generateDaily: false,
         ...(asksMode && mode !== "open" ? { revealTogether: true } : {}),
@@ -187,6 +280,9 @@ export function QuickCreateScreen({
     void create(title, name);
   }
 
+  const kindName = (key: Kind) => (key === "workout" ? t("workout") : tr(`recipes.${key}.name`));
+  const scope: CatalogScope | null = where ? (where.kind === "personal" ? "personal" : { groupId: where.groupId }) : null;
+
   return (
     <main className="mx-auto max-w-3xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
       <BackButton onClick={onBack} label={backLabel ?? tc("back")} className="mb-6" />
@@ -196,16 +292,16 @@ export function QuickCreateScreen({
         <div className="space-y-3">
           <Ask>{t("q1")}</Ask>
           {recipe ? (
-            <Answered onEdit={() => resetFrom("recipe")} editLabel={t("change")}>{tr(`recipes.${recipe}.name`)}</Answered>
+            <Answered onEdit={() => resetFrom("recipe")} editLabel={t("change")}>{kindName(recipe)}</Answered>
           ) : (
             <div className="ml-10 grid gap-3 sm:grid-cols-3">
-              {SAFE_RECIPES.map((key) => (
+              {KINDS.map((key) => (
                 <OptionCard
                   key={key}
                   onClick={() => setRecipe(key)}
-                  icon={<RecipeIcon name={key} className="h-[18px] w-[18px]" />}
-                  title={tr(`recipes.${key}.name`)}
-                  hint={tr(`recipes.${key}.tagline`)}
+                  icon={<RecipeIcon name={ICON_OF[key]} className="h-[18px] w-[18px]" />}
+                  title={kindName(key)}
+                  hint={key === "workout" ? t("workoutHint") : tr(`recipes.${key}.tagline`)}
                 />
               ))}
             </div>
@@ -268,6 +364,39 @@ export function QuickCreateScreen({
           </div>
         ) : null}
 
+        {asksHabit && where ? (
+          <div className="space-y-3">
+            <Ask>{t("qHabit")}</Ask>
+            {habit ? (
+              <Answered onEdit={() => resetFrom("mode")} editLabel={t("change")}>
+                {habit.kind === "check" ? t("habitCheck") : habit.goal === null ? habit.label : t("habitCountAnswer", { label: habit.label, goal: habit.goal })}
+              </Answered>
+            ) : countingHabit ? (
+              <form onSubmit={confirmCount} className="ml-10 flex flex-wrap items-center gap-2.5">
+                <input className={cx(inputClass, "max-w-[12rem] flex-1")} value={countLabel} onChange={(event) => setCountLabel(event.target.value)} placeholder={t("countLabelPlaceholder")} aria-label={t("countLabel")} maxLength={60} />
+                <input className={cx(inputClass, "max-w-[9rem] flex-1")} value={countGoal} onChange={(event) => setCountGoal(event.target.value)} placeholder={t("countGoalPlaceholder")} aria-label={t("countGoal")} type="number" inputMode="decimal" min="0" step="any" />
+                <Button type="submit" disabled={!countLabel.trim()}>{tc("continue")}</Button>
+              </form>
+            ) : (
+              <div className="ml-10 grid gap-3 sm:grid-cols-3">
+                <OptionCard onClick={() => setHabit({ kind: "check" })} title={t("habitCheck")} hint={t("habitCheckHint")} />
+                <OptionCard onClick={() => setCountingHabit(true)} title={t("habitCount")} hint={t("habitCountHint")} />
+              </div>
+            )}
+          </div>
+        ) : null}
+
+        {asksLibrary && where && scope ? (
+          <div className="space-y-3">
+            <Ask>{t("qLibrary")}</Ask>
+            {library ? (
+              <Answered onEdit={() => resetFrom("mode")} editLabel={t("change")}>{library.name}</Answered>
+            ) : (
+              <LibraryStep scope={scope} onPick={setLibrary} />
+            )}
+          </div>
+        ) : null}
+
         {recipe && where && modeSettled ? (
           <div className="space-y-3">
             <Ask>{t("q3")}</Ask>
@@ -294,14 +423,14 @@ export function QuickCreateScreen({
 
         {recipe && where && modeSettled && title !== null && NEEDS_ITEM[recipe] ? (
           <div className="space-y-3">
-            <Ask>{t(recipe === "cinema" ? "q4Cinema" : "q4Bookshelf")}</Ask>
+            <Ask>{t(recipe === "cinema" ? "q4Cinema" : recipe === "workout" ? "q4Workout" : "q4Bookshelf")}</Ask>
             <form onSubmit={submitItem} className="ml-10 flex flex-wrap items-center gap-2.5">
               <input
                 className={cx(inputClass, "max-w-sm flex-1")}
                 value={itemTitle}
                 onChange={(event) => setItemTitle(event.target.value)}
-                placeholder={t(recipe === "cinema" ? "itemPlaceholderCinema" : "itemPlaceholderBookshelf")}
-                aria-label={t(recipe === "cinema" ? "q4Cinema" : "q4Bookshelf")}
+                placeholder={t(recipe === "cinema" ? "itemPlaceholderCinema" : recipe === "workout" ? "itemPlaceholderWorkout" : "itemPlaceholderBookshelf")}
+                aria-label={t(recipe === "cinema" ? "q4Cinema" : recipe === "workout" ? "q4Workout" : "q4Bookshelf")}
                 maxLength={300}
                 disabled={busy}
               />
