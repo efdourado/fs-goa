@@ -54,7 +54,7 @@ test("o dia de um treino: um botão claro para registrar hoje; sem 'repetir', se
   assert.doesNotMatch(html, /Salvar treino/, "não há botão de salvar: o registro se salva sozinho, na folha");
 });
 
-test("o treino de hoje já registrado aparece resumido, com Continuar e um novo treino no mesmo dia", () => {
+test("o treino de hoje já registrado aparece num cartão que abre o treino, e dá para registrar outro no mesmo dia", () => {
   const spec = sessionSpecOf(challenge)!;
   const today = dateKeyInSaoPaulo(new Date());
   const withToday = [
@@ -65,9 +65,11 @@ test("o treino de hoje já registrado aparece resumido, com Continuar e um novo 
   const html = renderWithIntl(createElement(SessionLog, {
     challenge, spec, entries: withToday, userId: "me", canEdit: true, onSave: async () => undefined, onDelete: async () => undefined,
   }));
-  assert.match(html, /Treino 1 · 1 item/);
+  assert.match(html, />Treino<\/strong>/, "um treino só no dia: sem número");
+  assert.match(html, />1 item</);
   assert.match(html, /Supino<\/span><span[^>]*>60 · 8<\/span>/, "cada exercício numa linha, com os números");
-  assert.match(html, />Editar</);
+  assert.match(html, /<button[^>]*aria-label="Abrir Treino"/, "o cartão inteiro abre o treino, sem botão Editar");
+  assert.doesNotMatch(html, />Editar</);
   assert.match(html, /＋ Novo treino/, "outro treino no mesmo dia");
 });
 

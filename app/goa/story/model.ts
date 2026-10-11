@@ -163,7 +163,7 @@ export interface DatedStory {
   /** The weekdays that stand out (tied at the top, clearly above the rest); empty when the week is even. */
   bestWeekdays: number[];
   /** Workouts: per exercise, where it started, the best it reached, and every session's number in order. */
-  records: Array<{ item: StoryItem; first: number; best: number; bestDay: string; person: StoryPerson; sessions: number; series: number[] }>;
+  records: Array<{ item: StoryItem; first: number; best: number; bestDay: string; person: StoryPerson; sessions: number; series: number[]; days: string[] }>;
   notes: Array<{ person: StoryPerson; day: string; text: string }>;
   /** Two people: the days both of them showed up. */
   together: number | null;
@@ -485,7 +485,7 @@ function buildDated(input: StoryInput): DatedStory | null {
     // One number per day (the heaviest set that day), oldest first — the line a card draws.
     const byDay = new Map<string, number>();
     for (const row of ordered) byDay.set(row.day, Math.max(byDay.get(row.day) ?? -Infinity, row.value));
-    records.push({ item, first: ordered[0].value, best: best.value, bestDay: best.day, person: input.people.find((person) => person.id === ordered[0].personId)!, sessions: byDay.size, series: [...byDay.values()] });
+    records.push({ item, first: ordered[0].value, best: best.value, bestDay: best.day, person: input.people.find((person) => person.id === ordered[0].personId)!, sessions: byDay.size, series: [...byDay.values()], days: [...byDay.keys()] });
   }
   records.sort((a, b) => (b.best - b.first) / Math.max(1e-9, b.first) - (a.best - a.first) / Math.max(1e-9, a.first));
 

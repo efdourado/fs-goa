@@ -1037,8 +1037,6 @@
     "trayLess": "Mostrar menos",
     "removeRow": "Tirar {item}",
     "addRows": "Adicionar",
-    "visitHeading": "{name} {number} · {count, plural, one {# item} other {# itens}}",
-    "continueVisit": "Editar",
     "draftWaiting": "Há um registro não salvo neste aparelho. Toque para continuar.",
     "logToday": "Registrar o {name} de hoje",
     "logOnDay": "Registrar o {name} de {date}",
@@ -1049,7 +1047,10 @@
     "autoError": "Não deu para salvar agora. Tentamos de novo na próxima mudança.",
     "autoDraft": "Rascunho guardado neste aparelho · falta {what}",
     "autoIdle": "Escolha o que vai fazer. Tudo se salva sozinho.",
-    "done": "Pronto"
+    "done": "Pronto",
+    "visitNumbered": "{name} {number}",
+    "visitCount": "{count, plural, =0 {Nenhum item} one {# item} other {# itens}}",
+    "openVisit": "Abrir {name}"
   },
   "checkinLog": {
     "title": "Seus check-ins",
@@ -2215,7 +2216,13 @@
       "headline": "{title} subiu {gain}%.",
       "range": "{first}–{best} {unit}",
       "sessions": "{count, plural, one {# treino} other {# treinos}}",
-      "list": "{label}: o primeiro treino contra o melhor"
+      "list": "{label}: o primeiro treino contra o melhor",
+      "best": "Recorde",
+      "first": "Começo",
+      "gain": "Ganho",
+      "sessionsLabel": "Treinos",
+      "history": "Treino a treino",
+      "chartAria": "Progresso de {title}"
     },
     "notes": {
       "eyebrow": "Nas palavras deles"

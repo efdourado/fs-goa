@@ -7,6 +7,7 @@ import { coverColors, coverToneOf, ItemCover } from "../catalog-cover";
 import { firstName, initialsOf, personTone } from "../rating-scale";
 import { Rail, RailArrows, useShelfRail } from "../shelf";
 import type { Id, Metric } from "../types";
+import { Dialog } from "../dialog";
 import { CommentText, cx } from "../ui";
 import { formatRuntime } from "../utils";
 import type { DatedStory, GroupStat, ItemScore, RatedStory, Story, StoryInput } from "./model";
@@ -54,13 +55,15 @@ function Block({ title, children, wide }: { title: string; children: ReactNode; 
  * One exercise as a single row: its name, a tiny line of every session's number (the best dot filled),
  * the range it covered and the gain — compact, no arrows, the line already goes up.
  */
-function Progression({ title, row, unit, person, fmt, tone }: {
+function Progression({ title, row, unit, person, fmt, tone, onOpen }: {
   title: string;
   row: { first: number; best: number; sessions: number; series: number[] };
   unit: string;
   person: string | null;
   fmt: (value: number) => string;
   tone: string;
+  /** Opens the exercise's own page: the whole line, session by session. */
+  onOpen: () => void;
 }) {
   const t = useTranslations("story");
   const width = 88;
@@ -73,7 +76,8 @@ function Progression({ title, row, unit, person, fmt, tone }: {
   const points = row.series.map((value, index) => `${x(index)},${y(value)}`).join(" ");
   const gain = Math.round(((row.best - row.first) / Math.max(1e-9, row.first)) * 100);
   return (
-    <li className="grid grid-cols-[minmax(0,1fr)_88px_6.5rem_3rem] items-center gap-3 py-2.5 text-sm first:pt-0 last:pb-0">
+    <li>
+      <button type="button" onClick={onOpen} className="group grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_88px_6.5rem_3rem] items-center gap-3 rounded-lg py-2.5 text-left text-sm transition hover:bg-[var(--wash)]/60 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/20">
       <span className="min-w-0">
         <span className="block truncate">{title}</span>
         <span className="block text-xs text-[var(--muted)]">{[person, t("records.sessions", { count: row.sessions })].filter(Boolean).join(" · ")}</span>
@@ -84,7 +88,106 @@ function Progression({ title, row, unit, person, fmt, tone }: {
       </svg>
       <span className="whitespace-nowrap text-right text-xs tabular-nums text-[var(--muted)]">{t("records.range", { first: fmt(row.first), best: fmt(row.best), unit })}</span>
       <strong className="text-right font-medium tabular-nums" style={{ color: tone }}>+{gain}%</strong>
+      </button>
     </li>
+  );
+}
+
+type RecordRow = DatedStory["records"][number];
+
+/**
+ * One exercise's progress on a page of its own: the best, where it started and the gain up top, the whole
+ * line with its record marked, then every session with what changed since the one before.
+ */
+function RecordDialog({ row, unit, person, tone, onClose }: { row: RecordRow; unit: string; person: string | null; tone: string; onClose: () => void }) {
+  const t = useTranslations("story");
+  const nf = useFormatter();
+  const fmt = (value: number) => nf.number(value, { maximumFractionDigits: 2 });
+  const withUnit = (value: number) => `${fmt(value)}${unit ? ` ${unit}` : ""}`;
+  const day = (key: string, long = false) => nf.dateTime(new Date(`${key}T12:00:00Z`), long ? { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" } : { day: "numeric", month: "short", timeZone: "UTC" });
+  const gain = Math.round(((row.best - row.first) / Math.max(1e-9, row.first)) * 100);
+  const width = 560;
+  const height = 190;
+  const pad = { top: 26, right: 18, bottom: 26, left: 18 };
+  const low = Math.min(...row.series);
+  const high = Math.max(...row.series);
+  const span = Math.max(1e-9, high - low);
+  const last = row.series.length - 1;
+  const x = (index: number) => (last <= 0 ? width / 2 : pad.left + (index * (width - pad.left - pad.right)) / last);
+  const y = (value: number) => height - pad.bottom - ((value - low) / span) * (height - pad.top - pad.bottom);
+  const line = row.series.map((value, index) => `${x(index)},${y(value)}`).join(" ");
+  const bestIndex = row.series.indexOf(high);
+
+  const stats: Array<{ label: string; value: string; note?: string; strong?: boolean }> = [
+    { label: t("records.best"), value: withUnit(row.best), note: day(row.bestDay), strong: true },
+    { label: t("records.first"), value: withUnit(row.first), note: day(row.days[0]) },
+    { label: t("records.gain"), value: `+${gain}%` },
+    { label: t("records.sessionsLabel"), value: String(row.sessions) },
+  ];
+  return (
+    <Dialog title={row.item.title} onClose={onClose} wide>
+      <div>
+        <p className="text-xs text-[var(--muted)]">{[person, `${day(row.days[0], true)} – ${day(row.days[last], true)}`].filter(Boolean).join(" · ")}</p>
+
+        <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
+          {stats.map((stat) => (
+            <div key={stat.label} className="min-w-0">
+              <dt className="text-[11px] uppercase tracking-[0.08em] text-[var(--muted)]">{stat.label}</dt>
+              <dd className="mt-1 truncate text-2xl font-light tracking-[-0.04em] tabular-nums" style={stat.strong ? { color: tone } : undefined}>{stat.value}</dd>
+              {stat.note ? <dd className="text-xs text-[var(--muted)]">{stat.note}</dd> : null}
+            </div>
+          ))}
+        </dl>
+
+        <div className="mt-5 rounded-2xl border border-[var(--line)] p-3">
+          <svg viewBox={`0 0 ${width} ${height}`} className="block h-auto w-full" role="img" aria-label={t("records.chartAria", { title: row.item.title })}>
+            {[0, 0.5, 1].map((step) => (
+              <line key={step} x1={pad.left} x2={width - pad.right} y1={y(low + span * step)} y2={y(low + span * step)} stroke="var(--line)" strokeWidth={1} strokeDasharray={step === 0 ? undefined : "3 5"} />
+            ))}
+            <polyline points={`${x(0)},${height - pad.bottom} ${line} ${x(last)},${height - pad.bottom}`} fill={tone} opacity={0.08} stroke="none" />
+            <polyline points={line} fill="none" stroke={tone} strokeWidth={2.2} strokeLinejoin="round" strokeLinecap="round" />
+            {row.series.map((value, index) => (
+              <circle key={row.days[index]} cx={x(index)} cy={y(value)} r={index === bestIndex ? 5 : 2.8} fill={index === bestIndex ? tone : "var(--paper)"} stroke={tone} strokeWidth={1.6} />
+            ))}
+            <text x={Math.min(width - 60, Math.max(60, x(bestIndex)))} y={Math.max(13, y(high) - 11)} textAnchor="middle" fontSize={12} fontWeight={600} fill={tone}>{withUnit(high)}</text>
+            <text x={pad.left} y={height - 7} fontSize={11} fill="var(--muted)">{day(row.days[0])}</text>
+            <text x={width - pad.right} y={height - 7} textAnchor="end" fontSize={11} fill="var(--muted)">{day(row.days[last])}</text>
+          </svg>
+        </div>
+
+        <h3 className="mb-1 mt-6 text-[13px] font-medium">{t("records.history")}</h3>
+        <ul className="divide-y divide-[var(--line)]">
+          {row.series.map((value, index) => ({ value, index })).reverse().map(({ value, index }) => {
+            const change = index > 0 ? Number((value - row.series[index - 1]).toFixed(4)) : null;
+            return (
+              <li key={row.days[index]} className="flex items-center gap-3 py-2.5 text-sm">
+                <span className="w-28 flex-none text-[var(--muted)]">{day(row.days[index], true)}</span>
+                <strong className="flex-1 font-medium tabular-nums">{withUnit(value)}</strong>
+                {index === bestIndex ? <span className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ color: tone, background: "color-mix(in oklab, currentColor 12%, transparent)" }}>{t("records.best")}</span> : null}
+                <span className={cx("w-16 flex-none text-right text-xs tabular-nums", change === null || change === 0 ? "text-[var(--muted)]" : change > 0 ? "text-[var(--ok)]" : "text-[var(--danger)]")}>
+                  {change === null ? "" : change === 0 ? "=" : `${change > 0 ? "+" : "−"}${fmt(Math.abs(change))}`}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </Dialog>
+  );
+}
+
+/** The records page's list: each exercise a row to tap, opening its own page. */
+function RecordsList({ rows, unit, showPerson, ids, fmt }: { rows: RecordRow[]; unit: string; showPerson: boolean; ids: Id[]; fmt: (value: number) => string }) {
+  const [open, setOpen] = useState<RecordRow | null>(null);
+  return (
+    <>
+      <ul className="divide-y divide-[var(--line)]">
+        {rows.map((row) => (
+          <Progression key={`${row.person.id}-${row.item.id}`} title={row.item.title} row={row} unit={unit} person={showPerson ? firstName(row.person.name) : null} fmt={fmt} tone={personTone(ids, row.person.id)} onOpen={() => setOpen(row)} />
+        ))}
+      </ul>
+      {open ? <RecordDialog row={open} unit={unit} person={showPerson ? firstName(open.person.name) : null} tone={personTone(ids, open.person.id)} onClose={() => setOpen(null)} /> : null}
+    </>
   );
 }
 
@@ -906,11 +1009,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
         body: (
           <div className={grid}>
             <Block title={t("records.list", { label: input.recordLabel ?? "" })} wide>
-              <ul className="divide-y divide-[var(--line)]">
-                {s.records.map((row) => (
-                  <Progression key={`${row.person.id}-${row.item.id}`} title={row.item.title} row={row} unit={input.recordUnit ?? ""} person={s.lanes.length > 1 ? firstName(row.person.name) : null} fmt={(value) => nf.number(value)} tone={personTone(ids, row.person.id)} />
-                ))}
-              </ul>
+              <RecordsList rows={s.records} unit={input.recordUnit ?? ""} showPerson={s.lanes.length > 1} ids={ids} fmt={(value) => nf.number(value)} />
             </Block>
           </div>
         ),

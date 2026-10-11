@@ -585,23 +585,37 @@ export function SessionLog({
           <div className="space-y-3">
             {dayVisits.slice().reverse().map((visit, index) => {
               const records = sortedRecords(visit.id);
-              return (
-                <div key={visit.id} className="rounded-2xl border border-[var(--line)] p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <strong className="text-sm font-medium">{t("visitHeading", { name: spec.visit.name, number: index + 1, count: records.length })}</strong>
-                    {canEdit ? <Button variant="secondary" className="min-h-9 rounded-full px-3 text-xs" onClick={() => openSheet(visit)}>{t("continueVisit")}</Button> : null}
-                  </div>
+              // One card per workout, the whole of it a way back in: no button to hunt for.
+              const body = (
+                <>
+                  <span className="flex items-center gap-3">
+                    <span className="grid h-10 w-10 flex-none place-items-center rounded-full bg-[var(--main-soft)] text-[var(--main-strong)]" aria-hidden="true">
+                      <svg viewBox="0 0 20 20" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 10.4l3.200 3.200L15 6.800" /></svg>
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <strong className="block truncate text-[15px] font-medium tracking-[-0.01em]">{dayVisits.length > 1 ? t("visitNumbered", { name: spec.visit.name, number: index + 1 }) : spec.visit.name}</strong>
+                      <span className="block text-xs text-[var(--muted)]">{t("visitCount", { count: records.length })}</span>
+                    </span>
+                  </span>
                   {records.length ? (
-                    <ul className="mt-3 space-y-1.5 text-sm">
+                    <span className="mt-3.5 block divide-y divide-[var(--line)] border-t border-[var(--line)]">
                       {records.map((record) => (
-                        <li key={record.id} className="flex items-baseline justify-between gap-3">
+                        <span key={record.id} className="flex items-baseline justify-between gap-4 py-2.5 text-sm last:pb-0">
                           <span className="min-w-0 truncate">{itemTitle(record.itemId)}</span>
-                          <span className="flex-none tabular-nums text-[var(--muted)]">{recordSummary(record)}</span>
-                        </li>
+                          <span className="flex-none text-[13px] tabular-nums text-[var(--muted)]">{recordSummary(record)}</span>
+                        </span>
                       ))}
-                    </ul>
+                    </span>
                   ) : null}
-                </div>
+                </>
+              );
+              const shell = "block w-full rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-4 text-left";
+              return canEdit ? (
+                <button key={visit.id} type="button" onClick={() => openSheet(visit)} aria-label={t("openVisit", { name: spec.visit.name })} className={cx(shell, "cursor-pointer transition hover:border-[var(--muted)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25")}>
+                  {body}
+                </button>
+              ) : (
+                <div key={visit.id} className={shell}>{body}</div>
               );
             })}
             {draftWaiting ? (
