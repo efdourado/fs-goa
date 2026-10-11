@@ -834,6 +834,8 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
   if (story.kind === "dated") {
     const s: DatedStory = story;
     const unit = input.counter?.unit || (input.counter?.label ?? "");
+    // A workout keeps its rhythm by the week, not the day: the wording follows.
+    const wk = s.rhythm === "week" ? "Week" : "";
     const byStreak = [...s.lanes].sort((a, b) => (b.longest?.length ?? 1) - (a.longest?.length ?? 1));
     const byTotal = s.lanes.filter((lane) => lane.total !== null).sort((a, b) => (b.total ?? 0) - (a.total ?? 0));
     const byConsistency = [...s.lanes].sort((a, b) => (b.consistency ?? 0) - (a.consistency ?? 0));
@@ -846,14 +848,14 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
       pages.push({
         id: "streaks",
         title: t("pages.streaks.title"),
-        headline: lane.longest ? t("soloDays.headline", { count: lane.longest.length }) : t("streaks.none"),
+        headline: lane.longest ? t(`soloDays.headline${wk}`, { count: lane.longest.length }) : t("streaks.none"),
         body: (
           <div className={grid}>
             <Block title={t("soloDays.numbers")}>
               <dl className="grid grid-cols-3 gap-4">
                 {[
-                  { value: lane.longest?.length ?? 1, label: t("soloDays.longest") },
-                  { value: lane.current, label: t("soloDays.current") },
+                  { value: lane.longest?.length ?? 1, label: t(`soloDays.longest${wk}`) },
+                  { value: lane.current, label: t(`soloDays.current${wk}`) },
                   { value: lane.days.length, label: t("soloDays.days") },
                 ].map((row) => (
                   <div key={row.label} className="flex flex-col-reverse"><dt className="text-xs text-[var(--muted)]">{row.label}</dt><dd className="text-4xl font-light tabular-nums tracking-[-0.04em]">{row.value}</dd></div>
@@ -869,7 +871,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
                   </svg>
                   <span className="text-xl font-light tabular-nums">{lane.consistency ?? 0}%</span>
                 </span>
-                <p className="text-sm">{t("soloDays.consistency", { days: lane.days.length, total: s.totals.days })}</p>
+                <p className="text-sm">{wk ? t("soloDays.consistencyWeek", { value: nf.number(lane.perWeek ?? 0) }) : t("soloDays.consistency", { days: lane.days.length, total: s.totals.days })}</p>
               </div>
             </Block>
             {comebacks.length ? (
@@ -885,7 +887,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
     } else pages.push({
       id: "streaks",
       title: t("pages.streaks.title"),
-      headline: byStreak[0].longest ? t("streaks.title", { name: firstName(byStreak[0].person.name), count: byStreak[0].longest.length }) : t("streaks.none"),
+      headline: byStreak[0].longest ? t(`streaks.title${wk}`, { name: firstName(byStreak[0].person.name), count: byStreak[0].longest.length }) : t("streaks.none"),
       body: (
         <div className={grid}>
           <Block title={t("streaks.eyebrow")}>
@@ -900,7 +902,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
               ))}
             </ul>
           </Block>
-          <Block title={t("consistency.title", { name: firstName(byConsistency[0].person.name), value: byConsistency[0].consistency ?? 0 })}>
+          <Block title={t(`consistency.title${wk}`, { name: firstName(byConsistency[0].person.name), value: byConsistency[0].consistency ?? 0 })}>
             <div className="flex flex-wrap gap-4">
               {byConsistency.map((lane) => (
                 <div key={lane.person.id} className="flex flex-col items-center gap-1">
@@ -915,7 +917,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
                 </div>
               ))}
             </div>
-            <p className="mt-2 text-xs text-[var(--muted)]">{t("consistency.note", { days: s.totals.days })}</p>
+            <p className="mt-2 text-xs text-[var(--muted)]">{t(`consistency.note${wk}`, { days: s.totals.days })}</p>
           </Block>
           {s.together !== null ? (
             <Block title={t("together.title")}>

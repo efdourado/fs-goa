@@ -2184,12 +2184,15 @@
       "title": "{name}: {count, plural, one {# day} other {# days}} straight",
       "none": "No streaks yet",
       "best": "best {count}",
-      "now": "now {count}"
+      "now": "now {count}",
+      "titleWeek": "{name}: {count, plural, one {# week} other {# weeks}} in a row"
     },
     "consistency": {
       "eyebrow": "Consistency",
       "title": "{name} showed up {value}% of the days",
-      "note": "Share of the {days} days with a check-in."
+      "note": "Share of the {days} days with a check-in.",
+      "titleWeek": "{name} showed up in {value}% of the weeks",
+      "noteWeek": "Share of weeks with at least one check-in."
     },
     "totals": {
       "eyebrow": "{label}",
@@ -2321,16 +2324,24 @@
       "days": "days logged",
       "consistency": "{days} of {total} days.",
       "comeback": "You stopped for {gap} days",
-      "perDay": "{value} {unit} per day you showed up."
+      "perDay": "{value} {unit} per day you showed up.",
+      "headlineWeek": "{count, plural, one {Your longest run: # week.} other {Your longest run: # weeks in a row.}}",
+      "longestWeek": "longest run (weeks)",
+      "currentWeek": "current run (weeks)",
+      "consistencyWeek": "{value} a week, on average."
     },
     "together": {
       "title": "Together",
       "line": "{a} and {b} both showed up on {count} of {days} days."
     },
-    "calendarAria": "{days} days logged",
-    "calendarRun": "{count, plural, one {Outlined: your longest run, # day.} other {Outlined: your longest run, # days.}}",
+    "calendarRun": "{count, plural, one {Your longest run: # day.} other {Your longest run: # days in a row.}}",
     "datedHeadlineSolo": "Your days, drawn.",
-    "readCalendar": "Each square is a day: filled where you showed up, stronger where the day was bigger. The outlined run is your longest; the ringed day your best."
+    "streakWeeks": "{count, plural, one {# week} other {# weeks}}",
+    "calendarRunWeek": "{count, plural, one {Your longest run: # week.} other {Your longest run: # weeks in a row.}}",
+    "readDatedWeek": "Each lane is a person: solid while they showed up every week, with gaps where a week went by empty. The outlined stretch is their longest run of weeks.",
+    "soloAria": "{days} days logged over {weeks} weeks",
+    "soloWeek": "Week of {date}: {count, plural, one {# day} other {# days}}",
+    "readSolo": "Each bar is a week: how many days you showed up. The brighter ones are your longest run."
   },
   "organise": {
     "button": "Organise",

@@ -2184,12 +2184,15 @@
       "title": "{name}: {count, plural, one {# dia} other {# dias}} seguidos",
       "none": "Nenhuma sequência ainda",
       "best": "melhor {count}",
-      "now": "agora {count}"
+      "now": "agora {count}",
+      "titleWeek": "{name}: {count, plural, one {# semana} other {# semanas}} seguidas"
     },
     "consistency": {
       "eyebrow": "Constância",
       "title": "{name} apareceu em {value}% dos dias",
-      "note": "Parte dos {days} dias com registro."
+      "note": "Parte dos {days} dias com registro.",
+      "titleWeek": "{name} apareceu em {value}% das semanas",
+      "noteWeek": "Parte das semanas com pelo menos um registro."
     },
     "totals": {
       "eyebrow": "{label}",
@@ -2321,16 +2324,24 @@
       "days": "dias com registro",
       "consistency": "{days} de {total} dias.",
       "comeback": "Você parou por {gap} dias",
-      "perDay": "{value} {unit} por dia em que você apareceu."
+      "perDay": "{value} {unit} por dia em que você apareceu.",
+      "headlineWeek": "{count, plural, one {Sua maior sequência: # semana.} other {Sua maior sequência: # semanas seguidas.}}",
+      "longestWeek": "maior sequência (semanas)",
+      "currentWeek": "sequência atual (semanas)",
+      "consistencyWeek": "{value} por semana, em média."
     },
     "together": {
       "title": "Juntos",
       "line": "{a} e {b} registraram no mesmo dia {count} de {days} dias."
     },
-    "calendarAria": "{days} dias com registro",
-    "calendarRun": "{count, plural, one {Contornada: sua maior sequência, # dia.} other {Contornada: sua maior sequência, # dias.}}",
+    "calendarRun": "{count, plural, one {Sua maior sequência: # dia.} other {Sua maior sequência: # dias seguidos.}}",
     "datedHeadlineSolo": "Os seus dias, desenhados.",
-    "readCalendar": "Cada quadrado é um dia: preenchido onde você apareceu, mais forte nos dias maiores. O trecho contornado é sua maior sequência; o dia com anel, o seu melhor."
+    "streakWeeks": "{count, plural, one {# semana} other {# semanas}}",
+    "calendarRunWeek": "{count, plural, one {Sua maior sequência: # semana.} other {Sua maior sequência: # semanas seguidas.}}",
+    "readDatedWeek": "Cada faixa é uma pessoa: contínua enquanto ela apareceu toda semana, com buracos onde uma semana passou em branco. O trecho contornado é a maior sequência de semanas.",
+    "soloAria": "{days} dias registrados em {weeks} semanas",
+    "soloWeek": "Semana de {date}: {count, plural, one {# dia} other {# dias}}",
+    "readSolo": "Cada barra é uma semana: em quantos dias você apareceu. As mais fortes são a sua maior sequência."
   },
   "organise": {
     "button": "Organizar",

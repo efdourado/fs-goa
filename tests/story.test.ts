@@ -164,3 +164,27 @@ test("a form with several ratings: the overall ranking counts them all, and each
 test("a single rating field has no per-criterion rankings", () => {
   assert.deepEqual((buildStory(films) as RatedStory).dimensions, []);
 });
+
+test("a workout keeps its rhythm by the week: three sessions a week is a run of weeks, never a 'best streak of 1 day'", () => {
+  // Mon/Wed/Fri for three weeks, one week off, then back for a week (2026-08-31 is a Monday).
+  const sessions = ["2026-08-31", "2026-09-02", "2026-09-04", "2026-09-07", "2026-09-09", "2026-09-11", "2026-09-14", "2026-09-16", "2026-09-18", "2026-09-28"];
+  const input: StoryInput = {
+    ...films, ratings: [], expectations: [], items: [{ id: "squat", title: "Squat" }],
+    days: sessions.map((day) => ({ personId: "ana", day })), records: [], startsOn: "2026-08-31", endsOn: null,
+  };
+  const weekly = buildStory({ ...input, rhythm: "week" }) as DatedStory;
+  const lane = weekly.lanes[0];
+  assert.equal(weekly.rhythm, "week");
+  assert.deepEqual(lane.longest, { from: "2026-08-31", to: "2026-09-18", length: 3 }, "three weeks in a row");
+  assert.deepEqual(lane.runs, [{ from: "2026-08-31", to: "2026-09-18" }, { from: "2026-09-28", to: "2026-09-28" }], "one stroke per run of weeks");
+  assert.equal(lane.current, 1, "this week has one, last week had none");
+  assert.equal(lane.consistency, 80, "four of the five weeks");
+  assert.equal(lane.perWeek, 2, "ten sessions over five weeks");
+  assert.equal(lane.comeback?.back, "2026-09-28", "only the skipped week is a break, not the rest days between sessions");
+
+  // The same days read as a daily habit: never two days in a row.
+  const daily = buildStory(input) as DatedStory;
+  assert.equal(daily.rhythm, "day");
+  assert.equal(daily.lanes[0].longest, null);
+  assert.equal(daily.lanes[0].perWeek, null);
+});

@@ -98,7 +98,7 @@ export function ThreadPanel({ input, story, fit = false, interactive = true }: {
           ? <RatedThread story={story} input={input} focus={focus} run={run} fit={fit} />
           : <DatedThread story={story} input={input} focus={focus} run={run} fit={fit} />}
       </div>
-      <p className="px-5 pb-5 text-[11px] text-white/45 sm:px-8">{story.kind === "rated" ? t("readRated") : story.lanes.length === 1 ? t("readCalendar") : t("readDated")}</p>
+      <p className="px-5 pb-5 text-[11px] text-white/45 sm:px-8">{story.kind === "rated" ? t("readRated") : story.lanes.length === 1 ? t("readSolo") : t(`readDated${story.rhythm === "week" ? "Week" : ""}`)}</p>
     </div>
   );
 }

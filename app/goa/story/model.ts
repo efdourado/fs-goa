@@ -53,6 +53,12 @@ export interface StoryInput {
   dimensions?: StoryDimension[];
   days: StoryDay[];
   records: StoryRecord[];
+  /**
+   * What "keeping it up" means here. A habit or a reading log is daily: a run is days in a row. A workout is
+   * something done a few times a week, so a run is weeks in a row with at least one — counting consecutive
+   * days there would call three sessions a week a failure.
+   */
+  rhythm?: "day" | "week";
   /** The counted number's label and unit on a dated challenge ("Páginas", "km"). */
   counter?: { label: string; unit?: string | null } | null;
   recordLabel?: string | null;
@@ -146,15 +152,22 @@ export interface Lane {
   /** Every logged day, ascending, with its number when it has one. */
   days: Array<{ day: string; value: number | null }>;
   total: number | null;
+  /** The longest run, its length in the story's rhythm (days, or weeks for a workout). */
   longest: { from: string; to: string; length: number } | null;
   current: number;
+  /** Every run, first to last logged day — what the thread draws as one solid stroke. */
+  runs: Array<{ from: string; to: string }>;
+  /** How much of the time they showed up: % of the days, or of the weeks. */
   consistency: number | null;
+  /** Weekly rhythm only: check-ins per week, on average. */
+  perWeek: number | null;
   best: { day: string; value: number } | null;
   comeback: { gap: number; back: string } | null;
 }
 
 export interface DatedStory {
   kind: "dated";
+  rhythm: "day" | "week";
   from: string;
   to: string;
   lanes: Lane[];
@@ -178,6 +191,11 @@ export function addDaysKey(day: string, offset: number): string {
   const date = new Date(`${day}T12:00:00Z`);
   date.setUTCDate(date.getUTCDate() + offset);
   return date.toISOString().slice(0, 10);
+}
+/** Which week a day falls in (weeks start on Monday), as a running number — consecutive weeks differ by one. */
+export function weekIndex(day: string): number {
+  // 1970-01-05 was a Monday.
+  return Math.floor((Date.parse(`${day}T12:00:00Z`) - Date.parse("1970-01-05T00:00:00Z")) / (7 * 86_400_000));
 }
 export function daysBetween(from: string, to: string): number {
   return Math.round((Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86_400_000);
@@ -423,6 +441,7 @@ function buildDated(input: StoryInput): DatedStory | null {
   const to = lastLogged > end ? lastLogged : end;
   const elapsed = daysBetween(from, to) + 1;
   const hasValues = days.some((row) => typeof row.value === "number");
+  const weekly = input.rhythm === "week";
 
   const lanes: Lane[] = input.people.map((person) => {
     const byDay = new Map<string, number | null>();
@@ -434,23 +453,40 @@ function buildDated(input: StoryInput): DatedStory | null {
     const logged = [...byDay.entries()].map(([day, value]) => ({ day, value })).sort((a, b) => a.day.localeCompare(b.day));
     let longest: Lane["longest"] = null;
     let comeback: Lane["comeback"] = null;
+    const runs: Lane["runs"] = [];
+    // One step of the rhythm: the next day, or the next week (any day of it).
+    const step = (from: string, to: string) => (weekly ? weekIndex(to) - weekIndex(from) : daysBetween(from, to));
     let runStart = logged[0]?.day ?? "";
     for (let index = 0; index < logged.length; index += 1) {
       const day = logged[index].day;
       const previous = logged[index - 1]?.day;
-      if (previous && daysBetween(previous, day) > 1) {
+      if (previous && step(previous, day) > 1) {
         const gap = daysBetween(previous, day) - 1;
-        if (gap >= 3 && (!comeback || gap > comeback.gap)) comeback = { gap, back: day };
+        // Daily: three days off is a break. Weekly: only a whole week skipped is.
+        if ((weekly || gap >= 3) && (!comeback || gap > comeback.gap)) comeback = { gap, back: day };
         runStart = day;
       }
-      const length = daysBetween(runStart, day) + 1;
-      if (!longest || length > longest.length) longest = { from: runStart, to: day, length };
+      if (runs.at(-1)?.from === runStart) runs.at(-1)!.to = day;
+      else runs.push({ from: runStart, to: day });
+      const length = step(runStart, day) + 1;
+      // The same run still growing (a later day of the same week) moves its end, even at the same length.
+      if (!longest || length > longest.length || longest.from === runStart) longest = { from: runStart, to: day, length };
     }
     let current = 0;
-    for (let cursor = input.today; byDay.has(cursor) || (current === 0 && byDay.has(addDaysKey(cursor, -1))); cursor = addDaysKey(cursor, -1)) {
-      if (byDay.has(cursor)) current += 1;
-      else if (current > 0) break;
+    if (weekly) {
+      const weeks = new Set(logged.map((row) => weekIndex(row.day)));
+      // This week still counts as "going" while it has no workout yet, as long as last week had one.
+      let cursor = weekIndex(input.today);
+      if (!weeks.has(cursor)) cursor -= 1;
+      for (; weeks.has(cursor); cursor -= 1) current += 1;
+    } else {
+      for (let cursor = input.today; byDay.has(cursor) || (current === 0 && byDay.has(addDaysKey(cursor, -1))); cursor = addDaysKey(cursor, -1)) {
+        if (byDay.has(cursor)) current += 1;
+        else if (current > 0) break;
+      }
     }
+    const weeksElapsed = Math.max(1, weekIndex(to) - weekIndex(from) + 1);
+    const weeksLogged = new Set(logged.map((row) => weekIndex(row.day))).size;
     const valued = logged.filter((row): row is { day: string; value: number } => row.value !== null);
     return {
       person,
@@ -458,7 +494,9 @@ function buildDated(input: StoryInput): DatedStory | null {
       total: hasValues ? valued.reduce((sum, row) => sum + row.value, 0) : null,
       longest: longest && longest.length >= 2 ? longest : null,
       current,
-      consistency: logged.length ? Math.round((logged.length / elapsed) * 100) : null,
+      runs,
+      consistency: !logged.length ? null : Math.round(((weekly ? weeksLogged / weeksElapsed : logged.length / elapsed)) * 100),
+      perWeek: weekly && logged.length ? round1(logged.length / weeksElapsed) : null,
       best: valued.length ? valued.reduce((best, row) => (row.value > best.value ? row : best)) : null,
       comeback,
     };
@@ -491,6 +529,7 @@ function buildDated(input: StoryInput): DatedStory | null {
 
   return {
     kind: "dated",
+    rhythm: weekly ? "week" : "day",
     from,
     to,
     lanes,
@@ -604,6 +643,8 @@ export function storyFromChallenge(challenge: ChallengeDetail, entries: Entry[],
     dimensions,
     days,
     records,
+    // A check-in holding a record per item is a workout: done a few times a week, not every day.
+    rhythm: recordType ? "week" : "day",
     counter: counterField ? { label: counterField.label, unit: counterField.config?.unit ?? null } : null,
     recordLabel: recordField?.label?.replace(/\s*\([^)]*\)\s*$/, "") ?? null,
     recordUnit: recordField?.config?.unit ?? recordField?.label?.match(/\(([^)]+)\)\s*$/)?.[1] ?? null,

@@ -2184,12 +2184,15 @@
       "title": "{name}: {count, plural, one {# día} other {# días}} seguidos",
       "none": "Sin rachas todavía",
       "best": "mejor {count}",
-      "now": "ahora {count}"
+      "now": "ahora {count}",
+      "titleWeek": "{name}: {count, plural, one {# semana} other {# semanas}} seguidas"
     },
     "consistency": {
       "eyebrow": "Constancia",
       "title": "{name} apareció el {value}% de los días",
-      "note": "Parte de los {days} días con registro."
+      "note": "Parte de los {days} días con registro.",
+      "titleWeek": "{name} apareció en el {value}% de las semanas",
+      "noteWeek": "Parte de las semanas con al menos un registro."
     },
     "totals": {
       "eyebrow": "{label}",
@@ -2321,16 +2324,24 @@
       "days": "días con registro",
       "consistency": "{days} de {total} días.",
       "comeback": "Paraste {gap} días",
-      "perDay": "{value} {unit} por día que apareciste."
+      "perDay": "{value} {unit} por día que apareciste.",
+      "headlineWeek": "{count, plural, one {Tu mejor racha: # semana.} other {Tu mejor racha: # semanas seguidas.}}",
+      "longestWeek": "mejor racha (semanas)",
+      "currentWeek": "racha actual (semanas)",
+      "consistencyWeek": "{value} por semana, de media."
     },
     "together": {
       "title": "Juntos",
       "line": "{a} y {b} registraron el mismo día {count} de {days} días."
     },
-    "calendarAria": "{days} días con registro",
-    "calendarRun": "{count, plural, one {Contorneada: tu racha más larga, # día.} other {Contorneada: tu racha más larga, # días.}}",
+    "calendarRun": "{count, plural, one {Tu mejor racha: # día.} other {Tu mejor racha: # días seguidos.}}",
     "datedHeadlineSolo": "Tus días, dibujados.",
-    "readCalendar": "Cada cuadrado es un día: lleno donde apareciste, más intenso en los días más grandes. El tramo contorneado es tu racha más larga; el día con anillo, tu mejor."
+    "streakWeeks": "{count, plural, one {# semana} other {# semanas}}",
+    "calendarRunWeek": "{count, plural, one {Tu mejor racha: # semana.} other {Tu mejor racha: # semanas seguidas.}}",
+    "readDatedWeek": "Cada franja es una persona: continua mientras apareció cada semana, con huecos donde pasó una semana en blanco. El tramo marcado es su mejor racha de semanas.",
+    "soloAria": "{days} días registrados en {weeks} semanas",
+    "soloWeek": "Semana del {date}: {count, plural, one {# día} other {# días}}",
+    "readSolo": "Cada barra es una semana: cuántos días apareciste. Las más fuertes son tu mejor racha."
   },
   "organise": {
     "button": "Organizar",
