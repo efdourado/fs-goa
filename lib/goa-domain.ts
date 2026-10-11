@@ -5,9 +5,11 @@ export { bootstrap } from "./goa/domain/bootstrap";
 export { createChallenge, createPersonalChallenge } from "./goa/domain/challenges";
 export { fieldCount, fieldUnit, insertField, type FieldCount } from "./goa/domain/fields";
 export {
+  banGroupMember,
   cancelMemberRequest,
   createGroup,
   leaveGroup,
+  unbanGroupMember,
   requestGroupMember,
   respondToMemberRequest,
   setGroupMemberRole,

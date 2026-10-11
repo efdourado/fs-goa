@@ -207,7 +207,23 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
           [manageableGroupIds],
         )
       : null;
-    const [members, pending] = await Promise.all([membersQuery, pendingQuery]);
+    // Who is banned from each group the person runs — so they can lift a ban.
+    const bannedQuery = manageableGroupIds.length
+      ? pool.query<{ group_id: string; id: string; display_name: string; username: string }>(
+          `SELECT gm.group_id, u.id, u.display_name, u.username
+             FROM group_members gm JOIN users u ON u.id = gm.user_id
+            WHERE gm.group_id = ANY($1::text[]) AND gm.banned_at IS NOT NULL
+            ORDER BY gm.banned_at DESC`,
+          [manageableGroupIds],
+        )
+      : null;
+    const [members, pending, banned] = await Promise.all([membersQuery, pendingQuery, bannedQuery]);
+    const bannedByGroup = new Map<string, Array<Record<string, unknown>>>();
+    for (const row of banned?.rows ?? []) {
+      const list = bannedByGroup.get(row.group_id) ?? [];
+      list.push({ id: row.id, name: row.display_name, username: row.username });
+      bannedByGroup.set(row.group_id, list);
+    }
     const membersByGroup = new Map<string, Array<Record<string, unknown>>>();
     for (const member of members?.rows ?? []) {
       const list = membersByGroup.get(member.group_id) ?? [];
@@ -241,6 +257,7 @@ export async function bootstrap(session: SessionContext | null): Promise<Record<
         recommendationsEnabled: group.recommendations_enabled,
         members: membersByGroup.get(group.id) ?? [],
         pendingRequests: pendingByGroup.get(group.id) ?? [],
+        banned: bannedByGroup.get(group.id) ?? [],
       })),
       challenges: challengesResult.rows.map((challenge) => ({
         id: challenge.id,

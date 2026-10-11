@@ -5,6 +5,7 @@ import { inTransaction, oneOrNull } from "../../db";
 import { ApiError, stringValue } from "../../http";
 import { assertUnder, LIMITS } from "../../limits";
 import { normalizeUsername } from "../../security";
+import { purgeMemberFromGroup } from "../purge";
 import { moveToTrash } from "../trash";
 import { writeAudit } from "./audit";
 import { publicId } from "./shared";
@@ -194,6 +195,11 @@ export async function requestGroupMember(
       };
     }
 
+    const banned = await oneOrNull<{ user_id: string }>(
+      client, "SELECT user_id FROM group_members WHERE group_id = $1 AND user_id = $2 AND banned_at IS NOT NULL", [groupId, target.id],
+    );
+    if (banned) throw new ApiError(409, "banned", "Essa pessoa foi banida deste grupo. Desfaça o banimento antes de convidar.");
+
     const pending = await oneOrNull<{ id: string }>(
       client,
       `SELECT id FROM group_member_requests
@@ -337,14 +343,9 @@ export async function respondToMemberRequest(
 }
 
 /**
- * A member walks away from a group they were added to. Soft-removes the
- * membership and every challenge participation in that group — no question
- * asked, because there is nothing to choose: their entries stay (the round's
- * history stays intact) but every place that names them (recommended-by,
- * per-participant metrics) shows a neutral "left the group" label instead, the
- * same way a deleted account already shows "Conta removida". A published
- * showcase keeps serving — its identity masking is computed live from the roster
- * (`maskShowcaseIdentities`), so their name disappears from it at once (V1 §12).
+ * A member walks away from a group they were added to, and takes their content with them: everything
+ * they answered in its challenges is erased (`purgeMemberFromGroup`), not kept under a neutral label.
+ * Rankings, the showcase and the thread are computed live, so they simply stop counting those answers.
  * The owner cannot leave (no ownership transfer yet — delete the group instead).
  */
 export async function leaveGroup(session: SessionContext, groupId: string) {
@@ -380,16 +381,7 @@ export async function leaveGroup(session: SessionContext, groupId: string) {
       "UPDATE group_members SET removed_at = now() WHERE group_id = $1 AND user_id = $2 AND removed_at IS NULL",
       [groupId, session.user.id],
     );
-    // Clearing `name_consent` here (and never restoring it on a later rejoin)
-    // is what actually protects them: any already-public showcase reads this
-    // live, so their identity masks on its very next view — no need to take
-    // the showcase itself offline (V1 §12).
-    await client.query(
-      `UPDATE challenge_participants SET removed_at = now(), name_consent = false
-        WHERE user_id = $2 AND removed_at IS NULL
-          AND challenge_id IN (SELECT id FROM challenges WHERE group_id = $1)`,
-      [groupId, session.user.id],
-    );
+    await purgeMemberFromGroup(client, groupId, session.user.id);
 
     await writeAudit(
       client,
@@ -404,6 +396,63 @@ export async function leaveGroup(session: SessionContext, groupId: string) {
     );
     return { groupId, left: true as const };
   });
+}
+
+/**
+ * An admin bans a member: out of the group at once, everything of theirs in it erased, and no invite link
+ * or @-invite lets them back in until someone unbans them. The owner can ban anyone but themselves; an
+ * admin can ban participants, never the owner or another admin. Two admins banning the same person at the
+ * same moment is one ban: the row is locked, and the second request finds it already done.
+ */
+export async function banGroupMember(session: SessionContext, groupId: string, userId: string) {
+  return inTransaction(async (client) => {
+    const actor = await requireGroupRole(session.user.id, groupId, ["owner", "admin"], client);
+    if (userId === session.user.id) throw new ApiError(400, "cannot_ban_self", "Você não pode banir a si mesmo.");
+    const target = await oneOrNull<{ role: GroupRole; removed_at: Date | null; banned_at: Date | null }>(
+      client,
+      "SELECT role, removed_at, banned_at FROM group_members WHERE group_id = $1 AND user_id = $2 FOR UPDATE",
+      [groupId, userId],
+    );
+    if (!target) throw new ApiError(404, "not_found", "Essa pessoa não participa deste grupo.");
+    if (target.banned_at) return { groupId, userId, banned: true as const, idempotent: true };
+    if (target.removed_at === null) {
+      if (target.role === "owner") throw new ApiError(403, "forbidden", "O responsável pelo grupo não pode ser banido.");
+      if (target.role === "admin" && actor !== "owner") {
+        throw new ApiError(403, "forbidden", "Só o responsável pelo grupo pode banir um administrador.");
+      }
+    }
+    await client.query(
+      `UPDATE group_members SET removed_at = coalesce(removed_at, now()), role = 'participant', banned_at = now(), banned_by_user_id = $3
+        WHERE group_id = $1 AND user_id = $2`,
+      [groupId, userId, session.user.id],
+    );
+    await purgeMemberFromGroup(client, groupId, userId);
+    await writeAudit(client, groupId, null, session.user.id, "group.member_banned", "group_member", userId, { role: target.role }, { bannedAt: new Date().toISOString() });
+    return { groupId, userId, banned: true as const, idempotent: false };
+  });
+}
+
+/** Lifts a ban. It does not bring the person back: they can be invited again, and start from nothing. */
+export async function unbanGroupMember(session: SessionContext, groupId: string, userId: string) {
+  return inTransaction(async (client) => {
+    await requireGroupRole(session.user.id, groupId, ["owner", "admin"], client);
+    const lifted = await client.query(
+      "UPDATE group_members SET banned_at = NULL, banned_by_user_id = NULL WHERE group_id = $1 AND user_id = $2 AND banned_at IS NOT NULL",
+      [groupId, userId],
+    );
+    if (lifted.rowCount) {
+      await writeAudit(client, groupId, null, session.user.id, "group.member_unbanned", "group_member", userId, null, null);
+    }
+    return { groupId, userId, banned: false as const };
+  });
+}
+
+/** Refuses a banned person at every door into the group. */
+export async function assertNotBanned(client: PoolClient, groupId: string, userId: string): Promise<void> {
+  const banned = await oneOrNull<{ user_id: string }>(
+    client, "SELECT user_id FROM group_members WHERE group_id = $1 AND user_id = $2 AND banned_at IS NOT NULL", [groupId, userId],
+  );
+  if (banned) throw new ApiError(403, "banned", "Você não pode entrar neste grupo.");
 }
 
 /**

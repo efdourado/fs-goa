@@ -205,18 +205,8 @@ async function archiveDefWithClient(client: PoolClient, actorUserId: string, gro
     [defId, groupId],
   );
   if (!def) throw new ApiError(404, "not_found", "Atributo não encontrado.");
-  const withValues = await oneOrNull<{ count: number }>(
-    client,
-    "SELECT count(*)::int AS count FROM catalog_attribute_values WHERE attribute_def_id = $1",
-    [defId],
-  );
-  if ((withValues?.count ?? 0) > 0) {
-    throw new ApiError(
-      409,
-      "attribute_has_data",
-      `"${def.label}" já tem valores preenchidos em itens do acervo e não pode ser removido.`,
-    );
-  }
+  // Removing a property removes what the items had saved for it: a property that is gone holds nothing.
+  await client.query("DELETE FROM catalog_attribute_values WHERE attribute_def_id = $1 AND group_id = $2", [defId, groupId]);
   await client.query("UPDATE catalog_attribute_defs SET archived_at = now(), updated_at = now() WHERE id = $1", [defId]);
   await writeAudit(client, groupId, null, actorUserId, "catalog.attribute_archived", "catalog_attribute_def", defId, null, null);
 }

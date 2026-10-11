@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import { type FormEvent, useRef, useState } from "react";
 
 import { copyText } from "../clipboard";
-import { DeleteButton, DeleteConfirm, Dialog } from "../dialog";
+import { ConfirmDialog, DeleteButton, DeleteConfirm, Dialog } from "../dialog";
 import { useGoaFormat } from "../format";
 import { NewChallengeTile } from "../add-tile";
 import { CatalogShelfSkeleton } from "../catalog-shelf";
@@ -38,6 +38,7 @@ export function GroupScreen({
   onDeleteGroup,
   onLeaveGroup,
   onSetMemberRole,
+  onSetMemberBan,
   challengeLimit,
 }: {
   group: GroupSummary;
@@ -62,6 +63,8 @@ export function GroupScreen({
   onLeaveGroup?: () => Promise<void>;
   /** Present for owners: promote a participant to admin or demote an admin back. */
   onSetMemberRole?: (userId: Id, role: "admin" | "participant") => Promise<void>;
+  /** Present for those who run the group: ban a member (everything of theirs here is erased) or lift a ban. */
+  onSetMemberBan?: (userId: Id, banned: boolean) => Promise<void>;
 }) {
   const t = useTranslations("group");
   const tQuick = useTranslations("quickCreate");
@@ -114,8 +117,6 @@ export function GroupScreen({
   const [groupBusy, setGroupBusy] = useState(false);
   const [groupError, setGroupError] = useState<string | null>(null);
   const [groupSuccess, setGroupSuccess] = useState<string | null>(null);
-  const [leaveBusy, setLeaveBusy] = useState(false);
-  const [leaveError, setLeaveError] = useState<string | null>(null);
   const [roleBusyId, setRoleBusyId] = useState<Id | null>(null);
   const [roleError, setRoleError] = useState<string | null>(null);
   const memberCount = group.memberCount ?? group.members?.length ?? 0;
@@ -134,16 +135,22 @@ export function GroupScreen({
     }
   }
 
-  async function leave() {
-    if (!onLeaveGroup) return;
-    if (!window.confirm(t("leaveConfirm"))) return;
-    setLeaveBusy(true);
-    setLeaveError(null);
+  // The owner bans anyone but themselves; an admin bans participants only (the server holds the same line).
+  const canBan = (member: Member) => Boolean(onSetMemberBan) && member.role !== "owner" && (group.role === "owner" || member.role === "participant");
+  const [banning, setBanning] = useState<Member | null>(null);
+  const [leaving, setLeaving] = useState(false);
+  const [unbanBusyId, setUnbanBusyId] = useState<Id | null>(null);
+
+  async function unban(userId: Id) {
+    if (!onSetMemberBan) return;
+    setUnbanBusyId(userId);
+    setRoleError(null);
     try {
-      await onLeaveGroup();
+      await onSetMemberBan(userId, false);
     } catch (cause) {
-      setLeaveError(f.error(cause));
-      setLeaveBusy(false);
+      setRoleError(f.error(cause));
+    } finally {
+      setUnbanBusyId(null);
     }
   }
 
@@ -467,11 +474,31 @@ export function GroupScreen({
                   ) : (
                     <span className="flex-none rounded-full bg-[var(--wash)] px-2.5 py-1 text-[11px] text-[var(--muted)]">{tr(member.role)}</span>
                   )}
+                  {canBan(member) ? (
+                    <button type="button" className="min-h-8 flex-none cursor-pointer px-1 text-[11px] text-[var(--danger)] underline-offset-2 hover:underline" onClick={() => setBanning(member)}>{t("ban")}</button>
+                  ) : null}
                 </li>
               ))}
             </ul>
           ) : <p className="text-sm leading-6 text-[var(--muted)]">{t("membersUnavailable")}</p>}
-          {onSetMemberRole && group.role === "owner" ? <div className="mt-2"><StatusMessage error={roleError} /></div> : null}
+          {onSetMemberRole || onSetMemberBan ? <div className="mt-2"><StatusMessage error={roleError} /></div> : null}
+
+          {onSetMemberBan && group.banned?.length ? (
+            <div className="mt-6 border-t border-[var(--line)] pt-5">
+              <h3 className="text-sm font-semibold">{t("bannedTitle")}</h3>
+              <ul className="mt-2 divide-y divide-[var(--line)]">
+                {group.banned.map((person) => (
+                  <li className="flex items-center justify-between gap-3 py-3" key={person.id}>
+                    <span className="min-w-0">
+                      <strong className="block truncate text-sm">{person.name}</strong>
+                      <small className="text-[var(--muted)]">@{person.username}</small>
+                    </span>
+                    <Button className="min-h-9 flex-none px-3 py-1 text-xs" variant="ghost" disabled={unbanBusyId === person.id} onClick={() => void unban(person.id)}>{unbanBusyId === person.id ? tc("saving") : t("unban")}</Button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
 
           {canManage(group.role) && pendingRequests.length ? (
             <div className="mt-6 border-t border-[var(--line)] pt-5">
@@ -493,9 +520,22 @@ export function GroupScreen({
 
           {onLeaveGroup ? (
             <div className="mt-6 border-t border-[var(--line)] pt-5">
-              <button type="button" className="min-h-9 text-xs font-light text-[var(--danger)] underline underline-offset-2 disabled:opacity-50" disabled={leaveBusy} onClick={() => void leave()}>{leaveBusy ? tc("saving") : t("leaveToggle")}</button>
-              <div className="mt-2"><StatusMessage error={leaveError} /></div>
+              <button type="button" className="min-h-9 text-xs font-light text-[var(--danger)] underline underline-offset-2" onClick={() => setLeaving(true)}>{t("leaveToggle")}</button>
             </div>
+          ) : null}
+
+          {banning && onSetMemberBan ? (
+            <ConfirmDialog
+              title={t("banTitle", { name: banning.name })}
+              body={t("banBody")}
+              confirmLabel={t("ban")}
+              danger
+              onClose={() => setBanning(null)}
+              onConfirm={async () => { await onSetMemberBan(banning.id, true); setBanning(null); }}
+            />
+          ) : null}
+          {leaving && onLeaveGroup ? (
+            <ConfirmDialog title={t("leaveTitle")} body={t("leaveConfirm")} confirmLabel={t("leaveToggle")} danger onClose={() => setLeaving(false)} onConfirm={onLeaveGroup} />
           ) : null}
         </section>
       </div>

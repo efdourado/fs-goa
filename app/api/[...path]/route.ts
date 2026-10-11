@@ -137,6 +137,8 @@ import {
   createInvite,
   createPersonalChallenge,
   leaveGroup,
+  banGroupMember,
+  unbanGroupMember,
   previewInvite,
   requestGroupMember,
   respondToMemberRequest,
@@ -369,6 +371,12 @@ export async function POST(request: Request): Promise<Response> {
     if (isPath(path, "groups")) return json(await createGroup(session, body), 201);
     if (path[0] === "groups" && path[2] === "members" && path.length === 3) {
       return json(await requestGroupMember(session, path[1], body));
+    }
+    if (path[0] === "groups" && path[2] === "members" && path.length === 5 && path[4] === "ban") {
+      return json(await banGroupMember(session, path[1], path[3]));
+    }
+    if (path[0] === "groups" && path[2] === "members" && path.length === 5 && path[4] === "unban") {
+      return json(await unbanGroupMember(session, path[1], path[3]));
     }
     if (path[0] === "groups" && path[2] === "catalog-attributes" && path.length === 3) {
       return json(await createGroupCatalogAttribute(session, path[1], body), 201);

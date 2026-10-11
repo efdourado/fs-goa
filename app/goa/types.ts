@@ -93,6 +93,8 @@ export interface GroupSummary {
   members?: Member[];
   /** Outgoing @-invites still awaiting the invitee's approval (only for owners/admins). */
   pendingRequests?: PendingGroupRequest[];
+  /** People banned from the group — only sent to those who run it. */
+  banned?: Array<{ id: Id; name: string; username: string }>;
   /** When off, "who recommended it" is hidden and never asked for in this group. */
   recommendationsEnabled?: boolean;
 }
@@ -186,6 +188,8 @@ export interface LibraryProperty {
   hidden: boolean;
   position: number;
   canHide: boolean;
+  /** How many items hold a value for it — what switching it off (or removing it) erases. */
+  filled?: number;
   /** Custom properties only: the key an item's saved value is stored under. */
   attributeKey?: string;
 }

@@ -2523,11 +2523,11 @@ test("propriedades da biblioteca: renomear e ocultar, nativa ou personalizada, p
   const hiddenYear = await call("PATCH", `/api/catalog/libraries/${screens.id}/properties/year`, { session: owner, body: { hidden: true } });
   assert.deepEqual(
     (hiddenYear.body as { property: { label: string; hidden: boolean } }).property,
-    { key: "year", storage: "native", label: "Ano de estreia", type: "number", hidden: true, position: 1, canHide: true },
+    { key: "year", storage: "native", label: "Ano de estreia", type: "number", hidden: true, position: 1, canHide: true, filled: 0 },
   );
   const catalog = (await call("GET", `/api/groups/${gid}/catalog`, { session: owner })).body as { items: Array<{ title: string; year: number | null; mainGenre: string | null }> };
-  assert.equal(catalog.items.find((item) => item.title === "Filme A 2026")?.year, 2026, "ocultar não apaga o valor");
-  assert.deepEqual(await seriesKeys(), ["2025", "2026"], "a métrica por ano continua funcionando com a propriedade oculta");
+  const afterOff = (await call("GET", `/api/groups/${gid}/catalog`, { session: owner })).body as { items: Array<{ title: string; year: number | null }> };
+  assert.equal(afterOff.items.find((item) => item.title === "Filme A 2026")?.year, null, "desligar apaga o valor: desligada, a propriedade não guarda nada");
 
   // o título: pode ganhar outro rótulo, nunca pode sumir
   assert.equal((await call("PATCH", `/api/catalog/libraries/${screens.id}/properties/title`, { session: owner, body: { hidden: true } })).response.status, 400);
@@ -2553,7 +2553,7 @@ test("propriedades da biblioteca: renomear e ocultar, nativa ou personalizada, p
   const formAttrs = (await call("GET", `/api/groups/${gid}/catalog-attributes?kind=film`, { session: owner })).body as { attributes: unknown[] };
   assert.equal(formAttrs.attributes.length, 0, "oculta: fora dos formulários do dia a dia");
   const valueCount = await adminPool.query<{ n: string }>("SELECT count(*) AS n FROM catalog_attribute_values WHERE attribute_def_id = $1", [defId]);
-  assert.equal(Number(valueCount.rows[0].n), 1, "o valor continua guardado");
+  assert.equal(Number(valueCount.rows[0].n), 0, "desligada, os valores somem");
 
   // só administrador personaliza; qualquer membro consulta
   assert.equal((await call("PATCH", `/api/catalog/libraries/${screens.id}/properties/year`, { session: member, body: { label: "Não" } })).response.status, 403);
@@ -3732,7 +3732,7 @@ test("estante pessoal: só nota, sem data no registro, sem métricas de grupo, r
   assert.equal(cannotClose.response.status, 409, "uma estante-lista não é encerrada");
 });
 
-test("membro sai do grupo, opcionalmente apagando seus dados; o responsável não sai", async () => {
+test("membro sai do grupo e leva tudo o que era dele; o responsável não sai", async () => {
   const owner = await register("Dona Saída", "dona_saida");
   const keeper = await register("Fica O Registro", "fica_o_registro");
   const purger = await register("Some O Registro", "some_o_registro");
@@ -3785,8 +3785,7 @@ test("membro sai do grupo, opcionalmente apagando seus dados; o responsável nã
   assert.equal(ownerLeaves.response.status, 409, JSON.stringify(ownerLeaves.body));
   assert.equal((ownerLeaves.body as { error: string }).error, "owner_cannot_leave");
 
-  // Leaving asks nothing — it just happens: membership and participation close,
-  // the entry stays (the round's history stays intact).
+  // Leaving takes their content with them: membership, participation and every answer.
   const left = await call("POST", `/api/groups/${groupId}/leave`, { session: keeper, body: {} });
   assert.equal(left.response.status, 200, JSON.stringify(left.body));
   assert.deepEqual(left.body, { groupId, left: true });
@@ -3795,24 +3794,22 @@ test("membro sai do grupo, opcionalmente apagando seus dados; o responsável nã
     `SELECT
        (SELECT count(*)::int FROM group_members WHERE group_id = $1 AND user_id = $2 AND removed_at IS NULL) AS members,
        (SELECT count(*)::int FROM challenge_participants WHERE challenge_id = $3 AND user_id = $2 AND removed_at IS NULL) AS parts,
-       (SELECT count(*)::int FROM entries WHERE challenge_id = $3 AND participant_user_id = $2 AND deleted_at IS NULL) AS live_entries`,
+       (SELECT count(*)::int FROM entries WHERE challenge_id = $3 AND participant_user_id = $2) AS live_entries`,
     [groupId, keeper.user.id, challengeId],
   );
-  assert.deepEqual(afterLeave.rows[0], { members: 0, parts: 0, live_entries: 1 }, "o registro de quem saiu permanece");
+  assert.deepEqual(afterLeave.rows[0], { members: 0, parts: 0, live_entries: 0 }, "nada de quem saiu permanece");
 
   const groupGone = (await call("GET", "/api/bootstrap", { session: keeper })).body as { groups: Array<{ id: string }> };
   assert.ok(!groupGone.groups.some((entry) => entry.id === groupId), "o grupo some do bootstrap de quem saiu");
 
-  // Anonymity instead of a question: the item this person recommended loses the
-  // byline, and their row in the per-person metric loses the name (not the value).
+  // Nothing left to name: the item they recommended loses the byline, and the per-person metric no longer has their row.
   const detailAfterLeave = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
     items: Array<{ recommendedBy: { name: string } | null }>;
     metrics: ApiMetric[];
   };
   assert.equal(detailAfterLeave.items[0].recommendedBy, null, "indicação de quem saiu não aparece mais");
   const byPersonSeries = detailAfterLeave.metrics.find((metric) => metric.label === "Nota por pessoa")!.series!;
-  const keeperRow = byPersonSeries.find((row) => row.value === 4)!;
-  assert.equal(keeperRow.label, "Quem já saiu", "a nota de quem saiu continua contando, sem o nome");
+  assert.ok(!byPersonSeries.some((row) => row.label === "Quem já saiu" || row.value === 4), "a nota de quem saiu não conta mais");
 
   const leftAudit = await adminPool.query<{ count: number }>(
     "SELECT count(*)::int AS count FROM audit_events WHERE group_id = $1 AND action = 'group.member_left'",
@@ -4032,7 +4029,7 @@ test("hábito: sem catálogo, um campo numérico que o próprio usuário criou v
   assert.equal(avg.value, 40, "a métrica calcula certo sobre um campo que não veio de receita nenhuma");
 });
 
-test("atributo de acervo tipado: nomeado pelo grupo, preenchido num item, travado enquanto tiver dado", async () => {
+test("atributo de acervo tipado: nomeado pelo grupo, preenchido num item, e removível levando os valores", async () => {
   const owner = await register("Cataloga Tudo", "cataloga_atributos");
   const member = await register("So Participa", "so_participa_atributos");
 
@@ -4084,9 +4081,10 @@ test("atributo de acervo tipado: nomeado pelo grupo, preenchido num item, travad
   };
   assert.deepEqual(detail.attributes, [{ key: "diretor", label: "Diretor", type: "text", value: "Denis Villeneuve" }]);
 
-  const cannotArchive = await call("DELETE", `/api/groups/${groupId}/catalog-attributes/${attr.id}`, { session: owner });
-  assert.equal(cannotArchive.response.status, 409, "atributo com valor preenchido não pode ser removido");
-  assert.equal((cannotArchive.body as { error: string }).error, "attribute_has_data");
+  const removed = await call("DELETE", `/api/groups/${groupId}/catalog-attributes/${attr.id}`, { session: owner });
+  assert.equal(removed.response.status, 200, "remover uma propriedade com valores apaga os valores junto");
+  const leftover = await adminPool.query<{ n: string }>("SELECT count(*) AS n FROM catalog_attribute_values WHERE attribute_def_id = $1", [attr.id]);
+  assert.equal(Number(leftover.rows[0].n), 0);
 
   const empty = await call("POST", `/api/groups/${groupId}/catalog-attributes`, {
     session: owner,
@@ -7306,7 +7304,7 @@ test("duplicar leva a biblioteca com propriedades, valores e agenda dos itens �
   assert.equal(created.response.status, 201, JSON.stringify(created.body));
   const cid = (created.body as { id: string }).id;
   const items = ((await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { items: Array<{ id: string; title: string }> }).items;
-  // ocultar uma propriedade guarda o valor; a cópia leva também o que está oculto
+  // desligar uma propriedade apaga os valores dela; a cópia leva a propriedade, desligada e vazia
   await call("PATCH", `/api/catalog/libraries/${matches.id}/properties/${secret.id}`, { session: owner, body: { hidden: true } });
   const kickoff = "2026-06-15T19:00:00.000Z";
   const day = await call("PATCH", `/api/challenges/${cid}/items/${items[1].id}`, { session: owner, body: { opensOn: "2026-06-20", dueOn: "2026-06-21" } });
@@ -7328,14 +7326,14 @@ test("duplicar leva a biblioteca com propriedades, valores e agenda dos itens �
     [["Fase", false], ["Estádio", true]],
     "as propriedades personalizadas e o estado oculto vêm junto",
   );
-  // …e os valores de cada item, inclusive o da propriedade oculta
+  // …e os valores de cada item (a desligada não tem nenhum)
   const values = await adminPool.query<{ title: string; label: string; text_value: string }>(
     `SELECT ci.title, d.label, v.text_value FROM catalog_attribute_values v
        JOIN catalog_items ci ON ci.id = v.catalog_item_id JOIN catalog_attribute_defs d ON d.id = v.attribute_def_id
       WHERE ci.group_id = $1 ORDER BY ci.title, d.label`, [dstGid],
   );
   assert.deepEqual(values.rows.map((row) => [row.title, row.label, row.text_value]), [
-    ["Brasil x Argentina", "Estádio", "Maracanã"], ["Brasil x Argentina", "Fase", "Grupos"], ["França x Alemanha", "Fase", "Oitavas"],
+    ["Brasil x Argentina", "Fase", "Grupos"], ["França x Alemanha", "Fase", "Oitavas"],
   ]);
   // a agenda de cada jogo atravessa: o horário exato, a data só, e como foram informados
   const copyDetail = (await call("GET", `/api/challenges/${copyId}`, { session: owner })).body as {
@@ -9018,7 +9016,7 @@ test("varredura de acesso: quem é de fora não lê nem muda nada, e um particip
   assert.equal(await snapshot(), start, "nada mudou depois de todas as tentativas");
 });
 
-test("quem indicou é uma propriedade da biblioteca: desligada, some do item, do acervo e do ranking, sem apagar nada", async () => {
+test("quem indicou é uma propriedade da biblioteca: desligada, some do item, do acervo e do ranking, e os valores são apagados", async () => {
   const owner = await register("Nara Indica", "nara_indica_prop");
   const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Indica ou não" } })).body as { id: string }).id;
   const cid = ((await call("POST", `/api/groups/${gid}/challenges`, {
@@ -9056,8 +9054,8 @@ test("quem indicou é uma propriedade da biblioteca: desligada, some do item, do
   assert.ok(item.rounds.every((round) => round.recommendedBy === null), "nem o histórico do item");
 
   assert.equal((await call("PATCH", `/api/catalog/libraries/${film.id}/properties/recommended_by`, { session: owner, body: { hidden: false } })).response.status, 200);
-  assert.equal((await detail()).items[0].recommendedBy?.name, "Nara Indica", "religar traz de volta: nada foi apagado");
-  assert.equal((await catalogItem(personaId)).recommendedBy?.name, "Nara Indica");
+  assert.equal((await detail()).items[0].recommendedBy, null, "religar começa vazio: desligar apagou quem indicou");
+  assert.equal((await catalogItem(personaId)).recommendedBy, null);
 });
 
 test("o chat de criação: treino numa lista nova e hábito que conta rumo a uma meta nascem prontos, no espaço pessoal", async () => {
@@ -9101,4 +9099,88 @@ test("o chat de criação: treino numa lista nova e hábito que conta rumo a uma
   const habitDetail = (await call("GET", `/api/challenges/${(habit.body as { id: string }).id}`, { session: owner })).body as Detail;
   const counted = habitDetail.entryTypes.flatMap((type) => type.fields).find((field) => field.key === "quantidade");
   assert.equal(counted?.config?.count?.goal?.value, 100, "a meta fica guardada no campo");
+});
+
+test("banir: tudo da pessoa some do grupo, ela não volta por convite, dois admins ao mesmo tempo dão um banimento só, e desfazer libera", async () => {
+  const owner = await register("Olívia Bane", "olivia_bane");
+  const admin = await register("Abel Admin", "abel_bane");
+  const target = await register("Tito Banido", "tito_bane");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Grupo do Ban" } })).body as { id: string }).id;
+  const invite = (await call("POST", `/api/groups/${gid}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 10 } })).body as { token: string };
+  for (const person of [admin, target]) await call("POST", `/api/invites/${invite.token}`, { session: person, body: {} });
+  await call("PATCH", `/api/groups/${gid}/members/${admin.user.id}`, { session: owner, body: { role: "admin" } });
+  const cid = ((await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner,
+    body: { recipe: "cinema", title: "Antes do ban", participantIds: [owner.user.id, admin.user.id, target.user.id], items: [{ title: "Filme do Tito", recommendedByUserId: target.user.id }] },
+  })).body as { id: string }).id;
+  type Detail = { entryTypes: Array<{ id: string; purpose: string; fields: Array<{ id: string; key: string }> }>; items: Array<{ id: string; recommendedBy: unknown }>; participants: Array<{ id: string }> };
+  const detail = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as Detail;
+  const rating = detail.entryTypes.find((type) => type.purpose === "rating")!;
+  const nota = rating.fields.find((field) => field.key === "nota")!.id;
+  await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } });
+  for (const person of [owner, target]) {
+    await call("POST", `/api/challenges/${cid}/entries`, { session: person, body: { itemId: detail.items[0].id, entryTypeId: rating.id, values: { [nota]: 3 } } });
+  }
+
+  // Quem não manda não bane; admin não bane admin nem o dono; ninguém bane a si mesmo.
+  assert.equal((await call("POST", `/api/groups/${gid}/members/${owner.user.id}/ban`, { session: target, body: {} })).response.status, 403);
+  assert.equal((await call("POST", `/api/groups/${gid}/members/${owner.user.id}/ban`, { session: admin, body: {} })).response.status, 403);
+  assert.equal((await call("POST", `/api/groups/${gid}/members/${owner.user.id}/ban`, { session: owner, body: {} })).response.status, 400);
+
+  // Dois admins tocam em "Banir" no mesmo instante: um banimento só, nenhum erro.
+  const [first, second] = await Promise.all([
+    call("POST", `/api/groups/${gid}/members/${target.user.id}/ban`, { session: owner, body: {} }),
+    call("POST", `/api/groups/${gid}/members/${target.user.id}/ban`, { session: admin, body: {} }),
+  ]);
+  assert.deepEqual([first.response.status, second.response.status], [200, 200], JSON.stringify([first.body, second.body]));
+  assert.equal([first, second].filter((result) => (result.body as { idempotent: boolean }).idempotent).length, 1, "o segundo encontra já feito");
+
+  const left = await adminPool.query<{ entries: number; parts: number; active: number }>(
+    `SELECT (SELECT count(*)::int FROM entries WHERE challenge_id = $1 AND participant_user_id = $2) AS entries,
+            (SELECT count(*)::int FROM challenge_participants WHERE challenge_id = $1 AND user_id = $2) AS parts,
+            (SELECT count(*)::int FROM group_members WHERE group_id = $3 AND user_id = $2 AND removed_at IS NULL) AS active`,
+    [cid, target.user.id, gid],
+  );
+  assert.deepEqual(left.rows[0], { entries: 0, parts: 0, active: 0 }, "nada dele fica");
+  const after = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as Detail;
+  assert.equal(after.items[0].recommendedBy, null, "nem a indicação");
+  assert.ok(!after.participants.some((person) => person.id === target.user.id));
+  assert.ok(!JSON.stringify((await call("GET", `/api/challenges/${cid}/entries`, { session: owner })).body).includes(target.user.id));
+  assert.equal((await call("GET", `/api/challenges/${cid}`, { session: target })).response.status >= 400, true, "ele não vê mais o desafio");
+
+  // Banido não volta: nem pelo link, nem por @convite, até desfazerem.
+  const back = await call("POST", `/api/invites/${invite.token}`, { session: target, body: {} });
+  assert.equal(back.response.status, 403, JSON.stringify(back.body));
+  assert.equal((await call("POST", `/api/groups/${gid}/members`, { session: owner, body: { username: target.user.username } })).response.status, 409);
+  type Boot = { groups: Array<{ id: string; banned?: Array<{ id: string }> }> };
+  const banned = ((await call("GET", "/api/bootstrap", { session: admin })).body as Boot).groups.find((group) => group.id === gid)?.banned ?? [];
+  assert.deepEqual(banned.map((person) => person.id), [target.user.id], "quem manda vê a lista de banidos");
+
+  assert.equal((await call("POST", `/api/groups/${gid}/members/${target.user.id}/unban`, { session: admin, body: {} })).response.status, 200);
+  assert.equal((await call("POST", `/api/invites/${invite.token}`, { session: target, body: {} })).response.status, 200, "desfeito o banimento, o convite volta a valer");
+});
+
+test("apagar a conta apaga também o que era da pessoa nos grupos dos outros", async () => {
+  const owner = await register("Dona Fica", "dona_fica_apaga");
+  const leaver = await register("Vai Embora", "vai_embora_apaga");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Grupo que continua" } })).body as { id: string }).id;
+  const invite = (await call("POST", `/api/groups/${gid}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
+  await call("POST", `/api/invites/${invite.token}`, { session: leaver, body: {} });
+  const cid = ((await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner, body: { recipe: "cinema", title: "Fica sem ele", participantIds: [owner.user.id, leaver.user.id], items: [{ title: "Filme" }] },
+  })).body as { id: string }).id;
+  const detail = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { entryTypes: Array<{ id: string; purpose: string; fields: Array<{ id: string; key: string }> }>; items: Array<{ id: string }> };
+  const rating = detail.entryTypes.find((type) => type.purpose === "rating")!;
+  const nota = rating.fields.find((field) => field.key === "nota")!.id;
+  await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } });
+  await call("POST", `/api/challenges/${cid}/entries`, { session: leaver, body: { itemId: detail.items[0].id, entryTypeId: rating.id, values: { [nota]: 5 } } });
+
+  assert.equal((await call("POST", "/api/account/delete", { session: leaver, body: { password: "uma senha segura 123" } })).response.status, 200);
+  const left = await adminPool.query<{ entries: number; parts: number }>(
+    `SELECT (SELECT count(*)::int FROM entries WHERE challenge_id = $1 AND participant_user_id = $2) AS entries,
+            (SELECT count(*)::int FROM challenge_participants WHERE challenge_id = $1 AND user_id = $2) AS parts`,
+    [cid, leaver.user.id],
+  );
+  assert.deepEqual(left.rows[0], { entries: 0, parts: 0 });
+  assert.ok(!JSON.stringify((await call("GET", `/api/challenges/${cid}/entries`, { session: owner })).body).includes("Conta removida"), "nem um rótulo anônimo sobra");
 });

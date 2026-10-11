@@ -194,6 +194,9 @@ app nativo, feed social, fórmulas livres.
 - Uma visita sem sessão nunca recebe as métricas cruas: só a cópia mascarada da
   vitrine (nomes só de quem consentiu, ids opacos). `varredura de vazamento` e
   `varredura de acesso` nos testes de integração vigiam isso.
+- Sair, ser banido ou apagar a conta apaga tudo o que era da pessoa naquele grupo
+  (`purgeMemberFromGroup`): respostas, participação, indicações. Nada fica sob rótulo
+  anônimo. Banido (`group_members.banned_at`) não volta por convite até desfazerem.
 - Resposta compartilhada: trava de linha + versão vista (`expectedUpdatedAt`); dois
   primeiros salvamentos simultâneos ou editar uma resposta apagada viram
   `shared_conflict`, nunca erro nem ressurreição.

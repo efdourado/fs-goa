@@ -1,7 +1,7 @@
 import type { PoolClient } from "pg";
 import { inTransaction, oneOrNull, withClient } from "./db";
 import { writeSystemAudit } from "./goa/domain/audit";
-import { purgeGroupRows } from "./goa/purge";
+import { purgeGroupRows, purgeMemberFromGroup } from "./goa/purge";
 import { ApiError, cookieValue, requireMutationOrigin } from "./http";
 import { rateLimitWrites } from "./rate-limit";
 import {
@@ -448,16 +448,11 @@ export async function deleteOwnAccount(
       transferredGroups += 1;
     }
 
-    // Unpublish the departing person's showcases in the groups that survive —
-    // their name or words may appear in them. An admin republishes when ready.
-    await client.query(
-      `UPDATE challenges c
-          SET results_published_at = NULL, result_share_token_hash = NULL,
-              result_share_token = NULL, updated_at = now()
-        WHERE c.results_published_at IS NOT NULL AND c.deleted_at IS NULL
-          AND EXISTS (SELECT 1 FROM challenge_participants cp WHERE cp.challenge_id = c.id AND cp.user_id = $1)`,
-      [session.user.id],
-    );
+    // In every group that survives, nothing of theirs stays: their answers and their place in each
+    // challenge are erased, the same as leaving or being banned (rankings and showcases are computed
+    // live, so they simply stop counting them).
+    const memberships = await client.query<{ group_id: string }>("SELECT group_id FROM group_members WHERE user_id = $1", [session.user.id]);
+    for (const membership of memberships.rows) await purgeMemberFromGroup(client, membership.group_id, session.user.id);
     await client.query(
       "UPDATE group_members SET removed_at = now() WHERE user_id = $1 AND removed_at IS NULL",
       [session.user.id],

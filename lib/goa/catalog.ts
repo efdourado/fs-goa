@@ -1083,8 +1083,55 @@ export interface LibraryProperty {
   hidden: boolean;
   position: number;
   canHide: boolean;
+  /** How many of the library's items hold a value for it — what switching it off (or removing it) erases. */
+  filled: number;
   /** Custom properties only: the stable key an item's saved value is stored under. */
   attributeKey?: string;
+}
+
+/** Where each built-in property keeps its value on `catalog_items` — what "filled" counts and what switching it off clears. */
+const NATIVE_COLUMNS: Record<string, string[]> = {
+  year: ["year"],
+  main_genre: ["main_genre"],
+  runtime_minutes: ["runtime_minutes"],
+  author: ["author"],
+  page_count: ["page_count"],
+  scheduled_at: ["scheduled_at", "scheduled_end_at", "scheduled_time_zone"],
+  recommended_by: ["recommended_by_user_id", "recommended_by_external_id", "origin_note"],
+};
+
+/**
+ * A property that is off holds nothing: switching one off erases what the library's items had saved for it
+ * (a hidden-but-kept value is of no use to anyone). Two books that only their authors told apart would become
+ * the same book without an author, so that one case is refused instead.
+ */
+async function eraseNativeProperty(client: PoolClient, groupId: string, kind: string, propertyKey: string): Promise<void> {
+  const columns = NATIVE_COLUMNS[propertyKey];
+  if (!columns) return;
+  if (propertyKey === "author") {
+    const clash = await oneOrNull<{ title: string }>(
+      client,
+      `SELECT min(title) AS title FROM catalog_items
+        WHERE group_id = $1 AND kind = $2 AND archived_at IS NULL
+        GROUP BY normalized_title HAVING count(*) > 1 LIMIT 1`,
+      [groupId, kind],
+    );
+    if (clash) {
+      throw new ApiError(409, "author_tells_apart", `Há mais de um livro chamado "${clash.title}": sem o autor eles seriam o mesmo. Renomeie um deles antes.`);
+    }
+  }
+  await client.query(
+    `UPDATE catalog_items SET ${columns.map((column) => `${column} = NULL`).join(", ")}, updated_at = now() WHERE group_id = $1 AND kind = $2`,
+    [groupId, kind],
+  );
+  if (propertyKey === "recommended_by") {
+    // Each challenge keeps its own "who recommended it" for the item, apart from the catalogue's.
+    await client.query(
+      `UPDATE challenge_items it SET recommended_by_user_id = NULL, recommended_by_external_id = NULL, origin_note = NULL
+         FROM catalog_items ci WHERE ci.id = it.catalog_item_id AND ci.group_id = $1 AND ci.kind = $2`,
+      [groupId, kind],
+    );
+  }
 }
 
 async function listLibraryPropertiesWithClient(
@@ -1098,21 +1145,35 @@ async function listLibraryPropertiesWithClient(
   );
   const byKey = new Map(configs.rows.map((row) => [row.property_key, row]));
   const defs = await listDefsWithClient(client, groupId, library.kind, true);
+  const natives = nativePropertiesFor(library.kind);
+  const nativeCounts = (await client.query<Record<string, number>>(
+    `SELECT ${natives.map((native) => {
+      const columns = NATIVE_COLUMNS[native.key];
+      return columns ? `count(*) FILTER (WHERE num_nonnulls(${columns.join(", ")}) > 0)::int AS "${native.key}"` : `0 AS "${native.key}"`;
+    }).join(", ")} FROM catalog_items WHERE group_id = $1 AND kind = $2 AND archived_at IS NULL`,
+    [groupId, library.kind],
+  )).rows[0] ?? {};
+  const attributeCounts = new Map((await client.query<{ attribute_def_id: string; count: number }>(
+    "SELECT attribute_def_id, count(*)::int AS count FROM catalog_attribute_values WHERE group_id = $1 GROUP BY attribute_def_id",
+    [groupId],
+  )).rows.map((row) => [row.attribute_def_id, row.count]));
   // Natives default to their built-in order; attribute defs follow them
   // (their own `position` offset past the natives) unless someone gives a
   // native an explicit position to interleave.
   const properties: Array<LibraryProperty & { sort: number }> = [
-    ...nativePropertiesFor(library.kind).map((native, index) => {
+    ...natives.map((native, index) => {
       const config = byKey.get(native.key);
       const position = config?.position ?? index;
       return {
         key: native.key, storage: "native" as const, label: config?.label ?? null, type: native.type,
         hidden: config?.hidden ?? DEFAULT_HIDDEN_NATIVE.has(native.key), position, canHide: native.key !== "title", sort: position,
+        filled: nativeCounts[native.key] ?? 0,
       };
     }),
     ...defs.map((def) => ({
       key: def.id, storage: "attribute" as const, label: def.label, type: def.type,
       hidden: def.hidden, position: def.position + 10, canHide: true, sort: def.position + 10, attributeKey: def.key,
+      filled: attributeCounts.get(def.id) ?? 0,
     })),
   ];
   return properties.sort((a, b) => a.sort - b.sort).map(({ sort, ...property }) => { void sort; return property; });
@@ -1151,11 +1212,11 @@ export async function listCatalogLibraryProperties(session: SessionContext, libr
 }
 
 /**
- * Renames, hides/shows, or reorders one property — the same call whether it
+ * Renames, switches on/off, or reorders one property — the same call whether it
  * lives in a native column or an attribute definition, so no one has to know
- * which. Nothing here moves or deletes a value, and metrics keep reading the
- * same storage. The title can be renamed but never hidden: every item needs a
- * name.
+ * which. Switching one off erases what the items had saved for it (off means
+ * gone, not hidden); renaming and reordering touch no value. The title can be
+ * renamed but never switched off: every item needs a name.
  */
 export async function updateCatalogLibraryProperty(
   session: SessionContext,
@@ -1196,6 +1257,8 @@ export async function updateCatalogLibraryProperty(
         hidden: hidden === undefined ? current?.hidden ?? DEFAULT_HIDDEN_NATIVE.has(propertyKey) : hidden,
         position: position === undefined ? current?.position ?? null : position,
       };
+      const wasHidden = current?.hidden ?? DEFAULT_HIDDEN_NATIVE.has(propertyKey);
+      if (next.hidden && !wasHidden) await eraseNativeProperty(client, library.group_id, library.kind, propertyKey);
       if (next.label === null && next.hidden === DEFAULT_HIDDEN_NATIVE.has(propertyKey) && next.position === null) {
         // Back to the defaults: no override to keep.
         await client.query("DELETE FROM catalog_native_property_configs WHERE library_id = $1 AND property_key = $2", [library.id, propertyKey]);
@@ -1214,6 +1277,7 @@ export async function updateCatalogLibraryProperty(
       if (label === null || position === null) {
         throw new ApiError(400, "invalid_property", "Uma propriedade personalizada precisa de um nome e de uma posição.");
       }
+      if (hidden === true) await client.query("DELETE FROM catalog_attribute_values WHERE attribute_def_id = $1 AND group_id = $2", [propertyKey, library.group_id]);
       await updateAttributeDef(client, session.user.id, library.group_id, propertyKey, { label, hidden, position: position === undefined ? undefined : position });
     }
 

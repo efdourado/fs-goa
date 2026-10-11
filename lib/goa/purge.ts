@@ -65,3 +65,30 @@ export async function purgeGroupRows(client: PoolClient, groupId: string): Promi
   );
   await client.query("DELETE FROM groups WHERE id=$1", [groupId]);
 }
+
+/**
+ * Erases one person from one group: everything they answered in its challenges, their place in them, and
+ * every spot that names them. Used when they leave, are banned, or delete their account — in each case
+ * nothing of theirs stays behind, not even anonymised. What they built for the group as an admin (challenges,
+ * catalogue items, libraries) is the group's and stays; the membership row itself is the caller's to mark.
+ */
+export async function purgeMemberFromGroup(client: PoolClient, groupId: string, userId: string): Promise<void> {
+  const inGroup = "challenge_id IN (SELECT id FROM challenges WHERE group_id = $1)";
+  const theirEntries = `SELECT id FROM entries WHERE participant_user_id = $2 AND ${inGroup}`;
+  // A comment of theirs curated into a showcase points at the answer about to go.
+  await client.query(`DELETE FROM result_blocks WHERE source_entry_id IN (${theirEntries})`, [groupId, userId]);
+  await client.query(`DELETE FROM entry_values WHERE entry_id IN (${theirEntries})`, [groupId, userId]);
+  await client.query(`DELETE FROM trash_items WHERE entity_kind = 'entry' AND entity_id IN (${theirEntries})`, [groupId, userId]);
+  // A check-in's records before the check-in itself.
+  await client.query(`DELETE FROM entries WHERE participant_user_id = $2 AND parent_entry_id IS NOT NULL AND ${inGroup}`, [groupId, userId]);
+  await client.query(`DELETE FROM entries WHERE participant_user_id = $2 AND ${inGroup}`, [groupId, userId]);
+  await client.query(`DELETE FROM challenge_participants WHERE user_id = $2 AND ${inGroup}`, [groupId, userId]);
+  await client.query(`DELETE FROM challenge_user_prefs WHERE user_id = $2 AND ${inGroup}`, [groupId, userId]);
+  await client.query(`UPDATE challenge_items SET recommended_by_user_id = NULL WHERE recommended_by_user_id = $2 AND ${inGroup}`, [groupId, userId]);
+  await client.query("UPDATE catalog_items SET recommended_by_user_id = NULL WHERE group_id = $1 AND recommended_by_user_id = $2", [groupId, userId]);
+  await client.query("DELETE FROM group_member_requests WHERE group_id = $1 AND user_id = $2", [groupId, userId]);
+  await client.query(
+    "DELETE FROM invite_redemptions WHERE user_id = $2 AND invite_id IN (SELECT id FROM group_invites WHERE group_id = $1)",
+    [groupId, userId],
+  );
+}

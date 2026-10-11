@@ -286,7 +286,10 @@ export async function listEntries(session: SessionContext, challengeId: string) 
               e.occurred_on::text AS occurred_on,e.submitted_at,e.updated_at
          FROM entries e
          LEFT JOIN users u ON u.id=e.participant_user_id
+         -- Who last touched a shared answer is named only while they are still in the group.
          LEFT JOIN users le ON le.id=e.last_edited_by_user_id
+          AND EXISTS (SELECT 1 FROM challenges lc JOIN group_members lm ON lm.group_id = lc.group_id
+                       WHERE lc.id = e.challenge_id AND lm.user_id = le.id AND lm.removed_at IS NULL)
          LEFT JOIN entry_types et ON et.id = e.entry_type_id
          LEFT JOIN challenge_items ri ON ri.id = e.item_id
         WHERE e.challenge_id=$1 AND e.deleted_at IS NULL

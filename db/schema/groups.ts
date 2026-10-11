@@ -70,6 +70,9 @@ export const groupMembers = pgTable(
     }),
     joinedAt: timestamptz("joined_at").defaultNow().notNull(),
     removedAt: timestamptz("removed_at"),
+    // Banned by an admin: removed, their content erased, and no invite lets them back in until unbanned.
+    bannedAt: timestamptz("banned_at"),
+    bannedByUserId: text("banned_by_user_id").references(() => users.id, { onDelete: "set null" }),
   },
   (table) => [
     primaryKey({ name: "group_members_pk", columns: [table.groupId, table.userId] }),
