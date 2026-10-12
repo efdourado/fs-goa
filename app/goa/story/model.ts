@@ -514,18 +514,19 @@ function buildDated(input: StoryInput): DatedStory | null {
     const key = `${record.personId}:${record.itemId}`;
     recordKeys.set(key, [...(recordKeys.get(key) ?? []), record]);
   }
+  // Every exercise that was logged, not only the ones that went up: one that held steady, or was done once, is still theirs.
   for (const list of recordKeys.values()) {
-    if (list.length < 2) continue;
     const ordered = [...list].sort((a, b) => a.day.localeCompare(b.day));
     const best = ordered.reduce((top, row) => (row.value > top.value ? row : top));
     const item = input.items.find((candidate) => candidate.id === ordered[0].itemId);
-    if (!item || best.value <= ordered[0].value) continue;
+    if (!item) continue;
     // One number per day (the heaviest set that day), oldest first — the line a card draws.
     const byDay = new Map<string, number>();
     for (const row of ordered) byDay.set(row.day, Math.max(byDay.get(row.day) ?? -Infinity, row.value));
     records.push({ item, first: ordered[0].value, best: best.value, bestDay: best.day, person: input.people.find((person) => person.id === ordered[0].personId)!, sessions: byDay.size, series: [...byDay.values()], days: [...byDay.keys()] });
   }
-  records.sort((a, b) => (b.best - b.first) / Math.max(1e-9, b.first) - (a.best - a.first) / Math.max(1e-9, a.first));
+  // Biggest gain first; among equals, the one trained more often.
+  records.sort((a, b) => (b.best - b.first) / Math.max(1e-9, b.first) - (a.best - a.first) / Math.max(1e-9, a.first) || b.sessions - a.sessions);
 
   return {
     kind: "dated",
@@ -536,7 +537,7 @@ function buildDated(input: StoryInput): DatedStory | null {
     totals: { people: lanes.length, days: elapsed, checkins: days.length, total: hasValues ? lanes.reduce((sum, lane) => sum + (lane.total ?? 0), 0) : null },
     weekdays,
     bestWeekdays,
-    records: records.slice(0, 6),
+    records,
     together: lanes.length === 2
       ? lanes[0].days.filter((row) => lanes[1].days.some((other) => other.day === row.day)).length
       : null,

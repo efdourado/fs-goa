@@ -2229,8 +2229,9 @@
       "first": "Start",
       "gain": "Gain",
       "sessionsLabel": "Sessions",
-      "history": "Session by session",
-      "chartAria": "Progress of {title}"
+      "history": "Latest sessions",
+      "chartAria": "Progress of {title}",
+      "headlineFlat": "{count, plural, one {# exercise tracked.} other {# exercises tracked.}}"
     },
     "notes": {
       "eyebrow": "In their words"

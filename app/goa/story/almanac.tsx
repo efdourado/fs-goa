@@ -86,14 +86,17 @@ function Progression({ title, row, unit, person, fmt, tone, onOpen }: {
         <polyline points={points} fill="none" stroke={tone} strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round" />
         <circle cx={x(row.series.indexOf(high))} cy={y(high)} r={2.6} fill={tone} />
       </svg>
-      <span className="whitespace-nowrap text-right text-xs tabular-nums text-[var(--muted)]">{t("records.range", { first: fmt(row.first), best: fmt(row.best), unit })}</span>
-      <strong className="text-right font-medium tabular-nums" style={{ color: tone }}>+{gain}%</strong>
+      <span className="whitespace-nowrap text-right text-xs tabular-nums text-[var(--muted)]">{row.best > row.first ? t("records.range", { first: fmt(row.first), best: fmt(row.best), unit }) : `${fmt(row.best)}${unit ? ` ${unit}` : ""}`}</span>
+      {/* No gain yet: nothing to show. */}
+      <strong className="text-right font-medium tabular-nums" style={{ color: tone }}>{gain > 0 ? `+${gain}%` : ""}</strong>
       </button>
     </li>
   );
 }
 
 type RecordRow = DatedStory["records"][number];
+/** How many sessions the exercise's page lists, newest first. */
+const RECENT_SESSIONS = 5;
 
 /**
  * One exercise's progress on a page of its own: the best, where it started and the gain up top, the whole
@@ -123,7 +126,7 @@ function RecordDialog({ row, unit, person, tone, onClose }: { row: RecordRow; un
   const stats: Array<{ label: string; value: string; note?: string; strong?: boolean }> = [
     { label: t("records.best"), value: withUnit(row.best), note: day(row.bestDay), strong: true },
     { label: t("records.first"), value: withUnit(row.first), note: day(row.days[0]) },
-    { label: t("records.gain"), value: `+${gain}%` },
+    { label: t("records.gain"), value: gain > 0 ? `+${gain}%` : "" },
     { label: t("records.sessionsLabel"), value: String(row.sessions) },
   ];
   return (
@@ -159,7 +162,8 @@ function RecordDialog({ row, unit, person, tone, onClose }: { row: RecordRow; un
 
         <h3 className="mb-1 mt-6 text-[13px] font-medium">{t("records.history")}</h3>
         <ul className="divide-y divide-[var(--line)]">
-          {row.series.map((value, index) => ({ value, index })).reverse().map(({ value, index }) => {
+          {/* The latest few are what matters day to day; the chart above holds the whole story. */}
+          {row.series.map((value, index) => ({ value, index })).reverse().slice(0, RECENT_SESSIONS).map(({ value, index }) => {
             const change = index > 0 ? Number((value - row.series[index - 1]).toFixed(4)) : null;
             return (
               <li key={row.days[index]} className="flex items-center gap-3 py-2.5 text-sm">
@@ -1010,7 +1014,9 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
       pages.push({
         id: "records",
         title: t("records.eyebrow"),
-        headline: t("records.headline", { title: s.records[0].item.title, gain: Math.round(((s.records[0].best - s.records[0].first) / Math.max(1e-9, s.records[0].first)) * 100) }),
+        headline: s.records[0].best > s.records[0].first
+          ? t("records.headline", { title: s.records[0].item.title, gain: Math.round(((s.records[0].best - s.records[0].first) / Math.max(1e-9, s.records[0].first)) * 100) })
+          : t("records.headlineFlat", { count: s.records.length }),
         body: (
           <div className={grid}>
             <Block title={t("records.list", { label: input.recordLabel ?? "" })} wide>

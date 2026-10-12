@@ -77,7 +77,7 @@ test("a dated habit: lanes, streaks, comebacks, weekdays and totals", () => {
   assert.ok(story.notes.length >= 1);
 });
 
-test("workout records: where each exercise started and the best it reached", () => {
+test("workout records: every exercise, where it started and the best it reached", () => {
   const input: StoryInput = {
     ...films, ratings: [], expectations: [], items: [{ id: "squat", title: "Squat" }, { id: "bench", title: "Bench" }],
     days: [{ personId: "ana", day: "2026-09-01" }, { personId: "ana", day: "2026-09-08" }, { personId: "ana", day: "2026-09-15" }],
@@ -90,7 +90,7 @@ test("workout records: where each exercise started and the best it reached", () 
     ],
   };
   const story = buildStory(input) as DatedStory;
-  assert.deepEqual(story.records.map((row) => [row.item.title, row.first, row.best]), [["Squat", 60, 70]], "no record without progress");
+  assert.deepEqual(story.records.map((row) => [row.item.title, row.first, row.best]), [["Squat", 60, 70], ["Bench", 40, 40]], "every exercise is listed, the one that went up first");
 });
 
 test("two people read as a mix: where they met, what each brought, the favourite and the argument", () => {

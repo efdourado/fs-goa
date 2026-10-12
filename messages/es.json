@@ -2229,8 +2229,9 @@
       "first": "Inicio",
       "gain": "Mejora",
       "sessionsLabel": "Entrenos",
-      "history": "Sesión a sesión",
-      "chartAria": "Progreso de {title}"
+      "history": "Últimos entrenos",
+      "chartAria": "Progreso de {title}",
+      "headlineFlat": "{count, plural, one {# ejercicio seguido.} other {# ejercicios seguidos.}}"
     },
     "notes": {
       "eyebrow": "En sus palabras"
