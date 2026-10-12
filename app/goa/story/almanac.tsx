@@ -104,7 +104,8 @@ function RecordDialog({ row, unit, person, tone, onClose }: { row: RecordRow; un
   const nf = useFormatter();
   const fmt = (value: number) => nf.number(value, { maximumFractionDigits: 2 });
   const withUnit = (value: number) => `${fmt(value)}${unit ? ` ${unit}` : ""}`;
-  const day = (key: string, long = false) => nf.dateTime(new Date(`${key}T12:00:00Z`), long ? { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" } : { day: "numeric", month: "short", timeZone: "UTC" });
+  // Months are always abbreviated; the year only where it tells something (the period up top, or a history that crosses years).
+  const day = (key: string, withYear = false) => nf.dateTime(new Date(`${key}T12:00:00Z`), { day: "numeric", month: "short", ...(withYear ? { year: "numeric" as const } : {}), timeZone: "UTC" });
   const gain = Math.round(((row.best - row.first) / Math.max(1e-9, row.first)) * 100);
   const width = 560;
   const height = 190;
@@ -117,6 +118,7 @@ function RecordDialog({ row, unit, person, tone, onClose }: { row: RecordRow; un
   const y = (value: number) => height - pad.bottom - ((value - low) / span) * (height - pad.top - pad.bottom);
   const line = row.series.map((value, index) => `${x(index)},${y(value)}`).join(" ");
   const bestIndex = row.series.indexOf(high);
+  const crossesYears = row.days[0].slice(0, 4) !== row.days[last].slice(0, 4);
 
   const stats: Array<{ label: string; value: string; note?: string; strong?: boolean }> = [
     { label: t("records.best"), value: withUnit(row.best), note: day(row.bestDay), strong: true },
@@ -161,11 +163,12 @@ function RecordDialog({ row, unit, person, tone, onClose }: { row: RecordRow; un
             const change = index > 0 ? Number((value - row.series[index - 1]).toFixed(4)) : null;
             return (
               <li key={row.days[index]} className="flex items-center gap-3 py-2.5 text-sm">
-                <span className="w-28 flex-none text-[var(--muted)]">{day(row.days[index], true)}</span>
+                <span className="w-28 flex-none text-[var(--muted)]">{day(row.days[index], crossesYears)}</span>
                 <strong className="flex-1 font-medium tabular-nums">{withUnit(value)}</strong>
                 {index === bestIndex ? <span className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ color: tone, background: "color-mix(in oklab, currentColor 12%, transparent)" }}>{t("records.best")}</span> : null}
                 <span className={cx("w-16 flex-none text-right text-xs tabular-nums", change === null || change === 0 ? "text-[var(--muted)]" : change > 0 ? "text-[var(--ok)]" : "text-[var(--danger)]")}>
-                  {change === null ? "" : change === 0 ? "=" : `${change > 0 ? "+" : "−"}${fmt(Math.abs(change))}`}
+                  {/* Nothing to say (the first session, or no change): nothing shown. */}
+                  {change === null || change === 0 ? "" : `${change > 0 ? "+" : "−"}${fmt(Math.abs(change))}`}
                 </span>
               </li>
             );
