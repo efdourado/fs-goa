@@ -1054,8 +1054,7 @@
     "done": "Done",
     "visitNumbered": "{name} {number}",
     "visitCount": "{count, plural, =0 {No items} one {# item} other {# items}}",
-    "openVisit": "Open {name}",
-    "newItemHint": "Creates the item and adds it here."
+    "openVisit": "Open {name}"
   },
   "checkinLog": {
     "title": "Your check-ins",

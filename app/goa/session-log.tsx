@@ -716,19 +716,15 @@ export function SessionLog({
                 {/* A new one: the same dashed pill as "add a field". It opens a small box right here (never a second
                     modal over the sheet) with what it is, what it does, and the name to type. */}
                 {onAddItem && creating ? (
-                  <div className="mt-3 rounded-2xl border border-[var(--line)] p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <h4 className="text-sm font-medium">{t("newItemPill")}</h4>
-                        <p className="mt-0.5 text-xs leading-5 text-[var(--muted)]">{t("newItemHint")}</p>
-                      </div>
-                      <button type="button" disabled={creating.busy} aria-label={tc("close")} title={tc("close")} onClick={() => setCreating(null)} className="-mr-1.5 -mt-1 grid h-8 w-8 flex-none cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:text-[var(--ink-strong)] disabled:opacity-50">
-                        <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><circle cx="10" cy="10" r="7.5" /><path d="M6.75 10h6.5" strokeLinecap="round" /></svg>
-                      </button>
-                    </div>
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                  // A soft card in the pill's place (never a second modal over the sheet): what it is, a large line to
+                  // type the name on, and underneath a way out on the left and an arrow to add on the right.
+                  <div className="mt-3">
+                    <div className="rounded-2xl bg-[var(--wash)] px-4 py-3">
+                      <p className="text-xs text-[var(--muted)]">＋ {t("newItemPill")}</p>
                       <input
-                        ref={newItemInput} className={cx(inputClass, "min-w-0 flex-1")} value={creating.title} maxLength={200} disabled={creating.busy}
+                        ref={newItemInput}
+                        className="mt-0.5 w-full bg-transparent py-0.5 text-[15px] outline-none"
+                        value={creating.title} maxLength={200} disabled={creating.busy}
                         aria-label={t("newItemPlaceholder")}
                         enterKeyHint="done"
                         onChange={(event) => setCreating({ ...creating, title: event.target.value })}
@@ -737,7 +733,19 @@ export function SessionLog({
                           if (event.key === "Escape") { event.preventDefault(); setCreating(null); }
                         }}
                       />
-                      <Button type="button" className="min-h-11 flex-none rounded-full" disabled={creating.busy || !creating.title.trim()} onClick={() => void createItem()}>{creating.busy ? tc("saving") : t("newItemAdd")}</Button>
+                      <div className="mt-2 flex items-center justify-between gap-3 border-t border-[var(--line)] pt-2">
+                        <button type="button" disabled={creating.busy} onClick={() => setCreating(null)} className="cursor-pointer text-xs text-[var(--muted)] transition hover:text-[var(--ink-strong)]">{tc("cancel")}</button>
+                        <button
+                          type="button"
+                          disabled={creating.busy || !creating.title.trim()}
+                          aria-label={t("newItemAdd")}
+                          title={t("newItemAdd")}
+                          onClick={() => void createItem()}
+                          className="grid h-8 w-8 flex-none cursor-pointer place-items-center rounded-full bg-[var(--ink)] text-[var(--paper)] transition hover:bg-[var(--ink-strong)] disabled:cursor-default disabled:bg-[var(--wash-strong)] disabled:text-[var(--muted)]"
+                        >
+                          <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3.5 8h9M8.5 4l4 4-4 4" /></svg>
+                        </button>
+                      </div>
                     </div>
                     {creating.error ? <div className="mt-2"><StatusMessage error={creating.error} /></div> : null}
                   </div>

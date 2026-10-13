@@ -1054,8 +1054,7 @@
     "done": "Listo",
     "visitNumbered": "{name} {number}",
     "visitCount": "{count, plural, =0 {Ningún ítem} one {# ítem} other {# ítems}}",
-    "openVisit": "Abrir {name}",
-    "newItemHint": "Crea el ítem y lo añade aquí."
+    "openVisit": "Abrir {name}"
   },
   "checkinLog": {
     "title": "Tus registros",
