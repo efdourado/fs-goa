@@ -720,10 +720,10 @@ export function SessionLog({
                   // type the name on, and underneath a way out on the left and an arrow to add on the right.
                   <div className="mt-3">
                     <div className="rounded-2xl bg-[var(--wash)] px-4 py-3">
-                      <p className="text-xs text-[var(--muted)]">＋ {t("newItemPill")}</p>
+                      <p className="text-xs text-[var(--muted)]">{t("newItemPill")}</p>
                       <input
                         ref={newItemInput}
-                        className="mt-0.5 w-full bg-transparent py-0.5 text-[15px] outline-none"
+                        className="mt-2 w-full bg-transparent py-0.5 text-[15px] outline-none"
                         value={creating.title} maxLength={200} disabled={creating.busy}
                         aria-label={t("newItemPlaceholder")}
                         enterKeyHint="done"
