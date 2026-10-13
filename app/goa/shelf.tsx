@@ -61,14 +61,15 @@ export function RailArrows({ nudge }: { nudge: (direction: -1 | 1) => void }) {
 }
 
 /** A small dashed "+ new…" pill that sits in a shelf header, not in the rail. */
-export function ShelfAddButton({ label, onClick }: { label: string; onClick: () => void }) {
+/** The small dashed pill beside a shelf's title that starts something new there. `plus={false}` for a way in that isn't "add one" (start by chat). */
+export function ShelfAddButton({ label, onClick, plus = true }: { label: string; onClick: () => void; plus?: boolean }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-full border border-dashed border-[var(--line)] px-3 text-xs text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)]"
+      className="inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-full border border-dashed border-[var(--line)] px-3 text-xs text-[var(--muted)] transition hover:border-[var(--muted)] hover:text-[var(--ink-strong)]"
     >
-      <span aria-hidden="true" className="text-sm leading-none">+</span>
+      {plus ? <span aria-hidden="true" className="text-sm leading-none">+</span> : null}
       {label}
     </button>
   );
@@ -112,7 +113,7 @@ export function Shelf({
 
   return (
     <section className="mt-8 first:mt-0">
-      <div className="mb-3 flex items-end justify-between gap-3 pr-1">
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-x-3 gap-y-2 pr-1">
         <div className="flex shrink-0 items-baseline gap-2.5">
           <span className="whitespace-nowrap text-lg font-medium tracking-[-0.03em] sm:text-xl">{title}</span>
           {count != null ? <span className="text-xs font-medium text-[var(--muted)]">{count}</span> : null}

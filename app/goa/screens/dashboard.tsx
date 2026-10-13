@@ -9,7 +9,6 @@ import { useGoaFormat } from "../format";
 import { CatalogShelfView } from "../catalog-shelf";
 import { useCatalogShelf } from "../libraries";
 import { applyColorFilter, OrganizeBar, useChallengeOrganizer } from "../organize";
-import { NewChallengeTile } from "../add-tile";
 import { Shelf, ShelfAddButton, shelfCardWidth } from "../shelf";
 import { WelcomePanel } from "../welcome";
 import {
@@ -416,9 +415,12 @@ export function DashboardScreen({
 
   const emptyRail = (title: string) => <div className="w-full max-w-xl"><EmptyState title={colorFilter ? t("filter.empty") : title} /></div>;
 
-  // The way to start a challenge of your own: a card at the end of the row (hidden while a colour filters it).
-  const newPersonalTile = colorFilter ? null : (
-    <NewChallengeTile label={th("newChallenge")} chatLabel={tQuick("entryCta")} onCreate={onCreatePersonalChallenge} onChat={onQuickCreatePersonal} />
+  // The ways to start a challenge of your own: two small buttons beside the shelf's title, like "new group" (hidden while a colour filters it).
+  const newPersonalActions = colorFilter ? undefined : (
+    <>
+      <ShelfAddButton label={th("newChallenge")} onClick={onCreatePersonalChallenge} />
+      <ShelfAddButton plus={false} label={tQuick("entryCta")} onClick={onQuickCreatePersonal} />
+    </>
   );
 
   const groupsShelf = colorFilter ? null : (
@@ -496,8 +498,8 @@ export function DashboardScreen({
 
           {showPersonalSide ? (
             <HomeSectionBlock first={!filtered.pinned.length} title={th("sectionPersonal")}>
-              <Shelf title={th("personalRunning")} count={filtered.personal.length}>
-                {filtered.personal.length || newPersonalTile ? <>{renderRail(filtered.personal, false)}{newPersonalTile}</> : emptyRail(th("personalEmpty"))}
+              <Shelf title={th("personalRunning")} count={filtered.personal.length} actions={newPersonalActions}>
+                {filtered.personal.length ? renderRail(filtered.personal, false) : emptyRail(th("personalEmpty"))}
               </Shelf>
               {personalLibrary}
             </HomeSectionBlock>

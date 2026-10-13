@@ -6,12 +6,11 @@ import { type FormEvent, useRef, useState } from "react";
 import { copyText } from "../clipboard";
 import { ConfirmDialog, DeleteButton, DeleteConfirm, Dialog } from "../dialog";
 import { useGoaFormat } from "../format";
-import { NewChallengeTile } from "../add-tile";
 import { CatalogShelfSkeleton } from "../catalog-shelf";
 import { TasteMap } from "../taste-map";
 import { catalogCardHeight, CatalogTile, resolveCoverTop } from "../catalog-views";
 import { LibraryGlyph, useCatalogShelf, useLibraryName } from "../libraries";
-import { Rail, RailArrows, shelfCardWidth, useShelfRail } from "../shelf";
+import { Rail, RailArrows, ShelfAddButton, shelfCardWidth, useShelfRail } from "../shelf";
 import type { CatalogItem, ChallengeSummary, GroupInviteResult, GroupSummary, Id, Member, PendingGroupRequest } from "../types";
 import { AvatarMark, BackButton, Button, cx, EmptyState, Field, inputClass, SlidersIcon, StatusMessage, Toggle } from "../ui";
 import { canManage, formatRuntime } from "../utils";
@@ -352,13 +351,18 @@ export function GroupScreen({
               <h2 className="text-lg font-semibold tracking-[-0.02em]">{t("challengesTitle")}</h2>
               <span className="text-xs text-[var(--muted)]">{challenges.length}</span>
             </div>
+            {canCreateChallenge ? (
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <ShelfAddButton label={t("createChallengeCta")} onClick={onCreateChallenge} />
+                <ShelfAddButton plus={false} label={tQuick("entryCta")} onClick={onQuickCreate} />
+              </div>
+            ) : null}
           </div>
-          {challenges.length || canCreateChallenge ? (
+          {challenges.length ? (
             <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
               {challenges.map((challenge) => <ActiveChallengeCard key={challenge.id} challenge={challenge} onOpen={onOpenChallenge} fluid />)}
-              {canCreateChallenge ? <NewChallengeTile fluid label={t("createChallengeCta")} chatLabel={tQuick("entryCta")} onCreate={onCreateChallenge} onChat={onQuickCreate} /> : null}
             </div>
-          ) : <EmptyState title={t("noChallengesTitle")} hint={canManage(group.role) ? t("challengeLimitReached", { limit: challengeLimit }) : t("noChallengesMember")} />}
+          ) : <EmptyState title={t("noChallengesTitle")} hint={canCreateChallenge ? undefined : canManage(group.role) ? t("challengeLimitReached", { limit: challengeLimit }) : t("noChallengesMember")} />}
         </section>
 
         {shelfData === null ? <CatalogShelfSkeleton title={t("catalogTitle")} /> : sortedCatalog.length || canManage(group.role) ? (
