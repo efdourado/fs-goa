@@ -66,7 +66,6 @@ export function GroupScreen({
   onSetMemberBan?: (userId: Id, banned: boolean) => Promise<void>;
 }) {
   const t = useTranslations("group");
-  const tQuick = useTranslations("quickCreate");
   const canCreateChallenge = canManage(group.role) && challenges.length < challengeLimit;
   const tCat = useTranslations("catalog");
   const tl = useTranslations("libraries");
@@ -353,8 +352,8 @@ export function GroupScreen({
             </div>
             {canCreateChallenge ? (
               <div className="flex flex-wrap items-center justify-end gap-2">
-                <ShelfAddButton label={t("createChallengeCta")} onClick={onCreateChallenge} />
-                <ShelfAddButton plus={false} label={tQuick("entryCta")} onClick={onQuickCreate} />
+                <ShelfAddButton label={tc("newChallengePill")} onClick={onCreateChallenge} />
+                <ShelfAddButton label={tc("newChatPill")} onClick={onQuickCreate} />
               </div>
             ) : null}
           </div>

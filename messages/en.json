@@ -40,7 +40,9 @@
     "no": "No",
     "loadingApp": "Loading Goa…",
     "loadingChallenge": "Loading the challenge…",
-    "wait": "Please wait…"
+    "wait": "Please wait…",
+    "newChallengePill": "Challenge",
+    "newChatPill": "Chat"
   },
   "settings": {
     "legend": "Preferences"
@@ -326,7 +328,6 @@
       "justYou": "Just you",
       "personalRunning": "In progress",
       "personalEmpty": "Nothing running",
-      "newChallenge": "New challenge",
       "inviteGroups": "A group with friends",
       "startPersonal": "A challenge of your own"
     }
@@ -412,7 +413,6 @@
     "progress": "{done} of {total}",
     "noChallengesTitle": "No challenges yet",
     "noChallengesMember": "An admin creates the first one.",
-    "createChallengeCta": "Create challenge",
     "catalogTitle": "Catalogue",
     "myCatalogTitle": "My catalogue",
     "peopleTitle": "People",
@@ -1897,7 +1897,6 @@
     "itemPlaceholderBookshelf": "e.g. Piranesi",
     "create": "Create challenge",
     "groupWithoutId": "The group was created, but we lost track of it.",
-    "entryCta": "Start by chat",
     "q5": "How should the ratings come out?",
     "modeReveal": "Reveal together",
     "modeRevealHint": "Everyone rates blind; one tap shows them all at once.",

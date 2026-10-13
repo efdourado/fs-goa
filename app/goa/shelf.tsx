@@ -61,15 +61,15 @@ export function RailArrows({ nudge }: { nudge: (direction: -1 | 1) => void }) {
 }
 
 /** A small dashed "+ new…" pill that sits in a shelf header, not in the rail. */
-/** The small dashed pill beside a shelf's title that starts something new there. `plus={false}` for a way in that isn't "add one" (start by chat). */
-export function ShelfAddButton({ label, onClick, plus = true }: { label: string; onClick: () => void; plus?: boolean }) {
+/** The small dashed pill beside a shelf's title that starts something new there: "+ Challenge", "+ Chat", "+ Group". */
+export function ShelfAddButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className="inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-full border border-dashed border-[var(--line)] px-3 text-xs text-[var(--muted)] transition hover:border-[var(--muted)] hover:text-[var(--ink-strong)]"
     >
-      {plus ? <span aria-hidden="true" className="text-sm leading-none">+</span> : null}
+      <span aria-hidden="true" className="text-sm leading-none">+</span>
       {label}
     </button>
   );

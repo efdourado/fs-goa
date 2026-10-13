@@ -366,7 +366,7 @@ export function DashboardScreen({
   const tWelcome = useTranslations("welcome");
   const personalShelf = useCatalogShelf("personal");
   const tr = useTranslations("roles");
-  const tQuick = useTranslations("quickCreate");
+  const tc = useTranslations("common");
 
   const [showGroupDialog, setShowGroupDialog] = useState(false);
 
@@ -418,8 +418,8 @@ export function DashboardScreen({
   // The ways to start a challenge of your own: two small buttons beside the shelf's title, like "new group" (hidden while a colour filters it).
   const newPersonalActions = colorFilter ? undefined : (
     <>
-      <ShelfAddButton label={th("newChallenge")} onClick={onCreatePersonalChallenge} />
-      <ShelfAddButton plus={false} label={tQuick("entryCta")} onClick={onQuickCreatePersonal} />
+      <ShelfAddButton label={tc("newChallengePill")} onClick={onCreatePersonalChallenge} />
+      <ShelfAddButton label={tc("newChatPill")} onClick={onQuickCreatePersonal} />
     </>
   );
 

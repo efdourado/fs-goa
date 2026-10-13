@@ -40,7 +40,9 @@
     "no": "Não",
     "loadingApp": "Carregando o Goa…",
     "loadingChallenge": "Carregando o desafio…",
-    "wait": "Aguarde…"
+    "wait": "Aguarde…",
+    "newChallengePill": "Desafio",
+    "newChatPill": "Chat"
   },
   "settings": {
     "legend": "Preferências"
@@ -326,7 +328,6 @@
       "justYou": "Só você",
       "personalRunning": "Em andamento",
       "personalEmpty": "Nada em andamento",
-      "newChallenge": "Novo desafio",
       "inviteGroups": "Grupo com amigos",
       "startPersonal": "Desafio só seu"
     }
@@ -412,7 +413,6 @@
     "progress": "{done} de {total}",
     "noChallengesTitle": "Nenhum desafio ainda",
     "noChallengesMember": "Um admin cria o primeiro.",
-    "createChallengeCta": "Criar desafio",
     "catalogTitle": "Acervo",
     "myCatalogTitle": "Meu acervo",
     "peopleTitle": "Pessoas",
@@ -1897,7 +1897,6 @@
     "itemPlaceholderBookshelf": "ex.: Piranesi",
     "create": "Criar desafio",
     "groupWithoutId": "O grupo foi criado, mas perdemos o rastro dele.",
-    "entryCta": "Começar por chat",
     "q5": "Como as notas devem aparecer?",
     "modeReveal": "Revelar juntos",
     "modeRevealHint": "Todo mundo dá nota às cegas; um toque mostra todas de uma vez.",
