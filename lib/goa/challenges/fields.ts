@@ -312,19 +312,28 @@ export async function saveChallengeFields(
     }
     if (body.archiveMissing === true || body.replace === true) {
       if (access.challenge.status !== "draft") {
-        const withData = await client.query<{ label: string }>(
-          `SELECT f.label FROM challenge_fields f
+        const withData = await client.query<{ id: string; label: string; answers: number }>(
+          `SELECT f.id, f.label, (SELECT count(*)::int FROM entry_values ev WHERE ev.field_id=f.id) AS answers
+             FROM challenge_fields f
             WHERE f.challenge_id=$1 AND f.entry_type_id=$2 AND f.archived_at IS NULL
               AND NOT (f.id=ANY($3::text[]))
               AND EXISTS (SELECT 1 FROM entry_values ev WHERE ev.field_id=f.id)`,
           [challengeId, entryType.id, keptIds],
         );
-        if (withData.rows.length) {
+        if (withData.rows.length && body.deleteAnswers !== true) {
+          // Not a dead end: the client shows how much would go and asks again with `deleteAnswers`.
           throw new ApiError(
             409,
             "field_has_data",
-            `Estes campos já têm respostas e não podem ser removidos: ${withData.rows.map((row) => row.label).join(", ")}. Registros históricos ficam intactos.`,
+            `Estes campos já têm respostas: ${withData.rows.map((row) => row.label).join(", ")}. Removê-los apaga essas respostas.`,
+            { fields: withData.rows.map((row) => ({ label: row.label, answers: row.answers })) },
           );
+        }
+        if (withData.rows.length) {
+          // A field that goes takes its answers with it (the entries themselves stay, with whatever else they hold).
+          const gone = withData.rows.map((row) => row.id);
+          await client.query("DELETE FROM result_blocks WHERE challenge_id=$1 AND source_field_id = ANY($2::text[])", [challengeId, gone]);
+          await client.query("DELETE FROM entry_values WHERE challenge_id=$1 AND field_id = ANY($2::text[])", [challengeId, gone]);
         }
       }
       // Goa's own automatic metrics go with the field they were made for — nobody asked for them.

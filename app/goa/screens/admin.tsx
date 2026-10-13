@@ -6,7 +6,8 @@ import { type FormEvent, useMemo, useState } from "react";
 import { ActionMenu, ActionMenuItem } from "../action-menu";
 import { CheckpointPlanner } from "../checkpoint-planner";
 import { useGoaFormat } from "../format";
-import { FormDialog } from "../dialog";
+import { ApiError } from "../api";
+import { ConfirmDialog, FormDialog } from "../dialog";
 import { AddSharedResponseDialog, RemoveResponseDialog, SharedGlyph, SharedResponsePanel } from "../shared-responses";
 import { cleanFields, FIELD_TYPES, FieldConfigInputs, newFieldConfig, uniqueFieldKey } from "../fields";
 import { type CatalogScope } from "../libraries";
@@ -288,7 +289,8 @@ function AdminFields({
   onSavePolicy,
 }: {
   challenge: ChallengeDetail;
-  onSave: (entryTypeId: Id, fields: ChallengeField[]) => Promise<void>;
+  /** `deleteAnswers`: a removed field that already has answers takes them with it (asked for first). */
+  onSave: (entryTypeId: Id, fields: ChallengeField[], deleteAnswers?: boolean) => Promise<void>;
   onSetExpectation: (enabled: boolean) => Promise<void>;
   onSetPageCount: (enabled: boolean) => Promise<void>;
   onSaveEntryDate: (enabled: boolean) => Promise<void>;
@@ -348,16 +350,24 @@ function AdminFields({
     setSuccess(null);
   }
 
-  async function commit(next: ChallengeField[], message: string) {
+  // Removing a field that already has answers: say how many go, and only then remove it with them.
+  const [erasing, setErasing] = useState<{ next: ChallengeField[]; message: string; fields: Array<{ label: string; answers: number }> } | null>(null);
+
+  async function commit(next: ChallengeField[], message: string, deleteAnswers = false) {
     setBusy(true);
     setError(null);
     setSuccess(null);
     try {
-      await onSave(selectedTypeId, cleanFields(next));
+      await onSave(selectedTypeId, cleanFields(next), deleteAnswers);
       setFields(next);
       setSuccess(message);
     } catch (cause) {
-      setError(f.error(cause));
+      const held = cause instanceof ApiError && cause.code === "field_has_data"
+        ? (cause.details as { fields?: Array<{ label: string; answers: number }> } | undefined)?.fields
+        : undefined;
+      if (held?.length && !deleteAnswers) setErasing({ next, message, fields: held });
+      else if (deleteAnswers) throw cause;
+      else setError(f.error(cause));
     } finally {
       setBusy(false);
     }
@@ -411,6 +421,15 @@ function AdminFields({
         </div>
       ) : null}
       <div className="mb-4"><StatusMessage error={error} success={success} /></div>
+      {erasing ? (
+        <ConfirmDialog
+          title={t("fieldEraseTitle", { count: erasing.fields.length, label: erasing.fields[0].label })}
+          body={t("fieldEraseBody", { count: erasing.fields.reduce((sum, field) => sum + field.answers, 0) })}
+          danger
+          onClose={() => setErasing(null)}
+          onConfirm={async () => { await commit(erasing.next, erasing.message, true); setErasing(null); }}
+        />
+      ) : null}
       {fields.length ? (
         <ul className="divide-y divide-[var(--line)] border-t border-[var(--line)]">
           {fields.map((field, index) => (
@@ -876,7 +895,7 @@ export function AdminScreen({
   duplicateTargets: DuplicateTargetGroup[];
   onDelete?: () => Promise<void>;
   onSaveParticipants: (ids: Id[]) => Promise<void>;
-  onSaveFields: (entryTypeId: Id, fields: ChallengeField[]) => Promise<void>;
+  onSaveFields: (entryTypeId: Id, fields: ChallengeField[], deleteAnswers?: boolean) => Promise<void>;
   onSetExpectation: (enabled: boolean) => Promise<void>;
   onSetPageCount: (enabled: boolean) => Promise<void>;
   onSaveEntryDate: (enabled: boolean) => Promise<void>;

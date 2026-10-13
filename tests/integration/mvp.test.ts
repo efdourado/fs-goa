@@ -9229,3 +9229,33 @@ test("uma lista pessoal sem datas ganha só a data final: o início vem do prime
   assert.deepEqual([after.kind, after.status], ["round", "closed"], "com data final ela encerra como qualquer desafio");
   assert.equal((await call("GET", `/api/results/${token}`)).response.status, 200, "e a vitrine publicada continua no ar");
 });
+
+test("remover um campo que já tem respostas: primeiro avisa quantas, e com a confirmação apaga as respostas dele e deixa o resto", async () => {
+  const owner = await register("Fábio Campo", "fabio_campo_apaga");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Campos" } })).body as { id: string }).id;
+  const cid = ((await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner, body: { recipe: "cinema", title: "Com comentário", participantIds: [owner.user.id], items: [{ title: "Filme" }] },
+  })).body as { id: string }).id;
+  type Field = { id: string; key: string; label: string; type: string; required: boolean; config?: unknown };
+  type Detail = { entryTypes: Array<{ id: string; purpose: string; fields: Field[] }>; items: Array<{ id: string }> };
+  const detail = async () => (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as Detail;
+  const first = await detail();
+  const rating = first.entryTypes.find((type) => type.purpose === "rating")!;
+  const nota = rating.fields.find((field) => field.key === "nota")!;
+  const comentario = rating.fields.find((field) => field.key === "comentario")!;
+  await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } });
+  await call("POST", `/api/challenges/${cid}/entries`, { session: owner, body: { itemId: first.items[0].id, entryTypeId: rating.id, values: { [nota.id]: 4, [comentario.id]: "vai sumir" } } });
+
+  const body = { entryTypeId: rating.id, replace: true, archiveMissing: true, fields: [nota] };
+  const asked = await call("POST", `/api/challenges/${cid}/fields`, { session: owner, body });
+  assert.equal(asked.response.status, 409, JSON.stringify(asked.body));
+  assert.equal((asked.body as { error: string }).error, "field_has_data");
+  assert.deepEqual((asked.body as { details: { fields: unknown } }).details.fields, [{ label: comentario.label, answers: 1 }], "diz qual campo e quantas respostas");
+  assert.ok((await detail()).entryTypes.find((type) => type.id === rating.id)!.fields.some((field) => field.id === comentario.id), "sem confirmar, nada muda");
+
+  const removed = await call("POST", `/api/challenges/${cid}/fields`, { session: owner, body: { ...body, deleteAnswers: true } });
+  assert.equal(removed.response.status < 300, true, JSON.stringify(removed.body));
+  assert.ok(!(await detail()).entryTypes.find((type) => type.id === rating.id)!.fields.some((field) => field.id === comentario.id));
+  const left = await adminPool.query<{ field_id: string }>("SELECT ev.field_id FROM entry_values ev JOIN entries e ON e.id = ev.entry_id WHERE e.challenge_id = $1", [cid]);
+  assert.deepEqual(left.rows.map((row) => row.field_id), [nota.id], "o comentário sumiu, a nota do mesmo registro ficou");
+});

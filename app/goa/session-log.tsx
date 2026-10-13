@@ -221,7 +221,6 @@ export function SessionLog({
   const libraryName = useLibraryName();
   const showValue = useShowValue();
   const today = dateKeyInSaoPaulo(new Date());
-  const shortDate: Intl.DateTimeFormatOptions = { day: "2-digit", month: "short", year: "numeric" };
   const recordFields = useMemo(() => spec.record.fields.filter((field) => field.id), [spec.record.fields]);
   const numberFields = useMemo(() => recordFields.filter((field) => field.type === "number"), [recordFields]);
   const visitFields = useMemo(() => spec.visit.fields.filter((field) => field.id), [spec.visit.fields]);
@@ -499,8 +498,8 @@ export function SessionLog({
     setRows((current) => current.map((row) => (row.key === key ? { ...row, ...patch } : row)));
   }
 
-  /** The most recent record of an item, before the check-in being edited — "last time: 55 kg × 8" — and its values. */
-  function lastRecordFor(itemId: Id): { text: string; values: Record<Id, unknown> } | null {
+  /** The most recent record of an item before the check-in being edited: what each field's change is measured against. */
+  function lastRecordFor(itemId: Id): { values: Record<Id, unknown> } | null {
     let latest: Entry | null = null;
     for (const [visitId, records] of recordsByVisit) {
       if (visitId === editing?.id) continue;
@@ -511,9 +510,7 @@ export function SessionLog({
       }
     }
     if (!latest) return null;
-    const values = valuesAsRecord(latest.values);
-    const summary = recordFields.map((field) => showValue(field, values[field.id as Id])).filter(Boolean).join(" · ");
-    return { text: t("lastTime", { values: summary, date: f.date(latest.occurredOn, shortDate) }), values };
+    return { values: valuesAsRecord(latest.values) };
   }
 
   // How many of your check-ins each item was in — the tray lists the usual ones first.
@@ -681,15 +678,9 @@ export function SessionLog({
                     <div className="flex items-start gap-2">
                       <div className="min-w-0 flex-1">
                         <strong className="block truncate text-[15px] font-medium">{itemTitle(row.itemId)}</strong>
-                        {last ? (
-                          // Last time's numbers, one tap away: tapping them fills this row in.
-                          <button type="button" disabled={disabled} title={t("repeatLast")} onClick={() => patchRow(row.key, { values: { ...last.values } })} className="cursor-pointer text-left text-xs text-[var(--muted)] underline-offset-2 hover:text-[var(--ink)] hover:underline disabled:cursor-not-allowed">
-                            {last.text}
-                          </button>
-                        ) : <span className="block text-xs text-[var(--muted)]">{t("firstTime")}</span>}
                       </div>
                       <button type="button" disabled={disabled} aria-label={t("removeRow", { item: itemTitle(row.itemId) })} title={t("removeRow", { item: itemTitle(row.itemId) })} onClick={() => setRows((current) => current.filter((candidate) => candidate.key !== row.key))} className="grid h-9 w-9 flex-none cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)] disabled:opacity-50">
-                        <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
+                        <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><circle cx="10" cy="10" r="7.5" /><path d="M6.75 10h6.5" strokeLinecap="round" /></svg>
                       </button>
                     </div>
                     <div className="mt-3 grid grid-cols-2 items-start gap-2.5 sm:grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] [&>*:last-child:nth-child(odd)]:col-span-2 sm:[&>*:last-child:nth-child(odd)]:col-span-1">
@@ -762,7 +753,7 @@ export function SessionLog({
                     </button>
                   ) : <span />}
                   {onAddItem && !creating ? (
-                    <button type="button" disabled={disabled} onClick={() => setCreating({ title: "", busy: false, error: null })} className="min-h-10 cursor-pointer px-1 text-sm font-medium text-[var(--main-strong)] hover:underline disabled:opacity-50">
+                    <button type="button" disabled={disabled} onClick={() => setCreating({ title: "", busy: false, error: null })} className="min-h-10 cursor-pointer px-1 text-sm text-[var(--ink)] transition hover:text-[var(--ink-strong)] disabled:opacity-50">
                       ＋ {t("newItemPill")}
                     </button>
                   ) : null}
@@ -785,7 +776,7 @@ export function SessionLog({
                 ) : null}
               </section>
             ) : canEdit ? (
-              <button type="button" disabled={disabled} onClick={() => setAdding(true)} className="flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-[var(--main-line)] text-sm font-medium text-[var(--main-strong)] transition hover:bg-[var(--main-soft)] disabled:opacity-50">
+              <button type="button" disabled={disabled} onClick={() => setAdding(true)} className="flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-[var(--line)] text-sm text-[var(--ink)] transition hover:border-[var(--muted)] hover:text-[var(--ink-strong)] disabled:opacity-50">
                 ＋ {t("addRows")}
               </button>
             ) : null}

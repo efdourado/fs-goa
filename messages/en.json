@@ -935,7 +935,9 @@
     "scheduleEndHint": "Ends on the day you pick.",
     "scheduleEndLabel": "Ends on",
     "errEnd": "Pick the end date.",
-    "changesSavedNewLink": "Changes saved. The public link changed: copy the new one."
+    "changesSavedNewLink": "Changes saved. The public link changed: copy the new one.",
+    "fieldEraseTitle": "{count, plural, one {Remove \"{label}\"?} other {Remove # fields?}}",
+    "fieldEraseBody": "{count, plural, one {# answer already given is erased.} other {# answers already given are erased.}}"
   },
   "visibility": {
     "note": {
@@ -1022,14 +1024,11 @@
     "itemColumn": "Item",
     "newItemPlaceholder": "Name the new item",
     "newItemAdd": "Add",
-    "repeatLast": "Repeat",
     "save": "Save {name}",
     "saved": "Saved.",
-    "lastTime": "Last time: {values} · {date}",
     "noItems": "No items yet",
     "deleteBody": "It goes to the bin with {count, plural, one {# record} other {# records}}.",
     "newItemPill": "New item",
-    "firstTime": "First time in this challenge",
     "deltaSame": "= last time",
     "deltaUp": "+{value} vs. last",
     "deltaDown": "−{value} vs. last",

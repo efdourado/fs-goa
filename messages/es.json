@@ -935,7 +935,9 @@
     "scheduleEndHint": "Termina el día que elijas.",
     "scheduleEndLabel": "Termina el",
     "errEnd": "Elige la fecha final.",
-    "changesSavedNewLink": "Cambios guardados. El enlace público cambió: copia el nuevo."
+    "changesSavedNewLink": "Cambios guardados. El enlace público cambió: copia el nuevo.",
+    "fieldEraseTitle": "{count, plural, one {¿Quitar \"{label}\"?} other {¿Quitar # campos?}}",
+    "fieldEraseBody": "{count, plural, one {# respuesta ya dada se borra.} other {# respuestas ya dadas se borran.}}"
   },
   "visibility": {
     "note": {
@@ -1022,14 +1024,11 @@
     "itemColumn": "Ítem",
     "newItemPlaceholder": "Ponle nombre al nuevo ítem",
     "newItemAdd": "Añadir",
-    "repeatLast": "Repetir",
     "save": "Guardar {name}",
     "saved": "Guardado.",
-    "lastTime": "La última vez: {values} · {date}",
     "noItems": "Ningún ítem todavía",
     "deleteBody": "Va a la papelera con {count, plural, one {# registro} other {# registros}}.",
     "newItemPill": "Nuevo ítem",
-    "firstTime": "Primera vez en este desafío",
     "deltaSame": "= última vez",
     "deltaUp": "+{value} vs. la última",
     "deltaDown": "−{value} vs. la última",
