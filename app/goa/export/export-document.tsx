@@ -129,29 +129,10 @@ function Cover({ challenge, model, doc }: { challenge: ChallengeDetail; model: E
       <div className="xd-ribbon" aria-hidden="true">
         {RIBBON.map((width, index) => <span key={index} className={tone(DOC_COLORS[index])} style={{ width: `${width}%` }} />)}
       </div>
-      {model.people.length ? (
-        <div className={`xd-people${model.people.length > 4 ? " is-many" : ""}`}>
-          {model.people.slice(0, 6).map((person) => <PersonCard key={person.key} person={person} model={model} doc={doc} />)}
-        </div>
-      ) : null}
       <div className="xd-stats">
         {model.stats.map((stat) => <StatBlock key={stat.kind} stat={stat} doc={doc} />)}
       </div>
     </section>
-  );
-}
-
-function PersonCard({ person, model, doc }: { person: DocPerson; model: ExportModel; doc: Doc }) {
-  const parts = [
-    model.hasRecommenders && person.recommendedCount ? doc.t("recommendedCount", { count: person.recommendedCount }) : null,
-    doc.t("entryCount", { count: person.entryCount }),
-    person.ratingAvg !== null ? doc.t("average", { value: doc.n(person.ratingAvg) }) : null,
-  ].filter(Boolean);
-  return (
-    <div className={`xd-person ${tone(person.color)}`}>
-      <strong>{person.name}</strong>
-      <p>{parts.join(" · ")}</p>
-    </div>
   );
 }
 

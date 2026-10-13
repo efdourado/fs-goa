@@ -1957,9 +1957,6 @@
     "presentsGroup": "{count} people present",
     "coverLede": "The complete log of {title}, from the first day to the last.",
     "range": "{from} – {to}",
-    "recommendedCount": "{count, plural, one {# recommendation} other {# recommendations}}",
-    "entryCount": "{count, plural, one {# entry} other {# entries}}",
-    "average": "average {value}",
     "stats": {
       "items": "items",
       "entries": "entries",

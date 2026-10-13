@@ -1957,9 +1957,6 @@
     "presentsGroup": "{count} pessoas apresentam",
     "coverLede": "O registro completo de {title}, do primeiro ao último dia.",
     "range": "{from} – {to}",
-    "recommendedCount": "{count, plural, one {# indicação} other {# indicações}}",
-    "entryCount": "{count, plural, one {# registro} other {# registros}}",
-    "average": "média {value}",
     "stats": {
       "items": "itens",
       "entries": "registros",

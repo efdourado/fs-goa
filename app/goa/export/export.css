@@ -145,31 +145,6 @@
 }
 .xd-ribbon { margin-top: 12mm; display: grid; gap: 3.2mm; }
 .xd-ribbon span { display: block; height: 8mm; border-radius: 999px; background: var(--c); }
-.xd-people {
-  margin-top: 13mm;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 5mm;
-}
-.xd-people.is-many { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.xd-person {
-  border: 1px solid var(--xd-line);
-  border-radius: 5mm;
-  background: #fff;
-  padding: 7mm 7mm 6mm;
-  break-inside: avoid;
-}
-.xd-person strong {
-  display: block;
-  font-family: var(--xd-font-display), "Poppins", sans-serif;
-  font-size: 17pt;
-  font-weight: 700;
-  line-height: 1.1;
-  text-transform: uppercase;
-  color: var(--c);
-  overflow-wrap: anywhere;
-}
-.xd-person p { margin-top: 2.5mm !important; font-size: 8.5pt; color: var(--xd-soft); }
 .xd-stats {
   margin-top: auto;
   display: grid;
@@ -461,7 +436,7 @@
   .xd { width: 100%; border-radius: 0; padding: 28px 16px 40px; font-size: 10pt; }
   .xd-cover { min-height: 0; }
   .xd-stats { margin-top: 36px; grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 20px; }
-  .xd-people, .xd-people.is-many, .xd-podium { grid-template-columns: minmax(0, 1fr); }
+  .xd-podium { grid-template-columns: minmax(0, 1fr); }
   .xd-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .xd-row { grid-template-columns: minmax(0, 1fr); gap: 1mm; }
   .xd-month-body { grid-template-columns: minmax(0, 1fr); }
