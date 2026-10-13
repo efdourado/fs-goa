@@ -936,8 +936,9 @@
     "scheduleEndLabel": "Termina el",
     "errEnd": "Elige la fecha final.",
     "changesSavedNewLink": "Cambios guardados. El enlace público cambió: copia el nuevo.",
-    "fieldEraseTitle": "{count, plural, one {¿Quitar \"{label}\"?} other {¿Quitar # campos?}}",
-    "fieldEraseBody": "{count, plural, one {# respuesta ya dada se borra.} other {# respuestas ya dadas se borran.}}"
+    "responseSettings": "Ajustes del registro",
+    "fieldSettings": "Ajustes de {label}",
+    "fieldDeleteBody": "El campo sale del formulario y las respuestas ya dadas se borran."
   },
   "visibility": {
     "note": {
@@ -1036,7 +1037,6 @@
     "stepDown": "Menos {field}",
     "stepUp": "Más {field}",
     "newVisitOnDay": "Nuevo {name}",
-    "renameLabel": "Renombrar",
     "trayMore": "Mostrar más ({count})",
     "trayLess": "Mostrar menos",
     "removeRow": "Quitar {item}",
@@ -1054,7 +1054,8 @@
     "done": "Listo",
     "visitNumbered": "{name} {number}",
     "visitCount": "{count, plural, =0 {Ningún ítem} one {# ítem} other {# ítems}}",
-    "openVisit": "Abrir {name}"
+    "openVisit": "Abrir {name}",
+    "newItemHint": "Crea el ítem y lo añade aquí."
   },
   "checkinLog": {
     "title": "Tus registros",
@@ -1817,7 +1818,6 @@
     "requiredLabel": "Obligatoria",
     "requiredHint": "Un ítem no queda completado hasta que esto se rellene.",
     "add": "Añadir respuesta",
-    "removeTitle": "Quitar \"{name}\"",
     "removeBody": "Esta respuesta desaparece de todos los ítems.",
     "removeMetricsBody": "Estas métricas se van también:",
     "removeMetricsPrompt": "Algunas métricas leen esta respuesta. Confirma otra vez para quitarlas también.",
@@ -1825,9 +1825,6 @@
     "panelTitle": "Compartida con el grupo",
     "panelBody": "Hay una única respuesta por ítem, visible para todos junto con quién la cambió por última vez.",
     "policySaved": "Guardado.",
-    "removeHint": "Quitarla también elimina las respuestas ya dadas.",
-    "removeLastHint": "Un desafío necesita al menos una respuesta, así que esta no se puede quitar.",
-    "removeHintIndividual": "Saca esta respuesta del desafío. Las respuestas ya dadas se eliminan con ella.",
     "removeAnswersBody": "{count, plural, one {# respuesta ya dada se va} other {# respuestas ya dadas se van}} con ella.",
     "removeAnswersPrompt": "Confirma de nuevo para eliminar las respuestas y quitar el registro."
   },

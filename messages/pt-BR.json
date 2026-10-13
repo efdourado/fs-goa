@@ -936,8 +936,9 @@
     "scheduleEndLabel": "Termina em",
     "errEnd": "Escolha a data final.",
     "changesSavedNewLink": "Alterações salvas. O link público mudou: copie o novo.",
-    "fieldEraseTitle": "{count, plural, one {Remover \"{label}\"?} other {Remover # campos?}}",
-    "fieldEraseBody": "{count, plural, one {# resposta já dada é apagada.} other {# respostas já dadas são apagadas.}}"
+    "responseSettings": "Ajustes do registro",
+    "fieldSettings": "Ajustes de {label}",
+    "fieldDeleteBody": "O campo sai do formulário e as respostas já dadas a ele são apagadas."
   },
   "visibility": {
     "note": {
@@ -1036,7 +1037,6 @@
     "stepDown": "Menos {field}",
     "stepUp": "Mais {field}",
     "newVisitOnDay": "Novo {name}",
-    "renameLabel": "Renomear",
     "trayMore": "Mostrar mais ({count})",
     "trayLess": "Mostrar menos",
     "removeRow": "Tirar {item}",
@@ -1054,7 +1054,8 @@
     "done": "Pronto",
     "visitNumbered": "{name} {number}",
     "visitCount": "{count, plural, =0 {Nenhum item} one {# item} other {# itens}}",
-    "openVisit": "Abrir {name}"
+    "openVisit": "Abrir {name}",
+    "newItemHint": "Cria o item e já o adiciona aqui."
   },
   "checkinLog": {
     "title": "Seus check-ins",
@@ -1817,7 +1818,6 @@
     "requiredLabel": "Obrigatório",
     "requiredHint": "Um item não fica concluído até isto ser preenchido.",
     "add": "Adicionar resposta",
-    "removeTitle": "Remover \"{name}\"",
     "removeBody": "Esta resposta sai de todos os itens.",
     "removeMetricsBody": "Estas métricas saem junto:",
     "removeMetricsPrompt": "Algumas métricas leem esta resposta. Confirme de novo para removê-las também.",
@@ -1825,9 +1825,6 @@
     "panelTitle": "Compartilhada com o grupo",
     "panelBody": "Existe uma única resposta por item, mostrada a todos junto com quem mudou por último.",
     "policySaved": "Salvo.",
-    "removeHint": "Remover também apaga as respostas já dadas.",
-    "removeLastHint": "Um desafio precisa de pelo menos uma resposta, então esta não pode ser removida.",
-    "removeHintIndividual": "Tire esta resposta do desafio. As respostas já dadas a ela são apagadas junto.",
     "removeAnswersBody": "{count, plural, one {# resposta já dada some} other {# respostas já dadas somem}} junto.",
     "removeAnswersPrompt": "Confirme de novo para apagar as respostas e remover o registro."
   },

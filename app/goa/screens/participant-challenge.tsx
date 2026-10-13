@@ -1331,7 +1331,6 @@ export function ParticipantChallengeScreen({
   onSaveEntry,
   onSaveSession,
   onAddSessionItem,
-  onRenameEntryType,
   onDeleteEntry,
   onReload,
   onRevealItem,
@@ -1355,7 +1354,6 @@ export function ParticipantChallengeScreen({
   /** For someone who may add items (an admin, or the owner of a personal challenge): adds one and returns its id. */
   onAddSessionItem?: (title: string) => Promise<Id>;
   /** Managers only: renames a record type ("Treino" → "Sessão") straight from Today. */
-  onRenameEntryType?: (entryTypeId: Id, name: string) => Promise<void>;
   onDeleteEntry?: (entryId: Id) => Promise<void>;
   /** Re-reads the challenge and its entries — used to show the latest shared answer after a clash. */
   onReload?: () => Promise<void>;
@@ -1766,7 +1764,6 @@ export function ParticipantChallengeScreen({
               onSave={(payload, entry) => onSaveSession!(payload, entry)}
               onDelete={canDeleteEntry}
               onAddItem={challenge.status === "active" ? onAddSessionItem : undefined}
-              onRename={onRenameEntryType ? (name: string) => onRenameEntryType(sessionSpec.visit.id, name) : undefined}
             />
           ) : challenge.submissionMode !== "free" && !selectedItem && !undatedDaily ? (
             <EmptyState title={t("noCheckpointTitle")} />

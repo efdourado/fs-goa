@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { ApiError } from "./api";
-import { ConfirmDialog, FormDialog } from "./dialog";
+import { FormDialog } from "./dialog";
 import { cleanFields, FIELD_TYPES, FieldConfigInputs, newFieldConfig } from "./fields";
 import { useGoaFormat } from "./format";
 import type { ChallengeField, EntryTypeView, SharedEditPolicy } from "./types";
@@ -101,17 +101,27 @@ export function AddSharedResponseDialog({
   );
 }
 
-/** Remove a response type. Metrics that read it are named first and only go with it once the person agrees. */
-export function RemoveResponseDialog({
+/**
+ * One response's own settings: its name, and (when it isn't the only one) removing it. Removing is confirmed
+ * right here: the server says what else would go (answers already given, metrics that read them), that is
+ * shown, and a second confirmation takes it all.
+ */
+export function ResponseSettingsDialog({
   type,
-  onClose,
+  onCancel,
+  onRename,
   onRemove,
 }: {
   type: EntryTypeView;
-  onClose: () => void;
-  onRemove: (confirmed: { archiveMetrics: boolean; deleteAnswers: boolean }) => Promise<void>;
+  onCancel: () => void;
+  onRename: (name: string) => Promise<void>;
+  onRemove?: (confirmed: { archiveMetrics: boolean; deleteAnswers: boolean }) => Promise<void>;
 }) {
   const t = useTranslations("sharedResponses");
+  const f = useGoaFormat();
+  const [name, setName] = useState(type.name);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   // Filled in once the server says what else would go: answers already given, and metrics that read them.
   const [warning, setWarning] = useState<{ answers: number; metrics: string[] } | null>(null);
   const names = (details: unknown): string[] => {
@@ -119,40 +129,64 @@ export function RemoveResponseDialog({
     return Array.isArray(listed) ? listed.filter((label): label is string => typeof label === "string") : [];
   };
 
+  async function submit() {
+    const next = name.trim();
+    if (!next) return;
+    if (next === type.name) { onCancel(); return; }
+    setBusy(true);
+    setError(null);
+    try {
+      await onRename(next);
+    } catch (cause) {
+      setError(f.error(cause));
+      setBusy(false);
+    }
+  }
+
   return (
-    <ConfirmDialog
-      title={t("removeTitle", { name: type.name })}
-      body={warning ? (
-        <>
-          {warning.answers ? <p className="font-medium text-[var(--danger)]">{t("removeAnswersBody", { count: warning.answers })}</p> : null}
-          {warning.metrics.length ? (
-            <>
-              <p className={warning.answers ? "mt-3" : undefined}>{t("removeMetricsBody")}</p>
-              <ul className="mt-2 list-disc space-y-1 pl-5">{warning.metrics.map((label) => <li key={label}>{label}</li>)}</ul>
-            </>
-          ) : null}
-        </>
-      ) : t("removeBody")}
-      danger
-      onClose={onClose}
-      onConfirm={async () => {
-        try {
-          await onRemove({ archiveMetrics: Boolean(warning?.metrics.length), deleteAnswers: Boolean(warning?.answers) });
-        } catch (cause) {
-          // The server says what would be deleted with it; show that and ask again.
-          if (cause instanceof ApiError && cause.code === "entry_type_has_entries") {
-            const count = (cause.details as { count?: unknown } | undefined)?.count;
-            setWarning({ answers: typeof count === "number" ? count : 1, metrics: names(cause.details) });
-            throw new Error(t("removeAnswersPrompt"));
+    <FormDialog
+      title={type.name}
+      dirty={name.trim() !== type.name}
+      busy={busy}
+      error={error}
+      onCancel={onCancel}
+      onSubmit={submit}
+      submitDisabled={!name.trim()}
+      onDelete={onRemove ? {
+        body: warning ? (
+          <>
+            {warning.answers ? <p className="font-medium text-[var(--danger)]">{t("removeAnswersBody", { count: warning.answers })}</p> : null}
+            {warning.metrics.length ? (
+              <>
+                <p className={warning.answers ? "mt-3" : undefined}>{t("removeMetricsBody")}</p>
+                <ul className="mt-2 list-disc space-y-1 pl-5">{warning.metrics.map((label) => <li key={label}>{label}</li>)}</ul>
+              </>
+            ) : null}
+          </>
+        ) : t("removeBody"),
+        onConfirm: async () => {
+          try {
+            await onRemove({ archiveMetrics: Boolean(warning?.metrics.length), deleteAnswers: Boolean(warning?.answers) });
+          } catch (cause) {
+            // The server says what would be deleted with it; show that and ask again.
+            if (cause instanceof ApiError && cause.code === "entry_type_has_entries") {
+              const count = (cause.details as { count?: unknown } | undefined)?.count;
+              setWarning({ answers: typeof count === "number" ? count : 1, metrics: names(cause.details) });
+              throw new Error(t("removeAnswersPrompt"));
+            }
+            if (cause instanceof ApiError && cause.code === "entry_type_has_metrics") {
+              setWarning({ answers: warning?.answers ?? 0, metrics: names(cause.details) });
+              throw new Error(t("removeMetricsPrompt"));
+            }
+            throw cause;
           }
-          if (cause instanceof ApiError && cause.code === "entry_type_has_metrics") {
-            setWarning({ answers: warning?.answers ?? 0, metrics: names(cause.details) });
-            throw new Error(t("removeMetricsPrompt"));
-          }
-          throw cause;
-        }
-      }}
-    />
+        },
+      } : undefined}
+    >
+      <Field label={t("nameLabel")}>
+        <input className={inputClass} value={name} maxLength={60} required onChange={(event) => setName(event.target.value)} />
+      </Field>
+    </FormDialog>
   );
 }
 
@@ -161,14 +195,10 @@ export function SharedResponsePanel({
   type,
   locked,
   onChangePolicy,
-  onRemove,
-  removable,
 }: {
   type: EntryTypeView;
   locked: boolean;
   onChangePolicy: (policy: SharedEditPolicy) => Promise<void>;
-  onRemove: () => void;
-  removable: boolean;
 }) {
   const t = useTranslations("sharedResponses");
   const f = useGoaFormat();
@@ -209,19 +239,6 @@ export function SharedResponsePanel({
             options={POLICIES.map((value) => ({ value, label: t(`policy.${value}`), hint: t(`policyHint.${value}`) }))} />
         </Field>
         <StatusMessage error={error} success={success} />
-        {!locked ? (
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--main-line)]/60 pt-4">
-            <p className="max-w-md text-xs leading-5 text-[var(--muted)]">{removable ? t("removeHint") : t("removeLastHint")}</p>
-            <button
-              type="button"
-              disabled={!removable}
-              onClick={onRemove}
-              className="min-h-10 cursor-pointer rounded-xl border border-[var(--danger-line)] px-4 text-sm text-[var(--danger)] transition hover:bg-[var(--danger-soft)] disabled:cursor-not-allowed disabled:opacity-45"
-            >
-              {t("remove")}
-            </button>
-          </div>
-        ) : null}
       </div>
     </div>
   );

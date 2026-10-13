@@ -3,12 +3,10 @@
 import { useTranslations } from "next-intl";
 import { type FormEvent, useMemo, useState } from "react";
 
-import { ActionMenu, ActionMenuItem } from "../action-menu";
 import { CheckpointPlanner } from "../checkpoint-planner";
 import { useGoaFormat } from "../format";
-import { ApiError } from "../api";
-import { ConfirmDialog, FormDialog } from "../dialog";
-import { AddSharedResponseDialog, RemoveResponseDialog, SharedGlyph, SharedResponsePanel } from "../shared-responses";
+import { FormDialog } from "../dialog";
+import { AddSharedResponseDialog, ResponseSettingsDialog, SharedGlyph, SharedResponsePanel } from "../shared-responses";
 import { cleanFields, FIELD_TYPES, FieldConfigInputs, newFieldConfig, uniqueFieldKey } from "../fields";
 import { type CatalogScope } from "../libraries";
 import { bodyFromValues, editableProperties, PropertyInputs, type PropertyValues, propertiesHaveProblem, showsRecommender, useLibraryProperties, valuesFromItem } from "../property-inputs";
@@ -44,6 +42,7 @@ import {
   PageHeading,
   SchedulePeriodFields,
   SelectableCards,
+  SlidersIcon,
   StatusMessage,
   Toggle,
 } from "../ui";
@@ -278,9 +277,13 @@ function AdminGeneral({
   );
 }
 
+/** The small plain icons at the end of a row (move up, move down, settings): one size, one colour, no background. */
+const rowIconClass = "grid h-8 w-8 flex-none cursor-pointer place-items-center text-[var(--muted)] transition hover:text-[var(--ink-strong)] disabled:cursor-default disabled:opacity-25 disabled:hover:text-[var(--muted)]";
+
 function AdminFields({
   challenge,
   onSave,
+  onRenameType,
   onSetExpectation,
   onSetPageCount,
   onSaveEntryDate,
@@ -291,6 +294,7 @@ function AdminFields({
   challenge: ChallengeDetail;
   /** `deleteAnswers`: a removed field that already has answers takes them with it (asked for first). */
   onSave: (entryTypeId: Id, fields: ChallengeField[], deleteAnswers?: boolean) => Promise<void>;
+  onRenameType: (entryTypeId: Id, name: string) => Promise<void>;
   onSetExpectation: (enabled: boolean) => Promise<void>;
   onSetPageCount: (enabled: boolean) => Promise<void>;
   onSaveEntryDate: (enabled: boolean) => Promise<void>;
@@ -335,7 +339,7 @@ function AdminFields({
 
   const [editing, setEditing] = useState<ChallengeField | "new" | null>(null);
   const [addingShared, setAddingShared] = useState(false);
-  const [removingType, setRemovingType] = useState<ChallengeDetail["entryTypes"][number] | null>(null);
+  const [managingType, setManagingType] = useState(false);
   const locked = challenge.status === "closed";
   const isShared = activeType?.answerScope === "shared";
   const otherResponseCount = types.filter((type) => type.id !== activeType?.id && type.purpose !== "expectation").length;
@@ -350,9 +354,6 @@ function AdminFields({
     setSuccess(null);
   }
 
-  // Removing a field that already has answers: say how many go, and only then remove it with them.
-  const [erasing, setErasing] = useState<{ next: ChallengeField[]; message: string; fields: Array<{ label: string; answers: number }> } | null>(null);
-
   async function commit(next: ChallengeField[], message: string, deleteAnswers = false) {
     setBusy(true);
     setError(null);
@@ -362,12 +363,9 @@ function AdminFields({
       setFields(next);
       setSuccess(message);
     } catch (cause) {
-      const held = cause instanceof ApiError && cause.code === "field_has_data"
-        ? (cause.details as { fields?: Array<{ label: string; answers: number }> } | undefined)?.fields
-        : undefined;
-      if (held?.length && !deleteAnswers) setErasing({ next, message, fields: held });
-      else if (deleteAnswers) throw cause;
-      else setError(f.error(cause));
+      // Removing is confirmed in the field's own modal, which shows the error itself.
+      if (deleteAnswers) throw cause;
+      setError(f.error(cause));
     } finally {
       setBusy(false);
     }
@@ -387,8 +385,7 @@ function AdminFields({
         title={t("fieldsTitle")}
         description={challenge.status === "draft" ? t("fieldsHintDraft") : challenge.status === "active" ? t("fieldsHintActive") : t("fieldsHintClosed")}
       />
-      {!locked ? <Button className="mb-6 min-h-11 w-full" onClick={() => { setError(null); setEditing("new"); }}>＋ {t("addField")}</Button> : null}
-      {types.length > 1 || canAddShared ? (
+      {types.length > 1 || canAddShared || activeType?.id ? (
         <div className="mb-6 flex flex-wrap items-center gap-2" role="group" aria-label={t("fieldsTypeLegend")}>
           {types.map((type) => {
             const active = type.id === selectedTypeId;
@@ -418,18 +415,15 @@ function AdminFields({
               ＋ {tSr("addShort")}
             </button>
           ) : null}
+          {/* The picked response's own settings (its name, removing it): at the end of the row that picks it. */}
+          {activeType?.id && !locked ? (
+            <button type="button" aria-label={t("responseSettings")} title={t("responseSettings")} onClick={() => { setError(null); setManagingType(true); }} className={cx(rowIconClass, "ml-auto")}>
+              <SlidersIcon className="h-4 w-4" />
+            </button>
+          ) : null}
         </div>
       ) : null}
       <div className="mb-4"><StatusMessage error={error} success={success} /></div>
-      {erasing ? (
-        <ConfirmDialog
-          title={t("fieldEraseTitle", { count: erasing.fields.length, label: erasing.fields[0].label })}
-          body={t("fieldEraseBody", { count: erasing.fields.reduce((sum, field) => sum + field.answers, 0) })}
-          danger
-          onClose={() => setErasing(null)}
-          onConfirm={async () => { await commit(erasing.next, erasing.message, true); setErasing(null); }}
-        />
-      ) : null}
       {fields.length ? (
         <ul className="divide-y divide-[var(--line)] border-t border-[var(--line)]">
           {fields.map((field, index) => (
@@ -443,16 +437,15 @@ function AdminFields({
               </div>
               {!locked ? (
                 <div className="flex flex-none items-center gap-0.5">
-                  <button type="button" className="grid h-8 w-8 place-items-center rounded-lg text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)] disabled:opacity-25" disabled={index === 0 || busy} onClick={() => move(index, -1)} aria-label={tf("moveUp")}>
+                  <button type="button" className={rowIconClass} disabled={index === 0 || busy} onClick={() => move(index, -1)} aria-label={tf("moveUp")}>
                     <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M4 10l4-4 4 4" strokeLinecap="round" strokeLinejoin="round" /></svg>
                   </button>
-                  <button type="button" className="grid h-8 w-8 place-items-center rounded-lg text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)] disabled:opacity-25" disabled={index === fields.length - 1 || busy} onClick={() => move(index, 1)} aria-label={tf("moveDown")}>
+                  <button type="button" className={rowIconClass} disabled={index === fields.length - 1 || busy} onClick={() => move(index, 1)} aria-label={tf("moveDown")}>
                     <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M4 6l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" /></svg>
                   </button>
-                  <ActionMenu label={t("moreActions")} iconOnly>
-                    <ActionMenuItem onClick={() => { setError(null); setEditing(field); }}>{t("edit")}</ActionMenuItem>
-                    <ActionMenuItem danger onClick={() => void commit(fields.filter((candidate) => candidate !== field), t("fieldsSaved"))}>{t("remove")}</ActionMenuItem>
-                  </ActionMenu>
+                  <button type="button" aria-label={t("fieldSettings", { label: field.label })} title={t("edit")} onClick={() => { setError(null); setEditing(field); }} className={rowIconClass}>
+                    <SlidersIcon className="h-4 w-4" />
+                  </button>
                 </div>
               ) : null}
             </li>
@@ -461,6 +454,16 @@ function AdminFields({
       ) : locked
         ? <EmptyState title={t("fieldsEmptyTitle")} />
         : <EmptyState title={t("fieldsEmptyTitle")} onClick={() => { setError(null); setEditing("new"); }} />}
+      {/* Right under the last field, where a new one will land: the same dashed pill as "add a response", full width. */}
+      {!locked && fields.length ? (
+        <button
+          type="button"
+          onClick={() => { setError(null); setEditing("new"); }}
+          className="mt-4 flex min-h-10 w-full cursor-pointer items-center justify-center gap-1.5 rounded-full border border-dashed border-[var(--line)] px-4 text-sm text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)]"
+        >
+          ＋ {t("addField")}
+        </button>
+      ) : null}
 
       {editing ? (
         <FieldEditorDialog
@@ -469,6 +472,10 @@ function AdminFields({
           lockType={challenge.status !== "draft" && editing !== "new" && Boolean(editing.id)}
           countable={activeType && (activeType.cardinality === "once_per_day" || activeType.cardinality === "once_per_item_day") ? { bookGoal: recipeCatalogKind(challenge.recipeKey) === "book" } : undefined}
           onCancel={() => setEditing(null)}
+          onRemove={editing === "new" || fields.length < 2 ? undefined : async () => {
+            await commit(fields.filter((candidate) => candidate !== editing), t("fieldsSaved"), true);
+            setEditing(null);
+          }}
           onSave={async (built) => {
             const next = editing === "new"
               ? [...fields, built]
@@ -484,15 +491,8 @@ function AdminFields({
           key={activeType.id}
           type={activeType}
           locked={locked}
-          removable={removable}
           onChangePolicy={(policy) => onSavePolicy(activeType.id, policy)}
-          onRemove={() => setRemovingType(activeType)}
         />
-      ) : !locked && removable && activeType ? (
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--line)] px-5 py-4">
-          <p className="max-w-md text-xs leading-5 text-[var(--muted)]">{tSr("removeHintIndividual")}</p>
-          <button type="button" onClick={() => setRemovingType(activeType)} className="min-h-10 cursor-pointer rounded-xl border border-[var(--danger-line)] px-4 text-sm text-[var(--danger)] transition hover:bg-[var(--danger-soft)]">{tSr("remove")}</button>
-        </div>
       ) : null}
 
       {addingShared ? (
@@ -501,11 +501,12 @@ function AdminFields({
           onAdd={async (payload) => { await onAddShared(payload); setAddingShared(false); }}
         />
       ) : null}
-      {removingType ? (
-        <RemoveResponseDialog
-          type={removingType}
-          onClose={() => setRemovingType(null)}
-          onRemove={async (confirmed) => { await onRemoveType(removingType.id, confirmed); setRemovingType(null); }}
+      {managingType && activeType ? (
+        <ResponseSettingsDialog
+          type={activeType}
+          onCancel={() => setManagingType(false)}
+          onRename={async (name) => { await onRenameType(activeType.id, name); setManagingType(false); setSuccess(t("fieldsSaved")); }}
+          onRemove={removable ? async (confirmed) => { await onRemoveType(activeType.id, confirmed); setManagingType(false); } : undefined}
         />
       ) : null}
 
@@ -620,6 +621,7 @@ export function FieldEditorDialog({
   countable,
   onCancel,
   onSave,
+  onRemove,
 }: {
   field?: ChallengeField;
   takenKeys: string[];
@@ -628,6 +630,8 @@ export function FieldEditorDialog({
   countable?: { bookGoal: boolean };
   onCancel: () => void;
   onSave: (field: ChallengeField) => Promise<void>;
+  /** Removes the field and whatever was already answered in it (confirmed inside this modal). */
+  onRemove?: () => Promise<void>;
 }) {
   const t = useTranslations("adminChallenge");
   const tf = useTranslations("fields");
@@ -658,6 +662,7 @@ export function FieldEditorDialog({
       onCancel={onCancel}
       onSubmit={submit}
       submitLabel={field ? undefined : t("addField")}
+      onDelete={onRemove ? { body: t("fieldDeleteBody"), onConfirm: onRemove } : undefined}
     >
       <Field label={tf("labelLabel")}>
         <input className={inputClass} value={draft.label} maxLength={100} required onChange={(event) => setDraft((current) => ({ ...current, label: event.target.value }))} />
@@ -865,6 +870,7 @@ export function AdminScreen({
   onDelete,
   onSaveParticipants,
   onSaveFields,
+  onRenameEntryType,
   onSetExpectation,
   onSetPageCount,
   onSaveEntryDate,
@@ -896,6 +902,8 @@ export function AdminScreen({
   onDelete?: () => Promise<void>;
   onSaveParticipants: (ids: Id[]) => Promise<void>;
   onSaveFields: (entryTypeId: Id, fields: ChallengeField[], deleteAnswers?: boolean) => Promise<void>;
+  /** Renames what one check-in is called ("Workout") on a challenge that logs several items per check-in. */
+  onRenameEntryType: (entryTypeId: Id, name: string) => Promise<void>;
   onSetExpectation: (enabled: boolean) => Promise<void>;
   onSetPageCount: (enabled: boolean) => Promise<void>;
   onSaveEntryDate: (enabled: boolean) => Promise<void>;
@@ -971,7 +979,7 @@ export function AdminScreen({
             </div>
           </>
         ) : null}
-        {activeTab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.visibilityPolicy}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} onSetExpectation={onSetExpectation} onSetPageCount={onSetPageCount} onSaveEntryDate={onSaveEntryDate} onAddShared={onAddSharedResponse} onRemoveType={onRemoveEntryType} onSavePolicy={onSaveSharedPolicy} /> : null}
+        {activeTab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.visibilityPolicy}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} onRenameType={onRenameEntryType} onSetExpectation={onSetExpectation} onSetPageCount={onSetPageCount} onSaveEntryDate={onSaveEntryDate} onAddShared={onAddSharedResponse} onRemoveType={onRemoveEntryType} onSavePolicy={onSaveSharedPolicy} /> : null}
         {activeTab === "checkpoints" ? <CheckpointPlanner key={`${challenge.id}:${challenge.checkpoints.map((cp) => cp.id).join(",")}`} challenge={challenge} onSaveCheckpoints={onSaveCheckpoints} onAssign={onAssignCheckpointItems} /> : null}
         {activeTab === "settings" ? <ChallengeSettings challenge={challenge} duplicateTargets={duplicateTargets} onDuplicate={onDuplicate} onOpenCopy={onOpenCopy} onDelete={onDelete} isPlatformAdmin={isPlatformAdmin} onPublishTemplate={onPublishTemplate} onUnpublishTemplate={onUnpublishTemplate} onPublish={onPublishResult} onUnpublish={onUnpublishResult} /> : null}
       </div>

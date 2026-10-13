@@ -936,8 +936,9 @@
     "scheduleEndLabel": "Ends on",
     "errEnd": "Pick the end date.",
     "changesSavedNewLink": "Changes saved. The public link changed: copy the new one.",
-    "fieldEraseTitle": "{count, plural, one {Remove \"{label}\"?} other {Remove # fields?}}",
-    "fieldEraseBody": "{count, plural, one {# answer already given is erased.} other {# answers already given are erased.}}"
+    "responseSettings": "Response settings",
+    "fieldSettings": "Settings for {label}",
+    "fieldDeleteBody": "The field leaves the form and the answers already given to it are erased."
   },
   "visibility": {
     "note": {
@@ -1036,7 +1037,6 @@
     "stepDown": "Less {field}",
     "stepUp": "More {field}",
     "newVisitOnDay": "New {name}",
-    "renameLabel": "Rename",
     "trayMore": "Show more ({count})",
     "trayLess": "Show fewer",
     "removeRow": "Remove {item}",
@@ -1054,7 +1054,8 @@
     "done": "Done",
     "visitNumbered": "{name} {number}",
     "visitCount": "{count, plural, =0 {No items} one {# item} other {# items}}",
-    "openVisit": "Open {name}"
+    "openVisit": "Open {name}",
+    "newItemHint": "Creates the item and adds it here."
   },
   "checkinLog": {
     "title": "Your check-ins",
@@ -1817,7 +1818,6 @@
     "requiredLabel": "Required",
     "requiredHint": "An item isn't done until this is filled in.",
     "add": "Add response",
-    "removeTitle": "Remove \"{name}\"",
     "removeBody": "This response goes away from every item.",
     "removeMetricsBody": "These metrics go too:",
     "removeMetricsPrompt": "Some metrics read this response. Confirm again to remove them too.",
@@ -1825,9 +1825,6 @@
     "panelTitle": "Shared with the group",
     "panelBody": "There is a single answer per item, shown to everyone along with who last changed it.",
     "policySaved": "Saved.",
-    "removeHint": "Removing it also deletes any answers already given.",
-    "removeLastHint": "A challenge needs at least one response, so this one can't be removed.",
-    "removeHintIndividual": "Take this response out of the challenge. Any answers already given to it are deleted with it.",
     "removeAnswersBody": "{count, plural, one {# answer already given goes} other {# answers already given go}} with it.",
     "removeAnswersPrompt": "Confirm again to delete the answers and remove the response."
   },

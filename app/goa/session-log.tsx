@@ -198,7 +198,6 @@ export function SessionLog({
   onSave,
   onDelete,
   onAddItem,
-  onRename,
 }: {
   challenge: ChallengeDetail;
   spec: SessionSpec;
@@ -210,8 +209,6 @@ export function SessionLog({
   onDelete?: (entryId: Id) => Promise<void>;
   /** Present for someone who may add items to the challenge — makes "New item" available in the tray. */
   onAddItem?: (title: string) => Promise<Id>;
-  /** Present for a manager — renames what one check-in is called ("Treino"). */
-  onRename?: (name: string) => Promise<void>;
 }) {
   const t = useTranslations("sessionLog");
   const tf = useTranslations("entryForm");
@@ -282,7 +279,6 @@ export function SessionLog({
   const [removing, setRemoving] = useState(false);
   // "New item" being named in the tray. It never touches the rows until the item exists.
   const [creating, setCreating] = useState<{ title: string; busy: boolean; error: string | null } | null>(null);
-  const [renaming, setRenaming] = useState<{ name: string; busy: boolean; error: string | null } | null>(null);
   const [trayOpen, setTrayOpen] = useState(false);
   // "+ Add" opened the list of items (it's folded away while there's a check-in to repeat).
   const [adding, setAdding] = useState(false);
@@ -292,9 +288,6 @@ export function SessionLog({
   const cardsRef = useRef<HTMLOListElement>(null);
   const isCreating = creating !== null;
   useEffect(() => { if (isCreating) newItemInput.current?.focus(); }, [isCreating]);
-  const renameInput = useRef<HTMLInputElement>(null);
-  const isRenaming = renaming !== null;
-  useEffect(() => { if (isRenaming) renameInput.current?.select(); }, [isRenaming]);
   const disabled = !canEdit;
 
   function load(visit: Entry | null, onDay: string) {
@@ -458,22 +451,7 @@ export function SessionLog({
     addItemRow(itemId);
   }
 
-  async function saveRename() {
-    if (!renaming || !onRename) return;
-    const name = renaming.name.trim();
-    if (!name || name === spec.visit.name) { setRenaming(null); return; }
-    setRenaming({ ...renaming, busy: true, error: null });
-    try {
-      await onRename(name);
-      setRenaming(null);
-    } catch (cause) {
-      setRenaming({ ...renaming, busy: false, error: f.error(cause) });
-    }
-  }
-
   const startCreating = () => setCreating({ title: "", busy: false, error: null });
-  // True while a finger is on the new-item button, so the field's blur doesn't close it under the tap.
-  const pressingNewItem = useRef(false);
 
   function addItemRow(itemId: Id) {
     if (rows.some((row) => row.itemId === itemId)) { focusCard(itemId); return; }
@@ -643,30 +621,8 @@ export function SessionLog({
                 <span className={cx("h-2 w-2 flex-none rounded-full", saveState === "saved" ? "bg-[var(--ok)]" : saveState === "saving" ? "animate-pulse bg-[var(--main)]" : saveState === "error" ? "bg-[var(--danger)]" : saveState === "incomplete" ? "bg-[var(--warn)]" : "bg-[var(--line)]")} aria-hidden="true" />
                 <span className="min-w-0">{saveState === "saving" ? t("autoSaving") : saveState === "saved" ? t("autoSaved") : saveState === "error" ? t("autoError") : saveState === "incomplete" ? t("autoDraft", { what: missingText }) : t("autoIdle")}</span>
               </p>
-              {onRename && !renaming ? (
-                <button type="button" className="flex-none cursor-pointer text-xs text-[var(--muted)] underline-offset-4 transition hover:text-[var(--ink)] hover:underline" onClick={() => setRenaming({ name: spec.visit.name, busy: false, error: null })}>
-                  {t("renameLabel")}
-                </button>
-              ) : null}
             </div>
             {saveState === "error" && error ? <StatusMessage error={error} /> : null}
-            {renaming ? (
-              <div className="flex flex-wrap items-center gap-2">
-                <input
-                  ref={renameInput} className={cx(inputClass, "min-w-0 flex-1 sm:max-w-xs")} value={renaming.name} maxLength={60} disabled={renaming.busy}
-                  aria-label={t("renameLabel")}
-                  onChange={(event) => setRenaming({ ...renaming, name: event.target.value })}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") { event.preventDefault(); void saveRename(); }
-                    if (event.key === "Escape") { event.preventDefault(); setRenaming(null); }
-                  }}
-                />
-                <Button type="button" disabled={renaming.busy || !renaming.name.trim()} onClick={() => void saveRename()}>{renaming.busy ? tc("saving") : tc("save")}</Button>
-                <Button type="button" variant="ghost" disabled={renaming.busy} onClick={() => setRenaming(null)}>{tc("cancel")}</Button>
-                {renaming.error ? <span className="w-full"><StatusMessage error={renaming.error} /></span> : null}
-              </div>
-            ) : null}
-
           {rows.length ? (
             <ol ref={cardsRef} className="divide-y divide-[var(--line)] rounded-2xl border border-[var(--line)] px-4">
               {rows.map((row) => {
@@ -683,8 +639,8 @@ export function SessionLog({
                       <div className="min-w-0 flex-1">
                         <strong className="block truncate text-[15px] font-medium">{itemTitle(row.itemId)}</strong>
                       </div>
-                      <button type="button" disabled={disabled} aria-label={t("removeRow", { item: itemTitle(row.itemId) })} title={t("removeRow", { item: itemTitle(row.itemId) })} onClick={() => setRows((current) => current.filter((candidate) => candidate.key !== row.key))} className="grid h-9 w-9 flex-none cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)] disabled:opacity-50">
-                        <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M5.5 10h9" /></svg>
+                      <button type="button" disabled={disabled} aria-label={t("removeRow", { item: itemTitle(row.itemId) })} onClick={() => setRows((current) => current.filter((candidate) => candidate.key !== row.key))} className="min-h-9 flex-none cursor-pointer px-1 text-[13px] font-light text-[var(--muted)]/80 transition hover:text-[var(--ink-strong)] disabled:cursor-not-allowed disabled:opacity-50">
+                        {tc("remove")}
                       </button>
                     </div>
                     <div className="mt-3 grid grid-cols-2 items-start gap-2.5 sm:grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] [&>*:last-child:nth-child(odd)]:col-span-2 sm:[&>*:last-child:nth-child(odd)]:col-span-1">
@@ -757,59 +713,43 @@ export function SessionLog({
                     </li>
                   ) : null}
                 </ul>
-                {/* A new one: just the dashed "+" at the row's end. Tapping it fades in a field the width of the list to
-                    type the name in (nothing slides); left empty, it fades away again. */}
-                {onAddItem ? (
-                  <div className="mt-3">
-                    <div className="flex justify-end">
-                      {/* The box and the field are always there, only faded out: so they can come and go slowly. */}
-                      <div className="relative flex min-h-14 w-full items-center gap-3 px-4">
-                        <span aria-hidden="true" className={cx("pointer-events-none absolute inset-0 rounded-2xl bg-[var(--wash)] transition-opacity duration-500 ease-out", creating ? "opacity-100" : "opacity-0")} />
-                        <input
-                          ref={newItemInput}
-                          className={cx("relative min-w-0 flex-1 bg-transparent text-[15px] text-[var(--ink)] outline-none transition-opacity duration-500 ease-out", creating ? "opacity-100" : "pointer-events-none opacity-0")}
-                          value={creating?.title ?? ""} maxLength={200} disabled={!creating || creating.busy}
-                          tabIndex={creating ? 0 : -1}
-                          aria-hidden={creating ? undefined : true}
-                          aria-label={t("newItemPlaceholder")}
-                          enterKeyHint="done"
-                          onChange={(event) => { if (creating) setCreating({ ...creating, title: event.target.value }); }}
-                          // Leaving it empty closes it — unless the tap is on its own button, which decides for itself.
-                          onBlur={() => { if (creating && !pressingNewItem.current && !creating.busy && !creating.title.trim()) setCreating(null); }}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter") { event.preventDefault(); void createItem(); }
-                            if (event.key === "Escape") { event.preventDefault(); setCreating(null); }
-                          }}
-                        />
-                        {/* One button, three jobs: "+" opens the field, "−" closes it while it's empty, "→" adds once there's a name. */}
-                        <button
-                          type="button"
-                          disabled={disabled || Boolean(creating?.busy)}
-                          aria-label={!creating ? t("newItemPill") : creating.title.trim() ? t("newItemAdd") : tc("cancel")}
-                          title={!creating ? t("newItemPill") : creating.title.trim() ? t("newItemAdd") : tc("cancel")}
-                          onPointerDown={() => { pressingNewItem.current = true; }}
-                          onPointerUp={() => { window.setTimeout(() => { pressingNewItem.current = false; }, 0); }}
-                          onPointerCancel={() => { pressingNewItem.current = false; }}
-                          onClick={() => {
-                            pressingNewItem.current = false;
-                            if (!creating) startCreating();
-                            else if (creating.title.trim()) void createItem();
-                            else setCreating(null);
-                          }}
-                          className={cx(
-                            "relative grid h-8 w-8 flex-none cursor-pointer place-items-center rounded-full text-sm transition",
-                            creating?.title.trim() ? "bg-[var(--main)] text-white hover:opacity-90" : "border border-dashed border-[var(--muted)] text-[var(--muted)] hover:border-[var(--ink-strong)] hover:text-[var(--ink-strong)]",
-                            creating?.busy && "opacity-60",
-                          )}
-                        >
-                          {creating?.title.trim() ? (
-                            <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3.5 8h9M8.5 4l4 4-4 4" /></svg>
-                          ) : creating ? "−" : "+"}
-                        </button>
+                {/* A new one: the same dashed pill as "add a field". It opens a small box right here (never a second
+                    modal over the sheet) with what it is, what it does, and the name to type. */}
+                {onAddItem && creating ? (
+                  <div className="mt-3 rounded-2xl border border-[var(--line)] p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h4 className="text-sm font-medium">{t("newItemPill")}</h4>
+                        <p className="mt-0.5 text-xs leading-5 text-[var(--muted)]">{t("newItemHint")}</p>
                       </div>
+                      <button type="button" disabled={creating.busy} aria-label={tc("close")} title={tc("close")} onClick={() => setCreating(null)} className="-mr-1.5 -mt-1 grid h-8 w-8 flex-none cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:text-[var(--ink-strong)] disabled:opacity-50">
+                        <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><circle cx="10" cy="10" r="7.5" /><path d="M6.75 10h6.5" strokeLinecap="round" /></svg>
+                      </button>
                     </div>
-                    {creating?.error ? <div className="mt-2"><StatusMessage error={creating.error} /></div> : null}
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <input
+                        ref={newItemInput} className={cx(inputClass, "min-w-0 flex-1")} value={creating.title} maxLength={200} disabled={creating.busy}
+                        aria-label={t("newItemPlaceholder")}
+                        enterKeyHint="done"
+                        onChange={(event) => setCreating({ ...creating, title: event.target.value })}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") { event.preventDefault(); void createItem(); }
+                          if (event.key === "Escape") { event.preventDefault(); setCreating(null); }
+                        }}
+                      />
+                      <Button type="button" className="min-h-11 flex-none rounded-full" disabled={creating.busy || !creating.title.trim()} onClick={() => void createItem()}>{creating.busy ? tc("saving") : t("newItemAdd")}</Button>
+                    </div>
+                    {creating.error ? <div className="mt-2"><StatusMessage error={creating.error} /></div> : null}
                   </div>
+                ) : onAddItem ? (
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    onClick={startCreating}
+                    className="mt-3 flex min-h-10 w-full cursor-pointer items-center justify-center gap-1.5 rounded-full border border-dashed border-[var(--line)] px-4 text-sm text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    ＋ {t("newItemPill")}
+                  </button>
                 ) : null}
               </section>
             ) : canEdit ? (
