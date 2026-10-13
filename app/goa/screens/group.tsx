@@ -462,21 +462,30 @@ export function GroupScreen({
                       <small className="text-[var(--muted)]">@{member.username}</small>
                     </span>
                   </div>
-                  {onSetMemberRole && group.role === "owner" && member.role !== "owner" ? (
-                    <button
-                      type="button"
-                      className="min-h-8 flex-none rounded-full border border-[var(--line)] px-3 text-[11px] text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)] disabled:opacity-50"
-                      disabled={roleBusyId === member.id}
-                      onClick={() => void toggleRole(member)}
-                    >
-                      {roleBusyId === member.id ? tc("saving") : member.role === "admin" ? t("makeParticipant") : t("makeAdmin")}
-                    </button>
-                  ) : (
-                    <span className="flex-none rounded-full bg-[var(--wash)] px-2.5 py-1 text-[11px] text-[var(--muted)]">{tr(member.role)}</span>
-                  )}
-                  {canBan(member) ? (
-                    <button type="button" className="min-h-8 flex-none cursor-pointer px-1 text-[11px] text-[var(--danger)] underline-offset-2 hover:underline" onClick={() => setBanning(member)}>{t("ban")}</button>
-                  ) : null}
+                  {/* What can be done with this person sits together at the row's right: their role, then banning. */}
+                  <div className="flex flex-none items-center justify-end gap-2">
+                    {onSetMemberRole && group.role === "owner" && member.role !== "owner" ? (
+                      <button
+                        type="button"
+                        className="min-h-8 flex-none cursor-pointer rounded-full border border-[var(--line)] px-3 text-[11px] text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)] disabled:opacity-50"
+                        disabled={roleBusyId === member.id}
+                        onClick={() => void toggleRole(member)}
+                      >
+                        {roleBusyId === member.id ? tc("saving") : member.role === "admin" ? t("makeParticipant") : t("makeAdmin")}
+                      </button>
+                    ) : (
+                      <span className="flex-none rounded-full bg-[var(--wash)] px-2.5 py-1 text-[11px] text-[var(--muted)]">{tr(member.role)}</span>
+                    )}
+                    {canBan(member) ? (
+                      <button
+                        type="button"
+                        className="min-h-8 flex-none cursor-pointer rounded-full border border-[var(--danger-line)] px-3 text-[11px] text-[var(--danger)] transition hover:bg-[var(--danger-soft)]"
+                        onClick={() => setBanning(member)}
+                      >
+                        {t("ban")}
+                      </button>
+                    ) : null}
+                  </div>
                 </li>
               ))}
             </ul>
