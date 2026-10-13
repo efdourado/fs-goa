@@ -232,7 +232,8 @@ function Shift({ title, expected, actual, min, max, fmt }: { title: string; expe
 function Bar({ value, max, tone, label, figure, strong }: { value: number; max: number; tone?: string; label: ReactNode; figure: string; strong?: boolean }) {
   return (
     <div className="grid grid-cols-[minmax(0,10rem)_1fr_auto] items-center gap-3 text-sm">
-      <span className={cx("truncate", strong ? "font-medium" : "font-light")}>{label}</span>
+      {/* Same-width digits, so a label made of numbers (a year) lines up and reads the same size on every row. */}
+      <span className={cx("truncate tabular-nums", strong ? "font-medium" : "font-light")}>{label}</span>
       <span className="h-1.5 overflow-hidden rounded-full bg-[var(--wash-strong)]">
         <span className="block h-full rounded-full" style={{ width: `${Math.max(3, (value / Math.max(1e-9, max)) * 100)}%`, background: tone ?? "var(--main)" }} />
       </span>
@@ -283,35 +284,12 @@ function ScoreShelf({ title, scores, ratingLabel, pageTiles, scrolls = true }: {
 
 const COLLAPSED_COMMENT_HEIGHT = 232;
 const textActionClass = "cursor-pointer py-1.5 text-xs font-medium text-[var(--muted)] transition hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--main)]";
-const MAX_YEAR_GROUPS = 8;
 const CHART_PREVIEW_ROWS = 5;
 const RANKING_PREVIEW_ROWS = 5;
 const PAGE_QUOTES = 4;
 /** What's left out of a preview list: "+ 70", and folding it away again: "− 70". */
 const more = (count: number) => `+ ${count}`;
 const less = (count: number) => `− ${count}`;
-
-/** Long timelines start as a few weighted periods; the detailed view restores every individual year. */
-function summarizeYears(years: GroupStat[]): GroupStat[] {
-  if (years.length <= MAX_YEAR_GROUPS) return years;
-  const chunkSize = Math.ceil(years.length / MAX_YEAR_GROUPS);
-  const groups: GroupStat[] = [];
-  for (let index = 0; index < years.length; index += chunkSize) {
-    const chunk = years.slice(index, index + chunkSize);
-    const count = chunk.reduce((sum, year) => sum + year.count, 0);
-    const first = chunk[0].key;
-    const last = chunk.at(-1)!.key;
-    const shortLast = first.slice(0, 2) === last.slice(0, 2) ? last.slice(2) : last;
-    groups.push({
-      key: first === last ? first : `${first}–${shortLast}`,
-      count,
-      average: Math.round((chunk.reduce((sum, year) => sum + year.average * year.count, 0) / count) * 10) / 10,
-      score: chunk.reduce((sum, year) => sum + year.score * year.count, 0) / count,
-      items: chunk.flatMap((year) => year.items),
-    });
-  }
-  return groups;
-}
 
 /** A steady-height comment card that opens in place only when its words need the room. */
 function ExpandableComment({ text }: { text: string }) {
@@ -408,7 +386,8 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
     const fullPodiumLayout = [3, 1, 0, 2, 4].flatMap((index) => fullPodium[index] ? [{ score: fullPodium[index], place: index + 1 }] : []);
     const compactRest = s.ranking.slice(3);
     const fullRest = s.ranking.slice(5);
-    const yearGroups = summarizeYears(s.years);
+    // Always one line per year, never merged into ranges; a long list starts short and unfolds like the others.
+    const yearGroups = s.years;
     const displayedGenres = !full && genresExpanded ? s.genres : s.genres.slice(0, CHART_PREVIEW_ROWS);
     const displayedYearGroups = !full && yearGroupsExpanded ? yearGroups : yearGroups.slice(0, CHART_PREVIEW_ROWS);
     const tallestYearCount = Math.max(...yearGroups.map((row) => row.count));
@@ -482,7 +461,6 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
               label={<>{year.key} <span className="text-xs text-[var(--muted)]">· {year.count}</span></>}
               value={year.count}
               max={tallestYearCount}
-              strong={year.count >= 2 && year.score === bestYearScore}
               figure={fmt(year.average)}
               tone={year.count >= 2 && year.score === bestYearScore ? "var(--main)" : "var(--main-line)"}
             />
