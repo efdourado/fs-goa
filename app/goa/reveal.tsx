@@ -7,7 +7,7 @@ import { copyText } from "./clipboard";
 import { firstName, landedAfter, personTone, RatingScale } from "./rating-scale";
 import { ConfirmDialog } from "./dialog";
 import type { ChallengeDetail, ChallengeItem, Entry, EntryTypeView, Id } from "./types";
-import { Button, cx } from "./ui";
+import { AvatarMark, Button, cx } from "./ui";
 import { entryRatingReader, itemIdForEntry, valuesAsRecord } from "./utils";
 
 /** The rating type whose answers stay sealed until the group reveals them together, if the challenge has one. */
@@ -21,7 +21,6 @@ export function isSealed(challenge: Pick<ChallengeDetail, "status">, item: Pick<
   return challenge.status !== "closed" && !item.revealedAt;
 }
 
-const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "?";
 
 interface Landed {
   id: Id;
@@ -128,9 +127,9 @@ export function RevealPanel({
           return (
             <li key={participant.id} className="flex items-center gap-2 rounded-full bg-white/[0.06] py-1 pl-1 pr-3">
               <span className={cx(
-                "grid h-8 w-8 place-items-center rounded-full text-[11px] font-bold",
-                done ? "reveal-sealed bg-[var(--spotlight-ink)] text-[var(--spotlight)]" : "border border-dashed border-white/30 text-white/45",
-              )}>{done ? <LockGlyph /> : initials(participant.name)}</span>
+                "grid h-8 w-8 place-items-center overflow-hidden rounded-full text-[11px] font-bold",
+                done ? "reveal-sealed bg-[var(--spotlight-ink)] text-[var(--spotlight)]" : "border border-dashed border-white/30 opacity-55",
+              )}>{done ? <LockGlyph /> : <AvatarMark />}</span>
               <span className={cx("text-xs", done ? "text-white/85" : "text-white/45")}>
                 {participant.userId === userId ? t("you") : participant.name}
               </span>

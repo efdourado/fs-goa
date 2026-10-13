@@ -3,9 +3,10 @@
 import { useFormatter, useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 
-import { firstName, initialsOf, personTone } from "../rating-scale";
+import { firstName, personTone } from "../rating-scale";
 import type { Id } from "../types";
 import { addDaysKey, type DatedStory, daysBetween, type StoryInput, weekIndex } from "./model";
+import { AvatarMark } from "../ui";
 
 const LANE = 46;
 const TOP = 30;
@@ -87,7 +88,7 @@ export function DatedThread({ story, input, focus, run, fit = false }: { story: 
         {/* Names stay pinned on the left while the calendar scrolls. */}
         {story.lanes.map((lane, laneIndex) => (
           <div key={lane.person.id} className="absolute left-0 flex items-center gap-1.5 pl-1" style={{ top: TOP + laneIndex * LANE + LANE / 2 - 12, opacity: focus !== null && focus !== lane.person.id ? 0.3 : 1 }}>
-            <span className="grid h-6 w-6 place-items-center rounded-full text-[9px] font-bold text-white" style={{ background: personTone(ids, lane.person.id) }}>{initialsOf(lane.person.name)}</span>
+            <span className="grid h-6 w-6 place-items-center rounded-full p-[2px]" style={{ background: personTone(ids, lane.person.id) }}><AvatarMark /></span>
             <span className="max-w-[3.6rem] truncate text-[11px] text-white/75">{firstName(lane.person.name)}</span>
           </div>
         ))}

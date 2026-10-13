@@ -3,6 +3,7 @@
 import { useLocale, useTranslations } from "next-intl";
 
 import type { AffinityBlock, PersonalRanking } from "./types";
+import { AvatarMark } from "./ui";
 
 /**
  * The Wrapped's personal-rankings and affinity sections. Client components —
@@ -98,7 +99,7 @@ export function PersonalRankingsBlock({ rankings }: { rankings: PersonalRanking[
         <details className="group py-4 first:pt-0" key={person.userId}>
           <summary className="flex cursor-pointer list-none items-center justify-between gap-4 [&::-webkit-details-marker]:hidden">
             <div className="flex min-w-0 items-center gap-3">
-              <span aria-hidden="true" className="grid size-9 shrink-0 place-items-center rounded-full border-2 border-[var(--paper)] bg-[var(--main-line)] text-xs font-black">{lower(person.name.slice(0, 1))}</span>
+              <span aria-hidden="true" className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-[var(--paper)] bg-[var(--main-line)]"><AvatarMark /></span>
               <div className="min-w-0 leading-tight">
                 <strong className="block text-sm">{person.name}</strong>
                 <span className="block text-xs text-[var(--muted)]">{t("records", { count: person.entryCount })}{person.completionRate !== null ? ` · ${fmt(person.completionRate, "%")} ${lower(t("rankings.completion"))}` : ""}</span>

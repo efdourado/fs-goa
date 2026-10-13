@@ -4,9 +4,9 @@ import { useTranslations } from "next-intl";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { Dialog } from "../dialog";
-import { firstName, initialsOf, personTone } from "../rating-scale";
+import { firstName, personTone } from "../rating-scale";
 import type { Metric } from "../types";
-import { cx } from "../ui";
+import { AvatarMark, cx } from "../ui";
 import { type AlmanacPage, useAlmanacPages } from "./almanac";
 import { downloadNode, downloadZip, renderPng, slug } from "./download";
 import type { Story, StoryInput } from "./model";
@@ -82,7 +82,7 @@ function useDesignedPages(input: StoryInput, story: Story, metrics: Metric[]): D
               <ul className="flex flex-wrap gap-3">
                 {people.map((person) => (
                   <li key={person.id} className="flex items-center gap-2 rounded-full bg-white/[0.07] py-1 pl-1 pr-3.5 text-base">
-                    <span className="grid h-8 w-8 place-items-center rounded-full text-[11px] font-bold text-white" style={{ background: personTone(ids, person.id) }}>{initialsOf(person.name)}</span>
+                    <span className="grid h-8 w-8 place-items-center rounded-full p-[2px]" style={{ background: personTone(ids, person.id) }}><AvatarMark /></span>
                     {firstName(person.name)}
                   </li>
                 ))}

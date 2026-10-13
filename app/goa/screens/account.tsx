@@ -7,7 +7,7 @@ import { Dialog } from "../dialog";
 import { API_PATHS, apiRequest } from "../api";
 import { useGoaFormat } from "../format";
 import type { ChallengeSummary, User } from "../types";
-import { BackButton, Button, Disclosure, Field, inputClass, PageHeading, StatusMessage, Toggle } from "../ui";
+import { AvatarMark, BackButton, Button, Disclosure, Field, inputClass, PageHeading, StatusMessage, Toggle } from "../ui";
 
 // Mirror of `PASSWORD_MIN_LENGTH` in lib/security — the server rejects shorter.
 const PASSWORD_MIN_LENGTH = 10;
@@ -176,7 +176,6 @@ export function AccountScreen({
     }
   }
 
-  const initials = user.name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("");
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-8 pb-24 sm:px-6 sm:py-10">
@@ -186,7 +185,7 @@ export function AccountScreen({
       {/* identity + editable name */}
       <form onSubmit={saveProfile} className="space-y-5">
         <div className="flex items-center gap-4">
-          <span className="grid h-14 w-14 flex-none place-items-center rounded-full bg-[var(--main-line)] text-lg font-black" aria-hidden="true">{initials}</span>
+          <span className="grid h-14 w-14 flex-none place-items-center overflow-hidden rounded-full bg-[var(--main-line)]" aria-hidden="true"><AvatarMark /></span>
           <div className="min-w-0">
             <strong className="block truncate text-base font-semibold">{user.name}</strong>
             <span className="block truncate text-sm text-[var(--muted)]">

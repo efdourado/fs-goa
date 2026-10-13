@@ -4,11 +4,11 @@ import { useFormatter, useTranslations } from "next-intl";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 
 import { coverColors, coverToneOf, ItemCover } from "../catalog-cover";
-import { firstName, initialsOf, personTone } from "../rating-scale";
+import { firstName, personTone } from "../rating-scale";
 import { Rail, RailArrows, useShelfRail } from "../shelf";
 import type { Id, Metric } from "../types";
 import { Dialog } from "../dialog";
-import { CommentText, cx } from "../ui";
+import { AvatarMark, CommentText, cx } from "../ui";
 import { formatRuntime } from "../utils";
 import type { DatedStory, GroupStat, ItemScore, RatedStory, Story, StoryInput } from "./model";
 
@@ -243,7 +243,7 @@ function Bar({ value, max, tone, label, figure, strong }: { value: number; max: 
 }
 
 function Avatar({ id, name, ids, size = 7 }: { id: Id; name: string; ids: Id[]; size?: number }) {
-  return <span className="grid flex-none place-items-center rounded-full text-[10px] font-bold text-white" style={{ background: personTone(ids, id), width: size * 4, height: size * 4 }}>{initialsOf(name)}</span>;
+  return <span title={name} className="grid flex-none place-items-center rounded-full p-[2px]" style={{ background: personTone(ids, id), width: size * 4, height: size * 4 }}><AvatarMark /></span>;
 }
 
 /** One catalogue cover with its caption, as the homepage shelf draws it (nothing to open here). */

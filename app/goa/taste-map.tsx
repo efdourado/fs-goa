@@ -5,14 +5,13 @@ import { type CSSProperties, useEffect, useState } from "react";
 
 import { API_PATHS, apiRequest } from "./api";
 import type { Id } from "./types";
-import { cx } from "./ui";
+import { AvatarMark, cx } from "./ui";
 
 interface TasteMoment { title: string; you: number; them: number }
 interface TastePerson { userId: Id; name: string; shared: number; agreement: number | null; twin: TasteMoment | null; clash: TasteMoment | null }
 interface TastePair { a: { userId: Id; name: string }; b: { userId: Id; name: string }; agreement: number; shared: number }
 interface GroupTaste { viewerId: Id; minShared: number; ratedCount: number; people: TastePerson[]; twins: TastePair | null; opposites: TastePair | null }
 
-const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "?";
 
 /** Agreement as a colour: close in taste is green, far is coral — same language as the reveal. */
 function toneFor(agreement: number): string {
@@ -115,10 +114,10 @@ export function TasteMap({ groupId, youLabel }: { groupId: Id; youLabel: string 
                 aria-pressed={selected?.userId === person.userId}
               >
                 <span
-                  className={cx("grid h-10 w-10 place-items-center rounded-full text-xs font-bold text-white shadow-lg transition", selected?.userId === person.userId && "ring-2 ring-white ring-offset-2 ring-offset-[var(--spotlight)]")}
+                  className={cx("grid h-10 w-10 place-items-center rounded-full p-[2.5px] shadow-lg transition", selected?.userId === person.userId && "ring-2 ring-white ring-offset-2 ring-offset-[var(--spotlight)]")}
                   style={{ background: toneFor(person.agreement) }}
                 >
-                  {initials(person.name)}
+                  <AvatarMark />
                 </span>
                 <span className="whitespace-nowrap rounded-full bg-black/35 px-1.5 text-[10px] tabular-nums text-white/85">{person.agreement}%</span>
               </button>
@@ -168,7 +167,7 @@ export function TasteMap({ groupId, youLabel }: { groupId: Id; youLabel: string 
               <ul className="mt-2 flex flex-wrap gap-2">
                 {waiting.map((person) => (
                   <li key={person.userId} className="flex items-center gap-1.5 rounded-full bg-white/[0.06] py-0.5 pl-0.5 pr-2.5 text-xs text-white/60">
-                    <span className="grid h-6 w-6 place-items-center rounded-full border border-dashed border-white/30 text-[9px] font-bold">{initials(person.name)}</span>
+                    <span className="grid h-6 w-6 place-items-center overflow-hidden rounded-full border border-dashed border-white/30 opacity-60"><AvatarMark /></span>
                     {t("sharedSoFar", { name: person.name.split(/\s+/)[0], count: person.shared })}
                   </li>
                 ))}

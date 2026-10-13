@@ -3,10 +3,10 @@
 import { useFormatter, useTranslations } from "next-intl";
 import { useState } from "react";
 
-import { firstName, initialsOf, personTone } from "../rating-scale";
+import { firstName, personTone } from "../rating-scale";
 import type { Id, Metric } from "../types";
 import { PagedView } from "../paged-view";
-import { cx } from "../ui";
+import { AvatarMark, cx } from "../ui";
 import { useAlmanacPages } from "./almanac";
 import type { Story, StoryInput } from "./model";
 import { DatedThread } from "./thread-dated";
@@ -85,7 +85,7 @@ export function ThreadPanel({ input, story, fit = false, interactive = true }: {
             aria-pressed={focus === person.id}
             className={cx("flex items-center gap-1.5 rounded-full py-0.5 pl-0.5 pr-2.5 text-xs transition", interactive && "cursor-pointer", focus === person.id ? "bg-white/20" : "bg-white/[0.06] hover:bg-white/10", focus !== null && focus !== person.id && "opacity-50")}
           >
-            <span className="grid h-6 w-6 place-items-center rounded-full text-[9px] font-bold text-white" style={{ background: personTone(ids, person.id) }}>{initialsOf(person.name)}</span>
+            <span className="grid h-6 w-6 place-items-center rounded-full p-[2px]" style={{ background: personTone(ids, person.id) }}><AvatarMark /></span>
             {firstName(person.name)}
           </button>
         ))}

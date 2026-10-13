@@ -40,6 +40,7 @@ import { AddItemsDialog } from "../cine-items";
 import type { CatalogScope } from "../libraries";
 import { ItemEditorDialog } from "./admin";
 import {
+  AvatarMark,
   BackButton,
   Button,
   cardClass,
@@ -1850,7 +1851,7 @@ export function ParticipantChallengeScreen({
                 ].join(" · ");
                 return (
                   <div key={participant.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-                    <span className="grid h-9 w-9 flex-none place-items-center rounded-full border-2 border-[var(--paper)] bg-[var(--main-line)] text-xs font-black" aria-hidden="true">{participant.name.split(/\s+/).slice(0, 1).map((part) => part[0]).join("")}</span>
+                    <span className="grid h-9 w-9 flex-none place-items-center overflow-hidden rounded-full border-2 border-[var(--paper)] bg-[var(--main-line)]" aria-hidden="true"><AvatarMark /></span>
                     <div className="min-w-0 flex-1 leading-tight">
                       <span className="block truncate text-sm">{participant.name} {participant.userId === user?.id && `(${t("youLabel")})`}</span>
                       <span className="block truncate text-xs text-[var(--muted)]">{caption}</span>
@@ -1877,7 +1878,6 @@ export function ParticipantChallengeScreen({
               <div className="divide-y divide-[var(--line)]">
                 {[...challenge.participants].sort((a, b) => Number(b.userId === user?.id) - Number(a.userId === user?.id)).map((participant) => {
                   const isSelf = participant.userId === user?.id;
-                  const initial = participant.name.split(/\s+/).slice(0, 1).map((part) => part[0]).join("");
                   const rating = selectedItem && hasRatingType ? ratingForParticipant(participant.userId, selectedItem.id) : null;
                   const daysAgo = lastEntryDaysAgo(participant.userId);
                   const completed = sortedItems.length > 1 ? completedCountForParticipant(participant.userId) : null;
@@ -1887,7 +1887,7 @@ export function ParticipantChallengeScreen({
                   ].filter(Boolean).join(" · ");
                   return (
                     <div key={participant.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-                      <span className="grid h-9 w-9 flex-none place-items-center rounded-full border-2 border-[var(--paper)] bg-[var(--main-line)] text-xs font-black" aria-hidden="true">{initial}</span>
+                      <span className="grid h-9 w-9 flex-none place-items-center overflow-hidden rounded-full border-2 border-[var(--paper)] bg-[var(--main-line)]" aria-hidden="true"><AvatarMark /></span>
                       <div className="min-w-0 flex-1 leading-tight">
                         <span className="block truncate text-sm">{participant.name} {isSelf && `(${t("youLabel")})`}</span>
                         <span className="block truncate text-xs text-[var(--muted)]">{caption}</span>

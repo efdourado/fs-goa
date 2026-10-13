@@ -572,16 +572,27 @@ export function SchedulePeriodFields({
 }
 
 /** The person's initial in a soft disc — the header's avatar; `large` is the same disc on the You page. */
-export function UserAvatar({ name, large = false }: { name: string; large?: boolean }) {
+/**
+ * goa's mark, for now the face of every profile: wherever a person used to be a circle with their initial,
+ * the circle holds this picture instead. It fills whatever circle it is put in; where a colour is what tells
+ * people apart (the thread, the scales), the circle keeps a thin ring of it around the picture.
+ */
+export function AvatarMark() {
+  // A fixed little file from /public, drawn at a few dozen pixels: next/image would add nothing here.
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/fb.jpg" alt="" aria-hidden="true" draggable={false} className="h-full w-full rounded-full object-cover" />;
+}
+
+export function UserAvatar({ large = false }: { name: string; large?: boolean }) {
   return (
     <span
       className={cx(
-        "grid flex-none place-items-center rounded-full border-2 border-[var(--paper)] bg-[var(--main-line)] font-black",
-        large ? "h-14 w-14 text-xl" : "h-9 w-9 text-xs",
+        "grid flex-none place-items-center overflow-hidden rounded-full border-2 border-[var(--paper)] bg-[var(--main-line)]",
+        large ? "h-14 w-14" : "h-9 w-9",
       )}
       aria-hidden="true"
     >
-      {name.split(/\s+/).slice(0, 1).map((part) => part[0]).join("")}
+      <AvatarMark />
     </span>
   );
 }

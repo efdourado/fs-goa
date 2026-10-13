@@ -13,7 +13,7 @@ import { catalogCardHeight, CatalogTile, resolveCoverTop } from "../catalog-view
 import { LibraryGlyph, useCatalogShelf, useLibraryName } from "../libraries";
 import { Rail, RailArrows, shelfCardWidth, useShelfRail } from "../shelf";
 import type { CatalogItem, ChallengeSummary, GroupInviteResult, GroupSummary, Id, Member, PendingGroupRequest } from "../types";
-import { BackButton, Button, cx, EmptyState, Field, inputClass, SlidersIcon, StatusMessage, Toggle } from "../ui";
+import { AvatarMark, BackButton, Button, cx, EmptyState, Field, inputClass, SlidersIcon, StatusMessage, Toggle } from "../ui";
 import { canManage, formatRuntime } from "../utils";
 import { ActiveChallengeCard } from "./dashboard";
 
@@ -269,8 +269,8 @@ export function GroupScreen({
       <div className="mt-4 flex flex-wrap items-center gap-3 border-b border-[var(--line)] pb-5">
         <div className="flex">
           {(group.members ?? []).slice(0, 5).map((member, index) => (
-            <span key={member.id} className={cx("grid h-7 w-7 place-items-center rounded-full border-2 border-[var(--paper)] bg-[var(--main-line)] text-[10px] font-black", index > 0 && "-ml-2")}>
-              {member.name.split(/\s+/).slice(0, 1).map((part) => part[0]).join("")}
+            <span key={member.id} title={member.name} className={cx("grid h-7 w-7 place-items-center overflow-hidden rounded-full border-2 border-[var(--paper)] bg-[var(--main-line)]", index > 0 && "-ml-2")}>
+              <AvatarMark />
             </span>
           ))}
           {memberCount > 5 ? <span className="-ml-2 grid h-7 w-7 place-items-center rounded-full border-2 border-[var(--paper)] bg-[var(--wash-strong)] text-[10px] font-black text-[var(--muted)]">+{memberCount - 5}</span> : null}
@@ -454,8 +454,8 @@ export function GroupScreen({
               {group.members.map((member) => (
                 <li className="flex items-center justify-between gap-3 py-3" key={member.id}>
                   <div className="flex items-center gap-3">
-                    <span className="grid h-8 w-8 flex-none place-items-center rounded-full bg-[var(--wash-strong)] text-[11px] font-bold text-[var(--muted)]">
-                      {member.name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("")}
+                    <span className="grid h-8 w-8 flex-none place-items-center overflow-hidden rounded-full bg-[var(--wash-strong)]">
+                      <AvatarMark />
                     </span>
                     <span className="min-w-0">
                       <strong className="block truncate text-[13.5px] font-medium">{member.name}</strong>

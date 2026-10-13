@@ -4,7 +4,7 @@ import { useFormatter } from "next-intl";
 import { type CSSProperties, useEffect, useRef, useState } from "react";
 
 import type { Id } from "./types";
-import { cx } from "./ui";
+import { AvatarMark, cx } from "./ui";
 
 /**
  * Each person keeps one colour wherever they appear (reveal, recap, taste map) — an identity, not a
@@ -109,10 +109,10 @@ export function RatingScale({
         <div key={person.id} className="absolute bottom-6 -translate-x-1/2" style={{ left: `${left}%`, marginBottom: `${level * SLOT}px` }}>
           <div className="reveal-drop flex flex-col items-center" style={delay(startDelay + index * step)}>
             <span
-              className={cx("grid h-10 w-10 place-items-center rounded-full text-xs font-bold text-white shadow-lg", person.self && "ring-2 ring-white ring-offset-2 ring-offset-[var(--spotlight)]")}
+              className={cx("grid h-10 w-10 place-items-center rounded-full p-[2.5px] shadow-lg", person.self && "ring-2 ring-white ring-offset-2 ring-offset-[var(--spotlight)]")}
               style={{ background: person.tone }}
             >
-              {initialsOf(person.name)}
+              <AvatarMark />
             </span>
             <span className="mt-1 whitespace-nowrap rounded-full bg-black/40 px-1.5 py-px text-[10px] leading-4 text-white">
               {labelFor ? labelFor(person) : firstName(person.name)} <strong className="font-semibold tabular-nums">{fmt(person.value)}</strong>
