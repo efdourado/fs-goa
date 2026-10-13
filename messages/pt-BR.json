@@ -1050,7 +1050,7 @@
     "autoSaved": "Salvo",
     "autoError": "Não deu para salvar agora. Tentamos de novo na próxima mudança.",
     "autoDraft": "Rascunho guardado neste aparelho · falta {what}",
-    "autoIdle": "Escolha o que vai fazer. Tudo se salva sozinho.",
+    "autoIdle": "Tudo se salva sozinho.",
     "done": "Pronto",
     "visitNumbered": "{name} {number}",
     "visitCount": "{count, plural, =0 {Nenhum item} one {# item} other {# itens}}",

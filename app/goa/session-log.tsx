@@ -471,6 +471,10 @@ export function SessionLog({
     }
   }
 
+  const startCreating = () => setCreating({ title: "", busy: false, error: null });
+  // True while a finger is on the new-item button, so the field's blur doesn't close it under the tap.
+  const pressingNewItem = useRef(false);
+
   function addItemRow(itemId: Id) {
     if (rows.some((row) => row.itemId === itemId)) { focusCard(itemId); return; }
     setRows((current) => [...current, { key: newRowKey(), itemId, values: {} }]);
@@ -680,7 +684,7 @@ export function SessionLog({
                         <strong className="block truncate text-[15px] font-medium">{itemTitle(row.itemId)}</strong>
                       </div>
                       <button type="button" disabled={disabled} aria-label={t("removeRow", { item: itemTitle(row.itemId) })} title={t("removeRow", { item: itemTitle(row.itemId) })} onClick={() => setRows((current) => current.filter((candidate) => candidate.key !== row.key))} className="grid h-9 w-9 flex-none cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)] disabled:opacity-50">
-                        <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><circle cx="10" cy="10" r="7.5" /><path d="M6.75 10h6.5" strokeLinecap="round" /></svg>
+                        <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M5.5 10h9" /></svg>
                       </button>
                     </div>
                     <div className="mt-3 grid grid-cols-2 items-start gap-2.5 sm:grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] [&>*:last-child:nth-child(odd)]:col-span-2 sm:[&>*:last-child:nth-child(odd)]:col-span-1">
@@ -745,39 +749,72 @@ export function SessionLog({
                       </li>
                     );
                   })}
-                </ul>
-                <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                   {hiddenTrayCount > 0 || trayOpen ? (
-                    <button type="button" onClick={() => setTrayOpen((open) => !open)} className="min-h-10 cursor-pointer px-1 text-sm text-[var(--muted)] transition hover:text-[var(--ink)]">
-                      {trayOpen ? t("trayLess") : t("trayMore", { count: hiddenTrayCount })}
-                    </button>
-                  ) : <span />}
-                  {onAddItem && !creating ? (
-                    <button type="button" disabled={disabled} onClick={() => setCreating({ title: "", busy: false, error: null })} className="min-h-10 cursor-pointer px-1 text-sm text-[var(--ink)] transition hover:text-[var(--ink-strong)] disabled:opacity-50">
-                      ＋ {t("newItemPill")}
-                    </button>
+                    <li>
+                      <button type="button" onClick={() => setTrayOpen((open) => !open)} className="flex min-h-11 w-full cursor-pointer items-center justify-center text-xs text-[var(--muted)] transition hover:text-[var(--ink-strong)]">
+                        {trayOpen ? t("trayLess") : t("trayMore", { count: hiddenTrayCount })}
+                      </button>
+                    </li>
                   ) : null}
-                </div>
-                {creating ? (
-                  <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-[var(--wash)] p-2.5">
-                    <input
-                      ref={newItemInput} className={cx(inputClass, "min-w-0 flex-1")} value={creating.title} maxLength={200} disabled={creating.busy}
-                      placeholder={t("newItemPlaceholder")} aria-label={t("newItemPlaceholder")}
-                      onChange={(event) => setCreating({ ...creating, title: event.target.value })}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") { event.preventDefault(); void createItem(); }
-                        if (event.key === "Escape") { event.preventDefault(); setCreating(null); }
-                      }}
-                    />
-                    <Button type="button" disabled={creating.busy || !creating.title.trim()} onClick={() => void createItem()}>{creating.busy ? tc("saving") : t("newItemAdd")}</Button>
-                    <Button type="button" variant="ghost" disabled={creating.busy} onClick={() => setCreating(null)}>{tc("cancel")}</Button>
-                    {creating.error ? <span className="w-full"><StatusMessage error={creating.error} /></span> : null}
+                </ul>
+                {/* A new one: just the dashed "+" at the row's end. Tapping it fades in a field the width of the list to
+                    type the name in (nothing slides); left empty, it fades away again. */}
+                {onAddItem ? (
+                  <div className="mt-3">
+                    <div className="flex justify-end">
+                      {/* The box and the field are always there, only faded out: so they can come and go slowly. */}
+                      <div className="relative flex min-h-14 w-full items-center gap-3 px-4">
+                        <span aria-hidden="true" className={cx("pointer-events-none absolute inset-0 rounded-2xl bg-[var(--wash)] transition-opacity duration-500 ease-out", creating ? "opacity-100" : "opacity-0")} />
+                        <input
+                          ref={newItemInput}
+                          className={cx("relative min-w-0 flex-1 bg-transparent text-[15px] text-[var(--ink)] outline-none transition-opacity duration-500 ease-out", creating ? "opacity-100" : "pointer-events-none opacity-0")}
+                          value={creating?.title ?? ""} maxLength={200} disabled={!creating || creating.busy}
+                          tabIndex={creating ? 0 : -1}
+                          aria-hidden={creating ? undefined : true}
+                          aria-label={t("newItemPlaceholder")}
+                          enterKeyHint="done"
+                          onChange={(event) => { if (creating) setCreating({ ...creating, title: event.target.value }); }}
+                          // Leaving it empty closes it — unless the tap is on its own button, which decides for itself.
+                          onBlur={() => { if (creating && !pressingNewItem.current && !creating.busy && !creating.title.trim()) setCreating(null); }}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") { event.preventDefault(); void createItem(); }
+                            if (event.key === "Escape") { event.preventDefault(); setCreating(null); }
+                          }}
+                        />
+                        {/* One button, three jobs: "+" opens the field, "−" closes it while it's empty, "→" adds once there's a name. */}
+                        <button
+                          type="button"
+                          disabled={disabled || Boolean(creating?.busy)}
+                          aria-label={!creating ? t("newItemPill") : creating.title.trim() ? t("newItemAdd") : tc("cancel")}
+                          title={!creating ? t("newItemPill") : creating.title.trim() ? t("newItemAdd") : tc("cancel")}
+                          onPointerDown={() => { pressingNewItem.current = true; }}
+                          onPointerUp={() => { window.setTimeout(() => { pressingNewItem.current = false; }, 0); }}
+                          onPointerCancel={() => { pressingNewItem.current = false; }}
+                          onClick={() => {
+                            pressingNewItem.current = false;
+                            if (!creating) startCreating();
+                            else if (creating.title.trim()) void createItem();
+                            else setCreating(null);
+                          }}
+                          className={cx(
+                            "relative grid h-8 w-8 flex-none cursor-pointer place-items-center rounded-full text-sm transition",
+                            creating?.title.trim() ? "bg-[var(--main)] text-white hover:opacity-90" : "border border-dashed border-[var(--muted)] text-[var(--muted)] hover:border-[var(--ink-strong)] hover:text-[var(--ink-strong)]",
+                            creating?.busy && "opacity-60",
+                          )}
+                        >
+                          {creating?.title.trim() ? (
+                            <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3.5 8h9M8.5 4l4 4-4 4" /></svg>
+                          ) : creating ? "−" : "+"}
+                        </button>
+                      </div>
+                    </div>
+                    {creating?.error ? <div className="mt-2"><StatusMessage error={creating.error} /></div> : null}
                   </div>
                 ) : null}
               </section>
             ) : canEdit ? (
-              <button type="button" disabled={disabled} onClick={() => setAdding(true)} className="flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-[var(--line)] text-sm text-[var(--ink)] transition hover:border-[var(--muted)] hover:text-[var(--ink-strong)] disabled:opacity-50">
-                ＋ {t("addRows")}
+              <button type="button" disabled={disabled} aria-label={t("addRows")} title={t("addRows")} onClick={() => setAdding(true)} className="flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-[var(--line)] text-lg text-[var(--ink)] transition hover:border-[var(--muted)] hover:text-[var(--ink-strong)] disabled:opacity-50">
+                <span aria-hidden="true">＋</span>
               </button>
             ) : null}
 

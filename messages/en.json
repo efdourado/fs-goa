@@ -1050,7 +1050,7 @@
     "autoSaved": "Saved",
     "autoError": "Couldn't save just now. We'll try again on the next change.",
     "autoDraft": "Draft kept on this device · missing {what}",
-    "autoIdle": "Pick what you are doing. Everything saves on its own.",
+    "autoIdle": "Everything saves on its own.",
     "done": "Done",
     "visitNumbered": "{name} {number}",
     "visitCount": "{count, plural, =0 {No items} one {# item} other {# items}}",

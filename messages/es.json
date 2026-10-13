@@ -1050,7 +1050,7 @@
     "autoSaved": "Guardado",
     "autoError": "No se pudo guardar ahora. Lo intentamos de nuevo en el próximo cambio.",
     "autoDraft": "Borrador guardado en este dispositivo · falta {what}",
-    "autoIdle": "Elige lo que vas a hacer. Todo se guarda solo.",
+    "autoIdle": "Todo se guarda solo.",
     "done": "Listo",
     "visitNumbered": "{name} {number}",
     "visitCount": "{count, plural, =0 {Ningún ítem} one {# ítem} other {# ítems}}",
