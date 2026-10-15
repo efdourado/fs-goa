@@ -60,7 +60,10 @@ export default async function ChallengeExportPage({ params }: { params: Promise<
 @page { size: A4; margin: 24mm 0 22mm; background: #faf8f3;
   @bottom-center { content: ${footer} counter(page); font-family: ${display.style.fontFamily}; font-size: 7.5pt; letter-spacing: 0.04em; color: #a8a498; }
 }
-@page :first { @bottom-center { content: none; } }`;
+@page :first { @bottom-center { content: none; } }
+/* Where the sheet can carry its own top and bottom margins onto every page (export.css), the page's are
+   dropped: then the print dialog's "Margins" setting (often left on "None") can't take them away. */
+@supports (box-decoration-break: clone) { @page { margin: 0; } }`;
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: pageCss }} />
