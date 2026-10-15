@@ -282,7 +282,8 @@ function ScoreShelf({ title, scores, ratingLabel, pageTiles, scrolls = true }: {
   );
 }
 
-const COLLAPSED_COMMENT_HEIGHT = 232;
+/** A comment card grows with its words up to this, then folds behind "Show more". */
+const COLLAPSED_COMMENT_HEIGHT = 360;
 const textActionClass = "cursor-pointer py-1.5 text-xs font-medium text-[var(--muted)] transition hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--main)]";
 const CHART_PREVIEW_ROWS = 5;
 const RANKING_PREVIEW_ROWS = 5;
@@ -302,6 +303,7 @@ type WallQuote = { key: string; person: { id: Id; name: string }; text: string; 
 function QuoteWall({ quotes, full, ids }: { quotes: WallQuote[]; full: boolean; ids: Id[] }) {
   const t = useTranslations("story");
   const [query, setQuery] = useState("");
+  const [searching, setSearching] = useState(false);
   const [personId, setPersonId] = useState<Id | null>(null);
   const [showAll, setShowAll] = useState(false);
   if (full) {
@@ -331,7 +333,7 @@ function QuoteWall({ quotes, full, ids }: { quotes: WallQuote[]; full: boolean; 
     <div>
       {quotes.length > PAGE_QUOTES ? (
         <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2 sm:justify-center">
-          <SearchField className="w-full sm:w-72" value={query} onChange={setQuery} placeholder={t("quotes.filter")} />
+          <SearchField open={searching} onOpenChange={setSearching} keepWhileFiltering openClassName="w-[min(18rem,100%)]" value={query} onChange={setQuery} placeholder={t("quotes.filter")} />
           {people.length > 1 ? (
             <div role="group" aria-label={t("quotes.everyone")} className="flex max-w-full gap-0.5 overflow-x-auto rounded-full bg-[var(--wash)] p-1">
               <button type="button" aria-pressed={personId === null} className={seg(personId === null)} onClick={() => setPersonId(null)}>{t("quotes.everyone")}</button>
@@ -350,7 +352,7 @@ function QuoteWall({ quotes, full, ids }: { quotes: WallQuote[]; full: boolean; 
         {shown.map((quote) => (
           <figure key={quote.key} className={cx(cardClass, "border-l-[3px]")} style={{ borderLeftColor: personTone(ids, quote.person.id) }}>
             <ExpandableComment text={quote.text} />
-            <figcaption className="mt-3 flex items-center gap-2 text-xs text-[var(--muted)]"><Avatar id={quote.person.id} name={quote.person.name} ids={ids} size={5} />{quote.caption}</figcaption>
+            <figcaption className="mt-auto flex pt-3 items-center gap-2 text-xs text-[var(--muted)]"><Avatar id={quote.person.id} name={quote.person.name} ids={ids} size={5} />{quote.caption}</figcaption>
           </figure>
         ))}
       </div>
@@ -391,7 +393,6 @@ function ExpandableComment({ text }: { text: string }) {
         id={contentId}
         className="overflow-hidden transition-[max-height] duration-300 ease-out motion-reduce:transition-none"
         style={{
-          minHeight: expanded ? undefined : COLLAPSED_COMMENT_HEIGHT,
           maxHeight: expanded ? contentHeight : COLLAPSED_COMMENT_HEIGHT,
         }}
       >

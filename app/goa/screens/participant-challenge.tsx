@@ -52,7 +52,6 @@ import {
   labelClass,
   sectionLabelClass,
   SearchField,
-  SearchIcon,
   SlidersIcon,
   StatusMessage,
 } from "../ui";
@@ -1094,26 +1093,21 @@ function EntryPicker({
     <div>
       <div className="mb-2 flex min-h-9 items-center justify-between gap-3">
         <p className={cx(sectionLabelClass, "flex-none")}>{title}</p>
-        {searching ? (
-          <SearchField
-            focusOnMount
-            className="w-full max-w-64"
-            value={query}
-            onChange={setQuery}
-            placeholder={t("searchItems")}
-            onEscape={() => { setSearching(false); setQuery(""); }}
-            onEnter={() => { if (shown.length === 1 && !shown[0].option.soon) onSelect(shown[0].option.id); }}
-          />
-        ) : (
-          <span className="flex items-center gap-1.5">
-            {tally ? <span className="text-xs text-[var(--muted)]">{tally}</span> : null}
-            {options.length > 1 ? (
-              <button type="button" onClick={() => setSearching(true)} aria-label={t("searchItems")} title={t("searchItems")} className="grid h-8 w-8 flex-none cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)]">
-                <SearchIcon className="h-3.5 w-3.5" />
-              </button>
-            ) : null}
-          </span>
-        )}
+        <span className="flex min-w-0 items-center gap-2">
+          {/* The tally slides left as the search opens; on a phone it steps aside to give the search the room. */}
+          {tally ? <span className={cx("truncate text-xs text-[var(--muted)]", searching && "max-sm:hidden")}>{tally}</span> : null}
+          {options.length > 1 ? (
+            <SearchField
+              open={searching}
+              onOpenChange={setSearching}
+              openClassName="w-[min(16rem,62vw)]"
+              value={query}
+              onChange={setQuery}
+              placeholder={t("searchItems")}
+              onEnter={() => { if (shown.length === 1 && !shown[0].option.soon) onSelect(shown[0].option.id); }}
+            />
+          ) : null}
+        </span>
       </div>
       <section className={cx(cardClass, "p-4 sm:p-5")}>
       <ol
