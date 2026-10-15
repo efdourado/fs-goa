@@ -7,7 +7,7 @@ import { type ReactNode, useState } from "react";
 import { LanguageSegmented } from "../SettingsMenu";
 import { ThemeToggle } from "../ThemeToggle";
 import type { User } from "../types";
-import { BackButton, cx, UserAvatar } from "../ui";
+import { cx, UserAvatar } from "../ui";
 import { CONTACT_EMAIL } from "./about";
 
 const rowClass = "flex min-h-14 w-full cursor-pointer items-center gap-3.5 text-left text-[15px] transition hover:text-[var(--ink-strong)]";
@@ -48,12 +48,10 @@ function Section({ title, children }: { title?: string; children: ReactNode }) {
  * avatar, sliders and "⋯" menus (account, my catalogue, bin, theme, language, about,
  * contact, sign out). One page on every screen size; on a computer the avatar opens it.
  */
-export function YouScreen({ user, challengeCount, groupCount, onBack, backLabel, onAccount, onCatalog, onTrash, onAbout, onLogout }: {
+export function YouScreen({ user, challengeCount, groupCount, onAccount, onCatalog, onTrash, onAbout, onLogout }: {
   user: User;
   challengeCount: number;
   groupCount: number;
-  onBack: () => void;
-  backLabel?: string;
   onAccount: () => void;
   onCatalog: () => void;
   onTrash: () => void;
@@ -73,7 +71,6 @@ export function YouScreen({ user, challengeCount, groupCount, onBack, backLabel,
   return (
     <main className="mx-auto max-w-xl px-4 py-6 pb-24 sm:px-6 sm:py-12">
       {/* On a phone the dock is the way back; a computer has no dock, so it keeps the button. */}
-      <BackButton onClick={onBack} label={backLabel ?? tNav("home")} className="mb-6 hidden sm:inline-flex" />
 
       <header className="flex items-center gap-4">
         <UserAvatar name={user.name} large />

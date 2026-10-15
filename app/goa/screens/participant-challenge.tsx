@@ -1735,8 +1735,8 @@ export function ParticipantChallengeScreen({
 
   return (
     <main className="mx-auto max-w-7xl overflow-x-clip px-4 py-6 pb-28 sm:px-6 sm:py-10">
-      {/* On a phone the dock's ‹ is the way back, so this row is a computer's (and a template preview's, which has no dock). */}
-      <div className={cx("mb-5 flex items-center", tabs.length > 1 && "max-sm:hidden")}>
+      {/* Only a phone without the dock needs this row (a template preview); the dock's ‹ or a computer's header does the rest. */}
+      <div className={cx("mb-5 flex items-center sm:hidden", tabs.length > 1 && "hidden")}>
         <BackButton onClick={onBack} label={backLabel ?? t("back")} />
       </div>
       <section className="relative overflow-hidden rounded-[28px] bg-[var(--spotlight)] p-6 text-[var(--spotlight-ink)] sm:p-9">

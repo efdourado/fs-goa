@@ -936,8 +936,8 @@ export function AdminScreen({
     <main className="pb-24">
       <div className="sticky top-0 z-20 border-b border-[var(--line)] bg-[color-mix(in_srgb,var(--canvas)_90%,transparent)] backdrop-blur-md">
         <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-2.5 sm:px-6">
-          <BackButton onClick={onBack} label={backLabel ?? tc("back")} className="flex-none" labelClassName="sr-only sm:not-sr-only" />
-          <span className="h-5 w-px flex-none bg-[var(--line)]" aria-hidden="true" />
+          <BackButton onClick={onBack} label={backLabel ?? tc("back")} className="flex-none" labelClassName="sr-only" />
+          <span className="h-5 w-px flex-none bg-[var(--line)] sm:hidden [.has-dock_&]:hidden" aria-hidden="true" />
           <ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />
           <h1 className="min-w-0 flex-1 truncate text-base font-semibold tracking-tight">{challenge.title}</h1>
           <ChallengeStateButton challenge={challenge} onTransition={onTransition} />
