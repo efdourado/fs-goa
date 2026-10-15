@@ -148,3 +148,11 @@ test("o diário resume o mês: uma linha por exercício e pessoa, com quantas ve
     { name: "Agachamento", personKey: "me", times: 1, bests: [{ label: "Peso", value: 80, unit: "kg" }, { label: "Reps", value: 6, unit: null }] },
   ]);
 });
+
+test("na capa, uma coluna com muitas notas iguais para em três pontos e um ⋮, sem crescer", () => {
+  const tied = films.map((_, index) => entry({ id: `t${index}`, userId: "vivi", participantName: "Vivi", entryTypeId: "rate", itemId: `f${index}`, occurredOn: "2026-09-01", values: { nota: index === 6 ? 2 : 4 } }));
+  const html = renderWithIntl(createElement(ExportDocument, { challenge, entries: tied, userId: "vivi" }));
+  const plot = html.slice(html.indexOf('class="xd-plot"'), html.indexOf("</svg>", html.indexOf('class="xd-plot"')));
+  assert.equal(plot.match(/r="0.55"/g)?.length, 3, "o ⋮ são três pontinhos");
+  assert.equal(plot.match(/r="2.4" fill="#98948a"/g)?.length, 2, "seis empatados: a melhor e mais dois pontos, não seis");
+});

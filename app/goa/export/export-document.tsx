@@ -142,18 +142,25 @@ function ScorePlot({ model, doc }: { model: ExportModel; doc: Doc }) {
     const key = Math.round(item.ratingAvg! * 10) / 10;
     columns.set(key, [...(columns.get(key) ?? []), item]);
   }
-  const tallest = Math.max(...[...columns.values()].map((items) => items.length));
-  const r = tallest > 8 ? 1.6 : 2.4;
+  const best = model.champion;
+  const worst = model.disappointment;
+  // A column holds up to STACK dots; a taller one shows STACK − 1 and a vertical "⋮" on top, so ties never
+  // outgrow the cover. The named best and letdown go first, so they're always among the dots drawn.
+  const STACK = 4;
+  for (const [key, items] of columns) columns.set(key, [...items].sort((a, b) => Number(b === best || b === worst) - Number(a === best || a === worst)));
+  const shownIn = (column: DocItem[]) => (column.length > STACK ? STACK - 1 : column.length);
+  const tallest = Math.min(STACK, Math.max(...[...columns.values()].map((items) => items.length)));
+  const r = 2.4;
   const gap = r * 2.25;
   const labels = 18;
   const axis = labels + 6 + tallest * gap;
   const height = axis + 25;
-  const best = model.champion;
-  const worst = model.disappointment;
   const positionOf = (item: DocItem) => {
     const key = Math.round(item.ratingAvg! * 10) / 10;
     const column = columns.get(key)!;
-    return { cx: x(key), cy: axis - r - 1.2 - column.indexOf(item) * gap, columnTop: axis - r - 1.2 - (column.length - 1) * gap - r };
+    // An overflowing column's top slot is the "⋮"; the leader line stops above it.
+    const slots = column.length > STACK ? STACK : column.length;
+    return { cx: x(key), cy: axis - r - 1.2 - column.indexOf(item) * gap, columnTop: axis - r - 1.2 - (slots - 1) * gap - r };
   };
   // A label near an edge reads inwards; two close labels split left and right.
   const close = best && worst ? Math.abs(x(best.ratingAvg!) - x(worst.ratingAvg!)) < 44 : false;
@@ -185,8 +192,14 @@ function ScorePlot({ model, doc }: { model: ExportModel; doc: Doc }) {
             <text x={x(value)} y={axis + 6.5} fontSize={3.4} textAnchor="middle" className="faint">{doc.n(value)}</text>
           </g>
         ))}
+        {[...columns.entries()].filter(([, column]) => column.length > STACK).map(([key]) => {
+          const cy = axis - r - 1.2 - (STACK - 1) * gap;
+          return <g key={`more-${key}`} fill="#98948a">{[-1.5, 0, 1.5].map((dy) => <circle key={dy} cx={x(key)} cy={cy + dy} r={0.55} />)}</g>;
+        })}
         {rated.map((item) => {
           const { cx, cy } = positionOf(item);
+          const column = columns.get(Math.round(item.ratingAvg! * 10) / 10)!;
+          if (column.indexOf(item) >= shownIn(column)) return null;
           if (item === best) return <circle key={item.id} cx={cx} cy={cy} r={r + 0.6} fill="#1b1b1f" />;
           if (item === worst) return <circle key={item.id} cx={cx} cy={cy} r={r} fill="#faf8f3" stroke="#1b1b1f" strokeWidth={0.6} />;
           return <circle key={item.id} cx={cx} cy={cy} r={r} fill="#98948a" />;
