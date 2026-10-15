@@ -43,6 +43,15 @@ test("the words page keeps every comment (the page shows twelve, then Show all)"
   assert.equal(story.quotes.length, 13);
 });
 
+test("a short comment still counts on the words page", () => {
+  const story = buildStory({
+    ...films,
+    ratings: films.ratings.map((rating, index) => ({ ...rating, comment: index === 0 ? "oi dois" : null })),
+  }) as RatedStory;
+
+  assert.deepEqual(story.quotes.map((quote) => quote.text), ["oi dois"]);
+});
+
 test("nothing is invented: agreement, no expectations, no metadata", () => {
   const flat: StoryInput = {
     ...films,

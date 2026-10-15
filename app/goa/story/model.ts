@@ -270,7 +270,7 @@ function buildRated(input: StoryInput): RatedStory | null {
     notes.push({ kind: "flop", itemId: ranking.at(-1)!.item.id, value: ranking.at(-1)!.average });
   }
   const quotes = ratings
-    .filter((rating) => rating.comment && rating.comment.trim().length >= 12)
+    .filter((rating) => rating.comment?.trim())
     .sort((a, b) => Number(b.itemId === split?.item.id) - Number(a.itemId === split?.item.id) || b.comment!.length - a.comment!.length)
     .map((rating) => ({ person: personOf.get(rating.personId)!, item: input.items.find((item) => item.id === rating.itemId)!, value: rating.value, text: rating.comment!.trim() }));
   const pinnedQuote = quotes.find((quote) => quote.text.length <= 140);
@@ -541,7 +541,7 @@ function buildDated(input: StoryInput): DatedStory | null {
       ? lanes[0].days.filter((row) => lanes[1].days.some((other) => other.day === row.day)).length
       : null,
     notes: days
-      .filter((row) => row.note && row.note.trim().length >= 12)
+      .filter((row) => row.note?.trim())
       .sort((a, b) => b.note!.length - a.note!.length)
       .map((row) => ({ person: input.people.find((person) => person.id === row.personId)!, day: row.day, text: row.note!.trim() })),
   };
