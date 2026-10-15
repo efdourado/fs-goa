@@ -703,8 +703,6 @@ export default function GoaApp() {
       onAdd: (items) => mutateChallenge(API_PATHS.items(selectedChallenge.id), { items }),
       onUpdate: (itemId, payload) => mutateChallenge(API_PATHS.item(selectedChallenge.id, itemId), payload, "PATCH"),
       onRemove: (itemId) => mutateChallenge(API_PATHS.item(selectedChallenge.id, itemId), undefined, "DELETE"),
-      // New kinds of details are made in the library: the group's, or your own for a personal challenge.
-      onOpenLibrary: () => setScreen(selectedGroup && selectedGroup.kind !== "personal" ? { kind: "group-catalog", groupId: selectedGroup.id } : { kind: "personal-catalog" }),
     } : undefined} tab={screen.tab} onTab={(tab) => setScreen({ ...screen, tab })} onBack={goUp} backLabel={backLabel} onAdmin={canManage(selectedRole) ? () => openAdmin(selectedChallenge.id) : undefined} onSaveEntry={saveEntry} onSaveSession={saveSession} onAddSessionItem={canManage(selectedRole) ? addSessionItem : undefined} onDeleteEntry={(entryId) => mutateChallenge(API_PATHS.entry(entryId), undefined, "DELETE")} onReload={reloadSelected} onRevealItem={(itemId) => mutateChallenge(API_PATHS.itemReveal(selectedChallenge.id, itemId), {})} onCreateChallengeInvite={canManage(selectedRole) && selectedChallenge.groupId ? async () => {
       const created = await apiRequest<{ token?: string; url?: string }>(API_PATHS.groupInvites(selectedChallenge.groupId!), { method: "POST", body: { expiresInDays: 7, maxUses: 20, challengeId: selectedChallenge.id }, csrfToken: bootstrap.csrfToken });
       return created.url ?? `${window.location.origin}/invites/${encodeURIComponent(created.token ?? "")}`;

@@ -690,7 +690,6 @@ export function ItemEditorDialog({
   recommendationsEnabled,
   onCancel,
   onSave,
-  onOpenLibrary,
   onRemove,
   entryCount = 0,
 }: {
@@ -702,8 +701,6 @@ export function ItemEditorDialog({
   scope: CatalogScope;
   recommendationsEnabled: boolean;
   onCancel: () => void;
-  /** Where new kinds of details are made: the library. The dialog only fills the ones it already has. */
-  onOpenLibrary?: () => void;
   /** Takes the item out (with its entries, to the bin); `entryCount` warns how many go with it. */
   onRemove?: () => Promise<void>;
   entryCount?: number;
@@ -785,9 +782,6 @@ export function ItemEditorDialog({
             <PropertyInputs properties={factProperties} values={values} onChange={(key, value) => setEditedValues({ ...values, [key]: value })} />
           </div>
         </Disclosure>
-      ) : null}
-      {catalogItem && onOpenLibrary ? (
-        <button type="button" onClick={onOpenLibrary} className="cursor-pointer text-left text-xs font-medium text-[var(--main-strong)] underline-offset-2 hover:underline">{t("openLibrary")}</button>
       ) : null}
     </FormDialog>
   );

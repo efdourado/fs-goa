@@ -1402,7 +1402,7 @@ export function ParticipantChallengeScreen({
   previewActions?: ReactNode;
   /**
    * For whoever manages the challenge: add items and edit an item's details right from Today — the same
-   * dialogs as Manage › Items. New kinds of details are made in the library (`onOpenLibrary`).
+   * dialogs as Manage › Items.
    */
   itemTools?: {
     members: Member[];
@@ -1411,7 +1411,6 @@ export function ParticipantChallengeScreen({
     onAdd: (items: ChallengeItemInput[]) => Promise<void>;
     onUpdate: (itemId: Id, payload: Record<string, unknown>) => Promise<void>;
     onRemove: (itemId: Id) => Promise<void>;
-    onOpenLibrary: () => void;
   };
 }) {
   const t = useTranslations("participant");
@@ -1981,7 +1980,6 @@ export function ParticipantChallengeScreen({
           recommendationsEnabled={itemTools.recommendationsEnabled}
           onCancel={() => setEditingItem(null)}
           onSave={async (payload) => { await itemTools.onUpdate(editingItem.id, payload); setEditingItem(null); }}
-          onOpenLibrary={() => { setEditingItem(null); itemTools.onOpenLibrary(); }}
           entryCount={entries.filter((entry) => itemIdForEntry(entry) === editingItem.id).length}
           onRemove={challenge.status !== "closed" ? async () => { await itemTools.onRemove(editingItem.id); setEditingItem(null); } : undefined}
         />
