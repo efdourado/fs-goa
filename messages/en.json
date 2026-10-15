@@ -1018,7 +1018,9 @@
     "origin": "via {text}",
     "groupSealed": "Rated · sealed",
     "bookProgress": "p. {page, number} of {total, number} · {left, number} to go",
-    "bookDone": "Finished"
+    "bookDone": "Finished",
+    "searchItems": "Search items",
+    "searchItemsNone": "No item matches."
   },
   "sessionLog": {
     "composerTitle": "Log a {name}",
@@ -2173,7 +2175,11 @@
     },
     "quotes": {
       "eyebrow": "Best lines",
-      "by": "{name} on {title} · {value}"
+      "by": "{name} on {title} · {value}",
+      "filter": "Filter the lines (words, title or person)",
+      "everyone": "Everyone",
+      "found": "{count} of {total} lines",
+      "showAll": "Show all {count}"
     },
     "streaks": {
       "eyebrow": "Streaks",

@@ -1018,7 +1018,9 @@
     "origin": "via {text}",
     "groupSealed": "Deu nota · selada",
     "bookProgress": "p. {page, number} de {total, number} · faltam {left, number}",
-    "bookDone": "Terminado"
+    "bookDone": "Terminado",
+    "searchItems": "Buscar itens",
+    "searchItemsNone": "Nenhum item encontrado."
   },
   "sessionLog": {
     "composerTitle": "Registrar {name}",
@@ -2173,7 +2175,11 @@
     },
     "quotes": {
       "eyebrow": "As melhores frases",
-      "by": "{name} sobre {title} · {value}"
+      "by": "{name} sobre {title} · {value}",
+      "filter": "Filtrar as falas (palavras, título ou pessoa)",
+      "everyone": "Todos",
+      "found": "{count} de {total} falas",
+      "showAll": "Mostrar todas as {count}"
     },
     "streaks": {
       "eyebrow": "Sequências",

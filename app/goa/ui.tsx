@@ -148,6 +148,15 @@ export function CircleChevronIcon({ className, dir }: { className?: string; dir:
 }
 
 /** Edit / settings — the header's sliders glyph. */
+export function SearchIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+      <circle cx="7" cy="7" r="4.5" />
+      <path d="m10.5 10.5 3.5 3.5" />
+    </svg>
+  );
+}
+
 export function SlidersIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true">

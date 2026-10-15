@@ -1018,7 +1018,9 @@
     "origin": "vía {text}",
     "groupSealed": "Puntuó · sellada",
     "bookProgress": "p. {page, number} de {total, number} · faltan {left, number}",
-    "bookDone": "Terminado"
+    "bookDone": "Terminado",
+    "searchItems": "Buscar ítems",
+    "searchItemsNone": "Ningún ítem coincide."
   },
   "sessionLog": {
     "composerTitle": "Registrar {name}",
@@ -2173,7 +2175,11 @@
     },
     "quotes": {
       "eyebrow": "Las mejores frases",
-      "by": "{name} sobre {title} · {value}"
+      "by": "{name} sobre {title} · {value}",
+      "filter": "Filtrar las frases (palabras, título o persona)",
+      "everyone": "Todos",
+      "found": "{count} de {total} frases",
+      "showAll": "Mostrar las {count}"
     },
     "streaks": {
       "eyebrow": "Rachas",

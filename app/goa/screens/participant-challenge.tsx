@@ -51,6 +51,7 @@ import {
   inputClass,
   labelClass,
   sectionLabelClass,
+  SearchIcon,
   SlidersIcon,
   StatusMessage,
 } from "../ui";
@@ -1041,6 +1042,12 @@ function EntryPicker({
   const nf = useFormatter();
   const tCine = useTranslations("cineItems");
   const tAdmin = useTranslations("adminChallenge");
+  const t = useTranslations("participant");
+  // A long list gets a search: the loupe beside the heading opens it, Escape or emptying it closes it.
+  const [searching, setSearching] = useState(false);
+  const [query, setQuery] = useState("");
+  const needle = query.trim().toLocaleLowerCase();
+  const matches = (option: PickerOption) => !needle || `${option.label} ${option.meta ?? ""}`.toLocaleLowerCase().includes(needle);
   // "Add item" waits folded above the first row until you insist: at the top of the list, keep pulling down
   // (a finger or the wheel) in one go, and it opens. A pause starts the count again, so scrolling past never does.
   const listRef = useRef<HTMLOListElement>(null);
@@ -1070,15 +1077,47 @@ function EntryPicker({
   const swipe = useRef<{ x: number; y: number } | null>(null);
   // From ten items on, every number has the same width: 01, 02 … 10, 11.
   const digits = options.length >= 10 ? String(options.length).length : 1;
+  // Opening on the item already chosen, not on the top of the list: scroll the box (never the page) to it.
+  const selectedRow = useRef<HTMLLIElement>(null);
+  useEffect(() => {
+    const list = listRef.current;
+    const row = selectedRow.current;
+    if (!list || !row) return;
+    const top = row.getBoundingClientRect().top - list.getBoundingClientRect().top + list.scrollTop;
+    if (top < list.scrollTop || top + row.offsetHeight > list.scrollTop + list.clientHeight) {
+      list.scrollTop = Math.max(0, top - (list.clientHeight - row.offsetHeight) / 2);
+    }
+  }, [selectedId, needle]);
+  const shown = options.flatMap((option, index) => matches(option) ? [{ option, index }] : []);
   return (
     <div>
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <p className={sectionLabelClass}>{title}</p>
         <span className="flex items-baseline gap-3">
           {tally ? <span className="text-xs text-[var(--muted)]">{tally}</span> : null}
+          {options.length > 1 ? (
+            <button type="button" onClick={() => { setSearching((open) => !open); setQuery(""); }} aria-pressed={searching} aria-label={t("searchItems")} title={t("searchItems")} className={cx("grid h-8 w-8 flex-none cursor-pointer place-items-center self-center rounded-full transition hover:bg-[var(--wash)] hover:text-[var(--ink)]", searching ? "bg-[var(--wash)] text-[var(--ink)]" : "text-[var(--muted)]")}>
+              <SearchIcon className="h-4 w-4" />
+            </button>
+          ) : null}
         </span>
       </div>
       <section className={cx(cardClass, "p-4 sm:p-5")}>
+      {searching ? (
+        <input
+          ref={(input) => input?.focus()}
+          className={cx(inputClass, "mb-3 min-h-10")}
+          type="search"
+          value={query}
+          placeholder={t("searchItems")}
+          aria-label={t("searchItems")}
+          onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") { setSearching(false); setQuery(""); }
+            if (event.key === "Enter" && shown.length === 1 && !shown[0].option.soon) onSelect(shown[0].option.id);
+          }}
+        />
+      ) : null}
       <ol
         ref={listRef}
         className="max-h-60 space-y-1.5 overflow-y-auto pr-0.5"
@@ -1102,7 +1141,7 @@ function EntryPicker({
           pull.current.touchY = y;
         }}
       >
-        {onAdd ? (
+        {onAdd && !needle ? (
           // Folded away until pulled out (or tabbed to).
           // Opening glides; folding is instant (it only happens out of sight, or on a list too short to scroll).
           <li ref={addRef} className={cx("grid focus-within:grid-rows-[1fr] focus-within:opacity-100", addShown ? "grid-rows-[1fr] opacity-100 transition-[grid-template-rows,opacity] duration-300 ease-out" : "mb-0 grid-rows-[0fr] opacity-0")}>
@@ -1114,13 +1153,15 @@ function EntryPicker({
             </div>
           </li>
         ) : null}
-        {options.map((option, index) => {
+        {needle && !shown.length ? <li className="px-1 py-2 text-sm text-[var(--muted)]">{t("searchItemsNone")}</li> : null}
+        {shown.map(({ option, index }) => {
           const active = option.id === selectedId;
           const rating = typeof option.rating === "number" ? option.rating : null;
           const caption = [option.statusLabel, option.meta].filter(Boolean).join(" · ");
           return (
             <li
               key={option.id}
+              ref={active ? selectedRow : undefined}
               className="flex items-center gap-1.5"
               onTouchStart={onEdit ? (event) => { const touch = event.touches[0]; swipe.current = touch ? { x: touch.clientX, y: touch.clientY } : null; } : undefined}
               onTouchEnd={onEdit ? (event) => {
