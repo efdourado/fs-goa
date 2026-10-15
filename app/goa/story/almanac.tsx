@@ -333,28 +333,27 @@ function QuoteWall({ quotes, full, ids, headline }: { quotes: WallQuote[]; full:
   );
   return (
     <div>
-      {/* The headline on the left and the search at the far right, on one line. */}
-      <div className="mb-5 flex items-center justify-between gap-4">
+      {/* The headline on the left; the people filter and the search beside each other at the far right. On a phone they
+          take a row of their own under it, and an open search takes that whole row (the people step aside). */}
+      <div className={cx("flex flex-wrap items-center justify-between gap-x-4 gap-y-3", filtering ? "mb-3" : "mb-5")}>
         <p className="min-w-0 text-balance text-xl font-light leading-snug tracking-[-0.02em] text-[var(--ink)]/85 sm:text-2xl">{headline}</p>
         {quotes.length > PAGE_QUOTES ? (
-          <SearchField open={searching} onOpenChange={setSearching} keepWhileFiltering openClassName="w-[min(18rem,55vw)]" value={query} onChange={setQuery} placeholder={t("quotes.filter")} />
+          <div className="flex w-full items-center justify-between gap-2 sm:ml-auto sm:w-auto sm:justify-end">
+            {people.length > 1 ? (
+              <div role="group" aria-label={t("quotes.everyone")} className={cx("flex min-w-0 gap-0.5 overflow-x-auto rounded-full bg-[var(--wash)] p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden", searching && "max-sm:hidden")}>
+                <button type="button" aria-pressed={personId === null} className={seg(personId === null)} onClick={() => setPersonId(null)}>{t("quotes.everyone")}</button>
+                {people.map((person) => (
+                  <button key={person.id} type="button" aria-pressed={personId === person.id} className={seg(personId === person.id)} onClick={() => setPersonId(personId === person.id ? null : person.id)}>
+                    <span className="h-2 w-2 flex-none rounded-full" style={{ background: personTone(ids, person.id) }} />{firstName(person.name)}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            <SearchField open={searching} onOpenChange={setSearching} keepWhileFiltering openClassName="w-full sm:w-72" value={query} onChange={setQuery} placeholder={t("quotes.filter")} />
+          </div>
         ) : null}
       </div>
-      {quotes.length > PAGE_QUOTES && (people.length > 1 || filtering) ? (
-        <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2">
-          {people.length > 1 ? (
-            <div role="group" aria-label={t("quotes.everyone")} className="flex max-w-full gap-0.5 overflow-x-auto rounded-full bg-[var(--wash)] p-1">
-              <button type="button" aria-pressed={personId === null} className={seg(personId === null)} onClick={() => setPersonId(null)}>{t("quotes.everyone")}</button>
-              {people.map((person) => (
-                <button key={person.id} type="button" aria-pressed={personId === person.id} className={seg(personId === person.id)} onClick={() => setPersonId(personId === person.id ? null : person.id)}>
-                  <span className="h-2 w-2 flex-none rounded-full" style={{ background: personTone(ids, person.id) }} />{firstName(person.name)}
-                </button>
-              ))}
-            </div>
-          ) : null}
-          {filtering ? <span className="text-xs tabular-nums text-[var(--muted)]">{t("quotes.found", { count: found.length, total: quotes.length })}</span> : null}
-        </div>
-      ) : null}
+      {filtering ? <p className="mb-5 text-xs tabular-nums text-[var(--muted)] sm:text-right">{t("quotes.found", { count: found.length, total: quotes.length })}</p> : null}
       {filtering && !found.length ? <p className="py-10 text-center text-sm font-light text-[var(--muted)]">{t("quotes.none")}</p> : null}
       <div className={grid}>
         {shown.map((quote) => (
