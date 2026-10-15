@@ -610,16 +610,17 @@ export function ExportDocument({ challenge, entries, userId, fontClassName }: {
       <div className="xd-toolbar">
         <div className="xd-toolbar-inner">
           <div className="xd-toolbar-row">
-            <a className="inline-flex min-h-9 min-w-0 items-center gap-1.5 text-sm text-[var(--muted)] transition hover:text-[var(--ink)]" href={`/challenges/${challenge.id}`}>
-              <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 flex-none" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M10 3.5 5.5 8 10 12.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-              <span className="truncate">{challenge.title}</span>
-            </a>
+            {/* No Back link: the browser's own Back returns to the challenge, like every other page. */}
+            <div className="min-w-0">
+              <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--muted)]">PDF</p>
+              <h1 className="truncate text-lg font-light tracking-[-0.02em] text-[var(--ink)]">{challenge.title}</h1>
+            </div>
             <div className="flex flex-none items-center gap-3">
               <span className="hidden text-xs text-[var(--muted)] lg:inline">{doc.t("printHint")}</span>
               <button
                 type="button"
                 onClick={() => window.print()}
-                className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-transparent bg-[var(--main)] px-4 py-2 text-sm font-medium text-white shadow-[var(--elevate-1)] transition hover:opacity-90"
+                className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-full border border-transparent bg-[var(--main)] px-5 py-2 text-sm font-medium text-white shadow-[var(--elevate-1)] transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
               >
                 <DownloadIcon />
                 {doc.t("download")}
