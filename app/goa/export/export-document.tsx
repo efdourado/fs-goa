@@ -391,12 +391,12 @@ function Scoreboard({ model, doc, showDates }: { model: ExportModel; doc: Doc; s
         <table className="xd-table">
           <thead>
             <tr>
-              <th>#</th>
+              <th aria-hidden="true" />
               <th>{doc.t("col.item")}</th>
               {showYear ? <th>{doc.t("col.year")}</th> : null}
               {showBy ? <th>{doc.t("recommendedBy")}</th> : null}
-              {model.hasRatings && perPerson ? raters.map((person) => <th className="score" key={person.key}>{person.name.split(" ")[0]}</th>) : null}
-              {model.hasRatings ? <th className="score">{doc.t(perPerson ? "col.avg" : "col.rating")}</th> : <th className="score">{doc.t("col.entries")}</th>}
+              {model.hasRatings && perPerson ? raters.map((person) => <th className="score xd-col" key={person.key} title={person.name}><span>{person.name.split(" ")[0]}</span></th>) : null}
+              {model.hasRatings ? <th className="score xd-col"><span>{doc.t(perPerson ? "col.avg" : "col.rating")}</span></th> : <th className="score xd-col"><span>{doc.t("col.entries")}</span></th>}
               {showDates ? <th>{doc.t("col.date")}</th> : null}
             </tr>
           </thead>
@@ -452,7 +452,7 @@ function Records({ model, doc, showDates }: { model: ExportModel; doc: Doc; show
         <table className="xd-table">
           <thead>
             <tr>
-              <th>#</th>
+              <th aria-hidden="true" />
               <th>{doc.t("col.item")}</th>
               <th className="score">{doc.t("col.sessions")}</th>
               <th>{doc.t("col.best")}</th>

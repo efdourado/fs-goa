@@ -408,6 +408,9 @@
 .xd-table .title { font-family: var(--xd-font-display), "Poppins", sans-serif; font-weight: 500; }
 .xd-table .score { background: var(--xd-tile); text-align: center; font-variant-numeric: tabular-nums; border-left: 1px solid #e8e3d8; }
 .xd-table th.score { background: none; border-left: 0; text-align: center; }
+/* Every score column the same width, whoever's name heads it; a long name is cut with an ellipsis. */
+.xd-table .score.xd-col, .xd-table td.score { width: 15mm; }
+.xd-table th.xd-col span { display: block; max-width: 15mm; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .xd-table .avg { font-weight: 700; }
 .xd-table .muted { color: var(--xd-muted); }
 .xd-table .small { font-size: 8.5pt; white-space: nowrap; }
@@ -418,8 +421,8 @@
   gap: 4mm;
   break-inside: avoid;
 }
-.xd-podium div { border: 1px solid var(--xd-line); border-radius: 3.5mm; background: var(--xd-card); padding: 4mm 5mm; }
-.xd-podium span { display: block; font-family: var(--xd-font-display), "Poppins", sans-serif; font-size: 6.5pt; letter-spacing: 0.24em; text-transform: uppercase; color: var(--xd-muted); }
+.xd-podium div { border: 1px solid var(--xd-line); border-radius: 3.5mm; padding: 4mm 5mm; }
+.xd-podium span { display: block; font-family: var(--xd-font-display), "Poppins", sans-serif; font-size: 8pt; color: var(--xd-muted); }
 .xd-podium b { display: block; margin-top: 1mm; font-family: var(--xd-font-display), "Poppins", sans-serif; font-size: 12pt; font-weight: 600; line-height: 1.25; color: var(--c, var(--xd-ink)); }
 .xd-podium small { display: block; margin-top: 0.5mm; font-size: 8.5pt; color: var(--xd-soft); }
 .xd-colophon { margin-top: 10mm !important; font-size: 8pt; color: var(--xd-muted); }
