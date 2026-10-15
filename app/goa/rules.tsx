@@ -63,7 +63,7 @@ export function RuleSectionsEditor({
       {value.map((rule, index) => {
         const topics = rule.topics ?? [];
         return (
-          <article className="rounded-2xl border border-[var(--main-line)] bg-[var(--main-soft)]/55 p-4" key={index}>
+          <article className="rounded-2xl border border-[var(--line)] bg-[var(--wash)]/55 p-4" key={index}>
             <div className="mb-3 flex items-center justify-between gap-3">
               <strong className="text-sm">{t("ruleN", { n: index + 1 })}</strong>
               <div className="flex flex-wrap justify-end gap-1">
@@ -76,7 +76,7 @@ export function RuleSectionsEditor({
             <label className="mt-3 block"><span className={labelClass}>{t("descriptionLabel")}</span><textarea className={inputClass} rows={3} value={rule.description} onChange={(event) => update(index, { description: event.target.value })} placeholder={t("descriptionPlaceholder")} required maxLength={10000} disabled={disabled} /></label>
 
             {topics.length ? (
-              <div className="mt-4 space-y-3 border-l-2 border-[var(--main-line)] pl-4">
+              <div className="mt-4 space-y-3 border-l-2 border-[var(--ink)] pl-4">
                 {topics.map((topic, topicIndex) => (
                   <div key={topicIndex}>
                     <div className="mb-2 flex items-center justify-between gap-3">
@@ -108,14 +108,14 @@ export function RuleSectionsView({ rules, bare = false }: { rules: ChallengeRule
       {bare ? null : <h2 className="mt-2 text-2xl font-light tracking-[-0.035em]" id="challenge-rules-title">{t("viewTitle")}</h2>}
       <div className={cx("grid gap-3", !bare && "mt-5", rules.length > 1 && "md:grid-cols-2")}>
         {rules.map((rule, index) => (
-          <article className="rounded-2xl border border-[var(--main-line)]/70 bg-[var(--paper)] p-5" key={`${rule.title}-${index}`}>
+          <article className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-5" key={`${rule.title}-${index}`}>
             <div className="flex items-start gap-3">
-              <span className="grid h-8 w-8 flex-none place-items-center rounded-full bg-[var(--main)] text-xs font-black text-white" aria-hidden="true">{index + 1}</span>
+              <span className="grid h-8 w-8 flex-none place-items-center rounded-full bg-[var(--ink)] text-xs font-black text-[var(--paper)]" aria-hidden="true">{index + 1}</span>
               <div className="min-w-0">
                 <h3 className="text-lg font-light tracking-[-0.02em]">{rule.title}</h3>
                 <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--muted)]">{rule.description}</p>
                 {rule.topics?.length ? (
-                  <div className="mt-4 space-y-3 border-l-2 border-[var(--main-line)] pl-4">
+                  <div className="mt-4 space-y-3 border-l-2 border-[var(--ink)] pl-4">
                     {rule.topics.map((topic, topicIndex) => (
                       <div key={`${topic.title}-${topicIndex}`}>
                         <h4 className="text-sm font-light text-[var(--ink)]">
