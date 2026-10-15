@@ -2178,7 +2178,6 @@
       "filter": "Buscar en las frases",
       "everyone": "Todos",
       "found": "{count} de {total} frases",
-      "showAll": "Mostrar las {count}",
       "none": "Ninguna frase coincide."
     },
     "streaks": {

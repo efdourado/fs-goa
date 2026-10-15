@@ -2178,7 +2178,6 @@
       "filter": "Buscar nas falas",
       "everyone": "Todos",
       "found": "{count} de {total} falas",
-      "showAll": "Mostrar todas as {count}",
       "none": "Nenhuma fala encontrada."
     },
     "streaks": {

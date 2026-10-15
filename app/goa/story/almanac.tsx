@@ -365,11 +365,9 @@ function QuoteWall({ quotes, full, ids, headline }: { quotes: WallQuote[]; full:
         ))}
       </div>
       {!filtering && found.length > PREVIEW_QUOTES ? (
-        <div className="mt-5 flex justify-center">
-          <button type="button" className="h-9 cursor-pointer rounded-full border border-[var(--line)] px-5 text-xs font-medium text-[var(--ink)] transition hover:border-[var(--muted)] hover:bg-[var(--wash)]" onClick={() => setShowAll((value) => !value)}>
-            {showAll ? t("showLess") : t("quotes.showAll", { count: found.length })}
-          </button>
-        </div>
+        <button type="button" className={cx("mt-3", textActionClass)} aria-expanded={showAll} onClick={() => setShowAll((value) => !value)}>
+          {showAll ? t("showLess") : t("showMore", { count: found.length - PREVIEW_QUOTES })}
+        </button>
       ) : null}
     </div>
   );

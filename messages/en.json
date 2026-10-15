@@ -2178,7 +2178,6 @@
       "filter": "Search the lines",
       "everyone": "Everyone",
       "found": "{count} of {total} lines",
-      "showAll": "Show all {count}",
       "none": "No line matches."
     },
     "streaks": {
