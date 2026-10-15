@@ -1984,7 +1984,6 @@
     "noRating": "sin nota",
     "noEntries": "Todavía sin registro.",
     "checked": "Registrado.",
-    "total": "Total: {value}",
     "diaryTitle": "Diario",
     "diaryTitleSessions": "Entrenamientos",
     "diaryLede": "{entries, plural, one {# registro} other {# registros}} en {days, plural, one {# día} other {# días}}.",
@@ -2012,7 +2011,9 @@
     "colophon": "Generado con Goa el {date}. Los datos son tuyos, este PDF es solo una forma bonita de guardarlos.",
     "footer": "goa · {title} · página ",
     "streakValue": "{count, plural, one {# día} other {# días}}",
-    "showWhen": "Fechas"
+    "showWhen": "Fechas",
+    "progressDays": "{count, plural, one {en # día} other {en # días}}",
+    "progressEntries": "{count, plural, one {# registro} other {# registros}}"
   },
   "reveal": {
     "sealedTitle": "Notas selladas",

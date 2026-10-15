@@ -121,10 +121,12 @@
 /* ── Cover ─────────────────────────────────────────────────────── */
 .xd-cover {
   display: flex;
-  min-height: 259mm;
+  min-height: 251mm; /* the A4 page less its @page margins (24mm + 22mm) */
   flex-direction: column;
   break-after: page;
 }
+/* A cover with nothing after it (a challenge not started yet) ends the document: no blank page behind it. */
+.xd-cover:last-child { break-after: auto; }
 .xd-cover-title {
   margin-top: 14mm !important;
   font-weight: 800;
@@ -153,6 +155,7 @@
   border-top: 1px solid var(--xd-line);
   padding-top: 8mm;
 }
+.xd-stats-none { margin-top: auto; }
 .xd-stat b {
   display: block;
   font-family: var(--xd-font-display), "Poppins", sans-serif;
@@ -219,10 +222,16 @@
   background: var(--c);
 }
 .xd-card.is-long { break-inside: auto; }
-.xd-card.is-empty { padding-top: 4.5mm; padding-bottom: 4.5mm; }
-.xd-card.is-empty .xd-num { font-size: 15pt; }
-.xd-card.is-empty .xd-card-title h3 { font-size: 12pt; }
-.xd-card-empty { margin-top: 0.8mm !important; font-size: 8.5pt; font-style: italic; color: var(--xd-muted); }
+/* Nothing logged yet (an upcoming item): one slim line, so a list of what's still ahead stays short. */
+.xd-card.is-empty { margin-top: 2.5mm; padding-top: 2.6mm; padding-bottom: 2.6mm; }
+.xd-card.is-empty .xd-card-head { align-items: center; }
+.xd-card.is-empty .xd-num { min-width: 9mm; font-size: 12pt; line-height: 1; }
+.xd-card.is-empty .xd-card-title { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 3mm; }
+.xd-card.is-empty .xd-card-title h3 { font-size: 11pt; }
+.xd-card.is-empty .xd-card-title p { margin-top: 0 !important; }
+.xd-card.is-empty .xd-by { display: flex; align-items: baseline; gap: 2mm; }
+.xd-card.is-empty .xd-by strong { font-size: 9.5pt; }
+.xd-card-empty { font-size: 8.5pt; font-style: italic; color: var(--xd-muted); }
 .xd-card-head { display: flex; align-items: flex-start; gap: 5mm; }
 .xd-num {
   flex: none;
@@ -327,17 +336,7 @@
 .xd-text hr { margin: 2.5mm 0; border: 0; border-top: 1px solid var(--xd-line); }
 .xd-text-label { display: block; font-size: 7.5pt; letter-spacing: 0.08em; text-transform: uppercase; color: var(--xd-muted); }
 .xd-empty { color: var(--xd-muted); font-style: italic; }
-.xd-points { display: flex; flex-wrap: wrap; gap: 1.2mm; }
-.xd-point {
-  border-radius: 1.6mm;
-  background: var(--xd-tile);
-  padding: 0.5mm 2mm;
-  font-size: 8pt;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-.xd-point span { color: var(--xd-muted); }
-.xd-total { margin-top: 1.5mm !important; font-size: 8.5pt; color: var(--xd-soft); }
+.xd-soft { color: var(--xd-muted); }
 
 /* ── Diary ─────────────────────────────────────────────────────── */
 .xd-month { margin-top: 9mm; }
@@ -441,6 +440,9 @@
 /* ── Print ─────────────────────────────────────────────────────── */
 @media print {
   html, body, .xd-screen { background: #faf8f3 !important; }
+  /* The paper colour runs into the top and bottom margins (@page) too. Without this, Chrome's
+     "Background graphics" (off by default) prints them white: a beige page between two white bands. */
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body { min-height: 0 !important; }
   .xd-toolbar { display: none !important; }
   .xd-stage { padding: 0; }

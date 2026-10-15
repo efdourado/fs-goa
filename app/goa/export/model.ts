@@ -82,6 +82,8 @@ export interface DocItem {
 export interface DocChapter {
   index: number;
   color: DocColor;
+  /** A stage the challenge really has (it gets a heading), not just a colour run the document made up for a long list. */
+  staged: boolean;
   title: string | null;
   subtitle: string | null;
   items: DocItem[];
@@ -213,7 +215,13 @@ export function buildExportModel(input: {
 }): ExportModel {
   const { challenge, userId, words } = input;
   const typeById = new Map<Id, EntryTypeView>(challenge.entryTypes.map((type) => [type.id, type]));
-  const readRating = entryRatingReader(challenge);
+  // A challenge with no rating form of its own (a book club's "Terminei" holds the Nota) still has its
+  // scoreboard: the ranked rating fields on its completion form count as the rating.
+  const hasRatingForm = challenge.entryTypes.some((type) => type.purpose === "rating" && type.answerScope !== "shared");
+  const readRating = entryRatingReader(hasRatingForm ? challenge : {
+    ...challenge,
+    entryTypes: challenge.entryTypes.map((type) => (type.purpose === "completion" ? { ...type, purpose: "rating" as const } : type)),
+  });
   const sessionMode = challenge.entryTypes.some((type) => type.parentTypeId);
 
   const personKeyOf = (entry: Entry) => (entry.answerScope === "shared" || !entry.userId ? SHARED_PERSON : entry.userId);
@@ -383,6 +391,7 @@ export function buildExportModel(input: {
     return {
       index,
       color: DOC_COLORS[index % (DOC_COLORS.length - 1)],
+      staged: grouped,
       title: checkpoint?.title ?? null,
       subtitle: checkpoint?.description?.trim() || null,
       items: items.filter((item) => item.chapter === index),

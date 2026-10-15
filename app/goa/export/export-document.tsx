@@ -104,7 +104,9 @@ function EntryBody({ entry, doc, showDates }: { entry: DocEntry; doc: Doc; showD
   );
 }
 
-function Cover({ challenge, model, doc }: { challenge: ChallengeDetail; model: ExportModel; doc: Doc }) {
+function Cover({ challenge, model, doc, footer }: { challenge: ChallengeDetail; model: ExportModel; doc: Doc; footer?: ReactNode }) {
+  // A zero says nothing on a cover (a challenge that hasn't started yet): only the numbers there are.
+  const stats = model.stats.filter((stat) => !("value" in stat) || stat.value > 0);
   const lines = coverLines(challenge.title);
   const longest = Math.max(...lines.map((line) => line.length), 1);
   const size = Math.max(34, Math.min(92, Math.floor(610 / (longest * 0.68))));
@@ -129,9 +131,12 @@ function Cover({ challenge, model, doc }: { challenge: ChallengeDetail; model: E
       <div className="xd-ribbon" aria-hidden="true">
         {RIBBON.map((width, index) => <span key={index} className={tone(DOC_COLORS[index])} style={{ width: `${width}%` }} />)}
       </div>
-      <div className="xd-stats">
-        {model.stats.map((stat) => <StatBlock key={stat.kind} stat={stat} doc={doc} />)}
-      </div>
+      {stats.length ? (
+        <div className="xd-stats">
+          {stats.map((stat) => <StatBlock key={stat.kind} stat={stat} doc={doc} />)}
+        </div>
+      ) : <div className="xd-stats-none" />}
+      {footer}
     </section>
   );
 }
@@ -259,12 +264,8 @@ function ItemCard({ item, chapter, model, doc, people, showWhen }: {
             <div className={`xd-row ${tone(person?.color)}`} key={`progress-${row.personKey}`}>
               <dt>{person?.name ?? "—"}{row.label ? <small>{row.label}</small> : null}</dt>
               <dd>
-                <div className="xd-points">
-                  {row.points.map((point, index) => (
-                    <span className="xd-point" key={index}><span>{doc.day(point.day, { day: "numeric", month: "short" })} · </span>{point.text}</span>
-                  ))}
-                </div>
-                {row.total !== null && row.points.length > 1 ? <p className="xd-total">{doc.t("total", { value: row.unit ? `${doc.n(row.total)} ${row.unit}` : doc.n(row.total) })}</p> : null}
+                {/* Not every day (a book club logs dozens): how much, over how many days, from when to when. */}
+                <ProgressSummary row={row} doc={doc} />
               </dd>
             </div>
           );
@@ -276,23 +277,41 @@ function ItemCard({ item, chapter, model, doc, people, showWhen }: {
 
 function Items({ model, doc, people, showWhen }: { model: ExportModel; doc: Doc; people: Map<string, DocPerson>; showWhen: boolean }) {
   const itemCount = model.chapters.reduce((sum, chapter) => sum + chapter.items.length, 0);
-  const labelled = model.chapters.length > 1;
+  // Only real stages get a heading; a long list's colour runs are just colour.
+  const labelled = model.chapters.some((chapter) => chapter.staged);
   return (
     <section className="xd-page">
       <h2 className="xd-h2">{doc.t("itemsTitle")}</h2>
       <p className="xd-lede">{doc.t("itemsLede", { items: itemCount, chapters: labelled ? model.chapters.length : 0 })}</p>
       {model.chapters.map((chapter, index) => (
         <div key={chapter.index}>
-          {labelled || chapter.title ? (
+          {labelled ? (
             <div className={`xd-chapter ${tone(chapter.color)}${index === 0 ? " xd-first-chapter" : ""}`}>
               <h3>{doc.t("chapter", { n: index + 1 })}{chapter.title ? ` · ${chapter.title}` : ""}</h3>
               {chapter.subtitle ? <p>{chapter.subtitle}</p> : null}
             </div>
-          ) : <div style={{ height: "4mm" }} />}
+          ) : index === 0 ? <div style={{ height: "4mm" }} /> : null}
           {chapter.items.map((item) => <ItemCard key={item.id} item={item} chapter={chapter} model={model} doc={doc} people={people} showWhen={showWhen} />)}
         </div>
       ))}
     </section>
+  );
+}
+
+/** A person's progress on one item in a line: "129 pages in 22 days · 29 Mar – 3 May". */
+function ProgressSummary({ row, doc }: { row: DocItem["progress"][number]; doc: Doc }) {
+  const days = [...new Set(row.points.map((point) => point.day).filter((day): day is string => Boolean(day)))].sort();
+  const short = (day: string) => doc.day(day, { day: "numeric", month: "short" });
+  const range = days.length > 1 ? `${short(days[0])} – ${short(days.at(-1)!)}` : days.length ? short(days[0]) : null;
+  const amount = row.total !== null
+    ? (row.unit ? `${doc.n(row.total)} ${row.unit}` : doc.n(row.total))
+    : row.points.length === 1 ? row.points[0].text : doc.t("progressEntries", { count: row.points.length });
+  return (
+    <p className="xd-line">
+      <b>{amount}</b>
+      {days.length > 1 ? <span className="xd-soft">{doc.t("progressDays", { count: days.length })}</span> : null}
+      {range ? <span className="xd-soft">{range}</span> : null}
+    </p>
   );
 }
 
@@ -498,7 +517,8 @@ export function ExportDocument({ challenge, entries, userId, fontClassName }: {
     rules: Boolean(challenge.ruleSections?.length),
     items: !model.sessionMode && model.chapters.length > 0,
     diary: model.diary.length > 0,
-    scoreboard: model.sessionMode ? model.records.length > 0 : model.chapters.length > 0,
+    // A scoreboard needs something to score: a list nobody has logged yet has none.
+    scoreboard: model.sessionMode ? model.records.length > 0 : model.chapters.some((chapter) => chapter.items.some((item) => item.entries.length || item.progress.length)),
   };
   const [hidden, setHidden] = useState<Set<Section>>(new Set());
   const shown = (section: Section) => available[section] && !hidden.has(section);
@@ -508,6 +528,9 @@ export function ExportDocument({ challenge, entries, userId, fontClassName }: {
     return next;
   });
 
+  const colophon = <p className="xd-colophon">{doc.t("colophon", { date: doc.day(dateKeyInSaoPaulo(new Date())) })}</p>;
+  // With only the cover to print, the closing line sits on it rather than alone on a second, empty page.
+  const onlyCover = shown("cover") && !SECTIONS.some((section) => section !== "cover" && shown(section));
   return (
     <div className={`xd-screen ${fontClassName}`}>
       <div className="xd-toolbar">
@@ -559,12 +582,12 @@ export function ExportDocument({ challenge, entries, userId, fontClassName }: {
       </div>
       <div className="xd-stage">
         <article className="xd">
-          {shown("cover") ? <Cover challenge={challenge} model={model} doc={doc} /> : null}
+          {shown("cover") ? <Cover challenge={challenge} model={model} doc={doc} footer={onlyCover ? colophon : undefined} /> : null}
           {shown("rules") ? <HowItWorks challenge={challenge} doc={doc} /> : null}
           {shown("items") ? <Items model={model} doc={doc} people={people} showWhen={showWhen} /> : null}
           {shown("diary") ? <Diary model={model} doc={doc} people={people} /> : null}
           {shown("scoreboard") ? (model.sessionMode ? <Records model={model} doc={doc} showDates={showWhen} /> : <Scoreboard model={model} doc={doc} showDates={showWhen} />) : null}
-          <p className="xd-colophon">{doc.t("colophon", { date: doc.day(dateKeyInSaoPaulo(new Date())) })}</p>
+          {onlyCover ? null : colophon}
         </article>
       </div>
     </div>
