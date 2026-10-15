@@ -159,7 +159,7 @@ export function SearchIcon({ className }: { className?: string }) {
 
 /**
  * A loupe that opens into a quiet search pill: it grows out sideways (nudging whatever sits beside it), and a
- * click anywhere outside folds it back. `keepWhileFiltering` leaves it open while it still holds words, for a
+ * click on the loupe again, or anywhere outside, folds it back. `keepWhileFiltering` leaves it open while it still holds words, for a
  * filter you read through rather than pick from. Escape empties it and folds it.
  */
 export function SearchField({
@@ -200,19 +200,17 @@ export function SearchField({
     <div
       ref={wrapRef}
       className={cx(
-        "relative h-9 flex-none overflow-hidden rounded-full transition-[width,background-color,box-shadow] duration-300 ease-out motion-reduce:transition-none",
-        open
-          ? cx(openClassName, "bg-[var(--wash)] focus-within:bg-[var(--paper)] focus-within:ring-2 focus-within:ring-[var(--main)]/35")
-          : "w-9 hover:bg-[var(--wash)]",
+        "relative h-9 flex-none overflow-hidden transition-[width] duration-300 ease-out motion-reduce:transition-none",
+        open ? openClassName : "w-9",
       )}
     >
       <button
         type="button"
-        tabIndex={open ? -1 : 0}
         aria-label={placeholder}
+        aria-expanded={open}
         title={open ? undefined : placeholder}
-        onClick={() => (open ? inputRef.current?.focus() : onOpenChange(true))}
-        className={cx("absolute inset-y-0 left-0 z-10 grid w-9 cursor-pointer place-items-center transition-colors", open || value ? "text-[var(--ink)]" : "text-[var(--muted)] hover:text-[var(--ink)]")}
+        onClick={() => { if (open) onChange(""); onOpenChange(!open); }}
+        className={cx("absolute inset-y-0 left-0 z-10 grid w-9 cursor-pointer place-items-center rounded-full transition-colors hover:text-[var(--ink)]", open || value ? "text-[var(--ink)]" : "text-[var(--muted)]")}
       >
         <SearchIcon className="h-3.5 w-3.5" />
       </button>
