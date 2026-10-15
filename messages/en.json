@@ -1990,7 +1990,6 @@
     "diaryLede": "{entries, plural, one {# entry} other {# entries}} over {days, plural, one {# day} other {# days}}.",
     "monthDays": "{count, plural, one {# day logged} other {# days logged}}",
     "undated": "Undated",
-    "onlyMarks": "Only check-marks this month (no notes).",
     "scoreboardTitle": "Scoreboard",
     "scoreboardLede": "Every score side by side, in the challenge's order.",
     "scoreboardLedePlain": "Every item, in the challenge's order.",

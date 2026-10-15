@@ -376,23 +376,16 @@
 }
 .xd-cal > i.on { background: var(--c); color: #fff; font-weight: 700; }
 .xd-cal > i.many { box-shadow: 0 0 0 0.5mm var(--xd-paper), 0 0 0 0.9mm var(--c2, var(--c)); }
-.xd-timeline { margin: 0; padding: 0; list-style: none; }
-.xd-day {
-  display: grid;
-  grid-template-columns: 12mm minmax(0, 1fr);
-  gap: 3mm;
-  border-top: 1px solid #efebe2;
-  padding: 2.4mm 0;
-  break-inside: avoid;
-}
-.xd-day:first-child { border-top: 0; padding-top: 0; }
-.xd-day-date { text-align: center; line-height: 1.05; }
-.xd-day-date b { display: block; font-family: var(--xd-font-display), "Poppins", sans-serif; font-size: 14pt; font-weight: 600; font-variant-numeric: tabular-nums; }
-.xd-day-date span { font-size: 6.5pt; letter-spacing: 0.14em; text-transform: uppercase; color: var(--xd-muted); }
 .xd-who { font-family: var(--xd-font-display), "Poppins", sans-serif; font-size: 7.5pt; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--c); }
 .xd-sets { margin-top: 1.5mm; width: 100%; border-collapse: collapse; font-size: 8.5pt; }
 .xd-sets td { border-top: 1px dashed var(--xd-line); padding: 1mm 2mm 1mm 0; vertical-align: top; }
 .xd-sets td:first-child { width: 38%; font-weight: 700; }
+/* A month is one block: if it doesn't fit what's left of a page, it starts the next one whole. */
+.xd-month { break-inside: avoid; }
+.xd-summary { margin-top: 0; }
+.xd-summary tr:first-child td { border-top: 0; padding-top: 0; }
+.xd-summary td.xd-times { width: 12mm; font-variant-numeric: tabular-nums; color: var(--xd-soft); white-space: nowrap; }
+.xd-summary .xd-who { display: block; margin-top: 0.4mm; font-size: 6.5pt; }
 
 /* ── Scoreboard ────────────────────────────────────────────────── */
 .xd-table { margin-top: 7mm; width: 100%; border-collapse: collapse; font-size: 9.5pt; }

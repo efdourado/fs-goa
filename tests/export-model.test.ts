@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { createElement } from "react";
 
 import { ExportDocument } from "../app/goa/export/export-document";
-import { buildExportModel, coverLines, longestStreak } from "../app/goa/export/model";
+import { buildExportModel, coverLines, type DocEntry, longestStreak, summariseMonth } from "../app/goa/export/model";
 import type { ChallengeDetail, Entry } from "../app/goa/types";
 import { renderWithIntl } from "./helpers/intl";
 
@@ -128,4 +128,23 @@ test("sem pedir datas, o PDF não mostra data: nem coluna no placar, nem campo d
   }));
   assert.doesNotMatch(html, /Assisti em/, "a data opcional fica de fora");
   assert.doesNotMatch(html, /<th>Data<\/th>/, "o placar não tem coluna de data");
+});
+
+test("o diário resume o mês: uma linha por exercício e pessoa, com quantas vezes e o melhor de cada número", () => {
+  const set = (id: string, title: string, weight: number, reps: number): DocEntry => ({
+    id, personKey: "me", typeName: "Série", purpose: "checkin", day: "2026-01-01", rating: null, itemTitle: title, children: [],
+    values: [
+      { label: "Peso", text: String(weight), type: "number", number: weight, unit: "kg", long: false, required: true },
+      { label: "Reps", text: String(reps), type: "number", number: reps, unit: null, long: false, required: true },
+    ],
+  });
+  const day = (id: string, children: DocEntry[]): DocEntry => ({ id, personKey: "me", typeName: "Treino", purpose: "checkin", day: "2026-01-01", rating: null, itemTitle: null, children, values: [] });
+  const lines = summariseMonth([
+    day("a", [set("a1", "Supino", 70, 6), set("a2", "Agachamento", 80, 6)]),
+    day("b", [set("b1", "Supino", 75, 8)]),
+  ]);
+  assert.deepEqual(lines, [
+    { name: "Supino", personKey: "me", times: 2, bests: [{ label: "Peso", value: 75, unit: "kg" }, { label: "Reps", value: 8, unit: null }] },
+    { name: "Agachamento", personKey: "me", times: 1, bests: [{ label: "Peso", value: 80, unit: "kg" }, { label: "Reps", value: 6, unit: null }] },
+  ]);
 });

@@ -92,6 +92,38 @@ export interface DocMonth {
   /** Every day with an entry, and whose. */
   days: Array<{ day: string; personKeys: string[] }>;
   entries: DocEntry[];
+  /** The month in a few lines instead of every day: what was done (an exercise, a kind of check-in), by whom, how often, its bests. */
+  summary: DocMonthLine[];
+}
+
+export interface DocMonthLine {
+  name: string;
+  personKey: string;
+  times: number;
+  bests: Array<{ label: string; value: number; unit: string | null }>;
+}
+
+/** Folds a month's entries into one line per thing done and person (a workout's sets by exercise, anything else by its kind), when it has numbers to tell. */
+export function summariseMonth(entries: DocEntry[]): DocMonthLine[] {
+  const lines = new Map<string, DocMonthLine & { order: number }>();
+  const add = (name: string, doc: DocEntry) => {
+    const key = `${name}\u0000${doc.personKey}`;
+    const line = lines.get(key) ?? { name, personKey: doc.personKey, times: 0, bests: [], order: lines.size };
+    line.times += 1;
+    for (const value of doc.values) {
+      if (value.number === null) continue;
+      const best = line.bests.find((row) => row.label === value.label);
+      if (best) best.value = Math.max(best.value, value.number);
+      else line.bests.push({ label: value.label, value: value.number, unit: value.unit });
+    }
+    lines.set(key, line);
+  };
+  for (const entry of entries) {
+    if (entry.children.length) for (const child of entry.children) add(child.itemTitle ?? child.typeName, child);
+    else add(entry.itemTitle ?? entry.typeName, entry);
+  }
+  // A line with no numbers only repeats the calendar ("8 check-ins"), so it's left to the calendar.
+  return [...lines.values()].filter((line) => line.bests.length).sort((a, b) => b.times - a.times || a.order - b.order).map((line) => ({ name: line.name, personKey: line.personKey, times: line.times, bests: line.bests }));
 }
 
 export interface DocRecord {
@@ -362,7 +394,7 @@ export function buildExportModel(input: {
   const months = new Map<string, DocMonth>();
   for (const doc of diaryDocs) {
     const month = doc.day ? doc.day.slice(0, 7) : "";
-    const bucket = months.get(month) ?? { month, days: [], entries: [] };
+    const bucket = months.get(month) ?? { month, days: [], entries: [], summary: [] };
     if (doc.day) {
       const day = bucket.days.find((row) => row.day === doc.day);
       if (day) { if (!day.personKeys.includes(doc.personKey)) day.personKeys.push(doc.personKey); }
@@ -371,7 +403,8 @@ export function buildExportModel(input: {
     bucket.entries.push(doc);
     months.set(month, bucket);
   }
-  const diary = [...months.values()].sort((a, b) => a.month.localeCompare(b.month));
+  const diary = [...months.values()].sort((a, b) => a.month.localeCompare(b.month))
+    .map((month) => ({ ...month, summary: summariseMonth(month.entries) }));
 
   // Workouts: each item's best of every number field, across every visible record.
   const records: DocRecord[] = [];

@@ -1990,7 +1990,6 @@
     "diaryLede": "{entries, plural, one {# registro} other {# registros}} en {days, plural, one {# día} other {# días}}.",
     "monthDays": "{count, plural, one {# día con registro} other {# días con registro}}",
     "undated": "Sin fecha",
-    "onlyMarks": "Solo marcas este mes (ninguna anotación).",
     "scoreboardTitle": "Marcador",
     "scoreboardLede": "Todas las notas lado a lado, en el orden del desafío.",
     "scoreboardLedePlain": "Todos los ítems, en el orden del desafío.",

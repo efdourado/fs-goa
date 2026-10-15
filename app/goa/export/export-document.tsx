@@ -298,7 +298,7 @@ function Items({ model, doc, people, showWhen }: { model: ExportModel; doc: Doc;
 
 const WEEK = [0, 1, 2, 3, 4, 5, 6];
 
-function Diary({ model, doc, people, showDates }: { model: ExportModel; doc: Doc; people: Map<string, DocPerson>; showDates: boolean }) {
+function Diary({ model, doc, people }: { model: ExportModel; doc: Doc; people: Map<string, DocPerson> }) {
   const entryCount = model.diary.reduce((sum, month) => sum + month.entries.length, 0);
   const dayCount = model.diary.reduce((sum, month) => sum + month.days.length, 0);
   const multiPeople = model.people.length > 1;
@@ -311,7 +311,6 @@ function Diary({ model, doc, people, showDates }: { model: ExportModel; doc: Doc
       {model.diary.map((month, monthIndex) => {
         const color = DOC_COLORS[monthIndex % (DOC_COLORS.length - 1)];
         const logged = new Map(month.days.map((row) => [row.day, row.personKeys]));
-        const written = month.entries.filter((entry) => entry.values.length || entry.children.length);
         return (
           <div className={`xd-month ${tone(color)}`} key={month.month || "undated"}>
             <div className="xd-month-head">
@@ -334,35 +333,26 @@ function Diary({ model, doc, people, showDates }: { model: ExportModel; doc: Doc
                   })}
                 </div>
               ) : <div />}
-              <ol className="xd-timeline">
-                {written.map((entry) => {
-                  const person = people.get(entry.personKey);
-                  return (
-                    <li className="xd-day" key={entry.id}>
-                      <div className="xd-day-date">
-                        {entry.day ? <><b>{Number(entry.day.slice(8))}</b><span>{doc.day(entry.day, { weekday: "short" }).replace(".", "")}</span></> : <b>·</b>}
-                      </div>
-                      <div className={tone(person?.color)}>
-                        {multiPeople ? <p className="xd-who">{person?.name}</p> : null}
-                        <EntryBody entry={entry} doc={doc} showDates={showDates} />
-                        {entry.children.length ? (
-                          <table className="xd-sets">
-                            <tbody>
-                              {entry.children.map((child) => (
-                                <tr key={child.id}>
-                                  <td>{child.itemTitle ?? child.typeName}</td>
-                                  <td>{child.values.filter((value) => !value.long && printed(value, showDates)).map((value) => `${value.label} ${answerText(value, doc)}`).join(" · ")}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        ) : null}
-                      </div>
-                    </li>
-                  );
-                })}
-                {!written.length ? <li className="xd-empty">{doc.t("onlyMarks")}</li> : null}
-              </ol>
+              {/* The days are on the calendar; beside it, the month in a few lines rather than every one of them. */}
+              {month.summary.length ? (
+                <table className="xd-sets xd-summary">
+                  <tbody>
+                    {month.summary.map((line) => {
+                      const person = people.get(line.personKey);
+                      return (
+                        <tr key={`${line.name}-${line.personKey}`} className={tone(person?.color)}>
+                          <td>
+                            {line.name}
+                            {multiPeople ? <span className="xd-who">{person?.name}</span> : null}
+                          </td>
+                          <td className="xd-times">{doc.n(line.times)}×</td>
+                          <td>{line.bests.map((best) => `${best.label} ${doc.n(best.value)}${best.unit ? ` ${best.unit}` : ""}`).join(" · ")}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              ) : <div />}
             </div>
           </div>
         );
@@ -572,7 +562,7 @@ export function ExportDocument({ challenge, entries, userId, fontClassName }: {
           {shown("cover") ? <Cover challenge={challenge} model={model} doc={doc} /> : null}
           {shown("rules") ? <HowItWorks challenge={challenge} doc={doc} /> : null}
           {shown("items") ? <Items model={model} doc={doc} people={people} showWhen={showWhen} /> : null}
-          {shown("diary") ? <Diary model={model} doc={doc} people={people} showDates={showWhen} /> : null}
+          {shown("diary") ? <Diary model={model} doc={doc} people={people} /> : null}
           {shown("scoreboard") ? (model.sessionMode ? <Records model={model} doc={doc} showDates={showWhen} /> : <Scoreboard model={model} doc={doc} showDates={showWhen} />) : null}
           <p className="xd-colophon">{doc.t("colophon", { date: doc.day(dateKeyInSaoPaulo(new Date())) })}</p>
         </article>
