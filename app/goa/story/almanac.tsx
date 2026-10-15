@@ -1,9 +1,10 @@
 "use client";
 
 import { useFormatter, useTranslations } from "next-intl";
-import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { Children, isValidElement, type ReactNode, useEffect, useId, useRef, useState } from "react";
 
 import { coverColors, coverToneOf, ItemCover } from "../catalog-cover";
+import { CatalogTile } from "../catalog-views";
 import { firstName, personTone } from "../rating-scale";
 import { Rail, RailArrows, useShelfRail } from "../shelf";
 import type { Id, Metric } from "../types";
@@ -20,6 +21,18 @@ export function TitleChip({ title, year, className, bare = false, prominentYear 
       <span className={cx("relative tracking-[0.08em]", prominentYear ? "text-[10px] font-medium" : "text-[7px]")} style={{ fontFamily: "var(--font-geist-mono), ui-monospace, monospace" }}>{year ?? " "}</span>
       {/* Bare: the title is already written right next to the cover — don't say it twice. */}
       {bare ? null : <span className="relative line-clamp-3 break-words text-[10px] font-light leading-[1.05]">{title}</span>}
+    </span>
+  );
+}
+
+/** A list row as a slim catalogue tile: the item's cover colour, its title and year, and whatever sits at the end. */
+function ItemBar({ title, year, end }: { title: string; year?: number | null; end?: ReactNode }) {
+  return (
+    <span className="relative flex h-11 min-w-0 items-center gap-3 overflow-hidden rounded-xl bg-[var(--cover-bg)] px-3.5 text-[var(--cover-ink)]" style={coverColors(coverToneOf(title))}>
+      <span aria-hidden="true" className="pointer-events-none absolute -bottom-6 -right-5 h-12 w-12 rounded-full border-[8px] border-[var(--cover-deco)]" />
+      <span className="relative min-w-0 flex-1 truncate text-sm font-light tracking-[-0.01em]">{title}</span>
+      {year ? <span className="relative hidden flex-none text-[10px] tracking-[0.08em] sm:block" style={{ fontFamily: "var(--font-geist-mono), ui-monospace, monospace" }}>{year}</span> : null}
+      {end ? <span className="relative flex-none rounded-full bg-[var(--paper)] px-2.5 py-1 text-xs tabular-nums text-[var(--ink)]">{end}</span> : null}
     </span>
   );
 }
@@ -310,14 +323,14 @@ function QuoteWall({ quotes, full, ids, headline }: { quotes: WallQuote[]; full:
   const [showAll, setShowAll] = useState(false);
   if (full) {
     return (
-      <div className={grid}>
+      <Grid>
         {quotes.slice(0, PAGE_QUOTES).map((quote) => (
           <figure key={quote.key} className={cx(cardClass, "border-l-[3px]")} style={{ borderLeftColor: personTone(ids, quote.person.id) }}>
             <CommentText text={quote.text} className="max-h-[11.25rem] overflow-hidden text-lg font-light" />
             <figcaption className="mt-3 flex items-center gap-2 text-xs text-[var(--muted)]"><Avatar id={quote.person.id} name={quote.person.name} ids={ids} size={5} />{quote.caption}</figcaption>
           </figure>
         ))}
-      </div>
+      </Grid>
     );
   }
   const people = [...new Map(quotes.map((quote) => [quote.person.id, quote.person])).values()];
@@ -357,14 +370,14 @@ function QuoteWall({ quotes, full, ids, headline }: { quotes: WallQuote[]; full:
       {/* How many matched, only for typed words: picking a person needs no count. */}
       {needle ? <p className="mb-5 text-xs tabular-nums text-[var(--muted)] sm:text-right">{t("quotes.found", { count: found.length, total: quotes.length })}</p> : null}
       {filtering && !found.length ? <p className="py-10 text-center text-sm font-light text-[var(--muted)]">{t("quotes.none")}</p> : null}
-      <div className={grid}>
+      <Grid>
         {shown.map((quote) => (
           <figure key={quote.key} className={cx(cardClass, "border-l-[3px]")} style={{ borderLeftColor: personTone(ids, quote.person.id) }}>
             <ExpandableComment text={quote.text} />
             <figcaption className="mt-auto flex pt-3 items-center gap-2 text-xs text-[var(--muted)]"><Avatar id={quote.person.id} name={quote.person.name} ids={ids} size={5} />{quote.caption}</figcaption>
           </figure>
         ))}
-      </div>
+      </Grid>
       {!filtering && found.length > PREVIEW_QUOTES ? (
         <button type="button" className={cx("mt-3", textActionClass)} aria-expanded={showAll} onClick={() => setShowAll((value) => !value)}>
           {showAll ? t("showLess") : t("showMore", { count: found.length - PREVIEW_QUOTES })}
@@ -429,7 +442,32 @@ function ExpandableComment({ text }: { text: string }) {
 
 // Two columns at most, decided by the page's own width (a screen, or a downloaded page) — and a lone last section
 // takes the whole row instead of sitting next to a hole.
+/** The Rankings page's grid (left as it is): two columns, a last odd section across both. */
 const grid = "grid gap-4 @2xl:grid-cols-2 @2xl:[&>*:last-child:nth-child(odd)]:[grid-column:1/-1]";
+
+/** Whether a section spans the whole row: a `wide` Block, or anything that asks for `[grid-column:1/-1]`. */
+function isWide(node: ReactNode): boolean {
+  if (!isValidElement<{ wide?: boolean; className?: string }>(node)) return false;
+  return node.props.wide === true || String(node.props.className ?? "").includes("grid-column:1/-1");
+}
+
+/**
+ * Two columns from `@2xl`, and never an empty cell: between full-width sections, a section left alone in its row
+ * (an odd one out) takes the whole row.
+ */
+function Grid({ children }: { children: ReactNode }) {
+  const nodes = Children.toArray(children);
+  const lone = new Set<number>();
+  let run: number[] = [];
+  const close = () => { if (run.length % 2 === 1) lone.add(run[run.length - 1]); run = []; };
+  nodes.forEach((node, index) => { if (isWide(node)) close(); else run.push(index); });
+  close();
+  return (
+    <div className="grid gap-4 @2xl:grid-cols-2">
+      {nodes.map((node, index) => (lone.has(index) ? <div key={index} className="grid min-w-0 @2xl:[grid-column:1/-1]">{node}</div> : node))}
+    </div>
+  );
+}
 
 /**
  * Every page the almanac has for this story — only the ones its data can fill. `full` is a downloaded
@@ -614,14 +652,12 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
       const titleRows = (rows: typeof d.met, lead: "a" | "b" | null) => (
         <ul className="space-y-2 text-sm">
           {rows.slice(0, 5).map((row) => (
-            <li key={row.item.id} className="flex items-center gap-3">
-              <TitleChip bare title={row.item.title} year={row.item.year} className="w-8 flex-none" />
-              <span className="min-w-0 flex-1 truncate">{row.item.title}</span>
-              <span className="flex-none tabular-nums text-xs">
+            <li key={row.item.id}>
+              <ItemBar title={row.item.title} year={row.item.year} end={<>
                 <span className={lead === "b" ? "text-[var(--muted)]" : "font-medium"} style={lead === "a" ? { color: toneA } : undefined}>{fmt(row.a)}</span>
                 <span className="text-[var(--muted)]"> · </span>
                 <span className={lead === "a" ? "text-[var(--muted)]" : "font-medium"} style={lead === "b" ? { color: toneB } : undefined}>{fmt(row.b)}</span>
-              </span>
+              </>} />
             </li>
           ))}
           {rows.length > 5 ? <li className="text-xs text-[var(--muted)]">{t("metricsMore", { count: rows.length - 5 })}</li> : null}
@@ -634,7 +670,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
         title: t("duo.title"),
         headline: t("duo.mix.line", { total: d.met.length + d.aBrought.length + d.bBrought.length + d.between, things: noun(d.met.length + d.aBrought.length + d.bBrought.length + d.between), met: d.met.length, a: nameA, aCount: d.aBrought.length, b: nameB, bCount: d.bBrought.length }),
         body: (
-          <div className={grid}>
+          <Grid>
             <Block title={t("duo.mix.title")} wide>
               <div className="flex h-4 w-full overflow-hidden rounded-full">
                 {[
@@ -655,24 +691,14 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
             </Block>
             {d.sharedFavourite ? (
               <Block title={t("duo.loved")}>
-                <div className="flex items-center gap-4">
-                  <TitleChip bare title={d.sharedFavourite.item.title} year={d.sharedFavourite.item.year} className="w-20 flex-none" />
-                  <div>
-                    <p className="text-2xl font-light tracking-[-0.03em]">{d.sharedFavourite.item.title}</p>
-                    <p className="mt-1 text-sm"><span style={{ color: toneA }}>{nameA} {fmt(d.sharedFavourite.a)}</span> <span className="text-[var(--muted)]">·</span> <span style={{ color: toneB }}>{nameB} {fmt(d.sharedFavourite.b)}</span></p>
-                  </div>
-                </div>
+                <CatalogTile title={d.sharedFavourite.item.title} year={d.sharedFavourite.item.year} avg={(d.sharedFavourite.a + d.sharedFavourite.b) / 2} ratingLabel={fmt((d.sharedFavourite.a + d.sharedFavourite.b) / 2)} caption="" />
+                <p className="mt-2.5 px-1 text-sm"><span style={{ color: toneA }}>{nameA} {fmt(d.sharedFavourite.a)}</span> <span className="text-[var(--muted)]">·</span> <span style={{ color: toneB }}>{nameB} {fmt(d.sharedFavourite.b)}</span></p>
               </Block>
             ) : null}
             {d.argument ? (
               <Block title={t("duo.argument")}>
-                <div className="flex items-center gap-4">
-                  <TitleChip bare title={d.argument.item.title} year={d.argument.item.year} className="w-20 flex-none" />
-                  <div>
-                    <p className="text-2xl font-light tracking-[-0.03em]">{d.argument.item.title}</p>
-                    <p className="mt-1 text-sm"><span style={{ color: toneA }}>{nameA} {fmt(d.argument.a)}</span> <span className="text-[var(--muted)]">·</span> <span style={{ color: toneB }}>{nameB} {fmt(d.argument.b)}</span></p>
-                  </div>
-                </div>
+                <CatalogTile title={d.argument.item.title} year={d.argument.item.year} avg={(d.argument.a + d.argument.b) / 2} ratingLabel={fmt((d.argument.a + d.argument.b) / 2)} caption="" />
+                <p className="mt-2.5 px-1 text-sm"><span style={{ color: toneA }}>{nameA} {fmt(d.argument.a)}</span> <span className="text-[var(--muted)]">·</span> <span style={{ color: toneB }}>{nameB} {fmt(d.argument.b)}</span></p>
                 {argumentQuotes.length ? (
                   <div className="mt-4 space-y-2">
                     {argumentQuotes.map((quote) => (
@@ -692,7 +718,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
               </div>
               <p className="mt-3 text-sm">{Math.abs(d.aAverage - d.bAverage) < 0.2 ? t("duo.sameScale") : t("duo.higher", { name: d.aAverage > d.bAverage ? nameA : nameB, gap: fmt(Math.abs(d.aAverage - d.bAverage)) })}</p>
             </Block>
-          </div>
+          </Grid>
         ),
       });
       pages.push({
@@ -700,7 +726,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
         title: t("duo.broughtTitle"),
         headline: t("duo.broughtHeadline", { a: nameA, b: nameB }),
         body: (
-          <div className={grid}>
+          <Grid>
             {d.met.length ? <Block title={t("duo.met")}>{titleRows(d.met, null)}</Block> : null}
             {d.aBrought.length ? <Block title={t("duo.brought", { name: nameA })}>{titleRows(d.aBrought, "a")}</Block> : null}
             {d.bBrought.length ? <Block title={t("duo.brought", { name: nameB })}>{titleRows(d.bBrought, "b")}</Block> : null}
@@ -718,7 +744,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
                 </ul>
               </Block>
             ) : null}
-          </div>
+          </Grid>
         ),
       });
     } else if (s.solo) {
@@ -731,7 +757,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
         title: t("solo.title"),
         headline: t("solo.headline", { value: fmt(o.average), count: o.perfect.length }),
         body: (
-          <div className={grid}>
+          <Grid>
             <Block title={t("solo.scale")} wide>
               <div className="flex h-32 items-end gap-1.5">
                 {o.distribution.map((row) => (
@@ -757,7 +783,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
                 <p className="mt-2 text-sm">{t("solo.instinctsLine", { close: o.instincts.close, total: o.instincts.total })}</p>
               </Block>
             ) : null}
-          </div>
+          </Grid>
         ),
       });
     } else if (s.critics.length || s.pairs.length) {
@@ -770,7 +796,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
             ? t("pairs.title", { a: firstName(s.pairs[0].a.name), b: firstName(s.pairs[0].b.name), agreement: s.pairs[0].agreement })
             : t("critics.title", { name: firstName(s.critics[0].person.name), value: fmt(s.critics[0].average) }),
         body: (
-          <div className={grid}>
+          <Grid>
             {s.critics.length ? (
               <Block title={t("critics.title", { name: firstName(s.critics[0].person.name), value: fmt(s.critics[0].average) })}>
                 <ul className="space-y-2.5">
@@ -789,11 +815,16 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
             ) : null}
             {s.critics.length ? (
               <Block title={t("favourites.eyebrow")}>
-                <ul className="flex flex-wrap gap-3">
-                  {s.critics.filter((critic) => critic.favourite).map((critic) => (
-                    <li key={critic.person.id} className="flex w-[4.5rem] flex-col gap-1.5">
-                      <TitleChip title={critic.favourite!.item.title} year={critic.favourite!.item.year} className="w-full" />
-                      <span className="flex items-center gap-1 text-xs"><Avatar id={critic.person.id} name={critic.person.name} ids={ids} size={4} /><span className="truncate">{firstName(critic.person.name)}</span></span>
+                <ul className="space-y-3">
+                  {/* One tile per title, with everyone whose #1 it is under it. */}
+                  {[...Map.groupBy(s.critics.filter((critic) => critic.favourite), (critic) => critic.favourite!.item.id).values()].map((group) => (
+                    <li key={group[0].favourite!.item.id}>
+                      <CatalogTile title={group[0].favourite!.item.title} year={group[0].favourite!.item.year} ratingLabel="" caption="" />
+                      <span className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-xs">
+                        {group.map((critic) => (
+                          <span key={critic.person.id} className="flex items-center gap-1"><Avatar id={critic.person.id} name={critic.person.name} ids={ids} size={4} />{firstName(critic.person.name)}</span>
+                        ))}
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -824,7 +855,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
                 <p className="mt-2 text-xs text-[var(--muted)]">{t("common.hint")}</p>
               </Block>
             ) : null}
-          </div>
+          </Grid>
         ),
       });
     }
@@ -839,7 +870,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
             ? t("pages.details.headlineProperty", { label: propertyLabel(s.properties[0].label), name: s.properties[0].best.key })
             : t(input.people.length === 1 ? "time.titleSolo" : "time.title", { hours: Math.floor((s.totals.minutes ?? 0) / 60), minutes: Math.round((s.totals.minutes ?? 0) % 60) }),
         body: (
-          <div className={grid}>
+          <Grid>
             {s.totals.minutes ? (
               <Block title={t("time.eyebrow")}>
                 <p className="text-3xl font-light tracking-[-0.03em]">{t(input.people.length === 1 ? "time.titleSolo" : "time.title", { hours: Math.floor(s.totals.minutes / 60), minutes: Math.round(s.totals.minutes % 60) })}</p>
@@ -871,7 +902,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
                 </p>
               </Block>
             ) : null}
-          </div>
+          </Grid>
         ),
       });
     }
@@ -920,7 +951,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
         title: t("pages.streaks.title"),
         headline: lane.longest ? t(`soloDays.headline${wk}`, { count: lane.longest.length }) : t("streaks.none"),
         body: (
-          <div className={grid}>
+          <Grid>
             <Block title={t("soloDays.numbers")}>
               <dl className="grid grid-cols-3 gap-4">
                 {[
@@ -951,7 +982,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
                 <p className="mt-2 text-xs text-[var(--muted)]">{t("comeback.note")}</p>
               </Block>
             ) : null}
-          </div>
+          </Grid>
         ),
       });
     } else pages.push({
@@ -959,7 +990,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
       title: t("pages.streaks.title"),
       headline: byStreak[0].longest ? t(`streaks.title${wk}`, { name: firstName(byStreak[0].person.name), count: byStreak[0].longest.length }) : t("streaks.none"),
       body: (
-        <div className={grid}>
+        <Grid>
           <Block title={t("streaks.eyebrow")}>
             <ul className="space-y-2.5">
               {byStreak.map((lane) => (
@@ -1002,7 +1033,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
               <p className="mt-2 text-xs text-[var(--muted)]">{t("comeback.note")}</p>
             </Block>
           ) : null}
-        </div>
+        </Grid>
       ),
     });
 
@@ -1013,7 +1044,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
         title: t("pages.volume.title"),
         headline: s.totals.total !== null ? t("totals.title", { total: nf.number(s.totals.total), unit }) : t("pages.volume.headlineCount", { count: s.totals.checkins }),
         body: (
-          <div className={grid}>
+          <Grid>
             {s.totals.total !== null ? (
               <Block title={input.counter?.label ?? ""}>
                 <p className="text-5xl font-light tabular-nums tracking-[-0.04em]">{nf.number(s.totals.total)} <span className="text-xl text-[var(--muted)]">{unit}</span></p>
@@ -1036,7 +1067,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
                 ))}
               </div>
             </Block>
-          </div>
+          </Grid>
         ),
       });
     } else pages.push({
@@ -1044,7 +1075,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
       title: t("pages.volume.title"),
       headline: s.totals.total !== null ? t("totals.title", { total: nf.number(s.totals.total), unit }) : t("pages.volume.headlineCount", { count: s.totals.checkins }),
       body: (
-        <div className={grid}>
+        <Grid>
           {byTotal.length ? (
             <Block title={input.counter?.label ?? ""}>
               <div className="space-y-2.5">
@@ -1069,7 +1100,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
               </ul>
             </Block>
           ) : null}
-        </div>
+        </Grid>
       ),
     });
 
@@ -1081,11 +1112,11 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
           ? t("records.headline", { title: s.records[0].item.title, gain: Math.round(((s.records[0].best - s.records[0].first) / Math.max(1e-9, s.records[0].first)) * 100) })
           : t("records.headlineFlat", { count: s.records.length }),
         body: (
-          <div className={grid}>
+          <Grid>
             <Block title={t("records.list", { label: input.recordLabel ?? "" })} wide>
               <RecordsList rows={s.records} unit={input.recordUnit ?? ""} showPerson={s.lanes.length > 1} ids={ids} fmt={(value) => nf.number(value)} />
             </Block>
-          </div>
+          </Grid>
         ),
       });
     }

@@ -101,7 +101,8 @@ export function CatalogTile({ title, year, avg, ratingLabel, badgeHidden, captio
   selecting?: boolean;
   picked?: boolean;
   onPick?: (on: boolean) => void;
-  onOpen: () => void;
+  /** Leave it out for a tile that only shows the item (a result page): no button, no hover. */
+  onOpen?: () => void;
 }) {
   const rated = !badgeHidden && avg !== null && avg !== undefined;
   const body = (
@@ -138,8 +139,11 @@ export function CatalogTile({ title, year, avg, ratingLabel, badgeHidden, captio
       <input type="checkbox" className="peer sr-only" checked={Boolean(picked)} aria-label={title} onChange={(event) => onPick?.(event.target.checked)} />
       <span className="flex flex-col gap-2 rounded-[22px] peer-focus-visible:ring-4 peer-focus-visible:ring-[var(--main)]/25">{body}</span>
     </label>
-  ) : (
+  ) : onOpen ? (
     <button type="button" onClick={onOpen} title={title} className={cx(shared, "cursor-pointer rounded-[22px] focus-visible:ring-4 focus-visible:ring-[var(--main)]/25")}>{body}</button>
+  ) : (
+    // Not a "group": the hover lift belongs to tiles that open something.
+    <div title={title} className={cx("flex min-w-0 flex-col gap-2 text-left", className)}>{body}</div>
   );
 }
 
