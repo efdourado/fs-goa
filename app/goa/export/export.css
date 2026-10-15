@@ -59,6 +59,22 @@
   scrollbar-width: none;
 }
 .xd-chips::-webkit-scrollbar { display: none; }
+/* Inside the app's window: the header stays put and only the pages under it scroll, with a thin bar that
+   keeps clear of the window's rounded corners. */
+.xd-modal-panel .xd-screen { display: flex; height: 100%; min-height: 0; flex-direction: column; }
+.xd-modal-panel .xd-toolbar { position: relative; flex: none; }
+.xd-modal-panel .xd-stage {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+  scrollbar-gutter: stable both-edges;
+}
+.xd-modal-panel .xd-stage::-webkit-scrollbar { width: 10px; }
+.xd-modal-panel .xd-stage::-webkit-scrollbar-thumb { border: 3px solid transparent; border-radius: 999px; background: var(--line) padding-box; }
+.xd-modal-panel .xd-stage::-webkit-scrollbar-track { margin-block: 8px 16px; background: transparent; }
 /* Inside the header row the chips take what the button leaves, and scroll there. */
 .xd-toolbar-row .xd-chips { flex: 1; min-width: 0; margin: 0; padding: 0 0 2px; }
 .xd-chip-gap { flex: none; width: 1px; margin: 6px 6px; background: var(--line); }
@@ -454,7 +470,15 @@
   /* In the app's modal, only the document prints, and as plain flow: a fixed, scrolling box would print
      its first screen only. */
   html.xd-modal-open body > *:not(.xd-modal) { display: none !important; }
-  html.xd-modal-open .xd-modal { position: static !important; overflow: visible !important; }
+  html.xd-modal-open .xd-modal-backdrop { display: none !important; }
+  html.xd-modal-open .xd-modal-panel .xd-screen, html.xd-modal-open .xd-modal-panel .xd-stage {
+    display: block !important; height: auto !important; overflow: visible !important;
+  }
+  html.xd-modal-open .xd-modal, html.xd-modal-open .xd-modal-panel {
+    position: static !important; display: block !important; height: auto !important; max-height: none !important;
+    overflow: visible !important; padding: 0 !important; border-radius: 0 !important; box-shadow: none !important;
+    background: none !important; backdrop-filter: none !important;
+  }
   .xd-toolbar { display: none !important; }
   .xd-stage { padding: 0; }
   /* The side margins are the sheet's own padding, not @page's: a print dialog set to "Margins: None"
