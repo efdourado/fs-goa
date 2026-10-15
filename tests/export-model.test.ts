@@ -86,7 +86,7 @@ test("o documento mostra capa, regras, cartões e placar preenchido", () => {
   assert.match(html, /Vivi &amp; Dudu apresentam/);
   assert.match(html, /A ordem tem lógica\./);
   assert.match(html, /<blockquote>Sabe quando…<\/blockquote>/, "a citação do comentário vira citação");
-  assert.match(html, /Campeão<\/span><b>John Wick<\/b>/);
+  assert.match(html, /<dt>Campeão<\/dt><dd><b>John Wick<\/b>/, "o veredito vai para a capa, em linhas");
   assert.match(html, /<b>75<\/b><span class="xd-soft">em 2 dias<\/span>/);
   assert.match(html, /Baixar PDF/);
   assert.doesNotMatch(html, /<span>Notas<\/span>/, "as notas de cada um ficam nas linhas e no placar, não num quadro apertado");

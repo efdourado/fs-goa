@@ -118,6 +118,13 @@ function Cover({ challenge, model, doc, footer }: { challenge: ChallengeDetail; 
     : names.length === 1 ? doc.t("presentsOne", { name: names[0] })
       : names.length <= 4 ? doc.t("presents", { names: `${names.slice(0, -1).join(", ")} & ${names.at(-1)}` })
         : doc.t("presentsGroup", { count: names.length });
+  const scoreCount = model.chapters.reduce((sum, chapter) => sum + chapter.items.reduce((total, item) => total + item.ratings.length, 0), 0);
+  const outOf = (value: number) => `${doc.n(value)}/${model.ratingMax}`;
+  const verdict = !model.hasRatings ? [] : [
+    model.champion?.ratingAvg != null ? { label: doc.t("champion"), value: model.champion.title, note: outOf(model.champion.ratingAvg) } : null,
+    model.disappointment?.ratingAvg != null ? { label: doc.t("disappointment"), value: model.disappointment.title, note: outOf(model.disappointment.ratingAvg) } : null,
+    model.overallAvg !== null ? { label: doc.t("overall"), value: doc.n(model.overallAvg), note: doc.t("ratingsCount", { count: scoreCount }) } : null,
+  ].filter((row): row is { label: string; value: string; note: string } => row !== null);
   const range = model.firstDay
     ? model.firstDay === model.lastDay ? doc.day(model.firstDay) : doc.t("range", { from: doc.day(model.firstDay), to: doc.day(model.lastDay) })
     : null;
@@ -131,6 +138,14 @@ function Cover({ challenge, model, doc, footer }: { challenge: ChallengeDetail; 
       </h1>
       <p className="xd-cover-lede">{challenge.description?.trim() || doc.t("coverLede", { title: challenge.title })}</p>
       {range ? <p className="xd-eyebrow" style={{ marginTop: "6mm" }}>{range}</p> : null}
+      {verdict.length ? (
+        // The verdict, read off the scoreboard: a few plain lines, not boxes.
+        <dl className="xd-verdict">
+          {verdict.map((row) => (
+            <div key={row.label}><dt>{row.label}</dt><dd><b>{row.value}</b>{row.note ? <span>{row.note}</span> : null}</dd></div>
+          ))}
+        </dl>
+      ) : null}
       {stats.length ? (
         <div className="xd-stats">
           {stats.map((stat) => <StatBlock key={stat.kind} stat={stat} doc={doc} />)}
@@ -420,25 +435,6 @@ function Scoreboard({ model, doc, showDates }: { model: ExportModel; doc: Doc; s
           </tbody>
         </table>
       </div>
-      {model.hasRatings ? (
-        <div className="xd-podium">
-          <div>
-            <span>{doc.t("champion")}</span>
-            <b>{model.champion?.title ?? "—"}</b>
-            {model.champion?.ratingAvg != null ? <small>{doc.n(model.champion.ratingAvg)}/{model.ratingMax}</small> : null}
-          </div>
-          <div>
-            <span>{doc.t("disappointment")}</span>
-            <b>{model.disappointment?.title ?? "—"}</b>
-            {model.disappointment?.ratingAvg != null ? <small>{doc.n(model.disappointment.ratingAvg)}/{model.ratingMax}</small> : null}
-          </div>
-          <div>
-            <span>{doc.t("overall")}</span>
-            <b>{model.overallAvg !== null ? doc.n(model.overallAvg) : "—"}</b>
-            <small>{doc.t("ratingsCount", { count: items.reduce((sum, { item }) => sum + item.ratings.length, 0) })}</small>
-          </div>
-        </div>
-      ) : null}
     </section>
   );
 }

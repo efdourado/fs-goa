@@ -147,6 +147,13 @@
   line-height: 1.45;
   color: #3b3a36;
 }
+/* The verdict on the cover: label, then the title and its score, one line each. */
+.xd-verdict { margin: 12mm 0 0; display: grid; gap: 2.4mm; max-width: 150mm; }
+.xd-verdict > div { display: grid; grid-template-columns: 36mm minmax(0, 1fr); align-items: baseline; gap: 4mm; }
+.xd-verdict dt { font-family: var(--xd-font-display), "Poppins", sans-serif; font-size: 6.5pt; letter-spacing: 0.24em; text-transform: uppercase; color: var(--xd-muted); }
+.xd-verdict dd { margin: 0; min-width: 0; font-size: 11pt; }
+.xd-verdict b { font-family: var(--xd-font-display), "Poppins", sans-serif; font-weight: 600; }
+.xd-verdict span { margin-left: 2.5mm; font-size: 9pt; color: var(--xd-muted); font-variant-numeric: tabular-nums; }
 .xd-stats {
   margin-top: auto;
   display: grid;
@@ -417,17 +424,6 @@
 .xd-table .avg { font-weight: 700; }
 .xd-table .muted { color: var(--xd-muted); }
 .xd-table .small { font-size: 8.5pt; white-space: nowrap; }
-.xd-podium {
-  margin-top: 7mm;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 4mm;
-  break-inside: avoid;
-}
-.xd-podium div { border: 1px solid var(--xd-line); border-radius: 3.5mm; padding: 4mm 5mm; }
-.xd-podium span { display: block; font-family: var(--xd-font-display), "Poppins", sans-serif; font-size: 8pt; color: var(--xd-muted); }
-.xd-podium b { display: block; margin-top: 1mm; font-family: var(--xd-font-display), "Poppins", sans-serif; font-size: 12pt; font-weight: 600; line-height: 1.25; color: var(--c, var(--xd-ink)); }
-.xd-podium small { display: block; margin-top: 0.5mm; font-size: 8.5pt; color: var(--xd-soft); }
 .xd-colophon { margin-top: 10mm !important; font-size: 8pt; color: var(--xd-muted); }
 
 /* ── Small screens: the sheet reflows instead of scrolling sideways ── */
@@ -436,8 +432,7 @@
   .xd { width: 100%; border-radius: 0; padding: 28px 16px 40px; font-size: 10pt; }
   .xd-cover { min-height: 0; }
   .xd-stats { margin-top: 36px; grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 20px; }
-  .xd-podium { grid-template-columns: minmax(0, 1fr); }
-  .xd-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .xd-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .xd-row { grid-template-columns: minmax(0, 1fr); gap: 1mm; }
   .xd-month-body { grid-template-columns: minmax(0, 1fr); }
   .xd-cal { max-width: 240px; }
