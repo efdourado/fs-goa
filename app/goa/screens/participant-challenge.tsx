@@ -1,7 +1,7 @@
 "use client";
 
 import { useFormatter, useTranslations } from "next-intl";
-import { type FormEvent, forwardRef, type ReactNode, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { type FormEvent, forwardRef, type ReactNode, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 
 import { ApiError } from "../api";
 import { counterField, logRange } from "../checkin-days";
@@ -16,6 +16,7 @@ import { ChallengeResults, useChallengeStory, usePreviewStory } from "../story/f
 import { StoryView } from "../story/view";
 import { DownloadPagesButton } from "../story/pages";
 import { ChallengeDock } from "../bottom-dock";
+import dynamic from "next/dynamic";
 import { SharedGlyph } from "../shared-responses";
 import { SessionLog, type SessionPayload, sessionSpecOf } from "../session-log";
 import { challengeShowcaseBlocks, hasShowcaseContent, ShowcaseView } from "../showcase-view";
@@ -67,6 +68,9 @@ import {
   itemIdForEntry,
   valuesAsRecord,
 } from "../utils";
+
+// Loaded when first opened: it brings the PDF's own fonts and print sheet.
+const ExportModal = dynamic(() => import("../export/export-modal").then((module) => module.ExportModal), { ssr: false });
 
 function ratingChoices(config?: FieldConfig): number[] {
   const min = config?.min ?? 0;
@@ -574,7 +578,7 @@ export function ResultView({
  * has a public page, copy its link. Copying answers on the button itself — the squares give way to a
  * check drawn inside a ring, the label slides to "Copied", and the pill fills with the brand green.
  */
-function ChallengeCardActions({ challengeId, shareToken, extra, end }: { challengeId: string; shareToken?: string | null; extra?: ReactNode; end?: ReactNode }) {
+function ChallengeCardActions({ onExport, shareToken, extra, end }: { onExport: () => void; shareToken?: string | null; extra?: ReactNode; end?: ReactNode }) {
   const tr = useTranslations("resultView");
   const te = useTranslations("exportDoc");
   const [copied, setCopied] = useState(false);
@@ -590,11 +594,13 @@ function ChallengeCardActions({ challengeId, shareToken, extra, end }: { challen
     // On a phone the three are round icons in one row (their names stay for screen readers and on hover);
     // from `sm:` up each carries its label.
     <div className="mt-8 flex flex-wrap gap-2">
-      <a
-        href={`/challenges/${encodeURIComponent(challengeId)}/export`}
+      {/* Opens the PDF over the challenge (a modal), not a page of its own. */}
+      <button
+        type="button"
+        onClick={onExport}
         aria-label={te("button")}
         title={te("button")}
-        className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[var(--spotlight-ink)] text-sm font-medium transition hover:opacity-90 sm:w-auto sm:px-4"
+        className="inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-[var(--spotlight-ink)] text-sm font-medium transition hover:opacity-90 sm:w-auto sm:px-4"
       >
         <span className="inline-flex items-center gap-2 text-[var(--spotlight)]">
           {/* A film strip: the challenge's whole log as one PDF (the arrow is "Download pages"). */}
@@ -605,7 +611,7 @@ function ChallengeCardActions({ challengeId, shareToken, extra, end }: { challen
           </svg>
           <span className="hidden sm:inline">{te("button")}</span>
         </span>
-      </a>
+      </button>
       {extra}
       {shareToken ? (
         <button
@@ -1435,6 +1441,9 @@ export function ParticipantChallengeScreen({
   // Adding and editing items from Today: only on a running list with its library, for whoever manages it.
   const canAddItems = Boolean(itemTools) && !preview && challenge.submissionMode === "item" && challenge.status !== "closed" && Boolean(challenge.libraries?.length);
   const [addingItems, setAddingItems] = useState(false);
+  // The PDF log, over the challenge.
+  const [exporting, setExporting] = useState(false);
+  const closeExport = useCallback(() => setExporting(false), []);
   const [editingItem, setEditingItem] = useState<ChallengeItem | null>(null);
   // A shared answer has no author (`userId` is null), so it rides along with every person's own.
   const ownEntries = entries.filter((entry) => !entry.userId || entry.userId === user?.id);
@@ -1751,7 +1760,7 @@ export function ParticipantChallengeScreen({
           {!preview
             ? (
               <ChallengeCardActions
-                challengeId={challenge.id}
+                onExport={() => setExporting(true)}
                 shareToken={challenge.result?.shareToken}
                 extra={<DownloadPagesButton input={storyInput} story={story} metrics={challenge.metrics ?? []} />}
                 // Manage: the app's settings sliders, on the right of the same row, dressed like "Download pages".
@@ -1971,6 +1980,7 @@ export function ParticipantChallengeScreen({
           tabLabel={(tab) => t(`tabs.${tab}`)}
         />
       ) : null}
+      {exporting ? <ExportModal challenge={challenge} entries={entries} userId={user?.id ?? ""} onClose={closeExport} /> : null}
       {addingItems && itemTools ? (
         <AddItemsDialog
           members={itemTools.members}

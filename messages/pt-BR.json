@@ -1940,7 +1940,7 @@
     "button": "Baixar PDF",
     "fileTitle": "{title} (registro)",
     "download": "Baixar PDF",
-    "printHint": "Na janela de impressão, escolha “Salvar como PDF”.",
+    "printHint": "Escolha “Salvar como PDF”.",
     "sectionsLabel": "O que entra no PDF",
     "sections": {
       "cover": "Capa",

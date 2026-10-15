@@ -82,7 +82,7 @@ test("o título da capa quebra em até três linhas", () => {
 });
 
 test("o documento mostra capa, regras, cartões e placar preenchido", () => {
-  const html = renderWithIntl(createElement(ExportDocument, { challenge, entries, userId: "dudu", fontClassName: "" }));
+  const html = renderWithIntl(createElement(ExportDocument, { challenge, entries, userId: "dudu" }));
   assert.match(html, /Vivi &amp; Dudu apresentam/);
   assert.match(html, /A ordem tem lógica\./);
   assert.match(html, /<blockquote>Sabe quando…<\/blockquote>/, "a citação do comentário vira citação");
@@ -92,7 +92,7 @@ test("o documento mostra capa, regras, cartões e placar preenchido", () => {
   assert.doesNotMatch(html, /<span>Notas<\/span>/, "as notas de cada um ficam nas linhas e no placar, não num quadro apertado");
   assert.match(html, /<span>Média<\/span>/, "com duas pessoas, o quadro mostra a média");
   const solo = renderWithIntl(createElement(ExportDocument, {
-    challenge: { ...challenge, ruleSections: [], participants: [challenge.participants[1]] }, entries: entries.filter((row) => row.userId === "dudu"), userId: "dudu", fontClassName: "",
+    challenge: { ...challenge, ruleSections: [], participants: [challenge.participants[1]] }, entries: entries.filter((row) => row.userId === "dudu"), userId: "dudu",
   }));
   assert.match(solo, /<span>Nota<\/span>/, "uma pessoa só: a nota dela, no singular");
   assert.doesNotMatch(html, /Legenda/, "a legenda dos campos saiu do PDF");
@@ -106,7 +106,7 @@ test("num cartão, cada pessoa aparece uma vez: as notas numa linha, os comentá
   };
   const solo = { ...challenge, ruleSections: [], participants: [challenge.participants[1]], entryTypes: [rating, expectation], items: challenge.items.slice(0, 1) } as unknown as ChallengeDetail;
   const html = renderWithIntl(createElement(ExportDocument, {
-    challenge: solo, userId: "dudu", fontClassName: "", entries: [
+    challenge: solo, userId: "dudu", entries: [
       entry({ id: "r", userId: "dudu", participantName: "Dudu", entryTypeId: "rate", itemId: "f0", occurredOn: "2026-09-07", values: { nota: 5, comentario: "A virada no meio." } }),
       entry({ id: "x", userId: "dudu", participantName: "Dudu", entryTypeId: "exp", itemId: "f0", occurredOn: "2026-09-07", values: { expectativa: 4.5 } }),
     ],
@@ -123,7 +123,7 @@ test("sem pedir datas, o PDF não mostra data: nem coluna no placar, nem campo d
     fields: [...rating.fields, { id: "quando", key: "quando", label: "Assisti em", type: "date", required: false, config: {} }],
   };
   const html = renderWithIntl(createElement(ExportDocument, {
-    challenge: { ...challenge, entryTypes: [watched, progress] } as unknown as ChallengeDetail, userId: "dudu", fontClassName: "",
+    challenge: { ...challenge, entryTypes: [watched, progress] } as unknown as ChallengeDetail, userId: "dudu",
     entries: [entry({ id: "w", userId: "dudu", participantName: "Dudu", entryTypeId: "rate", itemId: "f0", occurredOn: "2026-09-07", values: { nota: 4, quando: "2026-09-07" } })],
   }));
   assert.doesNotMatch(html, /Assisti em/, "a data opcional fica de fora");

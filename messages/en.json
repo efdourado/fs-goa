@@ -1940,7 +1940,7 @@
     "button": "Download PDF",
     "fileTitle": "{title} (log)",
     "download": "Download PDF",
-    "printHint": "In the print window, choose “Save as PDF”.",
+    "printHint": "Choose “Save as PDF”.",
     "sectionsLabel": "What goes in the PDF",
     "sections": {
       "cover": "Cover",

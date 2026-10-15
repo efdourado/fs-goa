@@ -445,11 +445,16 @@
 
 /* ── Print ─────────────────────────────────────────────────────── */
 @media print {
-  html, body, .xd-screen { background: #faf8f3 !important; }
+  /* Scoped to `html.xd-doc` (set while the document is on screen): this sheet stays loaded in the app. */
+  html.xd-doc, html.xd-doc body, .xd-screen { background: #faf8f3 !important; }
   /* The paper colour runs into the top and bottom margins (@page) too. Without this, Chrome's
      "Background graphics" (off by default) prints them white: a beige page between two white bands. */
-  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  body { min-height: 0 !important; }
+  html.xd-doc { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  html.xd-doc body { min-height: 0 !important; overflow: visible !important; }
+  /* In the app's modal, only the document prints, and as plain flow: a fixed, scrolling box would print
+     its first screen only. */
+  html.xd-modal-open body > *:not(.xd-modal) { display: none !important; }
+  html.xd-modal-open .xd-modal { position: static !important; overflow: visible !important; }
   .xd-toolbar { display: none !important; }
   .xd-stage { padding: 0; }
   /* The side margins are the sheet's own padding, not @page's: a print dialog set to "Margins: None"

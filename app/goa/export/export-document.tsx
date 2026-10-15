@@ -1,9 +1,10 @@
 "use client";
 
 import { useFormatter, useLocale, useTranslations } from "next-intl";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { monthCells } from "../checkin-days";
+import { CircleMinusIcon } from "../ui";
 import type { ChallengeDetail, Entry, Id } from "../types";
 import { dateKeyInSaoPaulo, parseCommentBlocks } from "../utils";
 import {
@@ -570,10 +571,34 @@ function DownloadIcon() {
  * The export dashboard: pick what goes in, see the document as it will print, and save it as a PDF.
  * Everything shown is what the viewer can already see in the challenge — `listEntries` applied the rules.
  */
-export function ExportDocument({ challenge, entries, userId, fontClassName }: {
-  challenge: ChallengeDetail; entries: Entry[]; userId: Id; fontClassName: string;
+/** A CSS string literal that can't close the string, the rule or the <style> tag it's written into. */
+function cssString(value: string): string {
+  return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/</g, "\\3c ").replace(/[\r\n]+/g, " ")}"`;
+}
+
+export function ExportDocument({ challenge, entries, userId, fontClassName = "", displayFont = "inherit", onClose }: {
+  challenge: ChallengeDetail; entries: Entry[]; userId: Id;
+  /** The two faces (`fonts.ts`), passed in by the page and the modal: next/font only exists where Next compiles. */
+  fontClassName?: string;
+  displayFont?: string;
+  /** In the app's modal: a × beside the download button. */
+  onClose?: () => void;
 }) {
   const doc = useDoc();
+  // While the document is on screen its print rules apply (export.css scopes them to `html.xd-doc`).
+  useEffect(() => {
+    document.documentElement.classList.add("xd-doc");
+    return () => document.documentElement.classList.remove("xd-doc");
+  }, []);
+  // The printed page: A4, the page number in the bottom margin (where a browser still keeps @page margins).
+  const pageCss = `
+@page { size: A4; margin: 24mm 0 22mm; background: #faf8f3;
+  @bottom-center { content: ${cssString(doc.t("footer", { title: challenge.title }))} counter(page); font-family: ${displayFont}; font-size: 7.5pt; letter-spacing: 0.04em; color: #a8a498; }
+}
+@page :first { @bottom-center { content: none; } }
+/* Where the sheet can carry its own top and bottom margins onto every page (export.css), the page's are
+   dropped: then the print dialog's "Margins" setting (often left on "None") can't take them away. */
+@supports (box-decoration-break: clone) { @page { margin: 0; } }`;
   const tc = useTranslations("common");
   const [onlyMine, setOnlyMine] = useState(false);
   const [showWhen, setShowWhen] = useState(false);
@@ -607,6 +632,7 @@ export function ExportDocument({ challenge, entries, userId, fontClassName }: {
   const onlyCover = shown("cover") && !SECTIONS.some((section) => section !== "cover" && shown(section));
   return (
     <div className={`xd-screen ${fontClassName}`}>
+      <style dangerouslySetInnerHTML={{ __html: pageCss }} />
       <div className="xd-toolbar">
         <div className="xd-toolbar-inner">
           {/* One row: what goes in the PDF, then how to save it. No title or Back link: the browser's Back
@@ -648,6 +674,11 @@ export function ExportDocument({ challenge, entries, userId, fontClassName }: {
                 <DownloadIcon />
                 {doc.t("download")}
               </button>
+              {onClose ? (
+                <button type="button" onClick={onClose} aria-label={tc("close")} title={tc("close")} className="grid h-10 w-10 flex-none cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25">
+                  <CircleMinusIcon className="h-5 w-5" />
+                </button>
+              ) : null}
             </div>
           </div>
         </div>

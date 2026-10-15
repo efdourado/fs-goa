@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Lato, Poppins } from "next/font/google";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
@@ -10,19 +9,12 @@ import { getChallengeDetail } from "@/lib/goa/challenges/detail";
 import { listEntries } from "@/lib/goa/challenges/entries";
 import { SESSION_COOKIE_NAME } from "@/lib/security";
 import { ExportDocument } from "@/app/goa/export/export-document";
+import { exportDisplay, exportFontClass } from "@/app/goa/export/fonts";
 import "@/app/goa/export/export.css";
 import type { ChallengeDetail, Entry } from "@/app/goa/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const display = Poppins({ subsets: ["latin"], weight: ["300", "400", "500", "600", "700", "800"], variable: "--xd-font-display" });
-const text = Lato({ subsets: ["latin"], weight: ["400", "700"], style: ["normal", "italic"], variable: "--xd-font-text" });
-
-/** A CSS string literal that can't close the string, the rule or the <style> tag it's written into. */
-function cssString(value: string): string {
-  return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/</g, "\\3c ").replace(/[\r\n]+/g, " ")}"`;
-}
 
 // Metadata and the page both need it — one round of queries per request.
 const load = cache(async (challengeId: string): Promise<{ challenge: ChallengeDetail; entries: Entry[]; userId: string }> => {
@@ -54,25 +46,13 @@ export async function generateMetadata({ params }: { params: Promise<{ challenge
 export default async function ChallengeExportPage({ params }: { params: Promise<{ challengeId: string }> }) {
   const { challengeId } = await params;
   const { challenge, entries, userId } = await load(challengeId);
-  const t = await getTranslations("exportDoc");
-  const footer = cssString(t("footer", { title: challenge.title }));
-  const pageCss = `
-@page { size: A4; margin: 24mm 0 22mm; background: #faf8f3;
-  @bottom-center { content: ${footer} counter(page); font-family: ${display.style.fontFamily}; font-size: 7.5pt; letter-spacing: 0.04em; color: #a8a498; }
-}
-@page :first { @bottom-center { content: none; } }
-/* Where the sheet can carry its own top and bottom margins onto every page (export.css), the page's are
-   dropped: then the print dialog's "Margins" setting (often left on "None") can't take them away. */
-@supports (box-decoration-break: clone) { @page { margin: 0; } }`;
   return (
-    <>
-      <style dangerouslySetInnerHTML={{ __html: pageCss }} />
-      <ExportDocument
-        challenge={JSON.parse(JSON.stringify(challenge)) as ChallengeDetail}
-        entries={entries}
-        userId={userId}
-        fontClassName={`${display.variable} ${text.variable}`}
-      />
-    </>
+    <ExportDocument
+      challenge={JSON.parse(JSON.stringify(challenge)) as ChallengeDetail}
+      entries={entries}
+      userId={userId}
+      fontClassName={exportFontClass}
+      displayFont={exportDisplay.style.fontFamily}
+    />
   );
 }
