@@ -44,7 +44,7 @@
 .xd-toolbar-inner {
   margin: 0 auto;
   display: grid;
-  max-width: 1100px;
+  max-width: 1180px;
   gap: 10px;
   padding: 10px 16px 12px;
 }
@@ -59,6 +59,8 @@
   scrollbar-width: none;
 }
 .xd-chips::-webkit-scrollbar { display: none; }
+/* Inside the header row the chips take what the button leaves, and scroll there. */
+.xd-toolbar-row .xd-chips { flex: 1; min-width: 0; margin: 0; padding: 0 0 2px; }
 .xd-chip-gap { flex: none; width: 1px; margin: 6px 6px; background: var(--line); }
 .xd-chip {
   flex: none;

@@ -609,14 +609,37 @@ export function ExportDocument({ challenge, entries, userId, fontClassName }: {
     <div className={`xd-screen ${fontClassName}`}>
       <div className="xd-toolbar">
         <div className="xd-toolbar-inner">
+          {/* One row: what goes in the PDF, then how to save it. No title or Back link: the browser's Back
+              returns to the challenge, like every other page. */}
           <div className="xd-toolbar-row">
-            {/* No Back link: the browser's own Back returns to the challenge, like every other page. */}
-            <div className="min-w-0">
-              <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--muted)]">PDF</p>
-              <h1 className="truncate text-lg font-light tracking-[-0.02em] text-[var(--ink)]">{challenge.title}</h1>
+            <div className="xd-chips" role="group" aria-label={doc.t("sectionsLabel")}>
+              {SECTIONS.filter((section) => available[section]).map((section) => (
+                <button key={section} type="button" className="xd-chip" aria-pressed={!hidden.has(section)} onClick={() => toggle(section)}>
+                  {!hidden.has(section) ? <CheckIcon /> : null}
+                  {doc.t(section === "scoreboard" && model.sessionMode ? "sections.records" : `sections.${section}`)}
+                </button>
+              ))}
+              {shown("items") ? (
+                <>
+                  <span className="xd-chip-gap" aria-hidden="true" />
+                  <button type="button" className="xd-chip" aria-pressed={showWhen} onClick={() => setShowWhen((value) => !value)}>
+                    {showWhen ? <CheckIcon /> : null}
+                    {doc.t("showWhen")}
+                  </button>
+                </>
+              ) : null}
+              {everyone.people.length > 1 ? (
+                <>
+                  <span className="xd-chip-gap" aria-hidden="true" />
+                  <button type="button" className="xd-chip" aria-pressed={onlyMine} onClick={() => setOnlyMine((value) => !value)}>
+                    {onlyMine ? <CheckIcon /> : null}
+                    {doc.t("onlyMine")}
+                  </button>
+                </>
+              ) : null}
             </div>
             <div className="flex flex-none items-center gap-3">
-              <span className="hidden text-xs text-[var(--muted)] lg:inline">{doc.t("printHint")}</span>
+              <span className="hidden max-w-[12.5rem] text-right text-xs leading-snug text-[var(--muted)] lg:block">{doc.t("printHint")}</span>
               <button
                 type="button"
                 onClick={() => window.print()}
@@ -626,32 +649,6 @@ export function ExportDocument({ challenge, entries, userId, fontClassName }: {
                 {doc.t("download")}
               </button>
             </div>
-          </div>
-          <div className="xd-chips" role="group" aria-label={doc.t("sectionsLabel")}>
-            {SECTIONS.filter((section) => available[section]).map((section) => (
-              <button key={section} type="button" className="xd-chip" aria-pressed={!hidden.has(section)} onClick={() => toggle(section)}>
-                {!hidden.has(section) ? <CheckIcon /> : null}
-                {doc.t(section === "scoreboard" && model.sessionMode ? "sections.records" : `sections.${section}`)}
-              </button>
-            ))}
-            {shown("items") ? (
-              <>
-                <span className="xd-chip-gap" aria-hidden="true" />
-                <button type="button" className="xd-chip" aria-pressed={showWhen} onClick={() => setShowWhen((value) => !value)}>
-                  {showWhen ? <CheckIcon /> : null}
-                  {doc.t("showWhen")}
-                </button>
-              </>
-            ) : null}
-            {everyone.people.length > 1 ? (
-              <>
-                <span className="xd-chip-gap" aria-hidden="true" />
-                <button type="button" className="xd-chip" aria-pressed={onlyMine} onClick={() => setOnlyMine((value) => !value)}>
-                  {onlyMine ? <CheckIcon /> : null}
-                  {doc.t("onlyMine")}
-                </button>
-              </>
-            ) : null}
           </div>
         </div>
       </div>
