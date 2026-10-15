@@ -329,10 +329,13 @@
 .xd-kv b { font-weight: 700; }
 .xd-text { margin-top: 1.2mm; color: #2b2a27; line-height: 1.6; white-space: pre-wrap; }
 .xd-text + .xd-text { margin-top: 1.8mm; }
+/* A quoted passage, as on the app's words page: a rounded panel in the paper's darker tone, no rule beside it. */
 .xd-text blockquote {
   margin: 1.5mm 0;
-  border-left: 0.8mm solid var(--c, var(--xd-ink));
-  padding-left: 3mm;
+  border-radius: 2.5mm;
+  background: var(--xd-tile);
+  padding: 2mm 3.5mm 2mm 4.5mm;
+  color: var(--xd-soft);
   white-space: pre-wrap;
 }
 .xd-text hr { margin: 2.5mm 0; border: 0; border-top: 1px solid var(--xd-line); }
