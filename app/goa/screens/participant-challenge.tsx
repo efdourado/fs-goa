@@ -1,7 +1,6 @@
 "use client";
 
 import { useFormatter, useTranslations } from "next-intl";
-import { flushSync } from "react-dom";
 import { type FormEvent, forwardRef, type ReactNode, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 
 import { ApiError } from "../api";
@@ -1048,18 +1047,19 @@ function EntryPicker({
   const [query, setQuery] = useState("");
   const needle = query.trim().toLocaleLowerCase();
   const matches = (option: PickerOption) => !needle || `${option.label} ${option.meta ?? ""}`.toLocaleLowerCase().includes(needle);
-  // "Add item" waits folded above the first row until you insist: at the top of the list, keep pulling down
-  // (a finger or the wheel) in one go, and it opens. A pause starts the count again, so scrolling past never does.
+  // "Add item" waits folded below the last row until you insist: at the end of the list, keep scrolling down
+  // (a finger or the wheel) in one go, and it opens. A pause starts the count again, so reaching the end never does.
   const listRef = useRef<HTMLOListElement>(null);
   const addRef = useRef<HTMLLIElement>(null);
   const pull = useRef({ distance: 0, at: 0, touchY: null as number | null });
   // Open for the list as it was when pulled; adding an item (a new length) folds it away again.
   const [shownAt, setShownAt] = useState<number | null>(null);
   const addShown = !options.length || shownAt === options.length;
+  /** `distance` is how far the gesture asks to scroll down (negative: up). */
   function pulled(distance: number, needed: number) {
     const list = listRef.current;
     if (!onAdd || !list) return;
-    // Open: a list too short to scroll folds it when pushed back up (a longer one scrolls it away — see onScroll).
+    // Open: a list too short to scroll folds it when pushed back down (a longer one scrolls it away — see onScroll).
     if (addShown) {
       if (distance < -8 && list.scrollHeight <= list.clientHeight + 1) setShownAt(null);
       return;
@@ -1067,7 +1067,8 @@ function EntryPicker({
     const now = Date.now();
     const fresh = now - pull.current.at < 400;
     pull.current.at = now;
-    pull.current.distance = list.scrollTop <= 0 && distance > 0 ? (fresh ? pull.current.distance : 0) + distance : 0;
+    const atEnd = list.scrollTop + list.clientHeight >= list.scrollHeight - 1;
+    pull.current.distance = atEnd && distance > 0 ? (fresh ? pull.current.distance : 0) + distance : 0;
     if (pull.current.distance > needed) {
       pull.current.distance = 0;
       setShownAt(options.length);
@@ -1088,6 +1089,20 @@ function EntryPicker({
       list.scrollTop = Math.max(0, top - (list.clientHeight - row.offsetHeight) / 2);
     }
   }, [selectedId, needle]);
+  // As it opens at the end it grows below the edge, so follow it down until it's in view.
+  useEffect(() => {
+    if (!addShown || !options.length) return;
+    const list = listRef.current;
+    if (!list) return;
+    const until = Date.now() + 340;
+    let frame = 0;
+    const follow = () => {
+      list.scrollTop = list.scrollHeight;
+      if (Date.now() < until) frame = requestAnimationFrame(follow);
+    };
+    frame = requestAnimationFrame(follow);
+    return () => cancelAnimationFrame(frame);
+  }, [addShown, options.length]);
   const shown = options.flatMap((option, index) => matches(option) ? [{ option, index }] : []);
   return (
     <div>
@@ -1112,39 +1127,24 @@ function EntryPicker({
       <section className={cx(cardClass, "p-4 sm:p-5")}>
       <ol
         ref={listRef}
-        className="max-h-60 space-y-1.5 overflow-y-auto pr-0.5"
-        onWheel={(event) => pulled(-event.deltaY, 260)}
+        className="max-h-60 space-y-1.5 overflow-y-auto overscroll-y-contain pr-0.5"
+        onWheel={(event) => pulled(event.deltaY, 260)}
         onScroll={() => {
-          // Once the open row has scrolled fully out of view, fold it — instantly, with the scroll moved back by
-          // the same height, so nothing on screen shifts.
+          // Once the open row has scrolled fully out of view (below the edge), fold it — nothing on screen moves.
           const list = listRef.current;
           const add = addRef.current;
           if (!addShown || !list || !add) return;
-          const height = add.offsetHeight + 6;
-          if (list.scrollTop < height) return;
-          flushSync(() => setShownAt(null));
-          list.scrollTop -= height;
+          if (list.scrollTop + list.clientHeight > list.scrollHeight - add.offsetHeight - 6) return;
+          setShownAt(null);
         }}
         onTouchStart={(event) => { pull.current.touchY = event.touches[0]?.clientY ?? null; }}
         onTouchMove={(event) => {
           const y = event.touches[0]?.clientY;
           if (y === undefined || pull.current.touchY === null) return;
-          pulled(y - pull.current.touchY, 110);
+          pulled(pull.current.touchY - y, 110);
           pull.current.touchY = y;
         }}
       >
-        {onAdd && !needle ? (
-          // Folded away until pulled out (or tabbed to).
-          // Opening glides; folding is instant (it only happens out of sight, or on a list too short to scroll).
-          <li ref={addRef} className={cx("grid focus-within:grid-rows-[1fr] focus-within:opacity-100", addShown ? "grid-rows-[1fr] opacity-100 transition-[grid-template-rows,opacity] duration-300 ease-out" : "mb-0 grid-rows-[0fr] opacity-0")}>
-            <div className="min-h-0 overflow-hidden">
-              <button type="button" onClick={onAdd} className="flex min-h-12 w-full cursor-pointer items-center gap-3 rounded-xl border border-dashed border-[var(--line)] px-3 py-2.5 text-left text-sm text-[var(--ink)] transition hover:border-[var(--muted)] hover:text-[var(--ink-strong)]">
-                <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-[var(--wash)]" aria-hidden="true">＋</span>
-                {tCine("addItemRow")}
-              </button>
-            </div>
-          </li>
-        ) : null}
         {needle && !shown.length ? <li className="py-6 text-center text-sm font-light text-[var(--muted)]">{t("searchItemsNone")}</li> : null}
         {shown.map(({ option, index }) => {
           const active = option.id === selectedId;
@@ -1210,6 +1210,18 @@ function EntryPicker({
             </li>
           );
         })}
+        {onAdd && !needle ? (
+          // Folded away until pulled out (or tabbed to).
+          // Opening glides; folding is instant (it only happens out of sight, or on a list too short to scroll).
+          <li ref={addRef} className={cx("grid focus-within:grid-rows-[1fr] focus-within:opacity-100", addShown ? "grid-rows-[1fr] opacity-100 transition-[grid-template-rows,opacity] duration-300 ease-out" : "-mt-1.5 grid-rows-[0fr] opacity-0")}>
+            <div className="min-h-0 overflow-hidden">
+              <button type="button" onClick={onAdd} className="flex min-h-12 w-full cursor-pointer items-center gap-3 rounded-xl border border-dashed border-[var(--line)] px-3 py-2.5 text-left text-sm text-[var(--ink)] transition hover:border-[var(--muted)] hover:text-[var(--ink-strong)]">
+                <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-[var(--wash)]" aria-hidden="true">＋</span>
+                {tCine("addItemRow")}
+              </button>
+            </div>
+          </li>
+        ) : null}
       </ol>
       </section>
     </div>
