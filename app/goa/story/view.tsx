@@ -123,8 +123,8 @@ export function StoryView({ input, story, metrics = [] }: { input: StoryInput; s
             body: (
               <div>
                 {/* The section's one-line read, centred like a newspaper standfirst. */}
-                <p className="mx-auto max-w-2xl text-balance text-center text-xl font-light leading-snug tracking-[-0.02em] text-[var(--ink)]/85 sm:text-2xl">{page.headline}</p>
-                <div className="@container mt-7">{page.body}</div>
+                {page.ownHeadline ? null : <p className="mx-auto max-w-2xl text-balance text-center text-xl font-light leading-snug tracking-[-0.02em] text-[var(--ink)]/85 sm:text-2xl">{page.headline}</p>}
+                <div className={cx("@container", !page.ownHeadline && "mt-7")}>{page.body}</div>
               </div>
             ),
           }))}

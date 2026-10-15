@@ -29,6 +29,8 @@ export interface AlmanacPage {
   id: string;
   title: string;
   headline: string;
+  /** The body draws the headline itself (the words page puts its search beside it); the screen skips its own. */
+  ownHeadline?: boolean;
   body: ReactNode;
 }
 
@@ -300,7 +302,7 @@ type WallQuote = { key: string; person: { id: Id; name: string }; text: string; 
  * The words page: the first dozen lines, then "Show all"; a filter (words, title or person) once there are
  * enough to hunt through. A downloaded page keeps its few, cut to fit.
  */
-function QuoteWall({ quotes, full, ids }: { quotes: WallQuote[]; full: boolean; ids: Id[] }) {
+function QuoteWall({ quotes, full, ids, headline }: { quotes: WallQuote[]; full: boolean; ids: Id[]; headline: string }) {
   const t = useTranslations("story");
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
@@ -331,7 +333,14 @@ function QuoteWall({ quotes, full, ids }: { quotes: WallQuote[]; full: boolean; 
   );
   return (
     <div>
-      {quotes.length > PAGE_QUOTES ? (
+      {/* The headline on the left and the search at the far right, on one line. */}
+      <div className="mb-5 flex items-center justify-between gap-4">
+        <p className="min-w-0 text-balance text-xl font-light leading-snug tracking-[-0.02em] text-[var(--ink)]/85 sm:text-2xl">{headline}</p>
+        {quotes.length > PAGE_QUOTES ? (
+          <SearchField open={searching} onOpenChange={setSearching} keepWhileFiltering openClassName="w-[min(18rem,55vw)]" value={query} onChange={setQuery} placeholder={t("quotes.filter")} />
+        ) : null}
+      </div>
+      {quotes.length > PAGE_QUOTES && (people.length > 1 || filtering) ? (
         <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2">
           {people.length > 1 ? (
             <div role="group" aria-label={t("quotes.everyone")} className="flex max-w-full gap-0.5 overflow-x-auto rounded-full bg-[var(--wash)] p-1">
@@ -344,10 +353,6 @@ function QuoteWall({ quotes, full, ids }: { quotes: WallQuote[]; full: boolean; 
             </div>
           ) : null}
           {filtering ? <span className="text-xs tabular-nums text-[var(--muted)]">{t("quotes.found", { count: found.length, total: quotes.length })}</span> : null}
-          {/* The search keeps the right edge and grows leftwards into the free space. */}
-          <div className="ml-auto">
-            <SearchField open={searching} onOpenChange={setSearching} keepWhileFiltering openClassName="w-[min(18rem,80vw)]" value={query} onChange={setQuery} placeholder={t("quotes.filter")} />
-          </div>
         </div>
       ) : null}
       {filtering && !found.length ? <p className="py-10 text-center text-sm font-light text-[var(--muted)]">{t("quotes.none")}</p> : null}
@@ -877,8 +882,10 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
         id: "words",
         title: t(input.people.length === 1 ? "pages.words.titleSolo" : "pages.words.title"),
         headline: t("pages.words.headline", { count: s.quotes.length }),
+        ownHeadline: true,
         body: (
           <QuoteWall
+            headline={t("pages.words.headline", { count: s.quotes.length })}
             full={full}
             ids={ids}
             quotes={s.quotes.map((quote) => ({
@@ -1089,8 +1096,10 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
         id: "words",
         title: t(input.people.length === 1 ? "pages.words.titleSolo" : "pages.words.title"),
         headline: t("pages.words.headline", { count: s.notes.length }),
+        ownHeadline: true,
         body: (
           <QuoteWall
+            headline={t("pages.words.headline", { count: s.notes.length })}
             full={full}
             ids={ids}
             quotes={s.notes.map((note) => ({
