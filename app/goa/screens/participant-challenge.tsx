@@ -51,6 +51,7 @@ import {
   inputClass,
   labelClass,
   sectionLabelClass,
+  SearchField,
   SearchIcon,
   SlidersIcon,
   StatusMessage,
@@ -1091,33 +1092,30 @@ function EntryPicker({
   const shown = options.flatMap((option, index) => matches(option) ? [{ option, index }] : []);
   return (
     <div>
-      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <p className={sectionLabelClass}>{title}</p>
-        <span className="flex items-baseline gap-3">
-          {tally ? <span className="text-xs text-[var(--muted)]">{tally}</span> : null}
-          {options.length > 1 ? (
-            <button type="button" onClick={() => { setSearching((open) => !open); setQuery(""); }} aria-pressed={searching} aria-label={t("searchItems")} title={t("searchItems")} className={cx("grid h-8 w-8 flex-none cursor-pointer place-items-center self-center rounded-full transition hover:bg-[var(--wash)] hover:text-[var(--ink)]", searching ? "bg-[var(--wash)] text-[var(--ink)]" : "text-[var(--muted)]")}>
-              <SearchIcon className="h-4 w-4" />
-            </button>
-          ) : null}
-        </span>
+      <div className="mb-2 flex min-h-9 items-center justify-between gap-3">
+        <p className={cx(sectionLabelClass, "flex-none")}>{title}</p>
+        {searching ? (
+          <SearchField
+            focusOnMount
+            className="w-full max-w-64"
+            value={query}
+            onChange={setQuery}
+            placeholder={t("searchItems")}
+            onEscape={() => { setSearching(false); setQuery(""); }}
+            onEnter={() => { if (shown.length === 1 && !shown[0].option.soon) onSelect(shown[0].option.id); }}
+          />
+        ) : (
+          <span className="flex items-center gap-1.5">
+            {tally ? <span className="text-xs text-[var(--muted)]">{tally}</span> : null}
+            {options.length > 1 ? (
+              <button type="button" onClick={() => setSearching(true)} aria-label={t("searchItems")} title={t("searchItems")} className="grid h-8 w-8 flex-none cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)]">
+                <SearchIcon className="h-3.5 w-3.5" />
+              </button>
+            ) : null}
+          </span>
+        )}
       </div>
       <section className={cx(cardClass, "p-4 sm:p-5")}>
-      {searching ? (
-        <input
-          ref={(input) => input?.focus()}
-          className={cx(inputClass, "mb-3 min-h-10")}
-          type="search"
-          value={query}
-          placeholder={t("searchItems")}
-          aria-label={t("searchItems")}
-          onChange={(event) => setQuery(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Escape") { setSearching(false); setQuery(""); }
-            if (event.key === "Enter" && shown.length === 1 && !shown[0].option.soon) onSelect(shown[0].option.id);
-          }}
-        />
-      ) : null}
       <ol
         ref={listRef}
         className="max-h-60 space-y-1.5 overflow-y-auto pr-0.5"
@@ -1153,7 +1151,7 @@ function EntryPicker({
             </div>
           </li>
         ) : null}
-        {needle && !shown.length ? <li className="px-1 py-2 text-sm text-[var(--muted)]">{t("searchItemsNone")}</li> : null}
+        {needle && !shown.length ? <li className="py-6 text-center text-sm font-light text-[var(--muted)]">{t("searchItemsNone")}</li> : null}
         {shown.map(({ option, index }) => {
           const active = option.id === selectedId;
           const rating = typeof option.rating === "number" ? option.rating : null;

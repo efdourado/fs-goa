@@ -157,6 +157,62 @@ export function SearchIcon({ className }: { className?: string }) {
   );
 }
 
+/**
+ * A quiet pill to narrow a list: the loupe inside, a × to empty it, Escape to leave. No box of its own —
+ * it sits on a soft wash and only takes the accent ring while you type.
+ */
+export function SearchField({
+  value,
+  onChange,
+  placeholder,
+  onEscape,
+  onEnter,
+  focusOnMount,
+  className,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  onEscape?: () => void;
+  onEnter?: () => void;
+  focusOnMount?: boolean;
+  className?: string;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  // Once, when it appears: never again on a later render, so tapping the list doesn't pull the keyboard back up.
+  useEffect(() => { if (focusOnMount) inputRef.current?.focus(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <label className={cx("group relative flex h-9 min-w-0 items-center rounded-full bg-[var(--wash)] text-[var(--muted)] transition focus-within:bg-[var(--paper)] focus-within:text-[var(--ink)] focus-within:ring-2 focus-within:ring-[var(--main)]/35", className)}>
+      <SearchIcon className="pointer-events-none absolute left-3 h-3.5 w-3.5" />
+      <input
+        ref={inputRef}
+        type="text"
+        inputMode="search"
+        enterKeyHint="search"
+        value={value}
+        placeholder={placeholder}
+        aria-label={placeholder}
+        onChange={(event) => onChange(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") { if (value) onChange(""); else onEscape?.(); }
+          if (event.key === "Enter") onEnter?.();
+        }}
+        className="h-full w-full min-w-0 bg-transparent pl-8 pr-8 text-[13px] text-[var(--ink)] outline-none placeholder:text-[var(--muted)]"
+      />
+      {value || onEscape ? (
+        <button
+          type="button"
+          aria-label={placeholder}
+          onClick={() => (value ? onChange("") : onEscape?.())}
+          className="absolute right-1.5 grid h-6 w-6 cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--wash-strong)] hover:text-[var(--ink)]"
+        >
+          <svg viewBox="0 0 16 16" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8" /></svg>
+        </button>
+      ) : null}
+    </label>
+  );
+}
+
 export function SlidersIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true">

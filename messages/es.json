@@ -2176,10 +2176,11 @@
     "quotes": {
       "eyebrow": "Las mejores frases",
       "by": "{name} sobre {title} · {value}",
-      "filter": "Filtrar las frases (palabras, título o persona)",
+      "filter": "Buscar en las frases",
       "everyone": "Todos",
       "found": "{count} de {total} frases",
-      "showAll": "Mostrar las {count}"
+      "showAll": "Mostrar las {count}",
+      "none": "Ninguna frase coincide."
     },
     "streaks": {
       "eyebrow": "Rachas",

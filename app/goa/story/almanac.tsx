@@ -8,7 +8,7 @@ import { firstName, personTone } from "../rating-scale";
 import { Rail, RailArrows, useShelfRail } from "../shelf";
 import type { Id, Metric } from "../types";
 import { Dialog } from "../dialog";
-import { AvatarMark, CommentText, cx } from "../ui";
+import { AvatarMark, CommentText, cx, SearchField } from "../ui";
 import { formatRuntime } from "../utils";
 import type { DatedStory, GroupStat, ItemScore, RatedStory, Story, StoryInput } from "./model";
 
@@ -323,32 +323,29 @@ function QuoteWall({ quotes, full, ids }: { quotes: WallQuote[]; full: boolean; 
     && (!needle || `${quote.text} ${quote.about} ${quote.person.name}`.toLocaleLowerCase().includes(needle)));
   // A filter shows every match: the cap is only for browsing.
   const shown = filtering || showAll ? found : found.slice(0, PREVIEW_QUOTES);
-  const chip = (active: boolean) => cx("min-h-8 cursor-pointer rounded-full border px-3 text-xs transition", active ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] text-[var(--muted)] hover:text-[var(--ink)]");
+  const seg = (active: boolean) => cx(
+    "flex h-7 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-xs transition",
+    active ? "bg-[var(--paper)] font-medium text-[var(--ink)] shadow-[var(--elevate-1)]" : "text-[var(--muted)] hover:text-[var(--ink)]",
+  );
   return (
     <div>
       {quotes.length > PAGE_QUOTES ? (
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={t("quotes.filter")}
-            aria-label={t("quotes.filter")}
-            className="min-h-10 min-w-0 flex-1 basis-48 rounded-xl border border-[var(--line)] bg-[var(--paper)] px-3 text-sm outline-none transition focus:border-[var(--main)] focus:ring-4 focus:ring-[var(--main)]/15"
-          />
+        <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2 sm:justify-center">
+          <SearchField className="w-full sm:w-72" value={query} onChange={setQuery} placeholder={t("quotes.filter")} />
           {people.length > 1 ? (
-            <div className="flex flex-wrap gap-1.5">
-              <button type="button" aria-pressed={personId === null} className={chip(personId === null)} onClick={() => setPersonId(null)}>{t("quotes.everyone")}</button>
+            <div role="group" aria-label={t("quotes.everyone")} className="flex max-w-full gap-0.5 overflow-x-auto rounded-full bg-[var(--wash)] p-1">
+              <button type="button" aria-pressed={personId === null} className={seg(personId === null)} onClick={() => setPersonId(null)}>{t("quotes.everyone")}</button>
               {people.map((person) => (
-                <button key={person.id} type="button" aria-pressed={personId === person.id} className={cx(chip(personId === person.id), "flex items-center gap-1.5")} onClick={() => setPersonId(personId === person.id ? null : person.id)}>
-                  <span className="h-2 w-2 rounded-full" style={{ background: personTone(ids, person.id) }} />{firstName(person.name)}
+                <button key={person.id} type="button" aria-pressed={personId === person.id} className={seg(personId === person.id)} onClick={() => setPersonId(personId === person.id ? null : person.id)}>
+                  <span className="h-2 w-2 flex-none rounded-full" style={{ background: personTone(ids, person.id) }} />{firstName(person.name)}
                 </button>
               ))}
             </div>
           ) : null}
+          {filtering ? <span className="text-xs tabular-nums text-[var(--muted)]">{t("quotes.found", { count: found.length, total: quotes.length })}</span> : null}
         </div>
       ) : null}
-      {filtering ? <p className="mb-3 text-xs tabular-nums text-[var(--muted)]">{t("quotes.found", { count: found.length, total: quotes.length })}</p> : null}
+      {filtering && !found.length ? <p className="py-10 text-center text-sm font-light text-[var(--muted)]">{t("quotes.none")}</p> : null}
       <div className={grid}>
         {shown.map((quote) => (
           <figure key={quote.key} className={cx(cardClass, "border-l-[3px]")} style={{ borderLeftColor: personTone(ids, quote.person.id) }}>
@@ -358,9 +355,11 @@ function QuoteWall({ quotes, full, ids }: { quotes: WallQuote[]; full: boolean; 
         ))}
       </div>
       {!filtering && found.length > PREVIEW_QUOTES ? (
-        <button type="button" className={cx("mt-3", textActionClass)} onClick={() => setShowAll((value) => !value)}>
-          {showAll ? t("showLess") : t("quotes.showAll", { count: found.length })}
-        </button>
+        <div className="mt-5 flex justify-center">
+          <button type="button" className="h-9 cursor-pointer rounded-full border border-[var(--line)] px-5 text-xs font-medium text-[var(--ink)] transition hover:border-[var(--muted)] hover:bg-[var(--wash)]" onClick={() => setShowAll((value) => !value)}>
+            {showAll ? t("showLess") : t("quotes.showAll", { count: found.length })}
+          </button>
+        </div>
       ) : null}
     </div>
   );

@@ -2176,10 +2176,11 @@
     "quotes": {
       "eyebrow": "Best lines",
       "by": "{name} on {title} · {value}",
-      "filter": "Filter the lines (words, title or person)",
+      "filter": "Search the lines",
       "everyone": "Everyone",
       "found": "{count} of {total} lines",
-      "showAll": "Show all {count}"
+      "showAll": "Show all {count}",
+      "none": "No line matches."
     },
     "streaks": {
       "eyebrow": "Streaks",

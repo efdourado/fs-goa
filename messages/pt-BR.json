@@ -2176,10 +2176,11 @@
     "quotes": {
       "eyebrow": "As melhores frases",
       "by": "{name} sobre {title} · {value}",
-      "filter": "Filtrar as falas (palavras, título ou pessoa)",
+      "filter": "Buscar nas falas",
       "everyone": "Todos",
       "found": "{count} de {total} falas",
-      "showAll": "Mostrar todas as {count}"
+      "showAll": "Mostrar todas as {count}",
+      "none": "Nenhuma fala encontrada."
     },
     "streaks": {
       "eyebrow": "Sequências",
