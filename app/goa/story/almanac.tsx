@@ -332,8 +332,7 @@ function QuoteWall({ quotes, full, ids }: { quotes: WallQuote[]; full: boolean; 
   return (
     <div>
       {quotes.length > PAGE_QUOTES ? (
-        <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2 sm:justify-center">
-          <SearchField open={searching} onOpenChange={setSearching} keepWhileFiltering openClassName="w-[min(18rem,100%)]" value={query} onChange={setQuery} placeholder={t("quotes.filter")} />
+        <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2">
           {people.length > 1 ? (
             <div role="group" aria-label={t("quotes.everyone")} className="flex max-w-full gap-0.5 overflow-x-auto rounded-full bg-[var(--wash)] p-1">
               <button type="button" aria-pressed={personId === null} className={seg(personId === null)} onClick={() => setPersonId(null)}>{t("quotes.everyone")}</button>
@@ -345,6 +344,10 @@ function QuoteWall({ quotes, full, ids }: { quotes: WallQuote[]; full: boolean; 
             </div>
           ) : null}
           {filtering ? <span className="text-xs tabular-nums text-[var(--muted)]">{t("quotes.found", { count: found.length, total: quotes.length })}</span> : null}
+          {/* The search keeps the right edge and grows leftwards into the free space. */}
+          <div className="ml-auto">
+            <SearchField open={searching} onOpenChange={setSearching} keepWhileFiltering openClassName="w-[min(18rem,80vw)]" value={query} onChange={setQuery} placeholder={t("quotes.filter")} />
+          </div>
         </div>
       ) : null}
       {filtering && !found.length ? <p className="py-10 text-center text-sm font-light text-[var(--muted)]">{t("quotes.none")}</p> : null}
