@@ -147,22 +147,6 @@
   line-height: 1.45;
   color: #3b3a36;
 }
-/* Who took part: one thin line per person (up to five), as long as their share of the entries. */
-.xd-ribbon { margin-top: 14mm; display: grid; gap: 3.4mm; }
-.xd-ribbon > div { display: grid; grid-template-columns: 34mm minmax(0, 1fr); align-items: center; gap: 4mm; }
-.xd-ribbon-name {
-  overflow: hidden;
-  font-family: var(--xd-font-display), "Poppins", sans-serif;
-  font-size: 7.5pt;
-  letter-spacing: 0.18em;
-  text-overflow: ellipsis;
-  text-transform: uppercase;
-  white-space: nowrap;
-  color: var(--xd-soft);
-}
-.xd-ribbon-bar { display: flex; align-items: center; gap: 2.5mm; }
-.xd-ribbon-bar i { display: block; height: 1.6mm; border-radius: 999px; background: var(--xd-ink); }
-.xd-ribbon-bar b { font-family: var(--xd-font-display), "Poppins", sans-serif; font-size: 8pt; font-weight: 500; color: var(--xd-muted); font-variant-numeric: tabular-nums; }
 .xd-stats {
   margin-top: auto;
   display: grid;

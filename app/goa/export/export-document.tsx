@@ -13,8 +13,6 @@ import {
 
 type Section = "cover" | "rules" | "items" | "diary" | "scoreboard";
 const SECTIONS: Section[] = ["cover", "rules", "items", "diary", "scoreboard"];
-/** The cover draws one line per person who took part, up to five, as long as their share of the entries. */
-const COVER_PEOPLE = 5;
 
 function tone(color: DocColor | undefined): string {
   return color ? `xd-c-${color}` : "";
@@ -116,9 +114,6 @@ function Cover({ challenge, model, doc, footer }: { challenge: ChallengeDetail; 
   const longest = Math.max(...lines.map((line) => line.length), 1);
   const size = Math.max(34, Math.min(92, Math.floor(610 / (longest * 0.68))));
   const names = model.people.filter((person) => person.key !== "shared").map((person) => person.name);
-  const ribbon = model.people.filter((person) => person.key !== "shared" && person.entryCount > 0)
-    .sort((a, b) => b.entryCount - a.entryCount).slice(0, COVER_PEOPLE);
-  const ribbonMax = Math.max(1, ...ribbon.map((person) => person.entryCount));
   const eyebrow = names.length === 0 ? doc.t("eyebrowSolo")
     : names.length === 1 ? doc.t("presentsOne", { name: names[0] })
       : names.length <= 4 ? doc.t("presents", { names: `${names.slice(0, -1).join(", ")} & ${names.at(-1)}` })
@@ -136,16 +131,6 @@ function Cover({ challenge, model, doc, footer }: { challenge: ChallengeDetail; 
       </h1>
       <p className="xd-cover-lede">{challenge.description?.trim() || doc.t("coverLede", { title: challenge.title })}</p>
       {range ? <p className="xd-eyebrow" style={{ marginTop: "6mm" }}>{range}</p> : null}
-      {ribbon.length ? (
-        <div className="xd-ribbon">
-          {ribbon.map((person) => (
-            <div key={person.key}>
-              <span className="xd-ribbon-name">{person.name}</span>
-              <span className="xd-ribbon-bar"><i style={{ width: `${Math.max(4, (person.entryCount / ribbonMax) * 100)}%` }} /><b>{doc.n(person.entryCount)}</b></span>
-            </div>
-          ))}
-        </div>
-      ) : null}
       {stats.length ? (
         <div className="xd-stats">
           {stats.map((stat) => <StatBlock key={stat.kind} stat={stat} doc={doc} />)}
