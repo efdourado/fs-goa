@@ -2002,10 +2002,6 @@
       "sessions": "Times",
       "best": "Best"
     },
-    "champion": "Top pick",
-    "disappointment": "Biggest letdown",
-    "overall": "Overall average",
-    "ratingsCount": "{count, plural, one {# score} other {# scores}}",
     "recordsTitle": "Records",
     "recordsLede": "The best for each item, across every entry.",
     "colophon": "Made with Goa on {date}. The data is yours, this PDF is just a nice way to keep it.",
@@ -2013,7 +2009,12 @@
     "streakValue": "{count, plural, one {# day} other {# days}}",
     "showWhen": "Dates",
     "progressDays": "{count, plural, one {in # day} other {in # days}}",
-    "progressEntries": "{count, plural, one {# entry} other {# entries}}"
+    "progressEntries": "{count, plural, one {# entry} other {# entries}}",
+    "plotTitle": "{count, plural, one {The score} other {All # scores}}",
+    "plotBest": "the best · {value}",
+    "plotWorst": "the letdown · {value}",
+    "plotAverage": "group average {value}",
+    "plotAverageSolo": "your average {value}"
   },
   "reveal": {
     "sealedTitle": "Sealed ratings",

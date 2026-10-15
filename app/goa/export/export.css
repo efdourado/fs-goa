@@ -147,13 +147,14 @@
   line-height: 1.45;
   color: #3b3a36;
 }
-/* The verdict on the cover: label, then the title and its score, one line each. */
-.xd-verdict { margin: 12mm 0 0; display: grid; gap: 2.4mm; max-width: 150mm; }
-.xd-verdict > div { display: grid; grid-template-columns: 36mm minmax(0, 1fr); align-items: baseline; gap: 4mm; }
-.xd-verdict dt { font-family: var(--xd-font-display), "Poppins", sans-serif; font-size: 6.5pt; letter-spacing: 0.24em; text-transform: uppercase; color: var(--xd-muted); }
-.xd-verdict dd { margin: 0; min-width: 0; font-size: 11pt; }
-.xd-verdict b { font-family: var(--xd-font-display), "Poppins", sans-serif; font-weight: 600; }
-.xd-verdict span { margin-left: 2.5mm; font-size: 9pt; color: var(--xd-muted); font-variant-numeric: tabular-nums; }
+/* The cover's dot plot: the whole challenge on one rating line, sitting just above the numbers. */
+.xd-plot { margin-top: auto; }
+.xd-plot + .xd-stats, .xd-plot ~ .xd-stats { margin-top: 10mm; }
+.xd-plot-label { margin-bottom: 2mm !important; font-family: var(--xd-font-display), "Poppins", sans-serif; font-size: 6.5pt; letter-spacing: 0.26em; text-transform: uppercase; color: var(--xd-muted); }
+.xd-plot svg { display: block; width: 100%; height: auto; overflow: visible; }
+.xd-plot text { font-family: var(--xd-font-display), "Poppins", sans-serif; fill: var(--xd-ink); }
+.xd-plot text.soft { fill: var(--xd-soft); }
+.xd-plot text.faint { fill: var(--xd-muted); }
 .xd-stats {
   margin-top: auto;
   display: grid;

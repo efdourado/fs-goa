@@ -2002,10 +2002,6 @@
       "sessions": "Vezes",
       "best": "Melhor marca"
     },
-    "champion": "Campeão",
-    "disappointment": "Maior decepção",
-    "overall": "Média geral",
-    "ratingsCount": "{count, plural, one {# nota} other {# notas}}",
     "recordsTitle": "Recordes",
     "recordsLede": "O melhor de cada item, somando todos os registros.",
     "colophon": "Gerado pelo Goa em {date}. Os dados são seus, este PDF é só uma forma bonita de guardá-los.",
@@ -2013,7 +2009,12 @@
     "streakValue": "{count, plural, one {# dia} other {# dias}}",
     "showWhen": "Datas",
     "progressDays": "{count, plural, one {em # dia} other {em # dias}}",
-    "progressEntries": "{count, plural, one {# registro} other {# registros}}"
+    "progressEntries": "{count, plural, one {# registro} other {# registros}}",
+    "plotTitle": "{count, plural, one {A nota} other {As # notas}}",
+    "plotBest": "a melhor · {value}",
+    "plotWorst": "a decepção · {value}",
+    "plotAverage": "média do grupo {value}",
+    "plotAverageSolo": "sua média {value}"
   },
   "reveal": {
     "sealedTitle": "Notas seladas",

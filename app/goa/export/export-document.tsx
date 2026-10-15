@@ -107,6 +107,102 @@ function EntryBody({ entry, doc, showDates }: { entry: DocEntry; doc: Doc; showD
   );
 }
 
+/** A circle with a wavy edge (a little seal): the average's mark on the cover plot. */
+function wavyCircle(cx: number, cy: number, radius: number, waves = 10, depth = 0.32): string {
+  const points = Array.from({ length: 120 }, (_, index) => {
+    const angle = (index / 120) * Math.PI * 2;
+    const r = radius + depth * Math.sin(waves * angle);
+    return `${(cx + r * Math.cos(angle)).toFixed(2)} ${(cy + r * Math.sin(angle)).toFixed(2)}`;
+  });
+  return `M ${points.join(" L ")} Z`;
+}
+
+/**
+ * The whole challenge on one line: every rated title is a dot on the rating scale, stacked when they tie. The best
+ * and the letdown are named, and a wavy-edged seal marks the average. Drawn in mm (1 unit = 1 mm of the 178 mm page).
+ */
+function ScorePlot({ model, doc }: { model: ExportModel; doc: Doc }) {
+  const rated = model.chapters.flatMap((chapter) => chapter.items).filter((item) => item.ratingAvg !== null);
+  if (!rated.length) return null;
+  const W = 178;
+  const left = 8;
+  const right = W - 8;
+  const top = Math.max(model.ratingMax, ...rated.map((item) => item.ratingAvg!));
+  const low = Math.min(...rated.map((item) => item.ratingAvg!));
+  // From half a point under the lowest average (on a half-point line) to the top of the scale.
+  const halfFrom = Math.max(0, Math.floor((low - 0.5) * 2) / 2);
+  const step = top - halfFrom > 3 ? 1 : 0.5;
+  // Whole-point ticks start on a whole number.
+  const from = step === 1 ? Math.floor(halfFrom) : halfFrom;
+  const x = (value: number) => left + ((value - from) / Math.max(1e-9, top - from)) * (right - left);
+  // Ties share a column; the columns are what's drawn.
+  const columns = new Map<number, DocItem[]>();
+  for (const item of rated) {
+    const key = Math.round(item.ratingAvg! * 10) / 10;
+    columns.set(key, [...(columns.get(key) ?? []), item]);
+  }
+  const tallest = Math.max(...[...columns.values()].map((items) => items.length));
+  const r = tallest > 8 ? 1.6 : 2.4;
+  const gap = r * 2.25;
+  const labels = 18;
+  const axis = labels + 6 + tallest * gap;
+  const height = axis + 25;
+  const best = model.champion;
+  const worst = model.disappointment;
+  const positionOf = (item: DocItem) => {
+    const key = Math.round(item.ratingAvg! * 10) / 10;
+    const column = columns.get(key)!;
+    return { cx: x(key), cy: axis - r - 1.2 - column.indexOf(item) * gap, columnTop: axis - r - 1.2 - (column.length - 1) * gap - r };
+  };
+  // A label near an edge reads inwards; two close labels split left and right.
+  const close = best && worst ? Math.abs(x(best.ratingAvg!) - x(worst.ratingAvg!)) < 44 : false;
+  const anchor = (cx: number, side: "best" | "worst") => close ? (side === "best" ? "start" : "end") : cx < left + 22 ? "start" : cx > right - 22 ? "end" : "middle";
+  const ticks: number[] = [];
+  for (let value = from; value <= top + 1e-9; value += step) ticks.push(Math.round(value * 10) / 10);
+  const solo = model.people.filter((person) => person.key !== "shared").length <= 1;
+  const named = (item: DocItem, side: "best" | "worst") => {
+    const { cx, columnTop } = positionOf(item);
+    const textAnchor = anchor(cx, side);
+    const tx = textAnchor === "start" ? cx - 1 : textAnchor === "end" ? cx + 1 : cx;
+    return (
+      <g key={side}>
+        <line x1={cx} x2={cx} y1={labels - 5} y2={columnTop - 1.2} stroke="#1b1b1f" strokeWidth={0.35} strokeDasharray={side === "worst" ? "0.8 0.8" : undefined} />
+        <text x={tx} y={5} fontSize={4.2} fontWeight={600} textAnchor={textAnchor}>{item.title}</text>
+        <text x={tx} y={10} fontSize={3.4} textAnchor={textAnchor} className="soft">{doc.t(side === "best" ? "plotBest" : "plotWorst", { value: doc.n(item.ratingAvg!) })}</text>
+      </g>
+    );
+  };
+  const average = model.overallAvg;
+  return (
+    <div className="xd-plot">
+      <p className="xd-plot-label">{doc.t("plotTitle", { count: rated.length })}</p>
+      <svg viewBox={`0 0 ${W} ${height}`} role="img" aria-label={doc.t("plotTitle", { count: rated.length })}>
+        <line x1={left} x2={right} y1={axis} y2={axis} stroke="#1b1b1f" strokeWidth={0.5} />
+        {ticks.map((value) => (
+          <g key={value}>
+            <line x1={x(value)} x2={x(value)} y1={axis - 1} y2={axis + 1} stroke="#1b1b1f" strokeWidth={0.4} />
+            <text x={x(value)} y={axis + 6.5} fontSize={3.4} textAnchor="middle" className="faint">{doc.n(value)}</text>
+          </g>
+        ))}
+        {rated.map((item) => {
+          const { cx, cy } = positionOf(item);
+          if (item === best) return <circle key={item.id} cx={cx} cy={cy} r={r + 0.6} fill="#1b1b1f" />;
+          if (item === worst) return <circle key={item.id} cx={cx} cy={cy} r={r} fill="#faf8f3" stroke="#1b1b1f" strokeWidth={0.6} />;
+          return <circle key={item.id} cx={cx} cy={cy} r={r} fill="#98948a" />;
+        })}
+        {best ? named(best, "best") : null}
+        {worst ? named(worst, "worst") : null}
+        {average !== null ? (
+          <g>
+            <path d={wavyCircle(x(average), axis + 13, 2.6)} fill="#1b1b1f" />
+            <text x={x(average)} y={axis + 21.5} fontSize={3.4} textAnchor="middle" className="soft">{doc.t(solo ? "plotAverageSolo" : "plotAverage", { value: doc.n(average) })}</text>
+          </g>
+        ) : null}
+      </svg>
+    </div>
+  );
+}
+
 function Cover({ challenge, model, doc, footer }: { challenge: ChallengeDetail; model: ExportModel; doc: Doc; footer?: ReactNode }) {
   // A zero says nothing on a cover (a challenge that hasn't started yet): only the numbers there are.
   const stats = model.stats.filter((stat) => !("value" in stat) || stat.value > 0);
@@ -118,13 +214,6 @@ function Cover({ challenge, model, doc, footer }: { challenge: ChallengeDetail; 
     : names.length === 1 ? doc.t("presentsOne", { name: names[0] })
       : names.length <= 4 ? doc.t("presents", { names: `${names.slice(0, -1).join(", ")} & ${names.at(-1)}` })
         : doc.t("presentsGroup", { count: names.length });
-  const scoreCount = model.chapters.reduce((sum, chapter) => sum + chapter.items.reduce((total, item) => total + item.ratings.length, 0), 0);
-  const outOf = (value: number) => `${doc.n(value)}/${model.ratingMax}`;
-  const verdict = !model.hasRatings ? [] : [
-    model.champion?.ratingAvg != null ? { label: doc.t("champion"), value: model.champion.title, note: outOf(model.champion.ratingAvg) } : null,
-    model.disappointment?.ratingAvg != null ? { label: doc.t("disappointment"), value: model.disappointment.title, note: outOf(model.disappointment.ratingAvg) } : null,
-    model.overallAvg !== null ? { label: doc.t("overall"), value: doc.n(model.overallAvg), note: doc.t("ratingsCount", { count: scoreCount }) } : null,
-  ].filter((row): row is { label: string; value: string; note: string } => row !== null);
   const range = model.firstDay
     ? model.firstDay === model.lastDay ? doc.day(model.firstDay) : doc.t("range", { from: doc.day(model.firstDay), to: doc.day(model.lastDay) })
     : null;
@@ -138,14 +227,7 @@ function Cover({ challenge, model, doc, footer }: { challenge: ChallengeDetail; 
       </h1>
       <p className="xd-cover-lede">{challenge.description?.trim() || doc.t("coverLede", { title: challenge.title })}</p>
       {range ? <p className="xd-eyebrow" style={{ marginTop: "6mm" }}>{range}</p> : null}
-      {verdict.length ? (
-        // The verdict, read off the scoreboard: a few plain lines, not boxes.
-        <dl className="xd-verdict">
-          {verdict.map((row) => (
-            <div key={row.label}><dt>{row.label}</dt><dd><b>{row.value}</b>{row.note ? <span>{row.note}</span> : null}</dd></div>
-          ))}
-        </dl>
-      ) : null}
+      {model.hasRatings ? <ScorePlot model={model} doc={doc} /> : null}
       {stats.length ? (
         <div className="xd-stats">
           {stats.map((stat) => <StatBlock key={stat.kind} stat={stat} doc={doc} />)}
