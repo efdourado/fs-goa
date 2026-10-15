@@ -67,7 +67,7 @@ test("each criterion shows who leads it on the rankings page", () => {
   assert.ok(html.includes("Vibe: Boteco leads"));
 });
 
-test("interactive words pages have fixed-height comments while downloadable pages keep the full text", () => {
+test("interactive words pages fit each comment up to a cap while downloadable pages keep the full text", () => {
   const withComments: StoryInput = {
     ...input,
     ratings: input.ratings.map((rating, index) => ({
@@ -82,7 +82,8 @@ test("interactive words pages have fixed-height comments while downloadable page
 
   const interactive = renderToStaticMarkup(<NextIntlClientProvider locale="en" messages={messages} timeZone="America/Sao_Paulo"><Words /></NextIntlClientProvider>);
   assert.ok(interactive.includes('data-collapsible-comment="true"'));
-  assert.ok(interactive.includes("min-height:232px;max-height:232px"));
+  assert.ok(interactive.includes("max-height:360px"));
+  assert.ok(!interactive.includes("min-height"));
 
   const downloadable = renderToStaticMarkup(<NextIntlClientProvider locale="en" messages={messages} timeZone="America/Sao_Paulo"><Words full /></NextIntlClientProvider>);
   assert.ok(!downloadable.includes("data-collapsible-comment"));
