@@ -29,6 +29,8 @@
 .xd-c-green { --c: var(--xd-green); }
 .xd-c-amber { --c: var(--xd-amber); }
 .xd-ink { color: var(--c); }
+/* Ink is the colour; only a real stage of the challenge brings its own (see stageTone). */
+.xd { --c: var(--xd-ink); }
 
 /* ── Toolbar (screen only) ─────────────────────────────────────── */
 .xd-toolbar {
@@ -145,8 +147,22 @@
   line-height: 1.45;
   color: #3b3a36;
 }
-.xd-ribbon { margin-top: 12mm; display: grid; gap: 3.2mm; }
-.xd-ribbon span { display: block; height: 8mm; border-radius: 999px; background: var(--c); }
+/* Who took part: one thin line per person (up to five), as long as their share of the entries. */
+.xd-ribbon { margin-top: 14mm; display: grid; gap: 3.4mm; }
+.xd-ribbon > div { display: grid; grid-template-columns: 34mm minmax(0, 1fr); align-items: center; gap: 4mm; }
+.xd-ribbon-name {
+  overflow: hidden;
+  font-family: var(--xd-font-display), "Poppins", sans-serif;
+  font-size: 7.5pt;
+  letter-spacing: 0.18em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--xd-soft);
+}
+.xd-ribbon-bar { display: flex; align-items: center; gap: 2.5mm; }
+.xd-ribbon-bar i { display: block; height: 1.6mm; border-radius: 999px; background: var(--xd-ink); }
+.xd-ribbon-bar b { font-family: var(--xd-font-display), "Poppins", sans-serif; font-size: 8pt; font-weight: 500; color: var(--xd-muted); font-variant-numeric: tabular-nums; }
 .xd-stats {
   margin-top: auto;
   display: grid;
@@ -178,7 +194,7 @@
 /* ── How it works ──────────────────────────────────────────────── */
 .xd-rules {
   margin: 7mm 0 0;
-  border-left: 1.4mm solid var(--xd-blue);
+  border-left: 1.4mm solid var(--xd-ink);
   padding: 1mm 0 1mm 7mm;
   list-style: none;
   counter-reset: rule;
@@ -222,6 +238,8 @@
   background: var(--c);
 }
 .xd-card.is-long { break-inside: auto; }
+/* No stage, no stripe: a plain card. */
+.xd-card:not([class*="xd-c-"])::before { content: none; }
 /* Nothing logged yet (an upcoming item): one slim line, so a list of what's still ahead stays short. */
 .xd-card.is-empty { margin-top: 2.5mm; padding-top: 2.6mm; padding-bottom: 2.6mm; }
 .xd-card.is-empty .xd-card-head { align-items: center; }

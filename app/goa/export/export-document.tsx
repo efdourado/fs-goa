@@ -1,23 +1,28 @@
 "use client";
 
 import { useFormatter, useLocale, useTranslations } from "next-intl";
-import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
 import { monthCells } from "../checkin-days";
 import type { ChallengeDetail, Entry, Id } from "../types";
 import { dateKeyInSaoPaulo, parseCommentBlocks } from "../utils";
 import {
-  buildExportModel, coverLines, DOC_COLORS, type DocChapter, type DocColor, type DocEntry, type DocItem,
+  buildExportModel, coverLines, type DocChapter, type DocColor, type DocEntry, type DocItem,
   type DocPerson, type DocStat, type ExportModel,
 } from "./model";
 
 type Section = "cover" | "rules" | "items" | "diary" | "scoreboard";
 const SECTIONS: Section[] = ["cover", "rules", "items", "diary", "scoreboard"];
-const COVER_COLORS: DocColor[] = ["coral", "blue"];
-const RIBBON = [100, 84, 68, 52, 36];
+/** The cover draws one line per person who took part, up to five, as long as their share of the entries. */
+const COVER_PEOPLE = 5;
 
 function tone(color: DocColor | undefined): string {
   return color ? `xd-c-${color}` : "";
+}
+
+/** Ink unless the challenge has real stages: then each stage keeps its colour. Nothing else is coloured. */
+function stageTone(chapter: DocChapter | undefined): string {
+  return chapter?.staged ? tone(chapter.color) : "";
 }
 
 /** The day as a date at noon in São Paulo, so the calendar day never shifts. */
@@ -111,6 +116,9 @@ function Cover({ challenge, model, doc, footer }: { challenge: ChallengeDetail; 
   const longest = Math.max(...lines.map((line) => line.length), 1);
   const size = Math.max(34, Math.min(92, Math.floor(610 / (longest * 0.68))));
   const names = model.people.filter((person) => person.key !== "shared").map((person) => person.name);
+  const ribbon = model.people.filter((person) => person.key !== "shared" && person.entryCount > 0)
+    .sort((a, b) => b.entryCount - a.entryCount).slice(0, COVER_PEOPLE);
+  const ribbonMax = Math.max(1, ...ribbon.map((person) => person.entryCount));
   const eyebrow = names.length === 0 ? doc.t("eyebrowSolo")
     : names.length === 1 ? doc.t("presentsOne", { name: names[0] })
       : names.length <= 4 ? doc.t("presents", { names: `${names.slice(0, -1).join(", ")} & ${names.at(-1)}` })
@@ -123,14 +131,21 @@ function Cover({ challenge, model, doc, footer }: { challenge: ChallengeDetail; 
       <p className="xd-eyebrow">{eyebrow}</p>
       <h1 className="xd-cover-title" style={{ fontSize: `min(${size}px, calc((100vw - 40px) / ${(longest * 0.7).toFixed(2)}))` }}>
         {lines.map((line, index) => (
-          <span key={index} className={index === 0 ? undefined : `xd-ink ${tone(COVER_COLORS[(index - 1) % COVER_COLORS.length])}`}>{line}</span>
+          <span key={index}>{line}</span>
         ))}
       </h1>
       <p className="xd-cover-lede">{challenge.description?.trim() || doc.t("coverLede", { title: challenge.title })}</p>
       {range ? <p className="xd-eyebrow" style={{ marginTop: "6mm" }}>{range}</p> : null}
-      <div className="xd-ribbon" aria-hidden="true">
-        {RIBBON.map((width, index) => <span key={index} className={tone(DOC_COLORS[index])} style={{ width: `${width}%` }} />)}
-      </div>
+      {ribbon.length ? (
+        <div className="xd-ribbon">
+          {ribbon.map((person) => (
+            <div key={person.key}>
+              <span className="xd-ribbon-name">{person.name}</span>
+              <span className="xd-ribbon-bar"><i style={{ width: `${Math.max(4, (person.entryCount / ribbonMax) * 100)}%` }} /><b>{doc.n(person.entryCount)}</b></span>
+            </div>
+          ))}
+        </div>
+      ) : null}
       {stats.length ? (
         <div className="xd-stats">
           {stats.map((stat) => <StatBlock key={stat.kind} stat={stat} doc={doc} />)}
@@ -203,7 +218,7 @@ function ItemCard({ item, chapter, model, doc, people, showWhen }: {
   const multiPeople = model.people.length > 1;
   const recommender = item.recommender;
   const by = recommender ? (
-    <div className={`xd-by ${tone(people.get(recommender.personKey ?? "")?.color ?? chapter.color)}`}>
+    <div className={`xd-by ${stageTone(chapter)}`}>
       <span>{doc.t("recommendedBy")}</span>
       <strong>{recommender.name.split(" ")[0]}</strong>
     </div>
@@ -213,7 +228,7 @@ function ItemCard({ item, chapter, model, doc, people, showWhen }: {
   // Nothing logged yet: the title and a line saying so — no empty tiles.
   if (!item.entries.length && !item.progress.length) {
     return (
-      <article className={`xd-card is-empty ${tone(chapter.color)}`}>
+      <article className={`xd-card is-empty ${stageTone(chapter)}`}>
         <header className="xd-card-head">
           {number}
           <div className="xd-card-title"><h3>{item.title}</h3>{meta}<p className="xd-card-empty">{doc.t("noEntries")}</p></div>
@@ -238,7 +253,7 @@ function ItemCard({ item, chapter, model, doc, people, showWhen }: {
   if (showWhen && item.lastDay) tiles.push({ label: doc.t("tiles.when"), body: <>{doc.day(item.lastDay)}</> });
   const long = item.entries.length > 5 || item.entries.some((entry) => entry.values.some((value) => value.long && value.text.length > 600));
   return (
-    <article className={`xd-card ${tone(chapter.color)}${long ? " is-long" : ""}`}>
+    <article className={`xd-card ${stageTone(chapter)}${long ? " is-long" : ""}`}>
       <header className="xd-card-head">
         {number}
         <div className="xd-card-title"><h3>{item.title}</h3>{meta}</div>
@@ -252,7 +267,7 @@ function ItemCard({ item, chapter, model, doc, people, showWhen }: {
         {byPerson(item.entries).map((entry) => {
           const person = people.get(entry.personKey);
           return (
-            <div className={`xd-row ${tone(person?.color)}`} key={entry.id}>
+            <div className="xd-row" key={entry.id}>
               <dt>{person?.name ?? "—"}</dt>
               <dd><EntryBody entry={entry} doc={doc} showDates={showWhen} /></dd>
             </div>
@@ -261,7 +276,7 @@ function ItemCard({ item, chapter, model, doc, people, showWhen }: {
         {item.progress.map((row) => {
           const person = people.get(row.personKey);
           return (
-            <div className={`xd-row ${tone(person?.color)}`} key={`progress-${row.personKey}`}>
+            <div className="xd-row" key={`progress-${row.personKey}`}>
               <dt>{person?.name ?? "—"}{row.label ? <small>{row.label}</small> : null}</dt>
               <dd>
                 {/* Not every day (a book club logs dozens): how much, over how many days, from when to when. */}
@@ -286,7 +301,7 @@ function Items({ model, doc, people, showWhen }: { model: ExportModel; doc: Doc;
       {model.chapters.map((chapter, index) => (
         <div key={chapter.index}>
           {labelled ? (
-            <div className={`xd-chapter ${tone(chapter.color)}${index === 0 ? " xd-first-chapter" : ""}`}>
+            <div className={`xd-chapter ${stageTone(chapter)}${index === 0 ? " xd-first-chapter" : ""}`}>
               <h3>{doc.t("chapter", { n: index + 1 })}{chapter.title ? ` · ${chapter.title}` : ""}</h3>
               {chapter.subtitle ? <p>{chapter.subtitle}</p> : null}
             </div>
@@ -327,11 +342,10 @@ function Diary({ model, doc, people }: { model: ExportModel; doc: Doc; people: M
     <section className="xd-page">
       <h2 className="xd-h2">{doc.t(model.sessionMode ? "diaryTitleSessions" : "diaryTitle")}</h2>
       <p className="xd-lede">{doc.t("diaryLede", { entries: entryCount, days: dayCount })}</p>
-      {model.diary.map((month, monthIndex) => {
-        const color = DOC_COLORS[monthIndex % (DOC_COLORS.length - 1)];
+      {model.diary.map((month) => {
         const logged = new Map(month.days.map((row) => [row.day, row.personKeys]));
         return (
-          <div className={`xd-month ${tone(color)}`} key={month.month || "undated"}>
+          <div className="xd-month" key={month.month || "undated"}>
             <div className="xd-month-head">
               {month.month ? (
                 <h3>{doc.day(`${month.month}-15`, { month: "long" })} <span>{month.month.slice(0, 4)}</span></h3>
@@ -344,11 +358,9 @@ function Diary({ model, doc, people }: { model: ExportModel; doc: Doc; people: M
                   {weekdays.map((name, index) => <span key={index}>{name}</span>)}
                   {monthCells(month.month).map((day, index) => {
                     if (!day) return <i key={index} />;
+                    // A marked day; ringed when more than one person logged it.
                     const keys = logged.get(day);
-                    const first = keys ? people.get(keys[0]) : undefined;
-                    const second = keys && keys.length > 1 ? people.get(keys[1]) : undefined;
-                    const style = (first && multiPeople ? { "--c": `var(--xd-${first.color})`, "--c2": second ? `var(--xd-${second.color})` : undefined } : undefined) as CSSProperties | undefined;
-                    return <i key={index} className={keys ? `on${second ? " many" : ""}` : undefined} style={style}>{Number(day.slice(8))}</i>;
+                    return <i key={index} className={keys ? `on${keys.length > 1 ? " many" : ""}` : undefined}>{Number(day.slice(8))}</i>;
                   })}
                 </div>
               ) : <div />}
@@ -359,7 +371,7 @@ function Diary({ model, doc, people }: { model: ExportModel; doc: Doc; people: M
                     {month.summary.map((line) => {
                       const person = people.get(line.personKey);
                       return (
-                        <tr key={`${line.name}-${line.personKey}`} className={tone(person?.color)}>
+                        <tr key={`${line.name}-${line.personKey}`}>
                           <td>
                             {line.name}
                             {multiPeople ? <span className="xd-who">{person?.name}</span> : null}
@@ -386,7 +398,6 @@ function Scoreboard({ model, doc, showDates }: { model: ExportModel; doc: Doc; s
   const perPerson = raters.length > 1;
   const showYear = items.some(({ item }) => item.year);
   const showBy = model.hasRecommenders;
-  const colorOf = (item: DocItem | null) => (item ? model.chapters.find((chapter) => chapter.index === item.chapter)?.color : undefined);
   return (
     <section className="xd-page">
       <h2 className="xd-h2">{doc.t("scoreboardTitle")}</h2>
@@ -399,14 +410,14 @@ function Scoreboard({ model, doc, showDates }: { model: ExportModel; doc: Doc; s
               <th>{doc.t("col.item")}</th>
               {showYear ? <th>{doc.t("col.year")}</th> : null}
               {showBy ? <th>{doc.t("recommendedBy")}</th> : null}
-              {model.hasRatings && perPerson ? raters.map((person) => <th className={`score ${tone(person.color)}`} style={{ color: "var(--c)" }} key={person.key}>{person.name.split(" ")[0]}</th>) : null}
+              {model.hasRatings && perPerson ? raters.map((person) => <th className="score" key={person.key}>{person.name.split(" ")[0]}</th>) : null}
               {model.hasRatings ? <th className="score">{doc.t(perPerson ? "col.avg" : "col.rating")}</th> : <th className="score">{doc.t("col.entries")}</th>}
               {showDates ? <th>{doc.t("col.date")}</th> : null}
             </tr>
           </thead>
           <tbody>
             {items.map(({ item, chapter }) => (
-              <tr key={item.id} className={tone(chapter.color)}>
+              <tr key={item.id} className={stageTone(chapter)}>
                 <td className="num">{String(item.number).padStart(2, "0")}</td>
                 <td className="title">{item.title}</td>
                 {showYear ? <td className="small">{item.year ?? ""}</td> : null}
@@ -426,12 +437,12 @@ function Scoreboard({ model, doc, showDates }: { model: ExportModel; doc: Doc; s
       </div>
       {model.hasRatings ? (
         <div className="xd-podium">
-          <div className={tone(colorOf(model.champion))}>
+          <div>
             <span>{doc.t("champion")}</span>
             <b>{model.champion?.title ?? "—"}</b>
             {model.champion?.ratingAvg != null ? <small>{doc.n(model.champion.ratingAvg)}/{model.ratingMax}</small> : null}
           </div>
-          <div className={tone(colorOf(model.disappointment))}>
+          <div>
             <span>{doc.t("disappointment")}</span>
             <b>{model.disappointment?.title ?? "—"}</b>
             {model.disappointment?.ratingAvg != null ? <small>{doc.n(model.disappointment.ratingAvg)}/{model.ratingMax}</small> : null}
@@ -465,7 +476,7 @@ function Records({ model, doc, showDates }: { model: ExportModel; doc: Doc; show
           </thead>
           <tbody>
             {model.records.map((record, index) => (
-              <tr key={record.itemId} className={tone(DOC_COLORS[record.chapter % (DOC_COLORS.length - 1)])}>
+              <tr key={record.itemId}>
                 <td className="num">{String(index + 1).padStart(2, "0")}</td>
                 <td className="title">{record.title}</td>
                 <td className="score">{doc.n(record.sessions)}</td>
