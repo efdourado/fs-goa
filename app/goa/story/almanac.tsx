@@ -287,9 +287,84 @@ const textActionClass = "cursor-pointer py-1.5 text-xs font-medium text-[var(--m
 const CHART_PREVIEW_ROWS = 5;
 const RANKING_PREVIEW_ROWS = 5;
 const PAGE_QUOTES = 4;
+/** How many lines the words page shows before "Show all". */
+const PREVIEW_QUOTES = 12;
 /** What's left out of a preview list: "+ 70", and folding it away again: "− 70". */
 const more = (count: number) => `+ ${count}`;
 const less = (count: number) => `− ${count}`;
+
+type WallQuote = { key: string; person: { id: Id; name: string }; text: string; about: string; caption: string };
+
+/**
+ * The words page: the first dozen lines, then "Show all"; a filter (words, title or person) once there are
+ * enough to hunt through. A downloaded page keeps its few, cut to fit.
+ */
+function QuoteWall({ quotes, full, ids }: { quotes: WallQuote[]; full: boolean; ids: Id[] }) {
+  const t = useTranslations("story");
+  const [query, setQuery] = useState("");
+  const [personId, setPersonId] = useState<Id | null>(null);
+  const [showAll, setShowAll] = useState(false);
+  if (full) {
+    return (
+      <div className={grid}>
+        {quotes.slice(0, PAGE_QUOTES).map((quote) => (
+          <figure key={quote.key} className={cx(cardClass, "border-l-[3px]")} style={{ borderLeftColor: personTone(ids, quote.person.id) }}>
+            <CommentText text={quote.text} className="max-h-[11.25rem] overflow-hidden text-lg font-light" />
+            <figcaption className="mt-3 flex items-center gap-2 text-xs text-[var(--muted)]"><Avatar id={quote.person.id} name={quote.person.name} ids={ids} size={5} />{quote.caption}</figcaption>
+          </figure>
+        ))}
+      </div>
+    );
+  }
+  const people = [...new Map(quotes.map((quote) => [quote.person.id, quote.person])).values()];
+  const needle = query.trim().toLocaleLowerCase();
+  const filtering = Boolean(needle) || personId !== null;
+  const found = quotes.filter((quote) => (personId === null || quote.person.id === personId)
+    && (!needle || `${quote.text} ${quote.about} ${quote.person.name}`.toLocaleLowerCase().includes(needle)));
+  // A filter shows every match: the cap is only for browsing.
+  const shown = filtering || showAll ? found : found.slice(0, PREVIEW_QUOTES);
+  const chip = (active: boolean) => cx("min-h-8 cursor-pointer rounded-full border px-3 text-xs transition", active ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] text-[var(--muted)] hover:text-[var(--ink)]");
+  return (
+    <div>
+      {quotes.length > PAGE_QUOTES ? (
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={t("quotes.filter")}
+            aria-label={t("quotes.filter")}
+            className="min-h-10 min-w-0 flex-1 basis-48 rounded-xl border border-[var(--line)] bg-[var(--paper)] px-3 text-sm outline-none transition focus:border-[var(--main)] focus:ring-4 focus:ring-[var(--main)]/15"
+          />
+          {people.length > 1 ? (
+            <div className="flex flex-wrap gap-1.5">
+              <button type="button" aria-pressed={personId === null} className={chip(personId === null)} onClick={() => setPersonId(null)}>{t("quotes.everyone")}</button>
+              {people.map((person) => (
+                <button key={person.id} type="button" aria-pressed={personId === person.id} className={cx(chip(personId === person.id), "flex items-center gap-1.5")} onClick={() => setPersonId(personId === person.id ? null : person.id)}>
+                  <span className="h-2 w-2 rounded-full" style={{ background: personTone(ids, person.id) }} />{firstName(person.name)}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+      {filtering ? <p className="mb-3 text-xs tabular-nums text-[var(--muted)]">{t("quotes.found", { count: found.length, total: quotes.length })}</p> : null}
+      <div className={grid}>
+        {shown.map((quote) => (
+          <figure key={quote.key} className={cx(cardClass, "border-l-[3px]")} style={{ borderLeftColor: personTone(ids, quote.person.id) }}>
+            <ExpandableComment text={quote.text} />
+            <figcaption className="mt-3 flex items-center gap-2 text-xs text-[var(--muted)]"><Avatar id={quote.person.id} name={quote.person.name} ids={ids} size={5} />{quote.caption}</figcaption>
+          </figure>
+        ))}
+      </div>
+      {!filtering && found.length > PREVIEW_QUOTES ? (
+        <button type="button" className={cx("mt-3", textActionClass)} onClick={() => setShowAll((value) => !value)}>
+          {showAll ? t("showLess") : t("quotes.showAll", { count: found.length })}
+        </button>
+      ) : null}
+    </div>
+  );
+}
 
 /** A steady-height comment card that opens in place only when its words need the room. */
 function ExpandableComment({ text }: { text: string }) {
@@ -800,16 +875,17 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
         title: t(input.people.length === 1 ? "pages.words.titleSolo" : "pages.words.title"),
         headline: t("pages.words.headline", { count: s.quotes.length }),
         body: (
-          <div className={grid}>
-            {(full ? s.quotes.slice(0, PAGE_QUOTES) : s.quotes).map((quote) => (
-              <figure key={`${quote.person.id}-${quote.item.id}`} className={cx(cardClass, "border-l-[3px]")} style={{ borderLeftColor: personTone(ids, quote.person.id) }}>
-                {full
-                  ? <CommentText text={quote.text} className="max-h-[11.25rem] overflow-hidden text-lg font-light" />
-                  : <ExpandableComment text={quote.text} />}
-                <figcaption className="mt-3 flex items-center gap-2 text-xs text-[var(--muted)]"><Avatar id={quote.person.id} name={quote.person.name} ids={ids} size={5} />{t("quotes.by", { name: firstName(quote.person.name), title: quote.item.title, value: fmt(quote.value) })}</figcaption>
-              </figure>
-            ))}
-          </div>
+          <QuoteWall
+            full={full}
+            ids={ids}
+            quotes={s.quotes.map((quote) => ({
+              key: `${quote.person.id}-${quote.item.id}`,
+              person: quote.person,
+              text: quote.text,
+              about: quote.item.title,
+              caption: t("quotes.by", { name: firstName(quote.person.name), title: quote.item.title, value: fmt(quote.value) }),
+            }))}
+          />
         ),
       });
     }
@@ -1011,14 +1087,17 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
         title: t(input.people.length === 1 ? "pages.words.titleSolo" : "pages.words.title"),
         headline: t("pages.words.headline", { count: s.notes.length }),
         body: (
-          <div className={grid}>
-            {s.notes.map((note) => (
-              <figure key={`${note.person.id}-${note.day}`} className={cx(cardClass, "border-l-[3px]")} style={{ borderLeftColor: personTone(ids, note.person.id) }}>
-                <CommentText text={note.text} className="text-lg font-light" />
-                <figcaption className="mt-3 flex items-center gap-2 text-xs text-[var(--muted)]"><Avatar id={note.person.id} name={note.person.name} ids={ids} size={5} />{firstName(note.person.name)} · {day(note.day)}</figcaption>
-              </figure>
-            ))}
-          </div>
+          <QuoteWall
+            full={full}
+            ids={ids}
+            quotes={s.notes.map((note) => ({
+              key: `${note.person.id}-${note.day}`,
+              person: note.person,
+              text: note.text,
+              about: day(note.day),
+              caption: `${firstName(note.person.name)} · ${day(note.day)}`,
+            }))}
+          />
         ),
       });
     }

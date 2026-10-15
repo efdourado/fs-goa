@@ -31,7 +31,7 @@ test("a rated club: the drawing's pinned notes and the almanac say what the data
   assert.ok(story.totals.minutes! > 1000);
 });
 
-test("the words page includes up to twelve comments", () => {
+test("the words page keeps every comment (the page shows twelve, then Show all)", () => {
   const story = buildStory({
     ...films,
     ratings: films.ratings.slice(0, 13).map((rating, index) => ({
@@ -40,7 +40,7 @@ test("the words page includes up to twelve comments", () => {
     })),
   }) as RatedStory;
 
-  assert.equal(story.quotes.length, 12);
+  assert.equal(story.quotes.length, 13);
 });
 
 test("nothing is invented: agreement, no expectations, no metadata", () => {
