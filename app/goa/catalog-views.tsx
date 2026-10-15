@@ -143,19 +143,19 @@ export function CatalogTile({ title, year, avg, ratingLabel, badgeHidden, captio
   );
 }
 
-/** The dashed "＋ Add item" card that opens the add dialog — one line tall, like the item cards beside it. */
+/** The dashed "＋ Add …" card (an item, a library) — one line tall, like the cards beside it. Neutral, no fill: the line and the text darken under the pointer. */
 export function AddItemTile({ label, onClick, className }: { label: string; onClick: () => void; className?: string }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={cx(
-        "flex cursor-pointer items-center justify-center gap-2.5 self-start rounded-[20px] border border-dashed border-[var(--main-line)] px-4 text-[13px] text-[var(--main-strong)] transition hover:bg-[var(--main-soft)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25",
+        "group flex cursor-pointer items-center justify-center gap-2.5 self-start rounded-[20px] border border-dashed border-[var(--line)] px-4 text-[13px] text-[var(--ink)] transition hover:border-[var(--muted)] hover:text-[var(--ink-strong)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25",
         catalogCardHeight,
         className ?? "w-full",
       )}
     >
-      <span aria-hidden="true" className="grid h-8 w-8 place-items-center rounded-full bg-[var(--main-soft)]">＋</span>
+      <span aria-hidden="true" className="grid h-8 w-8 place-items-center rounded-full bg-[var(--wash)] transition group-hover:bg-[var(--wash-strong)]">＋</span>
       {label}
     </button>
   );

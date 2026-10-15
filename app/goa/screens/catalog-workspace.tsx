@@ -330,13 +330,7 @@ export function CatalogWorkspaceScreen({
               );
             })}
             {canManage ? (
-              <button
-                type="button"
-                onClick={() => setDialog("new")}
-                className={cx(catalogCardHeight, "flex min-w-0 cursor-pointer items-center justify-center gap-2 rounded-[20px] border border-dashed border-[var(--muted)] px-4 text-sm font-light text-[var(--muted)] transition hover:border-[var(--ink)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25")}
-              >
-                ＋ {tl("newLibrary")}
-              </button>
+              <AddItemTile label={tl("newLibrary")} onClick={() => setDialog("new")} className="w-full min-w-0 self-auto" />
             ) : null}
           </div>
         </nav>
