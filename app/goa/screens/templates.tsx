@@ -305,7 +305,6 @@ export function TemplateDetailScreen({
       ) : null}
       {user && showCopy ? (
         <Dialog title={t("duplicateAria")} onClose={() => setShowCopy(false)} busy={busy}>
-          <p className="text-sm text-[var(--muted)]">{t("duplicateBody")}</p>
           {copied ? <SkippedPropertiesNotice skipped={copied.skippedProperties} onOpen={() => { if (copied.challengeId) onDuplicated({ challengeId: copied.challengeId }); }} /> : null}
           <form className="mt-5 space-y-6" onSubmit={duplicate} hidden={Boolean(copied)}>
             <div>
@@ -319,7 +318,7 @@ export function TemplateDetailScreen({
                   { value: "structure", label: t("copyModeStructure"), hint: t("copyModeStructureHint") },
                 ]}
               />
-              <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{t("copyModeHint")}</p>
+              <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{t("duplicateBody")}</p>
             </div>
             <div>
               <p className={labelClass}>{t("whereLabel")}</p>
