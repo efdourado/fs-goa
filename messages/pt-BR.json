@@ -16,7 +16,7 @@
     "menuDeleteHint": "Vai para a lixeira (dá para restaurar).",
     "settingsTitle": "Configurações",
     "settingsSubtitle": "O que vale para o desafio inteiro: quem vê de fora, cópias e exclusão.",
-    "settingsDeleteAction": "Deletar"
+    "settingsDeleteAction": "Excluir"
   },
   "common": {
     "home": "Início",
@@ -765,11 +765,11 @@
     "reuseSubmit": "Criar cópia",
     "reuseNoneTitle": "Nenhum outro grupo disponível",
     "reuseNoneBody": "Crie outro grupo ou torne-se responsável de um grupo para reutilizar este modelo.",
-    "deleteTitle": "Deletar desafio?",
+    "deleteTitle": "Excluir desafio?",
     "deleteBody": "O desafio e seus registros vão para a lixeira.",
     "deleteBodyTemplateWarning": "O modelo publicado na galeria sai junto.",
     "deleteConfirm": "Mover \"{title}\" para a lixeira?",
-    "delete": "Deletar desafio",
+    "delete": "Excluir desafio",
     "deleting": "Apagando…",
     "platformTemplatePublish": "Publicar como modelo",
     "platformTemplateUnpublish": "Tirar da galeria",
