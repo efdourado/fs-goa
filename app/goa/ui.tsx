@@ -69,10 +69,13 @@ export function Button({
   disabled,
   onClick,
   className,
+  form,
 }: {
   children: ReactNode;
   variant?: "primary" | "secondary" | "ghost" | "danger";
   type?: "button" | "submit";
+  /** Submits a form elsewhere in the dialog (its footer button). */
+  form?: string;
   disabled?: boolean;
   onClick?: () => void;
   className?: string;
@@ -93,6 +96,7 @@ export function Button({
         className,
       )}
       type={type}
+      form={form}
       disabled={disabled}
       onClick={onClick}
     >

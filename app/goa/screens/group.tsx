@@ -283,12 +283,6 @@ export function GroupScreen({
         <span className="flex-1" />
         {canManage(group.role) ? (
           <div className="flex items-center gap-2">
-            <button type="button" onClick={() => setShowInvite(true)} className="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-full bg-[var(--main-soft)] pl-3 pr-4 text-sm text-[var(--main-strong)] transition hover:bg-[var(--main-line)]/60 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25">
-              <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true">
-                <circle cx="6.5" cy="5.5" r="2.5" /><path d="M2 13.5c.6-2.3 2.4-3.5 4.5-3.5s3.9 1.2 4.5 3.5M12.5 4.5v4M10.5 6.5h4" />
-              </svg>
-              {t("inviteTitle")}
-            </button>
             <button type="button" onClick={toggleGroupEdit} aria-label={t("editToggleClosed")} title={t("editToggleClosed")} className="grid h-9 w-9 cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--hover)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25">
               <SlidersIcon className="h-[18px] w-[18px]" />
             </button>
@@ -324,11 +318,10 @@ export function GroupScreen({
           <div className="mt-6 border-t border-[var(--line)] pt-5">
             <p className="text-[13px] font-medium">{t("inviteLinkLabel")}</p>
             <p className="mt-1 text-xs leading-5 text-[var(--muted)]">{t("inviteLinkBody")}</p>
-            <form className="mt-3 grid gap-3 sm:grid-cols-2" onSubmit={createInvite}>
+            <form id="invite-link-form" className="mt-3 grid gap-3 sm:grid-cols-2" onSubmit={createInvite}>
               <Field label={t("destinationLabel")} className="sm:col-span-2"><select className={inputClass} name="challengeId" defaultValue=""><option value="">{t("destinationGroupOnly")}</option>{challenges.filter((challenge) => challenge.status === "active").map((challenge) => <option value={challenge.id} key={challenge.id}>{t("destinationChallenge", { title: challenge.title })}</option>)}</select></Field>
               <Field label={t("expiresLabel")}><select className={inputClass} name="expiresInDays" defaultValue="7"><option value="1">{t("expires1")}</option><option value="7">{t("expires7")}</option><option value="30">{t("expires30")}</option></select></Field>
               <Field label={t("maxUsesLabel")}><input className={inputClass} name="maxUses" type="number" min={1} max={100} defaultValue={1} /></Field>
-              <div className="sm:col-span-2"><Button type="submit" disabled={busy}>{busy ? t("generating") : t("generateLink")}</Button></div>
             </form>
             <div className="mt-3"><StatusMessage error={error} /></div>
             {inviteUrl ? (
@@ -339,7 +332,8 @@ export function GroupScreen({
             ) : null}
             <div className="mt-3"><StatusMessage error={copyError} success={copySuccess} /></div>
           </div>
-          <div className="mt-6 flex justify-end border-t border-[var(--line)] pt-4"><Button variant="secondary" disabled={busy || memberBusy} onClick={() => setShowInvite(false)}>{tc("close")}</Button></div>
+          {/* The dialog ends on its one action; closing is the ⊖ at the top. */}
+          <div className="mt-6 flex justify-end border-t border-[var(--line)] pt-4"><Button type="submit" form="invite-link-form" disabled={busy}>{busy ? t("generating") : t("generateLink")}</Button></div>
         </Dialog>
       ) : null}
 
