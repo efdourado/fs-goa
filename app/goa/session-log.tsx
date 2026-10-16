@@ -643,7 +643,7 @@ export function SessionLog({
                         {tc("remove")}
                       </button>
                     </div>
-                    <div className="mt-3 grid grid-cols-2 items-start gap-2.5 sm:grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] [&>*:last-child:nth-child(odd)]:col-span-2 sm:[&>*:last-child:nth-child(odd)]:col-span-1">
+                    <div className="mt-3 grid grid-cols-2 items-start gap-2.5 [&>*:last-child:nth-child(odd)]:col-span-2">
                       {recordFields.map((field) => {
                         const id = `${row.key}-${field.id}`;
                         const current = numberValue(row.values[field.id as Id]);
