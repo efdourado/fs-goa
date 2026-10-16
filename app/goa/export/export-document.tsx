@@ -4,7 +4,7 @@ import { useFormatter, useLocale, useTranslations } from "next-intl";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { monthCells } from "../checkin-days";
-import { CircleMinusIcon } from "../ui";
+import { CircleMinusIcon, cx } from "../ui";
 import type { ChallengeDetail, Entry, Id } from "../types";
 import { dateKeyInSaoPaulo, parseCommentBlocks } from "../utils";
 import {
@@ -344,8 +344,9 @@ function ItemCard({ item, chapter, model, doc, people, showWhen }: {
         : <small>{doc.t("noRating")}</small>,
     });
   }
+  // A count of entries only tells something when several people logged: alone, it's your own rows below.
   const count = item.entries.length + item.progress.reduce((sum, row) => sum + row.points.length, 0);
-  tiles.push({ label: doc.t("tiles.entries"), body: <>{doc.n(count)}</> });
+  if (multiPeople) tiles.push({ label: doc.t("tiles.entries"), body: <>{doc.n(count)}</> });
   if (showWhen && item.lastDay) tiles.push({ label: doc.t("tiles.when"), body: <>{doc.day(item.lastDay)}</> });
   const long = item.entries.length > 5 || item.entries.some((entry) => entry.values.some((value) => value.long && value.text.length > 600));
   return (
@@ -363,8 +364,9 @@ function ItemCard({ item, chapter, model, doc, people, showWhen }: {
         {byPerson(item.entries).map((entry) => {
           const person = people.get(entry.personKey);
           return (
-            <div className="xd-row" key={entry.id}>
-              <dt>{person?.name ?? "—"}</dt>
+            // Alone, the row needs no name: it's all yours.
+            <div className={cx("xd-row", !multiPeople && "is-solo")} key={entry.id}>
+              {multiPeople ? <dt>{person?.name ?? "—"}</dt> : null}
               <dd><EntryBody entry={entry} doc={doc} showDates={showWhen} /></dd>
             </div>
           );
@@ -373,7 +375,7 @@ function ItemCard({ item, chapter, model, doc, people, showWhen }: {
           const person = people.get(row.personKey);
           return (
             <div className="xd-row" key={`progress-${row.personKey}`}>
-              <dt>{person?.name ?? "—"}{row.label ? <small>{row.label}</small> : null}</dt>
+              <dt>{multiPeople ? person?.name ?? "—" : null}{row.label ? <small>{row.label}</small> : null}</dt>
               <dd>
                 {/* Not every day (a book club logs dozens): how much, over how many days, from when to when. */}
                 <ProgressSummary row={row} doc={doc} />

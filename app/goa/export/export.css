@@ -348,6 +348,7 @@
   color: var(--c, var(--xd-muted));
   overflow-wrap: anywhere;
 }
+.xd-row.is-solo { grid-template-columns: minmax(0, 1fr); }
 .xd-row dt small { display: block; margin-top: 0.4mm; font-size: 6.5pt; letter-spacing: 0.08em; color: var(--xd-muted); }
 .xd-row dd { margin: 0; min-width: 0; font-size: 9.2pt; }
 .xd-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 1mm 3.5mm; }

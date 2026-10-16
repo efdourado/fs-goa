@@ -99,7 +99,7 @@ test("o documento mostra capa, regras, cartões e placar preenchido", () => {
   assert.doesNotMatch(solo, /Como funciona/, "sem regras, a seção some — e o botão dela também");
 });
 
-test("num cartão, cada pessoa aparece uma vez: as notas numa linha, os comentários embaixo, sem tipo nem data", () => {
+test("num cartão, cada pessoa aparece uma vez: as notas numa linha, os comentários embaixo, sem tipo nem data (e, sozinho, sem nome nem contagem)", () => {
   const expectation = {
     id: "exp", name: "Expectativa", semanticKey: "expectativa", purpose: "expectation", answerScope: "individual", parentTypeId: null,
     fields: [{ id: "expectativa", key: "expectativa", label: "Expectativa", type: "rating", required: true, config: { min: 0, max: 5 } }],
@@ -112,9 +112,11 @@ test("num cartão, cada pessoa aparece uma vez: as notas numa linha, os comentá
     ],
   }));
   const card = html.slice(html.indexOf('class="xd-rows"'), html.indexOf("</dl>", html.indexOf('class="xd-rows"')));
-  assert.equal(card.match(/<dt>/g)?.length, 1, "uma linha só para a mesma pessoa");
+  assert.equal(card.match(/class="xd-row[ "]/g)?.length, 1, "uma linha só para a mesma pessoa");
+  assert.doesNotMatch(card, /<dt>/, "sozinho, a linha não repete o nome (é tudo seu)");
   assert.ok(card.indexOf("Expectativa") < card.indexOf("Nota") && card.indexOf("Nota") < card.indexOf("A virada no meio."));
   assert.doesNotMatch(card, /Avaliação|set\./, "sem o nome do tipo e sem a data");
+  assert.doesNotMatch(html, /<span>Registros<\/span>/, "sozinho, sem o quadro de registros");
 });
 
 test("sem pedir datas, o PDF não mostra data: nem coluna no placar, nem campo de data opcional", () => {
