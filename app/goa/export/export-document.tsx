@@ -294,12 +294,19 @@ function HowItWorks({ challenge, doc }: { challenge: ChallengeDetail; doc: Doc }
  * their comments under it. The entry types and days are left out: the field label already says "Nota",
  * and when it happened lives in the "When" tile and the diary.
  */
-function byPerson(entries: DocEntry[]): DocEntry[] {
+/**
+ * One row per person. `scoreShown`: the card's tile already is the score (one person), so a rating entry's single
+ * rating isn't repeated in the row; several rating fields (criteria) stay, since the tile only holds their average.
+ */
+function byPerson(entries: DocEntry[], scoreShown = false): DocEntry[] {
   const rows = new Map<string, DocEntry[]>();
   for (const entry of entries) rows.set(entry.personKey, [...(rows.get(entry.personKey) ?? []), entry]);
   return [...rows.values()].map((own) => {
     const ordered = [...own].sort((a, b) => Number(b.purpose === "expectation") - Number(a.purpose === "expectation"));
-    const values = ordered.flatMap((entry) => entry.values);
+    const values = ordered.flatMap((entry) => {
+      const ratings = entry.values.filter((value) => value.type === "rating");
+      return scoreShown && entry.rating !== null && ratings.length === 1 ? entry.values.filter((value) => value !== ratings[0]) : entry.values;
+    });
     return {
       ...ordered[0],
       values: [...values.filter((value) => !value.long), ...values.filter((value) => value.long)],
@@ -361,7 +368,7 @@ function ItemCard({ item, chapter, model, doc, people, showWhen }: {
       </div>
       {item.note ? <p className="xd-lead"><b>{doc.t("about")} </b>{item.note}</p> : null}
       <dl className="xd-rows">
-        {byPerson(item.entries).map((entry) => {
+        {byPerson(item.entries, !multiPeople && model.hasRatings).map((entry) => {
           const person = people.get(entry.personKey);
           return (
             // Alone, the row needs no name: it's all yours.

@@ -114,7 +114,8 @@ test("num cartão, cada pessoa aparece uma vez: as notas numa linha, os comentá
   const card = html.slice(html.indexOf('class="xd-rows"'), html.indexOf("</dl>", html.indexOf('class="xd-rows"')));
   assert.equal(card.match(/class="xd-row[ "]/g)?.length, 1, "uma linha só para a mesma pessoa");
   assert.doesNotMatch(card, /<dt>/, "sozinho, a linha não repete o nome (é tudo seu)");
-  assert.ok(card.indexOf("Expectativa") < card.indexOf("Nota") && card.indexOf("Nota") < card.indexOf("A virada no meio."));
+  assert.ok(card.indexOf("Expectativa") < card.indexOf("A virada no meio."));
+  assert.doesNotMatch(card, /Nota/, "sozinho, a nota já está no quadro do cartão: a linha não a repete");
   assert.doesNotMatch(card, /Avaliação|set\./, "sem o nome do tipo e sem a data");
   assert.doesNotMatch(html, /<span>Registros<\/span>/, "sozinho, sem o quadro de registros");
 });
