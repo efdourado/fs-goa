@@ -1291,7 +1291,7 @@
     "whereLabel": "¿Adónde va?",
     "whereExisting": "Un grupo mío",
     "whereMine": "Solo yo",
-    "whereMineHint": "Un desafío personal, solo lo ves tú.",
+    "whereMineHint": "Un desafío personal.",
     "whereExistingHint": "Compartido con un grupo que administras."
   },
   "invite": {

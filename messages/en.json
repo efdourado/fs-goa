@@ -1291,7 +1291,7 @@
     "whereLabel": "Where does it go?",
     "whereExisting": "A group of mine",
     "whereMine": "Just me",
-    "whereMineHint": "A personal challenge, only you see it.",
+    "whereMineHint": "A personal challenge.",
     "whereExistingHint": "Shared with a group you run."
   },
   "invite": {
