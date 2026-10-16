@@ -1263,9 +1263,6 @@
     "copyModeItems": "Estructura + ítems",
     "copyModeStructure": "Solo la estructura",
     "copyModeHint": "Recibes una copia nueva: no vienen registros, personas ni invitaciones, y no cambia si el original cambia.",
-    "targetGroupLabel": "Grupo de destino",
-    "newGroupOption": "+ Crear un grupo nuevo",
-    "newGroupNameLabel": "Nombre del nuevo grupo (si vas a crear uno)",
     "duplicating": "Duplicando…",
     "duplicateSubmit": "Duplicar plantilla",
     "duplicateAria": "Duplicar plantilla",
@@ -1291,7 +1288,11 @@
     "storyBadge": "Destacado",
     "factPeople": "{count, plural, one {persona} other {personas}}",
     "factItems": "{count, plural, one {ítem} other {ítems}}",
-    "factFields": "{count, plural, one {campo} other {campos}}"
+    "factFields": "{count, plural, one {campo} other {campos}}",
+    "whereLabel": "Adónde va",
+    "whereExisting": "Un grupo mío",
+    "whereNew": "Un grupo nuevo",
+    "newGroupNamePlaceholder": "Nombre del grupo nuevo"
   },
   "invite": {
     "verifying": "Verificando invitación…",

@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { type FormEvent, type ReactNode, useEffect, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 
 import { API_PATHS, apiRequest } from "../api";
 import { SkippedPropertiesNotice } from "../copy-notice";
@@ -18,7 +18,7 @@ import type {
   TemplateSummary,
   User,
 } from "../types";
-import { BackButton, Brand, Button, CircleMinusIcon, CirclePinIcon, cx, EmptyState, inputClass, labelClass, PageHeading, StatusMessage } from "../ui";
+import { BackButton, Brand, Button, CircleMinusIcon, CirclePinIcon, cx, EmptyState, inputClass, labelClass, PageHeading, SelectableCards, StatusMessage } from "../ui";
 import { ParticipantChallengeScreen } from "./participant-challenge";
 
 function PublicChrome({ user, onSignIn, children }: { user: User | null; onSignIn: () => void; children: ReactNode }) {
@@ -168,6 +168,7 @@ export function TemplateDetailScreen({
   autoCopy?: boolean;
 }) {
   const t = useTranslations("templates");
+  const tm = useTranslations("managementUX");
   const f = useGoaFormat();
   const canPublish = Boolean(user?.platformAdmin);
   const [detail, setDetail] = useState<ChallengeDetail | null>(null);
@@ -194,28 +195,35 @@ export function TemplateDetailScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [challengeId]);
 
+  // The copy dialog: what comes along, then where it lands (a group you run, or a new one named here).
+  const [copyMode, setCopyMode] = useState<"structure_and_items" | "structure">("structure_and_items");
+  const [where, setWhere] = useState<"existing" | "new">(manageable.length ? "existing" : "new");
+  const [targetId, setTargetId] = useState<Id>(manageable[0]?.id ?? "");
+  const [newGroupName, setNewGroupName] = useState("");
+  // A group made for this copy is kept if the copy itself fails, so trying again doesn't make a second one.
+  const madeGroup = useRef<{ name: string; id: Id } | null>(null);
+  const ready = where === "existing" ? Boolean(targetId) : newGroupName.trim().length > 0;
+
   async function duplicate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const data = new FormData(event.currentTarget);
-    const choice = String(data.get("target") ?? "");
-    const newGroupName = String(data.get("newGroupName") ?? "").trim();
+    if (busy || !ready) return;
     setBusy(true);
     setCopyError(null);
     try {
-      let targetGroupId = choice;
-      if (choice === "__new__") {
-        if (!newGroupName) throw new Error(t("errNameGroup"));
-        const created = await apiRequest<{ id: Id }>(API_PATHS.groups, {
-          method: "POST",
-          body: { name: newGroupName },
-          csrfToken,
-        });
-        targetGroupId = created.id;
+      let targetGroupId = targetId;
+      if (where === "new") {
+        const name = newGroupName.trim();
+        if (!name) throw new Error(t("errNameGroup"));
+        if (madeGroup.current?.name !== name) {
+          const created = await apiRequest<{ id: Id }>(API_PATHS.groups, { method: "POST", body: { name }, csrfToken });
+          madeGroup.current = { name, id: created.id };
+        }
+        targetGroupId = madeGroup.current.id;
       }
       if (!targetGroupId) throw new Error(t("errPickGroup"));
       const result = await apiRequest<{ challengeId: Id; skippedProperties?: SkippedProperty[] }>(API_PATHS.templateDuplicate(challengeId), {
         method: "POST",
-        body: { targetGroupId, mode: data.get("mode") === "structure" ? "structure" : "structure_and_items" },
+        body: { targetGroupId, mode: copyMode },
         csrfToken,
       });
       if (result.skippedProperties?.length) setCopied({ challengeId: result.challengeId, skippedProperties: result.skippedProperties });
@@ -310,25 +318,47 @@ export function TemplateDetailScreen({
         <Dialog title={t("duplicateAria")} onClose={() => setShowCopy(false)} busy={busy}>
           <p className="text-sm text-[var(--muted)]">{t("duplicateBody")}</p>
           {copied ? <SkippedPropertiesNotice skipped={copied.skippedProperties} onOpen={() => { if (copied.challengeId) onDuplicated({ challengeId: copied.challengeId }); }} /> : null}
-          <form className="mt-4 grid gap-3" onSubmit={duplicate} hidden={Boolean(copied)}>
-            <label><span className={labelClass}>{t("targetGroupLabel")}</span>
-              <select className={inputClass} name="target" defaultValue={manageable[0]?.id ?? "__new__"}>
-                {manageable.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
-                <option value="__new__">{t("newGroupOption")}</option>
-              </select>
-            </label>
-            <label><span className={labelClass}>{t("newGroupNameLabel")}</span>
-              <input className={inputClass} name="newGroupName" maxLength={120} placeholder={detail.title} />
-            </label>
-            <label><span className={labelClass}>{t("copyModeLabel")}</span>
-              <select className={inputClass} name="mode" defaultValue="structure_and_items">
-                <option value="structure_and_items">{t("copyModeItems")}</option>
-                <option value="structure">{t("copyModeStructure")}</option>
-              </select>
-            </label>
-            <p className="text-xs text-[var(--muted)]">{t("copyModeHint")}</p>
-            <div><Button type="submit" disabled={busy}>{busy ? t("duplicating") : t("duplicateSubmit")}</Button></div>
+          <form className="mt-5 space-y-6" onSubmit={duplicate} hidden={Boolean(copied)}>
+            <div>
+              <p className={labelClass}>{t("copyModeLabel")}</p>
+              <SelectableCards
+                value={copyMode}
+                onChange={setCopyMode}
+                disabled={busy}
+                options={[
+                  { value: "structure_and_items", label: t("copyModeItems"), hint: t("copyModeItemsHint") },
+                  { value: "structure", label: t("copyModeStructure"), hint: t("copyModeStructureHint") },
+                ]}
+              />
+              <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{t("copyModeHint")}</p>
+            </div>
+            <div>
+              <p className={labelClass}>{t("whereLabel")}</p>
+              {manageable.length ? (
+                <SelectableCards
+                  value={where}
+                  onChange={setWhere}
+                  disabled={busy}
+                  options={[
+                    { value: "existing", label: t("whereExisting") },
+                    { value: "new", label: t("whereNew") },
+                  ]}
+                />
+              ) : null}
+              <div className={manageable.length ? "mt-3" : undefined}>
+                {where === "existing" ? (
+                  <select className={inputClass} value={targetId} onChange={(event) => setTargetId(event.target.value)} aria-label={t("whereExisting")} disabled={busy}>
+                    {manageable.map((group) => <option key={group.id} value={group.id}>{group.kind === "personal" ? tm("personal") : group.name}</option>)}
+                  </select>
+                ) : (
+                  <input className={inputClass} value={newGroupName} onChange={(event) => setNewGroupName(event.target.value)} placeholder={t("newGroupNamePlaceholder")} aria-label={t("newGroupNamePlaceholder")} required maxLength={120} disabled={busy} />
+                )}
+              </div>
+            </div>
             <StatusMessage error={copyError} />
+            <div className="flex justify-end border-t border-[var(--line)] pt-4">
+              <Button type="submit" disabled={busy || !ready}>{busy ? t("duplicating") : t("duplicateSubmit")}</Button>
+            </div>
           </form>
         </Dialog>
       ) : null}
