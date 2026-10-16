@@ -242,14 +242,6 @@ export function TrashView({
       description={description}
       action={emptyScope && rows.length ? (
         <button type="button" onClick={() => setEmptyOpen(true)} disabled={busyId !== null} className="inline-flex min-h-9 flex-none cursor-pointer items-center gap-1.5 self-start text-xs text-[var(--muted)] transition hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-55 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/20 sm:self-auto">
-          {/* A bar of soap with its bubbles: the bin, washed clean. */}
-          <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 flex-none" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-            <rect x="2.5" y="7.5" width="11" height="6.5" rx="3.25" />
-            <path d="M6 10.75h4" />
-            <circle cx="6.3" cy="3.9" r="1.4" fill="currentColor" stroke="none" />
-            <circle cx="9.8" cy="2.7" r="1" fill="currentColor" stroke="none" />
-            <circle cx="9.9" cy="5.6" r=".8" fill="currentColor" stroke="none" />
-          </svg>
           {t("empty")}
         </button>
       ) : undefined}
@@ -316,6 +308,7 @@ export function TrashView({
         <ConfirmDialog
           title={t("emptyConfirmTitle")}
           body={t("emptyConfirmBody")}
+          confirmLabel={t("emptyAction")}
           busyLabel={t("emptying")}
           danger
           onConfirm={emptyBin}

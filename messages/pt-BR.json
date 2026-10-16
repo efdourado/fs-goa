@@ -1672,7 +1672,8 @@
       "fields": "{count, plural, one {# campo} other {# campos}}",
       "values": "{count, plural, one {# resposta} other {# respostas}}",
       "challengesUsing": "{count, plural, one {usado por # desafio} other {usado por # desafios}}"
-    }
+    },
+    "emptyAction": "Esvaziar"
   },
   "accountDeactivated": {
     "title": "Sua conta está desativada",
