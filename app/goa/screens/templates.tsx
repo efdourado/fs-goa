@@ -306,7 +306,7 @@ export function TemplateDetailScreen({
       {user && showCopy ? (
         <Dialog title={t("duplicateAria")} onClose={() => setShowCopy(false)} busy={busy}>
           {copied ? <SkippedPropertiesNotice skipped={copied.skippedProperties} onOpen={() => { if (copied.challengeId) onDuplicated({ challengeId: copied.challengeId }); }} /> : null}
-          <form className="mt-5 space-y-6" onSubmit={duplicate} hidden={Boolean(copied)}>
+          <form className="space-y-6" onSubmit={duplicate} hidden={Boolean(copied)}>
             <div>
               <p className={labelClass}>{t("copyModeLabel")}</p>
               <SelectableCards
