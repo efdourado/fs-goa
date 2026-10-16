@@ -392,10 +392,13 @@ function MonthGrid({
   const max = Math.max(1, ...values.values());
   // Sunday-first initials, from a known Sunday (2026-09-06) so they follow the locale.
   const weekdays = Array.from({ length: 7 }, (_, index) => f.date(addDays("2026-09-06", index), { weekday: "narrow" }));
+  const months = monthsIn(from, to);
+  // Each month fills its column, and the columns follow the months: two months, two columns; three or more, three
+  // on a large screen. One month alone keeps a calendar's size instead of stretching across the page.
   return (
-    <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
-      {monthsIn(from, to).map((month) => (
-        <div key={month} className="w-full max-w-sm">
+    <div className={cx("grid gap-x-8 gap-y-6", months.length === 1 ? "max-w-md" : months.length === 2 ? "sm:grid-cols-2" : "sm:grid-cols-2 lg:grid-cols-3")}>
+      {months.map((month) => (
+        <div key={month} className="w-full min-w-0">
           <h4 className="mb-2 text-[13px] font-medium first-letter:uppercase">{f.date(`${month}-01`, { month: "long", year: "numeric" })}</h4>
           <div className="grid grid-cols-7 gap-1">
             {weekdays.map((weekday, index) => <span key={index} className="text-center text-[10px] uppercase text-[var(--muted)]" aria-hidden="true">{weekday}</span>)}
