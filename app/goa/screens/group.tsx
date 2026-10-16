@@ -12,7 +12,11 @@ import { catalogCardHeight, CatalogTile, resolveCoverTop } from "../catalog-view
 import { LibraryGlyph, useCatalogShelf, useLibraryName } from "../libraries";
 import { Rail, RailArrows, ShelfAddButton, shelfCardWidth, useShelfRail } from "../shelf";
 import type { CatalogItem, ChallengeSummary, GroupInviteResult, GroupSummary, Id, Member, PendingGroupRequest } from "../types";
-import { AvatarMark, BackButton, Button, cx, Disclosure, EmptyState, Field, inputClass, SlidersIcon, StatusMessage, Toggle } from "../ui";
+import { AvatarMark, BackButton, Button, cx, EmptyState, Field, inputClass, SlidersIcon, StatusMessage, Toggle } from "../ui";
+import { Segmented } from "../Segmented";
+
+/** A compact field drawn as a pill: the invite's settings and its @handle read as one line. */
+const pillSelect = "h-10 cursor-pointer rounded-full border border-[var(--line)] bg-transparent px-4 text-sm text-[var(--ink)] outline-none transition hover:border-[var(--muted)] focus:border-[var(--main)] focus:ring-4 focus:ring-[var(--main)]/15";
 import { canManage, formatRuntime } from "../utils";
 import { ActiveChallengeCard } from "./dashboard";
 
@@ -73,6 +77,7 @@ export function GroupScreen({
   const tr = useTranslations("roles");
   const f = useGoaFormat();
   const [showInvite, setShowInvite] = useState(false);
+  const [inviteMode, setInviteMode] = useState<"link" | "username">("link");
   const [showGroupEdit, setShowGroupEdit] = useState(false);
   const [deletingGroup, setDeletingGroup] = useState(false);
   const [groupName, setGroupName] = useState(group.name);
@@ -309,33 +314,46 @@ export function GroupScreen({
 
       {showInvite ? (
         <Dialog title={t("inviteTitle")} onClose={() => setShowInvite(false)} busy={busy || memberBusy}>
-          {/* Two ways in, one action each: a link first (the usual way), @username folded underneath. */}
-          <section>
-            <h3 className="text-[13px] font-medium">{t("inviteLinkLabel")}</h3>
-            <form className="mt-3 grid grid-cols-2 gap-3" onSubmit={createInvite}>
-              <Field label={t("destinationLabel")} className="col-span-2"><select className={inputClass} name="challengeId" defaultValue=""><option value="">{t("destinationGroupOnly")}</option>{challenges.filter((challenge) => challenge.status === "active").map((challenge) => <option value={challenge.id} key={challenge.id}>{t("destinationChallenge", { title: challenge.title })}</option>)}</select></Field>
-              <Field label={t("expiresLabel")}><select className={inputClass} name="expiresInDays" defaultValue="7"><option value="1">{t("expires1")}</option><option value="7">{t("expires7")}</option><option value="30">{t("expires30")}</option></select></Field>
-              <Field label={t("maxUsesLabel")}><input className={inputClass} name="maxUses" type="number" min={1} max={100} defaultValue={1} /></Field>
-              <div className="col-span-2"><Button type="submit" disabled={busy}>{busy ? t("generating") : t("generateLink")}</Button></div>
-            </form>
-            <div className="mt-3"><StatusMessage error={error} /></div>
-            {inviteUrl ? (
-              <div className="mt-3 flex flex-col gap-2 rounded-xl bg-[var(--main-soft)] p-3 sm:flex-row sm:items-center">
-                <input ref={inviteInputRef} className={cx(inputClass, "font-mono text-xs")} value={inviteUrl} readOnly aria-label={t("inviteUrlAria")} onFocus={(event) => event.currentTarget.select()} />
-                <Button variant="secondary" disabled={copyBusy} onClick={() => void copyInvite()}>{copyBusy ? t("copying") : copySuccess ? t("copied") : t("copy")}</Button>
+          {/* Two ways in, one at a time: a link (the usual way) or someone's @username. Each is one line and its
+              button, on the right. */}
+          <Segmented<"link" | "username">
+            className="w-full sm:w-72"
+            ariaLabel={t("inviteTitle")}
+            value={inviteMode}
+            onChange={setInviteMode}
+            options={[{ value: "link", label: t("inviteModeLink") }, { value: "username", label: t("inviteModeUser") }]}
+          />
+          {inviteMode === "link" ? (
+            <form className="mt-5" onSubmit={createInvite}>
+              <div className="flex flex-wrap gap-2">
+                <select className={cx(pillSelect, "min-w-0 flex-1 basis-56")} name="challengeId" defaultValue="" aria-label={t("destinationLabel")}>
+                  <option value="">{t("destinationGroupOnly")}</option>
+                  {challenges.filter((challenge) => challenge.status === "active").map((challenge) => <option value={challenge.id} key={challenge.id}>{t("destinationChallenge", { title: challenge.title })}</option>)}
+                </select>
+                <select className={pillSelect} name="expiresInDays" defaultValue="7" aria-label={t("expiresLabel")}>
+                  <option value="1">{t("expires1")}</option><option value="7">{t("expires7")}</option><option value="30">{t("expires30")}</option>
+                </select>
+                <select className={pillSelect} name="maxUses" defaultValue="1" aria-label={t("maxUsesLabel")}>
+                  {[1, 5, 10, 25, 100].map((count) => <option key={count} value={count}>{t("usesOption", { count })}</option>)}
+                </select>
               </div>
-            ) : null}
-            <div className="mt-3"><StatusMessage error={copyError} success={copySuccess} /></div>
-          </section>
-          <div className="mt-4">
-            <Disclosure summary={t("inviteUsernameLabel")}>
-              <form className="space-y-3 pb-2" onSubmit={inviteMember}>
-                <input className={inputClass} name="username" placeholder={t("inviteUsernamePlaceholder")} aria-label={t("inviteUsernameLabel")} required maxLength={33} disabled={memberBusy} spellCheck={false} />
-                <Button type="submit" disabled={memberBusy}>{memberBusy ? t("sendingInvite") : t("sendInvite")}</Button>
-                <StatusMessage error={memberError} success={memberSuccess} />
-              </form>
-            </Disclosure>
-          </div>
+              <div className="mt-4 flex justify-end"><Button type="submit" disabled={busy}>{busy ? t("generating") : t("generateLink")}</Button></div>
+              <StatusMessage error={error} />
+              {inviteUrl ? (
+                <div className="mt-4 flex items-center gap-1 rounded-full border border-[var(--line)] py-1 pl-4 pr-1">
+                  <input ref={inviteInputRef} className="min-w-0 flex-1 bg-transparent font-mono text-xs text-[var(--ink)] outline-none" value={inviteUrl} readOnly aria-label={t("inviteUrlAria")} onFocus={(event) => event.currentTarget.select()} />
+                  <Button variant="ghost" className="min-h-8 rounded-full px-3 text-xs" disabled={copyBusy} onClick={() => void copyInvite()}>{copyBusy ? t("copying") : copySuccess ? t("copied") : t("copy")}</Button>
+                </div>
+              ) : null}
+              <StatusMessage error={copyError} />
+            </form>
+          ) : (
+            <form className="mt-5" onSubmit={inviteMember}>
+              <input className={cx(pillSelect, "w-full cursor-text placeholder:text-[var(--muted)]")} name="username" placeholder={t("inviteUsernamePlaceholder")} aria-label={t("inviteUsernameLabel")} required maxLength={33} disabled={memberBusy} spellCheck={false} />
+              <div className="mt-4 flex justify-end"><Button type="submit" disabled={memberBusy}>{memberBusy ? t("sendingInvite") : t("sendInvite")}</Button></div>
+              <StatusMessage error={memberError} success={memberSuccess} />
+            </form>
+          )}
         </Dialog>
       ) : null}
 

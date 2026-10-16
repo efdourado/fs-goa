@@ -385,11 +385,10 @@
     "descriptionLabel": "Description",
     "descriptionPlaceholder": "What brings this group together?",
     "inviteTitle": "Invite people",
-    "inviteUsernameLabel": "Or invite by @username",
+    "inviteUsernameLabel": "Invite by @username",
     "inviteUsernamePlaceholder": "@handle",
     "sendingInvite": "Sending invite…",
     "sendInvite": "Send invite",
-    "inviteLinkLabel": "Invite link",
     "destinationLabel": "Destination",
     "destinationGroupOnly": "Group only",
     "destinationChallenge": "Challenge: {title}",
@@ -433,7 +432,10 @@
     "banBody": "They leave the group, everything of theirs here is erased and no invite brings them back.",
     "bannedTitle": "Banned",
     "unban": "Undo",
-    "leaveTitle": "Leave the group?"
+    "leaveTitle": "Leave the group?",
+    "inviteModeLink": "Link",
+    "inviteModeUser": "@username",
+    "usesOption": "{count, plural, one {# use} other {# uses}}"
   },
   "catalog": {
     "back": "Back",

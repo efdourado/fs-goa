@@ -385,11 +385,10 @@
     "descriptionLabel": "Descripción",
     "descriptionPlaceholder": "¿Qué reúne a este grupo?",
     "inviteTitle": "Invitar personas",
-    "inviteUsernameLabel": "O invita por @usuario",
+    "inviteUsernameLabel": "Invitar por @usuario",
     "inviteUsernamePlaceholder": "@usuario",
     "sendingInvite": "Enviando invitación…",
     "sendInvite": "Enviar invitación",
-    "inviteLinkLabel": "Enlace de invitación",
     "destinationLabel": "Destino",
     "destinationGroupOnly": "Solo el grupo",
     "destinationChallenge": "Desafío: {title}",
@@ -433,7 +432,10 @@
     "banBody": "Sale del grupo, todo lo suyo aquí se borra y ninguna invitación lo trae de vuelta.",
     "bannedTitle": "Expulsados",
     "unban": "Deshacer",
-    "leaveTitle": "¿Salir del grupo?"
+    "leaveTitle": "¿Salir del grupo?",
+    "inviteModeLink": "Enlace",
+    "inviteModeUser": "@usuario",
+    "usesOption": "{count, plural, one {# uso} other {# usos}}"
   },
   "catalog": {
     "back": "Volver",

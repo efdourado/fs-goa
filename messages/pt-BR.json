@@ -385,11 +385,10 @@
     "descriptionLabel": "Descrição",
     "descriptionPlaceholder": "O que reúne este grupo?",
     "inviteTitle": "Convidar pessoas",
-    "inviteUsernameLabel": "Ou convide por @usuário",
+    "inviteUsernameLabel": "Convidar por @usuário",
     "inviteUsernamePlaceholder": "@arroba",
     "sendingInvite": "Enviando convite…",
     "sendInvite": "Enviar convite",
-    "inviteLinkLabel": "Link de convite",
     "destinationLabel": "Destino",
     "destinationGroupOnly": "Somente o grupo",
     "destinationChallenge": "Desafio: {title}",
@@ -433,7 +432,10 @@
     "banBody": "Sai do grupo, tudo dele aqui é apagado e nenhum convite o traz de volta.",
     "bannedTitle": "Banidos",
     "unban": "Desfazer",
-    "leaveTitle": "Sair do grupo?"
+    "leaveTitle": "Sair do grupo?",
+    "inviteModeLink": "Link",
+    "inviteModeUser": "@usuário",
+    "usesOption": "{count, plural, one {# uso} other {# usos}}"
   },
   "catalog": {
     "back": "Voltar",
