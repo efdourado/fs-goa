@@ -48,7 +48,7 @@ import type {
 import { CACHE_KEYS, clearCache, readCache, writeCache } from "./goa/cache";
 import { challengeRequestBody } from "./goa/challenge-request";
 import { prefetchCatalogShelf } from "./goa/libraries";
-import { AppHeader, BackButton, Button, cardClass, cx, EmptyState, LoadingView, PageHeading } from "./goa/ui";
+import { AppHeader, BackButton, Button, cardClass, cx, EmptyState, LoadingView } from "./goa/ui";
 import { BottomDock, type DockTab, dockTabFor } from "./goa/bottom-dock";
 import { ActivityScreen } from "./goa/screens/activity";
 import { YouScreen } from "./goa/screens/you";
@@ -658,8 +658,7 @@ export default function GoaApp() {
     content = (
       <main className="mx-auto max-w-4xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
         <BackButton onClick={goUp} label={backLabel} className="mb-6" />
-        <PageHeading title={tTrash("groupTitle")} description={tTrash("groupSubtitle")} />
-        <TrashView scope={{ groupId: selectedGroup.id }} csrfToken={bootstrap.csrfToken} onChanged={() => { void refreshBootstrap(); }} />
+        <TrashView scope={{ groupId: selectedGroup.id }} csrfToken={bootstrap.csrfToken} onChanged={() => { void refreshBootstrap(); }} title={tTrash("groupTitle")} description={tTrash("groupSubtitle")} />
       </main>
     );
   } else if (screen.kind === "invite") {

@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 
 import { TrashView } from "../trash-view";
-import { BackButton, PageHeading } from "../ui";
+import { BackButton } from "../ui";
 
 export function PersonalTrashScreen({
   csrfToken,
@@ -21,8 +21,7 @@ export function PersonalTrashScreen({
   return (
     <main className="mx-auto max-w-4xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
       <BackButton onClick={onBack} label={backLabel ?? t("back")} className="mb-6" />
-      <PageHeading title={t("personalTitle")} description={t("personalSubtitle")} />
-      <TrashView scope="personal" csrfToken={csrfToken} onChanged={onChanged} />
+      <TrashView scope="personal" csrfToken={csrfToken} onChanged={onChanged} title={t("personalTitle")} />
     </main>
   );
 }

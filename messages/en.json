@@ -1627,7 +1627,6 @@
     "previewError": "Could not work out the impact.",
     "purgeError": "Could not delete for good.",
     "personalTitle": "My bin",
-    "personalSubtitle": "Groups, challenges and catalogue items you removed. They stay here until you restore them or delete them for good.",
     "groupTitle": "Group bin",
     "groupSubtitle": "Removed challenges and catalogue items. Restore or delete for good, nothing disappears on its own.",
     "emptyTitle": "Empty bin",

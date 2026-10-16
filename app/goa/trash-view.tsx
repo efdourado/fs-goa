@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { API_PATHS, apiRequest } from "./api";
 import { ConfirmDialog, Dialog } from "./dialog";
 import type { Id, TrashActionPreview, TrashItem } from "./types";
-import { Button, cardClass, cx, EmptyState, LoadingView, StatusMessage } from "./ui";
+import { Button, cardClass, cx, EmptyState, LoadingView, PageHeading, StatusMessage } from "./ui";
 
 type Scope = "personal" | { groupId: Id } | { challengeId: Id };
 
@@ -65,9 +65,7 @@ function PurgeDialog({
       <p className="text-sm text-[var(--muted)]">{t("purgeBody")}</p>
 
       {preview.blocked ? (
-        <p className="mt-3 rounded-md border border-[var(--danger-line)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]">
-          {preview.blocked.message}
-        </p>
+        <p className="mt-2 text-xs text-[var(--muted)]">{preview.blocked.message}</p>
       ) : (
         <>
           {preview.dependencies.length ? (
@@ -88,7 +86,7 @@ function PurgeDialog({
               <span className="mb-1 block text-sm">{t("confirmName", { name: preview.label })}</span>
               <input className="w-full rounded-md border border-[var(--line)] bg-transparent px-3 py-2 text-sm" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} aria-label={t("confirmName", { name: preview.label })} />
             </label>
-          ) : preview.confirmation === "count" ? (
+          ) : preview.confirmation === "count" && entries > 0 ? (
             <label className="mt-4 block">
               <span className="mb-1 block text-sm">{t("confirmCount", { count: entries })}</span>
               <input className="w-full rounded-md border border-[var(--line)] bg-transparent px-3 py-2 text-sm" inputMode="numeric" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} aria-label={t("confirmCount", { count: entries })} />
@@ -107,7 +105,7 @@ function PurgeDialog({
       <div className="mt-4"><StatusMessage error={error} /></div>
       {!preview.blocked && (
         <div className="mt-6 flex justify-end border-t border-[var(--line)] pt-4">
-          <Button variant="danger" onClick={() => onConfirm(confirmation.trim(), reason.trim())} disabled={busy}>
+          <Button variant="danger" onClick={() => onConfirm(preview.confirmation === "count" && entries === 0 ? "0" : confirmation.trim(), reason.trim())} disabled={busy}>
             {busy ? t("purging") : tc("delete")}
           </Button>
         </div>
@@ -125,9 +123,14 @@ export function TrashView({
   scope,
   csrfToken,
   onChanged,
+  title,
+  description,
 }: {
   scope: Scope;
   csrfToken: string;
+  /** The page's heading: drawn here so "Empty the bin" can sit on its line. */
+  title: string;
+  description?: string;
   onChanged?: () => void;
 }) {
   const t = useTranslations("trash");
@@ -232,9 +235,29 @@ export function TrashView({
     onChanged?.();
   }
 
+  const trashGlyph = (size: string) => (
+    <svg viewBox="0 0 16 16" className={size} fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M2.8 4.2h10.4M6.2 4.2V2.9c0-.4.3-.7.7-.7h2.2c.4 0 .7.3.7.7v1.3M4.2 4.2l.6 8.6c0 .6.5 1 1.1 1h4.2c.6 0 1.1-.4 1.1-1l.6-8.6M6.8 7v4.2M9.2 7v4.2" />
+    </svg>
+  );
+  // "Empty the bin" on the title's line: a quiet red pill with its icon, only when there's something to empty.
+  const heading = (
+    <PageHeading
+      title={title}
+      description={description}
+      action={emptyScope && rows.length ? (
+        <button type="button" onClick={() => setEmptyOpen(true)} disabled={busyId !== null} className="inline-flex min-h-10 flex-none cursor-pointer items-center gap-2 self-start rounded-full border border-[var(--danger-line)] px-4 text-sm text-[var(--danger)] transition hover:bg-[var(--danger-soft)] disabled:cursor-not-allowed disabled:opacity-55 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--danger)]/20 sm:self-auto">
+          {trashGlyph("h-4 w-4")}
+          {t("empty")}
+        </button>
+      ) : undefined}
+    />
+  );
+
   if (!rows.length) {
     return (
       <div className="space-y-3">
+        {heading}
         {kept != null ? <p className="text-xs text-[var(--muted)]">{t("emptyKept", { count: kept })}</p> : null}
         <TrashLoadState loading={items === null} error={error} onRetry={load} />
       </div>
@@ -243,15 +266,9 @@ export function TrashView({
 
   return (
     <div className="space-y-3">
+      {heading}
       <StatusMessage error={error} />
       {kept != null ? <p className="text-xs text-[var(--muted)]">{t("emptyKept", { count: kept })}</p> : null}
-      {emptyScope ? (
-        <div className="flex justify-end">
-          <Button variant="ghost" onClick={() => setEmptyOpen(true)} disabled={busyId !== null}>
-            {t("empty")}
-          </Button>
-        </div>
-      ) : null}
       <ul className={cx(cardClass, "divide-y divide-[var(--line)] overflow-hidden")}>
         {rows.map((item) => {
           const sentence = dependencySentence(item, t);
@@ -270,13 +287,14 @@ export function TrashView({
                 {item.reason ? <p className="mt-0.5 text-xs italic text-[var(--muted)]">{t("reasonShown", { reason: item.reason })}</p> : null}
                 {item.parentTrashed ? <p className="mt-0.5 text-xs text-[var(--danger)]">{t("parentTrashed")}</p> : null}
               </div>
-              <div className="flex shrink-0 gap-2">
+              <div className="flex shrink-0 items-center gap-1">
                 <Button variant="ghost" onClick={() => restore(item)} disabled={busyId === item.id || item.parentTrashed}>
                   {t("restore")}
                 </Button>
-                <Button variant="danger" onClick={() => openPurge(item)} disabled={busyId === item.id}>
-                  {t("purge")}
-                </Button>
+                {/* Permanent delete is a trash icon; its name is for screen readers and the hover tip. */}
+                <button type="button" onClick={() => openPurge(item)} disabled={busyId === item.id} aria-label={t("purge")} title={t("purge")} className="grid h-11 w-11 cursor-pointer place-items-center rounded-full text-[var(--danger)] transition hover:bg-[var(--danger-soft)] disabled:cursor-not-allowed disabled:opacity-55 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--danger)]/20">
+                  {trashGlyph("h-[22px] w-[22px]")}
+                </button>
               </div>
             </li>
           );
