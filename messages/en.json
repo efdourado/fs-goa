@@ -434,7 +434,9 @@
     "unban": "Undo",
     "leaveTitle": "Leave the group?",
     "usesOption": "{count, plural, one {# use} other {# uses}}",
-    "inviteOr": "or"
+    "inviteOr": "or",
+    "inviteLinkTitle": "Share a link with one or more people",
+    "inviteUserTitle": "Invite someone by their @username"
   },
   "catalog": {
     "back": "Back",

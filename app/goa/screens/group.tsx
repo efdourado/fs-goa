@@ -314,7 +314,8 @@ export function GroupScreen({
         <Dialog title={t("inviteTitle")} onClose={() => setShowInvite(false)} busy={busy || memberBusy}>
           {/* Two ways in, one under the other: a link (the usual way), then someone's @username. Each is a line of
               pills and its button, on the right. */}
-          <form onSubmit={createInvite}>
+          <form onSubmit={createInvite} aria-labelledby="invite-link-title">
+            <h3 id="invite-link-title" className="mb-3 text-sm font-medium">{t("inviteLinkTitle")}</h3>
             <div className="flex flex-wrap gap-2">
               <select className={cx(pillSelect, "min-w-0 flex-1 basis-56")} name="challengeId" defaultValue="" aria-label={t("destinationLabel")}>
                 <option value="">{t("destinationGroupOnly")}</option>
@@ -340,7 +341,8 @@ export function GroupScreen({
           <div className="my-5 flex items-center gap-3 text-xs text-[var(--muted)]" aria-hidden="true">
             <span className="h-px flex-1 bg-[var(--line)]" />{t("inviteOr")}<span className="h-px flex-1 bg-[var(--line)]" />
           </div>
-          <form onSubmit={inviteMember}>
+          <form onSubmit={inviteMember} aria-labelledby="invite-user-title">
+            <h3 id="invite-user-title" className="mb-3 text-sm font-medium">{t("inviteUserTitle")}</h3>
             <input className={cx(pillSelect, "w-full cursor-text placeholder:text-[var(--muted)]")} name="username" placeholder={t("inviteUsernamePlaceholder")} aria-label={t("inviteUsernameLabel")} required maxLength={33} disabled={memberBusy} spellCheck={false} />
             <div className="mt-4 flex justify-end"><Button type="submit" disabled={memberBusy}>{memberBusy ? t("sendingInvite") : t("sendInvite")}</Button></div>
             <StatusMessage error={memberError} success={memberSuccess} />

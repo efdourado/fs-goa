@@ -434,7 +434,9 @@
     "unban": "Deshacer",
     "leaveTitle": "¿Salir del grupo?",
     "usesOption": "{count, plural, one {# uso} other {# usos}}",
-    "inviteOr": "o"
+    "inviteOr": "o",
+    "inviteLinkTitle": "Comparte un enlace con una o más personas",
+    "inviteUserTitle": "Invita a alguien por su @usuario"
   },
   "catalog": {
     "back": "Volver",
