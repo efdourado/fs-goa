@@ -275,7 +275,7 @@ export function TrashView({
         {rows.map((item) => {
           const sentence = dependencySentence(item, t);
           return (
-            <li key={`${item.kind}:${item.id}`} className="flex flex-wrap items-start justify-between gap-3 px-4 py-3.5 sm:px-5">
+            <li key={`${item.kind}:${item.id}`} className="group flex flex-wrap items-start justify-between gap-3 px-4 py-3.5 transition-colors hover:bg-[var(--hover)] sm:items-center sm:px-5">
               <div className="min-w-0">
                 <p className="text-sm">
                   <span className="mr-2 rounded bg-[var(--wash)] px-1.5 py-0.5 text-[10px] text-[var(--muted)]">{t(`kind.${item.kind}`)}</span>
@@ -289,14 +289,25 @@ export function TrashView({
                 {item.reason ? <p className="mt-0.5 text-xs italic text-[var(--muted)]">{t("reasonShown", { reason: item.reason })}</p> : null}
                 {item.parentTrashed ? <p className="mt-0.5 text-xs text-[var(--danger)]">{t("parentTrashed")}</p> : null}
               </div>
-              {/* On a phone the two are the row's footer, side by side across it; from sm: up, at its right. */}
-              <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:shrink-0">
+              {/* On a phone (no hover) the two are the row's footer, side by side across it. */}
+              <div className="grid w-full grid-cols-2 gap-2 sm:hidden">
                 <Button variant="secondary" onClick={() => restore(item)} disabled={busyId === item.id || item.parentTrashed}>
                   {t("restore")}
                 </Button>
                 <Button variant="danger" onClick={() => openPurge(item)} disabled={busyId === item.id}>
                   {t("purge")}
                 </Button>
+              </div>
+              {/* From sm: up, two quiet words that fade in on the row's hover (or focus); Excluir reddens only under the pointer.
+                  A touch screen, with no hover to wait for, shows them. */}
+              <div className="hidden flex-none items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 sm:flex [@media(hover:none)]:opacity-100">
+                <button type="button" onClick={() => restore(item)} disabled={busyId === item.id || item.parentTrashed} className="cursor-pointer px-1 py-1.5 text-[13px] text-[var(--muted)] transition hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50">
+                  {t("restore")}
+                </button>
+                <span className="text-[var(--line)]" aria-hidden="true">·</span>
+                <button type="button" onClick={() => openPurge(item)} disabled={busyId === item.id} className="cursor-pointer px-1 py-1.5 text-[13px] text-[var(--muted)] transition hover:text-[var(--danger)] disabled:cursor-not-allowed disabled:opacity-50">
+                  {t("purge")}
+                </button>
               </div>
             </li>
           );
