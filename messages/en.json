@@ -1256,13 +1256,12 @@
     "detailLoading": "Loading template…",
     "duplicateCta": "Duplicate",
     "signInToDuplicate": "Sign in to duplicate",
-    "errNameGroup": "Give the new group a name.",
     "errPickGroup": "Choose a destination group.",
-    "duplicateBody": "Creates a draft in the chosen group.",
+    "duplicateBody": "Creates a draft.",
     "copyModeLabel": "What to copy",
     "copyModeItems": "Structure + items",
     "copyModeStructure": "Structure only",
-    "copyModeHint": "You get a fresh copy: no one's entries, people or invites come with it, and it won't change if the original does.",
+    "copyModeHint": "No one's entries, people or invites come with it.",
     "duplicating": "Duplicating…",
     "duplicateSubmit": "Duplicate template",
     "duplicateAria": "Duplicate template",
@@ -1291,8 +1290,7 @@
     "factFields": "{count, plural, one {field} other {fields}}",
     "whereLabel": "Where it goes",
     "whereExisting": "A group of mine",
-    "whereNew": "A new group",
-    "newGroupNamePlaceholder": "Name the new group"
+    "whereMine": "Just me"
   },
   "invite": {
     "verifying": "Checking the invite…",

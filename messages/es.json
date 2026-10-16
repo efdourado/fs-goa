@@ -1256,13 +1256,12 @@
     "detailLoading": "Cargando plantilla…",
     "duplicateCta": "Duplicar",
     "signInToDuplicate": "Entrar para duplicar",
-    "errNameGroup": "Ponle un nombre al nuevo grupo.",
     "errPickGroup": "Elige un grupo de destino.",
-    "duplicateBody": "Crea un borrador en el grupo elegido.",
+    "duplicateBody": "Crea un borrador.",
     "copyModeLabel": "Qué copiar",
     "copyModeItems": "Estructura + ítems",
     "copyModeStructure": "Solo la estructura",
-    "copyModeHint": "Recibes una copia nueva: no vienen registros, personas ni invitaciones, y no cambia si el original cambia.",
+    "copyModeHint": "No vienen registros, personas ni invitaciones.",
     "duplicating": "Duplicando…",
     "duplicateSubmit": "Duplicar plantilla",
     "duplicateAria": "Duplicar plantilla",
@@ -1291,8 +1290,7 @@
     "factFields": "{count, plural, one {campo} other {campos}}",
     "whereLabel": "Adónde va",
     "whereExisting": "Un grupo mío",
-    "whereNew": "Un grupo nuevo",
-    "newGroupNamePlaceholder": "Nombre del grupo nuevo"
+    "whereMine": "Solo yo"
   },
   "invite": {
     "verifying": "Verificando invitación…",

@@ -1033,6 +1033,16 @@ test("modelos públicos: publica, lista, detalha sem sessão e duplica para um g
   });
   assert.equal(notMyGroup.response.status, 404, "não dá para duplicar num grupo que você não administra");
 
+  // "Só eu": a cópia vai para o espaço pessoal de quem duplica, criado na hora se ainda não existe.
+  const toMySpace = await call("POST", `/api/templates/${challengeId}/duplicate`, { session: stranger, body: { target: "personal" } });
+  assert.equal(toMySpace.response.status, 201, JSON.stringify(toMySpace.body));
+  const mySpaceRow = await adminPool.query<{ kind: string; owner_user_id: string }>(
+    "SELECT g.kind, g.owner_user_id FROM challenges c JOIN groups g ON g.id = c.group_id WHERE c.id = $1",
+    [(toMySpace.body as { challengeId: string }).challengeId],
+  );
+  assert.equal(mySpaceRow.rows[0]?.kind, "personal");
+  assert.equal(mySpaceRow.rows[0]?.owner_user_id, stranger.user.id);
+
   const unpublished = await call("DELETE", `/api/challenges/${challengeId}/template`, { session: adminSession });
   assert.equal(unpublished.response.status, 200, JSON.stringify(unpublished.body));
   const galleryAfter = await call("GET", "/api/templates");

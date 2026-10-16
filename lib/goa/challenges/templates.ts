@@ -3,6 +3,7 @@ import { inTransaction, oneOrNull, withClient } from "../../db";
 import { challengeAccess, writeAudit } from "../../goa-domain";
 import { ApiError, stringValue } from "../../http";
 import { assertUnder, LIMITS } from "../../limits";
+import { ensurePersonalWorkspace } from "../domain/challenges";
 import { parseRuleSections } from "../domain/rules";
 import { copyChallengeStructure, readCopyMode } from "./copy";
 import { buildChallengeDetail, type DetailChallengeRow } from "./detail";
@@ -216,7 +217,11 @@ export async function duplicateTemplate(
   challengeId: string,
   body: Record<string, unknown>,
 ) {
-  const targetGroupId = stringValue(body, "targetGroupId", { min: 1, max: 100 })!;
+  // `target: "personal"` copies into the caller's own space (made on first use) instead of a group.
+  const personal = body.target === "personal";
+  const targetGroupId = personal
+    ? await ensurePersonalWorkspace(session.user.id)
+    : stringValue(body, "targetGroupId", { min: 1, max: 100 })!;
   return inTransaction(async (client) => {
     const template = await oneOrNull<{ id: string; group_id: string; title: string; recipe_key: string | null }>(
       client,
@@ -234,9 +239,10 @@ export async function duplicateTemplate(
     const targetGroup = await oneOrNull<{ id: string }>(
       client,
       `SELECT id FROM groups
-        WHERE id = $1 AND kind = 'standard' AND archived_at IS NULL AND deleted_at IS NULL
+        WHERE id = $1 AND archived_at IS NULL AND deleted_at IS NULL
+          AND (kind = 'standard' OR (kind = 'personal' AND owner_user_id = $2))
         FOR UPDATE`,
-      [targetGroupId],
+      [targetGroupId, session.user.id],
     );
     if (!targetGroup) throw new ApiError(404, "not_found", "Grupo de destino não encontrado.");
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 
 import { API_PATHS, apiRequest } from "../api";
 import { SkippedPropertiesNotice } from "../copy-notice";
@@ -195,14 +195,11 @@ export function TemplateDetailScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [challengeId]);
 
-  // The copy dialog: what comes along, then where it lands (a group you run, or a new one named here).
+  // The copy dialog: what comes along, then where it lands (a group you run, or just you).
   const [copyMode, setCopyMode] = useState<"structure_and_items" | "structure">("structure_and_items");
-  const [where, setWhere] = useState<"existing" | "new">(manageable.length ? "existing" : "new");
+  const [where, setWhere] = useState<"personal" | "existing">("personal");
   const [targetId, setTargetId] = useState<Id>(manageable[0]?.id ?? "");
-  const [newGroupName, setNewGroupName] = useState("");
-  // A group made for this copy is kept if the copy itself fails, so trying again doesn't make a second one.
-  const madeGroup = useRef<{ name: string; id: Id } | null>(null);
-  const ready = where === "existing" ? Boolean(targetId) : newGroupName.trim().length > 0;
+  const ready = where === "personal" || Boolean(targetId);
 
   async function duplicate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -210,20 +207,12 @@ export function TemplateDetailScreen({
     setBusy(true);
     setCopyError(null);
     try {
-      let targetGroupId = targetId;
-      if (where === "new") {
-        const name = newGroupName.trim();
-        if (!name) throw new Error(t("errNameGroup"));
-        if (madeGroup.current?.name !== name) {
-          const created = await apiRequest<{ id: Id }>(API_PATHS.groups, { method: "POST", body: { name }, csrfToken });
-          madeGroup.current = { name, id: created.id };
-        }
-        targetGroupId = madeGroup.current.id;
-      }
-      if (!targetGroupId) throw new Error(t("errPickGroup"));
+      const targetGroupId = where === "existing" ? targetId : null;
+      if (where === "existing" && !targetGroupId) throw new Error(t("errPickGroup"));
       const result = await apiRequest<{ challengeId: Id; skippedProperties?: SkippedProperty[] }>(API_PATHS.templateDuplicate(challengeId), {
         method: "POST",
-        body: { targetGroupId, mode: copyMode },
+        // "Just me": the server puts it in your own space (no group, no invites).
+        body: where === "personal" ? { target: "personal", mode: copyMode } : { targetGroupId, mode: copyMode },
         csrfToken,
       });
       if (result.skippedProperties?.length) setCopied({ challengeId: result.challengeId, skippedProperties: result.skippedProperties });
@@ -334,26 +323,21 @@ export function TemplateDetailScreen({
             </div>
             <div>
               <p className={labelClass}>{t("whereLabel")}</p>
-              {manageable.length ? (
-                <SelectableCards
-                  value={where}
-                  onChange={setWhere}
-                  disabled={busy}
-                  options={[
-                    { value: "existing", label: t("whereExisting") },
-                    { value: "new", label: t("whereNew") },
-                  ]}
-                />
+              <SelectableCards
+                value={where}
+                onChange={setWhere}
+                disabled={busy}
+                options={[
+                  // Just you first (and picked); a group only when you run one.
+                  { value: "personal" as const, label: t("whereMine") },
+                  ...(manageable.length ? [{ value: "existing" as const, label: t("whereExisting") }] : []),
+                ]}
+              />
+              {where === "existing" ? (
+                <select className={cx(inputClass, "mt-3")} value={targetId} onChange={(event) => setTargetId(event.target.value)} aria-label={t("whereExisting")} disabled={busy}>
+                  {manageable.map((group) => <option key={group.id} value={group.id}>{group.kind === "personal" ? tm("personal") : group.name}</option>)}
+                </select>
               ) : null}
-              <div className={manageable.length ? "mt-3" : undefined}>
-                {where === "existing" ? (
-                  <select className={inputClass} value={targetId} onChange={(event) => setTargetId(event.target.value)} aria-label={t("whereExisting")} disabled={busy}>
-                    {manageable.map((group) => <option key={group.id} value={group.id}>{group.kind === "personal" ? tm("personal") : group.name}</option>)}
-                  </select>
-                ) : (
-                  <input className={inputClass} value={newGroupName} onChange={(event) => setNewGroupName(event.target.value)} placeholder={t("newGroupNamePlaceholder")} aria-label={t("newGroupNamePlaceholder")} required maxLength={120} disabled={busy} />
-                )}
-              </div>
             </div>
             <StatusMessage error={copyError} />
             <div className="flex justify-end border-t border-[var(--line)] pt-4">
