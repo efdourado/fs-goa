@@ -1290,7 +1290,9 @@
     "factFields": "{count, plural, one {campo} other {campos}}",
     "whereLabel": "¿Adónde va?",
     "whereExisting": "Un grupo mío",
-    "whereMine": "Solo yo"
+    "whereMine": "Solo yo",
+    "whereMineHint": "Un desafío personal, solo lo ves tú.",
+    "whereExistingHint": "Compartido con un grupo que administras."
   },
   "invite": {
     "verifying": "Verificando invitación…",

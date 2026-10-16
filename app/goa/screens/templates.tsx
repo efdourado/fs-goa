@@ -328,8 +328,8 @@ export function TemplateDetailScreen({
                 disabled={busy}
                 options={[
                   // Just you first (and picked); a group only when you run one.
-                  { value: "personal" as const, label: t("whereMine") },
-                  ...(manageable.length ? [{ value: "existing" as const, label: t("whereExisting") }] : []),
+                  { value: "personal" as const, label: t("whereMine"), hint: t("whereMineHint") },
+                  ...(manageable.length ? [{ value: "existing" as const, label: t("whereExisting"), hint: t("whereExistingHint") }] : []),
                 ]}
               />
               {where === "existing" ? (

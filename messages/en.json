@@ -1290,7 +1290,9 @@
     "factFields": "{count, plural, one {field} other {fields}}",
     "whereLabel": "Where does it go?",
     "whereExisting": "A group of mine",
-    "whereMine": "Just me"
+    "whereMine": "Just me",
+    "whereMineHint": "A personal challenge, only you see it.",
+    "whereExistingHint": "Shared with a group you run."
   },
   "invite": {
     "verifying": "Checking the invite…",
