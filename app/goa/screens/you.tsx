@@ -18,7 +18,7 @@ const stroke = { fill: "none", stroke: "currentColor", strokeWidth: 1.6, strokeL
 const ICONS = {
   account: <svg viewBox="0 0 24 24" className={iconClass} {...stroke}><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="10" r="3" /><path d="M6.6 18.2c1.2-2.2 3.1-3.3 5.4-3.3s4.2 1.1 5.4 3.3" /></svg>,
   catalog: <svg viewBox="0 0 24 24" className={iconClass} {...stroke}><circle cx="8" cy="8" r="3.5" /><circle cx="16" cy="8" r="3.5" /><circle cx="8" cy="16" r="3.5" /><circle cx="16" cy="16" r="3.5" /></svg>,
-  trash: <svg viewBox="0 0 24 24" className={iconClass} {...stroke}><circle cx="12" cy="12" r="8.5" /><path d="M9 9l6 6M15 9l-6 6" /></svg>,
+  trash: <svg viewBox="0 0 24 24" className={iconClass} {...stroke}><path d="M4.5 6.5h15M9.5 6.5V5a1.5 1.5 0 0 1 1.5-1.5h2A1.5 1.5 0 0 1 14.5 5v1.5M6.5 6.5l.8 12a2 2 0 0 0 2 1.9h5.4a2 2 0 0 0 2-1.9l.8-12M10.2 10.5v6M13.8 10.5v6" /></svg>,
   about: <svg viewBox="0 0 24 24" className={iconClass} {...stroke}><circle cx="12" cy="12" r="8.5" /><path d="M12 11v5M12 8h.01" /></svg>,
   contact: <svg viewBox="0 0 24 24" className={iconClass} {...stroke}><path d="M12 4c4.4 0 8 2.9 8 6.6s-3.6 6.6-8 6.6c-.9 0-1.8-.1-2.6-.4L5 19l1.1-3.4C4.8 14.4 4 12.6 4 10.6 4 6.9 7.6 4 12 4Z" /></svg>,
   admin: <svg viewBox="0 0 24 24" className={iconClass} {...stroke}><path d="M12 3.5 19 6v5.5c0 4.3-3 7.6-7 9-4-1.4-7-4.7-7-9V6z" /></svg>,
