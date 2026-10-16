@@ -240,13 +240,13 @@ export function TrashView({
       <path d="M2.8 4.2h10.4M6.2 4.2V2.9c0-.4.3-.7.7-.7h2.2c.4 0 .7.3.7.7v1.3M4.2 4.2l.6 8.6c0 .6.5 1 1.1 1h4.2c.6 0 1.1-.4 1.1-1l.6-8.6M6.8 7v4.2M9.2 7v4.2" />
     </svg>
   );
-  // "Empty the bin" on the title's line: just red text, only when there's something to empty.
+  // "Empty the bin" on the title's line: small quiet text, only when there's something to empty.
   const heading = (
     <PageHeading
       title={title}
       description={description}
       action={emptyScope && rows.length ? (
-        <button type="button" onClick={() => setEmptyOpen(true)} disabled={busyId !== null} className="min-h-10 flex-none cursor-pointer self-start text-sm text-[var(--danger)] transition hover:opacity-75 disabled:cursor-not-allowed disabled:opacity-55 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--danger)]/20 sm:self-auto">
+        <button type="button" onClick={() => setEmptyOpen(true)} disabled={busyId !== null} className="min-h-9 flex-none cursor-pointer self-start text-xs text-[var(--muted)] transition hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-55 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/20 sm:self-auto">
           {t("empty")}
         </button>
       ) : undefined}
