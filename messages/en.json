@@ -1262,7 +1262,7 @@
     "copyModeLabel": "What to copy",
     "copyModeItems": "Structure + items",
     "copyModeStructure": "Structure only",
-    "copyModeHint": "Either way, no one's answers, Done state, private comments, members or invitations come across, and recommendation names are never copied. You start uncompleted, and later changes to the original never touch your copy.",
+    "copyModeHint": "You get a fresh copy: no one's entries, people or invites come with it, and it won't change if the original does.",
     "targetGroupLabel": "Destination group",
     "newGroupOption": "+ Create a new group",
     "newGroupNameLabel": "New group name (if you're creating one)",

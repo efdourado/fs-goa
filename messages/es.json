@@ -1262,7 +1262,7 @@
     "copyModeLabel": "Qué copiar",
     "copyModeItems": "Estructura + ítems",
     "copyModeStructure": "Solo la estructura",
-    "copyModeHint": "En ambos casos, no pasan respuestas, marcas de completado, comentarios privados, miembros ni invitaciones, y los nombres de quien recomendó nunca se copian. Empiezas desde cero, y los cambios posteriores en el original no tocan tu copia.",
+    "copyModeHint": "Recibes una copia nueva: no vienen registros, personas ni invitaciones, y no cambia si el original cambia.",
     "targetGroupLabel": "Grupo de destino",
     "newGroupOption": "+ Crear un grupo nuevo",
     "newGroupNameLabel": "Nombre del nuevo grupo (si vas a crear uno)",
