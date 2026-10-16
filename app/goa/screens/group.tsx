@@ -12,7 +12,7 @@ import { catalogCardHeight, CatalogTile, resolveCoverTop } from "../catalog-view
 import { LibraryGlyph, useCatalogShelf, useLibraryName } from "../libraries";
 import { Rail, RailArrows, ShelfAddButton, shelfCardWidth, useShelfRail } from "../shelf";
 import type { CatalogItem, ChallengeSummary, GroupInviteResult, GroupSummary, Id, Member, PendingGroupRequest } from "../types";
-import { AvatarMark, BackButton, Button, cx, EmptyState, Field, inputClass, SlidersIcon, StatusMessage, Toggle } from "../ui";
+import { AvatarMark, BackButton, Button, cx, Disclosure, EmptyState, Field, inputClass, SlidersIcon, StatusMessage, Toggle } from "../ui";
 import { canManage, formatRuntime } from "../utils";
 import { ActiveChallengeCard } from "./dashboard";
 
@@ -309,19 +309,14 @@ export function GroupScreen({
 
       {showInvite ? (
         <Dialog title={t("inviteTitle")} onClose={() => setShowInvite(false)} busy={busy || memberBusy}>
-          <p className="text-sm leading-6 text-[var(--muted)]">{t("inviteBody")}</p>
-          <form className="mt-4 space-y-3" onSubmit={inviteMember}>
-            <Field label={t("inviteUsernameLabel")}><input className={inputClass} name="username" placeholder={t("inviteUsernamePlaceholder")} required maxLength={33} disabled={memberBusy} spellCheck={false} /></Field>
-            <Button type="submit" variant="secondary" disabled={memberBusy}>{memberBusy ? t("sendingInvite") : t("sendInvite")}</Button>
-            <StatusMessage error={memberError} success={memberSuccess} />
-          </form>
-          <div className="mt-6 border-t border-[var(--line)] pt-5">
-            <p className="text-[13px] font-medium">{t("inviteLinkLabel")}</p>
-            <p className="mt-1 text-xs leading-5 text-[var(--muted)]">{t("inviteLinkBody")}</p>
-            <form id="invite-link-form" className="mt-3 grid gap-3 sm:grid-cols-2" onSubmit={createInvite}>
-              <Field label={t("destinationLabel")} className="sm:col-span-2"><select className={inputClass} name="challengeId" defaultValue=""><option value="">{t("destinationGroupOnly")}</option>{challenges.filter((challenge) => challenge.status === "active").map((challenge) => <option value={challenge.id} key={challenge.id}>{t("destinationChallenge", { title: challenge.title })}</option>)}</select></Field>
+          {/* Two ways in, one action each: a link first (the usual way), @username folded underneath. */}
+          <section>
+            <h3 className="text-[13px] font-medium">{t("inviteLinkLabel")}</h3>
+            <form className="mt-3 grid grid-cols-2 gap-3" onSubmit={createInvite}>
+              <Field label={t("destinationLabel")} className="col-span-2"><select className={inputClass} name="challengeId" defaultValue=""><option value="">{t("destinationGroupOnly")}</option>{challenges.filter((challenge) => challenge.status === "active").map((challenge) => <option value={challenge.id} key={challenge.id}>{t("destinationChallenge", { title: challenge.title })}</option>)}</select></Field>
               <Field label={t("expiresLabel")}><select className={inputClass} name="expiresInDays" defaultValue="7"><option value="1">{t("expires1")}</option><option value="7">{t("expires7")}</option><option value="30">{t("expires30")}</option></select></Field>
               <Field label={t("maxUsesLabel")}><input className={inputClass} name="maxUses" type="number" min={1} max={100} defaultValue={1} /></Field>
+              <div className="col-span-2"><Button type="submit" disabled={busy}>{busy ? t("generating") : t("generateLink")}</Button></div>
             </form>
             <div className="mt-3"><StatusMessage error={error} /></div>
             {inviteUrl ? (
@@ -331,9 +326,16 @@ export function GroupScreen({
               </div>
             ) : null}
             <div className="mt-3"><StatusMessage error={copyError} success={copySuccess} /></div>
+          </section>
+          <div className="mt-4">
+            <Disclosure summary={t("inviteUsernameLabel")}>
+              <form className="space-y-3 pb-2" onSubmit={inviteMember}>
+                <input className={inputClass} name="username" placeholder={t("inviteUsernamePlaceholder")} aria-label={t("inviteUsernameLabel")} required maxLength={33} disabled={memberBusy} spellCheck={false} />
+                <Button type="submit" disabled={memberBusy}>{memberBusy ? t("sendingInvite") : t("sendInvite")}</Button>
+                <StatusMessage error={memberError} success={memberSuccess} />
+              </form>
+            </Disclosure>
           </div>
-          {/* The dialog ends on its one action; closing is the ⊖ at the top. */}
-          <div className="mt-6 flex justify-end border-t border-[var(--line)] pt-4"><Button type="submit" form="invite-link-form" disabled={busy}>{busy ? t("generating") : t("generateLink")}</Button></div>
         </Dialog>
       ) : null}
 
