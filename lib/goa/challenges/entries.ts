@@ -29,6 +29,8 @@ import type { FieldRow } from "./types";
 import { moveToTrash } from "../trash";
 
 interface StorageField extends FieldRow {
+  /** When the field was added: an entry made before it doesn't have to answer it, even if it's required. */
+  created_at: Date;
   option_ids: string[];
 }
 
@@ -42,9 +44,9 @@ interface EntryValueInsert {
 }
 
 async function storageFields(client: PoolClient, challengeId: string, entryTypeId: string): Promise<StorageField[]> {
-  const fields = await client.query<FieldRow>(
+  const fields = await client.query<FieldRow & { created_at: Date }>(
     `SELECT id,challenge_id,entry_type_id,semantic_key,label,help_text,kind,required,position,
-            number_scale,min_scaled,max_scaled,step_scaled,max_length,settings
+            number_scale,min_scaled,max_scaled,step_scaled,max_length,settings,created_at
        FROM challenge_fields WHERE challenge_id=$1 AND entry_type_id=$2 AND archived_at IS NULL
       ORDER BY position`,
     [challengeId, entryTypeId],
@@ -95,6 +97,8 @@ async function writeEntryValues(
   entryTypeId: string,
   fields: StorageField[],
   rawValues: unknown,
+  /** An existing entry's creation time: a required field added after it is optional for it (an old workout stays editable). */
+  entryCreatedAt?: Date | null,
 ): Promise<Record<string, unknown>> {
   const values = asRecord(rawValues);
   const knownKeys = new Set(fields.flatMap((field) => [field.id, field.semantic_key]));
@@ -105,7 +109,9 @@ async function writeEntryValues(
   const presentFieldIds: string[] = [];
   for (const field of fields) {
     const candidate = Object.hasOwn(values, field.id) ? values[field.id] : values[field.semantic_key];
-    const validation = validateFieldValue(fieldDefinition(field), candidate);
+    const definition = fieldDefinition(field);
+    if (entryCreatedAt && field.created_at > entryCreatedAt) definition.required = false;
+    const validation = validateFieldValue(definition, candidate);
     if (!validation.ok) {
       throw new ApiError(400, "invalid_entry_value", `${field.label}: ${validation.message}`, { fieldId: field.id, code: validation.code });
     }
@@ -209,9 +215,10 @@ async function saveChildren(
   children: ChildInput[],
 ): Promise<Array<{ id: string; itemId: string; values: Record<string, unknown> }>> {
   const fields = await storageFields(client, ctx.challengeId, ctx.childType.id);
-  const existing = await client.query<{ id: string }>(
-    "SELECT id FROM entries WHERE parent_entry_id=$1 AND deleted_at IS NULL FOR UPDATE", [ctx.parentId]);
+  const existing = await client.query<{ id: string; created_at: Date }>(
+    "SELECT id,created_at FROM entries WHERE parent_entry_id=$1 AND deleted_at IS NULL FOR UPDATE", [ctx.parentId]);
   const existingIds = new Set(existing.rows.map((row) => row.id));
+  const createdAt = new Map(existing.rows.map((row) => [row.id, row.created_at]));
   const kept = new Set<string>();
   const saved: Array<{ id: string; itemId: string; values: Record<string, unknown> }> = [];
   for (const child of children) {
@@ -235,7 +242,7 @@ async function saveChildren(
           ctx.participantId, ctx.parentId, ctx.occurredOn, ctx.actorId]);
     }
     kept.add(entryId);
-    const values = await writeEntryValues(client, entryId, ctx.challengeId, ctx.childType.id, fields, child.values);
+    const values = await writeEntryValues(client, entryId, ctx.challengeId, ctx.childType.id, fields, child.values, createdAt.get(entryId) ?? null);
     saved.push({ id: entryId, itemId: child.itemId, values });
   }
   await purgeEntryRows(client, [...existingIds].filter((id) => !kept.has(id)));
@@ -584,10 +591,10 @@ export async function updateEntry(
       id: string; challenge_id: string; entry_type_id: string; participant_user_id: string | null;
       item_id: string | null; purpose: string | null; answer_scope: "individual" | "shared"; parent_entry_id: string | null;
       shared_edit_policy: "members_fill_admin_corrects" | "members_can_edit" | null;
-      updated_at: Date; group_id: string; status: "draft" | "active" | "closed"; time_zone: string | null;
+      updated_at: Date; created_at: Date; group_id: string; status: "draft" | "active" | "closed"; time_zone: string | null;
     }>(client,
       `SELECT e.id,e.challenge_id,e.entry_type_id,e.participant_user_id,e.item_id,t.purpose,e.parent_entry_id,
-              e.answer_scope,t.shared_edit_policy,e.updated_at,c.group_id,c.status,c.time_zone
+              e.answer_scope,t.shared_edit_policy,e.updated_at,e.created_at,c.group_id,c.status,c.time_zone
          FROM entries e JOIN challenges c ON c.id=e.challenge_id
          JOIN entry_types t ON t.id=e.entry_type_id
         WHERE e.id=$1 AND e.deleted_at IS NULL AND c.deleted_at IS NULL FOR UPDATE`, [entryId]);
@@ -628,7 +635,7 @@ export async function updateEntry(
         await client.query("UPDATE entries SET occurred_on=$2 WHERE id=$1 OR parent_entry_id=$1", [entryId, occurredOn]);
       }
       const visitFields = await storageFields(client, entry.challenge_id, entry.entry_type_id);
-      const visitValues = body.values === undefined ? {} : await writeEntryValues(client, entryId, entry.challenge_id, entry.entry_type_id, visitFields, body.values);
+      const visitValues = body.values === undefined ? {} : await writeEntryValues(client, entryId, entry.challenge_id, entry.entry_type_id, visitFields, body.values, entry.created_at);
       let savedChildren: Awaited<ReturnType<typeof saveChildren>> | undefined;
       if (Object.hasOwn(body, "children")) {
         const children = parseChildren(body.children);
@@ -650,7 +657,7 @@ export async function updateEntry(
       }
     }
     const fields = await storageFields(client, entry.challenge_id, entry.entry_type_id);
-    const values = await writeEntryValues(client, entryId, entry.challenge_id, entry.entry_type_id, fields, body.values);
+    const values = await writeEntryValues(client, entryId, entry.challenge_id, entry.entry_type_id, fields, body.values, entry.created_at);
     await client.query("UPDATE entries SET last_edited_by_user_id=$2,updated_at=now() WHERE id=$1", [entryId, session.user.id]);
     return { id: entryId, values };
   });

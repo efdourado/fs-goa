@@ -257,9 +257,12 @@ export async function saveChallengeFields(
           }
         }
         if (field.required === true) {
+          // Only entries made since the field exists can be "incomplete": the ones before it never had it to
+          // answer (adding "Carga 2" to a workout doesn't spoil the workouts already logged).
           const missing = await oneOrNull<{ count: number }>(client,
             `SELECT count(*)::int AS count FROM entries e
               WHERE e.entry_type_id = $1 AND e.deleted_at IS NULL
+                AND e.created_at >= (SELECT created_at FROM challenge_fields WHERE id = $2)
                 AND NOT EXISTS (SELECT 1 FROM entry_values ev WHERE ev.entry_id = e.id AND ev.field_id = $2)`,
             [entryType.id, field.id]);
           if (missing && missing.count > 0) {

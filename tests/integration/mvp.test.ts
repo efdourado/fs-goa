@@ -6219,6 +6219,49 @@ test("A: tornar um campo obrigatório com registros incompletos é recusado", as
   assert.equal((forceRequired.body as { error: string }).error, "required_would_invalidate");
 });
 
+test("A: um campo obrigatório novo não trava o desafio pelos registros feitos antes dele", async () => {
+  const owner = await register("A Carga2", "a_carga_dois");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube A4" } })).body as { id: string }).id;
+  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
+    session: owner, body: { recipe: "cinema", title: "Mais séries", participantIds: [owner.user.id], items: [{ title: "F" }, { title: "G" }] },
+  });
+  const challengeId = (challenge.body as { id: string }).id;
+  const detail = async () => (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+    entryTypes: Array<{ id: string; purpose: string }>;
+    fields: Array<{ id: string; key: string; type: string; required: boolean }>;
+    items: Array<{ id: string }>;
+  };
+  const d = await detail();
+  const rating = d.entryTypes.find((t) => t.purpose === "rating")!;
+  const nota = d.fields.find((f) => f.key === "nota")!;
+  const comentario = d.fields.find((f) => f.key === "comentario")!;
+  await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });
+  const old = await call("POST", `/api/challenges/${challengeId}/entries`, { session: owner, body: { itemId: d.items[0].id, entryTypeId: rating.id, values: { [nota.id]: 4 } } });
+  const oldId = (old.body as { id: string }).id;
+
+  const keep = [
+    { id: nota.id, key: "nota", label: "Nota", type: "rating", required: true },
+    { id: comentario.id, key: "comentario", label: "Comentário", type: "text", required: false },
+  ];
+  // 1º: o campo novo nasce obrigatório…
+  const added = await call("POST", `/api/challenges/${challengeId}/fields`, {
+    session: owner, body: { entryTypeId: rating.id, replace: true, archiveMissing: true, fields: [...keep, { key: "carga_2", label: "Carga 2", type: "number", required: true }] },
+  });
+  assert.equal(added.response.status < 300, true, JSON.stringify(added.body));
+  const carga = (await detail()).fields.find((f) => f.key === "carga_2")!;
+  // …2º: salvar o modelo de novo (já com o id) não pode acusar o registro antigo, que é de antes do campo.
+  const again = await call("POST", `/api/challenges/${challengeId}/fields`, {
+    session: owner, body: { entryTypeId: rating.id, replace: true, archiveMissing: true, fields: [...keep, { id: carga.id, key: "carga_2", label: "Carga 2", type: "number", required: true }] },
+  });
+  assert.equal(again.response.status < 300, true, JSON.stringify(again.body));
+  // O registro antigo continua editável sem o campo novo…
+  const edited = await call("PATCH", `/api/entries/${oldId}`, { session: owner, body: { values: { [nota.id]: 5 } } });
+  assert.equal(edited.response.status < 300, true, JSON.stringify(edited.body));
+  // …mas um registro novo precisa dele.
+  const fresh = await call("POST", `/api/challenges/${challengeId}/entries`, { session: owner, body: { itemId: d.items[1].id, entryTypeId: rating.id, values: { [nota.id]: 3 } } });
+  assert.equal(fresh.response.status, 400, JSON.stringify(fresh.body));
+});
+
 test("A: item adicionado depois numa Estante entra como livro, não filme", async () => {
   const owner = await register("A Estante", "a_estante");
   const created = await call("POST", "/api/personal/challenges", {

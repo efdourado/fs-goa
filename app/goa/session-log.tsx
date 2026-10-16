@@ -244,6 +244,14 @@ export function SessionLog({
   }, [entries, spec.record.id, userId]);
   const ownRecords = useMemo(() => [...recordsByVisit.values()].flat(), [recordsByVisit]);
   const sortedRecords = (visitId: Id) => (recordsByVisit.get(visitId) ?? []).slice().sort((a, b) => (a.submittedAt ?? "").localeCompare(b.submittedAt ?? ""));
+  // A saved record without a required field was made before that field existed (a later one could never be saved
+  // without it): there the field is optional, so adding "Carga 2" to the template never locks an old workout.
+  const savedValues = useMemo(() => new Map([...recordsByVisit.values()].flat().map((record) => [record.id, valuesAsRecord(record.values)])), [recordsByVisit]);
+  const requiredFor = (fields: ChallengeField[], saved: Record<Id, unknown> | undefined) => (saved
+    ? fields.filter((field) => !field.required || !field.id || (saved[field.id] !== undefined && saved[field.id] !== null && saved[field.id] !== ""))
+    : fields);
+  const rowGap = (row: Row) => findMissingRequiredField(requiredFor(recordFields, row.id ? savedValues.get(row.id) : undefined), row.values);
+  const visitGapOf = (visit: Entry | null | undefined, values: Record<Id, unknown>) => findMissingRequiredField(requiredFor(visitFields, visit ? valuesAsRecord(visit.values) : undefined), values);
 
   // Newest first within a day: a day with two check-ins opens the latest.
   const visitsByDay = useMemo(() => {
@@ -356,7 +364,7 @@ export function SessionLog({
       return { ...row, id: match.id };
     });
     setRows(next);
-    if (next.some((row) => findMissingRequiredField(recordFields, row.values))) {
+    if (next.some((row) => rowGap(row))) {
       writeDraft(latest.current.day, { visitId: visit.id, rows: next.map(({ id, itemId, values }) => ({ id, itemId, values })), visitValues: latest.current.visitValues });
     }
     awaiting.current = false;
@@ -371,8 +379,8 @@ export function SessionLog({
     if (saving.current || awaiting.current) { retry.current = true; return; }
     const { rows: current, visitValues: values, editing: visit, occurredOn: on, day: onDay, visitsByDay: byDay } = latest.current;
     if (!current.length) { setSaveState("idle"); return; }
-    const complete = current.filter((row) => row.itemId && !findMissingRequiredField(recordFields, row.values));
-    if (!complete.length || findMissingRequiredField(visitFields, values)) { setSaveState("incomplete"); return; }
+    const complete = current.filter((row) => row.itemId && !rowGap(row));
+    if (!complete.length || visitGapOf(visit, values)) { setSaveState("incomplete"); return; }
     saving.current = true;
     setSaveState("saving");
     try {
@@ -531,8 +539,8 @@ export function SessionLog({
     }).filter(Boolean).join(" · ");
   };
   // What the draft still needs, said plainly: "Supino · Repetições".
-  const firstGap = rows.map((row) => ({ row, missing: findMissingRequiredField(recordFields, row.values) })).find((candidate) => candidate.missing);
-  const visitGap = findMissingRequiredField(visitFields, visitValues);
+  const firstGap = rows.map((row) => ({ row, missing: rowGap(row) })).find((candidate) => candidate.missing);
+  const visitGap = visitGapOf(editing, visitValues);
   const missingText = firstGap?.missing ? `${itemTitle(firstGap.row.itemId)} · ${firstGap.missing.label}` : visitGap?.label ?? "";
   // One thing at a time: an empty check-in starts by picking its items; once it has some, more wait behind "+ Add".
   const showTray = adding || !rows.length;
