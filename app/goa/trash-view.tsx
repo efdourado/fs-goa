@@ -242,10 +242,11 @@ export function TrashView({
       description={description}
       action={emptyScope && rows.length ? (
         <button type="button" onClick={() => setEmptyOpen(true)} disabled={busyId !== null} className="inline-flex min-h-9 flex-none cursor-pointer items-center gap-1.5 self-start text-xs text-[var(--muted)] transition hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-55 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/20 sm:self-auto">
-          {/* Two sparkles: the bin, clean. */}
-          <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 flex-none" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" aria-hidden="true">
-            <path d="M6.5 2.5c.4 2.4 1.6 3.6 4 4-2.4.4-3.6 1.6-4 4-.4-2.4-1.6-3.6-4-4 2.4-.4 3.6-1.6 4-4z" />
-            <path d="M11.8 9.6c.2 1.2.8 1.8 2 2-1.2.2-1.8.8-2 2-.2-1.2-.8-1.8-2-2 1.2-.2 1.8-.8 2-2z" />
+          {/* An eraser: the bin wiped clean. */}
+          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 flex-none" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="m7.5 20.5-4.2-4.2a2.4 2.4 0 0 1 0-3.4l9.6-9.6a2.4 2.4 0 0 1 3.4 0l5 5a2.4 2.4 0 0 1 0 3.4l-8.8 8.8" />
+            <path d="M21.5 20.5h-14" />
+            <path d="m5.6 10.6 7.8 7.8" />
           </svg>
           {t("empty")}
         </button>
