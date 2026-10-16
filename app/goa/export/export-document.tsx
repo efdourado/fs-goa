@@ -520,12 +520,12 @@ function Scoreboard({ model, doc, showDates }: { model: ExportModel; doc: Doc; s
                 {showBy ? <td className="small">{item.recommender?.name.split(" ")[0] ?? ""}</td> : null}
                 {model.hasRatings && perPerson ? raters.map((person) => {
                   const rating = item.ratings.find((row) => row.personKey === person.key);
-                  return <td className="score" key={person.key}>{rating ? doc.n(rating.value) : <span className="muted">—</span>}</td>;
+                  return <td className="score" key={person.key}>{rating ? doc.n(rating.value) : null}</td>;
                 }) : null}
                 {model.hasRatings
-                  ? <td className="score avg">{item.ratingAvg !== null ? doc.n(item.ratingAvg) : <span className="muted">—</span>}</td>
+                  ? <td className="score avg">{item.ratingAvg !== null ? doc.n(item.ratingAvg) : null}</td>
                   : <td className="score">{doc.n(item.entries.length + item.progress.reduce((sum, row) => sum + row.points.length, 0))}</td>}
-                {showDates ? <td className="small muted">{item.lastDay ? doc.day(item.lastDay, { day: "2-digit", month: "2-digit", year: "2-digit" }) : "—"}</td> : null}
+                {showDates ? <td className="small muted">{item.lastDay ? doc.day(item.lastDay, { day: "2-digit", month: "2-digit", year: "2-digit" }) : null}</td> : null}
               </tr>
             ))}
           </tbody>
@@ -557,8 +557,8 @@ function Records({ model, doc, showDates }: { model: ExportModel; doc: Doc; show
                 <td className="num">{String(index + 1).padStart(2, "0")}</td>
                 <td className="title">{record.title}</td>
                 <td className="score">{doc.n(record.sessions)}</td>
-                <td className="small">{record.bests.map((best) => `${best.label} ${doc.n(best.value)}${best.unit ? ` ${best.unit}` : ""}`).join(" · ") || "—"}</td>
-                {showDates ? <td className="small muted">{record.lastDay ? doc.day(record.lastDay, { day: "2-digit", month: "2-digit", year: "2-digit" }) : "—"}</td> : null}
+                <td className="small">{record.bests.map((best) => `${best.label} ${doc.n(best.value)}${best.unit ? ` ${best.unit}` : ""}`).join(" · ")}</td>
+                {showDates ? <td className="small muted">{record.lastDay ? doc.day(record.lastDay, { day: "2-digit", month: "2-digit", year: "2-digit" }) : null}</td> : null}
               </tr>
             ))}
           </tbody>
