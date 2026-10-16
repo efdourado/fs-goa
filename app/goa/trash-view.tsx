@@ -61,8 +61,8 @@ function PurgeDialog({
   const needsReason = preview.kind === "entry";
 
   return (
-    <Dialog title={t("purgeTitle")} busy={busy} onClose={onCancel}>
-      <p className="text-sm text-[var(--muted)]">{t("purgeBody", { label: preview.label })}</p>
+    <Dialog title={t("purgeTitle", { label: preview.label })} busy={busy} onClose={onCancel}>
+      <p className="text-sm text-[var(--muted)]">{t("purgeBody")}</p>
 
       {preview.blocked ? (
         <p className="mt-3 rounded-md border border-[var(--danger-line)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]">
