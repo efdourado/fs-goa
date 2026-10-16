@@ -434,7 +434,6 @@
     "unban": "Desfazer",
     "leaveTitle": "Sair do grupo?",
     "usesOption": "{count, plural, one {# uso} other {# usos}}",
-    "inviteOr": "ou",
     "inviteLinkTitle": "Compartilhe um link com uma ou mais pessoas",
     "inviteUserTitle": "Convide alguém pelo @usuário"
   },

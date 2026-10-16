@@ -312,8 +312,8 @@ export function GroupScreen({
 
       {showInvite ? (
         <Dialog title={t("inviteTitle")} onClose={() => setShowInvite(false)} busy={busy || memberBusy}>
-          {/* Two ways in, one under the other: a link (the usual way), then someone's @username. Each is a line of
-              pills and its button, on the right. */}
+          {/* Two ways in: a link first (the usual way), then, folded under it, someone's @username. Each ends on its
+              button, on the right. */}
           <form onSubmit={createInvite} aria-labelledby="invite-link-title">
             <h3 id="invite-link-title" className="mb-3 text-sm font-medium">{t("inviteLinkTitle")}</h3>
             <div className="flex flex-wrap gap-2">
@@ -338,15 +338,20 @@ export function GroupScreen({
             ) : null}
             <StatusMessage error={copyError} />
           </form>
-          <div className="my-5 flex items-center gap-3 text-xs text-[var(--muted)]" aria-hidden="true">
-            <span className="h-px flex-1 bg-[var(--line)]" />{t("inviteOr")}<span className="h-px flex-1 bg-[var(--line)]" />
-          </div>
-          <form onSubmit={inviteMember} aria-labelledby="invite-user-title">
-            <h3 id="invite-user-title" className="mb-3 text-sm font-medium">{t("inviteUserTitle")}</h3>
-            <input className={cx(pillSelect, "w-full cursor-text placeholder:text-[var(--muted)]")} name="username" placeholder={t("inviteUsernamePlaceholder")} aria-label={t("inviteUsernameLabel")} required maxLength={33} disabled={memberBusy} spellCheck={false} />
-            <div className="mt-4 flex justify-end"><Button type="submit" disabled={memberBusy}>{memberBusy ? t("sendingInvite") : t("sendInvite")}</Button></div>
-            <StatusMessage error={memberError} success={memberSuccess} />
-          </form>
+          {/* The other way in waits folded: open it and a box holds the @handle and its button. */}
+          <details className="group mt-6 border-t border-[var(--line)] pt-4">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium [&::-webkit-details-marker]:hidden">
+              {t("inviteUserTitle")}
+              <svg viewBox="0 0 16 16" className="h-4 w-4 flex-none text-[var(--muted)] transition-transform group-open:rotate-180" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+                <path d="M4 6l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </summary>
+            <form onSubmit={inviteMember} className="mt-3 rounded-2xl border border-[var(--line)] p-4">
+              <input className={cx(pillSelect, "w-full cursor-text placeholder:text-[var(--muted)]")} name="username" placeholder={t("inviteUsernamePlaceholder")} aria-label={t("inviteUsernameLabel")} required maxLength={33} disabled={memberBusy} spellCheck={false} />
+              <div className="mt-4 flex justify-end"><Button type="submit" disabled={memberBusy}>{memberBusy ? t("sendingInvite") : t("sendInvite")}</Button></div>
+              <StatusMessage error={memberError} success={memberSuccess} />
+            </form>
+          </details>
         </Dialog>
       ) : null}
 
