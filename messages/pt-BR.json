@@ -1631,7 +1631,7 @@
     "groupSubtitle": "Desafios e itens do acervo removidos. Restaure ou exclua em definitivo (nada some sozinho).",
     "emptyTitle": "Lixeira vazia",
     "restore": "Restaurar",
-    "purge": "Excluir permanentemente",
+    "purge": "Excluir",
     "purging": "Excluindo…",
     "deletedAt": "removido em {date}",
     "deletedBy": "por {who}",

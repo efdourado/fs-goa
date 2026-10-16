@@ -1631,7 +1631,7 @@
     "groupSubtitle": "Desafíos e ítems del acervo quitados. Restaura o elimina definitivamente (nada desaparece solo).",
     "emptyTitle": "Papelera vacía",
     "restore": "Restaurar",
-    "purge": "Eliminar permanentemente",
+    "purge": "Eliminar",
     "purging": "Eliminando…",
     "deletedAt": "quitado el {date}",
     "deletedBy": "por {who}",

@@ -235,11 +235,6 @@ export function TrashView({
     onChanged?.();
   }
 
-  const trashGlyph = (size: string) => (
-    <svg viewBox="0 0 16 16" className={size} fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M2.8 4.2h10.4M6.2 4.2V2.9c0-.4.3-.7.7-.7h2.2c.4 0 .7.3.7.7v1.3M4.2 4.2l.6 8.6c0 .6.5 1 1.1 1h4.2c.6 0 1.1-.4 1.1-1l.6-8.6M6.8 7v4.2M9.2 7v4.2" />
-    </svg>
-  );
   // "Empty the bin" on the title's line: small quiet text, only when there's something to empty.
   const heading = (
     <PageHeading
@@ -286,14 +281,14 @@ export function TrashView({
                 {item.reason ? <p className="mt-0.5 text-xs italic text-[var(--muted)]">{t("reasonShown", { reason: item.reason })}</p> : null}
                 {item.parentTrashed ? <p className="mt-0.5 text-xs text-[var(--danger)]">{t("parentTrashed")}</p> : null}
               </div>
-              <div className="flex shrink-0 items-center gap-1">
-                <Button variant="ghost" onClick={() => restore(item)} disabled={busyId === item.id || item.parentTrashed}>
+              {/* On a phone the two are the row's footer, side by side across it; from sm: up, at its right. */}
+              <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:shrink-0">
+                <Button variant="secondary" onClick={() => restore(item)} disabled={busyId === item.id || item.parentTrashed}>
                   {t("restore")}
                 </Button>
-                {/* Permanent delete is a trash icon; its name is for screen readers and the hover tip. */}
-                <button type="button" onClick={() => openPurge(item)} disabled={busyId === item.id} aria-label={t("purge")} title={t("purge")} className="grid h-11 w-11 cursor-pointer place-items-center rounded-full text-[var(--danger)] transition hover:bg-[var(--danger-soft)] disabled:cursor-not-allowed disabled:opacity-55 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--danger)]/20">
-                  {trashGlyph("h-[22px] w-[22px]")}
-                </button>
+                <Button variant="danger" onClick={() => openPurge(item)} disabled={busyId === item.id}>
+                  {t("purge")}
+                </Button>
               </div>
             </li>
           );
