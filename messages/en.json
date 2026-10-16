@@ -433,9 +433,8 @@
     "bannedTitle": "Banned",
     "unban": "Undo",
     "leaveTitle": "Leave the group?",
-    "inviteModeLink": "Link",
-    "inviteModeUser": "@username",
-    "usesOption": "{count, plural, one {# use} other {# uses}}"
+    "usesOption": "{count, plural, one {# use} other {# uses}}",
+    "inviteOr": "or"
   },
   "catalog": {
     "back": "Back",

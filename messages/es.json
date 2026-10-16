@@ -433,9 +433,8 @@
     "bannedTitle": "Expulsados",
     "unban": "Deshacer",
     "leaveTitle": "¿Salir del grupo?",
-    "inviteModeLink": "Enlace",
-    "inviteModeUser": "@usuario",
-    "usesOption": "{count, plural, one {# uso} other {# usos}}"
+    "usesOption": "{count, plural, one {# uso} other {# usos}}",
+    "inviteOr": "o"
   },
   "catalog": {
     "back": "Volver",
