@@ -289,23 +289,13 @@ export function TrashView({
                 {item.reason ? <p className="mt-0.5 text-xs italic text-[var(--muted)]">{t("reasonShown", { reason: item.reason })}</p> : null}
                 {item.parentTrashed ? <p className="mt-0.5 text-xs text-[var(--danger)]">{t("parentTrashed")}</p> : null}
               </div>
-              {/* On a phone (no hover) the two are the row's footer, side by side across it. */}
-              <div className="grid w-full grid-cols-2 gap-2 sm:hidden">
-                <Button variant="secondary" onClick={() => restore(item)} disabled={busyId === item.id || item.parentTrashed}>
-                  {t("restore")}
-                </Button>
-                <Button variant="danger" onClick={() => openPurge(item)} disabled={busyId === item.id}>
-                  {t("purge")}
-                </Button>
-              </div>
-              {/* From sm: up, two quiet words that fade in on the row's hover (or focus); Excluir reddens only under the pointer.
-                  A touch screen, with no hover to wait for, shows them. */}
-              <div className="hidden flex-none items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 sm:flex [@media(hover:none)]:opacity-100">
-                <button type="button" onClick={() => restore(item)} disabled={busyId === item.id || item.parentTrashed} className="cursor-pointer px-1 py-1.5 text-[13px] text-[var(--muted)] transition hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50">
+              {/* Two quiet words. From sm: up they fade in on the row's hover (or focus) and Excluir
+                  reddens only under the pointer; on a phone, or any touch screen, they're simply there, under the details. */}
+              <div className="flex w-full flex-none items-center justify-end gap-4 transition-opacity sm:w-auto sm:gap-3 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 [@media(hover:none)]:opacity-100">
+                <button type="button" onClick={() => restore(item)} disabled={busyId === item.id || item.parentTrashed} className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 text-[13px] text-[var(--muted)] transition hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50">
                   {t("restore")}
                 </button>
-                <span className="text-[var(--line)]" aria-hidden="true">·</span>
-                <button type="button" onClick={() => openPurge(item)} disabled={busyId === item.id} className="cursor-pointer px-1 py-1.5 text-[13px] text-[var(--muted)] transition hover:text-[var(--danger)] disabled:cursor-not-allowed disabled:opacity-50">
+                <button type="button" onClick={() => openPurge(item)} disabled={busyId === item.id} className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 text-[13px] text-[var(--muted)] transition hover:text-[var(--danger)] disabled:cursor-not-allowed disabled:opacity-50">
                   {t("purge")}
                 </button>
               </div>
