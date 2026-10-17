@@ -3,6 +3,7 @@ import { inTransaction, oneOrNull } from "../../db";
 import { challengeAccess, writeAudit } from "../../goa-domain";
 import { ApiError, stringValue } from "../../http";
 import { assertUnder, LIMITS } from "../../limits";
+import { ensurePersonalWorkspace } from "../domain/challenges";
 import { copyChallengeStructure, readCopyMode } from "./copy";
 import { isRecipeKey } from "./recipes";
 
@@ -11,6 +12,9 @@ export async function duplicateChallenge(
   sourceChallengeId: string,
   body: Record<string, unknown>,
 ) {
+  // `target: "personal"` copies into the caller's own space (made on first use), like a template's "Just me".
+  const personal = body.target === "personal";
+  const personalSpaceId = personal ? await ensurePersonalWorkspace(session.user.id) : null;
   return inTransaction(async (client) => {
     const sourceAccess = await challengeAccess(session.user.id, sourceChallengeId, client, true);
     await requireGroupRole(session.user.id, sourceAccess.challenge.group_id, ["owner", "admin"], client);
@@ -21,17 +25,18 @@ export async function duplicateChallenge(
         "Este desafio antigo continua disponível para consulta, mas não pode originar uma nova cópia.",
       );
     }
-    const targetGroupId = stringValue(body, "targetGroupId", { min: 1, max: 100 })!;
-    if (targetGroupId === sourceAccess.challenge.group_id) {
+    const targetGroupId = personalSpaceId ?? stringValue(body, "targetGroupId", { min: 1, max: 100 })!;
+    if (!personal && targetGroupId === sourceAccess.challenge.group_id) {
       throw new ApiError(400, "same_group_copy", "Escolha outro grupo para reutilizar este desafio.");
     }
     await requireGroupRole(session.user.id, targetGroupId, ["owner", "admin"], client);
     const targetGroup = await oneOrNull<{ id: string }>(
       client,
       `SELECT id FROM groups
-        WHERE id=$1 AND kind='standard' AND archived_at IS NULL AND deleted_at IS NULL
+        WHERE id=$1 AND archived_at IS NULL AND deleted_at IS NULL
+          AND (kind='standard' OR (kind='personal' AND owner_user_id=$2 AND $3))
         FOR UPDATE`,
-      [targetGroupId],
+      [targetGroupId, session.user.id, personal],
     );
     if (!targetGroup) throw new ApiError(404, "not_found", "Grupo de destino não encontrado.");
     const targetCount = await oneOrNull<{ count: number }>(
@@ -39,15 +44,18 @@ export async function duplicateChallenge(
       "SELECT count(*)::int AS count FROM challenges WHERE group_id=$1 AND deleted_at IS NULL",
       [targetGroupId],
     );
+    const limit = personal ? LIMITS.challengesPerPersonalSpace : LIMITS.challengesPerGroup;
     assertUnder(
       targetCount?.count ?? 0,
-      LIMITS.challengesPerGroup,
+      limit,
       "challenge_limit",
-      `O grupo de destino atingiu o limite de ${LIMITS.challengesPerGroup} desafios.`,
+      personal
+        ? `Seu espaço pessoal atingiu o limite de ${limit} desafios.`
+        : `O grupo de destino atingiu o limite de ${limit} desafios.`,
     );
     const title = stringValue(body, "title", { max: 160, optional: true }) ?? `Cópia de ${sourceAccess.challenge.title}`;
     const { copyItems, mode } = readCopyMode(body);
-    const { id: targetId, skippedProperties } = await copyChallengeStructure(
+    const { id: targetId, skippedProperties, status } = await copyChallengeStructure(
       client,
       sourceChallengeId,
       targetGroupId,
@@ -65,6 +73,6 @@ export async function duplicateChallenge(
     await writeAudit(client, targetGroupId, targetId, session.user.id,
       "challenge.duplicated", "challenge", targetId, null,
       { sourceChallengeId, sourceGroupId: sourceAccess.challenge.group_id, targetGroupId, mode });
-    return { id: targetId, challengeId: targetId, groupId: targetGroupId, status: "draft", skippedProperties };
+    return { id: targetId, challengeId: targetId, groupId: targetGroupId, status, skippedProperties };
   });
 }

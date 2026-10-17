@@ -485,6 +485,19 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
   });
   assert.equal(sameGroupDuplicate.response.status, 400, "a cópia precisa reutilizar o modelo em outro grupo");
 
+  // "Só eu": a cópia vai para o espaço pessoal de quem copia, já ativa e com a pessoa dentro.
+  const mineDuplicate = await call("POST", `/api/challenges/${challengeId}/duplicate`, {
+    session: owner, body: { title: "Cine só meu", target: "personal" },
+  });
+  assert.equal(mineDuplicate.response.status, 201, JSON.stringify(mineDuplicate.body));
+  const mine = await adminPool.query<{ kind: string; owner_user_id: string; status: string; participants: number }>(
+    `SELECT g.kind, g.owner_user_id, c.status,
+            (SELECT count(*)::int FROM challenge_participants p WHERE p.challenge_id = c.id AND p.user_id = $2) AS participants
+       FROM challenges c JOIN groups g ON g.id = c.group_id WHERE c.id = $1`,
+    [(mineDuplicate.body as { id: string }).id, owner.user.id],
+  );
+  assert.deepEqual(mine.rows[0], { kind: "personal", owner_user_id: owner.user.id, status: "active", participants: 1 });
+
   const duplicate = await call("POST", `/api/challenges/${challengeId}/duplicate`, {
     session: owner, body: { title: "Cine — edição 2", targetGroupId },
   });
@@ -1042,6 +1055,13 @@ test("modelos públicos: publica, lista, detalha sem sessão e duplica para um g
   );
   assert.equal(mySpaceRow.rows[0]?.kind, "personal");
   assert.equal(mySpaceRow.rows[0]?.owner_user_id, stranger.user.id);
+  // Undated in one's own space, the copy is a living list: active at once, with its owner taking part.
+  const mySpaceCopy = await adminPool.query<{ status: string; kind: string; participants: number }>(
+    `SELECT c.status, c.kind, (SELECT count(*)::int FROM challenge_participants p WHERE p.challenge_id = c.id AND p.user_id = $2) AS participants
+       FROM challenges c WHERE c.id = $1`,
+    [(toMySpace.body as { challengeId: string }).challengeId, stranger.user.id],
+  );
+  assert.deepEqual(mySpaceCopy.rows[0], { status: "active", kind: "list", participants: 1 });
 
   const unpublished = await call("DELETE", `/api/challenges/${challengeId}/template`, { session: adminSession });
   assert.equal(unpublished.response.status, 200, JSON.stringify(unpublished.body));

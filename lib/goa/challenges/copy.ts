@@ -187,7 +187,7 @@ export async function copyChallengeStructure(
   createdByUserId: string,
   title: string,
   options: { copyItems?: boolean } = {},
-): Promise<{ id: string; skippedProperties: SkippedProperty[] }> {
+): Promise<{ id: string; skippedProperties: SkippedProperty[]; status: "active" | "draft" }> {
   const copyItems = options.copyItems !== false;
   const targetId = publicId();
   const skippedProperties: SkippedProperty[] = [];
@@ -401,5 +401,20 @@ export async function copyChallengeStructure(
     );
   }
 
-  return { id: targetId, skippedProperties };
+  // A copy into a group starts with no participants (the people there may not be the same; they're picked again). A
+  // copy into one's own space has no dates, so it's a living list: born active with its owner in it, as
+  // createChallenge makes one, or it could never start (a personal space has no participants to pick).
+  const living = await client.query(
+    `UPDATE challenges SET status = 'active', kind = 'list', activated_at = now()
+      WHERE id = $1 AND EXISTS (SELECT 1 FROM groups WHERE id = $2 AND kind = 'personal')`,
+    [targetId, targetGroupId],
+  );
+  if (living.rowCount) {
+    await client.query(
+      `INSERT INTO challenge_participants (challenge_id, group_id, user_id, added_by_user_id, joined_at)
+       VALUES ($1, $2, $3, $3, now()) ON CONFLICT DO NOTHING`,
+      [targetId, targetGroupId, createdByUserId],
+    );
+  }
+  return { id: targetId, skippedProperties, status: living.rowCount ? "active" as const : "draft" as const };
 }
