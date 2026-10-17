@@ -6,11 +6,11 @@ import { useMemo, useState } from "react";
 import { useGoaFormat } from "./format";
 import { applyOrder, type OrderableItem, type OrderStrategy } from "./ordering";
 import type { ChallengeDetail, CheckpointInput, CheckpointKind, Id } from "./types";
-import { BoxSection, Button, EmptyState, inputClass, labelClass, PageHeading, Select, StatusMessage } from "./ui";
+import { BoxSection, Button, CircleMinusIcon, EmptyState, labelClass, PageHeading, StatusMessage } from "./ui";
 import { formatRuntime } from "./utils";
 
-/** How many items a stage lists before "show more". */
-const STAGE_PREVIEW = 8;
+/** The small plain icon buttons on a stage row (up, down, remove). */
+const rowIcon = "grid h-8 w-8 flex-none cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)] disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent";
 
 interface DraftCheckpoint {
   key: string;
@@ -49,6 +49,17 @@ export function CheckpointPlanner({
     [challenge.checkpoints],
   );
 
+  const [initialDrafts] = useState<DraftCheckpoint[]>(() =>
+    savedCheckpoints.map((cp) => ({
+      key: cp.id,
+      id: cp.id,
+      title: cp.title,
+      kind: (cp.kind ?? "session") as CheckpointKind,
+      startsAt: toDateInput(cp.opensAt),
+      dueAt: toDateInput(cp.dueAt),
+      description: cp.description ?? "",
+    })),
+  );
   const [drafts, setDrafts] = useState<DraftCheckpoint[]>(() =>
     savedCheckpoints.map((cp) => ({
       key: cp.id,
@@ -71,13 +82,13 @@ export function CheckpointPlanner({
   const [order, setOrder] = useState<Id[]>(() =>
     [...challenge.items].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)).map((item) => item.id),
   );
+  const [initialAssignment] = useState(assignment);
+  const [initialOrder] = useState(order);
   const [seed, setSeed] = useState(0);
-  // Items ticked for a bulk move, and the stages whose full item list is open ("show more").
-  const [picked, setPicked] = useState<ReadonlySet<Id>>(new Set());
-  const [expanded, setExpanded] = useState<ReadonlySet<Id | "none">>(new Set());
-  const [assignBusy, setAssignBusy] = useState(false);
-  const [assignError, setAssignError] = useState<string | null>(null);
-  const [assignDone, setAssignDone] = useState<string | null>(null);
+  // The one stage open in the list, the one whose form is showing, and the item whose "Mover" choices are out.
+  const [openKey, setOpenKey] = useState<string | null>(null);
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [moving, setMoving] = useState<Id | null>(null);
 
   const itemById = useMemo(() => new Map(challenge.items.map((item) => [item.id, item])), [challenge.items]);
 
@@ -87,36 +98,6 @@ export function CheckpointPlanner({
     const next = [...drafts];
     [next[index], next[target]] = [next[target], next[index]];
     setDrafts(next);
-  }
-
-  function addDraft() {
-    setDrafts((current) => [
-      ...current,
-      { key: crypto.randomUUID(), title: t("newTitle", { n: current.length + 1 }), kind: "session", startsAt: "", dueAt: "", description: "" },
-    ]);
-  }
-
-  async function saveCheckpoints() {
-    setCpBusy(true);
-    setCpError(null);
-    setCpDone(null);
-    try {
-      await onSaveCheckpoints(
-        drafts.map((draft) => ({
-          ...(draft.id ? { id: draft.id } : {}),
-          title: draft.title.trim(),
-          kind: draft.kind,
-          startsAt: draft.startsAt || null,
-          dueAt: draft.dueAt || null,
-          description: draft.description.trim() || null,
-        })),
-      );
-      setCpDone(t("saved"));
-    } catch (cause) {
-      setCpError(f.error(cause));
-    } finally {
-      setCpBusy(false);
-    }
   }
 
   const orderableItems: OrderableItem[] = useMemo(
@@ -149,21 +130,6 @@ export function CheckpointPlanner({
     runStrategy({ kind: "shuffle_within", seed: `within-${next}` });
   }
 
-  async function saveAssignment() {
-    setAssignBusy(true);
-    setAssignError(null);
-    setAssignDone(null);
-    try {
-      // Send in the arranged sequence so a shuffle / manual sort actually sticks.
-      await onAssign(order.map((id, index) => ({ itemId: id, checkpointId: assignment[id] ?? null, position: index })));
-      setAssignDone(t("organiseSaved"));
-    } catch (cause) {
-      setAssignError(f.error(cause));
-    } finally {
-      setAssignBusy(false);
-    }
-  }
-
   const grouped = useMemo(() => {
     const buckets = new Map<Id | "none", Id[]>();
     buckets.set("none", []);
@@ -174,20 +140,6 @@ export function CheckpointPlanner({
     }
     return buckets;
   }, [order, assignment, savedCheckpoints]);
-
-  function togglePicked(ids: Id[], on: boolean) {
-    setPicked((current) => {
-      const next = new Set(current);
-      for (const id of ids) if (on) next.add(id); else next.delete(id);
-      return next;
-    });
-  }
-
-  /** Puts every ticked item in `stageId` (`null` = no stage) and clears the ticks. */
-  function moveTicked(stageId: Id | null) {
-    setAssignment((current) => ({ ...current, ...Object.fromEntries([...picked].map((id) => [id, stageId])) }));
-    setPicked(new Set());
-  }
 
   function runtimeFor(ids: Id[]): number {
     return ids.reduce((sum, id) => sum + (itemById.get(id)?.catalogItem?.runtimeMinutes ?? 0), 0);
@@ -238,12 +190,12 @@ export function CheckpointPlanner({
           </BoxSection>
           {savedCheckpoints.length ? (
             <BoxSection title={t("itemsByStage")}>
-              <div className="space-y-3">
+              <div className="divide-y divide-[var(--line)]">
                 {[...savedCheckpoints, null].map((cp) => {
                   const ids = grouped.get(cp?.id ?? "none") ?? [];
                   if (!cp && !ids.length) return null;
                   return (
-                    <div className="rounded-2xl border border-[var(--line)] p-4" key={cp?.id ?? "none"}>
+                    <div className="py-4 first:pt-0 last:pb-0" key={cp?.id ?? "none"}>
                       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                         <strong className="truncate text-sm">{cp ? cp.title : t("unassigned")}</strong>
                         <span className="text-xs text-[var(--muted)]">{t("itemsTally", { count: ids.length })}</span>
@@ -267,149 +219,188 @@ export function CheckpointPlanner({
     );
   }
 
+  // The stages as a folding list: one row each (number, name, dates, how many items), opened one at a time to show
+  // its items (each moves with "Mover") and, on demand, its form. Items with no stage wait in a dashed box above.
+  // One Save for everything: the items' places first (while every stage they point at still exists), then the stages.
+  const savedIds = new Set(drafts.flatMap((draft) => draft.id ? [draft.id] : []));
+  const loose = order.filter((id) => !assignment[id] || !savedIds.has(assignment[id]!));
+  const stageShape = (list: DraftCheckpoint[]) => JSON.stringify(list.map((d) => [d.id ?? null, d.title, d.kind, d.startsAt, d.dueAt, d.description]));
+  const stagesDirty = stageShape(drafts) !== stageShape(initialDrafts);
+  const assignDirty = JSON.stringify(order.map((id) => [id, assignment[id] ?? null])) !== JSON.stringify(initialOrder.map((id) => [id, initialAssignment[id] ?? null]));
+  const dirty = stagesDirty || assignDirty;
+
+  async function saveAll() {
+    setCpBusy(true);
+    setCpError(null);
+    setCpDone(null);
+    try {
+      if (assignDirty) await onAssign(order.map((id, index) => ({ itemId: id, checkpointId: assignment[id] && savedIds.has(assignment[id]!) ? assignment[id]! : null, position: index })));
+      if (stagesDirty) await onSaveCheckpoints(drafts.map((draft) => ({
+        ...(draft.id ? { id: draft.id } : {}),
+        title: draft.title.trim(),
+        kind: draft.kind,
+        startsAt: draft.startsAt || null,
+        dueAt: draft.dueAt || null,
+        description: draft.description.trim() || null,
+      })));
+      setCpDone(t("saved"));
+    } catch (cause) {
+      setCpError(f.error(cause));
+    } finally {
+      setCpBusy(false);
+    }
+  }
+
+  function addStage() {
+    const key = crypto.randomUUID();
+    setDrafts((current) => [...current, { key, title: t("newTitle", { n: current.length + 1 }), kind: "session", startsAt: "", dueAt: "", description: "" }]);
+    setOpenKey(key);
+    setEditingKey(key);
+  }
+
+  const patchDraft = (key: string, patch: Partial<DraftCheckpoint>) => setDrafts((cur) => cur.map((d) => d.key === key ? { ...d, ...patch } : d));
+  const tally = (ids: Id[]) => {
+    const runtime = formatRuntime(runtimeFor(ids));
+    return `${t("itemsTally", { count: ids.length })}${runtime ? ` · ${runtime}` : ""}`;
+  };
+  const pillClass = "min-h-8 cursor-pointer rounded-full border px-3 text-xs transition";
+
+  function itemRow(id: Id, here: Id | null) {
+    const item = itemById.get(id);
+    if (!item) return null;
+    const targets = [
+      ...drafts.filter((draft) => draft.id && draft.id !== here).map((draft) => ({ id: draft.id as Id | null, title: draft.title || t("newTitle", { n: drafts.indexOf(draft) + 1 }) })),
+      ...(here ? [{ id: null as Id | null, title: t("unassigned") }] : []),
+    ];
+    const isMoving = moving === id;
+    return (
+      <li className="border-t border-[var(--line)] py-2 first:border-t-0" key={id}>
+        <div className="flex min-h-9 items-center gap-3">
+          <span className="min-w-0 flex-1 truncate text-sm">{item.title}{item.catalogItem?.year ? <span className="text-[var(--muted)]"> ({item.catalogItem.year})</span> : null}</span>
+          {item.catalogItem?.runtimeMinutes ? <span className="font-mono text-xs text-[var(--muted)]">{formatRuntime(item.catalogItem.runtimeMinutes)}</span> : null}
+          {targets.length ? (
+            <button type="button" aria-expanded={isMoving} onClick={() => setMoving(isMoving ? null : id)} className={`${pillClass} border-[var(--line)] hover:border-[var(--muted)]`}>
+              {isMoving ? tc("cancel") : t("move")}
+            </button>
+          ) : null}
+        </div>
+        {isMoving ? (
+          <div className="flex flex-wrap gap-1.5 pb-1 pt-2" role="group" aria-label={t("moveItem", { title: item.title })}>
+            {targets.map((target) => (
+              <button type="button" key={target.id ?? "none"} onClick={() => { setAssignment((cur) => ({ ...cur, [id]: target.id })); setMoving(null); }} className={`${pillClass} border-[var(--ink)] hover:bg-[var(--wash)]`}>
+                {target.title}
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </li>
+    );
+  }
+
+  const fieldClass = "min-h-10 w-full rounded-xl border border-[var(--line)] bg-transparent px-3 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--main)]";
+
   return (
     <div className="mx-auto max-w-2xl">
-      <PageHeading title={t("title")} />
+      {/* Empty, the box's own title already says what stages are for. */}
+      <PageHeading title={t("title")} description={drafts.length ? t("description") : undefined} />
       <div className="space-y-4">
-      <BoxSection title={t("createTitle")}>
-          <div className="space-y-3">
-            {drafts.length ? (
-              <ol className="divide-y divide-[var(--line)]">
-                {drafts.map((draft, index) => {
-                  const saved = savedCheckpoints.find((cp) => cp.id === draft.id);
-                  return (
-                    <li className="py-5 first:pt-0" key={draft.key}>
-                      <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-                        <label>
-                          <span className="sr-only">{t("cpTitle")}</span>
-                          <input className={inputClass} value={draft.title} maxLength={160} placeholder={t("cpTitlePlaceholder")}
-                            onChange={(event) => setDrafts((cur) => cur.map((d) => d.key === draft.key ? { ...d, title: event.target.value } : d))} />
-                        </label>
-                        <div className="flex items-start gap-1">
-                          <Button variant="ghost" className="px-2" disabled={index === 0} onClick={() => move(index, -1)}>↑<span className="sr-only">{t("moveUp")}</span></Button>
-                          <Button variant="ghost" className="px-2" disabled={index === drafts.length - 1} onClick={() => move(index, 1)}>↓<span className="sr-only">{t("moveDown")}</span></Button>
-                          <button type="button" className="min-h-11 px-2 text-xs text-[var(--danger)] hover:underline" onClick={() => setDrafts((cur) => cur.filter((d) => d.key !== draft.key))}>{tc("remove")}</button>
-                        </div>
-                      </div>
-                      <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                        <label><span className={labelClass}>{t("cpStarts")}</span><input className={inputClass} type="date" value={draft.startsAt}
-                          onChange={(event) => setDrafts((cur) => cur.map((d) => d.key === draft.key ? { ...d, startsAt: event.target.value } : d))} /></label>
-                        <label><span className={labelClass}>{t("cpDue")}</span><input className={inputClass} type="date" min={draft.startsAt || undefined} value={draft.dueAt}
-                          onChange={(event) => setDrafts((cur) => cur.map((d) => d.key === draft.key ? { ...d, dueAt: event.target.value } : d))} /></label>
-                      </div>
-                      <label className="mt-2 block"><span className={labelClass}>{t("cpDescription")}</span>
-                        <textarea className={inputClass} rows={2} maxLength={2000} value={draft.description} placeholder={t("cpDescriptionPlaceholder")}
-                          onChange={(event) => setDrafts((cur) => cur.map((d) => d.key === draft.key ? { ...d, description: event.target.value } : d))} /></label>
-                      {saved ? (
-                        <p className="mt-2 text-xs text-[var(--muted)]">
-                          {t(`timeframe.${saved.timeframe ?? "current"}`)} · {t("itemsTally", { count: saved.itemCount ?? 0 })}
-                          {formatRuntime(saved.totalRuntimeMinutes) ? ` · ${formatRuntime(saved.totalRuntimeMinutes)}` : ""}
-                        </p>
-                      ) : null}
-                    </li>
-                  );
-                })}
-              </ol>
-            ) : (
-              <EmptyState title={t("noCheckpointsTitle")} />
-            )}
-            <Button variant="secondary" onClick={addDraft}>{t("addCheckpoint")}</Button>
-            <Button className="w-full" disabled={cpBusy} onClick={() => void saveCheckpoints()}>{cpBusy ? tc("saving") : t("saveCheckpoints")}</Button>
-            <StatusMessage error={cpError} success={cpDone} />
-          </div>
-      </BoxSection>
-
-      {savedCheckpoints.length ? (
-        <BoxSection title={t("organiseTitle")}>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" onClick={distribute}>{t("distribute")}</Button>
-            <Button variant="secondary" onClick={shuffleAll}>{t("shuffleAll")}</Button>
-            <Button variant="secondary" onClick={shuffleWithin}>{t("shuffleWithin")}</Button>
-          </div>
-
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Button variant="ghost" onClick={() => togglePicked(order, picked.size < order.length)}>
-              {picked.size < order.length ? t("selectAll", { count: order.length }) : t("clearSelection")}
-            </Button>
-          </div>
-          {picked.size ? (
-            <div className="sticky top-16 z-10 mt-3 flex flex-wrap items-center gap-2 rounded-2xl border border-[var(--main-line)] bg-[var(--main-soft)] p-3 shadow-[var(--elevate-1)]" role="region" aria-label={t("selectionBar")}>
-              <strong className="text-sm font-medium">{t("selected", { count: picked.size })}</strong>
-              <Select
-                look="bare"
-                className="min-h-10 rounded-xl border border-[var(--line)] px-3 text-sm"
-                value=""
-                placeholder={t("moveTo")}
-                ariaLabel={t("moveTo")}
-                onChange={(next) => moveTicked(next === "__none__" ? null : next)}
-                options={[...savedCheckpoints.map((option) => ({ value: option.id, label: option.title })), { value: "__none__", label: t("unassigned") }]}
-              />
-              <Button variant="secondary" onClick={() => moveTicked(null)}>{t("removeFromStage")}</Button>
-              <Button variant="ghost" onClick={() => setPicked(new Set())}>{t("clearSelection")}</Button>
+        {drafts.length && loose.length ? (
+          <section className="rounded-[20px] border border-dashed border-[var(--line)] px-5 py-4 sm:px-6">
+            <div className="flex items-baseline justify-between gap-3 pb-1">
+              <h2 className="text-[15px] font-medium">{t("unassigned")}</h2>
+              <span className="text-xs tabular-nums text-[var(--muted)]">{tally(loose)}</span>
             </div>
-          ) : null}
+            <ul>{loose.map((id) => itemRow(id, null))}</ul>
+          </section>
+        ) : null}
 
-          <div className="mt-5 space-y-4">
-            {[...savedCheckpoints, null].map((cp) => {
-              const key: Id | "none" = cp?.id ?? "none";
-              const ids = grouped.get(key) ?? [];
-              const runtime = formatRuntime(runtimeFor(ids));
-              const open = expanded.has(key);
-              const shown = open ? ids : ids.slice(0, STAGE_PREVIEW);
-              const allPicked = ids.length > 0 && ids.every((id) => picked.has(id));
-              return (
-                <div className="rounded-2xl border border-[var(--line)] p-4" key={key}>
-                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                    <label className="flex min-w-0 items-center gap-2.5">
-                      <input type="checkbox" className="h-4 w-4 flex-none" disabled={!ids.length} checked={allPicked} aria-label={t("selectStage", { name: cp ? cp.title : t("unassigned") })} onChange={(event) => togglePicked(ids, event.target.checked)} />
-                      <strong className="truncate text-sm">{cp ? cp.title : t("unassigned")}</strong>
-                    </label>
-                    <span className="text-xs text-[var(--muted)]">
-                      {t("itemsTally", { count: ids.length })}{runtime ? ` · ${runtime}` : ""}
-                    </span>
-                  </div>
-                  {ids.length ? (
-                    <>
-                      <ul className="space-y-1">
-                        {shown.map((id) => {
-                          const item = itemById.get(id);
-                          if (!item) return null;
-                          return (
-                            <li className="flex items-center gap-3 rounded-lg bg-[var(--wash)] px-3 py-1.5 text-sm" key={id}>
-                              <input type="checkbox" className="h-4 w-4 flex-none" checked={picked.has(id)} aria-label={item.title} onChange={(event) => togglePicked([id], event.target.checked)} />
-                              <span className="min-w-0 flex-1 truncate">{item.title}{item.catalogItem?.year ? ` (${item.catalogItem.year})` : ""}</span>
-                              <Select look="bare" className="min-h-9 max-w-[45%] rounded-lg border border-[var(--line)] px-2 text-xs"
-                                value={assignment[id] ?? ""}
-                                ariaLabel={t("moveItem", { title: item.title })}
-                                onChange={(next) => setAssignment((cur) => ({ ...cur, [id]: next || null }))}
-                                options={[{ value: "", label: t("unassigned") }, ...savedCheckpoints.map((option) => ({ value: option.id, label: option.title }))]} />
-                            </li>
-                          );
-                        })}
-                      </ul>
-                      {ids.length > STAGE_PREVIEW ? (
-                        <button
-                          type="button"
-                          aria-expanded={open}
-                          className="mt-2 min-h-10 w-full rounded-xl border border-[var(--line)] text-xs font-light text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)]"
-                          onClick={() => setExpanded((current) => { const next = new Set(current); if (open) next.delete(key); else next.add(key); return next; })}
-                        >
-                          {open ? t("showLess") : t("showMore", { count: ids.length - STAGE_PREVIEW })}
-                        </button>
-                      ) : null}
-                    </>
-                  ) : (
-                    <p className="text-xs text-[var(--muted)]">{t("emptyCheckpoint")}</p>
-                  )}
-                </div>
-              );
-            })}
+        {drafts.length ? (
+          <section className="rounded-[20px] border border-[var(--line)] px-5 sm:px-6">
+            <ol>
+              {drafts.map((draft, index) => {
+                const ids = draft.id ? grouped.get(draft.id) ?? [] : [];
+                const open = openKey === draft.key;
+                const editing = editingKey === draft.key;
+                const when = draft.startsAt || draft.dueAt ? f.dateRange(draft.startsAt || null, draft.dueAt || null) : t("noDates");
+                return (
+                  <li className="border-t border-[var(--line)] first:border-t-0" key={draft.key}>
+                    <div className="flex items-center gap-1">
+                      <button type="button" aria-expanded={open} onClick={() => { setOpenKey(open ? null : draft.key); setMoving(null); }} className="flex min-h-16 min-w-0 flex-1 cursor-pointer items-center gap-3.5 py-2.5 text-left">
+                        <span className="grid h-8 w-8 flex-none place-items-center rounded-full border border-[var(--ink)] text-[13px] font-medium tabular-nums">{index + 1}</span>
+                        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                          <span className="truncate text-[15px] font-medium">{draft.title || t("cpTitlePlaceholder")}</span>
+                          <span className="text-xs text-[var(--muted)]">{when}</span>
+                        </span>
+                        {/* Same-width digits, right-aligned: the counts line up from row to row. */}
+                        <span className="whitespace-nowrap text-right text-xs tabular-nums text-[var(--muted)]">{draft.id ? tally(ids) : ""}</span>
+                      </button>
+                      {/* Order and removal sit on the row itself, right of the count, always there. */}
+                      <button type="button" className={rowIcon} disabled={index === 0} onClick={() => move(index, -1)} aria-label={t("moveUp")} title={t("moveUp")}>
+                        <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4.5 9.5 8 6l3.5 3.5" /></svg>
+                      </button>
+                      <button type="button" className={rowIcon} disabled={index === drafts.length - 1} onClick={() => move(index, 1)} aria-label={t("moveDown")} title={t("moveDown")}>
+                        <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4.5 6.5 8 10l3.5-3.5" /></svg>
+                      </button>
+                      <button type="button" className={`${rowIcon} text-[var(--danger)] hover:text-[var(--danger)]`} onClick={() => { setDrafts((cur) => cur.filter((d) => d.key !== draft.key)); if (open) setOpenKey(null); }} aria-label={t("removeStage")} title={t("removeStage")}>
+                        <CircleMinusIcon className="h-[18px] w-[18px]" />
+                      </button>
+                    </div>
+                    {open ? (
+                      <div className="space-y-3 pb-5 pl-[46px]">
+                        {editing ? (
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            <label className="sm:col-span-2"><span className={labelClass}>{t("cpTitle")}</span>
+                              <input className={fieldClass} value={draft.title} maxLength={160} placeholder={t("cpTitlePlaceholder")} onChange={(event) => patchDraft(draft.key, { title: event.target.value })} /></label>
+                            <label><span className={labelClass}>{t("cpStarts")}</span>
+                              <input className={fieldClass} type="date" value={draft.startsAt} onChange={(event) => patchDraft(draft.key, { startsAt: event.target.value })} /></label>
+                            <label><span className={labelClass}>{t("cpDue")}</span>
+                              <input className={fieldClass} type="date" min={draft.startsAt || undefined} value={draft.dueAt} onChange={(event) => patchDraft(draft.key, { dueAt: event.target.value })} /></label>
+                            <label className="sm:col-span-2"><span className={labelClass}>{t("cpDescription")}</span>
+                              <textarea className={`${fieldClass} py-2`} rows={2} maxLength={2000} value={draft.description} placeholder={t("cpDescriptionPlaceholder")} onChange={(event) => patchDraft(draft.key, { description: event.target.value })} /></label>
+                          </div>
+                        ) : null}
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="min-w-0 text-[13px] text-[var(--muted)]">{draft.description}</span>
+                          <button type="button" onClick={() => setEditingKey(editing ? null : draft.key)} className="flex-none cursor-pointer text-[13px] text-[var(--ink)] underline underline-offset-4">
+                            {editing ? t("doneEditing") : t("editStage")}
+                          </button>
+                        </div>
+                        {draft.id ? (
+                          ids.length ? <ul>{ids.map((id) => itemRow(id, draft.id!))}</ul> : <p className="text-[13px] text-[var(--muted)]">{t("emptyCheckpoint")}</p>
+                        ) : <p className="text-[13px] text-[var(--muted)]">{t("saveToFill")}</p>}
+                      </div>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ol>
+            <div className="flex items-center border-t border-[var(--line)] py-3.5">
+<button type="button" onClick={addStage} aria-label={t("addCheckpoint")} className="grid h-8 w-8 flex-none cursor-pointer place-items-center rounded-full border border-dashed border-[var(--muted)] text-xs font-light leading-none transition hover:border-solid hover:border-[var(--ink)]">＋</button>
+              <span className="ml-3.5 text-sm text-[var(--muted)]" aria-hidden="true">{t("stageWord")}</span>
+            </div>
+          </section>
+        ) : (
+          <BoxSection title={t("createTitle")}>
+            {/* Empty: a dotted line to fill, an ink ＋ at its start. */}
+            <div className="relative flex items-center py-1 before:absolute before:left-[22px] before:right-0 before:top-1/2 before:h-px before:bg-[repeating-linear-gradient(90deg,var(--line)_0_6px,transparent_6px_12px)] before:content-['']">
+              <button type="button" onClick={addStage} aria-label={t("addCheckpoint")} className="relative z-[1] grid h-11 w-11 flex-none cursor-pointer place-items-center rounded-full border border-[var(--ink)] bg-[var(--canvas)] text-xl font-light leading-none text-[var(--ink)] transition hover:bg-[var(--ink)] hover:text-[var(--canvas)]">＋</button>
+              <span className="relative z-[1] ml-3.5 bg-[var(--canvas)] pr-2.5 text-sm text-[var(--muted)]" aria-hidden="true">{t("stageWord")}</span>
+            </div>
+          </BoxSection>
+        )}
+
+        {savedCheckpoints.length > 1 ? (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[13px] text-[var(--muted)]">
+            <button type="button" className="cursor-pointer underline-offset-4 hover:text-[var(--ink)] hover:underline" onClick={distribute}>{t("distribute")}</button>
+            <button type="button" className="cursor-pointer underline-offset-4 hover:text-[var(--ink)] hover:underline" onClick={shuffleAll}>{t("shuffleAll")}</button>
+            <button type="button" className="cursor-pointer underline-offset-4 hover:text-[var(--ink)] hover:underline" onClick={shuffleWithin}>{t("shuffleWithin")}</button>
           </div>
+        ) : null}
 
-          <Button className="mt-5 w-full" disabled={assignBusy} onClick={() => void saveAssignment()}>{assignBusy ? tc("saving") : t("saveOrganise")}</Button>
-          <StatusMessage error={assignError} success={assignDone} />
-        </BoxSection>
-      ) : null}
+        {drafts.length || savedCheckpoints.length ? (
+          <Button className="w-full" disabled={cpBusy || !dirty} onClick={() => void saveAll()}>{cpBusy ? tc("saving") : tc("save")}</Button>
+        ) : null}
+        <StatusMessage error={cpError} success={cpDone} />
       </div>
     </div>
   );

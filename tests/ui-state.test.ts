@@ -582,11 +582,11 @@ test("planejador de etapas: mostra as etapas sem escolha de tipo, o total de dur
   assert.match(html, /Sortear dentro de cada/);
   assert.match(html, /Sem etapa/, "há um balde para itens sem etapa");
   assert.doesNotMatch(html, /<option value="(week|session|milestone|day)"/, "etapas não têm mais um tipo para escolher");
-  assert.match(html, /Selecionar todos \(2\)/, "dá para marcar todos os itens de uma vez");
-  assert.doesNotMatch(html, /Mostrar mais/, "com poucos itens não há botão de mostrar mais");
+  assert.match(html, />Mover</, "um item sem etapa se move direto da caixa Sem etapa");
+  assert.match(html, /aria-expanded="false"[^>]*>.*?Semana 1/, "cada etapa é uma linha que abre e fecha");
 });
 
-test("planejador de etapas: uma etapa com muitos itens mostra os primeiros e um botão de mostrar mais", () => {
+test("planejador de etapas: fechada, uma etapa mostra só nome, datas e contagem (os itens aparecem ao abrir)", () => {
   const items = Array.from({ length: 12 }, (_, index) => ({ id: `i${index}`, title: `Filme ${index + 1}`, position: index, checkpointId: "w1" }));
   const challenge = {
     id: "c9", status: "draft", submissionMode: "item",
@@ -594,9 +594,11 @@ test("planejador de etapas: uma etapa com muitos itens mostra os primeiros e um 
     items,
   } as unknown as ChallengeDetail;
   const html = renderWithIntl(createElement(CheckpointPlanner, { challenge, onSaveCheckpoints: async () => undefined, onAssign: async () => undefined }));
-  assert.match(html, /Filme 8</);
-  assert.doesNotMatch(html, /Filme 9</, "só os oito primeiros aparecem de início");
-  assert.match(html, /Mostrar mais 4/);
+  assert.match(html, /Fase de grupos/);
+  assert.match(html, /12 itens/);
+  assert.match(html, /sem datas/);
+  assert.doesNotMatch(html, /Filme 1</, "os itens ficam dobrados até a etapa abrir");
+  assert.match(html, /disabled="">Salvar/, "sem mudanças, Salvar fica desligado");
 });
 
 test("planejador de etapas: um desafio com dias automáticos não os edita à mão", () => {
