@@ -200,9 +200,9 @@ export async function copyChallengeStructure(
   await client.query(
     `INSERT INTO challenges
       (id,group_id,created_by_user_id,title,description,rules,rule_sections,recipe_key,recipe_version,
-       start_date,end_date,time_zone,collects_entry_date,status,created_at,updated_at)
+       start_date,end_date,time_zone,status,created_at,updated_at)
      SELECT $1,$2,$3,$4,description,rules,rule_sections,recipe_key,recipe_version,
-            NULL,NULL,time_zone,collects_entry_date,'draft',now(),now()
+            NULL,NULL,time_zone,'draft',now(),now()
        FROM challenges WHERE id=$5`,
     [targetId, targetGroupId, createdByUserId, title, sourceChallengeId],
   );

@@ -7,6 +7,7 @@ import { challengeAccess } from "./domain/access";
 import { normalizeTitle, publicId } from "./domain/shared";
 import { writeAudit, writeSystemAudit } from "./domain/audit";
 import { purgeChallengeRows, purgeGroupRows } from "./purge";
+import { purgeEmptyLibrary } from "./catalog";
 
 /**
  * Recoverable deletion (docs/architecture.md › Lixeira e recuperação). The four actions the product keeps apart:
@@ -288,14 +289,8 @@ async function permanentGuard(client: PoolClient, row: RowContext): Promise<{ co
       return row.publishedTemplate ? { code: "has_template", message: "Retire o template da galeria primeiro." } : null;
     case "challenge":
       return row.publishedTemplate ? { code: "has_template", message: "Retire o template da galeria primeiro." } : null;
-    case "catalog_item": {
-      const used = await oneOrNull<{ count: number }>(client,
-        `SELECT count(*)::int AS count FROM challenge_items it JOIN challenges c ON c.id=it.challenge_id
-          WHERE it.catalog_item_id=$1 AND c.deleted_at IS NULL AND c.status <> 'draft'`, [row.id]);
-      return used && used.count > 0
-        ? { code: "catalog_in_use", message: "Algum desafio usa este item, por isso ele não pode ser excluído." }
-        : null;
-    }
+    // A catalogue item a challenge still uses is not blocked: deleting it for good disconnects it from those
+    // challenges (they keep their own copy of the title). The preview counts them so the person is warned.
     case "entry":
       // An entry reaches the bin from an active round; once that round closes its
       // memory is frozen and even a binned entry stays put.
@@ -430,7 +425,12 @@ async function applyPurge(client: PoolClient, row: RowContext): Promise<Record<s
       await client.query("DELETE FROM catalog_attribute_values WHERE catalog_item_id=$1", [row.id]);
       await client.query("UPDATE challenge_items SET catalog_item_id=NULL WHERE catalog_item_id=$1", [row.id]);
       await client.query("DELETE FROM trash_items WHERE entity_kind='catalog_item' AND entity_id=$1", [row.id]);
-      await client.query("DELETE FROM catalog_items WHERE id=$1", [row.id]);
+      {
+        const owner = await oneOrNull<{ group_id: string; kind: string }>(client, "SELECT group_id, kind FROM catalog_items WHERE id=$1", [row.id]);
+        await client.query("DELETE FROM catalog_items WHERE id=$1", [row.id]);
+        // The last item of a deleted library takes the library with it.
+        if (owner) await purgeEmptyLibrary(client, owner.group_id, owner.kind);
+      }
       break;
     case "entry":
       // A check-in's records (a workout's exercises) go with it, before the check-in they hang from.
@@ -842,9 +842,11 @@ export async function purgeTrashItem(session: SessionContext, body: Record<strin
  * a scope. The gesture itself is the confirmation, so the per-item name/count
  * tiers are skipped; anything a `permanentGuard` still blocks (a published
  * template, a closed challenge's frozen entry) is left in the bin and reported.
+ * In two steps: the first leaves the catalogue items a challenge still uses (reported as `connected`), and
+ * `force` then deletes those too, disconnecting them from their challenges.
  * Runs in a single transaction — all or nothing.
  */
-export async function emptyBin(session: SessionContext, scope: "personal" | { groupId: string }) {
+export async function emptyBin(session: SessionContext, scope: "personal" | { groupId: string }, force = false) {
   return inTransaction(async (client) => {
     let targets: Array<{ kind: BinKind; id: string }> = [];
     if (scope === "personal") {
@@ -879,6 +881,7 @@ export async function emptyBin(session: SessionContext, scope: "personal" | { gr
     targets.sort((a, b) => Number(a.kind === "group") - Number(b.kind === "group"));
 
     let purged = 0;
+    let connected = 0;
     const skipped: Array<{ kind: BinKind; code: string }> = [];
     for (const target of targets) {
       const row = await locate(client, target.kind, target.id).catch(() => null);
@@ -890,16 +893,22 @@ export async function emptyBin(session: SessionContext, scope: "personal" | { gr
       }
       const blocked = await permanentGuard(client, row);
       if (blocked) { skipped.push({ kind: target.kind, code: blocked.code }); continue; }
+      if (target.kind === "catalog_item" && !force) {
+        const used = await oneOrNull<{ id: string }>(client,
+          `SELECT it.id FROM challenge_items it JOIN challenges c ON c.id = it.challenge_id
+            WHERE it.catalog_item_id = $1 AND c.deleted_at IS NULL LIMIT 1`, [row.id]);
+        if (used) { connected += 1; continue; }
+      }
       const counts = await applyPurge(client, row);
-      await writeSystemAudit(client, session.user.id, `${row.kind}.purged`, row.kind, row.id, { ...counts, via: "empty_bin" });
+      await writeSystemAudit(client, session.user.id, `${row.kind}.purged`, row.kind, row.id, { ...counts, via: force ? "empty_bin_all" : "empty_bin" });
       purged += 1;
     }
     console.warn("trash.emptyBin", {
       actor: session.user.username,
       scope: scope === "personal" ? "personal" : scope.groupId,
-      purged, skipped: skipped.length,
+      purged, skipped: skipped.length, connected,
     });
-    return { emptied: true, purged, skipped: skipped.length };
+    return { emptied: true, purged, skipped: skipped.length, connected };
   });
 }
 

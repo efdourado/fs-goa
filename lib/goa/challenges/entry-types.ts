@@ -10,6 +10,7 @@ import { publicId, semanticKey } from "../domain/shared";
 import { insertField } from "../domain/fields";
 import { ApiError } from "../../http";
 import { PAGE_COUNT_KEY, pageCountType } from "./recipes";
+import { deleteEntryTypesHard } from "../hard-delete";
 
 export type SubmissionMode = "item" | "daily" | "free";
 export type Purpose = "progress" | "completion" | "expectation" | "rating" | "checkin";
@@ -328,22 +329,7 @@ export async function setExpectationEnabled(
     const active = types.find((type) => purposeOf(type) === "expectation");
     if (body.enabled) {
       if (active) return { enabled: true, entryTypeId: active.id };
-      const archived = await oneOrNull<{ id: string }>(
-        client,
-        "SELECT id FROM entry_types WHERE challenge_id=$1 AND purpose='expectation' AND archived_at IS NOT NULL ORDER BY created_at DESC LIMIT 1",
-        [challengeId],
-      );
-      let entryTypeId: string;
-      if (archived) {
-        entryTypeId = archived.id;
-        await client.query("UPDATE entry_types SET archived_at=NULL, updated_at=now() WHERE id=$1", [entryTypeId]);
-        await client.query(
-          "UPDATE challenge_fields SET archived_at=NULL, updated_at=now() WHERE entry_type_id=$1",
-          [entryTypeId],
-        );
-      } else {
-        entryTypeId = await seedExpectationType(client, challengeId);
-      }
+      const entryTypeId = await seedExpectationType(client, challengeId);
       await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
         "entry_type.created", "entry_type", entryTypeId, null, { purpose: "expectation" });
       return { enabled: true, entryTypeId };
@@ -358,10 +344,9 @@ export async function setExpectationEnabled(
     if (withEntries && withEntries.count > 0) {
       throw new ApiError(409, "expectation_has_entries", "Já há expectativas registradas, não dá para remover o tipo.");
     }
-    await client.query("UPDATE challenge_fields SET archived_at=now(), updated_at=now() WHERE entry_type_id=$1", [active.id]);
-    await client.query("UPDATE entry_types SET archived_at=now(), updated_at=now() WHERE id=$1", [active.id]);
+    await deleteEntryTypesHard(client, [active.id]);
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
-      "entry_type.archived", "entry_type", active.id, null, { purpose: "expectation" });
+      "entry_type.deleted", "entry_type", active.id, null, { purpose: "expectation" });
     return { enabled: false, entryTypeId: null };
   });
 }
@@ -485,24 +470,8 @@ export async function archiveEntryType(
         { metrics: readByMetric.rows.map((row) => row.label) },
       );
     }
-    if (readByMetric.rows.length) {
-      await client.query(
-        "UPDATE challenge_metrics SET archived_at=now(), updated_at=now() WHERE id = ANY($1::text[])",
-        [readByMetric.rows.map((row) => row.id)],
-      );
-    }
-
-    // The answers go with the type, out of metrics, history and the showcase (soft-deleted, like an
-    // item's answers when the item is removed).
-    if (answerCount > 0) {
-      await client.query(
-        "UPDATE entries SET deleted_at=now(), last_edited_by_user_id=$3, updated_at=now() WHERE entry_type_id=$1 AND challenge_id=$2 AND deleted_at IS NULL",
-        [entryTypeId, challengeId, session.user.id],
-      );
-    }
-    await client.query("UPDATE challenge_fields SET archived_at=now(), updated_at=now() WHERE entry_type_id=$1 AND archived_at IS NULL", [entryTypeId]);
-    await client.query("UPDATE entry_types SET archived_at=now(), is_primary=false, updated_at=now() WHERE id=$1", [entryTypeId]);
     // Hand the primary role and any completion-rate metric to whichever type stays.
+    await client.query("UPDATE entry_types SET is_primary=false WHERE id=$1", [entryTypeId]);
     const successor = remaining.find((candidate) => purposeOf(candidate) !== "expectation") ?? remaining[0];
     if (type.is_primary || !remaining.some((candidate) => candidate.is_primary)) {
       await client.query("UPDATE entry_types SET is_primary=true, updated_at=now() WHERE id=$1", [successor.id]);
@@ -512,8 +481,10 @@ export async function archiveEntryType(
         WHERE challenge_id=$1 AND entry_type_id=$2 AND operation='completion_rate' AND archived_at IS NULL`,
       [challengeId, entryTypeId, successor.id],
     );
+    // The type leaves the database with its answers, fields and the metrics that read them.
+    await deleteEntryTypesHard(client, [entryTypeId]);
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
-      "entry_type.archived", "entry_type", entryTypeId, null, { name: type.name, answerScope: type.answer_scope, answersDeleted: answerCount });
+      "entry_type.deleted", "entry_type", entryTypeId, null, { name: type.name, answerScope: type.answer_scope, answersDeleted: answerCount });
     return { id: entryTypeId, archived: true as const, answersDeleted: answerCount };
   });
 }
@@ -576,37 +547,25 @@ export async function setPageCountEnabled(
       if (await countsPages(client, challengeId)) {
         throw new ApiError(409, "page_count_exists", "Este desafio já conta páginas.");
       }
-      const archived = await oneOrNull<{ id: string }>(
-        client,
-        "SELECT id FROM entry_types WHERE challenge_id=$1 AND semantic_key=$2 AND archived_at IS NOT NULL ORDER BY created_at DESC LIMIT 1",
-        [challengeId, PAGE_COUNT_KEY],
+      const entryTypeId = publicId();
+      await client.query(
+        `INSERT INTO entry_types
+           (id, challenge_id, semantic_key, name, submission_mode, purpose, target_policy,
+            cardinality, schedule_policy, is_primary, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,false,now(),now())`,
+        [entryTypeId, challengeId, PAGE_COUNT_KEY, pageCountType.name, pageCountType.submissionMode, pageCountType.purpose,
+          pageCountType.targetPolicy, pageCountType.cardinality, pageCountType.schedulePolicy],
       );
-      let entryTypeId: string;
-      if (archived) {
-        entryTypeId = archived.id;
-        await client.query("UPDATE entry_types SET archived_at=NULL, updated_at=now() WHERE id=$1", [entryTypeId]);
-        await client.query("UPDATE challenge_fields SET archived_at=NULL, updated_at=now() WHERE entry_type_id=$1", [entryTypeId]);
-      } else {
-        entryTypeId = publicId();
-        await client.query(
-          `INSERT INTO entry_types
-             (id, challenge_id, semantic_key, name, submission_mode, purpose, target_policy,
-              cardinality, schedule_policy, is_primary, created_at, updated_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,false,now(),now())`,
-          [entryTypeId, challengeId, PAGE_COUNT_KEY, pageCountType.name, pageCountType.submissionMode, pageCountType.purpose,
-            pageCountType.targetPolicy, pageCountType.cardinality, pageCountType.schedulePolicy],
-        );
-        for (const [index, field] of pageCountType.fields.entries()) await insertField(client, challengeId, entryTypeId, field, index);
-      }
+      for (const [index, field] of pageCountType.fields.entries()) await insertField(client, challengeId, entryTypeId, field, index);
       await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
         "entry_type.created", "entry_type", entryTypeId, null, { purpose: "progress", semanticKey: PAGE_COUNT_KEY });
       return { enabled: true, entryTypeId };
     }
     if (!active) return { enabled: false, entryTypeId: null };
-    await client.query("UPDATE challenge_fields SET archived_at=now(), updated_at=now() WHERE entry_type_id=$1", [active.id]);
-    await client.query("UPDATE entry_types SET archived_at=now(), updated_at=now() WHERE id=$1", [active.id]);
+    // Off deletes the page counts already logged, along with the type.
+    await deleteEntryTypesHard(client, [active.id]);
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
-      "entry_type.archived", "entry_type", active.id, null, { purpose: "progress", semanticKey: PAGE_COUNT_KEY });
+      "entry_type.deleted", "entry_type", active.id, null, { purpose: "progress", semanticKey: PAGE_COUNT_KEY });
     return { enabled: false, entryTypeId: null };
   });
 }

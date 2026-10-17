@@ -210,7 +210,6 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
   note?: ReactNode;
   // An "when did it happen" date that rides with the optional fields — blank
   // means the entry is saved without a date. Owned by the caller.
-  dateField?: { label: string; hint: string; value: string; max: string; onChange: (value: string) => void };
   onSave: (values: Record<Id, unknown>, entry?: Entry) => Promise<void>;
   // The challenge's own zone, for reading the item's due date the way its admin set it.
   timeZone?: string;
@@ -242,7 +241,6 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
   heading,
   sectioned: sectionedProp,
   note,
-  dateField,
   timeZone,
   onSave,
   onDelete,
@@ -265,9 +263,8 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
 
   const optionalFields = fields.filter((field) => field.id && !field.required);
   const isBlank = (value: unknown) => value === undefined || value === null || value === "";
-  const optionalCount = optionalFields.length + (dateField ? 1 : 0);
-  const hasFilledOptional = optionalFields.some((field) => field.id && !isBlank(values[field.id]))
-    || Boolean(dateField?.value);
+  const optionalCount = optionalFields.length;
+  const hasFilledOptional = optionalFields.some((field) => field.id && !isBlank(values[field.id]));
   // Optional fields (e.g. "Nota do livro") stay tucked away so nobody feels
   // nudged to rate a book they have not finished. Auto-open once one is filled.
   const [showOptional, setShowOptional] = useState(hasFilledOptional || !canEdit);
@@ -504,13 +501,6 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
             </div>
           );
         })}
-        {dateField && showOptional && (interactive || dateField.value) ? (
-          <div>
-            <label className={labelClass} htmlFor="entry-occurred-on">{dateField.label}<small className="ml-2 font-light text-[var(--muted)]">{t("optional")}</small></label>
-            <input id="entry-occurred-on" className={inputClass} type="date" max={dateField.max} value={dateField.value} disabled={!interactive || busy} onChange={(event) => dateField.onChange(event.target.value)} />
-            <small className="mt-1 block text-[var(--muted)]">{dateField.hint}</small>
-          </div>
-        ) : null}
         {optionalCount && interactive ? (
           <button type="button" className={cx(actionChipClass, ghostChipClass)} onClick={() => setShowOptional((open) => !open)}>
             <ChevronGlyph open={showOptional} />
@@ -807,8 +797,6 @@ function ItemEntryPanel({
   timeZone,
   onReload,
   occurredOn,
-  onOccurredOnChange,
-  offerOptionalDate,
   today,
   unavailableMessage,
   canEdit,
@@ -826,10 +814,8 @@ function ItemEntryPanel({
   // "" when the participant left the (optional) date blank; `today` is the
   // fallback for the day-keyed forms that still require one.
   occurredOn: string;
-  onOccurredOnChange: (value: string) => void;
   // When a prominent date picker is already on screen (a per-day round), the
   // per-form optional date is skipped so there is only one control.
-  offerOptionalDate: boolean;
   today: string;
   unavailableMessage: string | null;
   canEdit: boolean;
@@ -908,7 +894,6 @@ function ItemEntryPanel({
         // A first plain-round entry may carry a date; day-keyed forms take it
         // from the picker above, an expectation is pre-watch, and once an entry
         // exists the date is fixed.
-        const offersDate = offerOptionalDate && !perDay && !entry && canEdit && !locked && type.purpose !== "expectation";
         // A type with a required field (Expectativa, Avaliação, Progresso do
         // dia) is a fact you answer once and then lock away — its required
         // field's own label already says what it is, so the section name on
@@ -953,13 +938,12 @@ function ItemEntryPanel({
               canEdit={canEdit && !locked}
               unavailableMessage={unavailableMessage}
               readOnlyInline={locked}
-              dateField={offersDate ? { label: t("occurredOnLabel"), hint: t("occurredOnOptionalHint"), value: occurredOn, max: today, onChange: onOccurredOnChange } : undefined}
               timeZone={timeZone}
               onSave={(values, saved) => onSaveEntry(
                 item.id,
                 values,
                 saved,
-                saved ? undefined : perDay ? occurredOn || today : offersDate ? occurredOn || null : undefined,
+                saved ? undefined : perDay ? occurredOn || today : undefined,
                 type.id || undefined,
                 type.schedulePolicy === "checkpoint" ? checkpointId ?? null : undefined,
               )}
@@ -1578,8 +1562,6 @@ export function ParticipantChallengeScreen({
   const individualFormCount = itemForms.filter((type) => type.answerScope !== "shared").length;
   // Whether this challenge has any rating-purpose form at all.
   const hasRatingType = itemForms.some((type) => type.purpose === "rating" && type.answerScope !== "shared");
-  // A retrospective list (Estante) has no "when" — its entry form skips the date.
-  const collectsEntryDate = challenge.collectsEntryDate !== false;
   // A daily / per-day round needs a concrete date, so it gets a prominent picker.
   // A plain round instead offers the date among the entry form's optional fields.
   const dateRequired = undatedDaily || (useItemPanel && perDayItem);
@@ -1857,7 +1839,7 @@ export function ParticipantChallengeScreen({
                     openEnded={!challenge.startsOn && !challenge.endsOn && !logOpensOn && !logDueOn}
                   >
                     {logItem ? (
-                      <ItemEntryPanel key={`${logItem.id}-no-session`} challenge={challenge} item={logItem} entries={entries} ownEntries={ownEntries} timeZone={timeZone} onReload={onReload} occurredOn={occurredOn} onOccurredOnChange={setOccurredOn} offerOptionalDate={false} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} onSaveEntry={onSaveEntry!} onDeleteEntry={canDeleteEntry} />
+                      <ItemEntryPanel key={`${logItem.id}-no-session`} challenge={challenge} item={logItem} entries={entries} ownEntries={ownEntries} timeZone={timeZone} onReload={onReload} occurredOn={occurredOn} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} onSaveEntry={onSaveEntry!} onDeleteEntry={canDeleteEntry} />
                     ) : (
                       <DynamicEntryForm key={`daily-${effectiveOccurredOn}-${currentEntry?.id ?? "new"}`} timeZone={timeZone} heading={t("yourResponseTitle")} sectioned={false} alwaysEditable={!challenge.fields.some((field) => field.required)} fields={challenge.fields} item={null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry!(null, values, entry, effectiveOccurredOn)} onDelete={currentEntry && canDeleteEntry ? () => canDeleteEntry(currentEntry.id) : undefined} />
                     )}
@@ -1866,7 +1848,7 @@ export function ParticipantChallengeScreen({
                 {/* The rest of the book's forms (Terminei, a rating) follow the log's own editor. */}
                 {showLog && logItem && logCounter && itemForms.some((type) => type.id !== logDayType?.id) ? (
                   <div className="mt-8 border-t border-[var(--line)] pt-6">
-                    <ItemEntryPanel key={`${logItem.id}-rest`} challenge={challenge} item={logItem} entries={entries} ownEntries={ownEntries} timeZone={timeZone} onReload={onReload} occurredOn={occurredOn} onOccurredOnChange={setOccurredOn} offerOptionalDate={false} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} onSaveEntry={onSaveEntry!} onDeleteEntry={canDeleteEntry} skipTypeId={logDayType?.id} />
+                    <ItemEntryPanel key={`${logItem.id}-rest`} challenge={challenge} item={logItem} entries={entries} ownEntries={ownEntries} timeZone={timeZone} onReload={onReload} occurredOn={occurredOn} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} onSaveEntry={onSaveEntry!} onDeleteEntry={canDeleteEntry} skipTypeId={logDayType?.id} />
                   </div>
                 ) : null}
                 {showLog ? null : <>
@@ -1879,7 +1861,7 @@ export function ParticipantChallengeScreen({
                 {useItemPanel && individualFormCount > 1 ? <p className={cx("mb-3", sectionLabelClass)}>{t("yourResponseTitle")}</p> : null}
                 {dateRequired ? <label className="mb-5 block"><span className={labelClass}>{t("occurredOnLabel")}</span><input className={inputClass} type="date" max={today} value={effectiveOccurredOn} disabled={Boolean(unavailableMessage)} onChange={(event) => setOccurredOn(event.target.value || today)} /><small className="mt-1 block text-[var(--muted)]">{t("occurredOnHint")}</small></label> : !useItemPanel && currentEntry?.occurredOn ? <p className="mb-5 text-xs text-[var(--muted)]">{t("occurredOn", { date: f.date(currentEntry.occurredOn, longDate) })}</p> : null}
                 {useItemPanel && selectedItem ? (
-                  <ItemEntryPanel key={`${selectedItem.id}-${selectedSession?.id ?? "no-session"}`} challenge={challenge} item={selectedItem} entries={entries} ownEntries={ownEntries} timeZone={timeZone} onReload={onReload} occurredOn={occurredOn} onOccurredOnChange={setOccurredOn} offerOptionalDate={!perDayItem && !sessionMode && collectsEntryDate} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} checkpointId={selectedSession?.id ?? null} onSaveEntry={onSaveEntry!} onDeleteEntry={canDeleteEntry} />
+                  <ItemEntryPanel key={`${selectedItem.id}-${selectedSession?.id ?? "no-session"}`} challenge={challenge} item={selectedItem} entries={entries} ownEntries={ownEntries} timeZone={timeZone} onReload={onReload} occurredOn={occurredOn} today={today} unavailableMessage={unavailableMessage} canEdit={!unavailableMessage} checkpointId={selectedSession?.id ?? null} onSaveEntry={onSaveEntry!} onDeleteEntry={canDeleteEntry} />
                 ) : (
                   <DynamicEntryForm key={`${selectedItem?.id ?? "free"}-${undatedDaily ? effectiveOccurredOn : "fixed"}-${currentEntry?.id ?? "new"}`} timeZone={timeZone} heading={t("yourResponseTitle")} sectioned={false} alwaysEditable={!challenge.fields.some((field) => field.required)} fields={challenge.fields} item={selectedItem ?? null} entry={currentEntry} canEdit={!unavailableMessage} unavailableMessage={unavailableMessage} onSave={(values, entry) => onSaveEntry!(selectedItem?.id ?? null, values, entry, undatedDaily ? effectiveOccurredOn : undefined)} onDelete={currentEntry && canDeleteEntry ? () => canDeleteEntry(currentEntry.id) : undefined} />
                 )}

@@ -67,7 +67,6 @@ export function CreateChallengeScreen({
   const [sharedEditPolicy, setSharedEditPolicy] = useState<SharedEditPolicy>("members_fill_admin_corrects");
   const [fieldsTouched, setFieldsTouched] = useState(false);
   // Custom starts without "when did it happen" — that date belongs to the response, not to the match.
-  const [collectsEntryDate, setCollectsEntryDate] = useState(false);
   // Each item carries its own date and time (a match's kickoff), kept on the library's items.
   const [itemDates, setItemDates] = useState(false);
   const [expectation, setExpectation] = useState(false);
@@ -129,7 +128,6 @@ export function CreateChallengeScreen({
     setSessionName("");
     setSharedEditPolicy("members_fill_admin_corrects");
     setFieldsTouched(false);
-    setCollectsEntryDate(false);
     setItemDates(false);
     setScheduleMode(meta.scheduleMode);
     setCineItems([]);
@@ -241,7 +239,7 @@ export function CreateChallengeScreen({
         expectation: canOfferExpectation && expectation,
         ...(recipe === "custom" && recordingMode === "session"
           ? { recordingMode, sessionName: sessionName.trim() || t("sessionNameDefault"), sessionNoteLabel: tp("comoFoi") }
-          : recipe === "custom" ? { collectsEntryDate, answerScope, ...(answerScope === "shared" ? { sharedEditPolicy } : {}) } : {}),
+          : recipe === "custom" ? { answerScope, ...(answerScope === "shared" ? { sharedEditPolicy } : {}) } : {}),
         ...(tracksCatalog && itemDates ? { itemDates: true } : {}),
         participantIds,
       });
@@ -346,7 +344,7 @@ export function CreateChallengeScreen({
                   </div>
                 </Disclosure>
               ) : null}
-            </div> : null}<FieldBuilder fields={fields} onChange={(next) => { setFields(next); setFieldsTouched(true); }} />{recipe === "custom" && recordingMode === "single" ? <Toggle className="mt-5 bg-[var(--paper)]" checked={collectsEntryDate} onChange={setCollectsEntryDate} label={t("entryDateLabel")} hint={t("entryDateHint")} /> : null}{canOfferExpectation ? <label className="mt-5 flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4 text-sm"><input type="checkbox" className="mt-0.5" aria-label={t("expectationLabel")} checked={expectation} onChange={(event) => setExpectation(event.target.checked)} /><span><strong className="block">{t("expectationLabel")}</strong><span className="mt-0.5 block text-xs text-[var(--muted)]">{t("expectationHint")}</span></span></label> : null}</div> : null}
+            </div> : null}<FieldBuilder fields={fields} onChange={(next) => { setFields(next); setFieldsTouched(true); }} />{canOfferExpectation ? <label className="mt-5 flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--paper)] p-4 text-sm"><input type="checkbox" className="mt-0.5" aria-label={t("expectationLabel")} checked={expectation} onChange={(event) => setExpectation(event.target.checked)} /><span><strong className="block">{t("expectationLabel")}</strong><span className="mt-0.5 block text-xs text-[var(--muted)]">{t("expectationHint")}</span></span></label> : null}</div> : null}
 
         {step === checkpointsStep && tracksCatalog ? (
           <div>

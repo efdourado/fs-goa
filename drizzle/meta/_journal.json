@@ -477,6 +477,13 @@
       "when": 1791677769364,
       "tag": "0067_group_bans",
       "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1792243604378,
+      "tag": "0068_drop_entry_date_and_archives",
+      "breakpoints": true
     }
   ]
 }

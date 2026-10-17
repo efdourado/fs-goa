@@ -16,6 +16,7 @@ import { seedFieldMetrics } from "./auto-metrics";
 import { ApiError } from "../../http";
 import { entryTypeById, primaryEntryType } from "./entry-types";
 import type { FieldRow } from "./types";
+import { deleteFieldsHard, deleteMetricsHard, deleteOptionsHard } from "../hard-delete";
 
 /**
  * Which entry type a fields edit targets. The admin's Fields tab passes an
@@ -188,9 +189,9 @@ export async function saveChallengeFields(
       const current = await oneOrNull<{
         id: string; kind: string; number_scale: number | null; min_scaled: number | null;
         max_scaled: number | null; step_scaled: number | null; max_length: number | null;
-        settings: Record<string, unknown>;
+        settings: Record<string, unknown>; required: boolean;
       }>(client,
-        `SELECT id,kind,number_scale,min_scaled,max_scaled,step_scaled,max_length,settings
+        `SELECT id,kind,number_scale,min_scaled,max_scaled,step_scaled,max_length,settings,required
            FROM challenge_fields WHERE id=$1 AND challenge_id=$2 AND entry_type_id=$3`,
         [field.id, challengeId, entryType.id]);
       if (!current) throw new ApiError(400, "invalid_field", "Campo não pertence a este tipo de registro.");
@@ -256,8 +257,8 @@ export async function saveChallengeFields(
               `Reduzir o tamanho de "${label}" cortaria ${tooLong.count} resposta(s) já gravada(s).`);
           }
         }
-        if (field.required === true) {
-          // Only entries made since the field exists can be "incomplete": the ones before it never had it to
+        if (field.required === true && !current.required) {
+          // Only when it becomes required. Only entries made since the field exists can be "incomplete": the ones before it never had it to
           // answer (adding "Carga 2" to a workout doesn't spoil the workouts already logged).
           const missing = await oneOrNull<{ count: number }>(client,
             `SELECT count(*)::int AS count FROM entries e
@@ -306,11 +307,12 @@ export async function saveChallengeFields(
             keptOptions.push(optionId);
           }
         }
-        await client.query(
-          `UPDATE field_options SET archived_at=now()
-            WHERE field_id=$1 AND archived_at IS NULL AND NOT (id=ANY($2::text[]))`,
+        // A choice that's gone is gone, with the answers that picked it.
+        const droppedOptions = await client.query<{ id: string }>(
+          "SELECT id FROM field_options WHERE field_id=$1 AND NOT (id=ANY($2::text[]))",
           [field.id, keptOptions],
         );
+        await deleteOptionsHard(client, droppedOptions.rows.map((row) => row.id));
       }
     }
     if (body.archiveMissing === true || body.replace === true) {
@@ -340,13 +342,13 @@ export async function saveChallengeFields(
         }
       }
       // Goa's own automatic metrics go with the field they were made for — nobody asked for them.
-      await client.query(
-        `UPDATE challenge_metrics m SET archived_at=now(), updated_at=now()
-           FROM challenge_fields f
-          WHERE m.field_id = f.id AND m.archived_at IS NULL AND coalesce((m.settings->>'auto')::boolean, false)
-            AND f.challenge_id=$1 AND f.entry_type_id=$2 AND f.archived_at IS NULL AND NOT (f.id=ANY($3::text[]))`,
+      const autoMetrics = await client.query<{ id: string }>(
+        `SELECT m.id FROM challenge_metrics m JOIN challenge_fields f ON f.id = m.field_id
+          WHERE coalesce((m.settings->>'auto')::boolean, false)
+            AND f.challenge_id=$1 AND f.entry_type_id=$2 AND NOT (f.id=ANY($3::text[]))`,
         [challengeId, entryType.id, keptIds],
       );
+      await deleteMetricsHard(client, autoMetrics.rows.map((row) => row.id));
       // A field a live metric the owner made computes over can't just vanish — resolve the
       // metric first (V1 §4). Applies in draft too: a dangling metric would
       // fail the preflight anyway.
@@ -364,11 +366,12 @@ export async function saveChallengeFields(
           `Estes campos alimentam uma métrica e não podem ser removidos antes de resolver a métrica: ${usedByMetric.rows.map((row) => row.label).join(", ")}.`,
         );
       }
-      await client.query(
-        `UPDATE challenge_fields SET archived_at=now(),updated_at=now()
-          WHERE challenge_id=$1 AND entry_type_id=$2 AND archived_at IS NULL AND NOT (id=ANY($3::text[]))`,
+      // A removed field leaves the database, with whatever answers it still had.
+      const dropped = await client.query<{ id: string }>(
+        "SELECT id FROM challenge_fields WHERE challenge_id=$1 AND entry_type_id=$2 AND NOT (id=ANY($3::text[]))",
         [challengeId, entryType.id, keptIds],
       );
+      await deleteFieldsHard(client, dropped.rows.map((row) => row.id));
     }
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
       "fields.updated", "challenge", challengeId, null, { fieldIds: keptIds });

@@ -290,7 +290,6 @@ function AdminFields({
   onRenameType,
   onSetExpectation,
   onSetPageCount,
-  onSaveEntryDate,
   onAddShared,
   onRemoveType,
   onSavePolicy,
@@ -301,7 +300,6 @@ function AdminFields({
   onRenameType: (entryTypeId: Id, name: string) => Promise<void>;
   onSetExpectation: (enabled: boolean) => Promise<void>;
   onSetPageCount: (enabled: boolean) => Promise<void>;
-  onSaveEntryDate: (enabled: boolean) => Promise<void>;
   onAddShared: (payload: { name: string; sharedEditPolicy: SharedEditPolicy; field: ChallengeField }) => Promise<void>;
   onRemoveType: (entryTypeId: Id, confirmed: { archiveMetrics: boolean; deleteAnswers: boolean }) => Promise<void>;
   onSavePolicy: (entryTypeId: Id, policy: SharedEditPolicy) => Promise<void>;
@@ -324,9 +322,6 @@ function AdminFields({
   const canTogglePageCount = recipeCatalogKind(challenge.recipeKey) === "book" && challenge.status !== "closed" && !otherPageCount;
   const [pageCountBusy, setPageCountBusy] = useState(false);
   // A day-by-day response always needs its day, so the choice only exists for the other kinds.
-  const canToggleEntryDate = challenge.status !== "closed"
-    && !challenge.entryTypes.some((type) => type.cardinality === "once_per_day" || type.cardinality === "once_per_item_day");
-  const [entryDateBusy, setEntryDateBusy] = useState(false);
   // Pages' page count is the "Contar páginas" switch below, not fields of your own — it isn't listed here.
   const ownTypes = challenge.entryTypes.filter((type) => type.semanticKey !== PAGE_COUNT_KEY);
   const types = ownTypes.length
@@ -511,27 +506,8 @@ function AdminFields({
         />
       ) : null}
 
-      {canToggleExpectation || hasExpectation || canToggleEntryDate || canTogglePageCount ? (
+      {canToggleExpectation || hasExpectation || canTogglePageCount ? (
         <div className="mt-8 divide-y divide-[var(--line)] overflow-hidden rounded-2xl border border-[var(--line)]">
-          {canToggleEntryDate ? (
-            <div className="p-5">
-              <Toggle
-                checked={challenge.collectsEntryDate !== false}
-                disabled={entryDateBusy}
-                onChange={(next) => {
-                  setEntryDateBusy(true);
-                  setError(null);
-                  onSaveEntryDate(next)
-                    .then(() => setSuccess(next ? t("entryDateOn") : t("entryDateOff")))
-                    .catch((cause: unknown) => setError(f.error(cause)))
-                    .finally(() => setEntryDateBusy(false));
-                }}
-                bare
-                label={t("entryDateTitle")}
-                hint={t("entryDateHint")}
-              />
-            </div>
-          ) : null}
           {canTogglePageCount ? (
             <div className="p-5">
               <Toggle
@@ -863,7 +839,6 @@ export function AdminScreen({
   onRenameEntryType,
   onSetExpectation,
   onSetPageCount,
-  onSaveEntryDate,
   onAddSharedResponse,
   onRemoveEntryType,
   onSaveSharedPolicy,
@@ -896,7 +871,6 @@ export function AdminScreen({
   onRenameEntryType: (entryTypeId: Id, name: string) => Promise<void>;
   onSetExpectation: (enabled: boolean) => Promise<void>;
   onSetPageCount: (enabled: boolean) => Promise<void>;
-  onSaveEntryDate: (enabled: boolean) => Promise<void>;
   onAddSharedResponse: (payload: { name: string; sharedEditPolicy: SharedEditPolicy; field: ChallengeField }) => Promise<void>;
   onRemoveEntryType: (entryTypeId: Id, confirmed: { archiveMetrics: boolean; deleteAnswers: boolean }) => Promise<void>;
   onSaveSharedPolicy: (entryTypeId: Id, policy: SharedEditPolicy) => Promise<void>;
@@ -969,7 +943,7 @@ export function AdminScreen({
             </div>
           </>
         ) : null}
-        {activeTab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.visibilityPolicy}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} onRenameType={onRenameEntryType} onSetExpectation={onSetExpectation} onSetPageCount={onSetPageCount} onSaveEntryDate={onSaveEntryDate} onAddShared={onAddSharedResponse} onRemoveType={onRemoveEntryType} onSavePolicy={onSaveSharedPolicy} /> : null}
+        {activeTab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.visibilityPolicy}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} onRenameType={onRenameEntryType} onSetExpectation={onSetExpectation} onSetPageCount={onSetPageCount} onAddShared={onAddSharedResponse} onRemoveType={onRemoveEntryType} onSavePolicy={onSaveSharedPolicy} /> : null}
         {activeTab === "checkpoints" ? <CheckpointPlanner key={`${challenge.id}:${challenge.checkpoints.map((cp) => cp.id).join(",")}`} challenge={challenge} onSaveCheckpoints={onSaveCheckpoints} onAssign={onAssignCheckpointItems} /> : null}
         {activeTab === "settings" ? <ChallengeSettings challenge={challenge} duplicateTargets={duplicateTargets} onDuplicate={onDuplicate} onOpenCopy={onOpenCopy} onDelete={onDelete} isPlatformAdmin={isPlatformAdmin} onPublishTemplate={onPublishTemplate} onUnpublishTemplate={onUnpublishTemplate} onPublish={onPublishResult} onUnpublish={onUnpublishResult} /> : null}
       </div>

@@ -74,10 +74,6 @@ export async function createChallenge(
   if (sharedPrimary && sharedEditPolicy !== "members_fill_admin_corrects" && sharedEditPolicy !== "members_can_edit") {
     throw new ApiError(400, "invalid_shared_edit_policy", "Escolha quem pode preencher ou corrigir a resposta compartilhada.");
   }
-  if (body.collectsEntryDate !== undefined && body.collectsEntryDate !== null && typeof body.collectsEntryDate !== "boolean") {
-    throw new ApiError(400, "invalid_setting", "Informe se o registro pergunta quando aconteceu.");
-  }
-  const collectsEntryDate = typeof body.collectsEntryDate === "boolean" ? body.collectsEntryDate : null;
   const wizardFields = Array.isArray(body.fields) && body.fields.length ? (body.fields as ClientField[]) : null;
   if (wizardFields && wizardFields.length > 30) throw new ApiError(400, "field_limit", "Use no máximo 30 campos.");
   const wantsItems = (recipe.catalogKind !== null || recipe.catalogKindFromBody === true)
@@ -133,11 +129,11 @@ export async function createChallenge(
     await client.query(
       `INSERT INTO challenges
         (id, group_id, created_by_user_id, title, description, rules, rule_sections, recipe_key, recipe_version,
-         start_date, end_date, time_zone, kind, status, collects_entry_date, activated_at, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11,$12,$13,$14,$15,
+         start_date, end_date, time_zone, kind, status, activated_at, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11,$12,$13,$14,
                CASE WHEN $14 = 'active' THEN now() END, now(), now())`,
       [id, groupId, session.user.id, title, description, rules, JSON.stringify(ruleSections),
-        recipe.key, recipe.version, startDate, endDate, timeZone, kind, status, collectsEntryDate],
+        recipe.key, recipe.version, startDate, endDate, timeZone, kind, status],
     );
 
     let primaryTypeId = "";

@@ -19,6 +19,7 @@ import type { DetailChallengeRow } from "./detail";
 import { publicStoryInput } from "./public-story";
 import { unsealedEntrySql } from "./reveal";
 import type { MetricRow } from "./types";
+import { deleteMetricsHard } from "../hard-delete";
 
 interface SeriesEntry {
   key: string;
@@ -1301,9 +1302,9 @@ export async function archiveMetric(session: SessionContext, challengeId: string
       "SELECT id, label FROM challenge_metrics WHERE id=$1 AND challenge_id=$2 AND archived_at IS NULL FOR UPDATE",
       [metricId, challengeId]);
     if (!existing) throw new ApiError(404, "not_found", "Métrica não encontrada.");
-    await client.query("UPDATE challenge_metrics SET archived_at=now(), updated_at=now() WHERE id=$1", [metricId]);
+    await deleteMetricsHard(client, [metricId]);
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
-      "metric.archived", "challenge_metric", metricId, null, { label: existing.label });
+      "metric.deleted", "challenge_metric", metricId, null, { label: existing.label });
     return { id: metricId, archived: true as const };
   });
 }
@@ -1739,7 +1740,7 @@ export async function publicResults(token: string) {
       `SELECT c.id, c.group_id, c.title, c.description, c.rules, c.rule_sections,
               c.start_date::text AS start_date, c.end_date::text AS end_date,
               c.status, c.kind, c.recipe_key, g.kind AS group_kind, c.results_anon,
-              c.show_schedule, c.collects_entry_date, c.time_zone
+              c.show_schedule, c.time_zone
          FROM challenges c
          JOIN groups g ON g.id = c.group_id AND g.deleted_at IS NULL
         WHERE c.result_share_token_hash=$1 AND c.results_published_at IS NOT NULL

@@ -343,8 +343,12 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
   const strandingShrink = await call("PATCH", `/api/challenges/${challengeId}`, {
     session: owner, body: { startsOn: "2026-08-01", endsOn: "2026-08-02" },
   });
-  assert.equal(strandingShrink.response.status, 409, "encurtar o prazo por cima de um registro é barrado");
-  assert.equal((strandingShrink.body as { error: string }).error, "schedule_would_strand_entries");
+  // Uma resposta sobre um item não tem data própria, então não há o que deixar fora do período.
+  assert.equal(strandingShrink.response.status, 200, JSON.stringify(strandingShrink.body));
+  const restored = await call("PATCH", `/api/challenges/${challengeId}`, {
+    session: owner, body: { startsOn: "2026-08-01", endsOn: "2026-12-31" },
+  });
+  assert.equal(restored.response.status, 200, JSON.stringify(restored.body));
 
   // Remover um item que já tem registro: os registros presos a ele saem em cascata.
   const cascadeItem = await call("POST", `/api/challenges/${challengeId}/items`, {
@@ -2728,14 +2732,13 @@ test("modelo de registros: um filme aceita mais de um tipo de registro por pesso
 
   // qualquer filme pode ser avaliado primeiro; nenhum checkpoint envolvido
   const petite = items.find((item) => item.title === "Petite Maman")!;
-  assert.equal((await call("POST", `/api/challenges/${challengeId}/entries`, { session: owner, body: { itemId: petite.id, values: { nota: 3 } } })).response.status, 201);
+  // A resposta sobre um filme não guarda data própria: uma data enviada é ignorada (vale quando foi salva).
+  const petiteRating = await call("POST", `/api/challenges/${challengeId}/entries`, { session: owner, body: { itemId: petite.id, occurredOn: "2099-01-01", values: { nota: 3 } } });
+  assert.equal(petiteRating.response.status, 201, JSON.stringify(petiteRating.body));
+  assert.equal((petiteRating.body as { occurredOn: string | null }).occurredOn, null);
   const checkpoints = await adminPool.query("SELECT id FROM challenge_checkpoints WHERE challenge_id=$1", [challengeId]);
   assert.equal(checkpoints.rows.length, 0, "cine não usa checkpoints");
 
-  // "assistido no futuro" é recusado
-  const future = await call("POST", `/api/challenges/${challengeId}/entries`, { session: owner, body: { itemId: petite.id, occurredOn: "2099-01-01", values: { nota: 2 } } });
-  assert.equal(future.response.status, 409);
-  assert.equal((future.body as { error: string }).error, "watch_in_future");
 });
 
 type DetailType = { id: string; purpose: string; semanticKey: string; cardinality: string; countsCompletion?: boolean };
@@ -2764,7 +2767,7 @@ async function addExpectationType(challengeId: string, fieldKey = "expectativa")
   return typeId;
 }
 
-test("data do registro é opcional: uma rodada aceita registro sem data, mas o diário não", async () => {
+test("resposta sobre um item não tem data própria, mas a do diário tem", async () => {
   const owner = await register("Nina", "nina_semdata");
   const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Sem data" } })).body as { id: string }).id;
   const today = dateKeyInTimeZone(new Date(), "America/Sao_Paulo");
@@ -2795,18 +2798,18 @@ test("data do registro é opcional: uma rodada aceita registro sem data, mas o d
   assert.equal(emptyDate.response.status, 201, JSON.stringify(emptyDate.body));
   assert.equal((emptyDate.body as { occurredOn: string | null }).occurredOn, null);
 
-  // omitir a chave mantém o padrão "hoje"
+  // omitir a chave também: a resposta sobre um item vale quando foi salva
   const omitted = await call("POST", `/api/challenges/${challengeId}/entries`, {
     session: owner, body: { itemId: byTitle("Padrão hoje").id, values: { nota: 5 } },
   });
   assert.equal(omitted.response.status, 201, JSON.stringify(omitted.body));
-  assert.equal((omitted.body as { occurredOn: string }).occurredOn, today);
+  assert.equal((omitted.body as { occurredOn: string | null }).occurredOn, null);
 
   const rows = await adminPool.query<{ occurred_on: string | null }>(
     "SELECT occurred_on::text AS occurred_on FROM entries WHERE challenge_id=$1 AND deleted_at IS NULL",
     [challengeId],
   );
-  assert.equal(rows.rows.filter((row) => row.occurred_on === null).length, 2);
+  assert.equal(rows.rows.filter((row) => row.occurred_on === null).length, 3);
 
   // o histórico devolve o registro sem data sem quebrar
   const listed = ((await call("GET", `/api/challenges/${challengeId}/entries`, { session: owner })).body as {
@@ -3728,13 +3731,11 @@ test("estante pessoal: só nota, sem data no registro, sem métricas de grupo, r
 
   const detail = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as {
     scope: string;
-    collectsEntryDate: boolean;
     entryTypes: Array<{ id: string; purpose: string; fields: Array<{ id: string; key: string }> }>;
     metrics: ApiMetric[];
     items: Array<{ id: string; title: string }>;
   };
   assert.equal(detail.scope, "personal");
-  assert.equal(detail.collectsEntryDate, false, "a estante não coleta data por registro");
   assert.deepEqual(detail.entryTypes.map((type) => type.purpose), ["rating", "progress"], "avaliação e a contagem de páginas (datas escondidas) — sem conclusão");
   assert.equal(detail.metrics.some((metric) => metric.operation === "indicator_bias"), false, "sem viés do indicador num desafio solo");
   assert.equal(detail.metrics.some((metric) => metric.operation === "spread"), false, "sem polarização num desafio solo");
@@ -5700,7 +5701,7 @@ test("lixeira: esvaziar apaga tudo de uma vez, registra no log e exige owner/adm
 
   const empty = await call("POST", `/api/groups/${groupId}/trash/empty`, { session: owner, body: {} });
   assert.equal(empty.response.status, 200, JSON.stringify(empty.body));
-  assert.deepEqual(empty.body, { emptied: true, purged: 2, skipped: 0 });
+  assert.deepEqual(empty.body, { emptied: true, purged: 2, skipped: 0, connected: 0 });
 
   const after = (await call("GET", `/api/groups/${groupId}/trash`, { session: owner })).body as { items: unknown[] };
   assert.deepEqual(after.items, [], "a lixeira fica vazia");
@@ -5712,7 +5713,7 @@ test("lixeira: esvaziar apaga tudo de uma vez, registra no log e exige owner/adm
   assert.ok(purged.rows.some((r) => r.action === "challenge.purged"), "a purga fica no log operacional");
 });
 
-test("lixeira: um item de catálogo usado por um desafio fechado é arquivado, não pode ser apagado", async () => {
+test("lixeira: um item de catálogo usado por um desafio pode ser apagado de vez, e o desafio fica com a cópia; esvaziar vai em dois passos", async () => {
   const owner = await register("Dona Acervo", "dona_acervo_bin");
   const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Cineclube Acervo" } })).body as { id: string }).id;
   const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
@@ -5731,15 +5732,26 @@ test("lixeira: um item de catálogo usado por um desafio fechado é arquivado, n
   };
   const row = trash.items.find((item) => item.id === itemId)!;
   assert.equal(row.kind, "catalog_item");
-  assert.ok(row.blocked && row.blocked.code === "catalog_in_use", "exclusão permanente bloqueada enquanto há histórico");
-  assert.equal(
-    (await call("POST", `/api/groups/${groupId}/trash/purge`, { session: owner, body: { kind: "catalog_item", id: itemId } })).response.status,
-    409,
-  );
-  assert.equal((await call("POST", `/api/groups/${groupId}/trash/restore`, { session: owner, body: { kind: "catalog_item", id: itemId } })).response.status, 200, "mas restaura");
+  assert.equal(row.blocked, null, "estar num desafio não bloqueia a exclusão definitiva");
+  const preview = (await call("POST", `/api/groups/${groupId}/trash/preview`, { session: owner, body: { kind: "catalog_item", id: itemId } })).body as {
+    dependencies: Array<{ type: string; count: number }>;
+  };
+  assert.equal(preview.dependencies.find((dep) => dep.type === "challengesUsing")?.count, 1, "a prévia avisa em quantos desafios ele está");
+
+  // Esvaziar, primeiro passo: o item ligado a um desafio fica e é contado.
+  const first = (await call("POST", `/api/groups/${groupId}/trash/empty`, { session: owner, body: {} })).body as { connected: number };
+  assert.equal(first.connected, 1);
+  assert.ok((await adminPool.query("SELECT id FROM catalog_items WHERE id=$1", [itemId])).rows.length, "ainda na lixeira");
+  // Segundo passo: apaga mesmo assim, e o desafio guarda o próprio título.
+  const second = (await call("POST", `/api/groups/${groupId}/trash/empty`, { session: owner, body: { force: true } })).body as { connected: number };
+  assert.equal(second.connected, 0);
+  assert.equal((await adminPool.query("SELECT id FROM catalog_items WHERE id=$1", [itemId])).rows.length, 0, "apagado de vez");
+  const kept = await adminPool.query<{ title: string; catalog_item_id: string | null }>(
+    "SELECT title, catalog_item_id FROM challenge_items WHERE challenge_id=$1", [challengeId]);
+  assert.deepEqual(kept.rows, [{ title: "Stalker", catalog_item_id: null }], "o desafio fica com o título, desligado do acervo");
 });
 
-test("lixeira: filho não restaura sem o pai; restaurar o pai traz o filho de volta", async () => {
+test("lixeira: um item removido sai de vez; restaurar o desafio traz os itens que ficaram", async () => {
   const owner = await register("Dona Pai", "dona_pai_bin");
   const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube Pai" } })).body as { id: string }).id;
   const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
@@ -5750,12 +5762,12 @@ test("lixeira: filho não restaura sem o pai; restaurar o pai traz o filho de vo
   const items = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { items: Array<{ id: string; title: string }> };
   const itemB = items.items.find((item) => item.title === "B")!.id;
 
-  await call("DELETE", `/api/challenges/${challengeId}/items/${itemB}`, { session: owner }); // archive the item
+  await call("DELETE", `/api/challenges/${challengeId}/items/${itemB}`, { session: owner }); // delete the item
   await call("DELETE", `/api/challenges/${challengeId}`, { session: owner }); // bin the parent
 
+  // Um item removido do desafio sai do banco: não há o que restaurar.
   const restoreChild = await call("POST", `/api/challenges/${challengeId}/trash/restore`, { session: owner, body: { kind: "challenge_item", id: itemB } });
-  assert.equal(restoreChild.response.status, 409, "o pai binado bloqueia o filho");
-  assert.equal((restoreChild.body as { error: string }).error, "parent_trashed");
+  assert.equal(restoreChild.response.status, 404);
 
   await call("POST", `/api/groups/${groupId}/trash/restore`, { session: owner, body: { kind: "challenge", id: challengeId } });
   const afterParent = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { items: Array<{ title: string }> };
@@ -5985,7 +5997,7 @@ test("cenário de aceitação V1: grupo de 6, Cinema com semanas, JSON, expectat
     "segue anônima",
   );
 
-  // 22. Excluir e restaurar um objeto pela lixeira.
+  // 22. Excluir um item do desafio o apaga de vez.
   await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });
   const targetItem = itemId("Filme 20");
   assert.equal((await call("DELETE", `/api/challenges/${challengeId}/items/${targetItem}`, { session: owner })).response.status, 200);
@@ -5994,17 +6006,8 @@ test("cenário de aceitação V1: grupo de 6, Cinema com semanas, JSON, expectat
     false,
     "o item removido some da listagem",
   );
-  const archive = (await call("GET", `/api/challenges/${challengeId}/archive`, { session: owner })).body as {
-    structure: Array<{ kind: string; id: string }>;
-  };
-  assert.ok(archive.structure.some((row) => row.id === targetItem), "aparece na estrutura removida");
-  const restore = await call("POST", `/api/challenges/${challengeId}/trash/restore`, { session: owner, body: { kind: "challenge_item", id: targetItem } });
-  assert.equal(restore.response.status, 200, JSON.stringify(restore.body));
-  assert.equal(
-    ((await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { items: Array<{ id: string }> }).items.some((it) => it.id === targetItem),
-    true,
-    "restaurado com o mesmo id",
-  );
+  const gone = await adminPool.query("SELECT id FROM challenge_items WHERE id=$1", [targetItem]);
+  assert.equal(gone.rows.length, 0, "o item removido sai do banco, sem arquivo para restaurar");
 
   // 23. Abrir todas as telas diretamente por URL (deep-link + refresh).
   const { screenFromUrl } = await import("../../app/goa/navigation");
@@ -6308,48 +6311,74 @@ test("A: item adicionado depois numa Estante entra como livro, não filme", asyn
   assert.equal(catalog.items.find((i) => i.title === "O Hobbit")?.kind, "book", "livro adicionado depois não vira filme");
 });
 
-test("A: opção de escolha arquivada em uso ainda renderiza o rótulo, não o id", async () => {
-  const owner = await register("A Opcao", "a_opcao_uso");
-  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube A5" } })).body as { id: string }).id;
+test("excluir é excluir: opção, campo, métrica, etapa, item e tipo saem do banco com o que dependia deles", async () => {
+  const owner = await register("Apaga Tudo", "apaga_tudo");
+  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube Apaga" } })).body as { id: string }).id;
   const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
     session: owner,
     body: {
       recipe: "habit", title: "Humor diário", participantIds: [owner.user.id],
-      fields: [{ key: "humor", label: "Humor", type: "select", required: true, config: { options: [{ label: "Bem" }, { label: "Mal" }, { label: "Neutro" }] } }],
+      fields: [
+        { key: "humor", label: "Humor", type: "select", required: true, config: { options: [{ label: "Bem" }, { label: "Mal" }, { label: "Neutro" }] } },
+        { key: "extra", label: "Extra", type: "number", required: false, config: { min: 0, step: 1 } },
+      ],
     },
   });
   const challengeId = (challenge.body as { id: string }).id;
-  let d = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
+  const d = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
     entryTypes: Array<{ id: string; purpose: string }>;
-    fields: Array<{ id: string; key: string; config?: { options?: Array<{ id?: string; label: string; archived?: boolean }> } }>;
+    fields: Array<{ id: string; key: string; config?: { options?: Array<{ id?: string; label: string }> } }>;
     status: string;
   };
   const type = d.entryTypes.find((t) => t.purpose === "checkin")!;
   const humor = d.fields.find((f) => f.key === "humor")!;
+  const extra = d.fields.find((f) => f.key === "extra")!.id;
   const opt = (label: string) => humor.config!.options!.find((o) => o.label === label)!.id!;
-  const optNeutro = opt("Neutro");
   if (d.status === "draft") await call("POST", `/api/challenges/${challengeId}/transition`, { session: owner, body: { status: "active" } });
-  await call("POST", `/api/challenges/${challengeId}/entries`, { session: owner, body: { entryTypeId: type.id, occurredOn: "2026-01-01", values: { [humor.id]: optNeutro } } });
+  const saved = await call("POST", `/api/challenges/${challengeId}/entries`, {
+    session: owner, body: { entryTypeId: type.id, occurredOn: "2026-01-01", values: { [humor.id]: opt("Neutro"), [extra]: 3 } },
+  });
+  assert.equal(saved.response.status, 201, JSON.stringify(saved.body));
 
-  // Arquiva "Neutro" mantendo as outras (com id).
+  // Uma opção removida sai com as respostas que a escolheram.
+  const neutro = opt("Neutro");
   await call("POST", `/api/challenges/${challengeId}/fields`, {
     session: owner,
-    body: { entryTypeId: type.id, replace: true, archiveMissing: true, fields: [
-      { id: humor.id, key: "humor", label: "Humor", type: "select", required: true, config: { options: [
-        { id: opt("Bem"), label: "Bem" }, { id: opt("Mal"), label: "Mal" },
-      ] } },
+    body: { entryTypeId: type.id, replace: true, archiveMissing: true, deleteAnswers: true, fields: [
+      { id: humor.id, key: "humor", label: "Humor", type: "select", required: true, config: { options: [{ id: opt("Bem"), label: "Bem" }, { id: opt("Mal"), label: "Mal" }] } },
+      { id: extra, key: "extra", label: "Extra", type: "number", required: false, config: { min: 0, step: 1 } },
     ] },
   });
-  d = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as typeof d;
-  const humorAfter = d.fields.find((f) => f.key === "humor")!;
-  const neutroAfter = humorAfter.config!.options!.find((o) => o.id === optNeutro);
-  assert.ok(neutroAfter, "a opção arquivada continua na lista para renderizar o histórico");
-  assert.equal(neutroAfter!.archived, true);
-  assert.equal(neutroAfter!.label, "Neutro", "com o rótulo, não o id");
+  assert.equal((await adminPool.query("SELECT id FROM field_options WHERE id=$1", [neutro])).rows.length, 0, "a opção sai do banco");
+  assert.equal((await adminPool.query("SELECT 1 FROM entry_values WHERE option_id=$1", [neutro])).rows.length, 0, "a resposta que a escolheu também");
+
+  // Uma métrica excluída sai; um campo removido sai com as respostas e as métricas que o liam.
+  const metric = await call("POST", `/api/challenges/${challengeId}/metrics`, { session: owner, body: { label: "Soma extra", operation: "sum", fieldId: extra } });
+  const metricId = (metric.body as { id: string }).id;
+  assert.equal((await call("DELETE", `/api/challenges/${challengeId}/metrics/${metricId}`, { session: owner })).response.status, 200);
+  assert.equal((await adminPool.query("SELECT id FROM challenge_metrics WHERE id=$1", [metricId])).rows.length, 0, "a métrica sai do banco");
+  const fieldsAfter = await call("POST", `/api/challenges/${challengeId}/fields`, {
+    session: owner,
+    body: { entryTypeId: type.id, replace: true, archiveMissing: true, deleteAnswers: true, fields: [
+      { id: humor.id, key: "humor", label: "Humor", type: "select", required: true, config: { options: [{ id: opt("Bem"), label: "Bem" }, { id: opt("Mal"), label: "Mal" }] } },
+    ] },
+  });
+  assert.equal(fieldsAfter.response.status, 201, JSON.stringify(fieldsAfter.body));
+  assert.equal((await adminPool.query("SELECT id FROM challenge_fields WHERE id=$1", [extra])).rows.length, 0, "o campo sai do banco");
+  assert.equal((await adminPool.query("SELECT 1 FROM entry_values WHERE field_id=$1", [extra])).rows.length, 0, "com as respostas dele");
+
+  // Nada fica arquivado no desafio.
+  const archived = await adminPool.query<{ count: number }>(
+    `SELECT ((SELECT count(*) FROM challenge_fields WHERE challenge_id=$1 AND archived_at IS NOT NULL)
+           + (SELECT count(*) FROM challenge_metrics WHERE challenge_id=$1 AND archived_at IS NOT NULL)
+           + (SELECT count(*) FROM entry_types WHERE challenge_id=$1 AND archived_at IS NOT NULL)
+           + (SELECT count(*) FROM challenge_checkpoints WHERE challenge_id=$1 AND archived_at IS NOT NULL))::int AS count`,
+    [challengeId],
+  );
+  assert.equal(archived.rows[0].count, 0, "excluir não arquiva nada");
+  const archive = (await call("GET", `/api/challenges/${challengeId}/archive`, { session: owner })).body as { structure: unknown[] };
+  assert.equal(archive.structure.length, 0, "não há estrutura removida para listar");
 });
-
-// ── Onda B — listas e checkpoints ────────────────────────────────────────
-
 test("B: a ordem enviada na atribuição de checkpoints persiste após recarregar", async () => {
   const owner = await register("B Ordem", "b_ordem_cp");
   const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube B1" } })).body as { id: string }).id;
@@ -6843,58 +6872,6 @@ test("D: restaurar um item do acervo pessoal traz de volta o vínculo e os regis
   assert.ok(entries.entries.some((e) => e.itemId === back.items.find((i) => i.title === "Duna")!.id), "e a nota volta junto");
 });
 
-test("D: a lixeira interna do desafio lista a estrutura removida e restaura", async () => {
-  const owner = await register("D Estrutura", "d_estrutura_interna");
-  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube D3" } })).body as { id: string }).id;
-  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
-    session: owner, body: { recipe: "cinema", title: "Estrutura mexe", participantIds: [owner.user.id], items: [{ title: "A" }, { title: "B" }] },
-  });
-  const challengeId = (challenge.body as { id: string }).id;
-  const items = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { items: Array<{ id: string; title: string }> };
-  const itemB = items.items.find((i) => i.title === "B")!.id;
-  await call("DELETE", `/api/challenges/${challengeId}/items/${itemB}`, { session: owner });
-
-  const archive = (await call("GET", `/api/challenges/${challengeId}/archive`, { session: owner })).body as {
-    structure: Array<{ kind: string; id: string }>;
-  };
-  assert.ok(archive.structure.some((r) => r.kind === "challenge_item" && r.id === itemB), "o item removido aparece na estrutura removida");
-  assert.equal((await call("POST", `/api/challenges/${challengeId}/trash/restore`, { session: owner, body: { kind: "challenge_item", id: itemB } })).response.status, 200);
-  assert.ok(((await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { items: Array<{ id: string }> }).items.some((i) => i.id === itemB));
-});
-
-test("D: excluir permanentemente um campo com métrica arquivada apontando para ele funciona", async () => {
-  const owner = await register("D Campo", "d_campo_metrica");
-  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube D4" } })).body as { id: string }).id;
-  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
-    session: owner,
-    body: {
-      recipe: "habit", title: "Campo extra", participantIds: [owner.user.id],
-      fields: [
-        { key: "minutos", label: "Minutos", type: "number", required: true, config: { min: 0, step: 1 } },
-        { key: "extra", label: "Extra", type: "number", required: false, config: { min: 0, step: 1 } },
-      ],
-    },
-  });
-  const challengeId = (challenge.body as { id: string }).id;
-  const d = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
-    entryTypes: Array<{ id: string }>; fields: Array<{ id: string; key: string }>;
-  };
-  const extra = d.fields.find((f) => f.key === "extra")!.id;
-  const minutos = d.fields.find((f) => f.key === "minutos")!.id;
-  // Métrica sobre "extra", depois arquivada.
-  const m = await call("POST", `/api/challenges/${challengeId}/metrics`, { session: owner, body: { label: "Soma extra", operation: "sum", fieldId: extra } });
-  await call("DELETE", `/api/challenges/${challengeId}/metrics/${(m.body as { id: string }).id}`, { session: owner });
-  // Agora remove o campo "extra" (sem respostas → vai para a estrutura removida).
-  await call("POST", `/api/challenges/${challengeId}/fields`, {
-    session: owner,
-    body: { entryTypeId: d.entryTypes[0].id, replace: true, archiveMissing: true, fields: [{ id: minutos, key: "minutos", label: "Minutos", type: "number", required: true, config: { min: 0, step: 1 } }] },
-  });
-  const purge = await call("POST", `/api/challenges/${challengeId}/trash/purge`, { session: owner, body: { kind: "field", id: extra } });
-  assert.equal(purge.response.status, 200, JSON.stringify(purge.body));
-});
-
-// ── Onda E — contas e permissões administrativas ────────────────────────
-
 test("E: excluir a conta apaga usuário, e-mail e senha; a identidade some do login", async () => {
   const person = await register("E Some", "e_some_conta");
   const groupId = ((await call("POST", "/api/groups", { session: person, body: { name: "Só meu" } })).body as { id: string }).id;
@@ -7073,46 +7050,6 @@ test("R2: grupo binado pelo dono não ocupa a cota dos outros participantes", as
   const gid2 = ((await call("POST", "/api/groups", { session: other, body: { name: "Outro grupo" } })).body as { id: string }).id;
   const inv2 = (await call("POST", `/api/groups/${gid2}/invites`, { session: other, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
   assert.equal((await call("POST", `/api/invites/${inv2.token}`, { session: member, body: {} })).response.status, 200);
-});
-
-test("R2: métrica não é restaurada enquanto o campo que ela lê estiver arquivado", async () => {
-  const owner = await register("R2 Métrica", "r2_metrica_pai");
-  const groupId = ((await call("POST", "/api/groups", { session: owner, body: { name: "Clube R2b" } })).body as { id: string }).id;
-  const challenge = await call("POST", `/api/groups/${groupId}/challenges`, {
-    session: owner,
-    body: {
-      recipe: "habit", title: "Campo e métrica", participantIds: [owner.user.id],
-      fields: [
-        { key: "minutos", label: "Minutos", type: "number", required: true, config: { min: 0, step: 1 } },
-        { key: "extra", label: "Extra", type: "number", required: false, config: { min: 0, step: 1 } },
-      ],
-    },
-  });
-  const challengeId = (challenge.body as { id: string }).id;
-  const d = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
-    entryTypes: Array<{ id: string }>; fields: Array<{ id: string; key: string }>;
-  };
-  const extra = d.fields.find((f) => f.key === "extra")!.id;
-  const minutos = d.fields.find((f) => f.key === "minutos")!.id;
-  const metricId = ((await call("POST", `/api/challenges/${challengeId}/metrics`, {
-    session: owner, body: { label: "Soma extra", operation: "sum", fieldId: extra },
-  })).body as { id: string }).id;
-
-  // Arquiva a métrica e, depois, o campo que ela lia.
-  await call("DELETE", `/api/challenges/${challengeId}/metrics/${metricId}`, { session: owner });
-  await call("POST", `/api/challenges/${challengeId}/fields`, {
-    session: owner,
-    body: { entryTypeId: d.entryTypes[0].id, replace: true, archiveMissing: true, fields: [
-      { id: minutos, key: "minutos", label: "Minutos", type: "number", required: true, config: { min: 0, step: 1 } },
-    ] },
-  });
-
-  const restore = await call("POST", `/api/challenges/${challengeId}/trash/restore`, { session: owner, body: { kind: "metric", id: metricId } });
-  assert.equal(restore.response.status, 409, JSON.stringify(restore.body));
-  assert.equal((restore.body as { error: string }).error, "parent_trashed");
-  // Restaurando o campo primeiro, a métrica volta.
-  assert.equal((await call("POST", `/api/challenges/${challengeId}/trash/restore`, { session: owner, body: { kind: "field", id: extra } })).response.status, 200);
-  assert.equal((await call("POST", `/api/challenges/${challengeId}/trash/restore`, { session: owner, body: { kind: "metric", id: metricId } })).response.status, 200);
 });
 
 test("R2: renomear ao restaurar um item do acervo usa a mesma chave de identidade da criação", async () => {
@@ -7615,54 +7552,6 @@ test("receitas não aceitam biblioteca a mais; o item do desafio edita as propri
   assert.equal((await call("POST", `/api/challenges/${cid}/template`, { session: platform, body: {} })).response.status, 200);
   const preview = await call("GET", `/api/templates/${cid}`);
   assert.equal(JSON.stringify(preview.body).includes("Apple TV"), false, "custom values don't leak into the public template");
-});
-
-test("desafio personalizado: sem \"quando aconteceu\" por padrão, com opção para ligar, e a cópia leva a escolha", async () => {
-  const owner = await register("Nina", "nina_data");
-  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Copa" } })).body as { id: string }).id;
-  const matches = (await call("POST", `/api/groups/${gid}/catalog/libraries`, { session: owner, body: { label: "Jogos" } })).body as { id: string };
-  const detail = async (id: string) =>
-    (await call("GET", `/api/challenges/${id}`, { session: owner })).body as { collectsEntryDate: boolean };
-
-  const created = await call("POST", `/api/groups/${gid}/challenges`, {
-    session: owner,
-    body: { recipe: "custom", title: "Palpites", libraryId: matches.id, participantIds: [owner.user.id], items: [{ title: "Brasil x Argentina" }] },
-  });
-  assert.equal(created.response.status, 201, JSON.stringify(created.body));
-  const cid = (created.body as { id: string }).id;
-  assert.equal((await detail(cid)).collectsEntryDate, false, "um desafio personalizado não pergunta a data do registro");
-
-  const cinema = await call("POST", `/api/groups/${gid}/challenges`, {
-    session: owner, body: { recipe: "cinema", title: "Filmes", participantIds: [owner.user.id], items: [{ title: "Aftersun" }] },
-  });
-  assert.equal((await detail((cinema.body as { id: string }).id)).collectsEntryDate, true, "o Cinema continua perguntando");
-
-  const enabled = await call("PATCH", `/api/challenges/${cid}`, { session: owner, body: { collectsEntryDate: true } });
-  assert.equal(enabled.response.status, 200, JSON.stringify(enabled.body));
-  assert.equal((enabled.body as { collectsEntryDate: boolean }).collectsEntryDate, true);
-  assert.equal((await detail(cid)).collectsEntryDate, true);
-
-  const dst = ((await call("POST", "/api/groups", { session: owner, body: { name: "Outro bolão" } })).body as { id: string }).id;
-  const copy = await call("POST", `/api/challenges/${cid}/duplicate`, { session: owner, body: { targetGroupId: dst, mode: "structure" } });
-  assert.equal((await detail((copy.body as { id: string }).id)).collectsEntryDate, true, "a cópia herda a escolha");
-
-  const back = await call("PATCH", `/api/challenges/${cid}`, { session: owner, body: { collectsEntryDate: null } });
-  assert.equal((back.body as { collectsEntryDate: boolean }).collectsEntryDate, false, "null devolve a decisão ao padrão do tipo de desafio");
-  assert.equal((await call("PATCH", `/api/challenges/${cid}`, { session: owner, body: { collectsEntryDate: "sim" } })).response.status, 400);
-
-  // ao criar já dá para escolher, e o servidor continua guardando o horário do registro por conta própria
-  const asked = await call("POST", `/api/groups/${gid}/challenges`, {
-    session: owner,
-    body: { recipe: "custom", title: "Com data", libraryId: matches.id, collectsEntryDate: true, participantIds: [owner.user.id], items: [{ title: "Chile x Peru" }] },
-  });
-  assert.equal((await detail((asked.body as { id: string }).id)).collectsEntryDate, true);
-  const askedId = (asked.body as { id: string }).id;
-  const itemId = ((await call("GET", `/api/challenges/${askedId}`, { session: owner })).body as { items: Array<{ id: string }> }).items[0].id;
-  await call("POST", `/api/challenges/${askedId}/transition`, { session: owner, body: { status: "active" } });
-  const noDate = await call("POST", `/api/challenges/${askedId}/entries`, { session: owner, body: { itemId, values: { nota: 4, comentario: "" } } });
-  assert.equal(noDate.response.status, 201, JSON.stringify(noDate.body));
-  const stored = await adminPool.query<{ created_at: Date; occurred_on: string | null }>("SELECT created_at, occurred_on::text FROM entries WHERE id = $1", [(noDate.body as { id: string }).id]);
-  assert.ok(stored.rows[0].created_at, "o horário do salvamento fica registrado");
 });
 
 test("o registro principal de um desafio personalizado nasce compartilhado quando o grupo escolhe preencher uma vez só", async () => {
@@ -8801,7 +8690,7 @@ test("métricas de treino: unidade no campo, contar check-ins ou dias e o record
   assert.equal(afterRename.metrics.find((metric) => metric.id === checkins)?.value, 3, "os check-ins continuam lá");
 });
 
-test("contagem: Pages conta as páginas de cada livro (datas escondidas), desliga e religa sem perder; o clube de leitura e os filmes não ganham outra", async () => {
+test("contagem: Pages conta as páginas de cada livro (datas escondidas), desligar apaga, religar recomeça; o clube de leitura e os filmes não ganham outra", async () => {
   const owner = await register("Leitora Contagem", "leitora_contagem");
   const created = await call("POST", "/api/personal/challenges", {
     session: owner,
@@ -8825,8 +8714,9 @@ test("contagem: Pages conta as páginas de cada livro (datas escondidas), deslig
   detail = await load();
   assert.ok(!detail.entryTypes.some((type) => type.semanticKey === "paginas_livro"), "desligado, é só uma estante");
   assert.equal((await call("PATCH", `/api/challenges/${challengeId}/page-count`, { session: owner, body: { enabled: true } })).response.status, 200);
-  const kept = await adminPool.query("SELECT deleted_at FROM entries WHERE id = $1", [(saved.body as { id: string }).id]);
-  assert.equal(kept.rows[0]?.deleted_at, null, "a página salva continua lá");
+  // Desligar apaga as páginas já contadas; religar começa do zero.
+  const gone = await adminPool.query("SELECT id FROM entries WHERE id = $1", [(saved.body as { id: string }).id]);
+  assert.equal(gone.rows.length, 0, "desligar apaga as páginas contadas");
 
   const club = await call("POST", "/api/personal/challenges", { session: owner, body: { recipe: "library", title: "Clube", startsOn: "2026-01-01", endsOn: "2026-12-31", items: [{ title: "Duna", author: "Frank Herbert", position: 0 }] } });
   assert.equal(club.response.status, 201, JSON.stringify(club.body));

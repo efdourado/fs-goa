@@ -688,8 +688,6 @@
     "scopeIndividualHint": "Cada persona responde por sí misma (una nota, una apuesta, un comentario).",
     "scopeShared": "Una vez para el grupo",
     "scopeSharedHint": "Una respuesta por ítem que todos ven (un marcador final, un veredicto acordado).",
-    "entryDateLabel": "Preguntar cuándo ocurrió cada registro",
-    "entryDateHint": "Añade al formulario una fecha opcional «¿Cuándo ocurrió?». Déjalo desactivado cuando la fecha pertenece al propio ítem, como el inicio de un partido.",
     "itemDatesLabel": "Cada ítem tiene su propia fecha y hora",
     "itemDatesHint": "Como el inicio de un partido o una sesión. Se guarda en el ítem, así que todo desafío que lo use muestra la misma fecha.",
     "errItemSchedule": "Revisa la fecha (el final, la hora o la zona horaria no parecen correctos)."
@@ -876,10 +874,6 @@
     "libraryHint": "De qué lista de cosas parte este desafío.",
     "linkLibrary": "Elegir biblioteca",
     "librariesHint": "De dónde vienen los ítems de este desafío. Mientras no tenga ítems, puedes cambiarla por otra.",
-    "entryDateTitle": "Preguntar cuándo ocurrió cada registro",
-    "entryDateHint": "Añade al formulario una fecha opcional «¿Cuándo ocurrió?». Desactivado, el formulario solo pregunta lo que configuraste (cada registro sigue guardando la hora en que se guardó).",
-    "entryDateOn": "El formulario ahora pregunta cuándo ocurrió cada registro.",
-    "entryDateOff": "El formulario ya no pregunta una fecha.",
     "reuseDoneTitle": "Copia creada",
     "reuseDoneBody": "La copia está lista, pero algunas propiedades no pudieron venir con ella.",
     "eventScheduleInvalid": "Revisa la fecha (el final, la hora o la zona horaria no parecen correctos).",
@@ -897,7 +891,7 @@
     "metricItemAll": "Todos los ítems",
     "metricItemHint": "Muestra el número de un solo ítem (tu récord de peso muerto, por ejemplo).",
     "pageCountTitle": "Contar páginas",
-    "pageCountHint": "Cada libro muestra dónde estás y cuánto falta, sin fechas. Apagado, es solo una estantería; las páginas ya guardadas se conservan.",
+    "pageCountHint": "Cada libro muestra dónde estás y cuánto falta, sin fechas. Apagado, es solo una estantería, y las páginas ya contadas se borran.",
     "pageCountOn": "Conteo de páginas activado.",
     "pageCountOff": "Conteo de páginas desactivado.",
     "organiseItems": "Organizar elementos",
@@ -976,7 +970,6 @@
     "dueBy": "hasta {date}",
     "occurredOnLabel": "Fecha en que ocurrió",
     "occurredOnHint": "Usa hoy o recupera un registro del pasado.",
-    "occurredOnOptionalHint": "Déjalo en blanco para guardar el registro sin fecha.",
     "occurredOn": "Ocurrió el {date}.",
     "checkpointsTitle": "Ítems",
     "sessionsTitle": "Sesiones",
@@ -1646,7 +1639,10 @@
       "values": "{count, plural, one {# respuesta} other {# respuestas}}",
       "challengesUsing": "{count, plural, one {usado por # desafío} other {usado por # desafíos}}"
     },
-    "emptyAction": "Vaciar"
+    "emptyAction": "Vaciar",
+    "purgeConnected": "{count, plural, one {Está en # desafío. Borrarlo lo saca de ahí (el desafío guarda el título).} other {Está en # desafíos. Borrarlo lo saca de ahí (los desafíos guardan el título).}}",
+    "emptyConnected": "{count, plural, one {# ítem quedó porque está en un desafío.} other {# ítems quedaron porque están en desafíos.}} Borrar los saca de ahí también.",
+    "emptyConnectedAction": "Borrar también"
   },
   "accountDeactivated": {
     "title": "Tu cuenta está desactivada",

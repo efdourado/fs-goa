@@ -2,6 +2,7 @@ import type { PoolClient } from "pg";
 
 import { ApiError } from "../http";
 import { publicId } from "./domain/shared";
+import { deleteCheckpointsHard } from "./hard-delete";
 
 interface DailyCheckpointInput {
   id: string;
@@ -70,13 +71,13 @@ export async function syncDailyCheckpoints(
   );
   const ids = upserted.rows.map((row) => row.id);
 
-  // Reagendar nunca descarta um dia que já recebeu check-in: arquivar só os
+  // Reagendar nunca descarta um dia que já recebeu check-in: apagar só os
   // checkpoints fora da nova janela que continuam vazios. Encurtar um período
   // por cima de registros é barrado antes, em updateChallenge; esta cláusula é a
   // rede de segurança para os demais caminhos (ex.: regeneração manual).
-  await client.query(
-    `UPDATE challenge_checkpoints cc SET archived_at=now(),updated_at=now()
-      WHERE cc.challenge_id=$1 AND cc.archived_at IS NULL AND NOT (cc.id=ANY($2::text[]))
+  const outside = await client.query<{ id: string }>(
+    `SELECT cc.id FROM challenge_checkpoints cc
+      WHERE cc.challenge_id=$1 AND NOT (cc.id=ANY($2::text[]))
         AND NOT EXISTS (
           SELECT 1 FROM entries e
            WHERE e.challenge_id=cc.challenge_id AND e.deleted_at IS NULL
@@ -84,5 +85,6 @@ export async function syncDailyCheckpoints(
         )`,
     [challengeId, ids],
   );
+  await deleteCheckpointsHard(client, outside.rows.map((row) => row.id));
   return ids;
 }

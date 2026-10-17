@@ -657,7 +657,6 @@ test("Hoje: duas seções obrigatórias empilhadas (Expectativa+Avaliação) div
     startsOn: "2026-01-01",
     endsOn: "2026-06-01",
     submissionMode: "item",
-    collectsEntryDate: true,
     participants: [],
     entryTypes: [
       { id: "exp", name: "Expectativa", purpose: "expectation", targetPolicy: "required", cardinality: "once_per_item", schedulePolicy: "while_active", isPrimary: false, fields: [{ id: "f-exp", key: "expectativa", label: "Expectativa", type: "rating", required: true, config: { min: 0, max: 5, step: 0.5 } }] },

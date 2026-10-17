@@ -58,6 +58,8 @@ function PurgeDialog({
   const [confirmation, setConfirmation] = useState("");
   const [reason, setReason] = useState("");
   const entries = preview.dependencies.find((dep) => dep.type === "entries")?.count ?? 0;
+  // Challenges still using a catalogue item: deleting it disconnects it from them, so say so first.
+  const connected = preview.kind === "catalog_item" ? preview.dependencies.find((dep) => dep.type === "challengesUsing")?.count ?? 0 : 0;
   const needsReason = preview.kind === "entry";
 
   return (
@@ -68,6 +70,7 @@ function PurgeDialog({
         <p className="mt-2 text-xs text-[var(--muted)]">{preview.blocked.message}</p>
       ) : (
         <>
+          {connected ? <p className="mt-3 text-sm text-[var(--danger)]">{t("purgeConnected", { count: connected })}</p> : null}
           {preview.dependencies.length ? (
             <ul className="mt-3 space-y-1 text-sm">
               {preview.dependencies.map((dep) => (
@@ -138,6 +141,8 @@ export function TrashView({
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<{ preview: TrashActionPreview } | null>(null);
+  const [connectedLeft, setConnectedLeft] = useState<number | null>(null);
+  const [forcing, setForcing] = useState(false);
   const [dialogBusy, setDialogBusy] = useState(false);
   const [dialogError, setDialogError] = useState<string | null>(null);
   const [emptyOpen, setEmptyOpen] = useState(false);
@@ -223,13 +228,16 @@ export function TrashView({
     }
   }
 
-  async function emptyBin() {
+  // Two steps: the first empties what nothing else uses and says how many items stayed because a challenge
+  // still uses them; "Excluir também" (force) then deletes those, disconnecting them from their challenges.
+  async function emptyBin(force = false) {
     if (!emptyScope) return;
-    const result = await apiRequest<{ purged: number; skipped: number }>(
-      API_PATHS.trashEmpty(emptyScope), { method: "POST", csrfToken, body: {} },
+    const result = await apiRequest<{ purged: number; skipped: number; connected?: number }>(
+      API_PATHS.trashEmpty(emptyScope), { method: "POST", csrfToken, body: force ? { force: true } : {} },
     );
     setEmptyOpen(false);
     setKept(result.skipped > 0 ? result.skipped : null);
+    setConnectedLeft(result.connected ? result.connected : null);
     setError(null);
     load();
     onChanged?.();
@@ -263,6 +271,14 @@ export function TrashView({
       {heading}
       <StatusMessage error={error} />
       {kept != null ? <p className="text-xs text-[var(--muted)]">{t("emptyKept", { count: kept })}</p> : null}
+      {connectedLeft != null ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--danger-line)] px-4 py-3">
+          <p className="min-w-0 flex-1 text-sm text-[var(--muted)]">{t("emptyConnected", { count: connectedLeft })}</p>
+          <Button variant="danger" disabled={forcing} onClick={() => { setForcing(true); void emptyBin(true).finally(() => setForcing(false)); }}>
+            {forcing ? t("emptying") : t("emptyConnectedAction")}
+          </Button>
+        </div>
+      ) : null}
       <ul className={cx(cardClass, "divide-y divide-[var(--line)] overflow-hidden")}>
         {rows.map((item) => {
           const sentence = dependencySentence(item, t);
@@ -311,7 +327,7 @@ export function TrashView({
           confirmLabel={t("emptyAction")}
           busyLabel={t("emptying")}
           danger
-          onConfirm={emptyBin}
+          onConfirm={() => emptyBin()}
           onClose={() => setEmptyOpen(false)}
         />
       ) : null}

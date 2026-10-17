@@ -455,7 +455,9 @@ export async function saveEntry(
 
     // Schedule axis — a free/period date, or a dated checkpoint (session).
     if (effectiveSchedule !== "checkpoint") {
-      occurredOn = dateOptional && (body.occurredOn === null || body.occurredOn === "")
+      // A response about an item has no date of its own (it's dated by when it's saved); a day-keyed one and a
+      // check-in visit keep theirs.
+      occurredOn = dateOptional && (targetPolicy !== "none" || body.occurredOn === null || body.occurredOn === "")
         ? null
         : typeof body.occurredOn === "string" && body.occurredOn
           ? dateString(body.occurredOn, "Data")

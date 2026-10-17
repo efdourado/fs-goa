@@ -688,8 +688,6 @@
     "scopeIndividualHint": "Everyone answers for themselves (a rating, a guess, a note).",
     "scopeShared": "Once for the group",
     "scopeSharedHint": "One answer per item that everyone sees (a final score, an agreed verdict).",
-    "entryDateLabel": "Ask when each response happened",
-    "entryDateHint": "Adds an optional “When did it happen?” date to the form. Leave it off when the date belongs to the item itself, like a match's kick-off.",
     "itemDatesLabel": "Each item has its own date and time",
     "itemDatesHint": "Like a match's kick-off or a screening. It's kept on the item, so every challenge that uses it shows the same date.",
     "errItemSchedule": "Check the date (the end, the time or the time zone doesn't look right)."
@@ -876,10 +874,6 @@
     "libraryHint": "Which list of things this challenge draws from.",
     "linkLibrary": "Choose a library",
     "librariesHint": "Where this challenge's items come from. While it has no items yet, you can swap it for another.",
-    "entryDateTitle": "Ask when each response happened",
-    "entryDateHint": "Adds an optional “When did it happen?” date to the response form. Off, the form only asks for what you set up (every response is still timestamped when it's saved).",
-    "entryDateOn": "The form now asks when each response happened.",
-    "entryDateOff": "The form no longer asks for a date.",
     "reuseDoneTitle": "Copy created",
     "reuseDoneBody": "The copy is ready, but some properties couldn't come across.",
     "eventScheduleInvalid": "Check the date (the end, the time or the time zone doesn't look right).",
@@ -897,7 +891,7 @@
     "metricItemAll": "Every item",
     "metricItemHint": "Shows the number for a single item (your deadlift record, say).",
     "pageCountTitle": "Count pages",
-    "pageCountHint": "Each book shows where you are and how much is left, no dates. Off, it's just a bookshelf; pages already saved are kept.",
+    "pageCountHint": "Each book shows where you are and how much is left, no dates. Off, it's just a bookshelf, and the pages already counted are deleted.",
     "pageCountOn": "Page count on.",
     "pageCountOff": "Page count off.",
     "organiseItems": "Organise items",
@@ -976,7 +970,6 @@
     "dueBy": "by {date}",
     "occurredOnLabel": "Date it happened",
     "occurredOnHint": "Use today or backfill an entry from the past.",
-    "occurredOnOptionalHint": "Leave it blank to save the entry without a date.",
     "occurredOn": "Happened on {date}.",
     "checkpointsTitle": "Items",
     "sessionsTitle": "Sessions",
@@ -1646,7 +1639,10 @@
       "values": "{count, plural, one {# answer} other {# answers}}",
       "challengesUsing": "{count, plural, one {used by # challenge} other {used by # challenges}}"
     },
-    "emptyAction": "Empty"
+    "emptyAction": "Empty",
+    "purgeConnected": "{count, plural, one {It's in # challenge. Deleting takes it out of there (the challenge keeps the title).} other {It's in # challenges. Deleting takes it out of them (they keep the title).}}",
+    "emptyConnected": "{count, plural, one {# item stayed because it's in a challenge.} other {# items stayed because they're in challenges.}} Deleting takes them out of there too.",
+    "emptyConnectedAction": "Delete them too"
   },
   "accountDeactivated": {
     "title": "Your account is deactivated",

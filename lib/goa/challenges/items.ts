@@ -24,6 +24,7 @@ import { ensureChallengeLibraries, resolveItemLibrary } from "./libraries";
 import { midnightInTimeZone } from "../domain/shared";
 import { resolveItemRecommender } from "./recommender";
 import { syncDailyCheckpoints } from "../daily-checkpoints";
+import { deleteChallengeItemsHard } from "../hard-delete";
 import {
   entryTypesForChallenge,
   primaryEntryType,
@@ -524,22 +525,15 @@ export async function archiveChallengeItem(
       }
       throw new ApiError(404, "not_found", "Item não encontrado.");
     }
-    // Um item com registros não trava mais a remoção: os registros presos a ele
-    // saem junto, em soft-delete, para sumir de métricas, histórico e showcase.
-    const purged = await client.query(
-      "UPDATE entries SET deleted_at=now(),last_edited_by_user_id=$3,updated_at=now() WHERE item_id=$1 AND challenge_id=$2 AND deleted_at IS NULL",
-      [itemId, challengeId, session.user.id],
-    );
-    await client.query(
-      "UPDATE challenge_items SET archived_at=now(),updated_at=now() WHERE id=$1 AND challenge_id=$2",
-      [itemId, challengeId],
-    );
+    // Removing an item deletes it, with every response about it.
+    const purged = await client.query<{ id: string }>("SELECT id FROM entries WHERE item_id=$1 AND challenge_id=$2 AND deleted_at IS NULL", [itemId, challengeId]);
+    await deleteChallengeItemsHard(client, [itemId]);
     await writeAudit(
       client,
       access.challenge.group_id,
       challengeId,
       session.user.id,
-      "item.archived",
+      "item.deleted",
       "challenge_item",
       itemId,
       { title: current.title },

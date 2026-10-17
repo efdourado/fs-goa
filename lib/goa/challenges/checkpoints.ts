@@ -4,6 +4,7 @@ import type { SessionContext } from "../../auth";
 import { inTransaction, oneOrNull } from "../../db";
 import { challengeAccess, publicId, semanticKey, writeAudit } from "../../goa-domain";
 import { ApiError } from "../../http";
+import { deleteCheckpointsHard } from "../hard-delete";
 
 export type CheckpointKind = "day" | "week" | "session" | "milestone";
 const CHECKPOINT_KINDS: readonly CheckpointKind[] = ["day", "week", "session", "milestone"];
@@ -137,7 +138,7 @@ export async function saveCheckpoints(
       }
     }
 
-    // Archive the dropped ones first, freeing their semantic keys for reuse.
+    // Delete the dropped ones first, freeing their semantic keys for reuse.
     const dropped = existing.filter((row) => !keptIds.has(row.id));
     for (const row of dropped) {
       const withEntries = await oneOrNull<{ count: number }>(
@@ -152,14 +153,7 @@ export async function saveCheckpoints(
           `A etapa "${row.title}" já tem ${withEntries.count} registro(s). Mova ou remova os registros antes de excluí-lo.`,
         );
       }
-      await client.query(
-        "UPDATE challenge_items SET checkpoint_id = NULL, updated_at = now() WHERE checkpoint_id = $1 AND challenge_id = $2",
-        [row.id, challengeId],
-      );
-      await client.query(
-        "UPDATE challenge_checkpoints SET archived_at = now(), updated_at = now() WHERE id = $1 AND challenge_id = $2",
-        [row.id, challengeId],
-      );
+      await deleteCheckpointsHard(client, [row.id]);
     }
 
     const taken = new Set<string>();

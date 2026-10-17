@@ -4,7 +4,6 @@ import { describe, test } from "node:test";
 import { ApiError } from "../lib/http";
 import {
   isRecipeKey,
-  recipeCollectsEntryDate,
   resolveRecipe,
 } from "../lib/goa/challenges/recipes";
 
@@ -46,10 +45,6 @@ describe("current challenge recipes", () => {
     assert.equal(recipe.key, "bookshelf");
     assert.equal(recipe.catalogKind, "book");
     assert.equal(recipe.scheduleMode, "none");
-    assert.equal(recipe.collectsEntryDate, false);
-    assert.equal(recipeCollectsEntryDate("bookshelf"), false);
-    assert.equal(recipeCollectsEntryDate("cinema"), true);
-    assert.equal(recipeCollectsEntryDate(null), true);
     assert.deepEqual(recipe.entryTypes.map((type) => type.purpose), ["rating", "progress"]);
     const pages = recipe.entryTypes[1];
     assert.equal(pages.cardinality, "once_per_item_day", "each update is saved on its day (never shown)");
@@ -86,9 +81,6 @@ describe("current challenge recipes", () => {
     // Only completion is seeded — a "nota"-keyed metric would be wrong the
     // moment the wizard's Fields step replaces the default fields.
     assert.deepEqual(recipe.metrics.map((metric) => metric.operation), ["completion_rate"]);
-    // A response is about something else (a match, a place) — its date is asked for only when switched on.
-    assert.equal(recipe.collectsEntryDate, false);
-    assert.equal(recipeCollectsEntryDate("custom"), false);
   });
 
   test("Tables rates a place on three 0-5 dimensions with an optional comment and nothing else", () => {
@@ -103,7 +95,6 @@ describe("current challenge recipes", () => {
     assert.deepEqual(fields.map((field) => field.type), ["rating", "rating", "rating", "text"]);
     assert.deepEqual(fields.map((field) => field.required), [true, true, true, false]);
     // No forced address, visit date, price, overall rating or "would return" field — an overall *metric* is fine.
-    assert.equal(recipe.collectsEntryDate, false);
     assert.equal(fields.some((field) => /endere|pre[cç]o|voltar/i.test(String(field.label))), false);
     // The three dimensions' per-place averages, a combined "Nota geral" averaging all three, + completion.
     assert.deepEqual(

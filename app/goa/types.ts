@@ -579,7 +579,6 @@ export interface ChallengeDetail extends ChallengeSummary {
   metrics: Metric[];
   result?: ChallengeResult | null;
   /** False for a retrospective list (e.g. Estante) — the entry form hides the "when" date. */
-  collectsEntryDate?: boolean;
   /** This challenge is listed in the public template gallery (a platform admin put it there). */
   publishedAsTemplate?: boolean;
 }
@@ -735,7 +734,6 @@ export interface ChallengeCreationInput {
   /** Group Cinema/Estante: ratings stay sealed until someone reveals each item. */
   revealTogether?: boolean;
   /** Custom only: ask "when did it happen" on each response. Left out, the recipe's default applies. */
-  collectsEntryDate?: boolean;
   /** Custom only: who fills the main response in — each participant, or once for the whole group. */
   answerScope?: "individual" | "shared";
   /** Custom only: `session` makes each entry one check-in holding a record per item (a workout of exercises). */

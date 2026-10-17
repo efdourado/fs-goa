@@ -362,10 +362,10 @@ export async function POST(request: Request): Promise<Response> {
       return json(await purgeTrashItem(session, body));
     }
     if (isPath(path, "personal", "trash", "empty")) {
-      return json(await emptyBin(session, "personal"));
+      return json(await emptyBin(session, "personal", body.force === true));
     }
     if (path[0] === "groups" && path[2] === "trash" && path[3] === "empty" && path.length === 4) {
-      return json(await emptyBin(session, { groupId: path[1] }));
+      return json(await emptyBin(session, { groupId: path[1] }, body.force === true));
     }
 
     if (isPath(path, "groups")) return json(await createGroup(session, body), 201);

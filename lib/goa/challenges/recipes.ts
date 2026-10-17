@@ -88,12 +88,6 @@ interface Recipe {
    */
   userDefinedFields?: boolean;
   scheduleMode: "none" | "period";
-  /**
-   * Whether a participant's entry form offers the optional "when did it happen"
-   * date. A retrospective list ("books I've already read") never needs it, so
-   * `bookshelf` opts out; the others default to true.
-   */
-  collectsEntryDate?: boolean;
   entryTypes: RecipeEntryType[];
   metrics: RecipeMetric[];
 }
@@ -107,14 +101,6 @@ export type RecipeKey = "cinema" | "library" | "bookshelf" | "habit" | "custom" 
 
 export function isRecipeKey(value: unknown): value is RecipeKey {
   return value === "cinema" || value === "library" || value === "bookshelf" || value === "habit" || value === "custom" || value === "tables";
-}
-
-/**
- * Whether a challenge on this recipe collects the optional per-entry date. Unknown
- * / legacy keys keep the historical default (true).
- */
-export function recipeCollectsEntryDate(key: string | null | undefined): boolean {
-  return isRecipeKey(key) ? RECIPES[key].collectsEntryDate !== false : true;
 }
 
 const ratingFields = (commentMax: number): ClientField[] => [
@@ -319,7 +305,6 @@ export const RECIPES: Record<RecipeKey, Recipe> = {
     version: 1,
     catalogKind: "book",
     scheduleMode: "none",
-    collectsEntryDate: false,
     entryTypes: [avaliacao(true), pageCountType],
     metrics: [
       { key: "media_nota", label: "Nota média", operation: "average", fieldKey: "nota", groupBy: "none" },
@@ -369,7 +354,6 @@ export const RECIPES: Record<RecipeKey, Recipe> = {
     scheduleMode: "none",
     // A response is about something else (a match, a place), so "when did it happen" is only asked
     // when the creator turns it on — every save is still timestamped internally.
-    collectsEntryDate: false,
     entryTypes: [customEntry],
     metrics: [completionMetric],
   },
@@ -382,7 +366,6 @@ export const RECIPES: Record<RecipeKey, Recipe> = {
     catalogKindFromBody: true,
     defaultLibrarySource: "tables",
     scheduleMode: "none",
-    collectsEntryDate: false,
     entryTypes: [tablesEntry],
     metrics: [
       { key: "media_comida", label: "Comida e bebida (média por lugar)", operation: "average", fieldKey: "comida", groupBy: "item" },

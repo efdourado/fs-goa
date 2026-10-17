@@ -21,11 +21,11 @@ import { attributeValuesForItems } from "../catalog-attributes";
 import { readChallengeLibraries } from "./libraries";
 import { generateDailyCheckpoints } from "./items";
 import { challengeRatingFieldIds } from "./rating";
-import { recipeCollectsEntryDate } from "./recipes";
 import { metricsForChallenge, resultForChallenge } from "./results";
 import { eventScheduleJson, scheduleVisibleSql } from "../domain/event-schedule";
 import { recommenderVisibleSql } from "../domain/shared";
 import { parseRuleSections, rulesCompatibilityText } from "../domain/rules";
+import { deleteCheckpointsHard } from "../hard-delete";
 
 function windowStatus(
   challengeStatus: "draft" | "active" | "closed",
@@ -196,7 +196,6 @@ export interface DetailChallengeRow {
   group_kind: string | null;
   results_anon: boolean;
   show_schedule?: boolean;
-  collects_entry_date?: boolean | null;
   results_all_comments?: boolean;
   published_as_template_at?: string | Date | null;
   time_zone?: string;
@@ -321,7 +320,6 @@ export async function buildChallengeDetail(
     kind: ch.kind,
     recipeKey: ch.recipe_key ?? null,
     scope: ch.group_kind === "personal" ? "personal" : "group",
-    collectsEntryDate: ch.collects_entry_date ?? recipeCollectsEntryDate(ch.recipe_key),
     resultsAnon: ch.results_anon,
     showSchedule: ch.show_schedule ?? true,
     resultsAllComments: ch.results_all_comments === true,
@@ -385,12 +383,6 @@ export async function updateChallenge(
       ? parseRuleSections(access.challenge.rule_sections, access.challenge.rules)
       : parseRuleSections(body.ruleSections, body.rules);
     const rules = rulesCompatibilityText(ruleSections);
-    // `null` hands the choice back to the recipe's default.
-    const touchesEntryDate = Object.hasOwn(body, "collectsEntryDate");
-    if (touchesEntryDate && body.collectsEntryDate !== null && typeof body.collectsEntryDate !== "boolean") {
-      throw new ApiError(400, "invalid_setting", "Informe se o registro pergunta quando aconteceu.");
-    }
-    const collectsEntryDate = touchesEntryDate ? (body.collectsEntryDate as boolean | null) : access.challenge.collects_entry_date;
     const rawStartDate = Object.hasOwn(body, "startsOn")
       ? body.startsOn
       : Object.hasOwn(body, "startDate")
@@ -461,8 +453,8 @@ export async function updateChallenge(
 
     await client.query(
       `UPDATE challenges SET title=$2, description=$3, rules=$4, rule_sections=$5::jsonb,
-              start_date=$6, end_date=$7, collects_entry_date=$8, updated_at=now() WHERE id=$1`,
-      [challengeId, title, description, rules, JSON.stringify(ruleSections), startDate, endDate, collectsEntryDate],
+              start_date=$6, end_date=$7, updated_at=now() WHERE id=$1`,
+      [challengeId, title, description, rules, JSON.stringify(ruleSections), startDate, endDate],
     );
     if (
       checkpointDriven
@@ -472,12 +464,9 @@ export async function updateChallenge(
       if (startDate !== null && endDate !== null) {
         await generateDailyCheckpoints(client, challengeId, startDate, endDate);
       } else {
-        await client.query(
-          `UPDATE challenge_checkpoints
-              SET archived_at = now(), updated_at = now()
-            WHERE challenge_id = $1 AND archived_at IS NULL`,
-          [challengeId],
-        );
+        // No dates, no days: the day checkpoints are deleted (responses keep their own date).
+        const days = await client.query<{ id: string }>("SELECT id FROM challenge_checkpoints WHERE challenge_id = $1", [challengeId]);
+        await deleteCheckpointsHard(client, days.rows.map((row) => row.id));
       }
     }
     // New dates are a different challenge to look at from outside: a published link is replaced, so an old
@@ -496,10 +485,9 @@ export async function updateChallenge(
       { title: access.challenge.title, description: access.challenge.description,
         ruleSections: parseRuleSections(access.challenge.rule_sections, access.challenge.rules),
         startsOn: access.challenge.start_date, endsOn: access.challenge.end_date },
-      { title, description, ruleSections, startsOn: startDate, endsOn: endDate, collectsEntryDate });
+      { title, description, ruleSections, startsOn: startDate, endsOn: endDate });
     return {
       id: challengeId, title, description, rules, ruleSections, startsOn: startDate, endsOn: endDate,
-      collectsEntryDate: collectsEntryDate ?? recipeCollectsEntryDate(access.challenge.recipe_key),
       linkRotated,
     };
   });

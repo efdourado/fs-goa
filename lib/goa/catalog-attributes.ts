@@ -207,8 +207,8 @@ async function archiveDefWithClient(client: PoolClient, actorUserId: string, gro
   if (!def) throw new ApiError(404, "not_found", "Atributo não encontrado.");
   // Removing a property removes what the items had saved for it: a property that is gone holds nothing.
   await client.query("DELETE FROM catalog_attribute_values WHERE attribute_def_id = $1 AND group_id = $2", [defId, groupId]);
-  await client.query("UPDATE catalog_attribute_defs SET archived_at = now(), updated_at = now() WHERE id = $1", [defId]);
-  await writeAudit(client, groupId, null, actorUserId, "catalog.attribute_archived", "catalog_attribute_def", defId, null, null);
+  await client.query("DELETE FROM catalog_attribute_defs WHERE id = $1", [defId]);
+  await writeAudit(client, groupId, null, actorUserId, "catalog.attribute_deleted", "catalog_attribute_def", defId, null, null);
 }
 
 /**
