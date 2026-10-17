@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { API_PATHS, apiRequest } from "./api";
 import { ConfirmDialog, Dialog } from "./dialog";
 import type { Id, TrashActionPreview, TrashItem } from "./types";
-import { Button, cardClass, cx, EmptyState, LoadingView, PageHeading, StatusMessage } from "./ui";
+import { Button, cardClass, cx, FaceEmptyState, LoadingView, PageHeading, StatusMessage } from "./ui";
 
 type Scope = "personal" | { groupId: Id } | { challengeId: Id };
 
@@ -24,7 +24,7 @@ export function TrashLoadState({ loading, error, onRetry }: {
   const tc = useTranslations("common");
   if (error) return <div className="space-y-3"><StatusMessage error={error} /><Button variant="secondary" onClick={onRetry}>{tc("retry")}</Button></div>;
   if (loading) return <LoadingView label={t("loading")} />;
-  return <EmptyState title={t("emptyTitle")} />;
+  return <FaceEmptyState title={t("emptyTitle")} />;
 }
 
 function scopeListPath(scope: Scope): string {

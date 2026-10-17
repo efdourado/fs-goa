@@ -598,9 +598,9 @@ async function listBinScope(client: PoolClient, scopeType: "personal" | "group",
 /** "Minha lixeira" — trashed personal challenges, personal catalogue items, and the owner's trashed standard groups. */
 export async function personalTrash(session: SessionContext) {
   return withClient(async (client) => {
+    // A new account has no personal space yet: its bin is just whatever groups it deleted (often nothing).
     const wsIds = await personalWorkspaceIds(client, session.user.id);
-    if (!wsIds.length) throw new ApiError(404, "not_found", "Espaço pessoal não encontrado.");
-    const items = await listBinScope(client, "personal", wsIds);
+    const items = wsIds.length ? await listBinScope(client, "personal", wsIds) : [];
     const ownedGroups = await client.query<{
       entity_id: string; deleted_at: string; reason: string | null; deleted_by: string | null;
     }>(
@@ -851,7 +851,6 @@ export async function emptyBin(session: SessionContext, scope: "personal" | { gr
     let targets: Array<{ kind: BinKind; id: string }> = [];
     if (scope === "personal") {
       const wsIds = await personalWorkspaceIds(client, session.user.id);
-      if (!wsIds.length) throw new ApiError(404, "not_found", "Espaço pessoal não encontrado.");
       const scoped = await client.query<{ entity_kind: BinKind; entity_id: string }>(
         `SELECT entity_kind, entity_id FROM trash_items
           WHERE scope_type='personal' AND scope_id = ANY($1::text[]) AND entity_kind NOT IN ('entry','group')`,

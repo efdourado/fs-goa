@@ -82,7 +82,7 @@
     "labelCount": "Updates ({count})",
     "title": "Updates",
     "pending": "{count, plural, one {# pending} other {# pending}}",
-    "empty": "No information.",
+    "empty": "No notifications",
     "error": "Couldn't finish. Try again.",
     "invited": "<b>{invitedBy}</b> invited you to the group <b>{groupName}</b>.",
     "someone": "Someone",

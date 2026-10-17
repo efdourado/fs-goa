@@ -529,6 +529,21 @@ export function ChevronIcon({ dir, className = "h-4 w-4" }: { dir: "up" | "down"
   return <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={dir === "up" ? "M4.5 9.5 8 6l3.5 3.5" : "M4.5 6.5 8 10l3.5-3.5"} /></svg>;
 }
 
+/**
+ * The empty state with a face: a little frown (ᴖ̈) in a thin circle over a muted title, centred, no box. The empty
+ * bin and an empty notifications menu use it. `compact` fits it in a menu.
+ */
+export function FaceEmptyState({ title, compact = false }: { title: string; compact?: boolean }) {
+  return (
+    <div className={cx("grid justify-items-center gap-3 px-4 text-center", compact ? "py-8" : "py-12")}>
+      <span className="grid h-[52px] w-[52px] place-items-center rounded-full border border-[var(--line)] font-[system-ui,sans-serif] text-[26px] leading-none text-[var(--ink)]" aria-hidden="true">
+        ᴖ̈
+      </span>
+      <p className="text-[15px] font-light tracking-[-0.01em] text-[var(--muted)]">{title}</p>
+    </div>
+  );
+}
+
 export function SlidersIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true">
@@ -1094,7 +1109,7 @@ export function NotificationList({
   }
 
   if (!inbox.length) {
-    return <p className="px-4 py-6 text-center text-sm text-[var(--muted)]">{t("empty")}</p>;
+    return <FaceEmptyState title={t("empty")} compact />;
   }
   return (
     <>

@@ -82,7 +82,7 @@
     "labelCount": "Novedades ({count})",
     "title": "Novedades",
     "pending": "{count, plural, one {# pendiente} other {# pendientes}}",
-    "empty": "Sin información.",
+    "empty": "Ninguna notificación",
     "error": "No se pudo completar. Inténtalo de nuevo.",
     "invited": "<b>{invitedBy}</b> te invitó al grupo <b>{groupName}</b>.",
     "someone": "Alguien",
