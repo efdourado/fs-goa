@@ -727,6 +727,7 @@
       "pending": "Pending"
     },
     "basicsTitle": "Basic details",
+    "saveBasics": "Save basic details",
     "titleLabel": "Title",
     "scheduleLegend": "Schedule",
     "schedulePeriod": "With a period",
