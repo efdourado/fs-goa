@@ -13,7 +13,7 @@
     "menuCopyHint": "Reuse its setup in another group.",
     "menuTemplateTitle": "Template gallery",
     "menuTemplateHint": "Publish it as a template anyone can use.",
-    "menuDeleteHint": "Goes to the bin, you can restore it.",
+    "menuDeleteHint": "Goes to the bin with its entries. Items only it uses leave your catalogue. All of it comes back if you restore it.",
     "settingsTitle": "Settings",
     "settingsSubtitle": "What applies to the whole challenge: who sees it from outside, copies and deletion.",
     "settingsDeleteAction": "Delete"
@@ -766,7 +766,7 @@
     "reuseNoneTitle": "No other group available",
     "reuseNoneBody": "Create another group or become an owner/admin of one to reuse this template.",
     "deleteTitle": "Delete challenge?",
-    "deleteBody": "Moves the challenge and its entries to the bin.",
+    "deleteBody": "The challenge and its entries go to the bin, and items only it uses leave your catalogue. All of it comes back if you restore it.",
     "deleteBodyTemplateWarning": "Its template in the gallery goes too.",
     "deleteConfirm": "Move \"{title}\" to the bin?",
     "delete": "Delete challenge",

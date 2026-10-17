@@ -13,7 +13,7 @@
     "menuCopyHint": "Reaproveite a estrutura em outro grupo.",
     "menuTemplateTitle": "Galeria de modelos",
     "menuTemplateHint": "Publique como modelo para qualquer pessoa usar.",
-    "menuDeleteHint": "Vai para a lixeira (dá para restaurar).",
+    "menuDeleteHint": "Vai para a lixeira com os registros. Os itens que só ele usa saem do catálogo. Tudo volta se você restaurar.",
     "settingsTitle": "Configurações",
     "settingsSubtitle": "O que vale para o desafio inteiro: quem vê de fora, cópias e exclusão.",
     "settingsDeleteAction": "Excluir"
@@ -766,7 +766,7 @@
     "reuseNoneTitle": "Nenhum outro grupo disponível",
     "reuseNoneBody": "Crie outro grupo ou torne-se responsável de um grupo para reutilizar este modelo.",
     "deleteTitle": "Excluir desafio?",
-    "deleteBody": "O desafio e seus registros vão para a lixeira.",
+    "deleteBody": "O desafio e seus registros vão para a lixeira, e os itens que só ele usa saem do catálogo. Tudo volta se você restaurar.",
     "deleteBodyTemplateWarning": "O modelo publicado na galeria sai junto.",
     "deleteConfirm": "Mover \"{title}\" para a lixeira?",
     "delete": "Excluir desafio",

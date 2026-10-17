@@ -13,7 +13,7 @@
     "menuCopyHint": "Reutiliza su estructura en otro grupo.",
     "menuTemplateTitle": "Galería de plantillas",
     "menuTemplateHint": "Publícalo como plantilla para que cualquiera lo use.",
-    "menuDeleteHint": "Va a la papelera (puedes restaurarlo).",
+    "menuDeleteHint": "Va a la papelera con sus registros. Los ítems que solo él usa salen del catálogo. Todo vuelve si lo restauras.",
     "settingsTitle": "Configuración",
     "settingsSubtitle": "Lo que vale para todo el desafío: quién lo ve desde fuera, copias y eliminación.",
     "settingsDeleteAction": "Eliminar"
@@ -766,7 +766,7 @@
     "reuseNoneTitle": "Ningún otro grupo disponible",
     "reuseNoneBody": "Crea otro grupo o vuélvete responsable de un grupo para reutilizar esta plantilla.",
     "deleteTitle": "¿Eliminar desafío?",
-    "deleteBody": "El desafío y sus registros van a la papelera.",
+    "deleteBody": "El desafío y sus registros van a la papelera, y los ítems que solo él usa salen del catálogo. Todo vuelve si lo restauras.",
     "deleteBodyTemplateWarning": "Su plantilla en la galería se va también.",
     "deleteConfirm": "¿Mover \"{title}\" a la papelera?",
     "delete": "Eliminar desafío",
