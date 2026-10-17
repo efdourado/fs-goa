@@ -176,7 +176,7 @@ export function CheckpointPlanner({
                   return (
                     <li className="py-4 first:pt-0 last:pb-0" key={cp.id}>
                       <strong className="block text-sm font-medium">{cp.title}</strong>
-                      <p className="mt-0.5 text-xs text-[var(--muted)]">{[when, t("itemsTally", { count: ids.length })].filter(Boolean).join(" · ")}</p>
+                      <p className="mt-0.5 text-xs tabular-nums text-[var(--muted)]">{[when, t("itemsTally", { count: ids.length })].filter(Boolean).join(" · ")}</p>
                       {cp.description ? <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{cp.description}</p> : null}
                     </li>
                   );
@@ -196,13 +196,13 @@ export function CheckpointPlanner({
                     <div className="py-4 first:pt-0 last:pb-0" key={cp?.id ?? "none"}>
                       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                         <strong className="truncate text-sm">{cp ? cp.title : t("unassigned")}</strong>
-                        <span className="text-xs text-[var(--muted)]">{t("itemsTally", { count: ids.length })}</span>
+                        <span className="text-xs tabular-nums text-[var(--muted)]">{t("itemsTally", { count: ids.length })}</span>
                       </div>
                       {ids.length ? (
-                        <ul className="space-y-1">
+                        <ul className="list-disc space-y-1 pl-5 marker:text-[var(--muted)]">
                           {ids.map((id) => {
                             const item = itemById.get(id);
-                            return item ? <li className="truncate rounded-lg bg-[var(--wash)] px-3 py-1.5 text-sm" key={id}>{item.title}{item.catalogItem?.year ? ` (${item.catalogItem.year})` : ""}</li> : null;
+                            return item ? <li className="text-sm leading-6" key={id}>{item.title}{item.catalogItem?.year ? <span className="text-[var(--muted)]"> ({item.catalogItem.year})</span> : null}</li> : null;
                           })}
                         </ul>
                       ) : <p className="text-xs text-[var(--muted)]">{t("emptyCheckpoint")}</p>}
@@ -327,7 +327,7 @@ export function CheckpointPlanner({
                         <span className="grid h-8 w-8 flex-none place-items-center rounded-full border border-[var(--ink)] text-[13px] font-medium tabular-nums">{index + 1}</span>
                         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                           <span className="truncate text-[15px] font-medium">{draft.title || t("cpTitlePlaceholder")}</span>
-                          <span className="text-xs text-[var(--muted)]">{when}</span>
+                          <span className="text-xs tabular-nums text-[var(--muted)]">{when}</span>
                         </span>
                         {/* Same-width digits, right-aligned: the counts line up from row to row. */}
                         <span className="whitespace-nowrap text-right text-xs tabular-nums text-[var(--muted)]">{draft.id ? tally(ids) : ""}</span>
