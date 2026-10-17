@@ -1481,7 +1481,8 @@
     "editStage": "Edit stage",
     "doneEditing": "Done",
     "removeStage": "Remove stage",
-    "saveToFill": "Save to put items here."
+    "saveToFill": "Save to put items here.",
+    "saveStages": "Save stages"
   },
   "listImport": {
     "title": "Import a list (JSON)",

@@ -1481,7 +1481,8 @@
     "editStage": "Editar etapa",
     "doneEditing": "Listo",
     "removeStage": "Quitar etapa",
-    "saveToFill": "Guarda para poner ítems aquí."
+    "saveToFill": "Guarda para poner ítems aquí.",
+    "saveStages": "Guardar etapas"
   },
   "listImport": {
     "title": "Importar una lista (JSON)",

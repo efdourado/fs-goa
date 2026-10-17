@@ -398,7 +398,7 @@ export function CheckpointPlanner({
         ) : null}
 
         {drafts.length || savedCheckpoints.length ? (
-          <Button className="w-full" disabled={cpBusy || !dirty} onClick={() => void saveAll()}>{cpBusy ? tc("saving") : tc("save")}</Button>
+          <Button className="w-full" disabled={cpBusy || !dirty} onClick={() => void saveAll()}>{cpBusy ? tc("saving") : t("saveStages")}</Button>
         ) : null}
         <StatusMessage error={cpError} success={cpDone} />
       </div>
