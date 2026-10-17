@@ -18,7 +18,7 @@ import type {
   TemplateSummary,
   User,
 } from "../types";
-import { BackButton, Brand, Button, CircleMinusIcon, CirclePinIcon, cx, EmptyState, inputClass, labelClass, PageHeading, SelectableCards, StatusMessage } from "../ui";
+import { BackButton, Brand, Button, CircleMinusIcon, CirclePinIcon, cx, EmptyState, labelClass, PageHeading, Select, SelectableCards, StatusMessage } from "../ui";
 import { ParticipantChallengeScreen } from "./participant-challenge";
 
 function PublicChrome({ user, onSignIn, children }: { user: User | null; onSignIn: () => void; children: ReactNode }) {
@@ -333,9 +333,8 @@ export function TemplateDetailScreen({
                 ]}
               />
               {where === "existing" ? (
-                <select className={cx(inputClass, "mt-3")} value={targetId} onChange={(event) => setTargetId(event.target.value)} aria-label={t("whereExisting")} disabled={busy}>
-                  {manageable.map((group) => <option key={group.id} value={group.id}>{group.kind === "personal" ? tm("personal") : group.name}</option>)}
-                </select>
+                <Select className="mt-3" value={targetId} onChange={setTargetId} ariaLabel={t("whereExisting")} disabled={busy}
+                  options={manageable.map((group) => ({ value: group.id, label: group.kind === "personal" ? tm("personal") : group.name }))} />
               ) : null}
             </div>
             <StatusMessage error={copyError} />

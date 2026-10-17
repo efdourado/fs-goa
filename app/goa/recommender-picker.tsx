@@ -8,7 +8,7 @@ import { useCsrf } from "./csrf";
 import { useGoaFormat } from "./format";
 import { type CatalogScope, useCatalogRecommenders } from "./libraries";
 import type { CatalogRecommender, Id, Member, RecommenderRef } from "./types";
-import { Button, inputClass } from "./ui";
+import { Button, inputClass, Select } from "./ui";
 
 /** Who an item came from — nobody in particular, a member, a saved outside name, or a free note. */
 export type RecommenderValue =
@@ -146,27 +146,19 @@ export function RecommenderPicker({
   return (
     <div className="space-y-2">
       {compact ? null : <span className="text-[13px] font-medium text-[var(--ink)]">{t("label")}</span>}
-      <select
-        className={inputClass}
-        aria-label={t("label")}
+      <Select
+        ariaLabel={t("label")}
         value={selectValue}
         disabled={disabled}
-        onChange={(event) => pick(event.target.value)}
-      >
-        <option value="">{t("none")}</option>
-        {members.length ? (
-          <optgroup label={t("members")}>
-            {members.map((member) => <option key={member.id} value={`m:${member.id}`}>{member.name}</option>)}
-          </optgroup>
-        ) : null}
-        {source.recommenders.length ? (
-          <optgroup label={t("saved")}>
-            {source.recommenders.map((person) => <option key={person.id} value={`e:${person.id}`}>{person.displayName}</option>)}
-          </optgroup>
-        ) : null}
-        <option value={NEW}>{t("addOutside")}</option>
-        <option value={NOTE}>{t("writeNote")}</option>
-      </select>
+        onChange={pick}
+        options={[
+          { value: "", label: t("none") },
+          ...members.map((member) => ({ value: `m:${member.id}`, label: member.name, group: t("members") })),
+          ...source.recommenders.map((person) => ({ value: `e:${person.id}`, label: person.displayName, group: t("saved") })),
+          { value: NEW, label: t("addOutside") },
+          { value: NOTE, label: t("writeNote") },
+        ]}
+      />
 
       {adding ? (
         <div className="rounded-xl border border-[var(--main-line)] bg-[var(--main-soft)]/40 p-3">

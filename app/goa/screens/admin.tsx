@@ -32,6 +32,7 @@ import type {
 } from "../types";
 import {
   BackButton,
+  BoxSection,
   Button,
   ChallengeStatusBadge,
   cx,
@@ -41,6 +42,7 @@ import {
   inputClass,
   PageHeading,
   SchedulePeriodFields,
+  Select,
   SelectableCards,
   SlidersIcon,
   StatusMessage,
@@ -98,7 +100,6 @@ function AdminGeneral({
     setSeenIdsKey(idsKey);
     setSelected(initialIds);
   }
-  const hasOptionalContent = Boolean(description.trim()) || ruleSections.length > 0;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -170,13 +171,13 @@ function AdminGeneral({
   return (
     <div className="mx-auto max-w-2xl">
       <form onSubmit={save}>
-        <PageHeading title={t("basicsTitle")} description={t("basicsSubtitle")} />
-        <fieldset disabled={locked} className="min-w-0 space-y-6">
-          <Field label={t("titleLabel")}>
-            <input className={inputClass} value={title} onChange={(event) => setTitle(event.target.value)} required maxLength={140} />
-          </Field>
+        <PageHeading title={t("basicsTitle")} />
+        <fieldset disabled={locked} className="min-w-0 space-y-4">
+          <BoxSection title={t("titleLabel")}>
+            <input className={inputClass} aria-label={t("titleLabel")} value={title} onChange={(event) => setTitle(event.target.value)} required maxLength={140} />
+          </BoxSection>
 
-          <Field label={t("scheduleLegend")} plain>
+          <BoxSection title={t("scheduleLegend")}>
             {endOnly ? (
               <>
                 <SelectableCards
@@ -216,10 +217,10 @@ function AdminGeneral({
                 {challenge.status === "active" ? <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{t("scheduleActiveNote")}</p> : null}
               </>
             )}
-          </Field>
+          </BoxSection>
 
-          <Disclosure summary={t("descRulesTitle")} defaultOpen={hasOptionalContent}>
-            <div className="space-y-5 pt-3">
+          <BoxSection title={t("descRulesTitle")}>
+            <div className="space-y-5">
               <Field label={t("descriptionLabel")} optional>
                 <textarea className={inputClass} rows={3} value={description} onChange={(event) => setDescription(event.target.value)} maxLength={1000} disabled={locked} />
               </Field>
@@ -227,12 +228,12 @@ function AdminGeneral({
                 <RuleSectionsEditor value={ruleSections} onChange={setRuleSections} disabled={locked} />
               </Field>
             </div>
-          </Disclosure>
+          </BoxSection>
         </fieldset>
 
         {!isPersonal ? (
-          <section className="mt-10 border-t border-[var(--line)] pt-8">
-            <PageHeading title={t("participantsTitle")} description={t("participantsSubtitle")} />
+          <div className="mt-4">
+          <BoxSection title={t("participantsTitle")} hint={t("participantsSubtitle")}>
             {group?.members?.length ? (
             <ul className="grid gap-2 sm:grid-cols-2">
               {group.members.map((member) => {
@@ -260,7 +261,8 @@ function AdminGeneral({
               })}
             </ul>
             ) : <EmptyState title={t("noMembersTitle")} />}
-          </section>
+          </BoxSection>
+          </div>
         ) : null}
 
         <div className={cx("z-10 mt-8 border-[var(--line)] py-3", dirty ? "sticky bottom-0 -mx-4 border-t bg-[color-mix(in_srgb,var(--canvas)_92%,transparent)] px-4 backdrop-blur-md sm:mx-0 sm:rounded-2xl sm:border" : "px-0")}>
@@ -381,10 +383,7 @@ function AdminFields({
 
   return (
     <section className="mx-auto max-w-2xl">
-      <PageHeading
-        title={t("fieldsTitle")}
-        description={challenge.status === "draft" ? t("fieldsHintDraft") : challenge.status === "active" ? t("fieldsHintActive") : t("fieldsHintClosed")}
-      />
+      <PageHeading title={t("fieldsTitle")} />
       {types.length > 1 || canAddShared || activeType?.id ? (
         <div className="mb-6 flex flex-wrap items-center gap-2" role="group" aria-label={t("fieldsTypeLegend")}>
           {types.map((type) => {
@@ -591,21 +590,16 @@ function CountSettings({ field, bookGoal, onChange }: { field: ChallengeField; b
         <>
           <Field label={t("goal")}>
             <div className="flex flex-wrap items-center gap-2">
-              <select className={cx(inputClass, "w-auto")} value={goalKind} onChange={(event) => set({ goal: event.target.value === "page_count" ? { from: "page_count" } : event.target.value === "value" ? { value: 100 } : null })}>
-                <option value="none">{t("goalNone")}</option>
-                <option value="value">{t("goalValue")}</option>
-                {bookGoal || goalKind === "page_count" ? <option value="page_count">{t("goalPageCount")}</option> : null}
-              </select>
+              <Select className="w-auto" ariaLabel={t("goal")} value={goalKind} onChange={(next) => set({ goal: next === "page_count" ? { from: "page_count" } : next === "value" ? { value: 100 } : null })}
+                options={[{ value: "none", label: t("goalNone") }, { value: "value", label: t("goalValue") }, ...(bookGoal || goalKind === "page_count" ? [{ value: "page_count", label: t("goalPageCount") }] : [])]} />
               {count.goal && "value" in count.goal ? (
                 <input className={cx(inputClass, "w-32")} type="number" min={1} step="any" aria-label={t("goalValue")} value={count.goal.value} onChange={(event) => set({ goal: { value: Math.max(1, Number(event.target.value) || 1) } })} />
               ) : null}
             </div>
           </Field>
           <Field label={t("entry")}>
-            <select className={cx(inputClass, "w-auto")} value={count.entry} onChange={(event) => set({ entry: event.target.value === "position" ? "position" : "amount" })}>
-              <option value="amount">{t("entryAmount")}</option>
-              <option value="position">{t("entryPosition")}</option>
-            </select>
+            <Select className="w-auto" ariaLabel={t("entry")} value={count.entry} onChange={(next) => set({ entry: next === "position" ? "position" : "amount" })}
+              options={[{ value: "amount", label: t("entryAmount") }, { value: "position", label: t("entryPosition") }]} />
           </Field>
           <Toggle checked={count.showDates} onChange={(on) => set({ showDates: on })} label={t("showDates")} hint={t("showDatesHint")} />
         </>
@@ -668,7 +662,7 @@ export function FieldEditorDialog({
         <input className={inputClass} value={draft.label} maxLength={100} required onChange={(event) => setDraft((current) => ({ ...current, label: event.target.value }))} />
       </Field>
       <Field label={tf("typeLabel")}>
-        <select className={inputClass} value={draft.type} disabled={lockType} onChange={(event) => { const type = event.target.value as ChallengeField["type"]; setDraft((current) => ({ ...current, type, config: newFieldConfig(type) })); }}>{FIELD_TYPES.map((value) => <option value={value} key={value}>{tf(`type.${value}`)}</option>)}</select>
+        <Select ariaLabel={tf("typeLabel")} value={draft.type} disabled={lockType} onChange={(type) => setDraft((current) => ({ ...current, type, config: newFieldConfig(type) }))} options={FIELD_TYPES.map((value) => ({ value, label: tf(`type.${value}`) }))} />
       </Field>
       {hasConfig ? <FieldConfigInputs field={draft} onChange={(patch) => setDraft((current) => ({ ...current, ...patch }))} /> : null}
       {countable && draft.type === "number" ? (
@@ -818,7 +812,7 @@ export function AdminItemsSection({ challenge, entries, onReorder }: {
   if (!organiseInput || !canOrganise(organiseInput) || challenge.status === "closed") return null;
 
   return (
-    <section className="mt-12 border-t border-[var(--line)] pt-8">
+    <section className="mt-6">
       <Button variant="secondary" className="min-h-12 w-full rounded-full" onClick={() => setOrganising(true)}>
         {/* A small chart: the order being worked out. */}
         <svg viewBox="0 0 20 20" className="h-[18px] w-[18px] flex-none" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true"><path d="M4.5 16v-5M10 16V4M15.5 16V8" /></svg>
@@ -887,7 +881,7 @@ export function AdminScreen({
   /** Resolves with `linkRotated` when new dates replaced a published results link. */
   onSaveBasics: (payload: Partial<ChallengeSummary>) => Promise<{ linkRotated?: boolean } | undefined | void>;
   onTransition: (status: "active" | "closed") => Promise<void>;
-  onDuplicate: (payload: { title: string; targetGroupId: Id; mode: CopyMode }) => Promise<CopyResult>;
+  onDuplicate: (payload: { title: string; targetGroupId?: Id; target?: "personal"; mode: CopyMode }) => Promise<CopyResult>;
   onOpenCopy: (challengeId: Id) => void;
   isPlatformAdmin?: boolean;
   onPublishTemplate: () => Promise<void>;

@@ -10,7 +10,7 @@ import { useGoaFormat } from "./format";
 import { type CatalogScope, useLibraryName } from "./libraries";
 import { RecipeIcon } from "./recipe-icons";
 import type { CatalogAttributeDef, CatalogLibrary, LibraryProperty } from "./types";
-import { Button, cx, Field, inputClass, StatusMessage, Toggle } from "./ui";
+import { Button, cx, Field, inputClass, Select, StatusMessage, Toggle } from "./ui";
 
 type PropertyType = LibraryProperty["type"];
 const PROPERTY_TYPES: PropertyType[] = ["text", "number", "date", "boolean"];
@@ -437,7 +437,7 @@ export function LibraryPropertiesDialog({
                   <div className="min-w-0 flex-1">
                     {canEdit && property.type !== "recommender" ? (
                       <input
-                        className="w-full rounded-lg border border-transparent bg-transparent px-1.5 py-0.5 text-sm font-medium outline-none transition hover:border-[var(--line)] focus:border-[var(--main)] focus:bg-[var(--paper)] disabled:opacity-60"
+                        className="w-full rounded-lg border border-transparent bg-transparent px-1.5 py-0.5 text-sm font-medium outline-none transition hover:border-[var(--line)] focus:border-[var(--main)] disabled:opacity-60"
                         value={drafts[property.key] ?? property.label ?? ""}
                         placeholder={nameOf(property)}
                         aria-label={t("propertyNameAria", { name: nameOf(property) })}
@@ -550,19 +550,19 @@ export function LibraryPropertiesDialog({
           <ul className="divide-y divide-[var(--line)] overflow-hidden rounded-2xl border border-[var(--line)]">
             <li className="flex min-h-14 items-center justify-between gap-3 px-3.5">
               <span className="text-sm">{t("coverTopLabel")}</span>
-              <select
-                className="max-w-[55%] cursor-pointer truncate rounded-full border border-[var(--line)] bg-[var(--paper)] py-1.5 pl-3 pr-2 text-xs text-[var(--ink)] outline-none transition hover:border-[var(--muted)] focus:border-[var(--main)]"
+              <Select
+                look="bare"
+                className="max-w-[55%] rounded-full border border-[var(--line)] py-1.5 pl-3 pr-2 text-xs text-[var(--ink)] transition hover:border-[var(--muted)] focus-visible:border-[var(--main)]"
                 value={coverTop}
                 disabled={coverBusy}
-                aria-label={t("coverTopLabel")}
-                onChange={(event) => void saveCoverTop(event.target.value)}
-              >
-                <option value={DEFAULT_COVER_TOP}>{t("coverTopDefault")}</option>
-                <option value="none">{t("coverTopNone")}</option>
-                {properties.filter((property) => property.key !== "title" && property.type !== "recommender").map((property) => (
-                  <option key={property.key} value={property.attributeKey ?? property.key}>{nameOf(property)}</option>
-                ))}
-              </select>
+                ariaLabel={t("coverTopLabel")}
+                onChange={(next) => void saveCoverTop(next)}
+                options={[
+                  { value: DEFAULT_COVER_TOP, label: t("coverTopDefault") },
+                  { value: "none", label: t("coverTopNone") },
+                  ...properties.filter((property) => property.key !== "title" && property.type !== "recommender").map((property) => ({ value: property.attributeKey ?? property.key, label: nameOf(property) })),
+                ]}
+              />
             </li>
             <li className="flex min-h-14 items-center justify-between gap-3 px-3.5">
               <span className="text-sm">{t("coverBadgeLabel")}</span>

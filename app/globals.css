@@ -274,3 +274,25 @@ button:focus-visible, a:focus-visible, textarea:focus-visible {
 .story-page .text-sm { font-size: 1.0625rem; line-height: 1.6rem; }
 .story-page .text-\[10px\] { font-size: 12px; }
 .story-page .text-\[11px\] { font-size: 13px; }
+
+/* CopyCheckIcon (ui.tsx): copy → a ring drawing itself → a check written inside, and back. */
+.copy-check { overflow: visible; }
+.copy-check__sheets { transform-box: view-box; transform-origin: 10px 10px; transition: transform .38s cubic-bezier(.34, 1.4, .55, 1), opacity .22s ease; }
+.copy-check__ring, .copy-check__tick { opacity: 0; transition: stroke-dashoffset .3s ease, opacity .15s ease; }
+.copy-check__ring { stroke-dasharray: 48; stroke-dashoffset: 48; }
+.copy-check__tick { stroke-dasharray: 10; stroke-dashoffset: 10; }
+.copy-check[data-done] { animation: copy-check-pop .55s cubic-bezier(.34, 1.4, .55, 1); }
+.copy-check[data-done] .copy-check__sheets { transform: scale(.35) rotate(-24deg); opacity: 0; }
+.copy-check[data-done] .copy-check__ring { stroke-dashoffset: 0; opacity: 1; transition: stroke-dashoffset .45s cubic-bezier(.65, 0, .35, 1) .06s, opacity .1s .06s; }
+.copy-check[data-done] .copy-check__tick { stroke-dashoffset: 0; opacity: 1; transition: stroke-dashoffset .28s cubic-bezier(.65, 0, .35, 1) .4s, opacity .05s .4s; }
+@keyframes copy-check-pop { 0% { transform: scale(1); } 45% { transform: scale(.86); } 75% { transform: scale(1.1); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) {
+  .copy-check, .copy-check * { animation: none !important; transition: none !important; }
+}
+
+/* Our Select's list (ui.tsx): drops in under its trigger; on a phone it's a sheet that rises from the bottom. */
+.goa-select-list:popover-open { animation: goa-select-drop .16s ease-out; }
+.goa-select-list.rounded-t-3xl:popover-open { animation: goa-select-rise .22s cubic-bezier(.2, .8, .3, 1); }
+@keyframes goa-select-drop { from { opacity: 0; transform: translateY(-4px) scale(.98); } }
+@keyframes goa-select-rise { from { transform: translateY(100%); } }
+@media (prefers-reduced-motion: reduce) { .goa-select-list:popover-open { animation: none; } }

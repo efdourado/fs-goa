@@ -11,7 +11,7 @@ import { DeleteButton, DeleteConfirm } from "./dialog";
 import { useGoaFormat } from "./format";
 import { useLibraryName } from "./libraries";
 import type { ChallengeDetail, ChallengeField, Entry, EntryTypeView, FieldConfig, Id } from "./types";
-import { Button, cardClass, cx, EmptyState, inputClass, labelClass, StatusMessage } from "./ui";
+import { Button, cardClass, cx, EmptyState, inputClass, labelClass, Select, StatusMessage } from "./ui";
 import { dateKeyInSaoPaulo, displayAnswer, findMissingRequiredField, valuesAsRecord } from "./utils";
 
 /** The check-in and the type of record it holds — a workout and its exercise records. */
@@ -82,29 +82,20 @@ function CellInput({ field, value, disabled, id, onChange, className }: {
   }
   if (field.type === "rating") {
     return (
-      <select id={id} className={cls} disabled={disabled} value={value === null || value === undefined ? "" : String(value)} onChange={(event) => onChange(event.target.value === "" ? "" : Number(event.target.value))}>
-        <option value="">—</option>
-        {ratingChoices(field.config).map((rating) => <option key={rating} value={String(rating)}>{String(rating).replace(".", ",")}</option>)}
-      </select>
+      <Select id={id} look="bare" className={cls} disabled={disabled} value={value === null || value === undefined ? "" : String(value)} onChange={(next) => onChange(next === "" ? "" : Number(next))}
+        options={[{ value: "", label: "—" }, ...ratingChoices(field.config).map((rating) => ({ value: String(rating), label: String(rating).replace(".", ",") }))]} />
     );
   }
   if (field.type === "select") {
     return (
-      <select id={id} className={cls} disabled={disabled} value={typeof value === "string" ? value : ""} onChange={(event) => onChange(event.target.value)}>
-        <option value="">{t("select")}</option>
-        {(field.config?.options ?? []).filter((option) => !option.archived).map((option) => (
-          <option key={option.id ?? option.value ?? option.label} value={option.id ?? option.value ?? option.label}>{option.label}</option>
-        ))}
-      </select>
+      <Select id={id} look="bare" className={cls} disabled={disabled} value={typeof value === "string" ? value : ""} onChange={onChange}
+        options={[{ value: "", label: t("select") }, ...(field.config?.options ?? []).filter((option) => !option.archived).map((option) => ({ value: option.id ?? option.value ?? option.label, label: option.label }))]} />
     );
   }
   if (field.type === "boolean") {
     return (
-      <select id={id} className={cls} disabled={disabled} value={value === true ? "yes" : value === false ? "no" : ""} onChange={(event) => onChange(event.target.value === "" ? "" : event.target.value === "yes")}>
-        <option value="">—</option>
-        <option value="yes">{tc("yes")}</option>
-        <option value="no">{tc("no")}</option>
-      </select>
+      <Select id={id} look="bare" className={cls} disabled={disabled} value={value === true ? "yes" : value === false ? "no" : ""} onChange={(next) => onChange(next === "" ? "" : next === "yes")}
+        options={[{ value: "", label: "—" }, { value: "yes", label: tc("yes") }, { value: "no", label: tc("no") }]} />
     );
   }
   if (field.type === "date") {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { API_PATHS, apiRequest } from "../api";
 import { AddCatalogItemDialog } from "../catalog-item-dialogs";
@@ -20,7 +20,7 @@ import { useLibraryProperties } from "../property-inputs";
 import { recommenderLine, useRecommenderSource } from "../recommender-picker";
 import { Segmented } from "../Segmented";
 import type { CatalogItem, CatalogLibrary, Id, Member } from "../types";
-import { BackButton, Button, cardClass, cx, EmptyState, SlidersIcon, StatusMessage } from "../ui";
+import { BackButton, Button, cardClass, cx, EmptyState, Select, type SelectOption, SlidersIcon, StatusMessage } from "../ui";
 import { formatRuntime } from "../utils";
 
 type Layout = "covers" | "list";
@@ -30,37 +30,33 @@ const icon = { fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLin
 const GridIcon = () => <svg viewBox="0 0 16 16" className="h-4 w-4" {...icon}><rect x="2" y="2" width="5" height="5" rx="1.2" /><rect x="9" y="2" width="5" height="5" rx="1.2" /><rect x="2" y="9" width="5" height="5" rx="1.2" /><rect x="9" y="9" width="5" height="5" rx="1.2" /></svg>;
 const ListIcon = () => <svg viewBox="0 0 16 16" className="h-4 w-4" {...icon}><path d="M3 4h10M3 8h10M3 12h10" /></svg>;
 
-/** A native select dressed as a chip; it lights up once it narrows the list. */
-function ChipSelect({ label, value, onChange, active, children }: { label: string; value: string; onChange: (value: string) => void; active: boolean; children: ReactNode }) {
+/** Our select dressed as a chip; it lights up once it narrows the list. */
+function ChipSelect({ label, value, onChange, active, options }: { label: string; value: string; onChange: (value: string) => void; active: boolean; options: SelectOption[] }) {
   return (
-    <label className="min-w-0">
-      <span className="sr-only">{label}</span>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className={cx(
-          "min-h-10 max-w-48 cursor-pointer rounded-full border px-4 text-sm outline-none transition focus-visible:ring-4 focus-visible:ring-[var(--main)]/25",
-          active ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] bg-[var(--paper)] text-[var(--ink)] hover:border-[var(--main-line)]",
-        )}
-      >
-        {children}
-      </select>
-    </label>
+    <Select
+      look="bare"
+      ariaLabel={label}
+      value={value}
+      onChange={onChange}
+      options={options}
+      className={cx(
+        "min-h-10 max-w-48 rounded-full border px-4 text-sm transition focus-visible:ring-4 focus-visible:ring-[var(--main)]/25",
+        active ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] bg-[var(--paper)] text-[var(--ink)] hover:border-[var(--main-line)]",
+      )}
+    />
   );
 }
 
 /** Libraries and items share one grid: the cards stretch to fill the row, one on a phone up to four on a wide screen. */
 const catalogGrid = "grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4";
 
-/** A phone's Group by / Sort by: a small pill with its name and a native picker, instead of a wide segmented bar. */
+/** A phone's Group by / Sort by: a small pill with its name and our picker, instead of a wide segmented bar. */
 function CompactSelect<T extends string>({ label, value, onChange, options }: { label: string; value: T; onChange: (value: T) => void; options: Array<{ value: T; label: string }> }) {
   return (
-    <label className="inline-flex min-h-10 min-w-0 items-center gap-1.5 rounded-full border border-[var(--line)] bg-[var(--paper)] pl-3.5 pr-2 text-sm transition focus-within:ring-4 focus-within:ring-[var(--main)]/25 hover:border-[var(--main-line)]">
+    <div className="inline-flex min-h-10 min-w-0 items-center gap-1.5 rounded-full border border-[var(--line)] bg-[var(--paper)] pl-3.5 pr-2.5 text-sm transition focus-within:ring-4 focus-within:ring-[var(--main)]/25 hover:border-[var(--main-line)]">
       <span className="flex-none text-xs text-[var(--muted)]">{label}</span>
-      <select value={value} onChange={(event) => onChange(event.target.value as T)} className="min-w-0 cursor-pointer bg-transparent pr-1 text-[var(--ink)] outline-none">
-        {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-      </select>
-    </label>
+      <Select look="bare" ariaLabel={label} value={value} onChange={onChange} options={options} className="text-[var(--ink)]" />
+    </div>
   );
 }
 
@@ -363,11 +359,8 @@ export function CatalogWorkspaceScreen({
               />
             ) : null}
             {recommendationsEnabled && recommenders.length ? (
-              <ChipSelect label={t("recommenderFilterLabel")} value={activeFilter} onChange={setRecommenderFilter} active={Boolean(activeFilter)}>
-                <option value="">{t("recommenderAll")}</option>
-                {recommenders.map(([key, name]) => <option key={key} value={key}>{t("recommendedBy", { name })}</option>)}
-                <option value="none">{t("recommenderNone")}</option>
-              </ChipSelect>
+              <ChipSelect label={t("recommenderFilterLabel")} value={activeFilter} onChange={setRecommenderFilter} active={Boolean(activeFilter)}
+                options={[{ value: "", label: t("recommenderAll") }, ...recommenders.map(([key, name]) => ({ value: key, label: t("recommendedBy", { name }) })), { value: "none", label: t("recommenderNone") }]} />
             ) : null}
             {canManage && unusedCount > 0 ? (
               <button

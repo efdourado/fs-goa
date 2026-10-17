@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { cookies, headers } from "next/headers";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getTranslations } from "next-intl/server";
+import Script from "next/script";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -65,7 +66,9 @@ export default async function RootLayout({
   return (
     <html lang={locale} data-theme={initialTheme} suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeBoot }} />
+        {/* Next's own way to run a script before hydration: a raw <script> in a component makes React 19 warn
+            ("Encountered a script tag while rendering React component"). */}
+        <Script id="theme-boot" strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: themeBoot }} />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
         <NextIntlClientProvider>{children}</NextIntlClientProvider>

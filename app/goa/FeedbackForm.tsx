@@ -5,7 +5,7 @@ import { type FormEvent, useState } from "react";
 
 import { apiRequest } from "./api";
 import { useGoaFormat } from "./format";
-import { Button, cardClass, cx, inputClass, labelClass, StatusMessage } from "./ui";
+import { Button, cardClass, cx, inputClass, labelClass, Select, StatusMessage } from "./ui";
 
 const IMPACTS = ["blocked", "effort", "minor", "idea"] as const;
 const WORKAROUNDS = ["spreadsheet", "whatsapp", "notion", "other_app", "none"] as const;
@@ -17,6 +17,7 @@ export function FeedbackForm() {
   const [succeeded, setSucceeded] = useState<"" | "yes" | "no">("");
   const [ease, setEase] = useState<number | null>(null);
   const [impact, setImpact] = useState<(typeof IMPACTS)[number] | "">("");
+  const [workaround, setWorkaround] = useState("");
   const [contactOk, setContactOk] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -148,12 +149,8 @@ export function FeedbackForm() {
 
       <label className="block">
         <span className={labelClass}>{t("q6")}</span>
-        <select className={inputClass} name="workaround" defaultValue="">
-          <option value="">{t("q6None")}</option>
-          {WORKAROUNDS.map((value) => (
-            <option key={value} value={t(`workaround.${value}`)}>{t(`workaround.${value}`)}</option>
-          ))}
-        </select>
+        <Select name="workaround" value={workaround} onChange={setWorkaround}
+          options={[{ value: "", label: t("q6None") }, ...WORKAROUNDS.map((value) => ({ value: t(`workaround.${value}`), label: t(`workaround.${value}`) }))]} />
       </label>
 
       <label className="block">

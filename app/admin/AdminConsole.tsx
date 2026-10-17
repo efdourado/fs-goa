@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 
-import { Brand } from "../goa/ui";
+import { Brand, Select } from "../goa/ui";
 
 type Tab = "usage" | "insights" | "feedback" | "accounts";
 
@@ -413,14 +413,11 @@ function InsightsTab({
 }) {
   const controls = (
     <div className="flex flex-wrap items-center gap-4 text-sm">
-      <label className="flex items-center gap-2">
+      <div className="flex items-center gap-2">
         <span className={muted}>Janela</span>
-        <select className="min-h-10 rounded-full border border-[var(--line)] bg-[var(--paper)] px-4" value={days} onChange={(event) => onDays(Number(event.target.value))}>
-          <option value={7}>7 dias</option>
-          <option value={30}>30 dias</option>
-          <option value={90}>90 dias</option>
-        </select>
-      </label>
+        <Select look="pill" ariaLabel="Janela" value={String(days)} onChange={(next) => onDays(Number(next))}
+          options={[7, 30, 90].map((count) => ({ value: String(count), label: `${count} dias` }))} />
+      </div>
       <label className="flex items-center gap-2">
         <input type="checkbox" checked={includeStaff} onChange={(event) => onIncludeStaff(event.target.checked)} />
         <span className={muted}>Incluir contas da equipe (seeds e testes)</span>
@@ -499,7 +496,7 @@ function AuditTab({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <input
-          className="min-h-9 w-full max-w-sm rounded-lg border border-[var(--line)] bg-[var(--paper)] px-3 text-sm outline-none focus:border-[var(--main)]"
+          className="min-h-9 w-full max-w-sm rounded-lg border border-[var(--line)] bg-transparent px-3 text-sm outline-none focus:border-[var(--main)]"
           placeholder="Filtrar por ID de entidade"
           value={entity}
           onChange={(event) => onEntity(event.target.value.trim())}

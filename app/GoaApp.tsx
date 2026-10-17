@@ -538,7 +538,7 @@ export default function GoaApp() {
   }
 
   // The caller decides where to go: straight to the copy, or — when the copy had to skip something — after the notice.
-  async function duplicateChallenge(payload: { title: string; targetGroupId: Id; mode: "structure" | "structure_and_items" }): Promise<CopyResult> {
+  async function duplicateChallenge(payload: { title: string; targetGroupId?: Id; target?: "personal"; mode: "structure" | "structure_and_items" }): Promise<CopyResult> {
     if (!bootstrap || !selectedChallenge) return { challengeId: null, skippedProperties: [] };
     const response = await apiRequest<{ skippedProperties?: SkippedProperty[] }>(API_PATHS.duplicate(selectedChallenge.id), { method: "POST", body: payload, csrfToken: bootstrap.csrfToken });
     const challengeId = normalizeCreatedId(response);

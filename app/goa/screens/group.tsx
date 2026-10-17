@@ -12,23 +12,11 @@ import { catalogCardHeight, CatalogTile, resolveCoverTop } from "../catalog-view
 import { LibraryGlyph, useCatalogShelf, useLibraryName } from "../libraries";
 import { Rail, RailArrows, ShelfAddButton, shelfCardWidth, useShelfRail } from "../shelf";
 import type { CatalogItem, ChallengeSummary, GroupInviteResult, GroupSummary, Id, Member, PendingGroupRequest } from "../types";
-import { AvatarMark, BackButton, Button, cx, EmptyState, Field, inputClass, SlidersIcon, StatusMessage, Toggle } from "../ui";
+import { AvatarMark, BackButton, Button, cx, EmptyState, Field, inputClass, LinkPill, Select, SlidersIcon, StatusMessage, Toggle } from "../ui";
 
-/** A quiet action: text with no button shape (Change). */
-const textAction = "inline-flex flex-none cursor-pointer items-center gap-1.5 text-[13px] font-medium text-[var(--main-strong)] transition hover:opacity-75 disabled:cursor-default disabled:opacity-55";
 
-function CheckIcon({ className }: { className?: string }) {
-  return <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m3.5 8.4 2.9 2.9 6.1-6.6" /></svg>;
-}
-function CopyIcon({ className }: { className?: string }) {
-  return <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.8" /><path d="M10.5 5.5V4.3A1.8 1.8 0 0 0 8.7 2.5H4.3a1.8 1.8 0 0 0-1.8 1.8v4.4a1.8 1.8 0 0 0 1.8 1.8h1.2" /></svg>;
-}
-function RefreshIcon({ className }: { className?: string }) {
-  return <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.6-3.7M13 2.8v2.9h-2.9" /></svg>;
-}
-
-/** A compact field drawn as a pill: the invite's settings and its @handle read as one line. */
-const pillSelect = "h-10 cursor-pointer rounded-full border border-[var(--line)] bg-transparent px-4 text-sm text-[var(--ink)] outline-none transition hover:border-[var(--muted)] focus:border-[var(--main)] focus:ring-4 focus:ring-[var(--main)]/15";
+/** A word of the line under the invite link that opens its select. */
+const summaryPart = "max-w-[60vw] rounded-md text-[13px] text-[var(--muted)] underline-offset-4 transition hover:text-[var(--ink)] hover:underline focus-visible:text-[var(--ink)] focus-visible:underline aria-expanded:text-[var(--ink)]";
 import { canManage, formatRuntime } from "../utils";
 import { ActiveChallengeCard } from "./dashboard";
 
@@ -200,16 +188,15 @@ export function GroupScreen({
   const [linkDestination, setLinkDestination] = useState("");
   const [linkDays, setLinkDays] = useState("7");
   const [linkUses, setLinkUses] = useState("1");
-  const [changingLink, setChangingLink] = useState(false);
 
-  async function createInvite() {
+  async function createInvite(settings = { destination: linkDestination, days: linkDays, uses: linkUses }) {
     setBusy(true);
     setError(null);
     try {
       const created = await onCreateInvite({
-        expiresInDays: Number(linkDays),
-        maxUses: Number(linkUses),
-        challengeId: linkDestination || undefined,
+        expiresInDays: Number(settings.days),
+        maxUses: Number(settings.uses),
+        challengeId: settings.destination || undefined,
       });
       const token = created.token ?? "";
       setInviteUrl(created.url ?? (token ? `${window.location.origin}/invites/${encodeURIComponent(token)}` : ""));
@@ -222,6 +209,15 @@ export function GroupScreen({
     }
   }
 
+  // Changing what the link opens makes a new one at once, so the line under the link always describes it.
+  function changeLink(patch: Partial<{ destination: string; days: string; uses: string }>) {
+    const next = { destination: linkDestination, days: linkDays, uses: linkUses, ...patch };
+    setLinkDestination(next.destination);
+    setLinkDays(next.days);
+    setLinkUses(next.uses);
+    void createInvite(next);
+  }
+
   // The ticket is ready when the dialog opens: its link is made the first time, then kept for this visit.
   function openInvite() {
     setShowInvite(true);
@@ -229,6 +225,7 @@ export function GroupScreen({
   }
 
   async function copyInvite() {
+    if (copyBusy) return;
     setCopyBusy(true);
     setCopySuccess(null);
     setCopyError(null);
@@ -337,52 +334,20 @@ export function GroupScreen({
 
       {showInvite ? (
         <Dialog title={t("inviteTitle")} onClose={() => setShowInvite(false)} busy={busy || memberBusy}>
-          {/* A ticket, ready to hand over: copy on the left of the link, a new link on its right, what it opens under
-              the perforation (Change shows the settings). The @username is one line below. */}
-          <div className="rounded-[18px] bg-[var(--main-soft)]">
-            <div className="flex min-h-14 items-center gap-3 py-3 pl-[18px] pr-4">
-              {/* Copy sits where a link icon would: the icon is the button (a check once it's copied). */}
-              <button type="button" onClick={() => void copyInvite()} disabled={!inviteUrl || copyBusy} aria-label={copySuccess ? t("copied") : t("copy")} title={copySuccess ? t("copied") : t("copy")} className="-ml-1.5 grid h-8 w-8 flex-none cursor-pointer place-items-center rounded-full text-[var(--main-strong)] transition hover:bg-[var(--main-line)]/50 disabled:cursor-default">
-                {copySuccess ? <CheckIcon className="h-[18px] w-[18px]" /> : <CopyIcon className="h-[18px] w-[18px]" />}
-              </button>
-              {inviteUrl ? (
-                <input ref={inviteInputRef} className="min-w-0 flex-1 bg-transparent font-mono text-[12.5px] text-[var(--ink)] outline-none" value={inviteUrl} readOnly aria-label={t("inviteUrlAria")} onFocus={(event) => event.currentTarget.select()} />
-              ) : (
-                <span className="min-w-0 flex-1 text-sm text-[var(--main-strong)]">{busy ? t("generating") : "\u00a0"}</span>
-              )}
-              {/* A link isn't edited, it's replaced: a fresh one with the settings as they are now. */}
-              <button type="button" onClick={() => void createInvite()} disabled={busy} aria-label={t("newLink")} title={t("newLink")} className="-mr-1.5 grid h-8 w-8 flex-none cursor-pointer place-items-center rounded-full text-[var(--main-strong)] transition hover:bg-[var(--main-line)]/50 disabled:cursor-default disabled:opacity-55">
-                <RefreshIcon className={cx("h-[18px] w-[18px]", busy && "animate-spin")} />
-              </button>
-            </div>
-            {/* The perforation: a dashed line with a notch cut on each side. */}
-            <div className="relative mx-[18px] border-t-[1.5px] border-dashed border-[var(--main-line)]" aria-hidden="true">
-              <span className="absolute -left-7 -top-2.5 h-5 w-5 rounded-full bg-[var(--paper)]" />
-              <span className="absolute -right-7 -top-2.5 h-5 w-5 rounded-full bg-[var(--paper)]" />
-            </div>
-            <div className="flex items-center justify-between gap-3 px-[18px] pb-3.5 pt-3 text-[13px] text-[var(--main-strong)]">
-              <span className="min-w-0 truncate">{[
-                linkDestination ? challenges.find((challenge) => challenge.id === linkDestination)?.title ?? group.name : group.name,
-                t(`expires${linkDays}` as "expires7"),
-                t("usesOption", { count: Number(linkUses) }),
-              ].join(" · ")}</span>
-              <button type="button" onClick={() => setChangingLink((open) => !open)} aria-expanded={changingLink} className={textAction}>{t("changeLink")}</button>
-            </div>
+          {/* The link, then what it opens: each part of the line its own select. */}
+          <LinkPill url={inviteUrl || null} placeholder={busy ? t("generating") : undefined} copied={Boolean(copySuccess)} busy={busy}
+            onCopy={() => void copyInvite()} onRenew={() => void createInvite()} inputRef={inviteInputRef}
+            copyLabel={t("copy")} copiedLabel={t("copied")} renewLabel={t("newLink")} urlLabel={t("inviteUrlAria")} />
+          <div className="mt-2 flex min-w-0 flex-wrap items-center pl-3 text-[13px] text-[var(--muted)]">
+            <Select look="bare" chevron={false} className={summaryPart} value={linkDestination} disabled={busy} ariaLabel={t("destinationLabel")} onChange={(next) => changeLink({ destination: next })}
+              options={[{ value: "", label: group.name }, ...challenges.filter((challenge) => challenge.status === "active").map((challenge) => ({ value: challenge.id, label: challenge.title }))]} />
+            <span className="mx-1.5 opacity-60" aria-hidden="true">·</span>
+            <Select look="bare" chevron={false} className={summaryPart} value={linkDays} disabled={busy} ariaLabel={t("expiresLabel")} onChange={(next) => changeLink({ days: next })}
+              options={["1", "7", "30"].map((days) => ({ value: days, label: t(`expires${days}` as "expires7") }))} />
+            <span className="mx-1.5 opacity-60" aria-hidden="true">·</span>
+            <Select look="bare" chevron={false} className={summaryPart} value={linkUses} disabled={busy} ariaLabel={t("maxUsesLabel")} onChange={(next) => changeLink({ uses: next })}
+              options={[1, 5, 10, 25, 100].map((count) => ({ value: String(count), label: t("usesOption", { count }) }))} />
           </div>
-          {changingLink ? (
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <select className={cx(pillSelect, "min-w-0 flex-1 basis-40")} value={linkDestination} onChange={(event) => setLinkDestination(event.target.value)} aria-label={t("destinationLabel")}>
-                <option value="">{group.name}</option>
-                {challenges.filter((challenge) => challenge.status === "active").map((challenge) => <option value={challenge.id} key={challenge.id}>{challenge.title}</option>)}
-              </select>
-              <select className={pillSelect} value={linkDays} onChange={(event) => setLinkDays(event.target.value)} aria-label={t("expiresLabel")}>
-                <option value="1">{t("expires1")}</option><option value="7">{t("expires7")}</option><option value="30">{t("expires30")}</option>
-              </select>
-              <select className={pillSelect} value={linkUses} onChange={(event) => setLinkUses(event.target.value)} aria-label={t("maxUsesLabel")}>
-                {[1, 5, 10, 25, 100].map((count) => <option key={count} value={count}>{t("usesOption", { count })}</option>)}
-              </select>
-            </div>
-          ) : null}
           <StatusMessage error={error ?? copyError} />
           <form onSubmit={inviteMember} className="mt-6">
             <div className="flex h-[46px] items-center gap-1 rounded-full border border-[var(--line)] pl-4 pr-1 transition focus-within:border-[var(--main)] focus-within:ring-4 focus-within:ring-[var(--main)]/15">

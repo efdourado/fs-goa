@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import { useMemo, useState } from "react";
 
 import { type EventForm, eventFormProblem, knownTimeZones } from "./schedule";
-import { Field, inputClass, Toggle } from "./ui";
+import { Field, inputClass, Select, Toggle } from "./ui";
 
 /**
  * An item's own date — a match's day, a screening. "Add date" opens a full-width date; "End date" is
@@ -105,9 +105,8 @@ export function EventScheduleInput({
       {value.withTime ? (
         <Field label="" error={problem === "zone" ? t("errZone") : null}>
           {zones.length ? (
-            <select className={inputClass} aria-label={t("zone")} value={value.timeZone} disabled={disabled} onChange={(event) => onChange({ ...value, timeZone: event.target.value })}>
-              {zones.map((zone) => <option key={zone} value={zone}>{zone}</option>)}
-            </select>
+            <Select ariaLabel={t("zone")} value={value.timeZone} disabled={disabled} onChange={(timeZone) => onChange({ ...value, timeZone })}
+              options={zones.map((zone) => ({ value: zone, label: zone }))} />
           ) : (
             <input className={inputClass} aria-label={t("zone")} value={value.timeZone} disabled={disabled} autoCapitalize="off" spellCheck={false} maxLength={100} onChange={(event) => onChange({ ...value, timeZone: event.target.value.trim() })} />
           )}

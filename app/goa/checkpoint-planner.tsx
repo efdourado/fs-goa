@@ -6,7 +6,7 @@ import { useMemo, useState } from "react";
 import { useGoaFormat } from "./format";
 import { applyOrder, type OrderableItem, type OrderStrategy } from "./ordering";
 import type { ChallengeDetail, CheckpointInput, CheckpointKind, Id } from "./types";
-import { Button, EmptyState, inputClass, labelClass, PageHeading, StatusMessage } from "./ui";
+import { BoxSection, Button, EmptyState, inputClass, labelClass, PageHeading, Select, StatusMessage } from "./ui";
 import { formatRuntime } from "./utils";
 
 /** How many items a stage lists before "show more". */
@@ -211,14 +211,68 @@ export function CheckpointPlanner({
     );
   }
 
+  // A closed challenge is frozen, but its stages and how the items were spread over them still read as they were.
+  if (locked) {
+    return (
+      <div className="mx-auto max-w-2xl">
+        <PageHeading title={t("title")} />
+        <div className="space-y-4">
+          <BoxSection title={t("stagesTitle")} hint={t("lockedNote")}>
+            {savedCheckpoints.length ? (
+              <ol className="divide-y divide-[var(--line)]">
+                {savedCheckpoints.map((cp) => {
+                  const ids = grouped.get(cp.id) ?? [];
+                  const when = cp.opensAt || cp.dueAt ? f.dateRange(cp.opensAt, cp.dueAt) : null;
+                  return (
+                    <li className="py-4 first:pt-0 last:pb-0" key={cp.id}>
+                      <strong className="block text-sm font-medium">{cp.title}</strong>
+                      <p className="mt-0.5 text-xs text-[var(--muted)]">{[when, t("itemsTally", { count: ids.length })].filter(Boolean).join(" · ")}</p>
+                      {cp.description ? <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{cp.description}</p> : null}
+                    </li>
+                  );
+                })}
+              </ol>
+            ) : (
+              <EmptyState title={t("noCheckpointsTitle")} />
+            )}
+          </BoxSection>
+          {savedCheckpoints.length ? (
+            <BoxSection title={t("itemsByStage")}>
+              <div className="space-y-3">
+                {[...savedCheckpoints, null].map((cp) => {
+                  const ids = grouped.get(cp?.id ?? "none") ?? [];
+                  if (!cp && !ids.length) return null;
+                  return (
+                    <div className="rounded-2xl border border-[var(--line)] p-4" key={cp?.id ?? "none"}>
+                      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                        <strong className="truncate text-sm">{cp ? cp.title : t("unassigned")}</strong>
+                        <span className="text-xs text-[var(--muted)]">{t("itemsTally", { count: ids.length })}</span>
+                      </div>
+                      {ids.length ? (
+                        <ul className="space-y-1">
+                          {ids.map((id) => {
+                            const item = itemById.get(id);
+                            return item ? <li className="truncate rounded-lg bg-[var(--wash)] px-3 py-1.5 text-sm" key={id}>{item.title}{item.catalogItem?.year ? ` (${item.catalogItem.year})` : ""}</li> : null;
+                          })}
+                        </ul>
+                      ) : <p className="text-xs text-[var(--muted)]">{t("emptyCheckpoint")}</p>}
+                    </div>
+                  );
+                })}
+              </div>
+            </BoxSection>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="mx-auto max-w-5xl space-y-12">
-      <section>
-        <PageHeading title={t("title")} description={t("subtitle")} />
-        {locked ? (
-          <p className="mt-4 text-sm text-[var(--muted)]">{t("lockedNote")}</p>
-        ) : (
-          <div className="mt-4 space-y-3">
+    <div className="mx-auto max-w-2xl">
+      <PageHeading title={t("title")} />
+      <div className="space-y-4">
+      <BoxSection title={t("createTitle")}>
+          <div className="space-y-3">
             {drafts.length ? (
               <ol className="divide-y divide-[var(--line)]">
                 {drafts.map((draft, index) => {
@@ -259,20 +313,15 @@ export function CheckpointPlanner({
             ) : (
               <EmptyState title={t("noCheckpointsTitle")} />
             )}
-            <div className="flex flex-wrap gap-2">
-              <Button variant="secondary" onClick={addDraft}>{t("addCheckpoint")}</Button>
-              <Button disabled={cpBusy} onClick={() => void saveCheckpoints()}>{cpBusy ? tc("saving") : t("saveCheckpoints")}</Button>
-            </div>
+            <Button variant="secondary" onClick={addDraft}>{t("addCheckpoint")}</Button>
+            <Button className="w-full" disabled={cpBusy} onClick={() => void saveCheckpoints()}>{cpBusy ? tc("saving") : t("saveCheckpoints")}</Button>
             <StatusMessage error={cpError} success={cpDone} />
           </div>
-        )}
-      </section>
+      </BoxSection>
 
-      {savedCheckpoints.length && !locked ? (
-        <section className="border-t border-[var(--line)] pt-10">
-          <h2 className="text-lg font-medium tracking-tight">{t("organiseTitle")}</h2>
-          <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{t("organiseSubtitle")}</p>
-          <div className="mt-4 flex flex-wrap gap-2">
+      {savedCheckpoints.length ? (
+        <BoxSection title={t("organiseTitle")}>
+          <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={distribute}>{t("distribute")}</Button>
             <Button variant="secondary" onClick={shuffleAll}>{t("shuffleAll")}</Button>
             <Button variant="secondary" onClick={shuffleWithin}>{t("shuffleWithin")}</Button>
@@ -286,16 +335,15 @@ export function CheckpointPlanner({
           {picked.size ? (
             <div className="sticky top-16 z-10 mt-3 flex flex-wrap items-center gap-2 rounded-2xl border border-[var(--main-line)] bg-[var(--main-soft)] p-3 shadow-[var(--elevate-1)]" role="region" aria-label={t("selectionBar")}>
               <strong className="text-sm font-medium">{t("selected", { count: picked.size })}</strong>
-              <select
-                className="min-h-10 rounded-xl border border-[var(--line)] bg-[var(--paper)] px-3 text-sm"
+              <Select
+                look="bare"
+                className="min-h-10 rounded-xl border border-[var(--line)] px-3 text-sm"
                 value=""
-                aria-label={t("moveTo")}
-                onChange={(event) => { if (event.target.value) moveTicked(event.target.value === "__none__" ? null : event.target.value); }}
-              >
-                <option value="">{t("moveTo")}</option>
-                {savedCheckpoints.map((option) => <option value={option.id} key={option.id}>{option.title}</option>)}
-                <option value="__none__">{t("unassigned")}</option>
-              </select>
+                placeholder={t("moveTo")}
+                ariaLabel={t("moveTo")}
+                onChange={(next) => moveTicked(next === "__none__" ? null : next)}
+                options={[...savedCheckpoints.map((option) => ({ value: option.id, label: option.title })), { value: "__none__", label: t("unassigned") }]}
+              />
               <Button variant="secondary" onClick={() => moveTicked(null)}>{t("removeFromStage")}</Button>
               <Button variant="ghost" onClick={() => setPicked(new Set())}>{t("clearSelection")}</Button>
             </div>
@@ -310,7 +358,7 @@ export function CheckpointPlanner({
               const shown = open ? ids : ids.slice(0, STAGE_PREVIEW);
               const allPicked = ids.length > 0 && ids.every((id) => picked.has(id));
               return (
-                <div className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-4" key={key}>
+                <div className="rounded-2xl border border-[var(--line)] p-4" key={key}>
                   <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                     <label className="flex min-w-0 items-center gap-2.5">
                       <input type="checkbox" className="h-4 w-4 flex-none" disabled={!ids.length} checked={allPicked} aria-label={t("selectStage", { name: cp ? cp.title : t("unassigned") })} onChange={(event) => togglePicked(ids, event.target.checked)} />
@@ -330,13 +378,11 @@ export function CheckpointPlanner({
                             <li className="flex items-center gap-3 rounded-lg bg-[var(--wash)] px-3 py-1.5 text-sm" key={id}>
                               <input type="checkbox" className="h-4 w-4 flex-none" checked={picked.has(id)} aria-label={item.title} onChange={(event) => togglePicked([id], event.target.checked)} />
                               <span className="min-w-0 flex-1 truncate">{item.title}{item.catalogItem?.year ? ` (${item.catalogItem.year})` : ""}</span>
-                              <select className="min-h-9 rounded-lg border border-[var(--line)] bg-[var(--paper)] px-2 text-xs"
+                              <Select look="bare" className="min-h-9 max-w-[45%] rounded-lg border border-[var(--line)] px-2 text-xs"
                                 value={assignment[id] ?? ""}
-                                aria-label={t("moveItem", { title: item.title })}
-                                onChange={(event) => setAssignment((cur) => ({ ...cur, [id]: event.target.value || null }))}>
-                                <option value="">{t("unassigned")}</option>
-                                {savedCheckpoints.map((option) => <option value={option.id} key={option.id}>{option.title}</option>)}
-                              </select>
+                                ariaLabel={t("moveItem", { title: item.title })}
+                                onChange={(next) => setAssignment((cur) => ({ ...cur, [id]: next || null }))}
+                                options={[{ value: "", label: t("unassigned") }, ...savedCheckpoints.map((option) => ({ value: option.id, label: option.title }))]} />
                             </li>
                           );
                         })}
@@ -360,12 +406,11 @@ export function CheckpointPlanner({
             })}
           </div>
 
-          <div className="mt-5 flex flex-wrap gap-2">
-            <Button disabled={assignBusy} onClick={() => void saveAssignment()}>{assignBusy ? tc("saving") : t("saveOrganise")}</Button>
-          </div>
+          <Button className="mt-5 w-full" disabled={assignBusy} onClick={() => void saveAssignment()}>{assignBusy ? tc("saving") : t("saveOrganise")}</Button>
           <StatusMessage error={assignError} success={assignDone} />
-        </section>
+        </BoxSection>
       ) : null}
+      </div>
     </div>
   );
 }

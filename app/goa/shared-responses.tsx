@@ -8,7 +8,7 @@ import { FormDialog } from "./dialog";
 import { cleanFields, FIELD_TYPES, FieldConfigInputs, newFieldConfig } from "./fields";
 import { useGoaFormat } from "./format";
 import type { ChallengeField, EntryTypeView, SharedEditPolicy } from "./types";
-import { Field, inputClass, SelectableCards, StatusMessage, Toggle } from "./ui";
+import { Field, inputClass, Select, SelectableCards, StatusMessage, Toggle } from "./ui";
 
 /** Two ends of a small "people" glyph — the mark for an answer that belongs to the whole group. */
 export function SharedGlyph({ className }: { className?: string }) {
@@ -86,13 +86,12 @@ export function AddSharedResponseDialog({
           <input className={inputClass} value={field.label} maxLength={100} placeholder={name.trim() || t("fieldPlaceholder")} onChange={(event) => setField((current) => ({ ...current, label: event.target.value }))} />
         </Field>
         <Field label={tf("typeLabel")}>
-          <select
-            className={inputClass}
+          <Select
+            ariaLabel={tf("typeLabel")}
             value={field.type}
-            onChange={(event) => { const type = event.target.value as ChallengeField["type"]; setField((current) => ({ ...current, type, config: newFieldConfig(type) })); }}
-          >
-            {FIELD_TYPES.map((value) => <option value={value} key={value}>{tf(`type.${value}`)}</option>)}
-          </select>
+            onChange={(type) => setField((current) => ({ ...current, type, config: newFieldConfig(type) }))}
+            options={FIELD_TYPES.map((value) => ({ value, label: tf(`type.${value}`) }))}
+          />
         </Field>
       </div>
       {hasConfig ? <FieldConfigInputs field={field} onChange={(patch) => setField((current) => ({ ...current, ...patch }))} /> : null}

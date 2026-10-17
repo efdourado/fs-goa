@@ -5,10 +5,13 @@ import { useTranslations } from "next-intl";
 import { copyText } from "../clipboard";
 import { useGoaFormat } from "../format";
 import type { ChallengeDetail } from "../types";
-import { Button, StatusMessage, Toggle } from "../ui";
+import { LinkPill, StatusMessage, Toggle } from "../ui";
 import { isLivingList } from "../utils";
 
-/** The public page's switch, its link (copy / new link) and the confirmation for each change — shown in place on Settings. */
+/**
+ * Settings' public page: its title and one line, the switch beside them, and, once it's on, its link drawn like the
+ * group's invite ticket (copy on the left, a new link on the right). Every change applies at once: no confirm step.
+ */
 export function PublicationPanel({ challenge, onPublish, onUnpublish }: {
   challenge: ChallengeDetail;
   onPublish: (payload: Record<string, unknown>) => Promise<{ url?: string | null } | undefined>;
@@ -16,12 +19,10 @@ export function PublicationPanel({ challenge, onPublish, onUnpublish }: {
 }) {
   const t = useTranslations("adminChallenge");
   const tx = useTranslations("managementUX");
-  const tc = useTranslations("common");
   const f = useGoaFormat();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [confirm, setConfirm] = useState<"publish" | "rotate" | "unpublish" | null>(null);
+  const [copied, setCopied] = useState(false);
   const [newUrl, setNewUrl] = useState<string | null>(null);
   const published = Boolean(challenge.result?.publishedAt);
   // A list has no round to close — it can be published any time, live.
@@ -29,50 +30,44 @@ export function PublicationPanel({ challenge, onPublish, onUnpublish }: {
   const canPublish = challenge.status === "closed" || challenge.kind === "list" || isLivingList(challenge);
   const token = challenge.result?.shareToken;
   const publicUrl = newUrl ?? (token && typeof window !== "undefined" ? `${window.location.origin}/results/${encodeURIComponent(token)}` : null);
-  async function apply() {
-    setBusy(true); setError(null); setSuccess(null);
+
+  async function run(action: "publish" | "unpublish" | "rotate") {
+    setBusy(true);
+    setError(null);
     try {
-      if (confirm === "unpublish") { await onUnpublish(); setNewUrl(null); setSuccess(t("showcaseUnpublished")); }
-      else { const result = await onPublish(confirm === "rotate" ? { rotateLink: true } : {}); setNewUrl(result?.url ?? null); setSuccess(t(confirm === "rotate" ? "linkRotated" : "showcasePublished")); }
-      setConfirm(null);
+      if (action === "unpublish") { await onUnpublish(); setNewUrl(null); }
+      else { const result = await onPublish(action === "rotate" ? { rotateLink: true } : {}); setNewUrl(result?.url ?? null); }
     } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
   }
-  return <div>
-    <div>
-      <Toggle
-        checked={published}
-        disabled={busy || !canPublish || confirm !== null}
-        onChange={() => setConfirm(published ? "unpublish" : "publish")}
-        label={tx(published ? "publicOn" : "publicOff")}
-        hint={published ? t(challenge.resultsAnon ? "publishStateAnon" : "publishStateNamed") : tx("privateUntilPublished")}
-      />
-    </div>
-    {!canPublish ? <p className="mt-2 text-xs text-[var(--muted)]">{t("publishNeedsClose")}</p> : null}
 
-    {published ? (
-      <div className="mt-4 space-y-2">
-        <div className="flex items-center gap-2 rounded-xl border border-[var(--line)] px-3">
-          <span className="min-w-0 flex-1 truncate py-2.5 text-xs text-[var(--muted)]">{publicUrl ?? t("linkNotStored")}</span>
-          <button type="button" aria-label={t("copyLink")} title={t("copyLink")} disabled={busy || !publicUrl || confirm !== null}
-            onClick={async () => { try { await copyText(publicUrl!); setError(null); setSuccess(t("linkCopied")); } catch { setError(t("copyFailed")); } }}
-            className="grid size-8 flex-none place-items-center rounded-lg text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)] disabled:opacity-40">
-            <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><rect x="5" y="5" width="8" height="8" rx="1.5" /><path d="M3 11V3.5h7.5" /></svg>
-          </button>
-          <button type="button" aria-label={t("rotateLink")} title={t("rotateLink")} disabled={busy || confirm !== null} onClick={() => setConfirm("rotate")}
-            className="grid size-8 flex-none place-items-center rounded-lg text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)] disabled:opacity-40">
-            <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M20 7h-9M17 4l3 3-3 3M4 17h9M7 14l-3 3 3 3" /></svg>
-          </button>
+  async function copy() {
+    if (!publicUrl) return;
+    try {
+      await copyText(publicUrl);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch { setError(t("copyFailed")); }
+  }
+
+  return (
+    <section className="rounded-[20px] border border-[var(--line)] p-5 sm:p-6">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h2 className="text-lg font-medium tracking-tight">{tx("menuPublicTitle")}</h2>
+          <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{tx("menuPublicHint")}</p>
         </div>
+        <Toggle className="mt-1 flex-none" checked={published} disabled={busy || !canPublish} onChange={(on) => void run(on ? "publish" : "unpublish")} ariaLabel={tx("menuPublicTitle")} />
       </div>
-    ) : null}
-    <p className="mt-4 text-xs leading-6 text-[var(--muted)]">{tx("savedVersionOnly")}</p>
-
-    {confirm ? (
-      <div className="mt-5 space-y-3 rounded-xl border border-[var(--line)] bg-[var(--wash)] p-4">
-        <p className="text-sm leading-6">{confirm === "rotate" ? t("rotateLinkConfirm") : confirm === "unpublish" ? t("unpublishConfirm") : t(challenge.resultsAnon ? "publishConfirmAnon" : "publishConfirmNoAnon")}</p>
-        <div className="flex flex-wrap justify-end gap-2"><Button variant="secondary" disabled={busy} onClick={() => setConfirm(null)}>{tc("cancel")}</Button><Button variant={confirm === "publish" ? "primary" : "danger"} disabled={busy} onClick={() => void apply()}>{busy ? tc("saving") : t(confirm === "rotate" ? "rotateLink" : confirm === "unpublish" ? "unpublish" : "publishShowcase")}</Button></div>
-      </div>
-    ) : null}
-    <StatusMessage error={error} success={success} />
-  </div>;
+      {!canPublish ? <p className="mt-2 text-xs text-[var(--muted)]">{t("publishNeedsClose")}</p> : null}
+      {published ? (
+        <div className="mt-4">
+          <LinkPill url={publicUrl} placeholder={t("linkNotStored")} copied={copied} busy={busy} onCopy={() => void copy()} onRenew={() => void run("rotate")}
+            copyLabel={t("copyLink")} copiedLabel={t("linkCopied")} renewLabel={t("rotateLink")} urlLabel={tx("menuPublicTitle")} />
+        </div>
+      ) : null}
+      {/* Off deletes the link for good (on again makes a new one), and so does a new link: say it before it happens. */}
+      {published ? <p className="mt-2 pl-3 text-xs text-[var(--muted)]">{tx("publicLinkWarning")}</p> : null}
+      <StatusMessage error={error} />
+    </section>
+  );
 }

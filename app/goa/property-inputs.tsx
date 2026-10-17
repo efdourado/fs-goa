@@ -16,7 +16,7 @@ import {
   eventFormProblem,
 } from "./schedule";
 import type { CatalogItem, Id, LibraryProperty } from "./types";
-import { Field, inputClass } from "./ui";
+import { Field, inputClass, Select } from "./ui";
 
 /** Values typed into a library's property fields, by `LibraryProperty.key`. Booleans are `"true"` / `"false"` / `""`. */
 export type PropertyValues = Record<string, string>;
@@ -221,11 +221,8 @@ export function PropertyInputs({
         return (
           <Field key={property.key} label={label} optional>
             {property.type === "boolean" ? (
-              <select className={inputClass} value={value} disabled={disabled} onChange={(event) => onChange(property.key, event.target.value)}>
-                <option value="" />
-                <option value="true">{tc("yes")}</option>
-                <option value="false">{tc("no")}</option>
-              </select>
+              <Select value={value} disabled={disabled} ariaLabel={label} onChange={(next) => onChange(property.key, next)}
+                options={[{ value: "", label: "" }, { value: "true", label: tc("yes") }, { value: "false", label: tc("no") }]} />
             ) : (
               <input
                 className={inputClass}

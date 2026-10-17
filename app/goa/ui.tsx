@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from "react";
+import { createContext, Fragment, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type Ref, useContext, useEffect, useId, useRef, useState } from "react";
 
 import { useGoaFormat } from "./format";
 import { SettingsMenu } from "./SettingsMenu";
@@ -18,7 +18,7 @@ import {
 export const cardClass =
   "rounded-[20px] border border-[var(--line)] bg-[var(--paper)] shadow-[var(--elevate-1)]";
 export const inputClass =
-  "min-h-11 w-full rounded-xl border border-[var(--line)] bg-[var(--paper)] px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--main)] focus:ring-4 focus:ring-[var(--main)]/18 disabled:cursor-not-allowed disabled:bg-[var(--canvas)] disabled:text-[var(--muted)]";
+  "min-h-11 w-full rounded-xl border border-[var(--line)] bg-transparent px-3.5 py-2.5 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--main)] focus:ring-4 focus:ring-[var(--main)]/18 disabled:cursor-not-allowed disabled:text-[var(--muted)]";
 export const labelClass = "mb-1.5 block text-[13px] font-medium text-[var(--ink)]";
 /**
  * A section title one step down from `PageHeading`'s `<h1>` — sentence case,
@@ -233,6 +233,267 @@ export function SearchField({
         />
       ) : null}
     </div>
+  );
+}
+
+/**
+ * Copy that answers: the two sheets spin away, a ring draws itself and a check is written inside it (`done`),
+ * then it all eases back. The motion lives in globals.css (`.copy-check`); reduced motion just swaps them.
+ */
+export function CopyCheckIcon({ done, className }: { done: boolean; className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={cx("copy-check", className)} data-done={done ? "" : undefined} fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <g className="copy-check__sheets" strokeWidth="1.5">
+        <rect x="7" y="7" width="9.5" height="9.5" rx="2.2" />
+        <path d="M13 7V5.6a2.1 2.1 0 0 0-2.1-2.1H5.6a2.1 2.1 0 0 0-2.1 2.1v5.3A2.1 2.1 0 0 0 5.6 13H7" />
+      </g>
+      {/* Drawn with fixed dash lengths (ring ≈ 47.8, tick ≈ 9.9), not pathLength, which some browsers ignore on shapes. */}
+      <circle className="copy-check__ring" cx="10" cy="10" r="7.6" strokeWidth="1.6" transform="rotate(-90 10 10)" />
+      <path className="copy-check__tick" d="m6.7 10.3 2.3 2.3 4.5-4.8" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+export interface SelectOption<T extends string = string> {
+  value: T;
+  label: string;
+  disabled?: boolean;
+  /** Options sharing a group sit under its name, like an `<optgroup>`. */
+  group?: string;
+}
+
+const selectLooks = {
+  field: inputClass,
+  pill: "min-h-10 rounded-full border border-[var(--line)] bg-transparent px-4 text-sm text-[var(--ink)] transition hover:border-[var(--muted)] focus-visible:border-[var(--main)] focus-visible:ring-4 focus-visible:ring-[var(--main)]/15 disabled:cursor-not-allowed disabled:opacity-55",
+  bare: "",
+};
+
+/**
+ * The app's own drop-down, in place of a native `<select>` (whose list the browser draws its own way). The list opens
+ * in the top layer as a popover, so a modal dialog neither clips nor blocks it: under the trigger (above it near the
+ * bottom of the screen) on a wide screen, as a sheet from the bottom on a phone. The chosen option carries an ink
+ * circle check. Keys: arrows, Home/End, a letter to jump, Enter or Space to pick, Escape to close.
+ */
+export function Select<T extends string>({
+  value,
+  onChange,
+  options,
+  ariaLabel,
+  id,
+  name,
+  disabled = false,
+  placeholder,
+  look = "field",
+  chevron = true,
+  className,
+}: {
+  value: T;
+  onChange: (value: T) => void;
+  options: Array<SelectOption<T>>;
+  ariaLabel?: string;
+  id?: string;
+  /** Sends the value with a native form, through a hidden input. */
+  name?: string;
+  disabled?: boolean;
+  /** Shown when the value matches no option. */
+  placeholder?: string;
+  look?: keyof typeof selectLooks;
+  /** A quiet trigger (a word in a line of text) can drop the chevron. */
+  chevron?: boolean;
+  className?: string;
+}) {
+  const listId = useId();
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const [sheet, setSheet] = useState(false);
+  const selected = options.find((option) => option.value === value);
+
+  function optionButtons() {
+    return Array.from(listRef.current?.querySelectorAll<HTMLButtonElement>("[role=option]:not(:disabled)") ?? []);
+  }
+
+  // Placed just before it shows: below the trigger, or above it when the room is under it is short.
+  function place() {
+    const trigger = triggerRef.current, list = listRef.current;
+    if (!trigger || !list) return;
+    const phone = window.matchMedia("(max-width: 639px)").matches;
+    setSheet(phone);
+    if (phone) { Object.assign(list.style, { top: "auto", left: "0px", right: "0px", bottom: "0px", minWidth: "", maxHeight: "60dvh" }); return; }
+    const box = trigger.getBoundingClientRect();
+    const below = window.innerHeight - box.bottom - 12, above = box.top - 12;
+    const up = below < 220 && above > below;
+    const room = Math.min(320, (up ? above : below) - 6);
+    const left = Math.max(8, Math.min(box.left, window.innerWidth - Math.max(box.width, 180) - 8));
+    Object.assign(list.style, {
+      left: `${left}px`, right: "auto", minWidth: `${box.width}px`, maxWidth: `${window.innerWidth - 16}px`, maxHeight: `${room}px`,
+      top: up ? "auto" : `${box.bottom + 6}px`, bottom: up ? `${window.innerHeight - box.top + 6}px` : "auto",
+    });
+  }
+
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const onBeforeToggle = (event: Event) => { if ((event as ToggleEvent).newState === "open") place(); };
+    const onToggle = (event: Event) => {
+      const isOpen = (event as ToggleEvent).newState === "open";
+      setOpen(isOpen);
+      if (isOpen) {
+        const buttons = optionButtons();
+        (buttons.find((button) => button.dataset.value === value) ?? buttons[0])?.focus({ preventScroll: true });
+        listRef.current?.querySelector("[aria-selected=true]")?.scrollIntoView({ block: "nearest" });
+      }
+    };
+    list.addEventListener("beforetoggle", onBeforeToggle);
+    list.addEventListener("toggle", onToggle);
+    return () => { list.removeEventListener("beforetoggle", onBeforeToggle); list.removeEventListener("toggle", onToggle); };
+  });
+
+  // A page that scrolls or resizes under an open list would leave it floating: close it instead.
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: Event) => { if (!(event.target instanceof Node && listRef.current?.contains(event.target))) listRef.current?.hidePopover(); };
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => { window.removeEventListener("scroll", close, true); window.removeEventListener("resize", close); };
+  }, [open]);
+
+  function pick(next: T) {
+    listRef.current?.hidePopover();
+    triggerRef.current?.focus();
+    if (next !== value) onChange(next);
+  }
+
+  function onTriggerKey(event: ReactKeyboardEvent) {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); listRef.current?.showPopover(); }
+  }
+
+  function onListKey(event: ReactKeyboardEvent) {
+    const buttons = optionButtons();
+    const at = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    let to = -1;
+    if (event.key === "ArrowDown") to = Math.min(buttons.length - 1, at + 1);
+    else if (event.key === "ArrowUp") to = Math.max(0, at - 1);
+    else if (event.key === "Home") to = 0;
+    else if (event.key === "End") to = buttons.length - 1;
+    else if (event.key === "Tab") { listRef.current?.hidePopover(); triggerRef.current?.focus(); return; }
+    else if (event.key.length === 1 && /\S/.test(event.key)) {
+      const letter = event.key.toLocaleLowerCase();
+      const order = [...buttons.slice(at + 1), ...buttons.slice(0, at + 1)];
+      const hit = order.find((button) => (button.textContent ?? "").trim().toLocaleLowerCase().startsWith(letter));
+      to = hit ? buttons.indexOf(hit) : -1;
+    }
+    if (to < 0) return;
+    event.preventDefault();
+    buttons[to]?.focus();
+  }
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        id={id}
+        disabled={disabled}
+        aria-label={ariaLabel}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={listId}
+        popoverTarget={listId}
+        onKeyDown={onTriggerKey}
+        className={cx("flex min-w-0 cursor-pointer items-center justify-between gap-2 text-left outline-none disabled:cursor-not-allowed", selectLooks[look], className)}
+      >
+        <span className={cx("min-w-0 truncate", !selected && "text-[var(--muted)]")}>{selected?.label ?? placeholder ?? ""}</span>
+        {chevron ? <svg viewBox="0 0 16 16" className={cx("h-3.5 w-3.5 flex-none text-[var(--muted)] transition-transform", open && "rotate-180")} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4.5 6.5 8 10l3.5-3.5" /></svg> : null}
+      </button>
+      {name ? <input type="hidden" name={name} value={value} /> : null}
+      <div
+        ref={listRef}
+        id={listId}
+        popover="auto"
+        role="listbox"
+        tabIndex={-1}
+        aria-label={ariaLabel}
+        onKeyDown={onListKey}
+        className={cx(
+          "goa-select-list m-0 overflow-y-auto border border-[var(--line)] bg-[var(--paper)] p-1.5 text-[var(--ink)] shadow-[var(--elevate-2)]",
+          sheet ? "w-full rounded-t-3xl px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 backdrop:bg-black/30" : "rounded-2xl",
+        )}
+      >
+        {options.map((option, index) => {
+          const chosen = option.value === value;
+          const heading = option.group && option.group !== options[index - 1]?.group ? option.group : null;
+          return (
+            <Fragment key={option.value}>
+            {heading ? <p className="px-3 pb-1 pt-2.5 text-xs text-[var(--muted)]" role="presentation">{heading}</p> : null}
+            <button
+              type="button"
+              role="option"
+              aria-selected={chosen}
+              data-value={option.value}
+              disabled={option.disabled}
+              onClick={() => pick(option.value)}
+              className={cx(
+                "flex w-full cursor-pointer items-center justify-between gap-4 rounded-xl px-3 text-left text-sm outline-none transition hover:bg-[var(--wash)] focus-visible:bg-[var(--wash)] disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-transparent",
+                sheet ? "min-h-12" : "min-h-9",
+                chosen && "font-medium",
+              )}
+            >
+              <span className="min-w-0 truncate">{option.label || "\u00a0"}</span>
+              {chosen ? <CircleCheckIcon className="h-4 w-4 flex-none text-[var(--ink)]" /> : null}
+            </button>
+            </Fragment>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+/**
+ * A link to hand over, in a round outline: copy on its left (the icon answers with a check), the link, and a new link
+ * on its right. The group's invite and a challenge's public page both show their link this way.
+ */
+export function LinkPill({ url, placeholder, copied, busy = false, onCopy, onRenew, copyLabel, copiedLabel, renewLabel, urlLabel, inputRef }: {
+  url: string | null;
+  /** Said in the link's place while there's none. */
+  placeholder?: string;
+  copied: boolean;
+  busy?: boolean;
+  onCopy: () => void;
+  onRenew: () => void;
+  copyLabel: string;
+  copiedLabel: string;
+  renewLabel: string;
+  urlLabel: string;
+  inputRef?: Ref<HTMLInputElement>;
+}) {
+  const iconButton = "grid h-8 w-8 flex-none cursor-pointer place-items-center rounded-full text-[var(--ink)] transition hover:bg-[var(--wash)] disabled:cursor-default";
+  return (
+    <div className="flex h-[46px] items-center gap-2 rounded-full border border-[var(--line)] px-2">
+      <button type="button" onClick={onCopy} disabled={!url} aria-label={copied ? copiedLabel : copyLabel} title={copied ? copiedLabel : copyLabel} className={iconButton}>
+        <CopyCheckIcon done={copied} className="h-[18px] w-[18px]" />
+      </button>
+      {url ? (
+        <input ref={inputRef} className="min-w-0 flex-1 bg-transparent font-mono text-[12.5px] text-[var(--ink)] outline-none" value={url} readOnly aria-label={urlLabel} onFocus={(event) => event.currentTarget.select()} />
+      ) : (
+        <span className="min-w-0 flex-1 truncate text-sm text-[var(--muted)]">{placeholder ?? "\u00a0"}</span>
+      )}
+      <button type="button" onClick={onRenew} disabled={busy} aria-label={renewLabel} title={renewLabel} className={cx(iconButton, "disabled:opacity-55")}>
+        <svg viewBox="0 0 16 16" className={cx("h-[18px] w-[18px]", busy && "animate-spin")} fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.6-3.7M13 2.8v2.9h-2.9" /></svg>
+      </button>
+    </div>
+  );
+}
+
+/** A box of content, as Manage's tabs lay out their parts: a thin border, its name, an optional line, then its controls. */
+export function BoxSection({ title, hint, danger = false, children }: { title: string; hint?: string; danger?: boolean; children: ReactNode }) {
+  return (
+    <section className="rounded-[20px] border border-[var(--line)] p-5 sm:p-6">
+      <h2 className={cx("text-lg font-medium tracking-tight", danger && "text-[var(--danger)]")}>{title}</h2>
+      {hint ? <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{hint}</p> : null}
+      <div className="mt-4">{children}</div>
+    </section>
   );
 }
 
@@ -648,7 +909,7 @@ export function SchedulePeriodFields({
                   const days = Number(event.target.value);
                   if (Number.isInteger(days) && days >= 1 && days <= 3660) applyShift({ days: days - 1 });
                 }}
-                className="w-20 rounded-lg border border-[var(--line)] bg-[var(--paper)] px-2 py-1.5 text-center text-sm text-[var(--ink)] outline-none focus:border-[var(--main)] disabled:cursor-not-allowed disabled:bg-[var(--canvas)]"
+                className="w-20 rounded-lg border border-[var(--line)] bg-transparent px-2 py-1.5 text-center text-sm text-[var(--ink)] outline-none focus:border-[var(--main)] disabled:cursor-not-allowed disabled:text-[var(--muted)]"
               />
               {t("days")}
             </label>

@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 
 import type { ChallengeRule, RuleTopic } from "./types";
-import { Button, cx, inputClass, labelClass } from "./ui";
+import { Button, CircleMinusIcon, cx, inputClass, labelClass } from "./ui";
 
 const MAX_RULES = 20;
 const MAX_TOPICS_PER_RULE = 12;
@@ -69,19 +69,19 @@ export function RuleSectionsEditor({
               <div className="flex flex-wrap justify-end gap-1">
                 <Button className="min-h-9 px-3 py-1 text-xs" variant="ghost" disabled={disabled || index === 0} onClick={() => move(index, -1)}><span aria-hidden="true">↑</span><span className="sr-only">{t("moveUp")}</span></Button>
                 <Button className="min-h-9 px-3 py-1 text-xs" variant="ghost" disabled={disabled || index === value.length - 1} onClick={() => move(index, 1)}><span aria-hidden="true">↓</span><span className="sr-only">{t("moveDown")}</span></Button>
-                <Button className="min-h-9 px-3 py-1 text-xs" variant="danger" disabled={disabled} onClick={() => onChange(value.filter((_, position) => position !== index))}>{t("remove")}</Button>
+                <button type="button" className="grid h-9 w-9 cursor-pointer place-items-center rounded-full text-[var(--danger)] transition hover:bg-[var(--wash)] disabled:cursor-default disabled:opacity-40" disabled={disabled} aria-label={t("remove")} title={t("remove")} onClick={() => onChange(value.filter((_, position) => position !== index))}><CircleMinusIcon className="h-[18px] w-[18px]" /></button>
               </div>
             </div>
             <label><span className={labelClass}>{t("titleLabel")}</span><input className={inputClass} value={rule.title} onChange={(event) => update(index, { title: event.target.value })} placeholder={t("titlePlaceholder")} required maxLength={160} disabled={disabled} /></label>
             <label className="mt-3 block"><span className={labelClass}>{t("descriptionLabel")}</span><textarea className={inputClass} rows={3} value={rule.description} onChange={(event) => update(index, { description: event.target.value })} placeholder={t("descriptionPlaceholder")} required maxLength={10000} disabled={disabled} /></label>
 
             {topics.length ? (
-              <div className="mt-4 space-y-3 border-l-2 border-[var(--ink)] pl-4">
+              <div className="mt-4 space-y-3 rounded-l-md border-l-2 border-[color-mix(in_srgb,var(--muted)_45%,var(--line))] pl-4">
                 {topics.map((topic, topicIndex) => (
                   <div key={topicIndex}>
                     <div className="mb-2 flex items-center justify-between gap-3">
                       <strong className="text-xs text-[var(--muted)]">{t("topicN", { n: `${index + 1}.${topicIndex + 1}` })}</strong>
-                      <Button className="min-h-9 px-3 py-1 text-xs" variant="ghost" disabled={disabled} onClick={() => removeTopic(index, topicIndex)}>{t("remove")}</Button>
+                      <button type="button" className="grid h-9 w-9 cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)] disabled:cursor-default disabled:opacity-40" disabled={disabled} aria-label={t("remove")} title={t("remove")} onClick={() => removeTopic(index, topicIndex)}><CircleMinusIcon className="h-[18px] w-[18px]" /></button>
                     </div>
                     <label><span className={labelClass}>{t("topicTitleLabel")}</span><input className={inputClass} value={topic.title} onChange={(event) => updateTopic(index, topicIndex, { title: event.target.value })} placeholder={t("topicTitlePlaceholder")} required maxLength={160} disabled={disabled} /></label>
                     <label className="mt-2 block"><span className={labelClass}>{t("topicDescriptionLabel")}</span><textarea className={inputClass} rows={2} value={topic.description} onChange={(event) => updateTopic(index, topicIndex, { description: event.target.value })} placeholder={t("topicDescriptionPlaceholder")} required maxLength={10000} disabled={disabled} /></label>
@@ -90,12 +90,12 @@ export function RuleSectionsEditor({
               </div>
             ) : null}
             {!disabled && topics.length < MAX_TOPICS_PER_RULE ? (
-              <Button className="mt-3 min-h-9 px-3 py-1 text-xs" variant="secondary" onClick={() => addTopic(index)}><span aria-hidden="true">+</span>{t("addTopic", { n: `${index + 1}.${topics.length + 1}` })}</Button>
+              <Button className="mt-3 min-h-9 w-full px-3 py-1 text-xs" variant="secondary" onClick={() => addTopic(index)}><span aria-hidden="true">+</span>{t("addTopic", { n: `${index + 1}.${topics.length + 1}` })}</Button>
             ) : null}
           </article>
         );
       })}
-      {!disabled && value.length < MAX_RULES ? <Button variant="secondary" onClick={() => onChange([...value, { title: "", description: "" }])}><span aria-hidden="true">+</span>{t("addRule")}</Button> : null}
+      {!disabled && value.length < MAX_RULES ? <Button variant="secondary" className="w-full" onClick={() => onChange([...value, { title: "", description: "" }])}><span aria-hidden="true">+</span>{t("addRule")}</Button> : null}
     </div>
   );
 }
@@ -115,7 +115,7 @@ export function RuleSectionsView({ rules, bare = false }: { rules: ChallengeRule
                 <h3 className="text-lg font-light tracking-[-0.02em]">{rule.title}</h3>
                 <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--muted)]">{rule.description}</p>
                 {rule.topics?.length ? (
-                  <div className="mt-4 space-y-3 border-l-2 border-[var(--ink)] pl-4">
+                  <div className="mt-4 space-y-3 rounded-l-md border-l-2 border-[color-mix(in_srgb,var(--muted)_45%,var(--line))] pl-4">
                     {rule.topics.map((topic, topicIndex) => (
                       <div key={`${topic.title}-${topicIndex}`}>
                         <h4 className="text-sm font-light text-[var(--ink)]">
