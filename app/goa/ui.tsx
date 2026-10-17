@@ -1125,13 +1125,16 @@ export function NotificationList({
               })}
             </p>
             <p className="mt-0.5 text-xs text-[var(--muted)]">{f.dateTime(request.createdAt)}</p>
-            <div className="mt-2 flex gap-2">
-              <Button className="min-h-9 px-3 py-1 text-xs" disabled={pendingId === request.id} onClick={() => void respond(request.id, "accept")}>
+            {/* Two halves of the row: Accept, the invite page's green pill in small; Decline, quiet. */}
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button type="button" disabled={pendingId === request.id} onClick={() => void respond(request.id, "accept")}
+                className="inline-flex min-h-8 w-full cursor-pointer items-center justify-center rounded-full bg-[var(--main)] px-3 text-[13px] font-medium text-white shadow-[0_8px_20px_-10px_var(--main)] transition hover:-translate-y-px hover:shadow-[0_12px_24px_-10px_var(--main)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:translate-y-0">
                 {pendingId === request.id ? "…" : t("accept")}
-              </Button>
-              <Button className="min-h-9 px-3 py-1 text-xs" variant="ghost" disabled={pendingId === request.id} onClick={() => void respond(request.id, "decline")}>
+              </button>
+              <button type="button" disabled={pendingId === request.id} onClick={() => void respond(request.id, "decline")}
+                className="inline-flex min-h-8 w-full cursor-pointer items-center justify-center rounded-full px-3 text-xs font-light text-[var(--muted)] transition hover:bg-[var(--hover)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 disabled:cursor-not-allowed disabled:opacity-55">
                 {t("decline")}
-              </Button>
+              </button>
             </div>
           </li>
         ))}
