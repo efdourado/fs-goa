@@ -6,11 +6,9 @@ import { useMemo, useState } from "react";
 import { useGoaFormat } from "./format";
 import { applyOrder, type OrderableItem, type OrderStrategy } from "./ordering";
 import type { ChallengeDetail, CheckpointInput, CheckpointKind, Id } from "./types";
-import { BoxSection, Button, CircleMinusIcon, EmptyState, labelClass, PageHeading, StatusMessage } from "./ui";
+import { AddRow, BoxSection, Button, ChevronIcon, CircleMinusIcon, EmptyState, labelClass, PageHeading, rowIconClass, StartLine, StatusMessage } from "./ui";
 import { formatRuntime } from "./utils";
 
-/** The small plain icon buttons on a stage row (up, down, remove). */
-const rowIcon = "grid h-8 w-8 flex-none cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)] disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent";
 
 interface DraftCheckpoint {
   key: string;
@@ -335,13 +333,13 @@ export function CheckpointPlanner({
                         <span className="whitespace-nowrap text-right text-xs tabular-nums text-[var(--muted)]">{draft.id ? tally(ids) : ""}</span>
                       </button>
                       {/* Order and removal sit on the row itself, right of the count, always there. */}
-                      <button type="button" className={rowIcon} disabled={index === 0} onClick={() => move(index, -1)} aria-label={t("moveUp")} title={t("moveUp")}>
-                        <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4.5 9.5 8 6l3.5 3.5" /></svg>
+                      <button type="button" className={rowIconClass} disabled={index === 0} onClick={() => move(index, -1)} aria-label={t("moveUp")} title={t("moveUp")}>
+                        <ChevronIcon dir="up" />
                       </button>
-                      <button type="button" className={rowIcon} disabled={index === drafts.length - 1} onClick={() => move(index, 1)} aria-label={t("moveDown")} title={t("moveDown")}>
-                        <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4.5 6.5 8 10l3.5-3.5" /></svg>
+                      <button type="button" className={rowIconClass} disabled={index === drafts.length - 1} onClick={() => move(index, 1)} aria-label={t("moveDown")} title={t("moveDown")}>
+                        <ChevronIcon dir="down" />
                       </button>
-                      <button type="button" className={`${rowIcon} text-[var(--danger)] hover:text-[var(--danger)]`} onClick={() => { setDrafts((cur) => cur.filter((d) => d.key !== draft.key)); if (open) setOpenKey(null); }} aria-label={t("removeStage")} title={t("removeStage")}>
+                      <button type="button" className={`${rowIconClass} text-[var(--danger)] hover:text-[var(--danger)]`} onClick={() => { setDrafts((cur) => cur.filter((d) => d.key !== draft.key)); if (open) setOpenKey(null); }} aria-label={t("removeStage")} title={t("removeStage")}>
                         <CircleMinusIcon className="h-[18px] w-[18px]" />
                       </button>
                     </div>
@@ -374,18 +372,11 @@ export function CheckpointPlanner({
                 );
               })}
             </ol>
-            <div className="flex items-center border-t border-[var(--line)] py-3.5">
-<button type="button" onClick={addStage} aria-label={t("addCheckpoint")} className="grid h-8 w-8 flex-none cursor-pointer place-items-center rounded-full border border-dashed border-[var(--muted)] text-xs font-light leading-none transition hover:border-solid hover:border-[var(--ink)]">＋</button>
-              <span className="ml-3.5 text-sm text-[var(--muted)]" aria-hidden="true">{t("stageWord")}</span>
-            </div>
+            <AddRow label={t("stageWord")} ariaLabel={t("addCheckpoint")} onClick={addStage} />
           </section>
         ) : (
           <BoxSection title={t("createTitle")}>
-            {/* Empty: a dotted line to fill, an ink ＋ at its start. */}
-            <div className="relative flex items-center py-1 before:absolute before:left-[22px] before:right-0 before:top-1/2 before:h-px before:bg-[repeating-linear-gradient(90deg,var(--line)_0_6px,transparent_6px_12px)] before:content-['']">
-              <button type="button" onClick={addStage} aria-label={t("addCheckpoint")} className="relative z-[1] grid h-11 w-11 flex-none cursor-pointer place-items-center rounded-full border border-[var(--ink)] bg-[var(--canvas)] text-xl font-light leading-none text-[var(--ink)] transition hover:bg-[var(--ink)] hover:text-[var(--canvas)]">＋</button>
-              <span className="relative z-[1] ml-3.5 bg-[var(--canvas)] pr-2.5 text-sm text-[var(--muted)]" aria-hidden="true">{t("stageWord")}</span>
-            </div>
+            <StartLine label={t("stageWord")} ariaLabel={t("addCheckpoint")} onClick={addStage} />
           </BoxSection>
         )}
 

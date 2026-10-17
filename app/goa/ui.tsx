@@ -487,14 +487,46 @@ export function LinkPill({ url, placeholder, copied, busy = false, onCopy, onRen
 }
 
 /** A box of content, as Manage's tabs lay out their parts: a thin border, its name, an optional line, then its controls. */
-export function BoxSection({ title, hint, danger = false, children }: { title: string; hint?: string; danger?: boolean; children: ReactNode }) {
+export function BoxSection({ title, hint, danger = false, mark, children }: {
+  title: string; hint?: string; danger?: boolean;
+  /** A small mark before the name (a status dot, say). */
+  mark?: ReactNode;
+  children: ReactNode;
+}) {
   return (
     <section className="rounded-[20px] border border-[var(--line)] p-5 sm:p-6">
-      <h2 className={cx("text-lg font-medium tracking-tight", danger && "text-[var(--danger)]")}>{title}</h2>
+      <h2 className={cx("flex items-center gap-2.5 text-lg font-medium tracking-tight", danger && "text-[var(--danger)]")}>{mark}{title}</h2>
       {hint ? <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{hint}</p> : null}
       <div className="mt-4">{children}</div>
     </section>
   );
+}
+
+/** How an empty numbered list (stages, rules) starts: a dotted line to fill, with an ink ＋ at its start and a word. */
+export function StartLine({ label, ariaLabel, onClick }: { label: string; ariaLabel: string; onClick: () => void }) {
+  return (
+    <div className="relative flex items-center py-1 before:absolute before:left-[22px] before:right-0 before:top-1/2 before:h-px before:bg-[repeating-linear-gradient(90deg,var(--line)_0_6px,transparent_6px_12px)] before:content-['']">
+      <button type="button" onClick={onClick} aria-label={ariaLabel} className="relative z-[1] grid h-11 w-11 flex-none cursor-pointer place-items-center rounded-full border border-[var(--ink)] bg-[var(--canvas)] text-xl font-light leading-none text-[var(--ink)] transition hover:bg-[var(--ink)] hover:text-[var(--canvas)]">＋</button>
+      <span className="relative z-[1] ml-3.5 bg-[var(--canvas)] pr-2.5 text-sm text-[var(--muted)]" aria-hidden="true">{label}</span>
+    </div>
+  );
+}
+
+/** One more row for a numbered list: a dashed ＋ circle the size of the numbers, and a word, under the last row. */
+export function AddRow({ label, ariaLabel, onClick }: { label: string; ariaLabel: string; onClick: () => void }) {
+  return (
+    <div className="flex items-center border-t border-[var(--line)] py-3.5">
+      <button type="button" onClick={onClick} aria-label={ariaLabel} className="grid h-8 w-8 flex-none cursor-pointer place-items-center rounded-full border border-dashed border-[var(--muted)] text-xs font-light leading-none transition hover:border-solid hover:border-[var(--ink)]">＋</button>
+      <span className="ml-3.5 text-sm text-[var(--muted)]" aria-hidden="true">{label}</span>
+    </div>
+  );
+}
+
+/** The small plain icon buttons at the end of a numbered row (up, down, remove). */
+export const rowIconClass = "grid h-8 w-8 flex-none cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)] disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent";
+
+export function ChevronIcon({ dir, className = "h-4 w-4" }: { dir: "up" | "down"; className?: string }) {
+  return <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={dir === "up" ? "M4.5 9.5 8 6l3.5 3.5" : "M4.5 6.5 8 10l3.5-3.5"} /></svg>;
 }
 
 export function SlidersIcon({ className }: { className?: string }) {

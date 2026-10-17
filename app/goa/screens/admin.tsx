@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { type FormEvent, useMemo, useState } from "react";
+import { type FormEvent, type ReactNode, useMemo, useState } from "react";
 
 import { CheckpointPlanner } from "../checkpoint-planner";
 import { useGoaFormat } from "../format";
@@ -13,7 +13,7 @@ import { bodyFromValues, editableProperties, PropertyInputs, type PropertyValues
 import { recommenderBody, RecommenderPicker, recommenderFromItem, type RecommenderValue, sameRecommender, useRecommenderSource } from "../recommender-picker";
 import { canOrganise, OrganiseDialog, organiseFromItems } from "../organize-panel";
 import { RuleSectionsEditor, visibleRuleSections } from "../rules";
-import { ChallengeSettings, ChallengeStateButton, type CopyMode } from "./challenge-actions";
+import { ChallengeSettings, ChallengeStatePanel, type CopyMode } from "./challenge-actions";
 import type {
   AdminTab,
   ChallengeDetail,
@@ -69,10 +69,13 @@ function AdminGeneral({
   isPersonal,
   onSaveBasics,
   onSaveParticipants,
+  lead,
 }: {
   challenge: ChallengeDetail;
   group?: GroupSummary;
   isPersonal: boolean;
+  /** The first box, above the form: where the challenge stands (activate, close, reopen). */
+  lead?: ReactNode;
   /** Resolves with `linkRotated` when new dates replaced a published results link. */
   onSaveBasics: (payload: Partial<ChallengeSummary>) => Promise<{ linkRotated?: boolean } | undefined | void>;
   onSaveParticipants: (participantIds: Id[]) => Promise<void>;
@@ -170,11 +173,21 @@ function AdminGeneral({
 
   return (
     <div className="mx-auto max-w-2xl">
+      <PageHeading title={t("basicsTitle")} />
+      {lead ? <div className="mb-4">{lead}</div> : null}
       <form onSubmit={save}>
-        <PageHeading title={t("basicsTitle")} />
         <fieldset disabled={locked} className="min-w-0 space-y-4">
+          {/* What the challenge is called and what it asks, in one box. */}
           <BoxSection title={t("titleLabel")}>
-            <input className={inputClass} aria-label={t("titleLabel")} value={title} onChange={(event) => setTitle(event.target.value)} required maxLength={140} />
+            <div className="space-y-5">
+              <input className={inputClass} aria-label={t("titleLabel")} value={title} onChange={(event) => setTitle(event.target.value)} required maxLength={140} />
+              <Field label={t("descriptionLabel")} optional>
+                <textarea className={inputClass} rows={3} value={description} onChange={(event) => setDescription(event.target.value)} maxLength={1000} disabled={locked} />
+              </Field>
+              <Field label={t("rulesLabel")} hint={t("rulesHint")} optional plain>
+                <RuleSectionsEditor value={ruleSections} onChange={setRuleSections} disabled={locked} />
+              </Field>
+            </div>
           </BoxSection>
 
           <BoxSection title={t("scheduleLegend")}>
@@ -217,17 +230,6 @@ function AdminGeneral({
                 {challenge.status === "active" ? <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{t("scheduleActiveNote")}</p> : null}
               </>
             )}
-          </BoxSection>
-
-          <BoxSection title={t("descRulesTitle")}>
-            <div className="space-y-5">
-              <Field label={t("descriptionLabel")} optional>
-                <textarea className={inputClass} rows={3} value={description} onChange={(event) => setDescription(event.target.value)} maxLength={1000} disabled={locked} />
-              </Field>
-              <Field label={t("rulesLabel")} hint={t("rulesHint")} optional plain>
-                <RuleSectionsEditor value={ruleSections} onChange={setRuleSections} disabled={locked} />
-              </Field>
-            </div>
           </BoxSection>
         </fieldset>
 
@@ -934,7 +936,6 @@ export function AdminScreen({
           <span className="h-5 w-px flex-none bg-[var(--line)] sm:hidden [.has-dock_&]:hidden" aria-hidden="true" />
           <ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />
           <h1 className="min-w-0 flex-1 truncate text-base font-semibold tracking-tight">{challenge.title}</h1>
-          <ChallengeStateButton challenge={challenge} onTransition={onTransition} />
         </div>
         <nav className="mx-auto max-w-5xl px-2 sm:px-5" aria-label={t("tabsAria")}>
           <div className="flex gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -961,7 +962,8 @@ export function AdminScreen({
         {setup ? <div className="mx-auto max-w-2xl"><SetupSummary state={setup} activeTab={activeTab} onGo={onTab} /></div> : null}
         {activeTab === "overview" ? (
           <>
-            <AdminGeneral challenge={challenge} group={group} isPersonal={isPersonal} onSaveBasics={onSaveBasics} onSaveParticipants={onSaveParticipants} />
+            <AdminGeneral challenge={challenge} group={group} isPersonal={isPersonal} onSaveBasics={onSaveBasics} onSaveParticipants={onSaveParticipants}
+              lead={<ChallengeStatePanel challenge={challenge} onTransition={onTransition} />} />
             <div className="mx-auto max-w-2xl">
               <AdminItemsSection challenge={challenge} entries={entries} onReorder={onAssignCheckpointItems} />
             </div>

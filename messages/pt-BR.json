@@ -642,7 +642,7 @@
     "optional": "opcional",
     "showOptional": "Mostrar campos opcionais ({count})",
     "hideOptional": "Ocultar campos opcionais",
-    "rulesLabel": "Regras com título",
+    "rulesLabel": "Regras",
     "rulesHint": "Dê destaque a cada acordo importante do desafio.",
     "fieldsTitle": "O que cada pessoa registra?",
     "checkpointsTitle": "Monte a lista",
@@ -738,7 +738,7 @@
     "showOptional": "Mostrar campos opcionais ({count})",
     "hideOptional": "Ocultar campos opcionais",
     "descriptionLabel": "Descrição",
-    "rulesLabel": "Regras com título",
+    "rulesLabel": "Regras",
     "rulesHint": "Cada regra ganha destaque próprio para ninguém precisar procurar o combinado.",
     "livingListBody": "Nunca encerra.",
     "stateTitle": "Estado do desafio",
@@ -868,7 +868,6 @@
     "fieldRequiredShort": "obrigatório",
     "fieldAdded": "Campo adicionado.",
     "fieldsEmptyTitle": "Nenhum campo",
-    "descRulesTitle": "Descrição e regras",
     "moreActions": "Mais ações",
     "alreadyPublicHint": "Esta vitrine já está pública, qualquer alteração salva aqui aparece no link e no modelo imediatamente.",
     "errPickLibrary": "Escolha a biblioteca de onde vêm os itens.",
@@ -1165,7 +1164,10 @@
     "topicDescriptionLabel": "Descrição do tópico",
     "topicDescriptionPlaceholder": "Detalhe este ponto.",
     "addTopic": "Adicionar tópico ({n})",
-    "addRule": "Adicionar regra"
+    "addRule": "Adicionar regra",
+    "ruleWord": "Regra",
+    "incomplete": "Falta título ou descrição",
+    "topicsCount": "{count, plural, one {# tópico} other {# tópicos}}"
   },
   "fields": {
     "inRankingLabel": "Conta para o ranking",

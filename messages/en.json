@@ -642,7 +642,7 @@
     "optional": "optional",
     "showOptional": "Show optional fields ({count})",
     "hideOptional": "Hide optional fields",
-    "rulesLabel": "Titled rules",
+    "rulesLabel": "Rules",
     "rulesHint": "Give every important agreement its own spotlight.",
     "fieldsTitle": "What does each person log?",
     "checkpointsTitle": "Build the list",
@@ -738,7 +738,7 @@
     "showOptional": "Show optional fields ({count})",
     "hideOptional": "Hide optional fields",
     "descriptionLabel": "Description",
-    "rulesLabel": "Titled rules",
+    "rulesLabel": "Rules",
     "rulesHint": "Each rule gets its own spotlight so nobody has to hunt for the agreement.",
     "livingListBody": "Never ends.",
     "stateTitle": "Challenge state",
@@ -868,7 +868,6 @@
     "fieldRequiredShort": "required",
     "fieldAdded": "Field added.",
     "fieldsEmptyTitle": "No fields",
-    "descRulesTitle": "Description & rules",
     "moreActions": "More actions",
     "alreadyPublicHint": "This showcase is already public, any change you save here appears on the link and the template immediately.",
     "errPickLibrary": "Choose the library the items come from.",
@@ -1165,7 +1164,10 @@
     "topicDescriptionLabel": "Topic description",
     "topicDescriptionPlaceholder": "Detail this point.",
     "addTopic": "Add topic ({n})",
-    "addRule": "Add rule"
+    "addRule": "Add rule",
+    "ruleWord": "Rule",
+    "incomplete": "Missing a title or description",
+    "topicsCount": "{count, plural, one {# topic} other {# topics}}"
   },
   "fields": {
     "inRankingLabel": "Counts toward the ranking",

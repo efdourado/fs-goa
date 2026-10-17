@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { SkippedPropertiesNotice } from "../copy-notice";
-import { ConfirmDialog, Dialog } from "../dialog";
+import { ConfirmDialog } from "../dialog";
 import { useGoaFormat } from "../format";
 import { PreflightPanel } from "../preflight-panel";
 import type { ChallengeDetail, CopyResult, Id } from "../types";
@@ -13,11 +13,14 @@ import { PublicationPanel } from "./publication";
 
 type Target = { id: Id; name: string; challengeCount: number; challengeLimit: number };
 
-/** Lifecycle (activate / close / reopen) + the pre-activation readiness check, in a dialog. */
-function ChallengeStateDialog({ challenge, onTransition, onClose }: {
+/**
+ * Geral's first box: where the challenge stands and the one move it can make (activate a draft, close an active
+ * round, reopen a closed one), with a draft's readiness check under it. Every move acts at once.
+ * A living list has no round to open or close, so it gets no box.
+ */
+export function ChallengeStatePanel({ challenge, onTransition }: {
   challenge: ChallengeDetail;
   onTransition: (status: "active" | "closed") => Promise<void>;
-  onClose: () => void;
 }) {
   const t = useTranslations("adminChallenge");
   const tc = useTranslations("common");
@@ -26,6 +29,7 @@ function ChallengeStateDialog({ challenge, onTransition, onClose }: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preflightReady, setPreflightReady] = useState(false);
+  if (isLivingList(challenge)) return null;
   const scheduled = isChallengeScheduled(challenge.status, challenge.startsOn, challenge.submissionMode);
 
   async function run(action: "activate" | "close" | "reopen") {
@@ -35,21 +39,21 @@ function ChallengeStateDialog({ challenge, onTransition, onClose }: {
     } catch (cause) { setError(f.error(cause)); } finally { setBusy(false); }
   }
 
-  return <Dialog title={t("stateTitle")} onClose={onClose} busy={busy}>
-    <div className="rounded-2xl bg-[var(--wash)] p-5">
-      <ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />
-      <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{challenge.status === "draft" ? t("stateDraft") : scheduled ? t("stateScheduled", { date: f.date(challenge.startsOn, longDate) }) : challenge.status === "active" ? t("stateActive") : t("stateClosed")}</p>
-      <div className="mt-4">
-        {challenge.status === "draft" ? <Button disabled={busy || !preflightReady} onClick={() => void run("activate")}>{busy ? tc("saving") : t("activate")}</Button> : null}
-        {challenge.status === "active" ? <Button variant="danger" disabled={busy} onClick={() => void run("close")}>{busy ? tc("saving") : t("close")}</Button> : null}
-        {challenge.status === "closed" ? <Button variant="secondary" disabled={busy} onClick={() => void run("reopen")}>{busy ? tc("saving") : t("reopen")}</Button> : null}
+  return (
+    <BoxSection title={t("stateTitle")} mark={<ChallengeStatusBadge status={challenge.status} startsOn={challenge.startsOn} submissionMode={challenge.submissionMode} />}>
+      <p className="-mt-2 text-sm leading-6 text-[var(--muted)]">{challenge.status === "draft" ? t("stateDraft") : scheduled ? t("stateScheduled", { date: f.date(challenge.startsOn, longDate) }) : challenge.status === "active" ? t("stateActive") : t("stateClosed")}</p>
+      {challenge.status === "draft" ? (
+        <div className="mt-5 border-t border-[var(--line)] pt-5"><PreflightPanel challengeId={challenge.id} onReady={setPreflightReady} /></div>
+      ) : null}
+      {/* The one move, as the box's footer. */}
+      <div className="mt-5">
+        {challenge.status === "draft" ? <Button className="w-full" disabled={busy || !preflightReady} onClick={() => void run("activate")}>{busy ? tc("saving") : t("activate")}</Button> : null}
+        {challenge.status === "active" ? <Button className="w-full" variant="danger" disabled={busy} onClick={() => void run("close")}>{busy ? tc("saving") : t("close")}</Button> : null}
+        {challenge.status === "closed" ? <Button className="w-full" variant="secondary" disabled={busy} onClick={() => void run("reopen")}>{busy ? tc("saving") : t("reopen")}</Button> : null}
       </div>
-    </div>
-    {challenge.status === "draft" && !isLivingList(challenge) ? (
-      <div className="mt-6 border-t border-[var(--line)] pt-6"><PreflightPanel challengeId={challenge.id} onReady={setPreflightReady} /></div>
-    ) : null}
-    <StatusMessage error={error} />
-  </Dialog>;
+      <StatusMessage error={error} />
+    </BoxSection>
+  );
 }
 
 /**
@@ -169,24 +173,6 @@ function CopyChallengePanel({ challenge, duplicateTargets, onDuplicate, onOpenCo
       <Button type="submit" className="w-full" disabled={busy || !ready}>{busy ? t("reuseCreating") : t("reuseSubmit")}</Button>
     </form>
   );
-}
-
-/** The lifecycle button in Manage's header — activate a draft, close an active round, reopen a closed one. */
-export function ChallengeStateButton({ challenge, onTransition }: {
-  challenge: ChallengeDetail;
-  onTransition: (status: "active" | "closed") => Promise<void>;
-}) {
-  const t = useTranslations("adminChallenge");
-  const [open, setOpen] = useState(false);
-  const stateAction = isLivingList(challenge) ? null
-    : challenge.status === "draft" ? { label: t("activate"), variant: "primary" as const }
-    : challenge.status === "active" ? { label: t("close"), variant: "danger" as const }
-    : { label: t("reopen"), variant: "secondary" as const };
-  if (!stateAction) return null;
-  return <>
-    <Button variant={stateAction.variant} onClick={() => setOpen(true)}>{stateAction.label}</Button>
-    {open ? <ChallengeStateDialog challenge={challenge} onTransition={onTransition} onClose={() => setOpen(false)} /> : null}
-  </>;
 }
 
 /**

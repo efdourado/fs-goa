@@ -642,7 +642,7 @@
     "optional": "opcional",
     "showOptional": "Mostrar campos opcionales ({count})",
     "hideOptional": "Ocultar campos opcionales",
-    "rulesLabel": "Reglas con título",
+    "rulesLabel": "Reglas",
     "rulesHint": "Destaca cada acuerdo importante del desafío.",
     "fieldsTitle": "¿Qué registra cada persona?",
     "checkpointsTitle": "Arma la lista",
@@ -738,7 +738,7 @@
     "showOptional": "Mostrar campos opcionales ({count})",
     "hideOptional": "Ocultar campos opcionales",
     "descriptionLabel": "Descripción",
-    "rulesLabel": "Reglas con título",
+    "rulesLabel": "Reglas",
     "rulesHint": "Cada regla gana su propio destaque para que nadie tenga que buscar el acuerdo.",
     "livingListBody": "Nunca termina.",
     "stateTitle": "Estado del desafío",
@@ -868,7 +868,6 @@
     "fieldRequiredShort": "obligatorio",
     "fieldAdded": "Campo agregado.",
     "fieldsEmptyTitle": "Ningún campo",
-    "descRulesTitle": "Descripción y reglas",
     "moreActions": "Más acciones",
     "alreadyPublicHint": "Esta vitrina ya es pública, cualquier cambio que guardes aquí aparece en el enlace y en la plantilla de inmediato.",
     "errPickLibrary": "Elige la biblioteca de la que vienen los ítems.",
@@ -1165,7 +1164,10 @@
     "topicDescriptionLabel": "Descripción del tema",
     "topicDescriptionPlaceholder": "Detalla este punto.",
     "addTopic": "Agregar tema ({n})",
-    "addRule": "Agregar regla"
+    "addRule": "Agregar regla",
+    "ruleWord": "Regla",
+    "incomplete": "Falta título o descripción",
+    "topicsCount": "{count, plural, one {# tema} other {# temas}}"
   },
   "fields": {
     "inRankingLabel": "Cuenta para el ranking",
