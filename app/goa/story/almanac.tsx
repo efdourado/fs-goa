@@ -295,15 +295,18 @@ function ScoreShelf({ title, scores, ratingLabel, pageTiles, limit, scrolls = tr
   const shown = !onScreen ? scores.slice(0, pageTiles) : limit !== undefined && !open ? scores.slice(0, limit) : scores;
   const cut = !onScreen && scores.length > shown.length;
   const folded = onScreen && limit !== undefined && scores.length > limit ? scores.length - limit : 0;
+  const threes = shown.length > 1 && shown.length % 3 === 0;
   return (
     <section className={cx("min-w-0", outlineClass)} data-score-shelf={title}>
       <div className="mb-4 flex items-baseline gap-2.5">
         <h4 className={sectionTitleClass}>{title}</h4>
         {scrolls ? <span className="text-xs tabular-nums text-[var(--muted)]">{scores.length}</span> : null}
       </div>
-      <div className={cx("grid gap-3", shown.length > 1 && "@lg:grid-cols-2")}>
-        {shown.map((score) => (
+      {/* Never an empty cell: three to a row when they come in threes, else two, a lone last one across the row. */}
+      <div className={cx("grid gap-3", shown.length > 1 && "@lg:grid-cols-2", threes && "@3xl:grid-cols-3")}>
+        {shown.map((score, index) => (
           <CatalogTile
+            className={index === shown.length - 1 && shown.length % 2 === 1 && shown.length > 1 ? cx("@lg:col-span-2", threes && "@3xl:col-span-1") : undefined}
             key={score.item.id}
             title={score.item.title}
             year={score.item.year}
