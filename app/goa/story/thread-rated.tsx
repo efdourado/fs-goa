@@ -76,14 +76,24 @@ export function RatedThread({ story, input, focus, run, fit = false }: { story: 
     const index = stationIndex.get(note.itemId);
     if (index === undefined) return [];
     const text = noteText(note, tn, personName, fmt);
-    const bubbleWidth = Math.min(208, text.length * 6.2 + 24);
-    const edge: "start" | "middle" | "end" = index === 0 ? "start" : index === count - 1 ? "end" : "middle";
-    const left = edge === "start" ? x(index) - 12 : edge === "end" ? x(index) + 12 - bubbleWidth : x(index) - bubbleWidth / 2;
+    // A note stays on one line (a wrapped one would run into the row under it), centred on its title and kept
+    // inside the drawing.
+    const bubbleWidth = text.length * 6.4 + 30;
+    const left = Math.max(0, Math.min(Math.max(0, contentWidth - bubbleWidth), x(index) - bubbleWidth / 2));
     let row = 0;
     while (rows[row]?.some(([from, to]) => left < to + 8 && left + bubbleWidth > from - 8)) row += 1;
     (rows[row] ??= []).push([left, left + bubbleWidth]);
-    return [{ note, index, row, text, edge }];
+    return [{ note, index, row, text, left }];
   });
+  // Titles too close to read: only every few get their name and number (spread evenly, first and last always);
+  // every point stays on the line.
+  const LABEL = 88;
+  const labelled = (() => {
+    if (step >= LABEL || count <= 2) return new Set(story.stations.map((_, index) => index));
+    const slots = Math.max(2, Math.floor(contentWidth / LABEL));
+    return new Set(Array.from({ length: slots }, (_, slot) => Math.round((slot * (count - 1)) / (slots - 1))));
+  })();
+  const labelWidth = Math.max(step, Math.min(LABEL + 24, contentWidth / Math.max(1, labelled.size)));
   const top = 20 + Math.max(1, rows.length) * 30;
   const height = top + PLOT;
   const y = (value: number) => top + (1 - (value - input.scale.min) / range) * (PLOT - BOTTOM);
@@ -155,17 +165,17 @@ export function RatedThread({ story, input, focus, run, fit = false }: { story: 
           })}
         </svg>
 
-        {bubbles.map(({ note, index, row, text, edge }) => (
-          <Bubble key={`${note.kind}-${index}`} note={note} text={text} left={x(index)} top={8 + row * 30} at={drawMs * ((index + 1) / count) + 500 + row * 200} edge={edge} />
+        {bubbles.map(({ note, index, row, text, left }) => (
+          <Bubble key={`${note.kind}-${index}`} note={note} text={text} left={left} top={8 + row * 30} at={drawMs * ((index + 1) / count) + 500 + row * 200} />
         ))}
 
         {/* The titles along the bottom, with the group's number. */}
-        {story.stations.map((station, index) => (
-          <div key={station.item.id} className="absolute text-center" style={{ left: x(index) - step / 2, width: step, top: HEIGHT - BOTTOM + 8 }}>
+        {story.stations.map((station, index) => labelled.has(index) ? (
+          <div key={station.item.id} className="absolute text-center" style={{ left: Math.max(0, Math.min(contentWidth - labelWidth, x(index) - labelWidth / 2)), width: labelWidth, top: HEIGHT - BOTTOM + 8 }}>
             <p className="mx-auto max-w-[92%] truncate text-[11px] leading-tight text-white/80" title={station.item.title}>{station.item.title}</p>
             <p className="mt-0.5 text-[11px] tabular-nums text-white/45">{fmt(station.average)}</p>
           </div>
-        ))}
+        ) : null)}
       </div>
     </div>
   );
@@ -182,16 +192,15 @@ function noteText(note: RatedNote, t: ReturnType<typeof useTranslations>, name: 
   }
 }
 
-function Bubble({ note, text, left, top, at, edge }: {
-  note: RatedNote; text: string; left: number; top: number; at: number; edge: "start" | "middle" | "end";
+function Bubble({ note, text, left, top, at }: {
+  note: RatedNote; text: string; left: number; top: number; at: number;
 }) {
   const accent = note.kind === "favourite" ? "var(--tag-green)" : note.kind === "flop" ? "var(--tag-coral)" : "var(--main-2)";
-  // The offset lives on the outer box and the fade-in on the inner one — an animation's transform would
-  // otherwise replace the offset and push end-of-line notes off the drawing.
+  // The position lives on the outer box and the fade-in on the inner one (an animation's transform would move it).
   return (
-    <div className="absolute z-10" style={{ left, top, transform: edge === "start" ? "translateX(-12px)" : edge === "end" ? "translateX(calc(-100% + 12px))" : "translateX(-50%)" }}>
+    <div className="absolute z-10" style={{ left, top }}>
       <div
-        className="reveal-rise w-max max-w-[13rem] rounded-lg bg-[var(--spotlight-ink)] px-2 py-1 text-[11px] leading-snug text-[var(--spotlight)] shadow-lg"
+        className="reveal-rise w-max whitespace-nowrap rounded-lg bg-[var(--spotlight-ink)] px-2 py-1 text-[11px] leading-snug text-[var(--spotlight)] shadow-lg"
         style={{ borderLeft: `3px solid ${accent}`, animationDelay: `${at}ms` }}
       >
         {text}

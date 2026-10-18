@@ -31,9 +31,22 @@ function FitBox({ children }: { children: ReactNode }) {
   useLayoutEffect(() => {
     const outer = box.current, content = inner.current;
     if (!outer || !content) return;
+    // Laid out wider, a page also gets shorter (cards go side by side, lines hold more words), so the scale is
+    // found by trying: the largest one, down to half, at which the page laid out at that width fits.
     const fit = () => {
-      const room = outer.clientHeight, need = content.scrollHeight;
-      setScale(need > room && need > 0 ? Math.max(0.5, room / need) : 1);
+      const room = outer.clientHeight;
+      const heightAt = (value: number) => { content.style.width = `${100 / value}%`; return content.scrollHeight * value; };
+      let found = 1;
+      if (heightAt(1) > room) {
+        let low = 0.5, high = 1;
+        for (let step = 0; step < 9; step += 1) {
+          const mid = (low + high) / 2;
+          if (heightAt(mid) <= room) low = mid; else high = mid;
+        }
+        found = low;
+      }
+      content.style.width = `${100 / found}%`;
+      setScale(found);
     };
     fit();
     const observer = new ResizeObserver(fit);
