@@ -355,9 +355,10 @@ function QuoteWall({ quotes, full, ids, headline }: { quotes: WallQuote[]; full:
     && (!needle || `${quote.text} ${quote.about} ${quote.person.name}`.toLocaleLowerCase().includes(needle)));
   // A filter shows every match: the cap is only for browsing.
   const shown = filtering || showAll ? found : found.slice(0, PREVIEW_QUOTES);
+  // The same two tones as the comment cards: a paper track with a hairline, the chosen one in the soft wash.
   const seg = (active: boolean) => cx(
     "flex h-7 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-xs transition",
-    active ? "bg-[var(--paper)] font-medium text-[var(--ink)] shadow-[var(--elevate-1)]" : "text-[var(--muted)] hover:text-[var(--ink)]",
+    active ? "bg-[var(--wash)] font-medium text-[var(--ink)]" : "text-[var(--muted)] hover:text-[var(--ink)]",
   );
   return (
     <div>
@@ -368,7 +369,7 @@ function QuoteWall({ quotes, full, ids, headline }: { quotes: WallQuote[]; full:
         {quotes.length > PAGE_QUOTES && people.length > 1 ? (
           // On a phone this wrapper takes a full line of its own, last; from `sm` it sits in the row.
           <div className="order-last flex w-full sm:order-none sm:w-auto">
-            <div role="group" aria-label={t("quotes.everyone")} className="flex max-w-full gap-0.5 overflow-x-auto rounded-full bg-[var(--wash)] p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div role="group" aria-label={t("quotes.everyone")} className="flex max-w-full gap-0.5 overflow-x-auto rounded-full border border-[var(--line)] bg-[var(--paper)] p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               <button type="button" aria-pressed={personId === null} className={seg(personId === null)} onClick={() => setPersonId(null)}>{t("quotes.everyone")}</button>
               {people.map((person) => (
                 <button key={person.id} type="button" aria-pressed={personId === person.id} className={seg(personId === person.id)} onClick={() => setPersonId(personId === person.id ? null : person.id)}>
