@@ -102,7 +102,7 @@ function resolveItemSchedule(
   const hasDatetime = Object.hasOwn(body, "opensAt") || Object.hasOwn(body, "dueAt");
   const hasDateOnly = Object.hasOwn(body, "opensOn") || Object.hasOwn(body, "dueOn");
   if (hasDatetime && hasDateOnly) {
-    throw new ApiError(400, "invalid_schedule", "Use data e hora ou só a data para os dois limites do item, não uma mistura.");
+    throw new ApiError(400, "invalid_schedule", "Use o mesmo formato de data nos dois limites.");
   }
   if (!hasDatetime && !hasDateOnly) return { ...current, touched: false };
 
@@ -521,7 +521,7 @@ export async function archiveChallengeItem(
         [itemId, challengeId],
       );
       if (checkpoint) {
-        throw new ApiError(409, "invalid_mode", "Os dias de um desafio diário seguem o período; ajuste as datas na aba Geral.");
+        throw new ApiError(409, "invalid_mode", "Os dias seguem o período: ajuste as datas em Geral.");
       }
       throw new ApiError(404, "not_found", "Item não encontrado.");
     }

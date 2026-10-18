@@ -427,7 +427,7 @@ export type RecordingMode = "single" | "session";
 export function withRecordingMode(recipe: Recipe, body: Record<string, unknown>): { recipe: Recipe; mode: RecordingMode } {
   const requested = body.recordingMode;
   if (requested !== undefined && requested !== "single" && requested !== "session") {
-    throw new ApiError(400, "invalid_recording_mode", "Escolha se cada registro é uma resposta por item ou um check-in com vários itens.");
+    throw new ApiError(400, "invalid_recording_mode", "Escolha como cada registro é feito.");
   }
   if (requested !== "session") return { recipe, mode: "single" };
   if (recipe.key !== "custom") {
@@ -468,13 +468,13 @@ const TEMPLATE_ALIAS: Record<string, RecipeKey> = {
 export function resolveRecipe(body: Record<string, unknown>): Recipe {
   if (Object.hasOwn(body, "recipe")) {
     if (!isRecipeKey(body.recipe)) {
-      throw new ApiError(400, "invalid_recipe", "Escolha o modelo Screens, Pages, Clube de leitura, Hábito, Tables ou Personalizado.");
+      throw new ApiError(400, "invalid_recipe", "Escolha um modelo.");
     }
     return RECIPES[body.recipe];
   }
   if (Object.hasOwn(body, "template")) {
     if (typeof body.template !== "string" || !Object.hasOwn(TEMPLATE_ALIAS, body.template)) {
-      throw new ApiError(400, "invalid_recipe", "Escolha o modelo Screens, Pages, Clube de leitura, Hábito, Tables ou Personalizado.");
+      throw new ApiError(400, "invalid_recipe", "Escolha um modelo.");
     }
     return RECIPES[TEMPLATE_ALIAS[body.template]];
   }

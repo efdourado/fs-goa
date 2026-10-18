@@ -711,7 +711,7 @@ export async function restoreTrashItem(session: SessionContext, body: Record<str
     if (kind === "entry" && row.challengeStatus === "closed") {
       // A closed round's memory is frozen — bringing an entry back would rewrite
       // its metrics and Wrapped after the fact (docs/architecture.md › Lixeira e recuperação).
-      throw new ApiError(409, "challenge_closed", "Reabra o desafio ou use a correção administrativa para mexer nos registros.");
+      throw new ApiError(409, "challenge_closed", "Reabra o desafio para mexer nos registros.");
     }
     if (await parentTrashed(client, row)) {
       throw new ApiError(409, "parent_trashed", "Restaure primeiro o item que contém este.");

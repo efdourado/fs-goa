@@ -1103,7 +1103,7 @@ async function resolveMetricField(
     }
     const entryTypeId = rows.rows[0].entry_type_id;
     if (rows.rows.some((row) => row.entry_type_id !== entryTypeId)) {
-      throw new ApiError(400, "invalid_metric", "Combine campos do mesmo tipo de registro, misturar tipos deixaria a maioria dos registros de fora.");
+      throw new ApiError(400, "invalid_metric", "Combine campos do mesmo tipo de registro.");
     }
     await assertNotSharedScope(client, entryTypeId, operation, groupBy);
     return { entryTypeId, fieldId: fieldIds[0], fieldIds };

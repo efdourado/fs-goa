@@ -223,7 +223,7 @@ export async function updateEntryTypeVisibility(
     );
     if (!type) throw new ApiError(404, "not_found", "Tipo de registro não encontrado.");
     if (wantsEditPolicy && type.answer_scope !== "shared") {
-      throw new ApiError(409, "not_shared", "Só uma resposta compartilhada tem regra de quem pode preencher ou corrigir.");
+      throw new ApiError(409, "not_shared", "Só respostas compartilhadas têm essa regra.");
     }
     const visibilityPolicy = wantsVisibility ? (body.visibilityPolicy as VisibilityPolicy) : (type.visibility_policy as VisibilityPolicy);
     const sharedEditPolicy = wantsEditPolicy ? (body.sharedEditPolicy as SharedEditPolicy) : type.shared_edit_policy;
@@ -436,7 +436,7 @@ export async function archiveEntryType(
     if (!type) throw new ApiError(404, "not_found", "Tipo de registro não encontrado.");
     const pair = sessionPairOf(types);
     if (pair && (pair.parent.id === entryTypeId || pair.child.id === entryTypeId)) {
-      throw new ApiError(409, "session_type_locked", "O registro com vários itens é a estrutura deste desafio. Para mudar isso, crie outro desafio.");
+      throw new ApiError(409, "session_type_locked", "Este desafio é de check-in com itens; crie outro para mudar.");
     }
     const remaining = types.filter((candidate) => candidate.id !== entryTypeId);
     if (!remaining.some((candidate) => purposeOf(candidate) !== "expectation")) {

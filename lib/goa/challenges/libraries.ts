@@ -145,10 +145,10 @@ export async function resolveItemLibrary(
   } else if (linked.length) {
     kind = linked[0].kind;
   } else {
-    throw new ApiError(400, "library_required", "Este desafio ainda não tem uma biblioteca. Vincule uma antes de adicionar itens.");
+    throw new ApiError(400, "library_required", "Vincule uma biblioteca antes de adicionar itens.");
   }
   if (!linked.some((library) => library.kind === kind)) {
-    throw new ApiError(400, "library_not_linked", "Essa biblioteca não faz parte deste desafio. Vincule-a antes de adicionar itens dela.");
+    throw new ApiError(400, "library_not_linked", "Vincule essa biblioteca antes de usar os itens dela.");
   }
   return kind;
 }
@@ -196,7 +196,7 @@ export async function removeChallengeLibrary(session: SessionContext, challengeI
       [challengeId, library.kind],
     );
     if ((inUse?.count ?? 0) > 0) {
-      throw new ApiError(409, "library_in_use", "Há itens dessa biblioteca no desafio. Remova-os antes de desvincular a biblioteca.");
+      throw new ApiError(409, "library_in_use", "Remova os itens dessa biblioteca do desafio antes.");
     }
     await client.query("DELETE FROM challenge_libraries WHERE challenge_id = $1 AND kind = $2", [challengeId, library.kind]);
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,

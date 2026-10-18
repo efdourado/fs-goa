@@ -1122,7 +1122,7 @@ async function eraseNativeProperty(client: PoolClient, groupId: string, kind: st
       [groupId, kind],
     );
     if (clash) {
-      throw new ApiError(409, "author_tells_apart", `Há mais de um livro chamado "${clash.title}": sem o autor eles seriam o mesmo. Renomeie um deles antes.`);
+      throw new ApiError(409, "author_tells_apart", `Há dois livros "${clash.title}": renomeie um antes de tirar o autor.`);
     }
   }
   await client.query(
@@ -1418,7 +1418,7 @@ export async function assertRecommendationsAllowed(client: PoolClient, groupId: 
     client, "SELECT recommendations_enabled FROM groups WHERE id = $1", [groupId],
   );
   if (group && !group.recommendations_enabled) {
-    throw new ApiError(409, "recommendations_disabled", "Este grupo desativou as indicações. Ative-as nas configurações do grupo para registrar quem indicou.");
+    throw new ApiError(409, "recommendations_disabled", "As indicações estão desligadas neste grupo.");
   }
 }
 

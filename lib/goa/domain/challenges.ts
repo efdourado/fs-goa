@@ -62,7 +62,7 @@ export async function createChallenge(
   // for the whole group instead of by each participant; every other recipe is per participant.
   const sharedPrimary = body.answerScope === "shared";
   if (body.answerScope !== undefined && body.answerScope !== "individual" && body.answerScope !== "shared") {
-    throw new ApiError(400, "invalid_answer_scope", "Escolha quem preenche o registro: cada participante ou uma vez para o grupo.");
+    throw new ApiError(400, "invalid_answer_scope", "Escolha quem preenche o registro.");
   }
   if (sharedPrimary && recordingMode === "session") {
     throw new ApiError(400, "shared_session_unsupported", "Um check-in com vários itens é sempre de cada participante.");
