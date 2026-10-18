@@ -1,7 +1,7 @@
 "use client";
 
 import { useFormatter, useLocale, useTranslations } from "next-intl";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { type CSSProperties, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { monthCells } from "../checkin-days";
 import { CircleMinusIcon, cx } from "../ui";
@@ -12,8 +12,8 @@ import {
   type DocPerson, type DocStat, type ExportModel,
 } from "./model";
 
-type Section = "cover" | "rules" | "items" | "diary" | "scoreboard";
-const SECTIONS: Section[] = ["cover", "rules", "items", "diary", "scoreboard"];
+type Section = "cover" | "rules" | "items" | "diary" | "records";
+const SECTIONS: Section[] = ["cover", "rules", "items", "diary", "records"];
 
 function tone(color: DocColor | undefined): string {
   return color ? `xd-c-${color}` : "";
@@ -363,7 +363,8 @@ function ItemCard({ item, chapter, model, doc, people, showWhen }: {
         <div className="xd-card-title"><h3>{item.title}</h3>{meta}</div>
         {by}
       </header>
-      <div className="xd-tiles">
+      {/* The tiles share the row: three in thirds, two in halves, one across the whole card. */}
+      <div className="xd-tiles" style={{ "--xd-tiles": tiles.length } as CSSProperties}>
         {tiles.map((tile) => <div className="xd-tile" key={tile.label}><span>{tile.label}</span><b>{tile.body}</b></div>)}
       </div>
       {item.note ? <p className="xd-lead"><b>{doc.t("about")} </b>{item.note}</p> : null}
@@ -497,53 +498,6 @@ function Diary({ model, doc, people }: { model: ExportModel; doc: Doc; people: M
   );
 }
 
-function Scoreboard({ model, doc, showDates }: { model: ExportModel; doc: Doc; showDates: boolean }) {
-  const items = model.chapters.flatMap((chapter) => chapter.items.map((item) => ({ item, chapter })));
-  const raters = model.people.filter((person) => person.ratingAvg !== null).slice(0, 4);
-  const perPerson = raters.length > 1;
-  const showYear = items.some(({ item }) => item.year);
-  const showBy = model.hasRecommenders;
-  return (
-    <section className="xd-page">
-      <h2 className="xd-h2">{doc.t("scoreboardTitle")}</h2>
-      <p className="xd-lede">{doc.t(model.hasRatings ? "scoreboardLede" : "scoreboardLedePlain")}</p>
-      <div className="xd-table-wrap">
-        <table className="xd-table">
-          <thead>
-            <tr>
-              <th aria-hidden="true" />
-              <th>{doc.t("col.item")}</th>
-              {showYear ? <th>{doc.t("col.year")}</th> : null}
-              {showBy ? <th>{doc.t("recommendedBy")}</th> : null}
-              {model.hasRatings && perPerson ? raters.map((person) => <th className="score xd-col" key={person.key} title={person.name}><span>{person.name.split(" ")[0]}</span></th>) : null}
-              {model.hasRatings ? <th className="score xd-col"><span>{doc.t(perPerson ? "col.avg" : "col.rating")}</span></th> : <th className="score xd-col"><span>{doc.t("col.entries")}</span></th>}
-              {showDates ? <th>{doc.t("col.date")}</th> : null}
-            </tr>
-          </thead>
-          <tbody>
-            {items.map(({ item, chapter }) => (
-              <tr key={item.id} className={stageTone(chapter)}>
-                <td className="num">{String(item.number).padStart(2, "0")}</td>
-                <td className="title">{item.title}</td>
-                {showYear ? <td className="small">{item.year ?? ""}</td> : null}
-                {showBy ? <td className="small">{item.recommender?.name.split(" ")[0] ?? ""}</td> : null}
-                {model.hasRatings && perPerson ? raters.map((person) => {
-                  const rating = item.ratings.find((row) => row.personKey === person.key);
-                  return <td className="score" key={person.key}>{rating ? doc.n(rating.value) : null}</td>;
-                }) : null}
-                {model.hasRatings
-                  ? <td className="score avg">{item.ratingAvg !== null ? doc.n(item.ratingAvg) : null}</td>
-                  : <td className="score">{doc.n(item.entries.length + item.progress.reduce((sum, row) => sum + row.points.length, 0))}</td>}
-                {showDates ? <td className="small muted">{item.lastDay ? doc.day(item.lastDay, { day: "2-digit", month: "2-digit", year: "2-digit" }) : null}</td> : null}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  );
-}
-
 function Records({ model, doc, showDates }: { model: ExportModel; doc: Doc; showDates: boolean }) {
   return (
     <section className="xd-page">
@@ -622,15 +576,11 @@ export function ExportDocument({ challenge, entries, userId, fontClassName = "",
    dropped: then the print dialog's "Margins" setting (often left on "None") can't take them away. */
 @supports (box-decoration-break: clone) { @page { margin: 0; } }`;
   const tc = useTranslations("common");
-  const [onlyMine, setOnlyMine] = useState(false);
   const [showWhen, setShowWhen] = useState(false);
   const words = { yes: tc("yes"), no: tc("no"), group: doc.t("group") };
-  const everyone = useMemo(() => buildExportModel({ challenge, entries, userId, words }),
+  const model = useMemo(() => buildExportModel({ challenge, entries, userId, words }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [challenge, entries, userId]);
-  const model = useMemo(() => (onlyMine ? buildExportModel({ challenge, entries, userId, onlyMine: true, words }) : everyone),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [challenge, entries, userId, onlyMine, everyone]);
   const people = useMemo(() => new Map(model.people.map((person) => [person.key, person])), [model]);
 
   const available: Record<Section, boolean> = {
@@ -638,16 +588,11 @@ export function ExportDocument({ challenge, entries, userId, fontClassName = "",
     rules: Boolean(challenge.ruleSections?.length),
     items: !model.sessionMode && model.chapters.length > 0,
     diary: model.diary.length > 0,
-    // A scoreboard needs something to score: a list nobody has logged yet has none.
-    scoreboard: model.sessionMode ? model.records.length > 0 : model.chapters.some((chapter) => chapter.items.some((item) => item.entries.length || item.progress.length)),
+    // A workout's best marks, once there is one.
+    records: model.sessionMode && model.records.length > 0,
   };
-  const [hidden, setHidden] = useState<Set<Section>>(new Set());
-  const shown = (section: Section) => available[section] && !hidden.has(section);
-  const toggle = (section: Section) => setHidden((current) => {
-    const next = new Set(current);
-    if (next.has(section)) next.delete(section); else next.add(section);
-    return next;
-  });
+  // Every section that has something goes in; the one choice left is whether entries show their dates.
+  const shown = (section: Section) => available[section];
 
   const colophon = <p className="xd-colophon">{doc.t("colophon", { date: doc.day(dateKeyInSaoPaulo(new Date())) })}</p>;
   // With only the cover to print, the closing line sits on it rather than alone on a second, empty page.
@@ -657,33 +602,15 @@ export function ExportDocument({ challenge, entries, userId, fontClassName = "",
       <style dangerouslySetInnerHTML={{ __html: pageCss }} />
       <div className="xd-toolbar">
         <div className="xd-toolbar-inner">
-          {/* One row: what goes in the PDF, then how to save it. No title or Back link: the browser's Back
+          {/* One row: whether entries show their dates, then how to save it. No title or Back link: the browser's Back
               returns to the challenge, like every other page. */}
           <div className="xd-toolbar-row">
             <div className="xd-chips" role="group" aria-label={doc.t("sectionsLabel")}>
-              {SECTIONS.filter((section) => available[section]).map((section) => (
-                <button key={section} type="button" className="xd-chip" aria-pressed={!hidden.has(section)} onClick={() => toggle(section)}>
-                  {!hidden.has(section) ? <CheckIcon /> : null}
-                  {doc.t(section === "scoreboard" && model.sessionMode ? "sections.records" : `sections.${section}`)}
+              {shown("items") || shown("records") ? (
+                <button type="button" className="xd-chip" aria-pressed={showWhen} onClick={() => setShowWhen((value) => !value)}>
+                  {showWhen ? <CheckIcon /> : null}
+                  {doc.t("showWhen")}
                 </button>
-              ))}
-              {shown("items") ? (
-                <>
-                  <span className="xd-chip-gap" aria-hidden="true" />
-                  <button type="button" className="xd-chip" aria-pressed={showWhen} onClick={() => setShowWhen((value) => !value)}>
-                    {showWhen ? <CheckIcon /> : null}
-                    {doc.t("showWhen")}
-                  </button>
-                </>
-              ) : null}
-              {everyone.people.length > 1 ? (
-                <>
-                  <span className="xd-chip-gap" aria-hidden="true" />
-                  <button type="button" className="xd-chip" aria-pressed={onlyMine} onClick={() => setOnlyMine((value) => !value)}>
-                    {onlyMine ? <CheckIcon /> : null}
-                    {doc.t("onlyMine")}
-                  </button>
-                </>
               ) : null}
             </div>
             <div className="flex flex-none items-center gap-3">
@@ -711,7 +638,7 @@ export function ExportDocument({ challenge, entries, userId, fontClassName = "",
           {shown("rules") ? <HowItWorks challenge={challenge} doc={doc} /> : null}
           {shown("items") ? <Items model={model} doc={doc} people={people} showWhen={showWhen} /> : null}
           {shown("diary") ? <Diary model={model} doc={doc} people={people} /> : null}
-          {shown("scoreboard") ? (model.sessionMode ? <Records model={model} doc={doc} showDates={showWhen} /> : <Scoreboard model={model} doc={doc} showDates={showWhen} />) : null}
+          {shown("records") ? <Records model={model} doc={doc} showDates={showWhen} /> : null}
           {onlyCover ? null : colophon}
         </article>
       </div>

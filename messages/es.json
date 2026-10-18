@@ -1909,15 +1909,6 @@
     "download": "Descargar PDF",
     "printHint": "Elige «Guardar como PDF».",
     "sectionsLabel": "Qué entra en el PDF",
-    "sections": {
-      "cover": "Portada",
-      "rules": "Cómo funciona",
-      "items": "Ítems",
-      "diary": "Diario",
-      "scoreboard": "Marcador",
-      "records": "Récords"
-    },
-    "onlyMine": "Solo mis registros",
     "group": "Grupo",
     "eyebrowSolo": "Un registro de Goa",
     "presentsOne": "{name} presenta",
@@ -1956,15 +1947,8 @@
     "diaryLede": "{entries, plural, one {# registro} other {# registros}} en {days, plural, one {# día} other {# días}}.",
     "monthDays": "{count, plural, one {# día con registro} other {# días con registro}}",
     "undated": "Sin fecha",
-    "scoreboardTitle": "Marcador",
-    "scoreboardLede": "Todas las notas lado a lado, en el orden del desafío.",
-    "scoreboardLedePlain": "Todos los ítems, en el orden del desafío.",
     "col": {
       "item": "Ítem",
-      "year": "Año",
-      "rating": "Nota",
-      "avg": "Media",
-      "entries": "Registros",
       "date": "Fecha",
       "sessions": "Veces",
       "best": "Mejor marca"

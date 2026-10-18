@@ -3,7 +3,7 @@ import { dateKeyInSaoPaulo, displayAnswer, entryRatingReader, formatRuntime, val
 
 /**
  * The exported log of a challenge, shaped for the printable document: who took part, the items in
- * coloured chapters with every answer they got, a diary of what wasn't about an item, and the scoreboard.
+ * coloured chapters with every answer they got, and a diary of what wasn't about an item.
  * Pure data — the document component does all the wording and formatting.
  */
 

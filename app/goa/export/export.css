@@ -299,7 +299,7 @@
 .xd-tiles {
   margin-top: 4.5mm;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--xd-tiles, 3), minmax(0, 1fr));
   gap: 3mm;
 }
 .xd-tile { min-width: 0; border-radius: 2.5mm; background: var(--xd-tile); padding: 2.5mm 3.5mm; }
@@ -452,7 +452,7 @@
   .xd { width: 100%; border-radius: 0; padding: 28px 16px 40px; font-size: 10pt; }
   .xd-cover { min-height: 0; }
   .xd-stats { margin-top: 36px; grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 20px; }
-    .xd-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .xd-tiles { grid-template-columns: repeat(min(var(--xd-tiles, 3), 2), minmax(0, 1fr)); }
   .xd-row { grid-template-columns: minmax(0, 1fr); gap: 1mm; }
   .xd-month-body { grid-template-columns: minmax(0, 1fr); }
   .xd-cal { max-width: 240px; }
