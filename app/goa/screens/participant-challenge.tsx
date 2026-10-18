@@ -48,6 +48,7 @@ import {
   CommentText,
   cx,
   EmptyState,
+  FaceEmptyState,
   inputClass,
   labelClass,
   sectionLabelClass,
@@ -543,7 +544,7 @@ export function ResultView({
   const blocks = challengeShowcaseBlocks(challenge, dropsCompletion);
 
   if (!hasShowcaseContent(blocks)) {
-    return <EmptyState title={live ? t("liveEmptyTitle") : t("emptyTitle")} />;
+    return <FaceEmptyState title={live ? t("liveEmptyTitle") : t("emptyTitle")} />;
   }
 
   return (
