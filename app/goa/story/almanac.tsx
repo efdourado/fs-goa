@@ -287,9 +287,14 @@ function Avatar({ id, name, ids, size = 7 }: { id: Id; name: string; ids: Id[]; 
  * ring, a caption under it), two to a row once there's room. On a downloaded page (`pageTiles`) it keeps that
  * many and ends with "…" for the rest: the page is a preview, the PDF has everything.
  */
-function ScoreShelf({ title, scores, ratingLabel, pageTiles, scrolls = true }: { title: string; scores: ItemScore[]; ratingLabel: (score: ItemScore) => string; pageTiles?: number; scrolls?: boolean }) {
-  const shown = pageTiles !== undefined ? scores.slice(0, pageTiles) : scores;
-  const cut = scores.length > shown.length;
+function ScoreShelf({ title, scores, ratingLabel, pageTiles, limit, scrolls = true }: { title: string; scores: ItemScore[]; ratingLabel: (score: ItemScore) => string; pageTiles?: number; limit?: number; scrolls?: boolean }) {
+  const t = useTranslations("story");
+  const [open, setOpen] = useState(false);
+  // On screen, at most `limit` until "+ N more" opens the rest; a downloaded page keeps `pageTiles` and says "…".
+  const onScreen = pageTiles === undefined;
+  const shown = !onScreen ? scores.slice(0, pageTiles) : limit !== undefined && !open ? scores.slice(0, limit) : scores;
+  const cut = !onScreen && scores.length > shown.length;
+  const folded = onScreen && limit !== undefined && scores.length > limit ? scores.length - limit : 0;
   return (
     <section className={cx("min-w-0", outlineClass)} data-score-shelf={title}>
       <div className="mb-4 flex items-baseline gap-2.5">
@@ -309,6 +314,11 @@ function ScoreShelf({ title, scores, ratingLabel, pageTiles, scrolls = true }: {
         ))}
       </div>
       {cut ? <p className="mt-2 text-sm leading-none text-[var(--muted)]" aria-hidden="true">…</p> : null}
+      {folded ? (
+        <button type="button" className={cx("mt-3 tabular-nums", textActionClass)} aria-expanded={open} aria-label={open ? t("showLess") : t("showMore", { count: folded })} onClick={() => setOpen((value) => !value)}>
+          {open ? less(folded) : t("plusMore", { count: folded })}
+        </button>
+      ) : null}
     </section>
   );
 }
@@ -337,9 +347,11 @@ function QuoteWall({ quotes, full, ids, headline }: { quotes: WallQuote[]; full:
   const [personId, setPersonId] = useState<Id | null>(null);
   const [showAll, setShowAll] = useState(false);
   if (full) {
+    // An image holds only what fits: the shortest lines (in their own order), never a long one cut off.
+    const picked = new Set([...quotes].sort((a, b) => a.text.length - b.text.length).slice(0, PAGE_QUOTES).map((quote) => quote.key));
     return (
       <Grid>
-        {quotes.slice(0, PAGE_QUOTES).map((quote) => (
+        {quotes.filter((quote) => picked.has(quote.key)).map((quote) => (
           <figure key={quote.key} className={cardClass}>
             <CommentText text={quote.text} className="max-h-[11.25rem] overflow-hidden text-lg font-light" />
             <figcaption className="mt-3 flex items-center gap-2 text-xs text-[var(--muted)]"><span title={quote.person.name} className="h-2 w-2 flex-none rounded-full" style={{ background: personTone(ids, quote.person.id) }} />{quote.caption}</figcaption>
@@ -823,11 +835,11 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
               </div>
               <p className="mt-3 text-sm">{t("solo.average", { value: fmt(o.average) })}</p>
             </Block>
-            {o.perfect.length || o.lowest ? (
+            {o.perfect.length || o.lowest.length ? (
               // The perfect scores, then the lowest under them.
               <div className="grid min-w-0 gap-4 [grid-column:1/-1]">
-                {o.perfect.length ? <ScoreShelf title={t("solo.perfect")} scores={o.perfect} pageTiles={full ? 4 : undefined} ratingLabel={ratingFor} /> : null}
-                {o.lowest ? <ScoreShelf title={t("solo.lowest")} scores={[o.lowest]} pageTiles={full ? 1 : undefined} scrolls={false} ratingLabel={ratingFor} /> : null}
+                {o.perfect.length ? <ScoreShelf title={t("solo.perfect")} scores={o.perfect} limit={6} pageTiles={full ? 4 : undefined} ratingLabel={ratingFor} /> : null}
+                {o.lowest.length ? <ScoreShelf title={t("solo.lowest", { count: o.lowest.length })} scores={o.lowest} pageTiles={full ? 2 : undefined} scrolls={false} ratingLabel={ratingFor} /> : null}
               </div>
             ) : null}
             {o.instincts ? (

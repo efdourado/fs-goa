@@ -104,7 +104,21 @@ test("o recap ordena pela pontuação inteira, não pela arredondada — e mostr
 test("as notas máximas do recap solo são as que a pessoa deu, não a pontuação", () => {
   const story = buildStory(soloInput({ lotr: { value: 4.74, count: 1 }, hobbit: { value: 4.72, count: 1 }, romance: { value: 4.61, count: 1 }, meh: { value: 2.2, count: 1 } })) as RatedStory;
   assert.deepEqual(story.solo!.perfect.map((station) => station.item.id).sort(), ["hobbit", "lotr", "romance"]);
-  assert.equal(story.solo!.lowest?.item.id, "meh");
+  assert.deepEqual(story.solo!.lowest.map((station) => station.item.id), ["meh"], "fewer than six ratings: just the one lowest");
+});
+
+test("nenhum título aparece nas notas máximas e nas mais baixas ao mesmo tempo", () => {
+  const same = (count: number): StoryInput => {
+    const items = Array.from({ length: count }, (_, index) => ({ id: `t${index}`, title: `T${index}` }));
+    return { ...soloInput(undefined), items, ratings: items.map((item) => ({ personId: "me", itemId: item.id, value: 5 })) };
+  };
+  for (const [count, low] of [[3, 1], [6, 3], [8, 3]] as const) {
+    const solo = (buildStory(same(count)) as RatedStory).solo!;
+    const lowest = new Set(solo.lowest.map((station) => station.item.id));
+    assert.equal(solo.lowest.length, low, `${count} titles all at 5: ${low} lowest`);
+    assert.equal(solo.perfect.length, count - low, "the perfect scores are the rest");
+    assert.ok(solo.perfect.every((station) => !lowest.has(station.item.id)), "and never repeat one");
+  }
 });
 
 test("uma pontuação que conta notas fora da tela não é usada", () => {

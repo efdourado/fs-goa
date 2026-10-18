@@ -142,7 +142,8 @@ export interface Solo {
   /** How many ratings fell on each step of the scale, low to high. */
   distribution: Array<{ value: number; count: number }>;
   perfect: ItemScore[];
-  lowest: ItemScore | null;
+  /** The lowest few (three once there are six or more, else one), lowest first; the perfect scores never repeat one. */
+  lowest: ItemScore[];
   /** Guess against rating, when there were guesses: the typical miss, and how many landed within half a point. */
   instincts: { miss: number; close: number; total: number } | null;
 }
@@ -418,13 +419,20 @@ function buildSolo(input: StoryInput, stations: ItemScore[], ratings: StoryRatin
     return guess ? [Math.abs(guess.value - rating.value)] : [];
   });
   const byValue = [...stations].sort((x, y) => x.score - y.score);
+  // The lowest are picked first and the perfect scores leave them out: no title sits on both shelves, even when
+  // everything got the same note (three titles: one lowest, the other two perfect).
+  const lowest = byValue.length >= 3 ? byValue.slice(0, byValue.length >= 6 ? 3 : 1) : [];
+  const lowestIds = new Set(lowest.map((station) => station.item.id));
+  // What they actually gave, never the score: a 5 they typed stays a 5 here. The latest ones first.
+  const perfect = stations
+    .filter((station) => !lowestIds.has(station.item.id) && Math.max(...station.ratings.map((row) => row.value)) >= top && top >= input.scale.max - step)
+    .reverse();
   return {
     person,
     average: round1(mean(mine.map((rating) => rating.value))),
     distribution: [...buckets.entries()].map(([value, count]) => ({ value, count })),
-    // What they actually gave, never the score: a 5 they typed stays a 5 here.
-    perfect: stations.filter((station) => Math.max(...station.ratings.map((row) => row.value)) >= top && top >= input.scale.max - step),
-    lowest: byValue.length >= 3 ? byValue[0] : null,
+    perfect,
+    lowest,
     instincts: guesses.length ? { miss: round1(mean(guesses)), close: guesses.filter((miss) => miss <= 0.5).length, total: guesses.length } : null,
   };
 }

@@ -134,7 +134,10 @@ test("one person reads as a taste: the scale they use, their perfect scores, the
   assert.equal(solo.distribution.reduce((sum, row) => sum + row.count, 0), 8);
   assert.equal(solo.distribution.length, 11, "0 to 5 in half points");
   assert.deepEqual(solo.perfect.map((row) => row.item.title).sort(), ["Past Lives", "Tár"]);
-  assert.equal(solo.lowest?.item.title, "Megalopolis");
+  assert.equal(solo.lowest[0]?.item.title, "Megalopolis");
+  assert.equal(solo.lowest.length, 3, "eight ratings: the three lowest");
+  assert.ok(solo.lowest.every((row, index, rows) => index === 0 || rows[index - 1].score <= row.score), "lowest first");
+  assert.ok(!solo.lowest.some((row) => solo.perfect.includes(row)), "never one of the perfect scores");
   assert.equal(solo.instincts?.total, 3);
 });
 

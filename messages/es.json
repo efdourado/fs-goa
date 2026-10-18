@@ -2267,7 +2267,7 @@
       "average": "Tu media: {value}.",
       "perfect": "Tus notas máximas",
       "ratingAria": "{title}, puntuación {value}",
-      "lowest": "La más baja",
+      "lowest": "{count, plural, one {La más baja} other {Las más bajas}}",
       "instincts": "Tu instinto",
       "instinctsLine": "Tus apuestas fallaron por eso, de media ({close} de {total} quedaron a medio punto)."
     },
