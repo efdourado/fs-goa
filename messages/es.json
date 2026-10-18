@@ -2083,13 +2083,16 @@
       "note": "{count} géneros, según la media del grupo."
     },
     "time": {
-      "eyebrow": "Tiempo de pantalla",
       "title": "{hours} h {minutes} min cada uno",
       "longest": "La más larga",
       "shortest": "La más corta",
       "worthIt": "Las largas promediaron {long}, las cortas {short} (las horas valieron la pena).",
       "notWorth": "Las largas promediaron {long}, las cortas {short} (menos fue más).",
-      "titleSolo": "{hours} h {minutes} min"
+      "titleSolo": "{hours} h {minutes} min",
+      "each": "Cada uno.",
+      "days": "Más de {count, plural, one {un día entero} other {# días enteros}} de pantalla.",
+      "almostDay": "Casi un día entero de pantalla.",
+      "workday": "Más que una jornada de trabajo."
     },
     "critics": {
       "eyebrow": "Los críticos",
@@ -2299,7 +2302,8 @@
       "year": "La mejor cosecha es <b>{year}</b>.",
       "note": "Por año de estreno, de {first} a {last}.",
       "tooltip": "{things} de {year}, con media {average}."
-    }
+    },
+    "plusMore": "+ {count} más"
   },
   "organise": {
     "button": "Organizar",

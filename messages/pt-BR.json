@@ -2083,13 +2083,16 @@
       "note": "{count} gêneros, pela média do grupo."
     },
     "time": {
-      "eyebrow": "Tempo de tela",
       "title": "{hours} h {minutes} min cada um",
       "longest": "Mais longo",
       "shortest": "Mais curto",
       "worthIt": "Os longos tiveram média {long}, os curtos {short} (as horas valeram a pena).",
       "notWorth": "Os longos tiveram média {long}, os curtos {short} (menos foi mais).",
-      "titleSolo": "{hours} h {minutes} min"
+      "titleSolo": "{hours} h {minutes} min",
+      "each": "Cada um.",
+      "days": "Mais de {count, plural, one {um dia inteiro} other {# dias inteiros}} de tela.",
+      "almostDay": "Quase um dia inteiro de tela.",
+      "workday": "Mais que um dia de trabalho."
     },
     "critics": {
       "eyebrow": "Os críticos",
@@ -2299,7 +2302,8 @@
       "year": "A melhor safra é <b>{year}</b>.",
       "note": "Por ano de lançamento, de {first} a {last}.",
       "tooltip": "{things} de {year}, com média {average}."
-    }
+    },
+    "plusMore": "+ {count} mais"
   },
   "organise": {
     "button": "Organizar",

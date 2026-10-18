@@ -2083,13 +2083,16 @@
       "note": "{count} genres, ranked by the group's average."
     },
     "time": {
-      "eyebrow": "Time in front of the screen",
       "title": "{hours} h {minutes} min each",
       "longest": "Longest",
       "shortest": "Shortest",
       "worthIt": "Long ones averaged {long}, short ones {short} (the hours were worth it).",
       "notWorth": "Long ones averaged {long}, short ones {short} (shorter was better).",
-      "titleSolo": "{hours} h {minutes} min"
+      "titleSolo": "{hours} h {minutes} min",
+      "each": "Each.",
+      "days": "More than {count, plural, one {a whole day} other {# whole days}} of screen.",
+      "almostDay": "Almost a whole day of screen.",
+      "workday": "More than a working day."
     },
     "critics": {
       "eyebrow": "The critics",
@@ -2299,7 +2302,8 @@
       "year": "The best vintage is <b>{year}</b>.",
       "note": "By release year, {first} to {last}.",
       "tooltip": "{things} from {year}, averaging {average}."
-    }
+    },
+    "plusMore": "+ {count} more"
   },
   "organise": {
     "button": "Organise",

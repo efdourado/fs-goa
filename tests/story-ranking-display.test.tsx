@@ -126,9 +126,9 @@ test("long genre and year charts stay paired, horizontal and independently expan
   assert.ok(html.includes('data-horizontal-chart="genres" data-chart-rows="5"'));
   assert.ok(html.includes('data-vertical-chart="years" data-chart-columns="19"'), "every year is a column, no folding");
   assert.ok(!html.includes("2001–03") && html.includes("’01"), "one column per year, never merged into ranges, short labels when crowded");
-  assert.ok(html.includes('aria-label="Show 2 more"') && html.includes(">+ 2<"), "the genres chart has its own + N action");
+  assert.ok(html.includes('aria-label="Show 2 more"') && html.includes(">+ 2 more<"), "the genres chart has its own + N more action");
   assert.ok(!html.includes("See every year") && !html.includes("data-scrollable-year-chart"));
-  assert.ok(html.includes(">+ 11<") && html.includes(">+ 9<"), "the rest of the ranking says + N");
+  assert.ok(html.includes(">+ 11 more<") && html.includes(">+ 9 more<"), "the rest of the ranking says + N more");
   assert.ok(html.includes('title="1 film from 2001, averaging'), "a year's column explains itself on hover");
   assert.ok(!html.includes("text-[var(--main-strong)]"), "the ranking action uses the same quiet treatment as comment actions");
 

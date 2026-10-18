@@ -46,8 +46,11 @@ export interface AlmanacPage {
   body: ReactNode;
 }
 
-/** The card a quoted comment sits in: paper on the canvas, a hairline (other sections are only outlined). */
-const cardClass = "flex min-w-0 flex-col rounded-[20px] border border-[var(--line)] bg-[var(--paper)] p-5 sm:p-6";
+/**
+ * The card a comment sits in: paper with a hairline, like the page's other cards; a quoted passage inside it is the
+ * soft wash. The fade over a long comment ends in the card's own colour (`--card`).
+ */
+const cardClass = "flex min-w-0 flex-col rounded-[20px] border border-[var(--line)] [--card:var(--paper)] bg-[var(--card)] p-5 sm:p-6 [&_blockquote]:bg-[var(--wash)]";
 
 /** A section's heading, the homepage shelves' own: the page needs no boxes to tell its parts apart. */
 const sectionTitleClass = "text-lg font-semibold tracking-[-0.02em]";
@@ -318,8 +321,7 @@ const RANKING_PREVIEW_ROWS = 5;
 const PAGE_QUOTES = 4;
 /** How many lines the words page shows before "Show all". */
 const PREVIEW_QUOTES = 12;
-/** What's left out of a preview list: "+ 4", and folding it away again: "− 4" (read out in words). */
-const more = (count: number) => `+ ${count}`;
+/** Folding a preview list away again: "− 4" (read out in words). Unfolding it says "+ 4 more" (`story.plusMore`). */
 const less = (count: number) => `− ${count}`;
 
 type WallQuote = { key: string; person: { id: Id; name: string }; text: string; about: string; caption: string };
@@ -338,9 +340,9 @@ function QuoteWall({ quotes, full, ids, headline }: { quotes: WallQuote[]; full:
     return (
       <Grid>
         {quotes.slice(0, PAGE_QUOTES).map((quote) => (
-          <figure key={quote.key} className={cx(cardClass, "border-l-[3px]")} style={{ borderLeftColor: personTone(ids, quote.person.id) }}>
+          <figure key={quote.key} className={cardClass}>
             <CommentText text={quote.text} className="max-h-[11.25rem] overflow-hidden text-lg font-light" />
-            <figcaption className="mt-3 flex items-center gap-2 text-xs text-[var(--muted)]"><Avatar id={quote.person.id} name={quote.person.name} ids={ids} size={5} />{quote.caption}</figcaption>
+            <figcaption className="mt-3 flex items-center gap-2 text-xs text-[var(--muted)]"><span title={quote.person.name} className="h-2 w-2 flex-none rounded-full" style={{ background: personTone(ids, quote.person.id) }} />{quote.caption}</figcaption>
           </figure>
         ))}
       </Grid>
@@ -385,15 +387,15 @@ function QuoteWall({ quotes, full, ids, headline }: { quotes: WallQuote[]; full:
       {filtering && !found.length ? <p className="py-10 text-center text-sm font-light text-[var(--muted)]">{t("quotes.none")}</p> : null}
       <Grid>
         {shown.map((quote) => (
-          <figure key={quote.key} className={cx(cardClass, "border-l-[3px]")} style={{ borderLeftColor: personTone(ids, quote.person.id) }}>
+          <figure key={quote.key} className={cardClass}>
             <ExpandableComment text={quote.text} />
-            <figcaption className="mt-auto flex pt-3 items-center gap-2 text-xs text-[var(--muted)]"><Avatar id={quote.person.id} name={quote.person.name} ids={ids} size={5} />{quote.caption}</figcaption>
+            <figcaption className="mt-auto flex pt-3 items-center gap-2 text-xs text-[var(--muted)]"><span title={quote.person.name} className="h-2 w-2 flex-none rounded-full" style={{ background: personTone(ids, quote.person.id) }} />{quote.caption}</figcaption>
           </figure>
         ))}
       </Grid>
       {!filtering && found.length > PREVIEW_QUOTES ? (
-        <button type="button" className={cx("mt-3", textActionClass)} aria-expanded={showAll} onClick={() => setShowAll((value) => !value)}>
-          {showAll ? t("showLess") : t("showMore", { count: found.length - PREVIEW_QUOTES })}
+        <button type="button" className={cx("mt-3 tabular-nums", textActionClass)} aria-expanded={showAll} aria-label={showAll ? t("showLess") : t("showMore", { count: found.length - PREVIEW_QUOTES })} onClick={() => setShowAll((value) => !value)}>
+          {showAll ? less(found.length - PREVIEW_QUOTES) : t("plusMore", { count: found.length - PREVIEW_QUOTES })}
         </button>
       ) : null}
     </div>
@@ -435,17 +437,19 @@ function ExpandableComment({ text }: { text: string }) {
       </div>
       {overflows ? (
         <div className={cx(
-          "flex justify-start",
-          expanded ? "mt-3" : "absolute inset-x-0 bottom-0 h-16 items-end bg-gradient-to-t from-[var(--paper)] via-[var(--paper)] to-transparent",
+          "flex justify-end",
+          expanded ? "mt-3" : "absolute inset-x-0 bottom-0 h-20 items-end bg-gradient-to-t from-[var(--card,var(--paper))] from-35% to-transparent",
         )}>
+          {/* Just "…" on the right, folded or not (the words are read out); a full finger-sized target around it. */}
           <button
             type="button"
             aria-controls={contentId}
             aria-expanded={expanded}
+            aria-label={expanded ? t("showLess") : t("showMoreComment")}
             onClick={() => setExpanded((value) => !value)}
-            className={textActionClass}
+            className="-my-2 -mr-3 grid min-h-11 min-w-11 cursor-pointer place-items-center rounded-full text-lg font-light leading-6 text-[var(--ink)] transition hover:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--main)]"
           >
-            {expanded ? t("showLess") : t("showMoreComment")}
+            …
           </button>
         </div>
       ) : null}
@@ -542,15 +546,17 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
       >
         {layout.map(({ score, place }) => (
           <div key={score.item.id} className="flex min-w-0 flex-col items-center" data-podium-place={place}>
-            {/* The cover carries the title and its place, like a catalogue card; the step under it carries the score. */}
-            <span
-              className="relative flex h-32 w-full flex-col overflow-hidden rounded-[14px] bg-[var(--cover-bg)] p-2.5 text-[var(--cover-ink)] sm:h-36 sm:p-3"
-              style={coverColors(coverToneOf(score.item.title))}
-            >
-              <span aria-hidden="true" className="absolute -bottom-5 -right-5 h-14 w-14 rounded-full border-[9px] border-[var(--cover-deco)]" />
-              <span className="relative grid h-5 w-5 flex-none place-items-center rounded-full bg-[var(--ink)] text-[10px] font-semibold text-[var(--paper)] sm:h-6 sm:w-6 sm:text-[11px]">{place}</span>
-              <span className="relative mt-2 line-clamp-3 break-words text-xs leading-[1.15] tracking-[-0.01em] sm:text-[15px]">{score.item.title}</span>
-              <span className="relative mt-auto text-[10px] opacity-70" style={monoFont}>{score.item.year ?? "\u00a0"}</span>
+            {/* The cover carries the title, like a catalogue card, its place on its top edge, in line with the title; the step under it carries the score. */}
+            <span className="relative w-full">
+              <span
+                className="relative flex h-32 w-full flex-col overflow-hidden rounded-[14px] bg-[var(--cover-bg)] p-2.5 pt-4 text-[var(--cover-ink)] sm:h-36 sm:p-3 sm:pt-5"
+                style={coverColors(coverToneOf(score.item.title))}
+              >
+                <span aria-hidden="true" className="absolute -bottom-5 -right-5 h-14 w-14 rounded-full border-[9px] border-[var(--cover-deco)]" />
+                <span className="relative line-clamp-3 break-words text-xs leading-[1.15] tracking-[-0.01em] sm:text-[15px]">{score.item.title}</span>
+                <span className="relative mt-auto text-[10px] opacity-70" style={monoFont}>{score.item.year ?? "\u00a0"}</span>
+              </span>
+              <span className="absolute -top-3 left-2.5 grid h-6 w-6 place-items-center rounded-full bg-[var(--ink)] text-[11px] font-semibold text-[var(--paper)] sm:-top-3.5 sm:left-3 sm:h-7 sm:w-7 sm:text-xs">{place}</span>
             </span>
             <div className={cx(
               "mt-2 grid w-full place-items-start justify-center rounded-t-xl rounded-b-[4px] bg-[var(--wash)] pt-2.5",
@@ -579,7 +585,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
         {/* Only on screen: a downloaded page never lists the rest. */}
         {rows.length > RANKING_PREVIEW_ROWS ? (
           <button type="button" className={cx("mt-3 tabular-nums", textActionClass)} aria-label={rankingExpanded ? t("showLess") : t("showMore", { count: rows.length - RANKING_PREVIEW_ROWS })} onClick={() => setRankingExpanded((value) => !value)}>
-            {rankingExpanded ? less(rows.length - RANKING_PREVIEW_ROWS) : more(rows.length - RANKING_PREVIEW_ROWS)}
+            {rankingExpanded ? less(rows.length - RANKING_PREVIEW_ROWS) : t("plusMore", { count: rows.length - RANKING_PREVIEW_ROWS })}
           </button>
         ) : null}
       </div>
@@ -591,7 +597,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
         {full && s.genres.length > CHART_PREVIEW_ROWS ? <p className="mt-2 text-sm leading-none text-[var(--muted)]" aria-hidden="true">…</p> : null}
         {!full && s.genres.length > CHART_PREVIEW_ROWS ? (
           <button type="button" className={cx("mt-3 tabular-nums", textActionClass)} aria-label={genresExpanded ? t("showLess") : t("showMore", { count: s.genres.length - CHART_PREVIEW_ROWS })} onClick={() => setGenresExpanded((value) => !value)}>
-            {genresExpanded ? less(s.genres.length - CHART_PREVIEW_ROWS) : more(s.genres.length - CHART_PREVIEW_ROWS)}
+            {genresExpanded ? less(s.genres.length - CHART_PREVIEW_ROWS) : t("plusMore", { count: s.genres.length - CHART_PREVIEW_ROWS })}
           </button>
         ) : null}
       </div>
@@ -615,7 +621,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
                     {best ? <span className="absolute inset-x-0 -top-5 text-center text-xs tabular-nums leading-none">{fmt(year.average)}</span> : null}
                   </span>
                 </span>
-                <span className={cx("h-3.5 text-xs tabular-nums leading-none text-[var(--muted)]", !named && "invisible")}>{yearGroups.length <= 8 ? year.key : `’${year.key.slice(-2)}`}</span>
+                <span className={cx("h-3.5 text-xs tabular-nums leading-none", best ? "font-medium text-[var(--ink)]" : "text-[var(--muted)]", !named && "invisible")}>{yearGroups.length <= 8 ? year.key : `’${year.key.slice(-2)}`}</span>
               </div>
             );
           })}
@@ -917,18 +923,38 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
             : t(input.people.length === 1 ? "time.titleSolo" : "time.title", { hours: Math.floor((s.totals.minutes ?? 0) / 60), minutes: Math.round((s.totals.minutes ?? 0) % 60) }),
         body: (
           <Grid>
-            {s.totals.minutes ? (
-              <Block title={t("time.eyebrow")}>
-                <p className="text-3xl font-light tracking-[-0.03em]">{t(input.people.length === 1 ? "time.titleSolo" : "time.title", { hours: Math.floor(s.totals.minutes / 60), minutes: Math.round(s.totals.minutes % 60) })}</p>
-                {s.length ? (
-                  <div className="mt-3 space-y-1.5 text-sm">
-                    <p><span className="text-[var(--muted)]">{t("time.longest")}</span> · {s.length.longest.item.title} · {s.length.longest.item.runtime} min · <strong className="font-medium tabular-nums">{fmt(s.length.longest.average)}</strong></p>
-                    <p><span className="text-[var(--muted)]">{t("time.shortest")}</span> · {s.length.shortest.item.title} · {s.length.shortest.item.runtime} min · <strong className="font-medium tabular-nums">{fmt(s.length.shortest.average)}</strong></p>
-                    {s.length.longAverage !== null && s.length.shortAverage !== null ? <p className="pt-1 text-[var(--muted)]">{t(s.length.longAverage >= s.length.shortAverage ? "time.worthIt" : "time.notWorth", { long: fmt(s.length.longAverage), short: fmt(s.length.shortAverage) })}</p> : null}
-                  </div>
-                ) : null}
-              </Block>
-            ) : null}
+            {s.totals.minutes ? (() => {
+              const minutes = s.totals.minutes;
+              const days = Math.floor(minutes / 1440);
+              // Something to measure the hours against: whole days, almost a day, more than a working day.
+              const scale = days >= 1 ? t("time.days", { count: days }) : minutes >= 1080 ? t("time.almostDay") : minutes >= 480 ? t("time.workday") : null;
+              const longestRuntime = s.length?.longest.item.runtime ?? 0;
+              return (
+                <Chapter>
+                  <p className="text-5xl font-light leading-none tracking-[-0.05em] tabular-nums sm:text-[56px]">{t("time.titleSolo", { hours: Math.floor(minutes / 60), minutes: Math.round(minutes % 60) })}</p>
+                  {input.people.length > 1 || scale ? (
+                    <p className="mt-3 text-balance text-[22px] font-light leading-[1.22] tracking-[-0.025em]">
+                      {[input.people.length > 1 ? t("time.each") : null, scale].filter(Boolean).join(" ")}
+                    </p>
+                  ) : null}
+                  {s.length ? (
+                    <div className="mt-6 space-y-3">
+                      {/* The longest and the shortest, each bar as long as its runtime against the longest. */}
+                      {([["longest", s.length.longest], ["shortest", s.length.shortest]] as const).map(([key, row]) => (
+                        <div key={key} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1.5 text-sm">
+                          <span className="truncate"><span className="text-[var(--muted)]">{t(`time.${key}`)} · </span>{row.item.title}</span>
+                          <span className="tabular-nums text-[var(--muted)]">{row.item.runtime} min · {fmt(row.average)}</span>
+                          <span className="col-span-2 h-1.5 overflow-hidden rounded-full bg-[var(--wash-strong)]">
+                            <span className="block h-full rounded-full" style={{ width: `${Math.max(3, ((row.item.runtime ?? 0) / Math.max(1, longestRuntime)) * 100)}%`, background: key === "longest" ? "var(--ink)" : "var(--muted)" }} />
+                          </span>
+                        </div>
+                      ))}
+                      {s.length.longAverage !== null && s.length.shortAverage !== null ? <p className="pt-1 text-xs text-[var(--muted)]">{t(s.length.longAverage >= s.length.shortAverage ? "time.worthIt" : "time.notWorth", { long: fmt(s.length.longAverage), short: fmt(s.length.shortAverage) })}</p> : null}
+                    </div>
+                  ) : null}
+                </Chapter>
+              );
+            })() : null}
             {s.properties.map((property) => (
               <Block key={property.label} title={t("property.eyebrow", { label: propertyLabel(property.label) })}>
                 <p className="text-3xl font-light tracking-[-0.03em]">{property.best.key}</p>
