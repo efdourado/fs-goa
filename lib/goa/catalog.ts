@@ -1037,12 +1037,11 @@ export async function deleteCatalogLibrary(session: SessionContext, libraryId: s
 
     for (const item of items.rows) await archiveCatalogItemWithClient(client, session.user.id, library.group_id, item.id);
     await client.query("DELETE FROM challenge_libraries WHERE group_id = $1 AND kind = $2", [library.group_id, library.kind]);
-    if (items.rows.length) {
-      // Its items wait in the Lixeira; the library waits with them so a restored item comes back to it. When the
-      // last of them is erased for good, the library goes too (see purgeEmptyLibrary).
+    // Erased at once when nothing of it is left anywhere; otherwise its items wait in the Lixeira (the ones just
+    // binned, or ones binned before) and the library waits with them, so a restored item comes back to it. When
+    // the last of them is erased for good, the library goes too (see purgeEmptyLibrary).
+    if (!(await purgeEmptyLibrary(client, library.group_id, library.kind, true))) {
       await client.query("UPDATE catalog_libraries SET archived_at = now(), updated_at = now() WHERE id = $1", [libraryId]);
-    } else {
-      await purgeEmptyLibrary(client, library.group_id, library.kind, true);
     }
     await writeAudit(client, library.group_id, null, session.user.id, "catalog.library_deleted", "catalog_library", libraryId, null,
       { label: library.label, source: library.source, items: items.rows.length });
@@ -1764,19 +1763,20 @@ export async function archiveOrphanedCatalogItemsForChallenge(
  * its custom properties and its settings leave the database. `force` skips the "was it deleted?" check, for a
  * library being deleted right now.
  */
-export async function purgeEmptyLibrary(client: PoolClient, groupId: string, kind: string, force = false): Promise<void> {
+export async function purgeEmptyLibrary(client: PoolClient, groupId: string, kind: string, force = false): Promise<boolean> {
   const library = await oneOrNull<{ id: string; archived: boolean }>(
     client,
     "SELECT id, archived_at IS NOT NULL AS archived FROM catalog_libraries WHERE group_id = $1 AND kind = $2",
     [groupId, kind],
   );
-  if (!library || (!force && !library.archived)) return;
+  if (!library || (!force && !library.archived)) return false;
   const left = await oneOrNull<{ id: string }>(client, "SELECT id FROM catalog_items WHERE group_id = $1 AND kind = $2 LIMIT 1", [groupId, kind]);
-  if (left) return;
+  if (left) return false;
   await client.query(
     "DELETE FROM catalog_attribute_values WHERE attribute_def_id IN (SELECT id FROM catalog_attribute_defs WHERE group_id = $1 AND kind = $2)",
     [groupId, kind],
   );
   await client.query("DELETE FROM catalog_attribute_defs WHERE group_id = $1 AND kind = $2", [groupId, kind]);
   await client.query("DELETE FROM catalog_libraries WHERE id = $1", [library.id]);
+  return true;
 }

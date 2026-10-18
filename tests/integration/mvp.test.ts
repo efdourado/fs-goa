@@ -8024,6 +8024,16 @@ test("excluir uma biblioteca: pede confirmação se tem itens, respeita desafio 
   const personal = (await call("POST", "/api/personal/catalog/libraries", { session: owner, body: { label: "Minha" } })).body as { id: string };
   assert.equal((await call("DELETE", `/api/catalog/libraries/${personal.id}`, { session: member })).response.status, 403, "biblioteca pessoal só o dono exclui");
   assert.equal((await call("DELETE", `/api/catalog/libraries/${personal.id}`, { session: owner })).response.status, 200);
+
+  // A library whose items are all in the bin already still goes: it leaves the list, and waits with them.
+  const binnedOnly = (await call("POST", "/api/personal/catalog/libraries", { session: owner, body: { label: "Só na lixeira" } })).body as { id: string; kind: string };
+  const loneCall = await call("POST", "/api/personal/catalog/items", { session: owner, body: { libraryId: binnedOnly.id, title: "Brasil x Argentina" } });
+  assert.equal(loneCall.response.status, 201, JSON.stringify(loneCall.body));
+  const lone = loneCall.body as { id: string };
+  assert.equal((await call("DELETE", `/api/personal/catalog/${lone.id}`, { session: owner })).response.status, 200);
+  assert.equal((await call("DELETE", `/api/catalog/libraries/${binnedOnly.id}`, { session: owner })).response.status, 200);
+  const shelfAfter = (await call("GET", "/api/personal/catalog/shelf", { session: owner })).body as { libraries: Array<{ id: string }> };
+  assert.equal(shelfAfter.libraries.some((library) => library.id === binnedOnly.id), false, "a biblioteca some do acervo");
 });
 
 test("o acervo devolve quando cada item entrou — é o que ordena \"adicionados recentemente\"", async () => {
