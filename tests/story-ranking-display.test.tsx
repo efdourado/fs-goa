@@ -32,7 +32,7 @@ test("the podium shows Goa scores to two places without repeating a label", () =
   assert.ok(html.indexOf("4.74") < html.indexOf("4.72") || html.includes("LOTR took it, at 4.74"), "LOTR leads");
 });
 
-test("perfect scores and the lowest are catalogue shelves, the perfect ones scrolling", () => {
+test("perfect scores and the lowest are drawn like the catalogue's items, in a grid, not a rail", () => {
   function Solo({ full = false }: { full?: boolean }) {
     const page = useAlmanacPages(buildStory(input), input, [], full).find((row) => row.id === "solo")!;
     return <div>{page.body}</div>;
@@ -41,7 +41,8 @@ test("perfect scores and the lowest are catalogue shelves, the perfect ones scro
   const interactive = renderToStaticMarkup(<NextIntlClientProvider locale="en" messages={messages} timeZone="America/Sao_Paulo"><Solo /></NextIntlClientProvider>);
   assert.ok(interactive.includes('data-score-shelf="Your perfect scores"'));
   assert.ok(interactive.includes('data-score-shelf="The lowest"'));
-  assert.ok(interactive.includes("snap-x snap-proximity"));
+  assert.ok(!interactive.includes("snap-x"), "no sideways rail");
+  assert.ok(interactive.includes("rounded-[20px] bg-[var(--cover-bg)]"), "each title is a catalogue card");
 
   const downloadable = renderToStaticMarkup(<NextIntlClientProvider locale="en" messages={messages} timeZone="America/Sao_Paulo"><Solo full /></NextIntlClientProvider>);
   assert.ok(!downloadable.includes("snap-x"));

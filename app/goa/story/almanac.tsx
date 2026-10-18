@@ -3,10 +3,9 @@
 import { useFormatter, useTranslations } from "next-intl";
 import { Children, isValidElement, type ReactNode, useEffect, useId, useRef, useState } from "react";
 
-import { coverColors, coverToneOf, ItemCover } from "../catalog-cover";
+import { coverColors, coverToneOf } from "../catalog-cover";
 import { CatalogTile } from "../catalog-views";
 import { firstName, personTone } from "../rating-scale";
-import { Rail, RailArrows, useShelfRail } from "../shelf";
 import type { Id, Metric } from "../types";
 import { Dialog } from "../dialog";
 import { AvatarMark, CommentText, cx, SearchField } from "../ui";
@@ -262,37 +261,33 @@ function Avatar({ id, name, ids, size = 7 }: { id: Id; name: string; ids: Id[]; 
 }
 
 /** One catalogue cover with its caption, as the homepage shelf draws it (nothing to open here). */
-function ScoreTile({ score, ratingLabel }: { score: ItemScore; ratingLabel: string }) {
-  const caption = [score.item.properties?.[0]?.value, score.item.genre, formatRuntime(score.item.runtime)].filter(Boolean).slice(0, 2).join(" · ");
-  return (
-    <div className="flex w-44 min-w-0 flex-none snap-start flex-col gap-2.5">
-      <ItemCover title={score.item.title} year={score.item.year} avg={score.average} ratingLabel={ratingLabel} size="sm" />
-      <span className="truncate text-xs text-[var(--muted)]">{caption || "\u00a0"}</span>
-    </div>
-  );
-}
-
 /**
- * A heading with a count over a rail of covers — the homepage's "My catalogue" shelf, filtered. On a
- * downloaded page (`pageTiles`) it keeps one row of covers and says how many more there are: the page is
- * a preview, the PDF has everything.
+ * Titles with their score, drawn like the catalogue's items (a coloured card: title, year, the score in its
+ * ring, a caption under it), two to a row once there's room. On a downloaded page (`pageTiles`) it keeps that
+ * many and ends with "…" for the rest: the page is a preview, the PDF has everything.
  */
 function ScoreShelf({ title, scores, ratingLabel, pageTiles, scrolls = true }: { title: string; scores: ItemScore[]; ratingLabel: (score: ItemScore) => string; pageTiles?: number; scrolls?: boolean }) {
-  const { railRef, showFade, onScroll, nudge } = useShelfRail();
-  const page = pageTiles !== undefined;
-  const hidden = page ? Math.max(0, scores.length - pageTiles) : 0;
-  const tiles = (page ? scores.slice(0, pageTiles) : scores).map((score) => <ScoreTile key={score.item.id} score={score} ratingLabel={ratingLabel(score)} />);
+  const shown = pageTiles !== undefined ? scores.slice(0, pageTiles) : scores;
+  const cut = scores.length > shown.length;
   return (
     <section className={cx("min-w-0", outlineClass)} data-score-shelf={title}>
-      <div className="mb-4 flex min-h-8 items-center justify-between gap-3">
-        <div className="flex items-baseline gap-2.5">
-          <h4 className={sectionTitleClass}>{title}</h4>
-          {scrolls ? <span className="text-xs text-[var(--muted)]">{scores.length}</span> : null}
-        </div>
-        {scrolls && !page && scores.length > 1 ? <RailArrows nudge={nudge} /> : null}
-        {hidden ? <span className="text-sm tabular-nums text-[var(--muted)]">{more(hidden)}</span> : null}
+      <div className="mb-4 flex items-baseline gap-2.5">
+        <h4 className={sectionTitleClass}>{title}</h4>
+        {scrolls ? <span className="text-xs tabular-nums text-[var(--muted)]">{scores.length}</span> : null}
       </div>
-      {page || !scrolls ? <div className="flex flex-wrap gap-4 pt-1">{tiles}</div> : <Rail railRef={railRef} showFade={showFade} onScroll={onScroll}>{tiles}</Rail>}
+      <div className={cx("grid gap-3", shown.length > 1 && "@lg:grid-cols-2")}>
+        {shown.map((score) => (
+          <CatalogTile
+            key={score.item.id}
+            title={score.item.title}
+            year={score.item.year}
+            avg={score.average}
+            ratingLabel={ratingLabel(score)}
+            caption={[score.item.properties?.[0]?.value, score.item.genre, formatRuntime(score.item.runtime)].filter(Boolean).slice(0, 2).join(" · ")}
+          />
+        ))}
+      </div>
+      {cut ? <p className="mt-2 text-sm leading-none text-[var(--muted)]" aria-hidden="true">…</p> : null}
     </section>
   );
 }
@@ -781,9 +776,9 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
               <p className="mt-3 text-sm">{t("solo.average", { value: fmt(o.average) })}</p>
             </Block>
             {o.perfect.length || o.lowest ? (
-              // The perfect scores scroll, the lowest is one cover beside them.
-              <div className={cx("grid min-w-0 gap-4 [grid-column:1/-1]", o.perfect.length > 0 && o.lowest && "@2xl:grid-cols-[minmax(0,1fr)_auto]")}>
-                {o.perfect.length ? <ScoreShelf title={t("solo.perfect")} scores={o.perfect} pageTiles={full ? (o.lowest ? 2 : 3) : undefined} ratingLabel={ratingFor} /> : null}
+              // The perfect scores, then the lowest under them.
+              <div className="grid min-w-0 gap-4 [grid-column:1/-1]">
+                {o.perfect.length ? <ScoreShelf title={t("solo.perfect")} scores={o.perfect} pageTiles={full ? 4 : undefined} ratingLabel={ratingFor} /> : null}
                 {o.lowest ? <ScoreShelf title={t("solo.lowest")} scores={[o.lowest]} pageTiles={full ? 1 : undefined} scrolls={false} ratingLabel={ratingFor} /> : null}
               </div>
             ) : null}
