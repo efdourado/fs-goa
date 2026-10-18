@@ -296,3 +296,10 @@ button:focus-visible, a:focus-visible, textarea:focus-visible {
 @keyframes goa-select-drop { from { opacity: 0; transform: translateY(-4px) scale(.98); } }
 @keyframes goa-select-rise { from { transform: translateY(100%); } }
 @media (prefers-reduced-motion: reduce) { .goa-select-list:popover-open { animation: none; } }
+
+/* Messages (ui.tsx `Toaster`): each slides in from the left, and leaves back the same way, fading and folding. */
+.goa-toast { animation: goa-toast-in .28s cubic-bezier(.2, .8, .3, 1); }
+.goa-toast[data-leaving] { animation: goa-toast-out .26s cubic-bezier(.4, 0, .7, .2) forwards; }
+@keyframes goa-toast-in { from { opacity: 0; transform: translateX(-16px) scale(.97); } }
+@keyframes goa-toast-out { to { opacity: 0; transform: translateX(-24px) scale(.96); } }
+@media (prefers-reduced-motion: reduce) { .goa-toast, .goa-toast[data-leaving] { animation: none; } }

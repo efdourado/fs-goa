@@ -5,6 +5,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getTranslations } from "next-intl/server";
 import Script from "next/script";
 import "./globals.css";
+import { Toaster } from "./goa/ui";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -71,7 +72,7 @@ export default async function RootLayout({
         <Script id="theme-boot" strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: themeBoot }} />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
-        <NextIntlClientProvider>{children}</NextIntlClientProvider>
+        <NextIntlClientProvider>{children}<Toaster /></NextIntlClientProvider>
       </body>
     </html>
   );

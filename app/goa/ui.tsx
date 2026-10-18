@@ -554,6 +554,54 @@ export function SlidersIcon({ className }: { className?: string }) {
   );
 }
 
+// ── Messages: one stack at the top left, above everything ──────────────────────────────────────────────────
+// Every success or error a screen reports goes here instead of a box inside the page: the top-left corner, over
+// pages and open windows alike. A success leaves by itself; an error stays until it's closed or its screen goes.
+
+type Toast = { id: number; source: string; kind: "error" | "success"; text: string; leaving?: boolean };
+let toastList: Toast[] = [];
+let toastSeq = 0;
+const toastListeners = new Set<() => void>();
+const emitToasts = (next: Toast[]) => { toastList = next; toastListeners.forEach((listener) => listener()); };
+const SUCCESS_MS = 3500;
+const LEAVE_MS = 260;
+
+/** A message leaves the way it came (sliding back left and fading), then it's gone. */
+function dismissToasts(match: (toast: Toast) => boolean) {
+  const going = toastList.filter((toast) => match(toast) && !toast.leaving).map((toast) => toast.id);
+  if (!going.length) return;
+  emitToasts(toastList.map((toast) => going.includes(toast.id) ? { ...toast, leaving: true } : toast));
+  window.setTimeout(() => emitToasts(toastList.filter((toast) => !going.includes(toast.id))), LEAVE_MS);
+}
+
+// A success's timer, held while the pointer (or focus) is on it: a message being read doesn't leave.
+const toastTimers = new Map<number, number>();
+function scheduleToast(id: number, ms: number) {
+  window.clearTimeout(toastTimers.get(id));
+  toastTimers.set(id, window.setTimeout(() => { toastTimers.delete(id); dismissToasts((toast) => toast.id === id); }, ms));
+}
+function holdToast(id: number) {
+  window.clearTimeout(toastTimers.get(id));
+  toastTimers.delete(id);
+}
+function releaseToast(toast: Toast) {
+  if (toast.kind === "success" && !toast.leaving) scheduleToast(toast.id, SUCCESS_MS / 2);
+}
+
+function showToast(source: string, kind: Toast["kind"], text: string) {
+  const id = ++toastSeq;
+  dismissToasts((toast) => toast.source === source);
+  emitToasts([...toastList, { id, source, kind, text }]);
+  if (kind === "success") scheduleToast(id, SUCCESS_MS);
+}
+function dropToasts(source: string, kind?: Toast["kind"]) {
+  dismissToasts((toast) => toast.source === source && (!kind || toast.kind === kind));
+}
+
+/**
+ * A screen's success or error: no longer drawn where it's placed, but raised as a message at the top left
+ * (`Toaster`). The props stay the same, so every screen keeps reporting the way it did.
+ */
 export function StatusMessage({
   error,
   success,
@@ -561,34 +609,62 @@ export function StatusMessage({
   error?: string | null;
   success?: string | null;
 }) {
-  const tc = useTranslations("common");
+  const source = useId();
   const message = error ?? success ?? null;
-  const [dismissed, setDismissed] = useState(false);
-  const [lastMessage, setLastMessage] = useState(message);
-  if (message !== lastMessage) {
-    setLastMessage(message);
-    setDismissed(false);
-  }
-  if (!message || dismissed) return null;
+  useEffect(() => {
+    if (message) showToast(source, error ? "error" : "success", message);
+    else dropToasts(source, "error");
+  }, [source, message, error]);
+  // A screen that goes takes its error with it; a success finishes its few seconds.
+  useEffect(() => () => dropToasts(source, "error"), [source]);
+  return null;
+}
+
+/** The message stack, once per page (the root layout). A popover, so it sits over an open window too. */
+export function Toaster() {
+  const tc = useTranslations("common");
+  const ref = useRef<HTMLDivElement>(null);
+  const [toasts, setToasts] = useState<Toast[]>(toastList);
+  useEffect(() => {
+    const listener = () => setToasts(toastList);
+    toastListeners.add(listener);
+    return () => { toastListeners.delete(listener); };
+  }, []);
+  useEffect(() => {
+    const node = ref.current;
+    if (!node?.showPopover) return;
+    // Re-opened on every message, so it lands above whatever window opened since.
+    if (node.matches(":popover-open")) node.hidePopover();
+    if (toasts.length) node.showPopover();
+  }, [toasts]);
   return (
     <div
-      className={cx(
-        "flex items-start gap-2 rounded-xl border px-4 py-3 text-sm",
-        error ? "border-[var(--danger-line)] bg-[var(--danger-soft)] text-[var(--danger-strong)]" : "border-[var(--ok-line)] bg-[var(--ok-soft)] text-[var(--ok)]",
-      )}
-      role={error ? "alert" : "status"}
+      ref={ref}
+      popover="manual"
       aria-live="polite"
+      className="goa-toaster pointer-events-none m-0 flex w-[min(calc(100vw-2rem),22rem)] flex-col gap-2 overflow-visible border-0 bg-transparent p-0"
+      style={{ inset: "auto", top: "max(1rem, env(safe-area-inset-top))", left: "max(1rem, env(safe-area-inset-left))" }}
     >
-      {error ? <CircleExclamationIcon className="mt-1 h-4 w-4 flex-none" /> : <CircleCheckIcon className="mt-1 h-4 w-4 flex-none" />}
-      <span className="flex-1">{message}</span>
-      <button
-        type="button"
-        className="mt-1 flex-none rounded-full opacity-60 transition hover:opacity-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
-        onClick={() => setDismissed(true)}
-        aria-label={tc("close")}
-      >
-        <CircleMinusIcon className="h-4 w-4" />
-      </button>
+      {toasts.map((toast) => (
+        <div
+          key={toast.id}
+          role={toast.kind === "error" ? "alert" : "status"}
+          data-leaving={toast.leaving ? "" : undefined}
+          onMouseEnter={() => holdToast(toast.id)}
+          onMouseLeave={() => releaseToast(toast)}
+          onFocus={() => holdToast(toast.id)}
+          onBlur={() => releaseToast(toast)}
+          className="goa-toast pointer-events-auto flex items-start gap-2.5 rounded-2xl border border-[var(--line)] bg-[var(--paper)] px-3.5 py-2.5 text-sm text-[var(--ink)] shadow-[var(--elevate-2)]"
+        >
+          {toast.kind === "error"
+            ? <CircleExclamationIcon className="mt-[3px] h-3.5 w-3.5 flex-none text-[var(--danger)] opacity-70" />
+            : <CircleCheckIcon className="mt-[3px] h-3.5 w-3.5 flex-none text-[var(--muted)]" />}
+          <span className="min-w-0 flex-1 leading-5">{toast.text}</span>
+          <button type="button" onClick={() => dismissToasts((one) => one.id === toast.id)} aria-label={tc("close")} className="mt-[3px] flex-none cursor-pointer rounded-full text-[var(--muted)] opacity-60 transition hover:text-[var(--ink)] hover:opacity-100">
+            <CircleMinusIcon className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      ))}
     </div>
   );
 }

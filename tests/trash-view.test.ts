@@ -28,7 +28,8 @@ test("failed initial bin loads show an error and retry, never an empty bin", () 
   const html = renderWithIntl(createElement(TrashLoadState, {
     loading: true, error: "Não foi possível abrir a lixeira.", onRetry: () => undefined,
   }));
-  assert.match(html, /Não foi possível abrir a lixeira/);
+  // The error itself is raised as a message in the corner (StatusMessage), not drawn in the page.
+  assert.doesNotMatch(html, /Não foi possível abrir a lixeira/);
   assert.match(html, /Tentar novamente/);
   assert.doesNotMatch(html, /Lixeira vazia/);
 });
