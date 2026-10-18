@@ -2070,7 +2070,6 @@
       "loner": "{name}, sozinho no {value}"
     },
     "podium": {
-      "eyebrow": "O pódio",
       "score": "pontuação Goa"
     },
     "common": {
@@ -2081,7 +2080,6 @@
     },
     "genres": {
       "eyebrow": "Por gênero",
-      "title": "{genre} vence, com {value}",
       "note": "{count} gêneros, pela média do grupo."
     },
     "time": {
@@ -2185,23 +2183,21 @@
       "eyebrow": "Nas palavras deles"
     },
     "years": {
-      "eyebrow": "Por ano de lançamento",
-      "title": "De {first} a {last}"
+      "eyebrow": "Por ano de lançamento"
     },
     "title": "O fio",
     "metricsMore": "+{count} outros",
     "dimension": {
       "eyebrow": "Por critério",
-      "title": "{label}: {title} na frente"
-    },
-    "ranking": {
-      "rest": "O resto do ranking"
+      "lead": "{label}: <b>{title}</b> na frente."
     },
     "pages": {
       "thread": {},
       "rankings": {
         "title": "Rankings",
-        "headline": "{title} levou, com {value}."
+        "lead": "<b>{title}</b> levou, com {value}.",
+        "genres": "{count, plural, one {# gênero} other {# gêneros}}",
+        "years": "de {first} a {last}"
       },
       "people": {
         "title": "As pessoas"
@@ -2297,7 +2293,13 @@
     "readDatedWeek": "Cada faixa é uma pessoa: contínua enquanto ela apareceu toda semana, com buracos onde uma semana passou em branco. O trecho contornado é a maior sequência de semanas.",
     "soloAria": "{days} dias registrados em {weeks} semanas",
     "soloWeek": "Semana de {date}: {count, plural, one {# dia} other {# dias}}",
-    "readSolo": "Cada barra é uma semana: em quantos dias você apareceu. As mais fortes são a sua maior sequência."
+    "readSolo": "Cada barra é uma semana: em quantos dias você apareceu. As mais fortes são a sua maior sequência.",
+    "genresYears": {
+      "genre": "<b>{genre}</b> vence, com {value}.",
+      "year": "A melhor safra é <b>{year}</b>.",
+      "note": "Por ano de lançamento, de {first} a {last}.",
+      "tooltip": "{things} de {year}, com média {average}."
+    }
   },
   "organise": {
     "button": "Organizar",

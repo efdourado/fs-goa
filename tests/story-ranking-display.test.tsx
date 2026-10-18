@@ -29,7 +29,7 @@ test("the podium shows Goa scores to two places without repeating a label", () =
   for (const value of ["4.74", "4.72", "4.61", "2.2"]) assert.ok(html.includes(value), `shows ${value}`);
   assert.ok(!html.includes("Goa score"), "the podium does not repeat a label under every score");
   assert.ok(!html.includes(">5<"), "no plain five on the podium or the bars");
-  assert.ok(html.indexOf("4.74") < html.indexOf("4.72") || html.includes("LOTR took it, at 4.74"), "LOTR leads");
+  assert.ok(html.indexOf("4.74") < html.indexOf("4.72") || html.includes("<b>LOTR</b> took it, at 4.74"), "LOTR leads");
 });
 
 test("perfect scores and the lowest are drawn like the catalogue's items, in a grid, not a rail", () => {
@@ -64,8 +64,8 @@ test("each criterion shows who leads it on the rankings page", () => {
     return <div>{page.body}</div>;
   }
   const html = renderToStaticMarkup(<NextIntlClientProvider locale="en" messages={messages} timeZone="America/Sao_Paulo"><Page /></NextIntlClientProvider>);
-  assert.ok(html.includes("Food: Cantina leads"));
-  assert.ok(html.includes("Vibe: Boteco leads"));
+  assert.ok(html.includes("Food: <b>Cantina</b> leads."));
+  assert.ok(html.includes("Vibe: <b>Boteco</b> leads."));
 });
 
 test("interactive words pages fit each comment up to a cap while downloadable pages keep the full text", () => {
@@ -118,17 +118,18 @@ test("long genre and year charts stay paired, horizontal and independently expan
   assert.ok(html.includes('data-ranking-layout="podium-with-rest"'));
   assert.ok(html.includes('data-ranking-rest="inline"'), "the remaining titles share the podium card instead of getting another white box");
   assert.deepEqual([...html.matchAll(/data-rank="(\d+)"/g)].map((match) => match[1]), ["04", "05", "06", "07", "08", "06", "07", "08", "09", "10"]);
-  assert.ok(html.indexOf("Film 5") < html.indexOf("The rest of the ranking"));
-  assert.ok(html.indexOf("The rest of the ranking") < html.indexOf("Film 6"), "the remaining ranking starts with number six");
-  assert.ok(html.indexOf("Suspense wins") < html.indexOf("From 2001 to 2019"), "genre and year cards are consecutive grid columns");
+  assert.ok(html.indexOf('data-ranking-rest="inline"') < html.indexOf("Film 6"), "the rest of the ranking sits right under the podium");
+  assert.ok(!html.includes("The rest of the ranking"), "with no heading of its own");
+  assert.ok(!html.includes("Genres and years") && !html.includes("Podium") && html.includes("<b>Suspense</b> wins") && html.includes("The best vintage is <b>"), "genres and years are one chapter, one sentence each");
+  assert.ok(html.indexOf("<b>Suspense</b> wins") < html.indexOf("By release year, 2001 to 2019."));
   assert.ok(html.includes('data-chart-pair="genres-years"'));
   assert.ok(html.includes('data-horizontal-chart="genres" data-chart-rows="5"'));
-  assert.ok(html.includes('data-horizontal-chart="years" data-chart-rows="5"'));
-  assert.ok(!html.includes("2001–03") && html.includes(">2001 <"), "one line per year, never merged into ranges");
-  assert.equal(html.match(/Show 2 more/g)?.length, 1, "the genres chart has its own show-more action");
-  assert.equal(html.match(/Show 14 more/g)?.length, 1, "and so do the years: nineteen of them, five showing");
+  assert.ok(html.includes('data-vertical-chart="years" data-chart-columns="19"'), "every year is a column, no folding");
+  assert.ok(!html.includes("2001–03") && html.includes("’01"), "one column per year, never merged into ranges, short labels when crowded");
+  assert.ok(html.includes('aria-label="Show 2 more"') && html.includes(">+ 2<"), "the genres chart has its own + N action");
   assert.ok(!html.includes("See every year") && !html.includes("data-scrollable-year-chart"));
-  assert.ok(html.includes("+ 11") && html.includes("+ 9"), "the rest of the ranking says how many titles are left out");
+  assert.ok(html.includes(">+ 11<") && html.includes(">+ 9<"), "the rest of the ranking says + N");
+  assert.ok(html.includes('title="1 film from 2001, averaging'), "a year's column explains itself on hover");
   assert.ok(!html.includes("text-[var(--main-strong)]"), "the ranking action uses the same quiet treatment as comment actions");
 
   function Downloaded() {
@@ -139,7 +140,7 @@ test("long genre and year charts stay paired, horizontal and independently expan
   assert.ok(!downloaded.includes("Film 19"), "a downloaded page is a preview, not the whole ranking");
   assert.ok(!downloaded.includes("<button"));
   assert.ok(downloaded.includes('data-podium-size="3"'), "a story keeps the top three on the podium");
-  assert.ok(!downloaded.includes("The rest of the ranking"), "and no list of the rest");
+  assert.ok(!downloaded.includes('data-ranking-rest'), "and no list of the rest");
   assert.ok(!downloaded.includes("+ "), "an image never counts what it leaves out");
   assert.ok(downloaded.includes("…") && downloaded.includes('data-chart-rows="5"'), "a cut chart just ends in an ellipsis");
 });

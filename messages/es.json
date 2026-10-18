@@ -2070,7 +2070,6 @@
       "loner": "{name}, solo en el {value}"
     },
     "podium": {
-      "eyebrow": "El podio",
       "score": "puntuación Goa"
     },
     "common": {
@@ -2081,7 +2080,6 @@
     },
     "genres": {
       "eyebrow": "Por género",
-      "title": "{genre} gana, con {value}",
       "note": "{count} géneros, según la media del grupo."
     },
     "time": {
@@ -2185,23 +2183,21 @@
       "eyebrow": "En sus palabras"
     },
     "years": {
-      "eyebrow": "Por año de estreno",
-      "title": "De {first} a {last}"
+      "eyebrow": "Por año de estreno"
     },
     "title": "El hilo",
     "metricsMore": "+{count} más",
     "dimension": {
       "eyebrow": "Por criterio",
-      "title": "{label}: {title} va primero"
-    },
-    "ranking": {
-      "rest": "El resto del ranking"
+      "lead": "{label}: <b>{title}</b> va primero."
     },
     "pages": {
       "thread": {},
       "rankings": {
         "title": "Rankings",
-        "headline": "{title} se lo llevó, con {value}."
+        "lead": "<b>{title}</b> se lo llevó, con {value}.",
+        "genres": "{count, plural, one {# género} other {# géneros}}",
+        "years": "de {first} a {last}"
       },
       "people": {
         "title": "Las personas"
@@ -2297,7 +2293,13 @@
     "readDatedWeek": "Cada franja es una persona: continua mientras apareció cada semana, con huecos donde pasó una semana en blanco. El tramo marcado es su mejor racha de semanas.",
     "soloAria": "{days} días registrados en {weeks} semanas",
     "soloWeek": "Semana del {date}: {count, plural, one {# día} other {# días}}",
-    "readSolo": "Cada barra es una semana: cuántos días apareciste. Las más fuertes son tu mejor racha."
+    "readSolo": "Cada barra es una semana: cuántos días apareciste. Las más fuertes son tu mejor racha.",
+    "genresYears": {
+      "genre": "<b>{genre}</b> gana, con {value}.",
+      "year": "La mejor cosecha es <b>{year}</b>.",
+      "note": "Por año de estreno, de {first} a {last}.",
+      "tooltip": "{things} de {year}, con media {average}."
+    }
   },
   "organise": {
     "button": "Organizar",

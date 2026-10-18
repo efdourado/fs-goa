@@ -2070,7 +2070,6 @@
       "loner": "{name}, alone at {value}"
     },
     "podium": {
-      "eyebrow": "The podium",
       "score": "Goa score"
     },
     "common": {
@@ -2081,7 +2080,6 @@
     },
     "genres": {
       "eyebrow": "By genre",
-      "title": "{genre} wins, at {value}",
       "note": "{count} genres, ranked by the group's average."
     },
     "time": {
@@ -2185,23 +2183,21 @@
       "eyebrow": "In their words"
     },
     "years": {
-      "eyebrow": "By release year",
-      "title": "From {first} to {last}"
+      "eyebrow": "By release year"
     },
     "title": "The thread",
     "metricsMore": "+{count} more",
     "dimension": {
       "eyebrow": "By criterion",
-      "title": "{label}: {title} leads"
-    },
-    "ranking": {
-      "rest": "The rest of the ranking"
+      "lead": "{label}: <b>{title}</b> leads."
     },
     "pages": {
       "thread": {},
       "rankings": {
         "title": "Rankings",
-        "headline": "{title} took it, at {value}."
+        "lead": "<b>{title}</b> took it, at {value}.",
+        "genres": "{count, plural, one {# genre} other {# genres}}",
+        "years": "from {first} to {last}"
       },
       "people": {
         "title": "The people"
@@ -2297,7 +2293,13 @@
     "readDatedWeek": "Each lane is a person: solid while they showed up every week, with gaps where a week went by empty. The outlined stretch is their longest run of weeks.",
     "soloAria": "{days} days logged over {weeks} weeks",
     "soloWeek": "Week of {date}: {count, plural, one {# day} other {# days}}",
-    "readSolo": "Each bar is a week: how many days you showed up. The brighter ones are your longest run."
+    "readSolo": "Each bar is a week: how many days you showed up. The brighter ones are your longest run.",
+    "genresYears": {
+      "genre": "<b>{genre}</b> wins, at {value}.",
+      "year": "The best vintage is <b>{year}</b>.",
+      "note": "By release year, {first} to {last}.",
+      "tooltip": "{things} from {year}, averaging {average}."
+    }
   },
   "organise": {
     "button": "Organise",
