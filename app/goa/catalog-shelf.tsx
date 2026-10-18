@@ -105,11 +105,11 @@ export function CatalogShelfView({ scope, canManage, onOpenCatalog, onOpenItem, 
               <button
                 type="button"
                 onClick={onOpenCatalog}
-                className={cx(shelfCardWidth, catalogCardHeight, "flex cursor-pointer items-center gap-3 self-start rounded-[20px] border border-[var(--line)] bg-[var(--paper)] px-4 text-left transition hover:border-[var(--main-line)]")}
+                className={cx(shelfCardWidth, catalogCardHeight, "flex cursor-pointer items-center gap-3 self-start rounded-[20px] border border-[var(--line)] bg-[var(--paper)] px-4 text-left transition hover:border-[var(--muted)]")}
               >
                 <span className="text-2xl font-light tracking-[-0.04em]">{remaining}</span>
                 <span className="min-w-0 flex-1 truncate text-xs text-[var(--muted)]">{t("catalogMoreIn", { name: title })}</span>
-                <span className="flex-none text-[13px] text-[var(--main-strong)]">{t("catalogSeeAll")} →</span>
+                <span className="flex-none text-[13px] text-[var(--ink)]">{t("catalogSeeAll")} →</span>
               </button>
             ) : null}
           </Rail>
