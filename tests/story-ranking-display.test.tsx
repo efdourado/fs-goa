@@ -137,5 +137,8 @@ test("long genre and year charts stay paired, horizontal and independently expan
   const downloaded = renderToStaticMarkup(<NextIntlClientProvider locale="en" messages={messages} timeZone="America/Sao_Paulo"><Downloaded /></NextIntlClientProvider>);
   assert.ok(!downloaded.includes("Film 19"), "a downloaded page is a preview, not the whole ranking");
   assert.ok(!downloaded.includes("<button"));
-  assert.ok(downloaded.includes("+ 11") && downloaded.includes('data-chart-rows="5"'));
+  assert.ok(downloaded.includes('data-podium-size="3"'), "a story keeps the top three on the podium");
+  assert.ok(!downloaded.includes("The rest of the ranking"), "and no list of the rest");
+  assert.ok(!downloaded.includes("+ "), "an image never counts what it leaves out");
+  assert.ok(downloaded.includes("…") && downloaded.includes('data-chart-rows="5"'), "a cut chart just ends in an ellipsis");
 });

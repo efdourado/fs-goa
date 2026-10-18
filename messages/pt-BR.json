@@ -2198,9 +2198,6 @@
       "rest": "O resto do ranking"
     },
     "pages": {
-      "cover": {
-        "title": "Capa"
-      },
       "thread": {},
       "rankings": {
         "title": "Rankings",
@@ -2231,13 +2228,18 @@
       }
     },
     "download": {
-      "button": "Baixar páginas",
-      "title": "Baixar páginas",
-      "lede": "{count} páginas feitas com este desafio, baixe uma ou todas.",
-      "one": "Baixar {title}",
-      "all": "Baixar as {count} (.zip)",
+      "button": "Baixar destaques",
+      "title": "Destaques para compartilhar",
+      "lede": "Toque nas imagens para escolher. Cada uma tem o nome do desafio e seus números, no formato dos stories.",
+      "one": "Baixar 1 imagem",
+      "all": "Baixar {count} (.zip)",
       "preparing": "Preparando…",
-      "format": "Imagens PNG, em retrato (4:5). Todas vêm num único .zip."
+      "format": "Imagens PNG em 9:16 (1080 × 1920), o tamanho dos stories. Todas vêm num único .zip.",
+      "pickSome": "Escolha as imagens",
+      "share": "{count, plural, one {Salvar 1 imagem} other {Salvar # imagens}}",
+      "selectAll": "Selecionar todas ({count})",
+      "clear": "Limpar seleção",
+      "formatShare": "Imagens 9:16 (1080 × 1920), prontas para os stories. Vão direto para Fotos ou para o app que você escolher."
     },
     "duo": {
       "title": "Vocês dois",

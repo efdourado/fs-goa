@@ -2198,9 +2198,6 @@
       "rest": "The rest of the ranking"
     },
     "pages": {
-      "cover": {
-        "title": "Cover"
-      },
       "thread": {},
       "rankings": {
         "title": "Rankings",
@@ -2231,13 +2228,18 @@
       }
     },
     "download": {
-      "button": "Download pages",
-      "title": "Download pages",
-      "lede": "{count} pages made from this challenge (download one, or all of them).",
-      "one": "Download {title}",
-      "all": "Download all {count} (.zip)",
+      "button": "Download highlights",
+      "title": "Highlights to share",
+      "lede": "Tap the images to pick them. Each one carries the challenge's name and numbers, shaped for stories.",
+      "one": "Download 1 image",
+      "all": "Download {count} (.zip)",
       "preparing": "Preparing…",
-      "format": "PNG images, portrait (4:5). All of them come in one .zip."
+      "format": "PNG images in 9:16 (1080 × 1920), the size of a story. All of them come in one .zip.",
+      "pickSome": "Pick the images",
+      "share": "{count, plural, one {Save 1 image} other {Save # images}}",
+      "selectAll": "Select all ({count})",
+      "clear": "Clear selection",
+      "formatShare": "9:16 images (1080 × 1920), ready for stories. They go straight to Photos or to the app you pick."
     },
     "duo": {
       "title": "The two of you",

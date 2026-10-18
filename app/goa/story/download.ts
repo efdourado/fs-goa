@@ -20,6 +20,11 @@ export async function downloadNode(node: HTMLElement, filename: string): Promise
   saveBlob(await renderPng(node), `${slug(filename)}.png`);
 }
 
+/** An image already drawn, saved under the name given. */
+export function downloadBlob(blob: Blob, filename: string): void {
+  saveBlob(blob, filename);
+}
+
 /** Every file in one zip, so "download all" is one download instead of a burst the browser may block. */
 export async function downloadZip(files: { name: string; blob: Blob }[], filename: string): Promise<void> {
   saveBlob(await zip(files), `${slug(filename)}.zip`);

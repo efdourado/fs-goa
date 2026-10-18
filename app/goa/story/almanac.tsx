@@ -564,7 +564,8 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
     const genresCard = s.genres.length ? (
       <Block title={t("genres.title", { genre: s.genres[0].key, value: fmt(s.genres[0].average) })}>
         <div data-horizontal-chart="genres" data-chart-rows={displayedGenres.length}>{statBars(displayedGenres)}</div>
-        {full && s.genres.length > CHART_PREVIEW_ROWS ? <p className="mt-3 text-xs tabular-nums text-[var(--muted)]">{more(s.genres.length - CHART_PREVIEW_ROWS)}</p> : null}
+        {/* A downloaded image says only that there's more. */}
+        {full && s.genres.length > CHART_PREVIEW_ROWS ? <p className="mt-2 text-sm leading-none text-[var(--muted)]" aria-hidden="true">…</p> : null}
         {!full && s.genres.length > CHART_PREVIEW_ROWS ? (
           <button type="button" className={cx("mt-3", textActionClass)} onClick={() => setGenresExpanded((value) => !value)}>
             {genresExpanded ? t("showLess") : t("showMore", { count: s.genres.length - CHART_PREVIEW_ROWS })}
@@ -586,7 +587,7 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
             />
           ))}
         </div>
-        {full && yearGroups.length > CHART_PREVIEW_ROWS ? <p className="mt-2 text-xs tabular-nums text-[var(--muted)]">{more(yearGroups.length - CHART_PREVIEW_ROWS)}</p> : null}
+        {full && yearGroups.length > CHART_PREVIEW_ROWS ? <p className="mt-2 text-sm leading-none text-[var(--muted)]" aria-hidden="true">…</p> : null}
         {!full && yearGroups.length > CHART_PREVIEW_ROWS ? (
           <button type="button" className={cx("mt-2", textActionClass)} onClick={() => setYearGroupsExpanded((value) => !value)}>
             {yearGroupsExpanded ? t("showLess") : t("showMore", { count: yearGroups.length - CHART_PREVIEW_ROWS })}
@@ -599,7 +600,16 @@ export function useAlmanacPages(story: Story, input: StoryInput, metrics: Metric
       id: "rankings",
       title: t("pages.rankings.title"),
       headline: t("pages.rankings.headline", { title: s.ranking[0].item.title, value: fmtScore(s.ranking[0].score) }),
-      body: (
+      // A downloaded story is one screen: the top three on the podium and, right below, the two charts.
+      body: full ? (
+        <div className="flex flex-col gap-4">
+          <section className={outlineClass}>
+            <h4 className={sectionTitleClass}>{t("podium.eyebrow")}</h4>
+            {renderPodium(compactPodiumLayout, "compact", "grid")}
+          </section>
+          {genresCard || yearsCard ? <div className={cx("grid gap-4", genresCard && yearsCard && "grid-cols-2")}>{genresCard}{yearsCard}</div> : null}
+        </div>
+      ) : (
         <div className={grid}>
           <div className={cx("min-w-0 [grid-column:1/-1]", outlineClass)} data-ranking-layout="podium-with-rest">
             <div className={cx("grid items-start gap-6", fullRest.length > 0 && "@2xl:grid-cols-[minmax(0,1fr)_15rem]")}>

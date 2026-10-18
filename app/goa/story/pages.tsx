@@ -1,113 +1,106 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { Dialog } from "../dialog";
-import { firstName, personTone } from "../rating-scale";
 import type { Metric } from "../types";
-import { AvatarMark, cx } from "../ui";
+import { cx } from "../ui";
 import { type AlmanacPage, useAlmanacPages } from "./almanac";
-import { downloadNode, downloadZip, renderPng, slug } from "./download";
+import { downloadBlob, downloadZip, renderPng, slug } from "./download";
 import type { Story, StoryInput } from "./model";
 import { storyHeadline, ThreadPanel, useStoryFigures } from "./view";
 
-const PAGE_WIDTH = 800;
-const PAGE_HEIGHT = 1000;
+// A story's shape: 9:16, saved at twice the size (1080 × 1920, what Instagram and WhatsApp stories take).
+const PAGE_WIDTH = 540;
+const PAGE_HEIGHT = 960;
 const GRID_GAP = 16;
 
-function Mark({ dark }: { dark?: boolean }) {
-  return <span className={cx("grid h-7 w-7 place-items-center rounded-[50%_50%_50%_16%] text-[12px] font-black", dark ? "bg-[var(--spotlight-ink)] text-[var(--spotlight)]" : "bg-[var(--ink)] text-[var(--canvas)]")}>g</span>;
+function Mark() {
+  return <span className="grid h-6 w-6 place-items-center rounded-[50%_50%_50%_16%] bg-[var(--ink)] text-[11px] font-black text-[var(--canvas)]">g</span>;
 }
 
 /**
- * One downloadable page: a portrait frame (4:5, the shape feeds and chats show whole) with the challenge's
- * name and the page number on top, the page's title and headline, its facts, and a quiet "goa" at the
- * foot. Animations are off (`story-still`) so the picture is the finished drawing.
+ * A story is one screen: when a page holds more than fits, the whole of it shrinks until it does (a story can't
+ * scroll, and cutting it off would hide the end). It's laid out wider by the same factor, so it keeps its shape.
  */
-function PageFrame({ input, index, total, title, headline, dark, children }: {
-  input: StoryInput; index: number; total: number; title?: string; headline?: string; dark?: boolean; children: ReactNode;
+function FitBox({ children }: { children: ReactNode }) {
+  const box = useRef<HTMLDivElement>(null);
+  const inner = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  useLayoutEffect(() => {
+    const outer = box.current, content = inner.current;
+    if (!outer || !content) return;
+    const fit = () => {
+      const room = outer.clientHeight, need = content.scrollHeight;
+      setScale(need > room && need > 0 ? Math.max(0.5, room / need) : 1);
+    };
+    fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, []);
+  return (
+    <div ref={box} className="relative mt-5 min-h-0 flex-1 overflow-hidden">
+      <div ref={inner} className="@container absolute left-0 top-0 flex flex-col" style={{ width: `${100 / scale}%`, transform: `scale(${scale})`, transformOrigin: "top left" }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * One story: the challenge's name and its numbers on top of every page (so each one stands alone wherever it's
+ * posted), then the page's one thing, highlighted, and a quiet page number and "goa" at the foot. Fixed 9:16, with
+ * animations off (`story-still`) so the picture is the finished drawing.
+ */
+function StoryFrame({ input, figures, index, eyebrow, headline, children }: {
+  input: StoryInput; figures: Array<{ value: string; label: string }>; index: number;
+  eyebrow?: string; headline?: string; children: ReactNode;
 }) {
   return (
-    <article
-      className={cx("story-still story-page flex flex-col p-14", dark ? "bg-[var(--spotlight)] text-[var(--spotlight-ink)]" : "bg-[var(--canvas)] text-[var(--ink)]")}
-      style={{ width: PAGE_WIDTH, minHeight: PAGE_HEIGHT }}
-    >
-      <header className={cx("flex items-center justify-between text-sm", dark ? "text-white/60" : "text-[var(--muted)]")}>
-        <span className="flex items-center gap-2.5"><Mark dark={dark} />{input.title}</span>
-        <span className="tabular-nums">{index + 1} / {total}</span>
+    <article className="story-still story-page flex flex-col overflow-hidden bg-[var(--canvas)] px-9 pb-7 pt-9 text-[var(--ink)]" style={{ width: PAGE_WIDTH, height: PAGE_HEIGHT }}>
+      <header className="border-b border-[var(--line)] pb-5">
+        <h1 className="line-clamp-2 text-[38px] font-light leading-[1.02] tracking-[-0.05em]">{input.title}</h1>
+        <dl className="mt-4 flex flex-wrap gap-x-6 gap-y-2">
+          {figures.map((figure) => (
+            <div key={figure.label} className="flex flex-col-reverse">
+              <dt className="text-[11px] text-[var(--muted)]">{figure.label}</dt>
+              <dd className="text-[24px] font-light tabular-nums leading-tight tracking-[-0.03em]">{figure.value}</dd>
+            </div>
+          ))}
+        </dl>
       </header>
-      {title ? (
-        <div className="mt-14">
-          <h1 className="text-6xl font-light leading-[1.02] tracking-[-0.05em]">{title}</h1>
-          {headline ? <p className={cx("mt-4 text-2xl font-light leading-snug", dark ? "text-white/70" : "text-[var(--muted)]")}>{headline}</p> : null}
-        </div>
-      ) : null}
-      <div className="@container mt-12 flex flex-1 flex-col">{children}</div>
-      <footer className={cx("mt-12 text-xs", dark ? "text-white/45" : "text-[var(--muted)]")}>goa</footer>
+      <section className="mt-6 flex min-h-0 flex-1 flex-col">
+        {eyebrow ? <p className="text-[11px] uppercase tracking-[0.16em] text-[var(--muted)]">{eyebrow}</p> : null}
+        {headline ? <p className="mt-1.5 text-[21px] font-light leading-snug tracking-[-0.02em]">{headline}</p> : null}
+        <FitBox>{children}</FitBox>
+      </section>
+      <footer className="mt-5 flex items-center justify-between text-[11px] text-[var(--muted)]">
+        <span className="tabular-nums">{index + 1}</span>
+        <span className="flex items-center gap-2"><Mark />goa</span>
+      </footer>
     </article>
   );
 }
 
 interface Designed { id: string; title: string; node: (index: number, total: number) => ReactNode }
 
-/** Every page there is to download, cover first: the cover, the drawing, then the almanac's pages. */
+/**
+ * Every story there is to download: the thread first, then the almanac's pages as they are (the rankings with
+ * the podium and its charts, then whatever else its data fills: the pair, the comments, the metrics…).
+ */
 function useDesignedPages(input: StoryInput, story: Story, metrics: Metric[]): Designed[] {
   const t = useTranslations("story");
   const figures = useStoryFigures(story, input);
   const almanac: AlmanacPage[] = useAlmanacPages(story, input, metrics, true);
   if (story.kind === "empty") return [];
-  const ids = input.people.map((person) => person.id);
-  const people = story.kind === "rated" ? story.threads.map((thread) => thread.person) : story.lanes.map((lane) => lane.person);
+  const frame = (eyebrow: string | undefined, headline: string | undefined, body: ReactNode) => function renderStory(index: number) {
+    return <StoryFrame input={input} figures={figures} index={index} eyebrow={eyebrow} headline={headline}>{body}</StoryFrame>;
+  };
   return [
-    {
-      id: "cover",
-      title: t("pages.cover.title"),
-      node: (index, total) => (
-        <PageFrame input={input} index={index} total={total} dark>
-          <div className="flex flex-1 flex-col justify-between">
-            <div>
-              <p className="text-2xl font-light text-white/60">{storyHeadline(story, input, t)}</p>
-              <h1 className="mt-6 text-8xl font-light leading-[0.95] tracking-[-0.06em]">{input.title}</h1>
-            </div>
-            <div className="mt-20 space-y-12">
-              <dl className="grid grid-cols-3 gap-8">
-                {figures.map((figure) => (
-                  <div key={figure.label} className="flex flex-col-reverse">
-                    <dt className="text-sm text-white/55">{figure.label}</dt>
-                    <dd className="text-5xl font-light tabular-nums tracking-[-0.04em]">{figure.value}</dd>
-                  </div>
-                ))}
-              </dl>
-              <ul className="flex flex-wrap gap-3">
-                {people.map((person) => (
-                  <li key={person.id} className="flex items-center gap-2 rounded-full bg-white/[0.07] py-1 pl-1 pr-3.5 text-base">
-                    <span className="grid h-8 w-8 place-items-center rounded-full p-[2px]" style={{ background: personTone(ids, person.id) }}><AvatarMark /></span>
-                    {firstName(person.name)}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </PageFrame>
-      ),
-    },
-    {
-      id: "thread",
-      title: t("title"),
-      node: (index, total) => (
-        <PageFrame input={input} index={index} total={total}>
-          <ThreadPanel input={input} story={story} fit interactive={false} />
-        </PageFrame>
-      ),
-    },
-    ...almanac.map((page) => ({
-      id: page.id,
-      title: page.title,
-      node: (index: number, total: number) => (
-        <PageFrame input={input} index={index} total={total} title={page.title} headline={page.headline}>{page.body}</PageFrame>
-      ),
-    })),
+    { id: "thread", title: t("title"), node: frame(t("title"), storyHeadline(story, input, t), <ThreadPanel input={input} story={story} fit interactive={false} bare />) },
+    ...almanac.map((page) => ({ id: page.id, title: page.title, node: frame(page.title, page.headline, page.body) })),
   ];
 }
 
@@ -142,85 +135,129 @@ export function DownloadPagesButton({ input, story, metrics = [], tone = "hero" 
   );
 }
 
+/**
+ * The images to share, picked like a library's items: tap a story to select it (an ink check marks it). The
+ * one button at the foot saves what's picked: one image as a PNG, several as a .zip on a computer. On a phone
+ * that can share files (iPhone, Android) it opens the share sheet instead, so the images go straight to Photos
+ * or to a story, no zip to unpack. Each picked image is drawn as soon as it's picked, so the share still counts
+ * as the tap that asked for it.
+ */
 function PagesDialog({ input, story, metrics, onClose }: { input: StoryInput; story: Story; metrics: Metric[]; onClose: () => void }) {
   const t = useTranslations("story.download");
   const pages = useDesignedPages(input, story, metrics);
   const refs = useRef(new Map<string, HTMLElement | null>());
-  const [busy, setBusy] = useState<string | null>(null);
-  // Two pages side by side at whatever width the dialog has (wide on a desktop, narrow on a phone).
+  const [selected, setSelected] = useState<string[]>([]);
+  const [ready, setReady] = useState<Map<string, Blob>>(new Map());
+  const [busy, setBusy] = useState(false);
+  // The dialog only ever opens in a browser, so asking right away is safe.
+  const [canShare] = useState(() => {
+    const probe = typeof File === "function" ? new File([new Blob()], "a.png", { type: "image/png" }) : null;
+    return Boolean(probe && typeof navigator !== "undefined" && navigator.canShare?.({ files: [probe] }));
+  });
+  // Three stories to a row on a wide dialog, two on a phone, each the real page shrunk.
   const grid = useRef<HTMLOListElement>(null);
   const [scale, setScale] = useState(0.2);
+  const [columns, setColumns] = useState(3);
   useEffect(() => {
     const node = grid.current;
     if (!node) return;
-    const observer = new ResizeObserver(([entry]) => setScale((entry.contentRect.width - GRID_GAP) / 2 / PAGE_WIDTH));
+    const observer = new ResizeObserver(([entry]) => {
+      const columns = entry.contentRect.width >= 560 ? 3 : 2;
+      setColumns(columns);
+      setScale((entry.contentRect.width - GRID_GAP * (columns - 1)) / columns / PAGE_WIDTH);
+    });
     observer.observe(node);
     return () => observer.disconnect();
   }, []);
 
-  async function save(id: string, index: number) {
-    const node = refs.current.get(id)?.firstElementChild as HTMLElement | null;
-    if (!node) return;
-    await downloadNode(node, `${input.title} (${index + 1} ${pages[index].title})`);
-  }
-  async function saveOne(id: string, index: number) {
-    setBusy(id);
-    try { await save(id, index); } finally { setBusy(null); }
-  }
-  async function saveAll() {
-    setBusy("all");
-    try {
-      const files: { name: string; blob: Blob }[] = [];
-      for (const [index, page] of pages.entries()) {
-        const node = refs.current.get(page.id)?.firstElementChild as HTMLElement | null;
+  const fileName = (id: string) => {
+    const index = pages.findIndex((page) => page.id === id);
+    return `${String(index + 1).padStart(2, "0")}-${slug(`${input.title} ${pages[index]?.title ?? ""}`)}.png`;
+  };
+  // Draw each picked page once, in the background, so saving or sharing is instant.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      for (const id of selected) {
+        if (ready.has(id)) continue;
+        const node = refs.current.get(id)?.firstElementChild as HTMLElement | null;
         if (!node) continue;
-        const number = String(index + 1).padStart(2, "0");
-        files.push({ name: `${number}-${slug(page.title)}.png`, blob: await renderPng(node) });
+        const blob = await renderPng(node);
+        if (cancelled) return;
+        setReady((current) => new Map(current).set(id, blob));
       }
-      await downloadZip(files, input.title);
+    })();
+    return () => { cancelled = true; };
+  }, [selected, ready]);
+
+  const toggle = (id: string) => setSelected((current) => current.includes(id) ? current.filter((one) => one !== id) : [...current, id]);
+  const allPicked = selected.length === pages.length;
+  const pending = selected.some((id) => !ready.has(id));
+  const ordered = pages.filter((page) => selected.includes(page.id)).map((page) => page.id);
+
+  async function save() {
+    if (!ordered.length || pending) return;
+    setBusy(true);
+    try {
+      const files = ordered.map((id) => ({ name: fileName(id), blob: ready.get(id)! }));
+      if (canShare) {
+        try {
+          await navigator.share({ files: files.map((file) => new File([file.blob], file.name, { type: "image/png" })) });
+        } catch (cause) {
+          if (!(cause instanceof DOMException && cause.name === "AbortError")) throw cause;
+        }
+      } else if (files.length === 1) {
+        downloadBlob(files[0].blob, files[0].name);
+      } else {
+        await downloadZip(files, input.title);
+      }
     } finally {
-      setBusy(null);
+      setBusy(false);
     }
   }
 
+  const label = !ordered.length ? t("pickSome")
+    : pending ? t("preparing")
+    : canShare ? t("share", { count: ordered.length })
+    : ordered.length === 1 ? t("one") : t("all", { count: ordered.length });
+
   return (
-    <Dialog title={t("title")} onClose={onClose} busy={busy !== null} wide>
-      <p className="text-sm text-[var(--muted)]">{t("lede", { count: pages.length })}</p>
-      <ol ref={grid} className="mt-5 grid grid-cols-2" style={{ gap: GRID_GAP }}>
-        {pages.map((page, index) => (
-          <li key={page.id}>
-            {/* The real page, shrunk: what you see is what downloads. */}
-            <div className="overflow-hidden rounded-md border border-[var(--line)]" style={{ aspectRatio: `${PAGE_WIDTH} / ${PAGE_HEIGHT}` }}>
-              <div ref={(node) => { refs.current.set(page.id, node); }} style={{ transform: `scale(${scale})`, transformOrigin: "top left", width: PAGE_WIDTH }}>
-                {page.node(index, pages.length)}
-              </div>
-            </div>
-            <div className="mt-2 flex items-center justify-between gap-2">
-              <p className="min-w-0 truncate text-sm font-medium"><span className="mr-1.5 tabular-nums text-[var(--muted)]">{index + 1}</span>{page.title}</p>
-              <button
-                type="button"
-                disabled={busy !== null}
-                onClick={() => void saveOne(page.id, index)}
-                aria-label={t("one", { title: page.title })}
-                title={t("one", { title: page.title })}
-                className="grid size-9 flex-none cursor-pointer place-items-center rounded-full text-[var(--main-strong)] transition hover:bg-[var(--main-soft)] disabled:opacity-50"
+    <Dialog title={t("title")} onClose={onClose} busy={busy} wide>
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <p className="text-sm text-[var(--muted)]">{t("lede", { count: pages.length })}</p>
+        <button type="button" onClick={() => setSelected(allPicked ? [] : pages.map((page) => page.id))} className="cursor-pointer text-sm text-[var(--ink)] underline-offset-4 hover:underline">
+          {allPicked ? t("clear") : t("selectAll", { count: pages.length })}
+        </button>
+      </div>
+      <ol ref={grid} className="mt-5 grid" style={{ gap: GRID_GAP, gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
+        {pages.map((page, index) => {
+          const picked = selected.includes(page.id);
+          return (
+            <li key={page.id}>
+              <div
+                className={cx("relative overflow-hidden rounded-md border transition", picked ? "border-[var(--ink)] ring-2 ring-[var(--ink)]" : "border-[var(--line)]")}
+                style={{ aspectRatio: `${PAGE_WIDTH} / ${PAGE_HEIGHT}` }}
               >
-                {busy === page.id ? (
-                  <span aria-hidden="true" className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                ) : (
-                  <svg viewBox="0 0 20 20" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
-                    <path d="M10 3v10m0 0-4-4m4 4 4-4M4 16h12" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                )}
-              </button>
-            </div>
-          </li>
-        ))}
+                {/* The real page, shrunk: what you see is what you save. `inert`: its own controls stay out of reach. */}
+                <div inert ref={(node) => { refs.current.set(page.id, node); }} style={{ transform: `scale(${scale})`, transformOrigin: "top left", width: PAGE_WIDTH }}>
+                  {page.node(index, pages.length)}
+                </div>
+                {/* One toggle over the whole preview (a button can't hold the page's own buttons). */}
+                <button type="button" aria-pressed={picked} aria-label={page.title} onClick={() => toggle(page.id)} className="absolute inset-0 cursor-pointer transition hover:bg-[var(--ink)]/[0.04] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-[var(--main)]/30">
+                  <span aria-hidden="true" className={cx("absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full border transition", picked ? "border-[var(--ink)] bg-[var(--ink)] text-[var(--canvas)]" : "border-[var(--line)] bg-[var(--paper)]/90 text-transparent")}>
+                    <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3.5 8.4 2.9 2.9 6.1-6.6" /></svg>
+                  </span>
+                </button>
+              </div>
+              <p className="mt-2 truncate text-sm font-medium"><span className="mr-1.5 tabular-nums text-[var(--muted)]">{index + 1}</span>{page.title}</p>
+            </li>
+          );
+        })}
       </ol>
       <div className="sticky bottom-0 -mx-6 -mb-6 mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--line)] bg-[var(--paper)] px-6 py-4">
-        <span className="text-xs text-[var(--muted)]">{t("format")}</span>
-        <button type="button" disabled={busy !== null} onClick={() => void saveAll()} className="inline-flex min-h-10 cursor-pointer items-center rounded-xl bg-[var(--main)] px-4 text-sm font-medium text-white disabled:opacity-55">
-          {busy === "all" ? t("preparing") : t("all", { count: pages.length })}
+        <span className="text-xs text-[var(--muted)]">{t(canShare ? "formatShare" : "format")}</span>
+        <button type="button" disabled={busy || !ordered.length || pending} onClick={() => void save()} className="inline-flex min-h-10 cursor-pointer items-center rounded-full bg-[var(--ink)] px-5 text-sm font-medium text-[var(--canvas)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45">
+          {label}
         </button>
       </div>
     </Dialog>

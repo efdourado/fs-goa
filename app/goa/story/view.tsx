@@ -49,7 +49,8 @@ export function storyHeadline(story: Story, input: StoryInput, t: ReturnType<typ
  * numbers, a legend to follow one person, and everyone's line. `fit` squeezes it into its box instead of
  * scrolling — the downloadable page has no scrollbar.
  */
-export function ThreadPanel({ input, story, fit = false, interactive = true }: { input: StoryInput; story: Story; fit?: boolean; interactive?: boolean }) {
+/** `bare` leaves out the heading and the numbers, for a page that already shows them above the drawing. */
+export function ThreadPanel({ input, story, fit = false, interactive = true, bare = false }: { input: StoryInput; story: Story; fit?: boolean; interactive?: boolean; bare?: boolean }) {
   const t = useTranslations("story");
   const figures = useStoryFigures(story, input);
   const [focus, setFocus] = useState<Id | null>(null);
@@ -59,7 +60,7 @@ export function ThreadPanel({ input, story, fit = false, interactive = true }: {
   const people = story.kind === "rated" ? story.threads.map((thread) => thread.person) : story.lanes.map((lane) => lane.person);
   return (
     <div className="overflow-hidden rounded-[28px] bg-[var(--spotlight)] text-[var(--spotlight-ink)]">
-      <div className="flex flex-wrap items-start justify-between gap-4 px-5 pb-2 pt-6 sm:px-8 sm:pt-8">
+      {bare ? <div className="pt-3" /> : <div className="flex flex-wrap items-start justify-between gap-4 px-5 pb-2 pt-6 sm:px-8 sm:pt-8">
         <div className="min-w-0">
           <h2 className="text-3xl font-light leading-[1.02] tracking-[-0.05em] sm:text-5xl">{t("title")}</h2>
           <p className="mt-2 text-sm text-white/65">{storyHeadline(story, input, t)}</p>
@@ -72,7 +73,7 @@ export function ThreadPanel({ input, story, fit = false, interactive = true }: {
             </div>
           ))}
         </dl>
-      </div>
+      </div>}
 
       <div className="flex flex-wrap items-center gap-2 px-5 pb-3 pt-3 sm:px-8">
         {/* Following one line only means something with more than one. */}

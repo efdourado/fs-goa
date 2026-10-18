@@ -162,7 +162,7 @@ export function RatedThread({ story, input, focus, run, fit = false }: { story: 
         {/* The titles along the bottom, with the group's number. */}
         {story.stations.map((station, index) => (
           <div key={station.item.id} className="absolute text-center" style={{ left: x(index) - step / 2, width: step, top: HEIGHT - BOTTOM + 8 }}>
-            <p className="mx-auto line-clamp-2 max-w-[92%] text-[11px] leading-tight text-white/80">{station.item.title}</p>
+            <p className="mx-auto max-w-[92%] truncate text-[11px] leading-tight text-white/80" title={station.item.title}>{station.item.title}</p>
             <p className="mt-0.5 text-[11px] tabular-nums text-white/45">{fmt(station.average)}</p>
           </div>
         ))}
