@@ -133,7 +133,7 @@ const ratingRow = (over: Record<string, unknown>) => ({
   nominated: false, visibility: "group_realtime", closed: true, genre: null, author: null, year: null, runtime: null, pages: null, ...over,
 });
 
-test("o acervo mostra tudo de 0 a 5, mesmo com desafios em /5 e /10", async () => {
+test("a coleção mostra tudo de 0 a 5, mesmo com desafios em /5 e /10", async () => {
   // 4/5 and 8/10 are the same rating: the catalogue says 4, not the 6 that averaging the two scales gave.
   const scores = await catalogScores(stub([
     ratingRow({ challenge_id: "c1", item_id: "i1", person_id: "a", value: 0.8, hi: 5 }),

@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 import type { ParticipantTab, Screen } from "./types";
 import { cx } from "./ui";
 
-export type DockTab = "home" | "templates" | "activity" | "you";
+export type DockTab = "home" | "catalog" | "activity" | "you";
 
 /**
  * Which dock tab a screen belongs to — the tab that stays lit while you're anywhere under it. `null` hides
@@ -25,18 +25,18 @@ export function dockTabFor(screen: Screen): DockTab | null {
     case "invite":
     case "invite-success":
       return "home";
-    case "templates":
-    case "template":
-      return "templates";
     case "activity":
       return "activity";
     case "you":
     case "account":
     case "personal-trash":
+    case "about":
+    case "templates":
+    case "template":
+      return "you";
     case "personal-catalog":
     case "personal-catalog-item":
-    case "about":
-      return "you";
+      return "catalog";
     case "challenge":
     case "admin":
     case "loading":
@@ -50,8 +50,8 @@ const icon = "h-[22px] w-[22px]";
 const ICONS: Record<DockTab, ReactNode> = {
   // Home: a progress ring, what Goa is about.
   home: <svg viewBox="0 0 24 24" className={icon} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5" opacity="0.35" /><path d="M12 3.5a8.5 8.5 0 0 1 8.2 10.7" strokeWidth="2.2" /><circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none" /></svg>,
-  // Templates: a little gallery of round choices.
-  templates: <svg viewBox="0 0 24 24" className={icon} fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><circle cx="7.75" cy="7.75" r="3.25" /><circle cx="16.25" cy="7.75" r="3.25" /><circle cx="7.75" cy="16.25" r="3.25" /><circle cx="16.25" cy="16.25" r="3.25" /></svg>,
+  // Catalogue: a little gallery of round covers.
+  catalog: <svg viewBox="0 0 24 24" className={icon} fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><circle cx="7.75" cy="7.75" r="3.25" /><circle cx="16.25" cy="7.75" r="3.25" /><circle cx="7.75" cy="16.25" r="3.25" /><circle cx="16.25" cy="16.25" r="3.25" /></svg>,
   activity: <svg viewBox="0 0 24 24" className={icon} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" strokeLinecap="round" aria-hidden="true"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15z" /><path d="M10 20.5a2.2 2.2 0 0 0 4 0" /></svg>,
   // You: a person in a circle.
   you: <svg viewBox="0 0 24 24" className={icon} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="10" r="3" /><path d="M6.6 18.2c1.2-2.2 3.1-3.3 5.4-3.3s4.2 1.1 5.4 3.3" /></svg>,
@@ -80,7 +80,7 @@ function DockBackButton({ onBack, label }: { onBack: () => void; label: string }
 }
 
 /**
- * The phone's one navigation: a floating dock at the thumb with ‹ (up one level), Home, Templates, Updates and You. It replaces
+ * The phone's one navigation: a floating dock at the thumb with ‹ (up one level), Home, Catalogue, Updates and You. It replaces
  * the header's avatar, bell, sliders and "⋯" on small screens; from `sm:` up the header keeps its links.
  */
 export function BottomDock({ active, notificationCount, onSelect, onBack, backLabel }: {
@@ -94,11 +94,11 @@ export function BottomDock({ active, notificationCount, onSelect, onBack, backLa
 }) {
   const t = useTranslations("nav");
   const tNotify = useTranslations("notifications");
-  const labels: Record<DockTab, string> = { home: t("home"), templates: t("templates"), activity: tNotify("label"), you: t("you") };
+  const labels: Record<DockTab, string> = { home: t("home"), catalog: t("catalogue"), activity: tNotify("label"), you: t("you") };
   return (
     <nav aria-label={t("dockAria")} className={cx(dockClass, onBack ? "grid-cols-[3.25rem_repeat(4,minmax(0,1fr))]" : "grid-cols-4")}>
       {onBack ? <DockBackButton onBack={onBack} label={backLabel} /> : null}
-      {(["home", "templates", "activity", "you"] as const).map((tab) => {
+      {(["home", "catalog", "activity", "you"] as const).map((tab) => {
         const on = tab === active;
         return (
           <button

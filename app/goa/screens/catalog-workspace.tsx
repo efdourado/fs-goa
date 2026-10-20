@@ -4,61 +4,71 @@ import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
 
 import { API_PATHS, apiRequest } from "../api";
+import { BottomSheet } from "../bottom-sheet";
 import { AddCatalogItemDialog } from "../catalog-item-dialogs";
-import { AddItemTile, catalogCardHeight, CatalogRow, CatalogTile, type CatalogGroupBy, groupCatalogItems, LayoutToggle, resolveCoverTop } from "../catalog-views";
+import { CatalogRow, type CatalogGroupBy, groupCatalogItems, resolveCoverTop } from "../catalog-views";
 import { useCsrf } from "../csrf";
 import { ConfirmDialog } from "../dialog";
 import { useGoaFormat } from "../format";
 import { NewLibraryDialog, LibraryPropertiesDialog } from "../library-dialogs";
 import {
   type CatalogScope,
-  LibraryGlyph,
   useCatalogLibraries,
   useLibraryName,
 } from "../libraries";
 import { useLibraryProperties } from "../property-inputs";
 import { recommenderLine, useRecommenderSource } from "../recommender-picker";
-import { Segmented } from "../Segmented";
 import type { CatalogItem, CatalogLibrary, Id, Member } from "../types";
-import { BackButton, Button, cardClass, cx, EmptyState, Select, type SelectOption, SlidersIcon, StatusMessage } from "../ui";
+import { BackButton, Button, cx, EmptyState, Select, SlidersIcon, StatusMessage } from "../ui";
 import { formatRuntime } from "../utils";
 
-type Layout = "covers" | "list";
 type Sort = "recent" | "title" | "rating" | "date";
 
-const icon = { fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true } as const;
-const GridIcon = () => <svg viewBox="0 0 16 16" className="h-4 w-4" {...icon}><rect x="2" y="2" width="5" height="5" rx="1.2" /><rect x="9" y="2" width="5" height="5" rx="1.2" /><rect x="2" y="9" width="5" height="5" rx="1.2" /><rect x="9" y="9" width="5" height="5" rx="1.2" /></svg>;
-const ListIcon = () => <svg viewBox="0 0 16 16" className="h-4 w-4" {...icon}><path d="M3 4h10M3 8h10M3 12h10" /></svg>;
+/** The quiet pill every control on the toolbar shares; `on` gives it a wash once it narrows the list. */
+const chipClass = (on = false) => cx(
+  "inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-sm sm:px-3.5 transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25",
+  on ? "border-transparent bg-[var(--wash)] text-[var(--ink)] hover:bg-[var(--wash-strong)]" : "border-[var(--line)] text-[var(--ink)] hover:border-[var(--muted)]",
+);
 
-/** Our select dressed as a chip; it lights up once it narrows the list. */
-function ChipSelect({ label, value, onChange, active, options }: { label: string; value: string; onChange: (value: string) => void; active: boolean; options: SelectOption[] }) {
-  return (
-    <Select
-      look="bare"
-      ariaLabel={label}
-      value={value}
-      onChange={onChange}
-      options={options}
-      className={cx(
-        "min-h-10 max-w-48 rounded-full border px-4 text-sm transition focus-visible:ring-4 focus-visible:ring-[var(--main)]/25",
-        active ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] bg-[var(--paper)] text-[var(--ink)] hover:border-[var(--main-line)]",
-      )}
-    />
-  );
-}
-
-/** Libraries and items share one grid: the cards stretch to fill the row, one on a phone up to four on a wide screen. */
-const catalogGrid = "grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4";
-
-/** A phone's Group by / Sort by: a small pill with its name and our picker, instead of a wide segmented bar. */
+/** Sort by: a pill with its name (a phone keeps just the picker) and our picker. */
 function CompactSelect<T extends string>({ label, value, onChange, options }: { label: string; value: T; onChange: (value: T) => void; options: Array<{ value: T; label: string }> }) {
   return (
-    <div className="inline-flex min-h-10 min-w-0 items-center gap-1.5 rounded-full border border-[var(--line)] bg-[var(--paper)] pl-3.5 pr-2.5 text-sm transition focus-within:ring-4 focus-within:ring-[var(--main)]/25 hover:border-[var(--main-line)]">
-      <span className="flex-none text-xs text-[var(--muted)]">{label}</span>
+    <div className="inline-flex min-h-9 min-w-0 items-center gap-1.5 rounded-full border border-[var(--line)] pl-3 pr-2 sm:pl-3.5 sm:pr-2.5 text-sm transition focus-within:ring-4 focus-within:ring-[var(--main)]/25 hover:border-[var(--muted)]">
+      <span className="hidden flex-none text-xs text-[var(--muted)] sm:inline">{label}</span>
       <Select look="bare" ariaLabel={label} value={value} onChange={onChange} options={options} className="text-[var(--ink)]" />
     </div>
   );
 }
+
+/**
+ * One line of the index: a library (a dot marks the open one) or a filter (a small box, ticked when on),
+ * with its count at the end.
+ */
+function IndexRow({ label, count, on, onClick, box = false }: { label: string; count?: number; on: boolean; onClick: () => void; box?: boolean }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      onClick={onClick}
+      className={cx(
+        "flex min-h-11 w-full min-w-0 cursor-pointer items-center gap-2.5 rounded-lg text-left text-[15px] transition hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 lg:min-h-9 lg:text-sm",
+        on ? "font-medium text-[var(--ink)]" : "text-[var(--muted)]",
+      )}
+    >
+      {box ? (
+        <span aria-hidden="true" className={cx("grid h-4 w-4 flex-none place-items-center rounded-[5px] border text-[10px] leading-none", on ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--muted)]/50")}>{on ? "✓" : ""}</span>
+      ) : (
+        <span aria-hidden="true" className={cx("h-1.5 w-1.5 flex-none rounded-full", on ? "bg-[var(--main)]" : "bg-transparent")} />
+      )}
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      {count === undefined ? null : <span className="flex-none text-xs font-normal text-[var(--muted)]">{count}</span>}
+    </button>
+  );
+}
+
+const SearchIcon = () => (
+  <svg viewBox="0 0 20 20" className="h-[18px] w-[18px] flex-none text-[var(--muted)]" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true"><circle cx="9" cy="9" r="5.5" /><path d="m13.2 13.2 3.8 3.8" /></svg>
+);
 
 /**
  * The catalogue of one space — a person's own or a group's — as a set of
@@ -78,7 +88,7 @@ export function CatalogWorkspaceScreen({
 }: {
   scope: CatalogScope;
   title: string;
-  subtitle: string;
+  subtitle?: string;
   backLabel: string;
   canManage: boolean;
   members: Member[];
@@ -98,7 +108,11 @@ export function CatalogWorkspaceScreen({
   const [itemsNonce, setItemsNonce] = useState(0);
   const [activeKind, setActiveKind] = useState<string | null>(null);
   const [recommenderFilter, setRecommenderFilter] = useState("");
-  const [layout, setLayout] = useState<Layout>("covers");
+  const [query, setQuery] = useState("");
+  const [genres, setGenres] = useState<string[]>([]);
+  const [unratedOnly, setUnratedOnly] = useState(false);
+  // On a phone the index lives in two sheets: the library switcher and the filters.
+  const [sheet, setSheet] = useState<"libraries" | "filters" | null>(null);
   const [sort, setSort] = useState<Sort>("recent");
   const [groupBy, setGroupBy] = useState<CatalogGroupBy>("none");
   const [dialog, setDialog] = useState<"add" | "new" | "properties" | null>(null);
@@ -163,8 +177,15 @@ export function CatalogWorkspaceScreen({
 
   function chooseLibrary(next: string) {
     setActiveKind(next);
-    setRecommenderFilter("");
+    clearFilters();
     setGroupBy("none");
+    setQuery("");
+  }
+
+  function clearFilters() {
+    setRecommenderFilter("");
+    setGenres([]);
+    setUnratedOnly(false);
     setUnusedOnly(false);
   }
 
@@ -178,12 +199,19 @@ export function CatalogWorkspaceScreen({
   const unusedCount = countByKind.get(kind ?? "")?.unused ?? 0;
   // Once the last unused item is gone the chip goes with it, so the filter can't be left stuck on.
   const onlyUnused = unusedOnly && unusedCount > 0;
+  // The library's genres, for the genre filter (gone when the library hides its genre).
+  const genreNames = useMemo(() => (hidden.has("main_genre") ? [] : [...new Set(scoped.map((item) => item.mainGenre?.trim() ?? "").filter(Boolean))].sort((a, b) => a.localeCompare(b))), [scoped, hidden]);
+  const activeGenres = useMemo(() => genres.filter((genre) => genreNames.includes(genre)), [genres, genreNames]);
+  const needle = query.trim().toLocaleLowerCase();
   const filtered = useMemo(() => scoped.filter((item) => {
     if (onlyUnused && (item.challengeCount ?? item.roundCount ?? 0) !== 0) return false;
+    if (unratedOnly && item.ratingAvg !== null && item.ratingAvg !== undefined) return false;
+    if (activeGenres.length && !activeGenres.includes(item.mainGenre?.trim() ?? "")) return false;
+    if (needle && ![item.title, item.author, item.mainGenre].some((field) => field?.toLocaleLowerCase().includes(needle))) return false;
     if (!activeFilter) return true;
     if (activeFilter === "none") return !item.recommendedBy && !item.originNote;
     return item.recommendedBy ? `${item.recommendedBy.kind}:${item.recommendedBy.id}` === activeFilter : false;
-  }), [scoped, activeFilter, onlyUnused]);
+  }), [scoped, activeFilter, onlyUnused, unratedOnly, activeGenres, needle]);
   // Only offered where the library keeps an event date (a match's kickoff) on its items.
   const hasDates = scoped.some((item) => item.scheduledAt);
   const activeSort: Sort = sort === "date" && !hasDates ? "recent" : sort;
@@ -222,12 +250,12 @@ export function CatalogWorkspaceScreen({
   const yearOf = (item: CatalogItem) => (hidden.has("year") ? null : item.year);
   /** The library's own choice for the cover's top slot — falls back to `yearOf` (hidden-aware) when it hasn't picked one. */
   const topOf = (item: CatalogItem) => (library?.coverTopProperty ? resolveCoverTop(item, library.coverTopProperty, f) : yearOf(item));
-  function metaFor(item: CatalogItem): string {
+  /** Everything shown under an item's name, most telling first: a phone keeps the first two, wider screens all of it. */
+  function metaFor(item: CatalogItem): string[] {
     return [
       ...detailsFor(item),
       recommendationsEnabled ? recommenderLine(item.recommendedBy, item.originNote, (name) => t("recommendedBy", { name }), (text) => t("origin", { text })) : null,
-      isUnused(item) ? t("notInChallenge") : t("rounds", { count: challengesOf(item) }),
-    ].filter(Boolean).join(" · ");
+    ].filter((part): part is string => Boolean(part));
   }
 
   function togglePicked(ids: Id[], on: boolean) {
@@ -267,73 +295,94 @@ export function CatalogWorkspaceScreen({
     ...(hasDates ? [{ value: "date" as const, label: t("sortDate") }] : []),
   ];
   const groupLabel = (label: string) => label || (groupBy === "genre" ? t("noGenre") : t("undated"));
-  const narrowed = Boolean(activeFilter || onlyUnused);
+  const recommenderName = (key: string) => (key === "none" ? t("recommenderNone") : recommenders.find(([entry]) => entry === key)?.[1] ?? "");
+  // What narrows the list, each removable on its own from the toolbar.
+  const activeChips: Array<{ key: string; label: string; remove: () => void }> = [
+    ...activeGenres.map((genre) => ({ key: `genre:${genre}`, label: genre, remove: () => setGenres(activeGenres.filter((entry) => entry !== genre)) })),
+    ...(activeFilter ? [{ key: "recommender", label: recommenderName(activeFilter), remove: () => setRecommenderFilter("") }] : []),
+    ...(unratedOnly ? [{ key: "unrated", label: t("notRatedFilter"), remove: () => setUnratedOnly(false) }] : []),
+    ...(onlyUnused ? [{ key: "unused", label: t("unusedOnly"), remove: () => setUnusedOnly(false) }] : []),
+  ];
+  const narrowed = Boolean(activeChips.length || needle);
+
+  const libraryIndex = (
+    <div>
+      {tabs.map((entry) => {
+        const active = entry.kind === kind;
+        return (
+          <div key={entry.id} className="group flex items-center gap-1">
+            <IndexRow label={libraryName(entry)} count={countByKind.get(entry.kind)?.total ?? 0} on={active} onClick={() => { chooseLibrary(entry.kind); setSheet(null); }} />
+            <button
+              type="button"
+              aria-label={`${tl("libraryActions")}: ${libraryName(entry)}`}
+              title={tl("libraryActions")}
+              onClick={() => { setSheet(null); openLibraryDialog(entry); }}
+              className={cx(
+                "grid h-9 w-9 flex-none cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25",
+                !active && "lg:opacity-0 lg:group-hover:opacity-100",
+              )}
+            >
+              <SlidersIcon className="h-4 w-4" />
+            </button>
+          </div>
+        );
+      })}
+      {canManage ? (
+        <button type="button" onClick={() => { setSheet(null); setDialog("new"); }} className="min-h-11 cursor-pointer pl-4 text-left text-[15px] text-[var(--muted)] transition hover:text-[var(--ink)] lg:min-h-9 lg:text-sm">
+          ＋ {tl("addLibrary")}
+        </button>
+      ) : null}
+    </div>
+  );
+
+  const facetHeading = "mb-1 text-xs text-[var(--muted)]";
+  const facets = (
+    <div className="flex flex-col gap-7">
+      {genreNames.length > 1 ? (
+        <div>
+          <p className={facetHeading}>{t("group.genre")}</p>
+          {genreNames.map((genre) => {
+            const on = activeGenres.includes(genre);
+            return <IndexRow key={genre} box label={genre} on={on} count={scoped.filter((item) => item.mainGenre?.trim() === genre).length} onClick={() => setGenres(on ? activeGenres.filter((entry) => entry !== genre) : [...activeGenres, genre])} />;
+          })}
+        </div>
+      ) : null}
+      {recommendationsEnabled && recommenders.length ? (
+        <div>
+          <p className={facetHeading}>{t("recommenderHeading")}</p>
+          {[...recommenders, ["none", t("recommenderNone")] as [string, string]].map(([key, name]) => (
+            <IndexRow key={key} box label={name} on={activeFilter === key} onClick={() => setRecommenderFilter(activeFilter === key ? "" : key)} />
+          ))}
+        </div>
+      ) : null}
+      <div>
+        <p className={facetHeading}>{t("showOnly")}</p>
+        <IndexRow box label={t("notRatedFilter")} on={unratedOnly} onClick={() => setUnratedOnly(!unratedOnly)} />
+        {canManage && unusedCount > 0 ? (
+          <IndexRow box label={t("unusedOnly")} count={unusedCount} on={onlyUnused} onClick={() => { const next = !onlyUnused; setUnusedOnly(next); if (next) setSelecting(true); }} />
+        ) : null}
+      </div>
+      {isBuiltIn ? (
+        <div>
+          <p className={facetHeading}>{t("groupByLabel")}</p>
+          {groupOptions.map((option) => <IndexRow key={option.value} label={option.label} on={groupBy === option.value} onClick={() => setGroupBy(option.value)} />)}
+        </div>
+      ) : null}
+    </div>
+  );
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
+    <main className="px-4 py-8 pb-24 sm:px-6 sm:py-12 lg:px-20">
       <BackButton onClick={onBack} label={backLabel} className="mb-6" />
 
-      <div className="mb-8">
-        <h1 className="text-3xl font-medium tracking-[-0.045em] sm:text-4xl">{title}</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">{subtitle}</p>
-      </div>
+      {/* A computer reads the page's name as its title; a phone keeps it small above the library switcher. */}
+      <h1 className="text-xs text-[var(--muted)] lg:mb-8 lg:text-4xl lg:font-medium lg:tracking-[-0.045em] lg:text-[var(--ink)]">{title}</h1>
+      {subtitle ? <p className="mt-2 hidden max-w-2xl text-sm leading-6 text-[var(--muted)] lg:block">{subtitle}</p> : null}
 
       <StatusMessage error={librariesError ?? itemsError} success={notice} />
 
-      {!loading && tabs.length ? (
-        // Every library at once, in the same grid as the items below (no sideways scroll); -mx-1 / p-1 leave room for a focus ring.
-        <nav className="-mx-1 mb-4" aria-label={tl("tabsLabel")}>
-          <div className={cx(catalogGrid, "p-1")}>
-            {tabs.map((entry) => {
-              const active = entry.kind === kind;
-              const counts = countByKind.get(entry.kind) ?? { total: 0, unused: 0 };
-              return (
-                <div key={entry.id} className="group relative min-w-0">
-                  <button
-                    type="button"
-                    aria-pressed={active}
-                    onClick={() => chooseLibrary(entry.kind)}
-                    className={cx(
-                      catalogCardHeight,
-                      "relative flex w-full cursor-pointer items-center gap-3 overflow-hidden rounded-[20px] border px-3.5 text-left sm:gap-3.5 sm:px-4 shadow-[var(--elevate-card)] transition duration-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25",
-                      active ? "border-[var(--main)] bg-[var(--main-soft)] ring-1 ring-inset ring-[var(--main)]" : "border-[var(--line)] bg-[var(--paper)] hover:-translate-y-0.5 hover:border-[var(--main-line)]",
-                    )}
-                  >
-                    <span aria-hidden="true" className={cx("pointer-events-none absolute -bottom-10 -right-10 h-24 w-24 rounded-full border-[14px]", active ? "border-[var(--main)]/[0.13]" : "border-[var(--main)]/[0.07]")} />
-                    <span className={cx("relative grid h-9 w-9 flex-none place-items-center rounded-full sm:h-11 sm:w-11", active ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-[var(--elevate-1)]" : "bg-[var(--wash)] text-[var(--muted)] ring-1 ring-inset ring-[var(--line)]")} aria-hidden="true">
-                      <LibraryGlyph source={entry.source} className="h-5 w-5 sm:h-6 sm:w-6" />
-                    </span>
-                    <span className="relative min-w-0">
-                      <strong className={cx("block truncate pr-6 text-sm font-medium tracking-[-0.02em] sm:text-base", active && "text-[var(--main-strong)]")}>{libraryName(entry)}</strong>
-                      <small className={cx("mt-0.5 block truncate text-xs", active ? "text-[var(--main-strong)]/85" : "text-[var(--muted)]")}>
-                        {t("libraryStats", { count: counts.total })}
-                        {canManage && counts.unused > 0 ? <span className="text-[var(--warn)]"> · {t("libraryUnused", { count: counts.unused })}</span> : null}
-                      </small>
-                    </span>
-                  </button>
-                  <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
-                    <button
-                      type="button"
-                      aria-label={tl("libraryActions")}
-                      title={tl("libraryActions")}
-                      onClick={() => openLibraryDialog(entry)}
-                      className="grid h-9 w-9 cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
-                    >
-                      <SlidersIcon className="h-[18px] w-[18px]" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-            {canManage ? (
-              <AddItemTile label={tl("newLibrary")} onClick={() => setDialog("new")} className="w-full min-w-0 self-auto" />
-            ) : null}
-          </div>
-        </nav>
-      ) : null}
-
       {loading ? (
-        <p className="text-sm text-[var(--muted)]">{t("loading")}</p>
+        <p className="mt-6 text-sm text-[var(--muted)]">{t("loading")}</p>
       ) : !tabs.length ? (
         <EmptyState
           title={t("emptyTitle")}
@@ -345,157 +394,147 @@ export function CatalogWorkspaceScreen({
           ) : undefined}
         />
       ) : library ? (
-        <section aria-label={libraryName(library)}>
-          <div className="flex flex-wrap items-center gap-2.5">
-            {scoped.length ? (
-              <LayoutToggle<Layout>
-                label={t("viewLabel")}
-                value={layout}
-                onChange={setLayout}
-                options={[
-                  { value: "covers", label: t("viewCovers"), icon: <GridIcon /> },
-                  { value: "list", label: t("viewList"), icon: <ListIcon /> },
-                ]}
-              />
-            ) : null}
-            {recommendationsEnabled && recommenders.length ? (
-              <ChipSelect label={t("recommenderFilterLabel")} value={activeFilter} onChange={setRecommenderFilter} active={Boolean(activeFilter)}
-                options={[{ value: "", label: t("recommenderAll") }, ...recommenders.map(([key, name]) => ({ value: key, label: t("recommendedBy", { name }) })), { value: "none", label: t("recommenderNone") }]} />
-            ) : null}
-            {canManage && unusedCount > 0 ? (
-              <button
-                type="button"
-                aria-pressed={onlyUnused}
-                onClick={() => { const next = !onlyUnused; setUnusedOnly(next); if (next) setSelecting(true); }}
-                className={cx(
-                  "min-h-10 cursor-pointer rounded-full border border-dashed px-4 text-sm transition",
-                  onlyUnused ? "border-[var(--warn)] bg-[var(--warn-soft)] text-[var(--warn)]" : "border-[var(--warn-line)] bg-[var(--warn-soft)]/60 text-[var(--warn)] hover:bg-[var(--warn-soft)]",
-                )}
-              >
-                {t("unusedFilter", { count: unusedCount })}
-              </button>
-            ) : null}
-            <span className="flex-1" />
-            {canManage && scoped.length ? (
-              <button
-                type="button"
-                aria-pressed={selecting}
-                onClick={() => (selecting ? stopSelecting() : setSelecting(true))}
-                className={cx(
-                  "min-h-10 cursor-pointer rounded-full border px-4 text-sm transition",
-                  selecting ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] bg-[var(--paper)] text-[var(--ink)] hover:border-[var(--main-line)]",
-                )}
-              >
-                {selecting ? t("doneSelecting") : t("select")}
-              </button>
-            ) : null}
-          </div>
+        <div className="lg:flex lg:items-start lg:gap-14">
+          <aside className="hidden w-56 flex-none lg:flex lg:flex-col lg:gap-7" aria-label={tl("tabsLabel")}>
+            <div>
+              <p className={facetHeading}>{tl("tabsLabel")}</p>
+              {libraryIndex}
+            </div>
+            {scoped.length ? facets : null}
+          </aside>
 
-          {scoped.length ? (
-            <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm text-[var(--muted)]" aria-live="polite">
+          <section className="min-w-0 flex-1" aria-label={libraryName(library)}>
+            <button
+              type="button"
+              onClick={() => setSheet("libraries")}
+              aria-haspopup="dialog"
+              aria-label={`${t("chooseLibrary")}: ${libraryName(library)}`}
+              className="mt-0.5 inline-flex min-h-11 max-w-full cursor-pointer items-center gap-2 text-3xl font-medium tracking-[-0.045em] lg:hidden"
+            >
+              <span className="truncate">{libraryName(library)}</span>
+              <svg viewBox="0 0 16 16" className="h-4 w-4 flex-none text-[var(--muted)]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg>
+            </button>
+
+            {/* Search takes the row; Sort, Select and ＋ Item sit together at its end (on a phone, the row below it, with Filter). */}
+            <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-3 lg:mt-0">
+              <label className="flex h-11 min-w-0 basis-full items-center gap-2.5 border-b border-[var(--line)] transition focus-within:border-[var(--main)] sm:basis-0 sm:flex-1">
+                <SearchIcon />
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder={t("searchPlaceholder", { name: libraryName(library) })}
+                  aria-label={t("searchPlaceholder", { name: libraryName(library) })}
+                  className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-[var(--muted)]"
+                />
+              </label>
+              <div className="flex flex-1 flex-wrap items-center gap-2 sm:flex-none">
+                {scoped.length ? (
+                  <button type="button" onClick={() => setSheet("filters")} aria-label={t("filter")} title={t("filter")} className={cx(chipClass(activeChips.length > 0), "!px-2.5 lg:hidden")}>
+                    <SlidersIcon className="h-4 w-4" />
+                    {activeChips.length ? <span className="text-xs text-[var(--muted)]">{activeChips.length}</span> : null}
+                  </button>
+                ) : null}
+                <span className="flex-1 sm:hidden" />
+                {scoped.length ? <CompactSelect<Sort> label={t("sortLabel")} value={activeSort} onChange={setSort} options={sortOptions} /> : null}
+                {canManage && scoped.length ? (
+                  <button type="button" aria-pressed={selecting} onClick={() => (selecting ? stopSelecting() : setSelecting(true))} className={chipClass(selecting)}>
+                    {selecting ? t("doneSelecting") : t("select")}
+                  </button>
+                ) : null}
+                {canManage ? <Button className="!min-h-9 !rounded-full !px-3.5" onClick={() => { setNotice(null); setDialog("add"); }}>＋ {t("newItem")}</Button> : null}
+              </div>
+            </div>
+
+            {activeChips.length ? (
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                {activeChips.map((chip) => (
+                  <button key={chip.key} type="button" onClick={chip.remove} aria-label={t("removeFilter", { name: chip.label })} className={chipClass(true)}>
+                    {chip.label}<span aria-hidden="true" className="text-[var(--muted)]">×</span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            {scoped.length ? (
+              <p className="mt-5 text-sm text-[var(--muted)]" aria-live="polite">
                 <strong className="font-medium text-[var(--ink)]">{narrowed ? t("resultOf", { shown: sorted.length, total: scoped.length }) : t("resultCount", { count: scoped.length })}</strong>
                 {average !== null ? ` · ${t("averageRating", { value: average })}` : ""}
               </p>
-              {/* From `sm:` up: segmented bars. A phone gets two compact pickers side by side. */}
-              <div className="hidden flex-wrap items-center gap-x-5 gap-y-2 sm:flex">
-                {isBuiltIn ? (
-                  <div className="flex items-center gap-2.5 text-xs text-[var(--muted)]">
-                    {t("groupByLabel")}
-                    <Segmented<CatalogGroupBy> className="w-64" ariaLabel={t("groupByLabel")} value={groupBy} onChange={setGroupBy} options={groupOptions} />
-                  </div>
-                ) : null}
-                <div className="flex items-center gap-2.5 text-xs text-[var(--muted)]">
-                  {t("sortLabel")}
-                  <Segmented<Sort> className={hasDates ? "w-64" : "w-48"} ariaLabel={t("sortLabel")} value={activeSort} onChange={setSort} options={sortOptions} />
-                </div>
-              </div>
-              <div className="flex w-full gap-2 sm:hidden">
-                {isBuiltIn ? <CompactSelect<CatalogGroupBy> label={t("groupByLabel")} value={groupBy} onChange={setGroupBy} options={groupOptions} /> : null}
-                <CompactSelect<Sort> label={t("sortLabel")} value={activeSort} onChange={setSort} options={sortOptions} />
-              </div>
-            </div>
-          ) : null}
+            ) : null}
 
-          {selecting ? (
-            <div className="sticky top-16 z-10 mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-[var(--main-line)] bg-[var(--main-soft)] p-3 shadow-[var(--elevate-1)]" role="region" aria-label={t("selectionBar")}>
-              <Button variant="secondary" disabled={!sorted.length} onClick={() => togglePicked(sorted.map((item) => item.id), !allHerePicked)}>
-                {allHerePicked ? t("clearSelection") : t("selectAll", { count: sorted.length })}
-              </Button>
-              <strong className="text-sm font-medium">{t("pickedTally", { count: pickedHere.length })}</strong>
-              <span className="flex-1" />
-              <Button variant="danger" disabled={!pickedHere.length} onClick={() => setConfirmingRemoval(true)}>{t("removePicked", { count: pickedHere.length })}</Button>
-            </div>
-          ) : null}
+            {selecting ? (
+              <div className="sticky top-16 z-10 mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-3 shadow-[var(--elevate-1)]" role="region" aria-label={t("selectionBar")}>
+                <Button variant="secondary" className="!rounded-full" disabled={!sorted.length} onClick={() => togglePicked(sorted.map((item) => item.id), !allHerePicked)}>
+                  {allHerePicked ? t("clearSelection") : t("selectAll", { count: sorted.length })}
+                </Button>
+                <strong className="text-sm font-medium">{t("pickedTally", { count: pickedHere.length })}</strong>
+                <span className="flex-1" />
+                <Button variant="danger" className="!rounded-full" disabled={!pickedHere.length} onClick={() => setConfirmingRemoval(true)}>{t("removePicked", { count: pickedHere.length })}</Button>
+              </div>
+            ) : null}
 
-          <div className="mt-5">
-            {!scoped.length ? (
-              <EmptyState
-                title={tl("emptyLibrary", { name: libraryName(library) })}
-                onClick={canManage ? () => setDialog("add") : undefined}
-              />
-            ) : !sorted.length ? (
-              <EmptyState title={t("noMatches")} />
-            ) : (
-              <div className="space-y-10">
-                {groups.map((group, index) => (
-                  <section key={group.key} aria-label={groupBy === "none" ? undefined : groupLabel(group.label)}>
-                    {groupBy !== "none" ? (
-                      <h2 className="mb-4 flex items-baseline gap-2.5 text-lg font-light tracking-[-0.02em]">
-                        {groupLabel(group.label)}
-                        <span className="text-xs text-[var(--muted)]">{group.items.length}</span>
-                      </h2>
-                    ) : null}
-                    {layout === "covers" ? (
-                      <div className={catalogGrid}>
-                        {canManage && !selecting && index === 0 ? <AddItemTile label={t("addItem")} onClick={() => { setNotice(null); setDialog("add"); }} /> : null}
+            <div className="mt-3">
+              {!scoped.length ? (
+                <EmptyState
+                  title={tl("emptyLibrary", { name: libraryName(library) })}
+                  onClick={canManage ? () => setDialog("add") : undefined}
+                />
+              ) : !sorted.length ? (
+                <EmptyState title={t("noMatches")} action={<Button variant="secondary" onClick={() => { clearFilters(); setQuery(""); }}>{t("clearFilters")}</Button>} />
+              ) : (
+                <div className="space-y-10">
+                  {groups.map((group) => (
+                    <section key={group.key} aria-label={groupBy === "none" ? undefined : groupLabel(group.label)}>
+                      {groupBy !== "none" ? (
+                        <h2 className="mb-2 mt-4 flex items-baseline gap-2.5 text-lg font-light tracking-[-0.02em]">
+                          {groupLabel(group.label)}
+                          <span className="text-xs text-[var(--muted)]">{group.items.length}</span>
+                        </h2>
+                      ) : null}
+                      <ul className="divide-y divide-[var(--line)] border-y border-[var(--line)]">
                         {group.items.map((item) => {
                           const unused = isUnused(item);
                           return (
-                            <CatalogTile
-                              key={item.id}
-                              title={item.title}
-                              year={topOf(item)}
-                              avg={item.ratingAvg}
-                              badgeHidden={library?.coverBadgeHidden}
-                              ratingLabel={ratingLabel(item)}
-                              caption={detailsFor(item).slice(0, 2).join(" · ")}
-                              note={unused ? t("notInChallenge") : t("rounds", { count: challengesOf(item) })}
-                              noteTone={unused ? "warn" : "muted"}
-                              selecting={selecting}
-                              picked={picked.has(item.id)}
-                              onPick={(on) => togglePicked([item.id], on)}
-                              onOpen={() => onOpenItem(item.id)}
-                            />
+                            <li key={item.id}>
+                              <CatalogRow
+                                title={item.title}
+                                year={topOf(item)}
+                                avg={item.ratingAvg}
+                                badgeHidden={library.coverBadgeHidden}
+                                ratingLabel={ratingLabel(item)}
+                                meta={metaFor(item)}
+                                note={unused ? t("notInChallenge") : t("rounds", { count: challengesOf(item) })}
+                                noteTone={unused && canManage ? "warn" : "muted"}
+                                selecting={selecting}
+                                picked={picked.has(item.id)}
+                                onPick={(on) => togglePicked([item.id], on)}
+                                onOpen={() => onOpenItem(item.id)}
+                              />
+                            </li>
                           );
                         })}
-                      </div>
-                    ) : (
-                      <ul className={cx(cardClass, "divide-y divide-[var(--line)] overflow-hidden")}>
-                        {group.items.map((item) => (
-                          <li key={item.id}>
-                            <CatalogRow
-                              title={item.title}
-                              year={topOf(item)}
-                              avg={item.ratingAvg}
-                              badgeHidden={library?.coverBadgeHidden}
-                              ratingLabel={ratingLabel(item)}
-                              meta={metaFor(item)}
-                              selecting={selecting}
-                              picked={picked.has(item.id)}
-                              onPick={(on) => togglePicked([item.id], on)}
-                              onOpen={() => onOpenItem(item.id)}
-                            />
-                          </li>
-                        ))}
                       </ul>
-                    )}
-                  </section>
-                ))}
-              </div>
-            )}
+                    </section>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {sheet === "libraries" ? (
+        <BottomSheet title={tl("tabsLabel")} onClose={() => setSheet(null)}>{libraryIndex}</BottomSheet>
+      ) : null}
+      {sheet === "filters" ? (
+        <BottomSheet title={t("filter")} onClose={() => setSheet(null)}>
+          {facets}
+          <div className="mt-7 flex gap-2">
+            <Button variant="secondary" onClick={clearFilters}>{t("clearFilters")}</Button>
+            <Button className="flex-1" onClick={() => setSheet(null)}>{t("showResults", { count: sorted.length })}</Button>
           </div>
-        </section>
+        </BottomSheet>
       ) : null}
 
       {dialog === "add" ? (

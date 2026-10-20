@@ -1050,7 +1050,7 @@ async function assertMetricCoherent(
       "SELECT count(*)::int AS count FROM challenge_items ci WHERE ci.challenge_id=$1 AND ci.archived_at IS NULL AND ci.catalog_item_id IS NOT NULL",
       [challengeId]);
     if (!has || has.count === 0) {
-      throw new ApiError(409, "metric_needs_catalog", "Esse agrupamento só existe num desafio com acervo.");
+      throw new ApiError(409, "metric_needs_catalog", "Esse agrupamento só existe num desafio com coleção.");
     }
   }
   if (parsed.operation === "surprise") {
@@ -1147,7 +1147,7 @@ async function parseMetricScope(client: PoolClient, challengeId: string, parsed:
   if (itemId) {
     if (!ITEM_SCOPE_OPS.has(parsed.operation)) throw new ApiError(400, "invalid_metric", "Essa operação não pode ser limitada a um item.");
     if (!["none", "participant", "checkpoint"].includes(parsed.groupBy)) {
-      throw new ApiError(400, "invalid_metric_grouping", "Uma métrica de um item só não se agrupa por item nem por acervo.");
+      throw new ApiError(400, "invalid_metric_grouping", "Uma métrica de um item só não se agrupa por item nem por coleção.");
     }
     const item = await oneOrNull<{ id: string }>(client,
       "SELECT id FROM challenge_items WHERE id=$1 AND challenge_id=$2 AND archived_at IS NULL", [itemId, challengeId]);

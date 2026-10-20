@@ -218,9 +218,10 @@ export function backTargetFor(screen: Screen, lookup: BackLookup): BackTarget | 
     case "quick-create":
       return screen.into && screen.into !== "personal" ? toGroup(screen.into.groupId) : HOME;
     case "about":
-    case "templates":
     case "invite":
       return lookup.loggedIn ? HOME : signedOut;
+    case "templates":
+      return lookup.loggedIn ? { screen: { kind: "you" }, label: { kind: "you" } } : signedOut;
     case "template":
       return { screen: { kind: "templates" }, label: { kind: "templates" } };
     case "group-catalog":

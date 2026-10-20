@@ -281,7 +281,7 @@ async function permanentGuard(client: PoolClient, row: RowContext): Promise<{ co
       const values = await oneOrNull<{ count: number }>(client,
         "SELECT count(*)::int AS count FROM catalog_attribute_values WHERE attribute_def_id=$1", [row.id]);
       return values && values.count > 0
-        ? { code: "attribute_has_values", message: "Há itens do acervo com este atributo preenchido." }
+        ? { code: "attribute_has_values", message: "Há itens da coleção com este atributo preenchido." }
         : null;
     }
     case "group":
@@ -359,7 +359,7 @@ async function identityConflict(client: PoolClient, row: RowContext, rename: str
          AND other.normalized_title = CASE WHEN $2::text IS NULL THEN self.normalized_title ELSE lower(btrim($2)) END
          AND coalesce(lower(btrim(other.author)),'') = coalesce(lower(btrim(self.author)),'')
         WHERE self.id=$1`, [row.id, rename]);
-    return clash ? { code: "name_conflict", message: "Já existe um item ativo com esse título no acervo. Renomeie ao restaurar." } : null;
+    return clash ? { code: "name_conflict", message: "Já existe um item ativo com esse título na coleção. Renomeie ao restaurar." } : null;
   }
   const keyedTable: Partial<Record<TrashKind, string>> = {
     challenge_item: "challenge_items", entry_type: "entry_types", field: "challenge_fields",

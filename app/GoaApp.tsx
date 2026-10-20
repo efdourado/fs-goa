@@ -57,7 +57,7 @@ import { canManage, isPersonalChallenge } from "./goa/utils";
 /** Where each dock tab leads — tapping the lit one again goes back to its top. */
 const DOCK_ROOTS: Record<DockTab, Screen> = {
   home: { kind: "dashboard" },
-  templates: { kind: "templates" },
+  catalog: { kind: "personal-catalog" },
   activity: { kind: "activity" },
   you: { kind: "you" },
 };
@@ -673,7 +673,7 @@ export default function GoaApp() {
   } else if (screen.kind === "about") {
     content = <AboutScreen onBack={goUp} backLabel={backLabel} />;
   } else if (screen.kind === "you") {
-    content = <YouScreen user={user} challengeCount={bootstrap.challenges.length} groupCount={bootstrap.groups.filter((group) => group.kind !== "personal").length} onAccount={() => setScreen({ kind: "account" })} onCatalog={() => setScreen({ kind: "personal-catalog" })} onTrash={() => setScreen({ kind: "personal-trash" })} onAbout={() => setScreen({ kind: "about" })} onLogout={logout} />;
+    content = <YouScreen user={user} challengeCount={bootstrap.challenges.length} groupCount={bootstrap.groups.filter((group) => group.kind !== "personal").length} onAccount={() => setScreen({ kind: "account" })} onTemplates={() => setScreen({ kind: "templates" })} onTrash={() => setScreen({ kind: "personal-trash" })} onAbout={() => setScreen({ kind: "about" })} onLogout={logout} />;
   } else if (screen.kind === "activity") {
     content = <ActivityScreen notifications={bootstrap.memberRequests ?? []} onAcceptRequest={(id) => respondToMemberRequest(id, "accept")} onDeclineRequest={(id) => respondToMemberRequest(id, "decline")} />;
   } else if (screen.kind === "quick-create") {
@@ -685,7 +685,7 @@ export default function GoaApp() {
   } else if (screen.kind === "catalog-item" && selectedGroup) {
     content = <CatalogItemScreen key={screen.itemId} scope={{ groupId: selectedGroup.id }} recommendationsEnabled={selectedGroup.recommendationsEnabled !== false} detailPath={API_PATHS.groupCatalogItem(screen.groupId, screen.itemId)} itemId={screen.itemId} onBack={goUp} backLabel={backLabel} onOpenChallenge={(id) => openParticipant(id)} editing={canManage(selectedGroup.role) ? { members: selectedGroup.members ?? [] } : undefined} onDelete={canManage(selectedGroup.role) ? () => deleteCatalogItem(API_PATHS.catalogItem(screen.itemId), { kind: "group-catalog", groupId: screen.groupId }) : undefined} />;
   } else if (screen.kind === "personal-catalog") {
-    content = <CatalogWorkspaceScreen key="personal" scope="personal" title={tPersonalCatalog("title")} subtitle={tPersonalCatalog("subtitle")} canManage members={[]} recommendationsEnabled onBack={goUp} backLabel={backLabel} onOpenItem={(itemId) => setScreen({ kind: "personal-catalog-item", itemId })} />;
+    content = <CatalogWorkspaceScreen key="personal" scope="personal" title={tPersonalCatalog("title")} canManage members={[]} recommendationsEnabled onBack={goUp} backLabel={backLabel} onOpenItem={(itemId) => setScreen({ kind: "personal-catalog-item", itemId })} />;
   } else if (screen.kind === "personal-catalog-item") {
     content = <CatalogItemScreen key={screen.itemId} scope="personal" detailPath={API_PATHS.personalCatalogItem(screen.itemId)} itemId={screen.itemId} onBack={goUp} backLabel={backLabel} onOpenChallenge={(id) => openParticipant(id)} editing={{ members: [] }} onDelete={() => deleteCatalogItem(API_PATHS.personalCatalogItem(screen.itemId), { kind: "personal-catalog" })} />;
   } else if (screen.kind === "create-challenge" && selectedGroup && canManage(selectedGroup.role)) {
@@ -719,7 +719,7 @@ export default function GoaApp() {
   return (
     <CsrfProvider token={bootstrap.csrfToken}>
     <div className="flex min-h-screen flex-col bg-[var(--canvas)] text-[var(--ink)]">
-      <AppHeader user={user} notifications={bootstrap.memberRequests} onHome={() => setScreen({ kind: "dashboard" })} onOpenYou={() => setScreen({ kind: "you" })} onOpenTemplates={() => setScreen({ kind: "templates" })} onOpenAbout={() => setScreen({ kind: "about" })} onLogout={logout} onAcceptRequest={(id) => respondToMemberRequest(id, "accept")} onDeclineRequest={(id) => respondToMemberRequest(id, "decline")} />
+      <AppHeader user={user} notifications={bootstrap.memberRequests} onHome={() => setScreen({ kind: "dashboard" })} onOpenYou={() => setScreen({ kind: "you" })} onOpenCatalog={() => setScreen({ kind: "personal-catalog" })} onOpenAbout={() => setScreen({ kind: "about" })} onLogout={logout} onAcceptRequest={(id) => respondToMemberRequest(id, "accept")} onDeclineRequest={(id) => respondToMemberRequest(id, "decline")} />
       {/* `has-dock`: on a phone the dock's ‹ is the way back, so the top Back links step aside (see BackButton). */}
       <div className={cx("flex-1", dockTab && "has-dock pb-[calc(env(safe-area-inset-bottom)+1.5rem)] sm:pb-0")}>{content}</div>
       {dockTab ? <BottomDock active={dockTab} notificationCount={(bootstrap.memberRequests ?? []).length} onSelect={(tab) => setScreen(DOCK_ROOTS[tab])} onBack={backTarget && !DOCK_ROOT_KINDS.has(screen.kind) ? goUp : undefined} backLabel={backTarget ? tNav("dockBack", { label: backLabel }) : tc("back")} /> : null}

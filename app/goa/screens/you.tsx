@@ -45,15 +45,15 @@ function Section({ title, children }: { title?: string; children: ReactNode }) {
 
 /**
  * "Você" — the dock's last tab: who you are, then everything that used to hide in the header's
- * avatar, sliders and "⋯" menus (account, my catalogue, bin, theme, language, about,
+ * avatar, sliders and "⋯" menus (account, templates, bin, theme, language, about,
  * contact, sign out). One page on every screen size; on a computer the avatar opens it.
  */
-export function YouScreen({ user, challengeCount, groupCount, onAccount, onCatalog, onTrash, onAbout, onLogout }: {
+export function YouScreen({ user, challengeCount, groupCount, onAccount, onTemplates, onTrash, onAbout, onLogout }: {
   user: User;
   challengeCount: number;
   groupCount: number;
   onAccount: () => void;
-  onCatalog: () => void;
+  onTemplates: () => void;
   onTrash: () => void;
   onAbout: () => void;
   onLogout: () => Promise<void>;
@@ -63,7 +63,6 @@ export function YouScreen({ user, challengeCount, groupCount, onAccount, onCatal
   const tSettings = useTranslations("settings");
   const tTheme = useTranslations("theme");
   const tLang = useTranslations("language");
-  const tCatalog = useTranslations("personalCatalog");
   const tTrash = useTranslations("trash");
   const tAbout = useTranslations("about");
   const [signingOut, setSigningOut] = useState(false);
@@ -84,7 +83,7 @@ export function YouScreen({ user, challengeCount, groupCount, onAccount, onCatal
 
       <Section>
         <button type="button" className={rowClass} onClick={onAccount}>{ICONS.account}{tNav("account")}<Chevron /></button>
-        <button type="button" className={rowClass} onClick={onCatalog}>{ICONS.catalog}{tCatalog("title")}<Chevron /></button>
+        <button type="button" className={rowClass} onClick={onTemplates}>{ICONS.catalog}{tNav("templates")}<Chevron /></button>
         <button type="button" className={rowClass} onClick={onTrash}>{ICONS.trash}{tTrash("personalTitle")}<Chevron /></button>
       </Section>
 

@@ -146,7 +146,7 @@ export async function upsertCatalogItem(
 ): Promise<string> {
   const title = input.title.trim();
   if (title.length < 1 || title.length > 300) {
-    throw new ApiError(400, "invalid_catalog_title", "O título do item do acervo é inválido.");
+    throw new ApiError(400, "invalid_catalog_title", "O título do item da coleção é inválido.");
   }
   const normalized = normalizeTitle(title);
   const attributes = readAttributes(input);
@@ -284,7 +284,7 @@ export async function createCatalogItem(
 ): Promise<string> {
   const title = input.title.trim();
   if (title.length < 1 || title.length > 300) {
-    throw new ApiError(400, "invalid_catalog_title", "O título do item do acervo é inválido.");
+    throw new ApiError(400, "invalid_catalog_title", "O título do item da coleção é inválido.");
   }
   const normalized = normalizeTitle(title);
   const attributes = readAttributes(input);
@@ -314,7 +314,7 @@ export async function assertCatalogItemInGroup(
     [catalogItemId, groupId],
   );
   if (!row || (kind && row.kind !== kind)) {
-    throw new ApiError(400, "invalid_catalog_item", "Item do acervo não pertence a este grupo.");
+    throw new ApiError(400, "invalid_catalog_item", "Item da coleção não pertence a este grupo.");
   }
 }
 
@@ -543,7 +543,7 @@ async function catalogItemDetailWithClient(
         WHERE ci.id = $1 AND ci.group_id = $2 AND ci.archived_at IS NULL`,
     [catalogItemId, workspaceId],
   );
-  if (!item) throw new ApiError(404, "not_found", "Item do acervo não encontrado.");
+  if (!item) throw new ApiError(404, "not_found", "Item da coleção não encontrado.");
 
   const rounds = await client.query<{
     challenge_id: string; title: string; status: string;
@@ -705,7 +705,7 @@ export async function listPersonalCatalog(session: SessionContext) {
 export async function personalCatalogItemDetail(session: SessionContext, catalogItemId: string) {
   return withClient(async (client) => {
     const workspaceId = await personalWorkspaceId(client, session.user.id);
-    if (!workspaceId) throw new ApiError(404, "not_found", "Item do acervo não encontrado.");
+    if (!workspaceId) throw new ApiError(404, "not_found", "Item da coleção não encontrado.");
     return catalogItemDetailWithClient(client, workspaceId, catalogItemId, session.user.id);
   });
 }
@@ -923,7 +923,7 @@ export async function updateCatalogLibrary(session: SessionContext, libraryId: s
     if (!library) throw new ApiError(404, "not_found", "Biblioteca não encontrada.");
     if (library.group_kind === "personal") {
       if (library.owner_user_id !== session.user.id) {
-        throw new ApiError(403, "forbidden", "Esta biblioteca não pertence ao seu acervo pessoal.");
+        throw new ApiError(403, "forbidden", "Esta biblioteca não pertence à sua coleção pessoal.");
       }
     } else {
       await requireGroupRole(session.user.id, library.group_id, ["owner", "admin"], client);
@@ -993,7 +993,7 @@ export async function deleteCatalogLibrary(session: SessionContext, libraryId: s
     if (!library) throw new ApiError(404, "not_found", "Biblioteca não encontrada.");
     if (library.group_kind === "personal") {
       if (library.owner_user_id !== session.user.id) {
-        throw new ApiError(403, "forbidden", "Esta biblioteca não pertence ao seu acervo pessoal.");
+        throw new ApiError(403, "forbidden", "Esta biblioteca não pertence à sua coleção pessoal.");
       }
     } else {
       await requireGroupRole(session.user.id, library.group_id, ["owner", "admin"], client);
@@ -1200,7 +1200,7 @@ async function libraryAccess(
   if (!library) throw new ApiError(404, "not_found", "Biblioteca não encontrada.");
   if (library.group_kind === "personal") {
     if (library.owner_user_id !== session.user.id) {
-      throw new ApiError(403, "forbidden", "Esta biblioteca não pertence ao seu acervo pessoal.");
+      throw new ApiError(403, "forbidden", "Esta biblioteca não pertence à sua coleção pessoal.");
     }
   } else {
     await requireGroupRole(session.user.id, library.group_id, roles, client);
@@ -1383,7 +1383,7 @@ export async function renameCatalogRecommender(session: SessionContext, recommen
     if (!recommender) throw new ApiError(404, "not_found", "Pessoa indicadora não encontrada.");
     if (recommender.group_kind === "personal") {
       if (recommender.owner_user_id !== session.user.id) {
-        throw new ApiError(403, "forbidden", "Este nome não pertence ao seu acervo pessoal.");
+        throw new ApiError(403, "forbidden", "Este nome não pertence à sua coleção pessoal.");
       }
     } else {
       await requireGroupRole(session.user.id, recommender.group_id, ["owner", "admin"], client);
@@ -1535,10 +1535,10 @@ export async function updateCatalogItem(
         FOR UPDATE OF ci`,
       [catalogItemId],
     );
-    if (!item) throw new ApiError(404, "not_found", "Item do acervo não encontrado.");
+    if (!item) throw new ApiError(404, "not_found", "Item da coleção não encontrado.");
     if (item.group_kind === "personal") {
       if (item.owner_user_id !== session.user.id) {
-        throw new ApiError(403, "forbidden", "Este item não pertence ao seu acervo pessoal.");
+        throw new ApiError(403, "forbidden", "Este item não pertence à sua coleção pessoal.");
       }
     } else {
       await requireGroupRole(session.user.id, item.group_id, ["owner", "admin"], client);
@@ -1555,14 +1555,14 @@ export async function updatePersonalCatalogItem(
 ) {
   return inTransaction(async (client) => {
     const workspaceId = await personalWorkspaceId(client, session.user.id);
-    if (!workspaceId) throw new ApiError(404, "not_found", "Item do acervo não encontrado.");
+    if (!workspaceId) throw new ApiError(404, "not_found", "Item da coleção não encontrado.");
     const item = await oneOrNull<{ id: string; kind: CatalogKind }>(
       client,
       `SELECT id, kind FROM catalog_items
         WHERE id = $1 AND group_id = $2 AND archived_at IS NULL FOR UPDATE`,
       [catalogItemId, workspaceId],
     );
-    if (!item) throw new ApiError(404, "not_found", "Item do acervo não encontrado.");
+    if (!item) throw new ApiError(404, "not_found", "Item da coleção não encontrado.");
     await applyCatalogItemUpdate(client, catalogItemId, workspaceId, body, item.kind);
     return { id: catalogItemId };
   });
@@ -1586,7 +1586,7 @@ async function archiveCatalogItemWithClient(
       WHERE id = $1 AND group_id = $2 AND archived_at IS NULL FOR UPDATE`,
     [catalogItemId, workspaceId],
   );
-  if (!item) throw new ApiError(404, "not_found", "Item do acervo não encontrado.");
+  if (!item) throw new ApiError(404, "not_found", "Item da coleção não encontrado.");
   const live = await oneOrNull<{ count: number }>(
     client,
     // A living list (personal, no dates) has no round to protect — its titles
@@ -1604,7 +1604,7 @@ async function archiveCatalogItemWithClient(
     throw new ApiError(
       409,
       "catalog_item_in_use",
-      `"${item.title}" está em ${live.count} desafio(s) em andamento. Retire o item desses desafios antes de excluí-lo do acervo.`,
+      `"${item.title}" está em ${live.count} desafio(s) em andamento. Retire o item desses desafios antes de excluí-lo da coleção.`,
     );
   }
   await client.query(
@@ -1654,10 +1654,10 @@ export async function archiveCatalogItem(session: SessionContext, catalogItemId:
           AND g.archived_at IS NULL AND g.deleted_at IS NULL`,
       [catalogItemId],
     );
-    if (!item) throw new ApiError(404, "not_found", "Item do acervo não encontrado.");
+    if (!item) throw new ApiError(404, "not_found", "Item da coleção não encontrado.");
     if (item.group_kind === "personal") {
       if (item.owner_user_id !== session.user.id) {
-        throw new ApiError(403, "forbidden", "Este item não pertence ao seu acervo pessoal.");
+        throw new ApiError(403, "forbidden", "Este item não pertence à sua coleção pessoal.");
       }
     } else {
       await requireGroupRole(session.user.id, item.group_id, ["owner", "admin"], client);
@@ -1707,7 +1707,7 @@ export async function archiveManyGroupCatalogItems(session: SessionContext, grou
 export async function archiveManyPersonalCatalogItems(session: SessionContext, body: Record<string, unknown>) {
   return inTransaction(async (client) => {
     const workspaceId = await personalWorkspaceId(client, session.user.id);
-    if (!workspaceId) throw new ApiError(404, "not_found", "Acervo não encontrado.");
+    if (!workspaceId) throw new ApiError(404, "not_found", "Coleção não encontrada.");
     return archiveManyCatalogItems(client, session.user.id, workspaceId, body);
   });
 }
@@ -1715,7 +1715,7 @@ export async function archiveManyPersonalCatalogItems(session: SessionContext, b
 export async function archivePersonalCatalogItem(session: SessionContext, catalogItemId: string) {
   return inTransaction(async (client) => {
     const workspaceId = await personalWorkspaceId(client, session.user.id);
-    if (!workspaceId) throw new ApiError(404, "not_found", "Item do acervo não encontrado.");
+    if (!workspaceId) throw new ApiError(404, "not_found", "Item da coleção não encontrado.");
     return archiveCatalogItemWithClient(client, session.user.id, workspaceId, catalogItemId);
   });
 }

@@ -83,7 +83,7 @@ export function TemplatesScreen({
       {user ? (
         <>
           <BackButton onClick={onBack} label={backLabel ?? t("back")} className="mb-6" />
-          <PageHeading title={t("title")} description={t("subtitle")} />
+          <PageHeading title={t("title")} />
         </>
       ) : (
         // Signed out, this is goa's front door: say what it is, then show real results; Sign in waits in the header.

@@ -74,6 +74,6 @@ test("ItemEditorDialog folds the catalogue facts behind a details, author for bo
   }));
   assert.match(html, /value="Torto Arado"/);
   assert.match(html, /<details/, "catalogue facts sit in a details");
-  assert.match(html, /Dados do acervo/);
+  assert.match(html, /Dados da coleção/);
   assert.match(html, /value="Itamar"/);
 });

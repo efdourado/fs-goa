@@ -77,8 +77,8 @@ export function CatalogShelfView({ scope, canManage, onOpenCatalog, onOpenItem, 
     <section>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-baseline gap-2.5">
-          <span aria-hidden="true" className="h-1.5 w-1.5 flex-none -translate-y-px self-center rounded-full bg-current" />
-          <button type="button" onClick={onOpenCatalog} className="cursor-pointer text-lg font-semibold tracking-[-0.02em] hover:underline">
+          {scope === "personal" ? null : <span aria-hidden="true" className="h-1.5 w-1.5 flex-none -translate-y-px self-center rounded-full bg-current" />}
+          <button type="button" onClick={onOpenCatalog} className="cursor-pointer text-lg font-semibold tracking-[-0.02em]">
             {title}
           </button>
           <span className="text-xs text-[var(--muted)]">{total}</span>

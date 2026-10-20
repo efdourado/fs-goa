@@ -141,7 +141,7 @@ export async function resolveItemLibrary(
     kind = (await oneOrNull<{ kind: string }>(
       client, "SELECT kind FROM catalog_items WHERE id = $1 AND group_id = $2 AND archived_at IS NULL", [catalogItemId, challenge.group_id],
     ))?.kind ?? null;
-    if (!kind) throw new ApiError(400, "invalid_catalog_item", "Item do acervo não pertence a este grupo.");
+    if (!kind) throw new ApiError(400, "invalid_catalog_item", "Item da coleção não pertence a este grupo.");
   } else if (linked.length) {
     kind = linked[0].kind;
   } else {

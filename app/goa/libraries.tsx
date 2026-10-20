@@ -209,7 +209,7 @@ export function LibraryPills({
           onClick={onNew}
           className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-full border border-dashed border-[var(--line)] px-4 text-sm text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)]"
         >
-          ＋ {t("newLibrary")}
+          ＋ {t("addLibrary")}
         </button>
       ) : null}
     </div>

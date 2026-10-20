@@ -448,8 +448,9 @@ export function DashboardScreen({
     </Shelf>
   );
 
+  // A phone reaches the catalogue from the dock, so the preview is a computer's only.
   const personalLibrary = colorFilter ? null : (
-    <div className="mt-8">
+    <div className="mt-8 hidden sm:block">
       <CatalogShelfView scope="personal" canManage data={personalShelf} onOpenCatalog={onOpenPersonalCatalog} onOpenItem={onOpenPersonalCatalogItem} />
     </div>
   );

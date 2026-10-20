@@ -1,8 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
-
-import { CoverSwatch, coverColors, coverToneOf, ScoreRing } from "./catalog-cover";
+import { coverColors, coverToneOf, ScoreRing } from "./catalog-cover";
 import type { GoaFormat } from "./format";
 import type { CatalogAttributeValue, CatalogLibrary, EventSchedule } from "./types";
 import { cx } from "./ui";
@@ -147,33 +145,22 @@ export function CatalogTile({ title, year, avg, ratingLabel, badgeHidden, captio
   );
 }
 
-/** The dashed "＋ Add …" card (an item, a library) — one line tall, like the cards beside it. Neutral, no fill: the line and the text darken under the pointer. */
-export function AddItemTile({ label, onClick, className }: { label: string; onClick: () => void; className?: string }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cx(
-        "group flex cursor-pointer items-center justify-center gap-2.5 self-start rounded-[20px] border border-dashed border-[var(--line)] px-4 text-[13px] text-[var(--ink)] transition hover:border-[var(--muted)] hover:text-[var(--ink-strong)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25",
-        catalogCardHeight,
-        className ?? "w-full",
-      )}
-    >
-      <span aria-hidden="true" className="grid h-8 w-8 place-items-center rounded-full bg-[var(--wash)] transition group-hover:bg-[var(--wash-strong)]">＋</span>
-      {label}
-    </button>
-  );
-}
-
-/** One row of the list layout: a small cover swatch, the title and its details, the rating ring. */
-export function CatalogRow({ title, year, avg, ratingLabel, badgeHidden, meta, selecting, picked, onPick, onOpen }: {
+/**
+ * One item as a list row: a small round cover in the title's tint, the title (with the library's top value), the rating ring, and
+ * under the title its details. A phone keeps the first two on one line; from `sm:` up every detail shows, wrapping.
+ */
+export function CatalogRow({ title, year, avg, ratingLabel, badgeHidden, meta, note, noteTone = "muted", selecting, picked, onPick, onOpen }: {
   title: string;
   year?: string | number | null;
   avg?: number | null;
   /** Turns off the rating ring badge regardless of `avg` — the library's own choice, not "no rating yet". */
   badgeHidden?: boolean;
   ratingLabel: string;
-  meta: string;
+  /** The details, most telling first. */
+  meta: readonly string[];
+  /** Always shown last (how many challenges hold the item). */
+  note?: string;
+  noteTone?: "muted" | "warn";
   selecting?: boolean;
   picked?: boolean;
   onPick?: (on: boolean) => void;
@@ -181,43 +168,22 @@ export function CatalogRow({ title, year, avg, ratingLabel, badgeHidden, meta, s
 }) {
   const body = (
     <>
-      {selecting ? <input type="checkbox" className="h-4 w-4 flex-none" checked={Boolean(picked)} aria-label={title} onChange={(event) => onPick?.(event.target.checked)} /> : null}
-      <span className="w-9 flex-none sm:w-11"><CoverSwatch title={title} /></span>
+      {selecting ? <input type="checkbox" className="h-4 w-4 flex-none accent-[var(--main)]" checked={Boolean(picked)} aria-label={title} onChange={(event) => onPick?.(event.target.checked)} /> : null}
+      <span aria-hidden="true" className="h-7 w-7 flex-none rounded-full bg-[var(--cover-bg)] shadow-[inset_0_0_0_6px_var(--cover-deco)] sm:h-8 sm:w-8" style={coverColors(coverToneOf(title))} />
       <span className="min-w-0 flex-1">
-        <strong className="block truncate font-light">{title}{year ? <span className="ml-1.5 text-[var(--muted)]">{year}</span> : null}</strong>
-        <small className="mt-1 block truncate text-[var(--muted)]">{meta}</small>
+        <strong className="block truncate text-[15px] font-normal sm:text-base">{title}{year ? <span className="ml-1.5 font-light text-[var(--muted)]">{year}</span> : null}</strong>
+        {meta.length || note ? (
+          <small className="mt-0.5 block truncate text-xs text-[var(--muted)] sm:mt-1 sm:whitespace-normal sm:text-[13px] sm:leading-5">
+            {meta.map((part, index) => <span key={index} className={index >= 2 ? "hidden sm:inline" : undefined}>{index ? " · " : ""}{part}</span>)}
+            {note ? <span className={noteTone === "warn" ? "text-[var(--warn)]" : undefined}>{meta.length ? " · " : ""}{note}</span> : null}
+          </small>
+        ) : null}
       </span>
-      {badgeHidden || avg === null || avg === undefined ? null : <ScoreRing value={avg} size={38} label={ratingLabel} strokeWidth={3} textClassName="text-[11px] font-medium" />}
+      {badgeHidden || avg === null || avg === undefined ? null : <ScoreRing value={avg} size={36} label={ratingLabel} strokeWidth={3} textClassName="text-[11px] font-medium" />}
     </>
   );
-  const shared = "flex w-full items-center gap-4 px-4 py-3 text-left transition hover:bg-[var(--wash)] sm:px-5";
+  const shared = "flex w-full items-center gap-3.5 px-1 py-3 text-left transition hover:bg-[var(--wash)] sm:gap-4 sm:px-3 sm:py-3.5";
   return selecting
     ? <label className={cx(shared, "cursor-pointer")}>{body}</label>
-    : <button type="button" onClick={onOpen} className={cx(shared, "cursor-pointer")}>{body}</button>;
-}
-
-/** Covers / list as icon buttons on one track. */
-export function LayoutToggle<T extends string>({ value, onChange, options, label }: {
-  value: T;
-  onChange: (next: T) => void;
-  options: ReadonlyArray<{ value: T; label: string; icon: ReactNode }>;
-  label: string;
-}) {
-  return (
-    <div role="group" aria-label={label} className="flex gap-0.5 rounded-full bg-[var(--wash-strong)]/70 p-1">
-      {options.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          aria-pressed={value === option.value}
-          aria-label={option.label}
-          title={option.label}
-          onClick={() => onChange(option.value)}
-          className={cx("grid h-8 w-10 cursor-pointer place-items-center rounded-full transition", value === option.value ? "bg-[var(--paper)] text-[var(--main-strong)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]")}
-        >
-          {option.icon}
-        </button>
-      ))}
-    </div>
-  );
+    : <button type="button" onClick={onOpen} className={cx(shared, "cursor-pointer focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-[var(--main)]/25")}>{body}</button>;
 }

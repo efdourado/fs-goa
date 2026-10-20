@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { createContext, Fragment, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type Ref, useContext, useEffect, useId, useRef, useState } from "react";
 
@@ -1074,7 +1073,7 @@ export function AppHeader({
   notifications,
   onHome,
   onOpenYou,
-  onOpenTemplates,
+  onOpenCatalog,
   onOpenAbout,
   onLogout,
   onAcceptRequest,
@@ -1084,7 +1083,7 @@ export function AppHeader({
   notifications: MemberRequest[];
   onHome: () => void;
   onOpenYou: () => void;
-  onOpenTemplates: () => void;
+  onOpenCatalog: () => void;
   onOpenAbout: () => void;
   onLogout: () => Promise<void>;
   onAcceptRequest: (id: Id) => Promise<void>;
@@ -1100,11 +1099,8 @@ export function AppHeader({
         <button className="cursor-pointer rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25" type="button" onClick={onHome}><Brand /></button>
         <div className="flex min-w-0 items-center gap-0.5 sm:gap-2">
           <button className={cx(navLink, "hidden items-center sm:inline-flex")} type="button" onClick={onHome}>{t("home")}</button>
-          <button className={cx(navLink, "hidden items-center sm:inline-flex")} type="button" onClick={onOpenTemplates}>{t("templates")}</button>
+          <button className={cx(navLink, "hidden items-center sm:inline-flex")} type="button" onClick={onOpenCatalog}>{t("catalogue")}</button>
           <button className={cx(navLink, "hidden items-center sm:inline-flex")} type="button" onClick={onOpenAbout}>{t("about")}</button>
-          {user.platformAdmin ? (
-            <Link className={cx(navLink, "hidden items-center sm:inline-flex")} href="/admin">{t("admin")}</Link>
-          ) : null}
           <button
             className="hidden shrink-0 cursor-pointer items-center gap-2.5 rounded-xl p-1 pr-2 text-left hover:bg-[var(--wash)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 sm:flex"
             type="button"

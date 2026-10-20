@@ -61,10 +61,11 @@ describe("Back goes up the hierarchy, never to wherever you were", () => {
     }
   });
 
-  test("You, Updates, about, templates and invites go Home when signed in, and to sign-in when not", () => {
-    for (const screen of [{ kind: "you" }, { kind: "activity" }, { kind: "about" }, { kind: "templates" }, { kind: "invite", token: "t" }] as Screen[]) {
+  test("You, Updates, about and invites go Home when signed in (templates go to You), and to sign-in when not", () => {
+    for (const screen of [{ kind: "you" }, { kind: "activity" }, { kind: "about" }, { kind: "invite", token: "t" }] as Screen[]) {
       assert.deepEqual(backTargetFor(screen, lookup())!.screen, { kind: "dashboard" }, screen.kind);
     }
+    assert.deepEqual(backTargetFor({ kind: "templates" }, lookup())!.screen, { kind: "you" });
     for (const screen of [{ kind: "about" }, { kind: "templates" }, { kind: "invite", token: "t" }] as Screen[]) {
       const out = backTargetFor(screen, lookup({ loggedIn: false }))!;
       assert.deepEqual(out.screen, { kind: "auth", mode: "login" }, screen.kind);
