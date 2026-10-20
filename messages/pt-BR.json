@@ -488,7 +488,7 @@
     "selectionBar": "Itens selecionados",
     "selectAll": "Selecionar todos ({count})",
     "clearSelection": "Limpar seleção",
-    "pickedTally": "{count, plural, =0 {Nada selecionado} one {# selecionado} other {# selecionados}}",
+    "pickedTally": "{count, plural, one {# selecionado} other {# selecionados}}",
     "removePicked": "{count, plural, =0 {Remover} one {Remover #} other {Remover #}}",
     "removeManyTitle": "{count, plural, one {Remover # item?} other {Remover # itens?}}",
     "removeManyBody": "Vão para a lixeira. Os que estão em desafios em andamento ficam.",
@@ -516,13 +516,14 @@
     "notRatedFilter": "Ainda sem nota",
     "unusedOnly": "Em nenhum desafio",
     "recommenderHeading": "Recomendado por",
-    "clearFilters": "Limpar filtros",
     "chooseLibrary": "Escolher uma biblioteca",
-    "showResults": "{count, plural, =0 {Nada para mostrar} one {Mostrar # item} other {Mostrar # itens}}",
     "removeFilter": "Tirar o filtro: {name}",
     "hideIndex": "Esconder filtros",
     "showIndex": "Mostrar filtros",
-    "showMore": "+ {count} mais"
+    "showMore": "+ {count} mais",
+    "clearShort": "Limpar",
+    "showItems": "Mostrar itens",
+    "moreFacets": "Mais {count}"
   },
   "cineItems": {
     "addItems": "Adicionar itens",

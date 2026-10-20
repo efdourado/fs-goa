@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { type ReactNode, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
 import { API_PATHS, apiRequest } from "../api";
 import { BottomSheet } from "../bottom-sheet";
@@ -19,13 +19,15 @@ import {
 import { useLibraryProperties } from "../property-inputs";
 import { recommenderLine, useRecommenderSource } from "../recommender-picker";
 import type { CatalogItem, CatalogLibrary, Id, Member } from "../types";
-import { BackButton, Button, CheckCircle, cx, EmptyState, FaceEmptyState, Select, SlidersIcon, StatusMessage } from "../ui";
+import { BackButton, Button, CheckCircle, cx, EmptyState, FaceEmptyState, SwitchIcon, Select, SlidersIcon, StatusMessage } from "../ui";
 import { formatRuntime } from "../utils";
 
 type Sort = "recent" | "title" | "rating" | "date";
 
 /** How many rows a library shows at first, and how many more each "Show more" adds. */
 const PAGE_SIZE = 30;
+/** A filter list (genres, recommenders) shows this many before its own "+ N more". */
+const FACET_SIZE = 6;
 
 // A computer's index can fold away for a wider list; the choice is remembered on this device. Read through an
 // external store (like the check-in log's view) so the server render and the first client render agree.
@@ -50,11 +52,11 @@ const chipClass = (on = false) => cx(
 );
 
 /** Sort by: a pill with its name (a phone keeps just the picker) and our picker. */
-function CompactSelect<T extends string>({ label, value, onChange, options }: { label: string; value: T; onChange: (value: T) => void; options: Array<{ value: T; label: string }> }) {
+function CompactSelect<T extends string>({ label, value, onChange, options, className }: { label: string; value: T; onChange: (value: T) => void; options: Array<{ value: T; label: string }>; className?: string }) {
   return (
-    <div className="inline-flex min-h-9 min-w-0 items-center gap-1.5 rounded-full border border-[var(--line)] pl-3 pr-2 sm:pl-3.5 sm:pr-2.5 text-[13px] transition focus-within:ring-4 focus-within:ring-[var(--main)]/25 hover:border-[var(--muted)]">
+    <div className={cx(className, "inline-flex min-h-9 min-w-0 items-center gap-1.5 rounded-full border border-[var(--line)] pl-3 pr-2 sm:pl-3.5 sm:pr-2.5 text-[13px] transition focus-within:ring-4 focus-within:ring-[var(--main)]/25 hover:border-[var(--muted)]")}>
       <span className="hidden flex-none text-xs text-[var(--muted)] sm:inline">{label}</span>
-      <Select look="bare" ariaLabel={label} value={value} onChange={onChange} options={options} className="text-[var(--ink)]" />
+      <Select look="bare" ariaLabel={label} value={value} onChange={onChange} options={options} className="flex-1 text-[var(--ink)]" />
     </div>
   );
 }
@@ -84,6 +86,11 @@ function IndexRow({ label, count, on, onClick, box = false }: { label: string; c
     </button>
   );
 }
+
+/** Three lines, the magnifier's size: opens the filters (the sidebar on a computer, left of the search; a sheet on smaller screens, at its right). */
+const MenuIcon = () => (
+  <svg viewBox="0 0 20 20" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true"><path d="M3.5 5.5h13M3.5 10h13M3.5 14.5h13" /></svg>
+);
 
 const SearchIcon = () => (
   <svg viewBox="0 0 20 20" className="h-[18px] w-[18px] flex-none text-[var(--muted)]" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true"><circle cx="9" cy="9" r="5.5" /><path d="m13.2 13.2 3.8 3.8" /></svg>
@@ -131,6 +138,7 @@ export function CatalogWorkspaceScreen({
   const [genres, setGenres] = useState<string[]>([]);
   const [unratedOnly, setUnratedOnly] = useState(false);
   const [shown, setShown] = useState(PAGE_SIZE);
+  const [openFacets, setOpenFacets] = useState<string[]>([]);
   const indexOpen = useSyncExternalStore(subscribeIndex, readIndexOpen, () => true);
   const toggleIndex = () => storeIndexOpen(!indexOpen);
   // On a phone the index lives in two sheets: the library switcher and the filters.
@@ -375,12 +383,29 @@ export function CatalogWorkspaceScreen({
   );
 
   const facetHeading = "mb-1 text-xs text-[var(--muted)]";
+  /** The head of a long filter list, with "+ N more" (in the ticks' column) to open the rest. */
+  function facetRows<T>(key: string, rows: T[], render: (row: T) => ReactNode) {
+    const open = openFacets.includes(key) || rows.length <= FACET_SIZE + 1;
+    return (
+      <>
+        {(open ? rows : rows.slice(0, FACET_SIZE)).map(render)}
+        {open ? null : (
+          <button type="button" onClick={() => setOpenFacets([...openFacets, key])} className="flex min-h-11 cursor-pointer items-center gap-2.5 text-left text-[15px] text-[var(--muted)] transition hover:text-[var(--ink)] lg:min-h-9 lg:text-sm">
+            <span aria-hidden="true" className="grid w-4 flex-none place-items-center">
+              <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"><path d="M6 1.5v9M1.5 6h9" /></svg>
+            </span>
+            {t("moreFacets", { count: rows.length - FACET_SIZE })}
+          </button>
+        )}
+      </>
+    );
+  }
   const facets = (
     <div className="flex flex-col gap-7">
       {genreNames.length > 1 ? (
         <div>
           <p className={facetHeading}>{t("group.genre")}</p>
-          {genreNames.map((genre) => {
+          {facetRows("genre", genreNames, (genre) => {
             const on = activeGenres.includes(genre);
             return <IndexRow key={genre} box label={genre} on={on} count={scoped.filter((item) => item.mainGenre?.trim() === genre).length} onClick={() => setGenres(on ? activeGenres.filter((entry) => entry !== genre) : [...activeGenres, genre])} />;
           })}
@@ -389,7 +414,7 @@ export function CatalogWorkspaceScreen({
       {recommendationsEnabled && recommenders.length ? (
         <div>
           <p className={facetHeading}>{t("recommenderHeading")}</p>
-          {[...recommenders, ["none", t("recommenderNone")] as [string, string]].map(([key, name]) => (
+          {facetRows("recommender", [...recommenders, ["none", t("recommenderNone")] as [string, string]], ([key, name]) => (
             <IndexRow key={key} box label={name} on={activeFilter === key} onClick={() => setRecommenderFilter(activeFilter === key ? "" : key)} />
           ))}
         </div>
@@ -411,7 +436,8 @@ export function CatalogWorkspaceScreen({
   );
 
   return (
-    <main className="px-4 py-8 pb-24 sm:px-6 sm:py-12 lg:px-20">
+    // While picking, a phone keeps room at the bottom for the selection bar floating over the dock.
+    <main className={cx("px-4 py-8 sm:px-6 sm:py-12 sm:pb-24 lg:px-20", selecting ? "pb-44" : "pb-24")}>
       <BackButton onClick={onBack} label={backLabel} className="mb-6" />
 
       {/* A computer reads the page's name as its title; a phone keeps it small above the library switcher. */}
@@ -444,19 +470,33 @@ export function CatalogWorkspaceScreen({
           </aside>
 
           <section className="min-w-0 flex-1" aria-label={libraryName(library)}>
-            <button
-              type="button"
-              onClick={() => setSheet("libraries")}
-              aria-haspopup="dialog"
-              aria-label={`${t("chooseLibrary")}: ${libraryName(library)}`}
-              className="mt-0.5 inline-flex min-h-11 max-w-full cursor-pointer items-center gap-2 text-3xl font-medium tracking-[-0.045em] lg:hidden"
-            >
-              <span className="truncate">{libraryName(library)}</span>
-              <svg viewBox="0 0 16 16" className="h-4 w-4 flex-none text-[var(--muted)]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg>
-            </button>
+            <div className="mt-0.5 flex items-center justify-between gap-3 lg:hidden">
+              <button
+                type="button"
+                onClick={() => setSheet("libraries")}
+                aria-haspopup="dialog"
+                aria-label={`${t("chooseLibrary")}: ${libraryName(library)}`}
+                className="inline-flex min-h-11 min-w-0 cursor-pointer items-center gap-2.5 text-3xl font-medium tracking-[-0.045em]"
+              >
+                <span className="truncate">{libraryName(library)}</span>
+                <SwitchIcon className="h-5 w-5 flex-none text-[var(--muted)]" />
+              </button>
+              {canManage ? (
+                <button
+                  type="button"
+                  onClick={() => { setNotice(null); setDialog("add"); }}
+                  aria-label={t("addItem")}
+                  title={t("addItem")}
+                  className="grid h-11 w-11 flex-none cursor-pointer place-items-center rounded-full bg-[var(--main)] text-white shadow-[var(--elevate-1)] transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 sm:hidden"
+                >
+                  <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
+                </button>
+              ) : null}
+            </div>
 
             {/* Search takes the row; Sort, Select and ＋ Item sit together at its end (on a phone, the row below it, with Filter). */}
             <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-3 lg:mt-0">
+              <div className="flex min-w-0 basis-full items-center gap-3 sm:mr-6 sm:basis-0 sm:flex-1">
               <button
                 type="button"
                 onClick={toggleIndex}
@@ -466,9 +506,9 @@ export function CatalogWorkspaceScreen({
                 title={indexOpen ? t("hideIndex") : t("showIndex")}
                 className="-ml-2 -mr-1 hidden h-9 w-9 flex-none cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 lg:grid"
               >
-                <svg viewBox="0 0 20 20" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true"><path d="M3.5 5.5h13M3.5 10h13M3.5 14.5h13" /></svg>
+                <MenuIcon />
               </button>
-              <label className="group relative flex h-11 min-w-0 basis-full cursor-text items-center gap-2.5 sm:mr-6 sm:basis-0 sm:flex-1">
+              <label className="group relative flex h-11 min-w-0 flex-1 cursor-text items-center gap-2.5">
                 <SearchIcon />
                 <input
                   type="search"
@@ -481,21 +521,27 @@ export function CatalogWorkspaceScreen({
                 {/* A hairline that grows in from the left while you type (and stays while there's text). */}
                 <span aria-hidden="true" className={cx("pointer-events-none absolute bottom-0 left-0 h-px bg-[var(--line)] transition-[width] duration-500 ease-[cubic-bezier(.22,1,.36,1)] group-focus-within:w-full motion-reduce:transition-none", query ? "w-full" : "w-0")} />
               </label>
-              <div className="flex flex-1 flex-wrap items-center gap-2 sm:flex-none">
-                {scoped.length ? (
-                  <button type="button" onClick={() => setSheet("filters")} aria-label={t("filter")} title={t("filter")} className={cx(chipClass(activeChips.length > 0), "!px-2.5 lg:hidden")}>
-                    <SlidersIcon className="h-4 w-4" />
-                    {activeChips.length ? <span className="text-xs text-[var(--muted)]">{activeChips.length}</span> : null}
-                  </button>
-                ) : null}
-                <span className="flex-1 sm:hidden" />
-                {scoped.length ? <CompactSelect<Sort> label={t("sortLabel")} value={activeSort} onChange={setSort} options={sortOptions} /> : null}
+              <button
+                type="button"
+                onClick={() => setSheet("filters")}
+                aria-label={t("filter")}
+                title={t("filter")}
+                className="relative -mr-1 grid h-9 w-9 flex-none cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 lg:hidden"
+              >
+                <MenuIcon />
+                {activeChips.length ? <span aria-hidden="true" className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-[var(--main)]" /> : null}
+              </button>
+              </div>
+              {/* Sort and Select are left off phones for now. */}
+              <div className="flex flex-1 items-center justify-end gap-2 max-sm:hidden sm:flex-none">
+                
+                {scoped.length ? <CompactSelect<Sort> className="max-sm:hidden" label={t("sortLabel")} value={activeSort} onChange={setSort} options={sortOptions} /> : null}
                 {canManage && scoped.length ? (
-                  <button type="button" aria-pressed={selecting} onClick={() => (selecting ? stopSelecting() : setSelecting(true))} className={chipClass(selecting)}>
+                  <button type="button" aria-pressed={selecting} onClick={() => (selecting ? stopSelecting() : setSelecting(true))} className={cx(chipClass(selecting), "max-sm:hidden")}>
                     {selecting ? t("doneSelecting") : t("select")}
                   </button>
                 ) : null}
-                {canManage ? <Button className="!min-h-9 !rounded-full !px-3.5 !text-[13px]" onClick={() => { setNotice(null); setDialog("add"); }}>＋ {t("newItem")}</Button> : null}
+                {canManage ? <Button className="!min-h-9 !rounded-full !px-3.5 !text-[13px] max-sm:!hidden" onClick={() => { setNotice(null); setDialog("add"); }}>＋ {t("newItem")}</Button> : null}
               </div>
             </div>
 
@@ -517,13 +563,13 @@ export function CatalogWorkspaceScreen({
             ) : null}
 
             {selecting ? (
-              <div className="mt-4 flex flex-wrap items-center gap-2 rounded-full bg-[var(--wash)] p-1.5" role="region" aria-label={t("selectionBar")}>
-                <Button variant="secondary" className="!rounded-full" disabled={!sorted.length} onClick={() => togglePicked(sorted.map((item) => item.id), !allHerePicked)}>
+              <div className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+5.25rem)] z-50 flex items-center gap-2 rounded-full bg-[var(--wash)] p-1.5 text-[13px] sm:text-sm shadow-[var(--elevate-2)] sm:static sm:mt-4 sm:shadow-none" role="region" aria-label={t("selectionBar")}>
+                <Button variant="secondary" className="!rounded-full max-sm:!px-3 max-sm:!text-[13px]" disabled={!sorted.length} onClick={() => togglePicked(sorted.map((item) => item.id), !allHerePicked)}>
                   {allHerePicked ? t("clearSelection") : t("selectAll", { count: sorted.length })}
                 </Button>
-                <strong className="text-sm font-medium">{t("pickedTally", { count: pickedHere.length })}</strong>
+                <strong className="min-w-0 truncate font-medium">{t("pickedTally", { count: pickedHere.length })}</strong>
                 <span className="flex-1" />
-                <Button variant="danger" className="!rounded-full" disabled={!pickedHere.length} onClick={() => setConfirmingRemoval(true)}>{t("removePicked", { count: pickedHere.length })}</Button>
+                <Button variant="danger" className="!rounded-full max-sm:!px-3 max-sm:!text-[13px]" disabled={!pickedHere.length} onClick={() => setConfirmingRemoval(true)}>{t("removePicked", { count: pickedHere.length })}</Button>
               </div>
             ) : null}
 
@@ -583,14 +629,15 @@ export function CatalogWorkspaceScreen({
       ) : null}
 
       {sheet === "libraries" ? (
-        <BottomSheet title={tl("tabsLabel")} onClose={() => setSheet(null)}>{libraryIndex}</BottomSheet>
+        // pr-2.5: the counts end where the close icon's circle ends.
+        <BottomSheet title={tl("tabsLabel")} onClose={() => setSheet(null)}><div className="pr-2.5">{libraryIndex}</div></BottomSheet>
       ) : null}
       {sheet === "filters" ? (
         <BottomSheet title={t("filter")} onClose={() => setSheet(null)}>
-          {facets}
-          <div className="mt-7 flex gap-2">
-            <Button variant="secondary" onClick={clearFilters}>{t("clearFilters")}</Button>
-            <Button className="flex-1" onClick={() => setSheet(null)}>{t("showResults", { count: sorted.length })}</Button>
+          <div className="pr-2.5">{facets}</div>
+          <div className="mt-7 grid grid-cols-2 gap-2">
+            <Button variant="secondary" onClick={clearFilters}>{t("clearShort")}</Button>
+            <Button onClick={() => setSheet(null)}>{t("showItems")}</Button>
           </div>
         </BottomSheet>
       ) : null}

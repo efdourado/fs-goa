@@ -408,7 +408,7 @@ export function Select<T extends string>({
         className={cx("flex min-w-0 cursor-pointer items-center justify-between gap-2 text-left outline-none disabled:cursor-not-allowed", selectLooks[look], className)}
       >
         <span className={cx("min-w-0 truncate", !selected && "text-[var(--muted)]")}>{selected?.label ?? placeholder ?? ""}</span>
-        {chevron ? <svg viewBox="0 0 16 16" className={cx("h-3.5 w-3.5 flex-none text-[var(--muted)] transition-transform", open && "rotate-180")} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4.5 6.5 8 10l3.5-3.5" /></svg> : null}
+        {chevron ? <SwitchIcon className={cx("h-3.5 w-3.5 flex-none text-[var(--muted)] transition-transform duration-300", open && "rotate-180")} /> : null}
       </button>
       {name ? <input type="hidden" name={name} value={value} /> : null}
       <div
@@ -528,6 +528,11 @@ export function AddRow({ label, ariaLabel, onClick }: { label: string; ariaLabel
 
 /** The small plain icon buttons at the end of a numbered row (up, down, remove). */
 export const rowIconClass = "grid h-8 w-8 flex-none cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)] disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent";
+
+/** A loop of two arrows: "pick another". Every drop-down wears it, and so does the phone's library switcher. */
+export function SwitchIcon({ className }: { className?: string }) {
+  return <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m17 2 4 4-4 4M3 11v-1a4 4 0 0 1 4-4h14M7 22l-4-4 4-4M21 13v1a4 4 0 0 1-4 4H3" /></svg>;
+}
 
 export function ChevronIcon({ dir, className = "h-4 w-4" }: { dir: "up" | "down"; className?: string }) {
   return <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={dir === "up" ? "M4.5 9.5 8 6l3.5 3.5" : "M4.5 6.5 8 10l3.5-3.5"} /></svg>;

@@ -488,7 +488,7 @@
     "selectionBar": "Selected items",
     "selectAll": "Select all ({count})",
     "clearSelection": "Clear selection",
-    "pickedTally": "{count, plural, =0 {Nothing selected} one {# selected} other {# selected}}",
+    "pickedTally": "{count, plural, one {# selected} other {# selected}}",
     "removePicked": "{count, plural, =0 {Remove} one {Remove #} other {Remove #}}",
     "removeManyTitle": "{count, plural, one {Remove # item?} other {Remove # items?}}",
     "removeManyBody": "They go to the bin. Ones in running challenges stay.",
@@ -516,13 +516,14 @@
     "notRatedFilter": "Not rated yet",
     "unusedOnly": "In no challenge",
     "recommenderHeading": "Recommended by",
-    "clearFilters": "Clear filters",
     "chooseLibrary": "Choose a library",
-    "showResults": "{count, plural, =0 {Nothing to show} one {Show # item} other {Show # items}}",
     "removeFilter": "Remove filter: {name}",
     "hideIndex": "Hide filters",
     "showIndex": "Show filters",
-    "showMore": "+ {count} more"
+    "showMore": "+ {count} more",
+    "clearShort": "Clear",
+    "showItems": "Show items",
+    "moreFacets": "{count} more"
   },
   "cineItems": {
     "addItems": "Add items",
