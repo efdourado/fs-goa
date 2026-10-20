@@ -725,9 +725,7 @@ export function LoadingView({ label }: { label?: string }) {
 export function Brand() {
   return (
     <span className="inline-flex items-center gap-2.5" aria-label="Goa">
-      <span className="grid h-9 w-9 -rotate-3 place-items-center rounded-[50%_50%_50%_16%] bg-[var(--ink)] text-lg font-black text-[var(--canvas)] border-1 border-[var(--paper)]" aria-hidden="true">
-        g
-      </span>
+      <img src="/logo.png" alt="" aria-hidden="true" draggable={false} className="h-9 w-9 object-contain" />
       <strong className="text-xl tracking-[-0.06em]">goa</strong>
     </span>
   );
