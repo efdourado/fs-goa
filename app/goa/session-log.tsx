@@ -753,7 +753,7 @@ export function SessionLog({
                     type="button"
                     disabled={disabled}
                     onClick={startCreating}
-                    className="mt-3 flex min-h-10 w-full cursor-pointer items-center justify-center gap-1.5 rounded-full border border-dashed border-[var(--line)] px-4 text-sm text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="mt-3 flex min-h-9 w-full cursor-pointer items-center justify-center gap-1.5 rounded-full border border-dashed border-[var(--line)] px-4 text-sm text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     ＋ {t("newItemPill")}
                   </button>

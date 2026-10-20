@@ -269,7 +269,7 @@ function PagesDialog({ input, story, metrics, onClose }: { input: StoryInput; st
       </ol>
       <div className="sticky bottom-0 -mx-6 -mb-6 mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--line)] bg-[var(--paper)] px-6 py-4">
         <span className="text-xs text-[var(--muted)]">{t(canShare ? "formatShare" : "format")}</span>
-        <button type="button" disabled={busy || !ordered.length || pending} onClick={() => void save()} className="inline-flex min-h-10 cursor-pointer items-center rounded-full bg-[var(--ink)] px-5 text-sm font-medium text-[var(--canvas)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45">
+        <button type="button" disabled={busy || !ordered.length || pending} onClick={() => void save()} className="inline-flex min-h-9 cursor-pointer items-center rounded-full bg-[var(--ink)] px-5 text-sm font-medium text-[var(--canvas)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45">
           {label}
         </button>
       </div>

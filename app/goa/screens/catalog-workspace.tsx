@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
 import { API_PATHS, apiRequest } from "../api";
 import { BottomSheet } from "../bottom-sheet";
@@ -19,21 +19,40 @@ import {
 import { useLibraryProperties } from "../property-inputs";
 import { recommenderLine, useRecommenderSource } from "../recommender-picker";
 import type { CatalogItem, CatalogLibrary, Id, Member } from "../types";
-import { BackButton, Button, cx, EmptyState, Select, SlidersIcon, StatusMessage } from "../ui";
+import { BackButton, Button, CheckCircle, cx, EmptyState, FaceEmptyState, Select, SlidersIcon, StatusMessage } from "../ui";
 import { formatRuntime } from "../utils";
 
 type Sort = "recent" | "title" | "rating" | "date";
 
+/** How many rows a library shows at first, and how many more each "Show more" adds. */
+const PAGE_SIZE = 30;
+
+// A computer's index can fold away for a wider list; the choice is remembered on this device. Read through an
+// external store (like the check-in log's view) so the server render and the first client render agree.
+const INDEX_KEY = "goa.catalog.index";
+const indexListeners = new Set<() => void>();
+function subscribeIndex(listener: () => void) {
+  indexListeners.add(listener);
+  return () => { indexListeners.delete(listener); };
+}
+function readIndexOpen(): boolean {
+  try { return window.localStorage.getItem(INDEX_KEY) !== "closed"; } catch { return true; }
+}
+function storeIndexOpen(open: boolean) {
+  try { window.localStorage.setItem(INDEX_KEY, open ? "open" : "closed"); } catch { /* private mode: the choice just isn't remembered */ }
+  indexListeners.forEach((listener) => listener());
+}
+
 /** The quiet pill every control on the toolbar shares; `on` gives it a wash once it narrows the list. */
 const chipClass = (on = false) => cx(
-  "inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-sm sm:px-3.5 transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25",
+  "inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-[13px] sm:px-3.5 transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25",
   on ? "border-transparent bg-[var(--wash)] text-[var(--ink)] hover:bg-[var(--wash-strong)]" : "border-[var(--line)] text-[var(--ink)] hover:border-[var(--muted)]",
 );
 
 /** Sort by: a pill with its name (a phone keeps just the picker) and our picker. */
 function CompactSelect<T extends string>({ label, value, onChange, options }: { label: string; value: T; onChange: (value: T) => void; options: Array<{ value: T; label: string }> }) {
   return (
-    <div className="inline-flex min-h-9 min-w-0 items-center gap-1.5 rounded-full border border-[var(--line)] pl-3 pr-2 sm:pl-3.5 sm:pr-2.5 text-sm transition focus-within:ring-4 focus-within:ring-[var(--main)]/25 hover:border-[var(--muted)]">
+    <div className="inline-flex min-h-9 min-w-0 items-center gap-1.5 rounded-full border border-[var(--line)] pl-3 pr-2 sm:pl-3.5 sm:pr-2.5 text-[13px] transition focus-within:ring-4 focus-within:ring-[var(--main)]/25 hover:border-[var(--muted)]">
       <span className="hidden flex-none text-xs text-[var(--muted)] sm:inline">{label}</span>
       <Select look="bare" ariaLabel={label} value={value} onChange={onChange} options={options} className="text-[var(--ink)]" />
     </div>
@@ -41,7 +60,7 @@ function CompactSelect<T extends string>({ label, value, onChange, options }: { 
 }
 
 /**
- * One line of the index: a library (a dot marks the open one) or a filter (a small box, ticked when on),
+ * One line of the index: a library (a dot marks the open one) or a filter (a round check, ticked when on),
  * with its count at the end.
  */
 function IndexRow({ label, count, on, onClick, box = false }: { label: string; count?: number; on: boolean; onClick: () => void; box?: boolean }) {
@@ -56,7 +75,7 @@ function IndexRow({ label, count, on, onClick, box = false }: { label: string; c
       )}
     >
       {box ? (
-        <span aria-hidden="true" className={cx("grid h-4 w-4 flex-none place-items-center rounded-[5px] border text-[10px] leading-none", on ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--muted)]/50")}>{on ? "✓" : ""}</span>
+        <CheckCircle on={on} className="!h-4 !w-4" />
       ) : (
         <span aria-hidden="true" className={cx("h-1.5 w-1.5 flex-none rounded-full", on ? "bg-[var(--main)]" : "bg-transparent")} />
       )}
@@ -111,6 +130,9 @@ export function CatalogWorkspaceScreen({
   const [query, setQuery] = useState("");
   const [genres, setGenres] = useState<string[]>([]);
   const [unratedOnly, setUnratedOnly] = useState(false);
+  const [shown, setShown] = useState(PAGE_SIZE);
+  const indexOpen = useSyncExternalStore(subscribeIndex, readIndexOpen, () => true);
+  const toggleIndex = () => storeIndexOpen(!indexOpen);
   // On a phone the index lives in two sheets: the library switcher and the filters.
   const [sheet, setSheet] = useState<"libraries" | "filters" | null>(null);
   const [sort, setSort] = useState<Sort>("recent");
@@ -180,6 +202,7 @@ export function CatalogWorkspaceScreen({
     clearFilters();
     setGroupBy("none");
     setQuery("");
+    setShown(PAGE_SIZE);
   }
 
   function clearFilters() {
@@ -226,7 +249,9 @@ export function CatalogWorkspaceScreen({
           ? addedAt(right) - addedAt(left) || left.title.localeCompare(right.title)
           : left.title.localeCompare(right.title),
   ), [filtered, activeSort]);
-  const groups = useMemo(() => groupCatalogItems(sorted, groupBy), [sorted, groupBy]);
+  // Only the first rows are drawn; "Show more" brings the next page.
+  const groups = useMemo(() => groupCatalogItems(sorted.slice(0, shown), groupBy), [sorted, groupBy, shown]);
+  const hiddenCount = Math.max(0, sorted.length - shown);
 
   const rated = scoped.filter((item) => item.ratingAvg !== null && item.ratingAvg !== undefined);
   const average = rated.length ? Math.round((rated.reduce((sum, item) => sum + (item.ratingAvg ?? 0), 0) / rated.length) * 100) / 100 : null;
@@ -310,26 +335,40 @@ export function CatalogWorkspaceScreen({
       {tabs.map((entry) => {
         const active = entry.kind === kind;
         return (
-          <div key={entry.id} className="group flex items-center gap-1">
-            <IndexRow label={libraryName(entry)} count={countByKind.get(entry.kind)?.total ?? 0} on={active} onClick={() => { chooseLibrary(entry.kind); setSheet(null); }} />
+          // The open library keeps its dot; its settings sit just before the name, in the same 12px column as the
+          // "＋" of "＋ Library" below. On a computer they show on the open library, or on a row under the pointer.
+          <div key={entry.id} className={cx("group flex min-h-11 items-center gap-2.5 text-[15px] lg:min-h-9 lg:text-sm", active ? "font-medium text-[var(--ink)]" : "text-[var(--muted)]")}>
+            <span aria-hidden="true" className={cx("h-1.5 w-1.5 flex-none rounded-full", active ? "bg-[var(--main)]" : "bg-transparent")} />
             <button
               type="button"
               aria-label={`${tl("libraryActions")}: ${libraryName(entry)}`}
               title={tl("libraryActions")}
               onClick={() => { setSheet(null); openLibraryDialog(entry); }}
+              // -m-2 / p-2: a bigger target around the 12px icon without moving it out of its column.
               className={cx(
-                "grid h-9 w-9 flex-none cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25",
+                "-m-2 grid flex-none cursor-pointer place-items-center rounded-full p-2 text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25",
                 !active && "lg:opacity-0 lg:group-hover:opacity-100",
               )}
             >
-              <SlidersIcon className="h-4 w-4" />
+              <SlidersIcon className="h-3 w-3" />
+            </button>
+            <button
+              type="button"
+              aria-pressed={active}
+              onClick={() => { chooseLibrary(entry.kind); setSheet(null); }}
+              className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded-lg text-left transition hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 lg:min-h-9"
+            >
+              <span className="min-w-0 flex-1 truncate">{libraryName(entry)}</span>
+              <span className="flex-none text-xs font-normal text-[var(--muted)]">{countByKind.get(entry.kind)?.total ?? 0}</span>
             </button>
           </div>
         );
       })}
       {canManage ? (
-        <button type="button" onClick={() => { setSheet(null); setDialog("new"); }} className="min-h-11 cursor-pointer pl-4 text-left text-[15px] text-[var(--muted)] transition hover:text-[var(--ink)] lg:min-h-9 lg:text-sm">
-          ＋ {tl("addLibrary")}
+        <button type="button" onClick={() => { setSheet(null); setDialog("new"); }} className="flex min-h-11 cursor-pointer items-center gap-2.5 text-left text-[15px] text-[var(--muted)] transition hover:text-[var(--ink)] lg:min-h-9 lg:text-sm">
+          <span aria-hidden="true" className="w-1.5 flex-none" />
+          <svg viewBox="0 0 12 12" className="h-3 w-3 flex-none" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" aria-hidden="true"><path d="M6 1.5v9M1.5 6h9" /></svg>
+          {tl("addLibrary")}
         </button>
       ) : null}
     </div>
@@ -395,9 +434,10 @@ export function CatalogWorkspaceScreen({
         />
       ) : library ? (
         <div className="lg:flex lg:items-start lg:gap-14">
-          <aside className="hidden w-56 flex-none lg:flex lg:flex-col lg:gap-7" aria-label={tl("tabsLabel")}>
+          <aside id="catalog-index" className={cx("hidden w-56 flex-none lg:flex-col lg:gap-7", indexOpen && "lg:flex")} aria-label={tl("tabsLabel")}>
             <div>
-              <p className={facetHeading}>{tl("tabsLabel")}</p>
+              {/* As tall as the search row, so this heading and the search text share a line. */}
+              <p className="flex h-11 items-center text-xs text-[var(--muted)]">{tl("tabsLabel")}</p>
               {libraryIndex}
             </div>
             {scoped.length ? facets : null}
@@ -417,7 +457,18 @@ export function CatalogWorkspaceScreen({
 
             {/* Search takes the row; Sort, Select and ＋ Item sit together at its end (on a phone, the row below it, with Filter). */}
             <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-3 lg:mt-0">
-              <label className="flex h-11 min-w-0 basis-full items-center gap-2.5 border-b border-[var(--line)] transition focus-within:border-[var(--main)] sm:basis-0 sm:flex-1">
+              <button
+                type="button"
+                onClick={toggleIndex}
+                aria-expanded={indexOpen}
+                aria-controls="catalog-index"
+                aria-label={indexOpen ? t("hideIndex") : t("showIndex")}
+                title={indexOpen ? t("hideIndex") : t("showIndex")}
+                className="-ml-2 -mr-1 hidden h-9 w-9 flex-none cursor-pointer place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--wash)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 lg:grid"
+              >
+                <svg viewBox="0 0 20 20" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true"><path d="M3.5 5.5h13M3.5 10h13M3.5 14.5h13" /></svg>
+              </button>
+              <label className="group relative flex h-11 min-w-0 basis-full cursor-text items-center gap-2.5 sm:mr-6 sm:basis-0 sm:flex-1">
                 <SearchIcon />
                 <input
                   type="search"
@@ -425,8 +476,10 @@ export function CatalogWorkspaceScreen({
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder={t("searchPlaceholder", { name: libraryName(library) })}
                   aria-label={t("searchPlaceholder", { name: libraryName(library) })}
-                  className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-[var(--muted)]"
+                  className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[var(--muted)] [&::-webkit-search-cancel-button]:appearance-none"
                 />
+                {/* A hairline that grows in from the left while you type (and stays while there's text). */}
+                <span aria-hidden="true" className={cx("pointer-events-none absolute bottom-0 left-0 h-px bg-[var(--line)] transition-[width] duration-500 ease-[cubic-bezier(.22,1,.36,1)] group-focus-within:w-full motion-reduce:transition-none", query ? "w-full" : "w-0")} />
               </label>
               <div className="flex flex-1 flex-wrap items-center gap-2 sm:flex-none">
                 {scoped.length ? (
@@ -442,7 +495,7 @@ export function CatalogWorkspaceScreen({
                     {selecting ? t("doneSelecting") : t("select")}
                   </button>
                 ) : null}
-                {canManage ? <Button className="!min-h-9 !rounded-full !px-3.5" onClick={() => { setNotice(null); setDialog("add"); }}>＋ {t("newItem")}</Button> : null}
+                {canManage ? <Button className="!min-h-9 !rounded-full !px-3.5 !text-[13px]" onClick={() => { setNotice(null); setDialog("add"); }}>＋ {t("newItem")}</Button> : null}
               </div>
             </div>
 
@@ -464,7 +517,7 @@ export function CatalogWorkspaceScreen({
             ) : null}
 
             {selecting ? (
-              <div className="sticky top-16 z-10 mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-3 shadow-[var(--elevate-1)]" role="region" aria-label={t("selectionBar")}>
+              <div className="mt-4 flex flex-wrap items-center gap-2 rounded-full bg-[var(--wash)] p-1.5" role="region" aria-label={t("selectionBar")}>
                 <Button variant="secondary" className="!rounded-full" disabled={!sorted.length} onClick={() => togglePicked(sorted.map((item) => item.id), !allHerePicked)}>
                   {allHerePicked ? t("clearSelection") : t("selectAll", { count: sorted.length })}
                 </Button>
@@ -481,7 +534,7 @@ export function CatalogWorkspaceScreen({
                   onClick={canManage ? () => setDialog("add") : undefined}
                 />
               ) : !sorted.length ? (
-                <EmptyState title={t("noMatches")} action={<Button variant="secondary" onClick={() => { clearFilters(); setQuery(""); }}>{t("clearFilters")}</Button>} />
+                <FaceEmptyState title={t("noMatches")} />
               ) : (
                 <div className="space-y-10">
                   {groups.map((group) => (
@@ -492,7 +545,7 @@ export function CatalogWorkspaceScreen({
                           <span className="text-xs text-[var(--muted)]">{group.items.length}</span>
                         </h2>
                       ) : null}
-                      <ul className="divide-y divide-[var(--line)] border-y border-[var(--line)]">
+                      <ul className="divide-y divide-[var(--line)] border-t border-[var(--line)]">
                         {group.items.map((item) => {
                           const unused = isUnused(item);
                           return (
@@ -517,6 +570,11 @@ export function CatalogWorkspaceScreen({
                       </ul>
                     </section>
                   ))}
+                  {hiddenCount > 0 ? (
+                    <button type="button" onClick={() => setShown(shown + PAGE_SIZE)} className={cx(chipClass(), "mx-auto flex")}>
+                      {t("showMore", { count: Math.min(PAGE_SIZE, hiddenCount) })}
+                    </button>
+                  ) : null}
                 </div>
               )}
             </div>

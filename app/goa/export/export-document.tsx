@@ -618,7 +618,7 @@ export function ExportDocument({ challenge, entries, userId, fontClassName = "",
               <button
                 type="button"
                 onClick={() => window.print()}
-                className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-full border border-transparent bg-[var(--main)] px-5 py-2 text-sm font-medium text-white shadow-[var(--elevate-1)] transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
+                className="inline-flex min-h-9 cursor-pointer items-center justify-center gap-2 rounded-full border border-transparent bg-[var(--main)] px-5 py-1.5 text-sm font-medium text-white shadow-[var(--elevate-1)] transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
               >
                 <DownloadIcon />
                 {doc.t("download")}

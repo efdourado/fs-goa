@@ -519,7 +519,10 @@
     "clearFilters": "Limpar filtros",
     "chooseLibrary": "Escolher uma biblioteca",
     "showResults": "{count, plural, =0 {Nada para mostrar} one {Mostrar # item} other {Mostrar # itens}}",
-    "removeFilter": "Tirar o filtro: {name}"
+    "removeFilter": "Tirar o filtro: {name}",
+    "hideIndex": "Esconder filtros",
+    "showIndex": "Mostrar filtros",
+    "showMore": "+ {count} mais"
   },
   "cineItems": {
     "addItems": "Adicionar itens",

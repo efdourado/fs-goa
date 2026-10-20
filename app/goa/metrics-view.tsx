@@ -85,7 +85,7 @@ export function MetricBlock({ metric, hideThinLabel = false, showExplanation = f
                 type="button"
                 onClick={() => setExpanded((value) => !value)}
                 aria-expanded={expanded}
-                className="mt-3 min-h-10 w-full rounded-xl border border-[var(--line)] text-xs font-light text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)]"
+                className="mt-3 min-h-9 w-full rounded-xl border border-[var(--line)] text-xs font-light text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)]"
               >
                 {expanded ? t("seriesShowLess") : t("seriesShowAll", { count: visibleRows.length })}
               </button>

@@ -90,7 +90,7 @@ export function FeedbackForm() {
               aria-pressed={succeeded === value}
               onClick={() => setSucceeded(value)}
               className={cx(
-                "min-h-10 rounded-xl border px-4 text-sm transition",
+                "min-h-9 rounded-xl border px-4 text-sm transition",
                 succeeded === value ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] text-[var(--muted)]",
               )}
             >

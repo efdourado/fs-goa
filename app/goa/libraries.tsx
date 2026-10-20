@@ -191,7 +191,7 @@ export function LibraryPills({
             aria-pressed={active}
             onClick={() => onPick(choice)}
             className={cx(
-              "inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border px-4 text-sm transition",
+              "inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-full border px-4 text-sm transition",
               active ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] hover:border-[var(--main-line)]",
             )}
           >
@@ -207,7 +207,7 @@ export function LibraryPills({
         <button
           type="button"
           onClick={onNew}
-          className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-full border border-dashed border-[var(--line)] px-4 text-sm text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)]"
+          className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border border-dashed border-[var(--line)] px-4 text-sm text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)]"
         >
           ＋ {t("addLibrary")}
         </button>

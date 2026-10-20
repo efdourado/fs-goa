@@ -35,6 +35,7 @@ import {
   BoxSection,
   Button,
   ChallengeStatusBadge,
+  CheckCircle,
   cx,
   Disclosure,
   EmptyState,
@@ -250,9 +251,7 @@ function AdminGeneral({
                     )}>
                       <input type="checkbox" className="peer sr-only" aria-label={t("selectMember", { name: member.name })} checked={checked} disabled={disabled}
                         onChange={(event) => setSelected((current) => event.target.checked ? [...current, member.id] : current.filter((id) => id !== member.id))} />
-                      <span className={cx("grid h-[18px] w-[18px] flex-none place-items-center rounded-[5px] border-[1.5px] text-white transition", checked ? "border-[var(--main)] bg-[var(--main)]" : "border-[var(--line)]")}>
-                        <svg viewBox="0 0 16 16" className={cx("h-2.5 w-2.5", checked ? "opacity-100" : "opacity-0")} fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                      </span>
+                      <CheckCircle on={checked} />
                       <span className="min-w-0">
                         <strong className="block text-sm font-medium">{member.name}</strong>
                         <small className="text-[var(--muted)]">{t("memberMeta", { username: member.username, role: tr(member.role) })}</small>
@@ -392,7 +391,7 @@ function AdminFields({
                 aria-pressed={active}
                 onClick={() => pickType(type.id)}
                 className={cx(
-                  "inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border px-4 text-sm transition",
+                  "inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-full border px-4 text-sm transition",
                   active ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] hover:border-[var(--main-line)]",
                 )}
               >
@@ -406,7 +405,7 @@ function AdminFields({
             <button
               type="button"
               onClick={() => { setError(null); setAddingShared(true); }}
-              className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-full border border-dashed border-[var(--line)] px-4 text-sm text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)]"
+              className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border border-dashed border-[var(--line)] px-4 text-sm text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)]"
             >
               ＋ {tSr("addShort")}
             </button>
@@ -455,7 +454,7 @@ function AdminFields({
         <button
           type="button"
           onClick={() => { setError(null); setEditing("new"); }}
-          className="mt-4 flex min-h-10 w-full cursor-pointer items-center justify-center gap-1.5 rounded-full border border-dashed border-[var(--line)] px-4 text-sm text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)]"
+          className="mt-4 flex min-h-9 w-full cursor-pointer items-center justify-center gap-1.5 rounded-full border border-dashed border-[var(--line)] px-4 text-sm text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)]"
         >
           ＋ {t("addField")}
         </button>

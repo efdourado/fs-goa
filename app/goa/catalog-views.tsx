@@ -3,7 +3,7 @@
 import { coverColors, coverToneOf, ScoreRing } from "./catalog-cover";
 import type { GoaFormat } from "./format";
 import type { CatalogAttributeValue, CatalogLibrary, EventSchedule } from "./types";
-import { cx } from "./ui";
+import { CheckCircle, cx } from "./ui";
 
 export type CatalogGroupBy = "none" | "genre" | "decade" | "year";
 
@@ -115,7 +115,7 @@ export function CatalogTile({ title, year, avg, ratingLabel, badgeHidden, captio
       >
         <span aria-hidden="true" className="pointer-events-none absolute -bottom-9 -right-7 h-20 w-20 rounded-full border-[12px] border-[var(--cover-deco)]" />
         {selecting ? (
-          <span aria-hidden="true" className={cx("relative grid h-6 w-6 flex-none place-items-center rounded-full border-2 text-xs", picked ? "border-[var(--main)] bg-[var(--main)] text-white" : "border-[var(--cover-ink)] bg-[var(--paper)]/70")}>{picked ? "✓" : ""}</span>
+          <CheckCircle on={Boolean(picked)} className="relative !h-6 !w-6" />
         ) : null}
         <span className="relative min-w-0 flex-1 truncate text-[15px] font-light tracking-[-0.02em] sm:text-lg">{title}</span>
         {year ? <span className="relative hidden flex-none text-[11px] tracking-[0.08em] sm:block" style={{ fontFamily: "var(--font-geist-mono), ui-monospace, monospace" }}>{year}</span> : null}
@@ -168,7 +168,7 @@ export function CatalogRow({ title, year, avg, ratingLabel, badgeHidden, meta, n
 }) {
   const body = (
     <>
-      {selecting ? <input type="checkbox" className="h-4 w-4 flex-none accent-[var(--main)]" checked={Boolean(picked)} aria-label={title} onChange={(event) => onPick?.(event.target.checked)} /> : null}
+      {selecting ? <input type="checkbox" className="h-4 w-4 flex-none" checked={Boolean(picked)} aria-label={title} onChange={(event) => onPick?.(event.target.checked)} /> : null}
       <span aria-hidden="true" className="h-7 w-7 flex-none rounded-full bg-[var(--cover-bg)] shadow-[inset_0_0_0_6px_var(--cover-deco)] sm:h-8 sm:w-8" style={coverColors(coverToneOf(title))} />
       <span className="min-w-0 flex-1">
         <strong className="block truncate text-[15px] font-normal sm:text-base">{title}{year ? <span className="ml-1.5 font-light text-[var(--muted)]">{year}</span> : null}</strong>
@@ -182,7 +182,7 @@ export function CatalogRow({ title, year, avg, ratingLabel, badgeHidden, meta, n
       {badgeHidden || avg === null || avg === undefined ? null : <ScoreRing value={avg} size={36} label={ratingLabel} strokeWidth={3} textClassName="text-[11px] font-medium" />}
     </>
   );
-  const shared = "flex w-full items-center gap-3.5 px-1 py-3 text-left transition hover:bg-[var(--wash)] sm:gap-4 sm:px-3 sm:py-3.5";
+  const shared = "flex w-full items-center gap-3.5 rounded-full px-3 py-3 text-left transition hover:bg-[var(--wash)] sm:gap-4 sm:px-4 sm:py-3.5";
   return selecting
     ? <label className={cx(shared, "cursor-pointer")}>{body}</label>
     : <button type="button" onClick={onOpen} className={cx(shared, "cursor-pointer focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-[var(--main)]/25")}>{body}</button>;

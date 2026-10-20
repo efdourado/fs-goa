@@ -86,7 +86,7 @@ export function Button({
   return (
     <button
       className={cx(
-        "cursor-pointer inline-flex min-h-10 items-center justify-center gap-2 border px-4 py-2 text-sm transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 disabled:cursor-not-allowed disabled:opacity-55",
+        "cursor-pointer inline-flex min-h-9 items-center justify-center gap-2 border px-4 py-1.5 text-sm transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 disabled:cursor-not-allowed disabled:opacity-55",
         inModal ? "rounded-full" : "rounded-xl",
         tones[variant],
         className,
@@ -253,6 +253,11 @@ export function CopyCheckIcon({ done, className }: { done: boolean; className?: 
   );
 }
 
+/** The round check every checkbox wears, for a button or label that toggles like one: fills and ticks with a pop. */
+export function CheckCircle({ on, className }: { on: boolean; className?: string }) {
+  return <span aria-hidden="true" className={cx("goa-check", className)} data-on={on ? "" : undefined} />;
+}
+
 export interface SelectOption<T extends string = string> {
   value: T;
   label: string;
@@ -263,7 +268,7 @@ export interface SelectOption<T extends string = string> {
 
 const selectLooks = {
   field: inputClass,
-  pill: "min-h-10 rounded-full border border-[var(--line)] bg-transparent px-4 text-sm text-[var(--ink)] transition hover:border-[var(--muted)] focus-visible:border-[var(--main)] focus-visible:ring-4 focus-visible:ring-[var(--main)]/15 disabled:cursor-not-allowed disabled:opacity-55",
+  pill: "min-h-9 rounded-full border border-[var(--line)] bg-transparent px-4 text-sm text-[var(--ink)] transition hover:border-[var(--muted)] focus-visible:border-[var(--main)] focus-visible:ring-4 focus-visible:ring-[var(--main)]/15 disabled:cursor-not-allowed disabled:opacity-55",
   bare: "",
 };
 
@@ -995,7 +1000,7 @@ export function SchedulePeriodFields({
               aria-pressed={active}
               onClick={() => applyShift(preset.shift)}
               className={cx(
-                "min-h-10 rounded-full border px-4 text-sm transition disabled:cursor-not-allowed disabled:opacity-60",
+                "min-h-9 rounded-full border px-4 text-sm transition disabled:cursor-not-allowed disabled:opacity-60",
                 active ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] text-[var(--muted)] hover:border-[var(--main-line)]",
               )}
             >
