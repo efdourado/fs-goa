@@ -78,20 +78,12 @@ export function AboutScreen({ onBack, backLabel }: { onBack: () => void; backLab
       <section className="mt-12 rounded-2xl bg-[var(--main-soft)] px-6 py-8 sm:px-8">
         {/* goa's mark beside "Let's talk?" — a phone has no header, so this is where goa signs its own page. */}
         <h2 className="flex items-center gap-3 text-2xl font-light tracking-[-0.02em] text-[var(--main-strong)]">
-          <span aria-hidden="true" className="grid h-8 w-8 flex-none -rotate-3 place-items-center rounded-[50%_50%_50%_16%] bg-[var(--main-strong)] text-sm font-black text-[var(--main-soft)]">g</span>
+          {/* eslint-disable-next-line @next/next/no-img-element -- a fixed little file from /public, like the header's Brand */}
+          <img src="/logo.png" alt="" aria-hidden="true" draggable={false} className="h-9 w-9 flex-none object-contain" />
           {t("contactTitle")}
         </h2>
         <p className="mt-2 max-w-xl text-[15px] leading-7">{t("contactBody")}</p>
-        <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2">
-          <a
-            href={`mailto:${CONTACT_EMAIL}`}
-            className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[var(--main)] px-5 text-sm font-medium text-white transition hover:opacity-90"
-          >
-            {t("contactButton")}
-            <span aria-hidden="true">→</span>
-          </a>
-          <a href={`mailto:${CONTACT_EMAIL}`} className="text-sm text-[var(--muted)] underline underline-offset-4 hover:text-[var(--ink)]">{CONTACT_EMAIL}</a>
-        </div>
+        <a href={`mailto:${CONTACT_EMAIL}`} className="mt-4 inline-block text-[15px] text-[var(--main-strong)] underline underline-offset-4 hover:opacity-80">{CONTACT_EMAIL}</a>
       </section>
 
       <footer className="mt-12 space-y-2 text-sm text-[var(--muted)]">
