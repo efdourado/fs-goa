@@ -63,7 +63,7 @@
     "home": "Home",
     "catalogue": "Catalogue",
     "templates": "Templates",
-    "about": "About",
+    "about": "The idea",
     "admin": "Console",
     "account": "Your account",
     "signOut": "Sign out",
@@ -1350,7 +1350,7 @@
   },
   "about": {
     "back": "Back",
-    "title": "About Goa",
+    "title": "The idea",
     "lede": "Private challenges for friends (or just you). Everyone logs; Goa does the maths and turns the round into a memory.",
     "stepsTitle": "How it works",
     "steps": [
@@ -1367,7 +1367,7 @@
         "body": "Rankings, the thread and a page of highlights, ready to keep or share."
       }
     ],
-    "featuresTitle": "What's inside",
+    "featuresTitle": "Features",
     "features": [
       {
         "title": "Libraries",
@@ -1388,16 +1388,8 @@
     ],
     "rankingTitle": "How Goa ranks",
     "ranking": [
-      "Your ratings are never changed, and averages are always real averages.",
       "Only the order uses the Goa score: it breaks ties using each person's own history, a 5 from someone who rarely gives one counts a little more.",
       "New people and new titles simply get the average. Hidden ratings never move a number you see."
-    ],
-    "factsTitle": "Good to know",
-    "facts": [
-      "You decide what one item is: a trilogy can be one item or three.",
-      "Done means the required answers are in (nothing more).",
-      "Some answers belong to the whole group, like a final score.",
-      "A challenge can mix libraries, Movies and TV Shows in one list."
     ],
     "byline": "A personal project by Eduardo Dourado, grown out of the spreadsheets of a film club and a reading club.",
     "feedbackNudge": "Have an idea, or did something bug you?",

@@ -1388,21 +1388,13 @@
     ],
     "rankingTitle": "Como o Goa ranqueia",
     "ranking": [
-      "Suas notas nunca mudam, e as médias são sempre médias de verdade.",
       "Só a ordem usa a pontuação Goa: ela desempata pelo histórico de cada pessoa, um 5 de quem quase nunca dá 5 pesa um pouco mais.",
       "Quem acabou de chegar e títulos novos ficam com a média simples. Notas ocultas nunca mexem num número que você vê."
-    ],
-    "factsTitle": "Bom saber",
-    "facts": [
-      "Você decide o que é um item: uma trilogia pode ser um item ou três.",
-      "Feito quer dizer que as respostas obrigatórias estão lá (só isso).",
-      "Algumas respostas são do grupo inteiro, como um placar final.",
-      "Um desafio pode misturar bibliotecas, Filmes e Séries numa lista só."
     ],
     "byline": "Um projeto pessoal de Eduardo Dourado, nascido das planilhas de um clube de cinema e de um clube de leitura.",
     "feedbackNudge": "Teve uma ideia ou algo te incomodou?",
     "feedbackLink": "Conta pra gente.",
-    "contactTitle": "Vamos conversar?",
+    "contactTitle": "Tem algo pra contar?",
     "contactBody": "Uma ideia, um bug, uma parceria ou só um oi: escreve pra gente, a resposta vem de uma pessoa.",
     "contactButton": "Fale conosco"
   },

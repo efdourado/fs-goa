@@ -21,15 +21,13 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 /**
- * About Goa — scannable, not an essay: three steps, a few feature cards, the ranking in three lines and some
- * quick facts. Every line is short on purpose.
+ * About Goa — scannable, not an essay: three steps, a few feature cards and the ranking in two lines. Every line is short on purpose.
  */
 export function AboutScreen({ onBack, backLabel }: { onBack: () => void; backLabel?: string }) {
   const t = useTranslations("about");
   const steps = t.raw("steps") as Point[];
   const features = t.raw("features") as Point[];
   const ranking = t.raw("ranking") as string[];
-  const facts = t.raw("facts") as string[];
   return (
     <main className="mx-auto max-w-3xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
       <BackButton onClick={onBack} label={backLabel ?? t("back")} className="mb-6" />
@@ -69,21 +67,22 @@ export function AboutScreen({ onBack, backLabel }: { onBack: () => void; backLab
         </ul>
       </Section>
 
-      <Section title={t("factsTitle")}>
-        <ul className="divide-y divide-[var(--line)] border-y border-[var(--line)]">
-          {facts.map((fact) => <li key={fact} className="py-3 text-[15px] leading-6">{fact}</li>)}
-        </ul>
-      </Section>
-
-      <section className="mt-12 rounded-2xl bg-[var(--main-soft)] px-6 py-8 sm:px-8">
+      <section className="mt-12 rounded-2xl border border-[var(--line)] bg-[var(--paper)] px-6 py-8 sm:px-8">
         {/* goa's mark beside "Let's talk?" — a phone has no header, so this is where goa signs its own page. */}
-        <h2 className="flex items-center gap-3 text-2xl font-light tracking-[-0.02em] text-[var(--main-strong)]">
+        <h2 className="flex items-center gap-3 text-2xl font-light tracking-[-0.02em]">
           {/* eslint-disable-next-line @next/next/no-img-element -- a fixed little file from /public, like the header's Brand */}
           <img src="/logo.png" alt="" aria-hidden="true" draggable={false} className="h-9 w-9 flex-none object-contain" />
           {t("contactTitle")}
         </h2>
         <p className="mt-2 max-w-xl text-[15px] leading-7">{t("contactBody")}</p>
-        <a href={`mailto:${CONTACT_EMAIL}`} className="mt-4 inline-block text-[15px] text-[var(--main-strong)] underline underline-offset-4 hover:opacity-80">{CONTACT_EMAIL}</a>
+        <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2">
+          {/* The pill only says it; the address beside it is the link. */}
+          <span className="inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--line)] px-5 text-sm text-[var(--ink)]">
+            {t("contactButton")}
+            <span aria-hidden="true">→</span>
+          </span>
+          <a href={`mailto:${CONTACT_EMAIL}`} className="text-sm text-[var(--muted)] underline underline-offset-4 hover:text-[var(--ink)]">{CONTACT_EMAIL}</a>
+        </div>
       </section>
 
       <footer className="mt-12 space-y-2 text-sm text-[var(--muted)]">
