@@ -15,7 +15,7 @@ import { writeAudit } from "./domain/audit";
 import { eventScheduleColumns, eventScheduleJson, parseEventSchedule, scheduleVisibleSql } from "./domain/event-schedule";
 import { ensurePersonalWorkspace } from "./domain/challenges";
 import { catalogScores, roundKey } from "./challenges/goa-score";
-import { CATALOG_YEAR_MAX, CATALOG_YEAR_MIN, normalizeTitle, publicId, recommenderVisibleSql } from "./domain/shared";
+import { CATALOG_YEAR_MAX, CATALOG_YEAR_MIN, hideRecommenderOnNewLibrary, normalizeTitle, publicId, recommenderVisibleSql } from "./domain/shared";
 import { moveToTrash } from "./trash";
 
 export type CatalogKind = "film" | "book" | "other";
@@ -43,12 +43,14 @@ export async function ensureCatalogLibrary(
   kind: string,
   actorUserId: string,
 ): Promise<void> {
-  await client.query(
+  const created = await client.query<{ id: string }>(
     `INSERT INTO catalog_libraries (id, group_id, kind, source, created_by_user_id)
      VALUES ($1, $2, $3, $4, $5)
-     ON CONFLICT (group_id, kind) DO NOTHING`,
+     ON CONFLICT (group_id, kind) DO NOTHING RETURNING id`,
     [publicId(), groupId, kind, sourceForKind(kind), actorUserId],
   );
+  // Made just now (not already there): it starts without "who recommended it".
+  if (created.rows[0]) await hideRecommenderOnNewLibrary(client, created.rows[0].id);
 }
 
 /**
@@ -836,6 +838,7 @@ async function insertLibrary(
      VALUES ($1,$2,$3,$4,$5,$6,$7,now(),now())`,
     [id, groupId, kind, source, label, position, userId],
   );
+  await hideRecommenderOnNewLibrary(client, id);
   await writeAudit(client, groupId, null, userId, "catalog.library_created", "catalog_library", id, null, { label, source });
   return { id, kind, source: source as CatalogLibrary["source"], label, position, coverTopProperty: null, coverBadgeHidden: false };
 }

@@ -8,7 +8,7 @@ import { API_PATHS, apiRequest } from "./api";
 import { Dialog, FormDialog } from "./dialog";
 import { canOrganise, OrganiseDialog, organiseFromRows } from "./organize-panel";
 import { type CatalogScope } from "./libraries";
-import { bodyFromValues, editableProperties, PropertyInputs, type PropertyValues, propertiesHaveProblem, showsRecommender, useLibrariesProperties } from "./property-inputs";
+import { bodyFromValues, editableProperties, PropertyInputs, type PropertyValues, propertiesHaveProblem, showsRecommender, useLibrariesProperties, useNativePropertyName } from "./property-inputs";
 import {
   NO_RECOMMENDER,
   recommenderBody,
@@ -19,7 +19,7 @@ import {
 } from "./recommender-picker";
 import { decodeEventForm, encodeEventForm, eventBodyOf, eventFormOf } from "./schedule";
 import type { CatalogItem, ChallengeItemInput, ChallengeLibraryRef, Id, LibraryProperty, Member } from "./types";
-import { Button, CircleMinusIcon, cx, FaceEmptyState, inputClass, labelClass, rowIconClass, StatusMessage } from "./ui";
+import { Button, CircleMinusIcon, cx, FaceEmptyState, inputClass, labelClass, rowIconClass } from "./ui";
 import { formatRuntime } from "./utils";
 import { useGoaFormat } from "./format";
 
@@ -62,108 +62,6 @@ function newCineRow(title = "", extra: Partial<CineRow> = {}): CineRow {
     extra: {},
     attributes: {},
     ...extra,
-  };
-}
-
-/** Reads any of a small set of aliases off a pasted JSON object, first match wins. */
-function pick(raw: Record<string, unknown>, ...keys: string[]): unknown {
-  for (const key of keys) if (raw[key] !== undefined && raw[key] !== null) return raw[key];
-  return undefined;
-}
-
-function asFieldString(value: unknown): string {
-  return value === undefined || value === null ? "" : String(value);
-}
-
-/** Keys the wizard understands; anything else is reported back, not silently dropped. */
-const KNOWN_PASTE_KEYS = new Set([
-  "title",
-  "mainGenre", "main_genre", "genre", "genres",
-  "author", "authors", "by",
-  "year",
-  "pageCount", "pages",
-  "runtimeMinutes", "runtime_minutes", "duration", "durationMinutes",
-].map((key) => key.toLowerCase()));
-
-interface JsonPasteSummary {
-  /** Entries in the pasted array, valid or not. */
-  total: number;
-  added: number;
-  /** Not an object, or without a usable `title`. */
-  invalid: number;
-  /** Title already among the rows, or repeated inside the paste itself. */
-  duplicates: number;
-  unknownKeys: string[];
-}
-
-/**
- * Parses a pasted JSON array of `{title, year, pageCount, mainGenre}` objects
- * into rows — the "already have the list ready" fast path, as an alternative to
- * typing titles one by one. Throws a translation key when the text isn't a JSON
- * array at all; anything discarded per entry comes back in the summary, so the
- * wizard can account for it the way the post-creation importer does.
- */
-export function parseJsonItemsPaste(
-  text: string,
-  existingTitles: Set<string>,
-): { rows: CineRow[]; summary: JsonPasteSummary } {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    throw new Error("jsonInvalid");
-  }
-  if (!Array.isArray(parsed)) throw new Error("jsonMustBeArray");
-  if (!parsed.length) throw new Error("jsonNoItems");
-  const known = new Set(existingTitles);
-  const rows: CineRow[] = [];
-  const unknownKeys = new Set<string>();
-  let invalid = 0;
-  let duplicates = 0;
-  for (const entry of parsed) {
-    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
-      invalid += 1;
-      continue;
-    }
-    const raw = entry as Record<string, unknown>;
-    for (const key of Object.keys(raw)) {
-      if (!KNOWN_PASTE_KEYS.has(key.toLowerCase())) unknownKeys.add(key);
-    }
-    const title = typeof raw.title === "string" ? raw.title.trim() : "";
-    if (!title) {
-      invalid += 1;
-      continue;
-    }
-    if (known.has(title.toLowerCase())) {
-      duplicates += 1;
-      continue;
-    }
-    known.add(title.toLowerCase());
-    const genreValue = pick(raw, "mainGenre", "main_genre", "genre", "genres");
-    const mainGenre = Array.isArray(genreValue)
-      ? genreValue.find((value): value is string => typeof value === "string") ?? ""
-      : typeof genreValue === "string" ? genreValue : "";
-    const authorValue = pick(raw, "author", "authors", "by");
-    const author = Array.isArray(authorValue)
-      ? authorValue.filter((value): value is string => typeof value === "string").join(", ")
-      : asFieldString(authorValue);
-    rows.push(newCineRow(title, {
-      author,
-      year: asFieldString(pick(raw, "year")),
-      pages: asFieldString(pick(raw, "pageCount", "pages")),
-      runtimeMinutes: asFieldString(pick(raw, "runtimeMinutes", "runtime_minutes", "duration", "durationMinutes")),
-      mainGenre,
-    }));
-  }
-  return {
-    rows,
-    summary: {
-      total: parsed.length,
-      added: rows.length,
-      invalid,
-      duplicates,
-      unknownKeys: [...unknownKeys].sort(),
-    },
   };
 }
 
@@ -330,7 +228,10 @@ function useEditorProperties({ libraries, refreshKey = 0, showSchedule = false }
   return { loaded, propertiesFor, problemOf };
 }
 
-/** Every property of the given rows, one card each: title, author or who recommended it, the date, then details. */
+/**
+ * Every property of the given rows, one card each: the name, then the author or who recommended it (each with its
+ * label), the date, and the rest folded under "+N more" at the bottom of the card.
+ */
 function RowCards({ rows, onChange, onRemove, shared, openByDefault = false }: {
   rows: CineRow[];
   onChange: (row: CineRow) => void;
@@ -344,6 +245,7 @@ function RowCards({ rows, onChange, onRemove, shared, openByDefault = false }: {
   const { propertiesFor } = useEditorProperties(shared);
   const source: RecommenderSource = useRecommenderSource(scope, recommendationsEnabled);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const propertyName = useNativePropertyName();
   const target = shared.libraries[0];
   const update = (row: CineRow, patch: Partial<CineRow>) => onChange({ ...row, ...patch });
   function setRowProperty(row: CineRow, propertyKey: string, propertyValue: string) {
@@ -369,30 +271,34 @@ function RowCards({ rows, onChange, onRemove, shared, openByDefault = false }: {
         // The group's switch, then the library's own: either can turn "who recommended it" off.
         const askRecommender = recommendationsEnabled && showsRecommender(properties);
         const recommenderInline = !authorInline && askRecommender;
-        const hasDetails = !openByDefault && (detailProperties.length > 0 || (authorInline && askRecommender));
+        const hiddenCount = detailProperties.length + (authorInline && askRecommender ? 1 : 0);
+        const hasDetails = !openByDefault && hiddenCount > 0;
+        // A property's name as the library calls it (it may have been renamed), or the usual one.
+        const nameOf = (key: string, fallback: string) => {
+          const property = properties?.find((entry) => entry.key === key);
+          return property ? propertyName(property) : fallback;
+        };
         const topRight = authorInline ? (
-          <label>
-            <span className="sr-only">{t("author")}</span>
+          <label className="block">
+            <span className={labelClass}>{nameOf("author", t("author"))}</span>
             <input className={cx(inputClass, authorMissing(row, properties) ? "border-[var(--danger)]" : "")} value={row.author} maxLength={200} placeholder={t("authorPlaceholder")} onChange={(event) => update(row, { author: event.target.value })} />
           </label>
         ) : recommenderInline ? (
-          <RecommenderPicker compact value={row.recommender} onChange={(recommender) => update(row, { recommender })} members={members} source={source} />
-        ) : <span />;
+          <div>
+            <span className={labelClass}>{nameOf("recommended_by", t("recommendedByLabel"))}</span>
+            <RecommenderPicker compact value={row.recommender} onChange={(recommender) => update(row, { recommender })} members={members} source={source} />
+          </div>
+        ) : null;
         return (
           <li className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-3" key={row.key}>
-            <div className={cx("grid gap-2", onRemove || hasDetails ? "sm:grid-cols-[1.6fr_1fr_auto]" : "sm:grid-cols-[1.6fr_1fr]")}>
-              <label>
-                <span className="sr-only">{t("titleLabel")}</span>
+            <div className={cx("grid items-end gap-2", topRight ? (onRemove ? "sm:grid-cols-[1.6fr_1fr_auto]" : "sm:grid-cols-[1.6fr_1fr]") : onRemove ? "grid-cols-[1fr_auto]" : "")}>
+              <label className="block min-w-0">
+                <span className={labelClass}>{nameOf("title", t("nameLabel"))}</span>
                 <input className={inputClass} value={row.title} maxLength={200} placeholder={t("titlePlaceholder")} onChange={(event) => update(row, { title: event.target.value, catalogItemId: undefined })} />
               </label>
               {topRight}
-              {onRemove || hasDetails ? (
-                <div className="flex items-start gap-1">
-                  {hasDetails ? <button type="button" className="min-h-11 rounded-lg px-2 text-xs text-[var(--muted)] hover:text-[var(--ink)]" aria-expanded={open} onClick={() => setExpanded((current) => { const next = new Set(current); if (next.has(row.key)) next.delete(row.key); else next.add(row.key); return next; })}>
-                    {open ? t("hideDetails") : t("details")}
-                  </button> : null}
-                  {onRemove ? <button type="button" className={cx(rowIconClass, "text-[var(--danger)] hover:text-[var(--danger)]")} aria-label={t("remove")} title={t("remove")} onClick={() => onRemove(row.key)}><CircleMinusIcon className="h-[18px] w-[18px]" /></button> : null}
-                </div>
+              {onRemove ? (
+                <button type="button" className={cx(rowIconClass, "mb-1.5 text-[var(--danger)] hover:text-[var(--danger)]")} aria-label={t("remove")} title={t("remove")} onClick={() => onRemove(row.key)}><CircleMinusIcon className="h-[18px] w-[18px]" /></button>
               ) : null}
             </div>
             {scheduleProperty ? (
@@ -410,6 +316,12 @@ function RowCards({ rows, onChange, onRemove, shared, openByDefault = false }: {
                 ) : null}
               </div>
             ) : null}
+            {/* The rest of the item's properties, folded at the foot of the card: "+3 mais". */}
+            {hasDetails ? (
+              <button type="button" className="mt-2 min-h-9 cursor-pointer rounded-full px-1 text-xs text-[var(--muted)] transition hover:text-[var(--ink)]" aria-expanded={open} onClick={() => setExpanded((current) => { const next = new Set(current); if (next.has(row.key)) next.delete(row.key); else next.add(row.key); return next; })}>
+                {open ? t("hideDetails") : t("moreDetails", { count: hiddenCount })}
+              </button>
+            ) : null}
             <span className="sr-only">{index + 1}</span>
           </li>
         );
@@ -419,8 +331,9 @@ function RowCards({ rows, onChange, onRemove, shared, openByDefault = false }: {
 }
 
 /**
- * The "add items" box: paste titles (or a detailed JSON list), or pick from the catalogue, then fill in each
- * new item's library properties right below. Works on a draft; the caller decides when it joins the list.
+ * The "add items" box: one round field (type a title and press Enter or the arrow; paste a list, one per line,
+ * and every line comes in), the catalogue one tap below, then each new item's library properties right under.
+ * Works on a draft; the caller decides when it joins the list.
  */
 export function ItemsAddBox({
   draft,
@@ -432,7 +345,7 @@ export function ItemsAddBox({
 }: EditorShared & {
   draft: CineRow[];
   onDraftChange: (rows: CineRow[]) => void;
-  /** Items already in the list — a pasted title or a catalogue pick that's already there is skipped. */
+  /** Items already in the list — a typed title or a catalogue pick that's already there is skipped. */
   existing?: CineRow[];
   /** Reports what would block saving the draft: a missing book author, or an event date that can't be saved. */
   onProblem?: (problem: "author" | "schedule" | null) => void;
@@ -442,12 +355,9 @@ export function ItemsAddBox({
   const t = useTranslations("cineItems");
   // A challenge has one library: every item added here goes to it.
   const target = shared.libraries[0];
-  const isFilmTarget = target?.kind === "film";
-  const isBookTarget = target?.kind === "book";
-  const [paste, setPaste] = useState("");
-  const [pasteMode, setPasteMode] = useState<"simple" | "json">("simple");
-  const [pasteError, setPasteError] = useState<string | null>(null);
-  const [pasteSummary, setPasteSummary] = useState<JsonPasteSummary | null>(null);
+  const [typed, setTyped] = useState("");
+  // How many of the last titles were already on the list (and so skipped), said once under the field.
+  const [skipped, setSkipped] = useState(0);
   const [catalog, setCatalog] = useState<CatalogItem[] | null>(null);
   const [showCatalog, setShowCatalog] = useState(false);
   const { problemOf } = useEditorProperties(shared);
@@ -469,89 +379,77 @@ export function ItemsAddBox({
   const usedCatalogIds = new Set(everyRow.map((row) => row.catalogItemId).filter(Boolean));
   const stamp = (rows: CineRow[]): CineRow[] => rows.map((row) => ({ ...row, libraryKind: target?.kind ?? "", libraryId: target?.id ?? null }));
 
-  function appendPaste() {
-    setPasteError(null);
-    setPasteSummary(null);
+  /** Adds these titles to the draft, skipping any already on the list (or repeated among them). */
+  function addTitles(titles: string[]) {
     const known = new Set(everyRow.map((row) => row.title.trim().toLowerCase()));
-    if (pasteMode === "json") {
-      try {
-        const { rows, summary } = parseJsonItemsPaste(paste, known);
-        // Always report what came in — including entries dropped as invalid or
-        // duplicated — so nothing disappears without the person being told.
-        setPasteSummary(summary);
-        if (rows.length) {
-          onDraftChange([...draft, ...stamp(rows)]);
-          setPaste("");
-        }
-      } catch (cause) {
-        // Raw: these messages quote JSON, and its braces would read as placeholders.
-        setPasteError(String(t.raw(cause instanceof Error ? cause.message : "jsonInvalid")));
-      }
-      return;
-    }
-    const titles = paste.split("\n").map((line) => line.trim()).filter(Boolean);
-    if (!titles.length) return;
-    const fresh = titles
-      .filter((title) => {
-        if (known.has(title.toLowerCase())) return false;
-        known.add(title.toLowerCase());
-        return true;
-      })
-      .map((title) => newCineRow(title));
-    onDraftChange([...draft, ...stamp(fresh)]);
-    setPasteSummary({ total: titles.length, added: fresh.length, invalid: 0, duplicates: titles.length - fresh.length, unknownKeys: [] });
-    setPaste("");
+    const fresh = titles.map((title) => title.trim()).filter(Boolean).filter((title) => {
+      if (known.has(title.toLowerCase())) return false;
+      known.add(title.toLowerCase());
+      return true;
+    });
+    setSkipped(titles.filter((title) => title.trim()).length - fresh.length);
+    if (fresh.length) onDraftChange([...draft, ...stamp(fresh.map((title) => newCineRow(title)))]);
+  }
+
+  function addTyped() {
+    if (!typed.trim()) return;
+    addTitles([typed]);
+    setTyped("");
   }
 
   if (!target) return null;
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-dashed border-[var(--line)] bg-[var(--wash)]/50 p-3">
-        {isFilmTarget || isBookTarget ? <div className="mb-2 flex gap-1 rounded-full bg-[var(--paper)] p-1 text-xs" role="tablist" aria-label={t("pasteModeAria")}>
-          {(["simple", "json"] as const).map((mode) => (
-            <button
-              type="button"
-              key={mode}
-              role="tab"
-              aria-selected={pasteMode === mode}
-              className={cx("min-h-9 flex-1 rounded-full px-3 font-light", pasteMode === mode ? "bg-[var(--main)] text-white" : "text-[var(--muted)] hover:text-[var(--ink)]")}
-              onClick={() => { setPasteMode(mode); setPasteError(null); setPasteSummary(null); }}
-            >
-              {mode === "simple" ? t("pasteModeSimple") : t("pasteModeJson")}
-            </button>
-          ))}
-        </div> : null}
-        <label className="block"><span className={labelClass}>{pasteMode === "json" && (isFilmTarget || isBookTarget) ? t("pasteJsonLabel") : t("pasteLabel")}</span>
-          <textarea className={cx(inputClass, pasteMode === "json" && (isFilmTarget || isBookTarget) ? "font-mono text-xs" : "")} rows={pasteMode === "json" && (isFilmTarget || isBookTarget) ? 8 : 4} value={paste} onChange={(event) => setPaste(event.target.value)} placeholder={pasteMode === "json" && (isFilmTarget || isBookTarget) ? String(t.raw(isBookTarget ? "pasteJsonPlaceholderBook" : "pasteJsonPlaceholderFilm")) : t("pastePlaceholder")} />
-        </label>
-        {pasteMode === "json" && (isFilmTarget || isBookTarget) ? <p className="mb-2 text-xs leading-5 text-[var(--muted)]">{t("pasteJsonHint")}</p> : null}
-        <StatusMessage error={pasteError} />
-        {pasteSummary ? (
-          <div className="mb-2 space-y-1">
-            <StatusMessage
-              error={pasteSummary.added ? null : t("pasteSummaryNone")}
-              success={pasteSummary.added
-                ? t("pasteSummary", { total: pasteSummary.total, added: pasteSummary.added, invalid: pasteSummary.invalid, duplicates: pasteSummary.duplicates })
-                : null}
-            />
-            {pasteSummary.unknownKeys.length ? (
-              <p className="text-[11px] leading-4 text-[var(--muted)]">{t("pasteUnknownKeys", { keys: pasteSummary.unknownKeys.join(", ") })}</p>
-            ) : null}
-          </div>
-        ) : null}
-        <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={appendPaste} disabled={!paste.trim()}>{t("addPasted")}</Button>
-          <Button variant="ghost" onClick={() => setShowCatalog((open) => !open)}>{showCatalog ? t("hideCatalog") : t("fromCatalog")}</Button>
-        </div>
-        {showCatalog ? (
-          <CatalogPicker
-            items={catalog === null ? null : catalogInTarget}
-            used={usedCatalogIds}
-            onAdd={(picked) => onDraftChange([...draft, ...stamp(picked.map((item) => rowFromCatalog(item, timeZone)))])}
+      {/* Not a form of its own: it sits inside the dialog's form, so Enter is handled here instead. */}
+      <div>
+        <div className="flex h-[46px] items-center gap-1 rounded-full border border-[var(--line)] bg-[var(--paper)] pl-4 pr-1 transition focus-within:border-[var(--main)] focus-within:ring-4 focus-within:ring-[var(--main)]/15">
+          <input
+            className="h-full min-w-0 flex-1 bg-transparent text-sm text-[var(--ink)] outline-none placeholder:text-[var(--muted)]"
+            value={typed}
+            onChange={(event) => setTyped(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
+              event.preventDefault();
+              addTyped();
+            }}
+            // A pasted list (one title per line) comes in whole, each line an item.
+            onPaste={(event) => {
+              const lines = event.clipboardData.getData("text").split(/\r?\n/).filter((line) => line.trim());
+              if (lines.length < 2) return;
+              event.preventDefault();
+              addTitles(lines);
+            }}
+            placeholder={t("typePlaceholder")}
+            aria-label={t("typeLabel")}
+            maxLength={160}
           />
-        ) : null}
+          <button type="button" onClick={addTyped} disabled={!typed.trim()} aria-label={t("addTyped")} title={t("addTyped")} className="grid h-9 w-9 flex-none cursor-pointer place-items-center rounded-full bg-[var(--main)] text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-55">
+            <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10h11M11 5.5 15.5 10 11 14.5" /></svg>
+          </button>
+        </div>
       </div>
-      {draft.length ? <p className="text-[13px] font-medium">{t("draftTitle", { count: draft.length })}</p> : null}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <button
+          type="button"
+          aria-expanded={showCatalog}
+          onClick={() => setShowCatalog((open) => !open)}
+          className={cx(
+            "inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border px-3.5 text-[13px] transition",
+            showCatalog ? "border-transparent bg-[var(--wash)] text-[var(--ink)]" : "border-dashed border-[var(--line)] text-[var(--muted)] hover:border-[var(--muted)] hover:text-[var(--ink)]",
+          )}
+        >
+          {showCatalog ? t("hideCatalog") : <><span aria-hidden="true">＋</span>{t("fromCatalog")}</>}
+        </button>
+        {skipped ? <p className="text-xs text-[var(--muted)]" aria-live="polite">{t("skippedDuplicates", { count: skipped })}</p> : null}
+      </div>
+      {showCatalog ? (
+        <CatalogPicker
+          items={catalog === null ? null : catalogInTarget}
+          used={usedCatalogIds}
+          onAdd={(picked) => onDraftChange([...draft, ...stamp(picked.map((item) => rowFromCatalog(item, timeZone)))])}
+        />
+      ) : null}
+      {draft.length ? <p className="pt-2 text-[13px] font-medium">{t("draftTitle", { count: draft.length })}</p> : null}
       <RowCards
         rows={draft}
         shared={shared}
@@ -637,12 +535,19 @@ export function CineItemsEditor({
   value,
   onChange,
   onProblem,
+  addDialogOpen,
+  onAddDialogOpenChange,
+  showEmptyAddButton = true,
   ...shared
 }: EditorShared & {
   value: CineRow[];
   onChange: (rows: CineRow[]) => void;
   /** Reports what would block saving these rows: a missing book author, or an event date that can't be saved. */
   onProblem?: (problem: "author" | "schedule" | null) => void;
+  /** Lets a surrounding heading own the add button while this editor still owns the dialog. */
+  addDialogOpen?: boolean;
+  onAddDialogOpenChange?: (open: boolean) => void;
+  showEmptyAddButton?: boolean;
 }) {
   const t = useTranslations("cineItems");
   const { problemOf, loaded } = useEditorProperties(shared);
@@ -653,7 +558,9 @@ export function CineItemsEditor({
   const organiseInput = organiseFromRows(value, loaded.get(shared.libraries[0]?.kind ?? "") ?? [], shared.members, recommenders, (key) => tOrganise(`property.${key}`));
   const problem = problemOf(value);
   useEffect(() => { onProblem?.(problem); }, [problem, onProblem]);
-  const [adding, setAdding] = useState(false);
+  const [localAdding, setLocalAdding] = useState(false);
+  const adding = addDialogOpen ?? localAdding;
+  const setAdding = onAddDialogOpenChange ?? setLocalAdding;
   const [draft, setDraft] = useState<CineRow[]>([]);
   const [draftProblem, setDraftProblem] = useState<"author" | "schedule" | null>(null);
   const [editingKey, setEditingKey] = useState<string | null>(null);
@@ -688,7 +595,7 @@ export function CineItemsEditor({
       ) : (
         <div className="grid justify-items-center pb-3">
           <FaceEmptyState title={t("emptyList")} compact />
-          <button
+          {showEmptyAddButton ? <button
             type="button"
             onClick={() => { setDraft([]); setAdding(true); }}
             aria-label={t("addItems")}
@@ -696,7 +603,7 @@ export function CineItemsEditor({
             className="-mt-3 grid h-11 w-11 cursor-pointer place-items-center rounded-full bg-[var(--main)] text-white shadow-[var(--elevate-1)] transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
           >
             <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
-          </button>
+          </button> : null}
         </div>
       )}
 

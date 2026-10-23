@@ -159,6 +159,22 @@ export function recommenderVisibleSql(itemAlias: string): string {
      WHERE rl.group_id = ${itemAlias}.group_id AND rl.kind = ${itemAlias}.kind AND rc.hidden = true)`;
 }
 
+/**
+ * A library starts without "who recommended it": a new library gets the explicit "hidden" row (the property
+ * stays one switch away in the library's settings). Libraries made before this keep whatever they had.
+ */
+export async function hideRecommenderOnNewLibrary(
+  client: { query: (text: string, values: unknown[]) => Promise<unknown> },
+  libraryId: string,
+): Promise<void> {
+  await client.query(
+    `INSERT INTO catalog_native_property_configs (id, library_id, property_key, label, hidden, position, created_at, updated_at)
+     VALUES ($1, $2, 'recommended_by', NULL, true, NULL, now(), now())
+     ON CONFLICT (library_id, property_key) DO NOTHING`,
+    [publicId(), libraryId],
+  );
+}
+
 /** Whether a challenge's items come from a library that switched "who recommended it" off. */
 export async function challengeHidesRecommender(
   client: { query: (text: string, values: unknown[]) => Promise<{ rows: unknown[] }> },

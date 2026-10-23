@@ -123,6 +123,7 @@ export function CreateChallengeScreen({
   const [itemDates, setItemDates] = useState(draft?.itemDates ?? false);
   const [expectation, setExpectation] = useState(draft?.expectation ?? false);
   const [cineItems, setCineItems] = useState<CineRow[]>(draft?.cineItems ?? []);
+  const [itemsAdding, setItemsAdding] = useState(false);
   const [participantIds, setParticipantIds] = useState<Id[]>(draft?.participantIds ?? group?.members?.map((member) => member.id) ?? []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -642,7 +643,20 @@ export function CreateChallengeScreen({
 
         {stepKey === "checkpoints" && tracksCatalog ? (
           <div>
-            <h2 className="text-xl font-light">{t("checkpointsTitle")}</h2>
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-xl font-light">{t("checkpointsTitle")}</h2>
+              {!cineItems.length && itemLibraries.length ? (
+                <button
+                  type="button"
+                  onClick={() => setItemsAdding(true)}
+                  aria-label={t("addItems")}
+                  title={t("addItems")}
+                  className="grid h-11 w-11 flex-none cursor-pointer place-items-center rounded-full bg-[var(--main)] text-white shadow-[var(--elevate-1)] transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
+                >
+                  <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
+                </button>
+              ) : null}
+            </div>
             {/* The hint follows what the list holds: films, books to rate, books to read day by day, or anything else. */}
             {itemListHint ? <p className="mt-1 mb-4 text-sm leading-6 text-[var(--muted)]">{itemListHint}</p> : null}
             {itemLibraries.length ? (
@@ -655,6 +669,9 @@ export function CreateChallengeScreen({
                 recommendationsEnabled={recommendationsEnabled}
                 showSchedule={itemDates}
                 onProblem={setItemProblem}
+                addDialogOpen={itemsAdding}
+                onAddDialogOpenChange={setItemsAdding}
+                showEmptyAddButton={false}
               />
             ) : <EmptyState title={t("pickLibraryFirst")} />}
             <Toggle className="mt-5 bg-[var(--paper)]" checked={itemDates} onChange={setItemDates} label={t("itemDatesLabel")} hint={t("itemDatesHint")} />

@@ -12,6 +12,14 @@ const { DELETE, GET, PATCH, POST } = await import("../../app/api/[...path]/route
 const { dateKeyInTimeZone } = await import("../../lib/goa/domain/shared");
 const adminPool = new pg.Pool({ connectionString: databaseUrl, max: 1 });
 
+/**
+ * New libraries start without "who recommended it" (the property is hidden until switched on); the tests
+ * about recommendations switch it back on for every library that exists at that point (the values were kept).
+ */
+async function showRecommenders() {
+  await adminPool.query("UPDATE catalog_native_property_configs SET hidden = false WHERE property_key = 'recommended_by'");
+}
+
 type ClientSession = { cookie: string; csrf: string; user: { id: string; name: string; username: string } };
 
 async function call(
@@ -1634,6 +1642,7 @@ test("fase 1a: acervo do grupo, identidade do filme entre rodadas e indicador", 
   assert.equal(aftersun.year, 2022);
   assert.equal(aftersun.mainGenre, "drama");
 
+  await showRecommenders();
   const detail = await call("GET", `/api/challenges/${firstId}`, { session: owner });
   const items = (detail.body as { items: Array<{ title: string; catalogItem: { id: string; year: number | null } | null; recommendedBy: { name: string } | null }> }).items;
   assert.equal(items[0].recommendedBy?.name, "Dan");
@@ -2099,6 +2108,7 @@ test("indicação por nome externo (fase 6): reutilizável, exclusiva, isolada p
   // atribui pela escolha "nome salvo"
   const assigned = await call("PATCH", `/api/challenges/${cid}/items/${itemId}`, { session: owner, body: { recommendedByExternalId: anaId } });
   assert.equal(assigned.response.status, 200, JSON.stringify(assigned.body));
+  await showRecommenders();
   const inGroup = await call("GET", `/api/challenges/${cid}`, { session: owner });
   assert.deepEqual(
     (inGroup.body as { items: Array<{ recommendedBy: unknown }> }).items[0].recommendedBy,
@@ -2127,6 +2137,7 @@ test("indicação por nome externo (fase 6): reutilizável, exclusiva, isolada p
     session: owner, body: { kind: "other", title: "Documentário X", catalogRecommendedByExternalId: anaId },
   });
   assert.equal(catalogItem.response.status, 201, JSON.stringify(catalogItem.body));
+  await showRecommenders();
   const catalog = await call("GET", `/api/groups/${gid}/catalog`, { session: owner });
   const docs = (catalog.body as { items: Array<{ title: string; recommendedBy: { name: string } | null }> }).items.find((item) => item.title === "Documentário X");
   assert.equal(docs?.recommendedBy?.name, "Ana (RH)");
@@ -2559,7 +2570,7 @@ test("propriedades da biblioteca: renomear e ocultar, nativa ou personalizada, p
   const initial = await props(screens.id);
   assert.deepEqual(initial.properties.map((property) => property.key), ["title", "year", "main_genre", "runtime_minutes", "scheduled_at", "recommended_by"]);
   assert.equal(initial.properties.every((property) => property.storage === "native" && property.label === null), true);
-  assert.deepEqual(initial.properties.filter((property) => property.hidden).map((property) => property.key), ["scheduled_at"], "só a data do evento nasce desligada");
+  assert.deepEqual(initial.properties.filter((property) => property.hidden).map((property) => property.key), ["scheduled_at", "recommended_by"], "a data do evento e quem indicou nascem desligadas");
   assert.equal(initial.properties[0].canHide, false, "o nome do item nunca fica oculto");
 
   // renomear e ocultar uma propriedade nativa — dado e métrica seguem intactos
@@ -2581,7 +2592,8 @@ test("propriedades da biblioteca: renomear e ocultar, nativa ou personalizada, p
   // voltar ao padrão remove a sobrescrita em vez de guardar uma linha vazia
   await call("PATCH", `/api/catalog/libraries/${screens.id}/properties/year`, { session: owner, body: { label: null, hidden: false } });
   const overrides = await adminPool.query<{ property_key: string }>("SELECT property_key FROM catalog_native_property_configs WHERE library_id = $1", [screens.id]);
-  assert.deepEqual(overrides.rows.map((row) => row.property_key), ["title"]);
+  // (the "who recommended it" row is the library's own default: it starts switched off)
+  assert.deepEqual(overrides.rows.map((row) => row.property_key).sort(), ["recommended_by", "title"]);
 
   // uma propriedade personalizada usa exatamente a mesma chamada
   const def = await call("POST", `/api/groups/${gid}/catalog-attributes`, { session: owner, body: { kind: "film", label: "Diretor" } });
@@ -4375,6 +4387,7 @@ test("um ranking por item traz quem indicou, o ano do catálogo e a média crua 
   });
   assert.equal(customRanking.response.status, 201, JSON.stringify(customRanking.body));
 
+  await showRecommenders();
   const withRanking = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { metrics: ApiMetric[] };
   const ranking = withRanking.metrics.find((metric) => metric.label === "Ranking com 1 voto")!;
   const row = ranking.series!.find((entry) => entry.label === "Aftersun")!;
@@ -4616,6 +4629,7 @@ test("importação por JSON: prévia sem salvar, mapeia campos, avisa chave desc
     },
   });
   assert.equal(commit.response.status, 201, JSON.stringify(commit.body));
+  await showRecommenders();
   const finalDetail = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
     items: Array<{ title: string; recommendedBy: { name: string } | null; originNote: string | null }>;
   };
@@ -5893,6 +5907,7 @@ test("cenário de aceitação V1: grupo de 6, Cinema com semanas, JSON, expectat
   const commit = await call("POST", `/api/challenges/${challengeId}/items`, { session: owner, body: { items: toCommit } });
   assert.equal(commit.response.status, 201, JSON.stringify(commit.body));
 
+  await showRecommenders();
   let detail = (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as {
     entryTypes: Array<{ id: string; purpose: string; visibilityPolicy: string; fields: Array<{ id: string; key: string }> }>;
     items: Array<{ id: string; title: string; recommendedBy: { name: string } | null; originNote: string | null }>;
@@ -7149,6 +7164,7 @@ test("indicações em itens novos: nome salvo na criação e na adição, isolad
   });
   assert.equal(created.response.status, 201, JSON.stringify(created.body));
   const cid = (created.body as { id: string }).id;
+  await showRecommenders();
   const detail = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as {
     items: Array<{ title: string; recommendedBy: { kind: string; name: string } | null; originNote: string | null }>;
   };
@@ -9037,6 +9053,7 @@ test("quem indicou é uma propriedade da biblioteca: desligada, some do item, do
   type Detail = { items: Array<{ id: string; recommendedBy: { name: string } | null; catalogItem: { id: string } }> };
   const detail = async () => (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as Detail;
   await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } });
+  await showRecommenders();
   const first = await detail();
   assert.equal(first.items[0].recommendedBy?.name, "Nara Indica");
   // The catalogue item keeps its own "who recommended it", apart from the round's.

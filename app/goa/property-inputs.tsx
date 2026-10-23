@@ -38,8 +38,8 @@ export function builtInProperties(kind: string): LibraryProperty[] {
       : [["title", "text"]];
   return [...keys, ["scheduled_at", "schedule"], ["recommended_by", "recommender"]].map(([key, type], position) => ({
     key, type: type as LibraryProperty["type"], storage: "native" as const, label: null,
-    // The event date is opt-in: a library has to switch it on before its items ask for one.
-    hidden: key === "scheduled_at", position, canHide: key !== "title",
+    // The event date and "who recommended it" are opt-in: a library switches them on before its items ask.
+    hidden: key === "scheduled_at" || key === "recommended_by", position, canHide: key !== "title",
   }));
 }
 
@@ -101,7 +101,7 @@ export function useLibrariesProperties(
 }
 
 /** A property's name as shown: whatever the library renamed it to, else its default. */
-function useNativePropertyName(): (property: Pick<LibraryProperty, "key" | "label" | "storage">) => string {
+export function useNativePropertyName(): (property: Pick<LibraryProperty, "key" | "label" | "storage">) => string {
   const t = useTranslations("libraries");
   return (property) => property.label?.trim() || (property.storage === "native" && t.has(`native.${property.key}`) ? t(`native.${property.key}`) : property.key);
 }
@@ -112,9 +112,13 @@ export function editableProperties(properties: LibraryProperty[]): LibraryProper
   return properties.filter((property) => !property.hidden && property.key !== "title" && property.type !== "recommender");
 }
 
-/** Whether the library asks who recommended an item. On unless it switched the property off (or while loading). */
+/**
+ * Whether the library asks who recommended an item: only when it has the property switched on. A library that
+ * doesn't exist yet (or whose properties are still loading) doesn't ask; a new library starts with it off.
+ */
 export function showsRecommender(properties: LibraryProperty[] | null | undefined): boolean {
-  return properties?.find((property) => property.type === "recommender")?.hidden !== true;
+  const property = properties?.find((entry) => entry.type === "recommender");
+  return Boolean(property && !property.hidden);
 }
 
 export function valuesFromItem(

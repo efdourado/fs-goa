@@ -128,8 +128,8 @@ describe("library properties as form values", () => {
     assert.deepEqual(builtInProperties("film").map((property) => property.key), ["title", "year", "main_genre", "runtime_minutes", "scheduled_at", "recommended_by"]);
     assert.deepEqual(builtInProperties("book").map((property) => property.key), ["title", "author", "year", "main_genre", "page_count", "scheduled_at", "recommended_by"]);
     assert.deepEqual(builtInProperties("lib_abc").map((property) => property.key), ["title", "scheduled_at", "recommended_by"]);
-    // The event date is off until a library switches it on.
-    assert.deepEqual(builtInProperties("lib_abc").filter((property) => property.hidden).map((property) => property.key), ["scheduled_at"]);
+    // The event date and "who recommended it" are off until a library switches them on.
+    assert.deepEqual(builtInProperties("lib_abc").filter((property) => property.hidden).map((property) => property.key), ["scheduled_at", "recommended_by"]);
   });
 });
 
