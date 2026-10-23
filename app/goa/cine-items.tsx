@@ -663,7 +663,7 @@ export function CineItemsEditor({
 
   return (
     <div>
-      <Button className="mb-4 min-h-11 w-full" onClick={() => { setDraft([]); setAdding(true); }}>＋ {t("addItems")}</Button>
+      {value.length ? <Button className="mb-4 min-h-11 w-full" onClick={() => { setDraft([]); setAdding(true); }}>＋ {t("addItems")}</Button> : null}
       {value.length ? (
         <div className="mb-3 flex min-h-9 items-center justify-between gap-3">
           <p className="text-sm font-medium">{t("listCount", { count: value.length })}</p>
@@ -686,7 +686,18 @@ export function CineItemsEditor({
           ))}
         </ol>
       ) : (
-        <FaceEmptyState title={t("emptyList")} compact />
+        <div className="grid justify-items-center pb-3">
+          <FaceEmptyState title={t("emptyList")} compact />
+          <button
+            type="button"
+            onClick={() => { setDraft([]); setAdding(true); }}
+            aria-label={t("addItems")}
+            title={t("addItems")}
+            className="-mt-3 grid h-11 w-11 cursor-pointer place-items-center rounded-full bg-[var(--main)] text-white shadow-[var(--elevate-1)] transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
+          >
+            <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
+          </button>
+        </div>
       )}
 
       {adding ? (

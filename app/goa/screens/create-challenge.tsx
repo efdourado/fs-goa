@@ -645,7 +645,6 @@ export function CreateChallengeScreen({
             <h2 className="text-xl font-light">{t("checkpointsTitle")}</h2>
             {/* The hint follows what the list holds: films, books to rate, books to read day by day, or anything else. */}
             {itemListHint ? <p className="mt-1 mb-4 text-sm leading-6 text-[var(--muted)]">{itemListHint}</p> : null}
-            <Toggle className="mb-5 bg-[var(--paper)]" checked={itemDates} onChange={setItemDates} label={t("itemDatesLabel")} hint={t("itemDatesHint")} />
             {itemLibraries.length ? (
               <CineItemsEditor
                 value={cineItems}
@@ -658,6 +657,7 @@ export function CreateChallengeScreen({
                 onProblem={setItemProblem}
               />
             ) : <EmptyState title={t("pickLibraryFirst")} />}
+            <Toggle className="mt-5 bg-[var(--paper)]" checked={itemDates} onChange={setItemDates} label={t("itemDatesLabel")} hint={t("itemDatesHint")} />
           </div>
         ) : null}
 
