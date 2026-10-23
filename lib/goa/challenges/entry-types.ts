@@ -134,7 +134,7 @@ export async function entryTypesForChallenge(
   const result = await client.query<EntryTypeRow>(
     `SELECT ${SELECT_COLUMNS} FROM entry_types
       WHERE challenge_id = $1 AND archived_at IS NULL
-      ORDER BY created_at`,
+      ORDER BY created_at, is_primary DESC, id`,
     [challengeId],
   );
   return result.rows;

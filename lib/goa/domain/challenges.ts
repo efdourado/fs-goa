@@ -178,11 +178,13 @@ export async function createChallenge(
       // A group's single answer has one name: the response is called what its value is called.
       const onlyLabel = typeFields.length === 1 && typeof typeFields[0].label === "string" ? typeFields[0].label.trim() : "";
       const typeName = shared && onlyLabel ? onlyLabel.slice(0, 120) : type.name;
+      // clock_timestamp, not now(): every type here is made in one transaction, and the forms are listed by when
+      // they were made, so they need distinct times to keep the order they were given in.
       await client.query(
         `INSERT INTO entry_types
           (id, challenge_id, semantic_key, name, submission_mode, purpose, target_policy, cardinality, schedule_policy,
            is_primary, answer_scope, shared_edit_policy, created_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,now(),now())`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,clock_timestamp(),now())`,
         [typeId, id, type.semanticKey, typeName, type.submissionMode, type.purpose,
           type.targetPolicy, type.cardinality, type.schedulePolicy, isPrimary,
           shared ? "shared" : "individual", shared ? sharedEditPolicy : null],
@@ -217,7 +219,7 @@ export async function createChallenge(
         `INSERT INTO entry_types
           (id, challenge_id, semantic_key, name, submission_mode, purpose, target_policy, cardinality, schedule_policy,
            is_primary, visibility_policy, answer_scope, shared_edit_policy, created_at, updated_at)
-         VALUES ($1,$2,$3,$4,'item','rating','required','once_per_item','while_active',false,'group_realtime',$5,$6,now(),now())`,
+         VALUES ($1,$2,$3,$4,'item','rating','required','once_per_item','while_active',false,'group_realtime',$5,$6,clock_timestamp(),now())`,
         [typeId, id, key, response.name, response.answerScope, shared ? sharedEditPolicy : null],
       );
       for (let index = 0; index < response.fields.length; index += 1) {
