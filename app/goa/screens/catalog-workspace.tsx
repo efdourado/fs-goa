@@ -668,12 +668,12 @@ export function CatalogWorkspaceScreen({
           itemCount={countByKind.get(dialogLibrary.kind)?.total ?? 0}
           onClose={() => setDialog(null)}
           onChanged={reloadAll}
-          onDeleted={dialogLibrary.source !== "screens" && dialogLibrary.source !== "pages" ? (name) => {
+          onDeleted={(name) => {
             setDialog(null);
             if (dialogLibrary.kind === kind) { chooseLibrary(""); stopSelecting(); }
             setNotice(tl("deleted", { name }));
             reloadAll();
-          } : undefined}
+          }}
         />
       ) : null}
       {confirmingRemoval ? (

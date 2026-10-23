@@ -182,7 +182,6 @@
       "library_not_linked": "Adicione essa biblioteca ao desafio primeiro.",
       "library_in_use": "Remova os itens dessa biblioteca antes.",
       "library_missing": "Crie primeiro a biblioteca Lugares e depois monte o desafio.",
-      "library_builtin": "Filmes e séries e Livros vêm com o app e não podem ser excluídas.",
       "library_has_items": "Confirme para excluir com os itens.",
       "library_busy": "Há itens dela em desafios em andamento.",
       "item_not_open": "As respostas para este item ainda não abriram.",

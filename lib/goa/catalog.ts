@@ -43,6 +43,11 @@ export async function ensureCatalogLibrary(
   kind: string,
   actorUserId: string,
 ): Promise<void> {
+  // A library deleted while its items wait in the Lixeira is only archived: adding to it again brings it back.
+  await client.query(
+    "UPDATE catalog_libraries SET archived_at = NULL, updated_at = now() WHERE group_id = $1 AND kind = $2 AND archived_at IS NOT NULL",
+    [groupId, kind],
+  );
   const created = await client.query<{ id: string }>(
     `INSERT INTO catalog_libraries (id, group_id, kind, source, created_by_user_id)
      VALUES ($1, $2, $3, $4, $5)
@@ -1001,10 +1006,6 @@ export async function deleteCatalogLibrary(session: SessionContext, libraryId: s
     } else {
       await requireGroupRole(session.user.id, library.group_id, ["owner", "admin"], client);
     }
-    if (library.source === "screens" || library.source === "pages") {
-      throw new ApiError(409, "library_builtin", "Filmes e séries e Livros vêm com o app e não podem ser excluídas.");
-    }
-
     const items = await client.query<{ id: string }>(
       "SELECT id FROM catalog_items WHERE group_id = $1 AND kind = $2 AND archived_at IS NULL ORDER BY title",
       [library.group_id, library.kind],

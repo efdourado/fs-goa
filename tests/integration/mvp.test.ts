@@ -8036,9 +8036,11 @@ test("excluir uma biblioteca: pede confirmação se tem itens, respeita desafio 
 
   await call("POST", `/api/groups/${gid}/catalog/items`, { session: owner, body: { kind: "film", title: "Aftersun" } });
   const screens = (await libraries()).find((library) => library.source === "screens")!;
-  const builtIn = await call("DELETE", `/api/catalog/libraries/${screens.id}?deleteItems=1`, { session: owner });
-  assert.equal(builtIn.response.status, 409);
-  assert.equal((builtIn.body as { error: string }).error, "library_builtin", "Screens e Pages ficam");
+  const filmsGone = await call("DELETE", `/api/catalog/libraries/${screens.id}?deleteItems=1`, { session: owner });
+  assert.equal(filmsGone.response.status, 200, `Filmes e séries também se exclui: ${JSON.stringify(filmsGone.body)}`);
+  assert.equal((await libraries()).some((library) => library.id === screens.id), false);
+  await call("POST", `/api/groups/${gid}/catalog/items`, { session: owner, body: { kind: "film", title: "Paris, Texas" } });
+  assert.equal((await libraries()).some((library) => library.source === "screens"), true, "um filme novo traz a biblioteca de volta");
 
   const created = await call("POST", `/api/groups/${gid}/challenges`, {
     session: owner, body: { recipe: "custom", title: "Ciclo", libraryId: shelf.id, participantIds: [owner.user.id], items: [{ title: "Item 3" }] },
