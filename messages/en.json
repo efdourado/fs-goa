@@ -664,7 +664,7 @@
     "summaryParticipants": "{count} participants",
     "summaryNote": "The challenge is created as a draft. Review everything in the admin area before activating.",
     "backStep": "Back",
-    "next": "Continue →",
+    "next": "Continue",
     "creatingDraft": "Creating draft…",
     "createDraft": "Create draft",
     "expectationLabel": "Collect an expectation rating",

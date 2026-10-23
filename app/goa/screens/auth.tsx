@@ -5,7 +5,7 @@ import { type FormEvent, useState } from "react";
 
 import { useGoaFormat } from "../format";
 import { SettingsMenu } from "../SettingsMenu";
-import { Brand, Button, inputClass, labelClass, StatusMessage } from "../ui";
+import { ArrowRightIcon, Brand, Button, inputClass, labelClass, StatusMessage } from "../ui";
 
 type Mode = "login" | "register";
 
@@ -128,7 +128,7 @@ export function AuthScreen({
             <StatusMessage error={error} />
             <Button type="submit" disabled={busy} className="w-full mt-6">
               {busy ? t("wait") : t(`${mode}.submit`)}
-              {!busy ? <span aria-hidden="true">→</span> : null}
+              {!busy ? <ArrowRightIcon /> : null}
             </Button>
           </form>
 

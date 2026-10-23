@@ -11,7 +11,7 @@ import { buildStory, type Story, type StoryInput } from "./story/model";
 import { firstName, personTone } from "./rating-scale";
 import { storyHeadline, useStoryFigures } from "./story/view";
 import { coverColors, coverToneOf } from "./catalog-cover";
-import { CirclePinIcon, cx } from "./ui";
+import { ArrowRightIcon, CirclePinIcon, cx } from "./ui";
 import { metricHasData } from "./utils";
 
 // ── picking and excerpting (pure, unit-tested) ─────────────────────────────
@@ -230,7 +230,7 @@ function Story({ template, onOpen }: { template: TemplateSummary; onOpen: (id: I
 
       <div className="mt-auto pt-5 sm:pt-8">
         <button type="button" onClick={() => onOpen(template.id)} className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border border-[var(--main-line)] px-4 text-sm text-[var(--main-strong)] transition hover:bg-[var(--main-soft)] focus-visible:outline-none">
-          {t("seeResult")} <span aria-hidden="true">→</span>
+          {t("seeResult")} <ArrowRightIcon />
         </button>
       </div>
     </article>

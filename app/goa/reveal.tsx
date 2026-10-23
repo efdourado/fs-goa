@@ -7,7 +7,7 @@ import { copyText } from "./clipboard";
 import { firstName, landedAfter, personTone, RatingScale } from "./rating-scale";
 import { ConfirmDialog } from "./dialog";
 import type { ChallengeDetail, ChallengeItem, Entry, EntryTypeView, Id } from "./types";
-import { AvatarMark, Button, cx } from "./ui";
+import { ArrowRightIcon, AvatarMark, Button, cx } from "./ui";
 import { entryRatingReader, itemIdForEntry, valuesAsRecord } from "./utils";
 
 /** The rating type whose answers stay sealed until the group reveals them together, if the challenge has one. */
@@ -145,7 +145,7 @@ export function RevealPanel({
               disabled={busy || !onReveal || answered.size === 0}
               onClick={() => (missing.length ? setConfirming(true) : void reveal())}
             >
-              {busy ? t("revealing") : t("revealButton")}<span aria-hidden="true">→</span>
+              {busy ? t("revealing") : t("revealButton")}<ArrowRightIcon />
             </Button>
           ) : (
             <p className="text-sm text-white/80">{t("rateFirst")}</p>

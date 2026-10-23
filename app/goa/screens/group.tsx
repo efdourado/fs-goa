@@ -12,7 +12,7 @@ import { catalogCardHeight, CatalogTile, resolveCoverTop } from "../catalog-view
 import { LibraryGlyph, useCatalogShelf, useLibraryName } from "../libraries";
 import { Rail, RailArrows, ShelfAddButton, shelfCardWidth, useShelfRail } from "../shelf";
 import type { CatalogItem, ChallengeSummary, GroupInviteResult, GroupSummary, Id, Member, PendingGroupRequest } from "../types";
-import { AvatarMark, BackButton, Button, cx, FaceEmptyState, Field, inputClass, LinkPill, Select, SlidersIcon, StatusMessage, Toggle } from "../ui";
+import { ArrowRightIcon, AvatarMark, BackButton, Button, cx, FaceEmptyState, Field, inputClass, LinkPill, Select, SlidersIcon, StatusMessage, Toggle } from "../ui";
 
 
 /** A word of the line under the invite link that opens its select. */
@@ -451,7 +451,7 @@ export function GroupScreen({
                     >
                       <span className="text-2xl font-light tracking-[-0.04em]">{remainingCatalog}</span>
                       <span className="min-w-0 flex-1 truncate text-xs text-[var(--muted)]">{t("catalogMoreIn", { name: activeCatalogLibrary ? libraryName(activeCatalogLibrary) : t("catalogTitle") })}</span>
-                      <span className="flex-none text-[13px] text-[var(--ink)]">{t("catalogSeeAll")} →</span>
+                      <span className="inline-flex flex-none items-center gap-1.5 text-[13px] text-[var(--ink)]">{t("catalogSeeAll")}<ArrowRightIcon className="h-3.5 w-3.5" /></span>
                     </button>
                   ) : null}
                 </Rail>

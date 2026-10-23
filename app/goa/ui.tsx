@@ -58,6 +58,15 @@ export function BackButton({ onClick, label, className, labelClassName }: { onCl
   );
 }
 
+/** The forward counterpart to the creator's icon-only Back arrow. */
+export function ArrowRightIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={className} fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+      <path d="M3 8h10m-4-4 4 4-4 4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 /** Set by a modal (dialog, bottom sheet): its buttons are pills. */
 export const InModal = createContext(false);
 

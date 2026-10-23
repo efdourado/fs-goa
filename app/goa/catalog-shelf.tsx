@@ -7,7 +7,7 @@ import { useGoaFormat } from "./format";
 import { type CatalogScope, type CatalogShelfData, useCatalogShelf } from "./libraries";
 import { Rail, RailArrows, shelfCardWidth, useShelfRail } from "./shelf";
 import type { Id } from "./types";
-import { cx, EmptyState } from "./ui";
+import { ArrowRightIcon, cx, EmptyState } from "./ui";
 import { formatRuntime } from "./utils";
 
 /** A page shows only the head of the catalogue; the rest is one tap away. */
@@ -109,7 +109,7 @@ export function CatalogShelfView({ scope, canManage, onOpenCatalog, onOpenItem, 
               >
                 <span className="text-2xl font-light tracking-[-0.04em]">{remaining}</span>
                 <span className="min-w-0 flex-1 truncate text-xs text-[var(--muted)]">{t("catalogMoreIn", { name: title })}</span>
-                <span className="flex-none text-[13px] text-[var(--ink)]">{t("catalogSeeAll")} →</span>
+                <span className="inline-flex flex-none items-center gap-1.5 text-[13px] text-[var(--ink)]">{t("catalogSeeAll")}<ArrowRightIcon className="h-3.5 w-3.5" /></span>
               </button>
             ) : null}
           </Rail>

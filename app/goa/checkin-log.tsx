@@ -20,7 +20,7 @@ import {
 import { useGoaFormat } from "./format";
 import { Segmented } from "./Segmented";
 import type { ChallengeField, Entry, Id } from "./types";
-import { Button, cx, inputClass, labelClass, sectionLabelClass, StatusMessage } from "./ui";
+import { ArrowRightIcon, Button, cx, inputClass, labelClass, sectionLabelClass, StatusMessage } from "./ui";
 import { valuesAsRecord } from "./utils";
 
 /** One logged day: the entry behind it and, for a counter, the number it holds. */
@@ -801,7 +801,7 @@ function CounterEditor({
         </div>
       ) : (
         <div className="flex flex-wrap items-center gap-2.5">
-          <Button type="submit" className="min-w-44" disabled={disabled || amount === null || Boolean(problem) || unchanged}>{saveLabel}<span aria-hidden="true">→</span></Button>
+          <Button type="submit" className="min-w-44" disabled={disabled || amount === null || Boolean(problem) || unchanged}>{saveLabel}<ArrowRightIcon /></Button>
           {record && counter.onDelete ? <Button variant="ghost" disabled={busy} onClick={() => setConfirming(true)}>{t("remove")}</Button> : null}
         </div>
       )}

@@ -13,7 +13,7 @@ import { type CatalogScope, LibraryPills, libraryChoices, librarySuggestions, us
 import { RecipeIcon, type RecipeIconName } from "../recipe-icons";
 import { RuleSectionsEditor } from "../rules";
 import type { ChallengeCreationInput, ChallengeField, ChallengeResponseInput, ChallengeRule, CreatableRecipeKey, GroupSummary, Id, SharedEditPolicy } from "../types";
-import { AddRow, BackButton, backLinkClass, Button, cardClass, ChevronIcon, CircleMinusIcon, cx, EmptyState, Field, inputClass, labelClass, PageHeading, rowIconClass, SchedulePeriodFields, SelectableCards, StatusMessage, Toggle } from "../ui";
+import { AddRow, ArrowRightIcon, BackButton, backLinkClass, Button, cardClass, ChevronIcon, CircleMinusIcon, cx, EmptyState, Field, inputClass, labelClass, PageHeading, rowIconClass, SchedulePeriodFields, SelectableCards, StatusMessage, Toggle } from "../ui";
 
 /** Where the items come from: the books of a daily-progress challenge, the library a list picks, or none at all. */
 type EditorLibrary = { id: Id | null; kind: string; source: "screens" | "pages" | "tables" | "custom"; label: string | null };
@@ -710,7 +710,7 @@ export function CreateChallengeScreen({
               <span className="sr-only">{t("backStep")}</span>
             </Button>
           ) : null}
-          {step < lastStep ? <Button className="min-h-11 px-6" disabled={!currentStepReady} onClick={nextStep}>{t("next")}</Button> : <Button className="min-h-11 px-6" disabled={busy || !formReady} onClick={() => void submit()}>{busy ? t("creatingDraft") : t("createDraft")}</Button>}
+          {step < lastStep ? <Button className="min-h-11 px-6" disabled={!currentStepReady} onClick={nextStep}>{t("next")}<ArrowRightIcon /></Button> : <Button className="min-h-11 px-6" disabled={busy || !formReady} onClick={() => void submit()}>{busy ? t("creatingDraft") : t("createDraft")}</Button>}
         </div>
       </section>
       {leaving ? (

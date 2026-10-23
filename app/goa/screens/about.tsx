@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 
-import { BackButton, PageHeading } from "../ui";
+import { ArrowRightIcon, BackButton, PageHeading } from "../ui";
 
 interface Point { title: string; body: string }
 
@@ -79,7 +79,7 @@ export function AboutScreen({ onBack, backLabel }: { onBack: () => void; backLab
           {/* The pill only says it; the address beside it is the link. */}
           <span className="inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--line)] px-5 text-sm text-[var(--ink)]">
             {t("contactButton")}
-            <span aria-hidden="true">→</span>
+            <ArrowRightIcon />
           </span>
           <a href={`mailto:${CONTACT_EMAIL}`} className="text-sm text-[var(--muted)] underline underline-offset-4 hover:text-[var(--ink)]">{CONTACT_EMAIL}</a>
         </div>
