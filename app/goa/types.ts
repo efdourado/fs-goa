@@ -16,7 +16,7 @@ export type RecipeKey =
   | "cine_curated"
   | "reading_club"
   | "reading_daily";
-export type CreatableRecipeKey = "cinema" | "library" | "bookshelf" | "habit" | "tables" | "custom";
+export type CreatableRecipeKey = "cinema" | "library" | "bookshelf" | "habit" | "tables" | "custom" | "progress";
 export type EntryPurpose = "progress" | "completion" | "expectation" | "rating" | "checkin";
 export type TargetPolicy = "required" | "optional" | "none";
 export type Cardinality = "once_per_item" | "once_per_item_day" | "repeatable" | "once_per_day";
@@ -128,7 +128,8 @@ export interface FieldConfig {
  * now); `showDates` false keeps the days out of sight — still saved, they're how a start and a finish are known.
  */
 export interface FieldCount {
-  goal: { from: "page_count" } | { value: number } | null;
+  /** A number property of the item (`page_count`, or a library property's key), a fixed number, or none. */
+  goal: { from: string } | { value: number } | null;
   entry: "amount" | "position";
   showDates: boolean;
 }
@@ -683,8 +684,8 @@ export type Screen =
   | { kind: "account-deactivated" }
   | { kind: "invite"; token: string }
   | { kind: "invite-success"; invitation: InviteAcceptance }
-  | { kind: "create-challenge"; groupId: Id }
-  | { kind: "create-personal-challenge" }
+  | { kind: "create-challenge"; groupId: Id; resume?: true }
+  | { kind: "create-personal-challenge"; resume?: true }
   | { kind: "challenge"; challengeId: Id; tab: ParticipantTab }
   | { kind: "admin"; challengeId: Id; tab: AdminTab }
   | { kind: "templates" }
@@ -727,6 +728,8 @@ export interface ChallengeCreationInput {
   startsOn: string | null;
   endsOn: string | null;
   fields: ChallengeField[];
+  /** Further item responses, each with its own fields and audience. The recipe's response above remains primary. */
+  additionalResponses?: ChallengeResponseInput[];
   items: ChallengeItemInput[];
   generateDaily: boolean;
   /** Cinema/Estante: also open the optional pre-watch "Expectativa" rating. */
@@ -746,6 +749,13 @@ export interface ChallengeCreationInput {
   /** Each item of the chosen libraries has its own scheduled date and time (a match's kickoff). */
   itemDates?: boolean;
   participantIds: Id[];
+}
+
+/** A separate answer form attached to every item in a newly-created challenge. */
+export interface ChallengeResponseInput {
+  name: string;
+  answerScope: "individual" | "shared";
+  fields: ChallengeField[];
 }
 
 export interface ChallengeItemInput {

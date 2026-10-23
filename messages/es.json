@@ -181,8 +181,8 @@
       "library_required": "Elige de qué biblioteca viene el ítem.",
       "library_not_linked": "Añade esta biblioteca al desafío primero.",
       "library_in_use": "Quita primero los ítems de esta biblioteca.",
-      "library_missing": "Crea primero la biblioteca Tables y luego arma el desafío.",
-      "library_builtin": "Screens y Pages vienen con la app y no se pueden eliminar.",
+      "library_missing": "Crea primero la biblioteca Lugares y luego arma el desafío.",
+      "library_builtin": "Películas y series y Libros vienen con la app y no se pueden eliminar.",
       "library_has_items": "Confirma para borrarla con sus ítems.",
       "library_busy": "Hay ítems suyos en desafíos en curso.",
       "item_not_open": "Las respuestas para este ítem aún no se han abierto.",
@@ -235,7 +235,8 @@
     "adminUnavailableTitle": "Sin acceso de admin",
     "backToStart": "Volver al inicio",
     "groupCatalogTitle": "{name} · colección",
-    "groupCatalogSubtitle": "Todo lo que sigue este grupo, organizado en bibliotecas. Los admins añaden ítems y dan forma a cada biblioteca."
+    "groupCatalogSubtitle": "Todo lo que sigue este grupo, organizado en bibliotecas. Los admins añaden ítems y dan forma a cada biblioteca.",
+    "groupWithoutId": "Se creó el grupo, pero perdimos su rastro."
   },
   "auth": {
     "heroKicker": "Desafíos privados, historias duraderas",
@@ -332,39 +333,26 @@
   },
   "welcome": {
     "lede": "Todavía no hay nada. Empieza por un desafío, lo demás viene después.",
-    "flowTitle": "Cómo se arma una ronda",
-    "steps": {
-      "library": {
-        "title": "Elige qué sigues",
-        "body": "Películas, libros, lugares, partidos (guardados en una biblioteca que recuerda cada ítem)."
-      },
-      "challenge": {
-        "title": "Arma un desafío",
-        "body": "Ver una lista de películas, leer durante 90 días, mantener un hábito. Elige una receta y decide qué registra cada persona."
-      },
-      "group": {
-        "title": "Trae a tu gente",
-        "body": "Un grupo privado para el club, los amigos, la familia (o quédate solo con tu espacio)."
-      },
-      "showcase": {
-        "title": "Lee la vitrina",
-        "body": "Goa hace las cuentas (medias, rankings, quién va al día) y convierte la ronda en una historia."
-      }
-    },
     "starts": {
       "group": {
         "title": "Crear un grupo"
       },
       "quick": {
         "title": "Empieza un desafío",
-        "body": "Tres preguntas rápidas, todo por toques (sin forma de equivocarte).",
         "cta": "Empezar"
-      },
-      "templates": {
-        "title": "Copiar uno ya hecho"
       }
     },
-    "otherWays": "O:"
+    "choose": {
+      "title": "¿Cómo quieres empezar?",
+      "chat": "Conversación",
+      "recommended": "Recomendado",
+      "chatBody": "Preguntas rápidas, ideal para tu primer desafío.",
+      "manual": "Manual",
+      "manualBody": "Ármalo tú, paso a paso.",
+      "whereTitle": "¿Para quién es?",
+      "createAndGo": "Crear y continuar",
+      "newGroupTitle": "Crea tu grupo primero, para crear el desafío dentro de él"
+    }
   },
   "group": {
     "updated": "Grupo guardado.",
@@ -583,37 +571,37 @@
     "addItemRow": "Añadir un elemento"
   },
   "createChallenge": {
-    "errPickTemplate": "Elige una plantilla y completa el título.",
     "errPeriod": "Completa el inicio y el fin, o elige un desafío sin plazo.",
     "errEndBeforeStart": "La fecha final debe ser igual o posterior al inicio.",
     "errNoAuthor": "Indica el autor de cada libro.",
     "errRules": "Completa el título y la descripción de cada regla y tema, o quita los vacíos.",
     "errNoFields": "Agrega al menos un campo.",
+    "errProgressProperty": "Elige una propiedad numérica para seguir.",
     "errNoItems": "Agrega al menos una película al desafío.",
     "errNoBooks": "Agrega al menos un libro al desafío.",
     "stepsNav": "Etapas de creación",
     "steps": {
-      "base": "Base",
-      "fields": "Campos",
-      "checkpoints": "Ítems",
-      "people": "Personas",
-      "items": "Ítems"
+      "setup": "Básico",
+      "fields": "Registros",
+      "checkpoints": "Lista",
+      "details": "Detalles",
+      "people": "Personas"
     },
     "back": "Volver",
     "title": "Arma la próxima experiencia",
     "subtitle": "Empieza con un preset y ajusta solo lo que tu grupo necesita.",
     "personalTitle": "Nuevo desafío personal",
     "personalSubtitle": "Solo tuyo (sin grupo, sin invitaciones). Empieza con un preset y ajusta lo esencial.",
-    "startTitle": "Elige un punto de partida",
+    "startTitle": "¿Cómo funcionará este desafío?",
     "recipes": {
       "cinema": {
-        "name": "Screens",
-        "tagline": "Puntúa películas y series",
+        "name": "Películas y series",
+        "tagline": "Califica lo que ves",
         "body": "Una lista de películas o series; cada persona da nota y comentario al verlas, con fecha opcional. Puede tener plazo o quedar abierta."
       },
       "bookshelf": {
-        "name": "Pages",
-        "tagline": "Puntúa lo que ya leíste",
+        "name": "Libros",
+        "tagline": "Califica lo que lees",
         "body": "Una lista de libros que solo valoras y comentas (sin páginas, sin plazo, sin \"cuándo\"). Ideal para registrar lo que ya leíste."
       },
       "library": {
@@ -622,19 +610,24 @@
         "body": "Una lista de libros con páginas leídas por día y por libro, y un \"Terminé\" con nota. Necesita un período."
       },
       "habit": {
-        "name": "Hábito",
-        "tagline": "Un registro por día",
+        "name": "Hábito diario",
+        "tagline": "Un registro al día",
         "body": "Sin película, sin libro (solo un registro diario). Agrega los campos que el hábito necesite y crea tus propias métricas a partir de ellos."
       },
       "tables": {
-        "name": "Tables",
-        "tagline": "Puntúa lugares para comer",
+        "name": "Lugares",
+        "tagline": "Restaurantes, bares y cafés",
         "body": "Valora restaurantes, bares y cafés en comida, ambiente y relación calidad-precio (una nota para cada una, sin nota general)."
       },
       "custom": {
-        "name": "Personalizado",
-        "tagline": "Tú decides qué registrar",
+        "name": "Tu propia lista",
+        "tagline": "Tú nombras las cosas y qué anotar",
         "body": "Elige cualquier biblioteca (partidos, juegos, lo que sea) y decide exactamente qué registra cada persona."
+      },
+      "progress": {
+        "name": "Progreso diario",
+        "tagline": "Cuánto por día, hasta una meta",
+        "body": "Una lista en la que cada persona anota cuánto hizo en cada ítem cada día, hasta una meta, y luego lo marca como terminado."
       }
     },
     "titleLabel": "Título",
@@ -651,8 +644,12 @@
     "hideOptional": "Ocultar campos opcionales",
     "rulesLabel": "Reglas",
     "rulesHint": "Destaca cada acuerdo importante del desafío.",
-    "fieldsTitle": "¿Qué registra cada persona?",
-    "checkpointsTitle": "Arma la lista",
+    "fieldsTitle": "¿Qué anota cada persona?",
+    "fieldsTitleItems": "¿Cómo quieres seguir los ítems?",
+    "fieldsLedeItems": "Elige qué hará cada persona con cada ítem. Esto define cuándo y cuántas veces puede registrar.",
+    "fieldsTitleDaily": "¿Qué incluye el registro diario?",
+    "fieldsLedeDaily": "Crea un check-in sencillo para completar una vez al día.",
+    "checkpointsTitle": "¿Qué entra en la lista?",
     "cineItemsHint": "Pega un título por línea (películas o series). Cada ítem se convierte en una oportunidad de registro para cada participante.",
     "bookItemsHint": "Pega un libro por línea. Cada libro entra en la colección y recibe progreso por día, un \"Terminé\" y nota.",
     "bookshelfItemsHint": "Pega un libro por línea. Cada libro entra en la colección y recibe una nota y un comentario opcional.",
@@ -673,31 +670,101 @@
     "expectationLabel": "Recolectar una nota de expectativa",
     "expectationHint": "Los participantes dan una nota de cuánto esperan disfrutar cada título antes de verlo. Se bloquea cuando envían la valoración real. También puedes activarlo después.",
     "errPickLibrary": "Elige la biblioteca de la que vienen los ítems.",
-    "errTablesLibrary": "Crea primero la biblioteca Tables.",
+    "errTablesLibrary": "Crea primero la biblioteca Lugares.",
     "tablesItemsHint": "Añade los lugares para valorar (uno por línea).",
     "customItemsHint": "Añade los ítems a seguir (uno por línea). Cada ítem se convierte en algo que todos pueden registrar.",
     "libraryLabel": "Biblioteca",
-    "libraryHint": "De qué lista de cosas parte este desafío.",
     "pickLibraryFirst": "Elige una biblioteca",
-    "recordingLabel": "¿Cómo se hace cada registro?",
-    "recordingHint": "Elige cómo registran las personas su progreso en los ítems de este desafío.",
+    "entriesTitle": "¿Cómo registrarán las personas?",
+    "recordingLabel": "Elige una opción",
+    "recordingHint": "Piensa en lo que ocurre con cada ítem durante el desafío.",
     "recordingSingle": "Una respuesta por ítem",
-    "recordingSingleHint": "Cada persona responde una vez por cada ítem (una nota, un marcador, un comentario).",
-    "recordingSession": "Un check-in con varios ítems",
-    "recordingSessionHint": "Una visita guarda un registro por cada ítem que elijas (un entrenamiento de ejercicios, una sesión de estudio de materias). Cada registro conserva su propio historial.",
+    "recordingSingleHint": "Nota, reseña o resultado",
+    "recordingProgress": "Progreso por ítem",
+    "recordingProgressHint": "Páginas, km, pasos o clases",
+    "recordingSession": "Una sesión con varios ítems",
+    "recordingSessionHint": "Entrenamiento o sesión de estudio",
+    "progressPropertyTitle": "¿Qué propiedad define el total?",
+    "chooseProgressProperty": "Elige una propiedad numérica",
+    "progressValueDefault": "Progreso",
+    "progressValueLabel": "Progreso: {property}",
+    "loadingProperties": "Cargando propiedades…",
+    "noProgressProperty": "Agrega primero una propiedad numérica a esta biblioteca",
     "sessionNameLabel": "¿Cómo llamas a un check-in?",
     "sessionNameHint": "Se muestra en el formulario y en el historial (un Entrenamiento, una Sesión de estudio, una Noche de juegos).",
     "sessionNamePlaceholder": "p. ej.: Entrenamiento",
     "sessionNameDefault": "Sesión",
-    "scopeLabel": "¿Quién rellena este registro?",
-    "scopeHint": "Es lo principal que la gente registra en cada ítem.",
-    "scopeIndividual": "Cada participante",
-    "scopeIndividualHint": "Cada persona responde por sí misma (una nota, una apuesta, un comentario).",
-    "scopeShared": "Una vez para el grupo",
-    "scopeSharedHint": "Una respuesta por ítem que todos ven (un marcador final, un veredicto acordado).",
+    "scopeLabel": "Respuesta inicial",
+    "scopeIndividual": "Respuesta individual",
+    "scopeIndividualHint": "Cada participante envía su propia respuesta para cada ítem.",
+    "scopeShared": "Respuesta compartida",
+    "scopeSharedHint": "Una respuesta por ítem para todo el grupo. Los administradores participantes la completan y corrigen.",
+    "responseN": "Respuesta {n}",
+    "responseSummary": "{scope} · {count, plural, one {# campo} other {# campos}}",
+    "responseWord": "Respuesta",
+    "addResponse": "Añadir respuesta",
+    "removeResponse": "Quitar respuesta",
+    "moveResponseUp": "Subir respuesta",
+    "moveResponseDown": "Bajar respuesta",
     "itemDatesLabel": "Cada ítem tiene su propia fecha y hora",
     "itemDatesHint": "Como el inicio de un partido o una sesión. Se guarda en el ítem, así que todo desafío que lo use muestra la misma fecha.",
-    "errItemSchedule": "Revisa la fecha (el final, la hora o la zona horaria no parecen correctos)."
+    "errItemSchedule": "Revisa la fecha (el final, la hora o la zona horaria no parecen correctos).",
+    "fieldsLede": "Aparecen en cada ítem. Renombra, quita o añade las que necesites.",
+    "fieldsConfigTitle": {
+      "single": "¿Qué incluye cada respuesta?",
+      "progress": "¿Qué incluye cada actualización?",
+      "session": "¿Qué se registra en cada ítem?",
+      "daily": "¿Qué incluye el registro diario?"
+    },
+    "fieldsConfigHint": {
+      "single": "Estas preguntas aparecen al abrir cada ítem y solo se pueden responder una vez.",
+      "progress": "Esta información aparece en cada actualización. Usa un número para páginas, km, pasos o cualquier otra medida.",
+      "session": "Esta información se completa para cada ítem elegido durante la sesión.",
+      "daily": "Estas preguntas aparecen una vez al día. Puede ser sí o no, minutos, una cantidad o una anotación."
+    },
+    "progressConfigTitle": "Configurar el progreso",
+    "progressConfigHint": "Define hasta dónde llega el progreso y si cada registro suma al total o indica la posición actual.",
+    "detailsTitle": "Fechas y extras",
+    "errTitle": "Ponle un título.",
+    "errFieldLabel": "Ponle un nombre a cada pregunta o medida.",
+    "errTooManyFields": "Usa como máximo 30 campos entre todas las respuestas.",
+    "leaveTitle": "¿Guardarlo como borrador?",
+    "leaveBody": "Empezaste a armar este desafío. Guárdalo como borrador para terminarlo después, o descártalo.",
+    "leaveDiscard": "Descartar",
+    "leaveSave": "Guardar borrador",
+    "resumeDraft": "Continuar «{title}»…",
+    "discardDraft": "Descartar borrador",
+    "draftLabel": "Borrador",
+    "creationTypes": {
+      "items": {
+        "name": "Seguir una lista",
+        "tagline": "Libros, películas, cursos, rutas o cualquier colección",
+        "body": "Crea una lista y luego elige si cada ítem recibe una respuesta, acumula progreso a lo largo del tiempo o participa en sesiones con varios ítems."
+      },
+      "daily": {
+        "name": "Registro diario",
+        "tagline": "Un registro al día, sin lista",
+        "body": "Sigue un hábito directamente en el calendario, sin elegir un ítem: estudiar, correr, meditar o pasar el día sin azúcar."
+      }
+    },
+    "structures": {
+      "list": {
+        "name": "Lista",
+        "tagline": "Cada ítem recibe una nota o una anotación",
+        "body": "Películas y series para calificar con amigos, libros que leíste, bares por conocer, pronósticos de los partidos del Mundial. O un entrenamiento donde cada registro junta varios ejercicios."
+      },
+      "progress": {
+        "name": "Progreso diario",
+        "tagline": "Cuánto hiciste en cada ítem, cada día, hasta una meta",
+        "body": "Páginas de un libro hasta la última, km de un recorrido hasta la meta, episodios de una serie, clases de un curso."
+      },
+      "daily": {
+        "name": "Registro diario",
+        "tagline": "¿Lo hiciste? Un registro al día, sin ítems",
+        "body": "Salir a correr, cero azúcar hoy, meditar, leer 20 minutos. Ves cuántos días lo lograste."
+      }
+    },
+    "progressItemsHint": "Añade en qué vas a progresar (uno por línea): recorridos, series, cursos… Cada uno tiene su camino hasta la meta."
   },
   "adminChallenge": {
     "back": "Volver",
@@ -773,6 +840,20 @@
     "memberMeta": "@{username} · {role}",
     "noMembersTitle": "Miembros no disponibles",
     "fieldsTitle": "Campos del registro",
+    "trackingTitle": "Progreso",
+    "trackingInactive": "Opcional. Actívalo cuando quieras que cada ítem avance hasta un número.",
+    "trackingLoading": "Cargando propiedades de la biblioteca…",
+    "trackingNoProperty": "Agrega primero una propiedad numérica a esta biblioteca.",
+    "trackingSave": "Guardar límite",
+    "trackingStarted": "Seguimiento del progreso iniciado.",
+    "trackingSaved": "Seguimiento del progreso actualizado.",
+    "trackingStopped": "Seguimiento del progreso desactivado.",
+    "trackingChangeConfirmTitle": "¿Cambiar el final del progreso?",
+    "trackingChangeConfirmBody": "Todo el progreso guardado con el final actual se eliminará permanentemente. La nueva propiedad comienza desde cero.",
+    "trackingOffConfirmTitle": "¿Desactivar el seguimiento del progreso?",
+    "trackingOffConfirmBody": "Todo el progreso guardado anteriormente se eliminará permanentemente.",
+    "trackingChange": "Eliminar progreso y cambiar",
+    "trackingTurnOff": "Eliminar progreso y desactivar",
     "fieldsTypeLegend": "Tipo de registro",
     "fieldsSaved": "Campos guardados.",
     "itemRemoveConfirm": "\"{title}\" sale del desafío.",
@@ -878,7 +959,6 @@
     "alreadyPublicHint": "Esta vitrina ya es pública, cualquier cambio que guardes aquí aparece en el enlace y en la plantilla de inmediato.",
     "errPickLibrary": "Elige la biblioteca de la que vienen los ítems.",
     "libraryLabel": "Biblioteca",
-    "libraryHint": "De qué lista de cosas parte este desafío.",
     "linkLibrary": "Elegir biblioteca",
     "librariesHint": "De dónde vienen los ítems de este desafío. Mientras no tenga ítems, puedes cambiarla por otra.",
     "reuseDoneTitle": "Copia creada",
@@ -897,10 +977,6 @@
     "metricItemLabel": "Solo un ítem",
     "metricItemAll": "Todos los ítems",
     "metricItemHint": "Muestra el número de un solo ítem (tu récord de peso muerto, por ejemplo).",
-    "pageCountTitle": "Contar páginas",
-    "pageCountHint": "Cada libro muestra dónde estás y cuánto falta, sin fechas. Apagado, es solo una estantería, y las páginas ya contadas se borran.",
-    "pageCountOn": "Páginas activadas.",
-    "pageCountOff": "Páginas apagadas.",
     "organiseItems": "Organizar elementos",
     "scheduleEnd": "Con fecha final",
     "scheduleEndHint": "Termina el día que elijas.",
@@ -990,7 +1066,8 @@
     "bookProgress": "p. {page, number} de {total, number} · faltan {left, number}",
     "bookDone": "Terminado",
     "searchItems": "Buscar ítems",
-    "searchItemsNone": "Ningún ítem coincide."
+    "searchItemsNone": "Ningún ítem coincide.",
+    "countProgress": "{page, number} de {total, number} · faltan {left, number}"
   },
   "sessionLog": {
     "composerTitle": "Registrar {name}",
@@ -1191,12 +1268,13 @@
       "custoBeneficio": "Calidad-precio",
       "resultado": "Resultado",
       "weight": "Carga (kg)",
-      "repetitions": "Repeticiones"
+      "repetitions": "Repeticiones",
+      "quantoHoje": "Cuánto hoy"
     },
-    "labelLabel": "Etiqueta",
+    "labelLabel": "Pregunta o medida",
     "labelRequired": "Ponle una etiqueta al campo.",
     "editFieldTitle": "Editar campo",
-    "typeLabel": "Tipo",
+    "typeLabel": "Tipo de respuesta",
     "required": "Obligatorio",
     "min": "Mínimo",
     "max": "Máximo",
@@ -1209,7 +1287,7 @@
     "moveDown": "Mover hacia abajo",
     "remove": "Quitar",
     "noFieldsTitle": "Ningún campo",
-    "addFieldTitle": "Agregar campo",
+    "addFieldTitle": "Agregar otra pregunta o medida",
     "fieldNameSr": "Nombre del campo",
     "fieldNamePlaceholder": "Ej.: Páginas leídas",
     "fieldTypeSr": "Tipo del campo",
@@ -1662,9 +1740,9 @@
     "deleted": "\"{name}\" eliminada.",
     "emptyLibrary": "{name} está vacía",
     "source": {
-      "screens": "Screens",
-      "pages": "Pages",
-      "tables": "Tables",
+      "screens": "Películas y series",
+      "pages": "Libros",
+      "tables": "Lugares",
       "custom": "Biblioteca"
     },
     "newTitle": "Nueva biblioteca",
@@ -1674,9 +1752,9 @@
     "namePlaceholder": "p. ej.: Partidos",
     "nameRequired": "Ponle un nombre a la biblioteca.",
     "create": "Crear biblioteca",
-    "tablesPromptTitle": "Empieza con una biblioteca Tables",
-    "tablesPromptBody": "Una biblioteca guarda en un solo lugar lo que sigues. Tables es la de restaurantes, bares y cafés (los lugares que añades quedan guardados en ella, listos para volver a valorarlos en otros desafíos).",
-    "tablesPromptCreate": "Crear biblioteca Tables",
+    "tablesPromptTitle": "Empieza con una biblioteca Lugares",
+    "tablesPromptBody": "Una biblioteca guarda en un solo lugar lo que sigues. Lugares es la de restaurantes, bares y cafés (los lugares que añades quedan guardados en ella, listos para calificar de nuevo en otros desafíos).",
+    "tablesPromptCreate": "Crear biblioteca Lugares",
     "tablesPromptCreating": "Creando…",
     "tablesPromptMore": "Puedes crear más bibliotecas cuando quieras (Bares, Cafeterías, Partidos) desde la colección.",
     "propertiesBody": "Apagar borra los valores.",
@@ -1772,15 +1850,6 @@
     "nameRequired": "Ponle un nombre a la respuesta.",
     "fieldLabel": "Etiqueta",
     "fieldPlaceholder": "Marcador",
-    "policyLabel": "Quién puede rellenarla",
-    "policy": {
-      "members_fill_admin_corrects": "Los miembros la rellenan, los admins corrigen",
-      "members_can_edit": "Cualquier participante puede editar"
-    },
-    "policyHint": {
-      "members_fill_admin_corrects": "Quien participa puede rellenarla una vez; después solo un admin la cambia.",
-      "members_can_edit": "Quien participa puede rellenarla o cambiarla. Si dos personas guardan a la vez, a la segunda se le avisa y ve el valor más reciente."
-    },
     "requiredLabel": "Obligatoria",
     "requiredHint": "Un ítem no queda completado hasta que esto se rellene.",
     "add": "Añadir respuesta",
@@ -1788,19 +1857,12 @@
     "removeMetricsBody": "Estas métricas se van también:",
     "removeMetricsPrompt": "Algunas métricas leen esta respuesta. Confirma otra vez para quitarlas también.",
     "remove": "Quitar respuesta",
-    "panelTitle": "Compartida con el grupo",
-    "panelBody": "Hay una única respuesta por ítem, visible para todos junto con quién la cambió por última vez.",
-    "policySaved": "Guardado.",
     "removeAnswersBody": "{count, plural, one {# respuesta ya dada se va} other {# respuestas ya dadas se van}} con ella.",
     "removeAnswersPrompt": "Confirma de nuevo para eliminar las respuestas y quitar el registro."
   },
   "sharedAnswers": {
     "badge": "Compartida con el grupo",
-    "policy": {
-      "members_fill_admin_corrects": "Cualquiera la rellena una vez · los admins la corrigen",
-      "members_can_edit": "Quien participa puede editarla"
-    },
-    "lockedByPolicy": "Esta respuesta ya está rellenada, solo un admin puede corregirla.",
+    "adminsOnly": "Solo un admin del grupo que participa en el desafío puede rellenar o cambiar esta respuesta.",
     "conflictShort": "Alguien cambió esta respuesta mientras editabas. Se muestra la versión más reciente, nada tuyo se guardó.",
     "conflictBody": "{name} cambió esta respuesta mientras editabas, así que tu cambio no se guardó. Se muestra la versión más reciente, revísala y edita de nuevo si aún lo necesitas.",
     "someone": "Alguien",
@@ -1851,7 +1913,7 @@
     "q3": "¿Cómo lo llamamos?",
     "change": "Cambiar",
     "justMe": "Solo yo",
-    "justMeHint": "Un desafío privado, solo tuyo.",
+    "justMeHint": "Un desafío personal.",
     "groupHint": "{count, plural, one {# persona} other {# personas}}",
     "newGroup": "Un grupo nuevo",
     "newGroupHint": "Invita a la gente una vez creado.",
@@ -2337,13 +2399,15 @@
     "title": "Contar como un camino",
     "hint": "Muestra dónde estás, cuánto falta y el camino hasta la meta, como las páginas de un libro.",
     "goal": "Meta",
-    "goalNone": "Sin meta",
-    "goalValue": "Un número",
-    "goalPageCount": "Las páginas del libro",
+    "goalNone": "Sin meta, solo seguirlo",
+    "goalValue": "La misma meta para todos los ítems",
+    "goalPageCount": "Páginas",
     "entry": "Cómo registrar",
-    "entryAmount": "Cuánto hiciste",
-    "entryPosition": "Dónde estás (el total hasta ahora)",
+    "entryAmount": "Sumar una cantidad en cada registro",
+    "entryPosition": "Indicar el total actual",
     "showDates": "Mostrar las fechas",
-    "showDatesHint": "Apagado, solo se ve el progreso; el día de cada registro se guarda sin mostrarse."
+    "showDatesHint": "Apagado, solo se ve el progreso; el día de cada registro se guarda sin mostrarse.",
+    "goalFrom": "Usar “{name}” de cada ítem",
+    "goalHint": "Usa el mismo número para todos los ítems o una propiedad numérica de la biblioteca cuando cada ítem tenga su propia meta."
   }
 }

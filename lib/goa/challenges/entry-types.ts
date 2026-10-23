@@ -363,10 +363,10 @@ export async function addSharedResponseType(
   challengeId: string,
   body: Record<string, unknown>,
 ) {
-  const editPolicy = body.sharedEditPolicy;
-  if (editPolicy !== "members_fill_admin_corrects" && editPolicy !== "members_can_edit") {
+  if (body.sharedEditPolicy !== undefined && body.sharedEditPolicy !== "members_fill_admin_corrects" && body.sharedEditPolicy !== "members_can_edit") {
     throw new ApiError(400, "invalid_shared_edit_policy", "Escolha quem pode preencher ou corrigir a resposta compartilhada.");
   }
+  const editPolicy = "members_fill_admin_corrects";
   return inTransaction(async (client) => {
     const access = await challengeAccess(session.user.id, challengeId, client, true);
     if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores adicionam tipos de registro.");
@@ -519,26 +519,103 @@ async function countsPages(client: PoolClient, challengeId: string, exceptTypeId
 }
 
 /**
- * Pages' count on or off: each book's pages against its page count (see `pageCountType`). Off archives the
- * type — the pages already saved stay, and come back when it's switched on again; on adds it to a book
- * challenge that never had it. A challenge that already counts pages its own way (a reading club) is left alone.
+ * Per-challenge progress tracking. The selected numeric library property is
+ * the endpoint for every item (pages, kilometres, lessons, etc.). Switching
+ * that property or turning tracking off deletes the positions saved against
+ * the previous endpoint, so they can never be silently reinterpreted.
  */
 export async function setPageCountEnabled(
   session: SessionContext,
   challengeId: string,
   body: Record<string, unknown>,
 ) {
-  if (typeof body.enabled !== "boolean") {
-    throw new ApiError(400, "invalid_request", "Informe se a contagem de páginas fica ligada ou desligada.");
+  // The original endpoint accepted a boolean for the book-only shortcut. Manage now sends the selected numeric
+  // property's stable key instead; booleans stay supported for old clients and integration compatibility.
+  const propertyKey = typeof body.enabled === "string" ? body.enabled.trim() : null;
+  if (propertyKey !== null && !/^[a-z][a-z0-9_]{0,63}$/.test(propertyKey)) {
+    throw new ApiError(400, "invalid_request", "Escolha uma propriedade numérica válida.");
+  }
+  if (propertyKey === null && typeof body.enabled !== "boolean") {
+    throw new ApiError(400, "invalid_request", "Escolha uma propriedade para acompanhar.");
   }
   return inTransaction(async (client) => {
     const access = await challengeAccess(session.user.id, challengeId, client, true);
     if (!access.canManage) throw new ApiError(403, "forbidden", "Somente administradores mudam os tipos de registro.");
     if (access.challenge.status === "closed") {
-      throw new ApiError(409, "challenge_locked", "Reabra o desafio para mudar a contagem de páginas.");
+      throw new ApiError(409, "challenge_locked", "Reabra o desafio para mudar o acompanhamento de progresso.");
     }
     const types = await entryTypesForChallenge(client, challengeId);
-    const active = types.find((type) => type.semantic_key === PAGE_COUNT_KEY);
+    const active = propertyKey !== null || body.enabled === false
+      ? types.find((type) => purposeOf(type) === "progress")
+      : types.find((type) => type.semantic_key === PAGE_COUNT_KEY);
+
+    if (propertyKey !== null) {
+      if (!usesRoundItems(types)) {
+        throw new ApiError(409, "tracking_unsupported", "Este desafio não acompanha itens de uma biblioteca.");
+      }
+      const library = await oneOrNull<{ group_id: string; kind: string }>(
+        client,
+        "SELECT group_id, kind FROM challenge_libraries WHERE challenge_id = $1 LIMIT 1",
+        [challengeId],
+      );
+      if (!library) throw new ApiError(409, "tracking_unsupported", "Escolha uma biblioteca para acompanhar progresso.");
+      const nativeNumber = propertyKey === "page_count" && library.kind === "book";
+      const customNumber = nativeNumber ? null : await oneOrNull<{ label: string }>(
+        client,
+        `SELECT label FROM catalog_attribute_defs
+          WHERE group_id = $1 AND kind = $2 AND semantic_key = $3 AND type = 'number'
+            AND hidden = false AND archived_at IS NULL`,
+        [library.group_id, library.kind, propertyKey],
+      );
+      if (!nativeNumber && !customNumber) {
+        throw new ApiError(409, "tracking_property_invalid", "A propriedade precisa ser um número visível desta biblioteca.");
+      }
+
+      const count = { goal: { from: propertyKey }, entry: "position", showDates: false };
+      if (active) {
+        const field = await oneOrNull<{ id: string; settings: Record<string, unknown> | null }>(
+          client,
+          `SELECT id, settings FROM challenge_fields
+            WHERE challenge_id = $1 AND entry_type_id = $2 AND kind = 'number' AND archived_at IS NULL
+            ORDER BY position LIMIT 1`,
+          [challengeId, active.id],
+        );
+        if (!field) throw new ApiError(409, "tracking_field_missing", "O registro de progresso não tem um campo numérico.");
+        const previous = field.settings && typeof field.settings === "object" ? field.settings : {};
+        const previousCount = previous.count && typeof previous.count === "object" ? previous.count as Record<string, unknown> : {};
+        const previousGoal = previousCount.goal && typeof previousCount.goal === "object" ? previousCount.goal as Record<string, unknown> : {};
+        const changedProperty = previousGoal.from !== propertyKey;
+        // Saved positions belong to the old endpoint and cannot be reinterpreted safely against a different one.
+        if (changedProperty) await client.query("DELETE FROM entries WHERE entry_type_id = $1", [active.id]);
+        const nextSettings = { ...previous, count: { ...count, ...previousCount, goal: count.goal } };
+        await client.query(
+          "UPDATE challenge_fields SET settings = $2::jsonb, updated_at = now() WHERE id = $1",
+          [field.id, JSON.stringify(nextSettings)],
+        );
+        await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
+          "entry_type.updated", "entry_type", active.id, null, { purpose: "progress", propertyKey, entriesDeleted: changedProperty });
+        return { enabled: true, entryTypeId: active.id, propertyKey };
+      }
+
+      const entryTypeId = publicId();
+      await client.query(
+        `INSERT INTO entry_types
+           (id, challenge_id, semantic_key, name, submission_mode, purpose, target_policy,
+            cardinality, schedule_policy, is_primary, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,false,now(),now())`,
+        [entryTypeId, challengeId, PAGE_COUNT_KEY, "Progress", pageCountType.submissionMode, pageCountType.purpose,
+          pageCountType.targetPolicy, pageCountType.cardinality, pageCountType.schedulePolicy],
+      );
+      await insertField(client, challengeId, entryTypeId, {
+        ...pageCountType.fields[0],
+        label: "Progress",
+        config: { min: 0, step: 1, count },
+      }, 0);
+      await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
+        "entry_type.created", "entry_type", entryTypeId, null, { purpose: "progress", propertyKey });
+      return { enabled: true, entryTypeId, propertyKey };
+    }
+
     if (body.enabled) {
       if (active) return { enabled: true, entryTypeId: active.id };
       if (recipeCatalogKind(access.challenge.recipe_key) !== "book" || !usesRoundItems(types)) {

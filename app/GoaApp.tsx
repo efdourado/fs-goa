@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
 import {
   API_PATHS,
@@ -18,7 +18,9 @@ import { AccountScreen } from "./goa/screens/account";
 import { AccountDeactivatedScreen } from "./goa/screens/account-deactivated";
 import { AdminScreen } from "./goa/screens/admin";
 import { AuthScreen } from "./goa/screens/auth";
-import { CreateChallengeScreen } from "./goa/screens/create-challenge";
+import { CreateChallengeScreen, type LeaveGuard } from "./goa/screens/create-challenge";
+import { type ChallengeDraft, type ChallengeDraftForm, clearChallengeDraft, saveChallengeDraft, useChallengeDraft } from "./goa/challenge-draft";
+import { DraftResume } from "./goa/draft-resume";
 import { DashboardScreen } from "./goa/screens/dashboard";
 import { CatalogItemScreen } from "./goa/screens/catalog-item";
 import { GroupScreen } from "./goa/screens/group";
@@ -67,6 +69,7 @@ const DOCK_ROOT_KINDS = new Set<Screen["kind"]>(Object.values(DOCK_ROOTS).map((r
 
 export default function GoaApp() {
   const t = useTranslations("app");
+  const tCreate = useTranslations("createChallenge");
   const tc = useTranslations("common");
   const tNav = useTranslations("nav");
   const tTrash = useTranslations("trash");
@@ -76,7 +79,29 @@ export default function GoaApp() {
   const fRef = useRef(f);
   fRef.current = f;
   const [bootstrap, setBootstrap] = useState<BootstrapData | null>(null);
-  const [screen, setScreen] = useState<Screen>({ kind: "loading" });
+  const [screen, setScreenState] = useState<Screen>({ kind: "loading" });
+  // A screen that wants a say before the app leaves it (the challenge creator, to offer a draft).
+  const leaveGuard = useRef<LeaveGuard | null>(null);
+  const registerLeaveGuard = useCallback((guard: LeaveGuard | null) => { leaveGuard.current = guard; }, []);
+  const draftUserId = bootstrap?.user?.id ?? null;
+  const challengeDraft = useChallengeDraft(draftUserId);
+  /** What a creator screen needs to keep, pick up and let go of the person's one draft. */
+  function draftProps(target: ChallengeDraft["target"], resume: boolean) {
+    const sameTarget = challengeDraft !== null && ("personal" in target
+      ? "personal" in challengeDraft.target
+      : "groupId" in challengeDraft.target && challengeDraft.target.groupId === target.groupId);
+    return {
+      initialDraft: resume && sameTarget ? challengeDraft.form : undefined,
+      onKeepDraft: (form: ChallengeDraftForm) => { if (draftUserId) saveChallengeDraft(draftUserId, { target, savedAt: new Date().toISOString(), form }); },
+      onClearDraft: () => { if (draftUserId) clearChallengeDraft(draftUserId); },
+    };
+  }
+  /** Every move to another screen goes through here, so a registered guard can hold it until it's answered. */
+  function setScreen(next: Screen) {
+    const guard = leaveGuard.current;
+    if (guard && guard(() => { leaveGuard.current = null; setScreenState(next); })) return;
+    setScreenState(next);
+  }
   const [pendingInviteToken, setPendingInviteToken] = useState<string | null>(null);
   const [pendingRoute, setPendingRoute] = useState<Screen | null>(null);
   const [resumeTemplateCopy, setResumeTemplateCopy] = useState<Id | null>(null);
@@ -413,6 +438,14 @@ export default function GoaApp() {
     if (resolvedId) setScreen({ kind: "group", groupId: resolvedId });
   }
 
+  /** Building a challenge by hand, for someone: just you, one of your groups, or a group made right now. */
+  async function createManuallyFor(target: { personal: true } | { groupId: Id } | { newGroup: string }) {
+    if ("personal" in target) { setScreen({ kind: "create-personal-challenge" }); return; }
+    const groupId = "groupId" in target ? target.groupId : await createGroupAndGetId(target.newGroup);
+    if (!groupId) throw new Error(t("groupWithoutId"));
+    setScreen({ kind: "create-challenge", groupId });
+  }
+
   async function updateGroup(groupId: Id, payload: { name: string; description: string; recommendationsEnabled: boolean }) {
     if (!bootstrap) return;
     await apiRequest(API_PATHS.group(groupId), {
@@ -689,9 +722,9 @@ export default function GoaApp() {
   } else if (screen.kind === "personal-catalog-item") {
     content = <CatalogItemScreen key={screen.itemId} scope="personal" detailPath={API_PATHS.personalCatalogItem(screen.itemId)} itemId={screen.itemId} onBack={goUp} backLabel={backLabel} onOpenChallenge={(id) => openParticipant(id)} editing={{ members: [] }} onDelete={() => deleteCatalogItem(API_PATHS.personalCatalogItem(screen.itemId), { kind: "personal-catalog" })} />;
   } else if (screen.kind === "create-challenge" && selectedGroup && canManage(selectedGroup.role)) {
-    content = <CreateChallengeScreen key={selectedGroup.id} group={selectedGroup} onBack={goUp} backLabel={backLabel} onCreate={(input) => createChallenge({ groupId: selectedGroup.id }, input)} />;
+    content = <CreateChallengeScreen key={`${selectedGroup.id}${screen.resume ? ":draft" : ""}`} group={selectedGroup} onBack={goUp} backLabel={backLabel} onCreate={(input) => createChallenge({ groupId: selectedGroup.id }, input)} {...draftProps({ groupId: selectedGroup.id }, Boolean(screen.resume))} registerLeaveGuard={registerLeaveGuard} />;
   } else if (screen.kind === "create-personal-challenge") {
-    content = <CreateChallengeScreen key="personal" personal onBack={goUp} backLabel={backLabel} onCreate={(input) => createChallenge({ personal: true }, input)} />;
+    content = <CreateChallengeScreen key={screen.resume ? "personal:draft" : "personal"} personal onBack={goUp} backLabel={backLabel} onCreate={(input) => createChallenge({ personal: true }, input)} {...draftProps({ personal: true }, Boolean(screen.resume))} registerLeaveGuard={registerLeaveGuard} />;
   } else if ((screen.kind === "challenge" || screen.kind === "admin") && (detailLoading || !selectedChallenge || selectedChallenge.id !== screen.challengeId)) {
     content = detailError ? <main className="mx-auto max-w-2xl px-5 py-16"><EmptyState title={t("detailError")} hint={detailError} action={<Button onClick={() => retryDetail(screen.challengeId)}>{t("retry")}</Button>} /></main> : <LoadingView label={tc("loadingChallenge")} />;
   } else if (screen.kind === "challenge" && selectedChallenge) {
@@ -711,10 +744,17 @@ export default function GoaApp() {
   } else if (screen.kind === "admin" || screen.kind === "create-challenge") {
     content = <main className="mx-auto max-w-2xl px-5 py-16"><EmptyState title={t("adminUnavailableTitle")} action={<Button onClick={() => setScreen({ kind: "dashboard" })}>{t("backToStart")}</Button>} /></main>;
   } else {
-    content = <DashboardScreen user={user} groups={bootstrap.groups} challenges={bootstrap.challenges} personalWorkspaceId={bootstrap.personalWorkspaceId} limits={bootstrap.limits} csrfToken={bootstrap.csrfToken} onOpenGroup={(groupId) => setScreen({ kind: "group", groupId })} onOpenChallenge={(id) => openParticipant(id)} onOpenAdmin={(id) => openAdmin(id)} onCreateGroup={createGroup} onQuickCreate={() => setScreen({ kind: "quick-create" })} onQuickCreatePersonal={() => setScreen({ kind: "quick-create", into: "personal" })} onCreatePersonalChallenge={() => setScreen({ kind: "create-personal-challenge" })} onOpenPersonalCatalog={() => setScreen({ kind: "personal-catalog" })} onOpenPersonalCatalogItem={(itemId) => setScreen({ kind: "personal-catalog-item", itemId })} onOpenTemplates={() => setScreen({ kind: "templates" })} onChanged={() => { void refreshBootstrap(); }} />;
+    content = <DashboardScreen user={user} groups={bootstrap.groups} challenges={bootstrap.challenges} personalWorkspaceId={bootstrap.personalWorkspaceId} limits={bootstrap.limits} csrfToken={bootstrap.csrfToken} onOpenGroup={(groupId) => setScreen({ kind: "group", groupId })} onOpenChallenge={(id) => openParticipant(id)} onOpenAdmin={(id) => openAdmin(id)} onCreateGroup={createGroup} onQuickCreate={() => setScreen({ kind: "quick-create" })} onQuickCreatePersonal={() => setScreen({ kind: "quick-create", into: "personal" })} onCreatePersonalChallenge={() => setScreen({ kind: "create-personal-challenge" })} onCreateManually={createManuallyFor} onOpenTemplate={(id) => setScreen({ kind: "template", challengeId: id })} onOpenPersonalCatalog={() => setScreen({ kind: "personal-catalog" })} onOpenPersonalCatalogItem={(itemId) => setScreen({ kind: "personal-catalog-item", itemId })} onChanged={() => { void refreshBootstrap(); }} />;
   }
 
   const dockTab = user.deactivated ? null : dockTabFor(screen);
+
+  // The one half-made challenge this person left (kept in this browser), and the way back into it.
+  const draftGroup = challengeDraft && "groupId" in challengeDraft.target
+    ? bootstrap.groups.find((group) => "groupId" in challengeDraft.target && group.id === challengeDraft.target.groupId) ?? null
+    : null;
+  const draftOpenable = Boolean(challengeDraft) && ("personal" in (challengeDraft?.target ?? {}) || (draftGroup !== null && canManage(draftGroup.role)));
+  const onCreator = screen.kind === "create-challenge" || screen.kind === "create-personal-challenge";
 
   return (
     <CsrfProvider token={bootstrap.csrfToken}>
@@ -722,6 +762,14 @@ export default function GoaApp() {
       <AppHeader user={user} notifications={bootstrap.memberRequests} onHome={() => setScreen({ kind: "dashboard" })} onOpenYou={() => setScreen({ kind: "you" })} onOpenCatalog={() => setScreen({ kind: "personal-catalog" })} onOpenAbout={() => setScreen({ kind: "about" })} onLogout={logout} onAcceptRequest={(id) => respondToMemberRequest(id, "accept")} onDeclineRequest={(id) => respondToMemberRequest(id, "decline")} />
       {/* `has-dock`: on a phone the dock's ‹ is the way back, so the top Back links step aside (see BackButton). */}
       <div className={cx("flex-1", dockTab && "has-dock pb-[calc(env(safe-area-inset-bottom)+1.5rem)] sm:pb-0")}>{content}</div>
+      {challengeDraft && draftOpenable && !onCreator ? (
+        <DraftResume
+          title={challengeDraft.form.title.trim() || tCreate(`structures.${challengeDraft.form.structure}.name`)}
+          aboveDock={Boolean(dockTab) || screen.kind === "challenge"}
+          onOpen={() => setScreen("personal" in challengeDraft.target ? { kind: "create-personal-challenge", resume: true } : { kind: "create-challenge", groupId: challengeDraft.target.groupId, resume: true })}
+          onDiscard={() => { if (draftUserId) clearChallengeDraft(draftUserId); }}
+        />
+      ) : null}
       {dockTab ? <BottomDock active={dockTab} notificationCount={(bootstrap.memberRequests ?? []).length} onSelect={(tab) => setScreen(DOCK_ROOTS[tab])} onBack={backTarget && !DOCK_ROOT_KINDS.has(screen.kind) ? goUp : undefined} backLabel={backTarget ? tNav("dockBack", { label: backLabel }) : tc("back")} /> : null}
     </div>
     </CsrfProvider>

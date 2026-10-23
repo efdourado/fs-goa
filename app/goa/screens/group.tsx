@@ -12,7 +12,7 @@ import { catalogCardHeight, CatalogTile, resolveCoverTop } from "../catalog-view
 import { LibraryGlyph, useCatalogShelf, useLibraryName } from "../libraries";
 import { Rail, RailArrows, ShelfAddButton, shelfCardWidth, useShelfRail } from "../shelf";
 import type { CatalogItem, ChallengeSummary, GroupInviteResult, GroupSummary, Id, Member, PendingGroupRequest } from "../types";
-import { AvatarMark, BackButton, Button, cx, EmptyState, Field, inputClass, LinkPill, Select, SlidersIcon, StatusMessage, Toggle } from "../ui";
+import { AvatarMark, BackButton, Button, cx, FaceEmptyState, Field, inputClass, LinkPill, Select, SlidersIcon, StatusMessage, Toggle } from "../ui";
 
 
 /** A word of the line under the invite link that opens its select. */
@@ -379,10 +379,10 @@ export function GroupScreen({
             <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
               {challenges.map((challenge) => <ActiveChallengeCard key={challenge.id} challenge={challenge} onOpen={onOpenChallenge} fluid />)}
             </div>
-          ) : <EmptyState title={t("noChallengesTitle")} hint={canCreateChallenge ? undefined : canManage(group.role) ? t("challengeLimitReached", { limit: challengeLimit }) : t("noChallengesMember")} />}
+          ) : <FaceEmptyState title={t("noChallengesTitle")} compact />}
         </section>
 
-        {shelfData === null ? <CatalogShelfSkeleton title={t("catalogTitle")} /> : sortedCatalog.length || canManage(group.role) ? (
+        {shelfData === null ? <CatalogShelfSkeleton title={t("catalogTitle")} /> : sortedCatalog.length ? (
           <section>
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-baseline gap-2.5">
@@ -403,8 +403,7 @@ export function GroupScreen({
                 {sortedCatalog.length ? <RailArrows nudge={nudgeCatalog} /> : null}
               </div>
             </div>
-            {sortedCatalog.length ? (
-              <>
+            <>
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                   {bothCatalogKinds && activeCatalogKind ? (
                     <div role="group" aria-label={tl("tabsLabel")} className="flex max-w-full gap-0.5 overflow-x-auto rounded-full bg-[var(--wash-strong)]/70 p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -456,10 +455,7 @@ export function GroupScreen({
                     </button>
                   ) : null}
                 </Rail>
-              </>
-            ) : (
-              <EmptyState title={t("catalogEmptyTitle")} onClick={onOpenCatalog} />
-            )}
+            </>
           </section>
         ) : null}
 

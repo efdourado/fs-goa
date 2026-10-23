@@ -5,9 +5,9 @@ import { type FormEvent, type ReactNode, useMemo, useState } from "react";
 
 import { CheckpointPlanner } from "../checkpoint-planner";
 import { useGoaFormat } from "../format";
-import { FormDialog } from "../dialog";
-import { AddSharedResponseDialog, ResponseSettingsDialog, SharedGlyph, SharedResponsePanel } from "../shared-responses";
-import { cleanFields, FIELD_TYPES, FieldConfigInputs, newFieldConfig, uniqueFieldKey } from "../fields";
+import { ConfirmDialog, FormDialog } from "../dialog";
+import { AddSharedResponseDialog, ResponseSettingsDialog, SharedGlyph } from "../shared-responses";
+import { cleanFields, type CountGoalOption, countGoalOptions, CountSettings, FIELD_TYPES, FieldConfigInputs, newFieldConfig, uniqueFieldKey } from "../fields";
 import { type CatalogScope } from "../libraries";
 import { bodyFromValues, editableProperties, PropertyInputs, type PropertyValues, propertiesHaveProblem, showsRecommender, useLibraryProperties, valuesFromItem } from "../property-inputs";
 import { recommenderBody, RecommenderPicker, recommenderFromItem, type RecommenderValue, sameRecommender, useRecommenderSource } from "../recommender-picker";
@@ -24,7 +24,6 @@ import type {
   CheckpointInput,
   CopyResult,
   Entry,
-  FieldCount,
   GroupSummary,
   Id,
   Member,
@@ -49,7 +48,7 @@ import {
   StatusMessage,
   Toggle,
 } from "../ui";
-import { isLivingList, itemIdForEntry, PAGE_COUNT_KEY, recipeCatalogKind } from "../utils";
+import { isLivingList, itemIdForEntry } from "../utils";
 import { SETUP_STEPS, SetupSummary, setupState, StepMarker, useChallengePreflight } from "../setup-progress";
 
 interface DuplicateTargetGroup {
@@ -288,21 +287,23 @@ function AdminFields({
   onSave,
   onRenameType,
   onSetExpectation,
-  onSetPageCount,
+  onSetTracking,
   onAddShared,
   onRemoveType,
-  onSavePolicy,
 }: {
   challenge: ChallengeDetail;
   /** `deleteAnswers`: a removed field that already has answers takes them with it (asked for first). */
   onSave: (entryTypeId: Id, fields: ChallengeField[], deleteAnswers?: boolean) => Promise<void>;
   onRenameType: (entryTypeId: Id, name: string) => Promise<void>;
   onSetExpectation: (enabled: boolean) => Promise<void>;
-  onSetPageCount: (enabled: boolean) => Promise<void>;
+  onSetTracking: (propertyKey: string | false) => Promise<void>;
   onAddShared: (payload: { name: string; sharedEditPolicy: SharedEditPolicy; field: ChallengeField }) => Promise<void>;
   onRemoveType: (entryTypeId: Id, confirmed: { archiveMetrics: boolean; deleteAnswers: boolean }) => Promise<void>;
-  onSavePolicy: (entryTypeId: Id, policy: SharedEditPolicy) => Promise<void>;
 }) {
+  const tCount = useTranslations("countSettings");
+  // What a count on these items can run up to: their library's number properties (a book's pages, a route's distance).
+  const { properties: libraryProperties } = useLibraryProperties(challenge.libraries?.[0] ?? null);
+  const countGoals: CountGoalOption[] = countGoalOptions(libraryProperties, tCount("goalPageCount"));
   const t = useTranslations("adminChallenge");
   const tf = useTranslations("fields");
   const tSr = useTranslations("sharedResponses");
@@ -313,16 +314,17 @@ function AdminFields({
     && challenge.submissionMode === "item"
     && challenge.entryTypes.some((type) => type.purpose === "rating");
   const [expectationBusy, setExpectationBusy] = useState(false);
-  // Pages' page count: on by default, off makes it a plain bookshelf. Only for books, and never where the
-  // challenge already counts pages its own way (a reading club's "Páginas lidas").
-  const countsPages = challenge.entryTypes.some((type) => type.semanticKey === PAGE_COUNT_KEY);
-  const otherPageCount = challenge.entryTypes.some((type) => type.semanticKey !== PAGE_COUNT_KEY
-    && type.fields.some((field) => field.config?.count?.goal && "from" in field.config.count.goal));
-  const canTogglePageCount = recipeCatalogKind(challenge.recipeKey) === "book" && challenge.status !== "closed" && !otherPageCount;
-  const [pageCountBusy, setPageCountBusy] = useState(false);
-  // A day-by-day response always needs its day, so the choice only exists for the other kinds.
-  // Pages' page count is the "Contar páginas" switch below, not fields of your own — it isn't listed here.
-  const ownTypes = challenge.entryTypes.filter((type) => type.semanticKey !== PAGE_COUNT_KEY);
+  const trackingType = challenge.entryTypes.find((type) => type.purpose === "progress");
+  const trackingField = trackingType?.fields.find((field) => field.config?.count) ?? null;
+  const trackingGoal = trackingField?.config?.count?.goal;
+  const trackedProperty = trackingGoal && "from" in trackingGoal ? trackingGoal.from : "";
+  const [trackingProperty, setTrackingProperty] = useState(trackedProperty);
+  const [trackingBusy, setTrackingBusy] = useState(false);
+  const [trackingConfirm, setTrackingConfirm] = useState<{ action: "change" | "off"; propertyKey?: string } | null>(null);
+  const chosenTrackingProperty = trackingProperty || trackedProperty || countGoals[0]?.key || "";
+  // Progress has its own setting below the fields, regardless of whether it came from an old reading template or
+  // the new Manage action. It should not appear again among the ordinary response forms.
+  const ownTypes = challenge.entryTypes.filter((type) => type.purpose !== "progress");
   const types = ownTypes.length
     ? ownTypes
     : [{ id: "", name: "", fields: challenge.fields } as ChallengeDetail["entryTypes"][number]];
@@ -339,7 +341,6 @@ function AdminFields({
   const [addingShared, setAddingShared] = useState(false);
   const [managingType, setManagingType] = useState(false);
   const locked = challenge.status === "closed";
-  const isShared = activeType?.answerScope === "shared";
   const otherResponseCount = types.filter((type) => type.id !== activeType?.id && type.purpose !== "expectation").length;
   const removable = otherResponseCount > 0 && activeType?.purpose !== "expectation";
   const canAddShared = challenge.submissionMode === "item" && !locked && challenge.entryTypes.length > 0;
@@ -465,7 +466,7 @@ function AdminFields({
           field={editing === "new" ? undefined : editing}
           takenKeys={fields.filter((candidate) => candidate !== editing).map((candidate) => candidate.key)}
           lockType={challenge.status !== "draft" && editing !== "new" && Boolean(editing.id)}
-          countable={activeType && (activeType.cardinality === "once_per_day" || activeType.cardinality === "once_per_item_day") ? { bookGoal: recipeCatalogKind(challenge.recipeKey) === "book" } : undefined}
+          countable={activeType && (activeType.cardinality === "once_per_day" || activeType.cardinality === "once_per_item_day") ? { goals: countGoals } : undefined}
           onCancel={() => setEditing(null)}
           onRemove={editing === "new" || fields.length < 2 ? undefined : async () => {
             await commit(fields.filter((candidate) => candidate !== editing), t("fieldsSaved"), true);
@@ -478,15 +479,6 @@ function AdminFields({
             await commit(next, editing === "new" ? t("fieldAdded") : t("fieldsSaved"));
             setEditing(null);
           }}
-        />
-      ) : null}
-
-      {isShared && activeType ? (
-        <SharedResponsePanel
-          key={activeType.id}
-          type={activeType}
-          locked={locked}
-          onChangePolicy={(policy) => onSavePolicy(activeType.id, policy)}
         />
       ) : null}
 
@@ -505,25 +497,48 @@ function AdminFields({
         />
       ) : null}
 
-      {canToggleExpectation || hasExpectation || canTogglePageCount ? (
+      {challenge.libraries?.length || canToggleExpectation || hasExpectation ? (
         <div className="mt-8 divide-y divide-[var(--line)] overflow-hidden rounded-2xl border border-[var(--line)]">
-          {canTogglePageCount ? (
+          {challenge.libraries?.length ? (
             <div className="p-5">
               <Toggle
-                checked={countsPages}
-                disabled={pageCountBusy}
+                checked={Boolean(trackingType)}
+                disabled={locked || trackingBusy || (!trackingType && !chosenTrackingProperty)}
                 onChange={(next) => {
-                  setPageCountBusy(true);
+                  if (!next) { setTrackingConfirm({ action: "off" }); return; }
+                  setTrackingBusy(true);
                   setError(null);
-                  onSetPageCount(next)
-                    .then(() => setSuccess(next ? t("pageCountOn") : t("pageCountOff")))
+                  onSetTracking(chosenTrackingProperty)
+                    .then(() => setSuccess(t("trackingStarted")))
                     .catch((cause: unknown) => setError(f.error(cause)))
-                    .finally(() => setPageCountBusy(false));
+                    .finally(() => setTrackingBusy(false));
                 }}
                 bare
-                label={t("pageCountTitle")}
-                hint={t("pageCountHint")}
+                label={t("trackingTitle")}
+                hint={trackingType ? undefined : t("trackingInactive")}
               />
+              {libraryProperties === null ? (
+                <p className="mt-4 text-sm text-[var(--muted)]">{t("trackingLoading")}</p>
+              ) : countGoals.length ? (
+                <div className="mt-4">
+                  <Select
+                    ariaLabel={t("trackingTitle")}
+                    value={chosenTrackingProperty}
+                    onChange={setTrackingProperty}
+                    disabled={locked || trackingBusy}
+                    options={countGoals.map((goal) => ({ value: goal.key, label: goal.label }))}
+                  />
+                  {trackingType ? <Button
+                    className="mt-3 min-h-11 w-full"
+                    disabled={locked || trackingBusy || !chosenTrackingProperty || chosenTrackingProperty === trackedProperty}
+                    onClick={() => setTrackingConfirm({ action: "change", propertyKey: chosenTrackingProperty })}
+                  >
+                    {t("trackingSave")}
+                  </Button> : null}
+                </div>
+              ) : (
+                <p className="mt-4 text-sm text-[var(--muted)]">{t("trackingNoProperty")}</p>
+              )}
             </div>
           ) : null}
           {canToggleExpectation || hasExpectation ? (
@@ -547,41 +562,21 @@ function AdminFields({
           ) : null}
         </div>
       ) : null}
-    </section>
-  );
-}
-
-/**
- * "Contagem" for a number field: count it along a road to a goal. Only where a count can be drawn — a form
- * answered day by day — and the book's page count is offered only when the items are books.
- */
-function CountSettings({ field, bookGoal, onChange }: { field: ChallengeField; bookGoal: boolean; onChange: (count: FieldCount | undefined) => void }) {
-  const t = useTranslations("countSettings");
-  const count = field.config?.count;
-  const goalKind = !count?.goal ? "none" : "from" in count.goal ? "page_count" : "value";
-  const set = (patch: Partial<FieldCount>) => onChange({ goal: null, entry: "amount", showDates: true, ...count, ...patch });
-  return (
-    <div className="space-y-4 rounded-2xl border border-[var(--line)] p-4">
-      <Toggle checked={Boolean(count)} onChange={(on) => onChange(on ? { goal: bookGoal ? { from: "page_count" } : null, entry: bookGoal ? "position" : "amount", showDates: true } : undefined)} label={t("title")} hint={t("hint")} />
-      {count ? (
-        <>
-          <Field label={t("goal")}>
-            <div className="flex flex-wrap items-center gap-2">
-              <Select className="w-auto" ariaLabel={t("goal")} value={goalKind} onChange={(next) => set({ goal: next === "page_count" ? { from: "page_count" } : next === "value" ? { value: 100 } : null })}
-                options={[{ value: "none", label: t("goalNone") }, { value: "value", label: t("goalValue") }, ...(bookGoal || goalKind === "page_count" ? [{ value: "page_count", label: t("goalPageCount") }] : [])]} />
-              {count.goal && "value" in count.goal ? (
-                <input className={cx(inputClass, "w-32")} type="number" min={1} step="any" aria-label={t("goalValue")} value={count.goal.value} onChange={(event) => set({ goal: { value: Math.max(1, Number(event.target.value) || 1) } })} />
-              ) : null}
-            </div>
-          </Field>
-          <Field label={t("entry")}>
-            <Select className="w-auto" ariaLabel={t("entry")} value={count.entry} onChange={(next) => set({ entry: next === "position" ? "position" : "amount" })}
-              options={[{ value: "amount", label: t("entryAmount") }, { value: "position", label: t("entryPosition") }]} />
-          </Field>
-          <Toggle checked={count.showDates} onChange={(on) => set({ showDates: on })} label={t("showDates")} hint={t("showDatesHint")} />
-        </>
+      {trackingConfirm ? (
+        <ConfirmDialog
+          title={trackingConfirm.action === "off" ? t("trackingOffConfirmTitle") : t("trackingChangeConfirmTitle")}
+          body={trackingConfirm.action === "off" ? t("trackingOffConfirmBody") : t("trackingChangeConfirmBody")}
+          confirmLabel={trackingConfirm.action === "off" ? t("trackingTurnOff") : t("trackingChange")}
+          danger
+          onClose={() => setTrackingConfirm(null)}
+          onConfirm={async () => {
+            await onSetTracking(trackingConfirm.action === "off" ? false : trackingConfirm.propertyKey!);
+            setSuccess(trackingConfirm.action === "off" ? t("trackingStopped") : t("trackingSaved"));
+            setTrackingConfirm(null);
+          }}
+        />
       ) : null}
-    </div>
+    </section>
   );
 }
 
@@ -597,8 +592,8 @@ export function FieldEditorDialog({
   field?: ChallengeField;
   takenKeys: string[];
   lockType: boolean;
-  /** The form is answered day by day, so a number on it can be a count; `bookGoal` when the items are books. */
-  countable?: { bookGoal: boolean };
+  /** The form is answered day by day, so a number on it can be a count; `goals` are the item properties it can count up to. */
+  countable?: { goals: CountGoalOption[] };
   onCancel: () => void;
   onSave: (field: ChallengeField) => Promise<void>;
   /** Removes the field and whatever was already answered in it (confirmed inside this modal). */
@@ -643,7 +638,7 @@ export function FieldEditorDialog({
       </Field>
       {hasConfig ? <FieldConfigInputs field={draft} onChange={(patch) => setDraft((current) => ({ ...current, ...patch }))} /> : null}
       {countable && draft.type === "number" ? (
-        <CountSettings field={draft} bookGoal={countable.bookGoal} onChange={(count) => setDraft((current) => ({ ...current, config: { ...current.config, count } }))} />
+        <CountSettings field={draft} goals={countable.goals} onChange={(count) => setDraft((current) => ({ ...current, config: { ...current.config, count } }))} />
       ) : null}
       <Toggle checked={draft.required} onChange={(next) => setDraft((current) => ({ ...current, required: next }))} label={tf("required")} hint={tf("requiredHint")} />
     </FormDialog>
@@ -840,7 +835,6 @@ export function AdminScreen({
   onSetPageCount,
   onAddSharedResponse,
   onRemoveEntryType,
-  onSaveSharedPolicy,
   onSaveCheckpoints,
   onAssignCheckpointItems,
   onPublishResult,
@@ -869,7 +863,8 @@ export function AdminScreen({
   /** Renames what one check-in is called ("Workout") on a challenge that logs several items per check-in. */
   onRenameEntryType: (entryTypeId: Id, name: string) => Promise<void>;
   onSetExpectation: (enabled: boolean) => Promise<void>;
-  onSetPageCount: (enabled: boolean) => Promise<void>;
+  /** Starts or edits item progress using a numeric library property's stable key. */
+  onSetPageCount: (propertyKey: string | false) => Promise<void>;
   onAddSharedResponse: (payload: { name: string; sharedEditPolicy: SharedEditPolicy; field: ChallengeField }) => Promise<void>;
   onRemoveEntryType: (entryTypeId: Id, confirmed: { archiveMetrics: boolean; deleteAnswers: boolean }) => Promise<void>;
   onSaveSharedPolicy: (entryTypeId: Id, policy: SharedEditPolicy) => Promise<void>;
@@ -942,7 +937,7 @@ export function AdminScreen({
             </div>
           </>
         ) : null}
-        {activeTab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.visibilityPolicy}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} onRenameType={onRenameEntryType} onSetExpectation={onSetExpectation} onSetPageCount={onSetPageCount} onAddShared={onAddSharedResponse} onRemoveType={onRemoveEntryType} onSavePolicy={onSaveSharedPolicy} /> : null}
+        {activeTab === "fields" ? <AdminFields key={`${challenge.id}:${challenge.entryTypes.map((type) => `${type.id}#${type.visibilityPolicy}#${type.fields.map((field) => field.id ?? field.key).join(",")}`).join("|")}`} challenge={challenge} onSave={onSaveFields} onRenameType={onRenameEntryType} onSetExpectation={onSetExpectation} onSetTracking={onSetPageCount} onAddShared={onAddSharedResponse} onRemoveType={onRemoveEntryType} /> : null}
         {activeTab === "checkpoints" ? <CheckpointPlanner key={`${challenge.id}:${challenge.checkpoints.map((cp) => cp.id).join(",")}`} challenge={challenge} onSaveCheckpoints={onSaveCheckpoints} onAssign={onAssignCheckpointItems} /> : null}
         {activeTab === "settings" ? <ChallengeSettings challenge={challenge} duplicateTargets={duplicateTargets} onDuplicate={onDuplicate} onOpenCopy={onOpenCopy} onDelete={onDelete} isPlatformAdmin={isPlatformAdmin} onPublishTemplate={onPublishTemplate} onUnpublishTemplate={onUnpublishTemplate} onPublish={onPublishResult} onUnpublish={onUnpublishResult} /> : null}
       </div>

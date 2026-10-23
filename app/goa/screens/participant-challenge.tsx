@@ -23,6 +23,7 @@ import { challengeShowcaseBlocks, hasShowcaseContent, ShowcaseView } from "../sh
 import { RuleSectionsView, visibleRuleSections } from "../rules";
 import { instantToDateKey } from "../schedule";
 import type {
+  CatalogAttributeValue,
   ChallengeDetail,
   ChallengeField,
   ChallengeItem,
@@ -704,17 +705,11 @@ function SharedAnswerSection({
   const t = useTranslations("sharedAnswers");
   const f = useGoaFormat();
   const admin = canManage(challenge.viewerRole);
-  const policy = type.sharedEditPolicy ?? "members_fill_admin_corrects";
   const entry = entries.find((candidate) => candidate.entryTypeId === type.id && itemIdForEntry(candidate) === item.id && candidate.answerScope === "shared");
   const [conflict, setConflict] = useState(false);
   const hasRequiredField = type.fields.some((field) => field.required);
-  // Anyone taking part can fill it the first time; who may change it afterwards is the admin's setting.
-  const lockedByPolicy = Boolean(entry) && policy === "members_fill_admin_corrects" && !admin;
-  // An admin who isn't taking part can still correct an answer that exists, just not start one.
-  const blocked = admin && entry && challenge.isParticipant === false
-    ? f.entryUnavailableMessage({ challengeStatus: challenge.status, isParticipant: true, itemStatus: item.status, opensAt: item.opensAt, schedulePrecision: item.schedulePrecision, timeZone })
-    : unavailableMessage;
-  const message = blocked ?? (lockedByPolicy ? t("lockedByPolicy") : null);
+  // There is one answer for everyone. Only a group admin who participates in this challenge can fill or edit it.
+  const message = unavailableMessage ?? (!admin ? t("adminsOnly") : null);
   const canEdit = !message;
 
   async function save(values: Record<Id, unknown>, saved?: Entry) {
@@ -739,7 +734,6 @@ function SharedAnswerSection({
         <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--main-soft)] px-2.5 py-1 text-[11px] font-medium text-[var(--main-strong)]">
           <SharedGlyph />{t("badge")}
         </span>
-        <span className="text-[11px] text-[var(--muted)]">{t(`policy.${policy}`)}</span>
       </div>
       {conflict ? (
         <div role="alert" className="mb-4 flex items-start gap-3 rounded-xl border border-[var(--warn-line)] bg-[var(--warn-soft)] px-4 py-3 text-sm text-[var(--warn)]">
@@ -776,18 +770,34 @@ function SharedAnswerSection({
  * progress / completion / rating. A plain Cine round renders a single form.
  */
 
+/** What an item offers a count's goal: its page count and its other properties. */
+type GoalSource = { pageCount?: number | null; kind?: string | null; attributes?: CatalogAttributeValue[] } | null | undefined;
+
+/** A number property of the item, by key: `page_count` or one of its library's properties. */
+function itemNumber(item: GoalSource, key: string): number | null {
+  if (key === "page_count") return item?.pageCount ?? null;
+  const value = item?.attributes?.find((attribute) => attribute.key === key)?.value;
+  const number = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
+  return Number.isFinite(number) && number > 0 ? number : null;
+}
+
 /**
- * Where a count's road ends: its own goal (a fixed number, or the item's page count) — or, for a field saved
- * before counts had settings, the old rule: a book's page count when the field is its pages.
+ * Where a count's road ends: its own goal (a fixed number, or a number property of the item: a book's pages,
+ * a route's distance) — or, for a field saved before counts had settings, the old rule: a book's page count
+ * when the field is its pages. `book`: it speaks in pages; `perItem`: the goal comes from each item, so every
+ * item has its own road.
  */
-function countGoal(field: ChallengeField, pageCount: number | null, kind?: string | null): { total: number | null; book: boolean } {
+function countGoal(field: ChallengeField, item: GoalSource): { total: number | null; book: boolean; perItem: boolean } {
   const goal = field.config?.count?.goal;
   if (field.config?.count) {
-    if (!goal) return { total: null, book: false };
-    return "from" in goal ? { total: pageCount, book: true } : { total: goal.value, book: false };
+    if (!goal) return { total: null, book: false, perItem: false };
+    return "from" in goal
+      ? { total: itemNumber(item, goal.from), book: goal.from === "page_count", perItem: true }
+      : { total: goal.value, book: false, perItem: false };
   }
-  const legacyBook = Boolean(pageCount) && (field.key === "paginas" || kind === "book");
-  return { total: legacyBook ? pageCount : null, book: legacyBook };
+  const pageCount = item?.pageCount ?? null;
+  const legacyBook = Boolean(pageCount) && (field.key === "paginas" || item?.kind === "book");
+  return { total: legacyBook ? pageCount : null, book: legacyBook, perItem: legacyBook };
 }
 
 function ItemEntryPanel({
@@ -1599,13 +1609,12 @@ export function ParticipantChallengeScreen({
   const logDueOn = logItem?.dueAt ? instantToDateKey(logItem.dueAt, timeZone) : null;
   const logBounds = logRange({ today, startsOn: challenge.startsOn, endsOn: challenge.endsOn, opensOn: logOpensOn, dueOn: logDueOn, loggedDays: [...logRecords.keys()] });
   const logDeadline = logDueOn ?? challenge.endsOn ?? null;
-  const pageCount = logItem?.catalogItem?.pageCount ?? null;
   const completionType = logDayType ? itemForms.find((type) => type.purpose === "completion" && type.answerScope !== "shared") ?? null : null;
   const finishedBook = Boolean(completionType && logItem && ownEntries.some((entry) => entry.entryTypeId === completionType.id && itemIdForEntry(entry) === logItem.id));
   const logCounter: LogCounter | null = logCounterField ? {
     field: logCounterField,
     notes: logFields.filter((field) => field.id && field !== logCounterField),
-    ...countGoal(logCounterField, pageCount, logItem?.catalogItem?.kind),
+    ...countGoal(logCounterField, logItem?.catalogItem),
     // Already finished another way (rated on a shelf, "Terminei" in a club): the road shows full.
     done: Boolean(logItem && doneByItem.has(logItem.id)),
     unit: logCounterField.config?.unit ?? null,
@@ -1626,7 +1635,7 @@ export function ParticipantChallengeScreen({
   const countHidesDates = logCounterField?.config?.count?.showDates === false;
   // How far each book is, for the list of books: the pages counted so far against its page count.
   const pagesByItem = new Map<Id, number>();
-  const bookCount = logDayType && logCounterField?.id && countGoal(logCounterField, 1, "book").book ? logCounterField : null;
+  const bookCount = logDayType && logCounterField?.id && countGoal(logCounterField, { pageCount: 1, kind: "book" }).perItem ? logCounterField : null;
   if (bookCount) {
     for (const entry of ownEntries) {
       const itemId = itemIdForEntry(entry);
@@ -1714,12 +1723,13 @@ export function ParticipantChallengeScreen({
         const done = doneByItem.has(item.id);
         const soon = item.status === "scheduled" && !entriesByItem.has(item.id);
         const label = item.catalogItem?.year ? `${item.title} (${item.catalogItem.year})` : item.title;
-        // A book being counted says how far you are ("p. 212 de 340 · faltam 128"), or that it's done.
+        // An item counted toward its own goal says how far you are ("p. 212 de 340 · faltam 128" for a book,
+        // "12 de 21 · faltam 9" for anything else), or that it's done.
         const read = pagesByItem.get(item.id);
-        const pages = item.catalogItem?.pageCount;
+        const pages = bookCount ? countGoal(bookCount, item.catalogItem).total : null;
         const progress = !pages || !bookCount ? null
           : done || (read ?? 0) >= pages ? t("bookDone")
-            : read === undefined ? null : t("bookProgress", { page: read, total: pages, left: pages - read });
+            : read === undefined ? null : t(item.catalogItem?.kind === "book" ? "bookProgress" : "countProgress", { page: read, total: pages, left: pages - read });
         return { id: item.id, label, done, soon, statusLabel: done ? "" : soon ? t("checkpointSoonLabel") : undefined, meta: progress ?? metaForItem(item), rating: ratingByItem.get(item.id) ?? null };
       })}
     />

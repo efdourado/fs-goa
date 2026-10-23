@@ -9,6 +9,7 @@ import { DynamicEntryForm, itemEntryTypes, ParticipantChallengeScreen, ResultVie
 import type { ChallengeDetail, ChallengeField } from "../app/goa/types";
 import { AppHeader, ChallengeStatusBadge, SchedulePeriodFields } from "../app/goa/ui";
 import { NewLibraryDialog, TablesLibraryPrompt } from "../app/goa/library-dialogs";
+import { ReadyMadeTemplatesSection } from "../app/goa/template-gallery";
 import { WelcomePanel } from "../app/goa/welcome";
 import {
   findMissingRequiredField,
@@ -710,21 +711,24 @@ test("Wrapped: quando há blocos, o Resultado os renderiza na ordem gravada e pu
   assert.ok(summaryIdx > -1 && metricIdx > summaryIdx, "o resumo (posição 0) vem antes da métrica (posição 2)");
 });
 
-test("boas-vindas de quem não tem nada: um caminho em destaque, dois em link, e as quatro partes de uma rodada escondidas até pedir", () => {
-  const html = renderWithIntl(createElement(WelcomePanel, { onCreateGroup: () => undefined, onQuickCreate: () => undefined, onOpenTemplates: () => undefined }));
-  assert.match(html, />Começar<\/button>/, "o caminho guiado é o botão");
-  assert.match(html, />Criar um grupo<\/button>/);
-  assert.match(html, />Copiar um que já existe<\/button>/);
-  assert.equal((html.match(/<button/g) ?? []).length, 3, "um botão de destaque e dois links — nada além");
-  assert.match(html, /<details(?![^>]*\sopen)/, "as quatro partes ficam recolhidas");
-  for (const step of ["Escolha o que você acompanha", "Monte um desafio", "Traga sua turma", "Leia a vitrine"]) assert.match(html, new RegExp(step));
-  assert.doesNotMatch(html, /Receitas para começar/, "sem os chips de receita que pareciam clicáveis");
+test("boas-vindas de quem não tem nada: só o + fica no cabeçalho, sem conteúdo próprio no painel", () => {
+  const html = renderWithIntl(createElement(WelcomePanel, { groups: [], onQuickCreate: () => undefined, onCreateManually: async () => undefined }));
+  assert.doesNotMatch(html, /Modelos/);
+  assert.match(html, /aria-label="Começar"[^>]*><svg[^>]*>.*?<\/svg><\/button>/, "o botão circular + abre as opções para começar");
+  assert.doesNotMatch(html, /Comece um desafio|Acompanhe o que você assiste, lê ou faz/);
+  assert.equal((html.match(/<button/g) ?? []).length, 1, "somente a ação + do cabeçalho");
+});
+
+test("a seção de modelos prontos pode ocupar a home vazia enquanto carrega a galeria publicada", () => {
+  const html = renderWithIntl(createElement(ReadyMadeTemplatesSection, { onOpen: () => undefined }));
+  assert.match(html, /<h2[^>]*>Modelos prontos<\/h2>/);
+  assert.match(html, /Carregando modelos…/);
 });
 
 test("Tables sem biblioteca: convida a criá-la e avisa que dá para criar outras, sem preset nem propriedades de partida", () => {
   const prompt = renderWithIntl(createElement(TablesLibraryPrompt, { scope: "personal", onCreated: () => undefined }));
-  assert.match(prompt, /Comece com uma biblioteca Tables/);
-  assert.match(prompt, />Criar biblioteca Tables<\/button>/);
+  assert.match(prompt, /Comece com uma biblioteca Lugares/);
+  assert.match(prompt, />Criar biblioteca Lugares<\/button>/);
   assert.match(prompt, /outras bibliotecas/, "sugere criar mais bibliotecas depois");
   assert.doesNotMatch(prompt, /Bairro|Endereço|cozinha/i);
   const dialog = renderWithIntl(createElement(NewLibraryDialog, { scope: "personal", onCancel: () => undefined, onCreated: () => undefined }));

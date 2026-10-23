@@ -97,10 +97,10 @@ interface Recipe {
  * key (`cine_free`, `cine_curated`, `reading_club`, `reading_daily`) that is still read faithfully but
  * that `resolveRecipe` never creates a challenge from.
  */
-export type RecipeKey = "cinema" | "library" | "bookshelf" | "habit" | "custom" | "tables";
+export type RecipeKey = "cinema" | "library" | "bookshelf" | "habit" | "custom" | "tables" | "progress";
 
 export function isRecipeKey(value: unknown): value is RecipeKey {
-  return value === "cinema" || value === "library" || value === "bookshelf" || value === "habit" || value === "custom" || value === "tables";
+  return value === "cinema" || value === "library" || value === "bookshelf" || value === "habit" || value === "custom" || value === "tables" || value === "progress";
 }
 
 const ratingFields = (commentMax: number): ClientField[] => [
@@ -144,9 +144,8 @@ const progressoDia: RecipeEntryType = {
   primary: true,
 };
 
-// Pages' own count: where you are in each book, against its page count. The day is saved quietly (it's how we
-// know when a book was started and finished) but never shown — a shelf has no deadline, only progress.
-// Optional: switched off in Manage, Pages is a plain bookshelf again.
+// The progress type Manage can add to an item challenge. Its goal property is replaced with the property selected
+// there; `page_count` remains the default only for old book-specific API calls and stored challenges.
 export const PAGE_COUNT_KEY = "paginas_livro";
 export const pageCountType: RecipeEntryType = {
   semanticKey: PAGE_COUNT_KEY,
@@ -233,6 +232,23 @@ const tablesEntry: RecipeEntryType = {
   primary: true,
 };
 
+// The reading club's shape on any library: how much was done on an item each day (km of a route, episodes of
+// a series, lessons of a course), counted along a road to the goal the creator chose (a number property of the
+// item, one number for all, or none), then a "Terminei" with an optional rating. The creator's columns replace
+// this starting one.
+const progressoItem: RecipeEntryType = {
+  semanticKey: "progresso",
+  name: "Progresso do dia",
+  purpose: "progress",
+  submissionMode: "daily",
+  targetPolicy: "required",
+  cardinality: "once_per_item_day",
+  schedulePolicy: "while_active",
+  fields: [
+    { key: "quantidade", label: "Quanto hoje", type: "number", required: true, config: { min: 0, count: { goal: null, entry: "amount", showDates: true } } },
+  ],
+  primary: true,
+};
 const completionMetric: RecipeMetric = {
   key: "taxa_conclusao",
   label: "Taxa de conclusão",
@@ -305,7 +321,7 @@ export const RECIPES: Record<RecipeKey, Recipe> = {
     version: 1,
     catalogKind: "book",
     scheduleMode: "none",
-    entryTypes: [avaliacao(true), pageCountType],
+    entryTypes: [avaliacao(true)],
     metrics: [
       { key: "media_nota", label: "Nota média", operation: "average", fieldKey: "nota", groupBy: "none" },
       {
@@ -356,6 +372,21 @@ export const RECIPES: Record<RecipeKey, Recipe> = {
     // when the creator turns it on — every save is still timestamped internally.
     entryTypes: [customEntry],
     metrics: [completionMetric],
+  },
+  // Daily progress on any library (see `progressoItem`); books keep `library`, which knows their pages.
+  progress: {
+    key: "progress",
+    version: 1,
+    catalogKind: null,
+    catalogKindFromBody: true,
+    userDefinedFields: true,
+    scheduleMode: "period",
+    entryTypes: [progressoItem, conclusao],
+    metrics: [
+      { key: "total", label: "Total", operation: "sum", fieldKey: "quantidade", groupBy: "none" },
+      { key: "total_por_pessoa", label: "Total por pessoa", operation: "sum", fieldKey: "quantidade", groupBy: "participant", needsGroup: true },
+      completionMetric,
+    ],
   },
   // A ready-made challenge on a Tables library: rate each place on food,
   // atmosphere/service and value, plus one combined score averaging all three — which is the place's rating.
@@ -484,5 +515,5 @@ export function resolveRecipe(body: Record<string, unknown>): Recipe {
   if (body.submissionMode === undefined || body.submissionMode === "item") {
     return RECIPES.cinema;
   }
-  throw new ApiError(400, "invalid_recipe", "Escolha o modelo Screens, Pages ou Clube de leitura.");
+  throw new ApiError(400, "invalid_recipe", "Escolha o modelo Filmes e séries, Livros ou Clube de leitura.");
 }

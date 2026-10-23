@@ -484,6 +484,13 @@
       "when": 1792243604378,
       "tag": "0068_drop_entry_date_and_archives",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1792763529010,
+      "tag": "0069_progress_recipe",
+      "breakpoints": true
     }
   ]
 }

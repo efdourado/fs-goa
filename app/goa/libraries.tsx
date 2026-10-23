@@ -23,13 +23,13 @@ export function useLibraryName(): (library: Pick<CatalogLibrary, "label" | "sour
   return (library) => library.label?.trim() || t(`source.${library.source}`);
 }
 
-/** The two built-in libraries every workspace can use before it has created anything. */
+/** The two built-in libraries a workspace can start, suggested until it has them (made the first time they get an item). */
 const BUILT_IN_LIBRARIES: ReadonlyArray<{ kind: "film" | "book"; source: "screens" | "pages" }> = [
   { kind: "film", source: "screens" },
   { kind: "book", source: "pages" },
 ];
 
-/** Libraries as a picker sees them: real ones plus the built-ins not created yet (made the first time they get an item). */
+/** A library a picker offers: a real one, or a suggested built-in that isn't made yet. */
 interface LibraryChoice {
   /** `null` for a built-in that doesn't exist yet. */
   id: Id | null;
@@ -38,12 +38,16 @@ interface LibraryChoice {
   label: string | null;
 }
 
+/** The workspace's own libraries, nothing else: nobody starts with libraries they never made. */
 export function libraryChoices(libraries: CatalogLibrary[]): LibraryChoice[] {
-  const real = libraries.map<LibraryChoice>((library) => ({ id: library.id, kind: library.kind, source: library.source, label: library.label }));
-  const missing = BUILT_IN_LIBRARIES
+  return libraries.map<LibraryChoice>((library) => ({ id: library.id, kind: library.kind, source: library.source, label: library.label }));
+}
+
+/** Films & series and Books, offered as a library to start until the workspace has them; choosing one makes it. */
+export function librarySuggestions(libraries: CatalogLibrary[]): LibraryChoice[] {
+  return BUILT_IN_LIBRARIES
     .filter((builtIn) => !libraries.some((library) => library.kind === builtIn.kind))
     .map<LibraryChoice>((builtIn) => ({ id: null, kind: builtIn.kind, source: builtIn.source, label: null }));
-  return [...real, ...missing];
 }
 
 /** The icon for each library source — the same artwork as the recipe it starts from (Screens = Cinema, Pages = Estante…). */
@@ -168,8 +172,11 @@ export function LibraryPills({
   onPick,
   onNew,
   label,
+  suggestions = [],
 }: {
   choices: LibraryChoice[];
+  /** Libraries to start (see `librarySuggestions`): dashed, with a plus, until one is picked. */
+  suggestions?: LibraryChoice[];
   /** The one chosen library, for a single-choice picker… */
   kind?: string | null;
   /** …or every chosen one, for a picker that combines several. */
@@ -182,8 +189,9 @@ export function LibraryPills({
   const libraryName = useLibraryName();
   return (
     <div className="flex flex-wrap gap-2" role="group" aria-label={label}>
-      {choices.map((choice) => {
+      {[...choices, ...suggestions].map((choice) => {
         const active = selectedKinds ? selectedKinds.includes(choice.kind) : choice.kind === kind;
+        const suggested = !active && suggestions.includes(choice);
         return (
           <button
             key={choice.kind}
@@ -192,13 +200,12 @@ export function LibraryPills({
             onClick={() => onPick(choice)}
             className={cx(
               "inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-full border px-4 text-sm transition",
-              active ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] hover:border-[var(--main-line)]",
+              active ? "border-[var(--main)] bg-[var(--main)] text-white"
+                : suggested ? "border-dashed border-[var(--line)] text-[var(--muted)] hover:border-[var(--main-line)] hover:text-[var(--ink)]"
+                  : "border-[var(--line)] hover:border-[var(--main-line)]",
             )}
           >
-            {/* The state is a check, never the library's round glyph — those read as radio buttons. */}
-            {active ? (
-              <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 flex-none" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            ) : null}
+            {suggested ? <span aria-hidden="true">＋</span> : null}
             {libraryName(choice)}
           </button>
         );

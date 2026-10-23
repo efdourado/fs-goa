@@ -1833,20 +1833,27 @@ test("resposta compartilhada (fase 4): uma vez só, admin corrige, sem duplicar 
   assert.equal(sharedType.response.status, 201, JSON.stringify(sharedType.body));
   const typeId = (sharedType.body as { id: string }).id;
 
-  // primeiro preenchimento: qualquer participante pode
-  const first = await call("POST", `/api/challenges/${cid}/entries`, {
+  // Uma pessoa participante sem papel de admin não pode preencher nem corrigir.
+  const memberBlocked = await call("POST", `/api/challenges/${cid}/entries`, {
     session: friend, body: { entryTypeId: typeId, itemId, values: { placar: 2 } },
+  });
+  assert.equal(memberBlocked.response.status, 403, JSON.stringify(memberBlocked.body));
+  assert.equal((memberBlocked.body as { error: string }).error, "shared_admin_only");
+
+  // O admin que também participa preenche a única resposta do grupo.
+  const first = await call("POST", `/api/challenges/${cid}/entries`, {
+    session: owner, body: { entryTypeId: typeId, itemId, values: { placar: 2 } },
   });
   assert.equal(first.response.status, 201, JSON.stringify(first.body));
   assert.equal((first.body as { answerScope: string }).answerScope, "shared");
   const entryId = (first.body as { id: string }).id;
 
-  // já preenchida: outro membro comum não pode corrigir
+  // Já preenchida: um membro comum também não pode corrigir.
   const blocked = await call("POST", `/api/challenges/${cid}/entries`, {
     session: friend, body: { entryTypeId: typeId, itemId, values: { placar: 3 } },
   });
   assert.equal(blocked.response.status, 403, JSON.stringify(blocked.body));
-  assert.equal((blocked.body as { error: string }).error, "shared_locked");
+  assert.equal((blocked.body as { error: string }).error, "shared_admin_only");
 
   // um único registro aparece pros dois, não duplicado por participante
   const listedAsOwner = await call("GET", `/api/challenges/${cid}/entries`, { session: owner });
@@ -1870,7 +1877,7 @@ test("resposta compartilhada (fase 4): uma vez só, admin corrige, sem duplicar 
   assert.equal(stale.response.status, 409, JSON.stringify(stale.body));
   assert.equal((stale.body as { error: string }).error, "shared_conflict");
 
-  // "members_can_edit": qualquer membro elegível preenche e corrige livremente
+  // Uma política antiga no payload não reabre a resposta para membros comuns.
   const openType = await call("POST", `/api/challenges/${cid}/entry-types`, {
     session: owner,
     body: {
@@ -1880,12 +1887,16 @@ test("resposta compartilhada (fase 4): uma vez só, admin corrige, sem duplicar 
   });
   assert.equal(openType.response.status, 201, JSON.stringify(openType.body));
   const openTypeId = (openType.body as { id: string }).id;
-  const openFirst = await call("POST", `/api/challenges/${cid}/entries`, {
+  const oldPolicyBlocked = await call("POST", `/api/challenges/${cid}/entries`, {
     session: friend, body: { entryTypeId: openTypeId, itemId, values: { clima: "chuvoso" } },
+  });
+  assert.equal(oldPolicyBlocked.response.status, 403, JSON.stringify(oldPolicyBlocked.body));
+  const openFirst = await call("POST", `/api/challenges/${cid}/entries`, {
+    session: owner, body: { entryTypeId: openTypeId, itemId, values: { clima: "chuvoso" } },
   });
   assert.equal(openFirst.response.status, 201, JSON.stringify(openFirst.body));
   const openSecond = await call("POST", `/api/challenges/${cid}/entries`, {
-    session: friend, body: { entryTypeId: openTypeId, itemId, values: { clima: "ensolarado" } },
+    session: owner, body: { entryTypeId: openTypeId, itemId, values: { clima: "ensolarado" } },
   });
   assert.equal(openSecond.response.status, 201, JSON.stringify(openSecond.body));
   assert.equal((openSecond.body as { id: string }).id, (openFirst.body as { id: string }).id, "mesma linha compartilhada, atualizada, não duplicada");
@@ -1923,8 +1934,8 @@ test("resposta compartilhada: Done, conclusão e métricas respeitam o escopo, e
   const before = await detail();
   assert.deepEqual(
     before.entryTypes.map((type) => [type.answerScope, type.sharedEditPolicy]).sort(),
-    [["individual", null], ["shared", "members_can_edit"]],
-    "o detalhe expõe o escopo e a política",
+    [["individual", null], ["shared", "members_fill_admin_corrects"]],
+    "o detalhe expõe a resposta única do grupo com a regra fixa",
   );
   const [item1] = before.items.map((item) => item.id);
   const completed = async (session: typeof owner) =>
@@ -1941,7 +1952,7 @@ test("resposta compartilhada: Done, conclusão e métricas respeitam o escopo, e
   assert.equal(await completed(owner), 0, "o placar sozinho não conclui para quem não avaliou");
 
   // criar "do zero" sabendo que já existe é um conflito, não uma sobrescrita silenciosa
-  const race = await call("POST", `/api/challenges/${cid}/entries`, { session: friend, body: { entryTypeId: sharedTypeId, itemId: item1, values: { placar: 9 }, expectedUpdatedAt: null } });
+  const race = await call("POST", `/api/challenges/${cid}/entries`, { session: owner, body: { entryTypeId: sharedTypeId, itemId: item1, values: { placar: 9 }, expectedUpdatedAt: null } });
   assert.equal(race.response.status, 409);
   assert.equal((race.body as { error: string }).error, "shared_conflict");
   const listed = (await call("GET", `/api/challenges/${cid}/entries`, { session: friend })).body as { entries: Array<{ answerScope: string; lastEditedByName: string | null }> };
@@ -2418,8 +2429,8 @@ test("cópia de modelo (fase 7): só a estrutura ou com itens, o escopo comparti
     assert.equal(await count("SELECT count(*) AS n FROM entries WHERE challenge_id = $1", id), 0, "nenhuma resposta atravessa");
     assert.equal(await count("SELECT count(*) AS n FROM challenge_participants WHERE challenge_id = $1", id), 0, "nenhum participante atravessa");
     assert.equal(
-      await count("SELECT count(*) AS n FROM entry_types WHERE challenge_id = $1 AND answer_scope = 'shared' AND shared_edit_policy = 'members_can_edit'", id),
-      1, "a resposta compartilhada continua compartilhada, com a mesma política",
+      await count("SELECT count(*) AS n FROM entry_types WHERE challenge_id = $1 AND answer_scope = 'shared' AND shared_edit_policy = 'members_fill_admin_corrects'", id),
+      1, "a resposta compartilhada continua única para o grupo e restrita aos admins participantes",
     );
     assert.equal(await count("SELECT count(*) AS n FROM challenge_items WHERE challenge_id = $1 AND (recommended_by_user_id IS NOT NULL OR recommended_by_external_id IS NOT NULL OR origin_note IS NOT NULL)", id), 0, "nenhuma indicação atravessa");
   }
@@ -3736,7 +3747,7 @@ test("estante pessoal: só nota, sem data no registro, sem métricas de grupo, r
     items: Array<{ id: string; title: string }>;
   };
   assert.equal(detail.scope, "personal");
-  assert.deepEqual(detail.entryTypes.map((type) => type.purpose), ["rating", "progress"], "avaliação e a contagem de páginas (datas escondidas) — sem conclusão");
+  assert.deepEqual(detail.entryTypes.map((type) => type.purpose), ["rating"], "a estante nasce como uma lista normal; progresso é ativado depois em Gerenciar");
   assert.equal(detail.metrics.some((metric) => metric.operation === "indicator_bias"), false, "sem viés do indicador num desafio solo");
   assert.equal(detail.metrics.some((metric) => metric.operation === "spread"), false, "sem polarização num desafio solo");
   const ranking = detail.metrics.find((metric) => metric.label.toLowerCase().includes("ranking"))!;
@@ -7579,13 +7590,15 @@ test("o registro principal de um desafio personalizado nasce compartilhado quand
   };
   const primary = detail.entryTypes.find((type) => type.isPrimary)!;
   assert.equal(primary.answerScope, "shared");
-  assert.equal(primary.sharedEditPolicy, "members_can_edit");
+  assert.equal(primary.sharedEditPolicy, "members_fill_admin_corrects");
   assert.deepEqual(primary.fields.map((field) => field.key), ["placar"]);
   assert.equal(primary.name, "Placar final", "a resposta compartilhada tem um nome só: o do seu valor");
   assert.equal(detail.entryTypes.length, 1, "só o registro escolhido — nada de tipo individual sobrando");
 
   await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } });
-  const first = await call("POST", `/api/challenges/${cid}/entries`, { session: friend, body: { entryTypeId: primary.id, itemId: detail.items[0].id, values: { placar: "2 x 1" } } });
+  const memberBlocked = await call("POST", `/api/challenges/${cid}/entries`, { session: friend, body: { entryTypeId: primary.id, itemId: detail.items[0].id, values: { placar: "2 x 1" } } });
+  assert.equal(memberBlocked.response.status, 403, JSON.stringify(memberBlocked.body));
+  const first = await call("POST", `/api/challenges/${cid}/entries`, { session: owner, body: { entryTypeId: primary.id, itemId: detail.items[0].id, values: { placar: "2 x 1" } } });
   assert.equal(first.response.status, 201, JSON.stringify(first.body));
   assert.equal((first.body as { answerScope: string }).answerScope, "shared");
   const blind = await call("POST", `/api/challenges/${cid}/entries`, { session: owner, body: { entryTypeId: primary.id, itemId: detail.items[0].id, values: { placar: "3 x 1" }, expectedUpdatedAt: null } });
@@ -7596,10 +7609,31 @@ test("o registro principal de um desafio personalizado nasce compartilhado quand
   const rows = await adminPool.query("SELECT 1 FROM entries WHERE challenge_id = $1 AND deleted_at IS NULL", [cid]);
   assert.equal(rows.rowCount, 1, "um único registro para o item, não um por participante");
 
-  // por padrão continua individual, e só o desafio personalizado pode ser compartilhado
-  const individual = await create({});
-  const individualDetail = (await call("GET", `/api/challenges/${(individual.body as { id: string }).id}`, { session: owner })).body as { entryTypes: Array<{ answerScope: string }> };
-  assert.equal(individualDetail.entryTypes[0].answerScope, "individual");
+  // Sem escolher o escopo compartilhado, uma lista personalizada continua individual.
+  const defaultIndividual = await create({});
+  const defaultDetail = (await call("GET", `/api/challenges/${(defaultIndividual.body as { id: string }).id}`, { session: owner })).body as { entryTypes: Array<{ answerScope: string }> };
+  assert.equal(defaultDetail.entryTypes[0].answerScope, "individual");
+
+  // A challenge can start with separate individual and shared response forms for the same item.
+  const mixed = await create({
+    additionalResponses: [
+      { name: "Comentário individual", answerScope: "individual", fields: [{ key: "comentario_extra", label: "Comentário", type: "text", required: false }] },
+      { name: "Resultado do grupo", answerScope: "shared", fields: [{ key: "resultado", label: "Resultado", type: "text", required: true }] },
+    ],
+  });
+  assert.equal(mixed.response.status, 201, JSON.stringify(mixed.body));
+  const mixedDetail = (await call("GET", `/api/challenges/${(mixed.body as { id: string }).id}`, { session: owner })).body as {
+    entryTypes: Array<{ name: string; answerScope: string; sharedEditPolicy: string | null; fields: Array<{ label: string }> }>;
+  };
+  assert.deepEqual(
+    mixedDetail.entryTypes.map((type) => [type.name, type.answerScope, type.fields[0]?.label]),
+    [
+      ["Registro", "individual", "Placar final"],
+      ["Comentário individual", "individual", "Comentário"],
+      ["Resultado do grupo", "shared", "Resultado"],
+    ],
+  );
+  assert.equal(mixedDetail.entryTypes[2].sharedEditPolicy, "members_fill_admin_corrects");
   const notCustom = await create({ answerScope: "shared" }, "cinema");
   assert.equal(notCustom.response.status, 400, JSON.stringify(notCustom.body));
   assert.equal((notCustom.body as { error: string }).error, "shared_custom_only");
@@ -8700,7 +8734,7 @@ test("métricas de treino: unidade no campo, contar check-ins ou dias e o record
   assert.equal(afterRename.metrics.find((metric) => metric.id === checkins)?.value, 3, "os check-ins continuam lá");
 });
 
-test("contagem: Pages conta as páginas de cada livro (datas escondidas), desligar apaga, religar recomeça; o clube de leitura e os filmes não ganham outra", async () => {
+test("acompanhamento: Gerenciar liga Pages como meta de cada livro; desligar apaga e religar recomeça", async () => {
   const owner = await register("Leitora Contagem", "leitora_contagem");
   const created = await call("POST", "/api/personal/challenges", {
     session: owner,
@@ -8712,8 +8746,12 @@ test("contagem: Pages conta as páginas de cada livro (datas escondidas), deslig
   const load = async () => (await call("GET", `/api/challenges/${challengeId}`, { session: owner })).body as { entryTypes: CountType[]; items: DetailItem[] };
 
   let detail = await load();
+  assert.ok(!detail.entryTypes.some((type) => type.semanticKey === "paginas_livro"), "a lista nasce sem acompanhamento");
+  const started = await call("PATCH", `/api/challenges/${challengeId}/page-count`, { session: owner, body: { enabled: "page_count" } });
+  assert.equal(started.response.status, 200, JSON.stringify(started.body));
+  detail = await load();
   const pages = detail.entryTypes.find((type) => type.semanticKey === "paginas_livro")!;
-  assert.ok(pages, "Pages nasce contando páginas");
+  assert.ok(pages, "Gerenciar iniciou o acompanhamento pela propriedade Pages");
   assert.equal(pages.cardinality, "once_per_item_day");
   assert.deepEqual(pages.fields[0].config?.count, { goal: { from: "page_count" }, entry: "position", showDates: false });
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
@@ -8723,7 +8761,7 @@ test("contagem: Pages conta as páginas de cada livro (datas escondidas), deslig
   assert.equal((await call("PATCH", `/api/challenges/${challengeId}/page-count`, { session: owner, body: { enabled: false } })).response.status, 200);
   detail = await load();
   assert.ok(!detail.entryTypes.some((type) => type.semanticKey === "paginas_livro"), "desligado, é só uma estante");
-  assert.equal((await call("PATCH", `/api/challenges/${challengeId}/page-count`, { session: owner, body: { enabled: true } })).response.status, 200);
+  assert.equal((await call("PATCH", `/api/challenges/${challengeId}/page-count`, { session: owner, body: { enabled: "page_count" } })).response.status, 200);
   // Desligar apaga as páginas já contadas; religar começa do zero.
   const gone = await adminPool.query("SELECT id FROM entries WHERE id = $1", [(saved.body as { id: string }).id]);
   assert.equal(gone.rows.length, 0, "desligar apaga as páginas contadas");
@@ -8854,6 +8892,7 @@ test("resposta compartilhada: dois primeiros salvamentos ao mesmo tempo e ediç�
   const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Corrida" } })).body as { id: string }).id;
   const invite = (await call("POST", `/api/groups/${gid}/invites`, { session: owner, body: { expiresInDays: 7, maxUses: 1 } })).body as { token: string };
   await call("POST", `/api/invites/${invite.token}`, { session: friend, body: {} });
+  await adminPool.query("UPDATE group_members SET role = 'admin' WHERE group_id = $1 AND user_id = $2", [gid, friend.user.id]);
   const cid = ((await call("POST", `/api/groups/${gid}/challenges`, {
     session: owner, body: { recipe: "cinema", title: "Final", participantIds: [owner.user.id, friend.user.id], items: [{ title: "Jogo" }] },
   })).body as { id: string }).id;

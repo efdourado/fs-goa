@@ -105,7 +105,7 @@ export function TablesLibraryPrompt({ scope, onCreated }: { scope: CatalogScope;
   return (
     <div className="rounded-2xl border border-dashed border-[var(--main-line)] bg-[var(--paper)] p-5 sm:p-6">
       <div className="flex items-start gap-4">
-        <span className="grid h-11 w-11 flex-none place-items-center rounded-xl bg-[var(--main-soft)] text-[var(--main)]" aria-hidden="true">
+        <span className="grid h-11 w-11 flex-none place-items-center rounded-xl bg-[var(--main)] text-white" aria-hidden="true">
           <RecipeIcon name="tables" className="h-6 w-6" />
         </span>
         <div className="min-w-0 flex-1">
@@ -521,7 +521,7 @@ export function LibraryPropertiesDialog({
                           onClick={() => setNewType(type)}
                           className={cx(
                             "inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-xs transition",
-                            newType === type ? "border-[var(--main)] bg-[var(--main-soft)] font-medium text-[var(--main-strong)]" : "border-[var(--line)] text-[var(--muted)] hover:text-[var(--ink)]",
+                            newType === type ? "border-[var(--main)] bg-[var(--main)] font-medium text-white" : "border-[var(--line)] text-[var(--muted)] hover:text-[var(--ink)]",
                           )}
                         >
                           <span className="text-[10px] font-medium" aria-hidden="true">{typeIcon(type)}</span>

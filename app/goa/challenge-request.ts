@@ -15,6 +15,7 @@ export function challengeRequestBody(input: ChallengeCreationInput) {
     startsOn: input.startsOn,
     endsOn: input.endsOn,
     fields: input.fields,
+    ...(input.additionalResponses?.length ? { additionalResponses: input.additionalResponses } : {}),
     items: input.items,
     generateDaily: input.generateDaily,
     expectation: input.expectation === true,

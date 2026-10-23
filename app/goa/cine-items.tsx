@@ -19,7 +19,7 @@ import {
 } from "./recommender-picker";
 import { decodeEventForm, encodeEventForm, eventBodyOf, eventFormOf } from "./schedule";
 import type { CatalogItem, ChallengeItemInput, ChallengeLibraryRef, Id, LibraryProperty, Member } from "./types";
-import { Button, cx, inputClass, labelClass, StatusMessage } from "./ui";
+import { Button, CircleMinusIcon, cx, inputClass, labelClass, rowIconClass, StatusMessage } from "./ui";
 import { formatRuntime } from "./utils";
 import { useGoaFormat } from "./format";
 
@@ -391,7 +391,7 @@ function RowCards({ rows, onChange, onRemove, shared, openByDefault = false }: {
                   {hasDetails ? <button type="button" className="min-h-11 rounded-lg px-2 text-xs text-[var(--muted)] hover:text-[var(--ink)]" aria-expanded={open} onClick={() => setExpanded((current) => { const next = new Set(current); if (next.has(row.key)) next.delete(row.key); else next.add(row.key); return next; })}>
                     {open ? t("hideDetails") : t("details")}
                   </button> : null}
-                  {onRemove ? <button type="button" className="min-h-11 cursor-pointer rounded-lg px-2 text-xs text-[var(--danger)] hover:underline" onClick={() => onRemove(row.key)}>{t("remove")}</button> : null}
+                  {onRemove ? <button type="button" className={cx(rowIconClass, "text-[var(--danger)] hover:text-[var(--danger)]")} aria-label={t("remove")} title={t("remove")} onClick={() => onRemove(row.key)}><CircleMinusIcon className="h-[18px] w-[18px]" /></button> : null}
                 </div>
               ) : null}
             </div>
@@ -506,7 +506,7 @@ export function ItemsAddBox({
   if (!target) return null;
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-dashed border-[var(--main-line)] bg-[var(--main-soft)]/50 p-3">
+      <div className="rounded-2xl border border-dashed border-[var(--line)] bg-[var(--wash)]/50 p-3">
         {isFilmTarget || isBookTarget ? <div className="mb-2 flex gap-1 rounded-full bg-[var(--paper)] p-1 text-xs" role="tablist" aria-label={t("pasteModeAria")}>
           {(["simple", "json"] as const).map((mode) => (
             <button
@@ -514,7 +514,7 @@ export function ItemsAddBox({
               key={mode}
               role="tab"
               aria-selected={pasteMode === mode}
-              className={cx("min-h-9 flex-1 rounded-full px-3 font-light", pasteMode === mode ? "bg-[var(--main-soft)] text-[var(--main-strong)]" : "text-[var(--muted)] hover:text-[var(--ink)]")}
+              className={cx("min-h-9 flex-1 rounded-full px-3 font-light", pasteMode === mode ? "bg-[var(--main)] text-white" : "text-[var(--muted)] hover:text-[var(--ink)]")}
               onClick={() => { setPasteMode(mode); setPasteError(null); setPasteSummary(null); }}
             >
               {mode === "simple" ? t("pasteModeSimple") : t("pasteModeJson")}
@@ -679,7 +679,7 @@ export function CineItemsEditor({
                 {flagged(row) ? <span className="block text-xs text-[var(--danger)]">{t("needsAttention")}</span> : null}
               </span>
               <button type="button" className="min-h-9 cursor-pointer rounded-lg px-2 text-xs text-[var(--muted)] hover:text-[var(--ink)]" onClick={() => setEditingKey(row.key)}>{t("edit")}</button>
-              <button type="button" className="min-h-9 cursor-pointer rounded-lg px-2 text-xs text-[var(--danger)] hover:underline" onClick={() => onChange(value.filter((candidate) => candidate.key !== row.key))}>{t("remove")}</button>
+              <button type="button" className={cx(rowIconClass, "text-[var(--danger)] hover:text-[var(--danger)]")} aria-label={t("remove")} title={t("remove")} onClick={() => onChange(value.filter((candidate) => candidate.key !== row.key))}><CircleMinusIcon className="h-[18px] w-[18px]" /></button>
             </li>
           ))}
         </ol>

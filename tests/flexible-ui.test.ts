@@ -19,8 +19,9 @@ import {
   wallClockToInstant,
 } from "../app/goa/schedule";
 import type { ChallengeDetail, ChallengeField, Entry, EntryTypeView, LibraryProperty } from "../app/goa/types";
+import { countGoalOptions } from "../app/goa/fields";
 import { displayAnswer, isItemDone } from "../app/goa/utils";
-import { libraryChoices } from "../app/goa/libraries";
+import { libraryChoices, librarySuggestions } from "../app/goa/libraries";
 
 describe("item schedule in the challenge's own time zone", () => {
   test("a wall-clock time round-trips through an instant in São Paulo and in Lisbon", () => {
@@ -132,19 +133,35 @@ describe("library properties as form values", () => {
   });
 });
 
+describe("progress endpoints", () => {
+  test("a challenge can track pages or any visible custom number property", () => {
+    const distance: LibraryProperty = {
+      key: "def-distance", attributeKey: "distance_km", storage: "attribute", label: "Distance (km)",
+      type: "number", hidden: false, position: 10, canHide: true,
+    };
+    const hiddenTarget: LibraryProperty = { ...distance, key: "def-secret", attributeKey: "secret", hidden: true };
+    const options = countGoalOptions([...builtInProperties("book"), distance, hiddenTarget], "Pages");
+    assert.deepEqual(options, [
+      { key: "page_count", label: "Pages" },
+      { key: "distance_km", label: "Distance (km)" },
+    ]);
+  });
+});
+
 describe("library choices", () => {
-  test("built-in Screens and Pages are always offered, even before they exist", () => {
-    const choices = libraryChoices([]);
-    assert.deepEqual(choices.map((choice) => [choice.kind, choice.id]), [["film", null], ["book", null]]);
+  test("nobody starts with a library they never made: Films & series and Books are only suggested", () => {
+    assert.deepEqual(libraryChoices([]), []);
+    assert.deepEqual(librarySuggestions([]).map((choice) => [choice.kind, choice.id]), [["film", null], ["book", null]]);
   });
 
-  test("a real library replaces its built-in placeholder rather than doubling it", () => {
-    const choices = libraryChoices([
-      { id: "l1", kind: "film", source: "screens", label: null, position: 0, coverTopProperty: null, coverBadgeHidden: false },
-      { id: "l2", kind: "lib_x", source: "custom", label: "Matches", position: 1, coverTopProperty: null, coverBadgeHidden: false },
-    ]);
-    assert.deepEqual(choices.map((choice) => choice.kind), ["film", "lib_x", "book"]);
-    assert.equal(choices.find((choice) => choice.kind === "film")?.id, "l1");
+  test("a library someone made is a choice, and stops being suggested", () => {
+    const libraries = [
+      { id: "l1", kind: "film", source: "screens" as const, label: null, position: 0, coverTopProperty: null, coverBadgeHidden: false },
+      { id: "l2", kind: "lib_x", source: "custom" as const, label: "Matches", position: 1, coverTopProperty: null, coverBadgeHidden: false },
+    ];
+    assert.deepEqual(libraryChoices(libraries).map((choice) => choice.kind), ["film", "lib_x"]);
+    assert.equal(libraryChoices(libraries).find((choice) => choice.kind === "film")?.id, "l1");
+    assert.deepEqual(librarySuggestions(libraries).map((choice) => choice.kind), ["book"]);
   });
 });
 

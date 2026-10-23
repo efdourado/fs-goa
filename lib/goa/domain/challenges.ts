@@ -58,26 +58,53 @@ export async function createChallenge(
   // "books I've read") — it has no round to open or close, so it is born active
   // and can never be closed. See `transitionChallenge` and `isLivingList`.
   const livingList = options.personal === true && !startDate && !endDate;
-  // "Who fills in this response?" — only a Custom challenge lets its main response be filled once
-  // for the whole group instead of by each participant; every other recipe is per participant.
+  // The creator chooses whether a custom list has one answer per participant
+  // or one shared answer for the group. Sessions remain individual.
   const sharedPrimary = body.answerScope === "shared";
   if (body.answerScope !== undefined && body.answerScope !== "individual" && body.answerScope !== "shared") {
     throw new ApiError(400, "invalid_answer_scope", "Escolha quem preenche o registro.");
   }
-  if (sharedPrimary && recordingMode === "session") {
+  if (body.answerScope === "shared" && recordingMode === "session") {
     throw new ApiError(400, "shared_session_unsupported", "Um check-in com vários itens é sempre de cada participante.");
   }
-  if (sharedPrimary && recipe.key !== "custom") {
+  if (body.answerScope === "shared" && recipe.key !== "custom") {
     throw new ApiError(400, "shared_custom_only", "Só um desafio personalizado pode ter o registro principal compartilhado.");
   }
-  const sharedEditPolicy = body.sharedEditPolicy ?? "members_fill_admin_corrects";
-  if (sharedPrimary && sharedEditPolicy !== "members_fill_admin_corrects" && sharedEditPolicy !== "members_can_edit") {
+  if (sharedPrimary && body.sharedEditPolicy !== undefined && body.sharedEditPolicy !== "members_fill_admin_corrects" && body.sharedEditPolicy !== "members_can_edit") {
     throw new ApiError(400, "invalid_shared_edit_policy", "Escolha quem pode preencher ou corrigir a resposta compartilhada.");
   }
+  // Kept in the persisted shape for compatibility, but there is no longer a
+  // policy choice: only participating group admins can fill or change it.
+  const sharedEditPolicy = "members_fill_admin_corrects";
   const wizardFields = Array.isArray(body.fields) && body.fields.length ? (body.fields as ClientField[]) : null;
   if (wizardFields && wizardFields.length > 30) throw new ApiError(400, "field_limit", "Use no máximo 30 campos.");
   const wantsItems = (recipe.catalogKind !== null || recipe.catalogKindFromBody === true)
     && recipe.entryTypes.some((type) => type.submissionMode === "item");
+  const additionalResponses = body.additionalResponses === undefined ? [] : body.additionalResponses;
+  if (!Array.isArray(additionalResponses)) {
+    throw new ApiError(400, "invalid_responses", "As respostas adicionais precisam estar em uma lista.");
+  }
+  assertArrayWithin(additionalResponses, 9, "Adicione no máximo 9 respostas além da principal.");
+  if (additionalResponses.length && (!wantsItems || recordingMode === "session")) {
+    throw new ApiError(400, "additional_responses_unsupported", "Respostas separadas precisam de um desafio com uma resposta por item.");
+  }
+  const parsedResponses = additionalResponses.map((value) => {
+    const response = asRecord(value);
+    const name = typeof response.name === "string" ? response.name.trim() : "";
+    if (!name || Array.from(name).length > 120) {
+      throw new ApiError(400, "invalid_response", "Dê um nome de até 120 caracteres para cada resposta.");
+    }
+    if (response.answerScope !== "individual" && response.answerScope !== "shared") {
+      throw new ApiError(400, "invalid_answer_scope", "Escolha se cada resposta é individual ou compartilhada.");
+    }
+    if (!Array.isArray(response.fields) || !response.fields.length) {
+      throw new ApiError(400, "invalid_response", "Cada resposta precisa de pelo menos um campo.");
+    }
+    if (response.fields.length > 30) throw new ApiError(400, "field_limit", "Use no máximo 30 campos por resposta.");
+    return { name, answerScope: response.answerScope, fields: response.fields as ClientField[] };
+  });
+  const totalFieldCount = (wizardFields?.length ?? 0) + parsedResponses.reduce((total, response) => total + response.fields.length, 0);
+  if (totalFieldCount > 30) throw new ApiError(400, "field_limit", "Use no máximo 30 campos entre todas as respostas.");
   const wantsCheckpoints = recipe.entryTypes.some((type) => type.schedulePolicy === "checkpoint");
   const items = Array.isArray(body.items) ? body.items : [];
   assertArrayWithin(body.items, 200, "Adicione no máximo 200 itens.");
@@ -179,6 +206,27 @@ export async function createChallenge(
         primaryTypeId = typeId;
       }
     }
+    for (const response of parsedResponses) {
+      const typeId = publicId();
+      const base = semanticKey(response.name, "resposta");
+      let key = base;
+      for (let suffix = 2; typeIdByKey.has(key); suffix += 1) key = `${base}_${suffix}`.slice(0, 64);
+      typeIdByKey.set(key, typeId);
+      const shared = response.answerScope === "shared";
+      await client.query(
+        `INSERT INTO entry_types
+          (id, challenge_id, semantic_key, name, submission_mode, purpose, target_policy, cardinality, schedule_policy,
+           is_primary, visibility_policy, answer_scope, shared_edit_policy, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,'item','rating','required','once_per_item','while_active',false,'group_realtime',$5,$6,now(),now())`,
+        [typeId, id, key, response.name, response.answerScope, shared ? sharedEditPolicy : null],
+      );
+      for (let index = 0; index < response.fields.length; index += 1) {
+        const field = await insertField(client, id, typeId, response.fields[index], index);
+        if (!fieldByKey.has(field.semanticKey)) {
+          fieldByKey.set(field.semanticKey, { id: field.id, kind: field.kind, entryTypeId: typeId });
+        }
+      }
+    }
     const entryTypeId = primaryTypeId;
     // A type that lives inside another (a workout's exercise records) points at it — both exist by now.
     for (const type of recipe.entryTypes) {
@@ -244,7 +292,7 @@ export async function createChallenge(
         if (libraryKind && !picked) throw new ApiError(400, "one_library", "Um desafio usa uma biblioteca só.");
         if (!libraryKind) {
           const own = await findLibraryBySource(client, groupId, recipe.defaultLibrarySource);
-          if (!own) throw new ApiError(409, "library_missing", "Crie a biblioteca Tables antes de criar esta rodada.");
+          if (!own) throw new ApiError(409, "library_missing", "Crie a biblioteca Lugares antes de criar esta rodada.");
           libraryKind = own;
         }
       }

@@ -10,6 +10,7 @@ import { CatalogShelfView } from "../catalog-shelf";
 import { useCatalogShelf } from "../libraries";
 import { applyColorFilter, OrganizeBar, useChallengeOrganizer } from "../organize";
 import { Shelf, ShelfAddButton, shelfCardWidth } from "../shelf";
+import { ReadyMadeTemplatesSection } from "../template-gallery";
 import { WelcomePanel } from "../welcome";
 import {
   CHALLENGE_COLOR_TAGS,
@@ -29,6 +30,7 @@ import {
   CirclePinIcon,
   cx,
   EmptyState,
+  FaceEmptyState,
   Field,
   inputClass,
   PageHeading,
@@ -338,9 +340,10 @@ export function DashboardScreen({
   onQuickCreate,
   onQuickCreatePersonal,
   onCreatePersonalChallenge,
+  onCreateManually,
+  onOpenTemplate,
   onOpenPersonalCatalog,
   onOpenPersonalCatalogItem,
-  onOpenTemplates,
   onChanged,
 }: {
   user: User;
@@ -356,9 +359,11 @@ export function DashboardScreen({
   onQuickCreate: () => void;
   onQuickCreatePersonal: () => void;
   onCreatePersonalChallenge: () => void;
+  /** Building a first challenge by hand, once it's known who it's for (a new group is made on the way). */
+  onCreateManually: (target: { personal: true } | { groupId: Id } | { newGroup: string }) => Promise<void>;
+  onOpenTemplate: (id: Id) => void;
   onOpenPersonalCatalog: () => void;
   onOpenPersonalCatalogItem: (itemId: Id) => void;
-  onOpenTemplates: () => void;
   onChanged?: () => void;
 }) {
   const t = useTranslations("dashboard");
@@ -466,10 +471,17 @@ export function DashboardScreen({
 
   return (
     <main className="px-4 py-8 pb-24 sm:px-6 sm:py-12 lg:px-20">
-      <PageHeading
-        title={t("greeting", { name: user.name.split(" ")[0] })}
-        description={brandNew ? tWelcome("lede") : t("subtitle")}
-      />
+      {brandNew ? (
+        <div className="mb-7">
+          <div className="flex items-center justify-between gap-4">
+            <h1 className="min-w-0 text-3xl font-medium tracking-[-0.045em] sm:text-4xl">{t("greeting", { name: user.name.split(" ")[0] })}</h1>
+            <WelcomePanel groups={standardGroups.filter((group) => canManage(group.role))} onQuickCreate={onQuickCreate} onCreateManually={onCreateManually} />
+          </div>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">{tWelcome("lede")}</p>
+        </div>
+      ) : (
+        <PageHeading title={t("greeting", { name: user.name.split(" ")[0] })} description={t("subtitle")} />
+      )}
 
       {showGroupDialog ? (
         <GroupCreateDialog
@@ -486,7 +498,10 @@ export function DashboardScreen({
       <StatusMessage error={error} />
 
       {brandNew ? (
-        <WelcomePanel onCreateGroup={() => setShowGroupDialog(true)} onQuickCreate={onQuickCreate} onOpenTemplates={onOpenTemplates} />
+        <>
+          <FaceEmptyState title={tWelcome("starts.quick.title")} />
+          <ReadyMadeTemplatesSection onOpen={onOpenTemplate} />
+        </>
       ) : (
         <>
           {filtered.pinned.length ? (
@@ -508,9 +523,11 @@ export function DashboardScreen({
 
           {hasGroups ? (
             <HomeSectionBlock first={!showPersonalSide && !filtered.pinned.length} title={th("sectionGroups")}>
-              <Shelf title={t("shelf.running")} count={filtered.group.length}>
-                {filtered.group.length ? renderRail(filtered.group, false) : emptyRail(t("noChallengesTitle"))}
-              </Shelf>
+              {shelves.group.length ? (
+                <Shelf title={t("shelf.running")} count={filtered.group.length}>
+                  {filtered.group.length ? renderRail(filtered.group, false) : emptyRail(t("noChallengesTitle"))}
+                </Shelf>
+              ) : null}
               {groupsShelf}
             </HomeSectionBlock>
           ) : null}
@@ -527,7 +544,7 @@ export function DashboardScreen({
 
           {!colorFilter && ((!hasGroups && !atGroupLimit) || (personalBlank && personalShelf !== null)) ? (
             <div className="mt-12 flex flex-col items-start gap-1">
-              {personalBlank && personalShelf !== null ? <HomeSideLink label={th("startPersonal")} onClick={onCreatePersonalChallenge} /> : null}
+              {personalBlank && personalShelf !== null ? <ShelfAddButton label={th("startPersonal")} onClick={onCreatePersonalChallenge} /> : null}
               {!hasGroups && !atGroupLimit ? <HomeSideLink label={th("inviteGroups")} onClick={() => setShowGroupDialog(true)} /> : null}
             </div>
           ) : null}

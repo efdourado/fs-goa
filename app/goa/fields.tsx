@@ -3,8 +3,8 @@
 import { useTranslations } from "next-intl";
 import { type FormEvent, useState } from "react";
 
-import type { ChallengeField, CreatableRecipeKey, FieldConfig, FieldType } from "./types";
-import { Button, EmptyState, Field, inputClass, labelClass, Select, Toggle } from "./ui";
+import type { ChallengeField, CreatableRecipeKey, FieldConfig, FieldCount, FieldType, LibraryProperty } from "./types";
+import { Button, CircleMinusIcon, cx, EmptyState, Field, inputClass, labelClass, rowIconClass, Select, Toggle } from "./ui";
 import { slugify } from "./utils";
 
 export const FIELD_TYPES: FieldType[] = ["text", "number", "rating", "select", "boolean", "date"];
@@ -21,7 +21,13 @@ type PresetLabels = (key: string) => string;
 export function presetFields(recipe: CreatableRecipeKey, label: PresetLabels): ChallengeField[] {
   if (recipe === "library") {
     return [
-      { key: "paginas", label: label("paginasLidas"), type: "number", required: true, config: { min: 0, step: 1 } },
+      {
+        key: "paginas",
+        label: label("paginasLidas"),
+        type: "number",
+        required: true,
+        config: { min: 0, step: 1, count: { goal: { from: "page_count" }, entry: "position", showDates: true } },
+      },
     ];
   }
   if (recipe === "tables") {
@@ -39,6 +45,12 @@ export function presetFields(recipe: CreatableRecipeKey, label: PresetLabels): C
     // build a metric on it afterwards in the admin Metrics tab.
     return [
       { key: "nota_dia", label: label("comoFoi"), type: "text", required: false, config: { multiline: true, maxLength: 500 } },
+    ];
+  }
+  if (recipe === "custom") {
+    // Your own list starts plain (just a comment); the creator adds the ratings, numbers or dates it needs.
+    return [
+      { key: "comentario", label: label("comentario"), type: "text", required: false, config: { multiline: true, maxLength: 500 } },
     ];
   }
   return [
@@ -121,7 +133,7 @@ export function FieldConfigInputs({
   }
   if (field.type === "number") {
     return (
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t("min")}><input className={inputClass} type="number" step="any" value={field.config?.min ?? ""} onChange={(event) => patchConfig({ min: event.target.value === "" ? undefined : Number(event.target.value) })} /></Field>
         <Field label={t("max")}><input className={inputClass} type="number" step="any" value={field.config?.max ?? ""} onChange={(event) => patchConfig({ max: event.target.value === "" ? undefined : Number(event.target.value) })} /></Field>
         <Field label={t("step")}><input className={inputClass} type="number" step="any" min="0.01" value={field.config?.step ?? 1} onChange={(event) => patchConfig({ step: Number(event.target.value) || 1 })} /></Field>
@@ -138,23 +150,106 @@ export function FieldConfigInputs({
   }
   if (field.type === "text") {
     return (
-      <div className="space-y-3">
-        <Toggle checked={field.config?.multiline ?? false} onChange={(next) => patchConfig({ multiline: next })} label={t("multiline")} />
-        <Field label={t("maxLength")}><input className={inputClass} type="number" min={1} max={6160} value={field.config?.maxLength ?? 280} onChange={(event) => patchConfig({ maxLength: Number(event.target.value) || 280 })} /></Field>
-      </div>
+      <Field label={t("maxLength")}>
+        <input
+          className={inputClass}
+          type="number"
+          min={1}
+          max={6160}
+          value={field.config?.maxLength ?? ""}
+          onChange={(event) => {
+            const value = event.target.value;
+            patchConfig({ maxLength: value === "" ? undefined : Number(value), multiline: value !== "" });
+          }}
+        />
+      </Field>
     );
   }
   return null;
+}
+
+/** A property a count can run up to: an item's number (a book's pages, a route's distance), by the key items carry it under. */
+export interface CountGoalOption {
+  key: string;
+  label: string;
+}
+
+/** The number properties of a library that can be a count's goal: a book's pages and any custom number. */
+export function countGoalOptions(properties: LibraryProperty[] | null, pageCountLabel: string): CountGoalOption[] {
+  return (properties ?? []).flatMap((property) => {
+    if (property.type !== "number" || property.hidden) return [];
+    if (property.storage === "native") return property.key === "page_count" ? [{ key: "page_count", label: property.label ?? pageCountLabel }] : [];
+    return property.attributeKey ? [{ key: property.attributeKey, label: property.label ?? property.attributeKey }] : [];
+  });
+}
+
+/**
+ * "Contagem" for a number field: count it along a road to a goal. Only where a count can be drawn (a form
+ * answered day by day). The goal is a number property of each item (`goals`), one number for every item, or none.
+ */
+export function CountSettings({ field, goals, onChange, alwaysOn = false }: {
+  field: ChallengeField;
+  goals: CountGoalOption[];
+  onChange: (count: FieldCount | undefined) => void;
+  /** The field is the count itself (daily progress), so there's no switch to turn it off. */
+  alwaysOn?: boolean;
+}) {
+  const t = useTranslations("countSettings");
+  const count = field.config?.count;
+  const goal = count?.goal ?? null;
+  const goalValue = !goal ? "none" : "value" in goal ? "value" : `from:${goal.from}`;
+  // A goal set to a property this list doesn't know (yet) still shows, by its key.
+  const options = goal && "from" in goal && !goals.some((option) => option.key === goal.from) ? [...goals, { key: goal.from, label: goal.from }] : goals;
+  const set = (patch: Partial<FieldCount>) => onChange({ goal: null, entry: "amount", showDates: true, ...count, ...patch });
+  return (
+    <div className={cx("space-y-4", !alwaysOn && "rounded-2xl border border-[var(--line)] p-4")}>
+      {alwaysOn ? null : (
+        <Toggle checked={Boolean(count)} onChange={(on) => onChange(on ? { goal: goals[0] ? { from: goals[0].key } : null, entry: goals[0]?.key === "page_count" ? "position" : "amount", showDates: true } : undefined)} label={t("title")} hint={t("hint")} />
+      )}
+      {count ? (
+        <>
+          <Field label={t("goal")}>
+            <div className="flex flex-wrap items-center gap-2">
+              <Select className="w-auto" ariaLabel={t("goal")} value={goalValue}
+                onChange={(next) => set({ goal: next === "none" ? null : next === "value" ? { value: 100 } : { from: next.slice("from:".length) } })}
+                options={[
+                  { value: "none", label: t("goalNone") },
+                  ...options.map((option) => ({ value: `from:${option.key}`, label: t("goalFrom", { name: option.label }) })),
+                  { value: "value", label: t("goalValue") },
+                ]} />
+              {goal && "value" in goal ? (
+                <input className={cx(inputClass, "w-32")} type="number" min={1} step="any" aria-label={t("goalValue")} value={goal.value} onChange={(event) => set({ goal: { value: Math.max(1, Number(event.target.value) || 1) } })} />
+              ) : null}
+            </div>
+          </Field>
+          <Field label={t("entry")}>
+            <Select className="w-auto" ariaLabel={t("entry")} value={count.entry} onChange={(next) => set({ entry: next === "position" ? "position" : "amount" })}
+              options={[{ value: "amount", label: t("entryAmount") }, { value: "position", label: t("entryPosition") }]} />
+          </Field>
+          <Toggle checked={count.showDates} onChange={(on) => set({ showDates: on })} label={t("showDates")} />
+        </>
+      ) : null}
+    </div>
+  );
 }
 
 export function FieldBuilder({
   fields,
   onChange,
   lockPersistedTypes = false,
+  allowAdd = true,
+  minimumFields = 0,
+  showOrdering = true,
 }: {
   fields: ChallengeField[];
   onChange: (fields: ChallengeField[]) => void;
   lockPersistedTypes?: boolean;
+  /** Some editors add a whole response instead, so a second field-level add action would be misleading. */
+  allowAdd?: boolean;
+  /** Keeps a response from being left without anything to answer. */
+  minimumFields?: number;
+  /** Response blocks order themselves, so their nested fields must not show a second pair of arrows. */
+  showOrdering?: boolean;
 }) {
   const t = useTranslations("fields");
   const [label, setLabel] = useState("");
@@ -189,33 +284,35 @@ export function FieldBuilder({
         <ol className="divide-y divide-[var(--line)]">
           {fields.map((field, index) => (
             <li className="py-5 first:pt-0" key={field.id ?? field.key}>
-              <div className="grid gap-3 md:grid-cols-[1.4fr_0.8fr_auto]">
+              <div className="grid gap-3 sm:grid-cols-2">
                 <label><span className={labelClass}>{t("labelLabel")}</span><input className={inputClass} value={field.label} maxLength={100} onChange={(event) => update(index, { label: event.target.value })} /></label>
                 <div><span className={labelClass}>{t("typeLabel")}</span><Select ariaLabel={t("typeLabel")} value={field.type} disabled={lockPersistedTypes && Boolean(field.id)} onChange={(type) => update(index, { type })} options={FIELD_TYPES.map((value) => ({ value, label: t(`type.${value}`) }))} /></div>
-                <label className="flex min-h-12 items-center gap-2 self-end rounded-xl border border-[var(--line)] px-3 text-sm font-medium"><input type="checkbox" checked={field.required} onChange={(event) => update(index, { required: event.target.checked })} />{t("required")}</label>
+                <Toggle className="sm:col-span-2" checked={field.required} onChange={(required) => update(index, { required })} label={t("required")} hint={t("requiredHint")} />
               </div>
               <div className="mt-3">
                 <FieldConfigInputs field={field} onChange={(patch) => update(index, patch)} />
               </div>
               <div className="mt-3 flex justify-end gap-1">
-                <Button variant="ghost" onClick={() => move(index, -1)} disabled={index === 0} className="px-3">↑<span className="sr-only">{t("moveUp")}</span></Button>
-                <Button variant="ghost" onClick={() => move(index, 1)} disabled={index === fields.length - 1} className="px-3">↓<span className="sr-only">{t("moveDown")}</span></Button>
-                <button type="button" className="min-h-11 px-2 text-sm text-[var(--danger)] hover:underline" onClick={() => onChange(fields.filter((_, fieldIndex) => fieldIndex !== index))}>{t("remove")}</button>
+                {showOrdering ? <>
+                  <Button variant="ghost" onClick={() => move(index, -1)} disabled={index === 0} className="px-3">↑<span className="sr-only">{t("moveUp")}</span></Button>
+                  <Button variant="ghost" onClick={() => move(index, 1)} disabled={index === fields.length - 1} className="px-3">↓<span className="sr-only">{t("moveDown")}</span></Button>
+                </> : null}
+                {fields.length > minimumFields ? <button type="button" className={cx(rowIconClass, "text-[var(--danger)] hover:text-[var(--danger)]")} aria-label={t("remove")} title={t("remove")} onClick={() => onChange(fields.filter((_, fieldIndex) => fieldIndex !== index))}><CircleMinusIcon className="h-[18px] w-[18px]" /></button> : null}
               </div>
             </li>
           ))}
         </ol>
       ) : <EmptyState title={t("noFieldsTitle")} />}
 
-      <form className="rounded-2xl border border-dashed border-[var(--main-line)] bg-[var(--main-soft)]/60 p-4" onSubmit={addField}>
-        <p className="mb-3 text-sm font-light text-[var(--main-strong)]">{t("addFieldTitle")}</p>
-        <div className="grid gap-3 sm:grid-cols-[1fr_180px_auto_auto]">
+      {allowAdd ? <form className="rounded-2xl border border-dashed border-[var(--line)] bg-[var(--wash)]/60 p-4" onSubmit={addField}>
+        <p className="mb-3 text-sm font-light text-[var(--ink)]">{t("addFieldTitle")}</p>
+        <div className="grid gap-3 sm:grid-cols-2">
           <label><span className="sr-only">{t("fieldNameSr")}</span><input className={inputClass} value={label} onChange={(event) => setLabel(event.target.value)} placeholder={t("fieldNamePlaceholder")} maxLength={100} required /></label>
           <Select ariaLabel={t("fieldTypeSr")} value={type} onChange={setType} options={FIELD_TYPES.map((value) => ({ value, label: t(`type.${value}`) }))} />
-          <label className="flex min-h-12 items-center gap-2 rounded-xl border border-[var(--line)] px-3 text-sm font-medium"><input type="checkbox" checked={required} onChange={(event) => setRequired(event.target.checked)} />{t("required")}</label>
-          <Button type="submit">{t("add")}</Button>
+          <Toggle className="sm:col-span-2" checked={required} onChange={setRequired} label={t("required")} hint={t("requiredHint")} />
+          <Button type="submit" className="w-full sm:col-span-2">{t("add")}</Button>
         </div>
-      </form>
+      </form> : null}
     </div>
   );
 }

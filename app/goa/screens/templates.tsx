@@ -6,19 +6,18 @@ import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import { API_PATHS, apiRequest } from "../api";
 import { SkippedPropertiesNotice } from "../copy-notice";
 import { Dialog } from "../dialog";
-import { FrontPageStories, pickFrontPage } from "../front-page";
 import { useGoaFormat } from "../format";
 import { SettingsMenu } from "../SettingsMenu";
+import { PublishedTemplates } from "../template-gallery";
 import type {
   ChallengeDetail,
   CopyResult,
   GroupSummary,
   Id,
   SkippedProperty,
-  TemplateSummary,
   User,
 } from "../types";
-import { BackButton, Brand, Button, CircleMinusIcon, CirclePinIcon, cx, EmptyState, labelClass, PageHeading, Select, SelectableCards, StatusMessage } from "../ui";
+import { BackButton, Brand, Button, CircleMinusIcon, CirclePinIcon, cx, labelClass, PageHeading, Select, SelectableCards, StatusMessage } from "../ui";
 import { ParticipantChallengeScreen } from "./participant-challenge";
 
 function PublicChrome({ user, onSignIn, children }: { user: User | null; onSignIn: () => void; children: ReactNode }) {
@@ -58,25 +57,6 @@ export function TemplatesScreen({
   onEmpty?: () => void;
 }) {
   const t = useTranslations("templates");
-  const f = useGoaFormat();
-  const [templates, setTemplates] = useState<TemplateSummary[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    apiRequest<{ templates: TemplateSummary[] }>(API_PATHS.templates, { signal: controller.signal })
-      .then((response) => {
-        setTemplates(response.templates);
-        if (!response.templates.length) onEmpty?.();
-      })
-      .catch((cause: unknown) => {
-        if (!(cause instanceof DOMException && cause.name === "AbortError")) setError(f.error(cause));
-      });
-    return () => controller.abort();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const front = pickFrontPage(templates ?? []);
 
   const body = (
     <main className="px-4 py-8 pb-24 sm:px-6 sm:py-12 lg:px-20">
@@ -93,50 +73,7 @@ export function TemplatesScreen({
         </header>
       )}
 
-      <div className="mt-2"><StatusMessage error={error} /></div>
-
-      {templates === null ? (
-        <p className="mt-6 text-sm text-[var(--muted)]" role="status">{t("loading")}</p>
-      ) : templates.length === 0 ? (
-        <EmptyState title={t("emptyTitle")} />
-      ) : (
-        <>
-        <FrontPageStories featured={front.featured} onOpen={onOpen} />
-        {front.rest.length ? (
-          <h2 className="mb-4 mt-10 border-t border-[var(--line)] pt-5 text-lg font-medium tracking-[-0.03em] sm:mb-5 sm:mt-14 sm:pt-6 sm:text-xl">{t("moreTitle")}</h2>
-        ) : null}
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-          {front.rest.map((template) => (
-            <article
-              key={template.id}
-              className="relative flex flex-col overflow-hidden rounded-[20px] border border-[var(--main-line)] bg-[var(--paper)] shadow-[var(--elevate-1)] transition hover:-translate-y-0.5 has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-[var(--main)]/25"
-            >
-              <div className="flex flex-1 flex-col p-3.5 sm:p-5">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="inline-block h-2.5 w-2.5 flex-none rounded-full bg-[var(--main-line)] ring-1 ring-inset ring-[var(--edge)]" aria-hidden="true" />
-                  <span className="truncate text-[11px] text-[var(--muted)] sm:text-xs">{t(`mode.${template.submissionMode}`)}</span>
-                </div>
-                <h3 className="mt-3 text-base font-light leading-tight tracking-[-0.03em] sm:mt-5 sm:text-2xl sm:tracking-[-0.04em]">
-                  <button type="button" title={template.title} className="block w-full cursor-pointer truncate text-left after:absolute after:inset-0 after:content-[''] focus-visible:outline-none" onClick={() => onOpen(template.id)}>{template.title}</button>
-                </h3>
-                {/* A phone-sized card keeps just the title, like a challenge card. */}
-                {template.summary ? <p className="mt-2 hidden text-sm leading-6 text-[var(--muted)] sm:line-clamp-2">{template.summary}</p> : null}
-                <p className="mt-4 hidden text-xs text-[var(--muted)] sm:block">
-                  {[
-                    template.participantCount ? t("cardPeople", { count: template.participantCount }) : null,
-                    template.ruleCount ? t("cardRules", { count: template.ruleCount }) : null,
-                    template.fieldCount ? t("cardFields", { count: template.fieldCount }) : null,
-                    template.itemCount ? t("cardItems", { count: template.itemCount }) : null,
-                    template.metricCount ? t("cardMetrics", { count: template.metricCount }) : null,
-                  ].filter(Boolean).join(" · ")}
-                </p>
-              </div>
-              <span className="block w-full bg-[var(--main-line)] px-5 py-1.5 sm:py-3.5" aria-hidden="true" />
-            </article>
-          ))}
-        </div>
-        </>
-      )}
+      <PublishedTemplates onOpen={onOpen} onEmpty={onEmpty} />
     </main>
   );
 

@@ -521,6 +521,9 @@ export async function saveEntry(
 
     const fields = await storageFields(client, challengeId, entryType.id);
     const answerScope = entryType.answer_scope;
+    if (answerScope === "shared" && !access.canManage) {
+      throw new ApiError(403, "shared_admin_only", "Somente um administrador participante pode preencher a resposta do grupo.");
+    }
     // Shared: one row per (item, type) — no participant — with its own
     // permission and concurrency rules (Phase 4). Individual: unchanged.
     const existing = answerScope === "shared"
@@ -604,18 +607,11 @@ export async function updateEntry(
     const role = await requireGroupRole(session.user.id, entry.group_id, ["owner", "admin", "participant"], client);
     const canManage = role === "owner" || role === "admin";
     if (entry.answer_scope === "shared") {
-      // Members_fill_admin_corrects: once filled, only an admin may change it.
-      // Members_can_edit: any eligible member may — same participant check as
-      // below, just without the "only the original author" restriction.
-      if (entry.shared_edit_policy === "members_fill_admin_corrects" && !canManage) {
-        throw new ApiError(403, "shared_locked", "Essa resposta já foi preenchida, só um administrador pode corrigi-la.");
-      }
-      if (!canManage) {
-        const participant = await oneOrNull<{ user_id: string }>(client,
-          "SELECT user_id FROM challenge_participants WHERE challenge_id=$1 AND user_id=$2 AND removed_at IS NULL",
-          [entry.challenge_id, session.user.id]);
-        if (!participant) throw new ApiError(404, "not_found", "Registro não encontrado.");
-      }
+      if (!canManage) throw new ApiError(403, "shared_admin_only", "Somente um administrador participante pode alterar a resposta do grupo.");
+      const participant = await oneOrNull<{ user_id: string }>(client,
+        "SELECT user_id FROM challenge_participants WHERE challenge_id=$1 AND user_id=$2 AND removed_at IS NULL",
+        [entry.challenge_id, session.user.id]);
+      if (!participant) throw new ApiError(403, "shared_admin_only", "O administrador precisa participar deste desafio para alterar a resposta do grupo.");
       assertSharedNotChanged(body, entry.updated_at);
     } else {
       // Individual: only the author may edit their own entry — no admin correction path.
@@ -684,15 +680,11 @@ export async function deleteEntry(
     const role = await requireGroupRole(session.user.id, entry.group_id, ["owner", "admin", "participant"], client);
     const canManage = role === "owner" || role === "admin";
     if (entry.answer_scope === "shared") {
-      if (entry.shared_edit_policy === "members_fill_admin_corrects" && !canManage) {
-        throw new ApiError(403, "shared_locked", "Essa resposta compartilhada só pode ser apagada por um administrador.");
-      }
-      if (!canManage) {
-        const participant = await oneOrNull<{ user_id: string }>(client,
-          "SELECT user_id FROM challenge_participants WHERE challenge_id=$1 AND user_id=$2 AND removed_at IS NULL",
-          [entry.challenge_id, session.user.id]);
-        if (!participant) throw new ApiError(404, "not_found", "Registro não encontrado.");
-      }
+      if (!canManage) throw new ApiError(403, "shared_admin_only", "Somente um administrador participante pode apagar a resposta do grupo.");
+      const participant = await oneOrNull<{ user_id: string }>(client,
+        "SELECT user_id FROM challenge_participants WHERE challenge_id=$1 AND user_id=$2 AND removed_at IS NULL",
+        [entry.challenge_id, session.user.id]);
+      if (!participant) throw new ApiError(403, "shared_admin_only", "O administrador precisa participar deste desafio para apagar a resposta do grupo.");
     } else {
       // Individual: only the author may delete their own entry — no admin correction path.
       if (entry.participant_user_id !== session.user.id) throw new ApiError(404, "not_found", "Registro não encontrado.");

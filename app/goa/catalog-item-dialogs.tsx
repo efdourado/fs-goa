@@ -7,7 +7,7 @@ import { API_PATHS, apiRequest } from "./api";
 import { useCsrf } from "./csrf";
 import { FormDialog } from "./dialog";
 import { useGoaFormat } from "./format";
-import { type CatalogScope, LibraryPills, libraryChoices } from "./libraries";
+import { type CatalogScope, LibraryPills, libraryChoices, librarySuggestions } from "./libraries";
 import {
   bodyFromValues,
   PropertyInputs,
@@ -69,8 +69,10 @@ export function AddCatalogItemDialog({
   const f = useGoaFormat();
   const csrf = useCsrf();
   const choices = useMemo(() => libraryChoices(libraries), [libraries]);
-  const [kind, setKind] = useState(() => (initialKind && choices.some((choice) => choice.kind === initialKind) ? initialKind : choices[0]?.kind ?? "film"));
-  const choice = choices.find((entry) => entry.kind === kind) ?? null;
+  const suggestions = useMemo(() => librarySuggestions(libraries), [libraries]);
+  // Nothing is chosen for someone with no library yet: they pick a suggestion to start one.
+  const [kind, setKind] = useState<string | null>(() => (initialKind && choices.some((choice) => choice.kind === initialKind) ? initialKind : choices[0]?.kind ?? null));
+  const choice = [...choices, ...suggestions].find((entry) => entry.kind === kind) ?? null;
   const { properties, error: propertiesError } = useLibraryProperties(choice);
   // The group's switch, then the library's own: either can turn "who recommended it" off.
   const askRecommender = recommendationsEnabled && showsRecommender(properties);
@@ -81,7 +83,7 @@ export function AddCatalogItemDialog({
   const [found, setFound] = useState<{ query: string; libraryKey: string; items: PossibleMatch[] }>({ query: "", libraryKey: "", items: [] });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const autoMatch = AUTO_MATCH.has(kind);
+  const autoMatch = kind !== null && AUTO_MATCH.has(kind);
 
   // What already looks like this title — refreshed a beat after typing stops.
   const query = title.trim();
@@ -133,12 +135,13 @@ export function AddCatalogItemDialog({
       onCancel={onCancel}
       onSubmit={() => submit()}
       submitLabel={t("add")}
-      submitDisabled={!properties}
+      submitDisabled={!properties || !choice}
     >
-      {choices.length > 1 ? (
+      {choices.length + suggestions.length > 1 ? (
         <Field label={t("libraryLabel")} plain>
           <LibraryPills
             choices={choices}
+            suggestions={suggestions}
             kind={kind}
             label={t("libraryLabel")}
             onPick={(entry) => { setKind(entry.kind); setValues({}); }}

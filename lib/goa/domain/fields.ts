@@ -33,11 +33,12 @@ export function fieldUnit(value: unknown): string | null {
 
 /**
  * "Contagem": a number field counted along a road to a goal (pages of a book, steps, km).
- * `goal` is where the road ends — the item's page count, a fixed number, or none; `entry` is how it's typed
+ * `goal` is where the road ends — a number property of the item (a book's `page_count`, a route's distance,
+ * by its key), a fixed number, or none; `entry` is how it's typed
  * (the amount done, or where you are now); `showDates` false keeps the days out of sight (still saved).
  */
 export interface FieldCount {
-  goal: { from: "page_count" } | { value: number } | null;
+  goal: { from: string } | { value: number } | null;
   entry: "amount" | "position";
   showDates: boolean;
 }
@@ -48,7 +49,11 @@ export function fieldCount(value: unknown): FieldCount | null {
   const raw = asRecord(value);
   const goalRaw = raw.goal === null || raw.goal === undefined ? null : asRecord(raw.goal);
   let goal: FieldCount["goal"] = null;
-  if (goalRaw?.from === "page_count") goal = { from: "page_count" };
+  if (goalRaw && goalRaw.from !== undefined) {
+    // A property key: `page_count` or a library property's semantic key; an item without it simply has no goal.
+    if (typeof goalRaw.from !== "string" || !/^[a-z][a-z0-9_]{0,63}$/.test(goalRaw.from)) throw new ApiError(400, "invalid_field_config", "Meta da contagem inválida.");
+    goal = { from: goalRaw.from };
+  }
   else if (goalRaw && goalRaw.value !== undefined) {
     const target = Number(goalRaw.value);
     if (!Number.isFinite(target) || target <= 0 || target > 1e9) throw new ApiError(400, "invalid_field_config", "A meta precisa ser um número positivo.");

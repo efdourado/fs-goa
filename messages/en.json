@@ -181,8 +181,8 @@
       "library_required": "Pick which library the item comes from.",
       "library_not_linked": "Add this library to the challenge first.",
       "library_in_use": "Remove this library's items first.",
-      "library_missing": "Create the Tables library first, then set up the challenge.",
-      "library_builtin": "Screens and Pages come with the app and can't be deleted.",
+      "library_missing": "Create the Places library first, then set up the challenge.",
+      "library_builtin": "Films & series and Books come with the app and can't be deleted.",
       "library_has_items": "Confirm to delete it with its items.",
       "library_busy": "Some of its items are in running challenges.",
       "item_not_open": "Answers for this item haven't opened yet.",
@@ -235,7 +235,8 @@
     "adminUnavailableTitle": "No admin access",
     "backToStart": "Back to home",
     "groupCatalogTitle": "{name} · catalogue",
-    "groupCatalogSubtitle": "Everything this group tracks, organised in libraries. Admins can add items and shape each library."
+    "groupCatalogSubtitle": "Everything this group tracks, organised in libraries. Admins can add items and shape each library.",
+    "groupWithoutId": "The group was created, but we lost track of it."
   },
   "auth": {
     "heroKicker": "Private challenges, lasting stories",
@@ -332,39 +333,26 @@
   },
   "welcome": {
     "lede": "Nothing here yet. Start with one challenge, the rest can come later.",
-    "flowTitle": "How a round comes together",
-    "steps": {
-      "library": {
-        "title": "Choose what you track",
-        "body": "Films, books, places, matches (kept in a library that remembers every item)."
-      },
-      "challenge": {
-        "title": "Set a challenge",
-        "body": "Watch a list, read for 90 days, keep a habit. Pick a recipe and decide what everyone records."
-      },
-      "group": {
-        "title": "Bring your people",
-        "body": "A private group for the club, the friends, the family (or keep it just yours)."
-      },
-      "showcase": {
-        "title": "Read the showcase",
-        "body": "Goa does the maths (averages, rankings, who's on schedule) and turns the round into a story."
-      }
-    },
     "starts": {
       "group": {
         "title": "Create a group"
       },
       "quick": {
         "title": "Start a challenge",
-        "body": "Three quick questions, all of them taps (no way to get it wrong).",
         "cta": "Get started"
-      },
-      "templates": {
-        "title": "Copy one that's built"
       }
     },
-    "otherWays": "Or:"
+    "choose": {
+      "title": "How do you want to start?",
+      "chat": "Chat",
+      "recommended": "Recommended",
+      "chatBody": "A few quick questions, ideal for your first challenge.",
+      "manual": "Manually",
+      "manualBody": "Set it up yourself, step by step.",
+      "whereTitle": "Who is it for?",
+      "createAndGo": "Create and continue",
+      "newGroupTitle": "Create your group first, to make the challenge inside it"
+    }
   },
   "group": {
     "updated": "Group saved.",
@@ -583,37 +571,37 @@
     "addItemRow": "Add an item"
   },
   "createChallenge": {
-    "errPickTemplate": "Pick a template and fill in the title.",
     "errPeriod": "Fill in the start and end, or choose a challenge with no deadline.",
     "errEndBeforeStart": "The end date must be the same as or after the start.",
     "errNoAuthor": "Add the author of each book.",
     "errRules": "Fill in the title and description of every rule and topic, or remove the empty ones.",
     "errNoFields": "Add at least one field.",
+    "errProgressProperty": "Choose a number property to track.",
     "errNoItems": "Add at least one film to the challenge.",
     "errNoBooks": "Add at least one book to the challenge.",
     "stepsNav": "Creation steps",
     "steps": {
-      "base": "Basics",
-      "fields": "Fields",
-      "checkpoints": "Items",
-      "people": "People",
-      "items": "Items"
+      "setup": "Basics",
+      "fields": "Entries",
+      "checkpoints": "List",
+      "details": "Details",
+      "people": "People"
     },
     "back": "Back",
     "title": "Build the next experience",
     "subtitle": "Start with a preset and adjust only what your group needs.",
     "personalTitle": "New personal challenge",
     "personalSubtitle": "Just yours (no group, no invites). Start with a preset and adjust the essentials.",
-    "startTitle": "Choose a starting point",
+    "startTitle": "How will this challenge work?",
     "recipes": {
       "cinema": {
-        "name": "Screens",
-        "tagline": "Rate films and series",
+        "name": "Films & series",
+        "tagline": "Rate what you watch",
         "body": "A list of films or series; each person rates and comments when they watch, with an optional date. Can have a deadline or stay open."
       },
       "bookshelf": {
-        "name": "Pages",
-        "tagline": "Rate what you've read",
+        "name": "Books",
+        "tagline": "Rate what you read",
         "body": "A list of books you just rate and comment on (no pages, no deadline, no \"when\"). Great for logging what you've already read."
       },
       "library": {
@@ -622,19 +610,24 @@
         "body": "A list of books with pages read per day and per book, plus a \"Finished\" with a rating. Needs a period."
       },
       "habit": {
-        "name": "Habit",
+        "name": "Daily habit",
         "tagline": "One check-in a day",
         "body": "No film, no book (just a daily check-in). Add whatever fields the habit needs and build your own metrics on them."
       },
       "tables": {
-        "name": "Tables",
-        "tagline": "Rate places to eat",
+        "name": "Places",
+        "tagline": "Restaurants, bars and cafés",
         "body": "Rate restaurants, bars and cafés on food, atmosphere and value (one rating each, no combined score)."
       },
       "custom": {
-        "name": "Custom",
-        "tagline": "You decide what to log",
+        "name": "Your own list",
+        "tagline": "You name the things and what to note",
         "body": "Pick any library (matches, games, anything) and decide exactly what everyone records."
+      },
+      "progress": {
+        "name": "Daily progress",
+        "tagline": "How much each day, up to a goal",
+        "body": "A list where each person logs how much they did on each item every day, up to a goal, then marks it finished."
       }
     },
     "titleLabel": "Title",
@@ -651,8 +644,12 @@
     "hideOptional": "Hide optional fields",
     "rulesLabel": "Rules",
     "rulesHint": "Give every important agreement its own spotlight.",
-    "fieldsTitle": "What does each person log?",
-    "checkpointsTitle": "Build the list",
+    "fieldsTitle": "What does each person note?",
+    "fieldsTitleItems": "How do you want to track the items?",
+    "fieldsLedeItems": "Choose what each person will do with every item. This determines when and how often they can add an entry.",
+    "fieldsTitleDaily": "What goes in the daily check-in?",
+    "fieldsLedeDaily": "Build a simple check-in to fill out once a day.",
+    "checkpointsTitle": "What's on the list?",
     "cineItemsHint": "Paste one title per line (films or series). Each item becomes a logging opportunity for every participant.",
     "bookItemsHint": "Paste one book per line. Each book joins the catalogue and gets per-day progress, a \"Finished\", and a rating.",
     "bookshelfItemsHint": "Paste one book per line. Each book joins the catalogue and gets a rating and an optional comment.",
@@ -673,31 +670,101 @@
     "expectationLabel": "Collect an expectation rating",
     "expectationHint": "Participants rate how much they expect to like each title before watching. It locks once they send the real rating. You can also toggle this later.",
     "errPickLibrary": "Choose the library the items come from.",
-    "errTablesLibrary": "Create the Tables library first.",
+    "errTablesLibrary": "Create the Places library first.",
     "tablesItemsHint": "Add the places to rate (one per line).",
     "customItemsHint": "Add the items to track (one per line). Each item becomes something everyone can record.",
     "libraryLabel": "Library",
-    "libraryHint": "Which list of things this challenge draws from.",
     "pickLibraryFirst": "Pick a library",
-    "recordingLabel": "How is each entry recorded?",
-    "recordingHint": "Pick how people log their progress on the items in this challenge.",
+    "entriesTitle": "How will people record it?",
+    "recordingLabel": "Choose one",
+    "recordingHint": "Think about what happens to each item during the challenge.",
     "recordingSingle": "One response per item",
-    "recordingSingleHint": "Each person answers once for every item (a rating, a score, a note).",
-    "recordingSession": "A check-in with several items",
-    "recordingSessionHint": "One visit holds a record for each item you pick (a workout of exercises, a study session of subjects). Each record keeps its own history.",
+    "recordingSingleHint": "Rating, review, or result",
+    "recordingProgress": "Progress on each item",
+    "recordingProgressHint": "Pages, km, steps, or lessons",
+    "recordingSession": "One session with several items",
+    "recordingSessionHint": "Workout or study session",
+    "progressPropertyTitle": "Which property sets the total?",
+    "chooseProgressProperty": "Choose a number property",
+    "progressValueDefault": "Progress",
+    "progressValueLabel": "Progress: {property}",
+    "loadingProperties": "Loading properties…",
+    "noProgressProperty": "Add a number property to this library first",
     "sessionNameLabel": "What do you call one check-in?",
     "sessionNameHint": "Shown on the form and in the history (a Workout, a Study session, a Game night).",
     "sessionNamePlaceholder": "e.g. Workout",
     "sessionNameDefault": "Session",
-    "scopeLabel": "Who fills in this response?",
-    "scopeHint": "This is the main thing people record on each item.",
-    "scopeIndividual": "Each participant",
-    "scopeIndividualHint": "Everyone answers for themselves (a rating, a guess, a note).",
-    "scopeShared": "Once for the group",
-    "scopeSharedHint": "One answer per item that everyone sees (a final score, an agreed verdict).",
+    "scopeLabel": "Initial response",
+    "scopeIndividual": "Individual response",
+    "scopeIndividualHint": "Each participant submits their own answer for every item.",
+    "scopeShared": "Shared response",
+    "scopeSharedHint": "One answer per item for the whole group. Participating admins fill it in and correct it.",
+    "responseN": "Response {n}",
+    "responseSummary": "{scope} · {count, plural, one {# field} other {# fields}}",
+    "responseWord": "Response",
+    "addResponse": "Add response",
+    "removeResponse": "Remove response",
+    "moveResponseUp": "Move response up",
+    "moveResponseDown": "Move response down",
     "itemDatesLabel": "Each item has its own date and time",
     "itemDatesHint": "Like a match's kick-off or a screening. It's kept on the item, so every challenge that uses it shows the same date.",
-    "errItemSchedule": "Check the date (the end, the time or the time zone doesn't look right)."
+    "errItemSchedule": "Check the date (the end, the time or the time zone doesn't look right).",
+    "fieldsLede": "They show up on every item. Rename, remove or add as many as you need.",
+    "fieldsConfigTitle": {
+      "single": "What goes in each response?",
+      "progress": "What goes in each progress update?",
+      "session": "What is recorded for each item?",
+      "daily": "What goes in the daily check-in?"
+    },
+    "fieldsConfigHint": {
+      "single": "These questions appear when an item is opened and can only be answered once.",
+      "progress": "This information appears in every progress update. Use a number for pages, km, steps, or any other measure.",
+      "session": "This information is filled in for every item selected during the session.",
+      "daily": "These questions appear once a day. It can be yes or no, minutes, an amount, or a note."
+    },
+    "progressConfigTitle": "Configure progress",
+    "progressConfigHint": "Set where progress ends and whether each entry adds to the total or reports the current position.",
+    "detailsTitle": "Dates and extras",
+    "errTitle": "Give it a title.",
+    "errFieldLabel": "Give every question or measure a name.",
+    "errTooManyFields": "Use no more than 30 fields across all responses.",
+    "leaveTitle": "Keep it as a draft?",
+    "leaveBody": "You've started setting this up. Save it as a draft to finish later, or discard it.",
+    "leaveDiscard": "Discard",
+    "leaveSave": "Save draft",
+    "resumeDraft": "Continue “{title}”…",
+    "discardDraft": "Discard draft",
+    "draftLabel": "Draft",
+    "creationTypes": {
+      "items": {
+        "name": "Track a list",
+        "tagline": "Books, films, courses, routes, or any collection",
+        "body": "Create a list, then choose whether each item gets one response, accumulates progress over time, or takes part in sessions with several items."
+      },
+      "daily": {
+        "name": "Daily check-in",
+        "tagline": "One entry per day, without a list",
+        "body": "Track a habit directly on the calendar without choosing an item: studying, running, meditating, or having a sugar-free day."
+      }
+    },
+    "structures": {
+      "list": {
+        "name": "List",
+        "tagline": "Each item gets a rating or a note",
+        "body": "Films and series to rate with friends, books you've read, bars to try, World Cup matches to guess. Or a workout where each check-in records several exercises."
+      },
+      "progress": {
+        "name": "Daily progress",
+        "tagline": "How much you did on each item, every day, up to a goal",
+        "body": "Pages of a book until the last page, km of a route until the finish, episodes of a series, lessons of a course."
+      },
+      "daily": {
+        "name": "Daily check-in",
+        "tagline": "Did you do it? One check-in a day, no items",
+        "body": "Going for a run, no sugar today, meditating, reading 20 minutes. You see how many days you managed."
+      }
+    },
+    "progressItemsHint": "Add what you'll make progress on (one per line): routes, series, courses… Each gets its own road to the goal."
   },
   "adminChallenge": {
     "back": "Back",
@@ -773,6 +840,20 @@
     "memberMeta": "@{username} · {role}",
     "noMembersTitle": "Members unavailable",
     "fieldsTitle": "Entry fields",
+    "trackingTitle": "Progress",
+    "trackingInactive": "Optional. Start it when you want each item to move toward a number.",
+    "trackingLoading": "Loading library properties…",
+    "trackingNoProperty": "Add a number property to this library first.",
+    "trackingSave": "Save endpoint",
+    "trackingStarted": "Progress tracking started.",
+    "trackingSaved": "Progress tracking updated.",
+    "trackingStopped": "Progress tracking turned off.",
+    "trackingChangeConfirmTitle": "Change the progress endpoint?",
+    "trackingChangeConfirmBody": "All progress saved with the current endpoint will be permanently deleted. The new property starts from zero.",
+    "trackingOffConfirmTitle": "Turn off progress tracking?",
+    "trackingOffConfirmBody": "All previously saved progress will be permanently deleted.",
+    "trackingChange": "Delete progress and change",
+    "trackingTurnOff": "Delete progress and turn off",
     "fieldsTypeLegend": "Entry type",
     "fieldsSaved": "Fields saved.",
     "itemRemoveConfirm": "\"{title}\" leaves the challenge.",
@@ -878,7 +959,6 @@
     "alreadyPublicHint": "This showcase is already public, any change you save here appears on the link and the template immediately.",
     "errPickLibrary": "Choose the library the items come from.",
     "libraryLabel": "Library",
-    "libraryHint": "Which list of things this challenge draws from.",
     "linkLibrary": "Choose a library",
     "librariesHint": "Where this challenge's items come from. While it has no items yet, you can swap it for another.",
     "reuseDoneTitle": "Copy created",
@@ -897,10 +977,6 @@
     "metricItemLabel": "One item only",
     "metricItemAll": "Every item",
     "metricItemHint": "Shows the number for a single item (your deadlift record, say).",
-    "pageCountTitle": "Count pages",
-    "pageCountHint": "Each book shows where you are and how much is left, no dates. Off, it's just a bookshelf, and the pages already counted are deleted.",
-    "pageCountOn": "Pages on.",
-    "pageCountOff": "Pages off.",
     "organiseItems": "Organise items",
     "scheduleEnd": "With an end date",
     "scheduleEndHint": "Ends on the day you pick.",
@@ -990,7 +1066,8 @@
     "bookProgress": "p. {page, number} of {total, number} · {left, number} to go",
     "bookDone": "Finished",
     "searchItems": "Search items",
-    "searchItemsNone": "No item matches."
+    "searchItemsNone": "No item matches.",
+    "countProgress": "{page, number} of {total, number} · {left, number} to go"
   },
   "sessionLog": {
     "composerTitle": "Log a {name}",
@@ -1191,12 +1268,13 @@
       "custoBeneficio": "Value for money",
       "resultado": "Result",
       "weight": "Weight (kg)",
-      "repetitions": "Repetitions"
+      "repetitions": "Repetitions",
+      "quantoHoje": "How much today"
     },
-    "labelLabel": "Label",
+    "labelLabel": "Question or measure",
     "labelRequired": "Give the field a label.",
     "editFieldTitle": "Edit field",
-    "typeLabel": "Type",
+    "typeLabel": "Answer type",
     "required": "Required",
     "min": "Minimum",
     "max": "Maximum",
@@ -1209,7 +1287,7 @@
     "moveDown": "Move down",
     "remove": "Remove",
     "noFieldsTitle": "No fields",
-    "addFieldTitle": "Add field",
+    "addFieldTitle": "Add another question or measure",
     "fieldNameSr": "Field name",
     "fieldNamePlaceholder": "e.g. Pages read",
     "fieldTypeSr": "Field type",
@@ -1662,9 +1740,9 @@
     "deleted": "\"{name}\" deleted.",
     "emptyLibrary": "{name} is empty",
     "source": {
-      "screens": "Screens",
-      "pages": "Pages",
-      "tables": "Tables",
+      "screens": "Films & series",
+      "pages": "Books",
+      "tables": "Places",
       "custom": "Library"
     },
     "newTitle": "New library",
@@ -1674,9 +1752,9 @@
     "namePlaceholder": "e.g. Matches",
     "nameRequired": "Give the library a name.",
     "create": "Create library",
-    "tablesPromptTitle": "Start with a Tables library",
-    "tablesPromptBody": "A library keeps what you track in one place. Tables is the one for restaurants, bars and cafés (the places you add here are saved in it, ready to rate again in later challenges).",
-    "tablesPromptCreate": "Create Tables library",
+    "tablesPromptTitle": "Start with a Places library",
+    "tablesPromptBody": "A library keeps what you track in one place. Places is the one for restaurants, bars and cafés (the places you add here are saved in it, ready to rate again in later challenges).",
+    "tablesPromptCreate": "Create Places library",
     "tablesPromptCreating": "Creating…",
     "tablesPromptMore": "You can create more libraries any time (Bars, Coffee shops, Matches) from the catalogue.",
     "propertiesBody": "Switching off erases the values.",
@@ -1772,15 +1850,6 @@
     "nameRequired": "Give the response a name.",
     "fieldLabel": "Label",
     "fieldPlaceholder": "Score",
-    "policyLabel": "Who can fill it in",
-    "policy": {
-      "members_fill_admin_corrects": "Members fill it, admins correct",
-      "members_can_edit": "Any participant can edit"
-    },
-    "policyHint": {
-      "members_fill_admin_corrects": "Anyone taking part can enter it once; after that only an admin changes it.",
-      "members_can_edit": "Anyone taking part can enter or change it. If two people save at once, the second is told and shown the latest value."
-    },
     "requiredLabel": "Required",
     "requiredHint": "An item isn't done until this is filled in.",
     "add": "Add response",
@@ -1788,19 +1857,12 @@
     "removeMetricsBody": "These metrics go too:",
     "removeMetricsPrompt": "Some metrics read this response. Confirm again to remove them too.",
     "remove": "Remove response",
-    "panelTitle": "Shared with the group",
-    "panelBody": "There is a single answer per item, shown to everyone along with who last changed it.",
-    "policySaved": "Saved.",
     "removeAnswersBody": "{count, plural, one {# answer already given goes} other {# answers already given go}} with it.",
     "removeAnswersPrompt": "Confirm again to delete the answers and remove the response."
   },
   "sharedAnswers": {
     "badge": "Shared with the group",
-    "policy": {
-      "members_fill_admin_corrects": "Anyone fills it once · admins correct it",
-      "members_can_edit": "Anyone taking part can edit it"
-    },
-    "lockedByPolicy": "This answer is already filled in, only an admin can correct it.",
+    "adminsOnly": "Only a participating group admin can fill or change this answer.",
     "conflictShort": "Someone changed this answer while you were editing. The latest version is showing, nothing of yours was saved.",
     "conflictBody": "{name} changed this answer while you were editing, so your change wasn't saved. The latest version is shown, review it and edit again if you still need to.",
     "someone": "Someone",
@@ -1851,7 +1913,7 @@
     "q3": "What should we call it?",
     "change": "Change",
     "justMe": "Just me",
-    "justMeHint": "A private challenge, just yours.",
+    "justMeHint": "A personal challenge.",
     "groupHint": "{count, plural, one {# person} other {# people}}",
     "newGroup": "A new group",
     "newGroupHint": "Invite people once it's made.",
@@ -2337,13 +2399,15 @@
     "title": "Count it as a road",
     "hint": "Shows where you are, how much is left and the way to the goal, like the pages of a book.",
     "goal": "Goal",
-    "goalNone": "No goal",
-    "goalValue": "A number",
-    "goalPageCount": "The book's pages",
+    "goalNone": "No target, just track it",
+    "goalValue": "The same target for every item",
+    "goalPageCount": "Pages",
     "entry": "How to log it",
-    "entryAmount": "How much you did",
-    "entryPosition": "Where you are (the total so far)",
+    "entryAmount": "Add an amount with each entry",
+    "entryPosition": "Enter the current total",
     "showDates": "Show the dates",
-    "showDatesHint": "Off, only the progress shows; each entry's day is kept without showing."
+    "showDatesHint": "Off, only the progress shows; each entry's day is kept without showing.",
+    "goalFrom": "Use each item's “{name}”",
+    "goalHint": "Use the same number for every item, or a number property from the library when each item has its own goal."
   }
 }

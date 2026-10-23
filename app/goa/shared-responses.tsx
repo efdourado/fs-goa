@@ -8,7 +8,7 @@ import { FormDialog } from "./dialog";
 import { cleanFields, FIELD_TYPES, FieldConfigInputs, newFieldConfig } from "./fields";
 import { useGoaFormat } from "./format";
 import type { ChallengeField, EntryTypeView, SharedEditPolicy } from "./types";
-import { Field, inputClass, Select, SelectableCards, StatusMessage, Toggle } from "./ui";
+import { Field, inputClass, Select, Toggle } from "./ui";
 
 /** Two ends of a small "people" glyph — the mark for an answer that belongs to the whole group. */
 export function SharedGlyph({ className }: { className?: string }) {
@@ -20,9 +20,6 @@ export function SharedGlyph({ className }: { className?: string }) {
     </svg>
   );
 }
-
-const POLICIES: SharedEditPolicy[] = ["members_fill_admin_corrects", "members_can_edit"];
-
 /**
  * Add a response that has one answer for the whole group — a final score, say —
  * next to the individual ones (ratings, comments) that stay per person.
@@ -38,7 +35,6 @@ export function AddSharedResponseDialog({
   const tf = useTranslations("fields");
   const f = useGoaFormat();
   const [name, setName] = useState("");
-  const [policy, setPolicy] = useState<SharedEditPolicy>("members_fill_admin_corrects");
   const [field, setField] = useState<ChallengeField>({ key: "", label: "", type: "number", required: true, config: newFieldConfig("number") });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,7 +48,7 @@ export function AddSharedResponseDialog({
     try {
       // The value's own label is optional: left empty it takes the response's name.
       const [clean] = cleanFields([{ ...field, label: field.label.trim() || responseName }]);
-      await onAdd({ name: responseName, sharedEditPolicy: policy, field: { ...clean, key: "" } });
+      await onAdd({ name: responseName, sharedEditPolicy: "members_fill_admin_corrects", field: { ...clean, key: "" } });
     } catch (cause) {
       setError(f.error(cause));
       setBusy(false);
@@ -73,14 +69,6 @@ export function AddSharedResponseDialog({
       <Field label={t("nameLabel")} hint={t("nameHint")}>
         <input className={inputClass} value={name} maxLength={120} required placeholder={t("namePlaceholder")} onChange={(event) => setName(event.target.value)} />
       </Field>
-      <Field label={t("policyLabel")} plain>
-        <SelectableCards
-          value={policy}
-          onChange={setPolicy}
-          columns={1}
-          options={POLICIES.map((value) => ({ value, label: t(`policy.${value}`), hint: t(`policyHint.${value}`) }))}
-        />
-      </Field>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label={t("fieldLabel")}>
           <input className={inputClass} value={field.label} maxLength={100} placeholder={name.trim() || t("fieldPlaceholder")} onChange={(event) => setField((current) => ({ ...current, label: event.target.value }))} />
@@ -99,7 +87,6 @@ export function AddSharedResponseDialog({
     </FormDialog>
   );
 }
-
 /**
  * One response's own settings: its name, and (when it isn't the only one) removing it. Removing is confirmed
  * right here: the server says what else would go (answers already given, metrics that read them), that is
@@ -186,59 +173,5 @@ export function ResponseSettingsDialog({
         <input className={inputClass} value={name} maxLength={60} required onChange={(event) => setName(event.target.value)} />
       </Field>
     </FormDialog>
-  );
-}
-
-/** The panel under a shared response's fields: who can change it, and how to take it away. */
-export function SharedResponsePanel({
-  type,
-  locked,
-  onChangePolicy,
-}: {
-  type: EntryTypeView;
-  locked: boolean;
-  onChangePolicy: (policy: SharedEditPolicy) => Promise<void>;
-}) {
-  const t = useTranslations("sharedResponses");
-  const f = useGoaFormat();
-  const [policy, setPolicy] = useState<SharedEditPolicy>(type.sharedEditPolicy ?? "members_fill_admin_corrects");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-
-  async function change(next: SharedEditPolicy) {
-    const previous = policy;
-    setPolicy(next);
-    setBusy(true);
-    setError(null);
-    setSuccess(null);
-    try {
-      await onChangePolicy(next);
-      setSuccess(t("policySaved"));
-    } catch (cause) {
-      setPolicy(previous);
-      setError(f.error(cause));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="mt-6 overflow-hidden rounded-2xl border border-[var(--main-line)] bg-[var(--main-soft)]/30">
-      <div className="flex items-start gap-3 border-b border-[var(--main-line)]/60 px-5 py-4">
-        <span className="mt-0.5 grid h-8 w-8 flex-none place-items-center rounded-full bg-[var(--main-soft)] text-[var(--main-strong)]"><SharedGlyph className="h-4 w-4" /></span>
-        <div>
-          <h3 className="text-sm font-medium">{t("panelTitle")}</h3>
-          <p className="mt-0.5 text-xs leading-5 text-[var(--muted)]">{t("panelBody")}</p>
-        </div>
-      </div>
-      <div className="space-y-4 p-5">
-        <Field label={t("policyLabel")} plain>
-          <SelectableCards value={policy} onChange={(next) => void change(next)} disabled={locked || busy} columns={1}
-            options={POLICIES.map((value) => ({ value, label: t(`policy.${value}`), hint: t(`policyHint.${value}`) }))} />
-        </Field>
-        <StatusMessage error={error} success={success} />
-      </div>
-    </div>
   );
 }

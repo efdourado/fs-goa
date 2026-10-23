@@ -999,7 +999,7 @@ export async function deleteCatalogLibrary(session: SessionContext, libraryId: s
       await requireGroupRole(session.user.id, library.group_id, ["owner", "admin"], client);
     }
     if (library.source === "screens" || library.source === "pages") {
-      throw new ApiError(409, "library_builtin", "Screens e Pages vêm com o app e não podem ser excluídas.");
+      throw new ApiError(409, "library_builtin", "Filmes e séries e Livros vêm com o app e não podem ser excluídas.");
     }
 
     const items = await client.query<{ id: string }>(

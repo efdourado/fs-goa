@@ -109,7 +109,7 @@ export function RuleSectionsEditor({
                         <div key={topicIndex}>
                           <div className="mb-2 flex items-center justify-between gap-3">
                             <strong className="text-xs text-[var(--muted)]">{t("topicN", { n: `${index + 1}.${topicIndex + 1}` })}</strong>
-                            <button type="button" className={rowIconClass} disabled={disabled} aria-label={t("remove")} title={t("remove")} onClick={() => removeTopic(index, topicIndex)}><CircleMinusIcon className="h-[18px] w-[18px]" /></button>
+                            <button type="button" className={cx(rowIconClass, "text-[var(--danger)] hover:text-[var(--danger)]")} disabled={disabled} aria-label={t("remove")} title={t("remove")} onClick={() => removeTopic(index, topicIndex)}><CircleMinusIcon className="h-[18px] w-[18px]" /></button>
                           </div>
                           <label className="block"><span className={labelClass}>{t("topicTitleLabel")}</span><input className={inputClass} value={topic.title} onChange={(event) => updateTopic(index, topicIndex, { title: event.target.value })} placeholder={t("topicTitlePlaceholder")} maxLength={160} disabled={disabled} /></label>
                           <label className="mt-2 block"><span className={labelClass}>{t("topicDescriptionLabel")}</span><textarea className={inputClass} rows={2} value={topic.description} onChange={(event) => updateTopic(index, topicIndex, { description: event.target.value })} placeholder={t("topicDescriptionPlaceholder")} maxLength={10000} disabled={disabled} /></label>

@@ -16,19 +16,18 @@ import { canManage } from "../utils";
 /**
  * What the chat can start, each a preset of the app's general capabilities:
  *  · Screens / Pages — rate films or books, from their always-there library;
- *  · the reading club — pages a day toward each book's end;
  *  · a habit — a check-in a day, or a number counted toward a goal;
  *  · a workout — one check-in holding a record per exercise, from a library of the person's own.
  * Tables and a fully custom challenge still need the wizard (several ratings, your own fields).
  */
-const KINDS = ["cinema", "bookshelf", "library", "habit", "workout"] as const;
+const KINDS = ["cinema", "bookshelf", "habit", "workout"] as const;
 type Kind = (typeof KINDS)[number];
-const RECIPE_OF: Record<Kind, CreatableRecipeKey> = { cinema: "cinema", bookshelf: "bookshelf", library: "library", habit: "habit", workout: "custom" };
-const ICON_OF: Record<Kind, RecipeIconName> = { cinema: "cinema", bookshelf: "bookshelf", library: "library", habit: "habit", workout: "custom" };
+const RECIPE_OF: Record<Kind, CreatableRecipeKey> = { cinema: "cinema", bookshelf: "bookshelf", habit: "habit", workout: "custom" };
+const ICON_OF: Record<Kind, RecipeIconName> = { cinema: "cinema", bookshelf: "bookshelf", habit: "habit", workout: "custom" };
 /** Everything but a habit opens with a first item. */
-const NEEDS_ITEM: Record<Kind, boolean> = { cinema: true, bookshelf: true, library: true, habit: false, workout: true };
+const NEEDS_ITEM: Record<Kind, boolean> = { cinema: true, bookshelf: true, habit: false, workout: true };
 /** A book is known by its title and author — the catalogue asks for both. */
-const IS_BOOK: Record<Kind, boolean> = { cinema: false, bookshelf: true, library: true, habit: false, workout: false };
+const IS_BOOK: Record<Kind, boolean> = { cinema: false, bookshelf: true, habit: false, workout: false };
 
 type Where = { kind: "personal" } | { kind: "group"; groupId: Id; name: string; participantIds: Id[] };
 /** How a group's ratings come out: sealed until revealed, sealed with a guess first, or live. */
@@ -44,7 +43,8 @@ type LibraryPick = { id: Id; name: string };
 function Ask({ children }: { children: ReactNode }) {
   return (
     <div className="flex items-start gap-3">
-      <span className="mt-0.5 grid h-7 w-7 flex-none -rotate-3 place-items-center rounded-[50%_50%_50%_16%] bg-[var(--ink)] text-xs font-black text-[var(--canvas)]" aria-hidden="true">g</span>
+      {/* eslint-disable-next-line @next/next/no-img-element -- a fixed little file from /public, like the header's Brand */}
+      <img src="/logo.png" alt="" aria-hidden="true" draggable={false} className="mt-0.5 h-7 w-7 flex-none object-contain" />
       <p className="mt-0.5 text-[15px] leading-6">{children}</p>
     </div>
   );

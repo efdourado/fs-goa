@@ -408,7 +408,7 @@ export function Select<T extends string>({
         className={cx("flex min-w-0 cursor-pointer items-center justify-between gap-2 text-left outline-none disabled:cursor-not-allowed", selectLooks[look], className)}
       >
         <span className={cx("min-w-0 truncate", !selected && "text-[var(--muted)]")}>{selected?.label ?? placeholder ?? ""}</span>
-        {chevron ? <SwitchIcon className={cx("h-3.5 w-3.5 flex-none text-[var(--muted)] transition-transform duration-300", open && "rotate-180")} /> : null}
+        {chevron ? <SwitchIcon className="h-3.5 w-3.5 flex-none text-[var(--muted)]" /> : null}
       </button>
       {name ? <input type="hidden" name={name} value={value} /> : null}
       <div
@@ -883,7 +883,7 @@ export function Toggle({
   );
 }
 
-/** A "pick one" group of bordered cards — a friendlier radio for 2–4 choices. */
+/** A "pick one" group of bordered cards — one or two columns, with an odd last choice spanning the row. */
 export function SelectableCards<T extends string>({
   value,
   onChange,
@@ -895,12 +895,13 @@ export function SelectableCards<T extends string>({
   onChange: (next: T) => void;
   options: Array<{ value: T; label: string; hint?: string }>;
   disabled?: boolean;
-  columns?: 1 | 2 | 3;
+  columns?: 1 | 2;
 }) {
   return (
-    <div className={cx("grid gap-2.5", columns === 1 ? "" : columns === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2")}>
-      {options.map((option) => {
+    <div className={cx("grid gap-2.5", columns === 1 ? "" : "sm:grid-cols-2")}>
+      {options.map((option, index) => {
         const active = option.value === value;
+        const fillsLastRow = columns === 2 && options.length % 2 === 1 && index === options.length - 1;
         return (
           <button
             key={option.value}
@@ -910,13 +911,14 @@ export function SelectableCards<T extends string>({
             onClick={() => onChange(option.value)}
             className={cx(
               "flex flex-col gap-0.5 rounded-xl border px-4 py-3 text-left transition disabled:cursor-not-allowed disabled:opacity-60",
+              fillsLastRow && "sm:col-span-2",
               active
-                ? "border-[var(--main)] bg-[var(--main-soft)] ring-[3px] ring-[var(--main)]/12"
+                ? "border-[var(--main)] bg-[var(--main)] text-white ring-[3px] ring-[var(--main)]/12"
                 : "border-[var(--line)] hover:border-[var(--main-line)]",
             )}
           >
-            <strong className={cx("text-[13.5px] font-medium", active && "text-[var(--main-strong)]")}>{option.label}</strong>
-            {option.hint ? <span className="text-[11.5px] text-[var(--muted)]">{option.hint}</span> : null}
+            <strong className="text-[13.5px] font-medium">{option.label}</strong>
+            {option.hint ? <span className={cx("text-[11.5px]", active ? "text-white/75" : "text-[var(--muted)]")}>{option.hint}</span> : null}
           </button>
         );
       })}
@@ -1006,7 +1008,7 @@ export function SchedulePeriodFields({
               onClick={() => applyShift(preset.shift)}
               className={cx(
                 "min-h-9 rounded-full border px-4 text-sm transition disabled:cursor-not-allowed disabled:opacity-60",
-                active ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] text-[var(--muted)] hover:border-[var(--main-line)]",
+                active ? "border-[var(--main)] bg-[var(--main)] text-white" : "border-[var(--line)] text-[var(--muted)] hover:border-[var(--main-line)]",
               )}
             >
               {t(`preset.${preset.key}`)}

@@ -449,15 +449,10 @@ export function CatalogWorkspaceScreen({
       {loading ? (
         <p className="mt-6 text-sm text-[var(--muted)]">{t("loading")}</p>
       ) : !tabs.length ? (
-        <EmptyState
-          title={t("emptyTitle")}
-          action={canManage ? (
-            <div className="flex flex-wrap justify-center gap-2">
-              <Button onClick={() => setDialog("add")}>＋ {t("addItem")}</Button>
-              <Button variant="secondary" onClick={() => setDialog("new")}>{tl("newLibrary")}</Button>
-            </div>
-          ) : undefined}
-        />
+        // The same quiet, unboxed empty state as Updates: no actions compete with the page heading.
+        <div className="mt-6">
+          <FaceEmptyState title={t("emptyTitle")} />
+        </div>
       ) : library ? (
         <div className="lg:flex lg:items-start lg:gap-14">
           <aside id="catalog-index" className={cx("hidden w-56 flex-none lg:flex-col lg:gap-7", indexOpen && "lg:flex")} aria-label={tl("tabsLabel")}>
