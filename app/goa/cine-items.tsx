@@ -19,7 +19,7 @@ import {
 } from "./recommender-picker";
 import { decodeEventForm, encodeEventForm, eventBodyOf, eventFormOf } from "./schedule";
 import type { CatalogItem, ChallengeItemInput, ChallengeLibraryRef, Id, LibraryProperty, Member } from "./types";
-import { Button, CircleMinusIcon, cx, inputClass, labelClass, rowIconClass, StatusMessage } from "./ui";
+import { Button, CircleMinusIcon, cx, FaceEmptyState, inputClass, labelClass, rowIconClass, StatusMessage } from "./ui";
 import { formatRuntime } from "./utils";
 import { useGoaFormat } from "./format";
 
@@ -664,10 +664,12 @@ export function CineItemsEditor({
   return (
     <div>
       <Button className="mb-4 min-h-11 w-full" onClick={() => { setDraft([]); setAdding(true); }}>＋ {t("addItems")}</Button>
-      <div className="mb-3 flex min-h-9 items-center justify-between gap-3">
-        <p className="text-sm font-medium">{t("listCount", { count: value.length })}</p>
-        {canOrganise(organiseInput) ? <Button variant="secondary" className="min-h-9" onClick={() => setOrganising(true)}>{tOrganise("button")}</Button> : null}
-      </div>
+      {value.length ? (
+        <div className="mb-3 flex min-h-9 items-center justify-between gap-3">
+          <p className="text-sm font-medium">{t("listCount", { count: value.length })}</p>
+          {canOrganise(organiseInput) ? <Button variant="secondary" className="min-h-9" onClick={() => setOrganising(true)}>{tOrganise("button")}</Button> : null}
+        </div>
+      ) : null}
       {value.length ? (
         <ol className="divide-y divide-[var(--line)] rounded-2xl border border-[var(--line)] bg-[var(--paper)]">
           {value.map((row, index) => (
@@ -684,7 +686,7 @@ export function CineItemsEditor({
           ))}
         </ol>
       ) : (
-        <p className="rounded-2xl border border-dashed border-[var(--line)] px-4 py-8 text-center text-sm text-[var(--muted)]">{t("emptyList")}</p>
+        <FaceEmptyState title={t("emptyList")} compact />
       )}
 
       {adding ? (

@@ -192,6 +192,13 @@ export function CreateChallengeScreen({
   const totalFields = fields.length + (tracksCatalog && itemRecordingMode === "single"
     ? additionalResponses.reduce((total, response) => total + response.fields.length, 0)
     : 0);
+  const itemListHint = structure === "progress"
+    ? (pickedKind === "book" ? t("bookItemsHint") : t("progressItemsHint"))
+    : pickedKind === "film"
+      ? t("cineItemsHint")
+      : pickedKind === "book"
+        ? t("bookshelfItemsHint")
+        : null;
 
   /**
    * The columns a structure starts with: a rating and a comment for films and books, just a comment for any other
@@ -637,7 +644,7 @@ export function CreateChallengeScreen({
           <div>
             <h2 className="text-xl font-light">{t("checkpointsTitle")}</h2>
             {/* The hint follows what the list holds: films, books to rate, books to read day by day, or anything else. */}
-            <p className="mt-1 mb-4 text-sm leading-6 text-[var(--muted)]">{structure === "progress" ? (pickedKind === "book" ? t("bookItemsHint") : t("progressItemsHint")) : pickedKind === "film" ? t("cineItemsHint") : pickedKind === "book" ? t("bookshelfItemsHint") : t("customItemsHint")}</p>
+            {itemListHint ? <p className="mt-1 mb-4 text-sm leading-6 text-[var(--muted)]">{itemListHint}</p> : null}
             <Toggle className="mb-5 bg-[var(--paper)]" checked={itemDates} onChange={setItemDates} label={t("itemDatesLabel")} hint={t("itemDatesHint")} />
             {itemLibraries.length ? (
               <CineItemsEditor

@@ -1,43 +1,34 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { type FormEvent, type ReactNode, useState } from "react";
+import { type FormEvent, type ReactNode, useRef, useState } from "react";
 
 import { API_PATHS, apiRequest } from "../api";
 import { useCsrf } from "../csrf";
-import { sessionPresetFields } from "../fields";
+import { cleanFields, FieldBuilder, presetFields, sessionPresetFields, sharedPresetFields } from "../fields";
 import { useGoaFormat } from "../format";
-import { type CatalogScope, useCatalogLibraries, useLibraryName } from "../libraries";
+import { type CatalogScope, LibraryGlyph, librarySuggestions, useCatalogLibraries, useLibraryName } from "../libraries";
 import { RecipeIcon, type RecipeIconName } from "../recipe-icons";
-import type { CatalogLibrary, ChallengeCreationInput, ChallengeField, CreatableRecipeKey, GroupSummary, Id } from "../types";
-import { BackButton, Button, cardClass, cx, inputClass, PageHeading, StatusMessage } from "../ui";
+import type { CatalogLibrary, ChallengeCreationInput, ChallengeField, ChallengeResponseInput, CreatableRecipeKey, GroupSummary, Id } from "../types";
+import { AddRow, BackButton, Button, cardClass, ChevronIcon, CircleMinusIcon, cx, inputClass, PageHeading, rowIconClass, SelectableCards, StatusMessage } from "../ui";
 import { canManage } from "../utils";
 
 /**
- * What the chat can start, each a preset of the app's general capabilities:
- *  · Screens / Pages — rate films or books, from their always-there library;
- *  · a habit — a check-in a day, or a number counted toward a goal;
- *  · a workout — one check-in holding a record per exercise, from a library of the person's own.
- * Tables and a fully custom challenge still need the wizard (several ratings, your own fields).
+ * The same two structures offered by manual creation: a challenge with a list of items, or a daily check-in.
+ * Every path uses the same response fields and individual/shared answer model as the full creator.
  */
-const KINDS = ["cinema", "bookshelf", "habit", "workout"] as const;
+const KINDS = ["items", "daily"] as const;
 type Kind = (typeof KINDS)[number];
-const RECIPE_OF: Record<Kind, CreatableRecipeKey> = { cinema: "cinema", bookshelf: "bookshelf", habit: "habit", workout: "custom" };
-const ICON_OF: Record<Kind, RecipeIconName> = { cinema: "cinema", bookshelf: "bookshelf", habit: "habit", workout: "custom" };
-/** Everything but a habit opens with a first item. */
-const NEEDS_ITEM: Record<Kind, boolean> = { cinema: true, bookshelf: true, habit: false, workout: true };
-/** A book is known by its title and author — the catalogue asks for both. */
-const IS_BOOK: Record<Kind, boolean> = { cinema: false, bookshelf: true, habit: false, workout: false };
+const ICON_OF: Record<Kind, RecipeIconName> = { items: "library", daily: "habit" };
 
 type Where = { kind: "personal" } | { kind: "group"; groupId: Id; name: string; participantIds: Id[] };
 /** How a group's ratings come out: sealed until revealed, sealed with a guess first, or live. */
 const RATING_MODES = ["reveal", "guess", "open"] as const;
 type RatingMode = (typeof RATING_MODES)[number];
 const MODE_KEY: Record<RatingMode, string> = { reveal: "modeReveal", guess: "modeGuess", open: "modeOpen" };
-/** A habit: just "did it today", or a number counted along a road (toward a goal, when it has one). */
-type HabitShape = { kind: "check" } | { kind: "count"; label: string; goal: number | null };
-/** A workout's exercises live in a library of the person's own: one they already have, or a new one they name. */
-type LibraryPick = { id: Id; name: string };
+type RecordingMode = "single" | "session";
+type LibraryPick = { id: Id | null; kind: string; source: CatalogLibrary["source"]; name: string };
+type ResponseDraft = ChallengeResponseInput & { clientKey: string };
 
 /** goa's own turn in the exchange — a small mark, then the question, in a quiet bubble. */
 function Ask({ children }: { children: ReactNode }) {
@@ -75,7 +66,7 @@ function OptionCard({ onClick, icon, title, hint }: { onClick: () => void; icon?
   );
 }
 
-/** The workout's library: the space's own lists to pick from, or a new one named here (never made on its own). */
+/** The same library choice as manual creation: existing libraries, suggested built-ins, or a new one. */
 function LibraryStep({ scope, onPick }: { scope: CatalogScope; onPick: (library: LibraryPick) => void }) {
   const t = useTranslations("quickCreate");
   const tc = useTranslations("common");
@@ -83,8 +74,9 @@ function LibraryStep({ scope, onPick }: { scope: CatalogScope; onPick: (library:
   const csrf = useCsrf();
   const libraryName = useLibraryName();
   const { data } = useCatalogLibraries(scope);
-  const own = (data ?? []).filter((library) => library.source === "custom");
-  const [name, setName] = useState(t("libraryDefault"));
+  const libraries = data ?? [];
+  const choices = [...libraries, ...librarySuggestions(libraries)];
+  const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -96,7 +88,7 @@ function LibraryStep({ scope, onPick }: { scope: CatalogScope; onPick: (library:
     setError(null);
     try {
       const made = await apiRequest<CatalogLibrary>(API_PATHS.catalogWorkspace(scope).libraries, { method: "POST", body: { label }, csrfToken: csrf });
-      onPick({ id: made.id, name: label });
+      onPick({ id: made.id, kind: made.kind, source: made.source, name: libraryName(made) });
     } catch (cause) {
       setError(f.error(cause));
       setBusy(false);
@@ -105,13 +97,20 @@ function LibraryStep({ scope, onPick }: { scope: CatalogScope; onPick: (library:
 
   return (
     <div className="ml-10 space-y-3">
-      {own.length ? (
+      {choices.length ? (
         <div className="grid gap-3 sm:grid-cols-3">
-          {own.map((library) => <OptionCard key={library.id} onClick={() => onPick({ id: library.id, name: libraryName(library) })} title={libraryName(library)} />)}
+          {choices.map((library) => (
+            <OptionCard
+              key={library.kind}
+              onClick={() => onPick({ id: library.id, kind: library.kind, source: library.source, name: libraryName(library) })}
+              icon={<LibraryGlyph source={library.source} />}
+              title={libraryName(library)}
+            />
+          ))}
         </div>
       ) : null}
       <form onSubmit={make} className="flex flex-wrap items-center gap-2.5">
-        <input className={cx(inputClass, "max-w-xs flex-1")} value={name} onChange={(event) => setName(event.target.value)} aria-label={t("libraryNew")} placeholder={t("libraryDefault")} maxLength={80} disabled={busy} />
+        <input className={cx(inputClass, "max-w-xs flex-1")} value={name} onChange={(event) => setName(event.target.value)} aria-label={t("libraryNew")} placeholder={t("libraryPlaceholder")} maxLength={80} disabled={busy} />
         <Button type="submit" disabled={busy || !name.trim()}>{busy ? tc("saving") : t("libraryNew")}</Button>
       </form>
       {error ? <StatusMessage error={error} /> : null}
@@ -156,11 +155,18 @@ export function QuickCreateScreen({
     return target ? { kind: "group", groupId: target.id, name: target.name, participantIds: target.members?.map((member) => member.id) ?? [currentUserId] } : null;
   };
   const [recipe, setRecipe] = useState<Kind | null>(null);
-  const [habit, setHabit] = useState<HabitShape | null>(null);
-  const [countingHabit, setCountingHabit] = useState(false);
-  const [countLabel, setCountLabel] = useState("");
-  const [countGoal, setCountGoal] = useState("");
+  const [fields, setFields] = useState<ChallengeField[]>([]);
+  const [answerScope, setAnswerScope] = useState<"individual" | "shared">("individual");
+  const [additionalResponses, setAdditionalResponses] = useState<ResponseDraft[]>([]);
+  const [primaryResponseKey, setPrimaryResponseKey] = useState("primary");
+  const [openResponse, setOpenResponse] = useState<string | null>("primary");
+  const [responsesSettled, setResponsesSettled] = useState(false);
+  const [fieldsTouched, setFieldsTouched] = useState(false);
+  const responseSequence = useRef(0);
   const [library, setLibrary] = useState<LibraryPick | null>(null);
+  const [recordingMode, setRecordingMode] = useState<RecordingMode | null>(null);
+  const [sessionName, setSessionName] = useState<string | null>(null);
+  const [sessionNameDraft, setSessionNameDraft] = useState("");
   const [where, setWhere] = useState<Where | null>(presetWhere);
   const [pickingNewGroup, setPickingNewGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
@@ -174,16 +180,40 @@ export function QuickCreateScreen({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Only a group rating something together has a reveal to plan.
-  const asksMode = Boolean((recipe === "cinema" || recipe === "bookshelf") && where?.kind === "group");
-  // A habit says what a day's check-in is; a workout says which list its exercises come from.
-  const asksHabit = recipe === "habit";
-  const asksLibrary = recipe === "workout";
-  const modeSettled = (!asksMode || mode !== null) && (!asksHabit || habit !== null) && (!asksLibrary || library !== null);
+  const tracksItems = recipe === "items";
+  const asksMode = Boolean(tracksItems && recordingMode === "single" && (library?.kind === "film" || library?.kind === "book") && where?.kind === "group" && answerScope === "individual");
+  const asksSessionName = tracksItems && recordingMode === "session";
+  const configurationSettled = responsesSettled && (!asksMode || mode !== null) && (!tracksItems || (library !== null && recordingMode !== null)) && (!asksSessionName || sessionName !== null);
+  const responseRows: Array<ResponseDraft & { primary?: true }> = [
+    { clientKey: primaryResponseKey, name: "", answerScope, fields, primary: true },
+    ...additionalResponses,
+  ];
 
   function resetFrom(step: "recipe" | "where" | "mode" | "title") {
-    if (step === "recipe") setRecipe(null);
-    if (step !== "title") { setMode(null); setHabit(null); setCountingHabit(false); setCountLabel(""); setCountGoal(""); setLibrary(null); }
+    if (step === "recipe") {
+      setRecipe(null);
+      setFields([]);
+      setAnswerScope("individual");
+      setAdditionalResponses([]);
+      setResponsesSettled(false);
+      setFieldsTouched(false);
+      setOpenResponse("primary");
+      setRecordingMode(null);
+      setSessionName(null);
+      setSessionNameDraft("");
+    }
+    if (step !== "title") setMode(null);
+    if (step === "where" && recipe === "items") {
+      setLibrary(null);
+      setRecordingMode(null);
+      setSessionName(null);
+      setSessionNameDraft("");
+      setFields([]);
+      setAdditionalResponses([]);
+      setAnswerScope("individual");
+      setResponsesSettled(false);
+      setFieldsTouched(false);
+    }
     // Changing the recipe keeps a destination the chat was opened into; changing the destination itself clears it.
     if (step === "recipe" || step === "where") { setWhere(step === "recipe" ? presetWhere() : null); setPickingNewGroup(false); setNewGroupName(""); setGroupError(null); }
     setTitle(null);
@@ -191,6 +221,160 @@ export function QuickCreateScreen({
     setItemTitle("");
     setItemAuthor("");
     setError(null);
+  }
+
+  function chooseRecipe(next: Kind) {
+    setRecipe(next);
+    setAnswerScope("individual");
+    setAdditionalResponses([]);
+    setPrimaryResponseKey("primary");
+    setOpenResponse(next === "items" ? "primary" : null);
+    setResponsesSettled(false);
+    setFieldsTouched(false);
+    setLibrary(null);
+    setRecordingMode(null);
+    setSessionName(null);
+    setSessionNameDraft("");
+    setFields(next === "daily" ? presetFields("habit", (key) => tp(key)) : []);
+  }
+
+  function chooseLibrary(next: LibraryPick) {
+    setLibrary(next);
+    setRecordingMode(null);
+    setSessionName(null);
+    setSessionNameDraft("");
+    setFields([]);
+    setAdditionalResponses([]);
+    setAnswerScope("individual");
+    setFieldsTouched(false);
+    setResponsesSettled(false);
+    setMode(null);
+  }
+
+  function editLibrary() {
+    setLibrary(null);
+    setRecordingMode(null);
+    setSessionName(null);
+    setSessionNameDraft("");
+    setFields([]);
+    setAdditionalResponses([]);
+    setAnswerScope("individual");
+    setFieldsTouched(false);
+    setResponsesSettled(false);
+    setMode(null);
+    setTitle(null);
+    setTitleDraft("");
+    setItemTitle("");
+    setItemAuthor("");
+  }
+
+  function chooseRecording(next: RecordingMode) {
+    if (!library) return;
+    setRecordingMode(next);
+    setSessionName(null);
+    setSessionNameDraft("");
+    setAnswerScope("individual");
+    setAdditionalResponses([]);
+    setOpenResponse(next === "single" ? "primary" : null);
+    setFields(next === "session"
+      ? sessionPresetFields((key) => tp(key))
+      : presetFields(library.kind === "film" || library.kind === "book" ? "cinema" : "custom", (key) => tp(key)));
+    setFieldsTouched(false);
+    setResponsesSettled(false);
+    setMode(null);
+  }
+
+  function editRecording() {
+    setRecordingMode(null);
+    setSessionName(null);
+    setSessionNameDraft("");
+    setFields([]);
+    setAdditionalResponses([]);
+    setAnswerScope("individual");
+    setFieldsTouched(false);
+    setResponsesSettled(false);
+    setMode(null);
+    setTitle(null);
+    setTitleDraft("");
+    setItemTitle("");
+    setItemAuthor("");
+  }
+
+  function chooseScope(next: "individual" | "shared") {
+    setAnswerScope(next);
+    setMode(null);
+    if (!fieldsTouched) setFields(next === "shared" ? sharedPresetFields((key) => tp(key)) : presetFields(library?.kind === "film" || library?.kind === "book" ? "cinema" : "custom", (key) => tp(key)));
+  }
+
+  function addResponse() {
+    const nextScope = answerScope === "individual" ? "shared" : "individual";
+    const responseFields = nextScope === "shared" ? sharedPresetFields((key) => tp(key)) : presetFields("custom", (key) => tp(key));
+    const clientKey = `new-${responseSequence.current += 1}`;
+    setAdditionalResponses((current) => [...current, { clientKey, name: responseFields[0]?.label ?? "", answerScope: nextScope, fields: responseFields }]);
+    setFieldsTouched(true);
+    setOpenResponse(clientKey);
+  }
+
+  function updateResponse(clientKey: string, patch: Partial<ChallengeResponseInput>) {
+    setAdditionalResponses((current) => current.map((response) => response.clientKey === clientKey ? { ...response, ...patch } : response));
+    setFieldsTouched(true);
+  }
+
+  function applyResponseOrder(next: Array<ResponseDraft & { primary?: true }>) {
+    if (!next.length) return;
+    const [nextPrimary, ...nextAdditional] = next;
+    setPrimaryResponseKey(nextPrimary.clientKey);
+    setFields(nextPrimary.fields);
+    setAnswerScope(nextPrimary.answerScope);
+    setAdditionalResponses(nextAdditional.map(({ clientKey, name, answerScope: scope, fields: responseFields }) => ({ clientKey, name, answerScope: scope, fields: responseFields })));
+    setMode(null);
+    setFieldsTouched(true);
+  }
+
+  function removeResponse(clientKey: string) {
+    if (responseRows.length <= 1) return;
+    applyResponseOrder(responseRows.filter((response) => response.clientKey !== clientKey));
+    setOpenResponse((current) => current === clientKey ? null : current);
+  }
+
+  function moveResponse(clientKey: string, offset: -1 | 1) {
+    const index = responseRows.findIndex((response) => response.clientKey === clientKey);
+    const target = index + offset;
+    if (index < 0 || target < 0 || target >= responseRows.length) return;
+    const next = [...responseRows];
+    [next[index], next[target]] = [next[target], next[index]];
+    applyResponseOrder(next);
+  }
+
+  function confirmResponses() {
+    if (!fields.length || additionalResponses.some((response) => !response.fields.length)) {
+      setError(tr("errNoFields"));
+      return;
+    }
+    if (fields.some((field) => !field.label.trim()) || additionalResponses.some((response) => response.fields.some((field) => !field.label.trim()))) {
+      setError(tr("errFieldLabel"));
+      return;
+    }
+    setError(null);
+    setResponsesSettled(true);
+    setOpenResponse(null);
+  }
+
+  function editResponses() {
+    setResponsesSettled(false);
+    setOpenResponse(primaryResponseKey);
+    setMode(null);
+    setTitle(null);
+    setTitleDraft("");
+    setItemTitle("");
+    setItemAuthor("");
+    setError(null);
+  }
+
+  function confirmSessionName(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const name = sessionNameDraft.trim();
+    if (name) setSessionName(name);
   }
 
   async function makeGroup(event: FormEvent<HTMLFormElement>) {
@@ -211,48 +395,54 @@ export function QuickCreateScreen({
     }
   }
 
-  const isBook = recipe ? IS_BOOK[recipe] : false;
-
-  function confirmCount(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const label = countLabel.trim();
-    const goal = Number(countGoal);
-    if (!label) return;
-    setHabit({ kind: "count", label, goal: countGoal.trim() && Number.isFinite(goal) && goal > 0 ? goal : null });
-  }
-
-  /** What the check-in asks, when the preset's own fields aren't it: a counted number, or a workout's weight and reps. */
-  function fieldsFor(): ChallengeField[] {
-    if (recipe === "workout") return sessionPresetFields((key) => tp(key));
-    if (recipe === "habit" && habit?.kind === "count") {
-      return [
-        {
-          key: "quantidade", label: habit.label, type: "number", required: true,
-          config: { min: 0, count: { goal: habit.goal === null ? null : { value: habit.goal }, entry: "amount", showDates: true } },
-        },
-        { key: "nota_dia", label: tp("comoFoi"), type: "text", required: false, config: { multiline: true, maxLength: 500 } },
-      ];
-    }
-    return [];
-  }
+  const isBook = library?.kind === "book";
 
   async function create(name: string, firstItem: string) {
     if (!recipe || !where) return;
     setBusy(true);
     setError(null);
     try {
+      const creationRecipe: CreatableRecipeKey = recipe === "daily"
+        ? "habit"
+        : recordingMode === "session" || answerScope === "shared"
+          ? "custom"
+          : library?.kind === "film"
+            ? "cinema"
+            : library?.kind === "book"
+              ? "bookshelf"
+              : "custom";
       const input: ChallengeCreationInput = {
-        recipe: RECIPE_OF[recipe],
+        recipe: creationRecipe,
         title: name,
         description: "",
         ruleSections: [],
         startsOn: null,
         endsOn: null,
-        fields: fieldsFor(),
-        ...(recipe === "workout" && library
-          ? { libraries: [{ libraryId: library.id }], recordingMode: "session" as const, sessionName: t("workoutSession"), sessionNoteLabel: tp("comoFoi") }
+        fields: cleanFields(fields),
+        ...(tracksItems && recordingMode === "single" && additionalResponses.length ? {
+          additionalResponses: additionalResponses.map((response) => ({
+            name: response.fields[0]?.label.trim() || response.name.trim(),
+            answerScope: response.answerScope,
+            fields: cleanFields(response.fields),
+          })),
+        } : {}),
+        ...(tracksItems && recordingMode === "session" && library
+          ? {
+              libraries: [library.id ? { libraryId: library.id } : { libraryKind: library.kind }],
+              recordingMode: "session" as const,
+              sessionName: sessionName ?? tr("sessionNameDefault"),
+              sessionNoteLabel: tp("comoFoi"),
+            }
           : {}),
-        items: firstItem ? [{ title: firstItem, position: 0, ...(isBook ? { author: itemAuthor.trim() } : {}) }] : [],
+        ...(tracksItems && recordingMode === "single" && creationRecipe === "custom" && library
+          ? { libraries: [library.id ? { libraryId: library.id } : { libraryKind: library.kind }], answerScope }
+          : {}),
+        items: firstItem ? [{
+          title: firstItem,
+          position: 0,
+          ...(isBook ? { author: itemAuthor.trim() } : {}),
+          ...(library?.id ? { libraryId: library.id } : library ? { libraryKind: library.kind } : {}),
+        }] : [],
         generateDaily: false,
         ...(asksMode && mode !== "open" ? { revealTogether: true } : {}),
         ...(asksMode && mode === "guess" ? { expectation: true } : {}),
@@ -269,7 +459,7 @@ export function QuickCreateScreen({
     event.preventDefault();
     const name = titleDraft.trim();
     if (!recipe || !name) return;
-    if (NEEDS_ITEM[recipe]) setTitle(name);
+    if (tracksItems) setTitle(name);
     else void create(name, "");
   }
 
@@ -280,7 +470,7 @@ export function QuickCreateScreen({
     void create(title, name);
   }
 
-  const kindName = (key: Kind) => (key === "workout" ? t("workout") : tr(`recipes.${key}.name`));
+  const kindName = (key: Kind) => tr(`creationTypes.${key}.name`);
   const scope: CatalogScope | null = where ? (where.kind === "personal" ? "personal" : { groupId: where.groupId }) : null;
 
   return (
@@ -294,14 +484,14 @@ export function QuickCreateScreen({
           {recipe ? (
             <Answered onEdit={() => resetFrom("recipe")} editLabel={t("change")}>{kindName(recipe)}</Answered>
           ) : (
-            <div className="ml-10 grid gap-3 sm:grid-cols-3">
+            <div className="ml-10 grid gap-3 sm:grid-cols-2">
               {KINDS.map((key) => (
                 <OptionCard
                   key={key}
-                  onClick={() => setRecipe(key)}
+                  onClick={() => chooseRecipe(key)}
                   icon={<RecipeIcon name={ICON_OF[key]} className="h-[18px] w-[18px]" />}
                   title={kindName(key)}
-                  hint={key === "workout" ? t("workoutHint") : tr(`recipes.${key}.tagline`)}
+                  hint={tr(`creationTypes.${key}.tagline`)}
                 />
               ))}
             </div>
@@ -349,7 +539,129 @@ export function QuickCreateScreen({
           </div>
         ) : null}
 
-        {asksMode && where ? (
+        {tracksItems && where && scope ? (
+          <div className="space-y-3">
+            <Ask>{t("qLibrary")}</Ask>
+            {library ? (
+              <Answered onEdit={editLibrary} editLabel={t("change")}>{library.name}</Answered>
+            ) : (
+              <LibraryStep scope={scope} onPick={chooseLibrary} />
+            )}
+          </div>
+        ) : null}
+
+        {tracksItems && where && library ? (
+          <div className="space-y-3">
+            <Ask>{t("qRecording")}</Ask>
+            {recordingMode ? (
+              <Answered onEdit={editRecording} editLabel={t("change")}>{tr(recordingMode === "single" ? "recordingSingle" : "recordingSession")}</Answered>
+            ) : (
+              <div className="ml-10">
+                <SelectableCards
+                  value={null}
+                  onChange={chooseRecording}
+                  options={[
+                    { value: "single", label: tr("recordingSingle"), hint: tr("recordingSingleHint") },
+                    { value: "session", label: tr("recordingSession"), hint: tr("recordingSessionHint") },
+                  ]}
+                />
+              </div>
+            )}
+          </div>
+        ) : null}
+
+        {asksSessionName && where ? (
+          <div className="space-y-3">
+            <Ask>{t("qSession")}</Ask>
+            {sessionName !== null ? (
+              <Answered onEdit={() => { setSessionName(null); setResponsesSettled(false); setTitle(null); }} editLabel={t("change")}>{sessionName}</Answered>
+            ) : (
+              <form onSubmit={confirmSessionName} className="ml-10 flex flex-wrap items-center gap-2.5">
+                <input className={cx(inputClass, "max-w-sm flex-1")} value={sessionNameDraft} onChange={(event) => setSessionNameDraft(event.target.value)} placeholder={tr("sessionNamePlaceholder")} maxLength={60} />
+                <Button type="submit" disabled={!sessionNameDraft.trim()}>{tc("continue")}</Button>
+              </form>
+            )}
+          </div>
+        ) : null}
+
+        {recipe && where && (!tracksItems || (recordingMode !== null && (!asksSessionName || sessionName !== null))) ? (
+          <div className="space-y-3">
+            <Ask>{t("qResponses")}</Ask>
+            {responsesSettled ? (
+              <Answered onEdit={editResponses} editLabel={t("change")}>
+                {t("responsesAnswer", { count: responseRows.length })}
+              </Answered>
+            ) : (
+              <div className="ml-10 space-y-4">
+                {tracksItems && recordingMode === "single" ? (
+                  <div>
+                    <ol>
+                      {responseRows.map((response, index) => {
+                        const isOpen = openResponse === response.clientKey;
+                        const responseTitle = response.fields[0]?.label.trim() || tr("responseN", { n: index + 1 });
+                        return (
+                          <li className="border-t border-[var(--line)] first:border-t-0" key={response.clientKey}>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                aria-expanded={isOpen}
+                                onClick={() => setOpenResponse(isOpen ? null : response.clientKey)}
+                                className="flex min-h-16 min-w-0 flex-1 cursor-pointer items-center gap-3.5 py-2.5 text-left"
+                              >
+                                <span className="grid h-8 w-8 flex-none place-items-center rounded-full border border-[var(--ink)] text-[13px] font-medium tabular-nums">{index + 1}</span>
+                                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                                  <span className="truncate text-[15px] font-medium">{responseTitle}</span>
+                                  <span className="truncate text-xs text-[var(--muted)]">{tr("responseSummary", { scope: tr(response.answerScope === "shared" ? "scopeShared" : "scopeIndividual"), count: response.fields.length })}</span>
+                                </span>
+                              </button>
+                              {responseRows.length > 1 ? <>
+                                <button type="button" className={rowIconClass} disabled={index === 0} onClick={() => moveResponse(response.clientKey, -1)} aria-label={tr("moveResponseUp")} title={tr("moveResponseUp")}><ChevronIcon dir="up" /></button>
+                                <button type="button" className={rowIconClass} disabled={index === responseRows.length - 1} onClick={() => moveResponse(response.clientKey, 1)} aria-label={tr("moveResponseDown")} title={tr("moveResponseDown")}><ChevronIcon dir="down" /></button>
+                                <button type="button" className={cx(rowIconClass, "text-[var(--danger)] hover:text-[var(--danger)]")} onClick={() => removeResponse(response.clientKey)} aria-label={tr("removeResponse")} title={tr("removeResponse")}><CircleMinusIcon className="h-[18px] w-[18px]" /></button>
+                              </> : null}
+                            </div>
+                            {isOpen ? (
+                              <div className="space-y-5 pb-6 pl-[46px]">
+                                <SelectableCards
+                                  value={response.answerScope}
+                                  onChange={(next) => response.primary ? chooseScope(next) : updateResponse(response.clientKey, { answerScope: next })}
+                                  options={[
+                                    { value: "individual", label: tr("scopeIndividual"), hint: tr("scopeIndividualHint") },
+                                    { value: "shared", label: tr("scopeShared"), hint: tr("scopeSharedHint") },
+                                  ]}
+                                />
+                                <div className="border-t border-[var(--line)] pt-5">
+                                  <FieldBuilder
+                                    fields={response.fields}
+                                    allowAdd={false}
+                                    minimumFields={1}
+                                    showOrdering={false}
+                                    onChange={(next) => {
+                                      if (response.primary) setFields(next);
+                                      else updateResponse(response.clientKey, { fields: next });
+                                      setFieldsTouched(true);
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            ) : null}
+                          </li>
+                        );
+                      })}
+                    </ol>
+                    {responseRows.length < 10 ? <AddRow label={tr("responseWord")} ariaLabel={tr("addResponse")} onClick={addResponse} /> : null}
+                  </div>
+                ) : (
+                  <FieldBuilder fields={fields} onChange={(next) => { setFields(next); setFieldsTouched(true); }} />
+                )}
+                <Button className="w-full" onClick={confirmResponses} disabled={!fields.length || fields.some((field) => !field.label.trim())}>{tc("continue")}</Button>
+                {error ? <StatusMessage error={error} /> : null}
+              </div>
+            )}
+          </div>
+        ) : null}
+
+        {asksMode && where && responsesSettled ? (
           <div className="space-y-3">
             <Ask>{t("q5")}</Ask>
             {mode ? (
@@ -364,40 +676,7 @@ export function QuickCreateScreen({
           </div>
         ) : null}
 
-        {asksHabit && where ? (
-          <div className="space-y-3">
-            <Ask>{t("qHabit")}</Ask>
-            {habit ? (
-              <Answered onEdit={() => resetFrom("mode")} editLabel={t("change")}>
-                {habit.kind === "check" ? t("habitCheck") : habit.goal === null ? habit.label : t("habitCountAnswer", { label: habit.label, goal: habit.goal })}
-              </Answered>
-            ) : countingHabit ? (
-              <form onSubmit={confirmCount} className="ml-10 flex flex-wrap items-center gap-2.5">
-                <input className={cx(inputClass, "max-w-[12rem] flex-1")} value={countLabel} onChange={(event) => setCountLabel(event.target.value)} placeholder={t("countLabelPlaceholder")} aria-label={t("countLabel")} maxLength={60} />
-                <input className={cx(inputClass, "max-w-[9rem] flex-1")} value={countGoal} onChange={(event) => setCountGoal(event.target.value)} placeholder={t("countGoalPlaceholder")} aria-label={t("countGoal")} type="number" inputMode="decimal" min="0" step="any" />
-                <Button type="submit" disabled={!countLabel.trim()}>{tc("continue")}</Button>
-              </form>
-            ) : (
-              <div className="ml-10 grid gap-3 sm:grid-cols-3">
-                <OptionCard onClick={() => setHabit({ kind: "check" })} title={t("habitCheck")} hint={t("habitCheckHint")} />
-                <OptionCard onClick={() => setCountingHabit(true)} title={t("habitCount")} hint={t("habitCountHint")} />
-              </div>
-            )}
-          </div>
-        ) : null}
-
-        {asksLibrary && where && scope ? (
-          <div className="space-y-3">
-            <Ask>{t("qLibrary")}</Ask>
-            {library ? (
-              <Answered onEdit={() => resetFrom("mode")} editLabel={t("change")}>{library.name}</Answered>
-            ) : (
-              <LibraryStep scope={scope} onPick={setLibrary} />
-            )}
-          </div>
-        ) : null}
-
-        {recipe && where && modeSettled ? (
+        {recipe && where && configurationSettled ? (
           <div className="space-y-3">
             <Ask>{t("q3")}</Ask>
             {title !== null ? (
@@ -413,7 +692,7 @@ export function QuickCreateScreen({
                   disabled={busy}
                 />
                 <Button type="submit" disabled={busy || !titleDraft.trim()}>
-                  {recipe && NEEDS_ITEM[recipe] ? tc("continue") : busy ? tc("saving") : t("create")}
+                  {tracksItems ? tc("continue") : busy ? tc("saving") : t("create")}
                 </Button>
               </form>
             )}
@@ -421,16 +700,16 @@ export function QuickCreateScreen({
           </div>
         ) : null}
 
-        {recipe && where && modeSettled && title !== null && NEEDS_ITEM[recipe] ? (
+        {recipe && where && configurationSettled && title !== null && tracksItems ? (
           <div className="space-y-3">
-            <Ask>{t(recipe === "cinema" ? "q4Cinema" : recipe === "workout" ? "q4Workout" : "q4Bookshelf")}</Ask>
+            <Ask>{t(library?.kind === "film" ? "q4Cinema" : isBook ? "q4Bookshelf" : "q4Item")}</Ask>
             <form onSubmit={submitItem} className="ml-10 flex flex-wrap items-center gap-2.5">
               <input
                 className={cx(inputClass, "max-w-sm flex-1")}
                 value={itemTitle}
                 onChange={(event) => setItemTitle(event.target.value)}
-                placeholder={t(recipe === "cinema" ? "itemPlaceholderCinema" : recipe === "workout" ? "itemPlaceholderWorkout" : "itemPlaceholderBookshelf")}
-                aria-label={t(recipe === "cinema" ? "q4Cinema" : recipe === "workout" ? "q4Workout" : "q4Bookshelf")}
+                placeholder={t(library?.kind === "film" ? "itemPlaceholderCinema" : isBook ? "itemPlaceholderBookshelf" : "itemPlaceholder")}
+                aria-label={t(library?.kind === "film" ? "q4Cinema" : isBook ? "q4Bookshelf" : "q4Item")}
                 maxLength={300}
                 disabled={busy}
               />

@@ -900,7 +900,7 @@ export function SelectableCards<T extends string>({
   disabled,
   columns = 2,
 }: {
-  value: T;
+  value: T | null;
   onChange: (next: T) => void;
   options: Array<{ value: T; label: string; hint?: string }>;
   disabled?: boolean;

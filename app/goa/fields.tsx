@@ -69,7 +69,7 @@ export function sessionPresetFields(label: PresetLabels): ChallengeField[] {
 
 /** What a response filled in once for the whole group starts with: one line of text, not a rating each. */
 export function sharedPresetFields(label: PresetLabels): ChallengeField[] {
-  return [{ key: "resultado", label: label("resultado"), type: "text", required: true, config: { maxLength: 200 } }];
+  return [{ key: "resultado", label: label("resposta"), type: "text", required: true, config: { maxLength: 200 } }];
 }
 
 export function cleanFields(fields: ChallengeField[]): ChallengeField[] {
