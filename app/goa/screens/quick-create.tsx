@@ -3,14 +3,13 @@
 import { useTranslations } from "next-intl";
 import { type FormEvent, type ReactNode, useRef, useState } from "react";
 
-import { API_PATHS, apiRequest } from "../api";
-import { useCsrf } from "../csrf";
 import { cleanFields, FieldBuilder, presetFields, sessionPresetFields, sharedPresetFields } from "../fields";
 import { useGoaFormat } from "../format";
-import { type CatalogScope, LibraryGlyph, librarySuggestions, useCatalogLibraries, useLibraryName } from "../libraries";
+import { type CatalogScope, LibraryPills, libraryChoices, librarySuggestions, useCatalogLibraries, useLibraryName } from "../libraries";
+import { NewLibraryDialog } from "../library-dialogs";
 import { RecipeIcon, type RecipeIconName } from "../recipe-icons";
 import type { CatalogLibrary, ChallengeCreationInput, ChallengeField, ChallengeResponseInput, CreatableRecipeKey, GroupSummary, Id } from "../types";
-import { AddRow, BackButton, Button, cardClass, ChevronIcon, CircleMinusIcon, cx, inputClass, PageHeading, rowIconClass, SelectableCards, StatusMessage } from "../ui";
+import { AddRow, ArrowField, ArrowRightIcon, BackButton, Button, cardClass, ChevronIcon, CircleMinusIcon, cx, inputClass, PageHeading, rowIconClass, SelectableCards, StatusMessage } from "../ui";
 import { canManage } from "../utils";
 
 /**
@@ -45,7 +44,7 @@ function Ask({ children }: { children: ReactNode }) {
 function Answered({ children, onEdit, editLabel }: { children: ReactNode; onEdit: () => void; editLabel: string }) {
   return (
     <div className="ml-10 flex items-center gap-2.5">
-      <span className="inline-flex min-h-9 items-center gap-2 rounded-full border border-[var(--main)] bg-[var(--main-soft)] px-4 text-sm font-medium text-[var(--main-strong)]">{children}</span>
+      <span className="inline-flex min-h-9 items-center gap-2 rounded-full bg-[var(--main)] px-4 text-sm font-medium text-white">{children}</span>
       <button type="button" onClick={onEdit} className="cursor-pointer text-xs text-[var(--muted)] underline decoration-dotted underline-offset-2 hover:text-[var(--ink)]">{editLabel}</button>
     </div>
   );
@@ -66,54 +65,30 @@ function OptionCard({ onClick, icon, title, hint }: { onClick: () => void; icon?
   );
 }
 
-/** The same library choice as manual creation: existing libraries, suggested built-ins, or a new one. */
+/** The same library choice as manual creation: your libraries, Films & series and Books suggested, or a new one. */
 function LibraryStep({ scope, onPick }: { scope: CatalogScope; onPick: (library: LibraryPick) => void }) {
   const t = useTranslations("quickCreate");
-  const tc = useTranslations("common");
-  const f = useGoaFormat();
-  const csrf = useCsrf();
   const libraryName = useLibraryName();
-  const { data } = useCatalogLibraries(scope);
+  const { data, reload } = useCatalogLibraries(scope);
   const libraries = data ?? [];
-  const choices = [...libraries, ...librarySuggestions(libraries)];
-  const [name, setName] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function make(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const label = name.trim();
-    if (!label) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const made = await apiRequest<CatalogLibrary>(API_PATHS.catalogWorkspace(scope).libraries, { method: "POST", body: { label }, csrfToken: csrf });
-      onPick({ id: made.id, kind: made.kind, source: made.source, name: libraryName(made) });
-    } catch (cause) {
-      setError(f.error(cause));
-      setBusy(false);
-    }
-  }
-
+  const [creating, setCreating] = useState(false);
   return (
-    <div className="ml-10 space-y-3">
-      {choices.length ? (
-        <div className="grid gap-3 sm:grid-cols-3">
-          {choices.map((library) => (
-            <OptionCard
-              key={library.kind}
-              onClick={() => onPick({ id: library.id, kind: library.kind, source: library.source, name: libraryName(library) })}
-              icon={<LibraryGlyph source={library.source} />}
-              title={libraryName(library)}
-            />
-          ))}
-        </div>
+    <div className="ml-10">
+      <LibraryPills
+        choices={libraryChoices(libraries)}
+        suggestions={librarySuggestions(libraries)}
+        kind={null}
+        label={t("qLibrary")}
+        onPick={(library) => onPick({ id: library.id, kind: library.kind, source: library.source, name: libraryName(library) })}
+        onNew={() => setCreating(true)}
+      />
+      {creating ? (
+        <NewLibraryDialog
+          scope={scope}
+          onCancel={() => setCreating(false)}
+          onCreated={(made) => { setCreating(false); reload(); onPick({ id: made.id, kind: made.kind, source: made.source, name: libraryName(made) }); }}
+        />
       ) : null}
-      <form onSubmit={make} className="flex flex-wrap items-center gap-2.5">
-        <input className={cx(inputClass, "max-w-xs flex-1")} value={name} onChange={(event) => setName(event.target.value)} aria-label={t("libraryNew")} placeholder={t("libraryPlaceholder")} maxLength={80} disabled={busy} />
-        <Button type="submit" disabled={busy || !name.trim()}>{busy ? tc("saving") : t("libraryNew")}</Button>
-      </form>
-      {error ? <StatusMessage error={error} /> : null}
     </div>
   );
 }
@@ -278,7 +253,7 @@ export function QuickCreateScreen({
     setOpenResponse(next === "single" ? "primary" : null);
     setFields(next === "session"
       ? sessionPresetFields((key) => tp(key))
-      : presetFields(library.kind === "film" || library.kind === "book" ? "cinema" : "custom", (key) => tp(key)));
+      : presetFields(library.kind === "film" || library.kind === "book" ? "cinema" : "custom", (key) => tp(key)).slice(0, 1));
     setFieldsTouched(false);
     setResponsesSettled(false);
     setMode(null);
@@ -303,7 +278,7 @@ export function QuickCreateScreen({
   function chooseScope(next: "individual" | "shared") {
     setAnswerScope(next);
     setMode(null);
-    if (!fieldsTouched) setFields(next === "shared" ? sharedPresetFields((key) => tp(key)) : presetFields(library?.kind === "film" || library?.kind === "book" ? "cinema" : "custom", (key) => tp(key)));
+    if (!fieldsTouched) setFields(next === "shared" ? sharedPresetFields((key) => tp(key)) : presetFields(library?.kind === "film" || library?.kind === "book" ? "cinema" : "custom", (key) => tp(key)).slice(0, 1));
   }
 
   function addResponse() {
@@ -578,7 +553,7 @@ export function QuickCreateScreen({
             ) : (
               <form onSubmit={confirmSessionName} className="ml-10 flex flex-wrap items-center gap-2.5">
                 <input className={cx(inputClass, "max-w-sm flex-1")} value={sessionNameDraft} onChange={(event) => setSessionNameDraft(event.target.value)} placeholder={tr("sessionNamePlaceholder")} maxLength={60} />
-                <Button type="submit" disabled={!sessionNameDraft.trim()}>{tc("continue")}</Button>
+                <Button type="submit" disabled={!sessionNameDraft.trim()}>{tc("continue")}<ArrowRightIcon /></Button>
               </form>
             )}
           </div>
@@ -654,7 +629,7 @@ export function QuickCreateScreen({
                 ) : (
                   <FieldBuilder fields={fields} onChange={(next) => { setFields(next); setFieldsTouched(true); }} />
                 )}
-                <Button className="w-full" onClick={confirmResponses} disabled={!fields.length || fields.some((field) => !field.label.trim())}>{tc("continue")}</Button>
+                <Button className="w-full" onClick={confirmResponses} disabled={!fields.length || fields.some((field) => !field.label.trim())}>{tc("continue")}<ArrowRightIcon /></Button>
                 {error ? <StatusMessage error={error} /> : null}
               </div>
             )}
@@ -682,18 +657,16 @@ export function QuickCreateScreen({
             {title !== null ? (
               <Answered onEdit={() => resetFrom("title")} editLabel={t("change")}>{title}</Answered>
             ) : (
-              <form onSubmit={confirmTitle} className="ml-10 flex flex-wrap items-center gap-2.5">
-                <input
-                  className={cx(inputClass, "max-w-sm flex-1")}
+              <form onSubmit={confirmTitle} className="ml-10 max-w-md">
+                <ArrowField
                   value={titleDraft}
-                  onChange={(event) => setTitleDraft(event.target.value)}
+                  onChange={setTitleDraft}
                   placeholder={t("titlePlaceholder")}
+                  label={t("q3")}
+                  submitLabel={tracksItems ? tc("continue") : t("create")}
                   maxLength={160}
                   disabled={busy}
                 />
-                <Button type="submit" disabled={busy || !titleDraft.trim()}>
-                  {tracksItems ? tc("continue") : busy ? tc("saving") : t("create")}
-                </Button>
               </form>
             )}
             {title === null && error ? <div className="ml-10"><StatusMessage error={error} /></div> : null}
@@ -703,19 +676,21 @@ export function QuickCreateScreen({
         {recipe && where && configurationSettled && title !== null && tracksItems ? (
           <div className="space-y-3">
             <Ask>{t(library?.kind === "film" ? "q4Cinema" : isBook ? "q4Bookshelf" : "q4Item")}</Ask>
-            <form onSubmit={submitItem} className="ml-10 flex flex-wrap items-center gap-2.5">
-              <input
-                className={cx(inputClass, "max-w-sm flex-1")}
+            {/* The same round box as the name, the arrow at its end; a book also asks its author, in the same shape. */}
+            <form onSubmit={submitItem} className="ml-10 max-w-md space-y-2.5">
+              <ArrowField
                 value={itemTitle}
-                onChange={(event) => setItemTitle(event.target.value)}
+                onChange={setItemTitle}
                 placeholder={t(library?.kind === "film" ? "itemPlaceholderCinema" : isBook ? "itemPlaceholderBookshelf" : "itemPlaceholder")}
-                aria-label={t(library?.kind === "film" ? "q4Cinema" : isBook ? "q4Bookshelf" : "q4Item")}
+                label={t(library?.kind === "film" ? "q4Cinema" : isBook ? "q4Bookshelf" : "q4Item")}
+                submitLabel={t("create")}
+                submitDisabled={isBook && !itemAuthor.trim()}
                 maxLength={300}
                 disabled={busy}
               />
               {isBook ? (
                 <input
-                  className={cx(inputClass, "max-w-xs flex-1")}
+                  className="h-[46px] w-full rounded-full border border-[var(--line)] bg-[var(--paper)] px-4 text-sm text-[var(--ink)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--main)] focus:ring-4 focus:ring-[var(--main)]/15"
                   value={itemAuthor}
                   onChange={(event) => setItemAuthor(event.target.value)}
                   placeholder={t("authorPlaceholder")}
@@ -724,7 +699,6 @@ export function QuickCreateScreen({
                   disabled={busy}
                 />
               ) : null}
-              <Button type="submit" disabled={busy || !itemTitle.trim() || (isBook && !itemAuthor.trim())}>{busy ? tc("saving") : t("create")}</Button>
             </form>
             {error ? <div className="ml-10"><StatusMessage error={error} /></div> : null}
           </div>

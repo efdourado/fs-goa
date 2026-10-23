@@ -570,7 +570,7 @@ export function CineItemsEditor({
 
   return (
     <div>
-      {value.length ? <Button className="mb-4 min-h-11 w-full" onClick={() => { setDraft([]); setAdding(true); }}>＋ {t("addItems")}</Button> : null}
+      {value.length ? <Button className="mb-4 w-full" onClick={() => { setDraft([]); setAdding(true); }}>＋ {t("addItems")}</Button> : null}
       {value.length ? (
         <div className="mb-3 flex min-h-9 items-center justify-between gap-3">
           <p className="text-sm font-medium">{t("listCount", { count: value.length })}</p>

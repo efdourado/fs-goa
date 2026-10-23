@@ -726,7 +726,7 @@
     "draftLabel": "Rascunho",
     "creationTypes": {
       "items": {
-        "name": "Acompanhar uma lista",
+        "name": "Lista",
         "tagline": "Livros, filmes, cursos, rotas ou qualquer coleção",
         "body": "Crie uma lista e depois escolha se cada item recebe uma resposta, acumula progresso ao longo do tempo ou participa de sessões com vários itens."
       },
@@ -831,7 +831,7 @@
     "noMembersTitle": "Membros indisponíveis",
     "fieldsTitle": "Campos do registro",
     "trackingTitle": "Progresso",
-    "trackingInactive": "Opcional. Ative quando quiser que cada item avance até um número.",
+    "trackingHint": "Cada pessoa registra, dia a dia, quanto avançou em cada item até chegar a um número da biblioteca (as páginas de um livro, os km de uma trilha). Opcional.",
     "trackingLoading": "Carregando propriedades da biblioteca…",
     "trackingNoProperty": "Adicione primeiro uma propriedade numérica a esta biblioteca.",
     "trackingSave": "Salvar limite",

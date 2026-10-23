@@ -133,7 +133,7 @@ export function SetupSummary({ state, activeTab, onGo }: {
         </ul>
       </div>
       {state.firstTodo && state.firstTodo !== activeTab ? (
-        <Button className="min-h-11 flex-none px-5" onClick={() => onGo(state.firstTodo as AdminTab)}>{t("setup.go", { tab: t(`tabs.${state.firstTodo}`) })}</Button>
+        <Button className="flex-none px-5" onClick={() => onGo(state.firstTodo as AdminTab)}>{t("setup.go", { tab: t(`tabs.${state.firstTodo}`) })}</Button>
       ) : null}
     </div>
   );

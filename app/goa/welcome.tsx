@@ -6,7 +6,7 @@ import { type FormEvent, useState } from "react";
 import { Dialog } from "./dialog";
 import { useGoaFormat } from "./format";
 import type { GroupSummary, Id } from "./types";
-import { cx } from "./ui";
+import { ArrowField, cx } from "./ui";
 
 type Target = { personal: true } | { groupId: Id } | { newGroup: string };
 
@@ -101,12 +101,7 @@ export function WelcomePanel({
               <form onSubmit={createGroup} className="rounded-2xl border border-dashed border-[var(--line)] p-4">
                 <strong className="block text-base font-medium">{t("choose.newGroupTitle")}</strong>
                 {/* The same pill as "invite by @username": type the name, the arrow makes the group and goes on. */}
-                <div className="mt-3 flex h-[46px] items-center gap-1 rounded-full border border-[var(--line)] bg-[var(--paper)] pl-4 pr-1 transition focus-within:border-[var(--main)] focus-within:ring-4 focus-within:ring-[var(--main)]/15">
-                  <input className="h-full min-w-0 flex-1 bg-transparent text-sm text-[var(--ink)] outline-none placeholder:text-[var(--muted)]" value={groupName} onChange={(event) => setGroupName(event.target.value)} maxLength={80} placeholder={tq("newGroupPlaceholder")} aria-label={tq("newGroupPlaceholder")} />
-                  <button type="submit" disabled={busy || !groupName.trim()} aria-label={t("choose.createAndGo")} title={t("choose.createAndGo")} className="grid h-9 w-9 flex-none cursor-pointer place-items-center rounded-full bg-[var(--main)] text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-55">
-                    <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10h11M11 5.5 15.5 10 11 14.5" /></svg>
-                  </button>
-                </div>
+                <ArrowField className="mt-3" value={groupName} onChange={setGroupName} maxLength={80} placeholder={tq("newGroupPlaceholder")} label={tq("newGroupPlaceholder")} submitLabel={t("choose.createAndGo")} disabled={busy} />
               </form>
               {error ? <p role="alert" className="text-sm text-[var(--danger)]">{error}</p> : null}
             </div>

@@ -215,7 +215,8 @@ export function CreateChallengeScreen({
     if (next === "daily") return presetFields("habit", label);
     if (recording === "session") return sessionPresetFields(label);
     if (scope === "shared") return sharedPresetFields(label);
-    return presetFields(kind === "film" || kind === "book" ? "cinema" : "custom", label);
+    // One question per record to start (a rating for films and books, a comment otherwise); "+ Response" adds the next.
+    return presetFields(kind === "film" || kind === "book" ? "cinema" : "custom", label).slice(0, 1);
   }
 
   function chooseStructure(next: ChallengeStructure) {
@@ -727,14 +728,14 @@ export function CreateChallengeScreen({
         <div className="mt-7 flex gap-2 border-t border-[var(--line)] pt-5 [&>*]:flex-1">
           {/* No Cancel: leaving is the page's Back (or any other way out), which offers to keep a draft. */}
           {step > 1 ? (
-            <Button variant="secondary" className="min-h-11 !flex-none px-4" onClick={() => setStep((current) => current - 1)}>
+            <Button variant="secondary" className="!flex-none px-4" onClick={() => setStep((current) => current - 1)}>
               <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
                 <path d="M13 8H3m4-4L3 8l4 4" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
               <span className="sr-only">{t("backStep")}</span>
             </Button>
           ) : null}
-          {step < lastStep ? <Button className="min-h-11 px-6" disabled={!currentStepReady} onClick={nextStep}>{t("next")}<ArrowRightIcon /></Button> : <Button className="min-h-11 px-6" disabled={busy || !formReady} onClick={() => void submit()}>{busy ? t("creatingDraft") : t("createDraft")}</Button>}
+          {step < lastStep ? <Button className="px-6" disabled={!currentStepReady} onClick={nextStep}>{t("next")}<ArrowRightIcon /></Button> : <Button className="px-6" disabled={busy || !formReady} onClick={() => void submit()}>{busy ? t("creatingDraft") : t("createDraft")}</Button>}
         </div>
       </section>
       {leaving ? (

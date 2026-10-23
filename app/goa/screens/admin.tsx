@@ -270,7 +270,7 @@ function AdminGeneral({
           {locked ? null : (
             <div className="space-y-2">
               <span className="block text-xs text-[var(--muted)]" aria-live="polite">{dirty ? t("unsavedChanges") : null}</span>
-              <Button type="submit" className="min-h-11 w-full px-6" disabled={saving || !dirty}>{saving ? tc("saving") : t("saveBasics")}</Button>
+              <Button type="submit" className="w-full px-6" disabled={saving || !dirty}>{saving ? tc("saving") : t("saveBasics")}</Button>
             </div>
           )}
         </div>
@@ -380,7 +380,21 @@ function AdminFields({
 
   return (
     <section className="mx-auto max-w-2xl">
-      <PageHeading title={t("fieldsTitle")} />
+      {/* Adding a field: the round "+" beside the title, as on Home (on a phone too, so not PageHeading's stacked action). */}
+      <div className="mb-7 flex items-center justify-between gap-4">
+        <h1 className="text-3xl font-medium tracking-[-0.045em] sm:text-4xl">{t("fieldsTitle")}</h1>
+        {!locked ? (
+          <button
+            type="button"
+            onClick={() => { setError(null); setEditing("new"); }}
+            aria-label={t("addField")}
+            title={t("addField")}
+            className="grid h-11 w-11 flex-none cursor-pointer place-items-center rounded-full bg-[var(--main)] text-white shadow-[var(--elevate-1)] transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25"
+          >
+            <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
+          </button>
+        ) : null}
+      </div>
       {types.length > 1 || canAddShared || activeType?.id ? (
         <div className="mb-6 flex flex-wrap items-center gap-2" role="group" aria-label={t("fieldsTypeLegend")}>
           {types.map((type) => {
@@ -393,12 +407,12 @@ function AdminFields({
                 onClick={() => pickType(type.id)}
                 className={cx(
                   "inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-full border px-4 text-sm transition",
-                  active ? "border-[var(--main)] bg-[var(--main-soft)] text-[var(--main-strong)]" : "border-[var(--line)] hover:border-[var(--main-line)]",
+                  active ? "border-[var(--main)] bg-[var(--main)] font-medium text-white" : "border-[var(--line)] hover:border-[var(--main-line)]",
                 )}
               >
                 {type.answerScope === "shared" ? <SharedGlyph /> : null}
                 {type.name}
-                {type.answerScope === "shared" ? <span className="rounded-full bg-[var(--main)]/10 px-2 py-0.5 text-[10px] font-medium">{tSr("badge")}</span> : null}
+                {type.answerScope === "shared" ? <span className={cx("rounded-full px-2 py-0.5 text-[10px] font-medium", active ? "bg-white/20" : "bg-[var(--main)]/10")}>{tSr("badge")}</span> : null}
               </button>
             );
           })}
@@ -450,16 +464,6 @@ function AdminFields({
       ) : locked
         ? <EmptyState title={t("fieldsEmptyTitle")} />
         : <EmptyState title={t("fieldsEmptyTitle")} onClick={() => { setError(null); setEditing("new"); }} />}
-      {/* Right under the last field, where a new one will land: the same dashed pill as "add a response", full width. */}
-      {!locked && fields.length ? (
-        <button
-          type="button"
-          onClick={() => { setError(null); setEditing("new"); }}
-          className="mt-4 flex min-h-9 w-full cursor-pointer items-center justify-center gap-1.5 rounded-full border border-dashed border-[var(--line)] px-4 text-sm text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)]"
-        >
-          ＋ {t("addField")}
-        </button>
-      ) : null}
 
       {editing ? (
         <FieldEditorDialog
@@ -515,9 +519,12 @@ function AdminFields({
                 }}
                 bare
                 label={t("trackingTitle")}
-                hint={trackingType ? undefined : t("trackingInactive")}
+                hint={t("trackingHint")}
               />
-              {libraryProperties === null ? (
+              {/* Which number it runs up to is only asked once progress is on; turning it on starts from the first one. */}
+              {!trackingType ? (
+                libraryProperties !== null && !countGoals.length ? <p className="mt-4 text-sm text-[var(--muted)]">{t("trackingNoProperty")}</p> : null
+              ) : libraryProperties === null ? (
                 <p className="mt-4 text-sm text-[var(--muted)]">{t("trackingLoading")}</p>
               ) : countGoals.length ? (
                 <div className="mt-4">
@@ -528,13 +535,13 @@ function AdminFields({
                     disabled={locked || trackingBusy}
                     options={countGoals.map((goal) => ({ value: goal.key, label: goal.label }))}
                   />
-                  {trackingType ? <Button
-                    className="mt-3 min-h-11 w-full"
+                  <Button
+                    className="mt-3 w-full"
                     disabled={locked || trackingBusy || !chosenTrackingProperty || chosenTrackingProperty === trackedProperty}
                     onClick={() => setTrackingConfirm({ action: "change", propertyKey: chosenTrackingProperty })}
                   >
                     {t("trackingSave")}
-                  </Button> : null}
+                  </Button>
                 </div>
               ) : (
                 <p className="mt-4 text-sm text-[var(--muted)]">{t("trackingNoProperty")}</p>
@@ -785,7 +792,7 @@ export function AdminItemsSection({ challenge, entries, onReorder }: {
 
   return (
     <section className="mt-6">
-      <Button variant="secondary" className="min-h-12 w-full rounded-full" onClick={() => setOrganising(true)}>
+      <Button variant="secondary" className="w-full rounded-full" onClick={() => setOrganising(true)}>
         {/* A small chart: the order being worked out. */}
         <svg viewBox="0 0 20 20" className="h-[18px] w-[18px] flex-none" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true"><path d="M4.5 16v-5M10 16V4M15.5 16V8" /></svg>
         {t("organiseItems")}

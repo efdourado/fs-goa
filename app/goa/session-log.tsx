@@ -355,6 +355,9 @@ export function SessionLog({
       return { ...row, id: match.id };
     });
     setRows(next);
+    // The retry below can run before React re-renders: it must already see this check-in and its row ids, or it
+    // would save everything again as a second check-in.
+    latest.current = { ...latest.current, editing: visit, rows: next };
     if (next.some((row) => rowGap(row))) {
       writeDraft(latest.current.day, { visitId: visit.id, rows: next.map(({ id, itemId, values }) => ({ id, itemId, values })), visitValues: latest.current.visitValues });
     }
@@ -602,7 +605,7 @@ export function SessionLog({
               </button>
             ) : null}
             {canEdit ? (
-              <Button className="min-h-12 w-full rounded-full" onClick={() => openSheet(null)}>
+              <Button className="w-full rounded-full" onClick={() => openSheet(null)}>
                 ＋ {dayVisits.length ? t("newVisitOnDay", { name: spec.visit.name.toLowerCase() }) : day === today ? t("logToday", { name: spec.visit.name.toLowerCase() }) : t("logOnDay", { name: spec.visit.name.toLowerCase(), date: f.date(day, { day: "numeric", month: "short" }) })}
               </Button>
             ) : unavailableMessage ? <p className="rounded-xl border border-[var(--line)] bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{unavailableMessage}</p> : null}
@@ -791,7 +794,7 @@ export function SessionLog({
           {/* The bar stays at the bottom, clear of the phone's home area. */}
           <div className="sticky bottom-0 -mx-5 mt-6 flex items-center gap-3 border-t border-[var(--line)] bg-[var(--paper)] px-5 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4">
             {editing && onDelete ? <DeleteButton open={removing} onClick={() => setRemoving((open) => !open)} /> : <span className="flex-1" />}
-            <Button className="min-h-11 px-6" onClick={closeSheet}>{t("done")}</Button>
+            <Button className="px-6" onClick={closeSheet}>{t("done")}</Button>
           </div>
         </BottomSheet>
       ) : null}

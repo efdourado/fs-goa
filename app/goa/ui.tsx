@@ -526,6 +526,34 @@ export function StartLine({ label, ariaLabel, onClick }: { label: string; ariaLa
 }
 
 /** One more row for a numbered list: a dashed ＋ circle the size of the numbers, and a word, under the last row. */
+/**
+ * One line to type into, with its green arrow inside the round box: invite by @username, name a new group, name a
+ * challenge. Sits inside a form; the arrow submits it.
+ */
+export function ArrowField({ value, onChange, placeholder, label, submitLabel, disabled = false, submitDisabled = false, maxLength, className }: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  /** What the field is, said to a screen reader. */
+  label: string;
+  /** What the arrow does ("Create challenge", "Continue"). */
+  submitLabel: string;
+  disabled?: boolean;
+  /** Something else the form needs is still missing (the arrow waits; the field stays editable). */
+  submitDisabled?: boolean;
+  maxLength?: number;
+  className?: string;
+}) {
+  return (
+    <div className={cx("flex h-[46px] items-center gap-1 rounded-full border border-[var(--line)] bg-[var(--paper)] pl-4 pr-1 transition focus-within:border-[var(--main)] focus-within:ring-4 focus-within:ring-[var(--main)]/15", className)}>
+      <input className="h-full min-w-0 flex-1 bg-transparent text-sm text-[var(--ink)] outline-none placeholder:text-[var(--muted)]" value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} aria-label={label} maxLength={maxLength} disabled={disabled} />
+      <button type="submit" disabled={disabled || submitDisabled || !value.trim()} aria-label={submitLabel} title={submitLabel} className="grid h-9 w-9 flex-none cursor-pointer place-items-center rounded-full bg-[var(--main)] text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-55">
+        <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10h11M11 5.5 15.5 10 11 14.5" /></svg>
+      </button>
+    </div>
+  );
+}
+
 export function AddRow({ label, ariaLabel, onClick }: { label: string; ariaLabel: string; onClick: () => void }) {
   return (
     <div className="flex items-center border-t border-[var(--line)] py-3.5">

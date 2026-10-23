@@ -726,7 +726,7 @@
     "draftLabel": "Draft",
     "creationTypes": {
       "items": {
-        "name": "Track a list",
+        "name": "List",
         "tagline": "Books, films, courses, routes, or any collection",
         "body": "Create a list, then choose whether each item gets one response, accumulates progress over time, or takes part in sessions with several items."
       },
@@ -831,7 +831,7 @@
     "noMembersTitle": "Members unavailable",
     "fieldsTitle": "Entry fields",
     "trackingTitle": "Progress",
-    "trackingInactive": "Optional. Start it when you want each item to move toward a number.",
+    "trackingHint": "Each person logs how far they've got on every item, day by day, until it reaches a number from the library (a book's pages, a route's km). Optional.",
     "trackingLoading": "Loading library properties…",
     "trackingNoProperty": "Add a number property to this library first.",
     "trackingSave": "Save endpoint",

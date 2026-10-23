@@ -81,7 +81,7 @@ export function InviteScreen({
           <h1 className="mt-3 text-balance text-4xl font-light leading-tight tracking-[-0.04em] text-[var(--ink)] sm:text-5xl">{preview.challengeTitle ?? preview.groupName}</h1>
           {preview.challengeId ? <p className="mt-2 text-sm text-[var(--muted)]">{t("inGroup", { groupName: preview.groupName })}</p> : null}
           {preview.status === "accepted" ? (
-            <div className="mt-10 space-y-4"><StatusMessage success={t("alreadyAccepted")} /><Button className="min-h-12 rounded-full px-10" onClick={() => void onAccepted({ ...preview, accepted: true, idempotent: true })}>{t("continue")}</Button></div>
+            <div className="mt-10 space-y-4"><StatusMessage success={t("alreadyAccepted")} /><Button className="rounded-full px-10" onClick={() => void onAccepted({ ...preview, accepted: true, idempotent: true })}>{t("continue")}</Button></div>
           ) : preview.status && preview.status !== "valid" ? (
             <div className="mt-10"><StatusMessage error={preview.status === "expired" ? t("expired") : preview.status === "revoked" ? t("revoked") : t("exhausted")} /></div>
           ) : (

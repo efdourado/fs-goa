@@ -726,7 +726,7 @@
     "draftLabel": "Borrador",
     "creationTypes": {
       "items": {
-        "name": "Seguir una lista",
+        "name": "Lista",
         "tagline": "Libros, películas, cursos, rutas o cualquier colección",
         "body": "Crea una lista y luego elige si cada ítem recibe una respuesta, acumula progreso a lo largo del tiempo o participa en sesiones con varios ítems."
       },
@@ -831,7 +831,7 @@
     "noMembersTitle": "Miembros no disponibles",
     "fieldsTitle": "Campos del registro",
     "trackingTitle": "Progreso",
-    "trackingInactive": "Opcional. Actívalo cuando quieras que cada ítem avance hasta un número.",
+    "trackingHint": "Cada persona registra, día a día, cuánto avanzó en cada ítem hasta llegar a un número de la biblioteca (las páginas de un libro, los km de una ruta). Opcional.",
     "trackingLoading": "Cargando propiedades de la biblioteca…",
     "trackingNoProperty": "Agrega primero una propiedad numérica a esta biblioteca.",
     "trackingSave": "Guardar límite",
