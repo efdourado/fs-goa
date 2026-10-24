@@ -726,7 +726,7 @@
     "creationTypes": {
       "items": {
         "name": "List",
-        "tagline": "Books, films, courses, routes, or any collection",
+        "tagline": "Books, films, courses, or any collection",
         "body": "Create a list, then choose whether each item gets one response, accumulates progress over time, or takes part in sessions with several items."
       },
       "daily": {
@@ -1897,7 +1897,6 @@
   },
   "quickCreate": {
     "title": "Start a challenge",
-    "subtitle": "A few questions, nearly all one tap.",
     "q1": "How will this challenge work?",
     "q2": "Just for you, or with a group?",
     "q3": "What should we call it?",
@@ -1907,7 +1906,7 @@
     "justMe": "Just me",
     "justMeHint": "A personal challenge.",
     "groupHint": "{count, plural, one {# person} other {# people}}",
-    "newGroup": "A new group",
+    "newGroup": "Group",
     "newGroupHint": "Invite people once it's made.",
     "newGroupPlaceholder": "Group name",
     "newGroupCreate": "Create group",

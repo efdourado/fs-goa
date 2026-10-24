@@ -726,7 +726,7 @@
     "creationTypes": {
       "items": {
         "name": "Lista",
-        "tagline": "Livros, filmes, cursos, rotas ou qualquer coleção",
+        "tagline": "Livros, filmes, cursos ou qualquer coleção",
         "body": "Crie uma lista e depois escolha se cada item recebe uma resposta, acumula progresso ao longo do tempo ou participa de sessões com vários itens."
       },
       "daily": {
@@ -1897,7 +1897,6 @@
   },
   "quickCreate": {
     "title": "Comece um desafio",
-    "subtitle": "Poucas perguntas, quase tudo num toque.",
     "q1": "Como este desafio vai funcionar?",
     "q2": "Só pra você, ou com um grupo?",
     "q3": "Como vamos chamar isso?",
@@ -1907,7 +1906,7 @@
     "justMe": "Só eu",
     "justMeHint": "Um desafio pessoal.",
     "groupHint": "{count, plural, one {# pessoa} other {# pessoas}}",
-    "newGroup": "Um grupo novo",
+    "newGroup": "Grupo",
     "newGroupHint": "Convide as pessoas depois de criado.",
     "newGroupPlaceholder": "Nome do grupo",
     "newGroupCreate": "Criar grupo",

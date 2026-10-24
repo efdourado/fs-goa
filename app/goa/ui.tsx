@@ -530,7 +530,17 @@ export function StartLine({ label, ariaLabel, onClick }: { label: string; ariaLa
  * One line to type into, with its green arrow inside the round box: invite by @username, name a new group, name a
  * challenge. Sits inside a form; the arrow submits it.
  */
-export function ArrowField({ value, onChange, placeholder, label, submitLabel, disabled = false, submitDisabled = false, maxLength, className }: {
+/** A round choice in a row of them: solid green once picked, dashed with a plus while it only offers to make something. */
+export function choicePillClass({ active = false, dashed = false }: { active?: boolean; dashed?: boolean } = {}) {
+  return cx(
+    "inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-full border px-4 text-sm transition",
+    active ? "border-[var(--main)] bg-[var(--main)] text-white"
+      : dashed ? "border-dashed border-[var(--line)] text-[var(--muted)] hover:border-[var(--main-line)] hover:text-[var(--ink)]"
+        : "border-[var(--line)] hover:border-[var(--main-line)]",
+  );
+}
+
+export function ArrowField({ value, onChange, placeholder, label, submitLabel, disabled = false, submitDisabled = false, maxLength, className, takesCursor = false }: {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
@@ -543,10 +553,20 @@ export function ArrowField({ value, onChange, placeholder, label, submitLabel, d
   submitDisabled?: boolean;
   maxLength?: number;
   className?: string;
+  /** Takes the cursor as it appears, its text selected (a suggestion is kept with Enter or replaced by typing). */
+  takesCursor?: boolean;
 }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!takesCursor) return;
+    inputRef.current?.focus({ preventScroll: true });
+    inputRef.current?.select();
+    // Only as it appears: later renders leave the cursor wherever the person put it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return (
     <div className={cx("flex h-[46px] items-center gap-1 rounded-full border border-[var(--line)] bg-[var(--paper)] pl-4 pr-1 transition focus-within:border-[var(--main)] focus-within:ring-4 focus-within:ring-[var(--main)]/15", className)}>
-      <input className="h-full min-w-0 flex-1 bg-transparent text-sm text-[var(--ink)] outline-none placeholder:text-[var(--muted)]" value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} aria-label={label} maxLength={maxLength} disabled={disabled} />
+      <input className="h-full min-w-0 flex-1 bg-transparent text-sm text-[var(--ink)] outline-none placeholder:text-[var(--muted)]" value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} aria-label={label} maxLength={maxLength} disabled={disabled} ref={inputRef} />
       <button type="submit" disabled={disabled || submitDisabled || !value.trim()} aria-label={submitLabel} title={submitLabel} className="grid h-9 w-9 flex-none cursor-pointer place-items-center rounded-full bg-[var(--main)] text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-55">
         <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 10h11M11 5.5 15.5 10 11 14.5" /></svg>
       </button>

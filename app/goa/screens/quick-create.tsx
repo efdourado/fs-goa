@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { type FormEvent, type ReactNode, useRef, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 
 import { cleanFields, FieldBuilder, presetFields, sessionPresetFields, sharedPresetFields } from "../fields";
 import { useGoaFormat } from "../format";
@@ -9,7 +9,7 @@ import { type CatalogScope, LibraryPills, libraryChoices, librarySuggestions, us
 import { NewLibraryDialog } from "../library-dialogs";
 import { RecipeIcon, type RecipeIconName } from "../recipe-icons";
 import type { CatalogLibrary, ChallengeCreationInput, ChallengeField, ChallengeResponseInput, CreatableRecipeKey, GroupSummary, Id } from "../types";
-import { AddRow, ArrowField, ArrowRightIcon, BackButton, Button, cardClass, ChevronIcon, CircleMinusIcon, cx, inputClass, PageHeading, rowIconClass, SelectableCards, StatusMessage } from "../ui";
+import { AddRow, ArrowField, ArrowRightIcon, BackButton, Button, cardClass, ChevronIcon, choicePillClass, CircleMinusIcon, cx, PageHeading, rowIconClass, SelectableCards, StatusMessage } from "../ui";
 import { canManage } from "../utils";
 
 /**
@@ -50,15 +50,14 @@ function Answered({ children, onEdit, editLabel }: { children: ReactNode; onEdit
   );
 }
 
-/** One big tappable option — a recipe, a group, "just me" — picking it answers the question immediately. */
-function OptionCard({ onClick, icon, title, hint }: { onClick: () => void; icon?: ReactNode; title: string; hint?: string }) {
+/** One big tappable option (a way the ratings come out): picking it answers the question immediately. */
+function OptionCard({ onClick, title, hint }: { onClick: () => void; title: string; hint?: string }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={cx(cardClass, "flex cursor-pointer flex-col gap-1.5 p-4 text-left transition hover:-translate-y-0.5 hover:border-[var(--main-line)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25")}
     >
-      {icon ? <span className="grid h-9 w-9 place-items-center rounded-full bg-[var(--main-soft)] text-[var(--main-strong)]" aria-hidden="true">{icon}</span> : null}
       <strong className="text-[15px] font-medium tracking-[-0.01em]">{title}</strong>
       {hint ? <span className="text-xs leading-5 text-[var(--muted)]">{hint}</span> : null}
     </button>
@@ -95,9 +94,9 @@ function LibraryStep({ scope, onPick }: { scope: CatalogScope; onPick: (library:
 
 /**
  * A short, guided way to start a challenge — a few questions, nearly every answer a tap (a title, a first
- * item and a new group's or list's name are the only typing). The fast path with no way to end up somewhere half-configured, for
- * a first challenge or the fifth — not a replacement for the full wizard, which is always still one tap
- * away from wherever this lands.
+ * item and a new group's name are the only typing). Faster than the full wizard: where it goes is asked first,
+ * whatever has a sensible default (the record, how films and books are logged, a session's name, a title) is
+ * answered for you with a "Change" beside it, and each field takes the cursor as it appears.
  */
 export function QuickCreateScreen({
   currentUserId,
@@ -149,7 +148,8 @@ export function QuickCreateScreen({
   const [groupError, setGroupError] = useState<string | null>(null);
   const [mode, setMode] = useState<RatingMode | null>(null);
   const [title, setTitle] = useState<string | null>(null);
-  const [titleDraft, setTitleDraft] = useState("");
+  /** null until typed in: the field shows the suggested title. */
+  const [titleDraft, setTitleDraft] = useState<string | null>(null);
   const [itemTitle, setItemTitle] = useState("");
   const [itemAuthor, setItemAuthor] = useState("");
   const [busy, setBusy] = useState(false);
@@ -164,8 +164,8 @@ export function QuickCreateScreen({
     ...additionalResponses,
   ];
 
-  function resetFrom(step: "recipe" | "where" | "mode" | "title") {
-    if (step === "recipe") {
+  function resetFrom(step: "where" | "recipe" | "mode" | "title") {
+    if (step === "where" || step === "recipe") {
       setRecipe(null);
       setFields([]);
       setAnswerScope("individual");
@@ -176,23 +176,13 @@ export function QuickCreateScreen({
       setRecordingMode(null);
       setSessionName(null);
       setSessionNameDraft("");
+      setLibrary(null);
     }
     if (step !== "title") setMode(null);
-    if (step === "where" && recipe === "items") {
-      setLibrary(null);
-      setRecordingMode(null);
-      setSessionName(null);
-      setSessionNameDraft("");
-      setFields([]);
-      setAdditionalResponses([]);
-      setAnswerScope("individual");
-      setResponsesSettled(false);
-      setFieldsTouched(false);
-    }
-    // Changing the recipe keeps a destination the chat was opened into; changing the destination itself clears it.
-    if (step === "recipe" || step === "where") { setWhere(step === "recipe" ? presetWhere() : null); setPickingNewGroup(false); setNewGroupName(""); setGroupError(null); }
+    // The destination comes first, so changing it starts the rest over (a library belongs to where it lives).
+    if (step === "where") { setWhere(null); setPickingNewGroup(false); setNewGroupName(""); setGroupError(null); }
     setTitle(null);
-    setTitleDraft("");
+    setTitleDraft(null);
     setItemTitle("");
     setItemAuthor("");
     setError(null);
@@ -204,7 +194,8 @@ export function QuickCreateScreen({
     setAdditionalResponses([]);
     setPrimaryResponseKey("primary");
     setOpenResponse(next === "items" ? "primary" : null);
-    setResponsesSettled(false);
+    // A daily check-in's preset record is already an answer (Change opens it).
+    setResponsesSettled(next === "daily");
     setFieldsTouched(false);
     setLibrary(null);
     setRecordingMode(null);
@@ -224,6 +215,8 @@ export function QuickCreateScreen({
     setFieldsTouched(false);
     setResponsesSettled(false);
     setMode(null);
+    // Films and books are logged one at a time; only a library of your own asks how.
+    if (next.kind === "film" || next.kind === "book") chooseRecording("single", next);
   }
 
   function editLibrary() {
@@ -238,24 +231,26 @@ export function QuickCreateScreen({
     setResponsesSettled(false);
     setMode(null);
     setTitle(null);
-    setTitleDraft("");
+    setTitleDraft(null);
     setItemTitle("");
     setItemAuthor("");
   }
 
-  function chooseRecording(next: RecordingMode) {
-    if (!library) return;
+  function chooseRecording(next: RecordingMode, picked: LibraryPick | null = library) {
+    if (!picked) return;
     setRecordingMode(next);
-    setSessionName(null);
-    setSessionNameDraft("");
+    // A session already has a name ("Session"); Change renames it.
+    setSessionName(next === "session" ? tr("sessionNameDefault") : null);
+    setSessionNameDraft(next === "session" ? tr("sessionNameDefault") : "");
     setAnswerScope("individual");
     setAdditionalResponses([]);
     setOpenResponse(next === "single" ? "primary" : null);
     setFields(next === "session"
       ? sessionPresetFields((key) => tp(key))
-      : presetFields(library.kind === "film" || library.kind === "book" ? "cinema" : "custom", (key) => tp(key)).slice(0, 1));
+      : presetFields(picked.kind === "film" || picked.kind === "book" ? "cinema" : "custom", (key) => tp(key)).slice(0, 1));
     setFieldsTouched(false);
-    setResponsesSettled(false);
+    // The preset record is the answer until Change opens it.
+    setResponsesSettled(true);
     setMode(null);
   }
 
@@ -270,7 +265,7 @@ export function QuickCreateScreen({
     setResponsesSettled(false);
     setMode(null);
     setTitle(null);
-    setTitleDraft("");
+    setTitleDraft(null);
     setItemTitle("");
     setItemAuthor("");
   }
@@ -340,10 +335,15 @@ export function QuickCreateScreen({
     setOpenResponse(primaryResponseKey);
     setMode(null);
     setTitle(null);
-    setTitleDraft("");
+    setTitleDraft(null);
     setItemTitle("");
     setItemAuthor("");
     setError(null);
+  }
+
+  /** A title to keep with Enter or type over: the library and the year ("Books 2026"). */
+  function suggestedTitle() {
+    return library ? `${library.name} ${new Date().getFullYear()}` : "";
   }
 
   function confirmSessionName(event: FormEvent<HTMLFormElement>) {
@@ -432,7 +432,7 @@ export function QuickCreateScreen({
 
   function confirmTitle(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const name = titleDraft.trim();
+    const name = (titleDraft ?? suggestedTitle()).trim();
     if (!recipe || !name) return;
     if (tracksItems) setTitle(name);
     else void create(name, "");
@@ -445,70 +445,92 @@ export function QuickCreateScreen({
     void create(title, name);
   }
 
+  // Each answer brings the next question into view (a typed one also takes the cursor).
+  const endRef = useRef<HTMLDivElement>(null);
+  const answered = useRef(false);
+  useEffect(() => {
+    if (answered.current) endRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    answered.current = true;
+  }, [where, recipe, library, recordingMode, sessionName, responsesSettled, mode, title]);
+
   const kindName = (key: Kind) => tr(`creationTypes.${key}.name`);
   const scope: CatalogScope | null = where ? (where.kind === "personal" ? "personal" : { groupId: where.groupId }) : null;
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8 pb-24 sm:px-6 sm:py-12">
       <BackButton onClick={onBack} label={backLabel ?? tc("back")} className="mb-6" />
-      <PageHeading title={t("title")} description={t("subtitle")} />
+      <PageHeading title={t("title")} />
 
       <div className="space-y-6">
         <div className="space-y-3">
-          <Ask>{t("q1")}</Ask>
-          {recipe ? (
-            <Answered onEdit={() => resetFrom("recipe")} editLabel={t("change")}>{kindName(recipe)}</Answered>
+          <Ask>{t("q2")}</Ask>
+          {where ? (
+            <Answered onEdit={() => resetFrom("where")} editLabel={t("change")}>
+              {where.kind === "personal" ? t("justMe") : where.name}
+            </Answered>
           ) : (
-            <div className="ml-10 grid gap-3 sm:grid-cols-2">
-              {KINDS.map((key) => (
-                <OptionCard
-                  key={key}
-                  onClick={() => chooseRecipe(key)}
-                  icon={<RecipeIcon name={ICON_OF[key]} className="h-[18px] w-[18px]" />}
-                  title={kindName(key)}
-                  hint={tr(`creationTypes.${key}.tagline`)}
-                />
-              ))}
+            <div className="ml-10 space-y-3">
+              {/* The same round pills as the library step: you, each group you run, or a new one. */}
+              <div className="flex flex-wrap gap-2" role="group" aria-label={t("q2")}>
+                <button type="button" onClick={() => setWhere({ kind: "personal" })} className={choicePillClass()}>{t("justMe")}</button>
+                {standardGroups.map((group) => (
+                  <button
+                    key={group.id}
+                    type="button"
+                    onClick={() => setWhere({ kind: "group", groupId: group.id, name: group.name, participantIds: group.members?.map((member) => member.id) ?? [currentUserId] })}
+                    className={choicePillClass()}
+                  >
+                    {group.name}
+                    <span className="text-[var(--muted)]" aria-hidden="true">·</span>
+                    <span className="text-xs text-[var(--muted)]">{t("groupHint", { count: group.memberCount ?? group.members?.length ?? 1 })}</span>
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  aria-pressed={pickingNewGroup}
+                  onClick={() => { setPickingNewGroup(!pickingNewGroup); setNewGroupName(""); setGroupError(null); }}
+                  className={choicePillClass({ active: pickingNewGroup, dashed: !pickingNewGroup })}
+                >
+                  <span aria-hidden="true">＋</span>{t("newGroup")}
+                </button>
+              </div>
+              {pickingNewGroup ? (
+                <form onSubmit={makeGroup} className="max-w-md space-y-2">
+                  <ArrowField
+                    value={newGroupName}
+                    onChange={setNewGroupName}
+                    placeholder={t("newGroupPlaceholder")}
+                    label={t("newGroupPlaceholder")}
+                    submitLabel={groupBusy ? tc("saving") : t("newGroupCreate")}
+                    maxLength={100}
+                    disabled={groupBusy}
+                    takesCursor
+                  />
+                  <p className="px-4 text-xs text-[var(--muted)]">{t("newGroupHint")}</p>
+                  {groupError ? <StatusMessage error={groupError} /> : null}
+                </form>
+              ) : null}
             </div>
           )}
         </div>
 
-        {recipe ? (
+        {where ? (
           <div className="space-y-3">
-            <Ask>{t("q2")}</Ask>
-            {where ? (
-              <Answered onEdit={() => resetFrom("where")} editLabel={t("change")}>
-                {where.kind === "personal" ? t("justMe") : where.name}
-              </Answered>
+            <Ask>{t("q1")}</Ask>
+            {recipe ? (
+              <Answered onEdit={() => resetFrom("recipe")} editLabel={t("change")}>{kindName(recipe)}</Answered>
             ) : (
-              <div className="ml-10 space-y-3">
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <OptionCard onClick={() => setWhere({ kind: "personal" })} title={t("justMe")} hint={t("justMeHint")} />
-                  {standardGroups.map((group) => (
-                    <OptionCard
-                      key={group.id}
-                      onClick={() => setWhere({ kind: "group", groupId: group.id, name: group.name, participantIds: group.members?.map((member) => member.id) ?? [currentUserId] })}
-                      title={group.name}
-                      hint={t("groupHint", { count: group.memberCount ?? group.members?.length ?? 1 })}
-                    />
-                  ))}
-                  {!pickingNewGroup ? <OptionCard onClick={() => setPickingNewGroup(true)} title={t("newGroup")} hint={t("newGroupHint")} /> : null}
-                </div>
-                {pickingNewGroup ? (
-                  <form onSubmit={makeGroup} className={cx(cardClass, "flex flex-wrap items-center gap-2.5 p-4")}>
-                    <input
-                      className={cx(inputClass, "max-w-xs flex-1")}
-                      value={newGroupName}
-                      onChange={(event) => setNewGroupName(event.target.value)}
-                      placeholder={t("newGroupPlaceholder")}
-                      maxLength={100}
-                      disabled={groupBusy}
-                    />
-                    <Button type="submit" disabled={groupBusy || !newGroupName.trim()}>{groupBusy ? tc("saving") : t("newGroupCreate")}</Button>
-                    <Button variant="ghost" disabled={groupBusy} onClick={() => { setPickingNewGroup(false); setNewGroupName(""); setGroupError(null); }}>{tc("cancel")}</Button>
-                    {groupError ? <span className="w-full"><StatusMessage error={groupError} /></span> : null}
-                  </form>
-                ) : null}
+              /* The same cards as manual creation's first step: a plain icon, the name, its tagline. */
+              <div className="ml-10 grid gap-2.5 sm:grid-cols-2 sm:gap-3">
+                {KINDS.map((key) => (
+                  <button key={key} type="button" onClick={() => chooseRecipe(key)} className="flex min-w-0 cursor-pointer items-center gap-3 rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-3.5 text-left transition hover:border-[var(--main-line)] sm:block sm:p-5">
+                    <span className="flex h-6 flex-none items-center sm:h-8" aria-hidden="true"><RecipeIcon name={ICON_OF[key]} className="h-5 w-5 sm:h-7 sm:w-7" /></span>
+                    <span className="min-w-0">
+                      <strong className="block text-[15px] leading-snug sm:mt-3 sm:text-lg">{kindName(key)}</strong>
+                      <span className="mt-0.5 block text-xs leading-5 text-[var(--muted)] sm:text-sm sm:leading-6">{tr(`creationTypes.${key}.tagline`)}</span>
+                    </span>
+                  </button>
+                ))}
               </div>
             )}
           </div>
@@ -551,9 +573,8 @@ export function QuickCreateScreen({
             {sessionName !== null ? (
               <Answered onEdit={() => { setSessionName(null); setResponsesSettled(false); setTitle(null); }} editLabel={t("change")}>{sessionName}</Answered>
             ) : (
-              <form onSubmit={confirmSessionName} className="ml-10 flex flex-wrap items-center gap-2.5">
-                <input className={cx(inputClass, "max-w-sm flex-1")} value={sessionNameDraft} onChange={(event) => setSessionNameDraft(event.target.value)} placeholder={tr("sessionNamePlaceholder")} maxLength={60} />
-                <Button type="submit" disabled={!sessionNameDraft.trim()}>{tc("continue")}<ArrowRightIcon /></Button>
+              <form onSubmit={confirmSessionName} className="ml-10 max-w-md">
+                <ArrowField value={sessionNameDraft} onChange={setSessionNameDraft} placeholder={tr("sessionNamePlaceholder")} label={t("qSession")} submitLabel={tc("continue")} maxLength={60} takesCursor />
               </form>
             )}
           </div>
@@ -659,13 +680,14 @@ export function QuickCreateScreen({
             ) : (
               <form onSubmit={confirmTitle} className="ml-10 max-w-md">
                 <ArrowField
-                  value={titleDraft}
+                  value={titleDraft ?? suggestedTitle()}
                   onChange={setTitleDraft}
                   placeholder={t("titlePlaceholder")}
                   label={t("q3")}
                   submitLabel={tracksItems ? tc("continue") : t("create")}
                   maxLength={160}
                   disabled={busy}
+                  takesCursor
                 />
               </form>
             )}
@@ -687,6 +709,7 @@ export function QuickCreateScreen({
                 submitDisabled={isBook && !itemAuthor.trim()}
                 maxLength={300}
                 disabled={busy}
+                takesCursor
               />
               {isBook ? (
                 <input
@@ -703,6 +726,7 @@ export function QuickCreateScreen({
             {error ? <div className="ml-10"><StatusMessage error={error} /></div> : null}
           </div>
         ) : null}
+        <div ref={endRef} aria-hidden="true" />
       </div>
     </main>
   );

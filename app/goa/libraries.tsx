@@ -8,7 +8,7 @@ import { CACHE_KEYS, readCache, writeCache } from "./cache";
 import { useGoaFormat } from "./format";
 import { RecipeIcon, type RecipeIconName } from "./recipe-icons";
 import type { CatalogItem, CatalogLibrary, CatalogRecommender, Id } from "./types";
-import { cx } from "./ui";
+import { choicePillClass, cx } from "./ui";
 
 /** Where a catalogue lives: the caller's own space, or one group's. */
 export type CatalogScope = "personal" | { groupId: Id };
@@ -198,12 +198,7 @@ export function LibraryPills({
             type="button"
             aria-pressed={active}
             onClick={() => onPick(choice)}
-            className={cx(
-              "inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-full border px-4 text-sm transition",
-              active ? "border-[var(--main)] bg-[var(--main)] text-white"
-                : suggested ? "border-dashed border-[var(--line)] text-[var(--muted)] hover:border-[var(--main-line)] hover:text-[var(--ink)]"
-                  : "border-[var(--line)] hover:border-[var(--main-line)]",
-            )}
+            className={choicePillClass({ active, dashed: suggested })}
           >
             {suggested ? <span aria-hidden="true">＋</span> : null}
             {libraryName(choice)}
@@ -214,9 +209,9 @@ export function LibraryPills({
         <button
           type="button"
           onClick={onNew}
-          className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border border-dashed border-[var(--line)] px-4 text-sm text-[var(--muted)] transition hover:border-[var(--main-line)] hover:text-[var(--ink)]"
+          className={choicePillClass({ dashed: true })}
         >
-          ＋ {t("addLibrary")}
+          <span aria-hidden="true">＋</span>{t("addLibrary")}
         </button>
       ) : null}
     </div>
