@@ -523,7 +523,7 @@ export function QuickCreateScreen({
               /* The same cards as manual creation's first step: a plain icon, the name, its tagline. */
               <div className="ml-10 grid gap-2.5 sm:grid-cols-2 sm:gap-3">
                 {KINDS.map((key) => (
-                  <button key={key} type="button" onClick={() => chooseRecipe(key)} className="flex min-w-0 cursor-pointer items-center gap-3 rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-3.5 text-left transition hover:border-[var(--main-line)] sm:block sm:p-5">
+                  <button key={key} type="button" onClick={() => chooseRecipe(key)} className="flex min-w-0 cursor-pointer items-center gap-3 rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-3.5 text-left transition hover:border-[var(--muted)] sm:block sm:p-5">
                     <span className="flex h-6 flex-none items-center sm:h-8" aria-hidden="true"><RecipeIcon name={ICON_OF[key]} className="h-5 w-5 sm:h-7 sm:w-7" /></span>
                     <span className="min-w-0">
                       <strong className="block text-[15px] leading-snug sm:mt-3 sm:text-lg">{kindName(key)}</strong>

@@ -515,7 +515,7 @@ export function CreateChallengeScreen({
             <h2 className="text-xl font-light">{t("startTitle")}</h2>
             <div className="mt-4 grid gap-2.5 sm:grid-cols-2 sm:gap-3">
               {CREATION_TYPES.map((entry) => (
-                <button className={cx("flex min-w-0 items-center gap-3 rounded-2xl border p-3.5 text-left transition sm:block sm:p-5", creationType === entry.key ? "border-[var(--main)] bg-[var(--main)] text-white ring-2 ring-[var(--main)]/25" : "border-[var(--line)] bg-[var(--paper)] hover:border-[var(--main-line)]")} type="button" aria-pressed={creationType === entry.key} onClick={() => chooseCreationType(entry.key)} key={entry.key}>
+                <button className={cx("flex min-w-0 items-center gap-3 rounded-2xl border p-3.5 text-left transition sm:block sm:p-5", creationType === entry.key ? "border-[var(--main)] bg-[var(--main)] text-white ring-2 ring-[var(--main)]/25" : "border-[var(--line)] bg-[var(--paper)] hover:border-[var(--muted)]")} type="button" aria-pressed={creationType === entry.key} onClick={() => chooseCreationType(entry.key)} key={entry.key}>
                   <span className="flex h-6 flex-none items-center sm:h-8" aria-hidden="true"><RecipeIcon name={entry.icon} className="h-5 w-5 sm:h-7 sm:w-7" /></span>
                   <span className="min-w-0">
                     <strong className="block text-[15px] leading-snug sm:mt-3 sm:text-lg">{t(`creationTypes.${entry.key}.name`)}</strong>
