@@ -167,6 +167,54 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * How long a request may take before the app stops waiting. The database stops a statement at 15s and Vercel's
+ * function at its own limit; past this, the person is better off with an answer than a spinner.
+ */
+export const REQUEST_TIMEOUT_MS = 25_000;
+
+/** Writes still on their way; closing the tab while one is pending asks the person to wait. */
+let pendingWrites = 0;
+let unloadGuardInstalled = false;
+
+function guardUnloadWhileWriting(): void {
+  if (unloadGuardInstalled || typeof window === "undefined") return;
+  unloadGuardInstalled = true;
+  window.addEventListener("beforeunload", (event) => {
+    if (pendingWrites === 0) return;
+    event.preventDefault();
+    // Older browsers only prompt when a return value is set.
+    event.returnValue = "";
+  });
+}
+
+export function pendingWriteCount(): number {
+  return pendingWrites;
+}
+
+/** Reads the body as JSON when there is one. Empty or malformed is `undefined`, never a thrown parse error. */
+async function readBody(response: Response): Promise<unknown> {
+  let text: string;
+  try {
+    text = await response.text();
+  } catch {
+    return undefined;
+  }
+  if (!text.trim()) return undefined;
+  if (!(response.headers.get("content-type") ?? "").includes("application/json")) return undefined;
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Every call to the API. Whatever goes wrong, the caller gets an `ApiError` with a code the UI can explain:
+ * `timeout` (no answer in time; for a write it may still have gone through), `network` (offline or the server
+ * unreachable), `bad_response` (a success with no usable body) or the server's own code. Only the caller's own
+ * abort comes through as the native `AbortError`, so cancelled screens stay quiet.
+ */
 export async function apiRequest<T>(
   path: string,
   options: {
@@ -174,40 +222,87 @@ export async function apiRequest<T>(
     body?: unknown;
     csrfToken?: string;
     signal?: AbortSignal;
+    timeoutMs?: number;
   } = {},
 ): Promise<T> {
+  const method = options.method ?? "GET";
   const headers = new Headers({ Accept: "application/json" });
   if (options.body !== undefined) headers.set("Content-Type", "application/json");
   if (options.csrfToken) headers.set("x-csrf-token", options.csrfToken);
 
-  const response = await fetch(path, {
-    method: options.method ?? "GET",
-    headers,
-    credentials: "same-origin",
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
-    signal: options.signal,
-  });
+  // One signal that fires on the caller's abort or on the timeout, whichever comes first.
+  const controller = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, options.timeoutMs ?? REQUEST_TIMEOUT_MS);
+  const forwardAbort = () => controller.abort();
+  if (options.signal?.aborted) controller.abort();
+  else options.signal?.addEventListener("abort", forwardAbort, { once: true });
 
-  const contentType = response.headers.get("content-type") ?? "";
-  const body = contentType.includes("application/json")
-    ? ((await response.json()) as ApiErrorBody | { data?: T })
-    : null;
-
-  if (!response.ok) {
-    const errorBody = body as ApiErrorBody | null;
-    throw new ApiError(
-      errorBody?.message ?? errorBody?.error ?? "",
-      response.status,
-      errorBody?.error,
-      errorBody?.errors,
-      errorBody?.details,
-    );
+  const isWrite = method !== "GET";
+  if (isWrite) {
+    guardUnloadWhileWriting();
+    pendingWrites += 1;
   }
 
-  if (body && typeof body === "object" && "data" in body && body.data !== undefined) {
-    return body.data;
+  try {
+    let response: Response;
+    try {
+      response = await fetch(path, {
+        method,
+        headers,
+        credentials: "same-origin",
+        body: options.body === undefined ? undefined : JSON.stringify(options.body),
+        signal: controller.signal,
+      });
+    } catch (cause) {
+      throw failure(cause, timedOut, isWrite);
+    }
+
+    let body: unknown;
+    try {
+      body = await readBody(response);
+    } catch (cause) {
+      throw failure(cause, timedOut, isWrite);
+    }
+    // The body can be cut off by the timeout too; that's a timeout, not a bad response.
+    if (timedOut) throw failure(null, true, isWrite);
+
+    if (!response.ok) {
+      const errorBody = (body && typeof body === "object" ? body : null) as ApiErrorBody | null;
+      throw new ApiError(
+        errorBody?.message ?? errorBody?.error ?? "",
+        response.status,
+        errorBody?.error,
+        errorBody?.errors,
+        errorBody?.details,
+      );
+    }
+
+    // Every endpoint answers with a JSON object; an empty or non-JSON success means something in between (a
+    // proxy, a cut connection) swallowed it, and callers would crash reading fields off `null`.
+    if (!body || typeof body !== "object") {
+      throw new ApiError("", response.status, isWrite ? "bad_response_write" : "bad_response");
+    }
+    if ("data" in body && (body as { data?: T }).data !== undefined) {
+      return (body as { data: T }).data;
+    }
+    return body as T;
+  } finally {
+    clearTimeout(timer);
+    options.signal?.removeEventListener("abort", forwardAbort);
+    if (isWrite) pendingWrites -= 1;
   }
-  return body as T;
+}
+
+function failure(cause: unknown, timedOut: boolean, isWrite: boolean): unknown {
+  if (timedOut) return new ApiError("", 0, isWrite ? "timeout_write" : "timeout");
+  // The caller's own abort: pass it through untouched.
+  if (cause instanceof DOMException && cause.name === "AbortError") return cause;
+  if (cause instanceof ApiError) return cause;
+  return new ApiError("", 0, isWrite ? "network_write" : "network");
 }
 
 export function normalizeBootstrap(raw: BootstrapData | { bootstrap: BootstrapData }): BootstrapData {

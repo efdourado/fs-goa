@@ -291,7 +291,7 @@ export async function POST(request: Request): Promise<Response> {
     if (isPath(path, "auth", "login")) {
       requireMutationOrigin(request);
       await rateLimit("login", clientIp(request));
-      const result = await loginAccount(await readJsonObject(request));
+      const result = await loginAccount(await readJsonObject(request), clientIp(request));
       return json({ user: result.user, csrfToken: result.csrfToken }, 200, { "set-cookie": result.setCookie });
     }
     if (isPath(path, "auth", "logout")) {

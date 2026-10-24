@@ -170,6 +170,19 @@ export async function registerAccount(body: Record<string, unknown>): Promise<{
   }
 }
 
+/**
+ * The lockout counts failures per identifier *and* address. Keyed by the identifier alone, anyone who knows a
+ * username (visible through @-invites) could keep its owner locked out with ten wrong passwords. Guessing from
+ * many addresses is held back by the per-IP login limit and the cost of each hash. The pair is hashed so a long
+ * e-mail plus an address still fits the key, and no raw address is stored. Without an address (off Vercel, where
+ * a client could forge one) the key stays the identifier.
+ */
+async function loginAttemptKey(identifier: string, ip: string | null): Promise<string> {
+  if (!ip) return identifier;
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${identifier}\n${ip}`));
+  return `ip:${Buffer.from(digest).toString("base64url")}`;
+}
+
 async function loginAllowed(client: PoolClient, username: string): Promise<boolean> {
   const row = await oneOrNull<{ failure_count: number; window_started_at: Date; locked_until: Date | null }>(
     client,
@@ -199,16 +212,17 @@ async function recordLoginFailure(client: PoolClient, username: string): Promise
   );
 }
 
-export async function loginAccount(body: Record<string, unknown>): Promise<{
+export async function loginAccount(body: Record<string, unknown>, ip: string | null = null): Promise<{
   user: AuthenticatedUser;
   csrfToken: string;
   setCookie: string;
 }> {
   const identifier = resolveIdentifier(body.username);
   const password = body.password;
+  const attemptKey = await loginAttemptKey(identifier.value, ip);
 
-  return inTransaction(async (client) => {
-    if (!(await loginAllowed(client, identifier.value))) {
+  const outcome = await inTransaction(async (client) => {
+    if (!(await loginAllowed(client, attemptKey))) {
       throw new ApiError(429, "login_limited", "Muitas tentativas. Aguarde 15 minutos.");
     }
     const row = await oneOrNull<UserRow>(
@@ -221,11 +235,12 @@ export async function loginAccount(body: Record<string, unknown>): Promise<{
     );
     const matches = await verifyPassword(password, row?.password_hash ?? DUMMY_PASSWORD_HASH);
     if (!row || !matches) {
-      await recordLoginFailure(client, identifier.value);
-      throw new ApiError(401, "invalid_credentials", "Usuário ou senha incorretos.");
+      // Returned, not thrown: a throw would roll the transaction back and take the failure count with it.
+      await recordLoginFailure(client, attemptKey);
+      return null;
     }
 
-    await client.query("DELETE FROM login_attempts WHERE username_normalized = $1", [identifier.value]);
+    await client.query("DELETE FROM login_attempts WHERE username_normalized = $1", [attemptKey]);
     const session = await createSession(client, row.id);
     return {
       user: publicUser(row),
@@ -233,6 +248,8 @@ export async function loginAccount(body: Record<string, unknown>): Promise<{
       setCookie: serializeSessionCookie(session.rawToken),
     };
   });
+  if (!outcome) throw new ApiError(401, "invalid_credentials", "Usuário ou senha incorretos.");
+  return outcome;
 }
 
 // Self-service password reset is on hold for V1: it needs an e-mail channel to

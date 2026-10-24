@@ -9290,3 +9290,108 @@ test("remover um campo que já tem respostas: primeiro avisa quantas, e com a co
   const left = await adminPool.query<{ field_id: string }>("SELECT ev.field_id FROM entry_values ev JOIN entries e ON e.id = ev.entry_id WHERE e.challenge_id = $1", [cid]);
   assert.deepEqual(left.rows.map((row) => row.field_id), [nota.id], "o comentário sumiu, a nota do mesmo registro ficou");
 });
+
+/** A request built by hand, for the cases `call` is careful never to produce. */
+async function rawPost(path: string, options: { origin?: string | null; contentType?: string; body?: string; session?: ClientSession; csrf?: string | null }) {
+  const headers = new Headers({ accept: "application/json" });
+  if (options.origin !== null) headers.set("origin", options.origin ?? "http://goa.test");
+  if (options.contentType) headers.set("content-type", options.contentType);
+  if (options.session) headers.set("cookie", options.session.cookie);
+  const csrf = options.csrf === undefined ? options.session?.csrf : options.csrf;
+  if (csrf) headers.set("x-csrf-token", csrf);
+  const response = await POST(new Request(`http://goa.test${path}`, { method: "POST", headers, body: options.body }));
+  return { status: response.status, body: await response.json() as { error: string } };
+}
+
+test("portões de escrita: origem, CSRF, formato e tamanho do corpo são recusados antes de tocar nos dados", async () => {
+  const owner = await register("Paula Portão", "paula_portao");
+  const body = JSON.stringify({ name: "Grupo Barrado" });
+  const groupsBefore = (await adminPool.query("SELECT count(*)::int AS n FROM groups")).rows[0].n;
+
+  const cases: Array<[string, Parameters<typeof rawPost>[1], number, string]> = [
+    ["sem origem", { origin: null, contentType: "application/json", body, session: owner }, 403, "invalid_origin"],
+    ["outra origem", { origin: "https://evil.example", contentType: "application/json", body, session: owner }, 403, "invalid_origin"],
+    ["origem com sufixo", { origin: "http://goa.test.evil.example", contentType: "application/json", body, session: owner }, 403, "invalid_origin"],
+    ["sem CSRF", { contentType: "application/json", body, session: owner, csrf: null }, 403, "invalid_csrf"],
+    ["CSRF de outra sessão", { contentType: "application/json", body, session: owner, csrf: "csrf-v1.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" }, 403, "invalid_csrf"],
+    ["sem sessão", { contentType: "application/json", body }, 401, "unauthenticated"],
+    ["sessão forjada", { contentType: "application/json", body, session: { ...owner, cookie: "__Host-goa_session=forjado" } }, 401, "unauthenticated"],
+    ["texto em vez de JSON", { contentType: "text/plain", body, session: owner }, 415, "content_type"],
+    ["JSON quebrado", { contentType: "application/json", body: "{\"name\":", session: owner }, 400, "invalid_json"],
+    ["corpo vazio", { contentType: "application/json", body: "", session: owner }, 400, "invalid_json"],
+    ["lista em vez de objeto", { contentType: "application/json", body: "[1,2]", session: owner }, 400, "invalid_body"],
+    ["null", { contentType: "application/json", body: "null", session: owner }, 400, "invalid_body"],
+    ["corpo grande demais", { contentType: "application/json", body: JSON.stringify({ name: "x".repeat(140 * 1024) }), session: owner }, 413, "payload_too_large"],
+  ];
+  for (const [label, options, status, code] of cases) {
+    const result = await rawPost("/api/groups", options);
+    assert.equal(result.status, status, `${label}: ${JSON.stringify(result.body)}`);
+    assert.equal(result.body.error, code, label);
+  }
+  const groupsAfter = (await adminPool.query("SELECT count(*)::int AS n FROM groups")).rows[0].n;
+  assert.equal(groupsAfter, groupsBefore, "nenhuma das tentativas recusadas criou um grupo");
+
+  // A logged-out session's CSRF token dies with it.
+  const stale = { ...owner };
+  await call("POST", "/api/auth/logout", { session: owner, body: {} });
+  const afterLogout = await rawPost("/api/groups", { contentType: "application/json", body, session: stale });
+  assert.equal(afterLogout.status, 401, "sessão encerrada não escreve mais");
+});
+
+test("bloqueio de login: dez erros travam só aquele endereço, e a dona da conta ainda entra de outro", async () => {
+  await register("Lia Bloqueio", "lia_bloqueio");
+  const previous = process.env.VERCEL;
+  process.env.VERCEL = "1";
+  const attempt = (ip: string, password: string) => POST(new Request("http://goa.test/api/auth/login", {
+    method: "POST",
+    headers: { origin: "http://goa.test", "content-type": "application/json", "x-real-ip": ip },
+    body: JSON.stringify({ username: "lia_bloqueio", password }),
+  }));
+  try {
+    for (let index = 0; index < 10; index += 1) {
+      assert.equal((await attempt("203.0.113.7", "senha errada demais")).status, 401);
+    }
+    const locked = await attempt("203.0.113.7", "uma senha segura 123");
+    assert.equal(locked.status, 429, "o endereço que errou dez vezes fica travado, mesmo com a senha certa");
+    assert.equal(((await locked.json()) as { error: string }).error, "login_limited");
+
+    const owner = await attempt("198.51.100.20", "uma senha segura 123");
+    assert.equal(owner.status, 200, "quem errou não trava a dona da conta, que entra de outro endereço");
+
+    const stored = await adminPool.query<{ username_normalized: string }>("SELECT username_normalized FROM login_attempts");
+    assert.ok(stored.rows.every((row) => !row.username_normalized.includes("203.0.113.7")), "nenhum IP cru fica guardado");
+  } finally {
+    if (previous === undefined) delete process.env.VERCEL;
+    else process.env.VERCEL = previous;
+  }
+});
+
+test("banco: a role tem tempo limite, uma transação que falha no meio não deixa nada, e a conexão volta saudável", async () => {
+  const { inTransaction, withClient } = await import("../../lib/db");
+  const settings = await withClient(async (client) => ({
+    statement: (await client.query<{ statement_timeout: string }>("SHOW statement_timeout")).rows[0].statement_timeout,
+    idle: (await client.query<{ idle_in_transaction_session_timeout: string }>("SHOW idle_in_transaction_session_timeout")).rows[0].idle_in_transaction_session_timeout,
+  }));
+  assert.deepEqual(settings, { statement: "15s", idle: "30s" });
+
+  const name = `Meio Caminho ${crypto.randomUUID()}`;
+  const owner = await register("Rui Rollback", "rui_rollback");
+  await assert.rejects(inTransaction(async (client) => {
+    await client.query(
+      "INSERT INTO groups (id, name, owner_user_id, created_at, updated_at) VALUES ($1, $2, $3, now(), now())",
+      [crypto.randomUUID(), name, owner.user.id],
+    );
+    throw new Error("a requisição caiu no meio");
+  }), /caiu no meio/);
+  const leftover = await adminPool.query("SELECT 1 FROM groups WHERE name = $1", [name]);
+  assert.equal(leftover.rowCount, 0, "nada do que veio antes da falha ficou salvo");
+
+  // A statement the database cancels: an ordinary error, and the next request works on the same pool.
+  await assert.rejects(inTransaction(async (client) => {
+    await client.query("SET LOCAL statement_timeout = '50ms'");
+    await client.query("SELECT pg_sleep(1)");
+  }), (error: { code?: string }) => error.code === "57014");
+  const health = await call("GET", "/api/health");
+  assert.equal(health.response.status, 200);
+  assert.equal((await call("GET", "/api/bootstrap", { session: await login("rui_rollback") })).response.status, 200);
+});

@@ -189,7 +189,13 @@
       "invalid_answer_scope": "Choose who fills in the entry.",
       "invalid_setting": "Choose whether the form asks when each response happened.",
       "invalid_shared_edit_policy": "Choose who can fill in or correct the shared response.",
-      "shared_custom_only": "Only Custom can share the main entry."
+      "shared_custom_only": "Only Custom can share the main entry.",
+      "timeout": "The server took too long to answer. Try again.",
+      "timeout_write": "The server took too long to answer. It may have saved, so check before trying again.",
+      "network": "Couldn't reach the server. Check your connection.",
+      "network_write": "The connection dropped before the answer came back. It may have saved, so check before trying again.",
+      "bad_response": "The server sent an unexpected answer. Try again.",
+      "bad_response_write": "The server sent an unexpected answer. It may have saved, so check before trying again."
     },
     "byStatus": {
       "401": "Your session expired. Sign in again.",
@@ -199,7 +205,10 @@
       "413": "The content you sent is too large.",
       "422": "Check the fields and try again.",
       "429": "Too many attempts in a short time. Wait a moment.",
-      "500": "Something went wrong at our end. Try again in a moment."
+      "500": "Something went wrong at our end. Try again in a moment.",
+      "502": "The server is briefly unavailable. Try again.",
+      "503": "The server is briefly unavailable. Try again.",
+      "504": "The server took too long to answer. Check whether your change saved before trying again."
     }
   },
   "clipboard": {

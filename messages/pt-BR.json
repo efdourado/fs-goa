@@ -189,7 +189,13 @@
       "invalid_answer_scope": "Escolha quem preenche o registro.",
       "invalid_setting": "Escolha se o formulário pergunta quando cada registro aconteceu.",
       "invalid_shared_edit_policy": "Escolha quem pode preencher ou corrigir a resposta compartilhada.",
-      "shared_custom_only": "Só o Personalizado pode compartilhar o registro."
+      "shared_custom_only": "Só o Personalizado pode compartilhar o registro.",
+      "timeout": "O servidor demorou demais para responder. Tente de novo.",
+      "timeout_write": "O servidor demorou demais para responder. Pode ser que tenha salvo: confira antes de tentar de novo.",
+      "network": "Não foi possível falar com o servidor. Verifique sua conexão.",
+      "network_write": "A conexão caiu antes da resposta. Pode ser que tenha salvo: confira antes de tentar de novo.",
+      "bad_response": "O servidor respondeu de um jeito inesperado. Tente de novo.",
+      "bad_response_write": "O servidor respondeu de um jeito inesperado. Pode ser que tenha salvo: confira antes de tentar de novo."
     },
     "byStatus": {
       "401": "Sua sessão expirou. Entre novamente.",
@@ -199,7 +205,10 @@
       "413": "O conteúdo enviado é grande demais.",
       "422": "Revise os campos e tente de novo.",
       "429": "Muitas tentativas em pouco tempo. Espere um instante.",
-      "500": "Tivemos um problema por aqui. Tente de novo em instantes."
+      "500": "Tivemos um problema por aqui. Tente de novo em instantes.",
+      "502": "O servidor está fora do ar por um instante. Tente de novo.",
+      "503": "O servidor está fora do ar por um instante. Tente de novo.",
+      "504": "O servidor demorou demais para responder. Confira se a alteração foi salva antes de tentar de novo."
     }
   },
   "clipboard": {

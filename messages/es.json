@@ -189,7 +189,13 @@
       "invalid_answer_scope": "Elige quién completa el registro.",
       "invalid_setting": "Elige si el formulario pregunta cuándo ocurrió cada registro.",
       "invalid_shared_edit_policy": "Elige quién puede rellenar o corregir la respuesta compartida.",
-      "shared_custom_only": "Solo Personalizado puede compartir el registro."
+      "shared_custom_only": "Solo Personalizado puede compartir el registro.",
+      "timeout": "El servidor tardó demasiado en responder. Inténtalo de nuevo.",
+      "timeout_write": "El servidor tardó demasiado en responder. Puede que se haya guardado: compruébalo antes de volver a intentarlo.",
+      "network": "No se pudo contactar con el servidor. Revisa tu conexión.",
+      "network_write": "La conexión se cortó antes de la respuesta. Puede que se haya guardado: compruébalo antes de volver a intentarlo.",
+      "bad_response": "El servidor respondió de forma inesperada. Inténtalo de nuevo.",
+      "bad_response_write": "El servidor respondió de forma inesperada. Puede que se haya guardado: compruébalo antes de volver a intentarlo."
     },
     "byStatus": {
       "401": "Tu sesión expiró. Vuelve a entrar.",
@@ -199,7 +205,10 @@
       "413": "El contenido enviado es demasiado grande.",
       "422": "Revisa los campos e inténtalo de nuevo.",
       "429": "Demasiados intentos en poco tiempo. Espera un momento.",
-      "500": "Tuvimos un problema por aquí. Inténtalo de nuevo en un momento."
+      "500": "Tuvimos un problema por aquí. Inténtalo de nuevo en un momento.",
+      "502": "El servidor no está disponible por un momento. Inténtalo de nuevo.",
+      "503": "El servidor no está disponible por un momento. Inténtalo de nuevo.",
+      "504": "El servidor tardó demasiado en responder. Comprueba si el cambio se guardó antes de volver a intentarlo."
     }
   },
   "clipboard": {
