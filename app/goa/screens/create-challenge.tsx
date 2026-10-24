@@ -59,7 +59,7 @@ function recipeFor(structure: ChallengeStructure, libraryKind: string | null, re
 export type LeaveGuard = (proceed: () => void) => boolean;
 
 /** The required things first (template and title, columns, then the list), the optional details after, then who's in. */
-type StepKey = "setup" | "fields" | "checkpoints" | "details" | "people";
+type StepKey = "setup" | "fields" | "checkpoints" | "people";
 
 
 export function CreateChallengeScreen({
@@ -174,17 +174,16 @@ export function CreateChallengeScreen({
   // Expectation is the pre-watch rating for the two "rate each title" recipes.
   const canOfferExpectation = recipe === "cinema" || recipe === "bookshelf";
   // A no-catalog recipe (a daily habit) has nothing to list, so the list step
-  // never appears; a personal challenge has no people step.
+  // never appears; a personal challenge has no people step. The dates and extras sit in the first step.
   const stepKeys: StepKey[] = [
     "setup",
     "fields",
     ...(tracksCatalog ? (["checkpoints"] as const) : []),
-    "details",
     ...(personal ? [] : (["people"] as const)),
   ];
   const lastStep = stepKeys.length;
   const stepKey = stepKeys[Math.min(step, lastStep) - 1];
-  const navColsClass = stepKeys.length === 3 ? "grid-cols-3" : stepKeys.length === 4 ? "grid-cols-4" : "grid-cols-5";
+  const navColsClass = stepKeys.length === 2 ? "grid-cols-2" : stepKeys.length === 3 ? "grid-cols-3" : "grid-cols-4";
   const optionalOpen = showOptional || Boolean(description.trim()) || ruleSections.length > 0;
   const responseRows: Array<ResponseDraft & { primary?: true }> = [
     { clientKey: primaryResponseKey, name: "", answerScope, fields, primary: true },
@@ -324,7 +323,7 @@ export function CreateChallengeScreen({
     if (!fieldsTouched) setFields(startingFields(structure, kind, recordingMode, answerScope));
   }
 
-  /** The dates and the rules: what the details step needs before the challenge can be made. */
+  /** The dates and the rules: what the first step needs, besides the title, before the challenge can be made. */
   function detailsProblem(): string | null {
     if (scheduleMode === "period" && (!startsOn || !endsOn)) return t("errPeriod");
     if (scheduleMode === "period" && endsOn < startsOn) return t("errEndBeforeStart");
@@ -340,6 +339,7 @@ export function CreateChallengeScreen({
     if (key === "setup") {
       if (tracksCatalog && !pickedLibrary) return t("errPickLibrary");
       if (!title.trim()) return t("errTitle");
+      return detailsProblem();
     }
     if (key === "fields") {
       if (!fields.length) return t("errNoFields");
@@ -356,7 +356,6 @@ export function CreateChallengeScreen({
       if (itemProblem === "author") return t("errNoAuthor");
       if (itemProblem === "schedule") return t("errItemSchedule");
     }
-    if (key === "details") return detailsProblem();
     return null;
   }
 
@@ -537,6 +536,32 @@ export function CreateChallengeScreen({
               </Field>
             ) : null}
             <label className="mt-6 block"><span className={labelClass}>{t("titleLabel")}</span><input className={inputClass} value={title} onChange={(event) => setTitle(event.target.value)} maxLength={140} required placeholder={t(`structures.${structure}.name`)} /></label>
+            <h3 className="mt-8 mb-5 border-t border-[var(--line)] pt-6 text-lg font-light">{t("detailsTitle")}</h3>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <fieldset className="sm:col-span-2">
+                <legend className={labelClass}>{t("scheduleLegend")}</legend>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <button className={cx("min-h-16 rounded-xl border px-4 py-3 text-left", scheduleMode === "period" ? "border-[var(--main)] bg-[var(--main)] text-white" : "border-[var(--line)] bg-[var(--paper)]")} type="button" aria-pressed={scheduleMode === "period"} onClick={() => setScheduleMode("period")}><strong className="block text-sm">{t("schedulePeriod")}</strong><span className={cx("mt-1 block text-xs font-normal", scheduleMode === "period" ? "text-white/75" : "text-[var(--muted)]")}>{t("schedulePeriodHint")}</span></button>
+                  <button className={cx("min-h-16 rounded-xl border px-4 py-3 text-left", scheduleMode === "none" ? "border-[var(--main)] bg-[var(--main)] text-white" : "border-[var(--line)] bg-[var(--paper)]")} type="button" aria-pressed={scheduleMode === "none"} onClick={() => setScheduleMode("none")}><strong className="block text-sm">{t("scheduleNone")}</strong><span className={cx("mt-1 block text-xs font-normal", scheduleMode === "none" ? "text-white/75" : "text-[var(--muted)]")}>{t("scheduleNoneHint")}</span></button>
+                </div>
+              </fieldset>
+              {scheduleMode === "period" ? <>
+                <SchedulePeriodFields startsOn={startsOn} endsOn={endsOn} onStartsOn={setStartsOn} onEndsOn={setEndsOn} />
+                <p className="sm:col-span-2 text-xs leading-5 text-[var(--muted)]">{t("periodNote")}</p>
+              </> : <p className="sm:col-span-2 rounded-xl bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{t("noneNote")}</p>}
+
+              <div className="sm:col-span-2">
+                {optionalOpen ? (
+                  <div className="grid gap-4">
+                    <button type="button" className={cx(backLinkClass, "justify-self-start")} onClick={() => setShowOptional(false)} hidden={Boolean(description.trim()) || ruleSections.length > 0}>{t("hideOptional")}</button>
+                    <label><span className={labelClass}>{t("descriptionLabel")} <small className="font-light text-[var(--muted)]">{t("optional")}</small></span><textarea className={inputClass} rows={3} value={description} onChange={(event) => setDescription(event.target.value)} maxLength={1000} /></label>
+                    <div><div className="mb-3"><span className={labelClass}>{t("rulesLabel")} <small className="font-light text-[var(--muted)]">{t("optional")}</small></span><p className="text-xs leading-5 text-[var(--muted)]">{t("rulesHint")}</p></div><RuleSectionsEditor value={ruleSections} onChange={setRuleSections} /></div>
+                  </div>
+                ) : (
+                  <button type="button" className={backLinkClass} onClick={() => setShowOptional(true)}>{t("showOptional", { count: 2 })}</button>
+                )}
+              </div>
+            </div>
           </div>
         ) : null}
 
@@ -676,37 +701,6 @@ export function CreateChallengeScreen({
               />
             ) : <EmptyState title={t("pickLibraryFirst")} />}
             <Toggle className="mt-5 bg-[var(--paper)]" checked={itemDates} onChange={setItemDates} label={t("itemDatesLabel")} hint={t("itemDatesHint")} />
-          </div>
-        ) : null}
-
-        {stepKey === "details" ? (
-          <div>
-            <h2 className="mb-5 text-xl font-light">{t("detailsTitle")}</h2>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <fieldset className="sm:col-span-2">
-                <legend className={labelClass}>{t("scheduleLegend")}</legend>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <button className={cx("min-h-16 rounded-xl border px-4 py-3 text-left", scheduleMode === "period" ? "border-[var(--main)] bg-[var(--main)] text-white" : "border-[var(--line)] bg-[var(--paper)]")} type="button" aria-pressed={scheduleMode === "period"} onClick={() => setScheduleMode("period")}><strong className="block text-sm">{t("schedulePeriod")}</strong><span className={cx("mt-1 block text-xs font-normal", scheduleMode === "period" ? "text-white/75" : "text-[var(--muted)]")}>{t("schedulePeriodHint")}</span></button>
-                  <button className={cx("min-h-16 rounded-xl border px-4 py-3 text-left", scheduleMode === "none" ? "border-[var(--main)] bg-[var(--main)] text-white" : "border-[var(--line)] bg-[var(--paper)]")} type="button" aria-pressed={scheduleMode === "none"} onClick={() => setScheduleMode("none")}><strong className="block text-sm">{t("scheduleNone")}</strong><span className={cx("mt-1 block text-xs font-normal", scheduleMode === "none" ? "text-white/75" : "text-[var(--muted)]")}>{t("scheduleNoneHint")}</span></button>
-                </div>
-              </fieldset>
-              {scheduleMode === "period" ? <>
-                <SchedulePeriodFields startsOn={startsOn} endsOn={endsOn} onStartsOn={setStartsOn} onEndsOn={setEndsOn} />
-                <p className="sm:col-span-2 text-xs leading-5 text-[var(--muted)]">{t("periodNote")}</p>
-              </> : <p className="sm:col-span-2 rounded-xl bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{t("noneNote")}</p>}
-
-              <div className="sm:col-span-2">
-                {optionalOpen ? (
-                  <div className="grid gap-4">
-                    <button type="button" className={cx(backLinkClass, "justify-self-start")} onClick={() => setShowOptional(false)} hidden={Boolean(description.trim()) || ruleSections.length > 0}>{t("hideOptional")}</button>
-                    <label><span className={labelClass}>{t("descriptionLabel")} <small className="font-light text-[var(--muted)]">{t("optional")}</small></span><textarea className={inputClass} rows={3} value={description} onChange={(event) => setDescription(event.target.value)} maxLength={1000} /></label>
-                    <div><div className="mb-3"><span className={labelClass}>{t("rulesLabel")} <small className="font-light text-[var(--muted)]">{t("optional")}</small></span><p className="text-xs leading-5 text-[var(--muted)]">{t("rulesHint")}</p></div><RuleSectionsEditor value={ruleSections} onChange={setRuleSections} /></div>
-                  </div>
-                ) : (
-                  <button type="button" className={backLinkClass} onClick={() => setShowOptional(true)}>{t("showOptional", { count: 2 })}</button>
-                )}
-              </div>
-            </div>
           </div>
         ) : null}
 
