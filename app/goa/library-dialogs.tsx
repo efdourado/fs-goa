@@ -65,7 +65,7 @@ export function NewLibraryDialog({
       busyLabel={tc("saving")}
     >
       <p className="text-sm leading-6 text-[var(--muted)]">{t("newBody")}</p>
-      <Field label={t("nameLabel")} hint={t("nameHint")}>
+      <Field label={t("nameLabel")}>
         <input
           className={inputClass}
           value={label}

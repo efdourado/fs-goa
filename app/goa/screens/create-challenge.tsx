@@ -524,7 +524,7 @@ export function CreateChallengeScreen({
               ))}
             </div>
             {tracksCatalog ? (
-              <Field label={t("libraryLabel")} plain className="mt-6">
+              <Field label={t("libraryLabel")} hint={t("libraryHint")} plain className="mt-6">
                 <LibraryPills
                   choices={choices}
                   kind={pickedKind}
@@ -539,7 +539,7 @@ export function CreateChallengeScreen({
             <h3 className="mt-8 mb-5 border-t border-[var(--line)] pt-6 text-lg font-light">{t("detailsTitle")}</h3>
             <div className="grid gap-4 sm:grid-cols-2">
               <fieldset className="sm:col-span-2">
-                <legend className={labelClass}>{t("scheduleLegend")}</legend>
+                <legend className="sr-only">{t("scheduleLegend")}</legend>
                 <div className="grid gap-2 sm:grid-cols-2">
                   <button className={cx("min-h-16 rounded-xl border px-4 py-3 text-left", scheduleMode === "period" ? "border-[var(--main)] bg-[var(--main)] text-white" : "border-[var(--line)] bg-[var(--paper)]")} type="button" aria-pressed={scheduleMode === "period"} onClick={() => setScheduleMode("period")}><strong className="block text-sm">{t("schedulePeriod")}</strong><span className={cx("mt-1 block text-xs font-normal", scheduleMode === "period" ? "text-white/75" : "text-[var(--muted)]")}>{t("schedulePeriodHint")}</span></button>
                   <button className={cx("min-h-16 rounded-xl border px-4 py-3 text-left", scheduleMode === "none" ? "border-[var(--main)] bg-[var(--main)] text-white" : "border-[var(--line)] bg-[var(--paper)]")} type="button" aria-pressed={scheduleMode === "none"} onClick={() => setScheduleMode("none")}><strong className="block text-sm">{t("scheduleNone")}</strong><span className={cx("mt-1 block text-xs font-normal", scheduleMode === "none" ? "text-white/75" : "text-[var(--muted)]")}>{t("scheduleNoneHint")}</span></button>

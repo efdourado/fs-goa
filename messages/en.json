@@ -670,6 +670,7 @@
     "errTablesLibrary": "Create the Places library first.",
     "tablesItemsHint": "Add the places to rate (one per line).",
     "libraryLabel": "Library",
+    "libraryHint": "Where this list's items are kept, ready for other challenges.",
     "pickLibraryFirst": "Pick a library",
     "entriesTitle": "How will people record it?",
     "recordingLabel": "Choose one",
@@ -1744,9 +1745,8 @@
       "custom": "Library"
     },
     "newTitle": "New library",
-    "newBody": "A list of what you track (places, games, anything).",
+    "newBody": "One kind of thing you track, like restaurants or board games.",
     "nameLabel": "Name",
-    "nameHint": "What you'll call this library.",
     "namePlaceholder": "e.g. Matches",
     "nameRequired": "Give the library a name.",
     "create": "Create library",

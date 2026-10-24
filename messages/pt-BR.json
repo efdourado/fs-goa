@@ -670,6 +670,7 @@
     "errTablesLibrary": "Crie primeiro a biblioteca Lugares.",
     "tablesItemsHint": "Adicione os lugares para avaliar (um por linha).",
     "libraryLabel": "Biblioteca",
+    "libraryHint": "Onde os itens desta lista ficam guardados, prontos para outros desafios.",
     "pickLibraryFirst": "Escolha uma biblioteca",
     "entriesTitle": "Como as pessoas vão registrar?",
     "recordingLabel": "Escolha uma opção",
@@ -1744,9 +1745,8 @@
       "custom": "Biblioteca"
     },
     "newTitle": "Nova biblioteca",
-    "newBody": "Uma lista do que você acompanha (lugares, jogos, qualquer coisa).",
+    "newBody": "Um tipo de coisa que você acompanha, como restaurantes ou jogos de tabuleiro.",
     "nameLabel": "Nome",
-    "nameHint": "Como você vai chamar esta biblioteca.",
     "namePlaceholder": "ex.: Jogos",
     "nameRequired": "Dê um nome à biblioteca.",
     "create": "Criar biblioteca",
