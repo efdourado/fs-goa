@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import { type FormEvent, useState } from "react";
 
 import type { ChallengeField, CreatableRecipeKey, FieldConfig, FieldCount, FieldType, LibraryProperty } from "./types";
-import { Button, CircleMinusIcon, cx, EmptyState, Field, inputClass, labelClass, rowIconClass, Select, Toggle } from "./ui";
+import { AddRow, Button, ChevronIcon, CircleMinusIcon, cx, EmptyState, Field, inputClass, labelClass, rowIconClass, Select, Toggle } from "./ui";
 import { slugify } from "./utils";
 
 export const FIELD_TYPES: FieldType[] = ["text", "number", "rating", "select", "boolean", "date"];
@@ -59,12 +59,10 @@ export function presetFields(recipe: CreatableRecipeKey, label: PresetLabels): C
   ];
 }
 
-/** What each record of a check-in holds to begin with — a workout's weight and repetitions, there to be renamed or replaced. */
+/** What each record of a check-in holds to begin with: a workout's weight, there to be renamed or replaced. */
 export function sessionPresetFields(label: PresetLabels): ChallengeField[] {
-  return [
-    { key: "carga", label: label("weight"), type: "number", required: true, config: { min: 0, step: 0.5 } },
-    { key: "repeticoes", label: label("repetitions"), type: "number", required: true, config: { min: 0, step: 1 } },
-  ];
+  // One suggested question; its unit lives in the unit, not in the name. "+ Question" adds the rest.
+  return [{ key: "carga", label: label("weight"), type: "number", required: true, config: { min: 0, step: 0.5, unit: "kg" } }];
 }
 
 /** What a response filled in once for the whole group starts with: one line of text, not a rating each. */
@@ -123,13 +121,8 @@ export function FieldConfigInputs({
   const t = useTranslations("fields");
   const patchConfig = (patch: Partial<FieldConfig>) => onChange({ config: { ...field.config, ...patch } });
   if (field.type === "rating") {
-    // A rating's bounds are fixed (0–5, half steps); what's left to decide is whether it ranks the titles.
-    return (
-      <div className="space-y-2">
-        <Toggle checked={field.config?.inRanking === true} onChange={(inRanking) => patchConfig({ inRanking })} label={t("inRankingLabel")} hint={t("inRankingHint")} />
-        <p className="text-xs leading-5 text-[var(--muted)]">{t("ratingFixed")}</p>
-      </div>
-    );
+    // A rating's bounds are fixed (0–5, half steps, said under its type); what's left is whether it ranks the titles.
+    return <Toggle checked={field.config?.inRanking === true} onChange={(inRanking) => patchConfig({ inRanking })} label={t("inRankingLabel")} hint={t("inRankingHint")} />;
   }
   if (field.type === "number") {
     return (
@@ -166,6 +159,12 @@ export function FieldConfigInputs({
     );
   }
   return null;
+}
+
+/** The type picker's choices. A rating names its fixed scale right in the option ("Rating (0 to 5, in half points)"). */
+export function useFieldTypeOptions(): Array<{ value: FieldType; label: string }> {
+  const t = useTranslations("fields");
+  return FIELD_TYPES.map((value) => ({ value, label: value === "rating" ? t("ratingOption") : t(`type.${value}`) }));
 }
 
 /** A property a count can run up to: an item's number (a book's pages, a route's distance), by the key items carry it under. */
@@ -233,6 +232,88 @@ export function CountSettings({ field, goals, onChange, alwaysOn = false }: {
   );
 }
 
+/**
+ * A form's questions as numbered rows, the same as a challenge's responses and rules: each named after its question
+ * with its type underneath, one open at a time to edit, moved with the arrows, removed with the minus, and "+ Question"
+ * adds the next. There's always at least one.
+ */
+export function FieldRows({ fields, onChange, max = 30 }: {
+  fields: ChallengeField[];
+  onChange: (fields: ChallengeField[]) => void;
+  max?: number;
+}) {
+  const t = useTranslations("fields");
+  const [open, setOpen] = useState<string | null>(fields[0]?.key ?? null);
+
+  function move(index: number, delta: -1 | 1) {
+    const target = index + delta;
+    if (target < 0 || target >= fields.length) return;
+    const next = [...fields];
+    [next[index], next[target]] = [next[target], next[index]];
+    onChange(next);
+  }
+
+  function add() {
+    // The key is fixed now, before the question has a name; a neutral one keeps it unique.
+    const key = uniqueFieldKey("campo", fields.map((field) => field.key));
+    onChange([...fields, { key, label: "", type: "text", required: true, config: newFieldConfig("text") }]);
+    setOpen(key);
+  }
+
+  return (
+    <div>
+      <ol>
+        {fields.map((field, index) => {
+          const isOpen = open === field.key;
+          return (
+            <li className="border-t border-[var(--line)] first:border-t-0" key={field.id ?? field.key}>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  aria-expanded={isOpen}
+                  onClick={() => setOpen(isOpen ? null : field.key)}
+                  className="flex min-h-16 min-w-0 flex-1 cursor-pointer items-center gap-3.5 py-2.5 text-left"
+                >
+                  <span className="grid h-8 w-8 flex-none place-items-center rounded-full border border-[var(--ink)] text-[13px] font-medium tabular-nums">{index + 1}</span>
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="truncate text-[15px] font-medium">{field.label.trim() || t("questionN", { n: index + 1 })}</span>
+                    <span className="truncate text-xs text-[var(--muted)]">{t(`type.${field.type}`)}{field.required ? ` · ${t("required")}` : ""}</span>
+                  </span>
+                </button>
+                {fields.length > 1 ? <>
+                  <button type="button" className={rowIconClass} disabled={index === 0} onClick={() => move(index, -1)} aria-label={t("moveUp")} title={t("moveUp")}><ChevronIcon dir="up" /></button>
+                  <button type="button" className={rowIconClass} disabled={index === fields.length - 1} onClick={() => move(index, 1)} aria-label={t("moveDown")} title={t("moveDown")}><ChevronIcon dir="down" /></button>
+                  <button
+                    type="button"
+                    className={cx(rowIconClass, "text-[var(--danger)] hover:text-[var(--danger)]")}
+                    onClick={() => onChange(fields.filter((_, fieldIndex) => fieldIndex !== index))}
+                    aria-label={t("remove")}
+                    title={t("remove")}
+                  >
+                    <CircleMinusIcon className="h-[18px] w-[18px]" />
+                  </button>
+                </> : null}
+              </div>
+              {isOpen ? (
+                <div className="pb-6 pl-[46px]">
+                  <FieldBuilder
+                    fields={[field]}
+                    allowAdd={false}
+                    minimumFields={1}
+                    showOrdering={false}
+                    onChange={([next]) => onChange(fields.map((current, fieldIndex) => fieldIndex === index ? next : current))}
+                  />
+                </div>
+              ) : null}
+            </li>
+          );
+        })}
+      </ol>
+      {fields.length < max ? <AddRow label={t("questionWord")} ariaLabel={t("addQuestion")} onClick={add} /> : null}
+    </div>
+  );
+}
+
 export function FieldBuilder({
   fields,
   onChange,
@@ -252,6 +333,7 @@ export function FieldBuilder({
   showOrdering?: boolean;
 }) {
   const t = useTranslations("fields");
+  const typeOptions = useFieldTypeOptions();
   const [label, setLabel] = useState("");
   const [type, setType] = useState<FieldType>("text");
   const [required, setRequired] = useState(true);
@@ -286,12 +368,16 @@ export function FieldBuilder({
             <li className="py-5 first:pt-0" key={field.id ?? field.key}>
               <div className="grid gap-3 sm:grid-cols-2">
                 <label><span className={labelClass}>{t("labelLabel")}</span><input className={inputClass} value={field.label} maxLength={100} onChange={(event) => update(index, { label: event.target.value })} /></label>
-                <div><span className={labelClass}>{t("typeLabel")}</span><Select ariaLabel={t("typeLabel")} value={field.type} disabled={lockPersistedTypes && Boolean(field.id)} onChange={(type) => update(index, { type })} options={FIELD_TYPES.map((value) => ({ value, label: t(`type.${value}`) }))} /></div>
-                <Toggle className="sm:col-span-2" checked={field.required} onChange={(required) => update(index, { required })} label={t("required")} hint={t("requiredHint")} />
+                <div><span className={labelClass}>{t("typeLabel")}</span><Select ariaLabel={t("typeLabel")} value={field.type} disabled={lockPersistedTypes && Boolean(field.id)} onChange={(type) => update(index, { type })} options={typeOptions} /></div>
+                {/* A rating's own switch sits beside "required"; anything else's settings go on their own row below. */}
+                <Toggle className={field.type === "rating" ? undefined : "sm:col-span-2"} checked={field.required} onChange={(required) => update(index, { required })} label={t("requiredToggle")} />
+                {field.type === "rating" ? <FieldConfigInputs field={field} onChange={(patch) => update(index, patch)} /> : null}
               </div>
-              <div className="mt-3">
-                <FieldConfigInputs field={field} onChange={(patch) => update(index, patch)} />
-              </div>
+              {field.type === "rating" ? null : (
+                <div className="mt-3">
+                  <FieldConfigInputs field={field} onChange={(patch) => update(index, patch)} />
+                </div>
+              )}
               <div className="mt-3 flex justify-end gap-1">
                 {showOrdering ? <>
                   <Button variant="ghost" onClick={() => move(index, -1)} disabled={index === 0} className="px-3">↑<span className="sr-only">{t("moveUp")}</span></Button>
@@ -308,8 +394,8 @@ export function FieldBuilder({
         <p className="mb-3 text-sm font-light text-[var(--ink)]">{t("addFieldTitle")}</p>
         <div className="grid gap-3 sm:grid-cols-2">
           <label><span className="sr-only">{t("fieldNameSr")}</span><input className={inputClass} value={label} onChange={(event) => setLabel(event.target.value)} placeholder={t("fieldNamePlaceholder")} maxLength={100} required /></label>
-          <Select ariaLabel={t("fieldTypeSr")} value={type} onChange={setType} options={FIELD_TYPES.map((value) => ({ value, label: t(`type.${value}`) }))} />
-          <Toggle className="sm:col-span-2" checked={required} onChange={setRequired} label={t("required")} hint={t("requiredHint")} />
+          <Select ariaLabel={t("fieldTypeSr")} value={type} onChange={setType} options={typeOptions} />
+          <Toggle className="sm:col-span-2" checked={required} onChange={setRequired} label={t("requiredToggle")} />
           <Button type="submit" className="w-full sm:col-span-2">{t("add")}</Button>
         </div>
       </form> : null}

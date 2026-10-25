@@ -6,9 +6,51 @@ import { type FormEvent, useState } from "react";
 import { Dialog } from "./dialog";
 import { useGoaFormat } from "./format";
 import type { GroupSummary, Id } from "./types";
+import { ShelfAddButton } from "./shelf";
 import { ArrowField, cx } from "./ui";
 
 type Target = { personal: true } | { groupId: Id } | { newGroup: string };
+
+const optionClass = "flex w-full cursor-pointer flex-col items-start gap-1 rounded-2xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 disabled:cursor-not-allowed disabled:opacity-60";
+
+/** "How do you want to start?": the guided chat (recommended) or building it by hand. */
+function StartChoices({ onChat, onManual }: { onChat: () => void; onManual: () => void }) {
+  const t = useTranslations("welcome");
+  return (
+    <div className="space-y-2.5 text-left">
+      <button type="button" onClick={onChat} className={cx(optionClass, "border-[var(--main)] bg-[var(--main-soft)]")}>
+        <span className="flex w-full items-center justify-between gap-3">
+          <strong className="text-base font-medium text-[var(--main-strong)]">{t("choose.chat")}</strong>
+          <span className="rounded-full bg-[var(--main)] px-2.5 py-0.5 text-[11px] font-medium text-white">{t("choose.recommended")}</span>
+        </span>
+        <span className="text-sm leading-6 text-[var(--muted)]">{t("choose.chatBody")}</span>
+      </button>
+      <button type="button" onClick={onManual} className={cx(optionClass, "border-[var(--line)] hover:border-[var(--muted)]")}>
+        <strong className="text-base font-medium">{t("choose.manual")}</strong>
+        <span className="text-sm leading-6 text-[var(--muted)]">{t("choose.manualBody")}</span>
+      </button>
+    </div>
+  );
+}
+
+/**
+ * The shelf's "+ Challenge" where it's already known who it's for (just you, or this group): it asks only how to
+ * begin, the chat or by hand, the same choice as a new account's first step.
+ */
+export function NewChallengeButton({ label, onChat, onManual }: { label: string; onChat: () => void; onManual: () => void }) {
+  const t = useTranslations("welcome");
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <ShelfAddButton label={label} onClick={() => setOpen(true)} />
+      {open ? (
+        <Dialog title={t("choose.title")} onClose={() => setOpen(false)}>
+          <StartChoices onChat={() => { setOpen(false); onChat(); }} onManual={() => { setOpen(false); onManual(); }} />
+        </Dialog>
+      ) : null}
+    </>
+  );
+}
 
 /**
  * The round action beside a brand-new account's greeting. It asks how to begin (guided chat or by hand) and,
@@ -33,7 +75,6 @@ export function WelcomePanel({
   const [groupName, setGroupName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const option = "flex w-full cursor-pointer flex-col items-start gap-1 rounded-2xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/25 disabled:cursor-not-allowed disabled:opacity-60";
 
   async function go(target: Target) {
     setBusy(true);
@@ -73,27 +114,15 @@ export function WelcomePanel({
       {step ? (
         <Dialog title={step === "how" ? t("choose.title") : t("choose.whereTitle")} onClose={() => { setStep(null); setError(null); }} busy={busy}>
           {step === "how" ? (
-            <div className="space-y-2.5 text-left">
-              <button type="button" onClick={() => { setStep(null); onQuickCreate(); }} className={cx(option, "border-[var(--main)] bg-[var(--main-soft)]")}>
-                <span className="flex w-full items-center justify-between gap-3">
-                  <strong className="text-base font-medium text-[var(--main-strong)]">{t("choose.chat")}</strong>
-                  <span className="rounded-full bg-[var(--main)] px-2.5 py-0.5 text-[11px] font-medium text-white">{t("choose.recommended")}</span>
-                </span>
-                <span className="text-sm leading-6 text-[var(--muted)]">{t("choose.chatBody")}</span>
-              </button>
-              <button type="button" onClick={() => setStep("where")} className={cx(option, "border-[var(--line)] hover:border-[var(--muted)]")}>
-                <strong className="text-base font-medium">{t("choose.manual")}</strong>
-                <span className="text-sm leading-6 text-[var(--muted)]">{t("choose.manualBody")}</span>
-              </button>
-            </div>
+            <StartChoices onChat={() => { setStep(null); onQuickCreate(); }} onManual={() => setStep("where")} />
           ) : (
             <div className="space-y-2.5 text-left">
-              <button type="button" disabled={busy} onClick={() => void go({ personal: true })} className={cx(option, "border-[var(--line)] hover:border-[var(--muted)]")}>
+              <button type="button" disabled={busy} onClick={() => void go({ personal: true })} className={cx(optionClass, "border-[var(--line)] hover:border-[var(--muted)]")}>
                 <strong className="text-base font-medium">{tq("justMe")}</strong>
                 <span className="text-sm leading-6 text-[var(--muted)]">{tq("justMeHint")}</span>
               </button>
               {groups.map((group) => (
-                <button key={group.id} type="button" disabled={busy} onClick={() => void go({ groupId: group.id })} className={cx(option, "border-[var(--line)] hover:border-[var(--muted)]")}>
+                <button key={group.id} type="button" disabled={busy} onClick={() => void go({ groupId: group.id })} className={cx(optionClass, "border-[var(--line)] hover:border-[var(--muted)]")}>
                   <strong className="text-base font-medium">{group.name}</strong>
                   <span className="text-sm leading-6 text-[var(--muted)]">{tq("groupHint", { count: group.members?.length ?? 1 })}</span>
                 </button>

@@ -1102,7 +1102,6 @@ export function SchedulePeriodFields({
                 }}
                 className="w-20 rounded-lg border border-[var(--line)] bg-transparent px-2 py-1.5 text-center text-sm text-[var(--ink)] outline-none focus:border-[var(--main)] disabled:cursor-not-allowed disabled:text-[var(--muted)]"
               />
-              {t("days")}
             </label>
           </div>
         </Disclosure>

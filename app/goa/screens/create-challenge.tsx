@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ChallengeDraftForm } from "../challenge-draft";
 import { Dialog } from "../dialog";
 import { useGoaFormat } from "../format";
-import { cleanFields, FieldBuilder, presetFields, sessionPresetFields, sharedPresetFields } from "../fields";
+import { cleanFields, FieldBuilder, FieldRows, presetFields, sessionPresetFields, sharedPresetFields } from "../fields";
 import { CineItemsEditor, type CineRow, cineRowsToInput } from "../cine-items";
 import { NewLibraryDialog } from "../library-dialogs";
 import { type CatalogScope, LibraryPills, libraryChoices, librarySuggestions, useCatalogLibraries } from "../libraries";
@@ -545,10 +545,9 @@ export function CreateChallengeScreen({
                   <button className={cx("min-h-16 rounded-xl border px-4 py-3 text-left", scheduleMode === "none" ? "border-[var(--main)] bg-[var(--main)] text-white" : "border-[var(--line)] bg-[var(--paper)]")} type="button" aria-pressed={scheduleMode === "none"} onClick={() => setScheduleMode("none")}><strong className="block text-sm">{t("scheduleNone")}</strong><span className={cx("mt-1 block text-xs font-normal", scheduleMode === "none" ? "text-white/75" : "text-[var(--muted)]")}>{t("scheduleNoneHint")}</span></button>
                 </div>
               </fieldset>
-              {scheduleMode === "period" ? <>
-                <SchedulePeriodFields startsOn={startsOn} endsOn={endsOn} onStartsOn={setStartsOn} onEndsOn={setEndsOn} />
-                <p className="sm:col-span-2 text-xs leading-5 text-[var(--muted)]">{t("periodNote")}</p>
-              </> : <p className="sm:col-span-2 rounded-xl bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{t("noneNote")}</p>}
+              {scheduleMode === "period"
+                ? <SchedulePeriodFields startsOn={startsOn} endsOn={endsOn} onStartsOn={setStartsOn} onEndsOn={setEndsOn} />
+                : <p className="sm:col-span-2 rounded-xl bg-[var(--wash)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">{t("noneNote")}</p>}
 
               <div className="sm:col-span-2">
                 {optionalOpen ? (
@@ -659,7 +658,7 @@ export function CreateChallengeScreen({
                   {responseRows.length < 10 ? <AddRow label={t("responseWord")} ariaLabel={t("addResponse")} onClick={addResponse} /> : null}
                 </div>
               ) : (
-                <FieldBuilder fields={fields} onChange={(next) => { setFields(next); setFieldsTouched(true); }} />
+                <FieldRows fields={fields} onChange={(next) => { setFields(next); setFieldsTouched(true); }} />
               )}
             </div>
 

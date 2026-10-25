@@ -10,7 +10,8 @@ import { CatalogShelfSkeleton } from "../catalog-shelf";
 import { TasteMap } from "../taste-map";
 import { catalogCardHeight, CatalogTile, resolveCoverTop } from "../catalog-views";
 import { LibraryGlyph, useCatalogShelf, useLibraryName } from "../libraries";
-import { Rail, RailArrows, ShelfAddButton, shelfCardWidth, useShelfRail } from "../shelf";
+import { Rail, RailArrows, shelfCardWidth, useShelfRail } from "../shelf";
+import { NewChallengeButton } from "../welcome";
 import type { CatalogItem, ChallengeSummary, GroupInviteResult, GroupSummary, Id, Member, PendingGroupRequest } from "../types";
 import { ArrowRightIcon, AvatarMark, BackButton, Button, cx, FaceEmptyState, Field, inputClass, LinkPill, Select, SlidersIcon, StatusMessage, Toggle } from "../ui";
 
@@ -369,10 +370,7 @@ export function GroupScreen({
               <span className="text-xs text-[var(--muted)]">{challenges.length}</span>
             </div>
             {canCreateChallenge ? (
-              <div className="flex flex-wrap items-center justify-end gap-2">
-                <ShelfAddButton label={tc("newChallengePill")} onClick={onCreateChallenge} />
-                <ShelfAddButton label={tc("newChatPill")} onClick={onQuickCreate} />
-              </div>
+              <NewChallengeButton label={tc("newChallengePill")} onChat={onQuickCreate} onManual={onCreateChallenge} />
             ) : null}
           </div>
           {challenges.length ? (

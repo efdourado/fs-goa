@@ -38,8 +38,7 @@
     "loadingApp": "Carregando o Goa…",
     "loadingChallenge": "Carregando o desafio…",
     "wait": "Aguarde…",
-    "newChallengePill": "Desafio",
-    "newChatPill": "Chat"
+    "newChallengePill": "Desafio"
   },
   "settings": {
     "legend": "Preferências"
@@ -222,7 +221,6 @@
     "durationHint": "Começa hoje, a menos que você escolha datas exatas.",
     "exactDates": "Datas exatas",
     "durationDaysAria": "Duração em dias",
-    "days": "dias",
     "preset": {
       "d30": "30 dias",
       "d60": "60 dias",
@@ -330,7 +328,7 @@
       "group": "Novo grupo"
     },
     "home": {
-      "sectionPersonal": "Só eu",
+      "sectionPersonal": "Pessoal",
       "sectionGroups": "Grupos",
       "justYou": "Só você",
       "personalRunning": "Em andamento",
@@ -354,7 +352,7 @@
       "title": "Como você quer começar?",
       "chat": "Conversa",
       "recommended": "Recomendado",
-      "chatBody": "Perguntas rápidas, ideal para o primeiro desafio.",
+      "chatBody": "Perguntas rápidas.",
       "manual": "Manual",
       "manualBody": "Monte você mesmo, passo a passo.",
       "whereTitle": "Para quem?",
@@ -633,7 +631,6 @@
     "schedulePeriodHint": "Use datas futuras ou passadas.",
     "scheduleNone": "Sem datas",
     "scheduleNoneHint": "Você encerra quando quiser.",
-    "periodNote": "Pode ser um período futuro, atual ou já realizado. Para reconstruir uma edição antiga, escolha as datas originais.",
     "noneNote": "Sem datas fixas: a lista fica aberta no seu ritmo e os registros por dia podem recuperar datas passadas.",
     "descriptionLabel": "Descrição",
     "optional": "opcional",
@@ -665,7 +662,7 @@
     "creatingDraft": "Criando rascunho…",
     "createDraft": "Criar rascunho",
     "expectationLabel": "Coletar uma nota de expectativa",
-    "expectationHint": "Os participantes dão uma nota de quanto esperam gostar de cada título antes de assistir. Ela trava quando enviam a avaliação real. Dá para ligar isso depois também.",
+    "expectationHint": "Os participantes dão uma nota de expectativa para cada item.",
     "errPickLibrary": "Escolha a biblioteca de onde vêm os itens.",
     "errTablesLibrary": "Crie primeiro a biblioteca Lugares.",
     "tablesItemsHint": "Adicione os lugares para avaliar (um por linha).",
@@ -695,7 +692,7 @@
     "scopeIndividual": "Resposta individual",
     "scopeIndividualHint": "Cada participante envia a própria resposta para cada item.",
     "scopeShared": "Resposta compartilhada",
-    "scopeSharedHint": "Uma resposta por item para o grupo todo. Administradores participantes preenchem e corrigem.",
+    "scopeSharedHint": "Uma resposta por item para o grupo todo.",
     "responseN": "Resposta {n}",
     "responseSummary": "{scope} · {count, plural, one {# campo} other {# campos}}",
     "responseWord": "Resposta",
@@ -1247,7 +1244,7 @@
   },
   "fields": {
     "inRankingLabel": "Conta para o ranking",
-    "inRankingHint": "Entra na média da pontuação de cada título, no pódio e na nota da coleção. Desligado: continua registrado e ganha seu próprio gráfico, mas não ordena os títulos.",
+    "inRankingHint": "Entra na média, no pódio e na nota da coleção.",
     "type": {
       "text": "Texto",
       "number": "Número",
@@ -1266,15 +1263,16 @@
       "custoBeneficio": "Custo-benefício",
       "resultado": "Resultado",
       "resposta": "Resposta",
-      "weight": "Carga (kg)",
-      "repetitions": "Repetições",
+      "weight": "Carga",
       "quantoHoje": "Quanto hoje"
     },
     "labelLabel": "Pergunta ou medida",
     "labelRequired": "Dê um rótulo ao campo.",
     "editFieldTitle": "Editar campo",
     "typeLabel": "Tipo de resposta",
+    "ratingOption": "Nota (0 a 5, de meio em meio ponto)",
     "required": "Obrigatório",
+    "requiredToggle": "Preenchimento obrigatório",
     "min": "Mínimo",
     "max": "Máximo",
     "step": "Intervalo",
@@ -1291,10 +1289,11 @@
     "fieldNamePlaceholder": "Ex.: Páginas lidas",
     "fieldTypeSr": "Tipo do campo",
     "add": "Adicionar",
-    "requiredHint": "Bloqueia o registro enquanto estiver em branco.",
-    "ratingFixed": "Escala fixa: 0 a 5, com meio ponto.",
     "unit": "Unidade",
-    "unitPlaceholder": "kg, km, min…"
+    "unitPlaceholder": "kg, km, min…",
+    "questionWord": "Pergunta",
+    "questionN": "Pergunta {n}",
+    "addQuestion": "Adicionar pergunta"
   },
   "templates": {
     "signIn": "Entrar",
@@ -1343,7 +1342,7 @@
     "factFields": "{count, plural, one {campo} other {campos}}",
     "whereLabel": "Para onde vai?",
     "whereExisting": "Um grupo meu",
-    "whereMine": "Só eu",
+    "whereMine": "Pessoal",
     "whereMineHint": "Um desafio pessoal.",
     "whereExistingHint": "Compartilhado com um grupo que você administra."
   },
@@ -1848,8 +1847,6 @@
     "nameRequired": "Dê um nome à resposta.",
     "fieldLabel": "Rótulo",
     "fieldPlaceholder": "Placar",
-    "requiredLabel": "Obrigatório",
-    "requiredHint": "Um item não fica concluído até isto ser preenchido.",
     "add": "Adicionar resposta",
     "removeBody": "Esta resposta sai de todos os itens.",
     "removeMetricsBody": "Estas métricas saem junto:",
@@ -1910,8 +1907,9 @@
     "q3": "Como vamos chamar isso?",
     "qResponses": "O que entra no registro?",
     "responsesAnswer": "{count, plural, one {# resposta configurada} other {# respostas configuradas}}",
+    "questionsAnswer": "{count, plural, one {# pergunta} other {# perguntas}}",
     "change": "Mudar",
-    "justMe": "Só eu",
+    "justMe": "Pessoal",
     "justMeHint": "Um desafio pessoal.",
     "groupHint": "{count, plural, one {# pessoa} other {# pessoas}}",
     "newGroup": "Grupo",

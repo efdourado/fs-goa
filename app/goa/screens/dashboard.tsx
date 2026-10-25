@@ -11,7 +11,7 @@ import { useCatalogShelf } from "../libraries";
 import { applyColorFilter, OrganizeBar, useChallengeOrganizer } from "../organize";
 import { Shelf, ShelfAddButton, shelfCardWidth } from "../shelf";
 import { ReadyMadeTemplatesSection } from "../template-gallery";
-import { WelcomePanel } from "../welcome";
+import { NewChallengeButton, WelcomePanel } from "../welcome";
 import {
   CHALLENGE_COLOR_TAGS,
   type ChallengeColorTag,
@@ -420,12 +420,10 @@ export function DashboardScreen({
 
   const emptyRail = (title: string) => <div className="w-full max-w-xl"><EmptyState title={colorFilter ? t("filter.empty") : title} /></div>;
 
-  // The ways to start a challenge of your own: two small buttons beside the shelf's title, like "new group" (hidden while a colour filters it).
+  // Starting a challenge of your own: one small button beside the shelf's title, like "new group", that asks chat or by
+  // hand (hidden while a colour filters it).
   const newPersonalActions = colorFilter ? undefined : (
-    <>
-      <ShelfAddButton label={tc("newChallengePill")} onClick={onCreatePersonalChallenge} />
-      <ShelfAddButton label={tc("newChatPill")} onClick={onQuickCreatePersonal} />
-    </>
+    <NewChallengeButton label={tc("newChallengePill")} onChat={onQuickCreatePersonal} onManual={onCreatePersonalChallenge} />
   );
 
   const groupsShelf = colorFilter ? null : (
@@ -544,7 +542,7 @@ export function DashboardScreen({
 
           {!colorFilter && ((!hasGroups && !atGroupLimit) || (personalBlank && personalShelf !== null)) ? (
             <div className="mt-12 flex flex-col items-start gap-1">
-              {personalBlank && personalShelf !== null ? <ShelfAddButton label={th("startPersonal")} onClick={onCreatePersonalChallenge} /> : null}
+              {personalBlank && personalShelf !== null ? <NewChallengeButton label={th("startPersonal")} onChat={onQuickCreatePersonal} onManual={onCreatePersonalChallenge} /> : null}
               {!hasGroups && !atGroupLimit ? <HomeSideLink label={th("inviteGroups")} onClick={() => setShowGroupDialog(true)} /> : null}
             </div>
           ) : null}

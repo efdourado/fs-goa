@@ -38,8 +38,7 @@
     "loadingApp": "Loading Goa…",
     "loadingChallenge": "Loading the challenge…",
     "wait": "Please wait…",
-    "newChallengePill": "Challenge",
-    "newChatPill": "Chat"
+    "newChallengePill": "Challenge"
   },
   "settings": {
     "legend": "Preferences"
@@ -222,7 +221,6 @@
     "durationHint": "Starts today unless you choose exact dates.",
     "exactDates": "Exact dates",
     "durationDaysAria": "Duration in days",
-    "days": "days",
     "preset": {
       "d30": "30 days",
       "d60": "60 days",
@@ -330,7 +328,7 @@
       "group": "New group"
     },
     "home": {
-      "sectionPersonal": "Just me",
+      "sectionPersonal": "Personal",
       "sectionGroups": "Groups",
       "justYou": "Just you",
       "personalRunning": "In progress",
@@ -354,7 +352,7 @@
       "title": "How do you want to start?",
       "chat": "Chat",
       "recommended": "Recommended",
-      "chatBody": "A few quick questions, ideal for your first challenge.",
+      "chatBody": "Quick questions.",
       "manual": "Manually",
       "manualBody": "Set it up yourself, step by step.",
       "whereTitle": "Who is it for?",
@@ -633,7 +631,6 @@
     "schedulePeriodHint": "Use future or past dates.",
     "scheduleNone": "No deadline",
     "scheduleNoneHint": "You close it whenever.",
-    "periodNote": "It can be a future, current, or already-finished period. To rebuild an old edition, choose the original dates.",
     "noneNote": "No fixed dates: the list stays open at your pace, and per-day entries can backfill past dates.",
     "descriptionLabel": "Description",
     "optional": "optional",
@@ -665,7 +662,7 @@
     "creatingDraft": "Creating draft…",
     "createDraft": "Create draft",
     "expectationLabel": "Collect an expectation rating",
-    "expectationHint": "Participants rate how much they expect to like each title before watching. It locks once they send the real rating. You can also toggle this later.",
+    "expectationHint": "Participants give an expectation rating for each item.",
     "errPickLibrary": "Choose the library the items come from.",
     "errTablesLibrary": "Create the Places library first.",
     "tablesItemsHint": "Add the places to rate (one per line).",
@@ -695,7 +692,7 @@
     "scopeIndividual": "Individual response",
     "scopeIndividualHint": "Each participant submits their own answer for every item.",
     "scopeShared": "Shared response",
-    "scopeSharedHint": "One answer per item for the whole group. Participating admins fill it in and correct it.",
+    "scopeSharedHint": "One answer per item for the whole group.",
     "responseN": "Response {n}",
     "responseSummary": "{scope} · {count, plural, one {# field} other {# fields}}",
     "responseWord": "Response",
@@ -1247,7 +1244,7 @@
   },
   "fields": {
     "inRankingLabel": "Counts toward the ranking",
-    "inRankingHint": "Averaged into each title's score, podium and catalogue rating. Off: it's still recorded and gets its own chart, but doesn't rank the titles.",
+    "inRankingHint": "Counts towards the average, the podium and the catalogue rating.",
     "type": {
       "text": "Text",
       "number": "Number",
@@ -1266,15 +1263,16 @@
       "custoBeneficio": "Value for money",
       "resultado": "Result",
       "resposta": "Response",
-      "weight": "Weight (kg)",
-      "repetitions": "Repetitions",
+      "weight": "Weight",
       "quantoHoje": "How much today"
     },
     "labelLabel": "Question or measure",
     "labelRequired": "Give the field a label.",
     "editFieldTitle": "Edit field",
     "typeLabel": "Answer type",
+    "ratingOption": "Rating (0 to 5, in half points)",
     "required": "Required",
+    "requiredToggle": "Must be filled in",
     "min": "Minimum",
     "max": "Maximum",
     "step": "Step",
@@ -1291,10 +1289,11 @@
     "fieldNamePlaceholder": "e.g. Pages read",
     "fieldTypeSr": "Field type",
     "add": "Add",
-    "requiredHint": "Blocks the entry while it's left blank.",
-    "ratingFixed": "Fixed scale: 0 to 5, half steps.",
     "unit": "Unit",
-    "unitPlaceholder": "kg, km, min…"
+    "unitPlaceholder": "kg, km, min…",
+    "questionWord": "Question",
+    "questionN": "Question {n}",
+    "addQuestion": "Add a question"
   },
   "templates": {
     "signIn": "Sign in",
@@ -1343,7 +1342,7 @@
     "factFields": "{count, plural, one {field} other {fields}}",
     "whereLabel": "Where does it go?",
     "whereExisting": "A group of mine",
-    "whereMine": "Just me",
+    "whereMine": "Personal",
     "whereMineHint": "A personal challenge.",
     "whereExistingHint": "Shared with a group you run."
   },
@@ -1848,8 +1847,6 @@
     "nameRequired": "Give the response a name.",
     "fieldLabel": "Label",
     "fieldPlaceholder": "Score",
-    "requiredLabel": "Required",
-    "requiredHint": "An item isn't done until this is filled in.",
     "add": "Add response",
     "removeBody": "This response goes away from every item.",
     "removeMetricsBody": "These metrics go too:",
@@ -1910,8 +1907,9 @@
     "q3": "What should we call it?",
     "qResponses": "What goes in the record?",
     "responsesAnswer": "{count, plural, one {# response configured} other {# responses configured}}",
+    "questionsAnswer": "{count, plural, one {# question} other {# questions}}",
     "change": "Change",
-    "justMe": "Just me",
+    "justMe": "Personal",
     "justMeHint": "A personal challenge.",
     "groupHint": "{count, plural, one {# person} other {# people}}",
     "newGroup": "Group",

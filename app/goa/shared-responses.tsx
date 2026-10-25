@@ -5,10 +5,10 @@ import { useState } from "react";
 
 import { ApiError } from "./api";
 import { FormDialog } from "./dialog";
-import { cleanFields, FIELD_TYPES, FieldConfigInputs, newFieldConfig } from "./fields";
+import { cleanFields, FieldConfigInputs, newFieldConfig, useFieldTypeOptions } from "./fields";
 import { useGoaFormat } from "./format";
 import type { ChallengeField, EntryTypeView, SharedEditPolicy } from "./types";
-import { Field, inputClass, Select, Toggle } from "./ui";
+import { cx, Field, inputClass, Select, Toggle } from "./ui";
 
 /** Two ends of a small "people" glyph — the mark for an answer that belongs to the whole group. */
 export function SharedGlyph({ className }: { className?: string }) {
@@ -33,6 +33,7 @@ export function AddSharedResponseDialog({
 }) {
   const t = useTranslations("sharedResponses");
   const tf = useTranslations("fields");
+  const typeOptions = useFieldTypeOptions();
   const f = useGoaFormat();
   const [name, setName] = useState("");
   const [field, setField] = useState<ChallengeField>({ key: "", label: "", type: "number", required: true, config: newFieldConfig("number") });
@@ -78,12 +79,15 @@ export function AddSharedResponseDialog({
             ariaLabel={tf("typeLabel")}
             value={field.type}
             onChange={(type) => setField((current) => ({ ...current, type, config: newFieldConfig(type) }))}
-            options={FIELD_TYPES.map((value) => ({ value, label: tf(`type.${value}`) }))}
+            options={typeOptions}
           />
         </Field>
       </div>
-      {hasConfig ? <FieldConfigInputs field={field} onChange={(patch) => setField((current) => ({ ...current, ...patch }))} /> : null}
-      <Toggle checked={field.required} onChange={(next) => setField((current) => ({ ...current, required: next }))} label={t("requiredLabel")} hint={t("requiredHint")} />
+      {/* Two switches side by side (a rating's "counts for the ranking" and "required") wherever there's room. */}
+      <div className={cx("grid gap-4", field.type === "rating" && "sm:grid-cols-2")}>
+        {hasConfig ? <FieldConfigInputs field={field} onChange={(patch) => setField((current) => ({ ...current, ...patch }))} /> : null}
+        <Toggle checked={field.required} onChange={(next) => setField((current) => ({ ...current, required: next }))} label={tf("requiredToggle")} />
+      </div>
     </FormDialog>
   );
 }

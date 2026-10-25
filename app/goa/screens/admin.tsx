@@ -7,7 +7,7 @@ import { CheckpointPlanner } from "../checkpoint-planner";
 import { useGoaFormat } from "../format";
 import { ConfirmDialog, FormDialog } from "../dialog";
 import { AddSharedResponseDialog, ResponseSettingsDialog, SharedGlyph } from "../shared-responses";
-import { cleanFields, type CountGoalOption, countGoalOptions, CountSettings, FIELD_TYPES, FieldConfigInputs, newFieldConfig, uniqueFieldKey } from "../fields";
+import { cleanFields, type CountGoalOption, countGoalOptions, CountSettings, FieldConfigInputs, newFieldConfig, uniqueFieldKey, useFieldTypeOptions } from "../fields";
 import { type CatalogScope } from "../libraries";
 import { bodyFromValues, editableProperties, PropertyInputs, type PropertyValues, propertiesHaveProblem, showsRecommender, useLibraryProperties, valuesFromItem } from "../property-inputs";
 import { recommenderBody, RecommenderPicker, recommenderFromItem, type RecommenderValue, sameRecommender, useRecommenderSource } from "../recommender-picker";
@@ -608,6 +608,7 @@ export function FieldEditorDialog({
 }) {
   const t = useTranslations("adminChallenge");
   const tf = useTranslations("fields");
+  const typeOptions = useFieldTypeOptions();
   const f = useGoaFormat();
   const initial = field ?? { key: "", label: "", type: "text" as const, required: true, config: newFieldConfig("text") };
   const [draft, setDraft] = useState<ChallengeField>(initial);
@@ -641,13 +642,21 @@ export function FieldEditorDialog({
         <input className={inputClass} value={draft.label} maxLength={100} required onChange={(event) => setDraft((current) => ({ ...current, label: event.target.value }))} />
       </Field>
       <Field label={tf("typeLabel")}>
-        <Select ariaLabel={tf("typeLabel")} value={draft.type} disabled={lockType} onChange={(type) => setDraft((current) => ({ ...current, type, config: newFieldConfig(type) }))} options={FIELD_TYPES.map((value) => ({ value, label: tf(`type.${value}`) }))} />
+        <Select ariaLabel={tf("typeLabel")} value={draft.type} disabled={lockType} onChange={(type) => setDraft((current) => ({ ...current, type, config: newFieldConfig(type) }))} options={typeOptions} />
       </Field>
-      {hasConfig ? <FieldConfigInputs field={draft} onChange={(patch) => setDraft((current) => ({ ...current, ...patch }))} /> : null}
-      {countable && draft.type === "number" ? (
-        <CountSettings field={draft} goals={countable.goals} onChange={(count) => setDraft((current) => ({ ...current, config: { ...current.config, count } }))} />
-      ) : null}
-      <Toggle checked={draft.required} onChange={(next) => setDraft((current) => ({ ...current, required: next }))} label={tf("required")} hint={tf("requiredHint")} />
+      {draft.type === "rating" ? (
+        // A rating's "counts for the ranking" and "required" side by side wherever there's room.
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FieldConfigInputs field={draft} onChange={(patch) => setDraft((current) => ({ ...current, ...patch }))} />
+          <Toggle checked={draft.required} onChange={(next) => setDraft((current) => ({ ...current, required: next }))} label={tf("requiredToggle")} />
+        </div>
+      ) : <>
+        {hasConfig ? <FieldConfigInputs field={draft} onChange={(patch) => setDraft((current) => ({ ...current, ...patch }))} /> : null}
+        {countable && draft.type === "number" ? (
+          <CountSettings field={draft} goals={countable.goals} onChange={(count) => setDraft((current) => ({ ...current, config: { ...current.config, count } }))} />
+        ) : null}
+        <Toggle checked={draft.required} onChange={(next) => setDraft((current) => ({ ...current, required: next }))} label={tf("requiredToggle")} />
+      </>}
     </FormDialog>
   );
 }

@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 
-import { cleanFields, FieldBuilder, presetFields, sessionPresetFields, sharedPresetFields } from "../fields";
+import { cleanFields, FieldBuilder, FieldRows, presetFields, sessionPresetFields, sharedPresetFields } from "../fields";
 import { useGoaFormat } from "../format";
 import { type CatalogScope, LibraryPills, libraryChoices, librarySuggestions, useCatalogLibraries, useLibraryName } from "../libraries";
 import { NewLibraryDialog } from "../library-dialogs";
@@ -585,7 +585,8 @@ export function QuickCreateScreen({
             <Ask>{t("qResponses")}</Ask>
             {responsesSettled ? (
               <Answered onEdit={editResponses} editLabel={t("change")}>
-                {t("responsesAnswer", { count: responseRows.length })}
+                {/* A list answered once per item counts its responses; a session or a daily check-in is one record, so its questions. */}
+                {tracksItems && recordingMode === "single" ? t("responsesAnswer", { count: responseRows.length }) : t("questionsAnswer", { count: fields.length })}
               </Answered>
             ) : (
               <div className="ml-10 space-y-4">
@@ -648,7 +649,7 @@ export function QuickCreateScreen({
                     {responseRows.length < 10 ? <AddRow label={tr("responseWord")} ariaLabel={tr("addResponse")} onClick={addResponse} /> : null}
                   </div>
                 ) : (
-                  <FieldBuilder fields={fields} onChange={(next) => { setFields(next); setFieldsTouched(true); }} />
+                  <FieldRows fields={fields} onChange={(next) => { setFields(next); setFieldsTouched(true); }} />
                 )}
                 <Button className="w-full" onClick={confirmResponses} disabled={!fields.length || fields.some((field) => !field.label.trim())}>{tc("continue")}<ArrowRightIcon /></Button>
                 {error ? <StatusMessage error={error} /> : null}

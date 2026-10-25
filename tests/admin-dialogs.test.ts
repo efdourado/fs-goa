@@ -42,12 +42,13 @@ test("FieldEditorDialog shows the type-specific config for a number field", () =
   assert.match(html, /type="submit">Salvar</);
 });
 
-test("FieldEditorDialog notes that a rating scale is fixed", () => {
+test("FieldEditorDialog names a rating's fixed scale in its type, with its two switches side by side", () => {
   const html = renderWithIntl(createElement(FieldEditorDialog, {
     field: { key: "nota", label: "Nota", type: "rating", required: true, config: { min: 0, max: 5, step: 0.5 } },
     takenKeys: [], lockType: false, onCancel: () => undefined, onSave: noop,
   }));
-  assert.match(html, /Escala fixa/);
+  assert.match(html, /Nota \(0 a 5, de meio em meio ponto\)/);
+  assert.match(html, /sm:grid-cols-2"><div[^>]*>[\s\S]*Conta para o ranking[\s\S]*Preenchimento obrigatório/);
   assert.doesNotMatch(html, /Mínimo/);
 });
 
