@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import { type FormEvent, type ReactNode, useState } from "react";
 
 import { KebabMenu, menuRowClass } from "../card-menu";
-import { Dialog } from "../dialog";
+import { Dialog, ModalActions } from "../dialog";
 import { useGoaFormat } from "../format";
 import { CatalogShelfView } from "../catalog-shelf";
 import { useCatalogShelf } from "../libraries";
@@ -90,9 +90,9 @@ function GroupCreateDialog({ onClose, onCreate }: { onClose: () => void; onCreat
           <input className={inputClass} name="name" placeholder={t("groupNamePlaceholder")} required maxLength={100} disabled={busy} />
         </Field>
         <StatusMessage error={error} />
-        <div className="flex justify-end gap-3 border-t border-[var(--line)] pt-4">
+        <ModalActions className="border-t border-[var(--line)] pt-4">
           <Button type="submit" disabled={busy}>{busy ? t("creating") : t("create")}</Button>
-        </div>
+        </ModalActions>
       </form>
     </Dialog>
   );

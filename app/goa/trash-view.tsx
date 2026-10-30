@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { API_PATHS, apiRequest } from "./api";
-import { ConfirmDialog, Dialog } from "./dialog";
+import { ConfirmDialog, Dialog, ModalActions } from "./dialog";
 import type { Id, TrashActionPreview, TrashItem } from "./types";
 import { Button, cardClass, cx, FaceEmptyState, LoadingView, PageHeading, StatusMessage } from "./ui";
 
@@ -107,11 +107,11 @@ function PurgeDialog({
 
       <div className="mt-4"><StatusMessage error={error} /></div>
       {!preview.blocked && (
-        <div className="mt-6 flex justify-end border-t border-[var(--line)] pt-4">
+        <ModalActions className="mt-6 border-t border-[var(--line)] pt-4">
           <Button variant="danger" onClick={() => onConfirm(preview.confirmation === "count" && entries === 0 ? "0" : confirmation.trim(), reason.trim())} disabled={busy}>
             {busy ? t("purging") : tc("delete")}
           </Button>
-        </div>
+        </ModalActions>
       )}
     </Dialog>
   );

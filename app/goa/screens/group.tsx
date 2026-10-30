@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import { type FormEvent, useRef, useState } from "react";
 
 import { copyText } from "../clipboard";
-import { ConfirmDialog, DeleteButton, DeleteConfirm, Dialog } from "../dialog";
+import { ConfirmDialog, DeleteButton, DeleteConfirm, Dialog, ModalActions } from "../dialog";
 import { useGoaFormat } from "../format";
 import { CatalogShelfSkeleton } from "../catalog-shelf";
 import { TasteMap } from "../taste-map";
@@ -323,11 +323,11 @@ export function GroupScreen({
             <Field label={t("descriptionLabel")} optional><textarea className={inputClass} rows={3} value={groupDescription} onChange={(event) => setGroupDescription(event.target.value)} maxLength={1000} placeholder={t("descriptionPlaceholder")} /></Field>
             <Toggle checked={groupRecommendations} onChange={setGroupRecommendations} label={t("recommendationsLabel")} hint={t("recommendationsHint")} />
             <StatusMessage error={groupError} success={groupSuccess} />
-            {/* One footer: delete on the left, away from Save on the right. */}
-            <div className="flex flex-wrap items-center gap-3 border-t border-[var(--line)] pt-4">
-              {onDeleteGroup ? <DeleteButton open={deletingGroup} disabled={groupBusy} onClick={() => setDeletingGroup((open) => !open)} /> : <span className="flex-1" />}
+            {/* Footer actions share the full available width equally. */}
+            <ModalActions className="border-t border-[var(--line)] pt-4">
+              {onDeleteGroup ? <DeleteButton open={deletingGroup} disabled={groupBusy} onClick={() => setDeletingGroup((open) => !open)} /> : null}
               <Button type="submit" disabled={groupBusy}>{groupBusy ? tc("saving") : tc("save")}</Button>
-            </div>
+            </ModalActions>
             {onDeleteGroup && deletingGroup ? <DeleteConfirm body={t("deleteConfirm", { name: group.name })} onConfirm={onDeleteGroup} /> : null}
           </form>
         </Dialog>

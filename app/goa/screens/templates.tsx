@@ -5,7 +5,7 @@ import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 
 import { API_PATHS, apiRequest } from "../api";
 import { SkippedPropertiesNotice } from "../copy-notice";
-import { Dialog } from "../dialog";
+import { Dialog, ModalActions } from "../dialog";
 import { useGoaFormat } from "../format";
 import { SettingsMenu } from "../SettingsMenu";
 import { PublishedTemplates } from "../template-gallery";
@@ -275,9 +275,9 @@ export function TemplateDetailScreen({
               ) : null}
             </div>
             <StatusMessage error={copyError} />
-            <div className="flex justify-end border-t border-[var(--line)] pt-4">
+            <ModalActions className="border-t border-[var(--line)] pt-4">
               <Button type="submit" disabled={busy || !ready}>{busy ? t("duplicating") : t("duplicateSubmit")}</Button>
-            </div>
+            </ModalActions>
           </form>
         </Dialog>
       ) : null}

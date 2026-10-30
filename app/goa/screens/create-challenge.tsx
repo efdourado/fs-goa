@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 
 import type { ChallengeDraftForm } from "../challenge-draft";
-import { Dialog } from "../dialog";
+import { Dialog, ModalActions } from "../dialog";
 import { useGoaFormat } from "../format";
 import { cleanFields, FieldBuilder, FieldRows, presetFields, sessionPresetFields, sharedPresetFields } from "../fields";
 import { CineItemsEditor, type CineRow, cineRowsToInput } from "../cine-items";
@@ -723,10 +723,10 @@ export function CreateChallengeScreen({
       {leaving ? (
         <Dialog title={t("leaveTitle")} onClose={() => setLeaving(null)}>
           <p className="text-sm leading-6 text-[var(--muted)]">{t("leaveBody")}</p>
-          <div className="mt-6 grid grid-cols-2 gap-2">
+          <ModalActions className="mt-6">
             <Button variant="secondary" className="!rounded-full" onClick={discardAndLeave}>{t("leaveDiscard")}</Button>
             <Button className="!rounded-full" disabled={!onKeepDraft} onClick={saveDraftAndLeave}>{t("leaveSave")}</Button>
-          </div>
+          </ModalActions>
         </Dialog>
       ) : null}
       {newLibrary ? (

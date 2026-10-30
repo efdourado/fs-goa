@@ -53,11 +53,16 @@ export function Dialog({ title, children, onClose, busy = false, wide = false }:
   /* eslint-enable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/click-events-have-key-events */
 }
 
+/** Modal actions fill one row, with an equal-width column for every action. */
+export function ModalActions({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={cx("grid w-full auto-cols-fr grid-flow-col gap-3 [&>*]:min-w-0 [&>*]:w-full", className)}>{children}</div>;
+}
+
 /**
  * The shared shell for every editing modal (field, item, metric, correction, …):
  * a `Dialog`, the "unsaved changes" guard, a `<form>` with a disabled-while-busy
- * `<fieldset>`, an inline error, and a right-aligned Save (with an optional
- * `footerStart` action, Delete say, pinned to its left). No Cancel: the circled
+ * `<fieldset>`, an inline error, and equal-width actions (Save plus an optional
+ * `footerStart` action or Delete). No Cancel: the circled
  * minus in the corner closes every modal. A caller passes only the fields and
  * the save action.
  */
@@ -87,9 +92,9 @@ export function FormDialog({
   busyLabel?: string;
   danger?: boolean;
   submitDisabled?: boolean;
-  /** An action at the footer's left edge, apart from Save. */
+  /** Extra footer actions; each shares the row equally with Save. */
   footerStart?: ReactNode;
-  /** A Delete button at the footer's left edge, confirmed in a panel under the footer (see `DeleteConfirm`). */
+  /** A Delete action sharing the footer with Save, confirmed in a panel below (see `DeleteConfirm`). */
   onDelete?: { body: ReactNode; onConfirm: () => Promise<void> | void; busyLabel?: string };
   children: ReactNode;
 }) {
@@ -102,22 +107,22 @@ export function FormDialog({
       {discard ? (
         <div role="alert" className="mb-5 flex flex-col gap-3 rounded-xl border border-[var(--warn-line)] bg-[var(--warn-soft)] px-4 py-3.5">
           <p className="text-sm text-[var(--warn)]">{tc("unsavedChanges")}</p>
-          <div className="flex flex-wrap gap-2">
+          <ModalActions>
             <Button variant="secondary" className="min-h-9" disabled={busy} onClick={() => setDiscard(false)}>{tc("keepEditing")}</Button>
             <Button variant="danger" className="min-h-9" disabled={busy} onClick={onCancel}>{tc("discardChanges")}</Button>
-          </div>
+          </ModalActions>
         </div>
       ) : null}
       <form onSubmit={(event) => { event.preventDefault(); void onSubmit(); }} className="space-y-6">
         <fieldset disabled={busy} className="min-w-0 space-y-5">{children}</fieldset>
         <StatusMessage error={error} />
-        <div className="flex flex-wrap items-center justify-end gap-3 border-t border-[var(--line)] pt-4">
+        <ModalActions className="border-t border-[var(--line)] pt-4">
           {onDelete ? <DeleteButton open={deleting} disabled={busy} onClick={() => setDeleting((open) => !open)} /> : null}
-          {footerStart ? <div className="mr-auto">{footerStart}</div> : null}
+          {footerStart ? <div className="contents">{footerStart}</div> : null}
           <Button type="submit" variant={danger ? "danger" : "primary"} disabled={busy || submitDisabled}>
             {busy ? busyLabel ?? tc("saving") : submitLabel ?? tc("save")}
           </Button>
-        </div>
+        </ModalActions>
         {onDelete && deleting ? <DeleteConfirm {...onDelete} /> : null}
       </form>
     </Dialog>
@@ -128,7 +133,7 @@ export function FormDialog({
 export function DeleteButton({ open, disabled, onClick }: { open: boolean; disabled?: boolean; onClick: () => void }) {
   const tc = useTranslations("common");
   return (
-    <Button variant="danger" className="mr-auto" aria-expanded={open} disabled={disabled} onClick={onClick}>{tc("delete")}</Button>
+    <Button variant="danger" className="w-full" aria-expanded={open} disabled={disabled} onClick={onClick}>{tc("delete")}</Button>
   );
 }
 
@@ -204,7 +209,7 @@ export function ConfirmDialog({
     <Dialog title={title} busy={busy} onClose={onClose}>
       <p className="text-sm leading-6">{body}</p>
       <StatusMessage error={error} />
-      <div className="mt-6 flex justify-end gap-3 border-t border-[var(--line)] pt-4">
+      <ModalActions className="mt-6 border-t border-[var(--line)] pt-4">
         <Button
           variant={danger ? "danger" : "primary"}
           disabled={busy}
@@ -221,7 +226,7 @@ export function ConfirmDialog({
         >
           {busy ? busyLabel ?? tc("saving") : confirmLabel ?? tc("delete")}
         </Button>
-      </div>
+      </ModalActions>
     </Dialog>
   );
 }

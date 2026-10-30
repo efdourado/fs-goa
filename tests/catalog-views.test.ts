@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
+import { CatalogItemPage } from "../app/goa/screens/catalog-item";
 import { ptFormat, renderWithIntl } from "./helpers/intl";
 
 import { COVER_TONES, coverToneOf } from "../app/goa/catalog-cover";
@@ -38,4 +39,22 @@ test("numeric cover values include zero and custom properties can use year as th
   assert.equal(resolveCoverTop(item, "year", ptFormat), 0);
   const html = renderWithIntl(createElement(CatalogRow, { title: "A", year: 0, ratingLabel: "", meta: [], onOpen: () => undefined }));
   assert.match(html, />0<\/span>/);
+});
+
+test("item details keep original label casing and show ratings above the item name", () => {
+  const html = renderWithIntl(createElement(CatalogItemPage, {
+    item: { id: "book", kind: "book", title: "Um título longo para a página do item", ratingAvg: 4.2, ratingCount: 2,
+      attributes: [{ key: "nota", label: "Minhas Observações", type: "text", value: "Uma anotação extensa que precisa caber em telas pequenas sem perder o conteúdo." }],
+      rounds: [{ challengeId: "round", title: "O histórico continua com o título completo do desafio", status: "active", startsOn: null, endsOn: null, ratingAvg: 4.2, ratingCount: 2 }],
+    },
+    library: { id: "lib", kind: "book", source: "pages", label: "Livros da Família", position: 0, coverTopProperty: "none", coverBadgeHidden: false },
+    onBack: () => undefined, onOpenChallenge: () => undefined,
+    editAction: createElement("button", { "aria-label": "Editar item" }, "Editar"),
+  }));
+  assert.match(html, /Livros da Família/);
+  assert.match(html, /Minhas Observações/);
+  assert.doesNotMatch(html, /uppercase/);
+  assert.match(html, /aria-label="Editar item"/);
+  assert.ok(html.indexOf('role="img"') < html.indexOf("<h1"));
+  assert.match(html, /O histórico continua com o título completo do desafio/);
 });

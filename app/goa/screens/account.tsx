@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import { type FormEvent, useEffect, useState } from "react";
 
-import { Dialog } from "../dialog";
+import { Dialog, ModalActions } from "../dialog";
 import { API_PATHS, apiRequest } from "../api";
 import { useGoaFormat } from "../format";
 import type { ChallengeSummary, User } from "../types";
@@ -296,11 +296,11 @@ export function AccountScreen({
                 <input className={inputClass} type="password" autoComplete="current-password" value={deletePassword} onChange={(event) => setDeletePassword(event.target.value)} />
               </Field>
               <StatusMessage error={deleteError} />
-              <div className="flex justify-end gap-3 border-t border-[var(--line)] pt-4">
+              <ModalActions className="border-t border-[var(--line)] pt-4">
                 <Button variant="danger" disabled={deleteBusy || deletePassword.length === 0 || !preview} onClick={() => void deletePermanently()}>
                   {deleteBusy ? t("deleting") : tc("delete")}
                 </Button>
-              </div>
+              </ModalActions>
             </div>
           </Dialog>
         ) : null}
@@ -309,9 +309,9 @@ export function AccountScreen({
           <Dialog title={t("deactivateTitle")} busy={deactivateBusy} onClose={() => setShowDeactivate(false)}>
             <p className="text-sm leading-6">{t("deactivateConfirm")}</p>
             <StatusMessage error={deleteError} />
-            <div className="mt-6 flex justify-end gap-3 border-t border-[var(--line)] pt-4">
+            <ModalActions className="mt-6 border-t border-[var(--line)] pt-4">
               <Button disabled={deactivateBusy} onClick={() => void deactivate()}>{deactivateBusy ? tc("saving") : t("deactivate")}</Button>
-            </div>
+            </ModalActions>
           </Dialog>
         ) : null}
       </section>

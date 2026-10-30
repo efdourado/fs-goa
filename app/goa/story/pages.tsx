@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 
-import { Dialog } from "../dialog";
+import { Dialog, ModalActions } from "../dialog";
 import type { Metric } from "../types";
 import { cx } from "../ui";
 import { type AlmanacPage, useAlmanacPages } from "./almanac";
@@ -267,11 +267,13 @@ function PagesDialog({ input, story, metrics, onClose }: { input: StoryInput; st
           );
         })}
       </ol>
-      <div className="sticky bottom-0 -mx-6 -mb-6 mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--line)] bg-[var(--paper)] px-6 py-4">
+      <div className="sticky bottom-0 -mx-6 -mb-6 mt-6 space-y-3 border-t border-[var(--line)] bg-[var(--paper)] px-6 py-4">
         <span className="text-xs text-[var(--muted)]">{t(canShare ? "formatShare" : "format")}</span>
-        <button type="button" disabled={busy || !ordered.length || pending} onClick={() => void save()} className="inline-flex min-h-9 cursor-pointer items-center rounded-full bg-[var(--ink)] px-5 text-sm font-medium text-[var(--canvas)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45">
-          {label}
-        </button>
+        <ModalActions>
+          <button type="button" disabled={busy || !ordered.length || pending} onClick={() => void save()} className="inline-flex min-h-9 cursor-pointer items-center justify-center rounded-full bg-[var(--ink)] px-5 text-sm font-medium text-[var(--canvas)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45">
+            {label}
+          </button>
+        </ModalActions>
       </div>
     </Dialog>
   );

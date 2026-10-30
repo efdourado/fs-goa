@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
 
 import { API_PATHS, apiRequest } from "./api";
-import { Dialog, FormDialog } from "./dialog";
+import { Dialog, FormDialog, ModalActions } from "./dialog";
 import { canOrganise, OrganiseDialog, organiseFromRows } from "./organize-panel";
 import { type CatalogScope } from "./libraries";
 import { bodyFromValues, editableProperties, PropertyInputs, type PropertyValues, useLibrariesProperties, useNativePropertyName } from "./property-inputs";
@@ -589,7 +589,7 @@ export function CineItemsEditor({
       {editing ? (
         <Dialog title={editing.title || t("untitled")} onClose={() => setEditingKey(null)}>
           <RowCards rows={[editing]} shared={shared} openByDefault onChange={(row) => onChange(value.map((candidate) => (candidate.key === row.key ? row : candidate)))} />
-          <div className="mt-4 flex justify-end"><Button onClick={() => setEditingKey(null)}>{t("doneEditing")}</Button></div>
+          <ModalActions className="mt-4"><Button onClick={() => setEditingKey(null)}>{t("doneEditing")}</Button></ModalActions>
         </Dialog>
       ) : null}
     </div>
