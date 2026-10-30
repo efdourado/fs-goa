@@ -13,7 +13,7 @@ import { LibraryGlyph, useCatalogShelf, useLibraryName } from "../libraries";
 import { Rail, RailArrows, shelfCardWidth, useShelfRail } from "../shelf";
 import { NewChallengeButton } from "../welcome";
 import type { CatalogItem, ChallengeSummary, GroupInviteResult, GroupSummary, Id, Member, PendingGroupRequest } from "../types";
-import { ArrowRightIcon, AvatarMark, BackButton, Button, cx, FaceEmptyState, Field, inputClass, LinkPill, Select, SlidersIcon, StatusMessage, Toggle } from "../ui";
+import { ArrowRightIcon, AvatarMark, BackButton, Button, cx, FaceEmptyState, Field, inputClass, LinkPill, Select, SlidersIcon, StatusMessage } from "../ui";
 
 
 /** A word of the line under the invite link that opens its select. */
@@ -61,7 +61,7 @@ export function GroupScreen({
   onCreateInvite: (payload: { expiresInDays: number; maxUses: number; challengeId?: Id }) => Promise<{ token?: string; url?: string }>;
   onInviteByUsername: (username: string) => Promise<GroupInviteResult>;
   onCancelRequest: (id: Id) => Promise<void>;
-  onUpdateGroup: (payload: { name: string; description: string; recommendationsEnabled: boolean }) => Promise<void>;
+  onUpdateGroup: (payload: { name: string; description: string }) => Promise<void>;
   onDeleteGroup?: () => Promise<void>;
   /** Present for non-owners: leave the group. */
   onLeaveGroup?: () => Promise<void>;
@@ -82,7 +82,6 @@ export function GroupScreen({
   const [deletingGroup, setDeletingGroup] = useState(false);
   const [groupName, setGroupName] = useState(group.name);
   const [groupDescription, setGroupDescription] = useState(group.description ?? "");
-  const [groupRecommendations, setGroupRecommendations] = useState(group.recommendationsEnabled !== false);
   const [inviteUrl, setInviteUrl] = useState("");
   const inviteInputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -161,7 +160,6 @@ export function GroupScreen({
     if (!showGroupEdit) {
       setGroupName(group.name);
       setGroupDescription(group.description ?? "");
-      setGroupRecommendations(group.recommendationsEnabled !== false);
       setGroupError(null);
       setGroupSuccess(null);
       setDeletingGroup(false);
@@ -175,7 +173,7 @@ export function GroupScreen({
     setGroupError(null);
     setGroupSuccess(null);
     try {
-      await onUpdateGroup({ name: groupName.trim(), description: groupDescription.trim(), recommendationsEnabled: groupRecommendations });
+      await onUpdateGroup({ name: groupName.trim(), description: groupDescription.trim() });
       setGroupSuccess(t("updated"));
     } catch (cause) {
       setGroupError(f.error(cause));
@@ -321,7 +319,6 @@ export function GroupScreen({
           <form className="space-y-5" onSubmit={updateGroup}>
             <Field label={t("nameLabel")}><input className={inputClass} value={groupName} onChange={(event) => setGroupName(event.target.value)} required maxLength={120} /></Field>
             <Field label={t("descriptionLabel")} optional><textarea className={inputClass} rows={3} value={groupDescription} onChange={(event) => setGroupDescription(event.target.value)} maxLength={1000} placeholder={t("descriptionPlaceholder")} /></Field>
-            <Toggle checked={groupRecommendations} onChange={setGroupRecommendations} label={t("recommendationsLabel")} hint={t("recommendationsHint")} />
             <StatusMessage error={groupError} success={groupSuccess} />
             {/* Footer actions share the full available width equally. */}
             <ModalActions className="border-t border-[var(--line)] pt-4">

@@ -446,7 +446,7 @@ export default function GoaApp() {
     setScreen({ kind: "create-challenge", groupId });
   }
 
-  async function updateGroup(groupId: Id, payload: { name: string; description: string; recommendationsEnabled: boolean }) {
+  async function updateGroup(groupId: Id, payload: { name: string; description: string }) {
     if (!bootstrap) return;
     await apiRequest(API_PATHS.group(groupId), {
       method: "PATCH",

@@ -410,8 +410,6 @@
     "cancel": "Cancel",
     "leaveToggle": "Leave group",
     "leaveConfirm": "Everything of yours in this group is erased.",
-    "recommendationsLabel": "Recommendations",
-    "recommendationsHint": "Ask who recommended each item and show it. Turn off to hide it everywhere in this group, what's already recorded is kept.",
     "catalogEmptyTitle": "Start the catalogue",
     "catalogMoreIn": "more in {name}",
     "catalogSeeAll": "See all",

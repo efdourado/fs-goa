@@ -410,8 +410,6 @@
     "cancel": "Cancelar",
     "leaveToggle": "Salir del grupo",
     "leaveConfirm": "Todo lo tuyo en este grupo se borra.",
-    "recommendationsLabel": "Recomendaciones",
-    "recommendationsHint": "Pregunta quién recomendó cada ítem y lo muestra. Desactívalo para ocultarlo en todo el grupo, lo ya registrado se conserva.",
     "catalogEmptyTitle": "Empieza la colección",
     "catalogMoreIn": "más en {name}",
     "catalogSeeAll": "Ver todo",

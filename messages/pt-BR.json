@@ -410,8 +410,6 @@
     "cancel": "Cancelar",
     "leaveToggle": "Sair do grupo",
     "leaveConfirm": "Tudo seu neste grupo é apagado.",
-    "recommendationsLabel": "Indicações",
-    "recommendationsHint": "Pergunta quem indicou cada item e mostra isso. Desligue para esconder em todo o grupo, o que já foi registrado fica guardado.",
     "catalogEmptyTitle": "Comece a coleção",
     "catalogMoreIn": "mais em {name}",
     "catalogSeeAll": "Ver tudo",
