@@ -370,7 +370,7 @@ export function buildExportModel(input: {
       ].filter((part): part is string => Boolean(part)),
       year: catalog?.year ?? null,
       recommender,
-      note: item.description?.trim() || item.originNote?.trim() || null,
+      note: item.originNote?.trim() || null,
       chapter: chapterOf.get(item.id) ?? 0,
       entries: rows,
       progress,

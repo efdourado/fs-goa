@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { API_PATHS, apiRequest } from "./api";
 import { useCsrf } from "./csrf";
 import { FormDialog } from "./dialog";
+import { ItemEditorDialog } from "./item-editor-dialog";
 import { useGoaFormat } from "./format";
 import { type CatalogScope, LibraryPills, libraryChoices, librarySuggestions } from "./libraries";
 import {
@@ -15,14 +16,12 @@ import {
   type PropertyValues,
   showsRecommender,
   useLibraryProperties,
-  valuesFromItem,
 } from "./property-inputs";
 import {
   NO_RECOMMENDER,
   recommenderBody,
   RecommenderPicker,
   type RecommenderSource,
-  recommenderFromItem,
   sameRecommender,
   type RecommenderValue,
 } from "./recommender-picker";
@@ -213,72 +212,24 @@ export function EditCatalogItemDialog({
   /** Takes the item out of the catalogue (to the bin). Offered at the foot of the form, after a second click. */
   onRemove?: () => Promise<void>;
 }) {
-  const t = useTranslations("catalogAdd");
   const tCat = useTranslations("catalog");
-  const tEvent = useTranslations("eventSchedule");
-  const f = useGoaFormat();
   const csrf = useCsrf();
-  const choice = libraryChoices(libraries).find((entry) => entry.kind === item.kind) ?? null;
-  const { properties, error: propertiesError } = useLibraryProperties(choice);
-  // The group's switch, then the library's own: either can turn "who recommended it" off.
-  const askRecommender = recommendationsEnabled && showsRecommender(properties);
-  const [title, setTitle] = useState(item.title);
-  const initialRecommender = useMemo(() => recommenderFromItem(item.recommendedBy, item.originNote), [item]);
-  const [recommender, setRecommender] = useState<RecommenderValue>(initialRecommender);
-  const [edited, setEdited] = useState<PropertyValues | null>(null);
-  const initialValues = useMemo(() => (properties ? valuesFromItem(properties, item) : {}), [properties, item]);
-  const values = edited ?? initialValues;
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const dirty = title.trim() !== item.title || edited !== null || !sameRecommender(recommender, initialRecommender);
-
-  async function submit() {
-    const name = title.trim();
-    if (!name) { setError(t("titleRequired")); return; }
-    if (properties && propertiesHaveProblem(properties, values)) { setError(tEvent("invalid")); return; }
-    setBusy(true);
-    setError(null);
-    try {
-      const { native, attributes } = bodyFromValues(properties ?? [], values, "update");
-      await apiRequest(API_PATHS.catalogWorkspace(scope).item(item.id), {
-        method: "PATCH",
-        body: {
-          title: name,
-          ...native,
-          ...(Object.keys(attributes).length ? { attributes } : {}),
-          ...(askRecommender && !sameRecommender(recommender, initialRecommender) ? recommenderBody(recommender, "catalog", true) : {}),
-        },
-        csrfToken: csrf,
-      });
-      onSaved();
-    } catch (cause) {
-      setError(f.error(cause));
-      setBusy(false);
-    }
-  }
-
+  const library = libraryChoices(libraries).find((entry) => entry.kind === item.kind) ?? null;
   return (
-    <>
-      <FormDialog
-        title={t("editTitle")}
-        dirty={dirty}
-        busy={busy}
-        error={error ?? propertiesError}
-        onCancel={onCancel}
-        onSubmit={submit}
-        submitDisabled={!properties}
-        onDelete={onRemove ? { body: tCat("removeBody", { title: item.title }), onConfirm: onRemove } : undefined}
-      >
-        <Field label={t("titleLabel")}>
-          <input className={inputClass} value={title} maxLength={300} required onChange={(event) => setTitle(event.target.value)} />
-        </Field>
-        {properties ? (
-          <PropertyInputs properties={properties} values={values} onChange={(key, value) => setEdited({ ...values, [key]: value })} />
-        ) : (
-          <p className="text-sm text-[var(--muted)]">{t("loadingProperties")}</p>
-        )}
-        {askRecommender ? <RecommenderPicker value={recommender} onChange={setRecommender} members={members} source={source} /> : null}
-      </FormDialog>
-    </>
+    <ItemEditorDialog
+      item={item}
+      library={library}
+      members={members}
+      recommendationsEnabled={recommendationsEnabled}
+      source={source}
+      recommenderTarget="catalog"
+      maxTitleLength={300}
+      onCancel={onCancel}
+      onSave={async (body) => {
+        await apiRequest(API_PATHS.catalogWorkspace(scope).item(item.id), { method: "PATCH", body, csrfToken: csrf });
+        onSaved();
+      }}
+      onRemove={onRemove ? { body: tCat("removeBody", { title: item.title }), onConfirm: onRemove } : undefined}
+    />
   );
 }

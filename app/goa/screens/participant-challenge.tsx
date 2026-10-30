@@ -142,13 +142,15 @@ function RatingField({
   );
 }
 
-function ChevronGlyph({ open, className }: { open: boolean; className?: string }) {
+function MoreFieldsGlyph() {
   return (
-    <svg viewBox="0 0 16 16" className={cx(className ?? "h-3 w-3", "transition-transform", open && "rotate-180")} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M4 6l4 4 4-4" />
+    <svg viewBox="0 0 16 16" className="h-3 w-3" fill="currentColor" aria-hidden="true">
+      <circle cx="3" cy="8" r="1.5" /><circle cx="8" cy="8" r="1.5" /><circle cx="13" cy="8" r="1.5" />
     </svg>
   );
 }
+
+const OPTIONAL_FIELD_PREVIEW = 6;
 
 /** A small bordered pill for a secondary action — deliberately more present than an underlined word. */
 const actionChipClass =
@@ -266,11 +268,11 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
 
   const optionalFields = fields.filter((field) => field.id && !field.required);
   const isBlank = (value: unknown) => value === undefined || value === null || value === "";
-  const optionalCount = optionalFields.length;
-  const hasFilledOptional = optionalFields.some((field) => field.id && !isBlank(values[field.id]));
-  // Optional fields (e.g. "Nota do livro") stay tucked away so nobody feels
-  // nudged to rate a book they have not finished. Auto-open once one is filled.
-  const [showOptional, setShowOptional] = useState(hasFilledOptional || !canEdit);
+  const overflowOptional = optionalFields.slice(OPTIONAL_FIELD_PREVIEW);
+  // Keep saved answers visible, including any beyond the initial six fields.
+  const hasFilledOverflow = overflowOptional.some((field) => field.id && !isBlank(values[field.id]));
+  const [showOptional, setShowOptional] = useState(hasFilledOverflow || !canEdit);
+  const hiddenOptionalIds = new Set(overflowOptional.map((field) => field.id));
 
   function setValue(field: ChallengeField, value: unknown) {
     if (!field.id) return;
@@ -398,23 +400,6 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
   const namedFields = fields.filter((candidate) => candidate.id);
   const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
   const labelIsHeading = Boolean(heading) && namedFields.length === 1 && sameName(heading ?? "", namedFields[0].label);
-  // An all-optional section (Terminei) has nothing to show until you opt in —
-  // no required field ever appears on its own, so with nothing filled yet it
-  // collapses to a single control; clicking it reveals the heading, the
-  // fields, and the Save button together, instead of a heading (and a Save
-  // button that saves nothing yet) sitting above an empty "show optional
-  // fields" toggle.
-  const collapsedOptional = alwaysEditable && !showOptional && optionalCount > 0;
-  if (collapsedOptional) {
-    // Same chip as the "hide optional fields" one below (just closed rather
-    // than open) — not a visually different button for opening vs. closing.
-    return (
-      <button type="button" className={cx(actionChipClass, ghostChipClass)} onClick={() => setShowOptional(true)}>
-        <ChevronGlyph open={false} />
-        {heading ?? t("showOptional", { count: optionalCount })}
-      </button>
-    );
-  }
 
   return (
     <div className={cx(sectioned ? "border-l-[3px] border-[var(--line)] pl-4" : undefined, !heading && canReopen ? "relative" : undefined)}>
@@ -453,7 +438,7 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
       <form className="space-y-5" onSubmit={handleFormSubmit} noValidate>
         {fields.map((field) => {
           if (!field.id) return null;
-          if (!field.required && !showOptional) return null;
+          if (interactive && !showOptional && hiddenOptionalIds.has(field.id)) return null;
           // A saved answer shows only what was written: an optional field left empty (no comment) isn't drawn at all.
           if (!field.required && !interactive && isBlank(field.id ? values[field.id] : undefined)) return null;
           const id = `entry-field-${field.id}`;
@@ -504,10 +489,10 @@ export const DynamicEntryForm = forwardRef<DynamicEntryFormHandle, {
             </div>
           );
         })}
-        {optionalCount && interactive ? (
-          <button type="button" className={cx(actionChipClass, ghostChipClass)} onClick={() => setShowOptional((open) => !open)}>
-            <ChevronGlyph open={showOptional} />
-            {showOptional ? t("hideOptional") : t("showOptional", { count: optionalCount })}
+        {overflowOptional.length > 0 && interactive ? (
+          <button type="button" className={cx(actionChipClass, ghostChipClass)} aria-expanded={showOptional} onClick={() => setShowOptional((open) => !open)}>
+            <MoreFieldsGlyph />
+            {showOptional ? t("showLess") : t("showMore", { count: overflowOptional.length })}
           </button>
         ) : null}
         <StatusMessage error={error} success={success} />

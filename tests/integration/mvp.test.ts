@@ -220,7 +220,6 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
   assert.deepEqual(ownerDraftItemEdit.body, {
     id: originalItemIds[0],
     title: "Aftersun — seleção do clube",
-    description: "Primeiro filme da rodada.",
     opensAt: null,
     dueAt: null,
     schedulePrecision: "datetime",
@@ -247,7 +246,7 @@ test("executa o MVP completo com isolamento, métricas, vitrine e duplicação e
   }).items;
   assert.deepEqual(draftAfterOwnerItems.map((item) => item.id), originalItemIds, "editar não deve recriar os itens");
   assert.equal(draftAfterOwnerItems[0].title, "Aftersun — seleção do clube");
-  assert.equal(draftAfterOwnerItems[0].description, "Primeiro filme da rodada.");
+  assert.equal(Object.hasOwn(draftAfterOwnerItems[0], "description"), false, "itens não têm uma descrição embutida, mesmo se um cliente antigo enviar o campo");
 
   const hiddenDraft = await call("GET", `/api/challenges/${challengeId}`, { session: participant });
   assert.equal(hiddenDraft.response.status, 404, "participante não pode descobrir rascunho antes da ativação");

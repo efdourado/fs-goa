@@ -166,6 +166,7 @@ export function CatalogRow({ title, year, avg, ratingLabel, badgeHidden, meta, n
   onPick?: (on: boolean) => void;
   onOpen: () => void;
 }) {
+  const rating = badgeHidden || avg === null || avg === undefined ? null : <ScoreRing value={avg} size={36} label={ratingLabel} strokeWidth={3} textClassName="text-[11px] font-medium" />;
   const body = (
     <>
       {selecting ? <input type="checkbox" className="h-4 w-4 flex-none" checked={Boolean(picked)} aria-label={title} onChange={(event) => onPick?.(event.target.checked)} /> : null}
@@ -179,11 +180,10 @@ export function CatalogRow({ title, year, avg, ratingLabel, badgeHidden, meta, n
           </small>
         ) : null}
       </span>
-      {badgeHidden || avg === null || avg === undefined ? null : <ScoreRing value={avg} size={36} label={ratingLabel} strokeWidth={3} textClassName="text-[11px] font-medium" />}
     </>
   );
-  const shared = "flex w-full items-center gap-3.5 rounded-full px-3 py-3 text-left transition hover:bg-[var(--wash)] sm:gap-4 sm:px-4 sm:py-3.5";
+  const shared = "flex w-full items-center gap-3.5 rounded-xl px-3 py-3 text-left transition hover:bg-[var(--wash)] sm:gap-4 sm:px-4 sm:py-3.5";
   return selecting
-    ? <label className={cx(shared, "cursor-pointer")}>{body}</label>
-    : <button type="button" onClick={onOpen} className={cx(shared, "cursor-pointer focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-[var(--main)]/25")}>{body}</button>;
+    ? <label className={cx(shared, "cursor-pointer")}>{body}{rating}</label>
+    : <button type="button" onClick={onOpen} className={cx(shared, "cursor-pointer focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-[var(--main)]/25")}>{body}{rating}</button>;
 }

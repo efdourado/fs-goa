@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { type FormEvent, type ReactNode, useMemo, useState } from "react";
+import { type FormEvent, type ReactNode, useState } from "react";
 
 import { CheckpointPlanner } from "../checkpoint-planner";
 import { useGoaFormat } from "../format";
@@ -9,8 +9,9 @@ import { ConfirmDialog, FormDialog } from "../dialog";
 import { AddSharedResponseDialog, ResponseSettingsDialog, SharedGlyph } from "../shared-responses";
 import { cleanFields, type CountGoalOption, countGoalOptions, CountSettings, FieldConfigInputs, newFieldConfig, uniqueFieldKey, useFieldTypeOptions } from "../fields";
 import { type CatalogScope } from "../libraries";
-import { bodyFromValues, editableProperties, PropertyInputs, type PropertyValues, propertiesHaveProblem, showsRecommender, useLibraryProperties, valuesFromItem } from "../property-inputs";
-import { recommenderBody, RecommenderPicker, recommenderFromItem, type RecommenderValue, sameRecommender, useRecommenderSource } from "../recommender-picker";
+import { useLibraryProperties } from "../property-inputs";
+import { ItemEditorDialog as SharedItemEditorDialog } from "../item-editor-dialog";
+import { useRecommenderSource } from "../recommender-picker";
 import { canOrganise, OrganiseDialog, organiseFromItems } from "../organize-panel";
 import { RuleSectionsEditor, visibleRuleSections } from "../rules";
 import { ChallengeSettings, ChallengeStatePanel, type CopyMode } from "./challenge-actions";
@@ -36,7 +37,6 @@ import {
   ChallengeStatusBadge,
   CheckCircle,
   cx,
-  Disclosure,
   EmptyState,
   Field,
   inputClass,
@@ -661,7 +661,7 @@ export function FieldEditorDialog({
   );
 }
 
-type ItemUpdatePayload = { title: string; description: string } & Record<string, unknown>;
+type ItemUpdatePayload = { title: string; description?: string } & Record<string, unknown>;
 
 export function ItemEditorDialog({
   item,
@@ -689,82 +689,57 @@ export function ItemEditorDialog({
   onSave: (payload: ItemUpdatePayload) => Promise<void>;
 }) {
   const t = useTranslations("adminChallenge");
-  const tCine = useTranslations("cineItems");
+  const source = useRecommenderSource(scope, recommendationsEnabled && challenge.submissionMode === "item");
+  const removal = onRemove ? {
+    body: entryCount > 0 ? t("itemRemoveConfirmWithEntries", { title: item.title, count: entryCount }) : t("itemRemoveConfirm", { title: item.title }),
+    onConfirm: onRemove,
+  } : undefined;
+  if (challenge.submissionMode !== "item") {
+    return <CheckpointEditorDialog item={item} onCancel={onCancel} onSave={onSave} onRemove={removal} />;
+  }
+  return (
+    <SharedItemEditorDialog
+      item={{ ...item.catalogItem, title: item.title, recommendedBy: item.recommendedBy, originNote: item.originNote }}
+      library={item.catalogItem ? library : null}
+      members={members}
+      recommendationsEnabled={recommendationsEnabled}
+      source={source}
+      recommenderTarget="item"
+      maxTitleLength={200}
+      requireAuthor
+      onCancel={onCancel}
+      onSave={onSave}
+      onRemove={removal}
+    />
+  );
+}
+
+/** Checkpoints have their own description and do not edit a catalogue item. */
+function CheckpointEditorDialog({ item, onCancel, onSave, onRemove }: {
+  item: ChallengeItem;
+  onCancel: () => void;
+  onSave: (payload: ItemUpdatePayload) => Promise<void>;
+  onRemove?: { body: string; onConfirm: () => Promise<void> };
+}) {
+  const t = useTranslations("adminChallenge");
   const f = useGoaFormat();
-  const catalogItem = item.catalogItem ?? null;
-  const isItem = challenge.submissionMode === "item";
-  const initialRecommender = recommenderFromItem(item.recommendedBy, item.originNote);
-  const initial = { title: item.title, description: item.description ?? "" };
-  const [draft, setDraft] = useState(initial);
-  const [recommender, setRecommender] = useState<RecommenderValue>(initialRecommender);
-  // The library's own properties — renamed, hidden or added by its owners — not a fixed set of columns.
-  const { properties } = useLibraryProperties(catalogItem && library ? library : null);
-  const initialValues = useMemo(() => (catalogItem && properties ? valuesFromItem(properties, catalogItem) : {}), [catalogItem, properties]);
-  const [editedValues, setEditedValues] = useState<PropertyValues | null>(null);
-  const values = editedValues ?? initialValues;
-  // The group's switch, then the library's own: either can turn "who recommended it" off.
-  const askRecommender = recommendationsEnabled && isItem && showsRecommender(properties);
-  const source = useRecommenderSource(scope, askRecommender);
-  const set = (patch: Partial<typeof draft>) => setDraft((current) => ({ ...current, ...patch }));
+  const [title, setTitle] = useState(item.title);
+  const [description, setDescription] = useState(item.description ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const recommenderChanged = !sameRecommender(recommender, initialRecommender);
-  const dirty = JSON.stringify(draft) !== JSON.stringify(initial) || recommenderChanged || editedValues !== null;
-  const authorNeeded = library?.kind === "book" && properties?.find((property) => property.key === "author")?.hidden !== true;
-  // The event's own date and time is asked up front; the rest of the library's facts sit in a disclosure.
-  const scheduleProperty = properties?.find((property) => property.type === "schedule" && !property.hidden) ?? null;
-  const factProperties = (properties ?? []).filter((property) => property.type !== "schedule");
-  const factsPreview = editableProperties(factProperties).map((property) => values[property.key]).filter(Boolean).slice(0, 3).join(" · ");
-
-  async function submit() {
-    if (catalogItem && authorNeeded && !(values.author ?? "").trim()) { setError(tCine("authorRequired")); return; }
-    if (properties && propertiesHaveProblem(properties, values)) { setError(t("eventScheduleInvalid")); return; }
-    setBusy(true);
-    setError(null);
-    try {
-      const facts = catalogItem && properties && editedValues ? bodyFromValues(properties, editedValues, "update") : null;
-      await onSave({
-        title: draft.title.trim(),
-        description: draft.description.trim(),
-        ...(askRecommender && recommenderChanged ? recommenderBody(recommender, "item", true) : {}),
-        ...(facts ? { ...facts.native, ...(Object.keys(facts.attributes).length ? { attributes: facts.attributes } : {}) } : {}),
-      });
-    } catch (cause) { setError(f.error(cause)); setBusy(false); }
-  }
-
   return (
-    <FormDialog
-      title={challenge.submissionMode === "daily" ? t("editCheckpoint") : t("editItem")}
-      dirty={dirty}
-      busy={busy}
-      error={error}
-      onCancel={onCancel}
-      onSubmit={submit}
-      onDelete={onRemove ? {
-        body: entryCount > 0 ? t("itemRemoveConfirmWithEntries", { title: item.title, count: entryCount }) : t("itemRemoveConfirm", { title: item.title }),
-        busyLabel: t("removing"),
-        onConfirm: onRemove,
-      } : undefined}
-    >
+    <FormDialog title={t("editCheckpoint")} dirty={title !== item.title || description !== (item.description ?? "")} busy={busy} error={error} onCancel={onCancel} onDelete={onRemove} onSubmit={async () => {
+      setBusy(true);
+      setError(null);
+      try { await onSave({ title: title.trim(), description: description.trim() }); }
+      catch (cause) { setError(f.error(cause)); setBusy(false); }
+    }}>
       <Field label={t("itemTitleLabel")}>
-        <input className={inputClass} value={draft.title} onChange={(event) => set({ title: event.target.value })} required maxLength={challenge.submissionMode === "daily" ? 160 : 200} />
+        <input className={inputClass} value={title} onChange={(event) => setTitle(event.target.value)} required maxLength={160} />
       </Field>
       <Field label={t("itemDescriptionLabel")} optional>
-        <textarea className={inputClass} rows={3} value={draft.description} onChange={(event) => set({ description: event.target.value })} maxLength={2000} placeholder={t("itemDescriptionPlaceholder")} />
+        <textarea className={inputClass} rows={3} value={description} onChange={(event) => setDescription(event.target.value)} maxLength={2000} placeholder={t("itemDescriptionPlaceholder")} />
       </Field>
-      {askRecommender ? (
-        <RecommenderPicker value={recommender} onChange={setRecommender} members={members} source={source} />
-      ) : null}
-      {catalogItem && scheduleProperty ? (
-        <PropertyInputs properties={[scheduleProperty]} values={values} onChange={(key, value) => setEditedValues({ ...values, [key]: value })} />
-      ) : null}
-      {catalogItem && properties && editableProperties(factProperties).length ? (
-        <Disclosure summary={tCine("catalogFacts")} preview={factsPreview || undefined} defaultOpen={authorNeeded && !(values.author ?? "").trim()}>
-          <div className="pt-2">
-            <PropertyInputs properties={factProperties} values={values} onChange={(key, value) => setEditedValues({ ...values, [key]: value })} />
-          </div>
-        </Disclosure>
-      ) : null}
     </FormDialog>
   );
 }

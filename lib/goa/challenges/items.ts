@@ -155,7 +155,6 @@ export async function addChallengeItem(
   body: Record<string, unknown>,
 ) {
   const title = stringValue(body, "title", { max: 200 })!;
-  const description = stringValue(body, "description", { max: 2_000, optional: true }) ?? null;
   const author = stringValue(body, "author", { max: 200, optional: true }) ?? null;
   const originNote = stringValue(body, "originNote", { max: 200, optional: true }) ?? null;
   return inTransaction(async (client) => {
@@ -188,10 +187,10 @@ export async function addChallengeItem(
     }
     await client.query(
       `INSERT INTO challenge_items
-        (id, challenge_id, entry_type_id, catalog_item_id, recommended_by_user_id, recommended_by_external_id, checkpoint_id, origin_note, semantic_key, title, description, position, metadata, created_at, updated_at)
-       VALUES ($1,$2,NULL,$3,$4,$11,$5,$6,$7,$8,$9,$10,'{}'::jsonb,now(),now())`,
+        (id, challenge_id, entry_type_id, catalog_item_id, recommended_by_user_id, recommended_by_external_id, checkpoint_id, origin_note, semantic_key, title, position, metadata, created_at, updated_at)
+       VALUES ($1,$2,NULL,$3,$4,$10,$5,$6,$7,$8,$9,'{}'::jsonb,now(),now())`,
       [id, challengeId, catalogItemId, recommender.userId, checkpointId, recommender.note,
-        await uniqueItemKey(client, challengeId, body.key ?? title, position), title, description, position, recommender.externalId],
+        await uniqueItemKey(client, challengeId, body.key ?? title, position), title, position, recommender.externalId],
     );
     await writeAudit(client, access.challenge.group_id, challengeId, session.user.id,
       "item.created", "challenge_item", id, null, { title });
@@ -301,11 +300,11 @@ export async function saveChallengeItems(
 
       await client.query(
         `INSERT INTO challenge_items
-          (id,challenge_id,entry_type_id,catalog_item_id,recommended_by_user_id,recommended_by_external_id,checkpoint_id,origin_note,semantic_key,title,description,position,metadata,created_at,updated_at)
-         VALUES ($1,$2,NULL,$3,$4,$11,$5,$6,$7,$8,$9,$10,'{}'::jsonb,now(),now())`,
+          (id,challenge_id,entry_type_id,catalog_item_id,recommended_by_user_id,recommended_by_external_id,checkpoint_id,origin_note,semantic_key,title,position,metadata,created_at,updated_at)
+         VALUES ($1,$2,NULL,$3,$4,$10,$5,$6,$7,$8,$9,'{}'::jsonb,now(),now())`,
         [id, challengeId, catalogItemId, recommender.userId, checkpointId, recommender.note,
           await uniqueItemKey(client, challengeId, item.key ?? title, position), title,
-          typeof item.description === "string" ? item.description.trim() || null : null, position, recommender.externalId],
+          position, recommender.externalId],
       );
       ids.push(id);
     }
@@ -368,13 +367,13 @@ export async function updateChallengeItem(
     }
 
     const current = await oneOrNull<{
-      title: string; description: string | null; recommended_by_user_id: string | null;
+      title: string; recommended_by_user_id: string | null;
       recommended_by_external_id: string | null;
       catalog_item_id: string | null; origin_note: string | null; checkpoint_id: string | null;
       opens_at: Date | null; due_at: Date | null; schedule_precision: "date" | "datetime";
     }>(
       client,
-      `SELECT title, description, recommended_by_user_id, recommended_by_external_id, catalog_item_id, origin_note, checkpoint_id,
+      `SELECT title, recommended_by_user_id, recommended_by_external_id, catalog_item_id, origin_note, checkpoint_id,
               opens_at, due_at, schedule_precision
          FROM challenge_items
         WHERE id = $1 AND challenge_id = $2 AND archived_at IS NULL
@@ -385,9 +384,6 @@ export async function updateChallengeItem(
       const title = body.title === undefined
         ? current.title
         : stringValue(body, "title", { min: 1, max: 200 })!;
-      const description = body.description === undefined
-        ? current.description
-        : stringValue(body, "description", { max: 2_000, optional: true }) ?? null;
       let checkpointId = current.checkpoint_id;
       if (Object.hasOwn(body, "checkpointId")) {
         const wanted = typeof body.checkpointId === "string" ? body.checkpointId : "";
@@ -446,11 +442,11 @@ export async function updateChallengeItem(
       });
       await client.query(
         `UPDATE challenge_items
-            SET title = $3, description = $4, recommended_by_user_id = $5,
-                origin_note = $6, checkpoint_id = $7, opens_at = $8, due_at = $9,
-                schedule_precision = $10, recommended_by_external_id = $11, updated_at = now()
+            SET title = $3, recommended_by_user_id = $4,
+                origin_note = $5, checkpoint_id = $6, opens_at = $7, due_at = $8,
+                schedule_precision = $9, recommended_by_external_id = $10, updated_at = now()
           WHERE id = $1 AND challenge_id = $2`,
-        [itemId, challengeId, title, description, recommendedBy, originNote, checkpointId,
+        [itemId, challengeId, title, recommendedBy, originNote, checkpointId,
           schedule.opensAt, schedule.dueAt, schedule.schedulePrecision, recommendedByExternal],
       );
       // Autor, ano, gênero principal, páginas e duração vivem no item do acervo
@@ -475,15 +471,15 @@ export async function updateChallengeItem(
         "item.updated",
         "challenge_item",
         itemId,
-        { title: current.title, description: current.description },
+        { title: current.title },
         {
-          title, description,
+          title,
           ...(touchesRecommender ? { recommendedByUserId: recommendedBy, recommendedByExternalId: recommendedByExternal, originNote } : {}),
           ...(schedule.touched ? { opensAt: schedule.opensAt, dueAt: schedule.dueAt, schedulePrecision: schedule.schedulePrecision } : {}),
         },
       );
       return {
-        id: itemId, title, description,
+        id: itemId, title,
         ...(touchesRecommender ? { recommendedByUserId: recommendedBy, recommendedByExternalId: recommendedByExternal, originNote } : {}),
         opensAt: schedule.opensAt?.toISOString() ?? null,
         dueAt: schedule.dueAt?.toISOString() ?? null,

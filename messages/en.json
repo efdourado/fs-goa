@@ -1196,6 +1196,8 @@
     "ratingAria": "Rating {rating}",
     "hideOptional": "Hide optional fields",
     "showOptional": "Show optional fields ({count})",
+    "showMore": "Show {count} more",
+    "showLess": "Show less",
     "saveEntry": "Save entry",
     "editAnswer": "Edit answer",
     "readOnly": "This entry is read-only.",

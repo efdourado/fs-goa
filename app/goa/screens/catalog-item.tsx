@@ -25,14 +25,14 @@ function EditItemAction({ item, scope, recommendationsEnabled, editing, onSaved,
   const [open, setOpen] = useState(false);
   return (
     <>
-      {/* Settings on the cover itself, centred on its height: shown on hover (always on touch screens, which have none), opens the edit dialog. */}
+      {/* Settings stay visible on the cover at every screen size. */}
       <button
         type="button"
         disabled={!libraries}
         onClick={() => setOpen(true)}
         aria-label={t("edit")}
         title={t("edit")}
-        className="absolute inset-y-0 right-5 my-auto grid h-12 w-12 cursor-pointer place-items-center rounded-full bg-[var(--paper)]/70 text-[var(--ink)] shadow-[0_8px_24px_rgba(32,36,31,0.18)] ring-1 ring-[var(--paper)] backdrop-blur-md transition duration-200 hover:scale-105 hover:bg-[var(--paper)]/90 focus-visible:scale-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/30 disabled:cursor-not-allowed disabled:opacity-0 sm:scale-90 sm:opacity-0 sm:group-hover:scale-100 sm:group-hover:opacity-100"
+        className="absolute inset-y-0 right-5 my-auto grid h-12 w-12 cursor-pointer place-items-center rounded-xl bg-[var(--paper)]/70 text-[var(--ink)] shadow-[0_8px_24px_rgba(32,36,31,0.18)] ring-1 ring-[var(--paper)] backdrop-blur-md transition duration-200 hover:scale-105 hover:bg-[var(--paper)]/90 focus-visible:scale-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--main)]/30 disabled:cursor-not-allowed disabled:opacity-50"
       >
         <SlidersIcon className="h-[18px] w-[18px]" />
       </button>
@@ -131,7 +131,14 @@ export function CatalogItemScreen({
 
       <div>
         <div className="group relative w-full">
-          <ItemCover size="banner" title={item.title} year={item.year} showTitle={false} className="transition-shadow duration-300 sm:group-hover:shadow-[0_24px_48px_rgba(32,36,31,0.16)]" />
+          {rated ? (
+            <section className={cx(cardClass, "flex flex-wrap items-center gap-x-8 gap-y-5 p-6 sm:p-7", editing && "pr-24 sm:pr-24")}>
+              <ScoreRing value={item.ratingAvg} size={132} strokeWidth={2} label={t("ratedAria", { value: item.ratingAvg ?? 0 })} caption={t("outOfFive")} textClassName="text-[44px] font-light leading-none tracking-[-0.05em]" />
+              <p className="min-w-0 flex-1 basis-56 text-xl font-light leading-snug tracking-[-0.03em] sm:text-2xl">
+                {t("ratingSummary", { ratings: item.ratingCount ?? 0, rounds: item.rounds.length })}
+              </p>
+            </section>
+          ) : <ItemCover size="banner" title={item.title} showTitle={false} />}
           {editing ? (
             <EditItemAction item={item} scope={scope} recommendationsEnabled={recommendationsEnabled} editing={editing} onSaved={() => setNonce((value) => value + 1)} onRemove={onDelete} />
           ) : null}
@@ -155,19 +162,6 @@ export function CatalogItemScreen({
                 </div>
               ))}
             </dl>
-          ) : null}
-
-          {/* Not rated (yet, or a library that isn't rated at all): no rating block. */}
-          {rated ? (
-            <section className={cx(cardClass, "mt-7 flex flex-wrap items-center gap-x-8 gap-y-5 p-6 sm:p-7")} aria-label={t("ratingTitle")}>
-              <ScoreRing value={item.ratingAvg} size={132} strokeWidth={2} label={t("ratedAria", { value: item.ratingAvg ?? 0 })} caption={t("outOfFive")} textClassName="text-[44px] font-light leading-none tracking-[-0.05em]" />
-              <div className="min-w-0 flex-1 basis-56">
-                <h2 className="text-xs uppercase tracking-[0.08em] text-[var(--muted)]">{t("ratingTitle")}</h2>
-                <p className="mt-2 text-xl font-light leading-snug tracking-[-0.03em] sm:text-2xl">
-                  {t("ratingSummary", { ratings: item.ratingCount ?? 0, rounds: item.rounds.length })}
-                </p>
-              </div>
-            </section>
           ) : null}
 
           <section className="mt-10">

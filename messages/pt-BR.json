@@ -1196,6 +1196,8 @@
     "ratingAria": "Nota {rating}",
     "hideOptional": "Ocultar campos opcionais",
     "showOptional": "Mostrar campos opcionais ({count})",
+    "showMore": "Mostrar mais {count}",
+    "showLess": "Mostrar menos",
     "saveEntry": "Salvar registro",
     "editAnswer": "Editar resposta",
     "readOnly": "Este registro está disponível somente para leitura.",

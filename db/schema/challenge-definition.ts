@@ -183,7 +183,6 @@ export const challengeItems = pgTable(
     originNote: text("origin_note"),
     semanticKey: text("semantic_key").notNull(),
     title: text("title").notNull(),
-    description: text("description"),
     position: integer("position").notNull().default(0),
     opensAt: timestamptz("opens_at"),
     dueAt: timestamptz("due_at"),

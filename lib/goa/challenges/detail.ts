@@ -55,7 +55,7 @@ async function detailItems(
   recommendationsEnabled = true,
 ) {
   const result = await client.query<{
-    id: string; title: string; description: string | null;
+    id: string; title: string;
     position: number; opens_at: Date | null; due_at: Date | null; schedule_precision: "date" | "datetime";
     checkpoint_id: string | null; origin_note: string | null;
     catalog_item_id: string | null; catalog_kind: string | null; catalog_title: string | null;
@@ -73,7 +73,7 @@ async function detailItems(
     // along with it, same as a deleted account already reads "Conta removida".
     // An external name has no membership to lose, so it always shows here —
     // it's excluded only from the *public* rendering (Phase 6), below.
-    `SELECT i.id, i.title, i.description, i.position, i.opens_at, i.due_at, i.schedule_precision, i.checkpoint_id, i.origin_note,
+    `SELECT i.id, i.title, i.position, i.opens_at, i.due_at, i.schedule_precision, i.checkpoint_id, i.origin_note,
             i.catalog_item_id, ci.kind AS catalog_kind, ci.title AS catalog_title, ci.author AS catalog_author, ci.year AS catalog_year,
             ci.main_genre AS catalog_main_genre, ci.page_count AS catalog_pages, ci.runtime_minutes AS catalog_runtime_minutes,
             CASE WHEN ${scheduleVisibleSql("ci")} THEN ci.scheduled_at END AS scheduled_at,
@@ -109,7 +109,7 @@ async function detailItems(
   const showWho = recommendationsEnabled && !isPublic;
   return result.rows.map((item) => ({
     id: item.id, title: item.title,
-    description: item.description, position: item.position,
+    position: item.position,
     checkpointId: item.checkpoint_id ?? null,
     // Whatever was recorded stays stored, just unseen.
     originNote: showWho && item.recommender_visible ? item.origin_note ?? null : null,

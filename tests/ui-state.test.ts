@@ -257,7 +257,7 @@ test("renderiza estado agendado e regras tituladas em destaque", () => {
   assert.doesNotMatch(rules, /<details/);
 });
 
-test("formulário de registro esconde campos opcionais até a pessoa pedir", () => {
+test("formulário de registro mostra campos opcionais sem precisar abrir", () => {
   const form = renderWithIntl(createElement(DynamicEntryForm, {
     fields: [
       { id: "f1", key: "paginas", label: "Páginas lidas", type: "number", required: true },
@@ -268,8 +268,35 @@ test("formulário de registro esconde campos opcionais até a pessoa pedir", () 
     onSave: async () => undefined,
   }));
   assert.match(form, /Páginas lidas/);
-  assert.doesNotMatch(form, /Nota do livro/, "campo opcional fica oculto por padrão");
-  assert.match(form, /Mostrar campos opcionais \(1\)/);
+  assert.match(form, /Nota do livro/, "campo opcional aparece por padrão");
+  assert.doesNotMatch(form, /Mostrar mais|Ocultar campos opcionais/);
+});
+
+test("optional fields show six initially and preserve saved answers beyond the preview", () => {
+  const fields: ChallengeField[] = Array.from({ length: 8 }, (_, index) => ({
+    id: `optional-${index}`, key: `optional-${index}`, label: `Optional ${index + 1}`, type: "text", required: false,
+  }));
+  const props = { fields, item: null, canEdit: true, alwaysEditable: true, onSave: async () => undefined };
+  const six = renderWithIntl(createElement(DynamicEntryForm, { ...props, fields: fields.slice(0, 6) }));
+  assert.match(six, /Optional 6/);
+  assert.doesNotMatch(six, /Mostrar mais/);
+
+  const overflow = renderWithIntl(createElement(DynamicEntryForm, { ...props, fields: [
+    ...fields, { id: "required", key: "required", label: "Required after optional", type: "text", required: true },
+  ] }));
+  assert.match(overflow, /Optional 6/);
+  assert.doesNotMatch(overflow, /Optional 7|Optional 8/);
+  assert.match(overflow, /Required after optional/);
+  assert.match(overflow, /aria-expanded="false"/);
+  assert.match(overflow, /Mostrar mais 2/);
+  assert.match(overflow, /<circle cx="8" cy="8"/);
+
+  const saved = renderWithIntl(createElement(DynamicEntryForm, {
+    ...props, entry: { id: "e1", values: { "optional-7": "Saved answer" } },
+  }));
+  assert.match(saved, /Optional 8/);
+  assert.match(saved, /value="Saved answer"/);
+  assert.match(saved, /aria-expanded="true"/);
 });
 
 test("uma resposta já salva mantém os mesmos campos (desabilitados) e troca os botões por um ícone de cadeado", () => {
@@ -344,7 +371,7 @@ test("sem botão de excluir: o rótulo 'Excluir registro' não aparece mais em l
   assert.match(editing, /type="submit">Salvar/, "salvar continua presente");
 });
 
-test("Terminei (alwaysEditable, só campos opcionais): fica recolhido num botão até o participante abrir", () => {
+test("Terminei mostra até seis campos opcionais diretamente", () => {
   const fields = [
     { id: "f-nota", key: "nota", label: "Nota", type: "rating", required: false, config: { min: 0, max: 5, step: 0.5 } },
     { id: "f-com", key: "comentario", label: "Comentário", type: "text", required: false },
@@ -358,9 +385,11 @@ test("Terminei (alwaysEditable, só campos opcionais): fica recolhido num botão
     canEdit: true,
     onSave: async () => undefined,
   }));
-  assert.match(collapsed, /Se terminei\.\.\./, "o botão recolhido usa o próprio heading como rótulo");
-  assert.doesNotMatch(collapsed, /<form/, "os campos ficam escondidos até abrir");
-  assert.doesNotMatch(collapsed, /Salvar (registro|alterações)/, "o botão de salvar só aparece depois de abrir");
+  assert.match(collapsed, /Se terminei\.\.\./);
+  assert.match(collapsed, /<form/);
+  assert.match(collapsed, /Comentário/);
+  assert.match(collapsed, /type="submit">Salvar/);
+  assert.doesNotMatch(collapsed, /Mostrar mais|Ocultar campos opcionais/);
 
   const filled = renderWithIntl(createElement(DynamicEntryForm, {
     fields,

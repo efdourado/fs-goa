@@ -309,13 +309,13 @@ export async function copyChallengeStructure(
   if (copyItems) {
     const sourceItems = await client.query<{
       entry_type_id: string | null; checkpoint_id: string | null; semantic_key: string; title: string;
-      description: string | null; position: number; metadata: unknown;
+      position: number; metadata: unknown;
       opens_at: Date | null; due_at: Date | null; schedule_precision: string;
       catalog_kind: string | null; catalog_title: string | null; catalog_author: string | null;
       catalog_year: number | null; catalog_main_genre: string | null; catalog_pages: number | null;
       catalog_runtime: number | null; catalog_item_id: string | null;
     }>(
-      `SELECT i.entry_type_id,i.checkpoint_id,i.semantic_key,i.title,i.description,i.position,i.metadata,i.catalog_item_id,
+      `SELECT i.entry_type_id,i.checkpoint_id,i.semantic_key,i.title,i.position,i.metadata,i.catalog_item_id,
               i.opens_at,i.due_at,i.schedule_precision,
               ci.kind AS catalog_kind, ci.title AS catalog_title, ci.author AS catalog_author, ci.year AS catalog_year,
               ci.main_genre AS catalog_main_genre, ci.page_count AS catalog_pages, ci.runtime_minutes AS catalog_runtime
@@ -362,14 +362,14 @@ export async function copyChallengeStructure(
       }
       await client.query(
         `INSERT INTO challenge_items
-          (id,challenge_id,entry_type_id,checkpoint_id,catalog_item_id,semantic_key,title,description,position,
+          (id,challenge_id,entry_type_id,checkpoint_id,catalog_item_id,semantic_key,title,position,
            opens_at,due_at,schedule_precision,metadata,created_at,updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,now(),now())`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,now(),now())`,
         [publicId(), targetId,
           item.entry_type_id ? typeMap.get(item.entry_type_id) : null,
           item.checkpoint_id ? checkpointMap.get(item.checkpoint_id) ?? null : null,
           catalogItemId,
-          item.semantic_key, item.title, item.description,
+          item.semantic_key, item.title,
           item.position, item.opens_at, item.due_at, item.schedule_precision, JSON.stringify(item.metadata ?? {})],
       );
     }
