@@ -25,7 +25,6 @@ export function challengeRequestBody(input: ChallengeCreationInput) {
     ...(input.sessionName ? { sessionName: input.sessionName } : {}),
     ...(input.sessionNoteLabel ? { sessionNoteLabel: input.sessionNoteLabel } : {}),
     ...(input.sharedEditPolicy ? { sharedEditPolicy: input.sharedEditPolicy } : {}),
-    ...(input.itemDates ? { itemDates: true } : {}),
     participantIds: input.participantIds,
   };
 }

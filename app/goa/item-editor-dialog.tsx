@@ -5,9 +5,8 @@ import { useMemo, useState } from "react";
 
 import { FormDialog } from "./dialog";
 import { useGoaFormat } from "./format";
-import { bodyFromValues, editableProperties, PropertyInputs, propertiesHaveProblem, type PropertyValues, showsRecommender, useLibraryProperties, valuesFromItem } from "./property-inputs";
-import { recommenderBody, recommenderFromItem, RecommenderPicker, type RecommenderSource, type RecommenderValue, sameRecommender } from "./recommender-picker";
-import type { CatalogItem, Id, LibraryProperty, Member } from "./types";
+import { bodyFromValues, editableProperties, PropertyInputs, type PropertyValues, useLibraryProperties, valuesFromItem } from "./property-inputs";
+import type { CatalogItem, Id, LibraryProperty } from "./types";
 import { Field, inputClass } from "./ui";
 
 export type ItemEditorPayload = { title: string } & Record<string, unknown>;
@@ -16,13 +15,9 @@ const VISIBLE_PROPERTIES = 6;
 const EMPTY_PROPERTIES: LibraryProperty[] = [];
 
 /** One item editor for both catalogue and challenge views. Callers supply only their save/removal actions. */
-export function ItemEditorDialog({ item, library, members, recommendationsEnabled, source, recommenderTarget, maxTitleLength, requireAuthor = false, onCancel, onSave, onRemove }: {
+export function ItemEditorDialog({ item, library, maxTitleLength, requireAuthor = false, onCancel, onSave, onRemove }: {
   item: EditorItem;
   library: { id: Id | null; kind: string } | null;
-  members: Member[];
-  recommendationsEnabled: boolean;
-  source: RecommenderSource;
-  recommenderTarget: "catalog" | "item";
   maxTitleLength: number;
   requireAuthor?: boolean;
   onCancel: () => void;
@@ -30,25 +25,21 @@ export function ItemEditorDialog({ item, library, members, recommendationsEnable
   onRemove?: { body: string; onConfirm: () => Promise<void> };
 }) {
   const t = useTranslations("catalogAdd");
-  const tEvent = useTranslations("eventSchedule");
   const tCine = useTranslations("cineItems");
   const tFields = useTranslations("entryForm");
   const f = useGoaFormat();
   const { properties: loadedProperties, error: propertiesError } = useLibraryProperties(library);
   const properties = library ? loadedProperties : EMPTY_PROPERTIES;
   const [title, setTitle] = useState(item.title);
-  const initialRecommender = recommenderFromItem(item.recommendedBy, item.originNote);
-  const [recommender, setRecommender] = useState<RecommenderValue>(initialRecommender);
   const initialValues = useMemo(() => properties ? valuesFromItem(properties, item) : {}, [properties, item]);
   const [edited, setEdited] = useState<PropertyValues | null>(null);
   const values = edited ?? initialValues;
   const [expanded, setExpanded] = useState(false);
   const visible = editableProperties(properties ?? []);
   const shown = expanded ? visible : visible.slice(0, VISIBLE_PROPERTIES);
-  const askRecommender = recommendationsEnabled && showsRecommender(properties);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const dirty = title.trim() !== item.title || edited !== null || !sameRecommender(recommender, initialRecommender);
+  const dirty = title.trim() !== item.title || edited !== null;
 
   async function submit() {
     const name = title.trim();
@@ -59,7 +50,6 @@ export function ItemEditorDialog({ item, library, members, recommendationsEnable
       setError(tCine("authorRequired"));
       return;
     }
-    if (propertiesHaveProblem(properties, values)) { setExpanded(true); setError(tEvent("invalid")); return; }
     setBusy(true);
     setError(null);
     try {
@@ -67,7 +57,6 @@ export function ItemEditorDialog({ item, library, members, recommendationsEnable
       await onSave({
         title: name,
         ...(facts ? { ...facts.native, ...(Object.keys(facts.attributes).length ? { attributes: facts.attributes } : {}) } : {}),
-        ...(askRecommender && !sameRecommender(recommender, initialRecommender) ? recommenderBody(recommender, recommenderTarget, true) : {}),
       });
     } catch (cause) { setError(f.error(cause)); setBusy(false); }
   }
@@ -84,7 +73,6 @@ export function ItemEditorDialog({ item, library, members, recommendationsEnable
           {expanded ? tFields("showLess") : tFields("showMore", { count: visible.length - VISIBLE_PROPERTIES })}
         </button>
       ) : null}
-      {askRecommender ? <RecommenderPicker value={recommender} onChange={setRecommender} members={members} source={source} /> : null}
     </FormDialog>
   );
 }

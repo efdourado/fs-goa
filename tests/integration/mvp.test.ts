@@ -2567,9 +2567,9 @@ test("propriedades da biblioteca: renomear e ocultar, nativa ou personalizada, p
     };
 
   const initial = await props(screens.id);
-  assert.deepEqual(initial.properties.map((property) => property.key), ["title", "year", "main_genre", "runtime_minutes", "scheduled_at", "recommended_by"]);
+  assert.deepEqual(initial.properties.map((property) => property.key), ["title", "year", "main_genre", "runtime_minutes"]);
   assert.equal(initial.properties.every((property) => property.storage === "native" && property.label === null), true);
-  assert.deepEqual(initial.properties.filter((property) => property.hidden).map((property) => property.key), ["scheduled_at", "recommended_by"], "a data do evento e quem indicou nascem desligadas");
+  assert.deepEqual(initial.properties.filter((property) => property.hidden).map((property) => property.key), [], "nenhuma propriedade especial é inserida");
   assert.equal(initial.properties[0].canHide, false, "o nome do item nunca fica oculto");
 
   // renomear e ocultar uma propriedade nativa — dado e métrica seguem intactos
@@ -2684,7 +2684,7 @@ test("propriedades da biblioteca: Tables nasce só com o nome e cada biblioteca 
 
   const starter = await list(tables.id);
   assert.deepEqual(starter.properties.filter((p) => p.storage === "attribute"), [], "nenhuma propriedade de partida além das nativas");
-  assert.deepEqual(starter.properties.filter((p) => p.storage === "native").map((p) => p.key), ["title", "scheduled_at", "recommended_by"], "fora film/book só o título, a data do evento e quem indicou são nativos");
+  assert.deepEqual(starter.properties.filter((p) => p.storage === "native").map((p) => p.key), ["title"], "fora film/book só o título é nativo");
 
   // "Kickoff" numa biblioteca Matches não aparece em Tables
   const kickoff = await call("POST", `/api/groups/${gid}/catalog-attributes`, { session: owner, body: { libraryId: matches.id, label: "Kickoff", type: "date" } });
@@ -7656,85 +7656,6 @@ test("o registro principal de um desafio personalizado nasce compartilhado quand
   assert.equal((await create({ answerScope: "shared", sharedEditPolicy: "anyone" })).response.status, 400);
 });
 
-test("data e hora do evento é propriedade do item do acervo: desligada por padrão, lida por todo desafio que usa o item, copiada junto", async () => {
-  const owner = await register("Quiteria", "quiteria_evento");
-  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Copa" } })).body as { id: string }).id;
-  const matches = (await call("POST", `/api/groups/${gid}/catalog/libraries`, { session: owner, body: { label: "Jogos" } })).body as { id: string; kind: string };
-  const props = async () => (await call("GET", `/api/catalog/libraries/${matches.id}/properties`, { session: owner })).body as { properties: Array<{ key: string; type: string; hidden: boolean }> };
-  const schedule = (await props()).properties.find((property) => property.key === "scheduled_at")!;
-  assert.equal(schedule.type, "schedule");
-  assert.equal(schedule.hidden, true, "a maioria das bibliotecas não tem data própria");
-
-  const kickoff = "2026-06-15T19:00:00.000Z";
-  const created = await call("POST", `/api/groups/${gid}/challenges`, {
-    session: owner,
-    body: {
-      recipe: "custom", title: "Copa", libraryId: matches.id, participantIds: [owner.user.id],
-      items: [
-        { title: "Brasil x Argentina", scheduledAt: { startsAt: kickoff, endsAt: "2026-06-15T21:00:00.000Z", timeZone: "America/Sao_Paulo" } },
-        { title: "França x Alemanha", scheduledAt: { startsOn: "2026-06-20", timeZone: "America/Sao_Paulo" } },
-        { title: "Sem data" },
-      ],
-    },
-  });
-  assert.equal(created.response.status, 201, JSON.stringify(created.body));
-  const cid = (created.body as { id: string }).id;
-  type ScheduledItem = { id: string; title: string; opensAt: string | null; catalogItem: { id: string; scheduledAt: { startsAt: string; endsAt: string | null; precision: string; timeZone: string } | null } };
-  const items = async () => ((await call("GET", `/api/challenges/${cid}`, { session: owner })).body as { items: ScheduledItem[] }).items;
-  assert.equal((await items())[0].catalogItem.scheduledAt, null, "desligada: os dados ficam guardados, mas não aparecem");
-
-  assert.equal((await call("PATCH", `/api/catalog/libraries/${matches.id}/properties/scheduled_at`, { session: owner, body: { hidden: false } })).response.status, 200);
-  const [brasil, franca, sem] = await items();
-  assert.deepEqual(brasil.catalogItem.scheduledAt, { startsAt: kickoff, endsAt: "2026-06-15T21:00:00.000Z", precision: "datetime", timeZone: "America/Sao_Paulo" });
-  assert.equal(franca.catalogItem.scheduledAt?.precision, "date");
-  assert.equal(franca.catalogItem.scheduledAt?.startsAt, "2026-06-20T03:00:00.000Z", "só a data: meia-noite no fuso informado");
-  assert.equal(sem.catalogItem.scheduledAt, null);
-  assert.equal(brasil.opensAt, null, "o horário do jogo não é uma janela de resposta");
-
-  // o acervo sozinho já conhece a data
-  const catalog = (await call("GET", `/api/groups/${gid}/catalog`, { session: owner })).body as { items: Array<{ title: string; scheduledAt: { startsAt: string } | null }> };
-  assert.equal(catalog.items.find((item) => item.title === "Brasil x Argentina")?.scheduledAt?.startsAt, kickoff);
-  const detail = (await call("GET", `/api/groups/${gid}/catalog/${brasil.catalogItem.id}`, { session: owner })).body as { scheduledAt: { startsAt: string } | null };
-  assert.equal(detail.scheduledAt?.startsAt, kickoff);
-
-  // editar pelo item do desafio muda o item do acervo — um único horário, sem segunda cópia para divergir
-  const moved = "2026-06-15T22:30:00.000Z";
-  const patched = await call("PATCH", `/api/challenges/${cid}/items/${brasil.id}`, { session: owner, body: { scheduledAt: { startsAt: moved, timeZone: "America/Sao_Paulo" } } });
-  assert.equal(patched.response.status, 200, JSON.stringify(patched.body));
-  const afterMove = (await items())[0].catalogItem.scheduledAt;
-  assert.equal(afterMove?.startsAt, moved);
-  assert.equal(afterMove?.endsAt, null, "o fim opcional some quando não é informado de novo");
-  const catalogAfter = (await call("GET", `/api/groups/${gid}/catalog`, { session: owner })).body as { items: Array<{ title: string; scheduledAt: { startsAt: string } | null }> };
-  assert.equal(catalogAfter.items.find((item) => item.title === "Brasil x Argentina")?.scheduledAt?.startsAt, moved);
-
-  for (const bad of [
-    { startsAt: kickoff, timeZone: "Mars/Olympus" },
-    { startsAt: "amanhã", timeZone: "UTC" },
-    { startsAt: kickoff, endsAt: "2026-06-15T18:00:00.000Z", timeZone: "UTC" },
-    { startsOn: "2026-06-15", startsAt: kickoff },
-    { endsOn: "2026-06-15" },
-  ]) {
-    const rejected = await call("PATCH", `/api/challenges/${cid}/items/${brasil.id}`, { session: owner, body: { scheduledAt: bad } });
-    assert.equal(rejected.response.status, 400, JSON.stringify(bad));
-  }
-  assert.equal(((await call("PATCH", `/api/challenges/${cid}/items/${brasil.id}`, { session: owner, body: { scheduledAt: { startsAt: kickoff, timeZone: "Mars/Olympus" } } })).body as { error: string }).error, "invalid_timezone");
-  const cleared = await call("PATCH", `/api/challenges/${cid}/items/${sem.id}`, { session: owner, body: { scheduledAt: null } });
-  assert.equal(cleared.response.status, 200);
-
-  // duplicar leva a data do evento — e liga a propriedade na cópia, senão ela ficaria guardada mas invisível
-  const dst = ((await call("POST", "/api/groups", { session: owner, body: { name: "Outro bolão" } })).body as { id: string }).id;
-  const copy = await call("POST", `/api/challenges/${cid}/duplicate`, { session: owner, body: { targetGroupId: dst, mode: "structure_and_items" } });
-  assert.equal(copy.response.status, 201, JSON.stringify(copy.body));
-  const copied = ((await call("GET", `/api/challenges/${(copy.body as { id: string }).id}`, { session: owner })).body as { items: ScheduledItem[] }).items;
-  assert.equal(copied.find((item) => item.title === "Brasil x Argentina")?.catalogItem.scheduledAt?.startsAt, moved);
-  assert.equal(copied.find((item) => item.title === "França x Alemanha")?.catalogItem.scheduledAt?.precision, "date");
-
-  // desligar de novo esconde sem apagar: a mesma propriedade, o mesmo caminho de sempre
-  await call("PATCH", `/api/catalog/libraries/${matches.id}/properties/scheduled_at`, { session: owner, body: { hidden: true } });
-  assert.equal((await items())[0].catalogItem.scheduledAt, null);
-  const configRows = await adminPool.query("SELECT 1 FROM catalog_native_property_configs WHERE library_id = $1 AND property_key = 'scheduled_at'", [matches.id]);
-  assert.equal(configRows.rowCount, 0, "voltar ao padrão (desligada) não deixa configuração para trás");
-});
 
 test("\"as respostas abrem em\" bloqueia de verdade no servidor; \"responder até\" é só um lembrete", async () => {
   const owner = await register("Rita", "rita_janela");
@@ -7817,50 +7738,6 @@ test("copiar para um destino com a mesma propriedade de outro tipo (ou arquivada
   assert.deepEqual((clean.body as { skippedProperties: unknown[] }).skippedProperties, []);
 });
 
-test("criar o desafio com \"cada item tem data e hora\" liga a propriedade nas bibliotecas dele, inclusive nas embutidas ainda sem linha", async () => {
-  const owner = await register("Tiago", "tiago_datas");
-  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Copa" } })).body as { id: string }).id;
-  const matches = (await call("POST", `/api/groups/${gid}/catalog/libraries`, { session: owner, body: { label: "Jogos" } })).body as { id: string; kind: string };
-  const scheduleOf = async (libraryId: string) =>
-    ((await call("GET", `/api/catalog/libraries/${libraryId}/properties`, { session: owner })).body as { properties: Array<{ key: string; hidden: boolean }> })
-      .properties.find((property) => property.key === "scheduled_at")!;
-  assert.equal((await scheduleOf(matches.id)).hidden, true);
-
-  const kickoff = "2026-06-15T19:00:00.000Z";
-  const created = await call("POST", `/api/groups/${gid}/challenges`, {
-    session: owner,
-    body: {
-      recipe: "custom", title: "Copa", libraryId: matches.id, itemDates: true, participantIds: [owner.user.id],
-      items: [{ title: "Brasil x Argentina", scheduledAt: { startsAt: kickoff, timeZone: "America/Sao_Paulo" } }],
-    },
-  });
-  assert.equal(created.response.status, 201, JSON.stringify(created.body));
-  assert.equal((await scheduleOf(matches.id)).hidden, false, "o desafio ligou a data do evento na biblioteca");
-  const detail = (await call("GET", `/api/challenges/${(created.body as { id: string }).id}`, { session: owner })).body as {
-    items: Array<{ catalogItem: { scheduledAt: { startsAt: string } | null } }>;
-  };
-  assert.equal(detail.items[0].catalogItem.scheduledAt?.startsAt, kickoff);
-
-  // uma biblioteca embutida que ainda nem tinha linha ganha a linha e a propriedade ligada
-  const cinema = await call("POST", `/api/groups/${gid}/challenges`, {
-    session: owner,
-    body: {
-      recipe: "cinema", title: "Sessões", itemDates: true, participantIds: [owner.user.id],
-      items: [{ title: "Aftersun", scheduledAt: { startsOn: "2026-07-01", timeZone: "America/Sao_Paulo" } }],
-    },
-  });
-  assert.equal(cinema.response.status, 201, JSON.stringify(cinema.body));
-  const film = (await call("GET", `/api/groups/${gid}/catalog/libraries`, { session: owner })).body as { libraries: Array<{ id: string; kind: string }> };
-  assert.equal((await scheduleOf(film.libraries.find((library) => library.kind === "film")!.id)).hidden, false);
-
-  // sem a opção, nada muda numa biblioteca que já existe
-  const plain = await call("POST", `/api/groups/${gid}/challenges`, {
-    session: owner, body: { recipe: "bookshelf", title: "Livros", participantIds: [owner.user.id], items: [{ title: "Dom Casmurro", author: "Machado de Assis" }] },
-  });
-  assert.equal(plain.response.status, 201, JSON.stringify(plain.body));
-  const book = (await call("GET", `/api/groups/${gid}/catalog/libraries`, { session: owner })).body as { libraries: Array<{ id: string; kind: string }> };
-  assert.equal((await scheduleOf(book.libraries.find((library) => library.kind === "book")!.id)).hidden, true);
-});
 
 test("remover um tipo de resposta que já tem respostas: avisa quantas, e só com a confirmação apaga as respostas junto", async () => {
   const owner = await register("Tais", "tais_apaga");
@@ -9045,48 +8922,6 @@ test("varredura de acesso: quem é de fora não lê nem muda nada, e um particip
   assert.equal(await snapshot(), start, "nada mudou depois de todas as tentativas");
 });
 
-test("quem indicou é uma propriedade da biblioteca: desligada, some do item, do acervo e do ranking, e os valores são apagados", async () => {
-  const owner = await register("Nara Indica", "nara_indica_prop");
-  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Indica ou não" } })).body as { id: string }).id;
-  const cid = ((await call("POST", `/api/groups/${gid}/challenges`, {
-    session: owner, body: { recipe: "cinema", title: "Com indicação", participantIds: [owner.user.id], items: [{ title: "Filme Indicado", recommendedByUserId: owner.user.id }] },
-  })).body as { id: string }).id;
-  type Detail = { items: Array<{ id: string; recommendedBy: { name: string } | null; catalogItem: { id: string } }> };
-  const detail = async () => (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as Detail;
-  await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } });
-  await showRecommenders();
-  const first = await detail();
-  assert.equal(first.items[0].recommendedBy?.name, "Nara Indica");
-  // The catalogue item keeps its own "who recommended it", apart from the round's.
-  const catalogItemId = first.items[0].catalogItem.id;
-  const added = await call("POST", `/api/groups/${gid}/catalog/items`, { session: owner, body: { kind: "film", title: "Persona", catalogRecommendedByUserId: owner.user.id } });
-  assert.equal(added.response.status, 201, JSON.stringify(added.body));
-  const personaId = (added.body as { id: string }).id;
-  type CatalogItem = { recommendedBy: { name: string } | null; rounds: Array<{ recommendedBy: string | null }> };
-  const catalogItem = async (id: string) => (await call("GET", `/api/groups/${gid}/catalog/${id}`, { session: owner })).body as CatalogItem;
-  assert.equal((await catalogItem(personaId)).recommendedBy?.name, "Nara Indica");
-  assert.equal((await catalogItem(catalogItemId)).rounds[0].recommendedBy, "Nara Indica");
-
-  const film = ((await call("GET", `/api/groups/${gid}/catalog/libraries`, { session: owner })).body as { libraries: Array<{ id: string; kind: string }> })
-    .libraries.find((library) => library.kind === "film")!;
-  type Props = { properties: Array<{ key: string; type: string; hidden: boolean; canHide: boolean }> };
-  const property = async () => ((await call("GET", `/api/catalog/libraries/${film.id}/properties`, { session: owner })).body as Props).properties.find((entry) => entry.key === "recommended_by")!;
-  assert.deepEqual({ ...(await property()) }.hidden, false, "nasce ligada");
-  assert.equal((await property()).canHide, true);
-
-  const hide = await call("PATCH", `/api/catalog/libraries/${film.id}/properties/recommended_by`, { session: owner, body: { hidden: true } });
-  assert.equal(hide.response.status, 200, JSON.stringify(hide.body));
-  assert.equal((await property()).hidden, true);
-  const hiddenDetail = await detail();
-  assert.equal(hiddenDetail.items[0].recommendedBy, null, "o item do desafio não diz mais quem indicou");
-  assert.equal((await catalogItem(personaId)).recommendedBy, null, "nem o acervo");
-  const item = await catalogItem(catalogItemId);
-  assert.ok(item.rounds.every((round) => round.recommendedBy === null), "nem o histórico do item");
-
-  assert.equal((await call("PATCH", `/api/catalog/libraries/${film.id}/properties/recommended_by`, { session: owner, body: { hidden: false } })).response.status, 200);
-  assert.equal((await detail()).items[0].recommendedBy, null, "religar começa vazio: desligar apagou quem indicou");
-  assert.equal((await catalogItem(personaId)).recommendedBy, null);
-});
 
 test("o chat de criação: treino numa lista nova e hábito que conta rumo a uma meta nascem prontos, no espaço pessoal", async () => {
   const owner = await register("Caio Chat", "caio_chat_cria");
@@ -9393,4 +9228,83 @@ test("banco: a role tem tempo limite, uma transação que falha no meio não dei
   const health = await call("GET", "/api/health");
   assert.equal(health.response.status, 200);
   assert.equal((await call("GET", "/api/bootstrap", { session: await login("rui_rollback") })).response.status, 200);
+});
+
+test("bibliotecas não oferecem indicação nem agenda fixas; data e nomes podem ser campos da resposta compartilhada", async () => {
+  const owner = await register("Dora Campos", "dora_campos_livres");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Datas compartilhadas" } })).body as { id: string }).id;
+  const library = (await call("POST", `/api/groups/${gid}/catalog/libraries`, { session: owner, body: { label: "Sessões" } })).body as { id: string };
+  type Properties = { properties: Array<{ key: string }> };
+  const properties = (await call("GET", `/api/catalog/libraries/${library.id}/properties`, { session: owner })).body as Properties;
+  assert.deepEqual(properties.properties.map((property) => property.key), ["title"]);
+  for (const key of ["scheduled_at", "recommended_by"]) {
+    const patch = await call("PATCH", `/api/catalog/libraries/${library.id}/properties/${key}`, { session: owner, body: { hidden: false } });
+    assert.equal(patch.response.status, 404, JSON.stringify(patch.body));
+  }
+  const created = await call("POST", `/api/groups/${gid}/challenges`, {
+    session: owner, body: {
+      recipe: "custom", title: "Sessões", libraryId: library.id, itemDates: true,
+      participantIds: [owner.user.id], answerScope: "shared",
+      fields: [
+        { key: "data", label: "Data da sessão", type: "date", required: true },
+        { key: "indicado", label: "Indicado por", type: "select", required: true, config: { options: [{ id: "dora", label: "Dora" }] } },
+      ], items: [{ title: "Filme" }],
+    },
+  });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const cid = (created.body as { id: string }).id;
+  const detail = (await call("GET", `/api/challenges/${cid}`, { session: owner })).body as {
+    items: Array<{ id: string }>; entryTypes: Array<{ id: string; answerScope: string; fields: Array<{ type: string; config?: { options?: Array<{ id: string }> } }> }>;
+  };
+  const response = detail.entryTypes[0];
+  assert.equal(response.answerScope, "shared");
+  assert.deepEqual(response.fields.map((field) => field.type), ["date", "select"]);
+  assert.equal((await call("POST", `/api/challenges/${cid}/transition`, { session: owner, body: { status: "active" } })).response.status, 200);
+  const saved = await call("POST", `/api/challenges/${cid}/entries`, {
+    session: owner, body: { entryTypeId: response.id, itemId: detail.items[0].id, values: { data: "2026-06-15", indicado: response.fields.find((field) => field.type === "select")!.config!.options![0].id } },
+  });
+  assert.equal(saved.response.status, 201, JSON.stringify(saved.body));
+  assert.equal((saved.body as { answerScope: string }).answerScope, "shared");
+  const after = (await call("GET", `/api/catalog/libraries/${library.id}/properties`, { session: owner })).body as Properties;
+  assert.deepEqual(after.properties.map((property) => property.key), ["title"], "o sinalizador antigo não cria propriedades de biblioteca");
+});
+
+test("propriedades: tipos vazios editáveis, remoção sem switch e topo automático pelo primeiro número visível", async () => {
+  const owner = await register("Nina Capa", "nina_primeiro_numero");
+  const gid = ((await call("POST", "/api/groups", { session: owner, body: { name: "Propriedades" } })).body as { id: string }).id;
+  const library = (await call("POST", `/api/groups/${gid}/catalog/libraries`, { session: owner, body: { label: "Locais" } })).body as { id: string; kind: string };
+  const top = async (id = library.id) => {
+    const libraries = (await call("GET", `/api/groups/${gid}/catalog/libraries`, { session: owner })).body as { libraries: Array<{ id: string; coverTopProperty: string }> };
+    return libraries.libraries.find((entry) => entry.id === id)!.coverTopProperty;
+  };
+  assert.equal(await top(), "none");
+  const attr = async (label: string, type: string) => (await call("POST", `/api/groups/${gid}/catalog-attributes`, { session: owner, body: { libraryId: library.id, label, type } })).body as { id: string; key: string };
+  const text = await attr("Nome extra", "text");
+  const first = await attr("Capacidade", "number");
+  const second = await attr("Preço", "number");
+  assert.equal(await top(), first.key, "ignora texto e escolhe o primeiro número, mesmo sem valores nos itens");
+  assert.equal((await call("PATCH", `/api/catalog/libraries/${library.id}/properties/${second.id}`, { session: owner, body: { position: 0 } })).response.status, 200);
+  assert.equal(await top(), second.key, "reordenar muda a escolha automática");
+  const changed = await call("PATCH", `/api/catalog/libraries/${library.id}/properties/${text.id}`, { session: owner, body: { label: "Distância", type: "number" } });
+  assert.equal(changed.response.status, 200, JSON.stringify(changed.body));
+  assert.equal((changed.body as { property: { type: string } }).property.type, "number");
+  const item = await call("POST", `/api/groups/${gid}/catalog/items`, { session: owner, body: { libraryId: library.id, title: "A", attributes: { [first.key]: 12 } } });
+  assert.equal(item.response.status, 201, JSON.stringify(item.body));
+  const refused = await call("PATCH", `/api/catalog/libraries/${library.id}/properties/${first.id}`, { session: owner, body: { type: "text" } });
+  assert.equal(refused.response.status, 409, JSON.stringify(refused.body));
+  assert.equal((await call("PATCH", `/api/catalog/libraries/${library.id}`, { session: owner, body: { coverTopProperty: second.key } })).response.status, 200);
+  assert.equal((await call("DELETE", `/api/groups/${gid}/catalog-attributes/${second.id}`, { session: owner })).response.status, 200);
+  assert.notEqual(await top(), second.key, "remover a escolha explícita volta ao primeiro número disponível");
+
+  await call("POST", `/api/groups/${gid}/catalog/items`, { session: owner, body: { kind: "film", title: "Filme", year: 2026, runtimeMinutes: 100 } });
+  const libraries = (await call("GET", `/api/groups/${gid}/catalog/libraries`, { session: owner })).body as { libraries: Array<{ id: string; kind: string }> };
+  const film = libraries.libraries.find((entry) => entry.kind === "film")!;
+  assert.equal(await top(film.id), "year");
+  assert.equal((await call("PATCH", `/api/catalog/libraries/${film.id}/properties/runtime_minutes`, { session: owner, body: { position: 0 } })).response.status, 200);
+  assert.equal(await top(film.id), "runtime_minutes", "o padrão respeita a ordem, sem privilegiar Ano");
+  assert.equal((await call("PATCH", `/api/catalog/libraries/${film.id}`, { session: owner, body: { coverTopProperty: "runtime_minutes" } })).response.status, 200);
+  assert.equal((await call("PATCH", `/api/catalog/libraries/${film.id}/properties/runtime_minutes`, { session: owner, body: { hidden: true } })).response.status, 200);
+  assert.equal(await top(film.id), "year");
+  const detail = (await call("GET", `/api/groups/${gid}/catalog/${(item.body as { id: string }).id}`, { session: owner })).body as { attributes: Array<{ key: string; value: unknown }> };
+  assert.equal(detail.attributes.find((value) => value.key === first.key)?.value, 12, "o tipo recusado não altera valores existentes");
 });

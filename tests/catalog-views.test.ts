@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { createElement } from "react";
+import { ptFormat, renderWithIntl } from "./helpers/intl";
 
 import { COVER_TONES, coverToneOf } from "../app/goa/catalog-cover";
-import { decadeOf, groupCatalogItems } from "../app/goa/catalog-views";
+import { CatalogRow, decadeOf, groupCatalogItems, resolveCoverTop } from "../app/goa/catalog-views";
 
 test("a title always gets the same cover colour, and the same title in any case or spacing agrees", () => {
   assert.equal(coverToneOf("Solaris"), coverToneOf("  SOLARIS "));
@@ -29,4 +31,11 @@ test("grouping keeps the sort inside each section, orders sections, and sends it
 test("decadeOf floors a year to its decade", () => {
   assert.equal(decadeOf(1994), "1990s");
   assert.equal(decadeOf(2000), "2000s");
+});
+
+test("numeric cover values include zero and custom properties can use year as their name", () => {
+  const item = { year: null, attributes: [{ key: "year", label: "Ano", type: "number" as const, value: 0 }] };
+  assert.equal(resolveCoverTop(item, "year", ptFormat), 0);
+  const html = renderWithIntl(createElement(CatalogRow, { title: "A", year: 0, ratingLabel: "", meta: [], onOpen: () => undefined }));
+  assert.match(html, />0<\/span>/);
 });

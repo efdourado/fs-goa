@@ -11,7 +11,6 @@ import { cleanFields, type CountGoalOption, countGoalOptions, CountSettings, Fie
 import { type CatalogScope } from "../libraries";
 import { useLibraryProperties } from "../property-inputs";
 import { ItemEditorDialog as SharedItemEditorDialog } from "../item-editor-dialog";
-import { useRecommenderSource } from "../recommender-picker";
 import { canOrganise, OrganiseDialog, organiseFromItems } from "../organize-panel";
 import { RuleSectionsEditor, visibleRuleSections } from "../rules";
 import { ChallengeSettings, ChallengeStatePanel, type CopyMode } from "./challenge-actions";
@@ -666,10 +665,7 @@ type ItemUpdatePayload = { title: string; description?: string } & Record<string
 export function ItemEditorDialog({
   item,
   challenge,
-  members,
   library,
-  scope,
-  recommendationsEnabled,
   onCancel,
   onSave,
   onRemove,
@@ -689,7 +685,6 @@ export function ItemEditorDialog({
   onSave: (payload: ItemUpdatePayload) => Promise<void>;
 }) {
   const t = useTranslations("adminChallenge");
-  const source = useRecommenderSource(scope, recommendationsEnabled && challenge.submissionMode === "item");
   const removal = onRemove ? {
     body: entryCount > 0 ? t("itemRemoveConfirmWithEntries", { title: item.title, count: entryCount }) : t("itemRemoveConfirm", { title: item.title }),
     onConfirm: onRemove,
@@ -701,10 +696,6 @@ export function ItemEditorDialog({
     <SharedItemEditorDialog
       item={{ ...item.catalogItem, title: item.title, recommendedBy: item.recommendedBy, originNote: item.originNote }}
       library={item.catalogItem ? library : null}
-      members={members}
-      recommendationsEnabled={recommendationsEnabled}
-      source={source}
-      recommenderTarget="item"
       maxTitleLength={200}
       requireAuthor
       onCancel={onCancel}

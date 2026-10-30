@@ -181,11 +181,7 @@ export interface LibraryProperty {
   key: string;
   storage: "native" | "attribute";
   label: string | null;
-  /**
-   * `schedule` is the built-in "Scheduled date and time" of the thing itself (a match's kickoff); `recommender`
-   * is "who recommended it" — a property like any other, so a library can switch it off.
-   */
-  type: "text" | "number" | "date" | "boolean" | "schedule" | "recommender";
+  type: "text" | "number" | "date" | "boolean";
   hidden: boolean;
   position: number;
   canHide: boolean;
@@ -746,8 +742,6 @@ export interface ChallengeCreationInput {
   /** With `session`: the label of the optional note on each check-in ("How did it go?"). */
   sessionNoteLabel?: string;
   sharedEditPolicy?: SharedEditPolicy;
-  /** Each item of the chosen libraries has its own scheduled date and time (a match's kickoff). */
-  itemDates?: boolean;
   participantIds: Id[];
 }
 

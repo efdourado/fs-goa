@@ -12,20 +12,10 @@ import { type CatalogScope, LibraryPills, libraryChoices, librarySuggestions } f
 import {
   bodyFromValues,
   PropertyInputs,
-  propertiesHaveProblem,
   type PropertyValues,
-  showsRecommender,
   useLibraryProperties,
 } from "./property-inputs";
-import {
-  NO_RECOMMENDER,
-  recommenderBody,
-  RecommenderPicker,
-  type RecommenderSource,
-  sameRecommender,
-  type RecommenderValue,
-} from "./recommender-picker";
-import type { CatalogItemDetail, CatalogLibrary, Id, Member } from "./types";
+import type { CatalogItemDetail, CatalogLibrary, Id } from "./types";
 import { Button, Field, inputClass } from "./ui";
 
 interface PossibleMatch {
@@ -48,23 +38,16 @@ export function AddCatalogItemDialog({
   scope,
   libraries,
   initialKind,
-  members,
-  recommendationsEnabled,
-  source,
   onCancel,
   onAdded,
 }: {
   scope: CatalogScope;
   libraries: CatalogLibrary[];
   initialKind?: string | null;
-  members: Member[];
-  recommendationsEnabled: boolean;
-  source: RecommenderSource;
   onCancel: () => void;
   onAdded: (result: { id: Id; reused: boolean }) => void;
 }) {
   const t = useTranslations("catalogAdd");
-  const tEvent = useTranslations("eventSchedule");
   const f = useGoaFormat();
   const csrf = useCsrf();
   const choices = useMemo(() => libraryChoices(libraries), [libraries]);
@@ -73,11 +56,8 @@ export function AddCatalogItemDialog({
   const [kind, setKind] = useState<string | null>(() => (initialKind && choices.some((choice) => choice.kind === initialKind) ? initialKind : choices[0]?.kind ?? null));
   const choice = [...choices, ...suggestions].find((entry) => entry.kind === kind) ?? null;
   const { properties, error: propertiesError } = useLibraryProperties(choice);
-  // The group's switch, then the library's own: either can turn "who recommended it" off.
-  const askRecommender = recommendationsEnabled && showsRecommender(properties);
   const [title, setTitle] = useState("");
   const [values, setValues] = useState<PropertyValues>({});
-  const [recommender, setRecommender] = useState<RecommenderValue>(NO_RECOMMENDER);
   // Suggestions are remembered with the query they answer, so a stale list never shows under a newer title.
   const [found, setFound] = useState<{ query: string; libraryKey: string; items: PossibleMatch[] }>({ query: "", libraryKey: "", items: [] });
   const [busy, setBusy] = useState(false);
@@ -100,13 +80,12 @@ export function AddCatalogItemDialog({
   }, [query, libraryKey, choice, scope]);
   const matches = query.length >= 2 && found.query === query && found.libraryKey === libraryKey ? found.items : [];
 
-  const dirty = Boolean(title.trim()) || Object.values(values).some(Boolean) || !sameRecommender(recommender, NO_RECOMMENDER);
+  const dirty = Boolean(title.trim()) || Object.values(values).some(Boolean);
 
   async function submit(useExistingId?: Id) {
     const name = title.trim();
     if (!name && !useExistingId) { setError(t("titleRequired")); return; }
     if (!choice) return;
-    if (!useExistingId && properties && propertiesHaveProblem(properties, values)) { setError(tEvent("invalid")); return; }
     setBusy(true);
     setError(null);
     try {
@@ -115,7 +94,6 @@ export function AddCatalogItemDialog({
         ...(choice.id ? { libraryId: choice.id } : { kind: choice.kind }),
         title: name || matches.find((match) => match.id === useExistingId)?.title,
         ...(useExistingId ? { useExistingId } : { ...native, ...(Object.keys(attributes).length ? { attributes } : {}) }),
-        ...(!useExistingId && askRecommender ? recommenderBody(recommender, "catalog", false) : {}),
       };
       const created = await apiRequest<{ id: Id }>(API_PATHS.catalogWorkspace(scope).items, { method: "POST", body, csrfToken: csrf });
       onAdded({ id: created.id, reused: Boolean(useExistingId) });
@@ -184,7 +162,6 @@ export function AddCatalogItemDialog({
         <p className="text-sm text-[var(--muted)]">{t("loadingProperties")}</p>
       )}
 
-      {askRecommender ? <RecommenderPicker value={recommender} onChange={setRecommender} members={members} source={source} /> : null}
     </FormDialog>
   );
 }
@@ -194,9 +171,6 @@ export function EditCatalogItemDialog({
   scope,
   item,
   libraries,
-  members,
-  recommendationsEnabled,
-  source,
   onCancel,
   onSaved,
   onRemove,
@@ -204,9 +178,6 @@ export function EditCatalogItemDialog({
   scope: CatalogScope;
   item: CatalogItemDetail;
   libraries: CatalogLibrary[];
-  members: Member[];
-  recommendationsEnabled: boolean;
-  source: RecommenderSource;
   onCancel: () => void;
   onSaved: () => void;
   /** Takes the item out of the catalogue (to the bin). Offered at the foot of the form, after a second click. */
@@ -219,10 +190,6 @@ export function EditCatalogItemDialog({
     <ItemEditorDialog
       item={item}
       library={library}
-      members={members}
-      recommendationsEnabled={recommendationsEnabled}
-      source={source}
-      recommenderTarget="catalog"
       maxTitleLength={300}
       onCancel={onCancel}
       onSave={async (body) => {

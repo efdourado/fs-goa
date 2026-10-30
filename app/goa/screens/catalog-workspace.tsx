@@ -17,7 +17,7 @@ import {
   useLibraryName,
 } from "../libraries";
 import { useLibraryProperties } from "../property-inputs";
-import { recommenderLine, useRecommenderSource } from "../recommender-picker";
+import { recommenderLine } from "../recommender-picker";
 import type { CatalogItem, CatalogLibrary, Id, Member } from "../types";
 import { BackButton, Button, CheckCircle, cx, EmptyState, FaceEmptyState, SwitchIcon, Select, SlidersIcon, StatusMessage } from "../ui";
 import { formatRuntime } from "../utils";
@@ -107,7 +107,6 @@ export function CatalogWorkspaceScreen({
   subtitle,
   backLabel,
   canManage,
-  members,
   recommendationsEnabled,
   onBack,
   onOpenItem,
@@ -155,7 +154,6 @@ export function CatalogWorkspaceScreen({
   const [picked, setPicked] = useState<ReadonlySet<Id>>(new Set());
   const [confirmingRemoval, setConfirmingRemoval] = useState(false);
   const csrf = useCsrf();
-  const source = useRecommenderSource(scope, recommendationsEnabled);
   const scopeId = scope === "personal" ? "personal" : scope.groupId;
 
   useEffect(() => {
@@ -266,7 +264,7 @@ export function CatalogWorkspaceScreen({
 
   /** What sets an item apart, minus whatever the cover's top slot already carries (year by default) and who recommended it. */
   function detailsFor(item: CatalogItem): string[] {
-    const topSlot = library?.coverTopProperty ?? "year";
+    const topSlot = library?.coverTopProperty ?? "none";
     const custom = (item.attributes ?? [])
       .filter((attribute) => attribute.key !== topSlot)
       .map((attribute) => attribute.type === "boolean" ? `${attribute.label}: ${attribute.value ? tc("yes") : tc("no")}` : `${attribute.label}: ${String(attribute.value)}`);
@@ -280,9 +278,8 @@ export function CatalogWorkspaceScreen({
   }
   const challengesOf = (item: CatalogItem) => item.challengeCount ?? item.roundCount ?? 0;
   const ratingLabel = (item: CatalogItem) => (item.ratingAvg === null || item.ratingAvg === undefined ? tItem("notRated") : tItem("ratedAria", { value: item.ratingAvg }));
-  const yearOf = (item: CatalogItem) => (hidden.has("year") ? null : item.year);
-  /** The library's own choice for the cover's top slot — falls back to `yearOf` (hidden-aware) when it hasn't picked one. */
-  const topOf = (item: CatalogItem) => (library?.coverTopProperty ? resolveCoverTop(item, library.coverTopProperty, f) : yearOf(item));
+  /** The server resolves an unconfigured cover to the first numeric property. */
+  const topOf = (item: CatalogItem) => resolveCoverTop(item, library?.coverTopProperty, f);
   /** Everything shown under an item's name, most telling first: a phone keeps the first two, wider screens all of it. */
   function metaFor(item: CatalogItem): string[] {
     return [
@@ -642,9 +639,6 @@ export function CatalogWorkspaceScreen({
           scope={scope}
           libraries={libraries ?? []}
           initialKind={kind}
-          members={members}
-          recommendationsEnabled={recommendationsEnabled}
-          source={source}
           onCancel={() => setDialog(null)}
           onAdded={({ reused }) => {
             setDialog(null);

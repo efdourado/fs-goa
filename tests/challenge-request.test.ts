@@ -49,7 +49,6 @@ test("toda configuração do formulário é repassada — uma nova que ficar de 
       answerScope: "shared",
       fields: [{ key: "resultado", label: "Resultado", type: "text", required: true }],
     }],
-    itemDates: true,
   };
   assert.deepEqual(Object.keys(challengeRequestBody(full)).sort(), Object.keys(full).sort());
 });

@@ -13,7 +13,7 @@ import { type CatalogScope, LibraryPills, libraryChoices, librarySuggestions, us
 import { RecipeIcon, type RecipeIconName } from "../recipe-icons";
 import { RuleSectionsEditor } from "../rules";
 import type { ChallengeCreationInput, ChallengeField, ChallengeResponseInput, ChallengeRule, CreatableRecipeKey, GroupSummary, Id, SharedEditPolicy } from "../types";
-import { AddRow, ArrowRightIcon, BackButton, backLinkClass, Button, cardClass, ChevronIcon, CircleMinusIcon, cx, EmptyState, Field, inputClass, labelClass, PageHeading, rowIconClass, SchedulePeriodFields, SelectableCards, StatusMessage, Toggle } from "../ui";
+import { AddRow, ArrowRightIcon, BackButton, backLinkClass, Button, cardClass, ChevronIcon, CircleMinusIcon, cx, EmptyState, Field, inputClass, labelClass, PageHeading, rowIconClass, SchedulePeriodFields, SelectableCards, StatusMessage } from "../ui";
 
 /** Where the items come from: the books of a daily-progress challenge, the library a list picks, or none at all. */
 type EditorLibrary = { id: Id | null; kind: string; source: "screens" | "pages" | "tables" | "custom"; label: string | null };
@@ -118,9 +118,6 @@ export function CreateChallengeScreen({
   const [sessionName, setSessionName] = useState(draft?.sessionName ?? "");
   const sharedEditPolicy: SharedEditPolicy = "members_fill_admin_corrects";
   const [fieldsTouched, setFieldsTouched] = useState(draft?.fieldsTouched ?? false);
-  // Custom starts without "when did it happen" — that date belongs to the response, not to the match.
-  // Each item carries its own date and time (a match's kickoff), kept on the library's items.
-  const [itemDates, setItemDates] = useState(draft?.itemDates ?? false);
   const [expectation, setExpectation] = useState(draft?.expectation ?? false);
   const [cineItems, setCineItems] = useState<CineRow[]>(draft?.cineItems ?? []);
   const [itemsAdding, setItemsAdding] = useState(false);
@@ -155,7 +152,7 @@ export function CreateChallengeScreen({
   }, [started]);
   // An item-based challenge's one library (none to start with: the person picks or makes one).
   const [pickedKind, setPickedKind] = useState<string | null>(draft?.pickedKind ?? null);
-  const [itemProblem, setItemProblem] = useState<"author" | "schedule" | null>(null);
+  const [itemProblem, setItemProblem] = useState<"author" | null>(null);
   const [newLibrary, setNewLibrary] = useState(false);
   const scope: CatalogScope = personal || !group ? "personal" : { groupId: group.id };
   const { data: libraries, reload: reloadLibraries } = useCatalogLibraries(scope);
@@ -228,7 +225,6 @@ export function CreateChallengeScreen({
     setRecordingMode("single");
     setSessionName("");
     setFieldsTouched(false);
-    setItemDates(false);
     setScheduleMode(meta.scheduleMode);
     setCineItems([]);
   }
@@ -354,7 +350,6 @@ export function CreateChallengeScreen({
       if (!itemLibraries.length) return t("errPickLibrary");
       if (tracksCatalog && !itemInputs.length) return allBooks ? t("errNoBooks") : t("errNoItems");
       if (itemProblem === "author") return t("errNoAuthor");
-      if (itemProblem === "schedule") return t("errItemSchedule");
     }
     return null;
   }
@@ -394,10 +389,7 @@ export function CreateChallengeScreen({
       setError(t("errNoAuthor"));
       return;
     }
-    if (itemProblem === "schedule") {
-      setError(t("errItemSchedule"));
-      return;
-    }
+
     setBusy(true);
     setError(null);
     finished.current = true;
@@ -444,7 +436,6 @@ export function CreateChallengeScreen({
       ...(recipe === "custom" && recordingMode === "session"
         ? { recordingMode, sessionName: sessionName.trim() || t("sessionNameDefault"), sessionNoteLabel: tp("comoFoi") }
         : recipe === "custom" ? { answerScope, ...(answerScope === "shared" ? { sharedEditPolicy } : {}) } : {}),
-      ...(tracksCatalog && itemDates ? { itemDates: true } : {}),
       participantIds,
     };
   }
@@ -454,7 +445,7 @@ export function CreateChallengeScreen({
     return {
       step, structure, title, description, ruleSections, showOptional, scheduleMode, startsOn, endsOn, fields, answerScope,
       additionalResponses: additionalResponses.map(({ name, answerScope: responseScope, fields: responseFields }) => ({ name, answerScope: responseScope, fields: responseFields })),
-      recordingMode, sessionName, sharedEditPolicy, fieldsTouched, itemDates, expectation, cineItems, participantIds, pickedKind,
+      recordingMode, sessionName, sharedEditPolicy, fieldsTouched, expectation, cineItems, participantIds, pickedKind,
     };
   }
 
@@ -692,14 +683,12 @@ export function CreateChallengeScreen({
                 scope={scope}
                 libraries={itemLibraries}
                 recommendationsEnabled={recommendationsEnabled}
-                showSchedule={itemDates}
                 onProblem={setItemProblem}
                 addDialogOpen={itemsAdding}
                 onAddDialogOpenChange={setItemsAdding}
                 showEmptyAddButton={false}
               />
             ) : <EmptyState title={t("pickLibraryFirst")} />}
-            <Toggle className="mt-5 bg-[var(--paper)]" checked={itemDates} onChange={setItemDates} label={t("itemDatesLabel")} hint={t("itemDatesHint")} />
           </div>
         ) : null}
 

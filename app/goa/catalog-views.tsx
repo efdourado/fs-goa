@@ -44,8 +44,7 @@ export function groupCatalogItems<T extends Groupable>(items: readonly T[], by: 
  * What a library's `coverTopProperty` choice resolves to for one item — a native
  * field, a custom attribute (matched by its semantic key, the same string
  * `item.attributes[].key` already uses), `"none"` for blank, or `null` (the
- * historical default: native `year`, which is already blank for any kind that
- * never had one).
+ * server resolves an unconfigured library to its first numeric property).
  */
 export function resolveCoverTop(
   item: {
@@ -56,8 +55,14 @@ export function resolveCoverTop(
   coverTopProperty: CatalogLibrary["coverTopProperty"] | undefined,
   f: GoaFormat,
 ): string | number | null {
-  if (coverTopProperty === undefined || coverTopProperty === null) return item.year ?? null;
+  if (coverTopProperty === undefined || coverTopProperty === null) return null;
   if (coverTopProperty === "none") return null;
+  const attribute = item.attributes?.find((entry) => entry.key === coverTopProperty);
+  if (attribute) {
+    if (attribute.type === "boolean") return attribute.value ? "✓" : null;
+    if (attribute.type === "date") return f.date(String(attribute.value));
+    return attribute.value as string | number;
+  }
   switch (coverTopProperty) {
     case "year": return item.year ?? null;
     case "author": return item.author ?? null;
@@ -65,13 +70,7 @@ export function resolveCoverTop(
     case "runtime_minutes": return item.runtimeMinutes ?? null;
     case "page_count": return item.pageCount ?? null;
     case "scheduled_at": return item.scheduledAt ? f.eventWhen(item.scheduledAt) : null;
-    default: {
-      const attribute = item.attributes?.find((entry) => entry.key === coverTopProperty);
-      if (!attribute) return null;
-      if (attribute.type === "boolean") return attribute.value ? "✓" : null;
-      if (attribute.type === "date") return f.date(String(attribute.value));
-      return attribute.value as string | number;
-    }
+    default: return null;
   }
 }
 
@@ -118,7 +117,7 @@ export function CatalogTile({ title, year, avg, ratingLabel, badgeHidden, captio
           <CheckCircle on={Boolean(picked)} className="relative !h-6 !w-6" />
         ) : null}
         <span className="relative min-w-0 flex-1 truncate text-[15px] font-light tracking-[-0.02em] sm:text-lg">{title}</span>
-        {year ? <span className="relative hidden flex-none text-[11px] tracking-[0.08em] sm:block" style={{ fontFamily: "var(--font-geist-mono), ui-monospace, monospace" }}>{year}</span> : null}
+        {year !== null && year !== undefined && year !== "" ? <span className="relative hidden flex-none text-[11px] tracking-[0.08em] sm:block" style={{ fontFamily: "var(--font-geist-mono), ui-monospace, monospace" }}>{year}</span> : null}
         {rated ? (
           <ScoreRing value={avg} size={34} label={ratingLabel} strokeWidth={3} className="relative hidden bg-[var(--paper)] shadow-[0_2px_8px_rgba(32,36,31,0.14)] sm:inline-grid" textClassName="text-[11px] font-medium" />
         ) : null}
@@ -172,7 +171,7 @@ export function CatalogRow({ title, year, avg, ratingLabel, badgeHidden, meta, n
       {selecting ? <input type="checkbox" className="h-4 w-4 flex-none" checked={Boolean(picked)} aria-label={title} onChange={(event) => onPick?.(event.target.checked)} /> : null}
       <span aria-hidden="true" className="h-7 w-7 flex-none rounded-full bg-[var(--cover-bg)] shadow-[inset_0_0_0_6px_var(--cover-deco)] sm:h-8 sm:w-8" style={coverColors(coverToneOf(title))} />
       <span className="min-w-0 flex-1">
-        <strong className="block truncate text-[15px] font-normal sm:text-base">{title}{year ? <span className="ml-1.5 font-light text-[var(--muted)]">{year}</span> : null}</strong>
+        <strong className="block truncate text-[15px] font-normal sm:text-base">{title}{year !== null && year !== undefined && year !== "" ? <span className="ml-1.5 font-light text-[var(--muted)]">{year}</span> : null}</strong>
         {meta.length || note ? (
           <small className="mt-0.5 block truncate text-xs text-[var(--muted)] sm:mt-1 sm:whitespace-normal sm:text-[13px] sm:leading-5">
             {meta.map((part, index) => <span key={index} className={index >= 2 ? "hidden sm:inline" : undefined}>{index ? " · " : ""}{part}</span>)}

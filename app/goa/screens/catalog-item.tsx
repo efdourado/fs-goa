@@ -8,7 +8,6 @@ import { ItemCover, ScoreRing } from "../catalog-cover";
 import { EditCatalogItemDialog } from "../catalog-item-dialogs";
 import { useGoaFormat } from "../format";
 import { type CatalogScope, LibraryGlyph, useCatalogLibraries, useLibraryName } from "../libraries";
-import { useRecommenderSource } from "../recommender-picker";
 import type { CatalogItemDetail, CatalogLibrary, Id, Member } from "../types";
 import { BackButton, Button, cardClass, cx, EmptyState, LoadingView, SlidersIcon } from "../ui";
 import { formatRuntime } from "../utils";
@@ -18,10 +17,9 @@ interface CatalogItemEditing {
 }
 
 /** The "Edit" control and its dialog. Its own component so the libraries load only when someone may actually edit. */
-function EditItemAction({ item, scope, recommendationsEnabled, editing, onSaved, onRemove }: { item: CatalogItemDetail; scope: CatalogScope; recommendationsEnabled: boolean; editing: CatalogItemEditing; onSaved: () => void; onRemove?: () => Promise<void> }) {
+function EditItemAction({ item, scope, onSaved, onRemove }: { item: CatalogItemDetail; scope: CatalogScope; recommendationsEnabled: boolean; editing: CatalogItemEditing; onSaved: () => void; onRemove?: () => Promise<void> }) {
   const t = useTranslations("catalog");
   const { data: libraries } = useCatalogLibraries(scope);
-  const source = useRecommenderSource(scope, recommendationsEnabled);
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -41,9 +39,6 @@ function EditItemAction({ item, scope, recommendationsEnabled, editing, onSaved,
           scope={scope}
           item={item}
           libraries={libraries as CatalogLibrary[]}
-          members={editing.members}
-          recommendationsEnabled={recommendationsEnabled}
-          source={source}
           onCancel={() => setOpen(false)}
           onSaved={() => { setOpen(false); onSaved(); }}
           onRemove={onRemove}

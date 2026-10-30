@@ -58,27 +58,6 @@ export async function ensureCatalogLibrary(
   if (created.rows[0]) await hideRecommenderOnNewLibrary(client, created.rows[0].id);
 }
 
-/**
- * Switches a library's "Scheduled date and time" property on — creating the row of a built-in
- * library nobody has used yet. Idempotent, and never touches a name or position someone gave the
- * property. A challenge that says "each item has its own date" does this for the libraries it draws from.
- */
-export async function enableLibraryEventSchedule(
-  client: PoolClient,
-  groupId: string,
-  userId: string,
-  kind: string,
-): Promise<void> {
-  await ensureCatalogLibrary(client, groupId, kind, userId);
-  await client.query(
-    `INSERT INTO catalog_native_property_configs (id, library_id, property_key, label, hidden, position, created_at, updated_at)
-     SELECT $3, l.id, 'scheduled_at', NULL, false, NULL, now(), now()
-       FROM catalog_libraries l WHERE l.group_id = $1 AND l.kind = $2
-     ON CONFLICT (library_id, property_key) DO UPDATE SET hidden = false, updated_at = now()`,
-    [groupId, kind, publicId()],
-  );
-}
-
 /** Matches the database's book-identity expression without altering accents. */
 function normalizeAuthor(value: string): string {
   return value.toLowerCase().replace(/\s+/gu, " ").trim();
@@ -803,8 +782,23 @@ function mapLibrary(row: LibraryRow): CatalogLibrary {
 
 async function listLibrariesWithClient(client: Pick<PoolClient, "query">, groupId: string): Promise<CatalogLibrary[]> {
   const rows = await client.query<LibraryRow>(
-    `SELECT id, kind, source, label, position, cover_top_property, cover_badge_hidden FROM catalog_libraries
-      WHERE group_id = $1 AND archived_at IS NULL ORDER BY position, created_at`,
+    `SELECT l.id, l.kind, l.source, l.label, l.position, l.cover_badge_hidden,
+            coalesce(l.cover_top_property, (
+              SELECT candidate.property_key FROM (
+                SELECT native.property_key, coalesce(config.position, native.position) AS position
+                  FROM (VALUES ('film','year',1), ('film','runtime_minutes',3),
+                               ('book','year',2), ('book','page_count',4)) AS native(kind,property_key,position)
+                  LEFT JOIN catalog_native_property_configs config
+                    ON config.library_id = l.id AND config.property_key = native.property_key
+                 WHERE native.kind = l.kind AND NOT coalesce(config.hidden, false)
+                UNION ALL
+                SELECT semantic_key, position + 10 FROM catalog_attribute_defs
+                 WHERE group_id = l.group_id AND kind = l.kind AND type = 'number'
+                   AND NOT hidden AND archived_at IS NULL
+              ) candidate ORDER BY candidate.position, candidate.property_key LIMIT 1
+            ), 'none') AS cover_top_property
+       FROM catalog_libraries l
+      WHERE l.group_id = $1 AND l.archived_at IS NULL ORDER BY l.position, l.created_at`,
     [groupId],
   );
   return rows.rows.map(mapLibrary);
@@ -958,7 +952,7 @@ export async function updateCatalogLibrary(session: SessionContext, libraryId: s
           // needs a second lookup from id to key; a native property's own key
           // already is that string.
           const properties = await listLibraryPropertiesWithClient(client, library.group_id, { id: libraryId, kind: library.kind });
-          if (!properties.some((property) => property.key !== "title" && (property.attributeKey ?? property.key) === value)) {
+          if (!properties.some((property) => !property.hidden && property.key !== "title" && (property.attributeKey ?? property.key) === value)) {
             throw new ApiError(400, "invalid_property", "Essa propriedade não existe nesta biblioteca.");
           }
           coverTopProperty = value;
@@ -1061,26 +1055,21 @@ export async function deleteCatalogLibrary(session: SessionContext, libraryId: s
  * the title — the rest of its properties are attribute definitions. Keys are
  * stable: metrics and storage key off these, never off a label.
  */
-type NativePropertyType = CatalogAttributeType | "schedule" | "recommender";
-const SCHEDULE_PROPERTY = { key: "scheduled_at", type: "schedule" as NativePropertyType };
-/** "Who recommended it": on every library, shown unless the library hides it (see `recommenderVisibleSql`). */
-const RECOMMENDER_PROPERTY = { key: "recommended_by", type: "recommender" as NativePropertyType };
+type NativePropertyType = CatalogAttributeType;
 const NATIVE_PROPERTIES: Record<string, Array<{ key: string; type: NativePropertyType }>> = {
   film: [
     { key: "title", type: "text" }, { key: "year", type: "number" },
-    { key: "main_genre", type: "text" }, { key: "runtime_minutes", type: "number" }, SCHEDULE_PROPERTY, RECOMMENDER_PROPERTY,
+    { key: "main_genre", type: "text" }, { key: "runtime_minutes", type: "number" },
   ],
   book: [
     { key: "title", type: "text" }, { key: "author", type: "text" }, { key: "year", type: "number" },
-    { key: "main_genre", type: "text" }, { key: "page_count", type: "number" }, SCHEDULE_PROPERTY, RECOMMENDER_PROPERTY,
+    { key: "main_genre", type: "text" }, { key: "page_count", type: "number" },
   ],
 };
-const TITLE_ONLY: Array<{ key: string; type: NativePropertyType }> = [{ key: "title", type: "text" }, SCHEDULE_PROPERTY, RECOMMENDER_PROPERTY];
+const TITLE_ONLY: Array<{ key: string; type: NativePropertyType }> = [{ key: "title", type: "text" }];
 function nativePropertiesFor(kind: string) {
   return NATIVE_PROPERTIES[kind] ?? TITLE_ONLY;
 }
-/** Off until someone turns it on: most libraries (films, books, restaurants) have no date of their own. */
-const DEFAULT_HIDDEN_NATIVE = new Set(["scheduled_at"]);
 
 export interface LibraryProperty {
   /** The native key (`year`, `title`…) or the attribute definition's id — never a label. */
@@ -1105,8 +1094,6 @@ const NATIVE_COLUMNS: Record<string, string[]> = {
   runtime_minutes: ["runtime_minutes"],
   author: ["author"],
   page_count: ["page_count"],
-  scheduled_at: ["scheduled_at", "scheduled_end_at", "scheduled_time_zone"],
-  recommended_by: ["recommended_by_user_id", "recommended_by_external_id", "origin_note"],
 };
 
 /**
@@ -1133,14 +1120,6 @@ async function eraseNativeProperty(client: PoolClient, groupId: string, kind: st
     `UPDATE catalog_items SET ${columns.map((column) => `${column} = NULL`).join(", ")}, updated_at = now() WHERE group_id = $1 AND kind = $2`,
     [groupId, kind],
   );
-  if (propertyKey === "recommended_by") {
-    // Each challenge keeps its own "who recommended it" for the item, apart from the catalogue's.
-    await client.query(
-      `UPDATE challenge_items it SET recommended_by_user_id = NULL, recommended_by_external_id = NULL, origin_note = NULL
-         FROM catalog_items ci WHERE ci.id = it.catalog_item_id AND ci.group_id = $1 AND ci.kind = $2`,
-      [groupId, kind],
-    );
-  }
 }
 
 async function listLibraryPropertiesWithClient(
@@ -1175,7 +1154,7 @@ async function listLibraryPropertiesWithClient(
       const position = config?.position ?? index;
       return {
         key: native.key, storage: "native" as const, label: config?.label ?? null, type: native.type,
-        hidden: config?.hidden ?? DEFAULT_HIDDEN_NATIVE.has(native.key), position, canHide: native.key !== "title", sort: position,
+        hidden: config?.hidden ?? false, position, canHide: native.key !== "title", sort: position,
         filled: nativeCounts[native.key] ?? 0,
       };
     }),
@@ -1252,7 +1231,14 @@ export async function updateCatalogLibraryProperty(
       else throw new ApiError(400, "invalid_property", "A posição precisa ser um inteiro a partir de zero.");
     }
 
+    const type = Object.hasOwn(body, "type") ? body.type : undefined;
+    if (type !== undefined && !["text", "number", "date", "boolean"].includes(type as string)) {
+      throw new ApiError(400, "invalid_type", "Tipo de propriedade inválido.");
+    }
     if (isNative) {
+      if (type !== undefined && type !== nativePropertiesFor(library.kind).find((property) => property.key === propertyKey)?.type) {
+        throw new ApiError(400, "property_type_fixed", "Esta propriedade mantém seu tipo original.");
+      }
       if (propertyKey === "title" && hidden === true) {
         throw new ApiError(400, "title_required", "O nome do item não pode ser ocultado, todo item precisa de um nome.");
       }
@@ -1263,12 +1249,15 @@ export async function updateCatalogLibraryProperty(
       );
       const next = {
         label: label === undefined ? current?.label ?? null : label,
-        hidden: hidden === undefined ? current?.hidden ?? DEFAULT_HIDDEN_NATIVE.has(propertyKey) : hidden,
+        hidden: hidden === undefined ? current?.hidden ?? false : hidden,
         position: position === undefined ? current?.position ?? null : position,
       };
-      const wasHidden = current?.hidden ?? DEFAULT_HIDDEN_NATIVE.has(propertyKey);
-      if (next.hidden && !wasHidden) await eraseNativeProperty(client, library.group_id, library.kind, propertyKey);
-      if (next.label === null && next.hidden === DEFAULT_HIDDEN_NATIVE.has(propertyKey) && next.position === null) {
+      const wasHidden = current?.hidden ?? false;
+      if (next.hidden && !wasHidden) {
+        await eraseNativeProperty(client, library.group_id, library.kind, propertyKey);
+        await client.query("UPDATE catalog_libraries SET cover_top_property = NULL WHERE id = $1 AND cover_top_property = $2", [library.id, propertyKey]);
+      }
+      if (next.label === null && next.hidden === false && next.position === null) {
         // Back to the defaults: no override to keep.
         await client.query("DELETE FROM catalog_native_property_configs WHERE library_id = $1 AND property_key = $2", [library.id, propertyKey]);
       } else {
@@ -1287,7 +1276,7 @@ export async function updateCatalogLibraryProperty(
         throw new ApiError(400, "invalid_property", "Uma propriedade personalizada precisa de um nome e de uma posição.");
       }
       if (hidden === true) await client.query("DELETE FROM catalog_attribute_values WHERE attribute_def_id = $1 AND group_id = $2", [propertyKey, library.group_id]);
-      await updateAttributeDef(client, session.user.id, library.group_id, propertyKey, { label, hidden, position: position === undefined ? undefined : position });
+      await updateAttributeDef(client, session.user.id, library.group_id, propertyKey, { label, hidden, type: type as CatalogAttributeType | undefined, position: position === undefined ? undefined : position });
     }
 
     const properties = await listLibraryPropertiesWithClient(client, library.group_id, library);

@@ -98,8 +98,7 @@ test("challenge and catalogue editors use the same modal for an item without lib
     onCancel: () => undefined, onSave: noop,
   }));
   const catalogHtml = renderWithIntl(createElement(EditCatalogItemDialog, {
-    item, libraries: [], members: [], scope: "personal", recommendationsEnabled: false,
-    source: { recommenders: [], create: async () => { throw new Error("unused"); } },
+    item, libraries: [], scope: "personal",
     onCancel: () => undefined, onSaved: () => undefined,
   }));
   assert.equal(challengeHtml, catalogHtml.replace('maxLength="300"', 'maxLength="200"'));

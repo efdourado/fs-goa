@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { API_PATHS, ApiError, apiRequest } from "./api";
 import { useCsrf } from "./csrf";
@@ -10,12 +10,11 @@ import { useGoaFormat } from "./format";
 import { type CatalogScope, useLibraryName } from "./libraries";
 import { RecipeIcon } from "./recipe-icons";
 import type { CatalogAttributeDef, CatalogLibrary, LibraryProperty } from "./types";
-import { Button, cx, Field, inputClass, Select, StatusMessage, Toggle } from "./ui";
+import { ArrowField, Button, CircleMinusIcon, Field, inputClass, Select, StatusMessage, Toggle } from "./ui";
 
 type PropertyType = LibraryProperty["type"];
 const PROPERTY_TYPES: PropertyType[] = ["text", "number", "date", "boolean"];
-/** A `<select>` sentinel — `coverTopProperty: null` (the historical default) has no literal HTML option value. */
-const DEFAULT_COVER_TOP = "__default__";
+const propertySelectClass = "max-w-[55%] rounded-full border border-[var(--line)] py-1.5 pl-3 pr-2 text-xs text-[var(--ink)] transition hover:border-[var(--muted)] focus-visible:border-[var(--main)]";
 /** How many properties the settings dialog lists before "show all". */
 const VISIBLE_PROPERTIES = 4;
 
@@ -140,9 +139,8 @@ function ArrowButton({ dir, disabled, onClick, label }: { dir: "up" | "down"; di
 /**
  * One editor for every property of a library — a built-in column (year, pages…)
  * or one someone added (cuisine, neighbourhood…) look and behave the same:
- * rename, switch on or off, reorder. Off means gone: switching a property off
- * (or removing a custom one) erases what the items had saved for it, after a
- * confirmation that says how many. It can be switched on again, empty.
+ * click to edit, reorder or remove. Removal erases saved values after a
+ * confirmation that says how many items are affected.
  */
 export function LibraryPropertiesDialog({
   scope,
@@ -172,11 +170,12 @@ export function LibraryPropertiesDialog({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
-  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [editing, setEditing] = useState<{ key: string; label: string; type: PropertyType } | null>(null);
   const [newLabel, setNewLabel] = useState("");
   const [newType, setNewType] = useState<PropertyType>("text");
   const [adding, setAdding] = useState(false);
-  const [coverTop, setCoverTop] = useState(library.coverTopProperty ?? DEFAULT_COVER_TOP);
+  const [coverTopEdit, setCoverTopEdit] = useState<{ received: string | null; value: string } | null>(null);
+  const coverTop = coverTopEdit?.received === library.coverTopProperty ? coverTopEdit.value : library.coverTopProperty;
   const [coverBadgeHidden, setCoverBadgeHidden] = useState(library.coverBadgeHidden);
   const [coverBusy, setCoverBusy] = useState(false);
   // Its name, edited in place like a property's: saved on blur or Enter.
@@ -186,8 +185,6 @@ export function LibraryPropertiesDialog({
   // Four properties are enough to recognise a library by; the rest unfold on demand.
   const [showAll, setShowAll] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
-  const newLabelInput = useRef<HTMLInputElement>(null);
-  useEffect(() => { if (addOpen) newLabelInput.current?.focus(); }, [addOpen]);
   const [deleting, setDeleting] = useState(false);
 
   async function commitName() {
@@ -223,16 +220,19 @@ export function LibraryPropertiesDialog({
     onDeleted?.(currentName);
   }
 
-  const load = useCallback(async () => {
-    try {
-      const response = await apiRequest<{ properties: LibraryProperty[] }>(API_PATHS.libraryProperties(library.id));
-      setProperties(response.properties);
-    } catch (cause) {
-      setError(f.error(cause));
-      setProperties([]);
-    }
-  }, [library.id, f]);
-  useEffect(() => { void load(); }, [load]);
+  const load = useCallback((signal?: AbortSignal) =>
+    apiRequest<{ properties: LibraryProperty[] }>(API_PATHS.libraryProperties(library.id), { signal })
+      .then((response) => setProperties(response.properties.filter((property) => !property.hidden)))
+      .catch((cause: unknown) => {
+        if (signal?.aborted) return;
+        setError(f.error(cause));
+        setProperties([]);
+      }), [library.id, f]);
+  useEffect(() => {
+    const controller = new AbortController();
+    void load(controller.signal);
+    return () => controller.abort();
+  }, [load]);
 
   const nativeName = (key: string) => (t.has(`native.${key}`) ? t(`native.${key}`) : key);
   const nameOf = (property: LibraryProperty) => property.label?.trim() || (property.storage === "native" ? nativeName(property.key) : property.key);
@@ -255,18 +255,12 @@ export function LibraryPropertiesDialog({
     }
   }
 
-  async function commitLabel(property: LibraryProperty) {
-    const draft = drafts[property.key];
-    if (draft === undefined) return;
-    const next = draft.trim();
-    setDrafts((current) => { const { [property.key]: _dropped, ...rest } = current; void _dropped; return rest; });
-    if (next === (property.label ?? "")) return;
-    if (!next) {
-      // A built-in falls back to its default name; a custom one must keep a name.
-      if (property.storage === "native") await patch(property, { label: null }, t("propertySaved"));
-      return;
-    }
-    await patch(property, { label: next }, t("propertySaved"));
+  async function saveProperty(property: LibraryProperty) {
+    if (!editing) return;
+    const label = editing.label.trim();
+    if (!label) { setError(t("propertyNameRequired")); return; }
+    const saved = await patch(property, { label, ...(editing.type !== property.type ? { type: editing.type } : {}) }, t("propertySaved"));
+    if (saved) setEditing(null);
   }
 
   async function move(index: number, delta: -1 | 1) {
@@ -296,15 +290,14 @@ export function LibraryPropertiesDialog({
     }
   }
 
-  // Switching off or removing something that holds values asks first, in place (no second modal).
-  const [erasing, setErasing] = useState<{ key: string; action: "off" | "remove" } | null>(null);
-  function switchProperty(property: LibraryProperty, show: boolean) {
-    if (!show && (property.filled ?? 0) > 0) { setErasing({ key: property.key, action: "off" }); return; }
-    void patch(property, { hidden: !show }, show ? t("propertyShown") : t("propertyHiddenSaved"));
+  const [erasing, setErasing] = useState<string | null>(null);
+  function askRemove(property: LibraryProperty) {
+    if ((property.filled ?? 0) > 0) { setErasing(property.key); return; }
+    void removeProperty(property);
   }
-  function askRemoveCustom(property: LibraryProperty) {
-    if ((property.filled ?? 0) > 0) { setErasing({ key: property.key, action: "remove" }); return; }
-    void removeCustom(property);
+  async function removeProperty(property: LibraryProperty) {
+    if (property.storage === "attribute") await removeCustom(property);
+    else await patch(property, { hidden: true }, t("propertyRemoved"));
   }
 
   async function removeCustom(property: LibraryProperty) {
@@ -338,6 +331,7 @@ export function LibraryPropertiesDialog({
       });
       setNewLabel("");
       setNewType("text");
+      setAddOpen(false);
       await load();
       onChanged();
       setSuccess(t("propertyAdded"));
@@ -353,8 +347,8 @@ export function LibraryPropertiesDialog({
     setError(null);
     setSuccess(null);
     try {
-      await apiRequest(API_PATHS.catalogLibrary(library.id), { method: "PATCH", body: { coverTopProperty: next === DEFAULT_COVER_TOP ? null : next }, csrfToken: csrf });
-      setCoverTop(next);
+      await apiRequest(API_PATHS.catalogLibrary(library.id), { method: "PATCH", body: { coverTopProperty: next }, csrfToken: csrf });
+      setCoverTopEdit({ received: library.coverTopProperty, value: next });
       onChanged();
       setSuccess(t("coversSaved"));
     } catch (cause) {
@@ -380,19 +374,15 @@ export function LibraryPropertiesDialog({
     }
   }
 
+  const coverProperties = (properties ?? []).filter((property) => property.key !== "title");
+  const firstNumber = coverProperties.find((property) => property.type === "number");
+  const selectedCoverTop = coverTop && coverProperties.some((property) => (property.attributeKey ?? property.key) === coverTop)
+    ? coverTop : coverTop === "none" ? "none" : firstNumber ? firstNumber.attributeKey ?? firstNumber.key : "none";
   const sectionTitle = "mb-2.5 text-[13px] font-medium text-[var(--ink)]";
   const shown = properties ? (showAll ? properties : properties.slice(0, VISIBLE_PROPERTIES)) : [];
   const more = properties ? properties.length - shown.length : 0;
   const typeIcon = (type: PropertyType) => (
-    type === "schedule" ? (
-      <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.4">
-        <rect x="2.2" y="3.2" width="11.6" height="10.6" rx="2" /><path d="M2.2 6.6h11.6M5.4 1.9v2.6M10.6 1.9v2.6" strokeLinecap="round" />
-      </svg>
-    ) : type === "recommender" ? (
-      <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.4">
-        <circle cx="8" cy="5.6" r="2.6" /><path d="M3 13.6c.6-2.6 2.6-4 5-4s4.400 1.400 5 4" strokeLinecap="round" />
-      </svg>
-    ) : type === "boolean" ? (
+    type === "boolean" ? (
       <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="8" cy="8" r="5.8" /><path d="M5.6 8.2l1.7 1.700 3.200-3.500" />
       </svg>
@@ -429,66 +419,32 @@ export function LibraryPropertiesDialog({
         ) : (
           <ul className="divide-y divide-[var(--line)] overflow-hidden rounded-2xl border border-[var(--line)]">
             {shown.map((property, index) => (
-              <li key={property.key} className={cx("px-3 py-2.5", property.hidden && "bg-[var(--wash)]/60")}>
+              <li key={property.key} className="px-3 py-2.5 transition-colors hover:bg-[var(--wash)] focus-within:bg-[var(--wash)]">
                 <div className="flex items-center gap-2.5">
-                  <span className="grid h-8 w-8 flex-none place-items-center rounded-full bg-[var(--wash)] text-[11px] font-medium text-[var(--muted)]" title={t(`type.${property.type}`)} aria-hidden="true">
-                    {typeIcon(property.type)}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    {canEdit && property.type !== "recommender" ? (
-                      <input
-                        className="w-full rounded-lg border border-transparent bg-transparent px-1.5 py-0.5 text-sm font-medium outline-none transition hover:border-[var(--line)] focus:border-[var(--main)] disabled:opacity-60"
-                        value={drafts[property.key] ?? property.label ?? ""}
-                        placeholder={nameOf(property)}
-                        aria-label={t("propertyNameAria", { name: nameOf(property) })}
-                        maxLength={80}
-                        disabled={busyKey !== null}
-                        onChange={(event) => setDrafts((current) => ({ ...current, [property.key]: event.target.value }))}
-                        onBlur={() => void commitLabel(property)}
-                        onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
-                      />
-                    ) : (
-                      <strong className="block px-1.5 py-0.5 text-sm font-medium">{nameOf(property)}</strong>
-                    )}
-                    <span className="block px-1.5 text-[11px] text-[var(--muted)]">
-                      {t(`type.${property.type}`)}{property.hidden ? ` · ${t("hidden")}` : ""}
-                    </span>
-                  </div>
+                  <span className="grid h-8 w-8 flex-none place-items-center rounded-full bg-[var(--wash)] text-[11px] font-medium text-[var(--muted)]" aria-hidden="true">{typeIcon(property.type)}</span>
+                  <button type="button" disabled={!canEdit || busyKey !== null} aria-expanded={editing?.key === property.key} onClick={() => {
+                    setAddOpen(false);
+                    setEditing((current) => current?.key === property.key ? null : { key: property.key, label: nameOf(property), type: property.type });
+                  }} className="min-h-10 min-w-0 flex-1 cursor-pointer rounded-lg px-1.5 text-left text-sm font-medium disabled:cursor-default">
+                    <span className="block truncate">{nameOf(property)}</span>
+                  </button>
                   {canEdit ? (
                     <div className="flex flex-none items-center">
                       <ArrowButton dir="up" label={t("moveUp")} disabled={index === 0 || busyKey !== null} onClick={() => void move(index, -1)} />
                       <ArrowButton dir="down" label={t("moveDown")} disabled={index === (properties?.length ?? 0) - 1 || busyKey !== null} onClick={() => void move(index, 1)} />
-                      {property.storage === "attribute" ? (
-                        <button
-                          type="button"
-                          aria-label={t("removeProperty")}
-                          title={t("removeProperty")}
-                          disabled={busyKey !== null}
-                          onClick={() => askRemoveCustom(property)}
-                          className="grid h-8 w-8 cursor-pointer place-items-center rounded-lg text-[var(--muted)] transition hover:bg-[var(--danger-soft)] hover:text-[var(--danger)] disabled:opacity-25"
-                        >
-                          <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                            <path d="M3 4.5h10M6.5 4.5V3h3v1.500M4.5 4.5l.6 8.500h5.800l.6-8.500" />
-                          </svg>
-                        </button>
-                      ) : null}
-                      <Toggle checked={!property.hidden} disabled={!property.canHide || busyKey !== null} onChange={(show) => switchProperty(property, show)} className="ml-1.5" />
+                      {property.canHide ? <button type="button" aria-label={t("removeProperty")} title={t("removeProperty")} disabled={busyKey !== null} onClick={() => askRemove(property)} className="grid h-8 w-8 cursor-pointer place-items-center rounded-lg text-[var(--muted)] transition hover:bg-[var(--danger-soft)] hover:text-[var(--danger)] disabled:opacity-25"><CircleMinusIcon className="h-4 w-4" /></button> : null}
                     </div>
                   ) : null}
                 </div>
-                {property.type === "schedule" && !property.hidden ? <p className="mt-1.5 pl-[2.625rem] text-[11px] leading-4 text-[var(--muted)]">{t("scheduleHint")}</p> : null}
-                {erasing?.key === property.key ? (
-                  <div className="mt-3">
-                    <DeleteConfirm
-                      body={t("eraseBody", { name: nameOf(property), count: property.filled ?? 0 })}
-                      onConfirm={async () => {
-                        setErasing(null);
-                        if (erasing.action === "remove") await removeCustom(property);
-                        else await patch(property, { hidden: true }, t("propertyHiddenSaved"));
-                      }}
-                    />
-                  </div>
+                {editing?.key === property.key ? (
+                  <form className="space-y-3 pb-1 pt-3" onSubmit={(event) => { event.preventDefault(); void saveProperty(property); }}>
+                    <ArrowField key={property.key} value={editing.label} onChange={(label) => setEditing({ ...editing, label })} label={t("propertyNameLabel")} placeholder={t("propertyNamePlaceholder")} submitLabel={tc("save")} maxLength={80} disabled={busyKey !== null} takesCursor />
+                    {property.storage === "attribute" && !(property.filled ?? 0) ? (
+                      <Select look="bare" className={propertySelectClass} ariaLabel={t("propertyTypeLabel")} value={editing.type} disabled={busyKey !== null} onChange={(type) => setEditing({ ...editing, type: type as PropertyType })} options={PROPERTY_TYPES.map((type) => ({ value: type, label: t(`type.${type}`) }))} />
+                    ) : null}
+                  </form>
                 ) : null}
+                {erasing === property.key ? <div className="mt-3"><DeleteConfirm body={t("eraseBody", { name: nameOf(property), count: property.filled ?? 0 })} onConfirm={async () => { setErasing(null); await removeProperty(property); }} /></div> : null}
               </li>
             ))}
             {more > 0 || (showAll && (properties?.length ?? 0) > VISIBLE_PROPERTIES) ? (
@@ -502,38 +458,13 @@ export function LibraryPropertiesDialog({
               <li>
                 {addOpen ? (
                   <form className="space-y-3 px-3 py-3" onSubmit={(event) => { event.preventDefault(); void addProperty(); }}>
-                    <input
-                      className={inputClass}
-                      value={newLabel}
-                      maxLength={80}
-                      ref={newLabelInput}
-                      placeholder={t("propertyNamePlaceholder")}
-                      aria-label={t("propertyNameLabel")}
-                      onChange={(event) => setNewLabel(event.target.value)}
-                    />
-                    <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label={t("propertyTypeLabel")}>
-                      {PROPERTY_TYPES.map((type) => (
-                        <button
-                          key={type}
-                          type="button"
-                          role="radio"
-                          aria-checked={newType === type}
-                          onClick={() => setNewType(type)}
-                          className={cx(
-                            "inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-xs transition",
-                            newType === type ? "border-[var(--main)] bg-[var(--main)] font-medium text-white" : "border-[var(--line)] text-[var(--muted)] hover:text-[var(--ink)]",
-                          )}
-                        >
-                          <span className="text-[10px] font-medium" aria-hidden="true">{typeIcon(type)}</span>
-                          {t(`type.${type}`)}
-                        </button>
-                      ))}
-                      <span className="flex-1" />
-                      <Button type="submit" className="min-h-9" disabled={adding || !newLabel.trim()}>{adding ? tc("saving") : t("addProperty")}</Button>
+                    <ArrowField value={newLabel} onChange={setNewLabel} label={t("propertyNameLabel")} placeholder={t("propertyNamePlaceholder")} submitLabel={t("addProperty")} maxLength={80} disabled={adding} takesCursor />
+                    <div className="flex items-center gap-3 px-1">
+                      <Select look="bare" className={propertySelectClass} ariaLabel={t("propertyTypeLabel")} value={newType} disabled={adding} onChange={(type) => setNewType(type as PropertyType)} options={PROPERTY_TYPES.map((type) => ({ value: type, label: t(`type.${type}`) }))} />
                     </div>
                   </form>
                 ) : (
-                  <button type="button" onClick={() => setAddOpen(true)} className="flex min-h-12 w-full cursor-pointer items-center gap-2.5 px-3 text-left text-sm text-[var(--muted)] transition hover:text-[var(--ink-strong)]">
+                  <button type="button" onClick={() => { setEditing(null); setAddOpen(true); }} className="flex min-h-12 w-full cursor-pointer items-center gap-2.5 px-3 text-left text-sm text-[var(--muted)] transition hover:text-[var(--ink-strong)]">
                     <span className="grid h-8 w-8 flex-none place-items-center rounded-full border border-dashed border-[var(--line)]" aria-hidden="true">＋</span>
                     {t("addPropertyTitle")}
                   </button>
@@ -552,15 +483,14 @@ export function LibraryPropertiesDialog({
               <span className="text-sm">{t("coverTopLabel")}</span>
               <Select
                 look="bare"
-                className="max-w-[55%] rounded-full border border-[var(--line)] py-1.5 pl-3 pr-2 text-xs text-[var(--ink)] transition hover:border-[var(--muted)] focus-visible:border-[var(--main)]"
-                value={coverTop}
+                className={propertySelectClass}
+                value={selectedCoverTop}
                 disabled={coverBusy}
                 ariaLabel={t("coverTopLabel")}
                 onChange={(next) => void saveCoverTop(next)}
                 options={[
-                  { value: DEFAULT_COVER_TOP, label: t("coverTopDefault") },
                   { value: "none", label: t("coverTopNone") },
-                  ...properties.filter((property) => property.key !== "title" && property.type !== "recommender").map((property) => ({ value: property.attributeKey ?? property.key, label: nameOf(property) })),
+                  ...coverProperties.map((property) => ({ value: property.attributeKey ?? property.key, label: nameOf(property) })),
                 ]}
               />
             </li>

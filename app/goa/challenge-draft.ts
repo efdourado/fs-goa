@@ -27,7 +27,6 @@ export interface ChallengeDraftForm {
   sessionName: string;
   sharedEditPolicy: SharedEditPolicy;
   fieldsTouched: boolean;
-  itemDates: boolean;
   expectation: boolean;
   cineItems: CineRow[];
   participantIds: Id[];

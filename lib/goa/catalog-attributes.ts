@@ -141,17 +141,22 @@ export async function updateAttributeDef(
   actorUserId: string,
   groupId: string,
   defId: string,
-  patch: { label?: string; hidden?: boolean; position?: number },
+  patch: { label?: string; hidden?: boolean; position?: number; type?: CatalogAttributeType },
 ): Promise<void> {
-  const def = await oneOrNull<{ label: string }>(
+  const def = await oneOrNull<{ label: string; type: CatalogAttributeType }>(
     client,
-    "SELECT label FROM catalog_attribute_defs WHERE id = $1 AND group_id = $2 AND archived_at IS NULL FOR UPDATE",
+    "SELECT label, type FROM catalog_attribute_defs WHERE id = $1 AND group_id = $2 AND archived_at IS NULL FOR UPDATE",
     [defId, groupId],
   );
   if (!def) throw new ApiError(404, "not_found", "Propriedade não encontrada.");
+  if (patch.type !== undefined && patch.type !== def.type) {
+    if (!ATTRIBUTE_TYPES.has(patch.type)) throw new ApiError(400, "invalid_type", "Tipo de propriedade inválido.");
+    const filled = await oneOrNull<{ count: number }>(client, "SELECT count(*)::int AS count FROM catalog_attribute_values WHERE attribute_def_id = $1", [defId]);
+    if (filled?.count) throw new ApiError(409, "property_type_in_use", "Uma propriedade com valores preenchidos mantém seu tipo.");
+  }
   const sets: string[] = [];
   const params: unknown[] = [defId];
-  for (const [column, value] of [["label", patch.label], ["hidden", patch.hidden], ["position", patch.position]] as const) {
+  for (const [column, value] of [["label", patch.label], ["hidden", patch.hidden], ["position", patch.position], ["type", patch.type]] as const) {
     if (value !== undefined) {
       params.push(value);
       sets.push(`${column} = $${params.length}`);
@@ -179,6 +184,8 @@ async function insertDef(
     [groupId, kind],
   );
   const used = new Set(existing.rows.map((row) => row.semantic_key));
+  // A custom property must not reuse a built-in storage key, even after that built-in was removed.
+  for (const key of kind === "film" ? ["title", "year", "main_genre", "runtime_minutes"] : kind === "book" ? ["title", "author", "year", "main_genre", "page_count"] : ["title"]) used.add(key);
   const base = semanticKey(body.key, semanticKey(label, "atributo"));
   let key = base;
   for (let suffix = 2; used.has(key); suffix += 1) key = `${base}_${suffix}`.slice(0, 64);
@@ -201,14 +208,15 @@ async function insertDef(
 }
 
 async function archiveDefWithClient(client: PoolClient, actorUserId: string, groupId: string, defId: string): Promise<void> {
-  const def = await oneOrNull<{ label: string }>(
+  const def = await oneOrNull<{ label: string; kind: string; semantic_key: string }>(
     client,
-    "SELECT label FROM catalog_attribute_defs WHERE id = $1 AND group_id = $2 AND archived_at IS NULL FOR UPDATE",
+    "SELECT label, kind, semantic_key FROM catalog_attribute_defs WHERE id = $1 AND group_id = $2 AND archived_at IS NULL FOR UPDATE",
     [defId, groupId],
   );
   if (!def) throw new ApiError(404, "not_found", "Atributo não encontrado.");
   // Removing a property removes what the items had saved for it: a property that is gone holds nothing.
   await client.query("DELETE FROM catalog_attribute_values WHERE attribute_def_id = $1 AND group_id = $2", [defId, groupId]);
+  await client.query("UPDATE catalog_libraries SET cover_top_property = NULL WHERE group_id = $1 AND kind = $2 AND cover_top_property = $3", [groupId, def.kind, def.semantic_key]);
   await client.query("DELETE FROM catalog_attribute_defs WHERE id = $1", [defId]);
   await writeAudit(client, groupId, null, actorUserId, "catalog.attribute_deleted", "catalog_attribute_def", defId, null, null);
 }

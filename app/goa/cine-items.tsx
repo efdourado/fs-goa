@@ -1,23 +1,18 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useFormatter } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
 
 import { API_PATHS, apiRequest } from "./api";
 import { Dialog, FormDialog } from "./dialog";
 import { canOrganise, OrganiseDialog, organiseFromRows } from "./organize-panel";
 import { type CatalogScope } from "./libraries";
-import { bodyFromValues, editableProperties, PropertyInputs, type PropertyValues, propertiesHaveProblem, showsRecommender, useLibrariesProperties, useNativePropertyName } from "./property-inputs";
+import { bodyFromValues, editableProperties, PropertyInputs, type PropertyValues, useLibrariesProperties, useNativePropertyName } from "./property-inputs";
 import {
   NO_RECOMMENDER,
-  recommenderBody,
-  RecommenderPicker,
-  type RecommenderSource,
   type RecommenderValue,
   useRecommenderSource,
 } from "./recommender-picker";
-import { decodeEventForm, encodeEventForm, eventBodyOf, eventFormOf } from "./schedule";
 import type { CatalogItem, ChallengeItemInput, ChallengeLibraryRef, Id, LibraryProperty, Member } from "./types";
 import { Button, CircleMinusIcon, cx, FaceEmptyState, inputClass, labelClass, rowIconClass } from "./ui";
 import { formatRuntime } from "./utils";
@@ -39,7 +34,6 @@ export interface CineRow {
   runtimeMinutes: string;
   mainGenre: string;
   /** The item's own date and time (a match's kickoff), as the event inputs hold it — blank when it has none. */
-  scheduled: string;
   /** What was typed into a custom library's own properties, by `LibraryProperty.key`. */
   extra: PropertyValues;
   /** The same values as the request wants them, by the property's storage key — kept in step with `extra` by the editor. */
@@ -58,7 +52,6 @@ function newCineRow(title = "", extra: Partial<CineRow> = {}): CineRow {
     pages: "",
     runtimeMinutes: "",
     mainGenre: "",
-    scheduled: "",
     extra: {},
     attributes: {},
     ...extra,
@@ -73,19 +66,16 @@ export function cineRowsToInput(rows: CineRow[]): ChallengeItemInput[] {
       const year = Number(row.year);
       const pages = Number(row.pages);
       const runtimeMinutes = Number(row.runtimeMinutes);
-      const scheduledAt = eventBodyOf(decodeEventForm(row.scheduled, ""));
       return {
         title: row.title.trim(),
         position: index,
         ...(row.catalogItemId ? { catalogItemId: row.catalogItemId } : {}),
         ...(row.libraryId ? { libraryId: row.libraryId } : row.libraryKind ? { libraryKind: row.libraryKind } : {}),
-        ...recommenderBody(row.recommender, "item", false),
         ...(row.author.trim() ? { author: row.author.trim() } : {}),
         ...(Number.isInteger(year) && year > 1800 ? { year } : {}),
         ...(Number.isInteger(pages) && pages > 0 ? { pageCount: pages } : {}),
         ...(Number.isInteger(runtimeMinutes) && runtimeMinutes > 0 ? { runtimeMinutes } : {}),
         ...(row.mainGenre.trim() ? { mainGenre: row.mainGenre.trim() } : {}),
-        ...(scheduledAt ? { scheduledAt } : {}),
         ...(Object.keys(row.attributes).length ? { attributes: row.attributes } : {}),
       };
     });
@@ -93,13 +83,12 @@ export function cineRowsToInput(rows: CineRow[]): ChallengeItemInput[] {
 
 /** The row fields that back a library's built-in properties, by the property's key. */
 const NATIVE_ROW_FIELD = {
-  author: "author", year: "year", main_genre: "mainGenre", page_count: "pages", runtime_minutes: "runtimeMinutes", scheduled_at: "scheduled",
+  author: "author", year: "year", main_genre: "mainGenre", page_count: "pages", runtime_minutes: "runtimeMinutes",
 } as const;
 
 function rowValues(row: CineRow): PropertyValues {
   return {
     author: row.author, year: row.year, main_genre: row.mainGenre, page_count: row.pages, runtime_minutes: row.runtimeMinutes,
-    scheduled_at: row.scheduled,
     ...row.extra,
   };
 }
@@ -113,7 +102,7 @@ function authorMissing(row: CineRow, properties: LibraryProperty[] | undefined):
 type EditorLibrary = Pick<ChallengeLibraryRef, "id" | "kind" | "source" | "label">;
 
 /** A row for a catalogue item being put into a challenge, carrying what the catalogue already knows about it. */
-function rowFromCatalog(item: CatalogItem, timeZone: string | undefined): CineRow {
+function rowFromCatalog(item: CatalogItem): CineRow {
   return newCineRow(item.title, {
     catalogItemId: item.id,
     author: item.author ?? "",
@@ -121,7 +110,6 @@ function rowFromCatalog(item: CatalogItem, timeZone: string | undefined): CineRo
     pages: item.pageCount ? String(item.pageCount) : "",
     runtimeMinutes: item.runtimeMinutes ? String(item.runtimeMinutes) : "",
     mainGenre: item.mainGenre ?? "",
-    scheduled: encodeEventForm(eventFormOf(item.scheduledAt, timeZone ?? ""), timeZone ?? ""),
   });
 }
 
@@ -206,31 +194,19 @@ interface EditorShared {
   refreshKey?: number;
   /** The zone a new event date starts in — the browser's when left out. */
   timeZone?: string;
-  /** Ask for each item's own date and time even where the library hasn't switched that property on yet (a challenge being created). */
-  showSchedule?: boolean;
 }
 
 /** The library's properties as the editor offers them, and what would block saving a set of rows. */
-function useEditorProperties({ libraries, refreshKey = 0, showSchedule = false }: Pick<EditorShared, "libraries" | "refreshKey" | "showSchedule">) {
+function useEditorProperties({ libraries, refreshKey = 0 }: Pick<EditorShared, "libraries" | "refreshKey">) {
   const loaded = useLibrariesProperties(libraries, refreshKey);
-  const propertiesFor = (library: Pick<EditorLibrary, "id" | "kind">): LibraryProperty[] | undefined => {
-    const properties = loaded.get(library.kind);
-    if (!showSchedule || !properties) return properties;
-    // Switched on for the challenge being made: the library's own (hidden) property, or a stand-in where it has none yet.
-    return properties.some((property) => property.type === "schedule")
-      ? properties.map((property) => (property.type === "schedule" ? { ...property, hidden: false } : property))
-      : [...properties, { key: "scheduled_at", storage: "native", label: null, type: "schedule", hidden: false, position: 999, canHide: true }];
-  };
-  const problemOf = (rows: CineRow[]): "author" | "schedule" | null =>
-    rows.some((row) => authorMissing(row, loaded.get(row.libraryKind))) ? "author"
-      : rows.some((row) => propertiesHaveProblem(propertiesFor({ id: row.libraryId, kind: row.libraryKind }) ?? [], rowValues(row))) ? "schedule"
-        : null;
+  const propertiesFor = (library: Pick<EditorLibrary, "id" | "kind">): LibraryProperty[] | undefined => loaded.get(library.kind);
+  const problemOf = (rows: CineRow[]): "author" | null => rows.some((row) => authorMissing(row, loaded.get(row.libraryKind))) ? "author" : null;
   return { loaded, propertiesFor, problemOf };
 }
 
 /**
  * Every property of the given rows, one card each: the name, then the author or who recommended it (each with its
- * label), the date, and the rest folded under "+N more" at the bottom of the card.
+ * label), and the rest folded under "+N more" at the bottom of the card.
  */
 function RowCards({ rows, onChange, onRemove, shared, openByDefault = false }: {
   rows: CineRow[];
@@ -241,9 +217,7 @@ function RowCards({ rows, onChange, onRemove, shared, openByDefault = false }: {
   openByDefault?: boolean;
 }) {
   const t = useTranslations("cineItems");
-  const { members, scope, recommendationsEnabled = true, timeZone } = shared;
   const { propertiesFor } = useEditorProperties(shared);
-  const source: RecommenderSource = useRecommenderSource(scope, recommendationsEnabled);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const propertyName = useNativePropertyName();
   const target = shared.libraries[0];
@@ -265,13 +239,8 @@ function RowCards({ rows, onChange, onRemove, shared, openByDefault = false }: {
         const open = openByDefault || expanded.has(row.key);
         const properties = propertiesFor({ id: row.libraryId, kind: row.libraryKind || target.kind });
         const authorInline = row.libraryKind === "book" && properties?.find((property) => property.key === "author")?.hidden !== true;
-        // An item's own date is what most of these rows are about — asked inline, not behind "details".
-        const scheduleProperty = editableProperties(properties ?? []).find((property) => property.type === "schedule") ?? null;
-        const detailProperties = editableProperties(properties ?? []).filter((property) => property.type !== "schedule" && !(authorInline && property.key === "author"));
-        // The group's switch, then the library's own: either can turn "who recommended it" off.
-        const askRecommender = recommendationsEnabled && showsRecommender(properties);
-        const recommenderInline = !authorInline && askRecommender;
-        const hiddenCount = detailProperties.length + (authorInline && askRecommender ? 1 : 0);
+        const detailProperties = editableProperties(properties ?? []).filter((property) => !(authorInline && property.key === "author"));
+        const hiddenCount = detailProperties.length;
         const hasDetails = !openByDefault && hiddenCount > 0;
         // A property's name as the library calls it (it may have been renamed), or the usual one.
         const nameOf = (key: string, fallback: string) => {
@@ -283,11 +252,6 @@ function RowCards({ rows, onChange, onRemove, shared, openByDefault = false }: {
             <span className={labelClass}>{nameOf("author", t("author"))}</span>
             <input className={cx(inputClass, authorMissing(row, properties) ? "border-[var(--danger)]" : "")} value={row.author} maxLength={200} placeholder={t("authorPlaceholder")} onChange={(event) => update(row, { author: event.target.value })} />
           </label>
-        ) : recommenderInline ? (
-          <div>
-            <span className={labelClass}>{nameOf("recommended_by", t("recommendedByLabel"))}</span>
-            <RecommenderPicker compact value={row.recommender} onChange={(recommender) => update(row, { recommender })} members={members} source={source} />
-          </div>
         ) : null;
         return (
           <li className="rounded-2xl border border-[var(--line)] bg-[var(--paper)] p-3" key={row.key}>
@@ -301,18 +265,10 @@ function RowCards({ rows, onChange, onRemove, shared, openByDefault = false }: {
                 <button type="button" className={cx(rowIconClass, "mb-1.5 text-[var(--danger)] hover:text-[var(--danger)]")} aria-label={t("remove")} title={t("remove")} onClick={() => onRemove(row.key)}><CircleMinusIcon className="h-[18px] w-[18px]" /></button>
               ) : null}
             </div>
-            {scheduleProperty ? (
-              <div className="mt-3">
-                <PropertyInputs properties={[scheduleProperty]} values={rowValues(row)} timeZone={timeZone} onChange={(propertyKey, propertyValue) => setRowProperty(row, propertyKey, propertyValue)} />
-              </div>
-            ) : null}
             {open ? (
               <div className="mt-2 space-y-3">
                 {detailProperties.length ? (
-                  <PropertyInputs properties={detailProperties} values={rowValues(row)} timeZone={timeZone} onChange={(propertyKey, propertyValue) => setRowProperty(row, propertyKey, propertyValue)} />
-                ) : null}
-                {authorInline && askRecommender ? (
-                  <RecommenderPicker value={row.recommender} onChange={(recommender) => update(row, { recommender })} members={members} source={source} />
+                  <PropertyInputs properties={detailProperties} values={rowValues(row)} onChange={(propertyKey, propertyValue) => setRowProperty(row, propertyKey, propertyValue)} />
                 ) : null}
               </div>
             ) : null}
@@ -348,7 +304,7 @@ export function ItemsAddBox({
   /** Items already in the list — a typed title or a catalogue pick that's already there is skipped. */
   existing?: CineRow[];
   /** Reports what would block saving the draft: a missing book author, or an event date that can't be saved. */
-  onProblem?: (problem: "author" | "schedule" | null) => void;
+  onProblem?: (problem: "author" | null) => void;
   /** Reports which library new rows are going to (for a caller that shows it, e.g. the list import). */
   onTargetChange?: (library: EditorLibrary) => void;
 }) {
@@ -364,7 +320,7 @@ export function ItemsAddBox({
   const problem = problemOf(draft);
   useEffect(() => { onProblem?.(problem); }, [problem, onProblem]);
   useEffect(() => { if (target) onTargetChange?.(target); }, [target, onTargetChange]);
-  const { scope, timeZone } = shared;
+  const { scope } = shared;
 
   useEffect(() => {
     if (!showCatalog || !target) return;
@@ -446,7 +402,7 @@ export function ItemsAddBox({
         <CatalogPicker
           items={catalog === null ? null : catalogInTarget}
           used={usedCatalogIds}
-          onAdd={(picked) => onDraftChange([...draft, ...stamp(picked.map((item) => rowFromCatalog(item, timeZone)))])}
+          onAdd={(picked) => onDraftChange([...draft, ...stamp(picked.map((item) => rowFromCatalog(item)))])}
         />
       ) : null}
       {draft.length ? <p className="pt-2 text-[13px] font-medium">{t("draftTitle", { count: draft.length })}</p> : null}
@@ -460,9 +416,8 @@ export function ItemsAddBox({
   );
 }
 
-/** One line about an item under its title in the list: author, year, length, genre, who recommended it, its date. */
-function useRowSummary(members: Member[], timeZone?: string) {
-  const f = useFormatter();
+/** One line about an item under its title in the list: author, year, length, genre and who recommended it. */
+function useRowSummary(members: Member[]) {
   const t = useTranslations("cineItems");
   return (row: CineRow): string => {
     const bits: string[] = [];
@@ -476,8 +431,6 @@ function useRowSummary(members: Member[], timeZone?: string) {
       const name = members.find((member) => member.id === (row.recommender as { userId: Id }).userId)?.name;
       if (name) bits.push(t("pickedBy", { name }));
     }
-    const day = row.scheduled ? decodeEventForm(row.scheduled, timeZone ?? "America/Sao_Paulo").date : "";
-    if (/^\d{4}-\d{2}-\d{2}$/.test(day)) bits.push(f.dateTime(new Date(`${day}T12:00:00Z`), { day: "numeric", month: "short", timeZone: "UTC" }));
     return bits.join(" · ");
   };
 }
@@ -497,11 +450,10 @@ export function AddItemsDialog({ onAdd, onClose, note, ...shared }: EditorShared
   note?: string;
 }) {
   const t = useTranslations("cineItems");
-  const ta = useTranslations("adminChallenge");
   const tc = useTranslations("common");
   const f = useGoaFormat();
   const [draft, setDraft] = useState<CineRow[]>([]);
-  const [problem, setProblem] = useState<"author" | "schedule" | null>(null);
+  const [problem, setProblem] = useState<"author" | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   return (
@@ -509,7 +461,7 @@ export function AddItemsDialog({ onAdd, onClose, note, ...shared }: EditorShared
       title={t("addItems")}
       dirty={draft.length > 0}
       busy={busy}
-      error={error ?? (problem === "author" ? t("authorRequired") : problem === "schedule" ? ta("eventScheduleInvalid") : null)}
+      error={error ?? (problem === "author" ? t("authorRequired") : null)}
       onCancel={onClose}
       submitDisabled={!draft.length || problem !== null}
       submitLabel={t("addCount", { count: draft.length })}
@@ -542,8 +494,8 @@ export function CineItemsEditor({
 }: EditorShared & {
   value: CineRow[];
   onChange: (rows: CineRow[]) => void;
-  /** Reports what would block saving these rows: a missing book author, or an event date that can't be saved. */
-  onProblem?: (problem: "author" | "schedule" | null) => void;
+  /** Reports whether a book is missing its required author. */
+  onProblem?: (problem: "author" | null) => void;
   /** Lets a surrounding heading own the add button while this editor still owns the dialog. */
   addDialogOpen?: boolean;
   onAddDialogOpenChange?: (open: boolean) => void;
@@ -553,7 +505,7 @@ export function CineItemsEditor({
   const { problemOf, loaded } = useEditorProperties(shared);
   const tOrganise = useTranslations("organise");
   const { recommenders } = useRecommenderSource(shared.scope, shared.recommendationsEnabled !== false);
-  const summary = useRowSummary(shared.members, shared.timeZone);
+  const summary = useRowSummary(shared.members);
   const [organising, setOrganising] = useState(false);
   const organiseInput = organiseFromRows(value, loaded.get(shared.libraries[0]?.kind ?? "") ?? [], shared.members, recommenders, (key) => tOrganise(`property.${key}`));
   const problem = problemOf(value);
@@ -562,7 +514,7 @@ export function CineItemsEditor({
   const adding = addDialogOpen ?? localAdding;
   const setAdding = onAddDialogOpenChange ?? setLocalAdding;
   const [draft, setDraft] = useState<CineRow[]>([]);
-  const [draftProblem, setDraftProblem] = useState<"author" | "schedule" | null>(null);
+  const [draftProblem, setDraftProblem] = useState<"author" | null>(null);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const editing = value.find((row) => row.key === editingKey) ?? null;
   const flagged = (row: CineRow) => problemOf([row]) !== null;
