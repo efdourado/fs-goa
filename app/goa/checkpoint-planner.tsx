@@ -202,7 +202,7 @@ export function CheckpointPlanner({
                         <ul className="list-disc space-y-1 pl-5 marker:text-[var(--muted)]">
                           {ids.map((id) => {
                             const item = itemById.get(id);
-                            return item ? <li className="text-sm leading-6" key={id}>{item.title}{item.catalogItem?.year ? <span className="text-[var(--muted)]"> ({item.catalogItem.year})</span> : null}</li> : null;
+                            return item ? <li className="text-sm leading-6" key={id}>{item.title}</li> : null;
                           })}
                         </ul>
                       ) : <p className="text-xs text-[var(--muted)]">{t("emptyCheckpoint")}</p>}
@@ -274,7 +274,7 @@ export function CheckpointPlanner({
     return (
       <li className="border-t border-[var(--line)] py-2 first:border-t-0" key={id}>
         <div className="flex min-h-9 items-center gap-3">
-          <span className="min-w-0 flex-1 truncate text-sm">{item.title}{item.catalogItem?.year ? <span className="text-[var(--muted)]"> ({item.catalogItem.year})</span> : null}</span>
+          <span className="min-w-0 flex-1 truncate text-sm">{item.title}</span>
           {item.catalogItem?.runtimeMinutes ? <span className="font-mono text-xs text-[var(--muted)]">{formatRuntime(item.catalogItem.runtimeMinutes)}</span> : null}
           {targets.length ? (
             <button type="button" aria-expanded={isMoving} onClick={() => setMoving(isMoving ? null : id)} className={`${pillClass} border-[var(--line)] hover:border-[var(--muted)]`}>

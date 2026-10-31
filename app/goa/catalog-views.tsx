@@ -145,7 +145,7 @@ export function CatalogTile({ title, year, avg, ratingLabel, badgeHidden, captio
 }
 
 /**
- * One item as a list row: a small round cover in the title's tint, the title (with the library's top value), the rating ring, and
+ * One item as a list row: a small round cover in the title's tint, the title, the rating ring, and
  * under the title its details. A phone keeps the first two on one line; from `sm:` up every detail shows, wrapping.
  */
 export function CatalogRow({ title, year, avg, ratingLabel, badgeHidden, meta, note, noteTone = "muted", selecting, picked, onPick, onOpen }: {
@@ -165,17 +165,18 @@ export function CatalogRow({ title, year, avg, ratingLabel, badgeHidden, meta, n
   onPick?: (on: boolean) => void;
   onOpen: () => void;
 }) {
+  const details = year !== null && year !== undefined && year !== "" && !meta.includes(String(year)) ? [String(year), ...meta] : meta;
   const rating = badgeHidden || avg === null || avg === undefined ? null : <ScoreRing value={avg} size={36} label={ratingLabel} strokeWidth={3} textClassName="text-[11px] font-medium" />;
   const body = (
     <>
       {selecting ? <input type="checkbox" className="h-4 w-4 flex-none" checked={Boolean(picked)} aria-label={title} onChange={(event) => onPick?.(event.target.checked)} /> : null}
       <span aria-hidden="true" className="h-7 w-7 flex-none rounded-full bg-[var(--cover-bg)] shadow-[inset_0_0_0_6px_var(--cover-deco)] sm:h-8 sm:w-8" style={coverColors(coverToneOf(title))} />
       <span className="min-w-0 flex-1">
-        <strong className="block truncate text-[15px] font-normal sm:text-base">{title}{year !== null && year !== undefined && year !== "" ? <span className="ml-1.5 font-light text-[var(--muted)]">{year}</span> : null}</strong>
-        {meta.length || note ? (
+        <strong className="block truncate text-[15px] font-normal sm:text-base">{title}</strong>
+        {details.length || note ? (
           <small className="mt-0.5 block truncate text-xs text-[var(--muted)] sm:mt-1 sm:whitespace-normal sm:text-[13px] sm:leading-5">
-            {meta.map((part, index) => <span key={index} className={index >= 2 ? "hidden sm:inline" : undefined}>{index ? " · " : ""}{part}</span>)}
-            {note ? <span className={noteTone === "warn" ? "text-[var(--warn)]" : undefined}>{meta.length ? " · " : ""}{note}</span> : null}
+            {details.map((part, index) => <span key={index} className={index >= 2 ? "hidden sm:inline" : undefined}>{index ? " · " : ""}{part}</span>)}
+            {note ? <span className={noteTone === "warn" ? "text-[var(--warn)]" : undefined}>{details.length ? " · " : ""}{note}</span> : null}
           </small>
         ) : null}
       </span>

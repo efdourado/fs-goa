@@ -53,7 +53,7 @@ export function MetricBlock({ metric, hideThinLabel = false, showExplanation = f
     <li key={entry.key} className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-4 gap-y-1 border-b border-[var(--line)] py-4 last:border-0">
       <div className="flex min-w-0 items-start gap-4">
         {!chronological ? <span aria-hidden="true" className={`w-7 shrink-0 pt-0.5 text-lg tabular-nums ${index === 0 && entry.value !== null ? "font-medium text-[var(--main-strong)]" : "text-[var(--muted)]"}`}>{entry.value === null ? "—" : String(rankOf(entry)).padStart(2, "0")}</span> : null}
-        <div className="min-w-0"><span className="block break-words text-base font-medium leading-6">{entry.label}{entry.year ? ` (${entry.year})` : ""}</span><span className="mt-1 block text-xs text-[var(--muted)]">{sampleLabel(entry.sampleSize)}</span></div>
+        <div className="min-w-0"><span className="block break-words text-base font-medium leading-6">{entry.label}</span><span className="mt-1 block text-xs text-[var(--muted)]">{[entry.year, sampleLabel(entry.sampleSize)].filter((value) => value !== null && value !== undefined && value !== "").join(" · ")}</span></div>
       </div>
       <div className="max-w-28 text-right sm:max-w-48">
         {entry.value !== null ? <strong className="text-2xl font-medium tracking-tight tabular-nums">{entry.formattedValue ?? entry.value}</strong> : <span className="text-xs leading-5 text-[var(--muted)]">{unavailable(entry)}</span>}

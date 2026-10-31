@@ -271,6 +271,7 @@ export function CatalogWorkspaceScreen({
     return [
       topSlot === "scheduled_at" ? null : item.scheduledAt ? f.eventWhen(item.scheduledAt) : null,
       hidden.has("author") || topSlot === "author" ? null : item.author,
+      hidden.has("year") || topSlot === "year" || item.year === null || item.year === undefined ? null : String(item.year),
       hidden.has("main_genre") || topSlot === "main_genre" ? null : item.mainGenre,
       hidden.has("runtime_minutes") || topSlot === "runtime_minutes" ? null : formatRuntime(item.runtimeMinutes),
       ...custom,

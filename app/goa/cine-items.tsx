@@ -164,10 +164,8 @@ function CatalogPicker({ items, used, onAdd }: { items: CatalogItem[] | null; us
               <label className={cx("flex cursor-pointer items-center gap-3 rounded-lg px-2 py-1.5 text-sm hover:bg-[var(--wash)]", taken && "cursor-not-allowed opacity-40")}>
                 <input type="checkbox" className="h-4 w-4 flex-none" checked={taken || ticked.has(item.id)} disabled={taken} onChange={() => toggle(item.id)} />
                 <span className="min-w-0 flex-1">
-                  {item.title}{item.year ? ` (${item.year})` : ""}
-                  {item.author ? <span className="text-[var(--muted)]"> · {item.author}</span> : null}
-                  {item.mainGenre ? <span className="text-[var(--muted)]"> · {item.mainGenre}</span> : null}
-                  {formatRuntime(item.runtimeMinutes) ? <span className="text-[var(--muted)]"> · {formatRuntime(item.runtimeMinutes)}</span> : null}
+                  <span className="block truncate">{item.title}</span>
+                  <span className="block truncate text-xs text-[var(--muted)]">{[item.year, item.author, item.mainGenre, formatRuntime(item.runtimeMinutes)].filter((value) => value !== null && value !== undefined && value !== "").join(" · ")}</span>
                 </span>
                 <span className="flex-none text-xs text-[var(--muted)]">{taken ? t("alreadyAdded") : t("roundsCount", { count: item.roundCount ?? 0 })}</span>
               </label>

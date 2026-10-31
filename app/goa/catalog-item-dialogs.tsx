@@ -145,8 +145,8 @@ export function AddCatalogItemDialog({
             {matches.map((match) => (
               <li key={match.id} className="flex items-center justify-between gap-3 rounded-xl bg-[var(--paper)] px-3 py-2">
                 <span className="min-w-0 truncate text-sm">
-                  {match.title}{match.year ? ` (${match.year})` : ""}
-                  {match.author ? <span className="text-[var(--muted)]"> · {match.author}</span> : null}
+                  <span className="block truncate">{match.title}</span>
+                  <span className="block truncate text-xs text-[var(--muted)]">{[match.year, match.author].filter((value) => value !== null && value !== undefined && value !== "").join(" · ")}</span>
                 </span>
                 {autoMatch ? null : (
                   <Button variant="secondary" className="min-h-9 flex-none" disabled={busy} onClick={() => void submit(match.id)}>{t("useThis")}</Button>

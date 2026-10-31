@@ -24,12 +24,15 @@ test("grouping choices respect operation and personal context", () => {
 
 test("small samples stay ineligible and explain the configured threshold, including custom thresholds", () => {
   const metric: Metric = { id: "ranking", label: "Ranking", operation: "bayesian_average", minSample: 3, series: [
-    { key: "eligible", label: "Elegível", value: 0, formattedValue: "0", sampleSize: 3 },
+    { key: "eligible", label: "Elegível", year: 2024, value: 0, formattedValue: "0", sampleSize: 3 },
     { key: "pending", label: "Amostra incompleta", value: null, formattedValue: "—", rawValue: 5, sampleSize: 2 },
     { key: "empty", label: "Sem respostas", value: null, sampleSize: 0 },
   ] };
   const html = renderWithIntl(createElement(MetricBlock, { metric }));
   assert.match(html, /2 de 3 registros/);
+  assert.match(html, />Elegível<\/span>/);
+  assert.match(html, /2024 · /);
+  assert.doesNotMatch(html, /Elegível \(2024\)/);
   assert.match(html, /Ainda sem registros/);
   assert.match(html, />0<\/strong>/);
   assert.doesNotMatch(html, />5<\/strong>/);

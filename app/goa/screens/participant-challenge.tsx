@@ -1292,7 +1292,6 @@ function StageCard({ stage, items }: { stage: ChallengeItem; items: ChallengeIte
               <li key={item.id}>
                 <span className="block truncate">
                   {item.title}
-                  {item.catalogItem?.year ? ` (${item.catalogItem.year})` : ""}
                 </span>
                 {item.catalogItem?.scheduledAt ? <small className="block truncate text-xs text-[var(--muted)]">{f.eventWhen(item.catalogItem.scheduledAt)}</small> : null}
               </li>
@@ -1677,6 +1676,7 @@ export function ParticipantChallengeScreen({
       item.catalogItem?.scheduledAt ? f.eventWhen(item.catalogItem.scheduledAt) : null,
       item.catalogItem?.author ? t("byAuthor", { name: item.catalogItem.author }) : null,
       showRecommenders ? recommenderLine(item.recommendedBy, item.originNote, (name) => t("recommendedBy", { name }), (text) => t("origin", { text })) : null,
+      item.catalogItem?.year === null || item.catalogItem?.year === undefined ? null : String(item.catalogItem.year),
       item.catalogItem?.mainGenre || null,
       formatRuntime(item.catalogItem?.runtimeMinutes),
     ].filter(Boolean).join(" · ") || undefined;
@@ -1694,7 +1694,7 @@ export function ParticipantChallengeScreen({
         const label = boundItem?.title ?? session.title;
         return {
           id: session.id,
-          label: boundItem?.catalogItem?.year ? `${label} (${boundItem.catalogItem.year})` : label, soon, statusLabel: soon ? t("checkpointSoonLabel") : undefined, meta: boundItem ? metaForItem(boundItem) : undefined, rating: boundItem ? ratingByItem.get(boundItem.id) ?? null : null };
+          label, soon, statusLabel: soon ? t("checkpointSoonLabel") : undefined, meta: boundItem ? metaForItem(boundItem) : undefined, rating: boundItem ? ratingByItem.get(boundItem.id) ?? null : null };
       })}
     />
   ) : sortedItems.length > 1 || canAddItems ? (
@@ -1708,7 +1708,7 @@ export function ParticipantChallengeScreen({
       options={pickerItems.map((item) => {
         const done = doneByItem.has(item.id);
         const soon = item.status === "scheduled" && !entriesByItem.has(item.id);
-        const label = item.catalogItem?.year ? `${item.title} (${item.catalogItem.year})` : item.title;
+        const label = item.title;
         // An item counted toward its own goal says how far you are ("p. 212 de 340 · faltam 128" for a book,
         // "12 de 21 · faltam 9" for anything else), or that it's done.
         const read = pagesByItem.get(item.id);
@@ -1811,7 +1811,7 @@ export function ParticipantChallengeScreen({
                   <div>
                     <h2 className="text-2xl font-light tracking-[-0.04em]">
                       {selectedItem
-                        ? `${selectedItem.title}${selectedItem.catalogItem?.year ? ` (${selectedItem.catalogItem.year})` : ""}`
+                        ? selectedItem.title
                         : (undatedDaily ? t("checkInOf", { date: f.date(effectiveOccurredOn, longDate) }) : t("newEntry"))}
                     </h2>
                   </div>
@@ -1904,7 +1904,6 @@ export function ParticipantChallengeScreen({
               {selectedItem
                 ? <h2 className="text-2xl font-light tracking-[-0.04em] mb-5 pb-5 border-b border-[var(--line)]">
                     {selectedItem.title}
-                    {selectedItem.catalogItem?.year ? ` (${selectedItem.catalogItem.year})` : ""}
                   </h2>
                 : null
               }

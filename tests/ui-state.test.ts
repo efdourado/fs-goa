@@ -249,7 +249,7 @@ test("renderiza estado agendado e regras tituladas em destaque", () => {
       },
     ],
   }));
-  assert.match(rules, /Regras a serem seguidas/);
+  assert.match(rules, /<h2[^>]*>Regras<\/h2>/);
   assert.match(rules, /Meta diária/);
   assert.match(rules, /Registro/);
   assert.match(rules, /2\.1/, "tópico da regra 2 é numerado 2.1");
@@ -478,7 +478,7 @@ test("aba Resultados agrupa rankings por tema (ranking, por pessoa, o que dividi
   assert.ok(rankingIndex < peopleIndex && peopleIndex < debateIndex, "ranking, depois por pessoa, depois o que dividiu opiniões");
 });
 
-test("no ranking do Resultado o ano fica ao lado do título e a média crua aparece atrás da ajustada", () => {
+test("no ranking do Resultado o ano fica nos detalhes e a média crua aparece atrás da ajustada", () => {
   const challenge = {
     title: "Cineclube com indicação",
     scope: "group",
@@ -499,8 +499,11 @@ test("no ranking do Resultado o ano fica ao lado do título e a média crua apar
   const aftersunIndex = html.indexOf("Aftersun");
   const stalkerIndex = html.indexOf("Stalker");
   assert.ok(aftersunIndex > -1 && stalkerIndex > -1 && aftersunIndex < stalkerIndex, "o servidor já entrega a série ordenada por nota");
-  assert.match(html, /Aftersun \(2022\)/, "o ano aparece ao lado do título");
-  assert.match(html, /Stalker \(1979\)/, "mesmo pro segundo item");
+  assert.match(html, />Aftersun<\/span>/);
+  assert.match(html, />Stalker<\/span>/);
+  assert.match(html, /2022 · 2 registros/);
+  assert.match(html, /1979 · 2 registros/);
+  assert.doesNotMatch(html, /Aftersun \(2022\)|Stalker \(1979\)/);
   assert.match(html, /Média simples: 4,5/, "identifica a média crua quando difere da ajustada");
   assert.doesNotMatch(html, /Média simples: 3,9/, "quando a crua é igual à ajustada, não repete o número");
 });

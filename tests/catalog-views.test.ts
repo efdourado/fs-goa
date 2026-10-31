@@ -38,7 +38,8 @@ test("numeric cover values include zero and custom properties can use year as th
   const item = { year: null, attributes: [{ key: "year", label: "Ano", type: "number" as const, value: 0 }] };
   assert.equal(resolveCoverTop(item, "year", ptFormat), 0);
   const html = renderWithIntl(createElement(CatalogRow, { title: "A", year: 0, ratingLabel: "", meta: [], onOpen: () => undefined }));
-  assert.match(html, />0<\/span>/);
+  assert.match(html, /<strong[^>]*>A<\/strong>/);
+  assert.match(html, /<small[^>]*><span>0<\/span>/);
 });
 
 test("item details keep original label casing and place the rating between item details and history", () => {
