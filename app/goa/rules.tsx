@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { MAX_CHALLENGE_RULES } from "../../lib/goa/domain/rule-limits";
 import type { ChallengeRule, RuleTopic } from "./types";
@@ -168,6 +168,54 @@ export function RuleSectionsView({ rules, bare = false, onCover = false }: { rul
   );
 }
 
+/** Clamp elastic scrolling on iOS and fade each edge as its remaining content runs out. */
+export function rulesScrollShadows({ scrollTop, scrollHeight, clientHeight }: { scrollTop: number; scrollHeight: number; clientHeight: number }) {
+  const end = Math.max(0, scrollHeight - clientHeight);
+  const top = Math.max(0, Math.min(end, scrollTop));
+  const fade = (distance: number) => distance <= 1 ? 0 : Math.min(1, distance / 24);
+  return { above: fade(top), below: fade(end - top) };
+}
+
+function ScrollableRules({ rules }: { rules: ChallengeRule[] }) {
+  const t = useTranslations("rules");
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [shadows, setShadows] = useState({ above: 0, below: 0 });
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    const content = contentRef.current;
+    if (!viewport || !content) return;
+    const update = () => {
+      const next = rulesScrollShadows(viewport);
+      setShadows((current) => current.above === next.above && current.below === next.below ? current : next);
+    };
+    const details = viewport.closest("details");
+    viewport.addEventListener("scroll", update, { passive: true });
+    details?.addEventListener("toggle", update);
+    window.addEventListener("resize", update);
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
+    observer?.observe(viewport);
+    observer?.observe(content);
+    update();
+    return () => {
+      viewport.removeEventListener("scroll", update);
+      details?.removeEventListener("toggle", update);
+      window.removeEventListener("resize", update);
+      observer?.disconnect();
+    };
+  }, []);
+
+  return <div className="relative isolate min-w-0">
+    {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- Focus lets keyboard users scroll the bounded rules panel. */}
+    <div ref={viewportRef} role="region" aria-label={t("legacyTitle")} tabIndex={0} className="min-w-0 max-h-[min(20rem,50dvh)] overflow-x-hidden overflow-y-auto overscroll-contain bg-[var(--spotlight)] px-6 pb-6 pt-3 sm:px-9 sm:pb-9 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
+      <div ref={contentRef}><RuleSectionsView rules={rules} bare onCover /></div>
+    </div>
+    <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 z-10 h-8" style={{ opacity: shadows.above, background: "linear-gradient(to bottom, var(--spotlight), transparent)" }} />
+    <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-8" style={{ opacity: shadows.below, background: "linear-gradient(to top, var(--spotlight), transparent)" }} />
+  </div>;
+}
+
 /** The upper curve is always visible; expanding reveals its matching lower half. */
 export function ChallengeCoverRules({ rules }: { rules: ChallengeRule[] }) {
   const t = useTranslations("rules");
@@ -179,10 +227,7 @@ export function ChallengeCoverRules({ rules }: { rules: ChallengeRule[] }) {
         </span>
       </summary>
       <div className="challenge-ticket-waist challenge-ticket-waist-lower bg-[var(--spotlight)]" aria-hidden="true" />
-      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- Focus lets keyboard users scroll the bounded rules panel. */}
-      <div role="region" aria-label={t("legacyTitle")} tabIndex={0} className="min-w-0 max-h-[min(20rem,50dvh)] overflow-x-hidden overflow-y-auto overscroll-contain bg-[var(--spotlight)] px-6 pb-6 pt-3 sm:px-9 sm:pb-9 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
-        <RuleSectionsView rules={rules} bare onCover />
-      </div>
+      <ScrollableRules rules={rules} />
       <div className="h-5 bg-[var(--spotlight)]" aria-hidden="true" />
     </details> : <div className="challenge-ticket-waist h-12 bg-[var(--spotlight)]" aria-hidden="true" />}
   </div>;

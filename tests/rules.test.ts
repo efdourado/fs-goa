@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
-import { ChallengeCoverRules } from "../app/goa/rules";
+import { ChallengeCoverRules, rulesScrollShadows } from "../app/goa/rules";
 import { MAX_CHALLENGE_RULES } from "../lib/goa/domain/rule-limits";
 import { renderWithIntl } from "./helpers/intl";
 
@@ -109,4 +109,16 @@ test("cover rules start folded in a bounded scroll region and retain the ticket 
   const empty = renderWithIntl(createElement(ChallengeCoverRules, { rules: [] }));
   assert.match(empty, /challenge-ticket-waist/);
   assert.doesNotMatch(empty, /<summary|<details|role="region"/);
+});
+
+
+test("rules scroll shadows disappear at either end, including iOS overscroll and content that fits", () => {
+  const viewport = { scrollHeight: 700, clientHeight: 300 };
+  assert.deepEqual(rulesScrollShadows({ ...viewport, scrollTop: 0 }), { above: 0, below: 1 });
+  assert.deepEqual(rulesScrollShadows({ ...viewport, scrollTop: 200 }), { above: 1, below: 1 });
+  assert.deepEqual(rulesScrollShadows({ ...viewport, scrollTop: 400 }), { above: 1, below: 0 });
+  assert.deepEqual(rulesScrollShadows({ ...viewport, scrollTop: -30 }), { above: 0, below: 1 });
+  assert.deepEqual(rulesScrollShadows({ ...viewport, scrollTop: 430 }), { above: 1, below: 0 });
+  assert.deepEqual(rulesScrollShadows({ scrollHeight: 200, clientHeight: 300, scrollTop: 0 }), { above: 0, below: 0 });
+  assert.ok(rulesScrollShadows({ ...viewport, scrollTop: 390 }).below < 1, "the bottom shadow fades as the end approaches");
 });
